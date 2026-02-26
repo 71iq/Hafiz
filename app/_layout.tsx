@@ -4,6 +4,7 @@ import { SQLiteProvider, useSQLiteContext } from "expo-sqlite";
 import { View, Text, ActivityIndicator } from "react-native";
 import { Suspense, useEffect, type ReactNode } from "react";
 import { SettingsProvider } from "../src/context/SettingsContext";
+import { AuthProvider } from "../src/context/AuthContext";
 import { ensureStudyLogTable } from "../src/db/database";
 
 function Loading() {
@@ -34,11 +35,13 @@ export default function RootLayout() {
         useSuspense
       >
         <DatabaseInit>
-          <SettingsProvider>
-            <View className="flex-1 bg-white dark:bg-gray-950">
-              <Slot />
-            </View>
-          </SettingsProvider>
+          <AuthProvider>
+            <SettingsProvider>
+              <View className="flex-1 bg-white dark:bg-gray-950">
+                <Slot />
+              </View>
+            </SettingsProvider>
+          </AuthProvider>
         </DatabaseInit>
       </SQLiteProvider>
     </Suspense>

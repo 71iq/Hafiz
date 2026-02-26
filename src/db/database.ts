@@ -23,6 +23,13 @@ export interface StudyLogEntry {
   ease_factor: number;
   next_review_date: string;
   last_review_date: string;
+  updated_at?: string;
+  synced?: number;
+}
+
+export interface StudyStats {
+  cards_studied: number;
+  total_reviews: number;
 }
 
 export interface JuzMapRow {
@@ -100,9 +107,27 @@ export function ensureStudyLogTable(db: SQLiteDatabase): void {
       ease_factor      REAL NOT NULL DEFAULT 2.5,
       next_review_date TEXT NOT NULL DEFAULT '',
       last_review_date TEXT NOT NULL DEFAULT '',
+      updated_at       TEXT NOT NULL DEFAULT '',
+      synced           INTEGER NOT NULL DEFAULT 0,
       PRIMARY KEY (surah, ayah)
     )
   `);
+
+  // Migration: add columns for existing installs
+  const cols = db.getAllSync<{ name: string }>(
+    "PRAGMA table_info(study_log)"
+  );
+  const colNames = cols.map((c) => c.name);
+  if (!colNames.includes("updated_at")) {
+    db.execSync(
+      "ALTER TABLE study_log ADD COLUMN updated_at TEXT NOT NULL DEFAULT ''"
+    );
+  }
+  if (!colNames.includes("synced")) {
+    db.execSync(
+      "ALTER TABLE study_log ADD COLUMN synced INTEGER NOT NULL DEFAULT 0"
+    );
+  }
 }
 
 export function getStudyLogEntry(
@@ -120,15 +145,18 @@ export function upsertStudyLog(
   db: SQLiteDatabase,
   entry: StudyLogEntry
 ): void {
+  const now = new Date().toISOString();
   db.runSync(
-    `INSERT INTO study_log (surah, ayah, interval, repetitions, ease_factor, next_review_date, last_review_date)
-     VALUES (?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO study_log (surah, ayah, interval, repetitions, ease_factor, next_review_date, last_review_date, updated_at, synced)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
      ON CONFLICT(surah, ayah) DO UPDATE SET
        interval = excluded.interval,
        repetitions = excluded.repetitions,
        ease_factor = excluded.ease_factor,
        next_review_date = excluded.next_review_date,
-       last_review_date = excluded.last_review_date`,
+       last_review_date = excluded.last_review_date,
+       updated_at = excluded.updated_at,
+       synced = 0`,
     [
       entry.surah,
       entry.ayah,
@@ -137,6 +165,7 @@ export function upsertStudyLog(
       entry.ease_factor,
       entry.next_review_date,
       entry.last_review_date,
+      now,
     ]
   );
 }
@@ -276,4 +305,67 @@ export function getDistinctRoots(
     [prefix]
   );
   return rows.map((r) => r.root);
+}
+
+// --- Sync helpers ---
+
+export function getUnsyncedEntries(db: SQLiteDatabase): StudyLogEntry[] {
+  return db.getAllSync<StudyLogEntry>(
+    "SELECT * FROM study_log WHERE synced = 0"
+  );
+}
+
+export function markAsSynced(
+  db: SQLiteDatabase,
+  surah: number,
+  ayah: number
+): void {
+  db.runSync(
+    "UPDATE study_log SET synced = 1 WHERE surah = ? AND ayah = ?",
+    [surah, ayah]
+  );
+}
+
+export function upsertFromRemote(
+  db: SQLiteDatabase,
+  entry: StudyLogEntry
+): void {
+  // Only overwrite if remote updated_at is newer than local
+  db.runSync(
+    `INSERT INTO study_log (surah, ayah, interval, repetitions, ease_factor, next_review_date, last_review_date, updated_at, synced)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+     ON CONFLICT(surah, ayah) DO UPDATE SET
+       interval = excluded.interval,
+       repetitions = excluded.repetitions,
+       ease_factor = excluded.ease_factor,
+       next_review_date = excluded.next_review_date,
+       last_review_date = excluded.last_review_date,
+       updated_at = excluded.updated_at,
+       synced = 1
+     WHERE excluded.updated_at > study_log.updated_at OR study_log.synced = 1`,
+    [
+      entry.surah,
+      entry.ayah,
+      entry.interval,
+      entry.repetitions,
+      entry.ease_factor,
+      entry.next_review_date,
+      entry.last_review_date,
+      entry.updated_at ?? new Date().toISOString(),
+    ]
+  );
+}
+
+export function getStudyStats(db: SQLiteDatabase): StudyStats {
+  const row = db.getFirstSync<{ cards_studied: number; total_reviews: number }>(
+    `SELECT
+       COUNT(*) as cards_studied,
+       COALESCE(SUM(repetitions), 0) as total_reviews
+     FROM study_log
+     WHERE repetitions > 0`
+  );
+  return {
+    cards_studied: row?.cards_studied ?? 0,
+    total_reviews: row?.total_reviews ?? 0,
+  };
 }
