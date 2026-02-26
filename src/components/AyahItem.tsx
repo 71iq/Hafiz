@@ -51,6 +51,7 @@ export default memo(function AyahItem({
     >
       <Text
         style={{
+          fontFamily: "AmiriQuran",
           fontSize,
           lineHeight: fontSize * 2,
           writingDirection: "rtl",

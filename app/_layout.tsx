@@ -7,6 +7,7 @@ import {
 } from "expo-sqlite";
 import { View, Text, ActivityIndicator, Platform } from "react-native";
 import { Suspense, useEffect, useState, type ReactNode } from "react";
+import { useFonts } from "expo-font";
 import { SettingsProvider } from "../src/context/SettingsContext";
 import { AuthProvider } from "../src/context/AuthContext";
 import { ensureStudyLogTable } from "../src/db/database";
@@ -131,6 +132,12 @@ async function importJsonOnWeb(
 }
 
 export default function RootLayout() {
+  const [fontsLoaded] = useFonts({
+    AmiriQuran: require("../assets/fonts/AmiriQuran-Regular.ttf"),
+  });
+
+  if (!fontsLoaded) return <Loading />;
+
   if (Platform.OS === "web") {
     return <WebLayout />;
   }
@@ -165,6 +172,10 @@ function getWebDbInitPromise(): Promise<void> | null {
 
 function setWebDbInitPromise(p: Promise<void>) {
   (globalThis as any)[WEB_DB_KEY] = p;
+}
+
+function clearWebDbInitPromise() {
+  (globalThis as any)[WEB_DB_KEY] = null;
 }
 
 function WebLayout() {
@@ -202,6 +213,8 @@ function WebLayout() {
     getWebDbInitPromise()!
       .then(() => setDbReady(true))
       .catch((e: any) => {
+        // Clear the singleton so a refresh/remount can retry
+        clearWebDbInitPromise();
         const msg =
           e?.message ||
           (typeof e === "object"

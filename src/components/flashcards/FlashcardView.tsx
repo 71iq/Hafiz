@@ -32,7 +32,7 @@ export default function FlashcardView({ card, revealed }: FlashcardViewProps) {
           {card.contextAyahs.map((ctx) => (
             <Text
               key={`${ctx.surah}-${ctx.ayah}`}
-              style={{ fontSize: fontSize - 2, lineHeight: fontSize * 1.8 }}
+              style={{ fontFamily: "AmiriQuran", fontSize: fontSize - 2, lineHeight: fontSize * 1.8 }}
               variant="muted"
               className="text-right mb-1"
             >
@@ -42,7 +42,7 @@ export default function FlashcardView({ card, revealed }: FlashcardViewProps) {
 
           {/* Target ayah (prompt) */}
           <Text
-            style={{ fontSize, lineHeight: fontSize * 2 }}
+            style={{ fontFamily: "AmiriQuran", fontSize, lineHeight: fontSize * 2 }}
             className="text-right text-foreground"
           >
             {card.ayah.text_uthmani}
@@ -58,7 +58,7 @@ export default function FlashcardView({ card, revealed }: FlashcardViewProps) {
               Next Ayah ({card.answer.surah}:{card.answer.ayah})
             </Text>
             <Text
-              style={{ fontSize, lineHeight: fontSize * 2 }}
+              style={{ fontFamily: "AmiriQuran", fontSize, lineHeight: fontSize * 2 }}
               className="text-right text-green-900 dark:text-green-100"
             >
               {card.answer.text_uthmani}

@@ -41,6 +41,7 @@ export default memo(function SearchResultItem({
       </View>
       <Text
         style={{
+          fontFamily: "AmiriQuran",
           fontSize: fontSize * 0.85,
           lineHeight: fontSize * 1.7,
           writingDirection: "rtl",
