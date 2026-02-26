@@ -11,6 +11,10 @@ interface SettingsContextValue {
   toggleHideAyahs: () => void;
   colorScheme: "light" | "dark" | undefined;
   toggleDarkMode: () => void;
+  newCardLimit: number;
+  setNewCardLimit: (n: number) => void;
+  reviewCardLimit: number;
+  setReviewCardLimit: (n: number) => void;
 }
 
 const SettingsContext = createContext<SettingsContextValue | null>(null);
@@ -22,6 +26,8 @@ const FONT_STEP = 2;
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const [fontSize, setFontSizeRaw] = useState(28);
   const [hideAyahs, setHideAyahs] = useState(false);
+  const [newCardLimit, setNewCardLimit] = useState(20);
+  const [reviewCardLimit, setReviewCardLimit] = useState(200);
   const { colorScheme, toggleColorScheme } = useColorScheme();
 
   const setFontSize = useCallback((size: number) => {
@@ -63,6 +69,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         toggleHideAyahs,
         colorScheme,
         toggleDarkMode,
+        newCardLimit,
+        setNewCardLimit,
+        reviewCardLimit,
+        setReviewCardLimit,
       }}
     >
       {children}

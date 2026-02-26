@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from "react";
-import { View, ActivityIndicator, ScrollView } from "react-native";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { View, ActivityIndicator, ScrollView, TextInput } from "react-native";
 import { useSQLiteContext } from "expo-sqlite";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useAuth } from "../../context/AuthContext";
+import { useSettings } from "../../context/SettingsContext";
 import { useSync } from "../../hooks/useSync";
 import { getStudyStats, type StudyStats } from "../../db/database";
 import { supabase } from "../../lib/supabase";
@@ -42,6 +43,8 @@ function AuthForm() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [signUpSuccess, setSignUpSuccess] = useState<string | null>(null);
+  const passwordRef = useRef<TextInput>(null);
 
   const { control, handleSubmit, reset } = useForm<AuthFormValues>({
     resolver: zodResolver(authSchema),
@@ -51,18 +54,47 @@ function AuthForm() {
   const onSubmit = async (data: AuthFormValues) => {
     setServerError(null);
     setSubmitting(true);
-    const err = isSignUp
-      ? await signUp(data.email.trim(), data.password)
-      : await signIn(data.email.trim(), data.password);
-    setSubmitting(false);
-    if (err) setServerError(err);
+    if (isSignUp) {
+      const err = await signUp(data.email.trim(), data.password);
+      setSubmitting(false);
+      if (err) {
+        setServerError(err);
+      } else {
+        setSignUpSuccess(data.email.trim());
+      }
+    } else {
+      const err = await signIn(data.email.trim(), data.password);
+      setSubmitting(false);
+      if (err) setServerError(err);
+    }
   };
 
   const toggleMode = () => {
     setIsSignUp((v) => !v);
     setServerError(null);
+    setSignUpSuccess(null);
     reset();
   };
+
+  if (signUpSuccess) {
+    return (
+      <ScrollView
+        className="flex-1 px-6"
+        contentContainerClassName="pt-8 pb-12 items-center"
+      >
+        <Text className="text-2xl font-bold text-foreground mb-4 text-center">
+          Check Your Email
+        </Text>
+        <Text variant="muted" className="text-center mb-8 px-4">
+          We sent a verification link to {signUpSuccess}. Please check your
+          inbox and click the link to activate your account.
+        </Text>
+        <Button variant="outline" onPress={() => { setSignUpSuccess(null); setIsSignUp(false); reset(); }}>
+          Back to Sign In
+        </Button>
+      </ScrollView>
+    );
+  }
 
   return (
     <ScrollView
@@ -84,6 +116,9 @@ function AuthForm() {
         placeholder="you@example.com"
         autoCapitalize="none"
         keyboardType="email-address"
+        returnKeyType="next"
+        onSubmitEditing={() => passwordRef.current?.focus()}
+        blurOnSubmit={false}
         className="mb-4"
       />
 
@@ -93,6 +128,9 @@ function AuthForm() {
         label="Password"
         placeholder="Min 6 characters"
         secureTextEntry
+        inputRef={passwordRef}
+        returnKeyType="done"
+        onSubmitEditing={handleSubmit(onSubmit)}
         className="mb-6"
       />
 
@@ -231,10 +269,67 @@ function LoggedInView() {
         </Text>
       )}
 
+      {/* Study Settings */}
+      <StudySettings />
+
       {/* Sign Out */}
       <Button variant="outline" onPress={signOut} className="mt-4">
         Sign Out
       </Button>
     </ScrollView>
+  );
+}
+
+// ─── Study Settings ─────────────────────────────────────────
+
+function StudySettings() {
+  const { newCardLimit, setNewCardLimit, reviewCardLimit, setReviewCardLimit } = useSettings();
+
+  return (
+    <View className="mt-4 mb-4">
+      <Text className="text-lg font-semibold text-foreground mb-3">Study Settings</Text>
+
+      <View className="flex-row items-center justify-between mb-3">
+        <Text className="text-foreground">New cards per session</Text>
+        <View className="flex-row items-center gap-2">
+          <Button
+            variant="outline"
+            size="icon"
+            onPress={() => setNewCardLimit(Math.max(5, newCardLimit - 5))}
+          >
+            -
+          </Button>
+          <Text className="text-foreground text-base w-8 text-center">{newCardLimit}</Text>
+          <Button
+            variant="outline"
+            size="icon"
+            onPress={() => setNewCardLimit(Math.min(100, newCardLimit + 5))}
+          >
+            +
+          </Button>
+        </View>
+      </View>
+
+      <View className="flex-row items-center justify-between">
+        <Text className="text-foreground">Reviews per session</Text>
+        <View className="flex-row items-center gap-2">
+          <Button
+            variant="outline"
+            size="icon"
+            onPress={() => setReviewCardLimit(Math.max(10, reviewCardLimit - 10))}
+          >
+            -
+          </Button>
+          <Text className="text-foreground text-base w-10 text-center">{reviewCardLimit}</Text>
+          <Button
+            variant="outline"
+            size="icon"
+            onPress={() => setReviewCardLimit(Math.min(500, reviewCardLimit + 10))}
+          >
+            +
+          </Button>
+        </View>
+      </View>
+    </View>
   );
 }

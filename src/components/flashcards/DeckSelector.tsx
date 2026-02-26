@@ -6,26 +6,34 @@ import {
   getDueCountForSurah,
   getDueCountForJuz,
   getDueCountForHizb,
+  getAllDueCards,
+  getNewAyahs,
   type Surah,
 } from "../../db/database";
 import { getTodayDate } from "../../lib/sm2";
+import { useSettings } from "../../context/SettingsContext";
 import { Text } from "../ui/text";
 import { Badge } from "../ui/badge";
+import { Button } from "../ui/button";
 import { TabsList, TabsTrigger } from "../ui/tabs";
 
 interface DeckSelectorProps {
   onStartSession: (mode: "surah" | "juz" | "hizb", id: number) => void;
+  onStartHifz: () => void;
 }
 
 type Tab = "surah" | "juz" | "hizb";
 
-export default function DeckSelector({ onStartSession }: DeckSelectorProps) {
+export default function DeckSelector({ onStartSession, onStartHifz }: DeckSelectorProps) {
   const db = useSQLiteContext();
+  const { newCardLimit, reviewCardLimit } = useSettings();
   const [tab, setTab] = useState<Tab>("surah");
   const [surahs, setSurahs] = useState<Surah[]>([]);
   const [surahDueCounts, setSurahDueCounts] = useState<Map<number, number>>(new Map());
   const [juzDueCounts, setJuzDueCounts] = useState<Map<number, number>>(new Map());
   const [hizbDueCounts, setHizbDueCounts] = useState<Map<number, number>>(new Map());
+  const [totalDue, setTotalDue] = useState(0);
+  const [totalNew, setTotalNew] = useState(0);
 
   useEffect(() => {
     (async () => {
@@ -53,6 +61,12 @@ export default function DeckSelector({ onStartSession }: DeckSelectorProps) {
       if (count > 0) hizbCounts.set(h, count);
     }
     setHizbDueCounts(hizbCounts);
+
+    // Total due & new counts for Hifz deck
+    const dueCards = await getAllDueCards(db, today);
+    setTotalDue(dueCards.length);
+    const newAyahs = await getNewAyahs(db, 1); // just check if any exist
+    setTotalNew(newAyahs.length > 0 ? 1 : 0); // flag, not count
     })();
   }, [db]);
 
@@ -125,6 +139,15 @@ export default function DeckSelector({ onStartSession }: DeckSelectorProps) {
       <View className="px-5 pb-3">
         <Text className="text-xl font-semibold text-foreground mb-3">
           Study Deck
+        </Text>
+
+        {/* Hifz deck button */}
+        <Button onPress={onStartHifz} className="mb-3">
+          {`Start Hifz Session${totalDue > 0 ? ` (${Math.min(totalDue, reviewCardLimit)} due` + (totalNew > 0 ? ` + ${newCardLimit} new)` : ")") : totalNew > 0 ? ` (${newCardLimit} new)` : ""}`}
+        </Button>
+
+        <Text variant="muted" className="text-xs mb-3 text-center">
+          Reviews up to {reviewCardLimit} due + {newCardLimit} new cards
         </Text>
         <TabsList>
           <TabsTrigger active={tab === "surah"} onPress={() => setTab("surah")}>

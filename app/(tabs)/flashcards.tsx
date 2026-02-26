@@ -3,7 +3,15 @@ import { View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useSQLiteContext } from "expo-sqlite";
 import { useSettings } from "../../src/context/SettingsContext";
-import { getAyahsBySurah, getAyahsByJuz, getAyahsByHizb, getStudyLogEntry } from "../../src/db/database";
+import {
+  getAyahsBySurah,
+  getAyahsByJuz,
+  getAyahsByHizb,
+  getStudyLogEntry,
+  getAllDueCards,
+  getNewAyahs,
+  getAyah,
+} from "../../src/db/database";
 import { buildDeck, type FlashCard } from "../../src/lib/uniqueness";
 import DeckSelector from "../../src/components/flashcards/DeckSelector";
 import FlashcardSession from "../../src/components/flashcards/FlashcardSession";
@@ -11,8 +19,16 @@ import SessionSummary, { type SessionStats } from "../../src/components/flashcar
 
 type Screen = "select" | "session" | "summary";
 
+function shuffle<T>(arr: T[]): T[] {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
 export default function FlashcardsTab() {
-  const { colorScheme } = useSettings();
+  const { colorScheme, newCardLimit, reviewCardLimit } = useSettings();
   const db = useSQLiteContext();
   const [screen, setScreen] = useState<Screen>("select");
   const [deck, setDeck] = useState<FlashCard[]>([]);
@@ -33,7 +49,6 @@ export default function FlashcardsTab() {
       const cards = await buildDeck(db, ayahs);
       if (cards.length === 0) return;
 
-      // Sort: due cards first, then new cards (cap 20 new per session)
       const today = new Date().toISOString().slice(0, 10);
       const due: FlashCard[] = [];
       const newCards: FlashCard[] = [];
@@ -45,24 +60,41 @@ export default function FlashcardsTab() {
         } else if (!log) {
           newCards.push(card);
         }
-        // Cards not yet due are skipped
       }
 
-      let sessionDeck = [...due, ...newCards.slice(0, 20)];
+      let sessionDeck = [...due, ...newCards.slice(0, newCardLimit)];
       if (sessionDeck.length === 0) {
-        // All cards reviewed and not yet due — use all cards anyway
-        sessionDeck = cards.slice(0, 20);
+        sessionDeck = cards.slice(0, newCardLimit);
       }
-      // Shuffle using Fisher-Yates
-      for (let i = sessionDeck.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [sessionDeck[i], sessionDeck[j]] = [sessionDeck[j], sessionDeck[i]];
-      }
-      setDeck(sessionDeck);
+      setDeck(shuffle(sessionDeck));
       setScreen("session");
     },
-    [db]
+    [db, newCardLimit]
   );
+
+  const handleStartHifz = useCallback(async () => {
+    const today = new Date().toISOString().slice(0, 10);
+
+    // Get due review cards
+    const dueEntries = await getAllDueCards(db, today);
+    const dueAyahs = [];
+    for (const entry of dueEntries.slice(0, reviewCardLimit)) {
+      const ayah = await getAyah(db, entry.surah, entry.ayah);
+      if (ayah) dueAyahs.push(ayah);
+    }
+
+    // Get new cards
+    const newAyahs = await getNewAyahs(db, newCardLimit);
+
+    const allAyahs = [...dueAyahs, ...newAyahs];
+    if (allAyahs.length === 0) return;
+
+    const cards = await buildDeck(db, allAyahs);
+    if (cards.length === 0) return;
+
+    setDeck(shuffle(cards));
+    setScreen("session");
+  }, [db, newCardLimit, reviewCardLimit]);
 
   const handleSessionComplete = useCallback((sessionStats: SessionStats) => {
     setStats(sessionStats);
@@ -77,7 +109,9 @@ export default function FlashcardsTab() {
   return (
     <View className="flex-1 pt-12">
       <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
-      {screen === "select" && <DeckSelector onStartSession={handleStartSession} />}
+      {screen === "select" && (
+        <DeckSelector onStartSession={handleStartSession} onStartHifz={handleStartHifz} />
+      )}
       {screen === "session" && (
         <FlashcardSession deck={deck} onComplete={handleSessionComplete} onExit={handleReturnToSelector} />
       )}

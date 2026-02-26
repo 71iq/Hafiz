@@ -374,6 +374,32 @@ export async function getDistinctRoots(
   return rows.map((r) => r.root);
 }
 
+// --- Hifz deck queries ---
+
+export async function getAllDueCards(
+  db: SQLiteDatabase,
+  today: string
+): Promise<StudyLogEntry[]> {
+  return db.getAllAsync<StudyLogEntry>(
+    "SELECT * FROM study_log WHERE next_review_date <= ? ORDER BY next_review_date",
+    [today]
+  );
+}
+
+export async function getNewAyahs(
+  db: SQLiteDatabase,
+  limit: number
+): Promise<Ayah[]> {
+  return db.getAllAsync<Ayah>(
+    `SELECT qt.* FROM quran_text qt
+     LEFT JOIN study_log sl ON qt.surah = sl.surah AND qt.ayah = sl.ayah
+     WHERE sl.surah IS NULL
+     ORDER BY qt.surah, qt.ayah
+     LIMIT ?`,
+    [limit]
+  );
+}
+
 // --- Sync helpers ---
 
 export async function getUnsyncedEntries(db: SQLiteDatabase): Promise<StudyLogEntry[]> {
