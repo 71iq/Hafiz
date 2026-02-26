@@ -3,7 +3,7 @@ import { View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useSQLiteContext } from "expo-sqlite";
 import { useSettings } from "../../src/context/SettingsContext";
-import { getAyahsBySurah, getAyahsByJuz, getStudyLogEntry } from "../../src/db/database";
+import { getAyahsBySurah, getAyahsByJuz, getAyahsByHizb, getStudyLogEntry } from "../../src/db/database";
 import { buildDeck, type FlashCard } from "../../src/lib/uniqueness";
 import DeckSelector from "../../src/components/flashcards/DeckSelector";
 import FlashcardSession from "../../src/components/flashcards/FlashcardSession";
@@ -25,8 +25,11 @@ export default function FlashcardsTab() {
   });
 
   const handleStartSession = useCallback(
-    async (mode: "surah" | "juz", id: number) => {
-      const ayahs = mode === "surah" ? await getAyahsBySurah(db, id) : await getAyahsByJuz(db, id);
+    async (mode: "surah" | "juz" | "hizb", id: number) => {
+      const ayahs =
+        mode === "surah" ? await getAyahsBySurah(db, id) :
+        mode === "juz" ? await getAyahsByJuz(db, id) :
+        await getAyahsByHizb(db, id);
       const cards = await buildDeck(db, ayahs);
       if (cards.length === 0) return;
 

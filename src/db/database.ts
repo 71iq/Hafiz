@@ -207,6 +207,73 @@ export async function getDueCountForJuz(
   return row?.count ?? 0;
 }
 
+// --- Hizb queries ---
+
+export interface HizbMapRow {
+  hizb: number;
+  surah_start: number;
+  ayah_start: number;
+  surah_end: number;
+  ayah_end: number;
+}
+
+export async function getAyahsByHizb(db: SQLiteDatabase, hizb: number): Promise<Ayah[]> {
+  const row = await db.getFirstAsync<HizbMapRow>(
+    "SELECT * FROM hizb_map WHERE hizb = ?",
+    [hizb]
+  );
+  if (!row) return [];
+
+  if (row.surah_start === row.surah_end) {
+    return db.getAllAsync<Ayah>(
+      "SELECT * FROM quran_text WHERE surah = ? AND ayah >= ? AND ayah <= ? ORDER BY surah, ayah",
+      [row.surah_start, row.ayah_start, row.ayah_end]
+    );
+  }
+
+  // Spans multiple surahs
+  return db.getAllAsync<Ayah>(
+    `SELECT * FROM quran_text WHERE
+       (surah = ? AND ayah >= ?) OR
+       (surah > ? AND surah < ?) OR
+       (surah = ? AND ayah <= ?)
+     ORDER BY surah, ayah`,
+    [row.surah_start, row.ayah_start, row.surah_start, row.surah_end, row.surah_end, row.ayah_end]
+  );
+}
+
+export async function getDueCountForHizb(
+  db: SQLiteDatabase,
+  hizb: number,
+  today: string
+): Promise<number> {
+  const row = await db.getFirstAsync<HizbMapRow>(
+    "SELECT * FROM hizb_map WHERE hizb = ?",
+    [hizb]
+  );
+  if (!row) return 0;
+
+  let countRow: { count: number } | null;
+  if (row.surah_start === row.surah_end) {
+    countRow = await db.getFirstAsync<{ count: number }>(
+      `SELECT COUNT(*) as count FROM study_log
+       WHERE surah = ? AND ayah >= ? AND ayah <= ? AND next_review_date <= ?`,
+      [row.surah_start, row.ayah_start, row.ayah_end, today]
+    );
+  } else {
+    countRow = await db.getFirstAsync<{ count: number }>(
+      `SELECT COUNT(*) as count FROM study_log
+       WHERE (
+         (surah = ? AND ayah >= ?) OR
+         (surah > ? AND surah < ?) OR
+         (surah = ? AND ayah <= ?)
+       ) AND next_review_date <= ?`,
+      [row.surah_start, row.ayah_start, row.surah_start, row.surah_end, row.surah_end, row.ayah_end, today]
+    );
+  }
+  return countRow?.count ?? 0;
+}
+
 // --- Juz queries ---
 
 export async function getAyahsByJuz(db: SQLiteDatabase, juz: number): Promise<Ayah[]> {

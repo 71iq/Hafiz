@@ -64,6 +64,13 @@ const TABLE_SCHEMAS = {
     lemma TEXT NOT NULL,
     PRIMARY KEY (surah, ayah, word_pos)
   )`,
+  hizb_map: `CREATE TABLE IF NOT EXISTS hizb_map (
+    hizb INTEGER PRIMARY KEY,
+    surah_start INTEGER NOT NULL,
+    ayah_start INTEGER NOT NULL,
+    surah_end INTEGER NOT NULL,
+    ayah_end INTEGER NOT NULL
+  )`,
 } as const;
 
 async function importJsonOnWeb(

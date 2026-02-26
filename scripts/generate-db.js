@@ -194,6 +194,14 @@ db.exec(`
   );
 
   CREATE INDEX idx_word_roots_root ON word_roots(root);
+
+  CREATE TABLE hizb_map (
+    hizb       INTEGER PRIMARY KEY,
+    surah_start INTEGER NOT NULL,
+    ayah_start  INTEGER NOT NULL,
+    surah_end   INTEGER NOT NULL,
+    ayah_end    INTEGER NOT NULL
+  );
 `);
 
 // Insert ayahs
@@ -260,6 +268,46 @@ for (const s of rawSurahs) {
 insertManyJuz(juzRows);
 console.log(`  Inserted ${juzRows.length} juz_map entries`);
 
+// Insert hizb_map
+const hizbData = JSON.parse(
+  fs.readFileSync(path.join(DATA_DIR, "hizb.json"), "utf-8")
+);
+
+// Build surah ayah count lookup
+const surahAyahCounts = new Map();
+for (const s of surahs) surahAyahCounts.set(s.number, s.ayah_count);
+
+const insertHizb = db.prepare(
+  "INSERT INTO hizb_map (hizb, surah_start, ayah_start, surah_end, ayah_end) VALUES (?, ?, ?, ?, ?)"
+);
+
+const insertManyHizb = db.transaction((rows) => {
+  for (let i = 0; i < rows.length; i++) {
+    const start = rows[i];
+    let endSurah, endAyah;
+    if (i + 1 < rows.length) {
+      // End is one ayah before the start of the next hizb
+      const nextStart = rows[i + 1];
+      if (nextStart.ayah > 1) {
+        endSurah = nextStart.surah;
+        endAyah = nextStart.ayah - 1;
+      } else {
+        // Next hizb starts at ayah 1 of a surah, so this hizb ends at the last ayah of the previous surah
+        endSurah = nextStart.surah - 1;
+        endAyah = surahAyahCounts.get(endSurah) || 1;
+      }
+    } else {
+      // Last hizb ends at 114:6
+      endSurah = 114;
+      endAyah = 6;
+    }
+    insertHizb.run(start.hizb, start.surah, start.ayah, endSurah, endAyah);
+  }
+});
+
+insertManyHizb(hizbData);
+console.log(`  Inserted ${hizbData.length} hizb_map entries`);
+
 // Parse and insert morphology (word roots)
 console.log("Parsing morphology data...");
 const wordRoots = parseMorphology(MORPHOLOGY_PATH);
@@ -287,6 +335,7 @@ const jsonDump = {
     quran_text: db.prepare("SELECT * FROM quran_text").all(),
     juz_map: db.prepare("SELECT * FROM juz_map").all(),
     word_roots: db.prepare("SELECT * FROM word_roots").all(),
+    hizb_map: db.prepare("SELECT * FROM hizb_map").all(),
   },
 };
 fs.writeFileSync(JSON_PATH, JSON.stringify(jsonDump));

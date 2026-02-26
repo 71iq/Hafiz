@@ -5,6 +5,7 @@ import {
   getAllSurahs,
   getDueCountForSurah,
   getDueCountForJuz,
+  getDueCountForHizb,
   type Surah,
 } from "../../db/database";
 import { getTodayDate } from "../../lib/sm2";
@@ -13,10 +14,10 @@ import { Badge } from "../ui/badge";
 import { TabsList, TabsTrigger } from "../ui/tabs";
 
 interface DeckSelectorProps {
-  onStartSession: (mode: "surah" | "juz", id: number) => void;
+  onStartSession: (mode: "surah" | "juz" | "hizb", id: number) => void;
 }
 
-type Tab = "surah" | "juz";
+type Tab = "surah" | "juz" | "hizb";
 
 export default function DeckSelector({ onStartSession }: DeckSelectorProps) {
   const db = useSQLiteContext();
@@ -24,6 +25,7 @@ export default function DeckSelector({ onStartSession }: DeckSelectorProps) {
   const [surahs, setSurahs] = useState<Surah[]>([]);
   const [surahDueCounts, setSurahDueCounts] = useState<Map<number, number>>(new Map());
   const [juzDueCounts, setJuzDueCounts] = useState<Map<number, number>>(new Map());
+  const [hizbDueCounts, setHizbDueCounts] = useState<Map<number, number>>(new Map());
 
   useEffect(() => {
     (async () => {
@@ -44,10 +46,18 @@ export default function DeckSelector({ onStartSession }: DeckSelectorProps) {
       if (count > 0) juzCounts.set(j, count);
     }
     setJuzDueCounts(juzCounts);
+
+    const hizbCounts = new Map<number, number>();
+    for (let h = 1; h <= 60; h++) {
+      const count = await getDueCountForHizb(db, h, today);
+      if (count > 0) hizbCounts.set(h, count);
+    }
+    setHizbDueCounts(hizbCounts);
     })();
   }, [db]);
 
   const juzList = Array.from({ length: 30 }, (_, i) => i + 1);
+  const hizbList = Array.from({ length: 60 }, (_, i) => i + 1);
 
   const renderSurahRow = useCallback(
     ({ item }: { item: Surah }) => {
@@ -90,6 +100,26 @@ export default function DeckSelector({ onStartSession }: DeckSelectorProps) {
     [onStartSession, juzDueCounts]
   );
 
+  const renderHizbRow = useCallback(
+    ({ item }: { item: number }) => {
+      const dueCount = hizbDueCounts.get(item) ?? 0;
+      const juzNum = Math.ceil(item / 2);
+      return (
+        <Pressable
+          onPress={() => onStartSession("hizb", item)}
+          className="flex-row items-center justify-between px-5 py-3.5 border-b border-border active:bg-accent"
+        >
+          <View>
+            <Text className="text-base text-foreground">Hizb {item}</Text>
+            <Text variant="muted" className="text-xs">Juz {juzNum}</Text>
+          </View>
+          {dueCount > 0 && <Badge>{dueCount}</Badge>}
+        </Pressable>
+      );
+    },
+    [onStartSession, hizbDueCounts]
+  );
+
   return (
     <View className="flex-1 bg-background">
       <View className="px-5 pb-3">
@@ -98,10 +128,13 @@ export default function DeckSelector({ onStartSession }: DeckSelectorProps) {
         </Text>
         <TabsList>
           <TabsTrigger active={tab === "surah"} onPress={() => setTab("surah")}>
-            By Surah
+            Surah
           </TabsTrigger>
           <TabsTrigger active={tab === "juz"} onPress={() => setTab("juz")}>
-            By Juz
+            Juz
+          </TabsTrigger>
+          <TabsTrigger active={tab === "hizb"} onPress={() => setTab("hizb")}>
+            Hizb
           </TabsTrigger>
         </TabsList>
       </View>
@@ -112,11 +145,17 @@ export default function DeckSelector({ onStartSession }: DeckSelectorProps) {
           keyExtractor={(item) => String(item.number)}
           renderItem={renderSurahRow}
         />
-      ) : (
+      ) : tab === "juz" ? (
         <FlatList
           data={juzList}
           keyExtractor={(item) => String(item)}
           renderItem={renderJuzRow}
+        />
+      ) : (
+        <FlatList
+          data={hizbList}
+          keyExtractor={(item) => String(item)}
+          renderItem={renderHizbRow}
         />
       )}
     </View>
