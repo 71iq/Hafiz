@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
+import { Platform } from "react-native";
 import { useColorScheme } from "nativewind";
 
 interface SettingsContextValue {
@@ -44,6 +45,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     // synchronous observable notifying subscribers during the render cycle.
     requestAnimationFrame(() => {
       toggleColorScheme();
+      // On web, sync the CSS dark class on <html> so global.css variables apply
+      if (Platform.OS === "web" && typeof document !== "undefined") {
+        document.documentElement.classList.toggle("dark");
+      }
     });
   }, [toggleColorScheme]);
 
