@@ -25,7 +25,10 @@ export function sm2(grade: number, prev: SM2Input): SM2Result {
   } else {
     // Success — advance
     if (repetitions === 0) {
-      interval = 1;
+      // First success: differentiate by grade
+      if (q === 3) interval = 1;       // Hard → 1 day
+      else if (q === 4) interval = 3;  // Good → 3 days
+      else interval = 7;               // Easy → 7 days
     } else if (repetitions === 1) {
       interval = 6;
     } else {
