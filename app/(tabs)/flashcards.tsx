@@ -72,7 +72,7 @@ export default function FlashcardsTab() {
       <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
       {screen === "select" && <DeckSelector onStartSession={handleStartSession} />}
       {screen === "session" && (
-        <FlashcardSession deck={deck} onComplete={handleSessionComplete} />
+        <FlashcardSession deck={deck} onComplete={handleSessionComplete} onExit={handleReturnToSelector} />
       )}
       {screen === "summary" && (
         <SessionSummary stats={stats} onReturn={handleReturnToSelector} />

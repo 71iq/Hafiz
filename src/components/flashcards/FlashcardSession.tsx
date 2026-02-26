@@ -14,11 +14,12 @@ import { Progress } from "../ui/progress";
 interface FlashcardSessionProps {
   deck: FlashCard[];
   onComplete: (stats: SessionStats) => void;
+  onExit: () => void;
 }
 
 type CardState = "prompt" | "reveal";
 
-export default function FlashcardSession({ deck, onComplete }: FlashcardSessionProps) {
+export default function FlashcardSession({ deck, onComplete, onExit }: FlashcardSessionProps) {
   const db = useSQLiteContext();
   const [cardIndex, setCardIndex] = useState(0);
   const [cardState, setCardState] = useState<CardState>("prompt");
@@ -92,9 +93,12 @@ export default function FlashcardSession({ deck, onComplete }: FlashcardSessionP
 
   return (
     <View className="flex-1 bg-background">
-      {/* Progress bar */}
+      {/* Header with back button and progress */}
       <View className="px-4 pt-2 pb-1">
         <View className="flex-row items-center justify-between mb-1">
+          <Button variant="ghost" size="sm" onPress={onExit}>
+            ← Back
+          </Button>
           <Text variant="muted" className="text-xs">
             {cardIndex + 1} / {deck.length}
           </Text>
