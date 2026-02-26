@@ -192,7 +192,9 @@ export default function RootLayout() {
     AmiriQuran: require("../assets/fonts/AmiriQuran-Regular.ttf"),
   });
 
-  if (!fontsLoaded) return <Loading />;
+  // On web, don't block on font loading — the font is applied via CSS @font-face
+  // and will swap in when ready. On native, we must wait.
+  if (!fontsLoaded && Platform.OS !== "web") return <Loading />;
 
   if (Platform.OS === "web") {
     return <WebLayout />;

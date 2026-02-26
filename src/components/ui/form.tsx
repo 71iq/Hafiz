@@ -1,4 +1,5 @@
-import { View } from "react-native";
+import { type Ref } from "react";
+import { View, TextInput } from "react-native";
 import {
   Controller,
   type Control,
@@ -14,6 +15,7 @@ interface FormFieldProps<T extends FieldValues> extends Omit<TextInputProps, "va
   name: Path<T>;
   label: string;
   className?: string;
+  inputRef?: Ref<TextInput>;
 }
 
 export function FormField<T extends FieldValues>({
@@ -21,6 +23,7 @@ export function FormField<T extends FieldValues>({
   name,
   label,
   className,
+  inputRef,
   ...inputProps
 }: FormFieldProps<T>) {
   return (
@@ -31,6 +34,7 @@ export function FormField<T extends FieldValues>({
         <View className={className}>
           <Text variant="muted" className="text-sm mb-1 ml-1">{label}</Text>
           <Input
+            ref={inputRef}
             value={value}
             onChangeText={onChange}
             onBlur={onBlur}

@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import { type Session, type User } from "@supabase/supabase-js";
+import { Platform } from "react-native";
 import { supabase } from "../lib/supabase";
 
 interface AuthContextValue {
@@ -32,8 +33,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, s) => {
+    } = supabase.auth.onAuthStateChange((event, s) => {
       setSession(s);
+      if (event === "SIGNED_IN" && Platform.OS === "web" && typeof window !== "undefined") {
+        window.history.replaceState(null, "", window.location.pathname);
+      }
     });
 
     return () => subscription.unsubscribe();
