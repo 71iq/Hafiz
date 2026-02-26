@@ -77,16 +77,72 @@ async function importJsonOnWeb(
   db: Awaited<ReturnType<typeof openDatabaseAsync>>
 ) {
   // Check if data already imported (verify rows exist, not just table)
+  let dataExists = false;
   try {
     const check = await db.getFirstAsync<{ count: number }>(
       "SELECT count(*) as count FROM surahs"
     );
     if (check && check.count > 0) {
-      console.log("[WebDB] Data already imported, skipping");
-      return;
+      dataExists = true;
     }
   } catch {
     // Table doesn't exist yet, proceed with import
+  }
+
+  // Always ensure all table schemas exist (handles migrations for new tables)
+  for (const [, sql] of Object.entries(TABLE_SCHEMAS)) {
+    await db.execAsync(sql);
+  }
+  await db.execAsync(
+    "CREATE INDEX IF NOT EXISTS idx_word_roots_root ON word_roots(root)"
+  );
+
+  if (dataExists) {
+    // Check if new tables need data (e.g. hizb_map added after initial import)
+    const hizbCheck = await db.getFirstAsync<{ count: number }>(
+      "SELECT count(*) as count FROM hizb_map"
+    );
+    if (hizbCheck && hizbCheck.count > 0) {
+      console.log("[WebDB] Data already imported, skipping");
+      return;
+    }
+    // Need to import only the missing tables
+    console.log("[WebDB] Fetching JSON data for migration...");
+    const response = await fetch("/quran-data.json");
+    const data = await response.json();
+
+    for (const [tableName, rows] of Object.entries(data.tables) as [string, Record<string, unknown>[]][]) {
+      if (!rows || rows.length === 0) continue;
+      // Check if table already has data
+      const existing = await db.getFirstAsync<{ count: number }>(
+        `SELECT count(*) as count FROM "${tableName}"`
+      );
+      if (existing && existing.count > 0) continue;
+
+      const columns = Object.keys(rows[0]);
+      const placeholders = columns.map(() => "?").join(",");
+      const colList = columns.map((c) => `"${c}"`).join(",");
+      const insertSql = `INSERT INTO "${tableName}" (${colList}) VALUES (${placeholders})`;
+
+      const BATCH_SIZE = 500;
+      for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+        const batch = rows.slice(i, i + BATCH_SIZE);
+        await db.execAsync("BEGIN TRANSACTION");
+        try {
+          for (const row of batch) {
+            await db.runAsync(insertSql, columns.map((c) => row[c] as any));
+          }
+          await db.execAsync("COMMIT");
+        } catch (e) {
+          await db.execAsync("ROLLBACK");
+          throw e;
+        }
+      }
+      console.log(`[WebDB] Migrated ${rows.length} rows into ${tableName}`);
+    }
+
+    console.log("[WebDB] Migration complete!");
+    return;
   }
 
   console.log("[WebDB] Fetching JSON data...");
@@ -94,14 +150,7 @@ async function importJsonOnWeb(
   const data = await response.json();
   console.log("[WebDB] JSON loaded, importing tables...");
 
-  // Create tables
-  for (const [name, sql] of Object.entries(TABLE_SCHEMAS)) {
-    await db.execAsync(sql);
-    console.log(`[WebDB] Created table: ${name}`);
-  }
-  await db.execAsync(
-    "CREATE INDEX IF NOT EXISTS idx_word_roots_root ON word_roots(root)"
-  );
+  // Tables and indexes already created above
 
   // Import data table by table using batch SQL
   for (const [tableName, rows] of Object.entries(data.tables) as [
