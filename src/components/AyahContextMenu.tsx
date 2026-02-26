@@ -1,6 +1,7 @@
-import { Modal, View, Text, Pressable, Dimensions } from "react-native";
+import { Modal, View, Pressable, Dimensions } from "react-native";
 import type { Ayah } from "../db/database";
 import { copyAyahToClipboard } from "../lib/clipboard";
+import { Text } from "./ui/text";
 
 interface AyahContextMenuProps {
   visible: boolean;
@@ -39,23 +40,19 @@ export default function AyahContextMenu({
       <Pressable className="flex-1" onPress={onClose}>
         <View
           style={{ top: menuTop, left: 40, right: 40, position: "absolute" }}
-          className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden"
+          className="bg-popover rounded-xl shadow-lg border border-border overflow-hidden"
         >
           <Pressable
             onPress={handleCopy}
-            className="px-5 py-3.5 active:bg-gray-100 dark:active:bg-gray-700 border-b border-gray-100 dark:border-gray-700"
+            className="px-5 py-3.5 active:bg-accent border-b border-border"
           >
-            <Text className="text-base text-gray-900 dark:text-gray-100">
-              Copy
-            </Text>
+            <Text className="text-base text-popover-foreground">Copy</Text>
           </Pressable>
           <Pressable
             onPress={handleAskCommunity}
-            className="px-5 py-3.5 active:bg-gray-100 dark:active:bg-gray-700"
+            className="px-5 py-3.5 active:bg-accent"
           >
-            <Text className="text-base text-blue-600 dark:text-blue-400">
-              Ask Community
-            </Text>
+            <Text className="text-base text-primary">Ask Community</Text>
           </Pressable>
         </View>
       </Pressable>

@@ -1,6 +1,8 @@
-import { View, Text, ScrollView } from "react-native";
+import { ScrollView } from "react-native";
 import { useSettings } from "../../context/SettingsContext";
 import type { FlashCard } from "../../lib/uniqueness";
+import { Text } from "../ui/text";
+import { Card, CardContent } from "../ui/card";
 
 interface FlashcardViewProps {
   card: FlashCard;
@@ -12,52 +14,57 @@ export default function FlashcardView({ card, revealed }: FlashcardViewProps) {
 
   return (
     <ScrollView className="flex-1 px-4" contentContainerStyle={{ paddingBottom: 24 }}>
-      <View className="bg-white dark:bg-gray-900 rounded-2xl p-5 mt-4 border border-gray-200 dark:border-gray-700">
-        {/* Surah label for disambiguation */}
-        {card.surahLabel && (
-          <Text className="text-center text-sm text-amber-700 dark:text-amber-400 mb-2 font-semibold">
-            {card.surahLabel}
+      <Card className="mt-4">
+        <CardContent>
+          {/* Surah label for disambiguation */}
+          {card.surahLabel && (
+            <Text className="text-center text-sm text-amber-700 dark:text-amber-400 mb-2 font-semibold">
+              {card.surahLabel}
+            </Text>
+          )}
+
+          {/* Reference */}
+          <Text variant="muted" className="text-center text-xs mb-4">
+            {card.ayah.surah}:{card.ayah.ayah}
           </Text>
-        )}
 
-        {/* Reference */}
-        <Text className="text-center text-xs text-gray-400 dark:text-gray-500 mb-4">
-          {card.ayah.surah}:{card.ayah.ayah}
-        </Text>
+          {/* Context ayahs (lighter) */}
+          {card.contextAyahs.map((ctx) => (
+            <Text
+              key={`${ctx.surah}-${ctx.ayah}`}
+              style={{ fontSize: fontSize - 2, lineHeight: fontSize * 1.8 }}
+              variant="muted"
+              className="text-right mb-1"
+            >
+              {ctx.text_uthmani}
+            </Text>
+          ))}
 
-        {/* Context ayahs (lighter) */}
-        {card.contextAyahs.map((ctx) => (
+          {/* Target ayah (prompt) */}
           <Text
-            key={`${ctx.surah}-${ctx.ayah}`}
-            style={{ fontSize: fontSize - 2, lineHeight: fontSize * 1.8 }}
-            className="text-right text-gray-400 dark:text-gray-500 mb-1"
+            style={{ fontSize, lineHeight: fontSize * 2 }}
+            className="text-right text-foreground"
           >
-            {ctx.text_uthmani}
+            {card.ayah.text_uthmani}
           </Text>
-        ))}
-
-        {/* Target ayah (prompt) */}
-        <Text
-          style={{ fontSize, lineHeight: fontSize * 2 }}
-          className="text-right text-gray-900 dark:text-gray-100"
-        >
-          {card.ayah.text_uthmani}
-        </Text>
-      </View>
+        </CardContent>
+      </Card>
 
       {/* Answer section */}
       {revealed && (
-        <View className="bg-green-50 dark:bg-green-950 rounded-2xl p-5 mt-4 border border-green-200 dark:border-green-800">
-          <Text className="text-xs text-green-600 dark:text-green-400 mb-2 text-center">
-            Next Ayah ({card.answer.surah}:{card.answer.ayah})
-          </Text>
-          <Text
-            style={{ fontSize, lineHeight: fontSize * 2 }}
-            className="text-right text-green-900 dark:text-green-100"
-          >
-            {card.answer.text_uthmani}
-          </Text>
-        </View>
+        <Card className="mt-4 bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
+          <CardContent>
+            <Text className="text-xs text-success mb-2 text-center">
+              Next Ayah ({card.answer.surah}:{card.answer.ayah})
+            </Text>
+            <Text
+              style={{ fontSize, lineHeight: fontSize * 2 }}
+              className="text-right text-green-900 dark:text-green-100"
+            >
+              {card.answer.text_uthmani}
+            </Text>
+          </CardContent>
+        </Card>
       )}
     </ScrollView>
   );

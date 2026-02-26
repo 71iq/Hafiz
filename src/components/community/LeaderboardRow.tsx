@@ -1,6 +1,7 @@
 import { memo } from "react";
-import { View, Text } from "react-native";
+import { View } from "react-native";
 import type { LeaderboardEntry } from "../../lib/community-types";
+import { Text } from "../ui/text";
 
 interface LeaderboardRowProps {
   entry: LeaderboardEntry;
@@ -21,28 +22,26 @@ export default memo(function LeaderboardRow({
 
   return (
     <View
-      className={`flex-row items-center px-4 py-3 border-b border-gray-100 dark:border-gray-800 ${
-        isCurrentUser ? "bg-blue-50 dark:bg-blue-950" : ""
+      className={`flex-row items-center px-4 py-3 border-b border-border ${
+        isCurrentUser ? "bg-primary/10" : ""
       }`}
     >
-      <Text className="w-10 text-center font-bold text-gray-500 dark:text-gray-400 text-base">
+      <Text variant="muted" className="w-10 text-center font-bold text-base">
         {rank}
       </Text>
       <Text
         className={`flex-1 text-base ${
           isCurrentUser
-            ? "font-bold text-blue-700 dark:text-blue-300"
-            : "text-gray-900 dark:text-gray-100"
+            ? "font-bold text-primary"
+            : "text-foreground"
         }`}
         numberOfLines={1}
       >
         {name}
       </Text>
-      <Text className="text-base font-semibold text-gray-700 dark:text-gray-300">
+      <Text className="text-base font-semibold text-foreground">
         {value}{" "}
-        <Text className="text-sm font-normal text-gray-400 dark:text-gray-500">
-          {unit}
-        </Text>
+        <Text variant="muted" className="text-sm font-normal">{unit}</Text>
       </Text>
     </View>
   );

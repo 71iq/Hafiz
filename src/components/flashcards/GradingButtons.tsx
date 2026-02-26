@@ -1,4 +1,6 @@
-import { View, Text, Pressable } from "react-native";
+import { View } from "react-native";
+import { Button } from "../ui/button";
+import { Text } from "../ui/text";
 
 interface GradingButtonsProps {
   intervals: number[];
@@ -6,10 +8,10 @@ interface GradingButtonsProps {
 }
 
 const BUTTONS = [
-  { grade: 0, label: "Again", color: "bg-red-600 active:bg-red-700" },
-  { grade: 1, label: "Hard", color: "bg-orange-500 active:bg-orange-600" },
-  { grade: 2, label: "Good", color: "bg-blue-600 active:bg-blue-700" },
-  { grade: 3, label: "Easy", color: "bg-green-600 active:bg-green-700" },
+  { grade: 0, label: "Again", variant: "destructive" as const },
+  { grade: 1, label: "Hard", variant: "warning" as const },
+  { grade: 2, label: "Good", variant: "default" as const },
+  { grade: 3, label: "Easy", variant: "success" as const },
 ] as const;
 
 function formatInterval(days: number): string {
@@ -24,16 +26,17 @@ export default function GradingButtons({ intervals, onGrade }: GradingButtonsPro
   return (
     <View className="flex-row gap-2 px-4 pb-4">
       {BUTTONS.map((btn) => (
-        <Pressable
+        <Button
           key={btn.grade}
+          variant={btn.variant}
           onPress={() => onGrade(btn.grade)}
-          className={`flex-1 items-center py-3 rounded-xl ${btn.color}`}
+          className="flex-1 flex-col py-3"
         >
           <Text className="text-white font-semibold text-sm">{btn.label}</Text>
           <Text className="text-white/70 text-xs mt-0.5">
             {formatInterval(intervals[btn.grade])}
           </Text>
-        </Pressable>
+        </Button>
       ))}
     </View>
   );

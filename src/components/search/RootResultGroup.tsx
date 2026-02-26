@@ -1,7 +1,8 @@
 import { memo, useState, useCallback } from "react";
-import { Text, Pressable, View } from "react-native";
+import { Pressable, View } from "react-native";
 import { useSettings } from "../../context/SettingsContext";
 import type { RootSearchResult } from "../../db/database";
+import { Text } from "../ui/text";
 import SearchResultItem from "./SearchResultItem";
 
 interface RootResultGroupProps {
@@ -32,15 +33,15 @@ export default memo(function RootResultGroup({
     <View className="mb-2">
       <Pressable
         onPress={toggle}
-        className="flex-row-reverse items-center justify-between px-4 py-3 bg-gray-100 dark:bg-gray-800"
+        className="flex-row-reverse items-center justify-between px-4 py-3 bg-muted"
       >
         <Text
           style={{ fontSize: fontSize * 0.8, writingDirection: "rtl" }}
-          className="text-gray-900 dark:text-gray-100 font-bold"
+          className="text-foreground font-bold"
         >
           {lemma}
         </Text>
-        <Text className="text-sm text-gray-500 dark:text-gray-400">
+        <Text variant="muted" className="text-sm">
           {expanded ? "▲" : "▼"} {ayahList.length} ayah{ayahList.length !== 1 ? "s" : ""}
         </Text>
       </Pressable>

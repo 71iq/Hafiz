@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
-  Text,
   FlatList,
   ActivityIndicator,
   RefreshControl,
@@ -10,6 +9,7 @@ import { useAuth } from "../../context/AuthContext";
 import { fetchPosts, toggleLike, checkUserLikes } from "../../lib/community-api";
 import type { Post } from "../../lib/community-types";
 import PostCard from "./PostCard";
+import { Text } from "../ui/text";
 
 interface PostFeedProps {
   onSelectPost: (post: Post) => void;
@@ -40,7 +40,6 @@ export default function PostFeed({ onSelectPost, refreshTrigger }: PostFeedProps
         setCursor(nextCursor);
         hasMore.current = nextCursor !== null;
 
-        // Check likes for new posts
         if (user && newPosts.length > 0) {
           const ids = newPosts.map((p) => p.id);
           const liked = await checkUserLikes(ids, user.id);
@@ -50,13 +49,12 @@ export default function PostFeed({ onSelectPost, refreshTrigger }: PostFeedProps
           });
         }
       } catch (_e) {
-        // Silently fail — user sees empty or stale data
+        // Silently fail
       }
     },
     [cursor, posts, user]
   );
 
-  // Initial load + refresh when trigger changes
   useEffect(() => {
     setLoading(true);
     loadPosts(true).finally(() => setLoading(false));
@@ -79,7 +77,6 @@ export default function PostFeed({ onSelectPost, refreshTrigger }: PostFeedProps
     async (postId: string) => {
       if (!user) return;
 
-      // Optimistic update
       const wasLiked = likedIds.has(postId);
       setLikedIds((prev) => {
         const next = new Set(prev);
@@ -98,7 +95,6 @@ export default function PostFeed({ onSelectPost, refreshTrigger }: PostFeedProps
       try {
         await toggleLike(postId, user.id);
       } catch (_e) {
-        // Revert on error
         setLikedIds((prev) => {
           const next = new Set(prev);
           if (wasLiked) next.add(postId);
@@ -134,7 +130,7 @@ export default function PostFeed({ onSelectPost, refreshTrigger }: PostFeedProps
   if (loading) {
     return (
       <View className="flex-1 items-center justify-center">
-        <ActivityIndicator size="large" color="#1e40af" />
+        <ActivityIndicator size="large" color="hsl(var(--primary))" />
       </View>
     );
   }
@@ -142,10 +138,10 @@ export default function PostFeed({ onSelectPost, refreshTrigger }: PostFeedProps
   if (posts.length === 0) {
     return (
       <View className="flex-1 items-center justify-center px-6">
-        <Text className="text-gray-400 dark:text-gray-500 text-center text-base">
+        <Text variant="muted" className="text-center text-base">
           No posts yet. Be the first to ask the community!
         </Text>
-        <Text className="text-gray-400 dark:text-gray-500 text-center text-sm mt-2">
+        <Text variant="muted" className="text-center text-sm mt-2">
           Long-press any ayah in the Mushaf to get started.
         </Text>
       </View>
@@ -165,7 +161,7 @@ export default function PostFeed({ onSelectPost, refreshTrigger }: PostFeedProps
       ListFooterComponent={
         loadingMore ? (
           <View className="py-4">
-            <ActivityIndicator color="#1e40af" />
+            <ActivityIndicator color="hsl(var(--primary))" />
           </View>
         ) : null
       }

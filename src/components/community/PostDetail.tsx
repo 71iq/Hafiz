@@ -1,10 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   View,
-  Text,
   FlatList,
-  TextInput,
-  Pressable,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
@@ -14,6 +11,9 @@ import { fetchComments, createComment } from "../../lib/community-api";
 import type { Post, Comment } from "../../lib/community-types";
 import PostCard from "./PostCard";
 import CommentItem from "./CommentItem";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { Text } from "../ui/text";
 
 interface PostDetailProps {
   post: Post;
@@ -76,11 +76,9 @@ export default function PostDetail({
   const header = (
     <>
       {/* Back button */}
-      <Pressable onPress={onBack} className="px-4 py-3">
-        <Text className="text-blue-600 dark:text-blue-400 font-medium">
-          Back
-        </Text>
-      </Pressable>
+      <Button variant="ghost" onPress={onBack} className="self-start mx-2 my-1">
+        <Text className="text-primary font-medium">Back</Text>
+      </Button>
 
       <PostCard
         post={post}
@@ -90,15 +88,15 @@ export default function PostDetail({
       />
 
       {/* Comments header */}
-      <View className="px-4 py-3 border-b border-gray-200 dark:border-gray-800">
-        <Text className="text-sm font-medium text-gray-500 dark:text-gray-400">
+      <View className="px-4 py-3 border-b border-border">
+        <Text variant="muted" className="text-sm font-medium">
           Comments ({comments.length})
         </Text>
       </View>
 
       {loading && (
         <View className="py-4">
-          <ActivityIndicator color="#1e40af" />
+          <ActivityIndicator color="hsl(var(--primary))" />
         </View>
       )}
     </>
@@ -119,34 +117,29 @@ export default function PostDetail({
         ListEmptyComponent={
           !loading ? (
             <View className="py-8 items-center">
-              <Text className="text-gray-400 dark:text-gray-500">
-                No comments yet
-              </Text>
+              <Text variant="muted">No comments yet</Text>
             </View>
           ) : null
         }
       />
 
       {/* Comment input bar */}
-      <View className="flex-row items-center px-4 py-2 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
-        <TextInput
-          className="flex-1 bg-gray-100 dark:bg-gray-800 rounded-full px-4 py-2 text-base text-gray-900 dark:text-gray-100 mr-2"
+      <View className="flex-row items-center px-4 py-2 border-t border-border bg-card">
+        <Input
+          className="flex-1 rounded-full mr-2 bg-muted border-0"
           placeholder="Add a comment..."
-          placeholderTextColor="#9ca3af"
           value={commentText}
           onChangeText={setCommentText}
           maxLength={1000}
           multiline
         />
-        <Pressable
+        <Button
+          variant="ghost"
           onPress={handleSubmitComment}
           disabled={submitting || !commentText.trim()}
-          style={{ opacity: submitting || !commentText.trim() ? 0.4 : 1 }}
         >
-          <Text className="text-blue-600 dark:text-blue-400 font-semibold text-base">
-            Send
-          </Text>
-        </Pressable>
+          <Text className="text-primary font-semibold text-base">Send</Text>
+        </Button>
       </View>
     </KeyboardAvoidingView>
   );

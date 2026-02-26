@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { View, Text } from "react-native";
+import { View } from "react-native";
 import { FlashList, type FlashListRef, type ViewToken } from "@shopify/flash-list";
 import { useSQLiteContext } from "expo-sqlite";
 import { getAllAyahs, getAllSurahs, type Ayah, type Surah } from "../db/database";
 import type { ListItem } from "../lib/types";
 import { consumePendingScroll } from "../lib/deeplink";
+import { Text } from "./ui/text";
 import AyahItemComponent from "./AyahItem";
 import SurahHeader from "./SurahHeader";
 import ControlBar from "./ControlBar";
@@ -168,7 +169,7 @@ export default function MushafScreen() {
 
   const getItemType = useCallback((item: ListItem) => item.type, []);
   const keyExtractor = useCallback(
-    (item: ListItem, index: number) =>
+    (item: ListItem) =>
       item.type === "surah-header"
         ? `header-${item.surah.number}`
         : `ayah-${item.ayah.surah}-${item.ayah.ayah}`,
@@ -178,7 +179,7 @@ export default function MushafScreen() {
   if (listData.length === 0) {
     return (
       <View className="flex-1 items-center justify-center">
-        <Text className="text-gray-500 dark:text-gray-400">Loading Mushaf...</Text>
+        <Text variant="muted">Loading Mushaf...</Text>
       </View>
     );
   }

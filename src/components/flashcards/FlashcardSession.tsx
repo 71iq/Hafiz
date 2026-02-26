@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
-import { View, Text, Pressable } from "react-native";
+import { View } from "react-native";
 import { useSQLiteContext } from "expo-sqlite";
 import type { FlashCard } from "../../lib/uniqueness";
 import { sm2, getNextReviewDate, getTodayDate, projectIntervals, type SM2Input } from "../../lib/sm2";
@@ -7,6 +7,9 @@ import { getStudyLogEntry, upsertStudyLog } from "../../db/database";
 import FlashcardView from "./FlashcardView";
 import GradingButtons from "./GradingButtons";
 import type { SessionStats } from "./SessionSummary";
+import { Button } from "../ui/button";
+import { Text } from "../ui/text";
+import { Progress } from "../ui/progress";
 
 interface FlashcardSessionProps {
   deck: FlashCard[];
@@ -68,7 +71,6 @@ export default function FlashcardSession({ deck, onComplete }: FlashcardSessionP
 
       const nextIndex = cardIndex + 1;
       if (nextIndex >= deck.length) {
-        // Session complete
         onComplete({
           total: newGrades.length,
           again: newGrades.filter((g) => g === 0).length,
@@ -86,21 +88,18 @@ export default function FlashcardSession({ deck, onComplete }: FlashcardSessionP
 
   if (!currentCard) return null;
 
+  const progressPercent = ((cardIndex + 1) / deck.length) * 100;
+
   return (
-    <View className="flex-1 bg-white dark:bg-gray-950">
+    <View className="flex-1 bg-background">
       {/* Progress bar */}
       <View className="px-4 pt-2 pb-1">
         <View className="flex-row items-center justify-between mb-1">
-          <Text className="text-xs text-gray-500 dark:text-gray-400">
+          <Text variant="muted" className="text-xs">
             {cardIndex + 1} / {deck.length}
           </Text>
         </View>
-        <View className="h-1.5 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
-          <View
-            className="h-full bg-blue-600 rounded-full"
-            style={{ width: `${((cardIndex + 1) / deck.length) * 100}%` }}
-          />
-        </View>
+        <Progress value={progressPercent} />
       </View>
 
       {/* Card */}
@@ -109,12 +108,7 @@ export default function FlashcardSession({ deck, onComplete }: FlashcardSessionP
       {/* Action area */}
       {cardState === "prompt" ? (
         <View className="px-4 pb-4">
-          <Pressable
-            onPress={handleReveal}
-            className="bg-blue-600 active:bg-blue-700 py-3.5 rounded-xl items-center"
-          >
-            <Text className="text-white font-semibold text-base">Show Answer</Text>
-          </Pressable>
+          <Button onPress={handleReveal}>Show Answer</Button>
         </View>
       ) : (
         <GradingButtons intervals={intervals} onGrade={handleGrade} />

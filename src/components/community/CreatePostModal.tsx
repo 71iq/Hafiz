@@ -2,8 +2,6 @@ import { useState, useCallback } from "react";
 import {
   Modal,
   View,
-  Text,
-  TextInput,
   Pressable,
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -12,6 +10,9 @@ import {
 } from "react-native";
 import { useAuth } from "../../context/AuthContext";
 import { createPost } from "../../lib/community-api";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { Text } from "../ui/text";
 
 interface CreatePostModalProps {
   visible: boolean;
@@ -72,15 +73,13 @@ export default function CreatePostModal({
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <Pressable className="flex-1" onPress={handleClose} />
-        <View className="bg-white dark:bg-gray-900 rounded-t-2xl border-t border-gray-200 dark:border-gray-700 max-h-[80%]">
+        <View className="bg-card rounded-t-2xl border-t border-border max-h-[80%]">
           {/* Header */}
-          <View className="flex-row items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800">
-            <Pressable onPress={handleClose}>
-              <Text className="text-gray-500 dark:text-gray-400 text-base">
-                Cancel
-              </Text>
-            </Pressable>
-            <Text className="text-base font-semibold text-gray-900 dark:text-gray-100">
+          <View className="flex-row items-center justify-between px-4 py-3 border-b border-border">
+            <Button variant="ghost" onPress={handleClose}>
+              <Text variant="muted" className="text-base">Cancel</Text>
+            </Button>
+            <Text className="text-base font-semibold text-foreground">
               Ask Community
             </Text>
             <Pressable
@@ -89,23 +88,21 @@ export default function CreatePostModal({
               style={{ opacity: submitting || !content.trim() ? 0.4 : 1 }}
             >
               {submitting ? (
-                <ActivityIndicator size="small" color="#2563eb" />
+                <ActivityIndicator size="small" color="hsl(var(--primary))" />
               ) : (
-                <Text className="text-blue-600 dark:text-blue-400 font-semibold text-base">
-                  Post
-                </Text>
+                <Text className="text-primary font-semibold text-base">Post</Text>
               )}
             </Pressable>
           </View>
 
           <ScrollView className="px-4 pt-3" keyboardShouldPersistTaps="handled">
             {/* Ayah preview */}
-            <View className="bg-gray-50 dark:bg-gray-800 rounded-xl p-3 mb-3">
-              <Text className="text-xs text-blue-600 dark:text-blue-400 mb-1">
+            <View className="bg-muted rounded-xl p-3 mb-3">
+              <Text className="text-xs text-primary mb-1">
                 Surah {surahName} : Ayah {ayah}
               </Text>
               <Text
-                className="text-base text-gray-700 dark:text-gray-300"
+                className="text-base text-foreground"
                 style={{ writingDirection: "rtl", textAlign: "right" }}
                 numberOfLines={3}
               >
@@ -114,10 +111,9 @@ export default function CreatePostModal({
             </View>
 
             {/* Content input */}
-            <TextInput
-              className="text-base text-gray-900 dark:text-gray-100 min-h-[120px] mb-4"
+            <Input
+              className="text-base min-h-[120px] mb-4 border-0 bg-transparent px-0"
               placeholder="What would you like to ask about this ayah?"
-              placeholderTextColor="#9ca3af"
               multiline
               textAlignVertical="top"
               maxLength={2000}
@@ -127,12 +123,12 @@ export default function CreatePostModal({
             />
 
             {/* Character count */}
-            <Text className="text-xs text-gray-400 dark:text-gray-500 text-right mb-2">
+            <Text variant="muted" className="text-xs text-right mb-2">
               {content.length}/2000
             </Text>
 
             {error && (
-              <Text className="text-red-500 text-center mb-4">{error}</Text>
+              <Text variant="destructive" className="text-center mb-4">{error}</Text>
             )}
           </ScrollView>
         </View>

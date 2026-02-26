@@ -1,14 +1,6 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  FlatList,
-  Pressable,
-  Keyboard,
-} from "react-native";
+import { View, TextInput, FlatList, Keyboard } from "react-native";
 import { useSQLiteContext } from "expo-sqlite";
-import { useSettings } from "../../context/SettingsContext";
 import {
   searchAyahsByText,
   searchByRoot,
@@ -16,6 +8,9 @@ import {
   type Ayah,
   type RootSearchResult,
 } from "../../db/database";
+import { Button } from "../ui/button";
+import { Text } from "../ui/text";
+import { TabsList, TabsTrigger } from "../ui/tabs";
 import SearchResultItem from "./SearchResultItem";
 import RootResultGroup from "./RootResultGroup";
 
@@ -23,8 +18,6 @@ type SearchMode = "text" | "root";
 
 export default function SearchScreen() {
   const db = useSQLiteContext();
-  const { colorScheme } = useSettings();
-  const isDark = colorScheme === "dark";
 
   const [query, setQuery] = useState("");
   const [mode, setMode] = useState<SearchMode>("text");
@@ -33,7 +26,6 @@ export default function SearchScreen() {
   const [hasSearched, setHasSearched] = useState(false);
   const inputRef = useRef<TextInput>(null);
 
-  // Build surah name map for display
   const [surahNames, setSurahNames] = useState<Map<number, string>>(new Map());
   useEffect(() => {
     (async () => {
@@ -69,7 +61,6 @@ export default function SearchScreen() {
     []
   );
 
-  // Group root results by lemma
   const rootGroups = useMemo(() => {
     const groups = new Map<string, RootSearchResult[]>();
     for (const r of rootResults) {
@@ -113,7 +104,6 @@ export default function SearchScreen() {
     []
   );
 
-  const currentResults = mode === "text" ? textResults : rootResults;
   const resultCount =
     mode === "text"
       ? textResults.length
@@ -126,13 +116,7 @@ export default function SearchScreen() {
     <View className="flex-1">
       {/* Search input */}
       <View className="px-4 pt-2 pb-2">
-        <View
-          className="flex-row items-center rounded-lg px-3 py-2 border"
-          style={{
-            backgroundColor: isDark ? "#1f2937" : "#f3f4f6",
-            borderColor: isDark ? "#374151" : "#d1d5db",
-          }}
-        >
+        <View className="flex-row items-center rounded-lg px-3 py-2 border border-input bg-muted">
           <TextInput
             ref={inputRef}
             value={query}
@@ -141,7 +125,7 @@ export default function SearchScreen() {
             placeholder={
               mode === "text" ? "Search ayah text..." : "Enter root (e.g. كتب)..."
             }
-            placeholderTextColor={isDark ? "#6b7280" : "#9ca3af"}
+            placeholderTextColor="hsl(var(--muted-foreground))"
             returnKeyType="search"
             autoCorrect={false}
             style={{
@@ -149,71 +133,38 @@ export default function SearchScreen() {
               fontSize: 18,
               writingDirection: "rtl",
               textAlign: "right",
-              color: isDark ? "#f3f4f6" : "#111827",
               paddingVertical: 4,
             }}
+            className="text-foreground"
           />
-          <Pressable
-            onPress={doSearch}
-            className="ml-2 px-3 py-1 rounded-md bg-blue-600 active:bg-blue-700"
-          >
-            <Text className="text-white font-medium">Search</Text>
-          </Pressable>
+          <Button size="sm" onPress={doSearch} className="ml-2">
+            Search
+          </Button>
         </View>
       </View>
 
       {/* Mode toggle */}
-      <View className="flex-row px-4 mb-2">
-        <Pressable
-          onPress={() => handleModeChange("text")}
-          className={`flex-1 py-2 rounded-l-lg items-center border ${
-            mode === "text"
-              ? "bg-blue-600 border-blue-600"
-              : isDark
-                ? "bg-gray-800 border-gray-700"
-                : "bg-gray-100 border-gray-300"
-          }`}
-        >
-          <Text
-            className={
-              mode === "text"
-                ? "text-white font-bold"
-                : isDark
-                  ? "text-gray-300"
-                  : "text-gray-600"
-            }
+      <View className="px-4 mb-2">
+        <TabsList>
+          <TabsTrigger
+            active={mode === "text"}
+            onPress={() => handleModeChange("text")}
           >
             Text
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={() => handleModeChange("root")}
-          className={`flex-1 py-2 rounded-r-lg items-center border ${
-            mode === "root"
-              ? "bg-blue-600 border-blue-600"
-              : isDark
-                ? "bg-gray-800 border-gray-700"
-                : "bg-gray-100 border-gray-300"
-          }`}
-        >
-          <Text
-            className={
-              mode === "root"
-                ? "text-white font-bold"
-                : isDark
-                  ? "text-gray-300"
-                  : "text-gray-600"
-            }
+          </TabsTrigger>
+          <TabsTrigger
+            active={mode === "root"}
+            onPress={() => handleModeChange("root")}
           >
-            Root (جذر)
-          </Text>
-        </Pressable>
+            {"Root (جذر)"}
+          </TabsTrigger>
+        </TabsList>
       </View>
 
       {/* Result count */}
       {hasSearched && (
         <View className="px-4 pb-2">
-          <Text className="text-sm text-gray-500 dark:text-gray-400">
+          <Text variant="muted" className="text-sm">
             {resultCount === 0
               ? "No results found"
               : `${resultCount} result${resultCount !== 1 ? "s" : ""}`}

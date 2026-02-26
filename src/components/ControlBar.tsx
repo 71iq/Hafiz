@@ -1,5 +1,9 @@
-import { View, Text, Pressable } from "react-native";
+import { View } from "react-native";
 import { useSettings } from "../context/SettingsContext";
+import { Button } from "./ui/button";
+import { Text } from "./ui/text";
+import { Toggle } from "./ui/toggle";
+import { AArrowDown, AArrowUp, Eye, EyeOff, Moon, Sun } from "lucide-react-native";
 
 interface ControlBarProps {
   currentSurahName: string;
@@ -12,59 +16,37 @@ export default function ControlBar({
 }: ControlBarProps) {
   const { increaseFontSize, decreaseFontSize, hideAyahs, toggleHideAyahs, toggleDarkMode, colorScheme } =
     useSettings();
+  const isDark = colorScheme === "dark";
+  const iconColor = isDark ? "hsl(220, 9%, 55%)" : "hsl(220, 9%, 46%)";
 
   return (
-    <View className="flex-row items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
-      <Pressable
+    <View className="flex-row items-center justify-between px-3 py-2 bg-muted border-b border-border">
+      <Button
+        variant="ghost"
         onPress={onSurahPickerOpen}
-        className="flex-1 mr-2 px-3 py-2 rounded-lg active:bg-gray-200 dark:active:bg-gray-800"
+        className="flex-1 mr-2 justify-start"
       >
-        <Text
-          className="text-sm font-medium text-gray-900 dark:text-gray-100"
-          numberOfLines={1}
-        >
+        <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
           {currentSurahName || "Select Surah"}
         </Text>
-      </Pressable>
+      </Button>
 
       <View className="flex-row items-center gap-1">
-        <Pressable
-          onPress={decreaseFontSize}
-          className="w-9 h-9 items-center justify-center rounded-lg active:bg-gray-200 dark:active:bg-gray-800"
-        >
-          <Text className="text-base font-bold text-gray-600 dark:text-gray-300">
-            A-
-          </Text>
-        </Pressable>
+        <Button variant="ghost" size="icon" onPress={decreaseFontSize}>
+          <AArrowDown size={18} color={iconColor} />
+        </Button>
 
-        <Pressable
-          onPress={increaseFontSize}
-          className="w-9 h-9 items-center justify-center rounded-lg active:bg-gray-200 dark:active:bg-gray-800"
-        >
-          <Text className="text-lg font-bold text-gray-600 dark:text-gray-300">
-            A+
-          </Text>
-        </Pressable>
+        <Button variant="ghost" size="icon" onPress={increaseFontSize}>
+          <AArrowUp size={18} color={iconColor} />
+        </Button>
 
-        <Pressable
-          onPress={toggleHideAyahs}
-          className={`w-9 h-9 items-center justify-center rounded-lg active:bg-gray-200 dark:active:bg-gray-800 ${
-            hideAyahs ? "bg-amber-200 dark:bg-amber-800" : ""
-          }`}
-        >
-          <Text className="text-base">
-            {hideAyahs ? "👁" : "👁‍🗨"}
-          </Text>
-        </Pressable>
+        <Toggle pressed={hideAyahs} onPress={toggleHideAyahs}>
+          {hideAyahs ? <EyeOff size={18} color={iconColor} /> : <Eye size={18} color={iconColor} />}
+        </Toggle>
 
-        <Pressable
-          onPress={toggleDarkMode}
-          className="w-9 h-9 items-center justify-center rounded-lg active:bg-gray-200 dark:active:bg-gray-800"
-        >
-          <Text className="text-base">
-            {colorScheme === "dark" ? "☀️" : "🌙"}
-          </Text>
-        </Pressable>
+        <Button variant="ghost" size="icon" onPress={toggleDarkMode}>
+          {isDark ? <Sun size={18} color={iconColor} /> : <Moon size={18} color={iconColor} />}
+        </Button>
       </View>
     </View>
   );

@@ -1,6 +1,6 @@
 import { Tabs } from "expo-router";
-import { Text } from "react-native";
 import { useSettings } from "../../src/context/SettingsContext";
+import { BookOpen, Layers, Search, MessageCircle, User } from "lucide-react-native";
 
 export default function TabLayout() {
   const { colorScheme } = useSettings();
@@ -11,19 +11,19 @@ export default function TabLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: isDark ? "#030712" : "#ffffff",
-          borderTopColor: isDark ? "#1f2937" : "#e5e7eb",
+          backgroundColor: isDark ? "hsl(224, 71%, 3%)" : "hsl(0, 0%, 100%)",
+          borderTopColor: isDark ? "hsl(220, 20%, 18%)" : "hsl(220, 13%, 91%)",
         },
-        tabBarActiveTintColor: isDark ? "#60a5fa" : "#1e40af",
-        tabBarInactiveTintColor: isDark ? "#6b7280" : "#9ca3af",
+        tabBarActiveTintColor: isDark ? "hsl(217, 91%, 60%)" : "hsl(221, 83%, 53%)",
+        tabBarInactiveTintColor: isDark ? "hsl(220, 9%, 55%)" : "hsl(220, 9%, 46%)",
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
           title: "Mushaf",
-          tabBarIcon: ({ color }) => (
-            <Text style={{ color, fontSize: 20 }}>{"📖"}</Text>
+          tabBarIcon: ({ color, size }) => (
+            <BookOpen color={color} size={size} />
           ),
         }}
       />
@@ -31,8 +31,8 @@ export default function TabLayout() {
         name="flashcards"
         options={{
           title: "Flashcards",
-          tabBarIcon: ({ color }) => (
-            <Text style={{ color, fontSize: 20 }}>{"🃏"}</Text>
+          tabBarIcon: ({ color, size }) => (
+            <Layers color={color} size={size} />
           ),
         }}
       />
@@ -40,8 +40,8 @@ export default function TabLayout() {
         name="search"
         options={{
           title: "Search",
-          tabBarIcon: ({ color }) => (
-            <Text style={{ color, fontSize: 20 }}>{"🔍"}</Text>
+          tabBarIcon: ({ color, size }) => (
+            <Search color={color} size={size} />
           ),
         }}
       />
@@ -49,8 +49,8 @@ export default function TabLayout() {
         name="community"
         options={{
           title: "Community",
-          tabBarIcon: ({ color }) => (
-            <Text style={{ color, fontSize: 20 }}>{"\uD83D\uDCAC"}</Text>
+          tabBarIcon: ({ color, size }) => (
+            <MessageCircle color={color} size={size} />
           ),
         }}
       />
@@ -58,8 +58,8 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: "Profile",
-          tabBarIcon: ({ color }) => (
-            <Text style={{ color, fontSize: 20 }}>{"👤"}</Text>
+          tabBarIcon: ({ color, size }) => (
+            <User color={color} size={size} />
           ),
         }}
       />

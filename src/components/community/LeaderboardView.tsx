@@ -1,15 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
-import {
-  View,
-  Text,
-  FlatList,
-  Pressable,
-  ActivityIndicator,
-} from "react-native";
+import { View, FlatList, ActivityIndicator } from "react-native";
 import { useAuth } from "../../context/AuthContext";
 import { fetchLeaderboard } from "../../lib/community-api";
 import type { LeaderboardEntry } from "../../lib/community-types";
 import LeaderboardRow from "./LeaderboardRow";
+import { Button } from "../ui/button";
+import { Text } from "../ui/text";
+import { TabsList, TabsTrigger } from "../ui/tabs";
 
 type SortMode = "score" | "current_streak";
 
@@ -54,57 +51,35 @@ export default function LeaderboardView() {
   return (
     <View className="flex-1">
       {/* Sort toggle */}
-      <View className="flex-row mx-4 mt-3 mb-2 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
-        <Pressable
-          onPress={() => setSortMode("score")}
-          className={`flex-1 py-2 rounded-md items-center ${
-            sortMode === "score" ? "bg-white dark:bg-gray-700" : ""
-          }`}
-        >
-          <Text
-            className={`text-sm font-medium ${
-              sortMode === "score"
-                ? "text-blue-600 dark:text-blue-400"
-                : "text-gray-500 dark:text-gray-400"
-            }`}
+      <View className="mx-4 mt-3 mb-2">
+        <TabsList>
+          <TabsTrigger
+            active={sortMode === "score"}
+            onPress={() => setSortMode("score")}
           >
             Cards Reviewed
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={() => setSortMode("current_streak")}
-          className={`flex-1 py-2 rounded-md items-center ${
-            sortMode === "current_streak" ? "bg-white dark:bg-gray-700" : ""
-          }`}
-        >
-          <Text
-            className={`text-sm font-medium ${
-              sortMode === "current_streak"
-                ? "text-blue-600 dark:text-blue-400"
-                : "text-gray-500 dark:text-gray-400"
-            }`}
+          </TabsTrigger>
+          <TabsTrigger
+            active={sortMode === "current_streak"}
+            onPress={() => setSortMode("current_streak")}
           >
             Streaks
-          </Text>
-        </Pressable>
+          </TabsTrigger>
+        </TabsList>
       </View>
 
       {loading ? (
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color="#1e40af" />
+          <ActivityIndicator size="large" color="hsl(var(--primary))" />
         </View>
       ) : error ? (
         <View className="flex-1 items-center justify-center px-6">
-          <Text className="text-red-500 text-center mb-4">{error}</Text>
-          <Pressable onPress={load}>
-            <Text className="text-blue-600 dark:text-blue-400 font-medium">
-              Retry
-            </Text>
-          </Pressable>
+          <Text variant="destructive" className="text-center mb-4">{error}</Text>
+          <Button variant="link" onPress={load}>Retry</Button>
         </View>
       ) : entries.length === 0 ? (
         <View className="flex-1 items-center justify-center px-6">
-          <Text className="text-gray-400 dark:text-gray-500 text-center">
+          <Text variant="muted" className="text-center">
             No users on the leaderboard yet. Start studying to appear here!
           </Text>
         </View>

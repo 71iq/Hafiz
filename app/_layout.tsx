@@ -13,9 +13,9 @@ import { ensureStudyLogTable } from "../src/db/database";
 
 function Loading() {
   return (
-    <View className="flex-1 items-center justify-center bg-white dark:bg-gray-950">
-      <ActivityIndicator size="large" color="#1e40af" />
-      <Text className="mt-4 text-gray-500 dark:text-gray-400">
+    <View className="flex-1 items-center justify-center bg-background">
+      <ActivityIndicator size="large" color="hsl(var(--primary))" />
+      <Text className="mt-4 text-muted-foreground">
         Loading database...
       </Text>
     </View>
@@ -145,7 +145,7 @@ export default function RootLayout() {
         <DatabaseInit>
           <AuthProvider>
             <SettingsProvider>
-              <View className="flex-1 bg-white dark:bg-gray-950">
+              <View className="flex-1 bg-background">
                 <Slot />
               </View>
             </SettingsProvider>
@@ -214,8 +214,8 @@ function WebLayout() {
 
   if (error) {
     return (
-      <View className="flex-1 items-center justify-center bg-white dark:bg-gray-950">
-        <Text className="text-red-500 px-4 text-center">
+      <View className="flex-1 items-center justify-center bg-background">
+        <Text className="text-destructive px-4 text-center">
           Database error: {error}
         </Text>
       </View>
@@ -228,7 +228,7 @@ function WebLayout() {
       <SQLiteProvider databaseName="quran.db" useSuspense>
         <AuthProvider>
           <SettingsProvider>
-            <View className="flex-1 bg-white dark:bg-gray-950">
+            <View className="flex-1 bg-background">
               <Slot />
             </View>
           </SettingsProvider>

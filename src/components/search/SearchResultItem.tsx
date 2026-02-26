@@ -1,8 +1,9 @@
 import { memo, useCallback } from "react";
-import { Text, Pressable, View } from "react-native";
+import { Pressable, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useSettings } from "../../context/SettingsContext";
 import { setPendingScroll } from "../../lib/deeplink";
+import { Text } from "../ui/text";
 
 interface SearchResultItemProps {
   surah: number;
@@ -19,8 +20,7 @@ export default memo(function SearchResultItem({
   surahName,
   highlight,
 }: SearchResultItemProps) {
-  const { fontSize, colorScheme } = useSettings();
-  const isDark = colorScheme === "dark";
+  const { fontSize } = useSettings();
   const router = useRouter();
 
   const handlePress = useCallback(() => {
@@ -31,10 +31,10 @@ export default memo(function SearchResultItem({
   return (
     <Pressable
       onPress={handlePress}
-      className="px-4 py-3 border-b border-gray-200 dark:border-gray-800 active:bg-gray-100 dark:active:bg-gray-800"
+      className="px-4 py-3 border-b border-border active:bg-accent"
     >
       <View className="flex-row-reverse justify-between items-center mb-1">
-        <Text className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+        <Text className="text-xs text-primary font-medium">
           {surahName ? `${surahName} ` : ""}
           {surah}:{ayah}
         </Text>
@@ -46,14 +46,15 @@ export default memo(function SearchResultItem({
           writingDirection: "rtl",
           textAlign: "right",
         }}
-        className="text-gray-900 dark:text-gray-100"
+        className="text-foreground"
       >
         {textUthmani}
       </Text>
       {highlight ? (
         <Text
           style={{ writingDirection: "rtl", textAlign: "right" }}
-          className="text-sm text-gray-500 dark:text-gray-400 mt-1"
+          variant="muted"
+          className="text-sm mt-1"
         >
           {highlight}
         </Text>

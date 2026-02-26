@@ -1,17 +1,18 @@
 import { useState, useEffect, useCallback } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  Pressable,
-  ActivityIndicator,
-  ScrollView,
-} from "react-native";
+import { View, ActivityIndicator, ScrollView } from "react-native";
 import { useSQLiteContext } from "expo-sqlite";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { useAuth } from "../../context/AuthContext";
 import { useSync } from "../../hooks/useSync";
 import { getStudyStats, type StudyStats } from "../../db/database";
 import { supabase } from "../../lib/supabase";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { Text } from "../ui/text";
+import { Card, CardContent } from "../ui/card";
+import { FormField } from "../ui/form";
 
 export default function ProfileScreen() {
   const { user, loading: authLoading } = useAuth();
@@ -19,7 +20,7 @@ export default function ProfileScreen() {
   if (authLoading) {
     return (
       <View className="flex-1 items-center justify-center">
-        <ActivityIndicator size="large" color="#1e40af" />
+        <ActivityIndicator size="large" color="hsl(var(--primary))" />
       </View>
     );
   }
@@ -29,22 +30,38 @@ export default function ProfileScreen() {
 
 // ─── Auth Form ───────────────────────────────────────────────
 
+const authSchema = z.object({
+  email: z.string().min(1, "Email is required").email("Invalid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+});
+
+type AuthFormValues = z.infer<typeof authSchema>;
+
 function AuthForm() {
   const { signIn, signUp } = useAuth();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [isSignUp, setIsSignUp] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [serverError, setServerError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = async () => {
-    setError(null);
+  const { control, handleSubmit, reset } = useForm<AuthFormValues>({
+    resolver: zodResolver(authSchema),
+    defaultValues: { email: "", password: "" },
+  });
+
+  const onSubmit = async (data: AuthFormValues) => {
+    setServerError(null);
     setSubmitting(true);
     const err = isSignUp
-      ? await signUp(email.trim(), password)
-      : await signIn(email.trim(), password);
+      ? await signUp(data.email.trim(), data.password)
+      : await signIn(data.email.trim(), data.password);
     setSubmitting(false);
-    if (err) setError(err);
+    if (err) setServerError(err);
+  };
+
+  const toggleMode = () => {
+    setIsSignUp((v) => !v);
+    setServerError(null);
+    reset();
   };
 
   return (
@@ -53,64 +70,53 @@ function AuthForm() {
       contentContainerClassName="pt-8 pb-12"
       keyboardShouldPersistTaps="handled"
     >
-      <Text className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2 text-center">
+      <Text className="text-2xl font-bold text-foreground mb-2 text-center">
         {isSignUp ? "Create Account" : "Sign In"}
       </Text>
-      <Text className="text-gray-500 dark:text-gray-400 text-center mb-8">
+      <Text variant="muted" className="text-center mb-8">
         Sync your study progress across devices
       </Text>
 
-      <Text className="text-sm text-gray-600 dark:text-gray-400 mb-1 ml-1">
-        Email
-      </Text>
-      <TextInput
-        className="border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-3 mb-4 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800"
+      <FormField
+        control={control}
+        name="email"
+        label="Email"
         placeholder="you@example.com"
-        placeholderTextColor="#9ca3af"
         autoCapitalize="none"
         keyboardType="email-address"
-        value={email}
-        onChangeText={setEmail}
+        className="mb-4"
       />
 
-      <Text className="text-sm text-gray-600 dark:text-gray-400 mb-1 ml-1">
-        Password
-      </Text>
-      <TextInput
-        className="border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-3 mb-6 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800"
+      <FormField
+        control={control}
+        name="password"
+        label="Password"
         placeholder="Min 6 characters"
-        placeholderTextColor="#9ca3af"
         secureTextEntry
-        value={password}
-        onChangeText={setPassword}
+        className="mb-6"
       />
 
-      {error && (
-        <Text className="text-red-500 text-center mb-4">{error}</Text>
+      {serverError && (
+        <Text variant="destructive" className="text-center mb-4">{serverError}</Text>
       )}
 
-      <Pressable
-        className="bg-blue-600 rounded-lg py-3 items-center mb-4"
-        onPress={handleSubmit}
-        disabled={submitting || !email || !password}
-        style={{ opacity: submitting || !email || !password ? 0.5 : 1 }}
+      <Button
+        onPress={handleSubmit(onSubmit)}
+        disabled={submitting}
+        className="mb-4"
       >
         {submitting ? (
           <ActivityIndicator color="#fff" />
         ) : (
-          <Text className="text-white font-semibold text-base">
-            {isSignUp ? "Sign Up" : "Sign In"}
-          </Text>
+          isSignUp ? "Sign Up" : "Sign In"
         )}
-      </Pressable>
+      </Button>
 
-      <Pressable onPress={() => setIsSignUp((v) => !v)}>
-        <Text className="text-blue-600 dark:text-blue-400 text-center">
-          {isSignUp
-            ? "Already have an account? Sign In"
-            : "Don't have an account? Sign Up"}
-        </Text>
-      </Pressable>
+      <Button variant="link" onPress={toggleMode}>
+        {isSignUp
+          ? "Already have an account? Sign In"
+          : "Don't have an account? Sign Up"}
+      </Button>
     </ScrollView>
   );
 }
@@ -129,9 +135,8 @@ function LoggedInView() {
     (async () => {
       setStats(await getStudyStats(db));
     })();
-  }, [db, syncing]); // refresh after sync completes
+  }, [db, syncing]);
 
-  // Load display name from profile
   useEffect(() => {
     if (!user) return;
     supabase
@@ -160,85 +165,76 @@ function LoggedInView() {
       contentContainerClassName="pt-8 pb-12"
       keyboardShouldPersistTaps="handled"
     >
-      <Text className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1 text-center">
+      <Text className="text-2xl font-bold text-foreground mb-1 text-center">
         Profile
       </Text>
-      <Text className="text-gray-500 dark:text-gray-400 text-center mb-6">
+      <Text variant="muted" className="text-center mb-6">
         {user?.email}
       </Text>
 
       {/* Display Name */}
-      <Text className="text-sm text-gray-600 dark:text-gray-400 mb-1 ml-1">
-        Display Name
-      </Text>
+      <Text variant="muted" className="text-sm mb-1 ml-1">Display Name</Text>
       <View className="flex-row items-center mb-8 gap-2">
-        <TextInput
-          className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-3 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800"
+        <Input
+          className="flex-1"
           placeholder="How others see you"
-          placeholderTextColor="#9ca3af"
           value={displayName}
           onChangeText={setDisplayName}
           maxLength={40}
           onBlur={saveDisplayName}
         />
-        {savingName && <ActivityIndicator size="small" color="#2563eb" />}
+        {savingName && <ActivityIndicator size="small" color="hsl(var(--primary))" />}
       </View>
 
       {/* Stats */}
       <View className="flex-row gap-4 mb-8">
-        <View className="flex-1 bg-blue-50 dark:bg-blue-950 rounded-xl p-4 items-center">
-          <Text className="text-3xl font-bold text-blue-700 dark:text-blue-300">
-            {stats.cards_studied}
-          </Text>
-          <Text className="text-sm text-blue-600 dark:text-blue-400 mt-1">
-            Cards Studied
-          </Text>
-        </View>
-        <View className="flex-1 bg-green-50 dark:bg-green-950 rounded-xl p-4 items-center">
-          <Text className="text-3xl font-bold text-green-700 dark:text-green-300">
-            {stats.total_reviews}
-          </Text>
-          <Text className="text-sm text-green-600 dark:text-green-400 mt-1">
-            Total Reviews
-          </Text>
-        </View>
+        <Card className="flex-1 bg-blue-50 dark:bg-blue-950 border-0">
+          <CardContent className="items-center">
+            <Text className="text-3xl font-bold text-blue-700 dark:text-blue-300">
+              {stats.cards_studied}
+            </Text>
+            <Text className="text-sm text-blue-600 dark:text-blue-400 mt-1">
+              Cards Studied
+            </Text>
+          </CardContent>
+        </Card>
+        <Card className="flex-1 bg-green-50 dark:bg-green-950 border-0">
+          <CardContent className="items-center">
+            <Text className="text-3xl font-bold text-green-700 dark:text-green-300">
+              {stats.total_reviews}
+            </Text>
+            <Text className="text-sm text-green-600 dark:text-green-400 mt-1">
+              Total Reviews
+            </Text>
+          </CardContent>
+        </Card>
       </View>
 
       {/* Sync */}
-      <Pressable
-        className="bg-blue-600 rounded-lg py-3 items-center mb-3"
-        onPress={sync}
-        disabled={syncing}
-        style={{ opacity: syncing ? 0.5 : 1 }}
-      >
+      <Button onPress={sync} disabled={syncing} className="mb-3">
         {syncing ? (
           <ActivityIndicator color="#fff" />
         ) : (
-          <Text className="text-white font-semibold text-base">Sync Now</Text>
+          "Sync Now"
         )}
-      </Pressable>
+      </Button>
 
       {lastSync && (
-        <Text className="text-gray-400 dark:text-gray-500 text-center text-sm mb-2">
+        <Text variant="muted" className="text-center text-sm mb-2">
           Last synced: {lastSync.toLocaleTimeString()}
         </Text>
       )}
 
       {syncError && (
-        <Text className="text-red-500 text-center text-sm mb-4">
+        <Text variant="destructive" className="text-center text-sm mb-4">
           {syncError}
         </Text>
       )}
 
       {/* Sign Out */}
-      <Pressable
-        className="border border-gray-300 dark:border-gray-600 rounded-lg py-3 items-center mt-4"
-        onPress={signOut}
-      >
-        <Text className="text-gray-700 dark:text-gray-300 font-semibold text-base">
-          Sign Out
-        </Text>
-      </Pressable>
+      <Button variant="outline" onPress={signOut} className="mt-4">
+        Sign Out
+      </Button>
     </ScrollView>
   );
 }

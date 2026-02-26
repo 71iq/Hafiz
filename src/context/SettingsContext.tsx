@@ -40,7 +40,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const toggleDarkMode = useCallback(() => {
-    toggleColorScheme();
+    // Defer to avoid "state update on unmounted component" from NativeWind's
+    // synchronous observable notifying subscribers during the render cycle.
+    requestAnimationFrame(() => {
+      toggleColorScheme();
+    });
   }, [toggleColorScheme]);
 
   return (

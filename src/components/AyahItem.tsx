@@ -1,7 +1,8 @@
 import { memo, useState, useCallback } from "react";
-import { Text, Pressable, type GestureResponderEvent } from "react-native";
+import { Pressable, type GestureResponderEvent } from "react-native";
 import { useSettings } from "../context/SettingsContext";
 import type { Ayah } from "../db/database";
+import { Text } from "./ui/text";
 
 const ARABIC_INDIC_DIGITS = ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"];
 
@@ -56,7 +57,7 @@ export default memo(function AyahItem({
           textAlign: "right",
           color: isHidden ? "transparent" : undefined,
         }}
-        className={`text-gray-900 dark:text-gray-100 ${isHidden ? "select-none" : ""}`}
+        className={`text-foreground ${isHidden ? "select-none" : ""}`}
       >
         {ayah.text_uthmani}
         {marker}
