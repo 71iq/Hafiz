@@ -11,4 +11,10 @@ export interface AyahItem {
   surahName: string;
 }
 
-export type ListItem = SurahHeaderItem | AyahItem;
+export interface SurahTextItem {
+  type: "surah-text";
+  surah: Surah;
+  ayahs: Ayah[];
+}
+
+export type ListItem = SurahHeaderItem | SurahTextItem;

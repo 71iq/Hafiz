@@ -6,8 +6,8 @@ import { getAllAyahs, getAllSurahs, type Ayah, type Surah } from "../db/database
 import type { ListItem } from "../lib/types";
 import { consumePendingScroll } from "../lib/deeplink";
 import { Text } from "./ui/text";
-import AyahItemComponent from "./AyahItem";
 import SurahHeader from "./SurahHeader";
+import SurahTextBlock from "./SurahTextBlock";
 import ControlBar from "./ControlBar";
 import SurahPicker from "./SurahPicker";
 import AyahContextMenu from "./AyahContextMenu";
@@ -46,19 +46,22 @@ export default function MushafScreen() {
     const surahMap = new Map<number, Surah>();
     for (const s of allSurahs) surahMap.set(s.number, s);
 
+    // Group ayahs by surah
+    const ayahsBySurah = new Map<number, Ayah[]>();
+    for (const ayah of allAyahs) {
+      const list = ayahsBySurah.get(ayah.surah);
+      if (list) list.push(ayah);
+      else ayahsBySurah.set(ayah.surah, [ayah]);
+    }
+
     const items: ListItem[] = [];
     const startIndices = new Map<number, number>();
-    let currentSurahNum = 0;
 
-    for (const ayah of allAyahs) {
-      if (ayah.surah !== currentSurahNum) {
-        currentSurahNum = ayah.surah;
-        const surah = surahMap.get(currentSurahNum)!;
-        startIndices.set(currentSurahNum, items.length);
-        items.push({ type: "surah-header", surah });
-      }
-      const surah = surahMap.get(ayah.surah)!;
-      items.push({ type: "ayah", ayah, surahName: surah.name_english });
+    for (const surah of allSurahs) {
+      startIndices.set(surah.number, items.length);
+      items.push({ type: "surah-header", surah });
+      const surahAyahs = ayahsBySurah.get(surah.number) ?? [];
+      items.push({ type: "surah-text", surah, ayahs: surahAyahs });
     }
 
     setListData(items);
@@ -106,16 +109,15 @@ export default function MushafScreen() {
           return;
         }
       }
-      // If no header is visible, use the surah of the first visible ayah
+      // If no header is visible, use the surah of the first visible text block
       if (viewableItems.length > 0) {
         const item = viewableItems[0].item;
-        if (item.type === "ayah") {
-          const surah = surahs.find((s) => s.number === item.ayah.surah);
-          if (surah) setCurrentSurah(surah.name_arabic);
+        if (item.type === "surah-text") {
+          setCurrentSurah(item.surah.name_arabic);
         }
       }
     },
-    [surahs]
+    []
   );
 
   const viewabilityConfig = useMemo(
@@ -157,9 +159,9 @@ export default function MushafScreen() {
         return <SurahHeader surah={item.surah} />;
       }
       return (
-        <AyahItemComponent
-          ayah={item.ayah}
-          surahName={item.surahName}
+        <SurahTextBlock
+          ayahs={item.ayahs}
+          surahName={item.surah.name_english}
           onLongPress={handleLongPress}
         />
       );
@@ -172,7 +174,7 @@ export default function MushafScreen() {
     (item: ListItem) =>
       item.type === "surah-header"
         ? `header-${item.surah.number}`
-        : `ayah-${item.ayah.surah}-${item.ayah.ayah}`,
+        : `text-${item.surah.number}`,
     []
   );
 
