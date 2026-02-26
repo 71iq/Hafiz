@@ -16,12 +16,33 @@ export interface FlashCard {
   surahLabel: string | null;
   /** The answer: next ayah in the Quran */
   answer: Ayah;
+  /** If true, this is a "surah opening" card: prompt is surah name, answer is first ayah */
+  isSurahOpening?: boolean;
 }
 
 const MAX_CONTEXT_DEPTH = 5;
 
 export async function buildDeck(db: SQLiteDatabase, ayahs: Ayah[]): Promise<FlashCard[]> {
   const cards: FlashCard[] = [];
+
+  // Add surah-opening cards: "What is the first ayah of [surah]?"
+  const surahsSeen = new Set<number>();
+  for (const ayah of ayahs) {
+    if (ayah.ayah === 1 && !surahsSeen.has(ayah.surah)) {
+      surahsSeen.add(ayah.surah);
+      const surah = await getSurah(db, ayah.surah);
+      if (surah) {
+        const nextAyah = await getNextAyah(db, ayah.surah, ayah.ayah);
+        cards.push({
+          ayah,
+          contextAyahs: [],
+          surahLabel: surah.name_arabic,
+          answer: nextAyah ?? ayah, // fallback for single-ayah surahs
+          isSurahOpening: true,
+        });
+      }
+    }
+  }
 
   for (const ayah of ayahs) {
     // Skip last ayah of Quran (114:6) — no next verse
