@@ -1,7 +1,7 @@
 import { View } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import MushafScreen from "../src/components/MushafScreen";
-import { useSettings } from "../src/context/SettingsContext";
+import MushafScreen from "../../src/components/MushafScreen";
+import { useSettings } from "../../src/context/SettingsContext";
 
 export default function HomeScreen() {
   const { colorScheme } = useSettings();

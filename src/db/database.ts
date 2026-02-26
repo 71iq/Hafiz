@@ -15,6 +15,23 @@ export interface Surah {
   revelation_type: string;
 }
 
+export interface StudyLogEntry {
+  surah: number;
+  ayah: number;
+  interval: number;
+  repetitions: number;
+  ease_factor: number;
+  next_review_date: string;
+  last_review_date: string;
+}
+
+export interface JuzMapRow {
+  juz: number;
+  surah: number;
+  ayah_start: number;
+  ayah_end: number;
+}
+
 export function getRandomAyah(db: SQLiteDatabase): Ayah | null {
   return db.getFirstSync<Ayah>(
     "SELECT * FROM quran_text ORDER BY RANDOM() LIMIT 1"
@@ -49,4 +66,156 @@ export function getAyah(
     "SELECT * FROM quran_text WHERE surah = ? AND ayah = ?",
     [surah, ayah]
   );
+}
+
+// --- Study log (runtime table) ---
+
+export function ensureStudyLogTable(db: SQLiteDatabase): void {
+  db.execSync(`
+    CREATE TABLE IF NOT EXISTS study_log (
+      surah            INTEGER NOT NULL,
+      ayah             INTEGER NOT NULL,
+      interval         REAL NOT NULL DEFAULT 0,
+      repetitions      INTEGER NOT NULL DEFAULT 0,
+      ease_factor      REAL NOT NULL DEFAULT 2.5,
+      next_review_date TEXT NOT NULL DEFAULT '',
+      last_review_date TEXT NOT NULL DEFAULT '',
+      PRIMARY KEY (surah, ayah)
+    )
+  `);
+}
+
+export function getStudyLogEntry(
+  db: SQLiteDatabase,
+  surah: number,
+  ayah: number
+): StudyLogEntry | null {
+  return db.getFirstSync<StudyLogEntry>(
+    "SELECT * FROM study_log WHERE surah = ? AND ayah = ?",
+    [surah, ayah]
+  );
+}
+
+export function upsertStudyLog(
+  db: SQLiteDatabase,
+  entry: StudyLogEntry
+): void {
+  db.runSync(
+    `INSERT INTO study_log (surah, ayah, interval, repetitions, ease_factor, next_review_date, last_review_date)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(surah, ayah) DO UPDATE SET
+       interval = excluded.interval,
+       repetitions = excluded.repetitions,
+       ease_factor = excluded.ease_factor,
+       next_review_date = excluded.next_review_date,
+       last_review_date = excluded.last_review_date`,
+    [
+      entry.surah,
+      entry.ayah,
+      entry.interval,
+      entry.repetitions,
+      entry.ease_factor,
+      entry.next_review_date,
+      entry.last_review_date,
+    ]
+  );
+}
+
+export function getDueCards(
+  db: SQLiteDatabase,
+  today: string
+): StudyLogEntry[] {
+  return db.getAllSync<StudyLogEntry>(
+    "SELECT * FROM study_log WHERE next_review_date <= ? ORDER BY next_review_date",
+    [today]
+  );
+}
+
+export function getDueCountForSurah(
+  db: SQLiteDatabase,
+  surah: number,
+  today: string
+): number {
+  const row = db.getFirstSync<{ count: number }>(
+    "SELECT COUNT(*) as count FROM study_log WHERE surah = ? AND next_review_date <= ?",
+    [surah, today]
+  );
+  return row?.count ?? 0;
+}
+
+export function getDueCountForJuz(
+  db: SQLiteDatabase,
+  juz: number,
+  today: string
+): number {
+  const row = db.getFirstSync<{ count: number }>(
+    `SELECT COUNT(*) as count FROM study_log sl
+     INNER JOIN juz_map jm ON sl.surah = jm.surah
+       AND sl.ayah >= jm.ayah_start AND sl.ayah <= jm.ayah_end
+     WHERE jm.juz = ? AND sl.next_review_date <= ?`,
+    [juz, today]
+  );
+  return row?.count ?? 0;
+}
+
+// --- Juz queries ---
+
+export function getAyahsByJuz(db: SQLiteDatabase, juz: number): Ayah[] {
+  return db.getAllSync<Ayah>(
+    `SELECT qt.* FROM quran_text qt
+     INNER JOIN juz_map jm ON qt.surah = jm.surah
+       AND qt.ayah >= jm.ayah_start AND qt.ayah <= jm.ayah_end
+     WHERE jm.juz = ?
+     ORDER BY qt.surah, qt.ayah`,
+    [juz]
+  );
+}
+
+export function getAyahsBySurah(db: SQLiteDatabase, surah: number): Ayah[] {
+  return db.getAllSync<Ayah>(
+    "SELECT * FROM quran_text WHERE surah = ? ORDER BY ayah",
+    [surah]
+  );
+}
+
+// --- Duplicate detection ---
+
+export function getDuplicateTexts(
+  db: SQLiteDatabase,
+  textClean: string
+): Ayah[] {
+  return db.getAllSync<Ayah>(
+    "SELECT * FROM quran_text WHERE text_clean = ? ORDER BY surah, ayah",
+    [textClean]
+  );
+}
+
+export function getPreviousAyah(
+  db: SQLiteDatabase,
+  surah: number,
+  ayah: number
+): Ayah | null {
+  if (ayah > 1) {
+    return getAyah(db, surah, ayah - 1);
+  }
+  // First ayah of surah — get last ayah of previous surah
+  if (surah <= 1) return null;
+  const prevSurah = getSurah(db, surah - 1);
+  if (!prevSurah) return null;
+  return getAyah(db, surah - 1, prevSurah.ayah_count);
+}
+
+export function getNextAyah(
+  db: SQLiteDatabase,
+  surah: number,
+  ayah: number
+): Ayah | null {
+  const currentSurah = getSurah(db, surah);
+  if (!currentSurah) return null;
+  if (ayah < currentSurah.ayah_count) {
+    return getAyah(db, surah, ayah + 1);
+  }
+  // Last ayah of surah — get first ayah of next surah
+  if (surah >= 114) return null;
+  return getAyah(db, surah + 1, 1);
 }

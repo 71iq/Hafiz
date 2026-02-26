@@ -14,7 +14,7 @@ export default function OpenScreen() {
       setPendingScroll(surahNum, ayahNum > 0 ? ayahNum : 1);
     }
 
-    router.replace("/");
+    router.replace("/(tabs)/");
   }, [surah, ayah, router]);
 
   return null;

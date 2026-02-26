@@ -86,6 +86,14 @@ db.exec(`
     ayah_count      INTEGER NOT NULL,
     revelation_type TEXT NOT NULL
   );
+
+  CREATE TABLE juz_map (
+    juz        INTEGER NOT NULL,
+    surah      INTEGER NOT NULL,
+    ayah_start INTEGER NOT NULL,
+    ayah_end   INTEGER NOT NULL,
+    PRIMARY KEY (juz, surah, ayah_start)
+  );
 `);
 
 // Insert ayahs
@@ -122,6 +130,35 @@ const insertManySurahs = db.transaction((rows) => {
 
 insertManySurahs(surahs);
 console.log(`  Inserted ${surahs.length} surahs`);
+
+// Insert juz_map from surahs.json juz data
+const rawSurahs = JSON.parse(
+  fs.readFileSync(path.join(DATA_DIR, "surahs.json"), "utf-8")
+);
+
+const insertJuz = db.prepare(
+  "INSERT INTO juz_map (juz, surah, ayah_start, ayah_end) VALUES (?, ?, ?, ?)"
+);
+
+const insertManyJuz = db.transaction((rows) => {
+  for (const row of rows) {
+    insertJuz.run(row.juz, row.surah, row.ayah_start, row.ayah_end);
+  }
+});
+
+const juzRows = [];
+for (const s of rawSurahs) {
+  const surahNum = parseInt(s.index, 10);
+  for (const j of s.juz) {
+    const juzNum = parseInt(j.index, 10);
+    const start = parseInt(j.verse.start.replace("verse_", ""), 10);
+    const end = parseInt(j.verse.end.replace("verse_", ""), 10);
+    juzRows.push({ juz: juzNum, surah: surahNum, ayah_start: start, ayah_end: end });
+  }
+}
+
+insertManyJuz(juzRows);
+console.log(`  Inserted ${juzRows.length} juz_map entries`);
 
 db.close();
 

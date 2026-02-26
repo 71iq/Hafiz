@@ -1,9 +1,10 @@
 import "../global.css";
 import { Slot } from "expo-router";
-import { SQLiteProvider } from "expo-sqlite";
+import { SQLiteProvider, useSQLiteContext } from "expo-sqlite";
 import { View, Text, ActivityIndicator } from "react-native";
-import { Suspense } from "react";
+import { Suspense, useEffect, type ReactNode } from "react";
 import { SettingsProvider } from "../src/context/SettingsContext";
+import { ensureStudyLogTable } from "../src/db/database";
 
 function Loading() {
   return (
@@ -16,6 +17,14 @@ function Loading() {
   );
 }
 
+function DatabaseInit({ children }: { children: ReactNode }) {
+  const db = useSQLiteContext();
+  useEffect(() => {
+    ensureStudyLogTable(db);
+  }, [db]);
+  return <>{children}</>;
+}
+
 export default function RootLayout() {
   return (
     <Suspense fallback={<Loading />}>
@@ -24,11 +33,13 @@ export default function RootLayout() {
         assetSource={{ assetId: require("../assets/quran.db") }}
         useSuspense
       >
-        <SettingsProvider>
-          <View className="flex-1 bg-white dark:bg-gray-950">
-            <Slot />
-          </View>
-        </SettingsProvider>
+        <DatabaseInit>
+          <SettingsProvider>
+            <View className="flex-1 bg-white dark:bg-gray-950">
+              <Slot />
+            </View>
+          </SettingsProvider>
+        </DatabaseInit>
       </SQLiteProvider>
     </Suspense>
   );
