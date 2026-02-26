@@ -20,6 +20,8 @@ interface ButtonProps extends Omit<PressableProps, "children"> {
   children: React.ReactNode;
   className?: string;
   textClassName?: string;
+  /** Tooltip shown on hover (web only) */
+  title?: string;
 }
 
 const variantClasses: Record<ButtonVariant, string> = {
@@ -66,6 +68,7 @@ export function Button({
   children,
   disabled,
   style,
+  title,
   ...props
 }: ButtonProps) {
   const isTextChild = typeof children === "string";
@@ -79,6 +82,8 @@ export function Button({
       )}
       disabled={disabled}
       style={[{ opacity: disabled ? 0.5 : 1 }, typeof style === "object" && !Array.isArray(style) ? style : undefined]}
+      accessibilityLabel={title}
+      {...(title ? { title } as any : {})}
       {...props}
     >
       {isTextChild ? (

@@ -32,19 +32,19 @@ export default function ControlBar({
       </Button>
 
       <View className="flex-row items-center gap-1">
-        <Button variant="ghost" size="icon" onPress={decreaseFontSize}>
+        <Button variant="ghost" size="icon" onPress={decreaseFontSize} title="Decrease font size">
           <AArrowDown size={18} color={iconColor} />
         </Button>
 
-        <Button variant="ghost" size="icon" onPress={increaseFontSize}>
+        <Button variant="ghost" size="icon" onPress={increaseFontSize} title="Increase font size">
           <AArrowUp size={18} color={iconColor} />
         </Button>
 
-        <Toggle pressed={hideAyahs} onPress={toggleHideAyahs}>
+        <Toggle pressed={hideAyahs} onPress={toggleHideAyahs} title={hideAyahs ? "Show ayahs" : "Hide ayahs"}>
           {hideAyahs ? <EyeOff size={18} color={iconColor} /> : <Eye size={18} color={iconColor} />}
         </Toggle>
 
-        <Button variant="ghost" size="icon" onPress={toggleDarkMode}>
+        <Button variant="ghost" size="icon" onPress={toggleDarkMode} title={isDark ? "Switch to light mode" : "Switch to dark mode"}>
           {isDark ? <Sun size={18} color={iconColor} /> : <Moon size={18} color={iconColor} />}
         </Button>
       </View>
