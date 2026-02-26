@@ -12,7 +12,7 @@ export async function syncStudyLog(
   userId: string
 ): Promise<void> {
   // 1. Push unsynced local entries to Supabase
-  const unsynced = getUnsyncedEntries(db);
+  const unsynced = await getUnsyncedEntries(db);
   if (unsynced.length > 0) {
     const rows = unsynced.map((e) => ({
       user_id: userId,
@@ -33,7 +33,7 @@ export async function syncStudyLog(
     if (pushError) throw new Error(`Push failed: ${pushError.message}`);
 
     for (const e of unsynced) {
-      markAsSynced(db, e.surah, e.ayah);
+      await markAsSynced(db, e.surah, e.ayah);
     }
   }
 
@@ -57,7 +57,7 @@ export async function syncStudyLog(
         last_review_date: r.last_review_date,
         updated_at: r.updated_at,
       };
-      upsertFromRemote(db, entry);
+      await upsertFromRemote(db, entry);
     }
   }
 

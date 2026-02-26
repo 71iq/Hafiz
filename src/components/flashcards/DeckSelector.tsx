@@ -23,23 +23,25 @@ export default function DeckSelector({ onStartSession }: DeckSelectorProps) {
   const [juzDueCounts, setJuzDueCounts] = useState<Map<number, number>>(new Map());
 
   useEffect(() => {
-    const allSurahs = getAllSurahs(db);
+    (async () => {
+    const allSurahs = await getAllSurahs(db);
     setSurahs(allSurahs);
 
     const today = getTodayDate();
     const surahCounts = new Map<number, number>();
     for (const s of allSurahs) {
-      const count = getDueCountForSurah(db, s.number, today);
+      const count = await getDueCountForSurah(db, s.number, today);
       if (count > 0) surahCounts.set(s.number, count);
     }
     setSurahDueCounts(surahCounts);
 
     const juzCounts = new Map<number, number>();
     for (let j = 1; j <= 30; j++) {
-      const count = getDueCountForJuz(db, j, today);
+      const count = await getDueCountForJuz(db, j, today);
       if (count > 0) juzCounts.set(j, count);
     }
     setJuzDueCounts(juzCounts);
+    })();
   }, [db]);
 
   const juzList = Array.from({ length: 30 }, (_, i) => i + 1);

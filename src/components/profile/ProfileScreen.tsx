@@ -126,7 +126,9 @@ function LoggedInView() {
   const [savingName, setSavingName] = useState(false);
 
   useEffect(() => {
-    setStats(getStudyStats(db));
+    (async () => {
+      setStats(await getStudyStats(db));
+    })();
   }, [db, syncing]); // refresh after sync completes
 
   // Load display name from profile

@@ -25,9 +25,9 @@ export default function FlashcardsTab() {
   });
 
   const handleStartSession = useCallback(
-    (mode: "surah" | "juz", id: number) => {
-      const ayahs = mode === "surah" ? getAyahsBySurah(db, id) : getAyahsByJuz(db, id);
-      const cards = buildDeck(db, ayahs);
+    async (mode: "surah" | "juz", id: number) => {
+      const ayahs = mode === "surah" ? await getAyahsBySurah(db, id) : await getAyahsByJuz(db, id);
+      const cards = await buildDeck(db, ayahs);
       if (cards.length === 0) return;
 
       // Sort: due cards first, then new cards (cap 20 new per session)
@@ -36,7 +36,7 @@ export default function FlashcardsTab() {
       const newCards: FlashCard[] = [];
 
       for (const card of cards) {
-        const log = getStudyLogEntry(db, card.ayah.surah, card.ayah.ayah);
+        const log = await getStudyLogEntry(db, card.ayah.surah, card.ayah.ayah);
         if (log && log.next_review_date <= today) {
           due.push(card);
         } else if (!log) {

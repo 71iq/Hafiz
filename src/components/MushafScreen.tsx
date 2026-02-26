@@ -37,8 +37,9 @@ export default function MushafScreen() {
 
   // Build interleaved list on mount
   useEffect(() => {
-    const allSurahs = getAllSurahs(db);
-    const allAyahs = getAllAyahs(db);
+    (async () => {
+    const allSurahs = await getAllSurahs(db);
+    const allAyahs = await getAllAyahs(db);
     setSurahs(allSurahs);
 
     const surahMap = new Map<number, Surah>();
@@ -66,6 +67,7 @@ export default function MushafScreen() {
     if (allSurahs.length > 0) {
       setCurrentSurah(allSurahs[0].name_arabic);
     }
+    })();
   }, [db]);
 
   // Handle pending deep-link scroll after data loads

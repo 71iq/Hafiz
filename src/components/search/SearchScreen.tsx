@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useRef } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -34,24 +34,27 @@ export default function SearchScreen() {
   const inputRef = useRef<TextInput>(null);
 
   // Build surah name map for display
-  const surahNames = useMemo(() => {
-    const surahs = getAllSurahs(db);
-    const map = new Map<number, string>();
-    for (const s of surahs) map.set(s.number, s.name_arabic);
-    return map;
+  const [surahNames, setSurahNames] = useState<Map<number, string>>(new Map());
+  useEffect(() => {
+    (async () => {
+      const surahs = await getAllSurahs(db);
+      const map = new Map<number, string>();
+      for (const s of surahs) map.set(s.number, s.name_arabic);
+      setSurahNames(map);
+    })();
   }, [db]);
 
-  const doSearch = useCallback(() => {
+  const doSearch = useCallback(async () => {
     const trimmed = query.trim();
     if (!trimmed) return;
     Keyboard.dismiss();
     setHasSearched(true);
 
     if (mode === "text") {
-      const results = searchAyahsByText(db, trimmed);
+      const results = await searchAyahsByText(db, trimmed);
       setTextResults(results);
     } else {
-      const results = searchByRoot(db, trimmed);
+      const results = await searchByRoot(db, trimmed);
       setRootResults(results);
     }
   }, [db, query, mode]);

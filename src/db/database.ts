@@ -59,37 +59,37 @@ export interface RootSearchResult {
   text_clean: string;
 }
 
-export function getRandomAyah(db: SQLiteDatabase): Ayah | null {
-  return db.getFirstSync<Ayah>(
+export async function getRandomAyah(db: SQLiteDatabase): Promise<Ayah | null> {
+  return db.getFirstAsync<Ayah>(
     "SELECT * FROM quran_text ORDER BY RANDOM() LIMIT 1"
   );
 }
 
-export function getSurah(db: SQLiteDatabase, number: number): Surah | null {
-  return db.getFirstSync<Surah>(
+export async function getSurah(db: SQLiteDatabase, number: number): Promise<Surah | null> {
+  return db.getFirstAsync<Surah>(
     "SELECT * FROM surahs WHERE number = ?",
     [number]
   );
 }
 
-export function getAllAyahs(db: SQLiteDatabase): Ayah[] {
-  return db.getAllSync<Ayah>(
+export function getAllAyahs(db: SQLiteDatabase): Promise<Ayah[]> {
+  return db.getAllAsync<Ayah>(
     "SELECT * FROM quran_text ORDER BY surah, ayah"
   );
 }
 
-export function getAllSurahs(db: SQLiteDatabase): Surah[] {
-  return db.getAllSync<Surah>(
+export function getAllSurahs(db: SQLiteDatabase): Promise<Surah[]> {
+  return db.getAllAsync<Surah>(
     "SELECT * FROM surahs ORDER BY number"
   );
 }
 
-export function getAyah(
+export async function getAyah(
   db: SQLiteDatabase,
   surah: number,
   ayah: number
-): Ayah | null {
-  return db.getFirstSync<Ayah>(
+): Promise<Ayah | null> {
+  return db.getFirstAsync<Ayah>(
     "SELECT * FROM quran_text WHERE surah = ? AND ayah = ?",
     [surah, ayah]
   );
@@ -97,8 +97,8 @@ export function getAyah(
 
 // --- Study log (runtime table) ---
 
-export function ensureStudyLogTable(db: SQLiteDatabase): void {
-  db.execSync(`
+export async function ensureStudyLogTable(db: SQLiteDatabase): Promise<void> {
+  await db.execAsync(`
     CREATE TABLE IF NOT EXISTS study_log (
       surah            INTEGER NOT NULL,
       ayah             INTEGER NOT NULL,
@@ -114,39 +114,39 @@ export function ensureStudyLogTable(db: SQLiteDatabase): void {
   `);
 
   // Migration: add columns for existing installs
-  const cols = db.getAllSync<{ name: string }>(
+  const cols = await db.getAllAsync<{ name: string }>(
     "PRAGMA table_info(study_log)"
   );
   const colNames = cols.map((c) => c.name);
   if (!colNames.includes("updated_at")) {
-    db.execSync(
+    await db.execAsync(
       "ALTER TABLE study_log ADD COLUMN updated_at TEXT NOT NULL DEFAULT ''"
     );
   }
   if (!colNames.includes("synced")) {
-    db.execSync(
+    await db.execAsync(
       "ALTER TABLE study_log ADD COLUMN synced INTEGER NOT NULL DEFAULT 0"
     );
   }
 }
 
-export function getStudyLogEntry(
+export async function getStudyLogEntry(
   db: SQLiteDatabase,
   surah: number,
   ayah: number
-): StudyLogEntry | null {
-  return db.getFirstSync<StudyLogEntry>(
+): Promise<StudyLogEntry | null> {
+  return db.getFirstAsync<StudyLogEntry>(
     "SELECT * FROM study_log WHERE surah = ? AND ayah = ?",
     [surah, ayah]
   );
 }
 
-export function upsertStudyLog(
+export async function upsertStudyLog(
   db: SQLiteDatabase,
   entry: StudyLogEntry
-): void {
+): Promise<void> {
   const now = new Date().toISOString();
-  db.runSync(
+  await db.runAsync(
     `INSERT INTO study_log (surah, ayah, interval, repetitions, ease_factor, next_review_date, last_review_date, updated_at, synced)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
      ON CONFLICT(surah, ayah) DO UPDATE SET
@@ -170,34 +170,34 @@ export function upsertStudyLog(
   );
 }
 
-export function getDueCards(
+export async function getDueCards(
   db: SQLiteDatabase,
   today: string
-): StudyLogEntry[] {
-  return db.getAllSync<StudyLogEntry>(
+): Promise<StudyLogEntry[]> {
+  return db.getAllAsync<StudyLogEntry>(
     "SELECT * FROM study_log WHERE next_review_date <= ? ORDER BY next_review_date",
     [today]
   );
 }
 
-export function getDueCountForSurah(
+export async function getDueCountForSurah(
   db: SQLiteDatabase,
   surah: number,
   today: string
-): number {
-  const row = db.getFirstSync<{ count: number }>(
+): Promise<number> {
+  const row = await db.getFirstAsync<{ count: number }>(
     "SELECT COUNT(*) as count FROM study_log WHERE surah = ? AND next_review_date <= ?",
     [surah, today]
   );
   return row?.count ?? 0;
 }
 
-export function getDueCountForJuz(
+export async function getDueCountForJuz(
   db: SQLiteDatabase,
   juz: number,
   today: string
-): number {
-  const row = db.getFirstSync<{ count: number }>(
+): Promise<number> {
+  const row = await db.getFirstAsync<{ count: number }>(
     `SELECT COUNT(*) as count FROM study_log sl
      INNER JOIN juz_map jm ON sl.surah = jm.surah
        AND sl.ayah >= jm.ayah_start AND sl.ayah <= jm.ayah_end
@@ -209,8 +209,8 @@ export function getDueCountForJuz(
 
 // --- Juz queries ---
 
-export function getAyahsByJuz(db: SQLiteDatabase, juz: number): Ayah[] {
-  return db.getAllSync<Ayah>(
+export async function getAyahsByJuz(db: SQLiteDatabase, juz: number): Promise<Ayah[]> {
+  return db.getAllAsync<Ayah>(
     `SELECT qt.* FROM quran_text qt
      INNER JOIN juz_map jm ON qt.surah = jm.surah
        AND qt.ayah >= jm.ayah_start AND qt.ayah <= jm.ayah_end
@@ -220,8 +220,8 @@ export function getAyahsByJuz(db: SQLiteDatabase, juz: number): Ayah[] {
   );
 }
 
-export function getAyahsBySurah(db: SQLiteDatabase, surah: number): Ayah[] {
-  return db.getAllSync<Ayah>(
+export async function getAyahsBySurah(db: SQLiteDatabase, surah: number): Promise<Ayah[]> {
+  return db.getAllAsync<Ayah>(
     "SELECT * FROM quran_text WHERE surah = ? ORDER BY ayah",
     [surah]
   );
@@ -229,37 +229,37 @@ export function getAyahsBySurah(db: SQLiteDatabase, surah: number): Ayah[] {
 
 // --- Duplicate detection ---
 
-export function getDuplicateTexts(
+export async function getDuplicateTexts(
   db: SQLiteDatabase,
   textClean: string
-): Ayah[] {
-  return db.getAllSync<Ayah>(
+): Promise<Ayah[]> {
+  return db.getAllAsync<Ayah>(
     "SELECT * FROM quran_text WHERE text_clean = ? ORDER BY surah, ayah",
     [textClean]
   );
 }
 
-export function getPreviousAyah(
+export async function getPreviousAyah(
   db: SQLiteDatabase,
   surah: number,
   ayah: number
-): Ayah | null {
+): Promise<Ayah | null> {
   if (ayah > 1) {
     return getAyah(db, surah, ayah - 1);
   }
   // First ayah of surah — get last ayah of previous surah
   if (surah <= 1) return null;
-  const prevSurah = getSurah(db, surah - 1);
+  const prevSurah = await getSurah(db, surah - 1);
   if (!prevSurah) return null;
   return getAyah(db, surah - 1, prevSurah.ayah_count);
 }
 
-export function getNextAyah(
+export async function getNextAyah(
   db: SQLiteDatabase,
   surah: number,
   ayah: number
-): Ayah | null {
-  const currentSurah = getSurah(db, surah);
+): Promise<Ayah | null> {
+  const currentSurah = await getSurah(db, surah);
   if (!currentSurah) return null;
   if (ayah < currentSurah.ayah_count) {
     return getAyah(db, surah, ayah + 1);
@@ -271,21 +271,21 @@ export function getNextAyah(
 
 // --- Search queries ---
 
-export function searchAyahsByText(
+export async function searchAyahsByText(
   db: SQLiteDatabase,
   query: string
-): Ayah[] {
-  return db.getAllSync<Ayah>(
+): Promise<Ayah[]> {
+  return db.getAllAsync<Ayah>(
     "SELECT * FROM quran_text WHERE text_clean LIKE '%' || ? || '%' ORDER BY surah, ayah LIMIT 100",
     [query]
   );
 }
 
-export function searchByRoot(
+export async function searchByRoot(
   db: SQLiteDatabase,
   root: string
-): RootSearchResult[] {
-  return db.getAllSync<RootSearchResult>(
+): Promise<RootSearchResult[]> {
+  return db.getAllAsync<RootSearchResult>(
     `SELECT wr.surah, wr.ayah, wr.word_pos, wr.word_text, wr.root, wr.lemma,
             qt.text_uthmani, qt.text_clean
      FROM word_roots wr
@@ -296,11 +296,11 @@ export function searchByRoot(
   );
 }
 
-export function getDistinctRoots(
+export async function getDistinctRoots(
   db: SQLiteDatabase,
   prefix: string
-): string[] {
-  const rows = db.getAllSync<{ root: string }>(
+): Promise<string[]> {
+  const rows = await db.getAllAsync<{ root: string }>(
     "SELECT DISTINCT root FROM word_roots WHERE root LIKE ? || '%' ORDER BY root LIMIT 20",
     [prefix]
   );
@@ -309,29 +309,29 @@ export function getDistinctRoots(
 
 // --- Sync helpers ---
 
-export function getUnsyncedEntries(db: SQLiteDatabase): StudyLogEntry[] {
-  return db.getAllSync<StudyLogEntry>(
+export async function getUnsyncedEntries(db: SQLiteDatabase): Promise<StudyLogEntry[]> {
+  return db.getAllAsync<StudyLogEntry>(
     "SELECT * FROM study_log WHERE synced = 0"
   );
 }
 
-export function markAsSynced(
+export async function markAsSynced(
   db: SQLiteDatabase,
   surah: number,
   ayah: number
-): void {
-  db.runSync(
+): Promise<void> {
+  await db.runAsync(
     "UPDATE study_log SET synced = 1 WHERE surah = ? AND ayah = ?",
     [surah, ayah]
   );
 }
 
-export function upsertFromRemote(
+export async function upsertFromRemote(
   db: SQLiteDatabase,
   entry: StudyLogEntry
-): void {
+): Promise<void> {
   // Only overwrite if remote updated_at is newer than local
-  db.runSync(
+  await db.runAsync(
     `INSERT INTO study_log (surah, ayah, interval, repetitions, ease_factor, next_review_date, last_review_date, updated_at, synced)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
      ON CONFLICT(surah, ayah) DO UPDATE SET
@@ -356,8 +356,8 @@ export function upsertFromRemote(
   );
 }
 
-export function getStudyStats(db: SQLiteDatabase): StudyStats {
-  const row = db.getFirstSync<{ cards_studied: number; total_reviews: number }>(
+export async function getStudyStats(db: SQLiteDatabase): Promise<StudyStats> {
+  const row = await db.getFirstAsync<{ cards_studied: number; total_reviews: number }>(
     `SELECT
        COUNT(*) as cards_studied,
        COALESCE(SUM(repetitions), 0) as total_reviews

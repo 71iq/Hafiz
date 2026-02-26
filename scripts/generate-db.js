@@ -278,6 +278,21 @@ const insertManyWordRoots = db.transaction((rows) => {
 insertManyWordRoots(wordRoots);
 console.log(`  Inserted ${wordRoots.length} word_roots entries`);
 
+// Generate JSON dump for web platform (expo-sqlite deserialize is broken on web)
+console.log("Generating JSON dump for web...");
+const JSON_PATH = path.join(__dirname, "..", "public", "quran-data.json");
+const jsonDump = {
+  tables: {
+    surahs: db.prepare("SELECT * FROM surahs").all(),
+    quran_text: db.prepare("SELECT * FROM quran_text").all(),
+    juz_map: db.prepare("SELECT * FROM juz_map").all(),
+    word_roots: db.prepare("SELECT * FROM word_roots").all(),
+  },
+};
+fs.writeFileSync(JSON_PATH, JSON.stringify(jsonDump));
+const jsonStats = fs.statSync(JSON_PATH);
+console.log(`  JSON dump: ${(jsonStats.size / 1024 / 1024).toFixed(1)} MB`);
+
 db.close();
 
 const stats = fs.statSync(DB_PATH);

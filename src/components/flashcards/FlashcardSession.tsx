@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { View, Text, Pressable } from "react-native";
 import { useSQLiteContext } from "expo-sqlite";
 import type { FlashCard } from "../../lib/uniqueness";
@@ -23,17 +23,23 @@ export default function FlashcardSession({ deck, onComplete }: FlashcardSessionP
 
   const currentCard = deck[cardIndex];
 
-  const prevEntry = useMemo((): SM2Input => {
-    if (!currentCard) return { interval: 0, repetitions: 0, easeFactor: 2.5 };
-    const log = getStudyLogEntry(db, currentCard.ayah.surah, currentCard.ayah.ayah);
-    if (log) {
-      return {
-        interval: log.interval,
-        repetitions: log.repetitions,
-        easeFactor: log.ease_factor,
-      };
-    }
-    return { interval: 0, repetitions: 0, easeFactor: 2.5 };
+  const defaultEntry: SM2Input = { interval: 0, repetitions: 0, easeFactor: 2.5 };
+  const [prevEntry, setPrevEntry] = useState<SM2Input>(defaultEntry);
+
+  useEffect(() => {
+    if (!currentCard) return;
+    (async () => {
+      const log = await getStudyLogEntry(db, currentCard.ayah.surah, currentCard.ayah.ayah);
+      if (log) {
+        setPrevEntry({
+          interval: log.interval,
+          repetitions: log.repetitions,
+          easeFactor: log.ease_factor,
+        });
+      } else {
+        setPrevEntry(defaultEntry);
+      }
+    })();
   }, [db, currentCard]);
 
   const intervals = useMemo(() => projectIntervals(prevEntry), [prevEntry]);
@@ -43,11 +49,11 @@ export default function FlashcardSession({ deck, onComplete }: FlashcardSessionP
   }, []);
 
   const handleGrade = useCallback(
-    (grade: number) => {
+    async (grade: number) => {
       const result = sm2(grade, prevEntry);
       const today = getTodayDate();
 
-      upsertStudyLog(db, {
+      await upsertStudyLog(db, {
         surah: currentCard.ayah.surah,
         ayah: currentCard.ayah.ayah,
         interval: result.interval,
