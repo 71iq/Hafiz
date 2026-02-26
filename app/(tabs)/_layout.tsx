@@ -36,6 +36,15 @@ export default function TabLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="search"
+        options={{
+          title: "Search",
+          tabBarIcon: ({ color }) => (
+            <Text style={{ color, fontSize: 20 }}>{"🔍"}</Text>
+          ),
+        }}
+      />
     </Tabs>
   );
 }

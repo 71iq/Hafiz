@@ -39,3 +39,6 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# cached morphology data (downloaded by generate-db)
+scripts/quran-data/quran-morphology.txt

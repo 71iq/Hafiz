@@ -32,6 +32,26 @@ export interface JuzMapRow {
   ayah_end: number;
 }
 
+export interface WordRoot {
+  surah: number;
+  ayah: number;
+  word_pos: number;
+  word_text: string;
+  root: string;
+  lemma: string;
+}
+
+export interface RootSearchResult {
+  surah: number;
+  ayah: number;
+  word_pos: number;
+  word_text: string;
+  root: string;
+  lemma: string;
+  text_uthmani: string;
+  text_clean: string;
+}
+
 export function getRandomAyah(db: SQLiteDatabase): Ayah | null {
   return db.getFirstSync<Ayah>(
     "SELECT * FROM quran_text ORDER BY RANDOM() LIMIT 1"
@@ -218,4 +238,42 @@ export function getNextAyah(
   // Last ayah of surah — get first ayah of next surah
   if (surah >= 114) return null;
   return getAyah(db, surah + 1, 1);
+}
+
+// --- Search queries ---
+
+export function searchAyahsByText(
+  db: SQLiteDatabase,
+  query: string
+): Ayah[] {
+  return db.getAllSync<Ayah>(
+    "SELECT * FROM quran_text WHERE text_clean LIKE '%' || ? || '%' ORDER BY surah, ayah LIMIT 100",
+    [query]
+  );
+}
+
+export function searchByRoot(
+  db: SQLiteDatabase,
+  root: string
+): RootSearchResult[] {
+  return db.getAllSync<RootSearchResult>(
+    `SELECT wr.surah, wr.ayah, wr.word_pos, wr.word_text, wr.root, wr.lemma,
+            qt.text_uthmani, qt.text_clean
+     FROM word_roots wr
+     INNER JOIN quran_text qt ON wr.surah = qt.surah AND wr.ayah = qt.ayah
+     WHERE wr.root = ?
+     ORDER BY wr.surah, wr.ayah, wr.word_pos`,
+    [root]
+  );
+}
+
+export function getDistinctRoots(
+  db: SQLiteDatabase,
+  prefix: string
+): string[] {
+  const rows = db.getAllSync<{ root: string }>(
+    "SELECT DISTINCT root FROM word_roots WHERE root LIKE ? || '%' ORDER BY root LIMIT 20",
+    [prefix]
+  );
+  return rows.map((r) => r.root);
 }

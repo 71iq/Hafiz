@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const https = require("https");
 const Database = require("better-sqlite3");
 
 const DATA_DIR = path.join(__dirname, "quran-data");
@@ -14,6 +15,88 @@ if (!fs.existsSync(OUTPUT_DIR)) {
 // Remove existing DB if present
 if (fs.existsSync(DB_PATH)) {
   fs.unlinkSync(DB_PATH);
+}
+
+const MORPHOLOGY_URL =
+  "https://raw.githubusercontent.com/mustafa0x/quran-morphology/master/quran-morphology.txt";
+const MORPHOLOGY_PATH = path.join(DATA_DIR, "quran-morphology.txt");
+
+// Download a file from URL if not already cached locally
+function downloadFile(url, dest) {
+  return new Promise((resolve, reject) => {
+    if (fs.existsSync(dest)) {
+      console.log(`  Using cached ${path.basename(dest)}`);
+      return resolve();
+    }
+    console.log(`  Downloading ${path.basename(dest)}...`);
+    const file = fs.createWriteStream(dest);
+    https
+      .get(url, (response) => {
+        if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+          // Follow redirect
+          file.close();
+          fs.unlinkSync(dest);
+          return downloadFile(response.headers.location, dest).then(resolve, reject);
+        }
+        if (response.statusCode !== 200) {
+          file.close();
+          fs.unlinkSync(dest);
+          return reject(new Error(`HTTP ${response.statusCode} for ${url}`));
+        }
+        response.pipe(file);
+        file.on("finish", () => {
+          file.close(resolve);
+        });
+      })
+      .on("error", (err) => {
+        file.close();
+        if (fs.existsSync(dest)) fs.unlinkSync(dest);
+        reject(err);
+      });
+  });
+}
+
+// Parse morphology file: tab-delimited with surah:ayah:word:segment, arabic, POS, features
+function parseMorphology(filePath) {
+  const lines = fs
+    .readFileSync(filePath, "utf-8")
+    .split("\n")
+    .filter((l) => l && !l.startsWith("#"));
+
+  const wordRoots = [];
+  const seen = new Set(); // deduplicate by surah:ayah:word
+
+  for (const line of lines) {
+    const parts = line.split("\t");
+    if (parts.length < 4) continue;
+
+    const [position, wordText, , features] = parts;
+    if (!features || !features.includes("ROOT:")) continue;
+
+    const posParts = position.split(":");
+    if (posParts.length < 3) continue;
+    const surah = parseInt(posParts[0], 10);
+    const ayah = parseInt(posParts[1], 10);
+    const wordPos = parseInt(posParts[2], 10);
+
+    const key = `${surah}:${ayah}:${wordPos}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    // Extract ROOT and LEM from features like "ROOT:رحم|LEM:رَحْمٰن|MS|GEN|ADJ"
+    let root = "";
+    let lemma = "";
+    for (const feat of features.split("|")) {
+      if (feat.startsWith("ROOT:")) root = feat.slice(5);
+      else if (feat.startsWith("LEM:")) lemma = feat.slice(4);
+    }
+
+    if (root) {
+      wordRoots.push({ surah, ayah, wordPos, wordText, root, lemma: lemma || wordText });
+    }
+  }
+
+  return wordRoots;
 }
 
 // Parse Tanzil pipe-delimited text file: surah|ayah|text
@@ -43,6 +126,11 @@ function parseSurahMetadata(filePath) {
     revelation_type: s.type,
   }));
 }
+
+async function main() {
+// Download morphology data
+console.log("Downloading morphology data...");
+await downloadFile(MORPHOLOGY_URL, MORPHOLOGY_PATH);
 
 console.log("Reading Quran data...");
 
@@ -94,6 +182,18 @@ db.exec(`
     ayah_end   INTEGER NOT NULL,
     PRIMARY KEY (juz, surah, ayah_start)
   );
+
+  CREATE TABLE word_roots (
+    surah    INTEGER NOT NULL,
+    ayah     INTEGER NOT NULL,
+    word_pos INTEGER NOT NULL,
+    word_text TEXT NOT NULL,
+    root     TEXT NOT NULL,
+    lemma    TEXT NOT NULL,
+    PRIMARY KEY (surah, ayah, word_pos)
+  );
+
+  CREATE INDEX idx_word_roots_root ON word_roots(root);
 `);
 
 // Insert ayahs
@@ -160,9 +260,33 @@ for (const s of rawSurahs) {
 insertManyJuz(juzRows);
 console.log(`  Inserted ${juzRows.length} juz_map entries`);
 
+// Parse and insert morphology (word roots)
+console.log("Parsing morphology data...");
+const wordRoots = parseMorphology(MORPHOLOGY_PATH);
+console.log(`  Parsed ${wordRoots.length} word roots`);
+
+const insertWordRoot = db.prepare(
+  "INSERT INTO word_roots (surah, ayah, word_pos, word_text, root, lemma) VALUES (?, ?, ?, ?, ?, ?)"
+);
+
+const insertManyWordRoots = db.transaction((rows) => {
+  for (const r of rows) {
+    insertWordRoot.run(r.surah, r.ayah, r.wordPos, r.wordText, r.root, r.lemma);
+  }
+});
+
+insertManyWordRoots(wordRoots);
+console.log(`  Inserted ${wordRoots.length} word_roots entries`);
+
 db.close();
 
 const stats = fs.statSync(DB_PATH);
 console.log(
   `\nDone! Database saved to ${DB_PATH} (${(stats.size / 1024).toFixed(1)} KB)`
 );
+}
+
+main().catch((err) => {
+  console.error("Error:", err);
+  process.exit(1);
+});
