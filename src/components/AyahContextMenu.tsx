@@ -1,4 +1,4 @@
-import { Modal, View, Pressable, Dimensions } from "react-native";
+import { Modal, View, Pressable, Dimensions, Platform, Share } from "react-native";
 import type { Ayah } from "../db/database";
 import { copyAyahToClipboard } from "../lib/clipboard";
 import { Text } from "./ui/text";
@@ -23,11 +23,34 @@ export default function AyahContextMenu({
   if (!ayah) return null;
 
   const screenHeight = Dimensions.get("window").height;
-  const menuTop = y > screenHeight - 160 ? y - 110 : y;
+  const menuTop = y > screenHeight - 200 ? y - 160 : y;
 
   const handleCopy = () => {
     copyAyahToClipboard(ayah, surahName);
     onClose();
+  };
+
+  const handleShare = async () => {
+    const text = [
+      `"${ayah.text_uthmani}"`,
+      `[Surah ${surahName} : Ayah ${ayah.ayah}]`,
+    ].join("\n");
+
+    onClose();
+
+    if (Platform.OS === "web" && typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({ text });
+      } catch {
+        // User cancelled share or not supported
+      }
+    } else {
+      try {
+        await Share.share({ message: text });
+      } catch {
+        // Cancelled
+      }
+    }
   };
 
   const handleAskCommunity = () => {
@@ -42,20 +65,22 @@ export default function AyahContextMenu({
           style={{ top: menuTop, left: 40, right: 40, position: "absolute" }}
           className="bg-popover rounded-xl shadow-lg border border-border overflow-hidden"
         >
-          <Pressable
-            onPress={handleCopy}
-            className="px-5 py-3.5 active:bg-accent border-b border-border"
-          >
-            <Text className="text-base text-popover-foreground">Copy</Text>
-          </Pressable>
-          <Pressable
-            onPress={handleAskCommunity}
-            className="px-5 py-3.5 active:bg-accent"
-          >
-            <Text className="text-base text-primary">Ask Community</Text>
-          </Pressable>
+          <MenuItem label="Copy" onPress={handleCopy} />
+          <MenuItem label="Share" onPress={handleShare} />
+          <MenuItem label="Ask Community" onPress={handleAskCommunity} primary last />
         </View>
       </Pressable>
     </Modal>
+  );
+}
+
+function MenuItem({ label, onPress, primary, last }: { label: string; onPress: () => void; primary?: boolean; last?: boolean }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      className={`px-5 py-3.5 active:bg-accent ${last ? "" : "border-b border-border"}`}
+    >
+      <Text className={`text-base ${primary ? "text-primary" : "text-popover-foreground"}`}>{label}</Text>
+    </Pressable>
   );
 }
