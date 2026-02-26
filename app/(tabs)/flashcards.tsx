@@ -45,13 +45,17 @@ export default function FlashcardsTab() {
         // Cards not yet due are skipped
       }
 
-      const sessionDeck = [...due, ...newCards.slice(0, 20)];
+      let sessionDeck = [...due, ...newCards.slice(0, 20)];
       if (sessionDeck.length === 0) {
         // All cards reviewed and not yet due — use all cards anyway
-        setDeck(cards.slice(0, 20));
-      } else {
-        setDeck(sessionDeck);
+        sessionDeck = cards.slice(0, 20);
       }
+      // Shuffle using Fisher-Yates
+      for (let i = sessionDeck.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [sessionDeck[i], sessionDeck[j]] = [sessionDeck[j], sessionDeck[i]];
+      }
+      setDeck(sessionDeck);
       setScreen("session");
     },
     [db]
