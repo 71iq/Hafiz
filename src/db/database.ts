@@ -276,8 +276,8 @@ export async function searchAyahsByText(
   query: string
 ): Promise<Ayah[]> {
   return db.getAllAsync<Ayah>(
-    "SELECT * FROM quran_text WHERE text_clean LIKE '%' || ? || '%' ORDER BY surah, ayah LIMIT 100",
-    [query]
+    "SELECT * FROM quran_text WHERE text_clean LIKE '%' || ? || '%' OR text_uthmani LIKE '%' || ? || '%' ORDER BY surah, ayah LIMIT 100",
+    [query, query]
   );
 }
 
