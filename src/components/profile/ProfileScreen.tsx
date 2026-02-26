@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import { useSQLiteContext } from "expo-sqlite";
 import { useAuth } from "../../context/AuthContext";
 import { useSync } from "../../hooks/useSync";
 import { getStudyStats, type StudyStats } from "../../db/database";
+import { supabase } from "../../lib/supabase";
 
 export default function ProfileScreen() {
   const { user, loading: authLoading } = useAuth();
@@ -121,22 +122,65 @@ function LoggedInView() {
   const { user, signOut } = useAuth();
   const { sync, syncing, lastSync, error: syncError } = useSync();
   const [stats, setStats] = useState<StudyStats>({ cards_studied: 0, total_reviews: 0 });
+  const [displayName, setDisplayName] = useState("");
+  const [savingName, setSavingName] = useState(false);
 
   useEffect(() => {
     setStats(getStudyStats(db));
   }, [db, syncing]); // refresh after sync completes
 
+  // Load display name from profile
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("profiles")
+      .select("display_name")
+      .eq("id", user.id)
+      .single()
+      .then(({ data }) => {
+        if (data?.display_name) setDisplayName(data.display_name);
+      });
+  }, [user]);
+
+  const saveDisplayName = useCallback(async () => {
+    if (!user || !displayName.trim()) return;
+    setSavingName(true);
+    await supabase
+      .from("profiles")
+      .update({ display_name: displayName.trim() })
+      .eq("id", user.id);
+    setSavingName(false);
+  }, [user, displayName]);
+
   return (
     <ScrollView
       className="flex-1 px-6"
       contentContainerClassName="pt-8 pb-12"
+      keyboardShouldPersistTaps="handled"
     >
       <Text className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1 text-center">
         Profile
       </Text>
-      <Text className="text-gray-500 dark:text-gray-400 text-center mb-8">
+      <Text className="text-gray-500 dark:text-gray-400 text-center mb-6">
         {user?.email}
       </Text>
+
+      {/* Display Name */}
+      <Text className="text-sm text-gray-600 dark:text-gray-400 mb-1 ml-1">
+        Display Name
+      </Text>
+      <View className="flex-row items-center mb-8 gap-2">
+        <TextInput
+          className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-3 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800"
+          placeholder="How others see you"
+          placeholderTextColor="#9ca3af"
+          value={displayName}
+          onChangeText={setDisplayName}
+          maxLength={40}
+          onBlur={saveDisplayName}
+        />
+        {savingName && <ActivityIndicator size="small" color="#2563eb" />}
+      </View>
 
       {/* Stats */}
       <View className="flex-row gap-4 mb-8">

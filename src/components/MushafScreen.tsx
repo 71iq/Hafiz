@@ -10,6 +10,7 @@ import SurahHeader from "./SurahHeader";
 import ControlBar from "./ControlBar";
 import SurahPicker from "./SurahPicker";
 import AyahContextMenu from "./AyahContextMenu";
+import CreatePostModal from "./community/CreatePostModal";
 
 export default function MushafScreen() {
   const db = useSQLiteContext();
@@ -26,6 +27,13 @@ export default function MushafScreen() {
     surahName: string;
     y: number;
   }>({ visible: false, ayah: null, surahName: "", y: 0 });
+  const [createPostData, setCreatePostData] = useState<{
+    visible: boolean;
+    surah: number;
+    ayah: number;
+    ayahText: string;
+    surahName: string;
+  }>({ visible: false, surah: 0, ayah: 0, ayahText: "", surahName: "" });
 
   // Build interleaved list on mount
   useEffect(() => {
@@ -123,6 +131,23 @@ export default function MushafScreen() {
     setContextMenu({ visible: false, ayah: null, surahName: "", y: 0 });
   }, []);
 
+  const handleAskCommunity = useCallback(
+    (ayah: Ayah, surahName: string) => {
+      setCreatePostData({
+        visible: true,
+        surah: ayah.surah,
+        ayah: ayah.ayah,
+        ayahText: ayah.text_uthmani,
+        surahName,
+      });
+    },
+    []
+  );
+
+  const closeCreatePost = useCallback(() => {
+    setCreatePostData((prev) => ({ ...prev, visible: false }));
+  }, []);
+
   const renderItem = useCallback(
     ({ item }: { item: ListItem }) => {
       if (item.type === "surah-header") {
@@ -183,6 +208,16 @@ export default function MushafScreen() {
         surahName={contextMenu.surahName}
         y={contextMenu.y}
         onClose={closeContextMenu}
+        onAskCommunity={handleAskCommunity}
+      />
+      <CreatePostModal
+        visible={createPostData.visible}
+        surah={createPostData.surah}
+        ayah={createPostData.ayah}
+        ayahText={createPostData.ayahText}
+        surahName={createPostData.surahName}
+        onClose={closeCreatePost}
+        onPostCreated={closeCreatePost}
       />
     </View>
   );

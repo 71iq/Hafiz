@@ -8,6 +8,7 @@ interface AyahContextMenuProps {
   surahName: string;
   y: number;
   onClose: () => void;
+  onAskCommunity?: (ayah: Ayah, surahName: string) => void;
 }
 
 export default function AyahContextMenu({
@@ -16,15 +17,21 @@ export default function AyahContextMenu({
   surahName,
   y,
   onClose,
+  onAskCommunity,
 }: AyahContextMenuProps) {
   if (!ayah) return null;
 
   const screenHeight = Dimensions.get("window").height;
-  const menuTop = y > screenHeight - 120 ? y - 60 : y;
+  const menuTop = y > screenHeight - 160 ? y - 110 : y;
 
   const handleCopy = () => {
     copyAyahToClipboard(ayah, surahName);
     onClose();
+  };
+
+  const handleAskCommunity = () => {
+    onClose();
+    onAskCommunity?.(ayah, surahName);
   };
 
   return (
@@ -36,10 +43,18 @@ export default function AyahContextMenu({
         >
           <Pressable
             onPress={handleCopy}
-            className="px-5 py-3.5 active:bg-gray-100 dark:active:bg-gray-700"
+            className="px-5 py-3.5 active:bg-gray-100 dark:active:bg-gray-700 border-b border-gray-100 dark:border-gray-700"
           >
             <Text className="text-base text-gray-900 dark:text-gray-100">
               Copy
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={handleAskCommunity}
+            className="px-5 py-3.5 active:bg-gray-100 dark:active:bg-gray-700"
+          >
+            <Text className="text-base text-blue-600 dark:text-blue-400">
+              Ask Community
             </Text>
           </Pressable>
         </View>

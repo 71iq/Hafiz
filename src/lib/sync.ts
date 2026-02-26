@@ -61,6 +61,7 @@ export async function syncStudyLog(
     }
   }
 
-  // 3. Recalculate remote score
+  // 3. Recalculate remote score and streak
   await supabase.rpc("recalc_score", { uid: userId });
+  await supabase.rpc("update_streak", { uid: userId });
 }
