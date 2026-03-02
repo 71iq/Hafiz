@@ -11,7 +11,7 @@ const THEME_OPTIONS: { value: ThemeMode; label: string; icon: typeof Sun }[] = [
 
 const FONT_OPTIONS: { value: QuranFont; label: string; sublabel: string }[] = [
   { value: "uthmanic", label: "UthmanicHafs", sublabel: "Standard Uthmani" },
-  { value: "qpc_v2", label: "KFGQPC", sublabel: "King Fahd Complex V2" },
+  { value: "qpc_v2", label: "Madani", sublabel: "King Fahd Complex" },
 ];
 
 export default function SettingsScreen() {

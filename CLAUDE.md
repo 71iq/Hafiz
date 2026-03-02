@@ -116,11 +116,14 @@ Phase 2c: Word-Level Interaction (next)
 - **Vertical scrolling**: Changed from horizontal paging to vertical FlatList with page separators (Arabic page numbers). `getItemLayout` with pre-computed offsets enables instant `scrollToIndex`.
 - **Line-by-line layout**: Each Mushaf page uses `page_lines` table data (15 lines/page) for precise line placement. Flexbox rows with `row-reverse` for RTL, `space-between` for justified lines, `center` for centered lines.
 - **QCF2 font loading**: On web, bypasses expo-font and uses native FontFace API with `display: 'swap'` to avoid `font-display: auto` issue where PUA codepoints render as Arabic Presentation Form fallback glyphs. On native, uses expo-font.
-- **QCF2 glyph distribution**: `buildQcf2LineWords` distributes QCF2 glyphs proportionally across lines using cumulative rounding to eliminate per-line rounding error.
+- **QCF2 glyph distribution**: `buildQcf2LineWords` distributes QCF2 glyphs proportionally across lines per-section (groups of consecutive ayah lines separated by surah_name/basmallah lines). Uses exact surah metadata from WordItems to find split points between sections, respecting surah boundaries.
+- **QCF2 page assignment (v2_page)**: 56 ayahs have different page assignments between `page_map` and QCF2 `v2_page`. Since QCF2 PUA codepoints are tied to per-page fonts, `buildPageDataQcf2()` groups ayahs by `v2_page` instead of `page_map` ranges. Standard mode still uses `page_map`.
+- **QCF2 Basmallah**: Uses page 1 font glyphs (U+FC41–FC44) for Basmallah lines in QCF2 mode. Page 1's font is preloaded alongside each page's font.
 - **Font reveal**: Renders text at opacity:0 while font loads, reveals with `requestAnimationFrame` after load completes. Spinner shown while font downloads.
 - **Page data building**: Load all 604 page_map rows, all 6236 ayahs, all 114 surahs, and all page_lines in parallel. Build page-grouped data in JS using ayahKey (surah * 10000 + ayah) for efficient range matching.
-- **GoToNavigator**: Modal with tab selector. In page mode shows both Page (number input) and Surah tabs. In verse mode shows only Surah tab. Surah-to-page mapping uses `MIN(page) GROUP BY surah_start` query.
+- **GoToNavigator**: Modal with tab selector. In page mode shows both Page (number input), Surah, and Juz' tabs. Surah-to-page mapping uses JOIN on `surah_start <= N AND surah_end >= N` to correctly find pages for surahs that start mid-page.
 - **goToPageRef pattern**: Parent passes a mutable ref to PageMushaf; PageMushaf assigns a goToPage callback to it. Allows parent (mushaf.tsx) to trigger scrollToIndex on the FlatList from outside.
+- **Uthmanic text cleaning**: `cleanArabicText()` strips U+06DF (Small High Rounded Zero) which renders as ugly outlined circles in web browsers.
 
 ## Plugins
 

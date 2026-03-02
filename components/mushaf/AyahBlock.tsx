@@ -1,5 +1,5 @@
 import { View, Text } from "react-native";
-import { toArabicNumber } from "@/lib/arabic";
+import { toArabicNumber, cleanArabicText } from "@/lib/arabic";
 
 type Props = {
   surah: number;
@@ -35,7 +35,7 @@ export function AyahBlock({ surah, ayah, text, fontSize, lineHeight }: Props) {
             writingDirection: "rtl",
           }}
         >
-          {text}
+          {cleanArabicText(text)}
           {"  "}
           <Text
             className="text-teal-600 dark:text-teal-400"

@@ -24,6 +24,7 @@ type AyahRow = {
   ayah: number;
   text_uthmani: string;
   text_qcf2: string;
+  v2_page: number;
 };
 
 type SurahRow = {
@@ -121,6 +122,51 @@ function buildPageData(
   return result;
 }
 
+/**
+ * Build page data for QCF2 mode using v2_page assignments.
+ * QCF2 glyphs are PUA codepoints tied to per-page fonts, so each ayah
+ * must be assigned to the page matching its v2_page (not page_map).
+ */
+function buildPageDataQcf2(
+  pages: PageRow[],
+  ayahs: AyahRow[],
+  lineLookup: Map<number, PageLineLayout[]>,
+  offsetLookup: Map<number, number>
+): PageData[] {
+  // Group ayahs by their QCF2 page assignment
+  const ayahsByPage = new Map<number, AyahRow[]>();
+  for (const a of ayahs) {
+    if (!a.v2_page) continue;
+    let arr = ayahsByPage.get(a.v2_page);
+    if (!arr) {
+      arr = [];
+      ayahsByPage.set(a.v2_page, arr);
+    }
+    arr.push(a);
+  }
+
+  const result: PageData[] = [];
+  for (const page of pages) {
+    const rows = ayahsByPage.get(page.page) ?? [];
+    const pageAyahs: AyahData[] = rows.map(a => ({
+      surah: a.surah,
+      ayah: a.ayah,
+      text: stripBismillah(a.text_uthmani, a.surah, a.ayah),
+      textQcf2: a.text_qcf2 ?? "",
+    }));
+
+    const pd: PageData = { page: page.page, ayahs: pageAyahs };
+    const lines = lineLookup.get(page.page);
+    if (lines) {
+      pd.lineLayout = lines;
+      pd.globalWordOffset = offsetLookup.get(page.page) ?? 0;
+    }
+    result.push(pd);
+  }
+
+  return result;
+}
+
 type Props = {
   onPageChange?: (page: number) => void;
   goToPageRef?: React.MutableRefObject<((page: number) => void) | null>;
@@ -144,7 +190,7 @@ function computePageItemHeight(
       if (line.line_type === "surah_name") {
         h += SURAH_HEADER_COMPACT_HEIGHT;
       } else if (line.line_type === "basmallah") {
-        h += lineHeight * 0.8 + 8; // my-1 margins
+        h += lineHeight * 0.85 + 8; // my-1 margins
       } else {
         h += lineHeight;
       }
@@ -212,7 +258,7 @@ export function PageMushaf({ onPageChange, goToPageRef }: Props) {
             "SELECT page, surah_start, ayah_start, surah_end, ayah_end FROM page_map ORDER BY page"
           ),
           db.getAllAsync<AyahRow>(
-            "SELECT surah, ayah, text_uthmani, text_qcf2 FROM quran_text ORDER BY surah, ayah"
+            "SELECT surah, ayah, text_uthmani, text_qcf2, v2_page FROM quran_text ORDER BY surah, ayah"
           ),
           db.getAllAsync<SurahRow>(
             "SELECT number, name_arabic, name_english, ayah_count, revelation_type FROM surahs ORDER BY number"
@@ -257,7 +303,10 @@ export function PageMushaf({ onPageChange, goToPageRef }: Props) {
           }
         }
 
-        const data = buildPageData(pages, ayahs, lineLookup, offsetLookup);
+        const useQcf2 = quranFont === "qpc_v2";
+        const data = useQcf2
+          ? buildPageDataQcf2(pages, ayahs, lineLookup, offsetLookup)
+          : buildPageData(pages, ayahs, lineLookup, offsetLookup);
         setPageData(data);
         setLayoutInfo(buildLayoutOffsets(data, lineHeight));
       } catch (err) {
@@ -268,7 +317,7 @@ export function PageMushaf({ onPageChange, goToPageRef }: Props) {
     }
 
     loadData();
-  }, [db, lineHeight]);
+  }, [db, lineHeight, quranFont]);
 
   // Rebuild layout offsets when lineHeight changes (font size adjustment)
   useEffect(() => {
@@ -368,6 +417,7 @@ export function PageMushaf({ onPageChange, goToPageRef }: Props) {
         renderItem={renderPage}
         keyExtractor={keyExtractor}
         getItemLayout={getItemLayout}
+        extraData={`${fontSize}-${quranFont}`}
         showsVerticalScrollIndicator={false}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}

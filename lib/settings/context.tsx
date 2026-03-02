@@ -34,7 +34,7 @@ const SettingsContext = createContext<SettingsContextType>({
   setTheme: () => {},
   viewMode: "verse",
   setViewMode: () => {},
-  quranFont: "uthmanic",
+  quranFont: "qpc_v2",
   setQuranFont: () => {},
   isLoaded: false,
 });

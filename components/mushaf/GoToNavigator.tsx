@@ -101,8 +101,12 @@ export function GoToNavigator({
              JOIN surahs s ON s.number = pm.surah_start
              ORDER BY pm.page`
           ),
-          db.getAllAsync<{ page: number; surah_start: number }>(
-            "SELECT MIN(page) as page, surah_start FROM page_map GROUP BY surah_start ORDER BY surah_start"
+          db.getAllAsync<{ page: number; surah: number }>(
+            `SELECT s.number as surah, MIN(pm.page) as page
+             FROM surahs s
+             JOIN page_map pm ON pm.surah_start <= s.number AND pm.surah_end >= s.number
+             GROUP BY s.number
+             ORDER BY s.number`
           ),
           db.getAllAsync<{
             juz: number;
@@ -136,7 +140,7 @@ export function GoToNavigator({
           pageRows.map((r) => ({ page: r.page, surahName: r.name_arabic }))
         );
         const map = new Map<number, number>();
-        for (const r of surahPages) map.set(r.surah_start, r.page);
+        for (const r of surahPages) map.set(r.surah, r.page);
         setSurahPageMap(map);
         setJuzList(
           juzRows.map((r) => ({
