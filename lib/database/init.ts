@@ -8,6 +8,8 @@ const pageMapData = require("../../assets/data/page-map.json");
 const tajweedData = require("../../assets/data/tajweed.json");
 const wbwData = require("../../assets/data/wbw/wbw.json");
 const masaqData = require("../../assets/data/masaq/masaq-aggregated.json");
+const pageLinesData = require("../../assets/data/layout/page-lines.json");
+const qcf2Data = require("../../assets/data/quran-qcf2.json");
 // morphology-terms-ar.json is a terminology reference (labels), not per-word data.
 // Per-word morphological data comes from the MASAQ dataset (word_irab table).
 // The word_morphology table is reserved for future use with mustafa0x/quran-morphology data.
@@ -139,7 +141,7 @@ export type ImportProgress = {
 
 type ProgressCallback = (progress: ImportProgress) => void;
 
-const TOTAL_STEPS = 10;
+const TOTAL_STEPS = 11;
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, "").trim();
@@ -204,12 +206,22 @@ async function importQuranText(
   onProgress({ step: "Quran Text", current: 2, total: TOTAL_STEPS, detail: `${texts.length} ayahs` });
   console.log(`[Import] Importing ${texts.length} quran_text rows...`);
 
-  const rows = texts.map((t: any) => [
-    t.surah, t.ayah, t.text_uthmani, t.text_clean,
-  ]);
+  // Build QCF2 lookup: "surah:ayah" -> { code_v2, v2_page }
+  const qcf2Map = new Map<string, { code_v2: string; v2_page: number }>();
+  for (const v of qcf2Data) {
+    qcf2Map.set(v.verse_key, { code_v2: v.code_v2, v2_page: v.v2_page });
+  }
+
+  const rows = texts.map((t: any) => {
+    const qcf2 = qcf2Map.get(`${t.surah}:${t.ayah}`);
+    return [
+      t.surah, t.ayah, t.text_uthmani, t.text_clean,
+      qcf2?.code_v2 ?? "", qcf2?.v2_page ?? 0,
+    ];
+  });
   await batchInsert(
     db,
-    "INSERT OR IGNORE INTO quran_text (surah, ayah, text_uthmani, text_clean) VALUES (?, ?, ?, ?)",
+    "INSERT OR IGNORE INTO quran_text (surah, ayah, text_uthmani, text_clean, text_qcf2, v2_page) VALUES (?, ?, ?, ?, ?, ?)",
     rows
   );
   console.log(`[Import] Quran text done: ${texts.length} rows`);
@@ -381,6 +393,30 @@ async function importWordIrab(
   console.log(`[Import] Word irab done: ${masaqData.length} rows`);
 }
 
+async function importPageLines(
+  db: SQLiteDatabase,
+  onProgress: ProgressCallback
+): Promise<void> {
+  onProgress({ step: "Page Layout", current: 11, total: TOTAL_STEPS, detail: `${pageLinesData.length} lines` });
+  console.log(`[Import] Importing ${pageLinesData.length} page_lines rows...`);
+
+  const rows = pageLinesData.map((l: any) => [
+    l.page_number,
+    l.line_number,
+    l.line_type,
+    l.is_centered,
+    l.first_word_id === "" ? null : l.first_word_id,
+    l.last_word_id === "" ? null : l.last_word_id,
+    l.surah_number === "" ? null : l.surah_number,
+  ]);
+  await batchInsert(
+    db,
+    "INSERT OR IGNORE INTO page_lines (page_number, line_number, line_type, is_centered, first_word_id, last_word_id, surah_number) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    rows
+  );
+  console.log(`[Import] Page lines done: ${pageLinesData.length} rows`);
+}
+
 async function importTajweed(
   db: SQLiteDatabase,
   onProgress: ProgressCallback
@@ -414,6 +450,42 @@ export async function initializeDatabase(
 
   const populated = await isPopulated(db);
   if (populated) {
+    // Check if page_lines needs migration (added after initial import)
+    const plCount = await db.getFirstAsync<{ count: number }>(
+      "SELECT COUNT(*) as count FROM page_lines"
+    );
+    if ((plCount?.count ?? 0) === 0) {
+      console.log("[Import] Migrating: importing page_lines...");
+      await importPageLines(db, onProgress);
+    }
+
+    // Ensure QCF2 columns exist (added after initial import)
+    try { await db.execAsync("ALTER TABLE quran_text ADD COLUMN text_qcf2 TEXT NOT NULL DEFAULT ''"); } catch (_) {}
+    try { await db.execAsync("ALTER TABLE quran_text ADD COLUMN v2_page INTEGER NOT NULL DEFAULT 0"); } catch (_) {}
+
+    // Check if QCF2 data needs populating
+    const qcf2Check = await db.getFirstAsync<{ cnt: number }>(
+      "SELECT COUNT(*) as cnt FROM quran_text WHERE text_qcf2 != ''"
+    );
+    if ((qcf2Check?.cnt ?? 0) === 0) {
+      console.log("[Import] Migrating: populating QCF2 text data...");
+      const qcf2Map = new Map<string, { code_v2: string; v2_page: number }>();
+      for (const v of qcf2Data) {
+        qcf2Map.set(v.verse_key, { code_v2: v.code_v2, v2_page: v.v2_page });
+      }
+      const updateRows: any[][] = [];
+      for (const [key, val] of qcf2Map) {
+        const [s, a] = key.split(":");
+        updateRows.push([val.code_v2, val.v2_page, parseInt(s), parseInt(a)]);
+      }
+      await batchInsert(
+        db,
+        "UPDATE quran_text SET text_qcf2 = ?, v2_page = ? WHERE surah = ? AND ayah = ?",
+        updateRows
+      );
+      console.log(`[Import] QCF2 migration done: ${updateRows.length} rows updated`);
+    }
+
     console.log("[Import] Database already populated, skipping import.");
     onProgress({ step: "Complete", current: TOTAL_STEPS, total: TOTAL_STEPS, detail: "Already imported" });
     return;
@@ -432,6 +504,7 @@ export async function initializeDatabase(
   await importWordTranslations(db, onProgress);
   await importWordIrab(db, onProgress);
   await importTajweed(db, onProgress);
+  await importPageLines(db, onProgress);
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
   console.log(`[Import] All imports complete in ${elapsed}s`);
@@ -453,6 +526,7 @@ export async function getTableCounts(
     "word_translations",
     "word_irab",
     "tajweed_rules",
+    "page_lines",
   ];
 
   const counts: Record<string, number> = {};

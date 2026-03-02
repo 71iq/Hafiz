@@ -24,6 +24,8 @@ export async function createSchema(db: SQLiteDatabase): Promise<void> {
       ayah INTEGER NOT NULL,
       text_uthmani TEXT NOT NULL,
       text_clean TEXT NOT NULL,
+      text_qcf2 TEXT NOT NULL DEFAULT '',
+      v2_page INTEGER NOT NULL DEFAULT 0,
       PRIMARY KEY (surah, ayah)
     );
 
@@ -121,6 +123,18 @@ export async function createSchema(db: SQLiteDatabase): Promise<void> {
       voice TEXT,
       verb_form TEXT,
       PRIMARY KEY (surah, ayah, word_pos)
+    );
+
+    -- Page line layout (9,046 rows — line-by-line Mushaf layout)
+    CREATE TABLE IF NOT EXISTS page_lines (
+      page_number INTEGER NOT NULL,
+      line_number INTEGER NOT NULL,
+      line_type TEXT NOT NULL,
+      is_centered INTEGER NOT NULL DEFAULT 0,
+      first_word_id INTEGER,
+      last_word_id INTEGER,
+      surah_number INTEGER,
+      PRIMARY KEY (page_number, line_number)
     );
 
     -- Tajweed rules

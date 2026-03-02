@@ -1,7 +1,7 @@
 import { View, Text, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Sun, Moon, Smartphone, Minus, Plus } from "lucide-react-native";
-import { useSettings, FONT_SIZE_STEPS, type ThemeMode } from "@/lib/settings/context";
+import { useSettings, FONT_SIZE_STEPS, type ThemeMode, type QuranFont } from "@/lib/settings/context";
 
 const THEME_OPTIONS: { value: ThemeMode; label: string; icon: typeof Sun }[] = [
   { value: "light", label: "Light", icon: Sun },
@@ -9,8 +9,13 @@ const THEME_OPTIONS: { value: ThemeMode; label: string; icon: typeof Sun }[] = [
   { value: "system", label: "Auto", icon: Smartphone },
 ];
 
+const FONT_OPTIONS: { value: QuranFont; label: string; sublabel: string }[] = [
+  { value: "uthmanic", label: "UthmanicHafs", sublabel: "Standard Uthmani" },
+  { value: "qpc_v2", label: "KFGQPC", sublabel: "King Fahd Complex V2" },
+];
+
 export default function SettingsScreen() {
-  const { theme, setTheme, fontSizeIndex, setFontSizeIndex, fontSize } = useSettings();
+  const { theme, setTheme, fontSizeIndex, setFontSizeIndex, fontSize, quranFont, setQuranFont } = useSettings();
 
   return (
     <SafeAreaView className="flex-1 bg-warm-50 dark:bg-neutral-950">
@@ -122,6 +127,64 @@ export default function SettingsScreen() {
               بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ
             </Text>
           </View>
+        </View>
+
+        {/* Quran Font Section */}
+        <View className="bg-white dark:bg-neutral-900 rounded-2xl p-4 mb-6">
+          <Text className="text-base font-medium text-warm-800 dark:text-neutral-200 mb-3">
+            Quran Font
+          </Text>
+          <View className="gap-2">
+            {FONT_OPTIONS.map((option) => {
+              const isActive = quranFont === option.value;
+              return (
+                <Pressable
+                  key={option.value}
+                  onPress={() => setQuranFont(option.value)}
+                  className={`flex-row items-center justify-between py-3 px-4 rounded-xl border-2 ${
+                    isActive
+                      ? "border-teal-500 bg-teal-50 dark:bg-teal-900/30"
+                      : "border-warm-200 dark:border-neutral-700 bg-warm-50 dark:bg-neutral-800"
+                  }`}
+                >
+                  <View>
+                    <Text
+                      className={`text-sm font-semibold ${
+                        isActive
+                          ? "text-teal-700 dark:text-teal-300"
+                          : "text-warm-700 dark:text-neutral-300"
+                      }`}
+                    >
+                      {option.label}
+                    </Text>
+                    <Text
+                      className={`text-xs mt-0.5 ${
+                        isActive
+                          ? "text-teal-600 dark:text-teal-400"
+                          : "text-warm-400 dark:text-neutral-500"
+                      }`}
+                    >
+                      {option.sublabel}
+                    </Text>
+                  </View>
+                  <View
+                    className={`w-5 h-5 rounded-full border-2 items-center justify-center ${
+                      isActive
+                        ? "border-teal-500 bg-teal-500"
+                        : "border-warm-300 dark:border-neutral-600"
+                    }`}
+                  >
+                    {isActive && <View className="w-2 h-2 rounded-full bg-white" />}
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+          {quranFont === "qpc_v2" && (
+            <Text className="text-xs text-warm-400 dark:text-neutral-500 mt-2">
+              Page-specific font — available in page view only
+            </Text>
+          )}
         </View>
       </View>
     </SafeAreaView>

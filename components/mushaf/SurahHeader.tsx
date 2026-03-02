@@ -6,6 +6,8 @@ type Props = {
   nameEnglish: string;
   ayahCount: number;
   revelationType: string;
+  hideBismillah?: boolean;
+  compact?: boolean;
 };
 
 const BISMILLAH = "بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ";
@@ -16,8 +18,47 @@ export function SurahHeader({
   nameEnglish,
   ayahCount,
   revelationType,
+  hideBismillah,
+  compact,
 }: Props) {
-  const showBismillah = surahNumber !== 9 && surahNumber !== 1;
+  const showBismillah = !hideBismillah && surahNumber !== 9 && surahNumber !== 1;
+
+  if (compact) {
+    return (
+      <View style={{ height: 68 }} className="justify-center">
+        <View className="rounded-xl bg-teal-700 dark:bg-teal-900 px-4 py-2 items-center flex-row justify-center gap-3">
+          <Text
+            className="text-white text-center"
+            style={{
+              fontFamily: "UthmanicHafs",
+              fontSize: 20,
+              lineHeight: 32,
+            }}
+          >
+            {nameArabic}
+          </Text>
+          <Text className="text-teal-200 text-xs">
+            {surahNumber}. {nameEnglish} · {ayahCount} Ayahs
+          </Text>
+        </View>
+
+        {showBismillah && (
+          <View className="items-center mt-2 mb-1">
+            <Text
+              className="text-warm-800 dark:text-neutral-200 text-center"
+              style={{
+                fontFamily: "UthmanicHafs",
+                fontSize: 18,
+                lineHeight: 32,
+              }}
+            >
+              {BISMILLAH}
+            </Text>
+          </View>
+        )}
+      </View>
+    );
+  }
 
   return (
     <View className="mx-4 mt-8 mb-4">

@@ -3,11 +3,13 @@ import { useColorScheme as useNativeWindColorScheme } from "nativewind";
 import type { SQLiteDatabase } from "expo-sqlite";
 import { useDatabase } from "@/lib/database/provider";
 
-export const FONT_SIZE_STEPS = [22, 26, 30, 34, 38] as const;
-export const FONT_SIZE_LINE_HEIGHTS = [48, 56, 64, 72, 80] as const;
+export const FONT_SIZE_STEPS = [22, 26, 30, 34, 38, 42, 46] as const;
+export const FONT_SIZE_LINE_HEIGHTS = [48, 56, 64, 72, 80, 88, 96] as const;
 const DEFAULT_FONT_SIZE_INDEX = 2; // 30px
 
 export type ThemeMode = "light" | "dark" | "system";
+export type ViewMode = "verse" | "page";
+export type QuranFont = "uthmanic" | "qpc_v2";
 
 type SettingsContextType = {
   fontSizeIndex: number;
@@ -16,6 +18,10 @@ type SettingsContextType = {
   setFontSizeIndex: (index: number) => void;
   theme: ThemeMode;
   setTheme: (theme: ThemeMode) => void;
+  viewMode: ViewMode;
+  setViewMode: (mode: ViewMode) => void;
+  quranFont: QuranFont;
+  setQuranFont: (font: QuranFont) => void;
   isLoaded: boolean;
 };
 
@@ -26,6 +32,10 @@ const SettingsContext = createContext<SettingsContextType>({
   setFontSizeIndex: () => {},
   theme: "system",
   setTheme: () => {},
+  viewMode: "verse",
+  setViewMode: () => {},
+  quranFont: "uthmanic",
+  setQuranFont: () => {},
   isLoaded: false,
 });
 
@@ -53,6 +63,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const { setColorScheme } = useNativeWindColorScheme();
   const [fontSizeIndex, setFontSizeIndexState] = useState(DEFAULT_FONT_SIZE_INDEX);
   const [theme, setThemeState] = useState<ThemeMode>("system");
+  const [viewMode, setViewModeState] = useState<ViewMode>("verse");
+  const [quranFont, setQuranFontState] = useState<QuranFont>("uthmanic");
   const [isLoaded, setIsLoaded] = useState(false);
 
   // Load settings from SQLite on mount
@@ -71,6 +83,16 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         if (savedTheme === "light" || savedTheme === "dark" || savedTheme === "system") {
           setThemeState(savedTheme);
           setColorScheme(savedTheme);
+        }
+
+        const savedViewMode = await readSetting(db, "view_mode");
+        if (savedViewMode === "verse" || savedViewMode === "page") {
+          setViewModeState(savedViewMode);
+        }
+
+        const savedQuranFont = await readSetting(db, "quran_font");
+        if (savedQuranFont === "uthmanic" || savedQuranFont === "qpc_v2") {
+          setQuranFontState(savedQuranFont);
         }
       } catch (err) {
         console.warn("[Settings] Failed to load settings:", err);
@@ -99,6 +121,22 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     [db]
   );
 
+  const setViewMode = useCallback(
+    (mode: ViewMode) => {
+      setViewModeState(mode);
+      writeSetting(db, "view_mode", mode).catch(console.warn);
+    },
+    [db]
+  );
+
+  const setQuranFont = useCallback(
+    (font: QuranFont) => {
+      setQuranFontState(font);
+      writeSetting(db, "quran_font", font).catch(console.warn);
+    },
+    [db]
+  );
+
   return (
     <SettingsContext.Provider
       value={{
@@ -108,6 +146,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         setFontSizeIndex,
         theme,
         setTheme,
+        viewMode,
+        setViewMode,
+        quranFont,
+        setQuranFont,
         isLoaded,
       }}
     >

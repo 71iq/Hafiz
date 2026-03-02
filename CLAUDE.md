@@ -44,9 +44,28 @@ Design references: design-references/ folder.
 
 ## Current Phase
 
-Phase 2b: Mushaf — Enhanced Reading (next)
+Phase 2c: Word-Level Interaction (next)
 
 ## Completed Phases
+
+### Phase 2b: Mushaf — Page-Based View
+
+- Page-based Mushaf view: 604 pages, vertical scrolling FlatList with page separators
+- MushafPage component: line-by-line flexbox layout using page_lines table (15 lines/page)
+- QPC V2 (KFGQPC) font support: 604 per-page fonts with Private Use Area glyph mapping
+- Font loader: native FontFace API on web (display:'swap'), expo-font on native
+- Proportional QCF2 glyph distribution across lines via buildQcf2LineWords
+- Surah headers (compact mode) and Basmallah lines rendered from page_lines layout data
+- View mode toggle in header: AlignJustify icon (verse) / BookOpen icon (page), persisted to user_settings
+- GoToNavigator modal: "Go to Page" number input (1-604) and "Go to Surah" scrollable list (114 surahs)
+- Go-to Surah in verse mode scrolls FlashList to surah header index
+- Go-to Surah in page mode maps surah to first page containing it
+- Quran font setting: UthmanicHafs (standard) / KFGQPC V2 (King Fahd Complex), persisted to SQLite
+- Font size control expanded: 7 steps (22–46px)
+- ViewMode + QuranFont settings added to SettingsProvider, persisted to SQLite
+- page_lines table (9,046 rows): line-by-line Mushaf layout with word ID ranges
+- quran_text extended: text_qcf2 and v2_page columns for QCF2 glyph data
+- Database migration: auto-populates page_lines and QCF2 data on existing installs
 
 ### Phase 2a: Mushaf — Verse-by-Verse View
 
@@ -91,6 +110,17 @@ Phase 2b: Mushaf — Enhanced Reading (next)
 - **FlashList for Mushaf**: Flat list with mixed item types (`surah-header` and `ayah`) using `getItemType`. 6350 total items. `estimatedItemSize: 150`.
 - **Color palette**: Warm neutrals (warm-50 to warm-900) for light mode base, Tailwind neutral for dark mode, teal accent (teal-500/600) for interactive elements and surah headers.
 - **Tab layout**: SettingsProvider placed inside TabLayout (after database ready check) so it can access useDatabase().
+
+### Phase 2b Decisions
+
+- **Vertical scrolling**: Changed from horizontal paging to vertical FlatList with page separators (Arabic page numbers). `getItemLayout` with pre-computed offsets enables instant `scrollToIndex`.
+- **Line-by-line layout**: Each Mushaf page uses `page_lines` table data (15 lines/page) for precise line placement. Flexbox rows with `row-reverse` for RTL, `space-between` for justified lines, `center` for centered lines.
+- **QCF2 font loading**: On web, bypasses expo-font and uses native FontFace API with `display: 'swap'` to avoid `font-display: auto` issue where PUA codepoints render as Arabic Presentation Form fallback glyphs. On native, uses expo-font.
+- **QCF2 glyph distribution**: `buildQcf2LineWords` distributes QCF2 glyphs proportionally across lines using cumulative rounding to eliminate per-line rounding error.
+- **Font reveal**: Renders text at opacity:0 while font loads, reveals with `requestAnimationFrame` after load completes. Spinner shown while font downloads.
+- **Page data building**: Load all 604 page_map rows, all 6236 ayahs, all 114 surahs, and all page_lines in parallel. Build page-grouped data in JS using ayahKey (surah * 10000 + ayah) for efficient range matching.
+- **GoToNavigator**: Modal with tab selector. In page mode shows both Page (number input) and Surah tabs. In verse mode shows only Surah tab. Surah-to-page mapping uses `MIN(page) GROUP BY surah_start` query.
+- **goToPageRef pattern**: Parent passes a mutable ref to PageMushaf; PageMushaf assigns a goToPage callback to it. Allows parent (mushaf.tsx) to trigger scrollToIndex on the FlatList from outside.
 
 ## Plugins
 

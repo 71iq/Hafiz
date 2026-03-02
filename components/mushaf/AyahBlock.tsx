@@ -1,4 +1,5 @@
 import { View, Text } from "react-native";
+import { toArabicNumber } from "@/lib/arabic";
 
 type Props = {
   surah: number;
@@ -7,11 +8,6 @@ type Props = {
   fontSize: number;
   lineHeight: number;
 };
-
-function toArabicNumber(num: number): string {
-  const arabicDigits = "٠١٢٣٤٥٦٧٨٩";
-  return String(num).replace(/\d/g, (d) => arabicDigits[parseInt(d, 10)]);
-}
 
 export function AyahBlock({ surah, ayah, text, fontSize, lineHeight }: Props) {
   return (
