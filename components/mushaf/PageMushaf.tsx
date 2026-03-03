@@ -118,9 +118,9 @@ const SURAH_HEADER_COMPACT_HEIGHT = 68; // mt-3(12) + card(48) + mb-2(8)
 function computePageItemHeight(
   page: PageData,
   lineHeight: number,
-  isFirst: boolean
+  isLast: boolean
 ): number {
-  let h = isFirst ? 0 : SEPARATOR_HEIGHT;
+  let h = isLast ? 0 : SEPARATOR_HEIGHT;
   h += PAGE_PADDING;
 
   if (page.lineLayout && page.lineLayout.length > 0) {
@@ -149,7 +149,7 @@ function buildLayoutOffsets(
   let cumOffset = 0;
 
   for (let i = 0; i < pages.length; i++) {
-    const h = computePageItemHeight(pages[i], lineHeight, i === 0);
+    const h = computePageItemHeight(pages[i], lineHeight, i === pages.length - 1);
     heights.push(h);
     offsets.push(cumOffset);
     cumOffset += h;
@@ -309,8 +309,6 @@ export function PageMushaf({ onPageChange, goToPageRef }: Props) {
   const renderPage = useCallback(
     ({ item, index }: { item: PageData; index: number }) => (
       <View>
-        {/* Page separator before every page except the first */}
-        {index > 0 && <PageSeparator page={item.page} />}
         <MushafPage
           pageNumber={item.page}
           ayahs={item.ayahs}
@@ -321,9 +319,11 @@ export function PageMushaf({ onPageChange, goToPageRef }: Props) {
           lineLayout={item.lineLayout}
           globalWordOffset={item.globalWordOffset}
         />
+        {/* Page separator after every page except the last */}
+        {index < pageData.length - 1 && <PageSeparator page={item.page} />}
       </View>
     ),
-    [surahMap, fontSize, lineHeight, width]
+    [surahMap, fontSize, lineHeight, width, pageData.length]
   );
 
   const keyExtractor = useCallback(

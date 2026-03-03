@@ -45,9 +45,17 @@ Design references: design-references/ folder.
 ## Current Phase
 
 Phase 2c: Word-Level Interaction (next)
-- Verse-by-verse view needs QCF2 integration (currently renders with system font)
 
 ## Completed Phases
+
+### Phase 2b-QCF2: Verse-by-Verse QCF2 Integration
+
+- AyahBlock renders QCF2 per-page fonts using text_qcf2 + v2_page per ayah
+- Per-ayah font loading with opacity reveal (instant for cached fonts, async load + requestAnimationFrame for new)
+- SurahHeader Bismillah uses QCF2 page 1 font PUA codepoints (\uFC41–\uFC44)
+- No Bismillah stripping needed — text_qcf2 doesn't contain Bismillah prefix
+- No manual ayah markers — end-of-ayah markers embedded in text_qcf2 PUA glyphs
+- Surah Arabic names remain system font (metadata, not Quran text)
 
 ### Phase 2b: Mushaf — Page-Based View
 
@@ -105,7 +113,7 @@ Phase 2c: Word-Level Interaction (next)
 
 - **NativeWind dark mode**: Uses `darkMode: 'class'` strategy in tailwind.config.js. NativeWind's `useColorScheme()` hook manages theme. Required `babel.config.js` with `jsxImportSource: "nativewind"` for className processing.
 - **Settings persistence**: React context (`SettingsProvider`) wraps the tab layout. Reads font_size_index and theme from `user_settings` SQLite table on mount, writes on change. NativeWind `setColorScheme()` applies theme immediately.
-- **Bismillah handling**: Database `text_uthmani` for ayah 1 of surahs 2-114 (except 9) includes the Bismillah prefix. Stripped at display time using Unicode-escape-based `indexOf` search for "ٱلرَّحِيمِ" end marker. SurahHeader renders a standalone decorative Bismillah instead.
+- **Bismillah handling**: With QCF2, `text_qcf2` does NOT contain Bismillah prefix — no stripping needed. SurahHeader renders Bismillah using QCF2 page 1 PUA codepoints. (Legacy: `text_uthmani` included Bismillah prefix that required stripping.)
 - **FlashList for Mushaf**: Flat list with mixed item types (`surah-header` and `ayah`) using `getItemType`. 6350 total items. `estimatedItemSize: 150`.
 - **Color palette**: Warm neutrals (warm-50 to warm-900) for light mode base, Tailwind neutral for dark mode, teal accent (teal-500/600) for interactive elements and surah headers.
 - **Tab layout**: SettingsProvider placed inside TabLayout (after database ready check) so it can access useDatabase().
@@ -122,6 +130,14 @@ Phase 2c: Word-Level Interaction (next)
 - **Page data building**: Load all 604 page_map rows, all 6236 ayahs, all 114 surahs, and all page_lines in parallel. Build page-grouped data in JS using ayahKey (surah * 10000 + ayah) for efficient range matching.
 - **GoToNavigator**: Modal with tab selector. In page mode shows both Page (number input), Surah, and Juz' tabs. Surah-to-page mapping uses JOIN on `surah_start <= N AND surah_end >= N` to correctly find pages for surahs that start mid-page.
 - **goToPageRef pattern**: Parent passes a mutable ref to PageMushaf; PageMushaf assigns a goToPage callback to it. Allows parent (mushaf.tsx) to trigger scrollToIndex on the FlatList from outside.
+
+### Phase 2b-QCF2 Decisions
+
+- **Verse-view QCF2**: AyahBlock loads per-page QCF2 font via `loadQpcFont(v2Page)`. SQL query uses `text_qcf2` and `v2_page` instead of `text_uthmani`. Each ayah's text belongs to exactly one v2_page font.
+- **Font caching**: `isQpcFontLoaded()` check in useState initializer gives instant render for already-loaded fonts (common when scrolling back). New fonts load async with opacity reveal via `requestAnimationFrame`.
+- **No Bismillah stripping**: `text_qcf2` doesn't include Bismillah prefix (unlike `text_uthmani`), so the raheemEnd stripping logic was removed from mushaf.tsx.
+- **No manual ayah markers**: End-of-ayah markers (circled numbers) are embedded as the last PUA glyph in `text_qcf2` — removed `toArabicNumber` from AyahBlock.
+- **SurahHeader Bismillah**: Uses `BISMILLAH_QCF2 = "\uFC41 \uFC42 \uFC43 \uFC44"` with page 1 font (`QCF2_001`). Font loading state independent of ayah fonts.
 
 ## Plugins
 

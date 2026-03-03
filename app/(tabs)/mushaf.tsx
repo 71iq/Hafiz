@@ -22,7 +22,8 @@ type SurahRow = {
 type AyahRow = {
   surah: number;
   ayah: number;
-  text_uthmani: string;
+  text_qcf2: string;
+  v2_page: number;
 };
 
 type MushafItem =
@@ -39,6 +40,7 @@ type MushafItem =
       surah: number;
       ayah: number;
       text: string;
+      v2Page: number;
     };
 
 export default function MushafScreen() {
@@ -68,15 +70,12 @@ export default function MushafScreen() {
         }
 
         const ayahs = await db.getAllAsync<AyahRow>(
-          "SELECT surah, ayah, text_uthmani FROM quran_text ORDER BY surah, ayah"
+          "SELECT surah, ayah, text_qcf2, v2_page FROM quran_text ORDER BY surah, ayah"
         );
 
         const flatItems: MushafItem[] = [];
         const headerIndices = new Map<number, number>();
         let currentSurah = 0;
-
-        const raheemEnd =
-          "\u0671\u0644\u0631\u0651\u064e\u062d\u0650\u064a\u0645\u0650";
 
         for (const row of ayahs) {
           if (row.surah !== currentSurah) {
@@ -95,19 +94,12 @@ export default function MushafScreen() {
             }
           }
 
-          let text = row.text_uthmani;
-          if (row.ayah === 1 && row.surah !== 1 && row.surah !== 9) {
-            const idx = text.indexOf(raheemEnd);
-            if (idx !== -1) {
-              text = text.substring(idx + raheemEnd.length).trimStart();
-            }
-          }
-
           flatItems.push({
             type: "ayah",
             surah: row.surah,
             ayah: row.ayah,
-            text,
+            text: row.text_qcf2,
+            v2Page: row.v2_page,
           });
         }
 
@@ -141,6 +133,7 @@ export default function MushafScreen() {
           surah={item.surah}
           ayah={item.ayah}
           text={item.text}
+          v2Page={item.v2Page}
           fontSize={fontSize}
           lineHeight={lineHeight}
         />

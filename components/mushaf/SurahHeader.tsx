@@ -1,4 +1,10 @@
+import { useEffect, useState } from "react";
 import { View, Text } from "react-native";
+import {
+  loadQpcFont,
+  qpcFontName,
+  isQpcFontLoaded,
+} from "@/lib/fonts/loader";
 
 type Props = {
   surahNumber: number;
@@ -10,7 +16,8 @@ type Props = {
   compact?: boolean;
 };
 
-const BISMILLAH = "بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ";
+/** QCF2 Bismillah from page 1 font (PUA codepoints) */
+const BISMILLAH_QCF2 = "\uFC41 \uFC42 \uFC43 \uFC44";
 
 export function SurahHeader({
   surahNumber,
@@ -21,11 +28,33 @@ export function SurahHeader({
   hideBismillah,
   compact,
 }: Props) {
-  const showBismillah = !hideBismillah && surahNumber !== 9 && surahNumber !== 1;
+  const showBismillah =
+    !hideBismillah && surahNumber !== 9 && surahNumber !== 1;
+
+  const [bismFontReady, setBismFontReady] = useState(() =>
+    isQpcFontLoaded(1)
+  );
+
+  useEffect(() => {
+    if (!showBismillah) return;
+    if (isQpcFontLoaded(1)) {
+      setBismFontReady(true);
+      return;
+    }
+    let cancelled = false;
+    loadQpcFont(1).then(() => {
+      if (!cancelled) {
+        requestAnimationFrame(() => setBismFontReady(true));
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [showBismillah]);
 
   if (compact) {
     return (
-      <View style={{ height: 68 }} className="justify-center">
+      <View style={{ height: showBismillah ? 100 : 68 }} className="justify-center">
         <View className="rounded-xl bg-teal-700 dark:bg-teal-900 px-4 py-2 items-center flex-row justify-center gap-3">
           <Text
             className="text-white text-center"
@@ -46,11 +75,13 @@ export function SurahHeader({
             <Text
               className="text-warm-800 dark:text-neutral-200 text-center"
               style={{
-                  fontSize: 18,
+                fontSize: 18,
                 lineHeight: 32,
+                fontFamily: qpcFontName(1),
+                opacity: bismFontReady ? 1 : 0,
               }}
             >
-              {BISMILLAH}
+              {BISMILLAH_QCF2}
             </Text>
           </View>
         )}
@@ -98,7 +129,7 @@ export function SurahHeader({
         </View>
       </View>
 
-      {/* Bismillah */}
+      {/* Bismillah (QCF2) */}
       {showBismillah && (
         <View className="items-center mt-5 mb-2">
           <Text
@@ -106,9 +137,11 @@ export function SurahHeader({
             style={{
               fontSize: 24,
               lineHeight: 48,
+              fontFamily: qpcFontName(1),
+              opacity: bismFontReady ? 1 : 0,
             }}
           >
-            {BISMILLAH}
+            {BISMILLAH_QCF2}
           </Text>
         </View>
       )}

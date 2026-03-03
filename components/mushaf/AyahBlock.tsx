@@ -1,15 +1,48 @@
+import { useEffect, useState } from "react";
 import { View, Text } from "react-native";
-import { toArabicNumber } from "@/lib/arabic";
+import {
+  loadQpcFont,
+  qpcFontName,
+  isQpcFontLoaded,
+} from "@/lib/fonts/loader";
 
 type Props = {
   surah: number;
   ayah: number;
   text: string;
+  v2Page: number;
   fontSize: number;
   lineHeight: number;
 };
 
-export function AyahBlock({ surah, ayah, text, fontSize, lineHeight }: Props) {
+export function AyahBlock({
+  surah,
+  ayah,
+  text,
+  v2Page,
+  fontSize,
+  lineHeight,
+}: Props) {
+  const [fontVisible, setFontVisible] = useState(() =>
+    isQpcFontLoaded(v2Page)
+  );
+
+  useEffect(() => {
+    if (isQpcFontLoaded(v2Page)) {
+      setFontVisible(true);
+      return;
+    }
+    let cancelled = false;
+    loadQpcFont(v2Page).then(() => {
+      if (!cancelled) {
+        requestAnimationFrame(() => setFontVisible(true));
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [v2Page]);
+
   return (
     <View className="border-b border-warm-100 dark:border-neutral-800 mx-4">
       {/* Ayah number badge */}
@@ -23,7 +56,7 @@ export function AyahBlock({ surah, ayah, text, fontSize, lineHeight }: Props) {
         </View>
       </View>
 
-      {/* Arabic text */}
+      {/* Arabic text (QCF2) */}
       <View className="px-2 pb-4 pt-1">
         <Text
           className="text-warm-900 dark:text-neutral-100"
@@ -32,18 +65,11 @@ export function AyahBlock({ surah, ayah, text, fontSize, lineHeight }: Props) {
             lineHeight,
             textAlign: "right",
             writingDirection: "rtl",
+            fontFamily: qpcFontName(v2Page),
+            opacity: fontVisible ? 1 : 0,
           }}
         >
           {text}
-          {"  "}
-          <Text
-            className="text-teal-600 dark:text-teal-400"
-            style={{
-                fontSize: fontSize * 0.75,
-            }}
-          >
-            {toArabicNumber(ayah)}
-          </Text>
         </Text>
       </View>
     </View>
