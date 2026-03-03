@@ -1,14 +1,12 @@
 import { useEffect, useState } from "react";
 import { View, Text, ActivityIndicator } from "react-native";
 import { SurahHeader } from "./SurahHeader";
-import type { QuranFont } from "@/lib/settings/context";
 import { loadQpcFont, qpcFontName, isQpcFontLoaded } from "@/lib/fonts/loader";
-import { toArabicNumber, cleanArabicText } from "@/lib/arabic";
+import { toArabicNumber } from "@/lib/arabic";
 
 type AyahData = {
   surah: number;
   ayah: number;
-  text: string;
   textQcf2: string;
 };
 
@@ -34,10 +32,6 @@ type WordItem = {
   text: string;
   surah: number;
   ayah: number;
-} | {
-  type: "marker";
-  ayah: number;
-  surah: number;
 };
 
 type Props = {
@@ -47,12 +41,9 @@ type Props = {
   fontSize: number;
   lineHeight: number;
   width: number;
-  quranFont: QuranFont;
   lineLayout?: PageLineLayout[];
   globalWordOffset?: number;
 };
-
-const BISMILLAH = "بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ";
 
 // QCF2 Basmallah: 4 word glyphs from page 1's font (Surah 1 Ayah 1 = the Basmallah)
 const BISMILLAH_QCF2 = "\uFC41 \uFC42 \uFC43 \uFC44";
@@ -60,44 +51,27 @@ const BISMILLAH_QCF2 = "\uFC41 \uFC42 \uFC43 \uFC44";
 // Content width scales with font size — a standard Mushaf line fills this width
 const FONT_WIDTH_SCALE = 19;
 
-function buildWordItems(ayahs: AyahData[], useQcf2: boolean): WordItem[] {
+function buildWordItems(ayahs: AyahData[]): WordItem[] {
   const items: WordItem[] = [];
   for (const a of ayahs) {
-    const src = useQcf2 ? a.textQcf2 : cleanArabicText(a.text);
-    const words = src.split(/\s+/).filter(Boolean);
+    const words = a.textQcf2.split(/\s+/).filter(Boolean);
     for (const w of words) {
       items.push({ type: "word", text: w, surah: a.surah, ayah: a.ayah });
-    }
-    // QCF2 text already includes end-of-ayah markers as the last word glyph
-    if (!useQcf2) {
-      items.push({ type: "marker", ayah: a.ayah, surah: a.surah });
     }
   }
   return items;
 }
 
-function getLineWords(
-  line: PageLineLayout,
-  wordItems: WordItem[],
-  offset: number
-): WordItem[] {
-  if (line.first_word_id == null || line.last_word_id == null) return [];
-  const start = line.first_word_id - offset - 1;
-  const end = line.last_word_id - offset;
-  return wordItems.slice(Math.max(0, start), end);
-}
-
 /**
- * Pre-compute per-line word slices for QCF2 font.
- * page_lines word IDs match UthmanicHafs word counts, but QCF2 has more glyphs.
- * Distribute QCF2 glyphs proportionally across lines based on the UthmanicHafs
- * word count per line, so every glyph gets rendered.
+ * Pre-compute per-line word slices by proportional distribution.
+ * page_lines word IDs are QCF2 glyph positions. Distribute wordItems
+ * proportionally across lines based on the QCF2 word count per line.
  *
  * Distribution is done per-section (groups of consecutive ayah lines separated
- * by surah_name/basmallah lines). Each section's exact QCF2 glyph count is
+ * by surah_name/basmallah lines). Each section's exact word/glyph count is
  * determined from wordItem surah metadata to respect surah boundaries exactly.
  */
-function buildQcf2LineWords(
+function buildLineWords(
   lines: PageLineLayout[],
   wordItems: WordItem[],
   offset: number
@@ -142,7 +116,6 @@ function buildQcf2LineWords(
 
   // Multiple sections: find the exact split point in wordItems where
   // the new surah starts (using surah metadata on each word item).
-  // Build section ranges: each section gets a [start, end) range in wordItems.
   const sectionRanges: { start: number; end: number }[] = [];
   let wiCursor = 0;
 
@@ -224,12 +197,8 @@ function renderLines(
   lineHeight: number,
   contentWidth: number,
   fontFamily: string,
-  useQcf2: boolean,
 ) {
-  // For QCF2, pre-compute proportional line assignments
-  const qcf2LineWords = useQcf2
-    ? buildQcf2LineWords(lines, wordItems, globalWordOffset)
-    : null;
+  const lineWordsMap = buildLineWords(lines, wordItems, globalWordOffset);
 
   return lines.map((line) => {
     const centered = line.is_centered === 1;
@@ -254,9 +223,7 @@ function renderLines(
     }
 
     if (line.line_type === "basmallah") {
-      const bismHeight = lineHeight * 0.85 + 8; // matches getItemLayout
-      const bismText = useQcf2 ? BISMILLAH_QCF2 : BISMILLAH;
-      const bismFont = useQcf2 ? qpcFontName(1) : fontFamily;
+      const bismHeight = lineHeight * 0.85 + 8;
       return (
         <View
           key={`line-${line.line_number}-bism`}
@@ -266,20 +233,18 @@ function renderLines(
           <Text
             className="text-warm-800 dark:text-neutral-200 text-center"
             style={{
-              fontFamily: bismFont,
+              fontFamily: qpcFontName(1),
               fontSize: fontSize * 0.85,
               lineHeight: lineHeight * 0.85,
             }}
           >
-            {bismText}
+            {BISMILLAH_QCF2}
           </Text>
         </View>
       );
     }
 
-    const words = qcf2LineWords
-      ? (qcf2LineWords.get(line.line_number) ?? [])
-      : getLineWords(line, wordItems, globalWordOffset);
+    const words = lineWordsMap.get(line.line_number) ?? [];
     if (words.length === 0) return null;
 
     return (
@@ -290,40 +255,22 @@ function renderLines(
           justifyContent: centered ? "center" : "space-between",
           width: contentWidth,
           height: lineHeight,
-          overflow: "hidden",
           gap: centered ? fontSize * 0.3 : undefined,
         }}
       >
-        {words.map((w, i) => {
-          if (w.type === "marker") {
-            return (
-              <Text
-                key={`m-${w.surah}-${w.ayah}-${i}`}
-                className="text-teal-600 dark:text-teal-400"
-                style={{
-                  fontFamily,
-                  fontSize: fontSize * 0.82,
-                  lineHeight,
-                }}
-              >
-                {"\uFD3E"}{toArabicNumber(w.ayah)}{"\uFD3F"}
-              </Text>
-            );
-          }
-          return (
-            <Text
-              key={`w-${w.surah}-${w.ayah}-${i}`}
-              className="text-warm-900 dark:text-neutral-100"
-              style={{
-                fontFamily,
-                fontSize,
-                lineHeight,
-              }}
-            >
-              {w.text}
-            </Text>
-          );
-        })}
+        {words.map((w, i) => (
+          <Text
+            key={`w-${w.surah}-${w.ayah}-${i}`}
+            className="text-warm-900 dark:text-neutral-100"
+            style={{
+              fontFamily,
+              fontSize,
+              lineHeight,
+            }}
+          >
+            {w.text}
+          </Text>
+        ))}
       </View>
     );
   });
@@ -336,26 +283,17 @@ export function MushafPage({
   fontSize,
   lineHeight,
   width,
-  quranFont,
   lineLayout,
   globalWordOffset,
 }: Props) {
-  const useQcf2 = quranFont === "qpc_v2";
-
   // fontVisible: false while font is loading. Text renders at opacity:0 so the
   // browser can lay out glyphs, then we reveal after one animation frame.
-  const [fontVisible, setFontVisible] = useState(!useQcf2);
+  const [fontVisible, setFontVisible] = useState(false);
 
   useEffect(() => {
-    if (!useQcf2) {
-      setFontVisible(true);
-      return;
-    }
     setFontVisible(false);
 
     const reveal = () => {
-      // Text is rendered with opacity:0. Give the browser one frame to lay out
-      // the text with the QCF2 font before revealing.
       requestAnimationFrame(() => setFontVisible(true));
     };
 
@@ -371,17 +309,17 @@ export function MushafPage({
     Promise.all([loadQpcFont(pageNumber), loadQpcFont(1)])
       .then(reveal)
       .catch(console.warn);
-  }, [pageNumber, useQcf2]);
+  }, [pageNumber]);
 
   const hasLineLayout = lineLayout && lineLayout.length > 0 && globalWordOffset != null;
 
   // Content width grows with font size, capped at screen width
   const contentWidth = Math.min(fontSize * FONT_WIDTH_SCALE, width - 32);
 
-  const fontFamily = useQcf2 ? qpcFontName(pageNumber) : "UthmanicHafs";
+  const fontFamily = qpcFontName(pageNumber);
 
   // Show loading indicator while font is not loaded at all
-  if (useQcf2 && !isQpcFontLoaded(pageNumber)) {
+  if (!isQpcFontLoaded(pageNumber)) {
     return (
       <View style={{ width, minHeight: 200 }} className="items-center justify-center">
         <ActivityIndicator size="small" color="#0d9488" />
@@ -391,7 +329,7 @@ export function MushafPage({
 
   let content;
   if (hasLineLayout) {
-    const wordItems = buildWordItems(ayahs, useQcf2);
+    const wordItems = buildWordItems(ayahs);
     content = renderLines(
       lineLayout,
       wordItems,
@@ -401,10 +339,9 @@ export function MushafPage({
       lineHeight,
       contentWidth,
       fontFamily,
-      useQcf2,
     );
   } else {
-    // Fallback: render ayahs as continuous justified text (shouldn't happen with layout data)
+    // Fallback: render ayahs as continuous text (shouldn't happen with layout data)
     content = (
       <Text
         className="text-warm-900 dark:text-neutral-100"
@@ -418,16 +355,7 @@ export function MushafPage({
       >
         {ayahs.map((a, i) => (
           <Text key={`${a.surah}-${a.ayah}`}>
-            {useQcf2 ? a.textQcf2 : cleanArabicText(a.text)}
-            {"  "}
-            {!useQcf2 && (
-              <Text
-                className="text-teal-600 dark:text-teal-400"
-                style={{ fontFamily, fontSize: fontSize * 0.75 }}
-              >
-                ﴿{toArabicNumber(a.ayah)}﴾
-              </Text>
-            )}
+            {a.textQcf2}
             {i < ayahs.length - 1 ? " " : ""}
           </Text>
         ))}

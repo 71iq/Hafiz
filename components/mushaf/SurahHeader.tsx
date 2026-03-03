@@ -30,7 +30,6 @@ export function SurahHeader({
           <Text
             className="text-white text-center"
             style={{
-              fontFamily: "UthmanicHafs",
               fontSize: 20,
               lineHeight: 32,
             }}
@@ -47,8 +46,7 @@ export function SurahHeader({
             <Text
               className="text-warm-800 dark:text-neutral-200 text-center"
               style={{
-                fontFamily: "UthmanicHafs",
-                fontSize: 18,
+                  fontSize: 18,
                 lineHeight: 32,
               }}
             >
@@ -74,7 +72,6 @@ export function SurahHeader({
         <Text
           className="text-white text-center mb-1"
           style={{
-            fontFamily: "UthmanicHafs",
             fontSize: 32,
             lineHeight: 56,
           }}
@@ -107,7 +104,6 @@ export function SurahHeader({
           <Text
             className="text-warm-800 dark:text-neutral-200 text-center"
             style={{
-              fontFamily: "UthmanicHafs",
               fontSize: 24,
               lineHeight: 48,
             }}

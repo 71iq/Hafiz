@@ -9,7 +9,6 @@ const DEFAULT_FONT_SIZE_INDEX = 2; // 30px
 
 export type ThemeMode = "light" | "dark" | "system";
 export type ViewMode = "verse" | "page";
-export type QuranFont = "uthmanic" | "qpc_v2";
 
 type SettingsContextType = {
   fontSizeIndex: number;
@@ -20,8 +19,6 @@ type SettingsContextType = {
   setTheme: (theme: ThemeMode) => void;
   viewMode: ViewMode;
   setViewMode: (mode: ViewMode) => void;
-  quranFont: QuranFont;
-  setQuranFont: (font: QuranFont) => void;
   isLoaded: boolean;
 };
 
@@ -34,8 +31,6 @@ const SettingsContext = createContext<SettingsContextType>({
   setTheme: () => {},
   viewMode: "verse",
   setViewMode: () => {},
-  quranFont: "qpc_v2",
-  setQuranFont: () => {},
   isLoaded: false,
 });
 
@@ -64,7 +59,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [fontSizeIndex, setFontSizeIndexState] = useState(DEFAULT_FONT_SIZE_INDEX);
   const [theme, setThemeState] = useState<ThemeMode>("system");
   const [viewMode, setViewModeState] = useState<ViewMode>("verse");
-  const [quranFont, setQuranFontState] = useState<QuranFont>("uthmanic");
   const [isLoaded, setIsLoaded] = useState(false);
 
   // Load settings from SQLite on mount
@@ -88,11 +82,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         const savedViewMode = await readSetting(db, "view_mode");
         if (savedViewMode === "verse" || savedViewMode === "page") {
           setViewModeState(savedViewMode);
-        }
-
-        const savedQuranFont = await readSetting(db, "quran_font");
-        if (savedQuranFont === "uthmanic" || savedQuranFont === "qpc_v2") {
-          setQuranFontState(savedQuranFont);
         }
       } catch (err) {
         console.warn("[Settings] Failed to load settings:", err);
@@ -129,14 +118,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     [db]
   );
 
-  const setQuranFont = useCallback(
-    (font: QuranFont) => {
-      setQuranFontState(font);
-      writeSetting(db, "quran_font", font).catch(console.warn);
-    },
-    [db]
-  );
-
   return (
     <SettingsContext.Provider
       value={{
@@ -148,8 +129,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         setTheme,
         viewMode,
         setViewMode,
-        quranFont,
-        setQuranFont,
         isLoaded,
       }}
     >

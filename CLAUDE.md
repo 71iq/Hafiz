@@ -11,7 +11,7 @@ Design references: design-references/ folder.
 - ALWAYS read HAFIZ_SPEC.md before starting any phase.
 - Follow phases strictly. Complete one phase fully before starting the next.
 - RTL is a first-class requirement. Every layout must work RTL from day one.
-- Use UthmanicHafs font for ALL Quran text. Never use system Arabic fonts for Quran rendering.
+- Use QCF2 (KFGQPC V2) per-page fonts for ALL Quran text rendering. 604 per-page fonts with PUA glyph mapping.
 - All Quran data reads come from local SQLite. Never block on network for reading features.
 - Run `npx expo start --web` after every significant change and verify it works.
 - Use NativeWind (Tailwind) for all styling. Avoid inline StyleSheet objects unless NativeWind can't handle it.
@@ -45,6 +45,7 @@ Design references: design-references/ folder.
 ## Current Phase
 
 Phase 2c: Word-Level Interaction (next)
+- Verse-by-verse view needs QCF2 integration (currently renders with system font)
 
 ## Completed Phases
 
@@ -52,29 +53,28 @@ Phase 2c: Word-Level Interaction (next)
 
 - Page-based Mushaf view: 604 pages, vertical scrolling FlatList with page separators
 - MushafPage component: line-by-line flexbox layout using page_lines table (15 lines/page)
-- QPC V2 (KFGQPC) font support: 604 per-page fonts with Private Use Area glyph mapping
+- QCF2 (KFGQPC V2) font: 604 per-page fonts with Private Use Area glyph mapping (single font, no alternatives)
 - Font loader: native FontFace API on web (display:'swap'), expo-font on native
-- Proportional QCF2 glyph distribution across lines via buildQcf2LineWords
+- Proportional QCF2 glyph distribution across lines via buildLineWords
 - Surah headers (compact mode) and Basmallah lines rendered from page_lines layout data
 - View mode toggle in header: AlignJustify icon (verse) / BookOpen icon (page), persisted to user_settings
 - GoToNavigator modal: "Go to Page" number input (1-604) and "Go to Surah" scrollable list (114 surahs)
 - Go-to Surah in verse mode scrolls FlashList to surah header index
 - Go-to Surah in page mode maps surah to first page containing it
-- Quran font setting: UthmanicHafs (standard) / KFGQPC V2 (King Fahd Complex), persisted to SQLite
-- Font size control expanded: 7 steps (22–46px)
-- ViewMode + QuranFont settings added to SettingsProvider, persisted to SQLite
+- Font size control: 7 steps (22–46px)
+- ViewMode setting added to SettingsProvider, persisted to SQLite
 - page_lines table (9,046 rows): line-by-line Mushaf layout with word ID ranges
-- quran_text extended: text_qcf2 and v2_page columns for QCF2 glyph data
+- quran_text: text_qcf2 and v2_page columns for QCF2 glyph data
 - Database migration: auto-populates page_lines and QCF2 data on existing installs
 
 ### Phase 2a: Mushaf — Verse-by-Verse View
 
 - 5-tab navigation: Mushaf, Search, Flashcards, Leaderboard, Settings (Lucide icons)
 - Verse-by-verse Mushaf screen with FlashList (6236 ayahs + 114 surah headers)
-- SurahHeader component: decorative teal card with Arabic name (UthmanicHafs), English name, ayah count, revelation type, standalone Bismillah
-- AyahBlock component: Arabic text in UthmanicHafs, end-of-ayah number markers (﴿٢﴾), RTL alignment, subtle dividers
+- SurahHeader component: decorative teal card with Arabic name, English name, ayah count, revelation type, standalone Bismillah
+- AyahBlock component: Arabic text with end-of-ayah number markers, RTL alignment, subtle dividers
 - Bismillah stripping from first ayah of surahs 2-114 (except 9) to avoid duplication with SurahHeader
-- Font size control: 5 steps (22–38px), live preview, persisted to user_settings SQLite table
+- Font size control: 7 steps (22–46px), live preview, persisted to user_settings SQLite table
 - Theme switching: Light/Dark/Auto modes via NativeWind dark mode (class strategy), persisted to user_settings
 - SettingsProvider context for font size and theme state management
 - Settings screen with theme toggle and font size control with Arabic preview
@@ -83,7 +83,6 @@ Phase 2c: Word-Level Interaction (next)
 ### Phase 1: Foundation & Data Pipeline
 
 - Expo SDK 55 project with TypeScript, expo-router, NativeWind v4, expo-sqlite
-- UthmanicHafs font bundled and loading correctly
 - Complete SQLite schema: 11 pre-populated tables + 6 user data tables
 - First-launch import of all datasets (220K+ rows total)
 - Verified table counts: surahs(114), quran_text(6236), juz_map(135), hizb_map(60), word_roots(50268), page_map(604), tafseer(6236), translations(6236), word_translations(77429), word_irab(77411), tajweed_rules(60057)
@@ -116,14 +115,13 @@ Phase 2c: Word-Level Interaction (next)
 - **Vertical scrolling**: Changed from horizontal paging to vertical FlatList with page separators (Arabic page numbers). `getItemLayout` with pre-computed offsets enables instant `scrollToIndex`.
 - **Line-by-line layout**: Each Mushaf page uses `page_lines` table data (15 lines/page) for precise line placement. Flexbox rows with `row-reverse` for RTL, `space-between` for justified lines, `center` for centered lines.
 - **QCF2 font loading**: On web, bypasses expo-font and uses native FontFace API with `display: 'swap'` to avoid `font-display: auto` issue where PUA codepoints render as Arabic Presentation Form fallback glyphs. On native, uses expo-font.
-- **QCF2 glyph distribution**: `buildQcf2LineWords` distributes QCF2 glyphs proportionally across lines per-section (groups of consecutive ayah lines separated by surah_name/basmallah lines). Uses exact surah metadata from WordItems to find split points between sections, respecting surah boundaries.
-- **QCF2 page assignment (v2_page)**: 56 ayahs have different page assignments between `page_map` and QCF2 `v2_page`. Since QCF2 PUA codepoints are tied to per-page fonts, `buildPageDataQcf2()` groups ayahs by `v2_page` instead of `page_map` ranges. Standard mode still uses `page_map`.
-- **QCF2 Basmallah**: Uses page 1 font glyphs (U+FC41–FC44) for Basmallah lines in QCF2 mode. Page 1's font is preloaded alongside each page's font.
+- **QCF2 glyph distribution**: `buildLineWords` distributes QCF2 glyphs proportionally across lines per-section (groups of consecutive ayah lines separated by surah_name/basmallah lines). Uses exact surah metadata from WordItems to find split points between sections, respecting surah boundaries.
+- **QCF2 page assignment (v2_page)**: 56 ayahs have different page assignments between `page_map` and QCF2 `v2_page`. Since QCF2 PUA codepoints are tied to per-page fonts, `buildPageData()` groups ayahs by `v2_page` instead of `page_map` ranges.
+- **QCF2 Basmallah**: Uses page 1 font glyphs (U+FC41–FC44) for Basmallah lines. Page 1's font is preloaded alongside each page's font.
 - **Font reveal**: Renders text at opacity:0 while font loads, reveals with `requestAnimationFrame` after load completes. Spinner shown while font downloads.
 - **Page data building**: Load all 604 page_map rows, all 6236 ayahs, all 114 surahs, and all page_lines in parallel. Build page-grouped data in JS using ayahKey (surah * 10000 + ayah) for efficient range matching.
 - **GoToNavigator**: Modal with tab selector. In page mode shows both Page (number input), Surah, and Juz' tabs. Surah-to-page mapping uses JOIN on `surah_start <= N AND surah_end >= N` to correctly find pages for surahs that start mid-page.
 - **goToPageRef pattern**: Parent passes a mutable ref to PageMushaf; PageMushaf assigns a goToPage callback to it. Allows parent (mushaf.tsx) to trigger scrollToIndex on the FlatList from outside.
-- **Uthmanic text cleaning**: `cleanArabicText()` strips U+06DF (Small High Rounded Zero) which renders as ugly outlined circles in web browsers.
 
 ## Plugins
 

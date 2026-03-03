@@ -9,9 +9,6 @@ module.exports = {
   darkMode: "class",
   theme: {
     extend: {
-      fontFamily: {
-        uthmanic: ["UthmanicHafs"],
-      },
       colors: {
         warm: {
           50: "#faf8f5",

@@ -436,7 +436,6 @@ export function GoToNavigator({
                 <Text
                   className="text-warm-700 dark:text-neutral-300 mt-1"
                   style={{
-                    fontFamily: "UthmanicHafs",
                     fontSize: 22,
                     lineHeight: 36,
                   }}
@@ -539,7 +538,6 @@ export function GoToNavigator({
                   <Text
                     className="text-warm-700 dark:text-neutral-300 text-right"
                     style={{
-                      fontFamily: "UthmanicHafs",
                       fontSize: 20,
                       lineHeight: 36,
                     }}
@@ -581,7 +579,6 @@ export function GoToNavigator({
                   <Text
                     className="text-warm-700 dark:text-neutral-300 text-right"
                     style={{
-                      fontFamily: "UthmanicHafs",
                       fontSize: 20,
                       lineHeight: 36,
                     }}

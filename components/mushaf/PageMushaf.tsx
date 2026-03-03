@@ -22,7 +22,6 @@ type PageRow = {
 type AyahRow = {
   surah: number;
   ayah: number;
-  text_uthmani: string;
   text_qcf2: string;
   v2_page: number;
 };
@@ -38,7 +37,6 @@ type SurahRow = {
 type AyahData = {
   surah: number;
   ayah: number;
-  text: string;
   textQcf2: string;
 };
 
@@ -59,75 +57,16 @@ type PageData = {
   globalWordOffset?: number;
 };
 
-// End marker of the Bismillah: "ٱلرَّحِيمِ" in Unicode escapes
-const RAHEEM_END =
-  "\u0671\u0644\u0631\u0651\u064e\u062d\u0650\u064a\u0645\u0650";
-
-function stripBismillah(text: string, surah: number, ayah: number): string {
-  if (ayah === 1 && surah !== 1 && surah !== 9) {
-    const idx = text.indexOf(RAHEEM_END);
-    if (idx !== -1) {
-      return text.substring(idx + RAHEEM_END.length).trimStart();
-    }
-  }
-  return text;
-}
-
 function ayahKey(surah: number, ayah: number): number {
   return surah * 10000 + ayah;
 }
 
-function buildPageData(
-  pages: PageRow[],
-  ayahs: AyahRow[],
-  lineLookup: Map<number, PageLineLayout[]>,
-  offsetLookup: Map<number, number>
-): PageData[] {
-  let ayahIdx = 0;
-  const result: PageData[] = [];
-
-  for (const page of pages) {
-    const startKey = ayahKey(page.surah_start, page.ayah_start);
-    const endKey = ayahKey(page.surah_end, page.ayah_end);
-    const pageAyahs: AyahData[] = [];
-
-    while (ayahIdx < ayahs.length) {
-      const a = ayahs[ayahIdx];
-      const key = ayahKey(a.surah, a.ayah);
-      if (key < startKey) {
-        ayahIdx++;
-        continue;
-      }
-      if (key > endKey) {
-        break;
-      }
-      pageAyahs.push({
-        surah: a.surah,
-        ayah: a.ayah,
-        text: stripBismillah(a.text_uthmani, a.surah, a.ayah),
-        textQcf2: a.text_qcf2 ?? "",
-      });
-      ayahIdx++;
-    }
-
-    const pd: PageData = { page: page.page, ayahs: pageAyahs };
-    const lines = lineLookup.get(page.page);
-    if (lines) {
-      pd.lineLayout = lines;
-      pd.globalWordOffset = offsetLookup.get(page.page) ?? 0;
-    }
-    result.push(pd);
-  }
-
-  return result;
-}
-
 /**
- * Build page data for QCF2 mode using v2_page assignments.
+ * Build page data using v2_page assignments.
  * QCF2 glyphs are PUA codepoints tied to per-page fonts, so each ayah
- * must be assigned to the page matching its v2_page (not page_map).
+ * must be assigned to the page matching its v2_page.
  */
-function buildPageDataQcf2(
+function buildPageData(
   pages: PageRow[],
   ayahs: AyahRow[],
   lineLookup: Map<number, PageLineLayout[]>,
@@ -151,7 +90,6 @@ function buildPageDataQcf2(
     const pageAyahs: AyahData[] = rows.map(a => ({
       surah: a.surah,
       ayah: a.ayah,
-      text: stripBismillah(a.text_uthmani, a.surah, a.ayah),
       textQcf2: a.text_qcf2 ?? "",
     }));
 
@@ -236,7 +174,7 @@ function PageSeparator({ page }: { page: number }) {
 
 export function PageMushaf({ onPageChange, goToPageRef }: Props) {
   const db = useDatabase();
-  const { fontSize, lineHeight, quranFont } = useSettings();
+  const { fontSize, lineHeight } = useSettings();
   const { width } = useWindowDimensions();
   const [pageData, setPageData] = useState<PageData[]>([]);
   const [surahMap, setSurahMap] = useState<Map<number, SurahRow>>(new Map());
@@ -258,7 +196,7 @@ export function PageMushaf({ onPageChange, goToPageRef }: Props) {
             "SELECT page, surah_start, ayah_start, surah_end, ayah_end FROM page_map ORDER BY page"
           ),
           db.getAllAsync<AyahRow>(
-            "SELECT surah, ayah, text_uthmani, text_qcf2, v2_page FROM quran_text ORDER BY surah, ayah"
+            "SELECT surah, ayah, text_qcf2, v2_page FROM quran_text ORDER BY surah, ayah"
           ),
           db.getAllAsync<SurahRow>(
             "SELECT number, name_arabic, name_english, ayah_count, revelation_type FROM surahs ORDER BY number"
@@ -294,7 +232,6 @@ export function PageMushaf({ onPageChange, goToPageRef }: Props) {
           });
 
           // Track min first_word_id per page for offset calculation
-          // page_lines stores "" for non-ayah lines, so check for actual numbers
           if (typeof row.first_word_id === "number" && row.first_word_id > 0) {
             const current = offsetLookup.get(row.page_number);
             if (current === undefined || row.first_word_id - 1 < current) {
@@ -303,10 +240,7 @@ export function PageMushaf({ onPageChange, goToPageRef }: Props) {
           }
         }
 
-        const useQcf2 = quranFont === "qpc_v2";
-        const data = useQcf2
-          ? buildPageDataQcf2(pages, ayahs, lineLookup, offsetLookup)
-          : buildPageData(pages, ayahs, lineLookup, offsetLookup);
+        const data = buildPageData(pages, ayahs, lineLookup, offsetLookup);
         setPageData(data);
         setLayoutInfo(buildLayoutOffsets(data, lineHeight));
       } catch (err) {
@@ -317,7 +251,7 @@ export function PageMushaf({ onPageChange, goToPageRef }: Props) {
     }
 
     loadData();
-  }, [db, lineHeight, quranFont]);
+  }, [db, lineHeight]);
 
   // Rebuild layout offsets when lineHeight changes (font size adjustment)
   useEffect(() => {
@@ -384,13 +318,12 @@ export function PageMushaf({ onPageChange, goToPageRef }: Props) {
           fontSize={fontSize}
           lineHeight={lineHeight}
           width={width}
-          quranFont={quranFont}
           lineLayout={item.lineLayout}
           globalWordOffset={item.globalWordOffset}
         />
       </View>
     ),
-    [surahMap, fontSize, lineHeight, width, quranFont]
+    [surahMap, fontSize, lineHeight, width]
   );
 
   const keyExtractor = useCallback(
@@ -417,7 +350,7 @@ export function PageMushaf({ onPageChange, goToPageRef }: Props) {
         renderItem={renderPage}
         keyExtractor={keyExtractor}
         getItemLayout={getItemLayout}
-        extraData={`${fontSize}-${quranFont}`}
+        extraData={fontSize}
         showsVerticalScrollIndicator={false}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
