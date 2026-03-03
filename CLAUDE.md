@@ -41,6 +41,8 @@ Design references: design-references/ folder.
 - masaq/ — MASAQ إعراب dataset (grammatical analysis)
 - morphology/ — Quranic corpus morphology (تصريف)
 - tajweed.json — Tajweed rule annotations
+- layout/page-words.json — Authoritative per-word line mapping from quran.com (83,863 words across 604 pages)
+- layout/page-lines.json — Per-line word ID ranges for Mushaf layout (9,046 lines)
 
 ## Current Phase
 
@@ -63,7 +65,7 @@ Phase 2c: Word-Level Interaction (next)
 - MushafPage component: line-by-line flexbox layout using page_lines table (15 lines/page)
 - QCF2 (KFGQPC V2) font: 604 per-page fonts with Private Use Area glyph mapping (single font, no alternatives)
 - Font loader: native FontFace API on web (display:'swap'), expo-font on native
-- Proportional QCF2 glyph distribution across lines via buildLineWords
+- Authoritative per-word line mapping from quran.com (page-words.json) — exact glyph-to-line assignment
 - Surah headers (compact mode) and Basmallah lines rendered from page_lines layout data
 - View mode toggle in header: AlignJustify icon (verse) / BookOpen icon (page), persisted to user_settings
 - GoToNavigator modal: "Go to Page" number input (1-604) and "Go to Surah" scrollable list (114 surahs)
@@ -123,7 +125,7 @@ Phase 2c: Word-Level Interaction (next)
 - **Vertical scrolling**: Changed from horizontal paging to vertical FlatList with page separators (Arabic page numbers). `getItemLayout` with pre-computed offsets enables instant `scrollToIndex`.
 - **Line-by-line layout**: Each Mushaf page uses `page_lines` table data (15 lines/page) for precise line placement. Flexbox rows with `row-reverse` for RTL, `space-between` for justified lines, `center` for centered lines.
 - **QCF2 font loading**: On web, bypasses expo-font and uses native FontFace API with `display: 'swap'` to avoid `font-display: auto` issue where PUA codepoints render as Arabic Presentation Form fallback glyphs. On native, uses expo-font.
-- **QCF2 glyph distribution**: `buildLineWords` distributes QCF2 glyphs proportionally across lines per-section (groups of consecutive ayah lines separated by surah_name/basmallah lines). Uses exact surah metadata from WordItems to find split points between sections, respecting surah boundaries.
+- **QCF2 word-to-line mapping**: Uses authoritative per-word line assignments from quran.com API (`page-words.json`). Each page's lines get their exact QCF2 words directly — no proportional distribution needed. Fixes overflow caused by multi-glyph words (4,321 words use 2 PUA characters).
 - **QCF2 page assignment (v2_page)**: 56 ayahs have different page assignments between `page_map` and QCF2 `v2_page`. Since QCF2 PUA codepoints are tied to per-page fonts, `buildPageData()` groups ayahs by `v2_page` instead of `page_map` ranges.
 - **QCF2 Basmallah**: Uses page 1 font glyphs (U+FC41–FC44) for Basmallah lines. Page 1's font is preloaded alongside each page's font.
 - **Font reveal**: Renders text at opacity:0 while font loads, reveals with `requestAnimationFrame` after load completes. Spinner shown while font downloads.

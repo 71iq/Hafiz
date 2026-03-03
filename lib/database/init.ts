@@ -463,11 +463,22 @@ export async function initializeDatabase(
     try { await db.execAsync("ALTER TABLE quran_text ADD COLUMN text_qcf2 TEXT NOT NULL DEFAULT ''"); } catch (_) {}
     try { await db.execAsync("ALTER TABLE quran_text ADD COLUMN v2_page INTEGER NOT NULL DEFAULT 0"); } catch (_) {}
 
-    // Check if QCF2 data needs populating
+    // Check if QCF2 data needs populating or updating (word grouping fix)
     const qcf2Check = await db.getFirstAsync<{ cnt: number }>(
       "SELECT COUNT(*) as cnt FROM quran_text WHERE text_qcf2 != ''"
     );
-    if ((qcf2Check?.cnt ?? 0) === 0) {
+    // Detect old char-level splitting: verse 66:1 has 17 individual PUA chars
+    // but should have 15 word groups (2 words use 2 PUA chars each).
+    const needsQcf2Rewrite = (qcf2Check?.cnt ?? 0) > 0
+      ? await db.getFirstAsync<{ text_qcf2: string }>(
+          "SELECT text_qcf2 FROM quran_text WHERE surah = 66 AND ayah = 1"
+        ).then(row => {
+          const tokens = (row?.text_qcf2 ?? "").split(/\s+/).filter(Boolean).length;
+          return tokens === 17; // old data has 17 individual chars; correct data has 15 word groups
+        })
+      : false;
+
+    if ((qcf2Check?.cnt ?? 0) === 0 || needsQcf2Rewrite) {
       console.log("[Import] Migrating: populating QCF2 text data...");
       const qcf2Map = new Map<string, { code_v2: string; v2_page: number }>();
       for (const v of qcf2Data) {
