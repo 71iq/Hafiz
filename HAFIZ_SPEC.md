@@ -24,7 +24,7 @@ The UI is a **hybrid of quran.com and wahy.net**. The reading experience, layout
 - wahy.net — word interaction popover, linguistic data panels
 
 **Design Tokens:**
-- **Font (Quran text):** UthmanicHafs (KFGQPC) — see §2.4 for download
+- **Font (Quran text):** QCF2 / KFGQPC V2 (604 per-page fonts with PUA glyph mapping) — see §2.4 for details
 - **Font (UI):** System default (San Francisco on iOS, Roboto on Android) for UI, plus a clean Arabic UI font (e.g., IBM Plex Arabic or Noto Sans Arabic) for non-Quran Arabic text
 - **Color palette:** Warm neutrals matching quran.com — not stark white. Dark mode support required.
 - **Spacing:** Generous line-height for Arabic text (minimum 2.0x). Clear visual hierarchy.
@@ -115,11 +115,12 @@ Your existing `quran-data.json` contains:
 - **Download:** `https://raw.githubusercontent.com/rn0x/Quran-Data/version-2.0/data/pagesQuran.json`
 - **Structure:** Array of `{ page, start: { surah_number, verse, name }, end: { surah_number, verse, name } }` for all 604 pages
 
-#### 2.4.5 Arabic Font (UthmanicHafs)
-- **Font:** KFGQPC HAFS Uthmanic Script (same font used by quran.com)
-- **Download (TTF):** `https://verses.quran.foundation/fonts/quran/hafs/uthmanic_hafs/UthmanicHafs1Ver18.ttf`
+#### 2.4.5 Arabic Font (QCF2 / KFGQPC V2)
+- **Font:** QCF2 (Quran Complex Font v2) — 604 per-page fonts with Private Use Area (PUA) glyph mapping, same rendering used by quran.com's reading mode.
+- **Source:** Quran Foundation CDN — `https://verses.quran.foundation/fonts/quran/hafs/v2/`
+- **Structure:** One TTF per page (QCF2_001.ttf through QCF2_604.ttf). Each font maps Quran words to PUA codepoints (U+FC41+) for pixel-perfect Mushaf rendering.
 - **License:** Free to use, copy, distribute. Cannot be sold, modified, or reverse-engineered.
-- **Usage:** Bundle in `assets/fonts/`, load via `expo-font`, apply to all Quran text rendering.
+- **Usage:** Bundle all 604 font files in `assets/fonts/qpc_v2/`. Fonts are loaded dynamically per-page (FontFace API on web, expo-font on native). Text data stored as `text_qcf2` column in `quran_text` with space-separated PUA codepoints per ayah.
 
 #### 2.4.6 Word-by-Word English Translation
 - **Source:** Quranic Universal Library (QUL) at `https://qul.tarteel.ai/resources`
@@ -186,7 +187,7 @@ The Mushaf supports **two view modes** (togglable like quran.com):
 - Below each ayah (collapsible): translation, tafseer, reflections (like quran.com).
 
 #### 3.1.3 Common to Both Views
-- **Font:** UthmanicHafs for all Quran text, rendered RTL.
+- **Font:** QCF2 (KFGQPC V2) per-page fonts for all Quran text, rendered RTL.
 - **Font Size Control:** Slider to adjust text size. Persist preference.
 - **Theme:** Light / Dark mode. Follow system preference with manual override.
 - **Hide Ayahs:** Toggle to blur/mask ayah text for self-testing.
@@ -518,7 +519,7 @@ Use Supabase Row Level Security (RLS) policies:
 
 1. Initialize Expo project with TypeScript and NativeWind.
 2. Configure `expo-sqlite`.
-3. Bundle the UthmanicHafs font via `expo-font`.
+3. Bundle the QCF2 per-page fonts (604 TTFs) and font loader.
 4. Write a data import script that runs on first app launch:
    - Import `quran-data.json` into SQLite tables (surahs, quran_text, juz_map, hizb_map, word_roots).
    - Import tafseer JSON files into `tafseer` table.
@@ -536,7 +537,7 @@ Use Supabase Row Level Security (RLS) policies:
 
 1. Create tab navigation: Mushaf, Search, Flashcards, Leaderboard, Settings.
 2. Build the verse-by-verse Mushaf screen with FlashList.
-3. Render each ayah with UthmanicHafs font, ayah number badge, RTL layout.
+3. Render each ayah with QCF2 per-page font, ayah number badge, RTL layout.
 4. Add surah headers (decorative) with name, bismillah handling.
 5. Implement font size slider (persist in user_settings).
 6. Implement dark/light/auto theme toggle.
@@ -736,7 +737,7 @@ hafiz/
 │   └── useSync.ts                # Background sync hook
 ├── assets/
 │   ├── fonts/
-│   │   └── UthmanicHafs1Ver18.ttf
+│   │   └── qpc_v2/               # 604 QCF2 per-page font files
 │   └── data/                     # Bundled datasets (JSON/SQLite)
 │       ├── quran-data.json
 │       ├── tafseer/
@@ -764,7 +765,7 @@ hafiz/
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
 | SRS Algorithm | FSRS-6 via ts-fsrs | 88% more accurate than SM-2. Zero deps, runs in Hermes. |
-| Font | UthmanicHafs V18 | Same font as quran.com. Single file, full Unicode support. |
+| Font | QCF2 / KFGQPC V2 | 604 per-page fonts with PUA glyph mapping. Pixel-perfect Mushaf rendering matching quran.com reading mode. |
 | Local DB | expo-sqlite | Expo-native, no native module headaches. |
 | Sync strategy | Offline-first, last-write-wins | Quran study is personal; merge conflicts are rare. |
 | Page mapping | Pre-bundled JSON | Offline-first requirement. No runtime API dependency. |
