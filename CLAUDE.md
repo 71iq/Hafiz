@@ -43,12 +43,38 @@ Design references: design-references/ folder.
 - tajweed.json — Tajweed rule annotations
 - layout/page-words.json — Authoritative per-word line mapping from quran.com (83,863 words across 604 pages)
 - layout/page-lines.json — Per-line word ID ranges for Mushaf layout (9,046 lines)
+- translations/*.json — 20 bundled language translations (downloaded from quran.com API)
 
 ## Current Phase
 
-Phase 2c: Word-Level Interaction (next)
+Phase 2d: Word-Level Interaction (next)
 
 ## Completed Phases
+
+### Multi-Language Translation Support
+
+- 21 translation languages (English + 20 additional) with offline-first bundled JSON data
+- Language picker modal in Settings with native script names and RTL support
+- Separate `translation_active` SQLite table for non-English translations (lazy import on selection)
+- English reads from existing `translations` table (instant, no import needed)
+- Query routing in AyahBlock based on selected language
+- RTL text alignment for Urdu, Persian, Pashto, Sindhi, Kurdish languages
+- Dynamic section header shows current language name instead of hardcoded "Translation"
+- Language persists across sessions via user_settings SQLite
+- Re-import on app restart if translation_active is empty for saved non-English language
+- Download script: `scripts/download-translations.js` (one-time, fetches from quran.com API)
+
+### Phase 2c: Inline Content & Hide Ayahs Mode
+
+- Collapsible Translation section below each AyahBlock (Sahih International English from translations table)
+- Collapsible Tafseer section below each AyahBlock (Tafseer Al-Muyassar Arabic from tafseer table)
+- On-demand SQLite fetch: translation/tafseer loaded only when section is expanded
+- Global settings toggles: showTranslation and showTafseer (persisted to user_settings SQLite)
+- Settings screen "Inline Content" section with Switch toggles for both
+- Hide Ayahs mode: Eye/EyeOff toggle in Mushaf header
+- When hidden: ayah text replaced with warm-100 placeholder box showing "Tap to reveal"
+- Tap to reveal: toggles individual ayah visibility while hide mode is active
+- AyahBlock wrapped in memo() for scroll performance with expanded content
 
 ### Phase 2b-QCF2: Verse-by-Verse QCF2 Integration
 
@@ -140,6 +166,24 @@ Phase 2c: Word-Level Interaction (next)
 - **No Bismillah stripping**: `text_qcf2` doesn't include Bismillah prefix (unlike `text_uthmani`), so the raheemEnd stripping logic was removed from mushaf.tsx.
 - **No manual ayah markers**: End-of-ayah markers (circled numbers) are embedded as the last PUA glyph in `text_qcf2` — removed `toArabicNumber` from AyahBlock.
 - **SurahHeader Bismillah**: Uses `BISMILLAH_QCF2 = "\uFC41 \uFC42 \uFC43 \uFC44"` with page 1 font (`QCF2_001`). Font loading state independent of ayah fonts.
+
+### Phase 2c Decisions
+
+- **On-demand fetch**: Translation and tafseer text fetched from SQLite only when the collapsible section is first opened. Cached in component state after first load. Prevents loading 12,472 extra text rows upfront.
+- **Global defaults via context**: `showTranslation` and `showTafseer` booleans in SettingsProvider. When toggled in settings, all AyahBlocks sync via useEffect on the context values.
+- **Hide mode as parent state**: `hideMode` boolean lives in mushaf.tsx and is passed as prop to AyahBlock. Included in FlashList's `extraData` to trigger re-renders.
+- **Placeholder instead of overlay**: Hide mode replaces the text entirely with a rounded placeholder box (`bg-warm-100 dark:bg-neutral-800`) rather than using a semi-transparent overlay. Avoids NativeWind opacity modifier limitations with custom hex colors.
+- **memo(AyahBlock)**: Wrapped in React.memo to prevent unnecessary re-renders during scroll with expanded inline content.
+
+### Multi-Language Translation Decisions
+
+- **Separate table**: `translation_active` holds only the currently selected non-English translation (6,236 rows max). English stays in existing `translations` table — zero migration risk.
+- **Lazy import**: Translations imported from bundled JSON only when user selects a language (~0.8-1s). First launch unchanged.
+- **Query routing**: AyahBlock checks `translationLanguage === "en"` to decide which table to query. Uses `useRef` to track fetched language and detect stale cache.
+- **RTL support**: `getLanguageByCode()` provides direction info. RTL languages get `writingDirection: "rtl"` and `textAlign: "right"` on translation text.
+- **Static require map**: `lib/translations/translation-requires.ts` has static `require()` calls for all 20 JSON files (Metro needs static strings).
+- **API response mapping**: quran.com API returns translations in sequential verse order without `verse_key`. Script maps to surah/ayah using known ayah counts array.
+- **HTML cleanup**: Download script strips `<sup>` footnotes, HTML tags, and decodes entities (`&quot;`, `&amp;`, etc.).
 
 ## Plugins
 

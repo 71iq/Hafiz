@@ -1,7 +1,10 @@
-import { View, Text, Pressable } from "react-native";
+import { useState } from "react";
+import { View, Text, Pressable, Switch, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Sun, Moon, Smartphone, Minus, Plus } from "lucide-react-native";
+import { Sun, Moon, Smartphone, Minus, Plus, ChevronRight } from "lucide-react-native";
 import { useSettings, FONT_SIZE_STEPS, type ThemeMode } from "@/lib/settings/context";
+import { getLanguageByCode } from "@/lib/translations/languages";
+import { TranslationLanguagePicker } from "@/components/settings/TranslationLanguagePicker";
 
 const THEME_OPTIONS: { value: ThemeMode; label: string; icon: typeof Sun }[] = [
   { value: "light", label: "Light", icon: Sun },
@@ -10,7 +13,13 @@ const THEME_OPTIONS: { value: ThemeMode; label: string; icon: typeof Sun }[] = [
 ];
 
 export default function SettingsScreen() {
-  const { theme, setTheme, fontSizeIndex, setFontSizeIndex, fontSize } = useSettings();
+  const {
+    theme, setTheme, fontSizeIndex, setFontSizeIndex, fontSize,
+    showTranslation, setShowTranslation, showTafseer, setShowTafseer,
+    translationLanguage, isTranslationLoading, isDark,
+  } = useSettings();
+  const [pickerVisible, setPickerVisible] = useState(false);
+  const currentLang = getLanguageByCode(translationLanguage);
 
   return (
     <SafeAreaView className="flex-1 bg-warm-50 dark:bg-neutral-950">
@@ -122,6 +131,76 @@ export default function SettingsScreen() {
             </Text>
           </View>
         </View>
+
+        {/* Inline Content Section */}
+        <View className="bg-white dark:bg-neutral-900 rounded-2xl p-4 mb-6">
+          <Text className="text-base font-medium text-warm-800 dark:text-neutral-200 mb-3">
+            Inline Content
+          </Text>
+
+          <View className="flex-row items-center justify-between py-2">
+            <View className="flex-1 mr-3">
+              <Text className="text-sm font-medium text-warm-700 dark:text-neutral-300">
+                Show Translation
+              </Text>
+              <Text className="text-xs text-warm-400 dark:text-neutral-500 mt-0.5">
+                Sahih International English
+              </Text>
+            </View>
+            <Switch
+              value={showTranslation}
+              onValueChange={setShowTranslation}
+              trackColor={{ false: "#d1ccc4", true: "#5eead4" }}
+              thumbColor={showTranslation ? "#0d9488" : "#a8a29e"}
+            />
+          </View>
+
+          <View className="border-t border-warm-100 dark:border-neutral-800 my-1" />
+
+          {/* Translation Language */}
+          <Pressable
+            onPress={() => setPickerVisible(true)}
+            className="flex-row items-center justify-between py-2"
+          >
+            <View className="flex-1 mr-3">
+              <Text className="text-sm font-medium text-warm-700 dark:text-neutral-300">
+                Translation Language
+              </Text>
+              <Text className="text-xs text-warm-400 dark:text-neutral-500 mt-0.5">
+                {currentLang?.nameEnglish ?? "English"}
+              </Text>
+            </View>
+            {isTranslationLoading ? (
+              <ActivityIndicator size="small" color="#0d9488" />
+            ) : (
+              <ChevronRight size={18} color={isDark ? "#737373" : "#a8a29e"} />
+            )}
+          </Pressable>
+
+          <View className="border-t border-warm-100 dark:border-neutral-800 my-1" />
+
+          <View className="flex-row items-center justify-between py-2">
+            <View className="flex-1 mr-3">
+              <Text className="text-sm font-medium text-warm-700 dark:text-neutral-300">
+                Show Tafseer
+              </Text>
+              <Text className="text-xs text-warm-400 dark:text-neutral-500 mt-0.5">
+                التفسير الميسر
+              </Text>
+            </View>
+            <Switch
+              value={showTafseer}
+              onValueChange={setShowTafseer}
+              trackColor={{ false: "#d1ccc4", true: "#5eead4" }}
+              thumbColor={showTafseer ? "#0d9488" : "#a8a29e"}
+            />
+          </View>
+        </View>
+
+        <TranslationLanguagePicker
+          visible={pickerVisible}
+          onClose={() => setPickerVisible(false)}
+        />
       </View>
     </SafeAreaView>
   );

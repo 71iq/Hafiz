@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { View, Text, Pressable, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { FlashList, FlashListRef } from "@shopify/flash-list";
-import { BookOpen, AlignJustify, Navigation } from "lucide-react-native";
+import { BookOpen, AlignJustify, Navigation, Eye, EyeOff } from "lucide-react-native";
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
 import { SurahHeader } from "@/components/mushaf/SurahHeader";
@@ -50,6 +50,7 @@ export default function MushafScreen() {
   const [loading, setLoading] = useState(true);
   const [showNavigator, setShowNavigator] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [hideMode, setHideMode] = useState(false);
   const goToPageRef = useRef<((page: number) => void) | null>(null);
   const flashListRef = useRef<FlashListRef<MushafItem>>(null);
 
@@ -136,10 +137,11 @@ export default function MushafScreen() {
           v2Page={item.v2Page}
           fontSize={fontSize}
           lineHeight={lineHeight}
+          hideMode={hideMode}
         />
       );
     },
-    [fontSize, lineHeight]
+    [fontSize, lineHeight, hideMode]
   );
 
   const getItemType = useCallback((item: MushafItem) => item.type, []);
@@ -234,8 +236,24 @@ export default function MushafScreen() {
           </Pressable>
         </View>
 
-        {/* Right: Font size control */}
-        <FontSizeControl />
+        {/* Right: Hide mode + Font size control */}
+        <View className="flex-row items-center gap-2">
+          <Pressable
+            onPress={() => setHideMode((prev) => !prev)}
+            className={`px-2.5 py-1.5 rounded-lg ${
+              hideMode
+                ? "bg-teal-100 dark:bg-teal-900/40"
+                : "bg-warm-100 dark:bg-neutral-800"
+            }`}
+          >
+            {hideMode ? (
+              <EyeOff size={16} color="#0d9488" />
+            ) : (
+              <Eye size={16} color="#b9a085" />
+            )}
+          </Pressable>
+          <FontSizeControl />
+        </View>
       </View>
 
       {/* Content */}
@@ -251,7 +269,7 @@ export default function MushafScreen() {
           renderItem={renderItem}
           getItemType={getItemType}
           keyExtractor={keyExtractor}
-          extraData={fontSize}
+          extraData={{ fontSize, hideMode }}
           contentContainerStyle={{ paddingBottom: 40 }}
         />
       )}
