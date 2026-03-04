@@ -208,6 +208,14 @@ export async function createSchema(db: SQLiteDatabase): Promise<void> {
       value TEXT NOT NULL
     );
 
+    -- Active non-English translation (6,236 rows max, swapped on language change)
+    CREATE TABLE IF NOT EXISTS translation_active (
+      surah INTEGER NOT NULL,
+      ayah INTEGER NOT NULL,
+      text TEXT NOT NULL,
+      PRIMARY KEY (surah, ayah)
+    );
+
     -- Sync queue for offline-first sync
     CREATE TABLE IF NOT EXISTS sync_queue (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
