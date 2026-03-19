@@ -11,6 +11,7 @@ const DEFAULT_FONT_SIZE_INDEX = 2; // 30px
 
 export type ThemeMode = "light" | "dark" | "system";
 export type ViewMode = "verse" | "page";
+export type UILanguage = "en" | "ar";
 
 type SettingsContextType = {
   fontSizeIndex: number;
@@ -28,6 +29,9 @@ type SettingsContextType = {
   translationLanguage: string;
   setTranslationLanguage: (code: string) => Promise<void>;
   isTranslationLoading: boolean;
+  uiLanguage: UILanguage;
+  setUiLanguage: (lang: UILanguage) => void;
+  isRTL: boolean;
   isDark: boolean;
   isLoaded: boolean;
 };
@@ -48,6 +52,9 @@ const SettingsContext = createContext<SettingsContextType>({
   translationLanguage: DEFAULT_LANGUAGE,
   setTranslationLanguage: async () => {},
   isTranslationLoading: false,
+  uiLanguage: "en",
+  setUiLanguage: () => {},
+  isRTL: false,
   isDark: false,
   isLoaded: false,
 });
@@ -81,6 +88,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [showTafseer, setShowTafseerState] = useState(false);
   const [translationLanguage, setTranslationLanguageState] = useState(DEFAULT_LANGUAGE);
   const [isTranslationLoading, setIsTranslationLoading] = useState(false);
+  const [uiLanguage, setUiLanguageState] = useState<UILanguage>("en");
   const [isLoaded, setIsLoaded] = useState(false);
 
   // Load settings from SQLite on mount
@@ -111,6 +119,11 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
         const savedShowTafseer = await readSetting(db, "show_tafseer");
         if (savedShowTafseer === "true") setShowTafseerState(true);
+
+        const savedUiLang = await readSetting(db, "ui_language");
+        if (savedUiLang === "en" || savedUiLang === "ar") {
+          setUiLanguageState(savedUiLang);
+        }
 
         const savedLang = await readSetting(db, "translation_language");
         if (savedLang && savedLang !== DEFAULT_LANGUAGE) {
@@ -201,7 +214,16 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     [db, translationLanguage]
   );
 
+  const setUiLanguage = useCallback(
+    (lang: UILanguage) => {
+      setUiLanguageState(lang);
+      writeSetting(db, "ui_language", lang).catch(console.warn);
+    },
+    [db]
+  );
+
   const isDark = nwScheme === "dark";
+  const isRTL = uiLanguage === "ar";
 
   return (
     <SettingsContext.Provider
@@ -221,6 +243,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         translationLanguage,
         setTranslationLanguage,
         isTranslationLoading,
+        uiLanguage,
+        setUiLanguage,
+        isRTL,
         isDark,
         isLoaded,
       }}

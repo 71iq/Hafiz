@@ -11,6 +11,7 @@ import {
 import { X, Search } from "lucide-react-native";
 import { useDatabase } from "@/lib/database/provider";
 import { toArabicNumber } from "@/lib/arabic";
+import { useStrings } from "@/lib/i18n/useStrings";
 
 type SurahRow = {
   number: number;
@@ -59,6 +60,7 @@ export function GoToNavigator({
   onGoToSurahVerse,
 }: Props) {
   const db = useDatabase();
+  const s = useStrings();
   const [surahs, setSurahs] = useState<SurahRow[]>([]);
   const [pages, setPages] = useState<PageInfo[]>([]);
   const [juzList, setJuzList] = useState<JuzInfo[]>([]);
@@ -322,10 +324,10 @@ export function GoToNavigator({
 
   const searchPlaceholder =
     tab === "page"
-      ? "Enter page number..."
+      ? s.enterPageNumber
       : tab === "surah"
-        ? "Search by name or number..."
-        : "Search by juz number...";
+        ? s.searchByName
+        : s.searchByJuz;
 
   return (
     <Modal visible={visible} transparent animationType="slide">
@@ -338,7 +340,7 @@ export function GoToNavigator({
           {/* Header */}
           <View className="flex-row items-center justify-between px-5 pt-5 pb-3">
             <Text className="text-lg font-bold text-warm-800 dark:text-neutral-100">
-              Go To
+              {s.goToTitle}
             </Text>
             <Pressable
               onPress={onClose}
@@ -387,7 +389,7 @@ export function GoToNavigator({
                       : "text-warm-400 dark:text-neutral-500"
                   }`}
                 >
-                  Page
+                  {s.tabPage}
                 </Text>
               </Pressable>
             )}
@@ -404,7 +406,7 @@ export function GoToNavigator({
                     : "text-warm-400 dark:text-neutral-500"
                 }`}
               >
-                Surah
+                {s.tabSurah}
               </Text>
             </Pressable>
             <Pressable
@@ -420,7 +422,7 @@ export function GoToNavigator({
                     : "text-warm-400 dark:text-neutral-500"
                 }`}
               >
-                Juz'
+                {s.tabJuz}
               </Text>
             </Pressable>
           </View>
@@ -516,7 +518,7 @@ export function GoToNavigator({
             <ScrollView className="px-5 pb-6" style={{ maxHeight: 400 }}>
               {filteredSurahs.length === 0 && (
                 <Text className="text-warm-400 dark:text-neutral-500 text-center py-8">
-                  No surahs found
+                  {s.noSurahsFound}
                 </Text>
               )}
               {filteredSurahs.map((surah) => (
@@ -554,7 +556,7 @@ export function GoToNavigator({
             <ScrollView className="px-5 pb-6" style={{ maxHeight: 400 }}>
               {filteredJuz.length === 0 && (
                 <Text className="text-warm-400 dark:text-neutral-500 text-center py-8">
-                  No juz' found
+                  {s.noJuzFound}
                 </Text>
               )}
               {filteredJuz.map((juz) => (

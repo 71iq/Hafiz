@@ -2,6 +2,7 @@ import { Modal, View, Text, Pressable, ScrollView } from "react-native";
 import { X, Check } from "lucide-react-native";
 import { TRANSLATION_LANGUAGES } from "@/lib/translations/languages";
 import { useSettings } from "@/lib/settings/context";
+import { useStrings } from "@/lib/i18n/useStrings";
 
 type Props = {
   visible: boolean;
@@ -11,6 +12,7 @@ type Props = {
 export function TranslationLanguagePicker({ visible, onClose }: Props) {
   const { translationLanguage, setTranslationLanguage, isTranslationLoading, isDark } =
     useSettings();
+  const s = useStrings();
 
   const handleSelect = async (code: string) => {
     await setTranslationLanguage(code);
@@ -36,7 +38,7 @@ export function TranslationLanguagePicker({ visible, onClose }: Props) {
           {/* Header */}
           <View className="flex-row items-center justify-between px-5 pt-5 pb-3">
             <Text className="text-lg font-bold text-warm-800 dark:text-neutral-100">
-              Translation Language
+              {s.translationLanguagePickerTitle}
             </Text>
             <Pressable
               onPress={onClose}

@@ -1,5 +1,9 @@
 import { View, Text } from "react-native";
 import type { ImportProgress } from "@/lib/database/init";
+import { strings } from "@/lib/i18n/strings";
+
+// LoadingScreen is shown before SettingsProvider mounts, so we use strings.en directly
+const s = strings.en;
 
 type Props = {
   progress: ImportProgress | null;
@@ -16,7 +20,7 @@ export function LoadingScreen({ progress }: Props) {
         Hafiz
       </Text>
       <Text className="text-lg text-warm-500 mb-12">
-        Quran Retention App
+        {s.appSubtitle}
       </Text>
 
       {progress ? (
@@ -42,7 +46,7 @@ export function LoadingScreen({ progress }: Props) {
           </Text>
         </View>
       ) : (
-        <Text className="text-base text-warm-400">Preparing database...</Text>
+        <Text className="text-base text-warm-400">{s.preparingDatabase}</Text>
       )}
     </View>
   );

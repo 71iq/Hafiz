@@ -5,11 +5,56 @@ import { FlashList, FlashListRef } from "@shopify/flash-list";
 import { BookOpen, AlignJustify, Navigation, Eye, EyeOff } from "lucide-react-native";
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
+import { useStrings, interpolate } from "@/lib/i18n/useStrings";
+import { WordInteractionProvider } from "@/lib/word/context";
 import { SurahHeader } from "@/components/mushaf/SurahHeader";
 import { AyahBlock } from "@/components/mushaf/AyahBlock";
 import { FontSizeControl } from "@/components/mushaf/FontSizeControl";
 import { PageMushaf } from "@/components/mushaf/PageMushaf";
 import { GoToNavigator } from "@/components/mushaf/GoToNavigator";
+import { WordDetailSheet } from "@/components/mushaf/WordDetailSheet";
+import { FloatingWordTooltip } from "@/components/mushaf/WordTooltip";
+import { useWordInteraction } from "@/lib/word/context";
+
+/** Registers an ayah navigation callback inside WordInteractionProvider */
+function AyahNavigationRegistrar({
+  items,
+  flashListRef,
+  goToPageRef,
+  viewMode,
+}: {
+  items: MushafItem[];
+  flashListRef: React.RefObject<FlashListRef<MushafItem> | null>;
+  goToPageRef: React.RefObject<((page: number) => void) | null>;
+  viewMode: string;
+}) {
+  const { setNavigateToAyah, closeDetail } = useWordInteraction();
+
+  useEffect(() => {
+    setNavigateToAyah((surah: number, ayah: number) => {
+      closeDetail();
+
+      if (viewMode === "verse") {
+        const idx = items.findIndex(
+          (item) => item.type === "ayah" && item.surah === surah && item.ayah === ayah
+        );
+        if (idx >= 0 && flashListRef.current) {
+          flashListRef.current.scrollToIndex({ index: idx, animated: true });
+        }
+      } else if (viewMode === "page") {
+        // Find the v2_page for this ayah
+        const ayahItem = items.find(
+          (item) => item.type === "ayah" && item.surah === surah && item.ayah === ayah
+        );
+        if (ayahItem && ayahItem.type === "ayah" && goToPageRef.current) {
+          goToPageRef.current(ayahItem.v2Page);
+        }
+      }
+    });
+  }, [items, viewMode, flashListRef, goToPageRef, setNavigateToAyah, closeDetail]);
+
+  return null;
+}
 
 type SurahRow = {
   number: number;
@@ -46,6 +91,7 @@ type MushafItem =
 export default function MushafScreen() {
   const db = useDatabase();
   const { fontSize, lineHeight, viewMode, setViewMode } = useSettings();
+  const s = useStrings();
   const [items, setItems] = useState<MushafItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNavigator, setShowNavigator] = useState(false);
@@ -183,106 +229,122 @@ export default function MushafScreen() {
       <SafeAreaView className="flex-1 bg-warm-50 dark:bg-neutral-950 items-center justify-center">
         <ActivityIndicator size="large" color="#0d9488" />
         <Text className="text-warm-500 dark:text-neutral-400 mt-3 text-sm">
-          Loading Quran...
+          {s.loadingQuran}
         </Text>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView
-      className="flex-1 bg-warm-50 dark:bg-neutral-950"
-      edges={["top"]}
-    >
-      {/* Header */}
-      <View className="flex-row items-center justify-between px-4 py-2.5 border-b border-warm-100 dark:border-neutral-800 bg-warm-50 dark:bg-neutral-950">
-        {/* Left: View toggle + Go-to */}
-        <View className="flex-row items-center gap-2">
-          {/* View mode toggle */}
-          <View className="flex-row bg-warm-100 dark:bg-neutral-800 rounded-lg p-0.5">
+    <WordInteractionProvider>
+      <AyahNavigationRegistrar
+        items={items}
+        flashListRef={flashListRef}
+        goToPageRef={goToPageRef}
+        viewMode={viewMode}
+      />
+      <SafeAreaView
+        className="flex-1 bg-warm-50 dark:bg-neutral-950"
+        edges={["top"]}
+      >
+        {/* Header */}
+        <View className="flex-row items-center justify-between px-4 py-2.5 border-b border-warm-100 dark:border-neutral-800 bg-warm-50 dark:bg-neutral-950">
+          {/* Left: View toggle + Go-to */}
+          <View className="flex-row items-center gap-2">
+            {/* View mode toggle */}
+            <View className="flex-row bg-warm-100 dark:bg-neutral-800 rounded-lg p-0.5">
+              <Pressable
+                onPress={() => setViewMode("verse")}
+                className={`px-2.5 py-1.5 rounded-md ${
+                  !isPageMode ? "bg-white dark:bg-neutral-700" : ""
+                }`}
+              >
+                <AlignJustify
+                  size={16}
+                  color={!isPageMode ? "#0d9488" : "#b9a085"}
+                />
+              </Pressable>
+              <Pressable
+                onPress={() => setViewMode("page")}
+                className={`px-2.5 py-1.5 rounded-md ${
+                  isPageMode ? "bg-white dark:bg-neutral-700" : ""
+                }`}
+              >
+                <BookOpen
+                  size={16}
+                  color={isPageMode ? "#0d9488" : "#b9a085"}
+                />
+              </Pressable>
+            </View>
+
+            {/* Go-to navigator button */}
             <Pressable
-              onPress={() => setViewMode("verse")}
-              className={`px-2.5 py-1.5 rounded-md ${
-                !isPageMode ? "bg-white dark:bg-neutral-700" : ""
-              }`}
+              onPress={() => setShowNavigator(true)}
+              className="flex-row items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-warm-100 dark:bg-neutral-800"
             >
-              <AlignJustify
-                size={16}
-                color={!isPageMode ? "#0d9488" : "#b9a085"}
-              />
-            </Pressable>
-            <Pressable
-              onPress={() => setViewMode("page")}
-              className={`px-2.5 py-1.5 rounded-md ${
-                isPageMode ? "bg-white dark:bg-neutral-700" : ""
-              }`}
-            >
-              <BookOpen
-                size={16}
-                color={isPageMode ? "#0d9488" : "#b9a085"}
-              />
+              <Navigation size={13} color="#0d9488" />
+              <Text className="text-xs font-medium text-warm-600 dark:text-neutral-300">
+                {isPageMode ? interpolate(s.pageN, { n: currentPage }) : s.goTo}
+              </Text>
             </Pressable>
           </View>
 
-          {/* Go-to navigator button */}
-          <Pressable
-            onPress={() => setShowNavigator(true)}
-            className="flex-row items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-warm-100 dark:bg-neutral-800"
-          >
-            <Navigation size={13} color="#0d9488" />
-            <Text className="text-xs font-medium text-warm-600 dark:text-neutral-300">
-              {isPageMode ? `Page ${currentPage}` : "Go to"}
-            </Text>
-          </Pressable>
+          {/* Right: Hide mode + Font size control */}
+          <View className="flex-row items-center gap-2">
+            <Pressable
+              onPress={() => setHideMode((prev) => !prev)}
+              className={`px-2.5 py-1.5 rounded-lg ${
+                hideMode
+                  ? "bg-teal-100 dark:bg-teal-900/40"
+                  : "bg-warm-100 dark:bg-neutral-800"
+              }`}
+            >
+              {hideMode ? (
+                <EyeOff size={16} color="#0d9488" />
+              ) : (
+                <Eye size={16} color="#b9a085" />
+              )}
+            </Pressable>
+            <FontSizeControl />
+          </View>
         </View>
 
-        {/* Right: Hide mode + Font size control */}
-        <View className="flex-row items-center gap-2">
-          <Pressable
-            onPress={() => setHideMode((prev) => !prev)}
-            className={`px-2.5 py-1.5 rounded-lg ${
-              hideMode
-                ? "bg-teal-100 dark:bg-teal-900/40"
-                : "bg-warm-100 dark:bg-neutral-800"
-            }`}
-          >
-            {hideMode ? (
-              <EyeOff size={16} color="#0d9488" />
-            ) : (
-              <Eye size={16} color="#b9a085" />
-            )}
-          </Pressable>
-          <FontSizeControl />
-        </View>
-      </View>
+        {/* Content */}
+        {isPageMode ? (
+          <View className="flex-1">
+            <PageMushaf
+              onPageChange={setCurrentPage}
+              goToPageRef={goToPageRef}
+            />
+          </View>
+        ) : (
+          <FlashList
+            ref={flashListRef}
+            data={items}
+            renderItem={renderItem}
+            getItemType={getItemType}
+            keyExtractor={keyExtractor}
+            extraData={{ fontSize, hideMode }}
+            contentContainerStyle={{ paddingBottom: 40 }}
+          />
+        )}
 
-      {/* Content */}
-      {isPageMode ? (
-        <PageMushaf
-          onPageChange={setCurrentPage}
-          goToPageRef={goToPageRef}
+        {/* Go-to navigator modal */}
+        <GoToNavigator
+          visible={showNavigator}
+          onClose={() => setShowNavigator(false)}
+          onGoToPage={handleGoToPage}
+          mode={viewMode}
+          currentPage={currentPage}
+          onGoToSurahVerse={handleGoToSurahVerse}
         />
-      ) : (
-        <FlashList
-          ref={flashListRef}
-          data={items}
-          renderItem={renderItem}
-          getItemType={getItemType}
-          keyExtractor={keyExtractor}
-          extraData={{ fontSize, hideMode }}
-          contentContainerStyle={{ paddingBottom: 40 }}
-        />
-      )}
 
-      {/* Go-to navigator modal */}
-      <GoToNavigator
-        visible={showNavigator}
-        onClose={() => setShowNavigator(false)}
-        onGoToPage={handleGoToPage}
-        mode={viewMode}
-        currentPage={currentPage}
-        onGoToSurahVerse={handleGoToSurahVerse}
-      />
-    </SafeAreaView>
+        {/* Floating word tooltip (portal-based, web only) */}
+        <FloatingWordTooltip />
+
+        {/* Word detail sheet */}
+        <WordDetailSheet />
+      </SafeAreaView>
+    </WordInteractionProvider>
   );
 }

@@ -1,42 +1,87 @@
 import { useState } from "react";
-import { View, Text, Pressable, Switch, ActivityIndicator } from "react-native";
+import { View, Text, Pressable, ActivityIndicator, ScrollView } from "react-native";
+import { Switch } from "@/components/ui/Switch";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Sun, Moon, Smartphone, Minus, Plus, ChevronRight } from "lucide-react-native";
-import { useSettings, FONT_SIZE_STEPS, type ThemeMode } from "@/lib/settings/context";
+import { Sun, Moon, Smartphone, Minus, Plus, ChevronRight, ChevronLeft } from "lucide-react-native";
+import { useSettings, FONT_SIZE_STEPS, type ThemeMode, type UILanguage } from "@/lib/settings/context";
 import { getLanguageByCode } from "@/lib/translations/languages";
 import { TranslationLanguagePicker } from "@/components/settings/TranslationLanguagePicker";
-
-const THEME_OPTIONS: { value: ThemeMode; label: string; icon: typeof Sun }[] = [
-  { value: "light", label: "Light", icon: Sun },
-  { value: "dark", label: "Dark", icon: Moon },
-  { value: "system", label: "Auto", icon: Smartphone },
-];
+import { useStrings } from "@/lib/i18n/useStrings";
 
 export default function SettingsScreen() {
   const {
     theme, setTheme, fontSizeIndex, setFontSizeIndex, fontSize,
     showTranslation, setShowTranslation, showTafseer, setShowTafseer,
-    translationLanguage, isTranslationLoading, isDark,
+    translationLanguage, isTranslationLoading, isDark, isRTL,
+    uiLanguage, setUiLanguage,
   } = useSettings();
+  const s = useStrings();
   const [pickerVisible, setPickerVisible] = useState(false);
   const currentLang = getLanguageByCode(translationLanguage);
+
+  const THEME_OPTIONS: { value: ThemeMode; label: string; icon: typeof Sun }[] = [
+    { value: "light", label: s.themeLight, icon: Sun },
+    { value: "dark", label: s.themeDark, icon: Moon },
+    { value: "system", label: s.themeAuto, icon: Smartphone },
+  ];
+
+  const UI_LANGUAGE_OPTIONS: { value: UILanguage; label: string }[] = [
+    { value: "en", label: "English" },
+    { value: "ar", label: "العربية" },
+  ];
 
   return (
     <SafeAreaView className="flex-1 bg-warm-50 dark:bg-neutral-950">
       <View className="px-5 pt-4 pb-2">
         <Text className="text-2xl font-bold text-warm-800 dark:text-neutral-100">
-          Settings
+          {s.settingsTitle}
         </Text>
       </View>
 
-      <View className="flex-1 px-5 pt-4">
-        {/* Theme Section */}
+      <ScrollView className="flex-1 px-5 pt-4" contentContainerStyle={{ paddingBottom: 40 }}>
+        {/* Language Section */}
         <Text className="text-sm font-semibold text-warm-500 dark:text-neutral-400 uppercase tracking-wider mb-3">
-          Appearance
+          {s.sectionLanguage}
         </Text>
         <View className="bg-white dark:bg-neutral-900 rounded-2xl p-4 mb-6">
           <Text className="text-base font-medium text-warm-800 dark:text-neutral-200 mb-3">
-            Theme
+            {s.appLanguageLabel}
+          </Text>
+          <View className="flex-row gap-3">
+            {UI_LANGUAGE_OPTIONS.map((option) => {
+              const isActive = uiLanguage === option.value;
+              return (
+                <Pressable
+                  key={option.value}
+                  onPress={() => setUiLanguage(option.value)}
+                  className={`flex-1 items-center py-3 rounded-xl border-2 ${
+                    isActive
+                      ? "border-teal-500 bg-teal-50 dark:bg-teal-900/30"
+                      : "border-warm-200 dark:border-neutral-700 bg-warm-50 dark:bg-neutral-800"
+                  }`}
+                >
+                  <Text
+                    className={`text-sm font-medium ${
+                      isActive
+                        ? "text-teal-700 dark:text-teal-300"
+                        : "text-warm-500 dark:text-neutral-400"
+                    }`}
+                  >
+                    {option.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* Theme Section */}
+        <Text className="text-sm font-semibold text-warm-500 dark:text-neutral-400 uppercase tracking-wider mb-3">
+          {s.sectionAppearance}
+        </Text>
+        <View className="bg-white dark:bg-neutral-900 rounded-2xl p-4 mb-6">
+          <Text className="text-base font-medium text-warm-800 dark:text-neutral-200 mb-3">
+            {s.themeLabel}
           </Text>
           <View className="flex-row gap-3">
             {THEME_OPTIONS.map((option) => {
@@ -73,11 +118,11 @@ export default function SettingsScreen() {
 
         {/* Font Size Section */}
         <Text className="text-sm font-semibold text-warm-500 dark:text-neutral-400 uppercase tracking-wider mb-3">
-          Reading
+          {s.sectionReading}
         </Text>
         <View className="bg-white dark:bg-neutral-900 rounded-2xl p-4 mb-6">
           <Text className="text-base font-medium text-warm-800 dark:text-neutral-200 mb-3">
-            Arabic Font Size
+            {s.fontSizeLabel}
           </Text>
 
           {/* Size control */}
@@ -135,24 +180,22 @@ export default function SettingsScreen() {
         {/* Inline Content Section */}
         <View className="bg-white dark:bg-neutral-900 rounded-2xl p-4 mb-6">
           <Text className="text-base font-medium text-warm-800 dark:text-neutral-200 mb-3">
-            Inline Content
+            {s.sectionInlineContent}
           </Text>
 
-          <View className="flex-row items-center justify-between py-2">
-            <View className="flex-1 mr-3">
+          <View className="flex-row items-center justify-between gap-3 py-2">
+            <View className="flex-1">
               <Text className="text-sm font-medium text-warm-700 dark:text-neutral-300">
-                Show Translation
+                {s.showTranslationLabel}
               </Text>
-              <Text className="text-xs text-warm-400 dark:text-neutral-500 mt-0.5">
+              <Text
+                className="text-xs text-warm-400 dark:text-neutral-500 mt-0.5"
+                style={isRTL ? { textAlign: "right" } : undefined}
+              >
                 Sahih International English
               </Text>
             </View>
-            <Switch
-              value={showTranslation}
-              onValueChange={setShowTranslation}
-              trackColor={{ false: "#d1ccc4", true: "#5eead4" }}
-              thumbColor={showTranslation ? "#0d9488" : "#a8a29e"}
-            />
+            <Switch value={showTranslation} onValueChange={setShowTranslation} />
           </View>
 
           <View className="border-t border-warm-100 dark:border-neutral-800 my-1" />
@@ -160,18 +203,23 @@ export default function SettingsScreen() {
           {/* Translation Language */}
           <Pressable
             onPress={() => setPickerVisible(true)}
-            className="flex-row items-center justify-between py-2"
+            className="flex-row items-center justify-between gap-3 py-2"
           >
-            <View className="flex-1 mr-3">
+            <View className="flex-1">
               <Text className="text-sm font-medium text-warm-700 dark:text-neutral-300">
-                Translation Language
+                {s.translationLanguageLabel}
               </Text>
-              <Text className="text-xs text-warm-400 dark:text-neutral-500 mt-0.5">
+              <Text
+                className="text-xs text-warm-400 dark:text-neutral-500 mt-0.5"
+                style={isRTL ? { textAlign: "right" } : undefined}
+              >
                 {currentLang?.nameEnglish ?? "English"}
               </Text>
             </View>
             {isTranslationLoading ? (
               <ActivityIndicator size="small" color="#0d9488" />
+            ) : isRTL ? (
+              <ChevronLeft size={18} color={isDark ? "#737373" : "#a8a29e"} />
             ) : (
               <ChevronRight size={18} color={isDark ? "#737373" : "#a8a29e"} />
             )}
@@ -179,21 +227,19 @@ export default function SettingsScreen() {
 
           <View className="border-t border-warm-100 dark:border-neutral-800 my-1" />
 
-          <View className="flex-row items-center justify-between py-2">
-            <View className="flex-1 mr-3">
+          <View className="flex-row items-center justify-between gap-3 py-2">
+            <View className="flex-1">
               <Text className="text-sm font-medium text-warm-700 dark:text-neutral-300">
-                Show Tafseer
+                {s.showTafseerLabel}
               </Text>
-              <Text className="text-xs text-warm-400 dark:text-neutral-500 mt-0.5">
+              <Text
+                className="text-xs text-warm-400 dark:text-neutral-500 mt-0.5"
+                style={isRTL ? undefined : { textAlign: "left" }}
+              >
                 التفسير الميسر
               </Text>
             </View>
-            <Switch
-              value={showTafseer}
-              onValueChange={setShowTafseer}
-              trackColor={{ false: "#d1ccc4", true: "#5eead4" }}
-              thumbColor={showTafseer ? "#0d9488" : "#a8a29e"}
-            />
+            <Switch value={showTafseer} onValueChange={setShowTafseer} />
           </View>
         </View>
 
@@ -201,7 +247,7 @@ export default function SettingsScreen() {
           visible={pickerVisible}
           onClose={() => setPickerVisible(false)}
         />
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }

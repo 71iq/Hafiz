@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef, memo } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo, memo } from "react";
 import { View, Text, Pressable } from "react-native";
 import {
   loadQpcFont,
@@ -8,7 +8,9 @@ import {
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
 import { DEFAULT_LANGUAGE, getLanguageByCode } from "@/lib/translations/languages";
+import { WordToken } from "./WordToken";
 import { ChevronDown, ChevronUp } from "lucide-react-native";
+import { useStrings } from "@/lib/i18n/useStrings";
 
 type Props = {
   surah: number;
@@ -35,10 +37,11 @@ function AyahBlockInner({
     showTafseer: defaultShowTafseer,
     translationLanguage,
     isTranslationLoading,
+    isRTL,
   } = useSettings();
-
   const langInfo = getLanguageByCode(translationLanguage);
   const isTranslationRtl = langInfo?.direction === "rtl";
+  const s = useStrings();
 
   const [fontVisible, setFontVisible] = useState(() =>
     isQpcFontLoaded(v2Page)
@@ -48,6 +51,16 @@ function AyahBlockInner({
   const [tafseerOpen, setTafseerOpen] = useState(false);
   const [translationText, setTranslationText] = useState<string | null>(null);
   const [tafseerText, setTafseerText] = useState<string | null>(null);
+
+  // Split QCF2 text into word tokens (last token is ayah end marker)
+  const wordTokens = useMemo(() => {
+    const tokens = text.split(" ").filter(Boolean);
+    if (tokens.length <= 1) return { words: [], marker: tokens[0] ?? "" };
+    return {
+      words: tokens.slice(0, -1),
+      marker: tokens[tokens.length - 1],
+    };
+  }, [text]);
 
   // Sync with global defaults when they change
   useEffect(() => {
@@ -142,6 +155,7 @@ function AyahBlockInner({
   }, [hideMode]);
 
   const isBlurred = hideMode && !revealed;
+  const fontFamily = qpcFontName(v2Page);
 
   return (
     <View className="border-b border-warm-100 dark:border-neutral-800 mx-4">
@@ -156,33 +170,57 @@ function AyahBlockInner({
         </View>
       </View>
 
-      {/* Arabic text (QCF2) */}
-      <Pressable onPress={handleReveal} className="px-2 pb-3 pt-1">
-        {isBlurred ? (
+      {/* Arabic text (QCF2) — interactive word tokens */}
+      {isBlurred ? (
+        <Pressable onPress={handleReveal} className="px-2 pb-3 pt-1">
           <View
             className="rounded-xl bg-warm-100 dark:bg-neutral-800 items-center justify-center"
             style={{ height: lineHeight + 16 }}
           >
             <Text className="text-warm-400 dark:text-neutral-500 text-sm">
-              Tap to reveal
+              {s.tapToReveal}
             </Text>
           </View>
-        ) : (
-          <Text
-            className="text-warm-900 dark:text-neutral-100"
+        </Pressable>
+      ) : (
+        <View className="px-2 pb-3 pt-1" style={{ opacity: fontVisible ? 1 : 0 }}>
+          <View
             style={{
-              fontSize,
-              lineHeight,
-              textAlign: "right",
-              writingDirection: "rtl",
-              fontFamily: qpcFontName(v2Page),
-              opacity: fontVisible ? 1 : 0,
+              // In RTL context (Arabic UI), direction:rtl already flows row right-to-left,
+              // so "row" is correct. In LTR context, "row-reverse" simulates RTL.
+              flexDirection: isRTL ? "row" : "row-reverse",
+              flexWrap: "wrap",
+              justifyContent: "flex-start",
+              alignItems: "center",
+              gap: 2,
             }}
           >
-            {text}
-          </Text>
-        )}
-      </Pressable>
+            {wordTokens.words.map((glyph, i) => (
+              <WordToken
+                key={`${surah}-${ayah}-w${i}`}
+                glyph={glyph}
+                fontFamily={fontFamily}
+                fontSize={fontSize}
+                lineHeight={lineHeight}
+                surah={surah}
+                ayah={ayah}
+                wordPos={i + 1}
+                v2Page={v2Page}
+                disabled={hideMode}
+              />
+            ))}
+            {/* Ayah end marker */}
+            {wordTokens.marker && (
+              <Text
+                className="text-warm-900 dark:text-neutral-100"
+                style={{ fontFamily, fontSize, lineHeight }}
+              >
+                {wordTokens.marker}
+              </Text>
+            )}
+          </View>
+        </View>
+      )}
 
       {/* Collapsible sections */}
       <View className="px-2 pb-2">
@@ -206,7 +244,7 @@ function AyahBlockInner({
               className="text-sm text-warm-500 dark:text-neutral-400 leading-5"
               style={isTranslationRtl ? { writingDirection: "rtl", textAlign: "right" } : undefined}
             >
-              {translationText ?? "Loading..."}
+              {translationText ?? s.loading}
             </Text>
           </View>
         )}
@@ -217,7 +255,7 @@ function AyahBlockInner({
           className="flex-row items-center justify-between py-2 border-t border-warm-50 dark:border-neutral-800/50"
         >
           <Text className="text-xs font-medium text-warm-400 dark:text-neutral-500 uppercase tracking-wider">
-            Tafseer
+            {s.tafseer}
           </Text>
           {tafseerOpen ? (
             <ChevronUp size={14} color="#a8a29e" />

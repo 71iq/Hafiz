@@ -5,6 +5,7 @@ import {
   qpcFontName,
   isQpcFontLoaded,
 } from "@/lib/fonts/loader";
+import { useStrings } from "@/lib/i18n/useStrings";
 
 type Props = {
   surahNumber: number;
@@ -28,6 +29,7 @@ export function SurahHeader({
   hideBismillah,
   compact,
 }: Props) {
+  const s = useStrings();
   const showBismillah =
     !hideBismillah && surahNumber !== 9 && surahNumber !== 1;
 
@@ -66,7 +68,7 @@ export function SurahHeader({
             {nameArabic}
           </Text>
           <Text className="text-teal-200 text-xs">
-            {surahNumber}. {nameEnglish} · {ayahCount} Ayahs
+            {surahNumber}. {nameEnglish} · {ayahCount} {s.ayahs}
           </Text>
         </View>
 
@@ -119,12 +121,12 @@ export function SurahHeader({
         <View className="flex-row items-center gap-3">
           <View className="bg-teal-600/50 dark:bg-teal-800/50 rounded-full px-3 py-1">
             <Text className="text-teal-100 text-xs">
-              {revelationType === "Makkiyah" ? "Meccan" : "Medinan"}
+              {revelationType === "Makkiyah" ? s.meccan : s.medinan}
             </Text>
           </View>
           <View className="w-1 h-1 rounded-full bg-teal-300/50" />
           <Text className="text-teal-200 text-xs">
-            {ayahCount} Ayahs
+            {ayahCount} {s.ayahs}
           </Text>
         </View>
       </View>
