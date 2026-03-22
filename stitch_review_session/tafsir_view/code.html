@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+
+<html dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Al-Mushaf - Tafsir View</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif:wght@400;600;700&amp;family=Manrope:wght@400;500;600&amp;family=IBM+Plex+Arabic:wght@300;400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-dim": "#dfd9d1",
+              "tertiary-fixed-dim": "#acccce",
+              "surface-container-high": "#eee7df",
+              "primary-fixed-dim": "#9fcfd1",
+              "surface-tint": "#366668",
+              "error": "#ba1a1a",
+              "secondary": "#735b1e",
+              "on-primary": "#ffffff",
+              "tertiary-fixed": "#c8e9eb",
+              "on-tertiary": "#ffffff",
+              "tertiary": "#163436",
+              "on-primary-container": "#8cbdbf",
+              "on-error": "#ffffff",
+              "on-primary-fixed-variant": "#1c4e50",
+              "background": "#fff8f1",
+              "on-secondary-fixed": "#251a00",
+              "surface-container-low": "#f9f3eb",
+              "surface-bright": "#fff8f1",
+              "surface-container": "#f4ede5",
+              "primary-fixed": "#baeced",
+              "error-container": "#ffdad6",
+              "inverse-on-surface": "#f7f0e8",
+              "outline-variant": "#c0c8c8",
+              "secondary-container": "#fddc91",
+              "on-surface": "#1e1b17",
+              "primary": "#003638",
+              "surface": "#fff8f1",
+              "on-secondary": "#ffffff",
+              "on-primary-fixed": "#002021",
+              "on-tertiary-fixed": "#002022",
+              "surface-container-lowest": "#ffffff",
+              "primary-container": "#1b4d4f",
+              "on-background": "#1e1b17",
+              "secondary-fixed-dim": "#e3c37b",
+              "surface-container-highest": "#e8e1da",
+              "secondary-fixed": "#ffdf99",
+              "on-surface-variant": "#404848",
+              "on-tertiary-container": "#9ababc",
+              "on-secondary-container": "#785f22",
+              "on-tertiary-fixed-variant": "#2e4c4e",
+              "inverse-surface": "#33302b",
+              "tertiary-container": "#2d4b4d",
+              "surface-variant": "#e8e1da",
+              "inverse-primary": "#9fcfd1",
+              "outline": "#707979",
+              "on-error-container": "#93000a",
+              "on-secondary-fixed-variant": "#594406"
+            },
+            fontFamily: {
+              "headline": ["Noto Serif"],
+              "body": ["Manrope"],
+              "label": ["Manrope"],
+              "arabic-display": ["Noto Serif Arabic", "serif"],
+              "arabic-body": ["IBM Plex Arabic", "sans-serif"]
+            },
+            borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      .uthmani-script {
+        font-family: 'Noto Serif Arabic', serif;
+        line-height: 2.2;
+      }
+      .custom-scrollbar::-webkit-scrollbar {
+        width: 4px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: #e8e1da;
+        border-radius: 10px;
+      }
+      body {
+        background-color: #fff8f1;
+        color: #1e1b17;
+      }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="font-body selection:bg-secondary-container selection:text-on-secondary-container">
+<!-- Top Navigation Bar -->
+<header class="bg-[#FFF8F1] dark:bg-stone-900 w-full pt-8 pb-4 px-6 sticky top-0 z-50">
+<div class="flex justify-between items-center w-full px-6 max-w-screen-xl mx-auto">
+<div class="flex items-center gap-4">
+<button class="scale-98 active:scale-95 transition-transform duration-200">
+<span class="material-symbols-outlined text-[#003638] dark:text-[#E8E1DA]">arrow_forward</span>
+</button>
+<h1 class="font-noto-serif text-2xl font-semibold tracking-tight text-[#003638] dark:text-[#E8E1DA]">التفسير</h1>
+</div>
+<div class="flex items-center gap-4">
+<button class="scale-98 active:scale-95 transition-transform duration-200">
+<span class="material-symbols-outlined text-[#003638] dark:text-[#E8E1DA]" data-icon="share">share</span>
+</button>
+<div class="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center overflow-hidden">
+<img alt="User Profile" class="w-full h-full object-cover" data-alt="User profile photo showing a friendly person" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCLA7ODGFfvjkfGsrI6u9HI-KCBzQBHyUN4TmdUk4wrfEOSQAEemFZByvl4u_QYd2VoUVmqE7aA3-03AJqf11AsctBM75h2-MAFbl6XAehM0Y7AAMGhA6i2dclOtvGMjwhOR63g3RjAhQosHJPlX2QGkuHQ1KSXQPjS3KTd-9kwu2_BcT_Hv3Z-lDDSsRddYAGP8slPVPaRSC2Q6a9aWz4UohrRD-OZUeUdwYncO4ES7NYpu1206ycY_JPJTdnygZHd1HHHhFY"/>
+</div>
+</div>
+</div>
+</header>
+<main class="max-w-screen-md mx-auto px-6 pb-32">
+<!-- Verse Canvas -->
+<section class="mt-8 mb-12">
+<div class="bg-surface-container-lowest rounded-lg p-8 shadow-sm relative overflow-hidden">
+<!-- Subtle Gradient Accent -->
+<div class="absolute top-0 right-0 w-32 h-32 bg-secondary-container/10 rounded-full -mr-16 -mt-16 blur-3xl"></div>
+<div class="flex flex-col items-center text-center gap-6">
+<span class="font-label text-xs uppercase tracking-widest text-secondary font-semibold">سورة البقرة • آية ١٥٥</span>
+<p class="uthmani-script text-3xl md:text-4xl text-on-surface leading-loose" dir="rtl">
+                        وَلَنَبْلُوَنَّكُم بِشَيْءٍ مِّنَ الْخَوْفِ وَالْجُوعِ وَنَقْصٍ مِّنَ الْأَمْوَالِ وَالْأَنفُسِ وَالثَّمَرَاتِ ۗ وَبَشِّرِ الصَّابِرِينَ
+                    </p>
+<div class="w-12 h-0.5 bg-secondary-container rounded-full"></div>
+</div>
+</div>
+</section>
+<!-- Tafsir Content Area -->
+<section class="space-y-8">
+<div class="flex items-center justify-between mb-4">
+<div class="flex flex-col">
+<h2 class="font-headline text-xl text-primary font-bold">في ظلال القرآن</h2>
+<span class="font-label text-sm text-on-surface-variant">للإمام سيد قطب رحمه الله</span>
+</div>
+<div class="flex gap-2">
+<button class="p-2 rounded-full bg-surface-container hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined text-sm" data-icon="text_fields">text_fields</span>
+</button>
+</div>
+</div>
+<article class="font-arabic-body text-lg leading-relaxed text-on-surface space-y-6 custom-scrollbar">
+<p>
+                    إن الابتلاء بالخوف والجوع ونقص الأموال والأنفس والثمرات هو الضريبة الضرورية التي يؤديها أصحاب العقيدة؛ لتصفو نفوسهم، وتخلص لله، وتتصل بالمصدر الوحيد الذي يمدها بالقوة والعزاء حين تنقطع الأسباب.
+                </p>
+<div class="bg-surface-container-low p-6 rounded-lg border-r-4 border-secondary">
+<p class="font-medium text-primary">
+                        "وبشر الصابرين".. هي الكلمة الحاسمة التي تنهي المعركة النفسية في قلب المؤمن، فما دام الصبر هو المفتاح، فالبشرى هي الجائزة.
+                    </p>
+</div>
+<p>
+                    هذا الدين ليس مجرد كلمات تُقال، بل هو حياة تُعاش، واختبارات تمحص القلوب. إن الخوف والجوع ليسوا مجرد آلام جسدية، بل هي مراحل تربوية تهيئ الجماعة المسلمة لحمل الأمانة الكبرى في الأرض.
+                </p>
+<p>
+                    والصابرون هم الذين إذا أصابتهم مصيبة قالوا: "إنا لله وإنا إليه راجعون". هذا هو الاستسلام المطلق، وهذا هو الأدب الكامل مع الخالق. إنهم يدركون أنهم ملك لله، وأن المصير إلى الله، فماذا يبقى للجزع في قلوب عرفت حقيقة وجودها؟
+                </p>
+<p>
+                    في ظلال هذه الآية، نجد السكينة التي تغمر القلب المؤمن وهو يواجه أعاصير الحياة. فالبلاء هنا ليس عقوبة، بل هو انتقاء وإعداد. إنه الطريق الصعب الذي لا بد منه للوصول إلى الغاية الأسمى.
+                </p>
+</article>
+</section>
+<!-- Attribution Footer Section -->
+<footer class="mt-16 pt-8 border-t border-outline-variant/10 flex flex-col items-center gap-6">
+<div class="flex items-center gap-4 text-on-surface-variant font-label text-sm">
+<span>المصدر: quran-tafsir.net</span>
+<span class="w-1 h-1 bg-outline-variant rounded-full"></span>
+<span class="material-symbols-outlined text-[16px]" data-icon="menu_book">menu_book</span>
+</div>
+<div class="flex gap-4">
+<button class="flex items-center gap-2 bg-primary text-on-primary px-8 py-4 rounded-full font-label font-bold text-sm scale-98 active:scale-95 transition-all shadow-lg shadow-primary/10">
+<span class="material-symbols-outlined text-lg" data-icon="bookmark" style="font-variation-settings: 'FILL' 1;">bookmark</span>
+                    حفظ المقطع
+                </button>
+</div>
+</footer>
+</main>
+<!-- Bottom Navigation Bar (Contextual) -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 py-3 pb-8 bg-[#FFF8F1]/80 dark:bg-stone-900/80 backdrop-blur-xl shadow-[0_-4px_20px_rgba(0,54,56,0.04)] rounded-t-[2.5rem]">
+<a class="flex flex-col items-center justify-center text-[#2D2D2D]/50 dark:text-[#E8E1DA]/50 px-5 py-2 hover:text-[#003638] transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="home_max">home_max</span>
+<span class="font-manrope text-[10px] font-medium tracking-wide">الرئيسية</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-[#1B4D4F] text-[#FDDC91] rounded-full px-5 py-2 mt-1" href="#">
+<span class="material-symbols-outlined" data-icon="book_5" style="font-variation-settings: 'FILL' 1;">book_5</span>
+<span class="font-manrope text-[10px] font-medium tracking-wide">المصحف</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#2D2D2D]/50 dark:text-[#E8E1DA]/50 px-5 py-2 hover:text-[#003638] transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="analytics">analytics</span>
+<span class="font-manrope text-[10px] font-medium tracking-wide">التقدم</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#2D2D2D]/50 dark:text-[#E8E1DA]/50 px-5 py-2 hover:text-[#003638] transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-manrope text-[10px] font-medium tracking-wide">الإعدادات</span>
+</a>
+</nav>
+</body></html>

@@ -9,7 +9,6 @@ type Props = {
 
 /** shadcn-style animated toggle switch, consistent on web + native */
 export function Switch({ value, onValueChange, disabled }: Props) {
-  // Animate `left` directly — transforms escape overflow:hidden on web
   const thumbLeft = useRef(new Animated.Value(value ? 22 : 2)).current;
 
   useEffect(() => {
@@ -27,9 +26,8 @@ export function Switch({ value, onValueChange, disabled }: Props) {
         width: 44,
         height: 24,
         borderRadius: 12,
-        backgroundColor: value ? "#0d9488" : "#d1ccc4",
+        backgroundColor: value ? "#0d9488" : "#E8E1DA", // primary-accent : surface-high
         opacity: disabled ? 0.4 : 1,
-        // position:relative so absolute child is contained; overflow:hidden clips it
         position: "relative",
         overflow: "hidden",
       }}
@@ -45,11 +43,12 @@ export function Switch({ value, onValueChange, disabled }: Props) {
           height: 20,
           borderRadius: 10,
           backgroundColor: "#ffffff",
-          shadowColor: "#000",
+          // Ambient teal-tinted shadow per DESIGN.md
+          shadowColor: "#003638",
           shadowOffset: { width: 0, height: 1 },
-          shadowOpacity: 0.15,
-          shadowRadius: 2,
-          elevation: 2,
+          shadowOpacity: 0.04,
+          shadowRadius: 8,
+          elevation: 1,
         }}
       />
     </Pressable>

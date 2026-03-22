@@ -6,7 +6,7 @@ export function QiraatTab() {
   return (
     <View className="py-10 items-center px-4">
       <Text className="text-3xl mb-4">{"📖"}</Text>
-      <Text className="text-base font-semibold text-warm-700 dark:text-neutral-200 mb-2 text-center">
+      <Text className="text-base font-semibold text-charcoal dark:text-neutral-200 mb-2 text-center">
         {s.comingSoon}
       </Text>
       <Text

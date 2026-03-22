@@ -41,28 +41,34 @@ function TooltipPopup({
     >
       <View
         style={{
-          backgroundColor: "#0d9488",
-          borderRadius: 8,
-          paddingHorizontal: 12,
-          paddingVertical: 7,
+          backgroundColor: "#003638", // primary deep teal
+          borderRadius: 20, // pill shape per DESIGN.md
+          paddingHorizontal: 14,
+          paddingVertical: 8,
           flexDirection: "row",
           alignItems: "center",
-          gap: 4,
-          shadowColor: "#000",
-          shadowOpacity: 0.18,
-          shadowRadius: 8,
-          shadowOffset: { width: 0, height: 3 },
-          elevation: 8,
+          gap: 5,
+          // Ambient teal-tinted shadow per DESIGN.md
+          shadowColor: "#003638",
+          shadowOpacity: 0.04,
+          shadowRadius: 32,
+          shadowOffset: { width: 0, height: 4 },
+          elevation: 4,
         }}
       >
         <Text
-          // @ts-ignore — whiteSpace is valid CSS but not in RN Text types
-          style={{ color: "#fff", fontSize: 13, fontWeight: "500", whiteSpace: "nowrap" }}
+          style={{
+            color: "#fff",
+            fontSize: 13,
+            fontFamily: "Manrope_500Medium",
+            // @ts-ignore — whiteSpace is valid CSS on web
+            whiteSpace: "nowrap",
+          }}
           numberOfLines={1}
         >
           {translation ?? "…"}
         </Text>
-        <ChevronRight size={12} color="rgba(255,255,255,0.75)" />
+        <ChevronRight size={12} color="rgba(255,255,255,0.6)" />
       </View>
       {/* Down-pointing caret */}
       <View
@@ -75,7 +81,7 @@ function TooltipPopup({
           borderTopWidth: ARROW_SIZE,
           borderLeftColor: "transparent",
           borderRightColor: "transparent",
-          borderTopColor: "#0d9488",
+          borderTopColor: "#003638",
         }}
       />
     </Pressable>

@@ -172,7 +172,7 @@ export function MushafPage({
             style={{ height: bismHeight, justifyContent: "center" }}
           >
             <Text
-              className="text-warm-800 dark:text-neutral-200 text-center"
+              className="text-charcoal dark:text-neutral-200 text-center"
               style={{
                 fontFamily: qpcFontName(1),
                 fontSize: fontSize * 0.85,
@@ -199,6 +199,7 @@ export function MushafPage({
         <View
           key={`line-${line.line_number}`}
           style={{
+            direction: "ltr",
             flexDirection: "row-reverse",
             justifyContent: centered ? "center" : "space-between",
             width: contentWidth,
@@ -227,7 +228,7 @@ export function MushafPage({
             return (
               <Text
                 key={`w-${line.line_number}-${i}`}
-                className="text-warm-900 dark:text-neutral-100"
+                className="text-charcoal dark:text-neutral-100"
                 style={{ fontFamily, fontSize, lineHeight }}
               >
                 {w}
@@ -241,7 +242,7 @@ export function MushafPage({
     // Fallback: render ayahs as continuous text (shouldn't happen with layout data)
     content = (
       <Text
-        className="text-warm-900 dark:text-neutral-100"
+        className="text-charcoal dark:text-neutral-100"
         style={{
           fontFamily,
           fontSize,

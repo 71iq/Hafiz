@@ -48,7 +48,6 @@ function WordTokenInner({
     openDetail(wordRef);
   }, [disabled, surah, ayah, wordPos, v2Page, openDetail]);
 
-  // Web hover: measure word position and show floating tooltip
   const webProps =
     Platform.OS === "web" && !disabled
       ? {
@@ -71,16 +70,16 @@ function WordTokenInner({
       <Text
         className={
           isSelected
-            ? "text-teal-600 dark:text-teal-400"
-            : "text-warm-900 dark:text-neutral-100"
+            ? "text-primary-accent dark:text-primary-bright"
+            : "text-charcoal dark:text-neutral-100"
         }
         style={{
           fontFamily,
           fontSize,
           lineHeight,
           ...(isSelected && {
-            backgroundColor: "rgba(13, 148, 136, 0.1)",
-            borderRadius: 4,
+            backgroundColor: "rgba(13, 148, 136, 0.08)",
+            borderRadius: 6,
           }),
         }}
       >

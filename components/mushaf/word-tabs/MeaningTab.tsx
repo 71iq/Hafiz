@@ -66,7 +66,7 @@ export function MeaningTab({ surah, ayah, wordPos }: Props) {
       {data.wordArabic && (
         <View className="mb-4 items-center">
           <Text
-            className="text-3xl text-warm-900 dark:text-neutral-100 font-semibold"
+            className="text-3xl text-charcoal dark:text-neutral-100 font-semibold"
             style={{ writingDirection: "rtl" }}
           >
             {data.wordArabic}
@@ -99,12 +99,12 @@ export function MeaningTab({ surah, ayah, wordPos }: Props) {
 
 function Row({ label, value, rtl }: { label: string; value: string; rtl?: boolean }) {
   return (
-    <View className="flex-row items-center justify-between py-2.5 border-b border-warm-100 dark:border-neutral-800/50">
+    <View className="flex-row items-center justify-between py-2.5 mb-2">
       <Text className="text-xs font-medium text-warm-400 dark:text-neutral-500 uppercase tracking-wider">
         {label}
       </Text>
       <Text
-        className="text-base text-warm-800 dark:text-neutral-100 font-medium"
+        className="text-base text-charcoal dark:text-neutral-100 font-medium"
         style={rtl ? { writingDirection: "rtl" } : undefined}
       >
         {value}

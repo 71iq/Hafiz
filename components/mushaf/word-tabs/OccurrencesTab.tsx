@@ -58,7 +58,7 @@ export function OccurrencesTab({ surah, ayah, wordPos }: Props) {
       {/* Root + count */}
       <View className="flex-row items-center justify-between mb-3">
         <Text
-          className="text-xl text-warm-900 dark:text-neutral-100 font-semibold"
+          className="text-xl text-charcoal dark:text-neutral-100 font-semibold"
           style={{ writingDirection: "rtl" }}
         >
           {root}
@@ -81,7 +81,7 @@ export function OccurrencesTab({ surah, ayah, wordPos }: Props) {
             <Pressable
               key={`${occ.surah}-${occ.ayah}-${occ.word_pos}`}
               onPress={() => navigateToAyah(occ.surah, occ.ayah)}
-              className={`flex-row items-center justify-between py-2 border-b border-warm-50 dark:border-neutral-800/50 ${
+              className={`flex-row items-center justify-between py-2 mb-2 ${
                 isCurrent ? "bg-teal-50 dark:bg-teal-900/20 -mx-1 px-1 rounded" : ""
               }`}
             >
@@ -89,7 +89,7 @@ export function OccurrencesTab({ surah, ayah, wordPos }: Props) {
                 {occ.surah}:{occ.ayah}
               </Text>
               <Text
-                className="text-base text-warm-800 dark:text-neutral-100 flex-1 text-right"
+                className="text-base text-charcoal dark:text-neutral-100 flex-1 text-right"
                 style={{ writingDirection: "rtl" }}
                 numberOfLines={1}
               >

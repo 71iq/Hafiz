@@ -71,7 +71,7 @@ export function TajweedTab({ surah, ayah, wordPos }: Props) {
       {rules.map((rule) => (
         <View
           key={rule.ruleId}
-          className="mb-4 border-b border-warm-50 dark:border-neutral-800/50 pb-4"
+          className="mb-4 pb-4"
         >
           <View className="flex-row items-center gap-2 mb-2">
             <View
@@ -82,12 +82,12 @@ export function TajweedTab({ surah, ayah, wordPos }: Props) {
                 backgroundColor: rule.color,
               }}
             />
-            <Text className="text-base font-semibold text-warm-800 dark:text-neutral-100">
+            <Text className="text-base font-semibold text-charcoal dark:text-neutral-100">
               {rule.english}
             </Text>
           </View>
           <Text
-            className="text-lg text-warm-700 dark:text-neutral-200 mb-1.5"
+            className="text-lg text-charcoal dark:text-neutral-200 mb-1.5"
             style={{ writingDirection: "rtl", textAlign: "right" }}
           >
             {rule.arabic}

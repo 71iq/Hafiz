@@ -10,7 +10,7 @@ type Props = {
 };
 
 export function TranslationLanguagePicker({ visible, onClose }: Props) {
-  const { translationLanguage, setTranslationLanguage, isTranslationLoading, isDark } =
+  const { translationLanguage, setTranslationLanguage, isDark } =
     useSettings();
   const s = useStrings();
 
@@ -28,67 +28,94 @@ export function TranslationLanguagePicker({ visible, onClose }: Props) {
     >
       <View className="flex-1 justify-end">
         {/* Backdrop */}
-        <Pressable className="flex-1" onPress={onClose} />
+        <Pressable
+          className="flex-1"
+          style={{ backgroundColor: "rgba(0,0,0,0.3)" }}
+          onPress={onClose}
+        />
 
         {/* Sheet */}
         <View
-          className="bg-white dark:bg-neutral-900 rounded-t-3xl"
+          className="bg-surface dark:bg-surface-dark-low rounded-t-4xl"
           style={{ maxHeight: "70%" }}
         >
+          {/* Drag handle */}
+          <View className="items-center pt-3 pb-1">
+            <View className="w-10 h-1 rounded-full bg-surface-high dark:bg-surface-dark-high" />
+          </View>
+
           {/* Header */}
-          <View className="flex-row items-center justify-between px-5 pt-5 pb-3">
-            <Text className="text-lg font-bold text-warm-800 dark:text-neutral-100">
+          <View className="flex-row items-center justify-between px-6 pt-3 pb-4">
+            <Text
+              className="text-charcoal dark:text-neutral-100"
+              style={{ fontFamily: "NotoSerif_700Bold", fontSize: 20 }}
+            >
               {s.translationLanguagePickerTitle}
             </Text>
             <Pressable
               onPress={onClose}
-              className="w-8 h-8 rounded-full bg-warm-100 dark:bg-neutral-800 items-center justify-center"
+              className="w-9 h-9 rounded-full bg-surface-high dark:bg-surface-dark-high items-center justify-center"
+              style={({ pressed }) => ({
+                transform: [{ scale: pressed ? 0.95 : 1 }],
+              })}
             >
-              <X size={16} color={isDark ? "#a3a3a3" : "#78716c"} />
+              <X size={16} color={isDark ? "#a3a3a3" : "#6e5a47"} />
             </Pressable>
           </View>
 
-          {/* Language list */}
-          <ScrollView className="px-5 pb-8">
-            {TRANSLATION_LANGUAGES.map((lang) => {
-              const isSelected = lang.code === translationLanguage;
-              return (
-                <Pressable
-                  key={lang.code}
-                  onPress={() => handleSelect(lang.code)}
-                  className={`flex-row items-center justify-between py-3.5 border-b border-warm-50 dark:border-neutral-800 ${
-                    isSelected ? "opacity-100" : "opacity-80"
-                  }`}
-                >
-                  <View className="flex-1">
-                    <Text
-                      className={`text-base ${
-                        isSelected
-                          ? "font-semibold text-teal-700 dark:text-teal-400"
-                          : "font-medium text-warm-700 dark:text-neutral-300"
-                      }`}
-                    >
-                      {lang.nameEnglish}
-                    </Text>
-                    <Text
-                      className="text-sm text-warm-400 dark:text-neutral-500 mt-0.5"
-                      style={
-                        lang.direction === "rtl"
-                          ? { writingDirection: "rtl", textAlign: "right" }
-                          : undefined
-                      }
-                    >
-                      {lang.nameNative}
-                    </Text>
-                  </View>
-                  {isSelected && (
-                    <Check size={20} color={isDark ? "#2dd4bf" : "#0d9488"} />
-                  )}
-                </Pressable>
-              );
-            })}
-            {/* Bottom spacing */}
-            <View className="h-8" />
+          {/* Language list — no borders, use spacing */}
+          <ScrollView className="px-6 pb-8">
+            <View className="gap-1">
+              {TRANSLATION_LANGUAGES.map((lang) => {
+                const isSelected = lang.code === translationLanguage;
+                return (
+                  <Pressable
+                    key={lang.code}
+                    onPress={() => handleSelect(lang.code)}
+                    className="flex-row items-center justify-between py-3.5 px-3 rounded-2xl"
+                    style={({ pressed }) => ({
+                      backgroundColor: isSelected
+                        ? (isDark ? "rgba(45,212,191,0.08)" : "rgba(13,148,136,0.06)")
+                        : pressed
+                          ? (isDark ? "rgba(45,212,191,0.04)" : "rgba(13,148,136,0.03)")
+                          : "transparent",
+                    })}
+                  >
+                    <View className="flex-1">
+                      <Text
+                        className={
+                          isSelected
+                            ? "text-primary-accent dark:text-primary-bright"
+                            : "text-charcoal dark:text-neutral-300"
+                        }
+                        style={{
+                          fontFamily: isSelected ? "Manrope_600SemiBold" : "Manrope_500Medium",
+                          fontSize: 15,
+                        }}
+                      >
+                        {lang.nameEnglish}
+                      </Text>
+                      <Text
+                        className="text-warm-400 dark:text-neutral-500 mt-0.5"
+                        style={{
+                          fontFamily: "Manrope_400Regular",
+                          fontSize: 13,
+                          ...(lang.direction === "rtl"
+                            ? { writingDirection: "rtl", textAlign: "right" }
+                            : {}),
+                        }}
+                      >
+                        {lang.nameNative}
+                      </Text>
+                    </View>
+                    {isSelected && (
+                      <Check size={20} color={isDark ? "#2dd4bf" : "#0d9488"} />
+                    )}
+                  </Pressable>
+                );
+              })}
+              <View className="h-8" />
+            </View>
           </ScrollView>
         </View>
       </View>

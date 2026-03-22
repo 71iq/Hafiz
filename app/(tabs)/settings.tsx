@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { View, Text, Pressable, ActivityIndicator, ScrollView } from "react-native";
 import { Switch } from "@/components/ui/Switch";
+import { Card } from "@/components/ui/Card";
+import { ToggleGroup } from "@/components/ui/ToggleGroup";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Sun, Moon, Smartphone, Minus, Plus, ChevronRight, ChevronLeft } from "lucide-react-native";
 import { useSettings, FONT_SIZE_STEPS, type ThemeMode, type UILanguage } from "@/lib/settings/context";
@@ -25,62 +27,46 @@ export default function SettingsScreen() {
     { value: "system", label: s.themeAuto, icon: Smartphone },
   ];
 
-  const UI_LANGUAGE_OPTIONS: { value: UILanguage; label: string }[] = [
-    { value: "en", label: "English" },
-    { value: "ar", label: "العربية" },
-  ];
-
   return (
-    <SafeAreaView className="flex-1 bg-warm-50 dark:bg-neutral-950">
-      <View className="px-5 pt-4 pb-2">
-        <Text className="text-2xl font-bold text-warm-800 dark:text-neutral-100">
+    <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
+      {/* Header — Gallery feel with generous top spacing */}
+      <View className="px-6 pt-8 pb-4">
+        <Text
+          className="text-charcoal dark:text-neutral-100"
+          style={{ fontFamily: "NotoSerif_700Bold", fontSize: 28 }}
+        >
           {s.settingsTitle}
         </Text>
       </View>
 
-      <ScrollView className="flex-1 px-5 pt-4" contentContainerStyle={{ paddingBottom: 40 }}>
+      <ScrollView className="flex-1 px-6" contentContainerStyle={{ paddingBottom: 48 }}>
+
         {/* Language Section */}
-        <Text className="text-sm font-semibold text-warm-500 dark:text-neutral-400 uppercase tracking-wider mb-3">
-          {s.sectionLanguage}
-        </Text>
-        <View className="bg-white dark:bg-neutral-900 rounded-2xl p-4 mb-6">
-          <Text className="text-base font-medium text-warm-800 dark:text-neutral-200 mb-3">
+        <SectionLabel>{s.sectionLanguage}</SectionLabel>
+        <Card elevation="low" className="p-5 mb-8">
+          <Text
+            className="text-charcoal dark:text-neutral-200 mb-4"
+            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15 }}
+          >
             {s.appLanguageLabel}
           </Text>
-          <View className="flex-row gap-3">
-            {UI_LANGUAGE_OPTIONS.map((option) => {
-              const isActive = uiLanguage === option.value;
-              return (
-                <Pressable
-                  key={option.value}
-                  onPress={() => setUiLanguage(option.value)}
-                  className={`flex-1 items-center py-3 rounded-xl border-2 ${
-                    isActive
-                      ? "border-teal-500 bg-teal-50 dark:bg-teal-900/30"
-                      : "border-warm-200 dark:border-neutral-700 bg-warm-50 dark:bg-neutral-800"
-                  }`}
-                >
-                  <Text
-                    className={`text-sm font-medium ${
-                      isActive
-                        ? "text-teal-700 dark:text-teal-300"
-                        : "text-warm-500 dark:text-neutral-400"
-                    }`}
-                  >
-                    {option.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
+          <ToggleGroup<UILanguage>
+            value={uiLanguage}
+            onValueChange={setUiLanguage}
+            items={[
+              { value: "en", label: "English" },
+              { value: "ar", label: "العربية" },
+            ]}
+          />
+        </Card>
 
-        {/* Theme Section */}
-        <Text className="text-sm font-semibold text-warm-500 dark:text-neutral-400 uppercase tracking-wider mb-3">
-          {s.sectionAppearance}
-        </Text>
-        <View className="bg-white dark:bg-neutral-900 rounded-2xl p-4 mb-6">
-          <Text className="text-base font-medium text-warm-800 dark:text-neutral-200 mb-3">
+        {/* Appearance Section */}
+        <SectionLabel>{s.sectionAppearance}</SectionLabel>
+        <Card elevation="low" className="p-5 mb-8">
+          <Text
+            className="text-charcoal dark:text-neutral-200 mb-4"
+            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15 }}
+          >
             {s.themeLabel}
           </Text>
           <View className="flex-row gap-3">
@@ -91,22 +77,26 @@ export default function SettingsScreen() {
                 <Pressable
                   key={option.value}
                   onPress={() => setTheme(option.value)}
-                  className={`flex-1 items-center py-3 rounded-xl border-2 ${
+                  className={`flex-1 items-center py-4 rounded-2xl ${
                     isActive
-                      ? "border-teal-500 bg-teal-50 dark:bg-teal-900/30"
-                      : "border-warm-200 dark:border-neutral-700 bg-warm-50 dark:bg-neutral-800"
+                      ? "bg-primary-accent/10 dark:bg-primary-bright/15"
+                      : "bg-surface-high dark:bg-surface-dark-high"
                   }`}
+                  style={({ pressed }) => ({
+                    transform: [{ scale: pressed ? 0.98 : 1 }],
+                  })}
                 >
                   <IconComponent
                     size={20}
-                    className={isActive ? "text-teal-600 dark:text-teal-400" : "text-warm-400 dark:text-neutral-500"}
+                    color={isActive ? (isDark ? "#2dd4bf" : "#0d9488") : (isDark ? "#737373" : "#b9a085")}
                   />
                   <Text
-                    className={`text-sm mt-1 font-medium ${
+                    className={`text-sm mt-2 ${
                       isActive
-                        ? "text-teal-700 dark:text-teal-300"
-                        : "text-warm-500 dark:text-neutral-400"
+                        ? "text-primary-accent dark:text-primary-bright"
+                        : "text-warm-400 dark:text-neutral-500"
                     }`}
+                    style={{ fontFamily: isActive ? "Manrope_600SemiBold" : "Manrope_500Medium" }}
                   >
                     {option.label}
                   </Text>
@@ -114,39 +104,40 @@ export default function SettingsScreen() {
               );
             })}
           </View>
-        </View>
+        </Card>
 
-        {/* Font Size Section */}
-        <Text className="text-sm font-semibold text-warm-500 dark:text-neutral-400 uppercase tracking-wider mb-3">
-          {s.sectionReading}
-        </Text>
-        <View className="bg-white dark:bg-neutral-900 rounded-2xl p-4 mb-6">
-          <Text className="text-base font-medium text-warm-800 dark:text-neutral-200 mb-3">
+        {/* Reading Section */}
+        <SectionLabel>{s.sectionReading}</SectionLabel>
+        <Card elevation="low" className="p-5 mb-8">
+          <Text
+            className="text-charcoal dark:text-neutral-200 mb-4"
+            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15 }}
+          >
             {s.fontSizeLabel}
           </Text>
 
           {/* Size control */}
-          <View className="flex-row items-center justify-between mb-4">
+          <View className="flex-row items-center justify-between mb-5">
             <Pressable
               onPress={() => setFontSizeIndex(fontSizeIndex - 1)}
               disabled={fontSizeIndex === 0}
-              className="w-10 h-10 rounded-full bg-warm-100 dark:bg-neutral-800 items-center justify-center"
+              className="w-10 h-10 rounded-full bg-surface-high dark:bg-surface-dark-high items-center justify-center"
               style={{ opacity: fontSizeIndex === 0 ? 0.3 : 1 }}
             >
-              <Minus size={18} className="text-warm-700 dark:text-neutral-300" />
+              <Minus size={18} color={isDark ? "#d4d4d4" : "#6e5a47"} />
             </Pressable>
 
             {/* Step indicators */}
-            <View className="flex-row items-center gap-2">
+            <View className="flex-row items-center gap-2.5">
               {FONT_SIZE_STEPS.map((_, i) => (
                 <View
                   key={i}
                   className={`rounded-full ${
                     i === fontSizeIndex
-                      ? "w-3 h-3 bg-teal-500"
+                      ? "w-3 h-3 bg-primary-accent"
                       : i < fontSizeIndex
-                        ? "w-2.5 h-2.5 bg-teal-300 dark:bg-teal-700"
-                        : "w-2.5 h-2.5 bg-warm-200 dark:bg-neutral-700"
+                        ? "w-2.5 h-2.5 bg-primary-accent/40"
+                        : "w-2.5 h-2.5 bg-surface-high dark:bg-surface-dark-high"
                   }`}
                 />
               ))}
@@ -155,17 +146,17 @@ export default function SettingsScreen() {
             <Pressable
               onPress={() => setFontSizeIndex(fontSizeIndex + 1)}
               disabled={fontSizeIndex === FONT_SIZE_STEPS.length - 1}
-              className="w-10 h-10 rounded-full bg-warm-100 dark:bg-neutral-800 items-center justify-center"
+              className="w-10 h-10 rounded-full bg-surface-high dark:bg-surface-dark-high items-center justify-center"
               style={{ opacity: fontSizeIndex === FONT_SIZE_STEPS.length - 1 ? 0.3 : 1 }}
             >
-              <Plus size={18} className="text-warm-700 dark:text-neutral-300" />
+              <Plus size={18} color={isDark ? "#d4d4d4" : "#6e5a47"} />
             </Pressable>
           </View>
 
           {/* Preview */}
-          <View className="bg-warm-50 dark:bg-neutral-800 rounded-xl p-4">
+          <View className="bg-surface dark:bg-surface-dark rounded-2xl p-5">
             <Text
-              className="text-warm-900 dark:text-neutral-100 text-center"
+              className="text-charcoal dark:text-neutral-100 text-center"
               style={{
                 fontSize,
                 lineHeight: fontSize * 2.1,
@@ -175,43 +166,47 @@ export default function SettingsScreen() {
               بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ
             </Text>
           </View>
-        </View>
+        </Card>
 
         {/* Inline Content Section */}
-        <View className="bg-white dark:bg-neutral-900 rounded-2xl p-4 mb-6">
-          <Text className="text-base font-medium text-warm-800 dark:text-neutral-200 mb-3">
+        <Card elevation="low" className="p-5 mb-8">
+          <Text
+            className="text-charcoal dark:text-neutral-200 mb-5"
+            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15 }}
+          >
             {s.sectionInlineContent}
           </Text>
 
-          <View className="flex-row items-center justify-between gap-3 py-2">
-            <View className="flex-1">
-              <Text className="text-sm font-medium text-warm-700 dark:text-neutral-300">
-                {s.showTranslationLabel}
-              </Text>
-              <Text
-                className="text-xs text-warm-400 dark:text-neutral-500 mt-0.5"
-                style={isRTL ? { textAlign: "right" } : undefined}
-              >
-                Sahih International English
-              </Text>
-            </View>
+          {/* Translation toggle */}
+          <SettingRow
+            label={s.showTranslationLabel}
+            description="Sahih International English"
+            isRTL={isRTL}
+          >
             <Switch value={showTranslation} onValueChange={setShowTranslation} />
-          </View>
+          </SettingRow>
 
-          <View className="border-t border-warm-100 dark:border-neutral-800 my-1" />
+          <View className="h-4" />
 
           {/* Translation Language */}
           <Pressable
             onPress={() => setPickerVisible(true)}
-            className="flex-row items-center justify-between gap-3 py-2"
+            className="flex-row items-center justify-between gap-3"
           >
             <View className="flex-1">
-              <Text className="text-sm font-medium text-warm-700 dark:text-neutral-300">
+              <Text
+                className="text-charcoal dark:text-neutral-300"
+                style={{ fontFamily: "Manrope_500Medium", fontSize: 14 }}
+              >
                 {s.translationLanguageLabel}
               </Text>
               <Text
-                className="text-xs text-warm-400 dark:text-neutral-500 mt-0.5"
-                style={isRTL ? { textAlign: "right" } : undefined}
+                className="text-warm-400 dark:text-neutral-500 mt-0.5"
+                style={{
+                  fontFamily: "Manrope_400Regular",
+                  fontSize: 12,
+                  ...(isRTL ? { textAlign: "right" } : {}),
+                }}
               >
                 {currentLang?.nameEnglish ?? "English"}
               </Text>
@@ -219,29 +214,24 @@ export default function SettingsScreen() {
             {isTranslationLoading ? (
               <ActivityIndicator size="small" color="#0d9488" />
             ) : isRTL ? (
-              <ChevronLeft size={18} color={isDark ? "#737373" : "#a8a29e"} />
+              <ChevronLeft size={18} color={isDark ? "#525252" : "#DFD9D1"} />
             ) : (
-              <ChevronRight size={18} color={isDark ? "#737373" : "#a8a29e"} />
+              <ChevronRight size={18} color={isDark ? "#525252" : "#DFD9D1"} />
             )}
           </Pressable>
 
-          <View className="border-t border-warm-100 dark:border-neutral-800 my-1" />
+          <View className="h-4" />
 
-          <View className="flex-row items-center justify-between gap-3 py-2">
-            <View className="flex-1">
-              <Text className="text-sm font-medium text-warm-700 dark:text-neutral-300">
-                {s.showTafseerLabel}
-              </Text>
-              <Text
-                className="text-xs text-warm-400 dark:text-neutral-500 mt-0.5"
-                style={isRTL ? undefined : { textAlign: "left" }}
-              >
-                التفسير الميسر
-              </Text>
-            </View>
+          {/* Tafseer toggle */}
+          <SettingRow
+            label={s.showTafseerLabel}
+            description="التفسير الميسر"
+            isRTL={isRTL}
+            descriptionRTL
+          >
             <Switch value={showTafseer} onValueChange={setShowTafseer} />
-          </View>
-        </View>
+          </SettingRow>
+        </Card>
 
         <TranslationLanguagePicker
           visible={pickerVisible}
@@ -249,5 +239,60 @@ export default function SettingsScreen() {
         />
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function SectionLabel({ children }: { children: string }) {
+  return (
+    <Text
+      className="text-warm-400 dark:text-neutral-500 mb-3"
+      style={{
+        fontFamily: "Manrope_600SemiBold",
+        fontSize: 11,
+        letterSpacing: 1.2,
+        textTransform: "uppercase",
+      }}
+    >
+      {children}
+    </Text>
+  );
+}
+
+function SettingRow({
+  label,
+  description,
+  isRTL,
+  descriptionRTL,
+  children,
+}: {
+  label: string;
+  description: string;
+  isRTL?: boolean;
+  descriptionRTL?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <View className="flex-row items-center justify-between gap-3">
+      <View className="flex-1">
+        <Text
+          className="text-charcoal dark:text-neutral-300"
+          style={{ fontFamily: "Manrope_500Medium", fontSize: 14 }}
+        >
+          {label}
+        </Text>
+        <Text
+          className="text-warm-400 dark:text-neutral-500 mt-0.5"
+          style={{
+            fontFamily: "Manrope_400Regular",
+            fontSize: 12,
+            ...(descriptionRTL ? { writingDirection: "rtl" } : {}),
+            ...(isRTL ? { textAlign: "right" } : {}),
+          }}
+        >
+          {description}
+        </Text>
+      </View>
+      {children}
+    </View>
   );
 }

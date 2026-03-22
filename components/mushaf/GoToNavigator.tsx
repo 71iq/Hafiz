@@ -12,6 +12,7 @@ import { X, Search } from "lucide-react-native";
 import { useDatabase } from "@/lib/database/provider";
 import { toArabicNumber } from "@/lib/arabic";
 import { useStrings } from "@/lib/i18n/useStrings";
+import { useSettings } from "@/lib/settings/context";
 
 type SurahRow = {
   number: number;
@@ -49,8 +50,6 @@ const VISIBLE_ITEMS = 7;
 const PICKER_HEIGHT = ITEM_HEIGHT * VISIBLE_ITEMS;
 const CENTER_OFFSET = ITEM_HEIGHT * Math.floor(VISIBLE_ITEMS / 2);
 
-
-
 export function GoToNavigator({
   visible,
   onClose,
@@ -61,6 +60,7 @@ export function GoToNavigator({
 }: Props) {
   const db = useDatabase();
   const s = useStrings();
+  const { isDark } = useSettings();
   const [surahs, setSurahs] = useState<SurahRow[]>([]);
   const [pages, setPages] = useState<PageInfo[]>([]);
   const [juzList, setJuzList] = useState<JuzInfo[]>([]);
@@ -78,7 +78,6 @@ export function GoToNavigator({
   const scrollEndTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const initialScrollDone = useRef(false);
 
-  // Load data when modal opens
   useEffect(() => {
     if (!visible) {
       initialScrollDone.current = false;
@@ -161,7 +160,6 @@ export function GoToNavigator({
     load();
   }, [db, visible, currentPage, mode]);
 
-  // Scroll picker to current page on first render
   useEffect(() => {
     if (
       visible &&
@@ -179,7 +177,6 @@ export function GoToNavigator({
     }
   }, [visible, pages.length, tab, currentPage]);
 
-  // Search-driven scroll for page picker
   useEffect(() => {
     if (tab !== "page" || !searchText) return;
     const num = parseInt(searchText, 10);
@@ -191,7 +188,6 @@ export function GoToNavigator({
     }
   }, [searchText, tab]);
 
-  // Cleanup
   useEffect(() => {
     return () => {
       if (scrollEndTimer.current) clearTimeout(scrollEndTimer.current);
@@ -217,7 +213,6 @@ export function GoToNavigator({
       selectedPageRef.current = page;
       setSelectedPage(page);
 
-      // Auto-navigate only for manual scrolling (no search text active)
       if (!searchTextRef.current) {
         if (scrollEndTimer.current) clearTimeout(scrollEndTimer.current);
         scrollEndTimer.current = setTimeout(() => {
@@ -256,7 +251,10 @@ export function GoToNavigator({
           justifyContent: "center",
         }}
       >
-        <Text style={{ fontSize: 18, fontWeight: "500", color: "#78716c" }}>
+        <Text
+          className="text-warm-400 dark:text-neutral-500"
+          style={{ fontSize: 18, fontFamily: "Manrope_500Medium" }}
+        >
           {toArabicNumber(item.page)}
         </Text>
       </View>
@@ -284,7 +282,6 @@ export function GoToNavigator({
 
   const handleSelectJuz = (juz: JuzInfo) => {
     if (mode === "verse" && onGoToSurahVerse) {
-      // In verse mode, scroll to the surah containing juz start
       onGoToSurahVerse(juz.startSurah);
       onClose();
       return;
@@ -293,7 +290,6 @@ export function GoToNavigator({
     onClose();
   };
 
-  // Filtered lists
   const isNumeric = /^\d+$/.test(searchText);
 
   const filteredSurahs = searchText
@@ -319,7 +315,6 @@ export function GoToNavigator({
     : juzList;
 
   const selectedSurahName = pages[selectedPage - 1]?.surahName ?? "";
-
   const showPageTab = mode === "page";
 
   const searchPlaceholder =
@@ -329,35 +324,53 @@ export function GoToNavigator({
         ? s.searchByName
         : s.searchByJuz;
 
+  const TAB_ITEMS = [
+    ...(showPageTab ? [{ value: "page" as TabKey, label: s.tabPage }] : []),
+    { value: "surah" as TabKey, label: s.tabSurah },
+    { value: "juz" as TabKey, label: s.tabJuz },
+  ];
+
   return (
     <Modal visible={visible} transparent animationType="slide">
-      <Pressable className="flex-1 bg-black/50" onPress={onClose}>
+      <Pressable className="flex-1" style={{ backgroundColor: "rgba(0,0,0,0.3)" }} onPress={onClose}>
         <View className="flex-1" />
         <Pressable
-          className="bg-warm-50 dark:bg-neutral-900 rounded-t-3xl"
+          className="bg-surface dark:bg-surface-dark-low rounded-t-4xl"
           onPress={() => {}}
         >
+          {/* Drag handle */}
+          <View className="items-center pt-3 pb-1">
+            <View className="w-10 h-1 rounded-full bg-surface-high dark:bg-surface-dark-high" />
+          </View>
+
           {/* Header */}
-          <View className="flex-row items-center justify-between px-5 pt-5 pb-3">
-            <Text className="text-lg font-bold text-warm-800 dark:text-neutral-100">
+          <View className="flex-row items-center justify-between px-6 pt-3 pb-4">
+            <Text
+              className="text-charcoal dark:text-neutral-100"
+              style={{ fontFamily: "NotoSerif_700Bold", fontSize: 20 }}
+            >
               {s.goToTitle}
             </Text>
             <Pressable
               onPress={onClose}
-              className="w-8 h-8 rounded-full bg-warm-100 dark:bg-neutral-800 items-center justify-center"
+              className="w-9 h-9 rounded-full bg-surface-high dark:bg-surface-dark-high items-center justify-center"
+              style={({ pressed }) => ({
+                transform: [{ scale: pressed ? 0.95 : 1 }],
+              })}
             >
-              <X size={16} className="text-warm-600 dark:text-neutral-400" />
+              <X size={16} color={isDark ? "#a3a3a3" : "#6e5a47"} />
             </Pressable>
           </View>
 
-          {/* Search bar */}
-          <View className="mx-5 mb-3">
-            <View className="flex-row items-center bg-white dark:bg-neutral-800 border border-warm-200 dark:border-neutral-700 rounded-xl px-3 py-2.5">
-              <Search size={16} color="#b9a085" />
+          {/* Search bar — no border, tonal background */}
+          <View className="mx-6 mb-4">
+            <View className="flex-row items-center bg-surface-low dark:bg-surface-dark-mid rounded-2xl px-4 py-3">
+              <Search size={16} color={isDark ? "#525252" : "#DFD9D1"} />
               <TextInput
-                className="flex-1 ml-2 text-base text-warm-900 dark:text-neutral-100"
+                className="flex-1 ml-2.5 text-charcoal dark:text-neutral-100"
+                style={{ fontFamily: "Manrope_400Regular", fontSize: 15 }}
                 placeholder={searchPlaceholder}
-                placeholderTextColor="#b9a085"
+                placeholderTextColor={isDark ? "#525252" : "#b9a085"}
                 value={searchText}
                 onChangeText={handleSearchChange}
                 onSubmitEditing={handleSearchSubmit}
@@ -367,88 +380,61 @@ export function GoToNavigator({
               />
               {searchText.length > 0 && (
                 <Pressable onPress={() => handleSearchChange("")}>
-                  <X size={14} color="#b9a085" />
+                  <X size={14} color={isDark ? "#525252" : "#DFD9D1"} />
                 </Pressable>
               )}
             </View>
           </View>
 
-          {/* Tab selector */}
-          <View className="flex-row mx-5 mb-4 bg-warm-100 dark:bg-neutral-800 rounded-xl p-1">
-            {showPageTab && (
-              <Pressable
-                onPress={() => handleTabChange("page")}
-                className={`flex-1 py-2 rounded-lg items-center ${
-                  tab === "page" ? "bg-white dark:bg-neutral-700" : ""
-                }`}
-              >
-                <Text
-                  className={`text-sm font-semibold ${
-                    tab === "page"
-                      ? "text-teal-600 dark:text-teal-400"
-                      : "text-warm-400 dark:text-neutral-500"
+          {/* Tab selector — pill toggle group */}
+          <View className="flex-row mx-6 mb-5 bg-surface-high dark:bg-surface-dark-high rounded-full p-1">
+            {TAB_ITEMS.map((item) => {
+              const active = tab === item.value;
+              return (
+                <Pressable
+                  key={item.value}
+                  onPress={() => handleTabChange(item.value)}
+                  className={`flex-1 py-2.5 rounded-full items-center ${
+                    active ? "bg-surface-bright dark:bg-surface-dark-bright" : ""
                   }`}
+                  style={({ pressed }) => ({
+                    transform: [{ scale: pressed ? 0.98 : 1 }],
+                  })}
                 >
-                  {s.tabPage}
-                </Text>
-              </Pressable>
-            )}
-            <Pressable
-              onPress={() => handleTabChange("surah")}
-              className={`flex-1 py-2 rounded-lg items-center ${
-                tab === "surah" ? "bg-white dark:bg-neutral-700" : ""
-              }`}
-            >
-              <Text
-                className={`text-sm font-semibold ${
-                  tab === "surah"
-                    ? "text-teal-600 dark:text-teal-400"
-                    : "text-warm-400 dark:text-neutral-500"
-                }`}
-              >
-                {s.tabSurah}
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={() => handleTabChange("juz")}
-              className={`flex-1 py-2 rounded-lg items-center ${
-                tab === "juz" ? "bg-white dark:bg-neutral-700" : ""
-              }`}
-            >
-              <Text
-                className={`text-sm font-semibold ${
-                  tab === "juz"
-                    ? "text-teal-600 dark:text-teal-400"
-                    : "text-warm-400 dark:text-neutral-500"
-                }`}
-              >
-                {s.tabJuz}
-              </Text>
-            </Pressable>
+                  <Text
+                    className={active
+                      ? "text-primary-accent dark:text-primary-bright"
+                      : "text-warm-400 dark:text-neutral-500"
+                    }
+                    style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}
+                  >
+                    {item.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
 
           {/* Page picker wheel */}
           {tab === "page" && pages.length > 0 && (
-            <View className="px-5 pb-6">
-              {/* Selected page info */}
+            <View className="px-6 pb-6">
               <View className="items-center mb-3">
-                <Text className="text-3xl font-bold text-teal-600 dark:text-teal-400">
+                <Text
+                  className="text-primary-accent dark:text-primary-bright"
+                  style={{ fontFamily: "Manrope_700Bold", fontSize: 28 }}
+                >
                   {toArabicNumber(selectedPage)}
                 </Text>
                 <Text
-                  className="text-warm-700 dark:text-neutral-300 mt-1"
-                  style={{
-                    fontSize: 22,
-                    lineHeight: 36,
-                  }}
+                  className="text-charcoal dark:text-neutral-300 mt-1"
+                  style={{ fontSize: 22, lineHeight: 36 }}
                 >
                   {selectedSurahName}
                 </Text>
               </View>
 
-              {/* Wheel */}
               <View style={{ height: PICKER_HEIGHT, overflow: "hidden" }}>
-                {/* Center highlight band */}
+                {/* Center highlight band — tonal, no border */}
                 <View
                   style={{
                     position: "absolute",
@@ -458,7 +444,7 @@ export function GoToNavigator({
                     height: ITEM_HEIGHT,
                     zIndex: 1,
                   }}
-                  className="bg-teal-50 dark:bg-teal-900/20 rounded-xl border border-teal-200 dark:border-teal-800"
+                  className="bg-primary-accent/8 dark:bg-primary-bright/8 rounded-2xl"
                   pointerEvents="none"
                 />
 
@@ -471,8 +457,8 @@ export function GoToNavigator({
                     right: 0,
                     height: CENTER_OFFSET,
                     zIndex: 2,
+                    backgroundColor: isDark ? "rgba(20,20,20,0.6)" : "rgba(255,248,241,0.6)",
                   }}
-                  className="bg-warm-50/60 dark:bg-neutral-900/60"
                   pointerEvents="none"
                 />
 
@@ -485,8 +471,8 @@ export function GoToNavigator({
                     right: 0,
                     height: CENTER_OFFSET,
                     zIndex: 2,
+                    backgroundColor: isDark ? "rgba(20,20,20,0.6)" : "rgba(255,248,241,0.6)",
                   }}
-                  className="bg-warm-50/60 dark:bg-neutral-900/60"
                   pointerEvents="none"
                 />
 
@@ -513,82 +499,111 @@ export function GoToNavigator({
             </View>
           )}
 
-          {/* Surah list */}
+          {/* Surah list — no borders, use spacing between items */}
           {tab === "surah" && (
-            <ScrollView className="px-5 pb-6" style={{ maxHeight: 400 }}>
+            <ScrollView className="px-6 pb-6" style={{ maxHeight: 400 }}>
               {filteredSurahs.length === 0 && (
-                <Text className="text-warm-400 dark:text-neutral-500 text-center py-8">
+                <Text
+                  className="text-warm-400 dark:text-neutral-500 text-center py-8"
+                  style={{ fontFamily: "Manrope_400Regular" }}
+                >
                   {s.noSurahsFound}
                 </Text>
               )}
-              {filteredSurahs.map((surah) => (
-                <Pressable
-                  key={surah.number}
-                  onPress={() => handleSelectSurah(surah.number)}
-                  className="flex-row items-center py-3 border-b border-warm-100 dark:border-neutral-800"
-                >
-                  <View className="w-10 h-10 rounded-full bg-teal-50 dark:bg-teal-900/40 items-center justify-center border border-teal-200 dark:border-teal-700 mr-3">
-                    <Text className="text-teal-700 dark:text-teal-300 text-xs font-semibold">
-                      {surah.number}
-                    </Text>
-                  </View>
-                  <View className="flex-1">
-                    <Text className="text-base text-warm-800 dark:text-neutral-100 font-medium">
-                      {surah.name_english}
-                    </Text>
-                  </View>
-                  <Text
-                    className="text-warm-700 dark:text-neutral-300 text-right"
-                    style={{
-                      fontSize: 20,
-                      lineHeight: 36,
-                    }}
+              <View className="gap-1.5">
+                {filteredSurahs.map((surah) => (
+                  <Pressable
+                    key={surah.number}
+                    onPress={() => handleSelectSurah(surah.number)}
+                    className="flex-row items-center py-3 px-3 rounded-2xl"
+                    style={({ pressed }) => ({
+                      backgroundColor: pressed
+                        ? (isDark ? "rgba(45,212,191,0.08)" : "rgba(13,148,136,0.06)")
+                        : "transparent",
+                    })}
                   >
-                    {surah.name_arabic}
-                  </Text>
-                </Pressable>
-              ))}
+                    <View className="w-10 h-10 rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 items-center justify-center mr-3.5">
+                      <Text
+                        className="text-primary-accent dark:text-primary-bright"
+                        style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11 }}
+                      >
+                        {surah.number}
+                      </Text>
+                    </View>
+                    <View className="flex-1">
+                      <Text
+                        className="text-charcoal dark:text-neutral-100"
+                        style={{ fontFamily: "Manrope_500Medium", fontSize: 15 }}
+                      >
+                        {surah.name_english}
+                      </Text>
+                    </View>
+                    <Text
+                      className="text-charcoal dark:text-neutral-300 text-right"
+                      style={{ fontSize: 20, lineHeight: 36 }}
+                    >
+                      {surah.name_arabic}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
             </ScrollView>
           )}
 
           {/* Juz' list */}
           {tab === "juz" && (
-            <ScrollView className="px-5 pb-6" style={{ maxHeight: 400 }}>
+            <ScrollView className="px-6 pb-6" style={{ maxHeight: 400 }}>
               {filteredJuz.length === 0 && (
-                <Text className="text-warm-400 dark:text-neutral-500 text-center py-8">
+                <Text
+                  className="text-warm-400 dark:text-neutral-500 text-center py-8"
+                  style={{ fontFamily: "Manrope_400Regular" }}
+                >
                   {s.noJuzFound}
                 </Text>
               )}
-              {filteredJuz.map((juz) => (
-                <Pressable
-                  key={juz.juz}
-                  onPress={() => handleSelectJuz(juz)}
-                  className="flex-row items-center py-3 border-b border-warm-100 dark:border-neutral-800"
-                >
-                  <View className="w-10 h-10 rounded-full bg-teal-50 dark:bg-teal-900/40 items-center justify-center border border-teal-200 dark:border-teal-700 mr-3">
-                    <Text className="text-teal-700 dark:text-teal-300 text-xs font-semibold">
-                      {toArabicNumber(juz.juz)}
-                    </Text>
-                  </View>
-                  <View className="flex-1">
-                    <Text className="text-base text-warm-800 dark:text-neutral-100 font-medium">
-                      Juz {juz.juz}
-                    </Text>
-                    <Text className="text-xs text-warm-400 dark:text-neutral-500 mt-0.5">
-                      {juz.surahNameEnglish} {juz.startSurah}:{juz.startAyah}
-                    </Text>
-                  </View>
-                  <Text
-                    className="text-warm-700 dark:text-neutral-300 text-right"
-                    style={{
-                      fontSize: 20,
-                      lineHeight: 36,
-                    }}
+              <View className="gap-1.5">
+                {filteredJuz.map((juz) => (
+                  <Pressable
+                    key={juz.juz}
+                    onPress={() => handleSelectJuz(juz)}
+                    className="flex-row items-center py-3 px-3 rounded-2xl"
+                    style={({ pressed }) => ({
+                      backgroundColor: pressed
+                        ? (isDark ? "rgba(45,212,191,0.08)" : "rgba(13,148,136,0.06)")
+                        : "transparent",
+                    })}
                   >
-                    {juz.surahNameArabic}
-                  </Text>
-                </Pressable>
-              ))}
+                    <View className="w-10 h-10 rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 items-center justify-center mr-3.5">
+                      <Text
+                        className="text-primary-accent dark:text-primary-bright"
+                        style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11 }}
+                      >
+                        {toArabicNumber(juz.juz)}
+                      </Text>
+                    </View>
+                    <View className="flex-1">
+                      <Text
+                        className="text-charcoal dark:text-neutral-100"
+                        style={{ fontFamily: "Manrope_500Medium", fontSize: 15 }}
+                      >
+                        Juz {juz.juz}
+                      </Text>
+                      <Text
+                        className="text-warm-400 dark:text-neutral-500 mt-0.5"
+                        style={{ fontFamily: "Manrope_400Regular", fontSize: 12 }}
+                      >
+                        {juz.surahNameEnglish} {juz.startSurah}:{juz.startAyah}
+                      </Text>
+                    </View>
+                    <Text
+                      className="text-charcoal dark:text-neutral-300 text-right"
+                      style={{ fontSize: 20, lineHeight: 36 }}
+                    >
+                      {juz.surahNameArabic}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
             </ScrollView>
           )}
         </Pressable>

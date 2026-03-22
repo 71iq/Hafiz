@@ -48,7 +48,7 @@ export function EnglishTab({ surah, ayah, wordPos }: Props) {
         <Text className="text-xs font-medium text-warm-400 dark:text-neutral-500 uppercase tracking-wider mb-1.5">
           {s.wordTranslation}
         </Text>
-        <Text className="text-base text-warm-800 dark:text-neutral-100 leading-6">
+        <Text className="text-base text-charcoal dark:text-neutral-100 leading-6">
           {data.translation_en}
         </Text>
       </View>
@@ -72,7 +72,7 @@ export function EnglishTab({ surah, ayah, wordPos }: Props) {
             {s.wordArabic}
           </Text>
           <Text
-            className="text-2xl text-warm-900 dark:text-neutral-100"
+            className="text-2xl text-charcoal dark:text-neutral-100"
             style={{ writingDirection: "rtl", textAlign: "right" }}
           >
             {data.word_arabic}

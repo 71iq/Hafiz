@@ -13,12 +13,12 @@ type Props = {
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <View className="flex-row items-start justify-between py-2.5 border-b border-warm-50 dark:border-neutral-800/50">
+    <View className="flex-row items-start justify-between py-2.5 mb-2">
       <Text className="text-sm text-warm-400 dark:text-neutral-500 w-28">
         {label}
       </Text>
       <Text
-        className="text-base text-warm-800 dark:text-neutral-100 flex-1 text-right"
+        className="text-base text-charcoal dark:text-neutral-100 flex-1 text-right"
         style={{ writingDirection: "rtl" }}
       >
         {value}

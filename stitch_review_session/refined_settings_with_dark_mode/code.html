@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+
+<html dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif:wght@400;600;700&amp;family=Manrope:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-dim": "#dfd9d1",
+              "tertiary-fixed-dim": "#acccce",
+              "surface-container-high": "#eee7df",
+              "primary-fixed-dim": "#9fcfd1",
+              "surface-tint": "#366668",
+              "error": "#ba1a1a",
+              "secondary": "#735b1e",
+              "on-primary": "#ffffff",
+              "tertiary-fixed": "#c8e9eb",
+              "on-tertiary": "#ffffff",
+              "tertiary": "#163436",
+              "on-primary-container": "#8cbdbf",
+              "on-error": "#ffffff",
+              "on-primary-fixed-variant": "#1c4e50",
+              "background": "#fff8f1",
+              "on-secondary-fixed": "#251a00",
+              "surface-container-low": "#f9f3eb",
+              "surface-bright": "#fff8f1",
+              "surface-container": "#f4ede5",
+              "primary-fixed": "#baeced",
+              "error-container": "#ffdad6",
+              "inverse-on-surface": "#f7f0e8",
+              "outline-variant": "#c0c8c8",
+              "secondary-container": "#fddc91",
+              "on-surface": "#1e1b17",
+              "primary": "#003638",
+              "surface": "#fff8f1",
+              "on-secondary": "#ffffff",
+              "on-primary-fixed": "#002021",
+              "on-tertiary-fixed": "#002022",
+              "surface-container-lowest": "#ffffff",
+              "primary-container": "#1b4d4f",
+              "on-background": "#1e1b17",
+              "secondary-fixed-dim": "#e3c37b",
+              "surface-container-highest": "#e8e1da",
+              "secondary-fixed": "#ffdf99",
+              "on-surface-variant": "#404848",
+              "on-tertiary-container": "#9ababc",
+              "on-secondary-container": "#785f22",
+              "on-tertiary-fixed-variant": "#2e4c4e",
+              "inverse-surface": "#33302b",
+              "tertiary-container": "#2d4b4d",
+              "surface-variant": "#e8e1da",
+              "inverse-primary": "#9fcfd1",
+              "outline": "#707979",
+              "on-error-container": "#93000a",
+              "on-secondary-fixed-variant": "#594406"
+            },
+            fontFamily: {
+              "headline": ["Noto Serif"],
+              "body": ["Manrope"],
+              "label": ["Manrope"]
+            },
+            borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Manrope', sans-serif; }
+        .font-noto-serif { font-family: 'Noto Serif', serif; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .safe-pb { padding-bottom: env(safe-area-inset-bottom); }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-surface text-on-surface min-h-screen pb-32">
+<!-- TopAppBar -->
+<header class="bg-[#FFF8F1] dark:bg-stone-900 w-full pt-8 pb-4 px-6 sticky top-0 z-50">
+<div class="flex justify-between items-center w-full px-6 max-w-screen-xl mx-auto">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-surface-container-highest flex items-center justify-center overflow-hidden">
+<img alt="User" class="w-full h-full object-cover" data-alt="User profile photo avatar" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCkakjhhjFkdyx6ikCKaZwF3DO8XY8_H0Ld-NnIxbsMw_TYVcTolh3bcXiLqsS_AFgpWxiQONSWJif4TeySYAv0943HNxl4VI-hKGQ_PkI5KN7v0FpwicFa681fHGMdM7xjlSTOWOd0t-aM5VJzV_ZWoXFn5fc5MPnDc962KdEWtBqi-bfDn8YYPT3LYX00Xn1bNE4Qr9kxIuvkl0ifQRFPgCg_z6HXYK7PReZo78l8lXEvhjDVoj3mCGhipfXI08_vSM1D7dw"/>
+</div>
+</div>
+<h1 class="font-noto-serif text-2xl font-semibold tracking-tight text-[#003638] dark:text-[#E8E1DA]">الإعدادات</h1>
+<div class="w-10 h-10 flex items-center justify-center">
+<span class="material-symbols-outlined text-[#003638] dark:text-[#E8E1DA]">notifications</span>
+</div>
+</div>
+</header>
+<main class="max-w-screen-xl mx-auto px-6 mt-8 space-y-8">
+<!-- Profile Summary Section -->
+<section class="bg-surface-container-low rounded-lg p-6 flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="w-16 h-16 rounded-full bg-primary-container flex items-center justify-center text-secondary-fixed">
+<span class="material-symbols-outlined text-4xl" style="font-variation-settings: 'FILL' 1;">account_circle</span>
+</div>
+<div>
+<h2 class="font-noto-serif text-xl font-bold text-primary">أحمد العلي</h2>
+<p class="text-sm text-on-surface-variant">حافظ منذ ٢٠٢٣</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline">chevron_left</span>
+</section>
+<!-- Memorization Settings -->
+<div class="space-y-4">
+<h3 class="text-sm font-bold tracking-widest text-outline uppercase px-2">إعدادات الحفظ والمراجعة</h3>
+<div class="bg-surface-container rounded-lg overflow-hidden">
+<!-- Daily Goal -->
+<div class="flex items-center justify-between p-5 hover:bg-surface-container-high transition-colors cursor-pointer group">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-white flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">track_changes</span>
+</div>
+<div>
+<p class="font-bold">الهدف اليومي</p>
+<p class="text-xs text-on-surface-variant">١٠ آيات يومياً</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors">chevron_left</span>
+</div>
+<!-- Review Algorithm -->
+<div class="flex items-center justify-between p-5 hover:bg-surface-container-high transition-colors cursor-pointer group">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-white flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">psychology</span>
+</div>
+<div>
+<p class="font-bold">خوارزمية المراجعة</p>
+<p class="text-xs text-on-surface-variant">بطاقات جديدة، حد المراجعة</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors">chevron_left</span>
+</div>
+</div>
+</div>
+<!-- Personalization -->
+<div class="space-y-4">
+<h3 class="text-sm font-bold tracking-widest text-outline uppercase px-2">التخصيص</h3>
+<div class="bg-surface-container rounded-lg overflow-hidden">
+<!-- Reciter Selection -->
+<div class="flex items-center justify-between p-5 hover:bg-surface-container-high transition-colors cursor-pointer group">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-white flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">record_voice_over</span>
+</div>
+<div>
+<p class="font-bold">اختيار القارئ</p>
+<p class="text-xs text-on-surface-variant">المنشاوي (مجود)</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors">chevron_left</span>
+</div>
+<!-- Theme Toggle -->
+<div class="flex items-center justify-between p-5 hover:bg-surface-container-high transition-colors cursor-pointer group">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-white flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">dark_mode</span>
+</div>
+<div>
+<p class="font-bold">المظهر</p>
+<p class="text-xs text-on-surface-variant">تلقائي (حسب النظام)</p>
+</div>
+</div>
+<div class="flex bg-surface-container-highest p-1 rounded-full gap-1"><div class="px-3 py-1 bg-primary text-white text-xs rounded-full cursor-pointer">تلقائي</div>
+<div class="px-3 py-1 text-on-surface-variant text-xs cursor-pointer hover:bg-surface-container-high rounded-full transition-colors">فاتح</div>
+<div class="px-3 py-1 text-on-surface-variant text-xs cursor-pointer hover:bg-surface-container-high rounded-full transition-colors">داكن</div></div>
+</div>
+</div>
+</div>
+<!-- Content Settings -->
+<div class="space-y-4">
+<h3 class="text-sm font-bold tracking-widest text-outline uppercase px-2">المحتوى والتفسير</h3>
+<div class="bg-surface-container rounded-lg overflow-hidden">
+<!-- Tafsir Source -->
+<div class="flex items-center justify-between p-5 hover:bg-surface-container-high transition-colors cursor-pointer group">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-white flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">menu_book</span>
+</div>
+<div>
+<p class="font-bold">مصدر التفسير</p>
+<p class="text-xs text-on-surface-variant">التفسير الميسر</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors">chevron_left</span>
+</div>
+<!-- Translation Language -->
+<div class="flex items-center justify-between p-5 hover:bg-surface-container-high transition-colors cursor-pointer group">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-white flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">translate</span>
+</div>
+<div>
+<p class="font-bold">لغة الترجمة</p>
+<p class="text-xs text-on-surface-variant">العربية (الأصلية)</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors">chevron_left</span>
+</div>
+</div>
+</div>
+<!-- App Settings -->
+<div class="space-y-4">
+<h3 class="text-sm font-bold tracking-widest text-outline uppercase px-2">التطبيق</h3>
+<div class="bg-surface-container rounded-lg overflow-hidden">
+<!-- Notifications -->
+<div class="flex items-center justify-between p-5 hover:bg-surface-container-high transition-colors cursor-pointer group">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-white flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">notifications_active</span>
+</div>
+<div><p class="font-bold">التنبيهات</p></div>
+</div>
+<div class="w-12 h-6 bg-primary-container rounded-full relative">
+<div class="absolute right-1 top-1 w-4 h-4 bg-secondary-fixed rounded-full shadow-sm"></div>
+</div>
+</div>
+<!-- About -->
+<div class="flex items-center justify-between p-5 hover:bg-surface-container-high transition-colors cursor-pointer group">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-white flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">info</span>
+</div>
+<div>
+<p class="font-bold">حول التطبيق</p>
+<p class="text-xs text-on-surface-variant">الإصدار ٢.٤.٠</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors">chevron_left</span>
+</div>
+</div>
+</div>
+<!-- Logout Button -->
+<button class="w-full py-4 text-error font-bold border border-error/10 rounded-lg hover:bg-error/5 transition-colors">
+            تسجيل الخروج
+        </button>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 py-3 pb-8 bg-[#FFF8F1]/80 dark:bg-stone-900/80 backdrop-blur-xl shadow-[0_-4px_20px_rgba(0,54,56,0.04)] rounded-t-[2.5rem]">
+<!-- Home -->
+<a class="flex flex-col items-center justify-center text-[#2D2D2D]/50 dark:text-[#E8E1DA]/50 px-5 py-2 hover:text-[#003638] dark:hover:text-[#FDDC91] transition-colors scale-98 active:scale-90 duration-300 ease-out" href="#">
+<span class="material-symbols-outlined">home_max</span>
+<span class="font-manrope text-[10px] font-medium tracking-wide">Home</span>
+</a>
+<!-- Mushaf -->
+<a class="flex flex-col items-center justify-center text-[#2D2D2D]/50 dark:text-[#E8E1DA]/50 px-5 py-2 hover:text-[#003638] dark:hover:text-[#FDDC91] transition-colors scale-98 active:scale-90 duration-300 ease-out" href="#">
+<span class="material-symbols-outlined">book_5</span>
+<span class="font-manrope text-[10px] font-medium tracking-wide">Mushaf</span>
+</a>
+<!-- Progress -->
+<a class="flex flex-col items-center justify-center text-[#2D2D2D]/50 dark:text-[#E8E1DA]/50 px-5 py-2 hover:text-[#003638] dark:hover:text-[#FDDC91] transition-colors scale-98 active:scale-90 duration-300 ease-out" href="#">
+<span class="material-symbols-outlined">analytics</span>
+<span class="font-manrope text-[10px] font-medium tracking-wide">Progress</span>
+</a>
+<!-- Settings (Active) -->
+<a class="flex flex-col items-center justify-center bg-[#1B4D4F] text-[#FDDC91] rounded-full px-5 py-2 mt-1 scale-98 active:scale-90 transition-all duration-300 ease-out" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">settings</span>
+<span class="font-manrope text-[10px] font-medium tracking-wide">Settings</span>
+</a>
+</nav>
+</body></html>

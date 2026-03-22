@@ -42,7 +42,6 @@ function AyahNavigationRegistrar({
           flashListRef.current.scrollToIndex({ index: idx, animated: true });
         }
       } else if (viewMode === "page") {
-        // Find the v2_page for this ayah
         const ayahItem = items.find(
           (item) => item.type === "ayah" && item.surah === surah && item.ayah === ayah
         );
@@ -90,7 +89,7 @@ type MushafItem =
 
 export default function MushafScreen() {
   const db = useDatabase();
-  const { fontSize, lineHeight, viewMode, setViewMode } = useSettings();
+  const { fontSize, lineHeight, viewMode, setViewMode, isDark } = useSettings();
   const s = useStrings();
   const [items, setItems] = useState<MushafItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -100,7 +99,6 @@ export default function MushafScreen() {
   const goToPageRef = useRef<((page: number) => void) | null>(null);
   const flashListRef = useRef<FlashListRef<MushafItem>>(null);
 
-  // Surah header indices for verse-view Go-to-Surah
   const [surahHeaderIndices, setSurahHeaderIndices] = useState<
     Map<number, number>
   >(new Map());
@@ -226,9 +224,12 @@ export default function MushafScreen() {
 
   if (loading && !isPageMode) {
     return (
-      <SafeAreaView className="flex-1 bg-warm-50 dark:bg-neutral-950 items-center justify-center">
+      <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark items-center justify-center">
         <ActivityIndicator size="large" color="#0d9488" />
-        <Text className="text-warm-500 dark:text-neutral-400 mt-3 text-sm">
+        <Text
+          className="text-warm-400 dark:text-neutral-400 mt-3"
+          style={{ fontFamily: "Manrope_400Regular", fontSize: 14 }}
+        >
           {s.loadingQuran}
         </Text>
       </SafeAreaView>
@@ -244,65 +245,80 @@ export default function MushafScreen() {
         viewMode={viewMode}
       />
       <SafeAreaView
-        className="flex-1 bg-warm-50 dark:bg-neutral-950"
+        className="flex-1 bg-surface dark:bg-surface-dark"
         edges={["top"]}
       >
-        {/* Header */}
-        <View className="flex-row items-center justify-between px-4 py-2.5 border-b border-warm-100 dark:border-neutral-800 bg-warm-50 dark:bg-neutral-950">
+        {/* Header — tonal background, no border */}
+        <View className="flex-row items-center justify-between px-4 py-3 bg-surface dark:bg-surface-dark">
           {/* Left: View toggle + Go-to */}
-          <View className="flex-row items-center gap-2">
-            {/* View mode toggle */}
-            <View className="flex-row bg-warm-100 dark:bg-neutral-800 rounded-lg p-0.5">
+          <View className="flex-row items-center gap-2.5">
+            {/* View mode toggle — pill group */}
+            <View className="flex-row bg-surface-high dark:bg-surface-dark-high rounded-full p-1">
               <Pressable
                 onPress={() => setViewMode("verse")}
-                className={`px-2.5 py-1.5 rounded-md ${
-                  !isPageMode ? "bg-white dark:bg-neutral-700" : ""
+                className={`px-3 py-1.5 rounded-full ${
+                  !isPageMode ? "bg-surface-bright dark:bg-surface-dark-bright" : ""
                 }`}
+                style={({ pressed }) => ({
+                  transform: [{ scale: pressed ? 0.98 : 1 }],
+                })}
               >
                 <AlignJustify
                   size={16}
-                  color={!isPageMode ? "#0d9488" : "#b9a085"}
+                  color={!isPageMode ? "#0d9488" : (isDark ? "#525252" : "#DFD9D1")}
                 />
               </Pressable>
               <Pressable
                 onPress={() => setViewMode("page")}
-                className={`px-2.5 py-1.5 rounded-md ${
-                  isPageMode ? "bg-white dark:bg-neutral-700" : ""
+                className={`px-3 py-1.5 rounded-full ${
+                  isPageMode ? "bg-surface-bright dark:bg-surface-dark-bright" : ""
                 }`}
+                style={({ pressed }) => ({
+                  transform: [{ scale: pressed ? 0.98 : 1 }],
+                })}
               >
                 <BookOpen
                   size={16}
-                  color={isPageMode ? "#0d9488" : "#b9a085"}
+                  color={isPageMode ? "#0d9488" : (isDark ? "#525252" : "#DFD9D1")}
                 />
               </Pressable>
             </View>
 
-            {/* Go-to navigator button */}
+            {/* Go-to navigator — pill button */}
             <Pressable
               onPress={() => setShowNavigator(true)}
-              className="flex-row items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-warm-100 dark:bg-neutral-800"
+              className="flex-row items-center gap-1.5 px-3.5 py-2 rounded-full bg-surface-high dark:bg-surface-dark-high"
+              style={({ pressed }) => ({
+                transform: [{ scale: pressed ? 0.98 : 1 }],
+              })}
             >
               <Navigation size={13} color="#0d9488" />
-              <Text className="text-xs font-medium text-warm-600 dark:text-neutral-300">
+              <Text
+                className="text-charcoal dark:text-neutral-300"
+                style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
+              >
                 {isPageMode ? interpolate(s.pageN, { n: currentPage }) : s.goTo}
               </Text>
             </Pressable>
           </View>
 
           {/* Right: Hide mode + Font size control */}
-          <View className="flex-row items-center gap-2">
+          <View className="flex-row items-center gap-2.5">
             <Pressable
               onPress={() => setHideMode((prev) => !prev)}
-              className={`px-2.5 py-1.5 rounded-lg ${
+              className={`px-3 py-2 rounded-full ${
                 hideMode
-                  ? "bg-teal-100 dark:bg-teal-900/40"
-                  : "bg-warm-100 dark:bg-neutral-800"
+                  ? "bg-primary-accent/15 dark:bg-primary-bright/15"
+                  : "bg-surface-high dark:bg-surface-dark-high"
               }`}
+              style={({ pressed }) => ({
+                transform: [{ scale: pressed ? 0.98 : 1 }],
+              })}
             >
               {hideMode ? (
                 <EyeOff size={16} color="#0d9488" />
               ) : (
-                <Eye size={16} color="#b9a085" />
+                <Eye size={16} color={isDark ? "#525252" : "#DFD9D1"} />
               )}
             </Pressable>
             <FontSizeControl />

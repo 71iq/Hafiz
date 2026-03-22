@@ -51,7 +51,7 @@ export function IrabTab({ surah, ayah, wordPos }: Props) {
       {data.arabic_word && (
         <View className="mb-4">
           <Text
-            className="text-2xl text-warm-900 dark:text-neutral-100 mb-2"
+            className="text-2xl text-charcoal dark:text-neutral-100 mb-2"
             style={{ writingDirection: "rtl", textAlign: "right" }}
           >
             {data.arabic_word}
@@ -66,7 +66,7 @@ export function IrabTab({ surah, ayah, wordPos }: Props) {
             {s.syntacticFunction}
           </Text>
           <Text
-            className="text-base text-warm-800 dark:text-neutral-100 leading-6"
+            className="text-base text-charcoal dark:text-neutral-100 leading-6"
             style={{ writingDirection: "rtl", textAlign: "right" }}
           >
             {decodedSyntax}
@@ -81,7 +81,7 @@ export function IrabTab({ surah, ayah, wordPos }: Props) {
             {s.morphologicalTag}
           </Text>
           <Text
-            className="text-base text-warm-800 dark:text-neutral-100 leading-6"
+            className="text-base text-charcoal dark:text-neutral-100 leading-6"
             style={{ writingDirection: "rtl", textAlign: "right" }}
           >
             {decodedMorpho}
