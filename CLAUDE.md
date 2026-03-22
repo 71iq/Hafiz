@@ -43,13 +43,31 @@ Design references: design-references/ folder.
 - tajweed.json — Tajweed rule annotations
 - layout/page-words.json — Authoritative per-word line mapping from quran.com (83,863 words across 604 pages)
 - layout/page-lines.json — Per-line word ID ranges for Mushaf layout (9,046 lines)
-- translations/*.json — 20 bundled language translations (downloaded from quran.com API)
+- translations/\*.json — 20 bundled language translations (downloaded from quran.com API)
 
 ## Current Phase
 
-Phase 2d: Word-Level Interaction (next)
+TBD (Phase 3b complete)
 
 ## Completed Phases
+
+### Phase 3b: Text Selection & Context Menu
+
+- Tap ayah badge → selects ayah → bottom action bar with Copy/Share/Reflect/Highlight/Bookmark
+- Long-press word → starts range selection → tap another word to complete (same surah only)
+- Copy/Share uses `text_uthmani` (not QCF2 PUA glyphs) with formatted reference
+- 4 highlight colors (Amber/Green/Blue/Pink) at 12% opacity as word backgrounds
+- Highlights persisted to SQLite `highlights` table, loaded upfront into Map
+- Bookmarks persisted to SQLite `bookmarks` table, shown as gold dot on ayah badge
+- BookmarksSheet modal accessible from header bookmark icon — tap to navigate
+- Selection mode banner shows "Tap another word to complete selection"
+- SelectionProvider context wraps Mushaf, manages all selection/highlight/bookmark state
+- Toast component for copy/bookmark/highlight confirmations (2s auto-dismiss)
+- Page view: highlights rendered via WordToken `highlightColor` prop
+- `lib/selection/` — types, queries, format, context (4 new files)
+- `components/mushaf/SelectionActionBar.tsx` — bottom action bar with 5 buttons
+- `components/mushaf/BookmarksSheet.tsx` — modal bookmark list with navigation
+- `components/ui/Toast.tsx` — self-dismissing pill toast
 
 ### Multi-Language Translation Support
 
@@ -157,7 +175,7 @@ Phase 2d: Word-Level Interaction (next)
 - **QCF2 page assignment (v2_page)**: 56 ayahs have different page assignments between `page_map` and QCF2 `v2_page`. Since QCF2 PUA codepoints are tied to per-page fonts, `buildPageData()` groups ayahs by `v2_page` instead of `page_map` ranges.
 - **QCF2 Basmallah**: Uses page 1 font glyphs (U+FC41–FC44) for Basmallah lines. Page 1's font is preloaded alongside each page's font.
 - **Font reveal**: Renders text at opacity:0 while font loads, reveals with `requestAnimationFrame` after load completes. Spinner shown while font downloads.
-- **Page data building**: Load all 604 page_map rows, all 6236 ayahs, all 114 surahs, and all page_lines in parallel. Build page-grouped data in JS using ayahKey (surah * 10000 + ayah) for efficient range matching.
+- **Page data building**: Load all 604 page_map rows, all 6236 ayahs, all 114 surahs, and all page_lines in parallel. Build page-grouped data in JS using ayahKey (surah \* 10000 + ayah) for efficient range matching.
 - **GoToNavigator**: Modal with tab selector. In page mode shows both Page (number input), Surah, and Juz' tabs. Surah-to-page mapping uses JOIN on `surah_start <= N AND surah_end >= N` to correctly find pages for surahs that start mid-page.
 - **goToPageRef pattern**: Parent passes a mutable ref to PageMushaf; PageMushaf assigns a goToPage callback to it. Allows parent (mushaf.tsx) to trigger scrollToIndex on the FlatList from outside.
 

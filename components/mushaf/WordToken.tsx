@@ -12,6 +12,7 @@ type Props = {
   wordPos: number;
   v2Page: number;
   disabled?: boolean;
+  highlightColor?: string;
 };
 
 function WordTokenInner({
@@ -24,11 +25,12 @@ function WordTokenInner({
   wordPos,
   v2Page,
   disabled = false,
+  highlightColor,
 }: Props) {
-  const { tooltipWord, setTooltipWord, clearTooltip, openDetail } = useWordInteraction();
+  const { tooltipWord, setTooltipWord, clearTooltipDelayed, openDetail } = useWordInteraction();
   const tokenRef = useRef<View>(null);
 
-  const isSelected =
+  const isTooltipSelected =
     tooltipWord !== null &&
     tooltipWord.surah === surah &&
     tooltipWord.ayah === ayah &&
@@ -56,9 +58,15 @@ function WordTokenInner({
               setTooltipWord(wordRef, { x, y, width, height });
             });
           },
-          onHoverOut: clearTooltip,
+          onHoverOut: clearTooltipDelayed,
         }
       : {};
+
+  // Highlight background for page view (verse view highlights at container level)
+  let bgColor: string | undefined;
+  if (highlightColor) {
+    bgColor = highlightColor + "20";
+  }
 
   return (
     <Pressable
@@ -70,7 +78,7 @@ function WordTokenInner({
     >
       <Text
         className={
-          isSelected
+          isTooltipSelected
             ? "text-primary-accent dark:text-primary-bright"
             : "text-charcoal dark:text-neutral-100"
         }
@@ -78,7 +86,11 @@ function WordTokenInner({
           fontFamily,
           fontSize,
           lineHeight,
-          ...(isSelected && {
+          ...(bgColor && {
+            backgroundColor: bgColor,
+            borderRadius: 6,
+          }),
+          ...(isTooltipSelected && !bgColor && {
             backgroundColor: "rgba(13, 148, 136, 0.08)",
             borderRadius: 6,
           }),

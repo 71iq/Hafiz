@@ -13,10 +13,14 @@ function TooltipPopup({
   position,
   translation,
   onPress,
+  onHoverIn,
+  onHoverOut,
 }: {
   position: TooltipPosition;
   translation: string | null;
   onPress: () => void;
+  onHoverIn?: () => void;
+  onHoverOut?: () => void;
 }) {
   const [tooltipWidth, setTooltipWidth] = useState(0);
 
@@ -36,8 +40,12 @@ function TooltipPopup({
         top,
         zIndex: 9999,
         opacity: tooltipWidth > 0 ? 1 : 0,
+        // @ts-ignore — cursor is valid on web
+        cursor: "pointer",
       }}
       onLayout={(e) => setTooltipWidth(e.nativeEvent.layout.width)}
+      {...(onHoverIn && { onHoverIn })}
+      {...(onHoverOut && { onHoverOut })}
     >
       <View
         style={{
@@ -89,7 +97,7 @@ function TooltipPopup({
 }
 
 export function FloatingWordTooltip() {
-  const { tooltipWord, tooltipPosition, openDetail } = useWordInteraction();
+  const { tooltipWord, tooltipPosition, openDetail, cancelTooltipClear, clearTooltipDelayed } = useWordInteraction();
   const db = useDatabase();
   const [translation, setTranslation] = useState<string | null>(null);
 
@@ -111,6 +119,8 @@ export function FloatingWordTooltip() {
       position={tooltipPosition}
       translation={translation}
       onPress={() => openDetail(tooltipWord)}
+      onHoverIn={cancelTooltipClear}
+      onHoverOut={clearTooltipDelayed}
     />,
     document.body
   );

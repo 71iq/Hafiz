@@ -2,11 +2,12 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { View, Text, Pressable, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { FlashList, FlashListRef } from "@shopify/flash-list";
-import { BookOpen, AlignJustify, Navigation, Eye, EyeOff, Search } from "lucide-react-native";
+import { BookOpen, AlignJustify, Navigation, Eye, EyeOff, Search, BookMarked } from "lucide-react-native";
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings, interpolate } from "@/lib/i18n/useStrings";
 import { WordInteractionProvider } from "@/lib/word/context";
+import { SelectionProvider, useSelection } from "@/lib/selection/context";
 import { SurahHeader } from "@/components/mushaf/SurahHeader";
 import { AyahBlock } from "@/components/mushaf/AyahBlock";
 import { FontSizeControl } from "@/components/mushaf/FontSizeControl";
@@ -14,6 +15,9 @@ import { PageMushaf } from "@/components/mushaf/PageMushaf";
 import { GoToNavigator } from "@/components/mushaf/GoToNavigator";
 import { WordDetailSheet } from "@/components/mushaf/WordDetailSheet";
 import { FloatingWordTooltip } from "@/components/mushaf/WordTooltip";
+import { SelectionActionBar } from "@/components/mushaf/SelectionActionBar";
+import { BookmarksSheet } from "@/components/mushaf/BookmarksSheet";
+import { Toast } from "@/components/ui/Toast";
 import { useWordInteraction } from "@/lib/word/context";
 
 /** Registers an ayah navigation callback inside WordInteractionProvider */
@@ -88,12 +92,25 @@ type MushafItem =
     };
 
 export default function MushafScreen() {
+  return (
+    <WordInteractionProvider>
+      <SelectionProvider>
+        <MushafInner />
+      </SelectionProvider>
+    </WordInteractionProvider>
+  );
+}
+
+function MushafInner() {
   const db = useDatabase();
   const { fontSize, lineHeight, viewMode, setViewMode, isDark } = useSettings();
   const s = useStrings();
+  const { selection, toastMessage, dismissToast } = useSelection();
+  const { navigateToAyah } = useWordInteraction();
   const [items, setItems] = useState<MushafItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNavigator, setShowNavigator] = useState(false);
+  const [showBookmarks, setShowBookmarks] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [hideMode, setHideMode] = useState(false);
   const goToPageRef = useRef<((page: number) => void) | null>(null);
@@ -220,6 +237,13 @@ export default function MushafScreen() {
     [surahHeaderIndices]
   );
 
+  const handleBookmarkNavigate = useCallback(
+    (surah: number, ayah: number) => {
+      navigateToAyah(surah, ayah);
+    },
+    [navigateToAyah]
+  );
+
   const isPageMode = viewMode === "page";
 
   if (loading && !isPageMode) {
@@ -237,7 +261,7 @@ export default function MushafScreen() {
   }
 
   return (
-    <WordInteractionProvider>
+    <>
       <AyahNavigationRegistrar
         items={items}
         flashListRef={flashListRef}
@@ -265,7 +289,7 @@ export default function MushafScreen() {
               >
                 <AlignJustify
                   size={16}
-                  color={!isPageMode ? "#0d9488" : (isDark ? "#525252" : "#DFD9D1")}
+                  color={!isPageMode ? "#0d9488" : (isDark ? "#737373" : "#8B8178")}
                 />
               </Pressable>
               <Pressable
@@ -279,7 +303,7 @@ export default function MushafScreen() {
               >
                 <BookOpen
                   size={16}
-                  color={isPageMode ? "#0d9488" : (isDark ? "#525252" : "#DFD9D1")}
+                  color={isPageMode ? "#0d9488" : (isDark ? "#737373" : "#8B8178")}
                 />
               </Pressable>
             </View>
@@ -302,8 +326,18 @@ export default function MushafScreen() {
             </Pressable>
           </View>
 
-          {/* Right: Hide mode + Font size control */}
+          {/* Right: Bookmarks + Hide mode + Search + Font size */}
           <View className="flex-row items-center gap-2.5">
+            {/* Bookmarks button */}
+            <Pressable
+              onPress={() => setShowBookmarks(true)}
+              className="px-3 py-2 rounded-full bg-surface-high dark:bg-surface-dark-high"
+              style={({ pressed }) => ({
+                transform: [{ scale: pressed ? 0.98 : 1 }],
+              })}
+            >
+              <BookMarked size={16} color={isDark ? "#737373" : "#8B8178"} />
+            </Pressable>
             <Pressable
               onPress={() => setHideMode((prev) => !prev)}
               className={`px-3 py-2 rounded-full ${
@@ -318,7 +352,7 @@ export default function MushafScreen() {
               {hideMode ? (
                 <EyeOff size={16} color="#0d9488" />
               ) : (
-                <Eye size={16} color={isDark ? "#525252" : "#DFD9D1"} />
+                <Eye size={16} color={isDark ? "#737373" : "#8B8178"} />
               )}
             </Pressable>
             {/* Search — placeholder, not yet functional */}
@@ -328,7 +362,7 @@ export default function MushafScreen() {
                 transform: [{ scale: pressed ? 0.98 : 1 }],
               })}
             >
-              <Search size={16} color={isDark ? "#525252" : "#DFD9D1"} />
+              <Search size={16} color={isDark ? "#737373" : "#8B8178"} />
             </Pressable>
             <FontSizeControl />
           </View>
@@ -364,12 +398,25 @@ export default function MushafScreen() {
           onGoToSurahVerse={handleGoToSurahVerse}
         />
 
+        {/* Bookmarks sheet */}
+        <BookmarksSheet
+          visible={showBookmarks}
+          onClose={() => setShowBookmarks(false)}
+          onNavigate={handleBookmarkNavigate}
+        />
+
         {/* Floating word tooltip (portal-based, web only) */}
         <FloatingWordTooltip />
 
         {/* Word detail sheet */}
         <WordDetailSheet />
+
+        {/* Selection action bar */}
+        <SelectionActionBar />
+
+        {/* Toast notifications */}
+        <Toast message={toastMessage} onDismiss={dismissToast} />
       </SafeAreaView>
-    </WordInteractionProvider>
+    </>
   );
 }

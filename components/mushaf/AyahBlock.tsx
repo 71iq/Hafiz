@@ -8,6 +8,7 @@ import {
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
 import { DEFAULT_LANGUAGE, getLanguageByCode } from "@/lib/translations/languages";
+import { useSelection } from "@/lib/selection/context";
 import { WordToken } from "./WordToken";
 import { ChevronDown, ChevronUp } from "lucide-react-native";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -44,6 +45,7 @@ function AyahBlockInner({
   const langInfo = getLanguageByCode(translationLanguage);
   const isTranslationRtl = langInfo?.direction === "rtl";
   const s = useStrings();
+  const { selectAyah, isBookmarked, getHighlightColor } = useSelection();
 
   const [fontVisible, setFontVisible] = useState(() =>
     isQpcFontLoaded(v2Page)
@@ -162,25 +164,56 @@ function AyahBlockInner({
     if (hideMode) setRevealed((prev) => !prev);
   }, [hideMode]);
 
+  const handleBadgeLongPress = useCallback(() => {
+    selectAyah(surah, ayah);
+  }, [surah, ayah, selectAyah]);
+
   const isBlurred = hideMode && !revealed;
   const fontFamily = qpcFontName(v2Page);
+  const bookmarked = isBookmarked(surah, ayah);
+  const highlightColor = getHighlightColor(surah, ayah);
 
   // Muted chevron color — DESIGN.md tonal, not heavy
   const chevronColor = isDark ? "#525252" : "#DFD9D1";
 
   return (
     <View className="mx-5 py-1">
-      {/* Ayah number badge — tonal, no border */}
+      {/* Ayah number badge — long-press for context menu */}
       <View className="flex-row items-center justify-between px-1 pt-4 pb-2">
         <View className="flex-row items-center gap-2">
-          <View className="w-10 h-10 rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 items-center justify-center">
-            <Text
-              className="text-primary-accent dark:text-primary-bright"
-              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11 }}
-            >
-              {surah}:{ayah}
-            </Text>
-          </View>
+          <Pressable
+            onLongPress={handleBadgeLongPress}
+            delayLongPress={300}
+            hitSlop={8}
+            style={({ pressed }) => ({
+              transform: [{ scale: pressed ? 0.95 : 1 }],
+              // @ts-ignore — cursor is valid on web
+              cursor: "pointer",
+            })}
+          >
+            <View className="w-10 h-10 rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 items-center justify-center">
+              <Text
+                className="text-primary-accent dark:text-primary-bright"
+                style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11 }}
+              >
+                {surah}:{ayah}
+              </Text>
+              {/* Bookmark dot */}
+              {bookmarked && (
+                <View
+                  style={{
+                    position: "absolute",
+                    top: -2,
+                    right: -2,
+                    width: 8,
+                    height: 8,
+                    borderRadius: 4,
+                    backgroundColor: "#FDDC91",
+                  }}
+                />
+              )}
+            </View>
+          </Pressable>
         </View>
       </View>
 
@@ -209,6 +242,12 @@ function AyahBlockInner({
               justifyContent: "flex-start",
               alignItems: "center",
               gap: 2,
+              ...(highlightColor && {
+                backgroundColor: highlightColor + "20",
+                borderRadius: 8,
+                paddingHorizontal: 4,
+                paddingVertical: 2,
+              }),
             }}
           >
             {wordTokens.words.map((glyph, i) => (

@@ -92,11 +92,11 @@ export function TajweedTab({ surah, ayah, wordPos }: Props) {
           >
             {rule.arabic}
           </Text>
-          {rule.description && (
+          {rule.description ? (
             <Text className="text-sm text-warm-500 dark:text-neutral-400 leading-5">
               {rule.description}
             </Text>
-          )}
+          ) : null}
         </View>
       ))}
     </View>

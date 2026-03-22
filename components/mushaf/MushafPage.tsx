@@ -1,8 +1,9 @@
-import { useEffect, useState, useMemo } from "react";
-import { View, Text, ActivityIndicator } from "react-native";
+import { useEffect, useState, useMemo, useCallback } from "react";
+import { View, Text, Pressable, ActivityIndicator } from "react-native";
 import { SurahHeader } from "./SurahHeader";
 import { WordToken } from "./WordToken";
 import { loadQpcFont, qpcFontName, isQpcFontLoaded } from "@/lib/fonts/loader";
+import { useSelection } from "@/lib/selection/context";
 
 // Authoritative per-page, per-line word mapping from quran.com
 // pageWordsData[pageIndex] = { "lineNumber": "word1 word2 ..." }
@@ -96,6 +97,7 @@ export function MushafPage({
   globalWordOffset,
 }: Props) {
   const [fontVisible, setFontVisible] = useState(false);
+  const { getHighlightColor, selectAyah } = useSelection();
 
   useEffect(() => {
     setFontVisible(false);
@@ -210,6 +212,7 @@ export function MushafPage({
           {words.map((w, i) => {
             const identity = wordIdentities[lineStartIndex + i];
             if (identity && !identity.isMarker) {
+              const hlColor = getHighlightColor(identity.surah, identity.ayah);
               return (
                 <WordToken
                   key={`w-${line.line_number}-${i}`}
@@ -221,10 +224,33 @@ export function MushafPage({
                   ayah={identity.ayah}
                   wordPos={identity.wordPos}
                   v2Page={pageNumber}
+                  highlightColor={hlColor}
                 />
               );
             }
-            // Ayah end marker or no identity — render as plain text
+            // Ayah end marker — long-pressable for context menu
+            if (identity && identity.isMarker) {
+              return (
+                <Pressable
+                  key={`w-${line.line_number}-${i}`}
+                  onLongPress={() => selectAyah(identity.surah, identity.ayah)}
+                  delayLongPress={300}
+                  style={({ pressed }) => ({
+                    transform: [{ scale: pressed ? 0.95 : 1 }],
+                    // @ts-ignore
+                    cursor: "pointer",
+                  })}
+                >
+                  <Text
+                    className="text-charcoal dark:text-neutral-100"
+                    style={{ fontFamily, fontSize, lineHeight }}
+                  >
+                    {w}
+                  </Text>
+                </Pressable>
+              );
+            }
+            // No identity fallback
             return (
               <Text
                 key={`w-${line.line_number}-${i}`}

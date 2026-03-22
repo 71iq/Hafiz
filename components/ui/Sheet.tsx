@@ -6,6 +6,7 @@ import {
   Animated,
   useWindowDimensions,
 } from "react-native";
+import { useColorScheme } from "nativewind";
 import { cn } from "@/lib/utils";
 import { forwardRef, useEffect, useRef } from "react";
 
@@ -24,6 +25,8 @@ export const Sheet = forwardRef<View, SheetProps>(
   ({ open, onClose, children, className, ...props }, ref) => {
     const slideAnim = useRef(new Animated.Value(0)).current;
     const { height } = useWindowDimensions();
+    const { colorScheme } = useColorScheme();
+    const isDark = colorScheme === "dark";
 
     useEffect(() => {
       Animated.spring(slideAnim, {
@@ -51,11 +54,9 @@ export const Sheet = forwardRef<View, SheetProps>(
           <View className="flex-1" />
         </Pressable>
         <Animated.View
-          className={cn(
-            "bg-surface dark:bg-surface-dark-low rounded-t-4xl",
-            className
-          )}
+          className={cn("rounded-t-4xl", className)}
           style={{
+            backgroundColor: isDark ? "#141414" : "#FFF8F1",
             transform: [
               {
                 translateY: slideAnim.interpolate({

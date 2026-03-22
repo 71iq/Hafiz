@@ -22,6 +22,8 @@ type WordInteractionContextType = {
   openDetail: (word: WordRef) => void;
   closeDetail: () => void;
   clearTooltip: () => void;
+  clearTooltipDelayed: () => void;
+  cancelTooltipClear: () => void;
   navigateToAyah: (surah: number, ayah: number) => void;
   setNavigateToAyah: (fn: (surah: number, ayah: number) => void) => void;
 };
@@ -34,6 +36,8 @@ const WordInteractionContext = createContext<WordInteractionContextType>({
   openDetail: () => {},
   closeDetail: () => {},
   clearTooltip: () => {},
+  clearTooltipDelayed: () => {},
+  cancelTooltipClear: () => {},
   navigateToAyah: () => {},
   setNavigateToAyah: () => {},
 });
@@ -46,8 +50,14 @@ export function WordInteractionProvider({ children }: { children: React.ReactNod
   const [tooltipWord, setTooltipWordState] = useState<WordRef | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState<TooltipPosition | null>(null);
   const [detailWord, setDetailWord] = useState<WordRef | null>(null);
+  const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const setTooltipWord = useCallback((word: WordRef | null, position?: TooltipPosition) => {
+    // Cancel any pending delayed clear when showing a new tooltip
+    if (clearTimerRef.current) {
+      clearTimeout(clearTimerRef.current);
+      clearTimerRef.current = null;
+    }
     setTooltipWordState((prev) => {
       // Toggle off if same word tapped again
       if (
@@ -66,7 +76,26 @@ export function WordInteractionProvider({ children }: { children: React.ReactNod
   }, []);
 
   const clearTooltip = useCallback(() => {
+    if (clearTimerRef.current) {
+      clearTimeout(clearTimerRef.current);
+      clearTimerRef.current = null;
+    }
     setTooltipWordState(null);
+  }, []);
+
+  const clearTooltipDelayed = useCallback(() => {
+    if (clearTimerRef.current) clearTimeout(clearTimerRef.current);
+    clearTimerRef.current = setTimeout(() => {
+      setTooltipWordState(null);
+      clearTimerRef.current = null;
+    }, 1000);
+  }, []);
+
+  const cancelTooltipClear = useCallback(() => {
+    if (clearTimerRef.current) {
+      clearTimeout(clearTimerRef.current);
+      clearTimerRef.current = null;
+    }
   }, []);
 
   const openDetail = useCallback((word: WordRef) => {
@@ -98,6 +127,8 @@ export function WordInteractionProvider({ children }: { children: React.ReactNod
         openDetail,
         closeDetail,
         clearTooltip,
+        clearTooltipDelayed,
+        cancelTooltipClear,
         navigateToAyah,
         setNavigateToAyah,
       }}
