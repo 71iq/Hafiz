@@ -187,6 +187,16 @@ Phase 2d: Word-Level Interaction (next)
 - **API response mapping**: quran.com API returns translations in sequential verse order without `verse_key`. Script maps to surah/ayah using known ayah counts array.
 - **HTML cleanup**: Download script strips `<sup>` footnotes, HTML tags, and decodes entities (`&quot;`, `&amp;`, etc.).
 
+### Fi Zilal al-Quran Integration
+
+- **Multi-source tafseer**: `tafseer` table has `source` column (`'muyassar'` or `'zilal'`), composite PK on `(surah, ayah, source)`. ~12,472 rows total.
+- **Database migration**: For existing installs, init.ts detects missing `source` column via `SELECT source FROM tafseer LIMIT 1` try/catch. Migrates by creating `tafseer_new`, copying data with `source='muyassar'`, dropping old table, renaming.
+- **Zilal import**: `zilal.json` (17MB) bundled in `assets/data/`. Imported during first-launch and as migration for existing installs. Skips empty tafsir entries.
+- **Tafseer source setting**: `tafseerSource` in SettingsProvider (`'muyassar'` default), persisted to `user_settings` as `tafseer_source`.
+- **AyahBlock query**: Uses `WHERE source = ?` parameter, tracks source changes via `fetchedSourceRef` (same pattern as translation language).
+- **Long text truncation**: Zilal texts are much longer than Muyassar. AyahBlock truncates to 200 chars with "Read more" expansion.
+- **Settings UI**: Two-option card selector under Inline Content section, Arabic names with descriptions.
+
 ## Plugins
 
 Use the frontend-design and typescript-lsp plugins for this phase.

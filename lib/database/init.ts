@@ -10,6 +10,7 @@ const wbwData = require("../../assets/data/wbw/wbw.json");
 const masaqData = require("../../assets/data/masaq/masaq-aggregated.json");
 const pageLinesData = require("../../assets/data/layout/page-lines.json");
 const qcf2Data = require("../../assets/data/quran-qcf2.json");
+const zilalData = require("../../assets/data/zilal.json");
 // morphology-terms-ar.json is a terminology reference (labels), not per-word data.
 // Per-word morphological data comes from the MASAQ dataset (word_irab table).
 // The word_morphology table is reserved for future use with mustafa0x/quran-morphology data.
@@ -141,7 +142,7 @@ export type ImportProgress = {
 
 type ProgressCallback = (progress: ImportProgress) => void;
 
-const TOTAL_STEPS = 11;
+const TOTAL_STEPS = 12;
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, "").trim();
@@ -277,8 +278,8 @@ async function importTafseer(
   db: SQLiteDatabase,
   onProgress: ProgressCallback
 ): Promise<void> {
-  onProgress({ step: "Tafseer", current: 5, total: TOTAL_STEPS, detail: "114 surah files" });
-  console.log(`[Import] Importing tafseer from 114 files...`);
+  onProgress({ step: "Tafseer", current: 5, total: TOTAL_STEPS, detail: "Al-Muyassar (114 files)" });
+  console.log(`[Import] Importing tafseer (muyassar) from 114 files...`);
 
   let totalRows = 0;
   const allRows: any[][] = [];
@@ -286,24 +287,51 @@ async function importTafseer(
     const data = tafseerRequires[i];
     const ayahs = data.ayahs || data;
     for (const entry of ayahs) {
-      allRows.push([entry.surah ?? i, entry.ayah, entry.text]);
+      allRows.push([entry.surah ?? i, entry.ayah, "muyassar", entry.text]);
     }
     totalRows += ayahs.length;
   }
 
   await batchInsert(
     db,
-    "INSERT OR IGNORE INTO tafseer (surah, ayah, text) VALUES (?, ?, ?)",
+    "INSERT OR IGNORE INTO tafseer (surah, ayah, source, text) VALUES (?, ?, ?, ?)",
     allRows
   );
-  console.log(`[Import] Tafseer done: ${totalRows} rows`);
+  console.log(`[Import] Tafseer (muyassar) done: ${totalRows} rows`);
+}
+
+async function importZilal(
+  db: SQLiteDatabase,
+  onProgress: ProgressCallback
+): Promise<void> {
+  onProgress({ step: "Tafseer", current: 6, total: TOTAL_STEPS, detail: "Fi Zilal al-Quran" });
+  console.log(`[Import] Importing tafseer (zilal)...`);
+
+  const allRows: any[][] = [];
+  const data = zilalData.data;
+  for (const surahNum of Object.keys(data)) {
+    const surah = data[surahNum];
+    if (!surah?.ayahs) continue;
+    for (const ayahNum of Object.keys(surah.ayahs)) {
+      const entry = surah.ayahs[ayahNum];
+      if (!entry?.tafsir || entry.tafsir.trim() === "") continue;
+      allRows.push([parseInt(surahNum), parseInt(ayahNum), "zilal", entry.tafsir]);
+    }
+  }
+
+  await batchInsert(
+    db,
+    "INSERT OR IGNORE INTO tafseer (surah, ayah, source, text) VALUES (?, ?, ?, ?)",
+    allRows
+  );
+  console.log(`[Import] Tafseer (zilal) done: ${allRows.length} rows`);
 }
 
 async function importTranslations(
   db: SQLiteDatabase,
   onProgress: ProgressCallback
 ): Promise<void> {
-  onProgress({ step: "Translations", current: 6, total: TOTAL_STEPS, detail: "Sahih International" });
+  onProgress({ step: "Translations", current: 7, total: TOTAL_STEPS, detail: "Sahih International" });
   console.log(`[Import] Importing translations...`);
 
   const allRows: any[][] = [];
@@ -326,7 +354,7 @@ async function importPageMap(
   db: SQLiteDatabase,
   onProgress: ProgressCallback
 ): Promise<void> {
-  onProgress({ step: "Page Map", current: 7, total: TOTAL_STEPS, detail: "604 pages" });
+  onProgress({ step: "Page Map", current: 8, total: TOTAL_STEPS, detail: "604 pages" });
   console.log(`[Import] Importing ${pageMapData.length} page_map rows...`);
 
   const rows = pageMapData.map((p: any) => [
@@ -348,7 +376,7 @@ async function importWordTranslations(
   db: SQLiteDatabase,
   onProgress: ProgressCallback
 ): Promise<void> {
-  onProgress({ step: "Word-by-Word", current: 8, total: TOTAL_STEPS, detail: `${wbwData.length} words` });
+  onProgress({ step: "Word-by-Word", current: 9, total: TOTAL_STEPS, detail: `${wbwData.length} words` });
   console.log(`[Import] Importing ${wbwData.length} word_translations rows...`);
 
   const rows = wbwData.map((w: any) => [
@@ -371,7 +399,7 @@ async function importWordIrab(
   db: SQLiteDatabase,
   onProgress: ProgressCallback
 ): Promise<void> {
-  onProgress({ step: "Grammar (إعراب)", current: 9, total: TOTAL_STEPS, detail: `${masaqData.length} words` });
+  onProgress({ step: "Grammar (إعراب)", current: 10, total: TOTAL_STEPS, detail: `${masaqData.length} words` });
   console.log(`[Import] Importing ${masaqData.length} word_irab rows...`);
 
   const rows = masaqData.map((m: any) => [
@@ -397,7 +425,7 @@ async function importPageLines(
   db: SQLiteDatabase,
   onProgress: ProgressCallback
 ): Promise<void> {
-  onProgress({ step: "Page Layout", current: 11, total: TOTAL_STEPS, detail: `${pageLinesData.length} lines` });
+  onProgress({ step: "Page Layout", current: 12, total: TOTAL_STEPS, detail: `${pageLinesData.length} lines` });
   console.log(`[Import] Importing ${pageLinesData.length} page_lines rows...`);
 
   const rows = pageLinesData.map((l: any) => [
@@ -421,7 +449,7 @@ async function importTajweed(
   db: SQLiteDatabase,
   onProgress: ProgressCallback
 ): Promise<void> {
-  onProgress({ step: "Tajweed Rules", current: 10, total: TOTAL_STEPS, detail: `${tajweedData.length} ayahs` });
+  onProgress({ step: "Tajweed Rules", current: 11, total: TOTAL_STEPS, detail: `${tajweedData.length} ayahs` });
   console.log(`[Import] Importing tajweed rules...`);
 
   const allRows: any[][] = [];
@@ -497,6 +525,47 @@ export async function initializeDatabase(
       console.log(`[Import] QCF2 migration done: ${updateRows.length} rows updated`);
     }
 
+    // Migrate tafseer table to multi-source schema if needed
+    try {
+      // Check if source column exists by trying to select it
+      let hasSource = false;
+      try {
+        await db.getFirstAsync("SELECT source FROM tafseer LIMIT 1");
+        hasSource = true;
+      } catch (_) {
+        hasSource = false;
+      }
+      if (!hasSource) {
+        console.log("[Import] Migrating tafseer table to multi-source schema...");
+        await db.execAsync(`
+          CREATE TABLE tafseer_new (
+            surah INTEGER NOT NULL,
+            ayah INTEGER NOT NULL,
+            source TEXT NOT NULL DEFAULT 'muyassar',
+            text TEXT NOT NULL,
+            PRIMARY KEY (surah, ayah, source)
+          );
+          INSERT INTO tafseer_new (surah, ayah, source, text)
+            SELECT surah, ayah, 'muyassar', text FROM tafseer;
+          DROP TABLE tafseer;
+          ALTER TABLE tafseer_new RENAME TO tafseer;
+          CREATE INDEX IF NOT EXISTS idx_tafseer_source ON tafseer(source);
+        `);
+        console.log("[Import] Tafseer migration done.");
+      }
+    } catch (e) {
+      console.warn("[Import] Tafseer migration check:", e);
+    }
+
+    // Import zilal if not yet imported
+    const zilalCount = await db.getFirstAsync<{ count: number }>(
+      "SELECT COUNT(*) as count FROM tafseer WHERE source = 'zilal'"
+    );
+    if ((zilalCount?.count ?? 0) === 0) {
+      console.log("[Import] Importing zilal tafseer...");
+      await importZilal(db, onProgress);
+    }
+
     console.log("[Import] Database already populated, skipping import.");
     onProgress({ step: "Complete", current: TOTAL_STEPS, total: TOTAL_STEPS, detail: "Already imported" });
     return;
@@ -510,12 +579,16 @@ export async function initializeDatabase(
   await importJuzAndHizb(db, onProgress);
   await importWordRoots(db, onProgress);
   await importTafseer(db, onProgress);
+  await importZilal(db, onProgress);
   await importTranslations(db, onProgress);
   await importPageMap(db, onProgress);
   await importWordTranslations(db, onProgress);
   await importWordIrab(db, onProgress);
   await importTajweed(db, onProgress);
   await importPageLines(db, onProgress);
+
+  // Create tafseer source index (not in schema.ts to avoid error on old tables without source column)
+  await db.execAsync("CREATE INDEX IF NOT EXISTS idx_tafseer_source ON tafseer(source)");
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
   console.log(`[Import] All imports complete in ${elapsed}s`);

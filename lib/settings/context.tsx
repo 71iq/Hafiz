@@ -12,6 +12,7 @@ const DEFAULT_FONT_SIZE_INDEX = 2; // 30px
 export type ThemeMode = "light" | "dark" | "system";
 export type ViewMode = "verse" | "page";
 export type UILanguage = "en" | "ar";
+export type TafseerSource = "muyassar" | "zilal";
 
 type SettingsContextType = {
   fontSizeIndex: number;
@@ -29,6 +30,8 @@ type SettingsContextType = {
   translationLanguage: string;
   setTranslationLanguage: (code: string) => Promise<void>;
   isTranslationLoading: boolean;
+  tafseerSource: TafseerSource;
+  setTafseerSource: (source: TafseerSource) => void;
   uiLanguage: UILanguage;
   setUiLanguage: (lang: UILanguage) => void;
   isRTL: boolean;
@@ -52,6 +55,8 @@ const SettingsContext = createContext<SettingsContextType>({
   translationLanguage: DEFAULT_LANGUAGE,
   setTranslationLanguage: async () => {},
   isTranslationLoading: false,
+  tafseerSource: "muyassar",
+  setTafseerSource: () => {},
   uiLanguage: "en",
   setUiLanguage: () => {},
   isRTL: false,
@@ -88,6 +93,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [showTafseer, setShowTafseerState] = useState(false);
   const [translationLanguage, setTranslationLanguageState] = useState(DEFAULT_LANGUAGE);
   const [isTranslationLoading, setIsTranslationLoading] = useState(false);
+  const [tafseerSource, setTafseerSourceState] = useState<TafseerSource>("muyassar");
   const [uiLanguage, setUiLanguageState] = useState<UILanguage>("en");
   const [isLoaded, setIsLoaded] = useState(false);
 
@@ -119,6 +125,11 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
         const savedShowTafseer = await readSetting(db, "show_tafseer");
         if (savedShowTafseer === "true") setShowTafseerState(true);
+
+        const savedTafseerSource = await readSetting(db, "tafseer_source");
+        if (savedTafseerSource === "muyassar" || savedTafseerSource === "zilal") {
+          setTafseerSourceState(savedTafseerSource);
+        }
 
         const savedUiLang = await readSetting(db, "ui_language");
         if (savedUiLang === "en" || savedUiLang === "ar") {
@@ -214,6 +225,14 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     [db, translationLanguage]
   );
 
+  const setTafseerSource = useCallback(
+    (source: TafseerSource) => {
+      setTafseerSourceState(source);
+      writeSetting(db, "tafseer_source", source).catch(console.warn);
+    },
+    [db]
+  );
+
   const setUiLanguage = useCallback(
     (lang: UILanguage) => {
       setUiLanguageState(lang);
@@ -243,6 +262,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         translationLanguage,
         setTranslationLanguage,
         isTranslationLoading,
+        tafseerSource,
+        setTafseerSource,
         uiLanguage,
         setUiLanguage,
         isRTL,

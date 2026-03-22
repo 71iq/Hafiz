@@ -71,6 +71,13 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     wordMeaningTranslation: "Translation",
     wordMeaningRoot: "Root",
     wordMeaningLemma: "Lemma",
+    // Tafseer sources
+    tafseerSourceLabel: "Tafsir Source",
+    tafseerMuyassar: "Al-Muyassar",
+    tafseerMuyassarDesc: "Concise, accessible",
+    tafseerZilal: "Fi Zilal al-Quran",
+    tafseerZilalDesc: "Sayyid Qutb — literary, in-depth",
+    readMore: "Read more",
     // QiraatTab
     comingSoon: "Coming Soon",
     // TranslationLanguagePicker
@@ -138,6 +145,12 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     wordMeaningTranslation: "الترجمة",
     wordMeaningRoot: "الجذر",
     wordMeaningLemma: "الصيغة",
+    tafseerSourceLabel: "مصدر التفسير",
+    tafseerMuyassar: "التفسير الميسر",
+    tafseerMuyassarDesc: "تفسير مختصر وميسر",
+    tafseerZilal: "في ظلال القرآن",
+    tafseerZilalDesc: "سيد قطب",
+    readMore: "اقرأ المزيد",
     comingSoon: "قريبًا",
     translationLanguagePickerTitle: "لغة الترجمة",
     preparingDatabase: "جارٍ تهيئة قاعدة البيانات...",

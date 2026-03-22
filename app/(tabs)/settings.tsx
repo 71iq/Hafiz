@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/Card";
 import { ToggleGroup } from "@/components/ui/ToggleGroup";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Sun, Moon, Smartphone, Minus, Plus, ChevronRight, ChevronLeft } from "lucide-react-native";
-import { useSettings, FONT_SIZE_STEPS, type ThemeMode, type UILanguage } from "@/lib/settings/context";
+import { useSettings, FONT_SIZE_STEPS, type ThemeMode, type UILanguage, type TafseerSource } from "@/lib/settings/context";
 import { getLanguageByCode } from "@/lib/translations/languages";
 import { TranslationLanguagePicker } from "@/components/settings/TranslationLanguagePicker";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -15,6 +15,7 @@ export default function SettingsScreen() {
     theme, setTheme, fontSizeIndex, setFontSizeIndex, fontSize,
     showTranslation, setShowTranslation, showTafseer, setShowTafseer,
     translationLanguage, isTranslationLoading, isDark, isRTL,
+    tafseerSource, setTafseerSource,
     uiLanguage, setUiLanguage,
   } = useSettings();
   const s = useStrings();
@@ -225,12 +226,40 @@ export default function SettingsScreen() {
           {/* Tafseer toggle */}
           <SettingRow
             label={s.showTafseerLabel}
-            description="التفسير الميسر"
+            description={tafseerSource === "muyassar" ? s.tafseerMuyassar : s.tafseerZilal}
             isRTL={isRTL}
             descriptionRTL
           >
             <Switch value={showTafseer} onValueChange={setShowTafseer} />
           </SettingRow>
+
+          <View className="h-4" />
+
+          {/* Tafsir source selector */}
+          <Text
+            className="text-charcoal dark:text-neutral-300 mb-3"
+            style={{ fontFamily: "Manrope_500Medium", fontSize: 14 }}
+          >
+            {s.tafseerSourceLabel}
+          </Text>
+          <View className="gap-2">
+            <TafseerSourceOption
+              value="muyassar"
+              title={s.tafseerMuyassar}
+              description={s.tafseerMuyassarDesc}
+              isActive={tafseerSource === "muyassar"}
+              onPress={() => setTafseerSource("muyassar")}
+              isDark={isDark}
+            />
+            <TafseerSourceOption
+              value="zilal"
+              title={s.tafseerZilal}
+              description={s.tafseerZilalDesc}
+              isActive={tafseerSource === "zilal"}
+              onPress={() => setTafseerSource("zilal")}
+              isDark={isDark}
+            />
+          </View>
         </Card>
 
         <TranslationLanguagePicker
@@ -255,6 +284,60 @@ function SectionLabel({ children }: { children: string }) {
     >
       {children}
     </Text>
+  );
+}
+
+function TafseerSourceOption({
+  value,
+  title,
+  description,
+  isActive,
+  onPress,
+  isDark,
+}: {
+  value: string;
+  title: string;
+  description: string;
+  isActive: boolean;
+  onPress: () => void;
+  isDark: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      className={`p-4 rounded-2xl ${
+        isActive
+          ? "bg-primary-accent/10 dark:bg-primary-bright/15"
+          : "bg-surface-high dark:bg-surface-dark-high"
+      }`}
+      style={({ pressed }) => ({
+        transform: [{ scale: pressed ? 0.98 : 1 }],
+      })}
+    >
+      <Text
+        className={isActive
+          ? "text-primary-accent dark:text-primary-bright"
+          : "text-charcoal dark:text-neutral-300"
+        }
+        style={{
+          fontFamily: isActive ? "Manrope_600SemiBold" : "Manrope_500Medium",
+          fontSize: 14,
+          writingDirection: "rtl",
+        }}
+      >
+        {title}
+      </Text>
+      <Text
+        className="text-warm-400 dark:text-neutral-500 mt-0.5"
+        style={{
+          fontFamily: "Manrope_400Regular",
+          fontSize: 12,
+          writingDirection: "rtl",
+        }}
+      >
+        {description}
+      </Text>
+    </Pressable>
   );
 }
 

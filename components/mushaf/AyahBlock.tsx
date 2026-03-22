@@ -37,6 +37,7 @@ function AyahBlockInner({
     showTafseer: defaultShowTafseer,
     translationLanguage,
     isTranslationLoading,
+    tafseerSource,
     isRTL,
     isDark,
   } = useSettings();
@@ -52,6 +53,7 @@ function AyahBlockInner({
   const [tafseerOpen, setTafseerOpen] = useState(false);
   const [translationText, setTranslationText] = useState<string | null>(null);
   const [tafseerText, setTafseerText] = useState<string | null>(null);
+  const [tafseerExpanded, setTafseerExpanded] = useState(false);
 
   const wordTokens = useMemo(() => {
     const tokens = text.split(" ").filter(Boolean);
@@ -89,6 +91,7 @@ function AyahBlockInner({
   useEffect(() => {
     setTranslationText(null);
     setTafseerText(null);
+    setTafseerExpanded(false);
   }, [surah, ayah]);
 
   const fetchedLangRef = useRef(translationLanguage);
@@ -121,15 +124,27 @@ function AyahBlockInner({
     }
   }, [translationOpen, surah, ayah, db, translationText, translationLanguage, isTranslationLoading]);
 
+  const fetchedSourceRef = useRef(tafseerSource);
+
   useEffect(() => {
-    if (!tafseerOpen || tafseerText !== null) return;
+    if (!tafseerOpen) return;
+
+    const sourceChanged = fetchedSourceRef.current !== tafseerSource;
+    if (!sourceChanged && tafseerText !== null) return;
+
+    if (sourceChanged) {
+      setTafseerText(null);
+      setTafseerExpanded(false);
+      fetchedSourceRef.current = tafseerSource;
+    }
+
     db.getFirstAsync<{ text: string }>(
-      "SELECT text FROM tafseer WHERE surah = ? AND ayah = ?",
-      [surah, ayah]
+      "SELECT text FROM tafseer WHERE surah = ? AND ayah = ? AND source = ?",
+      [surah, ayah, tafseerSource]
     ).then((row) => {
       setTafseerText(row?.text ?? "");
     }).catch(console.warn);
-  }, [tafseerOpen, surah, ayah, db, tafseerText]);
+  }, [tafseerOpen, surah, ayah, db, tafseerText, tafseerSource]);
 
   useEffect(() => {
     setRevealed(false);
@@ -289,18 +304,40 @@ function AyahBlockInner({
         </Pressable>
         {tafseerOpen && (
           <View className="pb-3">
-            <Text
-              className="text-warm-600 dark:text-neutral-300"
-              style={{
-                fontFamily: "Manrope_400Regular",
-                fontSize: 14,
-                lineHeight: 26,
-                writingDirection: "rtl",
-                textAlign: "right",
-              }}
-            >
-              {tafseerText ?? "...جاري التحميل"}
-            </Text>
+            {(() => {
+              const text = tafseerText ?? s.loading;
+              const TRUNCATE_LIMIT = 200;
+              const isLong = text.length > TRUNCATE_LIMIT;
+              const displayText = isLong && !tafseerExpanded
+                ? text.slice(0, TRUNCATE_LIMIT) + "..."
+                : text;
+              return (
+                <>
+                  <Text
+                    className="text-warm-600 dark:text-neutral-300"
+                    style={{
+                      fontFamily: "Manrope_400Regular",
+                      fontSize: 14,
+                      lineHeight: 26,
+                      writingDirection: "rtl",
+                      textAlign: "right",
+                    }}
+                  >
+                    {displayText}
+                  </Text>
+                  {isLong && !tafseerExpanded && (
+                    <Pressable onPress={() => setTafseerExpanded(true)} className="mt-1">
+                      <Text
+                        className="text-primary-accent dark:text-primary-bright"
+                        style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
+                      >
+                        {s.readMore}
+                      </Text>
+                    </Pressable>
+                  )}
+                </>
+              );
+            })()}
           </View>
         )}
       </View>

@@ -65,12 +65,13 @@ export async function createSchema(db: SQLiteDatabase): Promise<void> {
       ayah_end INTEGER NOT NULL
     );
 
-    -- Tafseer Al-Muyassar (6,236 rows)
+    -- Tafseer (multi-source: muyassar, zilal)
     CREATE TABLE IF NOT EXISTS tafseer (
       surah INTEGER NOT NULL,
       ayah INTEGER NOT NULL,
+      source TEXT NOT NULL DEFAULT 'muyassar',
       text TEXT NOT NULL,
-      PRIMARY KEY (surah, ayah)
+      PRIMARY KEY (surah, ayah, source)
     );
 
     -- Sahih International English translation (6,236 rows)
