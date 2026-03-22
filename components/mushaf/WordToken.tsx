@@ -25,7 +25,7 @@ function WordTokenInner({
   v2Page,
   disabled = false,
 }: Props) {
-  const { tooltipWord, setTooltipWord, openDetail } = useWordInteraction();
+  const { tooltipWord, setTooltipWord, clearTooltip, openDetail } = useWordInteraction();
   const tokenRef = useRef<View>(null);
 
   const isSelected =
@@ -56,6 +56,7 @@ function WordTokenInner({
               setTooltipWord(wordRef, { x, y, width, height });
             });
           },
+          onHoverOut: clearTooltip,
         }
       : {};
 
