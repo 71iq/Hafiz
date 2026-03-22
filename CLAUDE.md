@@ -105,7 +105,7 @@ Phase 2d: Word-Level Interaction (next)
 
 ### Phase 2a: Mushaf — Verse-by-Verse View
 
-- 5-tab navigation: Mushaf, Search, Flashcards, Leaderboard, Settings (Lucide icons)
+- 4-item navigation: Home, Mushaf, Progress, Settings (sidebar on desktop, bottom bar on mobile)
 - Verse-by-verse Mushaf screen with FlashList (6236 ayahs + 114 surah headers)
 - SurahHeader component: decorative teal card with Arabic name, English name, ayah count, revelation type, standalone Bismillah
 - AyahBlock component: Arabic text with end-of-ayah number markers, RTL alignment, subtle dividers
@@ -145,7 +145,7 @@ Phase 2d: Word-Level Interaction (next)
 - **FlashList for Mushaf**: Flat list with mixed item types (`surah-header` and `ayah`) using `getItemType`. 6350 total items. `estimatedItemSize: 150`.
 - **Color palette**: Warm neutrals (warm-50 to warm-900) for light mode base, Tailwind neutral for dark mode, teal accent (teal-500/600) for interactive elements and surah headers.
 - **Tab layout**: SettingsProvider placed inside TabLayout (after database ready check) so it can access useDatabase().
-- **Custom tab bar**: `CustomTabBar` component replaces expo-router's default bottom tab bar via the `tabBar` prop. Matches DESIGN.md "Serene Path" spec: dark teal pill (`#1B4D4F`) for active tab with gold (`#FDDC91`) text/icon, 50% opacity inactive tabs, rounded top corners (40px), glassmorphism (backdrop-blur on web, higher opacity on native), teal-tinted ambient shadow, Reanimated scale-on-press (0.90), filled/outline Lucide icons for active/inactive state. Filters hidden routes via `tabBarItemStyle.display === 'none'` (expo-router's internal representation of `href: null`).
+- **Responsive navigation**: `AppNavigation` component renders as sidebar (≥768px) or bottom tab bar (<768px). 4 items: Home, Mushaf, Progress, Settings. Sidebar has "Hafiz / The Digital Sanctuary" branding. Both modes use dark teal pill (`#1B4D4F`) for active state with gold (`#FDDC91`) text/icon. Bottom bar has glassmorphism, rounded top corners (40px), Reanimated scale-on-press. Desktop content offset via `sceneStyle: { marginLeft: 220 }`. Old routes (search, flashcards, leaderboard) hidden via `href: null`.
 
 ### Phase 2b Decisions
 
