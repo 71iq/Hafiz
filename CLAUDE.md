@@ -47,9 +47,30 @@ Design references: design-references/ folder.
 
 ## Current Phase
 
-TBD (Phase 3c complete)
+TBD (Phase 4 complete)
 
 ## Completed Phases
+
+### Phase 4: Smart Search
+
+- Full-featured Search tab with text search and root word search modes
+- 5-tab navigation: Home, Mushaf, Search, Progress, Settings
+- Text search: queries `text_search` column (diacritics-stripped) via LIKE, grouped by surah
+- Root search: queries `word_roots` by exact root match, grouped by lemma (derivative word)
+- Highlighted matches in both modes using character-position mapping back through diacritics
+- `text_search` column added to `quran_text` table — pre-stripped of Arabic diacritics (tashkeel) during import
+- Migration for existing installs: ALTER TABLE + batch UPDATE to populate text_search from text_clean
+- `search_history` SQLite table: last 10 searches with mode, deduplicated, most recent first
+- Search history UI with recent searches, tap to re-execute, clear all button
+- Debounced search (350ms) with loading indicator
+- Text results: limited to 200 matches, grouped by surah with count badges
+- Root results: grouped by lemma with occurrence count, expandable/collapsible
+- Tap any result → `setPendingDeepLink` + navigate to Mushaf tab → scroll + pulse highlight
+- Mushaf search button (header) now navigates to Search tab
+- Deep link consumption upgraded from `useEffect` to `useFocusEffect` (supports both `hafiz://` and search navigation)
+- `deepLinkConsumed` ref removed — `consumePendingDeepLink()` already clears state
+- i18n: 14 new search strings in both English and Arabic
+- `react-hook-form` + `@hookform/resolvers` installed (available for future form validation)
 
 ### Phase 3c: Deep Linking
 
@@ -208,6 +229,17 @@ TBD (Phase 3c complete)
 - **Hide mode as parent state**: `hideMode` boolean lives in mushaf.tsx and is passed as prop to AyahBlock. Included in FlashList's `extraData` to trigger re-renders.
 - **Placeholder instead of overlay**: Hide mode replaces the text entirely with a rounded placeholder box (`bg-warm-100 dark:bg-neutral-800`) rather than using a semi-transparent overlay. Avoids NativeWind opacity modifier limitations with custom hex colors.
 - **memo(AyahBlock)**: Wrapped in React.memo to prevent unnecessary re-renders during scroll with expanded inline content.
+
+### Phase 4 Decisions
+
+- **Diacritics stripping**: `text_clean` in the database still has diacritics (fatḥa, kasra, etc.) — only alif is standardized (ٱ→ا). Added `text_search` column with ALL diacritics stripped for LIKE searches. Regex: `[\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E4\u06E7\u06E8\u06EA-\u06ED\u0640]`.
+- **Highlight mapping**: Search matches are found in stripped text, but displayed from `text_uthmani`. A character-position mapper counts non-diacritic chars to map stripped match positions back to original text positions, including trailing diacritics in the highlight span.
+- **Root search grouping**: `word_roots` query returns all occurrences, grouped by lemma in JS (not SQL GROUP BY, since we need per-occurrence data for display). Sorted by occurrence count descending.
+- **Navigation from search**: Reuses the deep link mechanism (`setPendingDeepLink` + `router.navigate`). Mushaf's `useFocusEffect` consumes the pending target on tab focus. This unified approach supports both `hafiz://` deep links and in-app search navigation.
+- **Debounced search**: 350ms debounce on text input change. Prevents excessive SQLite queries during typing.
+- **Search history**: Simple SQLite table with deduplication (DELETE then INSERT). Capped at 10 entries via DELETE of overflow rows. Re-search on tap.
+- **5-tab layout**: Bottom tab padding reduced from 20px to 14px horizontal to fit 5 tabs. Sidebar (desktop) already handled variable tab counts via flexbox.
+- **Result limits**: Text search limited to 200 results via SQL LIMIT. Root search fetches all (typically < 500 for any root).
 
 ### Phase 3c Decisions
 

@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from "react";
+import { useFocusEffect, router } from "expo-router";
 import { View, Text, Pressable, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { FlashList, FlashListRef } from "@shopify/flash-list";
@@ -123,7 +124,6 @@ function MushafInner() {
 
   // Deep link highlight: "surah:ayah" key that triggers pulse animation
   const [highlightedKey, setHighlightedKey] = useState<string | null>(null);
-  const deepLinkConsumed = useRef(false);
 
   useEffect(() => {
     async function loadQuran() {
@@ -182,43 +182,43 @@ function MushafInner() {
     loadQuran();
   }, [db]);
 
-  // Consume pending deep link after data is loaded
-  useEffect(() => {
-    if (loading || items.length === 0 || deepLinkConsumed.current) return;
-    const target = consumePendingDeepLink();
-    if (!target) return;
-    deepLinkConsumed.current = true;
+  // Consume pending deep link on tab focus (supports both hafiz:// links and search navigation)
+  useFocusEffect(
+    useCallback(() => {
+      if (loading || items.length === 0) return;
+      const target = consumePendingDeepLink();
+      if (!target) return;
 
-    const key = `${target.surah}:${target.ayah}`;
-    setHighlightedKey(key);
+      const key = `${target.surah}:${target.ayah}`;
+      setHighlightedKey(key);
 
-    // Clear highlight after animation completes
-    const timer = setTimeout(() => setHighlightedKey(null), 2000);
+      // Clear highlight after animation completes
+      const timer = setTimeout(() => setHighlightedKey(null), 2000);
 
-    // Scroll to the target ayah (verse mode uses FlashList index)
-    if (viewMode === "verse") {
-      const idx = items.findIndex(
-        (item) => item.type === "ayah" && item.surah === target.surah && item.ayah === target.ayah
-      );
-      if (idx >= 0) {
-        // Short delay so FlashList is mounted and ready
-        setTimeout(() => {
-          flashListRef.current?.scrollToIndex({ index: idx, animated: true });
-        }, 100);
+      // Scroll to the target ayah
+      if (viewMode === "verse") {
+        const idx = items.findIndex(
+          (item) => item.type === "ayah" && item.surah === target.surah && item.ayah === target.ayah
+        );
+        if (idx >= 0) {
+          setTimeout(() => {
+            flashListRef.current?.scrollToIndex({ index: idx, animated: true });
+          }, 100);
+        }
+      } else if (viewMode === "page") {
+        const ayahItem = items.find(
+          (item) => item.type === "ayah" && item.surah === target.surah && item.ayah === target.ayah
+        );
+        if (ayahItem && ayahItem.type === "ayah" && goToPageRef.current) {
+          setTimeout(() => {
+            goToPageRef.current?.(ayahItem.v2Page);
+          }, 100);
+        }
       }
-    } else if (viewMode === "page") {
-      const ayahItem = items.find(
-        (item) => item.type === "ayah" && item.surah === target.surah && item.ayah === target.ayah
-      );
-      if (ayahItem && ayahItem.type === "ayah" && goToPageRef.current) {
-        setTimeout(() => {
-          goToPageRef.current?.(ayahItem.v2Page);
-        }, 100);
-      }
-    }
 
-    return () => clearTimeout(timer);
-  }, [loading, items, viewMode]);
+      return () => clearTimeout(timer);
+    }, [loading, items, viewMode])
+  );
 
   const renderItem = useCallback(
     ({ item }: { item: MushafItem }) => {
@@ -399,8 +399,9 @@ function MushafInner() {
                 <Eye size={16} color={isDark ? "#737373" : "#8B8178"} />
               )}
             </Pressable>
-            {/* Search — placeholder, not yet functional */}
+            {/* Search — navigate to search tab */}
             <Pressable
+              onPress={() => router.navigate("/(tabs)/search")}
               className="px-3 py-2 rounded-full bg-surface-high dark:bg-surface-dark-high"
               style={({ pressed }) => ({
                 transform: [{ scale: pressed ? 0.98 : 1 }],

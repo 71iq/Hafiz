@@ -148,6 +148,12 @@ function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, "").trim();
 }
 
+/** Strip Arabic diacritics (tashkeel) for search-friendly text */
+const ARABIC_DIACRITICS = /[\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E4\u06E7\u06E8\u06EA-\u06ED\u0640]/g;
+function stripDiacritics(text: string): string {
+  return text.replace(ARABIC_DIACRITICS, "");
+}
+
 async function isPopulated(db: SQLiteDatabase): Promise<boolean> {
   try {
     const result = await db.getFirstAsync<{ count: number }>(
@@ -218,11 +224,12 @@ async function importQuranText(
     return [
       t.surah, t.ayah, t.text_uthmani, t.text_clean,
       qcf2?.code_v2 ?? "", qcf2?.v2_page ?? 0,
+      stripDiacritics(t.text_clean),
     ];
   });
   await batchInsert(
     db,
-    "INSERT OR IGNORE INTO quran_text (surah, ayah, text_uthmani, text_clean, text_qcf2, v2_page) VALUES (?, ?, ?, ?, ?, ?)",
+    "INSERT OR IGNORE INTO quran_text (surah, ayah, text_uthmani, text_clean, text_qcf2, v2_page, text_search) VALUES (?, ?, ?, ?, ?, ?, ?)",
     rows
   );
   console.log(`[Import] Quran text done: ${texts.length} rows`);
@@ -564,6 +571,25 @@ export async function initializeDatabase(
     if ((zilalCount?.count ?? 0) === 0) {
       console.log("[Import] Importing zilal tafseer...");
       await importZilal(db, onProgress);
+    }
+
+    // Add text_search column for diacritics-stripped search (Phase 4 migration)
+    try { await db.execAsync("ALTER TABLE quran_text ADD COLUMN text_search TEXT NOT NULL DEFAULT ''"); } catch (_) {}
+    const searchCheck = await db.getFirstAsync<{ text_search: string }>(
+      "SELECT text_search FROM quran_text WHERE surah = 1 AND ayah = 1"
+    );
+    if (!searchCheck?.text_search) {
+      console.log("[Import] Migrating: populating text_search column...");
+      const allTexts = await db.getAllAsync<{ surah: number; ayah: number; text_clean: string }>(
+        "SELECT surah, ayah, text_clean FROM quran_text"
+      );
+      const updateRows = allTexts.map(t => [stripDiacritics(t.text_clean), t.surah, t.ayah]);
+      await batchInsert(
+        db,
+        "UPDATE quran_text SET text_search = ? WHERE surah = ? AND ayah = ?",
+        updateRows
+      );
+      console.log(`[Import] text_search migration done: ${updateRows.length} rows`);
     }
 
     console.log("[Import] Database already populated, skipping import.");

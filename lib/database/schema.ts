@@ -26,6 +26,7 @@ export async function createSchema(db: SQLiteDatabase): Promise<void> {
       text_clean TEXT NOT NULL,
       text_qcf2 TEXT NOT NULL DEFAULT '',
       v2_page INTEGER NOT NULL DEFAULT 0,
+      text_search TEXT NOT NULL DEFAULT '',
       PRIMARY KEY (surah, ayah)
     );
 
@@ -217,6 +218,14 @@ export async function createSchema(db: SQLiteDatabase): Promise<void> {
       PRIMARY KEY (surah, ayah)
     );
 
+    -- Search history (last 10 searches)
+    CREATE TABLE IF NOT EXISTS search_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      query TEXT NOT NULL,
+      mode TEXT NOT NULL DEFAULT 'text',
+      created_at TEXT NOT NULL
+    );
+
     -- Sync queue for offline-first sync
     CREATE TABLE IF NOT EXISTS sync_queue (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -231,6 +240,7 @@ export async function createSchema(db: SQLiteDatabase): Promise<void> {
     -- ============================================================
 
     CREATE INDEX IF NOT EXISTS idx_quran_text_surah ON quran_text(surah);
+    CREATE INDEX IF NOT EXISTS idx_quran_text_search ON quran_text(text_search);
     CREATE INDEX IF NOT EXISTS idx_word_roots_root ON word_roots(root);
     CREATE INDEX IF NOT EXISTS idx_word_roots_surah_ayah ON word_roots(surah, ayah);
     CREATE INDEX IF NOT EXISTS idx_tajweed_surah_ayah ON tajweed_rules(surah, ayah);
