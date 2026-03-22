@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hafiz Deep Link Tester</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 600px; margin: 40px auto; padding: 0 20px; background: #FFF8F1; color: #2D2D2D; }
+    h1 { color: #003638; }
+    a { display: block; margin: 12px 0; padding: 12px 20px; background: #003638; color: #FDDC91; border-radius: 999px; text-decoration: none; text-align: center; font-weight: 600; }
+    a:hover { opacity: 0.9; }
+    .note { color: #666; font-size: 14px; margin-top: 8px; }
+    .section { margin-top: 32px; }
+    code { background: #E8E1DA; padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <h1>Hafiz Deep Link Tester</h1>
+  <p>Click a link below to test deep linking into the Hafiz app.</p>
+
+  <div class="section">
+    <h2>Native Deep Links <code>hafiz://</code></h2>
+    <a href="hafiz://open?surah=2&ayah=255">Ayat al-Kursi (2:255)</a>
+    <a href="hafiz://open?surah=1&ayah=1">Al-Fatiha (1:1)</a>
+    <a href="hafiz://open?surah=36&ayah=1">Ya-Sin (36:1)</a>
+    <a href="hafiz://open?surah=55&ayah=13">Ar-Rahman (55:13)</a>
+    <a href="hafiz://open?surah=112&ayah=1">Al-Ikhlas (112:1)</a>
+    <a href="hafiz://open?surah=2&ayah=286">Last ayah of Al-Baqarah (2:286)</a>
+  </div>
+
+  <div class="section">
+    <h2>Web Deep Links</h2>
+    <p class="note">These work when the app is running on <code>localhost:8081</code> (Expo web).</p>
+    <a href="http://localhost:8081/open?surah=2&ayah=255">Ayat al-Kursi (2:255) — localhost</a>
+    <a href="http://localhost:8081/open?surah=36&ayah=1">Ya-Sin (36:1) — localhost</a>
+  </div>
+
+  <div class="section">
+    <h2>Edge Cases</h2>
+    <a href="hafiz://open?surah=114&ayah=6">Last ayah of last surah (114:6)</a>
+    <a href="hafiz://open?surah=9&ayah=1">At-Tawbah (9:1) — no Bismillah</a>
+    <a href="hafiz://open?surah=0&ayah=1">Invalid surah (0:1) — should go to Mushaf without scroll</a>
+    <a href="hafiz://open">No params — should go to Mushaf without scroll</a>
+  </div>
+</body>
+</html>

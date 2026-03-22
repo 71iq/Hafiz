@@ -47,9 +47,23 @@ Design references: design-references/ folder.
 
 ## Current Phase
 
-TBD (Phase 3b complete)
+TBD (Phase 3c complete)
 
 ## Completed Phases
+
+### Phase 3c: Deep Linking
+
+- `hafiz://` scheme already configured in app.json (`"scheme": "hafiz"`)
+- `app/open.tsx` route handles `hafiz://open?surah=X&ayah=Y` and web URLs (`/open?surah=X&ayah=Y`)
+- Parses surah/ayah from query params, validates ranges, stores in module-level pending state
+- `router.replace("/(tabs)/mushaf")` redirects to Mushaf tab (no back-nav to blank screen)
+- `lib/deep-link.ts` — lightweight module-level state (`setPendingDeepLink` / `consumePendingDeepLink`)
+- Mushaf screen consumes pending deep link after data loads, scrolls to target ayah
+- Works in both verse mode (FlashList `scrollToIndex`) and page mode (`goToPageRef`)
+- Pulse highlight animation: teal overlay at 15% opacity fades out over 1.5s via `Animated.timing`
+- `AyahBlock` accepts `highlighted` prop for the pulse effect
+- `Stack.Screen name="open"` registered in root layout
+- `test-deep-link.html` — test page with native (`hafiz://`) and web (`localhost:8081`) deep links
 
 ### Phase 3b: Text Selection & Context Menu
 
@@ -194,6 +208,15 @@ TBD (Phase 3b complete)
 - **Hide mode as parent state**: `hideMode` boolean lives in mushaf.tsx and is passed as prop to AyahBlock. Included in FlashList's `extraData` to trigger re-renders.
 - **Placeholder instead of overlay**: Hide mode replaces the text entirely with a rounded placeholder box (`bg-warm-100 dark:bg-neutral-800`) rather than using a semi-transparent overlay. Avoids NativeWind opacity modifier limitations with custom hex colors.
 - **memo(AyahBlock)**: Wrapped in React.memo to prevent unnecessary re-renders during scroll with expanded inline content.
+
+### Phase 3c Decisions
+
+- **Route-based deep linking**: `app/open.tsx` handles the `/open` path. Expo Router maps both `hafiz://open?...` (native scheme) and `/open?...` (web) to this route automatically.
+- **Module-level state transfer**: `lib/deep-link.ts` uses a simple module-level variable (not context/store) to pass the deep link target from the `/open` route to the Mushaf screen. Avoids context dependency on a route that renders outside the tab layout.
+- **`router.replace()`**: Uses replace instead of push so the blank `/open` screen doesn't appear in the back stack.
+- **Consume-once pattern**: `consumePendingDeepLink()` reads and clears the pending target. `deepLinkConsumed` ref prevents re-consumption on re-renders.
+- **Pulse animation**: `Animated.timing` from 1→0 over 1.5s on a teal overlay at 15% max opacity. Uses `useNativeDriver: true` for smooth animation. The overlay is conditionally rendered only when `highlighted` is true.
+- **Delayed scroll**: 100ms `setTimeout` before `scrollToIndex` to ensure FlashList/FlatList is mounted and ready after data loads.
 
 ### Multi-Language Translation Decisions
 

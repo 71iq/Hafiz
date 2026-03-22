@@ -19,6 +19,7 @@ import { SelectionActionBar } from "@/components/mushaf/SelectionActionBar";
 import { BookmarksSheet } from "@/components/mushaf/BookmarksSheet";
 import { Toast } from "@/components/ui/Toast";
 import { useWordInteraction } from "@/lib/word/context";
+import { consumePendingDeepLink } from "@/lib/deep-link";
 
 /** Registers an ayah navigation callback inside WordInteractionProvider */
 function AyahNavigationRegistrar({
@@ -120,6 +121,10 @@ function MushafInner() {
     Map<number, number>
   >(new Map());
 
+  // Deep link highlight: "surah:ayah" key that triggers pulse animation
+  const [highlightedKey, setHighlightedKey] = useState<string | null>(null);
+  const deepLinkConsumed = useRef(false);
+
   useEffect(() => {
     async function loadQuran() {
       try {
@@ -177,6 +182,44 @@ function MushafInner() {
     loadQuran();
   }, [db]);
 
+  // Consume pending deep link after data is loaded
+  useEffect(() => {
+    if (loading || items.length === 0 || deepLinkConsumed.current) return;
+    const target = consumePendingDeepLink();
+    if (!target) return;
+    deepLinkConsumed.current = true;
+
+    const key = `${target.surah}:${target.ayah}`;
+    setHighlightedKey(key);
+
+    // Clear highlight after animation completes
+    const timer = setTimeout(() => setHighlightedKey(null), 2000);
+
+    // Scroll to the target ayah (verse mode uses FlashList index)
+    if (viewMode === "verse") {
+      const idx = items.findIndex(
+        (item) => item.type === "ayah" && item.surah === target.surah && item.ayah === target.ayah
+      );
+      if (idx >= 0) {
+        // Short delay so FlashList is mounted and ready
+        setTimeout(() => {
+          flashListRef.current?.scrollToIndex({ index: idx, animated: true });
+        }, 100);
+      }
+    } else if (viewMode === "page") {
+      const ayahItem = items.find(
+        (item) => item.type === "ayah" && item.surah === target.surah && item.ayah === target.ayah
+      );
+      if (ayahItem && ayahItem.type === "ayah" && goToPageRef.current) {
+        setTimeout(() => {
+          goToPageRef.current?.(ayahItem.v2Page);
+        }, 100);
+      }
+    }
+
+    return () => clearTimeout(timer);
+  }, [loading, items, viewMode]);
+
   const renderItem = useCallback(
     ({ item }: { item: MushafItem }) => {
       if (item.type === "surah-header") {
@@ -199,10 +242,11 @@ function MushafInner() {
           fontSize={fontSize}
           lineHeight={lineHeight}
           hideMode={hideMode}
+          highlighted={highlightedKey === `${item.surah}:${item.ayah}`}
         />
       );
     },
-    [fontSize, lineHeight, hideMode]
+    [fontSize, lineHeight, hideMode, highlightedKey]
   );
 
   const getItemType = useCallback((item: MushafItem) => item.type, []);
@@ -383,7 +427,7 @@ function MushafInner() {
             renderItem={renderItem}
             getItemType={getItemType}
             keyExtractor={keyExtractor}
-            extraData={{ fontSize, hideMode }}
+            extraData={{ fontSize, hideMode, highlightedKey }}
             contentContainerStyle={{ paddingBottom: 40 }}
           />
         )}

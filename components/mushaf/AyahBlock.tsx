@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef, useMemo, memo } from "react";
-import { View, Text, Pressable } from "react-native";
+import { View, Text, Pressable, Animated as RNAnimated } from "react-native";
 import {
   loadQpcFont,
   qpcFontName,
@@ -21,6 +21,7 @@ type Props = {
   fontSize: number;
   lineHeight: number;
   hideMode?: boolean;
+  highlighted?: boolean;
 };
 
 function AyahBlockInner({
@@ -31,6 +32,7 @@ function AyahBlockInner({
   fontSize,
   lineHeight,
   hideMode = false,
+  highlighted = false,
 }: Props) {
   const db = useDatabase();
   const {
@@ -56,6 +58,19 @@ function AyahBlockInner({
   const [translationText, setTranslationText] = useState<string | null>(null);
   const [tafseerText, setTafseerText] = useState<string | null>(null);
   const [tafseerExpanded, setTafseerExpanded] = useState(false);
+
+  // Deep link pulse highlight
+  const pulseAnim = useRef(new RNAnimated.Value(0)).current;
+  useEffect(() => {
+    if (highlighted) {
+      pulseAnim.setValue(1);
+      RNAnimated.timing(pulseAnim, {
+        toValue: 0,
+        duration: 1500,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [highlighted, pulseAnim]);
 
   const wordTokens = useMemo(() => {
     const tokens = text.split(" ").filter(Boolean);
@@ -177,7 +192,26 @@ function AyahBlockInner({
   const chevronColor = isDark ? "#525252" : "#DFD9D1";
 
   return (
-    <View className="mx-5 py-1">
+    <View className="mx-5 py-1" style={{ position: "relative" }}>
+      {/* Deep link pulse highlight overlay */}
+      {highlighted && (
+        <RNAnimated.View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            top: 0,
+            left: -8,
+            right: -8,
+            bottom: 0,
+            borderRadius: 12,
+            backgroundColor: "#0d9488",
+            opacity: pulseAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0, 0.15],
+            }),
+          }}
+        />
+      )}
       {/* Ayah number badge — long-press for context menu */}
       <View className="flex-row items-center justify-between px-1 pt-4 pb-2">
         <View className="flex-row items-center gap-2">
