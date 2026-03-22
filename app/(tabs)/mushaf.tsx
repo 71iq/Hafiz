@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { View, Text, Pressable, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { FlashList, FlashListRef } from "@shopify/flash-list";
-import { BookOpen, AlignJustify, Navigation, Eye, EyeOff } from "lucide-react-native";
+import { BookOpen, AlignJustify, Navigation, Eye, EyeOff, Search } from "lucide-react-native";
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings, interpolate } from "@/lib/i18n/useStrings";
@@ -320,6 +320,15 @@ export default function MushafScreen() {
               ) : (
                 <Eye size={16} color={isDark ? "#525252" : "#DFD9D1"} />
               )}
+            </Pressable>
+            {/* Search — placeholder, not yet functional */}
+            <Pressable
+              className="px-3 py-2 rounded-full bg-surface-high dark:bg-surface-dark-high"
+              style={({ pressed }) => ({
+                transform: [{ scale: pressed ? 0.98 : 1 }],
+              })}
+            >
+              <Search size={16} color={isDark ? "#525252" : "#DFD9D1"} />
             </Pressable>
             <FontSizeControl />
           </View>

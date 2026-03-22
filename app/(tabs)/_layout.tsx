@@ -1,28 +1,57 @@
-import { View, Text } from "react-native";
+import { View, Text, useWindowDimensions } from "react-native";
 import { Tabs } from "expo-router";
-import { BookOpen, Search, Layers, Trophy, Settings } from "lucide-react-native";
+import { Sparkles, BookOpen, BarChart3, Settings } from "lucide-react-native";
 import { useDatabaseStatus } from "@/lib/database/provider";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { SettingsProvider, useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
-import { CustomTabBar } from "@/components/ui/CustomTabBar";
+import { AppNavigation, SIDEBAR_WIDTH, SIDEBAR_BREAKPOINT } from "@/components/ui/AppNavigation";
 
 function TabsWithStrings() {
   const { isRTL } = useSettings();
   const s = useStrings();
+  const { width } = useWindowDimensions();
+  const hasSidebar = width >= SIDEBAR_BREAKPOINT;
 
   return (
     <View style={{ flex: 1, direction: isRTL ? "rtl" : "ltr" }}>
       <Tabs
         screenOptions={{
           headerShown: false,
+          sceneStyle: hasSidebar ? { marginLeft: SIDEBAR_WIDTH } : undefined,
         }}
-        tabBar={(props) => <CustomTabBar {...props} />}
+        tabBar={(props) => <AppNavigation {...props} />}
       >
         <Tabs.Screen
           name="index"
+          options={{ href: null }}
+        />
+        {/* Hidden: old routes kept for expo-router (files still exist but hidden from nav) */}
+        <Tabs.Screen
+          name="search"
+          options={{ href: null }}
+        />
+        <Tabs.Screen
+          name="flashcards"
+          options={{ href: null }}
+        />
+        <Tabs.Screen
+          name="leaderboard"
+          options={{ href: null }}
+        />
+        {/* Visible tabs: Home, Mushaf, Progress, Settings */}
+        <Tabs.Screen
+          name="home"
           options={{
-            href: null,
+            title: s.tabHome,
+            tabBarIcon: ({ focused, color, size }) => (
+              <Sparkles
+                size={size}
+                color={color}
+                fill={focused ? color : "none"}
+                strokeWidth={focused ? 1.5 : 2}
+              />
+            ),
           }}
         />
         <Tabs.Screen
@@ -40,34 +69,11 @@ function TabsWithStrings() {
           }}
         />
         <Tabs.Screen
-          name="search"
+          name="progress"
           options={{
-            title: s.tabSearch,
+            title: s.tabProgress,
             tabBarIcon: ({ focused, color, size }) => (
-              <Search size={size} color={color} strokeWidth={focused ? 2.5 : 2} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="flashcards"
-          options={{
-            title: s.tabFlashcards,
-            tabBarIcon: ({ focused, color, size }) => (
-              <Layers
-                size={size}
-                color={color}
-                fill={focused ? color : "none"}
-                strokeWidth={focused ? 1.5 : 2}
-              />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="leaderboard"
-          options={{
-            title: s.tabLeaderboard,
-            tabBarIcon: ({ focused, color, size }) => (
-              <Trophy
+              <BarChart3
                 size={size}
                 color={color}
                 fill={focused ? color : "none"}
