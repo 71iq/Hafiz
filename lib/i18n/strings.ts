@@ -3,7 +3,7 @@ export type UIStrings = { [key: string]: string };
 export const strings: Record<"en" | "ar", UIStrings> = {
   en: {
     // Tabs
-    tabHome: "Sanctuary",
+    tabHome: "Home",
     tabMushaf: "Mushaf",
     tabProgress: "Progress",
     tabSettings: "Settings",
@@ -78,7 +78,7 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     tafseerZilalDesc: "Sayyid Qutb — literary, in-depth",
     readMore: "Read more",
     // Home page
-    homeTitle: "Sanctuary",
+    homeTitle: "Home",
     homeSubtitle: "Your spiritual journey continues",
     homeMemorized: "MEMORIZED",
     homeTodayReviews: "Today's Reviews",
