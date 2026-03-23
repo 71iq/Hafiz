@@ -1,6 +1,6 @@
 import { View, Text, useWindowDimensions } from "react-native";
 import { Tabs } from "expo-router";
-import { Sparkles, BookOpen, BarChart3, Settings } from "lucide-react-native";
+import { Sparkles, BookOpen, BarChart3, Settings, Trophy } from "lucide-react-native";
 import { useDatabaseStatus } from "@/lib/database/provider";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { SettingsProvider, useSettings } from "@/lib/settings/context";
@@ -58,10 +58,6 @@ function TabsWithStrings() {
         />
         {/* Hidden routes */}
         <Tabs.Screen
-          name="leaderboard"
-          options={{ href: null }}
-        />
-        <Tabs.Screen
           name="flashcards"
           options={{ href: null }}
         />
@@ -69,7 +65,7 @@ function TabsWithStrings() {
           name="search"
           options={{ href: null }}
         />
-        {/* Visible tabs: Home, Mushaf, Progress, Settings */}
+        {/* Visible tabs: Home, Mushaf, Leaderboard, Progress, Settings */}
         <Tabs.Screen
           name="home"
           options={{
@@ -90,6 +86,20 @@ function TabsWithStrings() {
             title: s.tabMushaf,
             tabBarIcon: ({ focused, color, size }) => (
               <BookOpen
+                size={size}
+                color={color}
+                fill={focused ? color : "none"}
+                strokeWidth={focused ? 1.5 : 2}
+              />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="leaderboard"
+          options={{
+            title: s.tabLeaderboard,
+            tabBarIcon: ({ focused, color, size }) => (
+              <Trophy
                 size={size}
                 color={color}
                 fill={focused ? color : "none"}

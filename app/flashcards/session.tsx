@@ -18,8 +18,10 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { gradeCard, Rating, State, createEmptyCard } from "@/lib/fsrs/scheduler";
 import type { Card as FSRSCard, Grade } from "@/lib/fsrs/scheduler";
-import { getDueCards, updateCard, insertStudyLog } from "@/lib/fsrs/queries";
+import { getDueCards, updateCard, insertStudyLog, getStudyStreak } from "@/lib/fsrs/queries";
 import { computeUniqueFront } from "@/lib/fsrs/uniqueness";
+import { computeReviewPoints, addTodayPoints, getTodayScore } from "@/lib/fsrs/scoring";
+import { syncDailyScore, updateProfileStats } from "@/lib/fsrs/leaderboard-sync";
 import type { StudyCardRow, TestMode } from "@/lib/fsrs/types";
 import { DEFAULT_ENABLED_MODES, TEST_MODE_COLORS } from "@/lib/fsrs/types";
 
@@ -76,6 +78,8 @@ function FlashcardSessionScreen() {
   const [enabledModes, setEnabledModes] = useState<TestMode[]>(DEFAULT_ENABLED_MODES);
   const [summary, setSummary] = useState<SessionSummary | null>(null);
   const sessionStartRef = useRef(Date.now());
+  const streakRef = useRef(0);
+  const sessionPointsRef = useRef(0);
   const flipAnim = useRef(new RNAnimated.Value(0)).current;
 
   // Load enabled test modes from settings
@@ -99,6 +103,8 @@ function FlashcardSessionScreen() {
   // Load due cards and pre-fetch all card data
   useEffect(() => {
     async function load() {
+      // Pre-load streak for scoring
+      streakRef.current = await getStudyStreak(db);
       const dueRows = await getDueCards(db, deckId);
       if (dueRows.length === 0) {
         setSummary({ total: 0, newCount: 0, reviewCount: 0, relearningCount: 0, durationMs: 0, nextReviewDate: null });
@@ -245,6 +251,18 @@ function FlashcardSessionScreen() {
       now.toISOString()
     );
 
+    // Compute and store leaderboard points
+    const points = computeReviewPoints(
+      rating,
+      streakRef.current,
+      currentCard.card.difficulty,
+      currentCard.card.stability
+    );
+    if (points > 0) {
+      sessionPointsRef.current += points;
+      addTodayPoints(db, points).catch(console.warn);
+    }
+
     if (currentIndex < cards.length - 1) {
       setCurrentIndex((i) => i + 1);
       setCurrentSideIndex(0);
@@ -268,6 +286,10 @@ function FlashcardSessionScreen() {
         nextReviewDate: nextRow?.due ?? null,
       });
       setPhase("summary");
+
+      // Sync daily score and profile stats to Supabase (non-blocking)
+      syncDailyScore(db).catch(console.warn);
+      updateProfileStats(db).catch(console.warn);
     }
   };
 

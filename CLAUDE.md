@@ -47,9 +47,28 @@ Design references: design-references/ folder.
 
 ## Current Phase
 
-TBD (Phase 7 complete)
+TBD (Phase 8 complete)
 
 ## Completed Phases
+
+### Phase 8: Leaderboard
+
+- Scoring algorithm (`lib/fsrs/scoring.ts`): base_points × streak_multiplier × difficulty_bonus × retention_bonus
+- Anti-gaming: max 200 reviews/day, Again ratings = 0 points
+- Points computed per review in flashcard session, stored in `user_settings` as `daily_score_YYYY-MM-DD`
+- Leaderboard sync (`lib/fsrs/leaderboard-sync.ts`): upserts daily_scores, updates profile stats on Supabase
+- Profile stats: total_score, current_streak, longest_streak, cards_reviewed, last_review_date
+- Leaderboard API (`lib/leaderboard/api.ts`): 4 fetch functions for Daily/Weekly/All-time/Streak
+- Leaderboard screen (`app/(tabs)/leaderboard.tsx`): 4 sub-tabs with TanStack Query caching
+  - Daily: query daily_scores for today
+  - Weekly: aggregate daily_scores for last 7 days per user
+  - All-time: query profiles by total_score
+  - Streak: query profiles by current_streak
+- `LeaderboardRow`: rank medal (gold/silver/bronze), avatar initial, name, "You" badge, score with unit
+- Current user highlighted with teal background
+- Pull-to-refresh on all tabs
+- Leaderboard tab added to navigation (Trophy icon, between Mushaf and Progress)
+- i18n: 11 new leaderboard strings in both English and Arabic
 
 ### Phase 7: Reflections (Community Feature)
 
@@ -369,6 +388,16 @@ TBD (Phase 7 complete)
 - **AyahBlock query**: Uses `WHERE source = ?` parameter, tracks source changes via `fetchedSourceRef` (same pattern as translation language).
 - **Long text truncation**: Zilal texts are much longer than Muyassar. AyahBlock truncates to 200 chars with "Read more" expansion.
 - **Settings UI**: Two-option card selector under Inline Content section, Arabic names with descriptions.
+
+### Phase 8 Decisions
+
+- **Scoring storage**: Daily scores stored in `user_settings` as `daily_score_YYYY-MM-DD` JSON (`{ score, reviewsCount }`). Avoids a new local table while keeping daily aggregates queryable for total score computation.
+- **Score per review**: Computed inline in `handleGrade` and accumulated via `addTodayPoints()`. Streak is loaded once at session start and cached in a ref.
+- **Anti-gaming**: `addTodayPoints` checks `reviewsCount >= 200` before adding. `computeReviewPoints` returns 0 for `Rating.Again`.
+- **Profile sync timing**: `syncDailyScore` and `updateProfileStats` called non-blocking at session end (summary phase). No blocking of UI.
+- **Weekly aggregation**: Fetches all daily_scores from last 7 days and aggregates in JS. Supabase doesn't support GROUP BY with joined columns in the client library, so client-side aggregation is simpler.
+- **Streak from local data**: Uses existing `getStudyStreak()` from queries.ts (counts consecutive review days from study_log). Synced to profile via `updateProfileStats`.
+- **5-tab layout**: Leaderboard tab added between Mushaf and Progress. Trophy icon from Lucide.
 
 ### Phase 7 Decisions
 
