@@ -3,7 +3,7 @@ import { View, Text, ScrollView, Pressable, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
-import { Plus, Trash2, Play, Layers, Flame, Clock } from "lucide-react-native";
+import { Plus, Trash2, Play, Layers, Flame, Clock, Search } from "lucide-react-native";
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -11,6 +11,7 @@ import { interpolate } from "@/lib/i18n/useStrings";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { CreateDeckSheet } from "@/components/flashcards/CreateDeckSheet";
+import { SearchCommand } from "@/components/SearchCommand";
 import { Toast } from "@/components/ui/Toast";
 import {
   getDecks,
@@ -43,6 +44,7 @@ export default function HomeScreen() {
   const [streak, setStreak] = useState(0);
   const [lastReview, setLastReview] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
@@ -129,6 +131,23 @@ export default function HomeScreen() {
             {s.homeSubtitle}
           </Text>
         </View>
+
+        {/* Search bar trigger */}
+        <Pressable
+          onPress={() => setShowSearch(true)}
+          className="mb-6"
+          style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+        >
+          <View className="flex-row items-center bg-surface-low dark:bg-surface-dark-low rounded-full px-4 py-3.5">
+            <Search size={18} color={isDark ? "#737373" : "#8B8178"} />
+            <Text
+              className="text-warm-400 dark:text-neutral-600 flex-1"
+              style={{ fontFamily: "Manrope_500Medium", fontSize: 15, marginLeft: 12 }}
+            >
+              {s.searchPlaceholder}
+            </Text>
+          </View>
+        </Pressable>
 
         {/* Progress ring */}
         <Card elevation="low" className="p-8 mb-6 items-center">
@@ -282,6 +301,8 @@ export default function HomeScreen() {
           </View>
         )}
       </ScrollView>
+
+      <SearchCommand visible={showSearch} onClose={() => setShowSearch(false)} />
 
       <CreateDeckSheet
         visible={showCreate}

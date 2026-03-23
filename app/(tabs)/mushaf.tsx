@@ -19,6 +19,7 @@ import { FloatingWordTooltip } from "@/components/mushaf/WordTooltip";
 import { SelectionActionBar } from "@/components/mushaf/SelectionActionBar";
 import { BookmarksSheet } from "@/components/mushaf/BookmarksSheet";
 import { Toast } from "@/components/ui/Toast";
+import { SearchCommand } from "@/components/SearchCommand";
 import { useWordInteraction } from "@/lib/word/context";
 import { consumePendingDeepLink } from "@/lib/deep-link";
 
@@ -113,6 +114,7 @@ function MushafInner() {
   const [loading, setLoading] = useState(true);
   const [showNavigator, setShowNavigator] = useState(false);
   const [showBookmarks, setShowBookmarks] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [hideMode, setHideMode] = useState(false);
   const goToPageRef = useRef<((page: number) => void) | null>(null);
@@ -399,9 +401,9 @@ function MushafInner() {
                 <Eye size={16} color={isDark ? "#737373" : "#8B8178"} />
               )}
             </Pressable>
-            {/* Search — navigate to search tab */}
+            {/* Search — open search modal */}
             <Pressable
-              onPress={() => router.navigate("/(tabs)/search")}
+              onPress={() => setShowSearch(true)}
               className="px-3 py-2 rounded-full bg-surface-high dark:bg-surface-dark-high"
               style={({ pressed }) => ({
                 transform: [{ scale: pressed ? 0.98 : 1 }],
@@ -452,6 +454,9 @@ function MushafInner() {
 
         {/* Floating word tooltip (portal-based, web only) */}
         <FloatingWordTooltip />
+
+        {/* Search command modal */}
+        <SearchCommand visible={showSearch} onClose={() => setShowSearch(false)} />
 
         {/* Word detail sheet */}
         <WordDetailSheet />
