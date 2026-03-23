@@ -176,7 +176,6 @@ function Sidebar(props: BottomTabBarProps & { isRTL?: boolean }) {
           paddingBottom: Math.max(insets.bottom, 24),
           left: isRTL ? undefined : 0,
           right: isRTL ? 0 : undefined,
-          shadowOffset: { width: isRTL ? -4 : 4, height: 0 },
         },
       ]}
     >
@@ -274,10 +273,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: SIDEBAR_WIDTH,
     paddingHorizontal: 16,
-    shadowColor: "#003638",
-    shadowOpacity: 0.03,
-    shadowRadius: 16,
-    elevation: 4,
     zIndex: 50,
   },
   sidebarHeader: {
