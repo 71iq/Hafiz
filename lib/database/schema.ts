@@ -231,8 +231,11 @@ export async function createSchema(db: SQLiteDatabase): Promise<void> {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       table_name TEXT NOT NULL,
       operation TEXT NOT NULL,
+      row_id TEXT NOT NULL,
       data TEXT NOT NULL,
-      created_at TEXT NOT NULL
+      status TEXT NOT NULL DEFAULT 'pending',
+      created_at TEXT NOT NULL,
+      synced_at TEXT
     );
 
     -- ============================================================

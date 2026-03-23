@@ -112,7 +112,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         const savedTheme = await readSetting(db, "theme");
         if (savedTheme === "light" || savedTheme === "dark" || savedTheme === "system") {
           setThemeState(savedTheme);
-          setColorScheme(savedTheme);
+          // Defer to avoid NativeWind observable firing before components mount
+          requestAnimationFrame(() => setColorScheme(savedTheme));
         }
 
         const savedViewMode = await readSetting(db, "view_mode");
@@ -174,7 +175,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const setTheme = useCallback(
     (newTheme: ThemeMode) => {
       setThemeState(newTheme);
-      setColorScheme(newTheme);
+      requestAnimationFrame(() => setColorScheme(newTheme));
       writeSetting(db, "theme", newTheme).catch(console.warn);
     },
     [db]

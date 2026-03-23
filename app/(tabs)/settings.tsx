@@ -1,16 +1,20 @@
 import { useState, useEffect, useCallback } from "react";
-import { View, Text, Pressable, ActivityIndicator, ScrollView } from "react-native";
+import { View, Text, Pressable, ActivityIndicator, ScrollView, Alert } from "react-native";
 import { Switch } from "@/components/ui/Switch";
 import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
 import { ToggleGroup } from "@/components/ui/ToggleGroup";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Sun, Moon, Smartphone, Minus, Plus, ChevronRight, ChevronLeft } from "lucide-react-native";
+import { Sun, Moon, Smartphone, Minus, Plus, ChevronRight, ChevronLeft, User, LogOut } from "lucide-react-native";
 import { useSettings, FONT_SIZE_STEPS, type ThemeMode, type UILanguage, type TafseerSource } from "@/lib/settings/context";
 import { useDatabase } from "@/lib/database/provider";
 import { getLanguageByCode } from "@/lib/translations/languages";
 import { TranslationLanguagePicker } from "@/components/settings/TranslationLanguagePicker";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { ALL_TEST_MODES, DEFAULT_ENABLED_MODES, type TestMode } from "@/lib/fsrs/types";
+import { useAuthStore } from "@/lib/auth/store";
+import { isSupabaseConfigured } from "@/lib/supabase";
+import { useRouter } from "expo-router";
 
 export default function SettingsScreen() {
   const {
@@ -22,9 +26,12 @@ export default function SettingsScreen() {
   } = useSettings();
   const db = useDatabase();
   const s = useStrings();
+  const router = useRouter();
   const [pickerVisible, setPickerVisible] = useState(false);
   const currentLang = getLanguageByCode(translationLanguage);
   const [enabledModes, setEnabledModes] = useState<TestMode[]>(DEFAULT_ENABLED_MODES);
+  const { user, profile, isLoading: authLoading, signOut } = useAuthStore();
+  const configured = isSupabaseConfigured();
 
   useEffect(() => {
     db.getFirstAsync<{ value: string }>(
@@ -67,6 +74,85 @@ export default function SettingsScreen() {
       </View>
 
       <ScrollView className="flex-1 px-6" contentContainerStyle={{ paddingBottom: 48 }}>
+
+        {/* Account Section */}
+        <SectionLabel>{s.authAccount}</SectionLabel>
+        <Card elevation="low" className="p-5 mb-8">
+          {user && profile ? (
+            <View>
+              <View className="flex-row items-center gap-3 mb-4">
+                <View className="w-12 h-12 rounded-full bg-primary-accent/10 dark:bg-primary-bright/15 items-center justify-center">
+                  <User size={22} color={isDark ? "#2dd4bf" : "#0d9488"} />
+                </View>
+                <View className="flex-1">
+                  <Text
+                    className="text-charcoal dark:text-neutral-100"
+                    style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16 }}
+                  >
+                    {profile.display_name || profile.username}
+                  </Text>
+                  <Text
+                    className="text-warm-400 dark:text-neutral-500"
+                    style={{ fontFamily: "Manrope_400Regular", fontSize: 13 }}
+                  >
+                    @{profile.username}
+                  </Text>
+                </View>
+              </View>
+              <Pressable
+                onPress={() => {
+                  Alert.alert(s.authLogout, s.authLogoutConfirm, [
+                    { text: s.flashcardsCancel, style: "cancel" },
+                    { text: s.authLogout, style: "destructive", onPress: signOut },
+                  ]);
+                }}
+                className="flex-row items-center justify-center gap-2 py-3 rounded-full bg-surface dark:bg-surface-dark"
+                style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+              >
+                <LogOut size={16} color={isDark ? "#ef4444" : "#dc2626"} />
+                <Text
+                  className="text-red-600 dark:text-red-400"
+                  style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}
+                >
+                  {s.authLogout}
+                </Text>
+              </Pressable>
+            </View>
+          ) : configured ? (
+            <View className="gap-2">
+              <Button
+                onPress={() => router.push("/auth/login")}
+                disabled={authLoading}
+              >
+                <Text
+                  className="text-white"
+                  style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15 }}
+                >
+                  {s.authLogin}
+                </Text>
+              </Button>
+              <Button
+                variant="outline"
+                onPress={() => router.push("/auth/signup")}
+                disabled={authLoading}
+              >
+                <Text
+                  className="text-charcoal dark:text-neutral-200"
+                  style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15 }}
+                >
+                  {s.authSignup}
+                </Text>
+              </Button>
+            </View>
+          ) : (
+            <Text
+              className="text-warm-400 dark:text-neutral-500 text-center py-2"
+              style={{ fontFamily: "Manrope_400Regular", fontSize: 13 }}
+            >
+              {s.authNotConfigured}
+            </Text>
+          )}
+        </Card>
 
         {/* Language Section */}
         <SectionLabel>{s.sectionLanguage}</SectionLabel>

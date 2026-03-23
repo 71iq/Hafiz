@@ -595,6 +595,32 @@ export async function initializeDatabase(
     // Create text_search index (must happen after column migration)
     await createTextSearchIndex(db);
 
+    // Migrate sync_queue table to add row_id, status, synced_at columns (Phase 6)
+    try {
+      await db.getFirstAsync("SELECT row_id FROM sync_queue LIMIT 1");
+    } catch (_) {
+      console.log("[Import] Migrating sync_queue table...");
+      try {
+        await db.execAsync(`
+          DROP TABLE IF EXISTS sync_queue;
+          CREATE TABLE sync_queue (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            table_name TEXT NOT NULL,
+            operation TEXT NOT NULL,
+            row_id TEXT NOT NULL,
+            data TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            created_at TEXT NOT NULL,
+            synced_at TEXT
+          );
+          CREATE INDEX IF NOT EXISTS idx_sync_queue_status ON sync_queue(table_name);
+        `);
+        console.log("[Import] sync_queue migration done.");
+      } catch (e) {
+        console.warn("[Import] sync_queue migration error:", e);
+      }
+    }
+
     console.log("[Import] Database already populated, skipping import.");
     onProgress({ step: "Complete", current: TOTAL_STEPS, total: TOTAL_STEPS, detail: "Already imported" });
     return;

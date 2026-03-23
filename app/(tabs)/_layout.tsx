@@ -6,6 +6,31 @@ import { LoadingScreen } from "@/components/LoadingScreen";
 import { SettingsProvider, useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { AppNavigation, SIDEBAR_WIDTH, SIDEBAR_BREAKPOINT } from "@/components/ui/AppNavigation";
+import { useSync } from "@/lib/sync/useSync";
+import { SyncIndicator } from "@/components/ui/SyncIndicator";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+function SyncOverlay() {
+  const { status } = useSync();
+  const { isDark, isRTL } = useSettings();
+  const insets = useSafeAreaInsets();
+
+  if (status === "idle") return null;
+
+  return (
+    <View
+      style={{
+        position: "absolute",
+        top: insets.top + 8,
+        ...(isRTL ? { left: 16 } : { right: 16 }),
+        zIndex: 100,
+      }}
+      pointerEvents="none"
+    >
+      <SyncIndicator status={status} isDark={isDark} />
+    </View>
+  );
+}
 
 function TabsWithStrings() {
   const { isRTL } = useSettings();
@@ -15,6 +40,7 @@ function TabsWithStrings() {
 
   return (
     <View style={{ flex: 1, direction: isRTL ? "rtl" : "ltr" }}>
+      <SyncOverlay />
       <Tabs
         screenOptions={{
           headerShown: false,

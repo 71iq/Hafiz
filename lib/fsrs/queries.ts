@@ -1,6 +1,7 @@
 import type { SQLiteDatabase } from "expo-sqlite";
 import { createEmptyCard } from "./scheduler";
 import type { DeckScope, StudyCardRow } from "./types";
+import { enqueueSync } from "@/lib/database/sync-queue";
 
 // ─── Deck ID generation ──────────────────────────────────────
 
@@ -242,6 +243,24 @@ export async function updateCard(db: SQLiteDatabase, card: StudyCardRow): Promis
       card.id,
     ]
   );
+
+  // Enqueue for sync
+  enqueueSync(db, "study_cards", "UPDATE", card.id, {
+    id: card.id,
+    deck_id: card.deck_id,
+    due: card.due,
+    stability: card.stability,
+    difficulty: card.difficulty,
+    elapsed_days: card.elapsed_days,
+    scheduled_days: card.scheduled_days,
+    learning_steps: card.learning_steps,
+    reps: card.reps,
+    lapses: card.lapses,
+    state: card.state,
+    last_review: card.last_review,
+    created_at: card.created_at,
+    updated_at: card.updated_at,
+  }).catch(console.warn);
 }
 
 export async function insertStudyLog(
@@ -261,6 +280,19 @@ export async function insertStudyLog(
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
     [cardId, rating, state, due, stability, difficulty, elapsedDays, scheduledDays, reviewedAt]
   );
+
+  // Enqueue for sync
+  enqueueSync(db, "study_log", "INSERT", `${cardId}:${reviewedAt}`, {
+    card_id: cardId,
+    rating,
+    state,
+    due,
+    stability,
+    difficulty,
+    elapsed_days: elapsedDays,
+    scheduled_days: scheduledDays,
+    reviewed_at: reviewedAt,
+  }).catch(console.warn);
 }
 
 export async function getStudyStreak(db: SQLiteDatabase): Promise<number> {

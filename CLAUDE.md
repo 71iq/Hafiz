@@ -47,9 +47,34 @@ Design references: design-references/ folder.
 
 ## Current Phase
 
-TBD (Phase 5 complete)
+TBD (Phase 6 complete)
 
 ## Completed Phases
+
+### Phase 6: Authentication & Sync
+
+- `@supabase/supabase-js` v2 for backend auth and data sync
+- `zustand` v5 for auth state management (`useAuthStore`)
+- `@react-native-community/netinfo` for connectivity detection
+- `@react-native-async-storage/async-storage` for Supabase session persistence on native
+- Supabase client in `lib/supabase.ts` with platform-aware storage adapter
+- Auth store (`lib/auth/store.ts`): signIn, signUp, signOut, fetchProfile, session restoration via `onAuthStateChange`
+- Login screen (`app/auth/login.tsx`): React Hook Form + Zod validation, email/password
+- Signup screen (`app/auth/signup.tsx`): email, username, display_name, password with validation
+- Auth routes registered in root layout with slide-from-bottom animation
+- Settings account section: logged-in profile display with logout, or login/signup buttons
+- Supabase SQL schema (`supabase/schema.sql`): profiles, daily_scores, study_cards, study_log, bookmarks, highlights
+- RLS policies: profiles publicly readable (leaderboard), user data owner-only
+- Sync queue (`lib/database/sync-queue.ts`): enqueue/dequeue/mark synced/failed/clean
+- Enhanced `sync_queue` table: row_id, status (pending/synced/failed), synced_at columns
+- Sync engine (`lib/database/sync.ts`): pushSyncQueue (local→Supabase), pullRemoteChanges (Supabase→local), fullSync
+- Conflict resolution: last-write-wins using updated_at timestamps
+- All writes to study_cards, study_log, bookmarks, highlights automatically enqueue sync entries
+- `useSync` hook (`lib/sync/useSync.ts`): auto-sync on app foreground, on connectivity restore, on login
+- `SyncIndicator` component: cloud icon with spinner (syncing), checkmark (synced), X (offline), alert (error)
+- Floating sync indicator in tab layout (top-right corner, respects RTL)
+- Database migration for existing installs: sync_queue table rebuilt with new schema
+- i18n: 16 new auth/sync strings in both English and Arabic
 
 ### Phase 5: Flashcard Engine (FSRS-Powered Spaced Repetition)
 
@@ -318,6 +343,20 @@ TBD (Phase 5 complete)
 - **AyahBlock query**: Uses `WHERE source = ?` parameter, tracks source changes via `fetchedSourceRef` (same pattern as translation language).
 - **Long text truncation**: Zilal texts are much longer than Muyassar. AyahBlock truncates to 200 chars with "Read more" expansion.
 - **Settings UI**: Two-option card selector under Inline Content section, Arabic names with descriptions.
+
+### Phase 6 Decisions
+
+- **Zustand for auth state**: First use of Zustand in the app. `useAuthStore` is a single global store (no provider needed) for session, user, profile, isLoading, error. All other state management still uses React Context.
+- **Supabase client storage**: On web, uses default `localStorage`. On native, uses `@react-native-async-storage/async-storage` for session persistence. Platform check via `Platform.OS !== "web"`.
+- **Auth initialization**: `useAuthStore.initialize()` called in root `_layout.tsx` on mount. Restores session, subscribes to `onAuthStateChange`. Profile fetched in background after session restore.
+- **isSupabaseConfigured()**: Guard function checks if placeholder credentials are replaced. When not configured, auth UI shows "Cloud sync not configured" and sync is skipped. App works fully offline.
+- **Sync queue pattern**: Writes to syncable tables (study_cards, study_log, bookmarks, highlights) call `enqueueSync()` after the local SQLite write. Non-blocking `.catch(console.warn)` — sync failures never break local operations.
+- **Push sync**: Groups pending entries by table, upserts to Supabase with `user_id`. study_log is append-only (INSERT only, no upsert). Deletes use table-specific key parsing (e.g., bookmarks use `surah:ayah`).
+- **Pull sync**: Fetches remote rows newer than `last_pull_at` (stored in user_settings). Last-write-wins for study_cards (compares `updated_at`). study_log deduplicates by `card_id + reviewed_at`.
+- **useSync hook**: Runs in tab layout. Listens to AppState changes (foreground) and NetInfo connectivity events. Syncs automatically when conditions are met. Never blocks UI.
+- **SyncIndicator**: Floating overlay in tab layout, positioned top-right (top-left in RTL). Uses `pointerEvents="none"` so it doesn't intercept touches. Shows for 3s after successful sync, then fades to idle.
+- **Sync queue migration**: For existing installs, detects old schema via `SELECT row_id` try/catch. Drops and recreates the table (no user data to preserve — pending entries are just sync metadata).
+- **Auth screens**: Stack screens outside tabs with slide-from-bottom animation. Use `router.replace()` between login/signup to avoid deep back stack. `router.back()` on successful auth returns to settings.
 
 ## Plugins
 
