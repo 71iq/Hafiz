@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { X, ChevronRight, Trophy, RotateCcw } from "lucide-react-native";
+import { X, ChevronRight, Trophy } from "lucide-react-native";
 import { useDatabase } from "@/lib/database/provider";
 import { SettingsProvider, useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -19,9 +19,9 @@ import { Button } from "@/components/ui/Button";
 import { gradeCard, Rating, State, createEmptyCard } from "@/lib/fsrs/scheduler";
 import type { Card as FSRSCard, Grade } from "@/lib/fsrs/scheduler";
 import { getDueCards, updateCard, insertStudyLog } from "@/lib/fsrs/queries";
-import { computeUniqueFront, getFirstLetters } from "@/lib/fsrs/uniqueness";
+import { computeUniqueFront } from "@/lib/fsrs/uniqueness";
 import type { StudyCardRow, TestMode } from "@/lib/fsrs/types";
-import { ALL_TEST_MODES, DEFAULT_ENABLED_MODES } from "@/lib/fsrs/types";
+import { DEFAULT_ENABLED_MODES, TEST_MODE_COLORS } from "@/lib/fsrs/types";
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -33,7 +33,6 @@ type CardData = {
   ayah: number;
   surahName: string;
   textUthmani: string;
-  textClean: string;
   uniqueFront: { text: string; surahName: string; contextCount: number; needsExplicitLabel: boolean };
   translation: string;
   tafseer: string;
@@ -87,7 +86,11 @@ function FlashcardSessionScreen() {
       if (row?.value) {
         try {
           const modes = JSON.parse(row.value) as TestMode[];
-          if (modes.length > 0) setEnabledModes(modes);
+          // Filter out removed modes (e.g. firstLetter, surahIdentification)
+          const valid = modes.filter((m) =>
+            ["nextAyah", "previousAyah", "translation", "tafseer", "surahName"].includes(m)
+          );
+          if (valid.length > 0) setEnabledModes(valid);
         } catch {}
       }
     });
@@ -110,8 +113,8 @@ function FlashcardSessionScreen() {
         const ayah = parseInt(ayahStr);
 
         const [ayahRow, surahRow, translationRow, tafseerRow, prevRow, nextRow, uniqueFront] = await Promise.all([
-          db.getFirstAsync<{ text_uthmani: string; text_clean: string }>(
-            "SELECT text_uthmani, text_clean FROM quran_text WHERE surah = ? AND ayah = ?",
+          db.getFirstAsync<{ text_uthmani: string }>(
+            "SELECT text_uthmani FROM quran_text WHERE surah = ? AND ayah = ?",
             [surah, ayah]
           ),
           db.getFirstAsync<{ name_arabic: string }>(
@@ -145,7 +148,6 @@ function FlashcardSessionScreen() {
           ayah,
           surahName: surahRow?.name_arabic ?? "",
           textUthmani: ayahRow?.text_uthmani ?? "",
-          textClean: ayahRow?.text_clean ?? "",
           uniqueFront,
           translation: translationRow?.text_en ?? "",
           tafseer: tafseerRow?.text ?? "",
@@ -164,7 +166,6 @@ function FlashcardSessionScreen() {
   const activeModes = useMemo(() => {
     if (!currentCard) return [];
     return enabledModes.filter((mode) => {
-      // Filter out modes that don't apply
       if (mode === "previousAyah" && !currentCard.prevAyahText) return false;
       if (mode === "nextAyah" && !currentCard.nextAyahText) return false;
       if (mode === "translation" && !currentCard.translation) return false;
@@ -174,8 +175,8 @@ function FlashcardSessionScreen() {
   }, [enabledModes, currentCard]);
 
   const currentMode = activeModes[currentSideIndex] ?? null;
+  const isLastSide = currentSideIndex >= activeModes.length - 1;
 
-  // Animate card flip
   const animateFlip = useCallback(() => {
     flipAnim.setValue(0);
     RNAnimated.spring(flipAnim, {
@@ -192,12 +193,11 @@ function FlashcardSessionScreen() {
   };
 
   const handleNext = () => {
-    if (currentSideIndex < activeModes.length - 1) {
+    if (!isLastSide) {
       setCurrentSideIndex((i) => i + 1);
       setRevealed(false);
       animateFlip();
     } else {
-      // All sides done → grading
       setPhase("grading");
     }
   };
@@ -206,7 +206,6 @@ function FlashcardSessionScreen() {
     if (!currentCard) return;
     const now = new Date();
 
-    // Reconstruct FSRS card from row
     const fsrsCard: FSRSCard = {
       due: new Date(currentCard.card.due),
       stability: currentCard.card.stability,
@@ -221,7 +220,6 @@ function FlashcardSessionScreen() {
 
     const result = gradeCard(fsrsCard, now, rating);
 
-    // Update card in DB
     const updatedRow: StudyCardRow = {
       ...currentCard.card,
       due: result.card.due.toISOString(),
@@ -238,7 +236,6 @@ function FlashcardSessionScreen() {
     };
     await updateCard(db, updatedRow);
 
-    // Log the review
     await insertStudyLog(
       db,
       currentCard.card.id,
@@ -252,19 +249,16 @@ function FlashcardSessionScreen() {
       now.toISOString()
     );
 
-    // Move to next card or summary
     if (currentIndex < cards.length - 1) {
       setCurrentIndex((i) => i + 1);
       setCurrentSideIndex(0);
       setRevealed(false);
       setPhase("front");
     } else {
-      // Session complete
       const newCount = cards.filter((c) => c.card.state === State.New).length;
       const relearningCount = cards.filter((c) => c.card.state === State.Relearning).length;
       const reviewCount = cards.length - newCount - relearningCount;
 
-      // Get next review date
       const nextRow = await db.getFirstAsync<{ due: string }>(
         "SELECT due FROM study_cards ORDER BY due ASC LIMIT 1"
       );
@@ -285,7 +279,7 @@ function FlashcardSessionScreen() {
     router.back();
   };
 
-  // ─── Render phases ─────────────────────────────────────────
+  // ─── Render ────────────────────────────────────────────────
 
   if (phase === "loading") {
     return (
@@ -300,26 +294,15 @@ function FlashcardSessionScreen() {
   if (phase === "summary") {
     return (
       <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
-        <SessionSummaryView
-          summary={summary!}
-          onDone={handleEndSession}
-          isDark={isDark}
-          s={s}
-        />
+        <SessionSummaryView summary={summary!} onDone={handleEndSession} isDark={isDark} s={s} />
       </SafeAreaView>
     );
   }
 
   if (!currentCard) return null;
 
-  const translateY = flipAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [30, 0],
-  });
-  const opacity = flipAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 1],
-  });
+  const translateY = flipAnim.interpolate({ inputRange: [0, 1], outputRange: [30, 0] });
+  const opacity = flipAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
 
   return (
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
@@ -332,7 +315,6 @@ function FlashcardSessionScreen() {
           <X size={18} color={isDark ? "#d4d4d4" : "#6e5a47"} />
         </Pressable>
 
-        {/* Progress bar */}
         <View className="flex-1 mx-4">
           <View className="h-2 rounded-full bg-surface-high dark:bg-surface-dark-high overflow-hidden">
             <View
@@ -348,16 +330,48 @@ function FlashcardSessionScreen() {
           </Text>
         </View>
 
-        {/* Card state badge */}
         <CardStateBadge state={currentCard.card.state} s={s} />
       </View>
+
+      {/* Mode tags row */}
+      {phase === "side" && activeModes.length > 0 && (
+        <View className="flex-row flex-wrap gap-2 px-6 pb-3">
+          {activeModes.map((mode, i) => {
+            const color = TEST_MODE_COLORS[mode];
+            const isActive = i === currentSideIndex;
+            const isDone = i < currentSideIndex;
+            return (
+              <View
+                key={mode}
+                className="px-3 py-1.5 rounded-full"
+                style={{
+                  backgroundColor: isActive ? color : "transparent",
+                  borderWidth: 1.5,
+                  borderColor: color,
+                  opacity: isDone ? 0.4 : 1,
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: isActive ? "Manrope_600SemiBold" : "Manrope_500Medium",
+                    fontSize: 11,
+                    color: isActive ? "#fff" : color,
+                  }}
+                >
+                  {getModeName(mode, s)}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+      )}
 
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ alignItems: "center", paddingHorizontal: 24, paddingBottom: 140 }}
       >
         <View style={{ width: "100%", maxWidth }}>
-          {/* Surah context (always shown subtly) */}
+          {/* Surah context */}
           <Text
             className="text-warm-400 dark:text-neutral-500 text-center mb-2 mt-4"
             style={{ fontFamily: "Manrope_500Medium", fontSize: 12, writingDirection: "rtl" }}
@@ -368,7 +382,6 @@ function FlashcardSessionScreen() {
           {/* Front of card */}
           {phase === "front" && (
             <Card elevation="low" className="p-8 mb-6">
-              {/* Show unique front text */}
               {currentCard.uniqueFront.needsExplicitLabel && (
                 <Text
                   className="text-primary-accent dark:text-primary-bright text-center mb-3"
@@ -387,11 +400,7 @@ function FlashcardSessionScreen() {
               )}
               <Text
                 className="text-charcoal dark:text-neutral-100 text-center"
-                style={{
-                  fontSize: fontSize,
-                  lineHeight: lineHeight,
-                  writingDirection: "rtl",
-                }}
+                style={{ fontSize, lineHeight, writingDirection: "rtl" }}
               >
                 {currentCard.uniqueFront.text}
               </Text>
@@ -401,49 +410,26 @@ function FlashcardSessionScreen() {
           {/* Side (test mode) */}
           {phase === "side" && currentMode && (
             <View>
-              {/* Front context (smaller) */}
               <Card elevation="low" className="p-5 mb-4">
-                <TestModePrompt
-                  mode={currentMode}
-                  card={currentCard}
-                  fontSize={fontSize * 0.85}
-                  lineHeight={lineHeight * 0.85}
-                  s={s}
-                />
+                <TestModePrompt mode={currentMode} card={currentCard} fontSize={fontSize * 0.85} lineHeight={lineHeight * 0.85} s={s} />
               </Card>
 
-              {/* Answer */}
-              {revealed ? (
+              {revealed && (
                 <RNAnimated.View style={{ transform: [{ translateY }], opacity }}>
                   <Card elevation="mid" className="p-6">
-                    <Text
-                      className="text-primary-accent dark:text-primary-bright mb-2"
-                      style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
-                    >
-                      {getModeName(currentMode, s)}
-                    </Text>
-                    <TestModeAnswer
-                      mode={currentMode}
-                      card={currentCard}
-                      fontSize={fontSize}
-                      lineHeight={lineHeight}
-                    />
+                    <TestModeAnswer mode={currentMode} card={currentCard} fontSize={fontSize} lineHeight={lineHeight} />
                   </Card>
                 </RNAnimated.View>
-              ) : null}
+              )}
             </View>
           )}
 
-          {/* Grading phase — show the ayah as reminder */}
+          {/* Grading phase */}
           {phase === "grading" && (
             <Card elevation="low" className="p-6 mb-4">
               <Text
                 className="text-charcoal dark:text-neutral-100 text-center"
-                style={{
-                  fontSize: fontSize * 0.8,
-                  lineHeight: lineHeight * 0.8,
-                  writingDirection: "rtl",
-                }}
+                style={{ fontSize: fontSize * 0.8, lineHeight: lineHeight * 0.8, writingDirection: "rtl" }}
               >
                 {currentCard.textUthmani}
               </Text>
@@ -477,7 +463,7 @@ function FlashcardSessionScreen() {
           <Button onPress={handleNext} className="w-full">
             <View className="flex-row items-center gap-2">
               <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16, color: "#fff" }}>
-                {currentSideIndex < activeModes.length - 1 ? s.flashcardsNext : s.flashcardsNext}
+                {isLastSide ? s.flashcardsGrade ?? "Grade" : s.flashcardsNext}
               </Text>
               <ChevronRight size={18} color="#fff" />
             </View>
@@ -495,184 +481,84 @@ function FlashcardSessionScreen() {
 // ─── Test Mode Components ────────────────────────────────────
 
 function TestModePrompt({
-  mode,
-  card,
-  fontSize,
-  lineHeight,
-  s,
+  mode, card, fontSize, lineHeight, s,
 }: {
-  mode: TestMode;
-  card: CardData;
-  fontSize: number;
-  lineHeight: number;
-  s: any;
+  mode: TestMode; card: CardData; fontSize: number; lineHeight: number; s: any;
 }) {
-  switch (mode) {
-    case "nextAyah":
-      return (
-        <View>
-          <Text
-            className="text-warm-400 dark:text-neutral-500 mb-2"
-            style={{ fontFamily: "Manrope_500Medium", fontSize: 11 }}
-          >
-            {s.flashcardsModeNextAyah}: What comes next?
-          </Text>
-          <Text
-            className="text-charcoal dark:text-neutral-100 text-center"
-            style={{ fontSize, lineHeight, writingDirection: "rtl" }}
-          >
-            {card.textUthmani}
-          </Text>
-        </View>
-      );
-    case "previousAyah":
-      return (
-        <View>
-          <Text
-            className="text-warm-400 dark:text-neutral-500 mb-2"
-            style={{ fontFamily: "Manrope_500Medium", fontSize: 11 }}
-          >
-            {s.flashcardsModePreviousAyah}: What came before?
-          </Text>
-          <Text
-            className="text-charcoal dark:text-neutral-100 text-center"
-            style={{ fontSize, lineHeight, writingDirection: "rtl" }}
-          >
-            {card.textUthmani}
+  const label = getModeName(mode, s);
+  const color = TEST_MODE_COLORS[mode];
+
+  const promptText: Record<string, string> = {
+    nextAyah: "What comes next?",
+    previousAyah: "What came before?",
+    translation: "What does this mean?",
+    tafseer: "",
+    surahName: "Which surah is this from?",
+  };
+
+  // Surah Name mode hides the surah context
+  const showAyah = mode !== "surahName" || true;
+
+  return (
+    <View>
+      <View className="flex-row items-center gap-2 mb-3">
+        <View className="px-2.5 py-1 rounded-full" style={{ backgroundColor: color }}>
+          <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, color: "#fff" }}>
+            {label}
           </Text>
         </View>
-      );
-    case "translation":
-      return (
-        <View>
-          <Text
-            className="text-warm-400 dark:text-neutral-500 mb-2"
-            style={{ fontFamily: "Manrope_500Medium", fontSize: 11 }}
-          >
-            {s.flashcardsModeTranslation}: What does this mean?
+        {promptText[mode] ? (
+          <Text className="text-warm-400 dark:text-neutral-500" style={{ fontFamily: "Manrope_400Regular", fontSize: 11 }}>
+            {promptText[mode]}
           </Text>
-          <Text
-            className="text-charcoal dark:text-neutral-100 text-center"
-            style={{ fontSize, lineHeight, writingDirection: "rtl" }}
-          >
-            {card.textUthmani}
-          </Text>
-        </View>
-      );
-    case "tafseer":
-      return (
-        <View>
-          <Text
-            className="text-warm-400 dark:text-neutral-500 mb-2"
-            style={{ fontFamily: "Manrope_500Medium", fontSize: 11 }}
-          >
-            {s.flashcardsModeTafseer}
-          </Text>
-          <Text
-            className="text-charcoal dark:text-neutral-100 text-center"
-            style={{ fontSize, lineHeight, writingDirection: "rtl" }}
-          >
-            {card.textUthmani}
-          </Text>
-        </View>
-      );
-    case "firstLetter":
-      return (
-        <View>
-          <Text
-            className="text-warm-400 dark:text-neutral-500 mb-2"
-            style={{ fontFamily: "Manrope_500Medium", fontSize: 11 }}
-          >
-            {s.flashcardsModeFirstLetter}: Complete the ayah
-          </Text>
-          <Text
-            className="text-charcoal dark:text-neutral-100 text-center"
-            style={{ fontSize: fontSize * 1.1, lineHeight: lineHeight * 1.1, writingDirection: "rtl", letterSpacing: 6 }}
-          >
-            {getFirstLetters(card.textClean)}
-          </Text>
-        </View>
-      );
-    case "surahIdentification":
-      return (
-        <View>
-          <Text
-            className="text-warm-400 dark:text-neutral-500 mb-2"
-            style={{ fontFamily: "Manrope_500Medium", fontSize: 11 }}
-          >
-            {s.flashcardsModeSurahId}: Which surah?
-          </Text>
-          <Text
-            className="text-charcoal dark:text-neutral-100 text-center"
-            style={{ fontSize, lineHeight, writingDirection: "rtl" }}
-          >
-            {card.textUthmani}
-          </Text>
-        </View>
-      );
-    default:
-      return null;
-  }
+        ) : null}
+      </View>
+      <Text
+        className="text-charcoal dark:text-neutral-100 text-center"
+        style={{ fontSize, lineHeight, writingDirection: "rtl" }}
+      >
+        {card.textUthmani}
+      </Text>
+    </View>
+  );
 }
 
 function TestModeAnswer({
-  mode,
-  card,
-  fontSize,
-  lineHeight,
+  mode, card, fontSize, lineHeight,
 }: {
-  mode: TestMode;
-  card: CardData;
-  fontSize: number;
-  lineHeight: number;
+  mode: TestMode; card: CardData; fontSize: number; lineHeight: number;
 }) {
   switch (mode) {
     case "nextAyah":
       return (
-        <Text
-          className="text-charcoal dark:text-neutral-100 text-center"
-          style={{ fontSize, lineHeight, writingDirection: "rtl" }}
-        >
+        <Text className="text-charcoal dark:text-neutral-100 text-center" style={{ fontSize, lineHeight, writingDirection: "rtl" }}>
           {card.nextAyahText ?? "—"}
         </Text>
       );
     case "previousAyah":
       return (
-        <Text
-          className="text-charcoal dark:text-neutral-100 text-center"
-          style={{ fontSize, lineHeight, writingDirection: "rtl" }}
-        >
+        <Text className="text-charcoal dark:text-neutral-100 text-center" style={{ fontSize, lineHeight, writingDirection: "rtl" }}>
           {card.prevAyahText ?? "—"}
         </Text>
       );
     case "translation":
       return (
-        <Text
-          className="text-charcoal dark:text-neutral-200"
-          style={{ fontFamily: "Manrope_400Regular", fontSize: 15, lineHeight: 24 }}
-        >
+        <Text className="text-charcoal dark:text-neutral-200" style={{ fontFamily: "Manrope_400Regular", fontSize: 15, lineHeight: 24 }}>
           {card.translation}
         </Text>
       );
     case "tafseer":
       return (
-        <Text
-          className="text-charcoal dark:text-neutral-200"
-          style={{ fontFamily: "Manrope_400Regular", fontSize: 14, lineHeight: 22, writingDirection: "rtl" }}
-        >
-          {card.tafseer.length > 300 ? card.tafseer.slice(0, 300) + "..." : card.tafseer}
-        </Text>
+        <ScrollView style={{ maxHeight: 240 }} nestedScrollEnabled>
+          <Text
+            className="text-charcoal dark:text-neutral-200"
+            style={{ fontFamily: "Manrope_400Regular", fontSize: 14, lineHeight: 22, writingDirection: "rtl" }}
+          >
+            {card.tafseer}
+          </Text>
+        </ScrollView>
       );
-    case "firstLetter":
-      return (
-        <Text
-          className="text-charcoal dark:text-neutral-100 text-center"
-          style={{ fontSize, lineHeight, writingDirection: "rtl" }}
-        >
-          {card.textUthmani}
-        </Text>
-      );
-    case "surahIdentification":
+    case "surahName":
       return (
         <Text
           className="text-primary-accent dark:text-primary-bright text-center"
@@ -688,22 +574,14 @@ function TestModeAnswer({
 
 // ─── Grading ─────────────────────────────────────────────────
 
-const GRADE_BUTTONS: { rating: Grade; colorClass: string; bgColor: string }[] = [
-  { rating: Rating.Again, colorClass: "text-red-500", bgColor: "#ef4444" },
-  { rating: Rating.Hard, colorClass: "text-orange-500", bgColor: "#f97316" },
-  { rating: Rating.Good, colorClass: "text-green-500", bgColor: "#22c55e" },
-  { rating: Rating.Easy, colorClass: "text-blue-500", bgColor: "#3b82f6" },
+const GRADE_BUTTONS: { rating: Grade; bgColor: string }[] = [
+  { rating: Rating.Again, bgColor: "#ef4444" },
+  { rating: Rating.Hard, bgColor: "#f97316" },
+  { rating: Rating.Good, bgColor: "#22c55e" },
+  { rating: Rating.Easy, bgColor: "#3b82f6" },
 ];
 
-function GradingButtons({
-  onGrade,
-  isDark,
-  s,
-}: {
-  onGrade: (rating: Grade) => void;
-  isDark: boolean;
-  s: any;
-}) {
+function GradingButtons({ onGrade, isDark, s }: { onGrade: (rating: Grade) => void; isDark: boolean; s: any }) {
   const labels: Record<number, string> = {
     [Rating.Again]: s.flashcardsAgain,
     [Rating.Hard]: s.flashcardsHard,
@@ -736,131 +614,70 @@ function GradingButtons({
 // ─── Card State Badge ────────────────────────────────────────
 
 function CardStateBadge({ state, s }: { state: number; s: any }) {
-  const config: Record<number, { label: string; bg: string; text: string }> = {
-    [State.New]: { label: s.flashcardsSummaryNew, bg: "#3b82f6", text: "#fff" },
-    [State.Learning]: { label: s.loading?.split("...")[0] ?? "Learning", bg: "#f97316", text: "#fff" },
-    [State.Review]: { label: s.flashcardsSummaryReview, bg: "#22c55e", text: "#fff" },
-    [State.Relearning]: { label: s.flashcardsSummaryRelearning, bg: "#ef4444", text: "#fff" },
+  const config: Record<number, { label: string; bg: string }> = {
+    [State.New]: { label: s.flashcardsSummaryNew, bg: "#3b82f6" },
+    [State.Learning]: { label: "Learning", bg: "#f97316" },
+    [State.Review]: { label: s.flashcardsSummaryReview, bg: "#22c55e" },
+    [State.Relearning]: { label: s.flashcardsSummaryRelearning, bg: "#ef4444" },
   };
   const c = config[state] ?? config[State.New];
 
   return (
     <View className="px-3 py-1 rounded-full" style={{ backgroundColor: c.bg }}>
-      <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, color: c.text }}>
-        {c.label}
-      </Text>
+      <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, color: "#fff" }}>{c.label}</Text>
     </View>
   );
 }
 
 // ─── Session Summary ─────────────────────────────────────────
 
-function SessionSummaryView({
-  summary,
-  onDone,
-  isDark,
-  s,
-}: {
-  summary: SessionSummary;
-  onDone: () => void;
-  isDark: boolean;
-  s: any;
-}) {
+function SessionSummaryView({ summary, onDone, isDark, s }: { summary: SessionSummary; onDone: () => void; isDark: boolean; s: any }) {
   const durationMin = Math.max(1, Math.round(summary.durationMs / 60000));
-  const nextReview = summary.nextReviewDate
-    ? new Date(summary.nextReviewDate).toLocaleDateString()
-    : "—";
+  const nextReview = summary.nextReviewDate ? new Date(summary.nextReviewDate).toLocaleDateString() : "—";
 
   return (
-    <ScrollView
-      className="flex-1 px-6"
-      contentContainerStyle={{ alignItems: "center", paddingTop: 60, paddingBottom: 100 }}
-    >
-      {/* Trophy */}
-      <View
-        className="w-20 h-20 rounded-full items-center justify-center mb-6"
-        style={{ backgroundColor: isDark ? "#1B4D4F" : "#f0fdfa" }}
-      >
+    <ScrollView className="flex-1 px-6" contentContainerStyle={{ alignItems: "center", paddingTop: 60, paddingBottom: 100 }}>
+      <View className="w-20 h-20 rounded-full items-center justify-center mb-6" style={{ backgroundColor: isDark ? "#1B4D4F" : "#f0fdfa" }}>
         <Trophy size={36} color={isDark ? "#FDDC91" : "#0d9488"} />
       </View>
 
-      <Text
-        className="text-charcoal dark:text-neutral-100 mb-8"
-        style={{ fontFamily: "NotoSerif_700Bold", fontSize: 24 }}
-      >
+      <Text className="text-charcoal dark:text-neutral-100 mb-8" style={{ fontFamily: "NotoSerif_700Bold", fontSize: 24 }}>
         {s.flashcardsSummaryTitle}
       </Text>
 
-      {/* Stats grid */}
       <View className="w-full max-w-sm gap-4">
-        <SummaryRow label={s.flashcardsSummaryReviewed} value={String(summary.total)} isDark={isDark} />
+        <SummaryRow label={s.flashcardsSummaryReviewed} value={String(summary.total)} />
         <View className="flex-row gap-3">
-          <SummaryCard label={s.flashcardsSummaryNew} value={String(summary.newCount)} color="#3b82f6" isDark={isDark} />
-          <SummaryCard label={s.flashcardsSummaryReview} value={String(summary.reviewCount)} color="#22c55e" isDark={isDark} />
-          <SummaryCard label={s.flashcardsSummaryRelearning} value={String(summary.relearningCount)} color="#ef4444" isDark={isDark} />
+          <SummaryCard label={s.flashcardsSummaryNew} value={String(summary.newCount)} color="#3b82f6" />
+          <SummaryCard label={s.flashcardsSummaryReview} value={String(summary.reviewCount)} color="#22c55e" />
+          <SummaryCard label={s.flashcardsSummaryRelearning} value={String(summary.relearningCount)} color="#ef4444" />
         </View>
-        <SummaryRow
-          label={s.flashcardsSummaryDuration}
-          value={interpolate(s.flashcardsSummaryMinutes, { n: String(durationMin) })}
-          isDark={isDark}
-        />
-        <SummaryRow label={s.flashcardsSummaryNextReview} value={nextReview} isDark={isDark} />
+        <SummaryRow label={s.flashcardsSummaryDuration} value={interpolate(s.flashcardsSummaryMinutes, { n: String(durationMin) })} />
+        <SummaryRow label={s.flashcardsSummaryNextReview} value={nextReview} />
       </View>
 
       <Button onPress={onDone} className="mt-10 w-full max-w-sm">
-        <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16, color: "#fff" }}>
-          {s.flashcardsSummaryDone}
-        </Text>
+        <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16, color: "#fff" }}>{s.flashcardsSummaryDone}</Text>
       </Button>
     </ScrollView>
   );
 }
 
-function SummaryRow({ label, value, isDark }: { label: string; value: string; isDark: boolean }) {
+function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
     <Card elevation="low" className="flex-row items-center justify-between p-5">
-      <Text
-        className="text-warm-400 dark:text-neutral-500"
-        style={{ fontFamily: "Manrope_500Medium", fontSize: 14 }}
-      >
-        {label}
-      </Text>
-      <Text
-        className="text-charcoal dark:text-neutral-100"
-        style={{ fontFamily: "Manrope_700Bold", fontSize: 18 }}
-      >
-        {value}
-      </Text>
+      <Text className="text-warm-400 dark:text-neutral-500" style={{ fontFamily: "Manrope_500Medium", fontSize: 14 }}>{label}</Text>
+      <Text className="text-charcoal dark:text-neutral-100" style={{ fontFamily: "Manrope_700Bold", fontSize: 18 }}>{value}</Text>
     </Card>
   );
 }
 
-function SummaryCard({
-  label,
-  value,
-  color,
-  isDark,
-}: {
-  label: string;
-  value: string;
-  color: string;
-  isDark: boolean;
-}) {
+function SummaryCard({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <Card elevation="low" className="flex-1 items-center p-4">
       <View className="w-2 h-2 rounded-full mb-2" style={{ backgroundColor: color }} />
-      <Text
-        className="text-charcoal dark:text-neutral-100"
-        style={{ fontFamily: "Manrope_700Bold", fontSize: 20 }}
-      >
-        {value}
-      </Text>
-      <Text
-        className="text-warm-400 dark:text-neutral-500 mt-0.5"
-        style={{ fontFamily: "Manrope_500Medium", fontSize: 11 }}
-      >
-        {label}
-      </Text>
+      <Text className="text-charcoal dark:text-neutral-100" style={{ fontFamily: "Manrope_700Bold", fontSize: 20 }}>{value}</Text>
+      <Text className="text-warm-400 dark:text-neutral-500 mt-0.5" style={{ fontFamily: "Manrope_500Medium", fontSize: 11 }}>{label}</Text>
     </Card>
   );
 }
@@ -873,8 +690,7 @@ function getModeName(mode: TestMode, s: any): string {
     previousAyah: s.flashcardsModePreviousAyah,
     translation: s.flashcardsModeTranslation,
     tafseer: s.flashcardsModeTafseer,
-    firstLetter: s.flashcardsModeFirstLetter,
-    surahIdentification: s.flashcardsModeSurahId,
+    surahName: s.flashcardsModeSurahName,
   };
   return map[mode] ?? mode;
 }

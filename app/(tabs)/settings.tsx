@@ -298,8 +298,7 @@ export default function SettingsScreen() {
                 previousAyah: s.flashcardsModePreviousAyah,
                 translation: s.flashcardsModeTranslation,
                 tafseer: s.flashcardsModeTafseer,
-                firstLetter: s.flashcardsModeFirstLetter,
-                surahIdentification: s.flashcardsModeSurahId,
+                surahName: s.flashcardsModeSurahName,
               };
               return (
                 <View key={mode} className="flex-row items-center justify-between">

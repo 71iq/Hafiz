@@ -54,20 +54,27 @@ export type TestMode =
   | "previousAyah"
   | "translation"
   | "tafseer"
-  | "firstLetter"
-  | "surahIdentification";
+  | "surahName";
 
 export const ALL_TEST_MODES: TestMode[] = [
   "nextAyah",
   "previousAyah",
   "translation",
   "tafseer",
-  "firstLetter",
-  "surahIdentification",
+  "surahName",
 ];
 
 export const DEFAULT_ENABLED_MODES: TestMode[] = [
   "nextAyah",
   "translation",
-  "firstLetter",
+  "surahName",
 ];
+
+/** Color for each test mode tag */
+export const TEST_MODE_COLORS: Record<TestMode, string> = {
+  nextAyah: "#3b82f6",       // blue
+  previousAyah: "#8b5cf6",   // violet
+  translation: "#0d9488",    // teal
+  tafseer: "#d97706",        // amber
+  surahName: "#e11d48",      // rose
+};

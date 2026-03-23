@@ -171,6 +171,7 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     flashcardsHard: "Hard",
     flashcardsGood: "Good",
     flashcardsEasy: "Easy",
+    flashcardsGrade: "Grade",
     flashcardsEndSession: "End Session",
     flashcardsCardsRemaining: "{{n}} remaining",
     // Test modes
@@ -178,8 +179,7 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     flashcardsModePreviousAyah: "Previous Ayah",
     flashcardsModeTranslation: "Translation",
     flashcardsModeTafseer: "Tafseer",
-    flashcardsModeFirstLetter: "First Letter",
-    flashcardsModeSurahId: "Surah ID",
+    flashcardsModeSurahName: "Surah Name",
     // Session summary
     flashcardsSummaryTitle: "Session Complete",
     flashcardsSummaryReviewed: "Cards Reviewed",
@@ -344,6 +344,7 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     flashcardsHard: "صعب",
     flashcardsGood: "جيد",
     flashcardsEasy: "سهل",
+    flashcardsGrade: "تقييم",
     flashcardsEndSession: "إنهاء الجلسة",
     flashcardsCardsRemaining: "{{n}} متبقية",
     // Test modes
@@ -351,8 +352,7 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     flashcardsModePreviousAyah: "الآية السابقة",
     flashcardsModeTranslation: "الترجمة",
     flashcardsModeTafseer: "التفسير",
-    flashcardsModeFirstLetter: "الحرف الأول",
-    flashcardsModeSurahId: "تحديد السورة",
+    flashcardsModeSurahName: "اسم السورة",
     // Session summary
     flashcardsSummaryTitle: "اكتملت الجلسة",
     flashcardsSummaryReviewed: "البطاقات المراجعة",
