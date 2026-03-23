@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { View, Text, Pressable, ActivityIndicator, ScrollView } from "react-native";
 import { Switch } from "@/components/ui/Switch";
 import { Card } from "@/components/ui/Card";
@@ -6,9 +6,11 @@ import { ToggleGroup } from "@/components/ui/ToggleGroup";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Sun, Moon, Smartphone, Minus, Plus, ChevronRight, ChevronLeft } from "lucide-react-native";
 import { useSettings, FONT_SIZE_STEPS, type ThemeMode, type UILanguage, type TafseerSource } from "@/lib/settings/context";
+import { useDatabase } from "@/lib/database/provider";
 import { getLanguageByCode } from "@/lib/translations/languages";
 import { TranslationLanguagePicker } from "@/components/settings/TranslationLanguagePicker";
 import { useStrings } from "@/lib/i18n/useStrings";
+import { ALL_TEST_MODES, DEFAULT_ENABLED_MODES, type TestMode } from "@/lib/fsrs/types";
 
 export default function SettingsScreen() {
   const {
@@ -18,9 +20,33 @@ export default function SettingsScreen() {
     tafseerSource, setTafseerSource,
     uiLanguage, setUiLanguage,
   } = useSettings();
+  const db = useDatabase();
   const s = useStrings();
   const [pickerVisible, setPickerVisible] = useState(false);
   const currentLang = getLanguageByCode(translationLanguage);
+  const [enabledModes, setEnabledModes] = useState<TestMode[]>(DEFAULT_ENABLED_MODES);
+
+  useEffect(() => {
+    db.getFirstAsync<{ value: string }>(
+      "SELECT value FROM user_settings WHERE key = 'flashcard_test_modes'"
+    ).then((row) => {
+      if (row?.value) {
+        try { setEnabledModes(JSON.parse(row.value)); } catch {}
+      }
+    });
+  }, [db]);
+
+  const toggleTestMode = useCallback((mode: TestMode) => {
+    setEnabledModes((prev) => {
+      const next = prev.includes(mode) ? prev.filter((m) => m !== mode) : [...prev, mode];
+      if (next.length === 0) return prev; // Must have at least one mode
+      db.runAsync(
+        "INSERT OR REPLACE INTO user_settings (key, value) VALUES (?, ?)",
+        ["flashcard_test_modes", JSON.stringify(next)]
+      );
+      return next;
+    });
+  }, [db]);
 
   const THEME_OPTIONS: { value: ThemeMode; label: string; icon: typeof Sun }[] = [
     { value: "light", label: s.themeLight, icon: Sun },
@@ -259,6 +285,37 @@ export default function SettingsScreen() {
               onPress={() => setTafseerSource("zilal")}
               isDark={isDark}
             />
+          </View>
+        </Card>
+
+        {/* Flashcard Test Modes */}
+        <SectionLabel>{s.flashcardsTestModes}</SectionLabel>
+        <Card elevation="low" className="p-5 mb-8">
+          <View className="gap-3">
+            {ALL_TEST_MODES.map((mode) => {
+              const modeLabels: Record<TestMode, string> = {
+                nextAyah: s.flashcardsModeNextAyah,
+                previousAyah: s.flashcardsModePreviousAyah,
+                translation: s.flashcardsModeTranslation,
+                tafseer: s.flashcardsModeTafseer,
+                firstLetter: s.flashcardsModeFirstLetter,
+                surahIdentification: s.flashcardsModeSurahId,
+              };
+              return (
+                <View key={mode} className="flex-row items-center justify-between">
+                  <Text
+                    className="text-charcoal dark:text-neutral-300 flex-1"
+                    style={{ fontFamily: "Manrope_500Medium", fontSize: 14 }}
+                  >
+                    {modeLabels[mode]}
+                  </Text>
+                  <Switch
+                    value={enabledModes.includes(mode)}
+                    onValueChange={() => toggleTestMode(mode)}
+                  />
+                </View>
+              );
+            })}
           </View>
         </Card>
 

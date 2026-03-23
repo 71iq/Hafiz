@@ -47,9 +47,46 @@ Design references: design-references/ folder.
 
 ## Current Phase
 
-TBD (Phase 4 complete)
+TBD (Phase 5 complete)
 
 ## Completed Phases
+
+### Phase 5: Flashcard Engine (FSRS-Powered Spaced Repetition)
+
+- `ts-fsrs` integration with `request_retention: 0.95` (higher precision for Quran memorization)
+- FSRS scheduler: `lib/fsrs/scheduler.ts` — wraps `fsrs.repeat()` with `gradeCard()` convenience helper
+- Deck creation: by Surah (multi-select), Juz (1-30), Hizb (1-60), or custom range
+- `CreateDeckSheet` modal with scope tabs, surah list, juz/hizb number chips, custom range inputs
+- Cards generated in `study_cards` table — one row per ayah in selected scope, INSERT OR IGNORE for idempotency
+- Deck metadata stored in `user_settings` as `deck_<id>` JSON entries
+- Card Uniqueness Algorithm (`lib/fsrs/uniqueness.ts` per §3.6.2):
+  - Checks if ayah `text_clean` is unique across entire Quran via duplicate cache
+  - Prepends previous ayah(s) if not unique (up to 2 context ayahs)
+  - Falls back to explicit surah name + ayah number label if still ambiguous
+  - Surah name always shown subtly as secondary context
+- Multi-Sided Card Flow (§3.6.3 Carousel):
+  - State machine: Front → Side 1 → Side 2 → ... → Grading → Next card
+  - 6 test modes: Next Ayah, Previous Ayah, Translation, Tafseer, First Letter, Surah Identification
+  - Each mode toggleable in Settings (`flashcard_test_modes` persisted to `user_settings`)
+  - Modes filtered per-card (e.g., no Previous Ayah for ayah 1, no Translation if missing)
+  - First Letter mode: strips diacritics, shows first letter of each word with wide spacing
+- Grading: 4 buttons (Again=red, Hard=orange, Good=green, Easy=blue) → `gradeCard()` → FSRS state update
+- `study_cards` updated with new FSRS fields (due, stability, difficulty, state, reps, lapses, etc.)
+- `study_log` records each review (card_id, rating, state, due, reviewed_at)
+- Session summary screen: Trophy icon, cards reviewed, new/review/relearning breakdown, duration, next review date
+- Study Dashboard (Flashcards tab):
+  - Stats row: Due Today count, Day Streak (consecutive days), Last Review date
+  - Start Review CTA card with gold play button (navigates to review session)
+  - Deck list with card/due/new counts, per-deck Start Review and Delete buttons
+  - Empty state with Create Deck button
+  - Data refreshes on tab focus via `useFocusEffect`
+- Review session route: `app/flashcards/session.tsx` (outside tabs, slide-from-bottom animation)
+  - Wrapped in own `SettingsProvider` (since outside tab layout)
+  - Progress bar with card count, card state badge (New=blue, Learning=orange, Review=green, Relearning=red)
+  - Animated card reveal (spring translateY + opacity)
+- 6-tab navigation: Home, Mushaf, Search, Flashcards, Progress, Settings
+- Bottom tab padding reduced to 10px horizontal to fit 6 tabs
+- i18n: 50+ new flashcard strings in both English and Arabic
 
 ### Phase 4: Smart Search
 
@@ -229,6 +266,18 @@ TBD (Phase 4 complete)
 - **Hide mode as parent state**: `hideMode` boolean lives in mushaf.tsx and is passed as prop to AyahBlock. Included in FlashList's `extraData` to trigger re-renders.
 - **Placeholder instead of overlay**: Hide mode replaces the text entirely with a rounded placeholder box (`bg-warm-100 dark:bg-neutral-800`) rather than using a semi-transparent overlay. Avoids NativeWind opacity modifier limitations with custom hex colors.
 - **memo(AyahBlock)**: Wrapped in React.memo to prevent unnecessary re-renders during scroll with expanded inline content.
+
+### Phase 5 Decisions
+
+- **ts-fsrs API**: `scheduler.repeat(card, now)` returns `IPreview` keyed by `Grade` (excludes `Rating.Manual`). `gradeCard()` helper wraps this. `Card` type has `due: Date`, `stability`, `difficulty`, `elapsed_days`, `scheduled_days`, `learning_steps`, `reps`, `lapses`, `state`.
+- **Deck metadata storage**: Decks stored as JSON in `user_settings` with key `deck_<id>`. This avoids adding a new table while keeping deck info queryable. Deck ID is deterministic from scope (e.g., `surah-1,2,3`).
+- **Card ID format**: `"surah:ayah"` (e.g., `"2:255"`). INSERT OR IGNORE prevents duplicates when creating overlapping decks.
+- **Uniqueness algorithm**: Builds a one-time cache of all duplicate `text_clean` values (GROUP BY HAVING COUNT > 1). For each card, checks if its text is in the cache. If duplicate, prepends prev ayah and checks if the combo exists elsewhere via JOIN. After 2 context ayahs, falls back to explicit label.
+- **Test mode persistence**: `flashcard_test_modes` stored as JSON array in `user_settings`. Default: `["nextAyah", "translation", "firstLetter"]`.
+- **Session route**: `app/flashcards/session.tsx` is a Stack screen outside tabs (slide-from-bottom). Wrapped in its own `SettingsProvider` since it's not a child of the tab layout.
+- **Pre-fetch pattern**: All card data (text, translation, tafseer, prev/next ayah, unique front) loaded upfront when session starts. Avoids per-card SQLite queries during review.
+- **FSRS card reconstruction**: StudyCardRow from SQLite → FSRSCard with `new Date(due)` and state cast. After grading, card fields are extracted back to row format with `toISOString()`.
+- **6-tab navigation**: Flashcards tab added between Search and Progress. Bottom tab horizontal padding reduced from 14px to 10px. Layers icon from Lucide.
 
 ### Phase 4 Decisions
 

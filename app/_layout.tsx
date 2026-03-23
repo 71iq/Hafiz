@@ -27,6 +27,7 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="open" />
+        <Stack.Screen name="flashcards/session" options={{ animation: "slide_from_bottom" }} />
       </Stack>
     </DatabaseProvider>
   );
