@@ -240,7 +240,6 @@ export async function createSchema(db: SQLiteDatabase): Promise<void> {
     -- ============================================================
 
     CREATE INDEX IF NOT EXISTS idx_quran_text_surah ON quran_text(surah);
-    CREATE INDEX IF NOT EXISTS idx_quran_text_search ON quran_text(text_search);
     CREATE INDEX IF NOT EXISTS idx_word_roots_root ON word_roots(root);
     CREATE INDEX IF NOT EXISTS idx_word_roots_surah_ayah ON word_roots(surah, ayah);
     CREATE INDEX IF NOT EXISTS idx_tajweed_surah_ayah ON tajweed_rules(surah, ayah);
@@ -250,4 +249,13 @@ export async function createSchema(db: SQLiteDatabase): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_study_log_card ON study_log(card_id);
     CREATE INDEX IF NOT EXISTS idx_sync_queue_status ON sync_queue(table_name);
   `);
+}
+
+/** Create text_search index — must run AFTER the text_search column migration */
+export async function createTextSearchIndex(db: SQLiteDatabase): Promise<void> {
+  try {
+    await db.execAsync("CREATE INDEX IF NOT EXISTS idx_quran_text_search ON quran_text(text_search)");
+  } catch (_) {
+    // Column may not exist yet on very old databases — the migration will handle it
+  }
 }

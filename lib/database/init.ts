@@ -1,5 +1,5 @@
 import type { SQLiteDatabase } from "expo-sqlite";
-import { createSchema } from "./schema";
+import { createSchema, createTextSearchIndex } from "./schema";
 
 // JSON data imports via require()
 const quranData = require("../../assets/data/quran-data.json");
@@ -591,6 +591,9 @@ export async function initializeDatabase(
       );
       console.log(`[Import] text_search migration done: ${updateRows.length} rows`);
     }
+
+    // Create text_search index (must happen after column migration)
+    await createTextSearchIndex(db);
 
     console.log("[Import] Database already populated, skipping import.");
     onProgress({ step: "Complete", current: TOTAL_STEPS, total: TOTAL_STEPS, detail: "Already imported" });
