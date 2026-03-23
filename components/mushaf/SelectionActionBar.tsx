@@ -10,6 +10,7 @@ import { useSettings } from "@/lib/settings/context";
 import { fetchUthmaniRange, fetchSurahName } from "@/lib/selection/queries";
 import { formatForCopy } from "@/lib/selection/format";
 import { HIGHLIGHT_COLORS } from "@/lib/selection/types";
+import { WriteReflectionSheet } from "@/components/reflections/WriteReflectionSheet";
 
 export function SelectionActionBar() {
   const db = useDatabase();
@@ -26,6 +27,7 @@ export function SelectionActionBar() {
     getHighlightColor,
   } = useSelection();
   const [showColors, setShowColors] = useState(false);
+  const [showWriteReflection, setShowWriteReflection] = useState(false);
 
   const isOpen = selection !== null;
   const currentHighlight = selection ? getHighlightColor(selection.start.surah, selection.start.ayah) : undefined;
@@ -56,9 +58,8 @@ export function SelectionActionBar() {
   }, [getTextAndMeta, showToast, s.copied, handleClose]);
 
   const handleReflect = useCallback(() => {
-    showToast(s.reflectionComingSoon);
-    handleClose();
-  }, [showToast, s.reflectionComingSoon, handleClose]);
+    setShowWriteReflection(true);
+  }, []);
 
   const handleHighlightColor = useCallback(
     async (color: string) => {
@@ -88,6 +89,7 @@ export function SelectionActionBar() {
   const mutedColor = isDark ? "#737373" : "#A39B93";
 
   return (
+    <>
     <Sheet open={isOpen} onClose={handleClose}>
       <SheetContent>
         {/* Ayah reference */}
@@ -175,6 +177,23 @@ export function SelectionActionBar() {
         )}
       </SheetContent>
     </Sheet>
+
+    {/* Write Reflection Sheet */}
+    {selection && (
+      <WriteReflectionSheet
+        open={showWriteReflection}
+        onClose={() => {
+          setShowWriteReflection(false);
+          handleClose();
+        }}
+        surah={selection.start.surah}
+        ayahStart={selection.start.ayah}
+        ayahEnd={selection.end.ayah}
+        ayahPreview={`${selection.start.surah}:${selection.start.ayah}${selection.start.ayah !== selection.end.ayah ? `-${selection.end.ayah}` : ""}`}
+        onSuccess={() => showToast(s.reflectionPosted)}
+      />
+    )}
+    </>
   );
 }
 

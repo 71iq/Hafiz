@@ -12,6 +12,7 @@ import { useSelection } from "@/lib/selection/context";
 import { WordToken } from "./WordToken";
 import { ChevronDown, ChevronUp } from "lucide-react-native";
 import { useStrings } from "@/lib/i18n/useStrings";
+import { ReflectionsSection } from "@/components/reflections/ReflectionsSection";
 
 type Props = {
   surah: number;
@@ -413,6 +414,11 @@ function AyahBlockInner({
             })()}
           </View>
         )}
+
+        <View className="h-1" />
+
+        {/* Reflections (community feature) */}
+        <ReflectionsSection surah={surah} ayah={ayah} />
       </View>
     </View>
   );

@@ -47,9 +47,35 @@ Design references: design-references/ folder.
 
 ## Current Phase
 
-TBD (Phase 6 complete)
+TBD (Phase 7 complete)
 
 ## Completed Phases
+
+### Phase 7: Reflections (Community Feature)
+
+- `@tanstack/react-query` v5 for async state management and caching
+- `QueryClientProvider` wraps entire app in root `_layout.tsx` (5min stale time default)
+- Supabase tables: `reflections`, `reflection_likes`, `reflection_comments`, `reports`
+- RLS: reflections publicly readable (active only), writable by author; likes/comments require auth
+- Database triggers: auto-update `likes_count` and `comments_count` on reflections
+- Reflections API (`lib/reflections/api.ts`): CRUD for reflections, likes, comments, reports
+- `ReflectionsSection` component: collapsible section below each AyahBlock (below tafseer)
+  - Count badge from `fetchReflectionCount` (TanStack Query cached)
+  - Paginated reflection list (5 per page) with "Load more"
+  - Empty state with "Be the first to share" prompt
+  - Inline "Write a reflection" button
+- `ReflectionCard` component: author avatar initial, name, relative timestamp, text, like/comment buttons
+  - Optimistic like toggle with rollback on error
+  - Three-dot menu with Report action
+- `WriteReflectionSheet`: bottom sheet with ayah preview, textarea (10-5000 chars), character count
+  - Auth gate: shows login prompt if not authenticated
+  - Optimistic cache invalidation on success
+- `CommentsSheet`: sub-sheet for viewing/adding comments on a reflection
+  - Real-time comment list, text input with send button
+  - Increments comments_count optimistically
+- Context menu integration: "Reflect" button in SelectionActionBar now opens WriteReflectionSheet
+  - Supports single ayah and ayah range reflections
+- i18n: 17 new reflection strings in both English and Arabic
 
 ### Phase 6: Authentication & Sync
 
@@ -343,6 +369,18 @@ TBD (Phase 6 complete)
 - **AyahBlock query**: Uses `WHERE source = ?` parameter, tracks source changes via `fetchedSourceRef` (same pattern as translation language).
 - **Long text truncation**: Zilal texts are much longer than Muyassar. AyahBlock truncates to 200 chars with "Read more" expansion.
 - **Settings UI**: Two-option card selector under Inline Content section, Arabic names with descriptions.
+
+### Phase 7 Decisions
+
+- **TanStack Query for reflections**: First use of TanStack Query in the app. `QueryClientProvider` wraps the entire app at the root layout level (above `DatabaseProvider`). Used for fetching/caching reflections data from Supabase. Local SQLite queries still use direct `useEffect` patterns.
+- **Reflection count caching**: Each AyahBlock independently queries its reflection count with `queryKey: ["reflectionCount", surah, ayah]`. 5-minute stale time prevents excessive Supabase calls during scroll.
+- **Pagination strategy**: Fetches PAGE_SIZE + 1 rows from Supabase to determine `hasMore`. Trims to PAGE_SIZE for display. Subsequent pages append to local state array.
+- **Like optimism**: Like toggle updates local state immediately, then calls Supabase. On error, reverts both the liked flag and count. The Supabase trigger updates the server-side `likes_count` atomically.
+- **Comment count sync**: When a comment is added, the local `allReflections` array is updated optimistically (incrementing `comments_count`). The Supabase trigger handles the server-side count.
+- **User like detection**: After fetching reflections, a second query checks `reflection_likes` for the current user's likes across all fetched reflection IDs. Sets `user_has_liked` flag on each reflection.
+- **Auth gate pattern**: `WriteReflectionSheet` checks `useAuthStore` user state. If null, shows a login CTA that navigates to `/auth/login`. This avoids wrapping community features in an auth-only route.
+- **Context menu → sheet**: The SelectionActionBar "Reflect" button now opens `WriteReflectionSheet` as a second modal (not nested). The selection sheet stays mounted but the write sheet overlays it.
+- **Reports table**: Simple `reports` table with `reporter_id`, `reflection_id`, `reason`. RLS allows insert for authenticated users and read only own reports. Moderation UI is out of scope for this phase.
 
 ### Phase 6 Decisions
 

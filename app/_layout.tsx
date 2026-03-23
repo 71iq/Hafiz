@@ -3,9 +3,19 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import * as Font from "expo-font";
 import { useEffect, useState } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { DatabaseProvider } from "@/lib/database/provider";
 import { UI_FONTS } from "@/lib/fonts/ui-fonts";
 import { useAuthStore } from "@/lib/auth/store";
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutes
+      retry: 1,
+    },
+  },
+});
 
 export { ErrorBoundary } from "expo-router";
 
@@ -30,14 +40,16 @@ export default function RootLayout() {
   if (!fontsLoaded) return null;
 
   return (
-    <DatabaseProvider>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="open" />
-        <Stack.Screen name="flashcards/session" options={{ animation: "slide_from_bottom" }} />
-        <Stack.Screen name="auth/login" options={{ animation: "slide_from_bottom" }} />
-        <Stack.Screen name="auth/signup" options={{ animation: "slide_from_bottom" }} />
-      </Stack>
-    </DatabaseProvider>
+    <QueryClientProvider client={queryClient}>
+      <DatabaseProvider>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="open" />
+          <Stack.Screen name="flashcards/session" options={{ animation: "slide_from_bottom" }} />
+          <Stack.Screen name="auth/login" options={{ animation: "slide_from_bottom" }} />
+          <Stack.Screen name="auth/signup" options={{ animation: "slide_from_bottom" }} />
+        </Stack>
+      </DatabaseProvider>
+    </QueryClientProvider>
   );
 }
