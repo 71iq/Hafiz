@@ -18,9 +18,13 @@ function TabsWithStrings() {
       <Tabs
         screenOptions={{
           headerShown: false,
-          sceneStyle: hasSidebar ? { marginLeft: SIDEBAR_WIDTH } : undefined,
+          sceneStyle: hasSidebar
+            ? isRTL
+              ? { marginRight: SIDEBAR_WIDTH }
+              : { marginLeft: SIDEBAR_WIDTH }
+            : undefined,
         }}
-        tabBar={(props) => <AppNavigation {...props} />}
+        tabBar={(props) => <AppNavigation {...props} isRTL={isRTL} />}
       >
         <Tabs.Screen
           name="index"

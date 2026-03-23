@@ -159,8 +159,8 @@ function SidebarItem({
   );
 }
 
-function Sidebar(props: BottomTabBarProps) {
-  const { state, descriptors, navigation } = props;
+function Sidebar(props: BottomTabBarProps & { isRTL?: boolean }) {
+  const { state, descriptors, navigation, isRTL } = props;
   const insets = useSafeAreaInsets();
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === "dark";
@@ -174,6 +174,9 @@ function Sidebar(props: BottomTabBarProps) {
           backgroundColor: isDark ? SIDEBAR_BG_DARK : SIDEBAR_BG_LIGHT,
           paddingTop: Math.max(insets.top, 24),
           paddingBottom: Math.max(insets.bottom, 24),
+          left: isRTL ? undefined : 0,
+          right: isRTL ? 0 : undefined,
+          shadowOffset: { width: isRTL ? -4 : 4, height: 0 },
         },
       ]}
     >
@@ -215,7 +218,7 @@ function Sidebar(props: BottomTabBarProps) {
 
 // ─── Responsive wrapper ─────────────────────────────────────
 
-export function AppNavigation(props: BottomTabBarProps) {
+export function AppNavigation(props: BottomTabBarProps & { isRTL?: boolean }) {
   const { width } = useWindowDimensions();
   const isWide = width >= SIDEBAR_BREAKPOINT;
 
@@ -268,13 +271,10 @@ const styles = StyleSheet.create({
   sidebarContainer: {
     position: "absolute",
     top: 0,
-    left: 0,
     bottom: 0,
     width: SIDEBAR_WIDTH,
     paddingHorizontal: 16,
-    // Subtle right edge shadow
     shadowColor: "#003638",
-    shadowOffset: { width: 4, height: 0 },
     shadowOpacity: 0.03,
     shadowRadius: 16,
     elevation: 4,
