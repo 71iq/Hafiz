@@ -193,13 +193,9 @@ function FlashcardSessionScreen() {
   };
 
   const handleNext = () => {
-    if (!isLastSide) {
-      setCurrentSideIndex((i) => i + 1);
-      setRevealed(false);
-      animateFlip();
-    } else {
-      setPhase("grading");
-    }
+    setCurrentSideIndex((i) => i + 1);
+    setRevealed(false);
+    animateFlip();
   };
 
   const handleGrade = async (rating: Grade) => {
@@ -459,18 +455,19 @@ function FlashcardSessionScreen() {
           </Button>
         )}
 
-        {phase === "side" && revealed && (
+        {phase === "side" && revealed && !isLastSide && (
           <Button onPress={handleNext} className="w-full">
             <View className="flex-row items-center gap-2">
               <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16, color: "#fff" }}>
-                {isLastSide ? s.flashcardsGrade ?? "Grade" : s.flashcardsNext}
+                {s.flashcardsNext}
               </Text>
               <ChevronRight size={18} color="#fff" />
             </View>
           </Button>
         )}
 
-        {phase === "grading" && (
+        {/* Grading: show directly after last side is revealed, or in grading phase */}
+        {((phase === "side" && revealed && isLastSide) || phase === "grading") && (
           <GradingButtons onGrade={handleGrade} isDark={isDark} s={s} />
         )}
       </View>
