@@ -166,7 +166,7 @@ function FlashcardSessionScreen() {
   const activeModes = useMemo(() => {
     if (!currentCard) return [];
     return enabledModes.filter((mode) => {
-      if (mode === "previousAyah" && !currentCard.prevAyahText) return false;
+      if (mode === "previousAyah" && (!currentCard.prevAyahText || currentCard.uniqueFront.contextCount > 0)) return false;
       if (mode === "nextAyah" && !currentCard.nextAyahText) return false;
       if (mode === "translation" && !currentCard.translation) return false;
       if (mode === "tafseer" && !currentCard.tafseer) return false;
