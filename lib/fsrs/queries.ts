@@ -149,17 +149,19 @@ export async function createDeck(
 
 export async function getDueCards(
   db: SQLiteDatabase,
-  deckId?: string
+  deckId?: string,
+  limit?: number
 ): Promise<StudyCardRow[]> {
   const now = new Date().toISOString();
+  const limitClause = limit ? ` LIMIT ${limit}` : "";
   if (deckId) {
     return db.getAllAsync<StudyCardRow>(
-      "SELECT * FROM study_cards WHERE deck_id = ? AND due <= ? ORDER BY due",
+      `SELECT * FROM study_cards WHERE deck_id = ? AND due <= ? ORDER BY due${limitClause}`,
       [deckId, now]
     );
   }
   return db.getAllAsync<StudyCardRow>(
-    "SELECT * FROM study_cards WHERE due <= ? ORDER BY due",
+    `SELECT * FROM study_cards WHERE due <= ? ORDER BY due${limitClause}`,
     [now]
   );
 }

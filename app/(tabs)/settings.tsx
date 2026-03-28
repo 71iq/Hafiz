@@ -6,7 +6,16 @@ import { Button } from "@/components/ui/Button";
 import { ToggleGroup } from "@/components/ui/ToggleGroup";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Sun, Moon, Smartphone, Minus, Plus, ChevronRight, ChevronLeft, User, LogOut } from "lucide-react-native";
-import { useSettings, FONT_SIZE_STEPS, type ThemeMode, type UILanguage, type TafseerSource } from "@/lib/settings/context";
+import {
+  useSettings,
+  FONT_SIZE_STEPS,
+  MIN_DAILY_REVIEW_LIMIT,
+  MAX_DAILY_REVIEW_LIMIT,
+  DAILY_REVIEW_LIMIT_STEP,
+  type ThemeMode,
+  type UILanguage,
+  type TafseerSource,
+} from "@/lib/settings/context";
 import { useDatabase } from "@/lib/database/provider";
 import { getLanguageByCode } from "@/lib/translations/languages";
 import { TranslationLanguagePicker } from "@/components/settings/TranslationLanguagePicker";
@@ -23,6 +32,7 @@ export default function SettingsScreen() {
     translationLanguage, isTranslationLoading, isDark, isRTL,
     tafseerSource, setTafseerSource,
     uiLanguage, setUiLanguage,
+    dailyReviewLimit, setDailyReviewLimit,
   } = useSettings();
   const db = useDatabase();
   const s = useStrings();
@@ -401,6 +411,46 @@ export default function SettingsScreen() {
                 </View>
               );
             })}
+          </View>
+        </Card>
+
+        {/* Daily Review Limit */}
+        <Card elevation="low" className="p-5 mb-8">
+          <Text
+            className="text-charcoal dark:text-neutral-200 mb-1"
+            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15 }}
+          >
+            {s.flashcardsDailyLimit}
+          </Text>
+          <Text
+            className="text-warm-400 dark:text-neutral-500 mb-4"
+            style={{ fontFamily: "Manrope_400Regular", fontSize: 12 }}
+          >
+            {s.flashcardsDailyLimitDesc}
+          </Text>
+          <View className="flex-row items-center justify-between">
+            <Pressable
+              onPress={() => setDailyReviewLimit(dailyReviewLimit - DAILY_REVIEW_LIMIT_STEP)}
+              disabled={dailyReviewLimit <= MIN_DAILY_REVIEW_LIMIT}
+              className="w-10 h-10 rounded-full bg-surface-high dark:bg-surface-dark-high items-center justify-center"
+              style={{ opacity: dailyReviewLimit <= MIN_DAILY_REVIEW_LIMIT ? 0.3 : 1 }}
+            >
+              <Minus size={18} color={isDark ? "#d4d4d4" : "#6e5a47"} />
+            </Pressable>
+            <Text
+              className="text-charcoal dark:text-neutral-100"
+              style={{ fontFamily: "Manrope_700Bold", fontSize: 22 }}
+            >
+              {dailyReviewLimit}
+            </Text>
+            <Pressable
+              onPress={() => setDailyReviewLimit(dailyReviewLimit + DAILY_REVIEW_LIMIT_STEP)}
+              disabled={dailyReviewLimit >= MAX_DAILY_REVIEW_LIMIT}
+              className="w-10 h-10 rounded-full bg-surface-high dark:bg-surface-dark-high items-center justify-center"
+              style={{ opacity: dailyReviewLimit >= MAX_DAILY_REVIEW_LIMIT ? 0.3 : 1 }}
+            >
+              <Plus size={18} color={isDark ? "#d4d4d4" : "#6e5a47"} />
+            </Pressable>
           </View>
         </Card>
 

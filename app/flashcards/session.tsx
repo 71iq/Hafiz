@@ -63,9 +63,18 @@ export default function FlashcardSessionScreenWrapper() {
   );
 }
 
+/** Fisher-Yates shuffle (in-place) */
+function shuffle<T>(arr: T[]): T[] {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
 function FlashcardSessionScreen() {
   const db = useDatabase();
-  const { isDark, fontSize, lineHeight, tafseerSource } = useSettings();
+  const { isDark, fontSize, lineHeight, tafseerSource, dailyReviewLimit } = useSettings();
   const s = useStrings();
   const router = useRouter();
   const { deckId } = useLocalSearchParams<{ deckId?: string }>();
@@ -107,7 +116,7 @@ function FlashcardSessionScreen() {
     async function load() {
       // Pre-load streak for scoring
       streakRef.current = await getStudyStreak(db);
-      const dueRows = await getDueCards(db, deckId);
+      const dueRows = await getDueCards(db, deckId, dailyReviewLimit);
       if (dueRows.length === 0) {
         setSummary({ total: 0, newCount: 0, reviewCount: 0, relearningCount: 0, durationMs: 0, nextReviewDate: null });
         setPhase("summary");
@@ -164,11 +173,12 @@ function FlashcardSessionScreen() {
         });
       }
 
+      shuffle(loaded);
       setCards(loaded);
       setPhase("front");
     }
     load();
-  }, [db, deckId, tafseerSource]);
+  }, [db, deckId, tafseerSource, dailyReviewLimit]);
 
   const currentCard = cards[currentIndex] ?? null;
   const activeModes = useMemo(() => {

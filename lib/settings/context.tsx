@@ -9,6 +9,11 @@ export const FONT_SIZE_STEPS = [22, 26, 30, 34, 38, 42, 46] as const;
 export const FONT_SIZE_LINE_HEIGHTS = [48, 56, 64, 72, 80, 88, 96] as const;
 const DEFAULT_FONT_SIZE_INDEX = 2; // 30px
 
+export const DEFAULT_DAILY_REVIEW_LIMIT = 50;
+export const MIN_DAILY_REVIEW_LIMIT = 10;
+export const MAX_DAILY_REVIEW_LIMIT = 200;
+export const DAILY_REVIEW_LIMIT_STEP = 10;
+
 export type ThemeMode = "light" | "dark" | "system";
 export type ViewMode = "verse" | "page";
 export type UILanguage = "en" | "ar";
@@ -34,6 +39,8 @@ type SettingsContextType = {
   setTafseerSource: (source: TafseerSource) => void;
   uiLanguage: UILanguage;
   setUiLanguage: (lang: UILanguage) => void;
+  dailyReviewLimit: number;
+  setDailyReviewLimit: (limit: number) => void;
   isRTL: boolean;
   isDark: boolean;
   isLoaded: boolean;
@@ -59,6 +66,8 @@ const SettingsContext = createContext<SettingsContextType>({
   setTafseerSource: () => {},
   uiLanguage: "en",
   setUiLanguage: () => {},
+  dailyReviewLimit: DEFAULT_DAILY_REVIEW_LIMIT,
+  setDailyReviewLimit: () => {},
   isRTL: false,
   isDark: false,
   isLoaded: false,
@@ -95,6 +104,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [isTranslationLoading, setIsTranslationLoading] = useState(false);
   const [tafseerSource, setTafseerSourceState] = useState<TafseerSource>("muyassar");
   const [uiLanguage, setUiLanguageState] = useState<UILanguage>("en");
+  const [dailyReviewLimit, setDailyReviewLimitState] = useState(DEFAULT_DAILY_REVIEW_LIMIT);
   const [isLoaded, setIsLoaded] = useState(false);
 
   // Load settings from SQLite on mount
@@ -135,6 +145,14 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         const savedUiLang = await readSetting(db, "ui_language");
         if (savedUiLang === "en" || savedUiLang === "ar") {
           setUiLanguageState(savedUiLang);
+        }
+
+        const savedLimit = await readSetting(db, "daily_review_limit");
+        if (savedLimit !== null) {
+          const n = parseInt(savedLimit, 10);
+          if (n >= MIN_DAILY_REVIEW_LIMIT && n <= MAX_DAILY_REVIEW_LIMIT) {
+            setDailyReviewLimitState(n);
+          }
         }
 
         const savedLang = await readSetting(db, "translation_language");
@@ -234,6 +252,15 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     [db]
   );
 
+  const setDailyReviewLimit = useCallback(
+    (limit: number) => {
+      const clamped = Math.max(MIN_DAILY_REVIEW_LIMIT, Math.min(MAX_DAILY_REVIEW_LIMIT, limit));
+      setDailyReviewLimitState(clamped);
+      writeSetting(db, "daily_review_limit", String(clamped)).catch(console.warn);
+    },
+    [db]
+  );
+
   const setUiLanguage = useCallback(
     (lang: UILanguage) => {
       setUiLanguageState(lang);
@@ -267,6 +294,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         setTafseerSource,
         uiLanguage,
         setUiLanguage,
+        dailyReviewLimit,
+        setDailyReviewLimit,
         isRTL,
         isDark,
         isLoaded,

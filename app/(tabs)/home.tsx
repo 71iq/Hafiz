@@ -36,7 +36,7 @@ type DeckDisplay = {
 
 export default function HomeScreen() {
   const db = useDatabase();
-  const { isDark } = useSettings();
+  const { isDark, dailyReviewLimit } = useSettings();
   const s = useStrings();
   const router = useRouter();
   const [decks, setDecks] = useState<DeckDisplay[]>([]);
@@ -197,7 +197,7 @@ export default function HomeScreen() {
               className="text-primary-accent dark:text-primary-bright"
               style={{ fontFamily: "Manrope_700Bold", fontSize: 24 }}
             >
-              {totalDue}
+              {totalDue > dailyReviewLimit ? dailyReviewLimit : totalDue}
             </Text>
             <Text
               className="text-warm-400 dark:text-neutral-500 mt-1"
@@ -205,6 +205,14 @@ export default function HomeScreen() {
             >
               {s.homeTodayReviews}
             </Text>
+            {totalDue > dailyReviewLimit && (
+              <Text
+                className="text-warm-400 dark:text-neutral-600 mt-0.5"
+                style={{ fontFamily: "Manrope_400Regular", fontSize: 10 }}
+              >
+                {interpolate(s.flashcardsDueTodayLimit, { due: String(totalDue), limit: String(dailyReviewLimit) })}
+              </Text>
+            )}
           </Card>
           <Card elevation="low" className="flex-1 p-5 items-center">
             <View className="flex-row items-center gap-1">
@@ -259,7 +267,7 @@ export default function HomeScreen() {
                   className="text-neutral-300"
                   style={{ fontFamily: "Manrope_400Regular", fontSize: 13 }}
                 >
-                  {interpolate(s.flashcardsCardsRemaining, { n: String(totalDue) })}
+                  {interpolate(s.flashcardsCardsRemaining, { n: String(Math.min(totalDue, dailyReviewLimit)) })}
                 </Text>
               </View>
               <View className="w-12 h-12 rounded-full bg-gold items-center justify-center">

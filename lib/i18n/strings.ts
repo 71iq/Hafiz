@@ -192,6 +192,9 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     flashcardsSummaryMinutes: "{{n}} min",
     // Settings
     flashcardsTestModes: "Flashcard Test Modes",
+    flashcardsDailyLimit: "Daily Review Limit",
+    flashcardsDailyLimitDesc: "Max cards per session",
+    flashcardsDueTodayLimit: "{{due}} due ({{limit}} today)",
     // Auth
     authLogin: "Log In",
     authSignup: "Sign Up",
@@ -444,6 +447,9 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     flashcardsSummaryMinutes: "{{n}} دقيقة",
     // Settings
     flashcardsTestModes: "أوضاع اختبار البطاقات",
+    flashcardsDailyLimit: "حد المراجعة اليومي",
+    flashcardsDailyLimitDesc: "أقصى عدد بطاقات في الجلسة",
+    flashcardsDueTodayLimit: "{{due}} مستحقة ({{limit}} اليوم)",
     // Auth
     authLogin: "تسجيل الدخول",
     authSignup: "إنشاء حساب",
