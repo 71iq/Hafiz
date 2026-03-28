@@ -47,8 +47,17 @@ export default function HomeScreen() {
   const [showCreate, setShowCreate] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [surahNames, setSurahNames] = useState<Record<number, string>>({});
 
   const loadData = useCallback(async () => {
+    // Load surah names for deck labels
+    const surahRows = await db.getAllAsync<{ number: number; name_arabic: string }>(
+      "SELECT number, name_arabic FROM surahs"
+    );
+    const nameMap: Record<number, string> = {};
+    for (const row of surahRows) nameMap[row.number] = row.name_arabic;
+    setSurahNames(nameMap);
+
     const rawDecks = await getDecks(db);
     const deckDisplays: DeckDisplay[] = [];
     for (const d of rawDecks) {
@@ -92,8 +101,18 @@ export default function HomeScreen() {
 
   const getDeckLabel = (scope: DeckScope): string => {
     switch (scope.type) {
-      case "surah":
-        return `${s.flashcardsScopeBysurah}: ${scope.surahs.join(", ")}`;
+      case "surah": {
+        const nums = [...scope.surahs].sort((a, b) => a - b);
+        const getName = (n: number) => surahNames[n] ? `سورة ${surahNames[n]}` : String(n);
+        if (nums.length === 1) {
+          return `${getName(nums[0])} (${nums[0]})`;
+        }
+        const isContiguous = nums.every((n, i) => i === 0 || n === nums[i - 1] + 1);
+        if (isContiguous) {
+          return `${getName(nums[0])} - ${getName(nums[nums.length - 1])} (${nums[0]}-${nums[nums.length - 1]})`;
+        }
+        return `${nums.map(getName).join("، ")} (${nums.join(", ")})`;
+      }
       case "juz":
         return `${s.flashcardsScopeByjuz}: ${scope.juzNumbers.join(", ")}`;
       case "hizb":

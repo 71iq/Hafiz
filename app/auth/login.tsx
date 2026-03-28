@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import {
   View,
   Text,
@@ -31,6 +31,8 @@ export default function LoginScreen() {
   const s = useStrings();
   const { signIn, isLoading, error, clearError } = useAuthStore();
   const [showError, setShowError] = useState<string | null>(null);
+
+  const passwordRef = useRef<TextInput>(null);
 
   const {
     control,
@@ -115,6 +117,9 @@ export default function LoginScreen() {
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoCorrect={false}
+                  returnKeyType="next"
+                  onSubmitEditing={() => passwordRef.current?.focus()}
+                  blurOnSubmit={false}
                   onBlur={onBlur}
                   onChangeText={onChange}
                   value={value}
@@ -141,11 +146,14 @@ export default function LoginScreen() {
               name="password"
               render={({ field: { onChange, onBlur, value } }) => (
                 <TextInput
+                  ref={passwordRef}
                   className="bg-surface dark:bg-surface-dark-high rounded-2xl px-4 py-3 text-charcoal dark:text-neutral-100 mb-1"
                   style={{ fontFamily: "Manrope_400Regular", fontSize: 15 }}
                   placeholder={s.authPassword}
                   placeholderTextColor="#b9a085"
                   secureTextEntry
+                  returnKeyType="done"
+                  onSubmitEditing={handleSubmit(onSubmit)}
                   onBlur={onBlur}
                   onChangeText={onChange}
                   value={value}

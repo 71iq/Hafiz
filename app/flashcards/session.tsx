@@ -603,11 +603,11 @@ function TestModeAnswer({
 
 // ─── Grading ─────────────────────────────────────────────────
 
-const GRADE_BUTTONS: { rating: Grade; bgColor: string }[] = [
-  { rating: Rating.Again, bgColor: "#ef4444" },
-  { rating: Rating.Hard, bgColor: "#f97316" },
-  { rating: Rating.Good, bgColor: "#22c55e" },
-  { rating: Rating.Easy, bgColor: "#3b82f6" },
+const GRADE_BUTTONS: { rating: Grade; bgLight: string; bgDark: string }[] = [
+  { rating: Rating.Again, bgLight: "#b91c1c", bgDark: "#dc2626" },
+  { rating: Rating.Hard, bgLight: "#b45309", bgDark: "#d97706" },
+  { rating: Rating.Good, bgLight: "#15803d", bgDark: "#16a34a" },
+  { rating: Rating.Easy, bgLight: "#1d4ed8", bgDark: "#2563eb" },
 ];
 
 function GradingButtons({ onGrade, isDark, s }: { onGrade: (rating: Grade) => void; isDark: boolean; s: any }) {
@@ -620,16 +620,15 @@ function GradingButtons({ onGrade, isDark, s }: { onGrade: (rating: Grade) => vo
 
   return (
     <View className="flex-row gap-3">
-      {GRADE_BUTTONS.map(({ rating, bgColor }) => (
+      {GRADE_BUTTONS.map(({ rating, bgLight, bgDark }) => (
         <Pressable
           key={rating}
           onPress={() => onGrade(rating)}
-          className="flex-1 py-4 rounded-full items-center"
-          style={({ pressed }) => ({
-            backgroundColor: bgColor,
-            opacity: pressed ? 0.85 : 1,
-            transform: [{ scale: pressed ? 0.95 : 1 }],
-          })}
+          className="flex-1 rounded-full items-center"
+          style={{
+            backgroundColor: isDark ? bgDark : bgLight,
+            paddingVertical: 16,
+          }}
         >
           <Text style={{ fontFamily: "Manrope_700Bold", fontSize: 14, color: "#fff" }}>
             {labels[rating]}

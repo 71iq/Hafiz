@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import {
   View,
   Text,
@@ -38,6 +38,10 @@ export default function SignupScreen() {
   const s = useStrings();
   const { signUp, isLoading, error, clearError } = useAuthStore();
   const [showError, setShowError] = useState<string | null>(null);
+
+  const usernameRef = useRef<TextInput>(null);
+  const displayNameRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInput>(null);
 
   const {
     control,
@@ -121,6 +125,9 @@ export default function SignupScreen() {
                     keyboardType="email-address"
                     autoCapitalize="none"
                     autoCorrect={false}
+                    returnKeyType="next"
+                    onSubmitEditing={() => usernameRef.current?.focus()}
+                    blurOnSubmit={false}
                     onBlur={onBlur}
                     onChangeText={onChange}
                     value={value}
@@ -136,12 +143,16 @@ export default function SignupScreen() {
                 name="username"
                 render={({ field: { onChange, onBlur, value } }) => (
                   <TextInput
+                    ref={usernameRef}
                     className="bg-surface dark:bg-surface-dark-high rounded-2xl px-4 py-3 text-charcoal dark:text-neutral-100"
                     style={{ fontFamily: "Manrope_400Regular", fontSize: 15 }}
                     placeholder={s.authUsername}
                     placeholderTextColor="#b9a085"
                     autoCapitalize="none"
                     autoCorrect={false}
+                    returnKeyType="next"
+                    onSubmitEditing={() => displayNameRef.current?.focus()}
+                    blurOnSubmit={false}
                     onBlur={onBlur}
                     onChangeText={onChange}
                     value={value}
@@ -157,10 +168,14 @@ export default function SignupScreen() {
                 name="displayName"
                 render={({ field: { onChange, onBlur, value } }) => (
                   <TextInput
+                    ref={displayNameRef}
                     className="bg-surface dark:bg-surface-dark-high rounded-2xl px-4 py-3 text-charcoal dark:text-neutral-100"
                     style={{ fontFamily: "Manrope_400Regular", fontSize: 15 }}
                     placeholder={s.authDisplayName}
                     placeholderTextColor="#b9a085"
+                    returnKeyType="next"
+                    onSubmitEditing={() => passwordRef.current?.focus()}
+                    blurOnSubmit={false}
                     onBlur={onBlur}
                     onChangeText={onChange}
                     value={value}
@@ -176,11 +191,14 @@ export default function SignupScreen() {
                 name="password"
                 render={({ field: { onChange, onBlur, value } }) => (
                   <TextInput
+                    ref={passwordRef}
                     className="bg-surface dark:bg-surface-dark-high rounded-2xl px-4 py-3 text-charcoal dark:text-neutral-100"
                     style={{ fontFamily: "Manrope_400Regular", fontSize: 15 }}
                     placeholder={s.authPassword}
                     placeholderTextColor="#b9a085"
                     secureTextEntry
+                    returnKeyType="done"
+                    onSubmitEditing={handleSubmit(onSubmit)}
                     onBlur={onBlur}
                     onChangeText={onChange}
                     value={value}

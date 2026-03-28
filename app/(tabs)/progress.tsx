@@ -75,7 +75,7 @@ export default function ProgressScreen() {
         <Card elevation="low" className="p-6 mb-6 bg-primary-soft dark:bg-primary-soft">
           <Text
             className="text-gold mb-2"
-            style={{ fontFamily: "Manrope_500Medium", fontSize: 12, letterSpacing: 0.5 }}
+            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 18, letterSpacing: 0.5 }}
           >
             {s.progressDailyReminder}
           </Text>
@@ -83,8 +83,8 @@ export default function ProgressScreen() {
             className="text-neutral-200"
             style={{
               fontFamily: "Manrope_400Regular",
-              fontSize: 14,
-              lineHeight: 22,
+              fontSize: 16,
+              lineHeight: 26,
               writingDirection: "rtl",
               textAlign: "center",
             }}
