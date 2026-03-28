@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 import { View, Text, Pressable } from "react-native";
 import { Heart, MessageCircle, MoreHorizontal, Flag } from "lucide-react-native";
 import { useAuthStore } from "@/lib/auth/store";
+import { hapticLight } from "@/lib/haptics";
 import { toggleLike, reportReflection } from "@/lib/reflections/api";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -39,6 +40,7 @@ export function ReflectionCard({ reflection, onLikeToggled, onCommentsPress }: P
 
   const handleLike = useCallback(async () => {
     if (!user) return;
+    hapticLight();
     const wasLiked = liked;
     // Optimistic update
     setLiked(!wasLiked);

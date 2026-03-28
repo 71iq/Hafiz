@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { View, Text, Pressable, Modal, ScrollView } from "react-native";
-import { X, BookMarked, Trash2 } from "lucide-react-native";
+import { X, BookMarked, Trash2, BookmarkX } from "lucide-react-native";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { useSelection } from "@/lib/selection/context";
 import { removeBookmark } from "@/lib/selection/queries";
 import { useDatabase } from "@/lib/database/provider";
@@ -125,19 +126,12 @@ export function BookmarksSheet({ visible, onClose, onNavigate }: Props) {
           {/* Bookmark list */}
           <ScrollView style={{ paddingHorizontal: 20 }}>
             {enriched.length === 0 ? (
-              <View style={{ alignItems: "center", paddingVertical: 40 }}>
-                <BookMarked size={32} color={isDark ? "#525252" : "#DFD9D1"} />
-                <Text
-                  style={{
-                    fontFamily: "Manrope_500Medium",
-                    fontSize: 14,
-                    color: isDark ? "#525252" : "#A39B93",
-                    marginTop: 12,
-                  }}
-                >
-                  {s.noBookmarks}
-                </Text>
-              </View>
+              <EmptyState
+                icon={BookmarkX}
+                title={s.noBookmarks}
+                subtitle={s.emptyBookmarksSubtitle}
+                isDark={isDark}
+              />
             ) : (
               enriched.map((b) => (
                 <Pressable

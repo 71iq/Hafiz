@@ -3,7 +3,8 @@ import { View, Text, ScrollView, Pressable, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
-import { Plus, Trash2, Play, Layers, Flame, Clock, Search } from "lucide-react-native";
+import { Plus, Trash2, Play, Layers, Flame, Clock, Search, LayoutGrid } from "lucide-react-native";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -267,23 +268,15 @@ export default function HomeScreen() {
         </View>
 
         {decks.length === 0 ? (
-          <Card elevation="low" className="p-8 items-center">
-            <Layers size={36} color={isDark ? "#525252" : "#DFD9D1"} />
-            <Text
-              className="text-warm-400 dark:text-neutral-500 mt-3"
-              style={{ fontFamily: "Manrope_500Medium", fontSize: 14 }}
-            >
-              {s.flashcardsNoDecks}
-            </Text>
-            <Button
-              onPress={() => setShowCreate(true)}
-              className="mt-4"
-              size="sm"
-            >
-              <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, color: "#fff" }}>
-                {s.flashcardsCreateDeck}
-              </Text>
-            </Button>
+          <Card elevation="low" className="py-4">
+            <EmptyState
+              icon={LayoutGrid}
+              title={s.flashcardsNoDecks}
+              subtitle={s.emptyDecksSubtitle}
+              actionLabel={s.flashcardsCreateDeck}
+              onAction={() => setShowCreate(true)}
+              isDark={isDark}
+            />
           </Card>
         ) : (
           <View className="gap-3">

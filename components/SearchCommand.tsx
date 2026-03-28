@@ -13,6 +13,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Search, X, Clock, Trash2, ChevronDown, ChevronRight } from "lucide-react-native";
+import { SearchResultsSkeleton } from "@/components/ui/Skeleton";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings, interpolate } from "@/lib/i18n/useStrings";
@@ -441,9 +443,7 @@ export function SearchCommand({ visible, onClose }: SearchCommandProps) {
 
         {/* Content area */}
         {searching ? (
-          <View className="flex-1 items-center justify-center">
-            <ActivityIndicator size="large" color={tealColor} />
-          </View>
+          <SearchResultsSkeleton isDark={isDark} className="flex-1" />
         ) : !hasSearched && query.length === 0 ? (
           <View className="flex-1 px-5">
             {history.length > 0 && (
@@ -511,14 +511,13 @@ export function SearchCommand({ visible, onClose }: SearchCommandProps) {
             )}
           </View>
         ) : hasSearched && ((mode === "text" && textResults.length === 0) || (mode === "root" && rootResults.length === 0)) ? (
-          <View className="flex-1 items-center justify-center px-6">
-            <Search size={40} color={isDark ? "#404040" : "#DFD9D1"} />
-            <Text
-              className="text-warm-400 dark:text-neutral-500 mt-4"
-              style={{ fontFamily: "Manrope_500Medium", fontSize: 15 }}
-            >
-              {s.searchNoResults}
-            </Text>
+          <View className="flex-1 items-center justify-center">
+            <EmptyState
+              icon={Search}
+              title={s.searchNoResults}
+              subtitle={mode === "text" ? s.emptySearchTextSubtitle : s.emptySearchRootSubtitle}
+              isDark={isDark}
+            />
           </View>
         ) : mode === "text" ? (
           <View className="flex-1">

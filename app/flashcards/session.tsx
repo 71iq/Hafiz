@@ -21,6 +21,8 @@ import type { Card as FSRSCard, Grade } from "@/lib/fsrs/scheduler";
 import { getDueCards, updateCard, insertStudyLog, getStudyStreak } from "@/lib/fsrs/queries";
 import { computeUniqueFront } from "@/lib/fsrs/uniqueness";
 import { computeReviewPoints, addTodayPoints, getTodayScore } from "@/lib/fsrs/scoring";
+import { hapticMedium, hapticSuccess } from "@/lib/haptics";
+import { Skeleton, SkeletonText } from "@/components/ui/Skeleton";
 import { syncDailyScore, updateProfileStats } from "@/lib/fsrs/leaderboard-sync";
 import type { StudyCardRow, TestMode } from "@/lib/fsrs/types";
 import { DEFAULT_ENABLED_MODES, TEST_MODE_COLORS } from "@/lib/fsrs/types";
@@ -206,6 +208,7 @@ function FlashcardSessionScreen() {
 
   const handleGrade = async (rating: Grade) => {
     if (!currentCard) return;
+    hapticMedium();
     const now = new Date();
 
     const fsrsCard: FSRSCard = {
@@ -286,6 +289,7 @@ function FlashcardSessionScreen() {
         nextReviewDate: nextRow?.due ?? null,
       });
       setPhase("summary");
+      hapticSuccess();
 
       // Sync daily score and profile stats to Supabase (non-blocking)
       syncDailyScore(db).catch(console.warn);
@@ -301,10 +305,16 @@ function FlashcardSessionScreen() {
 
   if (phase === "loading") {
     return (
-      <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark items-center justify-center">
-        <Text className="text-warm-400 dark:text-neutral-500" style={{ fontFamily: "Manrope_500Medium", fontSize: 16 }}>
-          {s.loading}
-        </Text>
+      <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
+        <View className="px-6 pt-6" style={{ gap: 16 }}>
+          <Skeleton isDark={isDark} width="100%" height={8} borderRadius={4} />
+          <View style={{ height: 24 }} />
+          <Skeleton isDark={isDark} width="40%" height={12} borderRadius={6} style={{ alignSelf: "center" }} />
+          <Skeleton isDark={isDark} width="100%" height={200} borderRadius={24} />
+          <View style={{ height: 8 }} />
+          <SkeletonText isDark={isDark} width="80%" lineHeight={14} style={{ alignSelf: "center" }} />
+          <SkeletonText isDark={isDark} width="60%" lineHeight={14} style={{ alignSelf: "center" }} />
+        </View>
       </SafeAreaView>
     );
   }
@@ -328,7 +338,7 @@ function FlashcardSessionScreen() {
       <View className="flex-row items-center justify-between px-6 py-3">
         <Pressable
           onPress={handleEndSession}
-          className="w-10 h-10 rounded-full bg-surface-high dark:bg-surface-dark-high items-center justify-center"
+          className="w-11 h-11 rounded-full bg-surface-high dark:bg-surface-dark-high items-center justify-center"
         >
           <X size={18} color={isDark ? "#d4d4d4" : "#6e5a47"} />
         </Pressable>

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
 import { useDatabase } from "@/lib/database/provider";
+import { hapticLight } from "@/lib/haptics";
 import type { Selection, HighlightEntry, BookmarkEntry } from "./types";
 import {
   fetchAllBookmarks,
@@ -144,6 +145,7 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
   const toggleBookmarkForSelection = useCallback(
     async (): Promise<"added" | "removed" | null> => {
       if (!selection) return null;
+      hapticLight();
       const { start } = selection;
       const key = ayahKey(start.surah, start.ayah);
       try {

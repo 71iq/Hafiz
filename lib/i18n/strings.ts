@@ -245,6 +245,34 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     reflectionNoComments: "No comments yet",
     // Error
     databaseError: "Database Error",
+    // Onboarding
+    onboardingWelcome: "Hafiz",
+    onboardingSubtitle: "Your companion for Quran memorization",
+    onboardingGetStarted: "Get Started",
+    onboardingMemorizedTitle: "What have you memorized?",
+    onboardingMemorizedSubtitle: "Select the surahs you've already memorized",
+    onboardingContinue: "Continue",
+    onboardingSelected: "{{n}} selected",
+    onboardingSkip: "Skip",
+    onboardingCreateDeckTitle: "Create your first deck",
+    onboardingCreateDeckDesc: "A deck creates flashcards for spaced repetition review. You'll be tested on each ayah at optimal intervals to strengthen your memorization.",
+    onboardingSurahsSelected: "{{n}} surahs selected",
+    onboardingAyahsTotal: "{{n}} ayahs total",
+    onboardingCreateAndStart: "Create Deck & Start",
+    onboardingSkipForNow: "Skip for now",
+    onboardingCreating: "Creating...",
+    // Offline
+    offlineBanner: "You're offline — study features work, community features will sync when connected",
+    // Empty states
+    emptyBookmarksSubtitle: "Tap the bookmark icon on any ayah to save it here",
+    emptyDecksSubtitle: "Create a deck to start reviewing ayahs with spaced repetition",
+    emptyLeaderboardSubtitle: "Complete flashcard reviews to earn points and appear on the leaderboard",
+    emptySearchTextSubtitle: "Try different keywords or fewer diacritics",
+    emptySearchRootSubtitle: "Check the root spelling and try again",
+    // Error boundary
+    errorTitle: "Something went wrong",
+    errorSubtitle: "This section couldn't load properly",
+    errorTryAgain: "Try Again",
   },
   ar: {
     tabHome: "الرئيسية",
@@ -468,5 +496,33 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     reflectionPosted: "تم نشر التأمل",
     reflectionNoComments: "لا توجد تعليقات بعد",
     databaseError: "خطأ في قاعدة البيانات",
+    // Onboarding
+    onboardingWelcome: "حافظ",
+    onboardingSubtitle: "رفيقك في حفظ القرآن الكريم",
+    onboardingGetStarted: "ابدأ",
+    onboardingMemorizedTitle: "ماذا حفظت؟",
+    onboardingMemorizedSubtitle: "اختر السور التي حفظتها بالفعل",
+    onboardingContinue: "استمر",
+    onboardingSelected: "{{n}} مختارة",
+    onboardingSkip: "تخطي",
+    onboardingCreateDeckTitle: "أنشئ مجموعتك الأولى",
+    onboardingCreateDeckDesc: "تنشئ المجموعة بطاقات للمراجعة المتباعدة. سيتم اختبارك على كل آية في فترات مثالية لتقوية حفظك.",
+    onboardingSurahsSelected: "{{n}} سور مختارة",
+    onboardingAyahsTotal: "{{n}} آية إجمالاً",
+    onboardingCreateAndStart: "أنشئ المجموعة وابدأ",
+    onboardingSkipForNow: "تخطي الآن",
+    onboardingCreating: "جارٍ الإنشاء...",
+    // Offline
+    offlineBanner: "أنت غير متصل — ميزات الدراسة تعمل، الميزات الاجتماعية ستتم مزامنتها عند الاتصال",
+    // Empty states
+    emptyBookmarksSubtitle: "اضغط على أيقونة الإشارة على أي آية لحفظها هنا",
+    emptyDecksSubtitle: "أنشئ مجموعة لبدء مراجعة الآيات بالتكرار المتباعد",
+    emptyLeaderboardSubtitle: "أكمل مراجعات البطاقات لكسب النقاط والظهور في لوحة المتصدرين",
+    emptySearchTextSubtitle: "جرب كلمات مختلفة أو حروف أقل",
+    emptySearchRootSubtitle: "تحقق من هجاء الجذر وحاول مجددًا",
+    // Error boundary
+    errorTitle: "حدث خطأ ما",
+    errorSubtitle: "لم يتم تحميل هذا القسم بشكل صحيح",
+    errorTryAgain: "حاول مجددًا",
   },
 };

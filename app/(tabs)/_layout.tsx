@@ -8,6 +8,8 @@ import { useStrings } from "@/lib/i18n/useStrings";
 import { AppNavigation, SIDEBAR_WIDTH, SIDEBAR_BREAKPOINT } from "@/components/ui/AppNavigation";
 import { useSync } from "@/lib/sync/useSync";
 import { SyncIndicator } from "@/components/ui/SyncIndicator";
+import { OfflineBanner } from "@/components/ui/OfflineBanner";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 function SyncOverlay() {
@@ -33,7 +35,7 @@ function SyncOverlay() {
 }
 
 function TabsWithStrings() {
-  const { isRTL } = useSettings();
+  const { isRTL, uiLanguage } = useSettings();
   const s = useStrings();
   const { width } = useWindowDimensions();
   const hasSidebar = width >= SIDEBAR_BREAKPOINT;
@@ -41,6 +43,7 @@ function TabsWithStrings() {
   return (
     <View style={{ flex: 1, direction: isRTL ? "rtl" : "ltr" }}>
       <SyncOverlay />
+      <OfflineBanner uiLanguage={uiLanguage} />
       <Tabs
         screenOptions={{
           headerShown: false,
@@ -165,7 +168,9 @@ export default function TabLayout() {
 
   return (
     <SettingsProvider>
-      <TabsWithStrings />
+      <ErrorBoundary section="TabLayout">
+        <TabsWithStrings />
+      </ErrorBoundary>
     </SettingsProvider>
   );
 }

@@ -1,6 +1,8 @@
 import { useState, useCallback } from "react";
-import { View, Text, Pressable, ActivityIndicator } from "react-native";
-import { ChevronDown, ChevronUp, PenLine } from "lucide-react-native";
+import { View, Text, Pressable } from "react-native";
+import { ChevronDown, ChevronUp, PenLine, MessageSquare } from "lucide-react-native";
+import { ReflectionsSkeleton } from "@/components/ui/Skeleton";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/lib/auth/store";
 import { useSettings } from "@/lib/settings/context";
@@ -140,20 +142,14 @@ export function ReflectionsSection({ surah, ayah }: Props) {
       {expanded && (
         <View className="pb-3">
           {isLoading ? (
-            <ActivityIndicator style={{ padding: 16 }} />
+            <ReflectionsSkeleton isDark={isDark} />
           ) : allReflections.length === 0 ? (
-            <View className="items-center py-4">
-              <Text
-                style={{ fontFamily: "Manrope_400Regular", fontSize: 13, color: mutedColor }}
-              >
-                {s.reflectionEmpty}
-              </Text>
-              <Text
-                style={{ fontFamily: "Manrope_400Regular", fontSize: 12, color: mutedColor, marginTop: 2 }}
-              >
-                {s.reflectionBeFirst}
-              </Text>
-            </View>
+            <EmptyState
+              icon={MessageSquare}
+              title={s.reflectionEmpty}
+              subtitle={s.reflectionBeFirst}
+              isDark={isDark}
+            />
           ) : (
             allReflections.map((r) => (
               <ReflectionCard

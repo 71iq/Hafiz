@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { View, Text, Pressable, ScrollView, ActivityIndicator, RefreshControl } from "react-native";
+import { View, Text, Pressable, ScrollView, RefreshControl } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Trophy, Flame } from "lucide-react-native";
 import { useQuery } from "@tanstack/react-query";
@@ -7,6 +7,8 @@ import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { useAuthStore } from "@/lib/auth/store";
 import { isSupabaseConfigured } from "@/lib/supabase";
+import { LeaderboardSkeleton } from "@/components/ui/Skeleton";
+import { EmptyState } from "@/components/ui/EmptyState";
 import {
   fetchDailyLeaderboard,
   fetchWeeklyLeaderboard,
@@ -103,17 +105,15 @@ export default function LeaderboardScreen() {
           </Text>
         </View>
       ) : isLoading ? (
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" />
-        </View>
+        <LeaderboardSkeleton isDark={isDark} className="flex-1" />
       ) : entries.length === 0 ? (
-        <View className="flex-1 items-center justify-center px-6">
-          <Trophy size={40} color={mutedColor} />
-          <Text
-            style={{ fontFamily: "Manrope_400Regular", fontSize: 14, color: mutedColor, marginTop: 12 }}
-          >
-            {s.leaderboardEmpty}
-          </Text>
+        <View className="flex-1 items-center justify-center">
+          <EmptyState
+            icon={Trophy}
+            title={s.leaderboardEmpty}
+            subtitle={s.emptyLeaderboardSubtitle}
+            isDark={isDark}
+          />
         </View>
       ) : (
         <ScrollView

@@ -44,6 +44,7 @@ export default function RootLayout() {
       <DatabaseProvider>
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="onboarding" options={{ animation: "fade" }} />
           <Stack.Screen name="open" />
           <Stack.Screen name="flashcards/session" options={{ animation: "slide_from_bottom" }} />
           <Stack.Screen name="auth/login" options={{ animation: "slide_from_bottom" }} />

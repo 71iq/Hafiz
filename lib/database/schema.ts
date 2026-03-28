@@ -251,6 +251,9 @@ export async function createSchema(db: SQLiteDatabase): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_study_cards_due ON study_cards(due);
     CREATE INDEX IF NOT EXISTS idx_study_log_card ON study_log(card_id);
     CREATE INDEX IF NOT EXISTS idx_sync_queue_status ON sync_queue(table_name);
+    CREATE INDEX IF NOT EXISTS idx_highlights_surah_ayah ON highlights(surah, ayah);
+    CREATE INDEX IF NOT EXISTS idx_study_log_reviewed ON study_log(reviewed_at);
+    CREATE INDEX IF NOT EXISTS idx_word_roots_lemma ON word_roots(lemma);
   `);
 }
 
