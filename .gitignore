@@ -11,6 +11,10 @@ web-build/
 .env
 .env.local
 
+# Scripts & screenshots (not part of the app)
+scrape_zilal.py
+screenshots/
+
 # Original SQLite databases (pre-converted to JSON)
 assets/data/masaq/*.db
 assets/data/wbw/*.db
