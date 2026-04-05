@@ -9,6 +9,7 @@ import { useAuthStore } from "@/lib/auth/store";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { LeaderboardSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { AuthGate } from "@/components/ui/AuthGate";
 import {
   fetchDailyLeaderboard,
   fetchWeeklyLeaderboard,
@@ -26,6 +27,17 @@ export default function LeaderboardScreen() {
   const [activeTab, setActiveTab] = useState<Tab>("daily");
 
   const configured = isSupabaseConfigured();
+
+  if (configured && !user) {
+    return (
+      <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
+        <AuthGate
+          title={s.authGateLeaderboardTitle}
+          subtitle={s.authGateLeaderboardSubtitle}
+        />
+      </SafeAreaView>
+    );
+  }
 
   const queryFn = useCallback(() => {
     switch (activeTab) {

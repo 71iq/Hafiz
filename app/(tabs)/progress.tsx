@@ -5,9 +5,12 @@ import { useFocusEffect } from "@react-navigation/native";
 import { Card } from "@/components/ui/Card";
 import { ActivityHeatmap } from "@/components/progress/ActivityHeatmap";
 import { SurahProgressList } from "@/components/progress/SurahProgressList";
+import { AuthGate } from "@/components/ui/AuthGate";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { useSettings } from "@/lib/settings/context";
 import { useDatabase } from "@/lib/database/provider";
+import { useAuthStore } from "@/lib/auth/store";
+import { isSupabaseConfigured } from "@/lib/supabase";
 import { getTotalCardCount, getStudyStreak } from "@/lib/fsrs/queries";
 
 type HeatmapDay = { date: string; count: number };
@@ -23,6 +26,18 @@ export default function ProgressScreen() {
   const s = useStrings();
   const { isDark, isRTL } = useSettings();
   const db = useDatabase();
+  const user = useAuthStore((state) => state.user);
+
+  if (isSupabaseConfigured() && !user) {
+    return (
+      <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
+        <AuthGate
+          title={s.authGateProgressTitle}
+          subtitle={s.authGateProgressSubtitle}
+        />
+      </SafeAreaView>
+    );
+  }
 
   const [totalCards, setTotalCards] = useState(0);
   const [streak, setStreak] = useState(0);

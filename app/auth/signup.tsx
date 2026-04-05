@@ -18,6 +18,7 @@ import { useAuthStore } from "@/lib/auth/store";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { OAuthButtons } from "@/components/auth/OAuthButtons";
 import { ChevronLeft } from "lucide-react-native";
 
 const signupSchema = z.object({
@@ -226,6 +227,8 @@ export default function SignupScreen() {
               )}
             </Button>
           </Card>
+
+          <OAuthButtons onError={(msg) => setShowError(msg)} />
 
           {/* Login link */}
           <View className="flex-row items-center justify-center gap-1 mb-8">

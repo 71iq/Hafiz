@@ -218,6 +218,11 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     authProfile: "Profile",
     authAccount: "Account",
     authNotConfigured: "Cloud sync not configured",
+    authGateProgressTitle: "Sign in to view your progress",
+    authGateProgressSubtitle: "Your progress syncs across devices when you're signed in",
+    authGateLeaderboardTitle: "Sign in to view the leaderboard",
+    authGateLeaderboardSubtitle: "The leaderboard is a community feature that requires an account",
+    authOrContinueWith: "or continue with",
     // Sync
     syncSyncing: "Syncing...",
     syncSynced: "Synced",
@@ -480,6 +485,11 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     authProfile: "الملف الشخصي",
     authAccount: "الحساب",
     authNotConfigured: "المزامنة السحابية غير مُعدّة",
+    authGateProgressTitle: "سجّل الدخول لعرض تقدمك",
+    authGateProgressSubtitle: "يتم مزامنة تقدمك عبر الأجهزة عند تسجيل الدخول",
+    authGateLeaderboardTitle: "سجّل الدخول لعرض لوحة المتصدرين",
+    authGateLeaderboardSubtitle: "لوحة المتصدرين ميزة مجتمعية تتطلب حسابًا",
+    authOrContinueWith: "أو تابع باستخدام",
     // Sync
     syncSyncing: "جارٍ المزامنة...",
     syncSynced: "تمت المزامنة",
