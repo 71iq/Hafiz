@@ -3,20 +3,33 @@ import { View, Text, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
 import { Card } from "@/components/ui/Card";
+import { ActivityHeatmap } from "@/components/progress/ActivityHeatmap";
+import { SurahProgressList } from "@/components/progress/SurahProgressList";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { useSettings } from "@/lib/settings/context";
 import { useDatabase } from "@/lib/database/provider";
 import { getTotalCardCount, getStudyStreak } from "@/lib/fsrs/queries";
 
+type HeatmapDay = { date: string; count: number };
+type SurahProgress = {
+  surah: number;
+  nameArabic: string;
+  nameEnglish: string;
+  totalCards: number;
+  memorized: number;
+};
+
 export default function ProgressScreen() {
   const s = useStrings();
-  const { isDark } = useSettings();
+  const { isDark, isRTL } = useSettings();
   const db = useDatabase();
 
   const [totalCards, setTotalCards] = useState(0);
   const [streak, setStreak] = useState(0);
   const [longestStreak, setLongestStreak] = useState(0);
   const [totalReviews, setTotalReviews] = useState(0);
+  const [heatmapData, setHeatmapData] = useState<HeatmapDay[]>([]);
+  const [surahProgress, setSurahProgress] = useState<SurahProgress[]>([]);
 
   const loadData = useCallback(async () => {
     const [cards, currentStreak, reviewCount] = await Promise.all([
@@ -48,6 +61,56 @@ export default function ProgressScreen() {
       prev = d;
     }
     setLongestStreak(maxStreak);
+
+    // Heatmap: reviews per day for the last 90 days
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+    const heatRows = await db.getAllAsync<{ review_date: string; cnt: number }>(
+      `SELECT DATE(reviewed_at) as review_date, COUNT(*) as cnt
+       FROM study_log
+       WHERE reviewed_at >= ?
+       GROUP BY review_date
+       ORDER BY review_date`,
+      [ninetyDaysAgo.toISOString()]
+    );
+    setHeatmapData(heatRows.map((r) => ({ date: r.review_date, count: r.cnt })));
+
+    // Surah progress: per-surah card counts with memorization state
+    const surahRows = await db.getAllAsync<{
+      surah: number;
+      total: number;
+      memorized: number;
+    }>(
+      `SELECT
+         CAST(SUBSTR(sc.id, 1, INSTR(sc.id, ':') - 1) AS INTEGER) as surah,
+         COUNT(*) as total,
+         SUM(CASE WHEN sc.state = 2 THEN 1 ELSE 0 END) as memorized
+       FROM study_cards sc
+       GROUP BY surah
+       ORDER BY surah`
+    );
+
+    if (surahRows.length > 0) {
+      const surahNums = surahRows.map((r) => r.surah);
+      const placeholders = surahNums.map(() => "?").join(",");
+      const nameRows = await db.getAllAsync<{ number: number; name_arabic: string; name_english: string }>(
+        `SELECT number, name_arabic, name_english FROM surahs WHERE number IN (${placeholders})`,
+        surahNums
+      );
+      const nameMap = new Map(nameRows.map((r) => [r.number, r]));
+
+      setSurahProgress(
+        surahRows.map((r) => ({
+          surah: r.surah,
+          nameArabic: nameMap.get(r.surah)?.name_arabic ?? `Surah ${r.surah}`,
+          nameEnglish: nameMap.get(r.surah)?.name_english ?? "",
+          totalCards: r.total,
+          memorized: r.memorized,
+        }))
+      );
+    } else {
+      setSurahProgress([]);
+    }
   }, [db]);
 
   useFocusEffect(
@@ -155,7 +218,7 @@ export default function ProgressScreen() {
           </Card>
         </View>
 
-        {/* Activity heatmap placeholder */}
+        {/* Activity heatmap */}
         <Card elevation="low" className="p-6 mb-6">
           <Text
             className="text-charcoal dark:text-neutral-200 mb-4"
@@ -163,33 +226,17 @@ export default function ProgressScreen() {
           >
             {s.progressActivity}
           </Text>
-          <View className="h-32 rounded-2xl bg-surface-low dark:bg-surface-dark-low items-center justify-center">
-            <Text
-              className="text-warm-400 dark:text-neutral-500"
-              style={{ fontFamily: "Manrope_500Medium", fontSize: 13 }}
-            >
-              {s.comingSoon}
-            </Text>
-          </View>
+          <ActivityHeatmap data={heatmapData} isDark={isDark} s={s} isRTL={isRTL} />
         </Card>
 
-        {/* Surah progress placeholder */}
+        {/* Surah progress */}
         <Text
           className="text-charcoal dark:text-neutral-200 mb-4"
           style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16 }}
         >
           {s.progressSurahProgress}
         </Text>
-        <Card elevation="low" className="p-5 mb-3">
-          <View className="h-16 items-center justify-center">
-            <Text
-              className="text-warm-400 dark:text-neutral-500"
-              style={{ fontFamily: "Manrope_500Medium", fontSize: 13 }}
-            >
-              {s.comingSoon}
-            </Text>
-          </View>
-        </Card>
+        <SurahProgressList data={surahProgress} isDark={isDark} s={s} />
       </ScrollView>
     </SafeAreaView>
   );

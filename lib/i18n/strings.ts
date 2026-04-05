@@ -99,6 +99,13 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     progressLongestStreak: "Longest Streak",
     progressActivity: "Memorization Activity",
     progressSurahProgress: "Surah Progress",
+    // Heatmap
+    heatmapReviews: "reviews",
+    heatmapActiveDays: "active days",
+    heatmapTotalReviews: "total reviews",
+    // Surah progress
+    surahProgressEmpty: "No surahs tracked yet",
+    surahProgressEmptyDesc: "Create a deck to start tracking your memorization progress",
     // QiraatTab
     comingSoon: "Coming Soon",
     // TranslationLanguagePicker
@@ -359,6 +366,13 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     progressLongestStreak: "أطول سلسلة",
     progressActivity: "نشاط الحفظ والمراجعة",
     progressSurahProgress: "تقدم السور",
+    // Heatmap
+    heatmapReviews: "مراجعة",
+    heatmapActiveDays: "يوم نشط",
+    heatmapTotalReviews: "إجمالي المراجعات",
+    // Surah progress
+    surahProgressEmpty: "لا توجد سور قيد التتبع",
+    surahProgressEmptyDesc: "أنشئ مجموعة لبدء تتبع تقدمك في الحفظ",
     comingSoon: "قريبًا",
     translationLanguagePickerTitle: "لغة الترجمة",
     preparingDatabase: "جارٍ تهيئة قاعدة البيانات...",
