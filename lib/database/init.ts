@@ -1,137 +1,177 @@
+import { Platform } from "react-native";
 import type { SQLiteDatabase } from "expo-sqlite";
 import { createSchema, createTextSearchIndex } from "./schema";
 
-// JSON data imports via require()
-const quranData = require("../../assets/data/quran-data.json");
-const translationData = require("../../assets/data/translation-sahih.json");
-const pageMapData = require("../../assets/data/page-map.json");
-const tajweedData = require("../../assets/data/tajweed.json");
-const wbwData = require("../../assets/data/wbw/wbw.json");
-const masaqData = require("../../assets/data/masaq/masaq-aggregated.json");
-const pageLinesData = require("../../assets/data/layout/page-lines.json");
-const qcf2Data = require("../../assets/data/quran-qcf2.json");
-const zilalData = require("../../assets/data/zilal.json");
-// morphology-terms-ar.json is a terminology reference (labels), not per-word data.
-// Per-word morphological data comes from the MASAQ dataset (word_irab table).
-// The word_morphology table is reserved for future use with mustafa0x/quran-morphology data.
+// ─── Platform-aware data loading ─────────────────────────────
+// On web: fetch from /data/ (static files served from public/)
+// On native: use require() (Metro handles large assets fine)
 
-// Static require map for tafseer files (metro bundler needs static requires)
-const tafseerRequires: Record<number, any> = {
-  1: require("../../assets/data/tafseer/1.json"),
-  2: require("../../assets/data/tafseer/2.json"),
-  3: require("../../assets/data/tafseer/3.json"),
-  4: require("../../assets/data/tafseer/4.json"),
-  5: require("../../assets/data/tafseer/5.json"),
-  6: require("../../assets/data/tafseer/6.json"),
-  7: require("../../assets/data/tafseer/7.json"),
-  8: require("../../assets/data/tafseer/8.json"),
-  9: require("../../assets/data/tafseer/9.json"),
-  10: require("../../assets/data/tafseer/10.json"),
-  11: require("../../assets/data/tafseer/11.json"),
-  12: require("../../assets/data/tafseer/12.json"),
-  13: require("../../assets/data/tafseer/13.json"),
-  14: require("../../assets/data/tafseer/14.json"),
-  15: require("../../assets/data/tafseer/15.json"),
-  16: require("../../assets/data/tafseer/16.json"),
-  17: require("../../assets/data/tafseer/17.json"),
-  18: require("../../assets/data/tafseer/18.json"),
-  19: require("../../assets/data/tafseer/19.json"),
-  20: require("../../assets/data/tafseer/20.json"),
-  21: require("../../assets/data/tafseer/21.json"),
-  22: require("../../assets/data/tafseer/22.json"),
-  23: require("../../assets/data/tafseer/23.json"),
-  24: require("../../assets/data/tafseer/24.json"),
-  25: require("../../assets/data/tafseer/25.json"),
-  26: require("../../assets/data/tafseer/26.json"),
-  27: require("../../assets/data/tafseer/27.json"),
-  28: require("../../assets/data/tafseer/28.json"),
-  29: require("../../assets/data/tafseer/29.json"),
-  30: require("../../assets/data/tafseer/30.json"),
-  31: require("../../assets/data/tafseer/31.json"),
-  32: require("../../assets/data/tafseer/32.json"),
-  33: require("../../assets/data/tafseer/33.json"),
-  34: require("../../assets/data/tafseer/34.json"),
-  35: require("../../assets/data/tafseer/35.json"),
-  36: require("../../assets/data/tafseer/36.json"),
-  37: require("../../assets/data/tafseer/37.json"),
-  38: require("../../assets/data/tafseer/38.json"),
-  39: require("../../assets/data/tafseer/39.json"),
-  40: require("../../assets/data/tafseer/40.json"),
-  41: require("../../assets/data/tafseer/41.json"),
-  42: require("../../assets/data/tafseer/42.json"),
-  43: require("../../assets/data/tafseer/43.json"),
-  44: require("../../assets/data/tafseer/44.json"),
-  45: require("../../assets/data/tafseer/45.json"),
-  46: require("../../assets/data/tafseer/46.json"),
-  47: require("../../assets/data/tafseer/47.json"),
-  48: require("../../assets/data/tafseer/48.json"),
-  49: require("../../assets/data/tafseer/49.json"),
-  50: require("../../assets/data/tafseer/50.json"),
-  51: require("../../assets/data/tafseer/51.json"),
-  52: require("../../assets/data/tafseer/52.json"),
-  53: require("../../assets/data/tafseer/53.json"),
-  54: require("../../assets/data/tafseer/54.json"),
-  55: require("../../assets/data/tafseer/55.json"),
-  56: require("../../assets/data/tafseer/56.json"),
-  57: require("../../assets/data/tafseer/57.json"),
-  58: require("../../assets/data/tafseer/58.json"),
-  59: require("../../assets/data/tafseer/59.json"),
-  60: require("../../assets/data/tafseer/60.json"),
-  61: require("../../assets/data/tafseer/61.json"),
-  62: require("../../assets/data/tafseer/62.json"),
-  63: require("../../assets/data/tafseer/63.json"),
-  64: require("../../assets/data/tafseer/64.json"),
-  65: require("../../assets/data/tafseer/65.json"),
-  66: require("../../assets/data/tafseer/66.json"),
-  67: require("../../assets/data/tafseer/67.json"),
-  68: require("../../assets/data/tafseer/68.json"),
-  69: require("../../assets/data/tafseer/69.json"),
-  70: require("../../assets/data/tafseer/70.json"),
-  71: require("../../assets/data/tafseer/71.json"),
-  72: require("../../assets/data/tafseer/72.json"),
-  73: require("../../assets/data/tafseer/73.json"),
-  74: require("../../assets/data/tafseer/74.json"),
-  75: require("../../assets/data/tafseer/75.json"),
-  76: require("../../assets/data/tafseer/76.json"),
-  77: require("../../assets/data/tafseer/77.json"),
-  78: require("../../assets/data/tafseer/78.json"),
-  79: require("../../assets/data/tafseer/79.json"),
-  80: require("../../assets/data/tafseer/80.json"),
-  81: require("../../assets/data/tafseer/81.json"),
-  82: require("../../assets/data/tafseer/82.json"),
-  83: require("../../assets/data/tafseer/83.json"),
-  84: require("../../assets/data/tafseer/84.json"),
-  85: require("../../assets/data/tafseer/85.json"),
-  86: require("../../assets/data/tafseer/86.json"),
-  87: require("../../assets/data/tafseer/87.json"),
-  88: require("../../assets/data/tafseer/88.json"),
-  89: require("../../assets/data/tafseer/89.json"),
-  90: require("../../assets/data/tafseer/90.json"),
-  91: require("../../assets/data/tafseer/91.json"),
-  92: require("../../assets/data/tafseer/92.json"),
-  93: require("../../assets/data/tafseer/93.json"),
-  94: require("../../assets/data/tafseer/94.json"),
-  95: require("../../assets/data/tafseer/95.json"),
-  96: require("../../assets/data/tafseer/96.json"),
-  97: require("../../assets/data/tafseer/97.json"),
-  98: require("../../assets/data/tafseer/98.json"),
-  99: require("../../assets/data/tafseer/99.json"),
-  100: require("../../assets/data/tafseer/100.json"),
-  101: require("../../assets/data/tafseer/101.json"),
-  102: require("../../assets/data/tafseer/102.json"),
-  103: require("../../assets/data/tafseer/103.json"),
-  104: require("../../assets/data/tafseer/104.json"),
-  105: require("../../assets/data/tafseer/105.json"),
-  106: require("../../assets/data/tafseer/106.json"),
-  107: require("../../assets/data/tafseer/107.json"),
-  108: require("../../assets/data/tafseer/108.json"),
-  109: require("../../assets/data/tafseer/109.json"),
-  110: require("../../assets/data/tafseer/110.json"),
-  111: require("../../assets/data/tafseer/111.json"),
-  112: require("../../assets/data/tafseer/112.json"),
-  113: require("../../assets/data/tafseer/113.json"),
-  114: require("../../assets/data/tafseer/114.json"),
-};
+// Native-only require map — these are stripped from the web bundle
+// because the loadData() web path uses fetch() instead.
+const nativeRequires: Record<string, () => any> = Platform.OS !== "web"
+  ? {
+      "quran-data.json": () => require("../../assets/data/quran-data.json"),
+      "quran-qcf2.json": () => require("../../assets/data/quran-qcf2.json"),
+      "translation-sahih.json": () => require("../../assets/data/translation-sahih.json"),
+      "page-map.json": () => require("../../assets/data/page-map.json"),
+      "tajweed.json": () => require("../../assets/data/tajweed.json"),
+      "wbw/wbw.json": () => require("../../assets/data/wbw/wbw.json"),
+      "masaq/masaq-aggregated.json": () => require("../../assets/data/masaq/masaq-aggregated.json"),
+      "layout/page-lines.json": () => require("../../assets/data/layout/page-lines.json"),
+      "zilal.json": () => require("../../assets/data/zilal.json"),
+    }
+  : {};
+
+const nativeTafseerRequires: Record<number, () => any> = Platform.OS !== "web"
+  ? Object.fromEntries(
+      Array.from({ length: 114 }, (_, i) => i + 1).map((n) => [n, () => {
+        // Metro needs static string literals — we use a switch
+        return tafseerRequireStatic(n);
+      }])
+    )
+  : {};
+
+function tafseerRequireStatic(n: number): any {
+  // Metro bundler requires static string literals for require() calls.
+  // This function is only called on native, never on web.
+  switch (n) {
+    case 1: return require("../../assets/data/tafseer/1.json");
+    case 2: return require("../../assets/data/tafseer/2.json");
+    case 3: return require("../../assets/data/tafseer/3.json");
+    case 4: return require("../../assets/data/tafseer/4.json");
+    case 5: return require("../../assets/data/tafseer/5.json");
+    case 6: return require("../../assets/data/tafseer/6.json");
+    case 7: return require("../../assets/data/tafseer/7.json");
+    case 8: return require("../../assets/data/tafseer/8.json");
+    case 9: return require("../../assets/data/tafseer/9.json");
+    case 10: return require("../../assets/data/tafseer/10.json");
+    case 11: return require("../../assets/data/tafseer/11.json");
+    case 12: return require("../../assets/data/tafseer/12.json");
+    case 13: return require("../../assets/data/tafseer/13.json");
+    case 14: return require("../../assets/data/tafseer/14.json");
+    case 15: return require("../../assets/data/tafseer/15.json");
+    case 16: return require("../../assets/data/tafseer/16.json");
+    case 17: return require("../../assets/data/tafseer/17.json");
+    case 18: return require("../../assets/data/tafseer/18.json");
+    case 19: return require("../../assets/data/tafseer/19.json");
+    case 20: return require("../../assets/data/tafseer/20.json");
+    case 21: return require("../../assets/data/tafseer/21.json");
+    case 22: return require("../../assets/data/tafseer/22.json");
+    case 23: return require("../../assets/data/tafseer/23.json");
+    case 24: return require("../../assets/data/tafseer/24.json");
+    case 25: return require("../../assets/data/tafseer/25.json");
+    case 26: return require("../../assets/data/tafseer/26.json");
+    case 27: return require("../../assets/data/tafseer/27.json");
+    case 28: return require("../../assets/data/tafseer/28.json");
+    case 29: return require("../../assets/data/tafseer/29.json");
+    case 30: return require("../../assets/data/tafseer/30.json");
+    case 31: return require("../../assets/data/tafseer/31.json");
+    case 32: return require("../../assets/data/tafseer/32.json");
+    case 33: return require("../../assets/data/tafseer/33.json");
+    case 34: return require("../../assets/data/tafseer/34.json");
+    case 35: return require("../../assets/data/tafseer/35.json");
+    case 36: return require("../../assets/data/tafseer/36.json");
+    case 37: return require("../../assets/data/tafseer/37.json");
+    case 38: return require("../../assets/data/tafseer/38.json");
+    case 39: return require("../../assets/data/tafseer/39.json");
+    case 40: return require("../../assets/data/tafseer/40.json");
+    case 41: return require("../../assets/data/tafseer/41.json");
+    case 42: return require("../../assets/data/tafseer/42.json");
+    case 43: return require("../../assets/data/tafseer/43.json");
+    case 44: return require("../../assets/data/tafseer/44.json");
+    case 45: return require("../../assets/data/tafseer/45.json");
+    case 46: return require("../../assets/data/tafseer/46.json");
+    case 47: return require("../../assets/data/tafseer/47.json");
+    case 48: return require("../../assets/data/tafseer/48.json");
+    case 49: return require("../../assets/data/tafseer/49.json");
+    case 50: return require("../../assets/data/tafseer/50.json");
+    case 51: return require("../../assets/data/tafseer/51.json");
+    case 52: return require("../../assets/data/tafseer/52.json");
+    case 53: return require("../../assets/data/tafseer/53.json");
+    case 54: return require("../../assets/data/tafseer/54.json");
+    case 55: return require("../../assets/data/tafseer/55.json");
+    case 56: return require("../../assets/data/tafseer/56.json");
+    case 57: return require("../../assets/data/tafseer/57.json");
+    case 58: return require("../../assets/data/tafseer/58.json");
+    case 59: return require("../../assets/data/tafseer/59.json");
+    case 60: return require("../../assets/data/tafseer/60.json");
+    case 61: return require("../../assets/data/tafseer/61.json");
+    case 62: return require("../../assets/data/tafseer/62.json");
+    case 63: return require("../../assets/data/tafseer/63.json");
+    case 64: return require("../../assets/data/tafseer/64.json");
+    case 65: return require("../../assets/data/tafseer/65.json");
+    case 66: return require("../../assets/data/tafseer/66.json");
+    case 67: return require("../../assets/data/tafseer/67.json");
+    case 68: return require("../../assets/data/tafseer/68.json");
+    case 69: return require("../../assets/data/tafseer/69.json");
+    case 70: return require("../../assets/data/tafseer/70.json");
+    case 71: return require("../../assets/data/tafseer/71.json");
+    case 72: return require("../../assets/data/tafseer/72.json");
+    case 73: return require("../../assets/data/tafseer/73.json");
+    case 74: return require("../../assets/data/tafseer/74.json");
+    case 75: return require("../../assets/data/tafseer/75.json");
+    case 76: return require("../../assets/data/tafseer/76.json");
+    case 77: return require("../../assets/data/tafseer/77.json");
+    case 78: return require("../../assets/data/tafseer/78.json");
+    case 79: return require("../../assets/data/tafseer/79.json");
+    case 80: return require("../../assets/data/tafseer/80.json");
+    case 81: return require("../../assets/data/tafseer/81.json");
+    case 82: return require("../../assets/data/tafseer/82.json");
+    case 83: return require("../../assets/data/tafseer/83.json");
+    case 84: return require("../../assets/data/tafseer/84.json");
+    case 85: return require("../../assets/data/tafseer/85.json");
+    case 86: return require("../../assets/data/tafseer/86.json");
+    case 87: return require("../../assets/data/tafseer/87.json");
+    case 88: return require("../../assets/data/tafseer/88.json");
+    case 89: return require("../../assets/data/tafseer/89.json");
+    case 90: return require("../../assets/data/tafseer/90.json");
+    case 91: return require("../../assets/data/tafseer/91.json");
+    case 92: return require("../../assets/data/tafseer/92.json");
+    case 93: return require("../../assets/data/tafseer/93.json");
+    case 94: return require("../../assets/data/tafseer/94.json");
+    case 95: return require("../../assets/data/tafseer/95.json");
+    case 96: return require("../../assets/data/tafseer/96.json");
+    case 97: return require("../../assets/data/tafseer/97.json");
+    case 98: return require("../../assets/data/tafseer/98.json");
+    case 99: return require("../../assets/data/tafseer/99.json");
+    case 100: return require("../../assets/data/tafseer/100.json");
+    case 101: return require("../../assets/data/tafseer/101.json");
+    case 102: return require("../../assets/data/tafseer/102.json");
+    case 103: return require("../../assets/data/tafseer/103.json");
+    case 104: return require("../../assets/data/tafseer/104.json");
+    case 105: return require("../../assets/data/tafseer/105.json");
+    case 106: return require("../../assets/data/tafseer/106.json");
+    case 107: return require("../../assets/data/tafseer/107.json");
+    case 108: return require("../../assets/data/tafseer/108.json");
+    case 109: return require("../../assets/data/tafseer/109.json");
+    case 110: return require("../../assets/data/tafseer/110.json");
+    case 111: return require("../../assets/data/tafseer/111.json");
+    case 112: return require("../../assets/data/tafseer/112.json");
+    case 113: return require("../../assets/data/tafseer/113.json");
+    case 114: return require("../../assets/data/tafseer/114.json");
+    default: return null;
+  }
+}
+
+async function loadData(filename: string): Promise<any> {
+  if (Platform.OS === "web") {
+    const resp = await fetch(`/data/${filename}`);
+    return resp.json();
+  }
+  const loader = nativeRequires[filename];
+  return loader ? loader() : null;
+}
+
+async function loadTafseerFile(surahNumber: number): Promise<any> {
+  if (Platform.OS === "web") {
+    const resp = await fetch(`/data/tafseer/${surahNumber}.json`);
+    return resp.json();
+  }
+  const loader = nativeTafseerRequires[surahNumber];
+  return loader ? loader() : null;
+}
+
+// ─── Types & helpers ─────────────────────────────────────────
 
 export type ImportProgress = {
   step: string;
@@ -186,10 +226,13 @@ async function batchInsert(
   }
 }
 
+// ─── Import functions ────────────────────────────────────────
+
 async function importSurahs(
   db: SQLiteDatabase,
   onProgress: ProgressCallback
 ): Promise<void> {
+  const quranData = await loadData("quran-data.json");
   const surahs = quranData.tables.surahs;
   onProgress({ step: "Surahs", current: 1, total: TOTAL_STEPS, detail: `${surahs.length} surahs` });
   console.log(`[Import] Importing ${surahs.length} surahs...`);
@@ -209,6 +252,10 @@ async function importQuranText(
   db: SQLiteDatabase,
   onProgress: ProgressCallback
 ): Promise<void> {
+  const [quranData, qcf2Data] = await Promise.all([
+    loadData("quran-data.json"),
+    loadData("quran-qcf2.json"),
+  ]);
   const texts = quranData.tables.quran_text;
   onProgress({ step: "Quran Text", current: 2, total: TOTAL_STEPS, detail: `${texts.length} ayahs` });
   console.log(`[Import] Importing ${texts.length} quran_text rows...`);
@@ -239,6 +286,7 @@ async function importJuzAndHizb(
   db: SQLiteDatabase,
   onProgress: ProgressCallback
 ): Promise<void> {
+  const quranData = await loadData("quran-data.json");
   const juzMap = quranData.tables.juz_map;
   const hizbMap = quranData.tables.hizb_map;
   onProgress({ step: "Juz & Hizb Maps", current: 3, total: TOTAL_STEPS, detail: `${juzMap.length} juz + ${hizbMap.length} hizb` });
@@ -266,6 +314,7 @@ async function importWordRoots(
   db: SQLiteDatabase,
   onProgress: ProgressCallback
 ): Promise<void> {
+  const quranData = await loadData("quran-data.json");
   const roots = quranData.tables.word_roots;
   onProgress({ step: "Word Roots", current: 4, total: TOTAL_STEPS, detail: `${roots.length} words` });
   console.log(`[Import] Importing ${roots.length} word_roots rows...`);
@@ -291,7 +340,7 @@ async function importTafseer(
   let totalRows = 0;
   const allRows: any[][] = [];
   for (let i = 1; i <= 114; i++) {
-    const data = tafseerRequires[i];
+    const data = await loadTafseerFile(i);
     const ayahs = data.ayahs || data;
     for (const entry of ayahs) {
       allRows.push([entry.surah ?? i, entry.ayah, "muyassar", entry.text]);
@@ -314,6 +363,7 @@ async function importZilal(
   onProgress({ step: "Tafseer", current: 6, total: TOTAL_STEPS, detail: "Fi Zilal al-Quran" });
   console.log(`[Import] Importing tafseer (zilal)...`);
 
+  const zilalData = await loadData("zilal.json");
   const allRows: any[][] = [];
   const data = zilalData.data;
   for (const surahNum of Object.keys(data)) {
@@ -341,6 +391,7 @@ async function importTranslations(
   onProgress({ step: "Translations", current: 7, total: TOTAL_STEPS, detail: "Sahih International" });
   console.log(`[Import] Importing translations...`);
 
+  const translationData = await loadData("translation-sahih.json");
   const allRows: any[][] = [];
   // translation-sahih.json is an array of 114 surah objects
   for (const surah of translationData) {
@@ -361,6 +412,7 @@ async function importPageMap(
   db: SQLiteDatabase,
   onProgress: ProgressCallback
 ): Promise<void> {
+  const pageMapData = await loadData("page-map.json");
   onProgress({ step: "Page Map", current: 8, total: TOTAL_STEPS, detail: "604 pages" });
   console.log(`[Import] Importing ${pageMapData.length} page_map rows...`);
 
@@ -383,6 +435,7 @@ async function importWordTranslations(
   db: SQLiteDatabase,
   onProgress: ProgressCallback
 ): Promise<void> {
+  const wbwData = await loadData("wbw/wbw.json");
   onProgress({ step: "Word-by-Word", current: 9, total: TOTAL_STEPS, detail: `${wbwData.length} words` });
   console.log(`[Import] Importing ${wbwData.length} word_translations rows...`);
 
@@ -406,6 +459,7 @@ async function importWordIrab(
   db: SQLiteDatabase,
   onProgress: ProgressCallback
 ): Promise<void> {
+  const masaqData = await loadData("masaq/masaq-aggregated.json");
   onProgress({ step: "Grammar (إعراب)", current: 10, total: TOTAL_STEPS, detail: `${masaqData.length} words` });
   console.log(`[Import] Importing ${masaqData.length} word_irab rows...`);
 
@@ -432,6 +486,7 @@ async function importPageLines(
   db: SQLiteDatabase,
   onProgress: ProgressCallback
 ): Promise<void> {
+  const pageLinesData = await loadData("layout/page-lines.json");
   onProgress({ step: "Page Layout", current: 12, total: TOTAL_STEPS, detail: `${pageLinesData.length} lines` });
   console.log(`[Import] Importing ${pageLinesData.length} page_lines rows...`);
 
@@ -456,6 +511,7 @@ async function importTajweed(
   db: SQLiteDatabase,
   onProgress: ProgressCallback
 ): Promise<void> {
+  const tajweedData = await loadData("tajweed.json");
   onProgress({ step: "Tajweed Rules", current: 11, total: TOTAL_STEPS, detail: `${tajweedData.length} ayahs` });
   console.log(`[Import] Importing tajweed rules...`);
 
@@ -475,6 +531,8 @@ async function importTajweed(
   );
   console.log(`[Import] Tajweed done: ${allRows.length} rows`);
 }
+
+// ─── Main initialization ─────────────────────────────────────
 
 export async function initializeDatabase(
   db: SQLiteDatabase,
@@ -515,6 +573,7 @@ export async function initializeDatabase(
 
     if ((qcf2Check?.cnt ?? 0) === 0 || needsQcf2Rewrite) {
       console.log("[Import] Migrating: populating QCF2 text data...");
+      const qcf2Data = await loadData("quran-qcf2.json");
       const qcf2Map = new Map<string, { code_v2: string; v2_page: number }>();
       for (const v of qcf2Data) {
         qcf2Map.set(v.verse_key, { code_v2: v.code_v2, v2_page: v.v2_page });

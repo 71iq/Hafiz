@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 
@@ -9,22 +9,11 @@ import { Platform } from "react-native";
 // To connect to your own Supabase project:
 // 1. Create a project at https://supabase.com
 // 2. Run the SQL in supabase/schema.sql to create tables + RLS policies
-// 3. Replace the values below with your project's URL and anon key
+// 3. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY in .env
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? "YOUR_PROJECT_URL";
 const SUPABASE_ANON_KEY =
   process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "YOUR_ANON_KEY";
-
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: {
-    // On native, use AsyncStorage for session persistence
-    // On web, Supabase defaults to localStorage
-    ...(Platform.OS !== "web" ? { storage: AsyncStorage } : {}),
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: Platform.OS === "web",
-  },
-});
 
 /** Returns true if the Supabase client is configured with real credentials */
 export function isSupabaseConfigured(): boolean {
@@ -33,3 +22,47 @@ export function isSupabaseConfigured(): boolean {
     !SUPABASE_ANON_KEY.includes("YOUR_ANON_KEY")
   );
 }
+
+// Lazy-initialize the Supabase client so the app can boot without
+// valid credentials (offline-first). The client is only created when
+// auth, sync, or community features actually access it.
+let _client: SupabaseClient | null = null;
+
+export const supabase: SupabaseClient = new Proxy({} as SupabaseClient, {
+  get(_target, prop) {
+    if (!_client) {
+      if (!isSupabaseConfigured()) {
+        // Return a safe stub for unconfigured environments.
+        // Auth store's initialize() checks isSupabaseConfigured() and skips.
+        if (prop === "auth") {
+          return {
+            getSession: () => Promise.resolve({ data: { session: null }, error: null }),
+            signInWithPassword: () => Promise.reject(new Error("Supabase not configured")),
+            signUp: () => Promise.reject(new Error("Supabase not configured")),
+            signOut: () => Promise.resolve({ error: null }),
+            signInWithOAuth: () => Promise.reject(new Error("Supabase not configured")),
+            onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+            setSession: () => Promise.reject(new Error("Supabase not configured")),
+          };
+        }
+        if (prop === "from") {
+          return () => ({
+            select: () => ({ eq: () => ({ single: () => Promise.resolve({ data: null, error: null }) }) }),
+            insert: () => Promise.resolve({ error: new Error("Supabase not configured") }),
+            upsert: () => Promise.resolve({ error: new Error("Supabase not configured") }),
+          });
+        }
+        return undefined;
+      }
+      _client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: {
+          ...(Platform.OS !== "web" ? { storage: AsyncStorage } : {}),
+          autoRefreshToken: true,
+          persistSession: true,
+          detectSessionInUrl: Platform.OS === "web",
+        },
+      });
+    }
+    return (_client as any)[prop];
+  },
+});

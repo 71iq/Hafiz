@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
-import { View, Text, Pressable, ActivityIndicator } from "react-native";
+import { View, Text, Pressable, ActivityIndicator, Platform } from "react-native";
 import { SurahHeader } from "./SurahHeader";
 import { WordToken } from "./WordToken";
 import { loadQpcFont, qpcFontName, isQpcFontLoaded } from "@/lib/fonts/loader";
@@ -7,7 +7,26 @@ import { useSelection } from "@/lib/selection/context";
 
 // Authoritative per-page, per-line word mapping from quran.com
 // pageWordsData[pageIndex] = { "lineNumber": "word1 word2 ..." }
-const pageWordsData: Record<string, string>[] = require("../../assets/data/layout/page-words.json");
+// On native: require() (small enough at 400KB). On web: lazy-fetched.
+let pageWordsData: Record<string, string>[] | null =
+  Platform.OS !== "web"
+    ? require("../../assets/data/layout/page-words.json")
+    : null;
+
+let pageWordsPromise: Promise<Record<string, string>[]> | null = null;
+
+function getPageWords(): Record<string, string>[] | null {
+  if (pageWordsData) return pageWordsData;
+  if (!pageWordsPromise) {
+    pageWordsPromise = fetch("/data/layout/page-words.json")
+      .then((r) => r.json())
+      .then((data) => {
+        pageWordsData = data;
+        return data;
+      });
+  }
+  return null;
+}
 
 type AyahData = {
   surah: number;
@@ -97,7 +116,15 @@ export function MushafPage({
   globalWordOffset,
 }: Props) {
   const [fontVisible, setFontVisible] = useState(false);
+  const [wordsLoaded, setWordsLoaded] = useState(!!pageWordsData);
   const { getHighlightColor, selectAyah } = useSelection();
+
+  // On web, trigger async load of page-words data
+  useEffect(() => {
+    if (pageWordsData) { setWordsLoaded(true); return; }
+    getPageWords(); // starts the fetch
+    pageWordsPromise?.then(() => setWordsLoaded(true));
+  }, []);
 
   useEffect(() => {
     setFontVisible(false);
@@ -140,7 +167,7 @@ export function MushafPage({
 
   let content;
   if (hasLineLayout) {
-    const lineWords = pageWordsData[pageNumber - 1] ?? {};
+    const lineWords = (pageWordsData ?? [])[pageNumber - 1] ?? {};
     let wordIndex = 0;
 
     content = lineLayout.map((line) => {

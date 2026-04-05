@@ -6,7 +6,8 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "prebuild:web": "bash scripts/prepare-web-data.sh"
   },
   "dependencies": {
     "@expo-google-fonts/manrope": "^0.4.2",

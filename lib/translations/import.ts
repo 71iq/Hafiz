@@ -1,5 +1,5 @@
 import type { SQLiteDatabase } from "expo-sqlite";
-import { translationRequires } from "./translation-requires";
+import { loadTranslation } from "./translation-requires";
 
 /**
  * Import a translation into the translation_active table.
@@ -9,7 +9,7 @@ export async function importTranslation(
   db: SQLiteDatabase,
   langCode: string
 ): Promise<void> {
-  const data = translationRequires[langCode];
+  const data = await loadTranslation(langCode);
   if (!data) {
     throw new Error(`No bundled translation for language: ${langCode}`);
   }

@@ -8,6 +8,7 @@ dist/
 *.mobileprovision
 *.orig.*
 web-build/
+public/data/
 .env
 .env.local
 
@@ -24,3 +25,4 @@ assets/data/wbw/*.db
 
 expo-env.d.ts
 # @end expo-cli
+.vercel
