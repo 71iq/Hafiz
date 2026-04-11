@@ -153,7 +153,19 @@ function tafseerRequireStatic(n: number): any {
   }
 }
 
-async function loadData(filename: string): Promise<any> {
+// ─── Fetch cache ────────────────────────────────────────────
+// Many importers load the same JSON (quran-data.json is used 4x). Caching
+// the in-flight promise dedupes fetches AND lets us pre-warm loads in
+// parallel while serialized SQLite inserts run. Cleared on importFinished().
+const loadCache = new Map<string, Promise<any>>();
+const tafseerCache = new Map<number, Promise<any>>();
+
+function clearImportCaches() {
+  loadCache.clear();
+  tafseerCache.clear();
+}
+
+async function doLoad(filename: string): Promise<any> {
   if (Platform.OS === "web") {
     const resp = await fetch(`/data/${filename}`);
     return resp.json();
@@ -162,13 +174,29 @@ async function loadData(filename: string): Promise<any> {
   return loader ? loader() : null;
 }
 
-async function loadTafseerFile(surahNumber: number): Promise<any> {
+function loadData(filename: string): Promise<any> {
+  const cached = loadCache.get(filename);
+  if (cached) return cached;
+  const p = doLoad(filename);
+  loadCache.set(filename, p);
+  return p;
+}
+
+async function doLoadTafseerFile(surahNumber: number): Promise<any> {
   if (Platform.OS === "web") {
     const resp = await fetch(`/data/tafseer/${surahNumber}.json`);
     return resp.json();
   }
   const loader = nativeTafseerRequires[surahNumber];
   return loader ? loader() : null;
+}
+
+function loadTafseerFile(surahNumber: number): Promise<any> {
+  const cached = tafseerCache.get(surahNumber);
+  if (cached) return cached;
+  const p = doLoadTafseerFile(surahNumber);
+  tafseerCache.set(surahNumber, p);
+  return p;
 }
 
 // ─── Types & helpers ─────────────────────────────────────────
@@ -337,16 +365,21 @@ async function importTafseer(
   onProgress({ step: "Tafseer", current: 5, total: TOTAL_STEPS, detail: "Al-Muyassar (114 files)" });
   console.log(`[Import] Importing tafseer (muyassar) from 114 files...`);
 
+  // Fetch all 114 files in parallel instead of sequentially.
+  const tafseerResults = await Promise.all(
+    Array.from({ length: 114 }, (_, i) => loadTafseerFile(i + 1))
+  );
+
   let totalRows = 0;
   const allRows: any[][] = [];
-  for (let i = 1; i <= 114; i++) {
-    const data = await loadTafseerFile(i);
+  tafseerResults.forEach((data, idx) => {
+    const surahNum = idx + 1;
     const ayahs = data.ayahs || data;
     for (const entry of ayahs) {
-      allRows.push([entry.surah ?? i, entry.ayah, "muyassar", entry.text]);
+      allRows.push([entry.surah ?? surahNum, entry.ayah, "muyassar", entry.text]);
     }
     totalRows += ayahs.length;
-  }
+  });
 
   await batchInsert(
     db,
@@ -688,6 +721,23 @@ export async function initializeDatabase(
   console.log("[Import] Starting first-launch data import...");
   const startTime = Date.now();
 
+  // Pre-warm: kick off every network fetch in parallel (web only — native
+  // uses require() which is synchronous). Each call primes loadCache so
+  // importers await already-in-flight promises instead of triggering fresh
+  // sequential downloads.
+  if (Platform.OS === "web") {
+    void loadData("quran-data.json");
+    void loadData("quran-qcf2.json");
+    void loadData("zilal.json");
+    void loadData("translation-sahih.json");
+    void loadData("page-map.json");
+    void loadData("wbw/wbw.json");
+    void loadData("masaq/masaq-aggregated.json");
+    void loadData("tajweed.json");
+    void loadData("layout/page-lines.json");
+    for (let i = 1; i <= 114; i++) void loadTafseerFile(i);
+  }
+
   await importSurahs(db, onProgress);
   await importQuranText(db, onProgress);
   await importJuzAndHizb(db, onProgress);
@@ -703,6 +753,10 @@ export async function initializeDatabase(
 
   // Create tafseer source index (not in schema.ts to avoid error on old tables without source column)
   await db.execAsync("CREATE INDEX IF NOT EXISTS idx_tafseer_source ON tafseer(source)");
+
+  // Free the fetch cache — the parsed JSON (~50MB) has been inserted into
+  // SQLite and is no longer needed in memory.
+  clearImportCaches();
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
   console.log(`[Import] All imports complete in ${elapsed}s`);
