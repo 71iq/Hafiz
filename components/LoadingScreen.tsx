@@ -1,9 +1,10 @@
-import { View, Text } from "react-native";
+import { View, Text, Image } from "react-native";
 import type { ImportProgress } from "@/lib/database/init";
 import { Progress } from "@/components/ui/Progress";
 import { strings } from "@/lib/i18n/strings";
 
 const s = strings.en;
+const logoSource = require("@/assets/images/logo.png");
 
 type Props = {
   progress: ImportProgress | null;
@@ -18,6 +19,12 @@ export function LoadingScreen({ progress }: Props) {
     <View className="flex-1 items-center justify-center bg-surface dark:bg-surface-dark px-8">
       {/* Gallery feel: generous top spacing via justify-center + offset */}
       <View className="items-center mb-16">
+        <Image
+          source={logoSource}
+          style={{ width: 96, height: 96, marginBottom: 20 }}
+          resizeMode="contain"
+          accessibilityLabel="Hafiz"
+        />
         <Text
           className="text-charcoal dark:text-neutral-100 mb-2"
           style={{ fontFamily: "NotoSerif_700Bold", fontSize: 40 }}
