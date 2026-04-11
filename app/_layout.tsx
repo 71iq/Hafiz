@@ -2,10 +2,11 @@ import "../global.css";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import * as Font from "expo-font";
+import { Platform } from "react-native";
 import { useEffect, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { DatabaseProvider } from "@/lib/database/provider";
-import { UI_FONTS } from "@/lib/fonts/ui-fonts";
+import { UI_FONTS, loadUiFontsWeb } from "@/lib/fonts/ui-fonts";
 import { useAuthStore } from "@/lib/auth/store";
 
 const queryClient = new QueryClient({
@@ -22,10 +23,18 @@ export { ErrorBoundary } from "expo-router";
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const [fontsLoaded, setFontsLoaded] = useState(false);
+  // On web we never block render on fonts — FontFace with display:swap
+  // lets text paint instantly in a fallback and swap when ready. Native
+  // still waits for expo-font since the splash covers the interval.
+  const [fontsLoaded, setFontsLoaded] = useState(Platform.OS === "web");
   const initialize = useAuthStore((s) => s.initialize);
 
   useEffect(() => {
+    if (Platform.OS === "web") {
+      loadUiFontsWeb().catch(console.error);
+      SplashScreen.hideAsync().catch(() => {});
+      return;
+    }
     Font.loadAsync(UI_FONTS)
       .then(() => setFontsLoaded(true))
       .catch(console.error)
