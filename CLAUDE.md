@@ -5,6 +5,10 @@
 Hafiz — Quran retention app (iOS/Android/Web via Expo). All 9 phases complete.
 Full spec: HAFIZ_SPEC.md (read before starting any work).
 
+## Workflow
+
+- **Commit and push to `main` after every change.** The live site deploys from `main`, so unpushed commits are invisible to users. After each edit, `git commit` then `git push origin main` immediately — no confirmation needed for normal pushes. Destructive ops (`reset --hard`, `push --force`, branch deletion) still require confirmation.
+
 ## Rules
 
 - RTL is first-class. Every layout must work RTL. Quran word containers use `direction: "ltr"` + `flexDirection: "row-reverse"` to avoid double-reversal when UI language is Arabic.
