@@ -177,7 +177,7 @@ function PageSeparator({ page }: { page: number }) {
 
 export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
   const db = useDatabase();
-  const { fontSize, lineHeight, pageScroll, isRTL } = useSettings();
+  const { fontSize, lineHeight, pageScroll } = useSettings();
   const { width } = useWindowDimensions();
   const horizontal = pageScroll === "horizontal";
   const [pageData, setPageData] = useState<PageData[]>([]);
@@ -378,8 +378,9 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
         extraData={fontSize}
         horizontal={horizontal}
         pagingEnabled={horizontal}
-        // Arabic reads right-to-left; swipe-right should go to the next page.
-        inverted={horizontal && isRTL}
+        // Quran is Arabic (RTL) regardless of UI language — always invert so
+        // swiping left goes to the next page.
+        inverted={horizontal}
         // Only hide chrome in vertical scroll mode — swipe mode has no scroll direction signal.
         onScroll={horizontal ? undefined : onScroll}
         scrollEventThrottle={16}

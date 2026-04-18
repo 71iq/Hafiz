@@ -119,7 +119,7 @@ function MushafInner() {
   const isNarrow = windowWidth < 480;
   const { selection, toastMessage, dismissToast } = useSelection();
   const { navigateToAyah } = useWordInteraction();
-  const { visible: chromeVisible, setVisible: setChromeVisible } = useChrome();
+  const { visible: chromeVisible } = useChrome();
   const onScrollHide = useHideChromeOnScroll();
 
   // Header slides/fades out in sync with the bottom bar.
@@ -132,11 +132,6 @@ function MushafInner() {
     transform: [{ translateY: -headerHidden.value * 80 }],
   }));
 
-  // When chrome is hidden, the first tap anywhere in content re-reveals it
-  // instead of acting on words/ayahs.
-  const revealOnTap = useCallback(() => {
-    if (!chromeVisible) setChromeVisible(true);
-  }, [chromeVisible, setChromeVisible]);
   const [items, setItems] = useState<MushafItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNavigator, setShowNavigator] = useState(false);
@@ -345,13 +340,18 @@ function MushafInner() {
         className="flex-1 bg-surface dark:bg-surface-dark"
         edges={["top"]}
       >
-        {/* Header — tonal background, no border. Hides on scroll down. */}
+        {/* Header — tonal background, no border. Hides on scroll down.
+            NativeWind's className doesn't flow into Animated.View, so we
+            keep the animated wrapper style-only and put layout classes on
+            the inner View. */}
         <Animated.View
           pointerEvents={chromeVisible ? "auto" : "none"}
+          style={headerAnimStyle}
+        >
+        <View
           className={`flex-row items-center justify-between bg-surface dark:bg-surface-dark ${
             isNarrow ? "px-2 py-2" : "px-4 py-3"
           }`}
-          style={headerAnimStyle}
         >
           {/* Left: View toggle + Go-to */}
           <View className={`flex-row items-center ${isNarrow ? "gap-1.5" : "gap-2.5"}`}>
@@ -456,6 +456,7 @@ function MushafInner() {
                 keep the top bar fitting on phone widths. */}
             {!isNarrow && <FontSizeControl />}
           </View>
+        </View>
         </Animated.View>
 
         {/* Content */}
@@ -478,14 +479,6 @@ function MushafInner() {
             contentContainerStyle={{ paddingBottom: 40 }}
             onScroll={onScrollHide}
             scrollEventThrottle={16}
-          />
-        )}
-
-        {/* Tap overlay: when chrome is hidden, first tap anywhere re-shows it. */}
-        {!chromeVisible && (
-          <Pressable
-            onPress={revealOnTap}
-            style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
           />
         )}
 
