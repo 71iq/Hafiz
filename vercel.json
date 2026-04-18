@@ -1,4 +1,6 @@
 {
   "buildCommand": "bash scripts/prepare-web-data.sh && expo export -p web",
-  "outputDirectory": "dist"
+  "outputDirectory": "dist",
+  "cleanUrls": true,
+  "trailingSlash": false
 }
