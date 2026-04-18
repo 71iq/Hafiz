@@ -1,13 +1,26 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
+import { Platform, useWindowDimensions } from "react-native";
 import { useColorScheme as useNativeWindColorScheme } from "nativewind";
 import type { SQLiteDatabase } from "expo-sqlite";
 import { useDatabase } from "@/lib/database/provider";
 import { DEFAULT_LANGUAGE } from "@/lib/translations/languages";
 import { importTranslation } from "@/lib/translations/import";
 
+// Desktop / large-viewport scale. Also the canonical length (7 steps) used
+// by UI controls like the font size picker.
 export const FONT_SIZE_STEPS = [22, 26, 30, 34, 38, 42, 46] as const;
 export const FONT_SIZE_LINE_HEIGHTS = [48, 56, 64, 72, 80, 88, 96] as const;
-const DEFAULT_FONT_SIZE_INDEX = 2; // 30px
+
+// Mobile scale — chosen so that phone-largest ≈ desktop-medium (30) and
+// phone-medium (index 2, default) ≈ desktop-smallest (22). Seven steps
+// aligned 1-to-1 with FONT_SIZE_STEPS, so fontSizeIndex is portable.
+export const FONT_SIZE_STEPS_MOBILE = [18, 20, 22, 24, 26, 28, 30] as const;
+export const FONT_SIZE_LINE_HEIGHTS_MOBILE = [40, 44, 48, 52, 56, 60, 64] as const;
+
+const DEFAULT_FONT_SIZE_INDEX = 2; // desktop 30px / mobile 22px
+
+// Web viewports narrower than this use the mobile scale; native is always mobile.
+const MOBILE_BREAKPOINT = 768;
 
 export const DEFAULT_DAILY_REVIEW_LIMIT = 50;
 export const MIN_DAILY_REVIEW_LIMIT = 10;
@@ -95,6 +108,10 @@ async function writeSetting(db: SQLiteDatabase, key: string, value: string): Pro
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const db = useDatabase();
   const { colorScheme: nwScheme, setColorScheme } = useNativeWindColorScheme();
+  const { width } = useWindowDimensions();
+  const isCompact = Platform.OS !== "web" || width < MOBILE_BREAKPOINT;
+  const activeSteps = isCompact ? FONT_SIZE_STEPS_MOBILE : FONT_SIZE_STEPS;
+  const activeLineHeights = isCompact ? FONT_SIZE_LINE_HEIGHTS_MOBILE : FONT_SIZE_LINE_HEIGHTS;
   const [fontSizeIndex, setFontSizeIndexState] = useState(DEFAULT_FONT_SIZE_INDEX);
   const [theme, setThemeState] = useState<ThemeMode>("system");
   const [viewMode, setViewModeState] = useState<ViewMode>("verse");
@@ -276,8 +293,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     <SettingsContext.Provider
       value={{
         fontSizeIndex,
-        fontSize: FONT_SIZE_STEPS[fontSizeIndex],
-        lineHeight: FONT_SIZE_LINE_HEIGHTS[fontSizeIndex],
+        fontSize: activeSteps[fontSizeIndex],
+        lineHeight: activeLineHeights[fontSizeIndex],
         setFontSizeIndex,
         theme,
         setTheme,
