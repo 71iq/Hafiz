@@ -122,15 +122,31 @@ function MushafInner() {
   const { visible: chromeVisible } = useChrome();
   const onScrollHide = useHideChromeOnScroll();
 
-  // Header slides/fades out in sync with the bottom bar.
+  // Header slides/fades out AND collapses its height so the list fills the
+  // freed vertical space. We measure the natural header height on first
+  // layout and animate height from that to 0.
   const headerHidden = useSharedValue(0);
   useEffect(() => {
     headerHidden.value = withTiming(chromeVisible ? 0 : 1, { duration: 200 });
   }, [chromeVisible, headerHidden]);
-  const headerAnimStyle = useAnimatedStyle(() => ({
-    opacity: 1 - headerHidden.value,
-    transform: [{ translateY: -headerHidden.value * 80 }],
-  }));
+  const [measuredHeaderH, setMeasuredHeaderH] = useState<number | null>(null);
+  const headerAnimStyle = useAnimatedStyle(() => {
+    if (measuredHeaderH == null) {
+      return { opacity: 1, overflow: "hidden" };
+    }
+    return {
+      height: measuredHeaderH * (1 - headerHidden.value),
+      opacity: 1 - headerHidden.value,
+      overflow: "hidden",
+    };
+  });
+  const onHeaderLayout = useCallback(
+    (e: { nativeEvent: { layout: { height: number } } }) => {
+      const h = e.nativeEvent.layout.height;
+      if (h > 0 && measuredHeaderH == null) setMeasuredHeaderH(h);
+    },
+    [measuredHeaderH]
+  );
 
   const [items, setItems] = useState<MushafItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -349,6 +365,7 @@ function MushafInner() {
           style={headerAnimStyle}
         >
         <View
+          onLayout={onHeaderLayout}
           className={`flex-row items-center justify-between bg-surface dark:bg-surface-dark ${
             isNarrow ? "px-2 py-2" : "px-4 py-3"
           }`}
