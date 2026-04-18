@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useFocusEffect, router } from "expo-router";
-import { View, Text, Pressable, ActivityIndicator } from "react-native";
+import { View, Text, Pressable, ActivityIndicator, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { FlashList, FlashListRef } from "@shopify/flash-list";
 import { BookOpen, AlignJustify, Navigation, Eye, EyeOff, Search, BookMarked } from "lucide-react-native";
@@ -108,6 +108,9 @@ function MushafInner() {
   const db = useDatabase();
   const { fontSize, lineHeight, viewMode, setViewMode, isDark } = useSettings();
   const s = useStrings();
+  const { width: windowWidth } = useWindowDimensions();
+  // Compact layout under ~480px — phones. Drops labels and tightens gaps.
+  const isNarrow = windowWidth < 480;
   const { selection, toastMessage, dismissToast } = useSelection();
   const { navigateToAyah } = useWordInteraction();
   const [items, setItems] = useState<MushafItem[]>([]);
@@ -319,14 +322,18 @@ function MushafInner() {
         edges={["top"]}
       >
         {/* Header — tonal background, no border */}
-        <View className="flex-row items-center justify-between px-4 py-3 bg-surface dark:bg-surface-dark">
+        <View
+          className={`flex-row items-center justify-between bg-surface dark:bg-surface-dark ${
+            isNarrow ? "px-2 py-2" : "px-4 py-3"
+          }`}
+        >
           {/* Left: View toggle + Go-to */}
-          <View className="flex-row items-center gap-2.5">
+          <View className={`flex-row items-center ${isNarrow ? "gap-1.5" : "gap-2.5"}`}>
             {/* View mode toggle — pill group */}
             <View className="flex-row bg-surface-high dark:bg-surface-dark-high rounded-full p-1">
               <Pressable
                 onPress={() => setViewMode("verse")}
-                className={`px-3 py-1.5 rounded-full ${
+                className={`rounded-full ${isNarrow ? "px-2 py-1" : "px-3 py-1.5"} ${
                   !isPageMode ? "bg-surface-bright dark:bg-surface-dark-bright" : ""
                 }`}
                 style={({ pressed }) => ({
@@ -340,7 +347,7 @@ function MushafInner() {
               </Pressable>
               <Pressable
                 onPress={() => setViewMode("page")}
-                className={`px-3 py-1.5 rounded-full ${
+                className={`rounded-full ${isNarrow ? "px-2 py-1" : "px-3 py-1.5"} ${
                   isPageMode ? "bg-surface-bright dark:bg-surface-dark-bright" : ""
                 }`}
                 style={({ pressed }) => ({
@@ -354,30 +361,36 @@ function MushafInner() {
               </Pressable>
             </View>
 
-            {/* Go-to navigator — pill button */}
+            {/* Go-to navigator — pill button. Drops label on narrow. */}
             <Pressable
               onPress={() => setShowNavigator(true)}
-              className="flex-row items-center gap-1.5 px-3.5 py-2 rounded-full bg-surface-high dark:bg-surface-dark-high"
+              className={`flex-row items-center rounded-full bg-surface-high dark:bg-surface-dark-high ${
+                isNarrow ? "px-2 py-2" : "gap-1.5 px-3.5 py-2"
+              }`}
               style={({ pressed }) => ({
                 transform: [{ scale: pressed ? 0.98 : 1 }],
               })}
             >
               <Navigation size={13} color="#0d9488" />
-              <Text
-                className="text-charcoal dark:text-neutral-300"
-                style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
-              >
-                {isPageMode ? interpolate(s.pageN, { n: currentPage }) : s.goTo}
-              </Text>
+              {!isNarrow && (
+                <Text
+                  className="text-charcoal dark:text-neutral-300"
+                  style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
+                >
+                  {isPageMode ? interpolate(s.pageN, { n: currentPage }) : s.goTo}
+                </Text>
+              )}
             </Pressable>
           </View>
 
           {/* Right: Bookmarks + Hide mode + Search + Font size */}
-          <View className="flex-row items-center gap-2.5">
+          <View className={`flex-row items-center ${isNarrow ? "gap-1" : "gap-2.5"}`}>
             {/* Bookmarks button */}
             <Pressable
               onPress={() => setShowBookmarks(true)}
-              className="px-3 py-2 rounded-full bg-surface-high dark:bg-surface-dark-high"
+              className={`rounded-full bg-surface-high dark:bg-surface-dark-high ${
+                isNarrow ? "px-2 py-2" : "px-3 py-2"
+              }`}
               style={({ pressed }) => ({
                 transform: [{ scale: pressed ? 0.98 : 1 }],
               })}
@@ -386,7 +399,7 @@ function MushafInner() {
             </Pressable>
             <Pressable
               onPress={() => setHideMode((prev) => !prev)}
-              className={`px-3 py-2 rounded-full ${
+              className={`rounded-full ${isNarrow ? "px-2 py-2" : "px-3 py-2"} ${
                 hideMode
                   ? "bg-primary-accent/15 dark:bg-primary-bright/15"
                   : "bg-surface-high dark:bg-surface-dark-high"
@@ -404,14 +417,18 @@ function MushafInner() {
             {/* Search — open search modal */}
             <Pressable
               onPress={() => setShowSearch(true)}
-              className="px-3 py-2 rounded-full bg-surface-high dark:bg-surface-dark-high"
+              className={`rounded-full bg-surface-high dark:bg-surface-dark-high ${
+                isNarrow ? "px-2 py-2" : "px-3 py-2"
+              }`}
               style={({ pressed }) => ({
                 transform: [{ scale: pressed ? 0.98 : 1 }],
               })}
             >
               <Search size={16} color={isDark ? "#737373" : "#8B8178"} />
             </Pressable>
-            <FontSizeControl />
+            {/* Font size adjuster lives in Settings on narrow viewports to
+                keep the top bar fitting on phone widths. */}
+            {!isNarrow && <FontSizeControl />}
           </View>
         </View>
 
