@@ -2,7 +2,13 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useFocusEffect, router } from "expo-router";
 import { View, Text, Pressable, ActivityIndicator, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import { FlashList, FlashListRef } from "@shopify/flash-list";
+import { useChrome, useHideChromeOnScroll } from "@/lib/ui/chrome";
 import { BookOpen, AlignJustify, Navigation, Eye, EyeOff, Search, BookMarked } from "lucide-react-native";
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
@@ -113,6 +119,24 @@ function MushafInner() {
   const isNarrow = windowWidth < 480;
   const { selection, toastMessage, dismissToast } = useSelection();
   const { navigateToAyah } = useWordInteraction();
+  const { visible: chromeVisible, setVisible: setChromeVisible } = useChrome();
+  const onScrollHide = useHideChromeOnScroll();
+
+  // Header slides/fades out in sync with the bottom bar.
+  const headerHidden = useSharedValue(0);
+  useEffect(() => {
+    headerHidden.value = withTiming(chromeVisible ? 0 : 1, { duration: 200 });
+  }, [chromeVisible, headerHidden]);
+  const headerAnimStyle = useAnimatedStyle(() => ({
+    opacity: 1 - headerHidden.value,
+    transform: [{ translateY: -headerHidden.value * 80 }],
+  }));
+
+  // When chrome is hidden, the first tap anywhere in content re-reveals it
+  // instead of acting on words/ayahs.
+  const revealOnTap = useCallback(() => {
+    if (!chromeVisible) setChromeVisible(true);
+  }, [chromeVisible, setChromeVisible]);
   const [items, setItems] = useState<MushafItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNavigator, setShowNavigator] = useState(false);
@@ -321,11 +345,13 @@ function MushafInner() {
         className="flex-1 bg-surface dark:bg-surface-dark"
         edges={["top"]}
       >
-        {/* Header — tonal background, no border */}
-        <View
+        {/* Header — tonal background, no border. Hides on scroll down. */}
+        <Animated.View
+          pointerEvents={chromeVisible ? "auto" : "none"}
           className={`flex-row items-center justify-between bg-surface dark:bg-surface-dark ${
             isNarrow ? "px-2 py-2" : "px-4 py-3"
           }`}
+          style={headerAnimStyle}
         >
           {/* Left: View toggle + Go-to */}
           <View className={`flex-row items-center ${isNarrow ? "gap-1.5" : "gap-2.5"}`}>
@@ -430,7 +456,7 @@ function MushafInner() {
                 keep the top bar fitting on phone widths. */}
             {!isNarrow && <FontSizeControl />}
           </View>
-        </View>
+        </Animated.View>
 
         {/* Content */}
         {isPageMode ? (
@@ -438,6 +464,7 @@ function MushafInner() {
             <PageMushaf
               onPageChange={setCurrentPage}
               goToPageRef={goToPageRef}
+              onScroll={onScrollHide}
             />
           </View>
         ) : (
@@ -449,6 +476,16 @@ function MushafInner() {
             keyExtractor={keyExtractor}
             extraData={{ fontSize, hideMode, highlightedKey }}
             contentContainerStyle={{ paddingBottom: 40 }}
+            onScroll={onScrollHide}
+            scrollEventThrottle={16}
+          />
+        )}
+
+        {/* Tap overlay: when chrome is hidden, first tap anywhere re-shows it. */}
+        {!chromeVisible && (
+          <Pressable
+            onPress={revealOnTap}
+            style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
           />
         )}
 

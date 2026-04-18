@@ -5,8 +5,11 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
+  withTiming,
 } from "react-native-reanimated";
+import { useEffect } from "react";
 import { useColorScheme } from "nativewind";
+import { useChrome } from "@/lib/ui/chrome";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -78,9 +81,23 @@ function BottomBar(props: BottomTabBarProps) {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === "dark";
   const visibleRoutes = getVisibleRoutes(state, descriptors);
+  const { visible } = useChrome();
+
+  const hidden = useSharedValue(0);
+  useEffect(() => {
+    hidden.value = withTiming(visible ? 0 : 1, { duration: 200 });
+  }, [visible, hidden]);
+  const barAnimStyle = useAnimatedStyle(() => {
+    const slide = hidden.value * 120;
+    return {
+      transform: [{ translateY: slide }],
+      opacity: 1 - hidden.value,
+    };
+  });
 
   return (
-    <View
+    <Animated.View
+      pointerEvents={visible ? "auto" : "none"}
       style={[
         styles.bottomContainer,
         {
@@ -93,6 +110,7 @@ function BottomBar(props: BottomTabBarProps) {
             },
           }),
         },
+        barAnimStyle,
       ]}
     >
       {visibleRoutes.map((route) => {
@@ -116,7 +134,7 @@ function BottomBar(props: BottomTabBarProps) {
           />
         );
       })}
-    </View>
+    </Animated.View>
   );
 }
 

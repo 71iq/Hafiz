@@ -5,6 +5,8 @@ import {
   FlatList,
   ActivityIndicator,
   useWindowDimensions,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
 } from "react-native";
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
@@ -108,6 +110,7 @@ function buildPageData(
 type Props = {
   onPageChange?: (page: number) => void;
   goToPageRef?: React.MutableRefObject<((page: number) => void) | null>;
+  onScroll?: (e: NativeSyntheticEvent<NativeScrollEvent>) => void;
 };
 
 // Fixed heights for getItemLayout calculation
@@ -172,7 +175,7 @@ function PageSeparator({ page }: { page: number }) {
   );
 }
 
-export function PageMushaf({ onPageChange, goToPageRef }: Props) {
+export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
   const db = useDatabase();
   const { fontSize, lineHeight, pageScroll, isRTL } = useSettings();
   const { width } = useWindowDimensions();
@@ -377,6 +380,9 @@ export function PageMushaf({ onPageChange, goToPageRef }: Props) {
         pagingEnabled={horizontal}
         // Arabic reads right-to-left; swipe-right should go to the next page.
         inverted={horizontal && isRTL}
+        // Only hide chrome in vertical scroll mode — swipe mode has no scroll direction signal.
+        onScroll={horizontal ? undefined : onScroll}
+        scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
         showsHorizontalScrollIndicator={false}
         onViewableItemsChanged={onViewableItemsChanged}

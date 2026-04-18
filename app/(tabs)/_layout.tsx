@@ -11,6 +11,7 @@ import { SyncIndicator } from "@/components/ui/SyncIndicator";
 import { OfflineBanner } from "@/components/ui/OfflineBanner";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ChromeProvider } from "@/lib/ui/chrome";
 
 function SyncOverlay() {
   const { status } = useSync();
@@ -168,9 +169,11 @@ export default function TabLayout() {
 
   return (
     <SettingsProvider>
-      <ErrorBoundary section="TabLayout">
-        <TabsWithStrings />
-      </ErrorBoundary>
+      <ChromeProvider>
+        <ErrorBoundary section="TabLayout">
+          <TabsWithStrings />
+        </ErrorBoundary>
+      </ChromeProvider>
     </SettingsProvider>
   );
 }
