@@ -15,6 +15,7 @@ import {
   type ThemeMode,
   type UILanguage,
   type TafseerSource,
+  type PageScroll,
 } from "@/lib/settings/context";
 import { useDatabase } from "@/lib/database/provider";
 import { getLanguageByCode } from "@/lib/translations/languages";
@@ -33,6 +34,7 @@ export default function SettingsScreen() {
     tafseerSource, setTafseerSource,
     uiLanguage, setUiLanguage,
     dailyReviewLimit, setDailyReviewLimit,
+    pageScroll, setPageScroll,
   } = useSettings();
   const db = useDatabase();
   const s = useStrings();
@@ -289,6 +291,24 @@ export default function SettingsScreen() {
               بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ
             </Text>
           </View>
+
+          <View className="h-5" />
+
+          {/* Page view navigation: scroll vs. swipe */}
+          <Text
+            className="text-charcoal dark:text-neutral-200 mb-3"
+            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15 }}
+          >
+            {s.pageScrollLabel}
+          </Text>
+          <ToggleGroup<PageScroll>
+            value={pageScroll}
+            onValueChange={setPageScroll}
+            items={[
+              { value: "vertical", label: s.pageScrollVertical },
+              { value: "horizontal", label: s.pageScrollHorizontal },
+            ]}
+          />
         </Card>
 
         {/* Inline Content Section */}

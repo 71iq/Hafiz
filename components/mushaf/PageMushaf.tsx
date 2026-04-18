@@ -174,8 +174,9 @@ function PageSeparator({ page }: { page: number }) {
 
 export function PageMushaf({ onPageChange, goToPageRef }: Props) {
   const db = useDatabase();
-  const { fontSize, lineHeight } = useSettings();
+  const { fontSize, lineHeight, pageScroll, isRTL } = useSettings();
   const { width } = useWindowDimensions();
+  const horizontal = pageScroll === "horizontal";
   const [pageData, setPageData] = useState<PageData[]>([]);
   const [surahMap, setSurahMap] = useState<Map<number, SurahRow>>(new Map());
   const [loading, setLoading] = useState(true);
@@ -263,6 +264,10 @@ export function PageMushaf({ onPageChange, goToPageRef }: Props) {
   // getItemLayout enables instant scrollToIndex without rendering intermediate items
   const getItemLayout = useCallback(
     (_data: ArrayLike<PageData> | null | undefined, index: number) => {
+      // Horizontal swipe mode: every page is exactly one viewport wide.
+      if (horizontal) {
+        return { length: width, offset: width * index, index };
+      }
       if (!layoutInfo || index < 0 || index >= layoutInfo.heights.length) {
         // Fallback estimate
         const estHeight = 15 * lineHeight + PAGE_PADDING + (index > 0 ? SEPARATOR_HEIGHT : 0);
@@ -274,7 +279,7 @@ export function PageMushaf({ onPageChange, goToPageRef }: Props) {
         index,
       };
     },
-    [layoutInfo, lineHeight]
+    [layoutInfo, lineHeight, horizontal, width]
   );
 
   // Expose goToPage function to parent — instant jump via getItemLayout
@@ -307,23 +312,40 @@ export function PageMushaf({ onPageChange, goToPageRef }: Props) {
   ).current;
 
   const renderPage = useCallback(
-    ({ item, index }: { item: PageData; index: number }) => (
-      <View>
-        <MushafPage
-          pageNumber={item.page}
-          ayahs={item.ayahs}
-          surahMap={surahMap}
-          fontSize={fontSize}
-          lineHeight={lineHeight}
-          width={width}
-          lineLayout={item.lineLayout}
-          globalWordOffset={item.globalWordOffset}
-        />
-        {/* Page separator after every page except the last */}
-        {index < pageData.length - 1 && <PageSeparator page={item.page} />}
-      </View>
-    ),
-    [surahMap, fontSize, lineHeight, width, pageData.length]
+    ({ item, index }: { item: PageData; index: number }) => {
+      if (horizontal) {
+        return (
+          <View style={{ width, height: "100%" }}>
+            <MushafPage
+              pageNumber={item.page}
+              ayahs={item.ayahs}
+              surahMap={surahMap}
+              fontSize={fontSize}
+              lineHeight={lineHeight}
+              width={width}
+              lineLayout={item.lineLayout}
+              globalWordOffset={item.globalWordOffset}
+            />
+          </View>
+        );
+      }
+      return (
+        <View>
+          <MushafPage
+            pageNumber={item.page}
+            ayahs={item.ayahs}
+            surahMap={surahMap}
+            fontSize={fontSize}
+            lineHeight={lineHeight}
+            width={width}
+            lineLayout={item.lineLayout}
+            globalWordOffset={item.globalWordOffset}
+          />
+          {index < pageData.length - 1 && <PageSeparator page={item.page} />}
+        </View>
+      );
+    },
+    [surahMap, fontSize, lineHeight, width, pageData.length, horizontal]
   );
 
   const keyExtractor = useCallback(
@@ -351,13 +373,18 @@ export function PageMushaf({ onPageChange, goToPageRef }: Props) {
         keyExtractor={keyExtractor}
         getItemLayout={getItemLayout}
         extraData={fontSize}
+        horizontal={horizontal}
+        pagingEnabled={horizontal}
+        // Arabic reads right-to-left; swipe-right should go to the next page.
+        inverted={horizontal && isRTL}
         showsVerticalScrollIndicator={false}
+        showsHorizontalScrollIndicator={false}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
         initialNumToRender={3}
         maxToRenderPerBatch={3}
         windowSize={5}
-        contentContainerStyle={{ paddingBottom: 60 }}
+        contentContainerStyle={horizontal ? undefined : { paddingBottom: 60 }}
       />
 
       {/* Page indicator */}

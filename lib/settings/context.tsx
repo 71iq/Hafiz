@@ -29,6 +29,7 @@ export const DAILY_REVIEW_LIMIT_STEP = 10;
 
 export type ThemeMode = "light" | "dark" | "system";
 export type ViewMode = "verse" | "page";
+export type PageScroll = "vertical" | "horizontal";
 export type UILanguage = "en" | "ar";
 export type TafseerSource = "muyassar" | "zilal";
 
@@ -41,6 +42,8 @@ type SettingsContextType = {
   setTheme: (theme: ThemeMode) => void;
   viewMode: ViewMode;
   setViewMode: (mode: ViewMode) => void;
+  pageScroll: PageScroll;
+  setPageScroll: (scroll: PageScroll) => void;
   showTranslation: boolean;
   setShowTranslation: (show: boolean) => void;
   showTafseer: boolean;
@@ -68,6 +71,8 @@ const SettingsContext = createContext<SettingsContextType>({
   setTheme: () => {},
   viewMode: "verse",
   setViewMode: () => {},
+  pageScroll: "vertical",
+  setPageScroll: () => {},
   showTranslation: false,
   setShowTranslation: () => {},
   showTafseer: false,
@@ -115,6 +120,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [fontSizeIndex, setFontSizeIndexState] = useState(DEFAULT_FONT_SIZE_INDEX);
   const [theme, setThemeState] = useState<ThemeMode>("system");
   const [viewMode, setViewModeState] = useState<ViewMode>("verse");
+  const [pageScroll, setPageScrollState] = useState<PageScroll>("vertical");
   const [showTranslation, setShowTranslationState] = useState(false);
   const [showTafseer, setShowTafseerState] = useState(false);
   const [translationLanguage, setTranslationLanguageState] = useState(DEFAULT_LANGUAGE);
@@ -146,6 +152,11 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         const savedViewMode = await readSetting(db, "view_mode");
         if (savedViewMode === "verse" || savedViewMode === "page") {
           setViewModeState(savedViewMode);
+        }
+
+        const savedPageScroll = await readSetting(db, "page_scroll");
+        if (savedPageScroll === "vertical" || savedPageScroll === "horizontal") {
+          setPageScrollState(savedPageScroll);
         }
 
         const savedShowTranslation = await readSetting(db, "show_translation");
@@ -220,6 +231,14 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     (mode: ViewMode) => {
       setViewModeState(mode);
       writeSetting(db, "view_mode", mode).catch(console.warn);
+    },
+    [db]
+  );
+
+  const setPageScroll = useCallback(
+    (scroll: PageScroll) => {
+      setPageScrollState(scroll);
+      writeSetting(db, "page_scroll", scroll).catch(console.warn);
     },
     [db]
   );
@@ -300,6 +319,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         setTheme,
         viewMode,
         setViewMode,
+        pageScroll,
+        setPageScroll,
         showTranslation,
         setShowTranslation,
         showTafseer,
