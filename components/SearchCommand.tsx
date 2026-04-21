@@ -19,6 +19,7 @@ import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings, interpolate } from "@/lib/i18n/useStrings";
 import { setPendingDeepLink } from "@/lib/deep-link";
+import { useWordInteraction } from "@/lib/word/context";
 
 // ─── Arabic diacritics stripping ───
 const ARABIC_DIACRITICS_RE =
@@ -136,6 +137,7 @@ export function SearchCommand({ visible, onClose }: SearchCommandProps) {
   const db = useDatabase();
   const { isDark, isRTL } = useSettings();
   const s = useStrings();
+  const { clearTooltip, closeDetail } = useWordInteraction();
 
   const [query, setQuery] = useState("");
   const [mode, setMode] = useState<"text" | "root">("text");
@@ -148,10 +150,45 @@ export function SearchCommand({ visible, onClose }: SearchCommandProps) {
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<TextInput>(null);
+  // Cache of diacritic-stripped lemma/word_text → root, for resolving a typed
+  // word like "جاء" to canonical root "جيأ" in root-mode search.
+  const rootIndexRef = useRef<{
+    lemmaMap: Map<string, Set<string>>;
+    wordMap: Map<string, Set<string>>;
+  } | null>(null);
+
+  const loadRootIndex = useCallback(async () => {
+    if (rootIndexRef.current) return rootIndexRef.current;
+    const rows = await db.getAllAsync<{ root: string; lemma: string | null; word_text: string | null }>(
+      `SELECT root, lemma, word_text FROM word_roots WHERE root IS NOT NULL GROUP BY root, lemma, word_text`
+    );
+    const lemmaMap = new Map<string, Set<string>>();
+    const wordMap = new Map<string, Set<string>>();
+    for (const r of rows) {
+      if (!r.root) continue;
+      if (r.lemma) {
+        const key = stripDiacritics(r.lemma);
+        if (!lemmaMap.has(key)) lemmaMap.set(key, new Set());
+        lemmaMap.get(key)!.add(r.root);
+      }
+      if (r.word_text) {
+        const key = stripDiacritics(r.word_text);
+        if (!wordMap.has(key)) wordMap.set(key, new Set());
+        wordMap.get(key)!.add(r.root);
+      }
+    }
+    const cache = { lemmaMap, wordMap };
+    rootIndexRef.current = cache;
+    return cache;
+  }, [db]);
 
   // Auto-focus input when opened
   useEffect(() => {
     if (visible) {
+      // Dismiss any lingering Mushaf word tooltip/detail sheet — otherwise
+      // they float above the search modal.
+      clearTooltip();
+      closeDetail();
       setTimeout(() => inputRef.current?.focus(), 100);
       loadHistory();
     } else {
@@ -162,7 +199,7 @@ export function SearchCommand({ visible, onClose }: SearchCommandProps) {
       setHasSearched(false);
       setExpandedLemmas(new Set());
     }
-  }, [visible]);
+  }, [visible, clearTooltip, closeDetail]);
 
   const loadHistory = useCallback(async () => {
     try {
@@ -227,16 +264,50 @@ export function SearchCommand({ visible, onClose }: SearchCommandProps) {
           setTextResults(rows);
           setRootResults([]);
         } else {
-          const rows = await db.getAllAsync<RootOccurrence>(
-            `SELECT wr.surah, wr.ayah, wr.word_pos, wr.word_text, wr.root, wr.lemma,
-                    q.text_uthmani, s.name_arabic, s.name_english
-             FROM word_roots wr
-             JOIN quran_text q ON wr.surah = q.surah AND wr.ayah = q.ayah
-             JOIN surahs s ON wr.surah = s.number
-             WHERE wr.root = ?
-             ORDER BY wr.surah, wr.ayah, wr.word_pos`,
-            [term.trim()]
-          );
+          // Users typically type a word (e.g. "جاء"), not a canonical root
+          // (e.g. "جيأ"). Resolve the input to matching root(s) by checking
+          // direct root match + diacritic-stripped lemma/word_text lookups.
+          const trimmed = term.trim();
+          const strippedTerm = stripDiacritics(trimmed);
+          const rootCandidates = new Set<string>();
+          rootCandidates.add(trimmed);
+          rootCandidates.add(strippedTerm);
+
+          const index = await loadRootIndex();
+          if (index.lemmaMap.has(strippedTerm)) {
+            for (const r of index.lemmaMap.get(strippedTerm)!) rootCandidates.add(r);
+          }
+          if (index.wordMap.has(strippedTerm)) {
+            for (const r of index.wordMap.get(strippedTerm)!) rootCandidates.add(r);
+          }
+          // Prefix fallback for partial words
+          if (strippedTerm.length >= 3) {
+            for (const [key, roots] of index.lemmaMap) {
+              if (key.startsWith(strippedTerm)) {
+                for (const r of roots) rootCandidates.add(r);
+              }
+            }
+            for (const [key, roots] of index.wordMap) {
+              if (key.startsWith(strippedTerm)) {
+                for (const r of roots) rootCandidates.add(r);
+              }
+            }
+          }
+
+          const candidateList = Array.from(rootCandidates).filter(Boolean);
+          const placeholders = candidateList.map(() => "?").join(",");
+          const rows = candidateList.length
+            ? await db.getAllAsync<RootOccurrence>(
+                `SELECT wr.surah, wr.ayah, wr.word_pos, wr.word_text, wr.root, wr.lemma,
+                        q.text_uthmani, s.name_arabic, s.name_english
+                 FROM word_roots wr
+                 JOIN quran_text q ON wr.surah = q.surah AND wr.ayah = q.ayah
+                 JOIN surahs s ON wr.surah = s.number
+                 WHERE wr.root IN (${placeholders})
+                 ORDER BY wr.surah, wr.ayah, wr.word_pos`,
+                candidateList
+              )
+            : [];
 
           const lemmaMap = new Map<string, RootOccurrence[]>();
           for (const row of rows) {
@@ -265,7 +336,7 @@ export function SearchCommand({ visible, onClose }: SearchCommandProps) {
         setSearching(false);
       }
     },
-    [db, saveToHistory]
+    [db, saveToHistory, loadRootIndex]
   );
 
   const handleQueryChange = useCallback(
