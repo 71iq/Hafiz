@@ -1,5 +1,3 @@
-import { ScrollViewStyleReset } from 'expo-router/html';
-
 // This file is web-only and used to configure the root HTML for every
 // web page during static rendering.
 // The contents of this function only run in Node.js environments and
@@ -30,26 +28,70 @@ export default function Root({ children }: { children: React.ReactNode }) {
         <meta name="apple-mobile-web-app-title" content="Hafiz" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
-        {/*
-          Disable body scrolling on web. This makes ScrollView components work closer to how they do on native.
-          However, body scrolling is often nice to have for mobile web. If you want to enable it, remove this line.
-        */}
-        <ScrollViewStyleReset />
+        {/* Allow the document body to overflow by 1px so mobile browsers
+            register a scrollable page and collapse their URL bar. #root stays
+            clipped to the dynamic viewport (100dvh) so internal lists keep
+            working exactly as before. */}
+        <style dangerouslySetInnerHTML={{ __html: urlBarHideStyles }} />
 
-        {/* Using raw CSS styles as an escape-hatch to ensure the background color never flickers in dark-mode. */}
-        <style dangerouslySetInnerHTML={{ __html: responsiveBackground }} />
+        {/* On first load, nudge window scroll so iOS/Android immediately hide
+            the URL bar instead of waiting for the user to scroll the body. */}
+        <script dangerouslySetInnerHTML={{ __html: urlBarHideScript }} />
       </head>
       <body>{children}</body>
     </html>
   );
 }
 
-const responsiveBackground = `
+const urlBarHideStyles = `
+html {
+  /* Body needs to be the scroll container, not html — iOS only hides the
+     URL bar when a body-level scroll is observed. */
+  overflow: hidden;
+  height: 100%;
+}
 body {
+  margin: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  /* Anchor the visible content to the large viewport and add a sliver of
+     extra height so window scroll is always possible. */
+  min-height: calc(100dvh + 1px);
   background-color: #fff;
+  /* Prefer smooth momentum on iOS so the scroll-to-1px nudge doesn't feel
+     sudden. */
+  -webkit-overflow-scrolling: touch;
+}
+#root {
+  height: 100dvh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 @media (prefers-color-scheme: dark) {
-  body {
-    background-color: #000;
-  }
+  body { background-color: #000; }
 }`;
+
+const urlBarHideScript = `
+(function () {
+  var nudge = function () {
+    if (window.scrollY < 1) {
+      window.scrollTo(0, 1);
+    }
+  };
+  var run = function () {
+    nudge();
+    // Retry — some mobile browsers ignore the first scroll call before the
+    // page is fully settled.
+    setTimeout(nudge, 0);
+    setTimeout(nudge, 300);
+    setTimeout(nudge, 900);
+  };
+  if (document.readyState === 'complete') {
+    run();
+  } else {
+    window.addEventListener('load', run, { once: true });
+  }
+  window.addEventListener('orientationchange', function () { setTimeout(nudge, 200); });
+})();
+`;
