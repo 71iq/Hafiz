@@ -440,23 +440,27 @@ function MushafInner() {
             >
               <BookMarked size={16} color={isDark ? "#737373" : "#8B8178"} />
             </Pressable>
-            <Pressable
-              onPress={() => setHideMode((prev) => !prev)}
-              className={`rounded-full ${isNarrow ? "px-2 py-2" : "px-3 py-2"} ${
-                hideMode
-                  ? "bg-primary-accent/15 dark:bg-primary-bright/15"
-                  : "bg-surface-high dark:bg-surface-dark-high"
-              }`}
-              style={({ pressed }) => ({
-                transform: [{ scale: pressed ? 0.98 : 1 }],
-              })}
-            >
-              {hideMode ? (
-                <EyeOff size={16} color="#0d9488" />
-              ) : (
-                <Eye size={16} color={isDark ? "#737373" : "#8B8178"} />
-              )}
-            </Pressable>
+            {/* Hide-mode toggle only makes sense in verse-by-verse view —
+                page view renders whole pages with no per-ayah blur target. */}
+            {viewMode === "verse" && (
+              <Pressable
+                onPress={() => setHideMode((prev) => !prev)}
+                className={`rounded-full ${isNarrow ? "px-2 py-2" : "px-3 py-2"} ${
+                  hideMode
+                    ? "bg-primary-accent/15 dark:bg-primary-bright/15"
+                    : "bg-surface-high dark:bg-surface-dark-high"
+                }`}
+                style={({ pressed }) => ({
+                  transform: [{ scale: pressed ? 0.98 : 1 }],
+                })}
+              >
+                {hideMode ? (
+                  <EyeOff size={16} color="#0d9488" />
+                ) : (
+                  <Eye size={16} color={isDark ? "#737373" : "#8B8178"} />
+                )}
+              </Pressable>
+            )}
             {/* Search — open search modal */}
             <Pressable
               onPress={() => setShowSearch(true)}
