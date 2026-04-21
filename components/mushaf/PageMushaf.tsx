@@ -389,9 +389,13 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
         showsHorizontalScrollIndicator={false}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
-        initialNumToRender={3}
-        maxToRenderPerBatch={3}
-        windowSize={5}
+        // Horizontal paging mode needs a generous render window so virtualized
+        // items keep materializing as the user swipes forward. Vertical list
+        // items are tall so a smaller window suffices.
+        initialNumToRender={horizontal ? 5 : 3}
+        maxToRenderPerBatch={horizontal ? 5 : 3}
+        windowSize={horizontal ? 11 : 5}
+        removeClippedSubviews={!horizontal}
         contentContainerStyle={horizontal ? undefined : { paddingBottom: 60 }}
       />
 
