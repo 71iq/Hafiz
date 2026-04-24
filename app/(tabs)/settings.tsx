@@ -474,6 +474,33 @@ export default function SettingsScreen() {
           </View>
         </Card>
 
+        {/* Credits & Sources */}
+        <SectionLabel>{s.creditsSection}</SectionLabel>
+        <Card elevation="low" className="p-5 mb-8">
+          <View className="gap-2.5">
+            {[
+              s.creditWordMeanings,
+              s.creditIrab,
+              s.creditQiraat,
+              s.creditTajweedRules,
+              s.creditTajweedDesc,
+            ].map((line, i) => (
+              <Text
+                key={i}
+                className="text-warm-500 dark:text-neutral-400"
+                style={{
+                  fontFamily: "Manrope_400Regular",
+                  fontSize: 12,
+                  lineHeight: 18,
+                  ...(isRTL ? { writingDirection: "rtl", textAlign: "right" } : {}),
+                }}
+              >
+                • {line}
+              </Text>
+            ))}
+          </View>
+        </Card>
+
         <TranslationLanguagePicker
           visible={pickerVisible}
           onClose={() => setPickerVisible(false)}

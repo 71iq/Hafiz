@@ -16,6 +16,11 @@ cp assets/data/translation-sahih.json public/data/
 cp assets/data/page-map.json public/data/
 cp assets/data/tajweed.json public/data/
 cp assets/data/zilal.json public/data/
+cp assets/data/wbw-arabic-meanings.json public/data/
+cp assets/data/irab-per-word.json public/data/
+cp assets/data/tajweed-rules-ar.json public/data/
+cp assets/data/tajweed-rules-en.json public/data/
+cp assets/data/al-qira-at-al-mawsoo-ah-al-qur-aniyyah.json public/data/
 
 # Subdirectory data
 cp assets/data/wbw/wbw.json public/data/wbw/

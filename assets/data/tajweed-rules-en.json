@@ -1,0 +1,117 @@
+{
+  "_comment": "Maps cpfair/quran-tajweed rule keys to English explanations. Sources: kalimah-center.com, madinaharabic.com, riyadalquran.com, quranspirit.com",
+  "madd_2": {
+    "name": "Madd (2 counts)",
+    "name_ar": "مد طبيعي",
+    "short": "Natural prolongation",
+    "description": "Prolong the vowel sound for 2 counts (harakat). This is the natural extension that occurs with alif, waw, or ya when preceded by their matching short vowel."
+  },
+  "madd_246": {
+    "name": "Madd (2, 4, or 6 counts)",
+    "name_ar": "مد منفصل",
+    "short": "Separated prolongation",
+    "description": "Prolong for 2, 4, or 6 counts. Occurs when a madd letter is at the end of a word followed by a hamza at the start of the next word."
+  },
+  "madd_muttasil": {
+    "name": "Madd Muttasil",
+    "name_ar": "مد متصل",
+    "short": "Connected prolongation (4-5 counts)",
+    "description": "Obligatory prolongation of 4-5 counts when a madd letter is followed by a hamza within the same word."
+  },
+  "madd_munfasil": {
+    "name": "Madd Munfasil",
+    "name_ar": "مد منفصل",
+    "short": "Separated prolongation (2-5 counts)",
+    "description": "Prolong for 2-5 counts when a madd letter at the end of a word is followed by a hamza at the beginning of the next word."
+  },
+  "madd_6": {
+    "name": "Madd Lazim (6 counts)",
+    "name_ar": "مد لازم",
+    "short": "Obligatory 6-count prolongation",
+    "description": "Obligatory prolongation of exactly 6 counts, occurring when a madd letter is followed by a sukoon or shaddah."
+  },
+  "ghunnah": {
+    "name": "Ghunnah",
+    "name_ar": "غنة",
+    "short": "Nasalization (2 counts)",
+    "description": "A nasal sound made through the nose lasting 2 counts. Applied to noon and meem when they carry a shaddah, or in certain idghaam and ikhfa cases."
+  },
+  "idghaam_ghunnah": {
+    "name": "Idghaam with Ghunnah",
+    "name_ar": "إدغام بغنة",
+    "short": "Merging with nasalization",
+    "description": "When noon sakinah or tanween is followed by ي، ن، م، و, merge the sound into the next letter while maintaining a 2-count nasal sound."
+  },
+  "idghaam_no_ghunnah": {
+    "name": "Idghaam without Ghunnah",
+    "name_ar": "إدغام بغير غنة",
+    "short": "Merging without nasalization",
+    "description": "When noon sakinah or tanween is followed by ل or ر, merge the sound into the next letter without any nasalization."
+  },
+  "idghaam_mutajanisayn": {
+    "name": "Idghaam Mutajanisayn",
+    "name_ar": "إدغام متجانسين",
+    "short": "Merging of similar articulation",
+    "description": "Merging two letters that share the same point of articulation but differ in characteristics (e.g., ت and ط, د and ت)."
+  },
+  "idghaam_mutaqaribayn": {
+    "name": "Idghaam Mutaqaribayn",
+    "name_ar": "إدغام متقاربين",
+    "short": "Merging of close articulation",
+    "description": "Merging two letters whose points of articulation are close to each other (e.g., ل and ر, ق and ك)."
+  },
+  "idghaam_shafawi": {
+    "name": "Idghaam Shafawi",
+    "name_ar": "إدغام شفوي",
+    "short": "Labial merging",
+    "description": "When meem sakinah is followed by another meem, merge the two with a complete ghunnah (2-count nasal sound)."
+  },
+  "ikhfa": {
+    "name": "Ikhfa",
+    "name_ar": "إخفاء",
+    "short": "Concealment with nasalization",
+    "description": "When noon sakinah or tanween is followed by one of 15 specific letters, the noon sound is partially hidden with a 2-count nasal sound. The tongue does not touch the roof of the mouth."
+  },
+  "ikhfa_shafawi": {
+    "name": "Ikhfa Shafawi",
+    "name_ar": "إخفاء شفوي",
+    "short": "Labial concealment",
+    "description": "When meem sakinah is followed by ب, conceal the meem with a light nasal sound (ghunnah) for 2 counts."
+  },
+  "iqlab": {
+    "name": "Iqlab",
+    "name_ar": "إقلاب",
+    "short": "Conversion to meem",
+    "description": "When noon sakinah or tanween is followed by ب, convert the noon sound into a meem with ghunnah (2-count nasal sound)."
+  },
+  "qalqalah": {
+    "name": "Qalqalah",
+    "name_ar": "قلقلة",
+    "short": "Bouncing sound",
+    "description": "A slight bounce or echo when pronouncing the letters ق، ط، ب، ج، د when they carry a sukoon or appear at the end of a word."
+  },
+  "hamzat_wasl": {
+    "name": "Hamzat al-Wasl",
+    "name_ar": "همزة الوصل",
+    "short": "Connecting hamza (silent when continuing)",
+    "description": "A hamza pronounced only when starting a phrase; dropped when reading continues from the previous word. Written as ٱ."
+  },
+  "lam_shamsiyyah": {
+    "name": "Lam Shamsiyyah",
+    "name_ar": "لام شمسية",
+    "short": "Silent lam (sun letter)",
+    "description": "The lam of 'al' (ال) is silent and the following letter is doubled. Occurs before 14 'sun letters': ت، ث، د، ذ، ر، ز، س، ش، ص، ض، ط، ظ، ل، ن."
+  },
+  "lam_qamariyyah": {
+    "name": "Lam Qamariyyah",
+    "name_ar": "لام قمرية",
+    "short": "Pronounced lam (moon letter)",
+    "description": "The lam of 'al' (ال) is clearly pronounced. Occurs before 14 'moon letters': ا، ب، ج، ح، خ، ع، غ، ف، ق، ك، م، ه، و، ي."
+  },
+  "silent": {
+    "name": "Silent letter",
+    "name_ar": "حرف ساكن",
+    "short": "Not pronounced",
+    "description": "This letter is written but not pronounced in recitation."
+  }
+}

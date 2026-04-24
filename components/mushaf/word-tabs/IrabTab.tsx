@@ -1,8 +1,12 @@
 import { useEffect, useState } from "react";
 import { View, Text } from "react-native";
 import { useDatabase } from "@/lib/database/provider";
-import { fetchWordIrab, type WordIrabRow } from "@/lib/word/queries";
-import { decodeLabelList } from "@/lib/word/morphology-labels";
+import {
+  fetchWordIrabDaasForAyah,
+  fetchWordText,
+  findBestWordMatch,
+  type WordIrabDaasRow,
+} from "@/lib/word/queries";
 import { useStrings } from "@/lib/i18n/useStrings";
 
 type Props = {
@@ -14,13 +18,20 @@ type Props = {
 export function IrabTab({ surah, ayah, wordPos }: Props) {
   const db = useDatabase();
   const s = useStrings();
-  const [data, setData] = useState<WordIrabRow | null>(null);
+  const [rows, setRows] = useState<WordIrabDaasRow[]>([]);
+  const [matchIdx, setMatchIdx] = useState<number>(-1);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setLoading(true);
-    fetchWordIrab(db, surah, ayah, wordPos)
-      .then((row) => setData(row))
+    Promise.all([
+      fetchWordIrabDaasForAyah(db, surah, ayah),
+      fetchWordText(db, surah, ayah, wordPos),
+    ])
+      .then(([r, tappedText]) => {
+        setRows(r);
+        setMatchIdx(findBestWordMatch(r, wordPos, tappedText ?? ""));
+      })
       .finally(() => setLoading(false));
   }, [db, surah, ayah, wordPos]);
 
@@ -32,62 +43,70 @@ export function IrabTab({ surah, ayah, wordPos }: Props) {
     );
   }
 
-  if (!data) {
+  if (rows.length === 0) {
     return (
       <View className="py-6 items-center">
-        <Text className="text-warm-400 dark:text-neutral-500 text-sm">
-          {s.noIrabData}
+        <Text
+          className="text-warm-400 dark:text-neutral-500 text-sm"
+          style={{ writingDirection: "rtl" }}
+        >
+          {s.noDaasIrab}
         </Text>
       </View>
     );
   }
 
-  const decodedMorpho = decodeLabelList(data.morphological_tag);
-  const decodedSyntax = decodeLabelList(data.syntactic_function);
+  // Move the matched entry to the top when present
+  const ordered = matchIdx > 0
+    ? [rows[matchIdx], ...rows.filter((_, i) => i !== matchIdx)]
+    : rows;
 
   return (
     <View className="py-4 px-1">
-      {/* Arabic word */}
-      {data.arabic_word && (
-        <View className="mb-4">
-          <Text
-            className="text-2xl text-charcoal dark:text-neutral-100 mb-2"
-            style={{ writingDirection: "rtl", textAlign: "right" }}
+      {ordered.map((row, visibleIdx) => {
+        const isMatch = matchIdx !== -1 && visibleIdx === 0 && row === rows[matchIdx];
+        return (
+          <View
+            key={`${row.surah}-${row.ayah}-${row.word_pos}`}
+            className={`mb-3 p-3 rounded-2xl ${
+              isMatch
+                ? "bg-primary-accent/10 dark:bg-primary-bright/10"
+                : "bg-surface-high dark:bg-surface-dark-high"
+            }`}
           >
-            {data.arabic_word}
-          </Text>
-        </View>
-      )}
-
-      {/* Syntactic Function */}
-      {decodedSyntax && (
-        <View className="mb-4">
-          <Text className="text-xs font-medium text-warm-400 dark:text-neutral-500 uppercase tracking-wider mb-1.5">
-            {s.syntacticFunction}
-          </Text>
-          <Text
-            className="text-base text-charcoal dark:text-neutral-100 leading-6"
-            style={{ writingDirection: "rtl", textAlign: "right" }}
-          >
-            {decodedSyntax}
-          </Text>
-        </View>
-      )}
-
-      {/* Morphological Tag */}
-      {decodedMorpho && (
-        <View className="mb-4">
-          <Text className="text-xs font-medium text-warm-400 dark:text-neutral-500 uppercase tracking-wider mb-1.5">
-            {s.morphologicalTag}
-          </Text>
-          <Text
-            className="text-base text-charcoal dark:text-neutral-100 leading-6"
-            style={{ writingDirection: "rtl", textAlign: "right" }}
-          >
-            {decodedMorpho}
-          </Text>
-        </View>
-      )}
+            {row.word && (
+              <Text
+                className={`text-xl mb-1.5 font-semibold ${
+                  isMatch
+                    ? "text-primary-accent dark:text-primary-bright"
+                    : "text-charcoal dark:text-neutral-100"
+                }`}
+                style={{ writingDirection: "rtl", textAlign: "right" }}
+              >
+                {row.word}
+              </Text>
+            )}
+            {row.irab && (
+              <Text
+                className="text-base text-charcoal dark:text-neutral-200 leading-7"
+                style={{
+                  writingDirection: "rtl",
+                  textAlign: "right",
+                  fontFamily: "IBMPlexSansArabic, NotoSansArabic, system-ui",
+                }}
+              >
+                {row.irab}
+              </Text>
+            )}
+          </View>
+        );
+      })}
+      <Text
+        className="text-xs text-warm-400 dark:text-neutral-500 mt-2"
+        style={{ writingDirection: "rtl", textAlign: "right" }}
+      >
+        {s.irabSourceAttribution}
+      </Text>
     </View>
   );
 }

@@ -80,6 +80,19 @@ export async function fetchWordRoot(
   );
 }
 
+export async function fetchWordText(
+  db: SQLiteDatabase,
+  surah: number,
+  ayah: number,
+  wordPos: number,
+): Promise<string | null> {
+  const row = await db.getFirstAsync<{ word_text: string }>(
+    "SELECT word_text FROM word_roots WHERE surah = ? AND ayah = ? AND word_pos = ?",
+    [surah, ayah, wordPos],
+  );
+  return row?.word_text ?? null;
+}
+
 export async function fetchRootOccurrences(
   db: SQLiteDatabase,
   root: string,
@@ -112,4 +125,148 @@ export async function fetchAyahTafseer(
     [surah, ayah],
   );
   return row?.text ?? null;
+}
+
+// ─── New tab queries ──────────────────────────────────────────
+
+export type WordMeaningArRow = {
+  surah: number;
+  ayah: number;
+  word_pos: number;
+  word: string | null;
+  meaning: string | null;
+};
+
+export type WordIrabDaasRow = {
+  surah: number;
+  ayah: number;
+  word_pos: number;
+  word: string | null;
+  irab: string | null;
+};
+
+export type TajweedRuleArRow = {
+  rule_key: string;
+  name_ar: string | null;
+  short_ar: string | null;
+  description_ar: string | null;
+};
+
+export type TajweedRuleEnRow = {
+  rule_key: string;
+  name: string | null;
+  name_ar: string | null;
+  short: string | null;
+  description: string | null;
+};
+
+export type QiraatRow = {
+  text: string | null;
+  ayah_group: string | null;
+};
+
+/** Strip Arabic diacritics (tashkeel) for loose matching of word text. */
+const ARABIC_DIACRITICS_RE = /[ً-ٰٟۖ-ۜ۟-۪ۤۧۨ-ۭـ]/g;
+export function normalizeArabicWord(s: string): string {
+  return s
+    .replace(ARABIC_DIACRITICS_RE, "")
+    .replace(/[ً-ٟ]/g, "")
+    .replace(/\s+/g, "")
+    .trim();
+}
+
+export async function fetchWordMeaningsArForAyah(
+  db: SQLiteDatabase,
+  surah: number,
+  ayah: number,
+): Promise<WordMeaningArRow[]> {
+  return db.getAllAsync<WordMeaningArRow>(
+    "SELECT surah, ayah, word_pos, word, meaning FROM word_meanings_ar WHERE surah = ? AND ayah = ? ORDER BY word_pos",
+    [surah, ayah],
+  );
+}
+
+export async function fetchWordIrabDaasForAyah(
+  db: SQLiteDatabase,
+  surah: number,
+  ayah: number,
+): Promise<WordIrabDaasRow[]> {
+  return db.getAllAsync<WordIrabDaasRow>(
+    "SELECT surah, ayah, word_pos, word, irab FROM word_irab_daas WHERE surah = ? AND ayah = ? ORDER BY word_pos",
+    [surah, ayah],
+  );
+}
+
+export async function fetchTajweedRuleAr(
+  db: SQLiteDatabase,
+  ruleKey: string,
+): Promise<TajweedRuleArRow | null> {
+  return db.getFirstAsync<TajweedRuleArRow>(
+    "SELECT rule_key, name_ar, short_ar, description_ar FROM tajweed_rules_ar WHERE rule_key = ?",
+    [ruleKey],
+  );
+}
+
+export async function fetchTajweedRuleEn(
+  db: SQLiteDatabase,
+  ruleKey: string,
+): Promise<TajweedRuleEnRow | null> {
+  return db.getFirstAsync<TajweedRuleEnRow>(
+    "SELECT rule_key, name, name_ar, short, description FROM tajweed_rules_en WHERE rule_key = ?",
+    [ruleKey],
+  );
+}
+
+export async function fetchQiraat(
+  db: SQLiteDatabase,
+  surah: number,
+  ayah: number,
+): Promise<QiraatRow | null> {
+  return db.getFirstAsync<QiraatRow>(
+    "SELECT text, ayah_group FROM qiraat_encyclopedia WHERE surah = ? AND ayah = ?",
+    [surah, ayah],
+  );
+}
+
+/**
+ * Find the best matching entry in a per-ayah list for a tapped word.
+ * The Da'as and quran-words datasets group words differently from the Mushaf
+ * (e.g., "بِسْمِ اللهِ" as one entry vs two Mushaf tokens). Strategy:
+ *   1. Exact word_pos match.
+ *   2. Normalized-text match (drop diacritics/spaces) — prefer containment.
+ *   3. Fuzzy: first entry whose normalized word contains the tapped word.
+ * Returns the index into `list`, or -1 if nothing matched.
+ */
+export function findBestWordMatch<T extends { word_pos: number; word: string | null }>(
+  list: T[],
+  targetPos: number,
+  targetText: string,
+): number {
+  if (list.length === 0) return -1;
+  const exactIdx = list.findIndex((r) => r.word_pos === targetPos);
+  if (exactIdx !== -1) {
+    // If the exact-position row's word matches the tapped text (loosely),
+    // keep it. Otherwise fall through to text-based matching.
+    const row = list[exactIdx];
+    if (row.word) {
+      const a = normalizeArabicWord(row.word);
+      const b = normalizeArabicWord(targetText);
+      if (a && b && (a === b || a.includes(b) || b.includes(a))) return exactIdx;
+    } else {
+      return exactIdx;
+    }
+  }
+  const target = normalizeArabicWord(targetText);
+  if (!target) return exactIdx; // fall back to whatever we had
+  // Prefer exact normalized equality first
+  const eqIdx = list.findIndex((r) => r.word && normalizeArabicWord(r.word) === target);
+  if (eqIdx !== -1) return eqIdx;
+  // Then containment either direction
+  const containsIdx = list.findIndex((r) => {
+    if (!r.word) return false;
+    const w = normalizeArabicWord(r.word);
+    return w.includes(target) || target.includes(w);
+  });
+  if (containsIdx !== -1) return containsIdx;
+  return exactIdx;
 }

@@ -148,6 +148,52 @@ export async function createSchema(db: SQLiteDatabase): Promise<void> {
       end_offset INTEGER NOT NULL
     );
 
+    -- Arabic word meanings (quran-words.com) — separate from English word_translations
+    CREATE TABLE IF NOT EXISTS word_meanings_ar (
+      surah INTEGER NOT NULL,
+      ayah INTEGER NOT NULL,
+      word_pos INTEGER NOT NULL,
+      word TEXT,
+      meaning TEXT,
+      PRIMARY KEY (surah, ayah, word_pos)
+    );
+
+    -- Da'as i'rab per word — separate from MASAQ word_irab (keep that intact)
+    CREATE TABLE IF NOT EXISTS word_irab_daas (
+      surah INTEGER NOT NULL,
+      ayah INTEGER NOT NULL,
+      word_pos INTEGER NOT NULL,
+      word TEXT,
+      irab TEXT,
+      PRIMARY KEY (surah, ayah, word_pos)
+    );
+
+    -- Arabic descriptions for tajweed rule keys
+    CREATE TABLE IF NOT EXISTS tajweed_rules_ar (
+      rule_key TEXT PRIMARY KEY,
+      name_ar TEXT,
+      short_ar TEXT,
+      description_ar TEXT
+    );
+
+    -- English descriptions for tajweed rule keys
+    CREATE TABLE IF NOT EXISTS tajweed_rules_en (
+      rule_key TEXT PRIMARY KEY,
+      name TEXT,
+      name_ar TEXT,
+      short TEXT,
+      description TEXT
+    );
+
+    -- Qira'at encyclopedia per ayah
+    CREATE TABLE IF NOT EXISTS qiraat_encyclopedia (
+      surah INTEGER NOT NULL,
+      ayah INTEGER NOT NULL,
+      text TEXT,
+      ayah_group TEXT,
+      PRIMARY KEY (surah, ayah)
+    );
+
     -- ============================================================
     -- USER DATA TABLES (read/write, synced)
     -- ============================================================
@@ -254,6 +300,8 @@ export async function createSchema(db: SQLiteDatabase): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_highlights_surah_ayah ON highlights(surah, ayah);
     CREATE INDEX IF NOT EXISTS idx_study_log_reviewed ON study_log(reviewed_at);
     CREATE INDEX IF NOT EXISTS idx_word_roots_lemma ON word_roots(lemma);
+    CREATE INDEX IF NOT EXISTS idx_word_meanings_ar_sa ON word_meanings_ar(surah, ayah);
+    CREATE INDEX IF NOT EXISTS idx_word_irab_daas_sa ON word_irab_daas(surah, ayah);
   `);
 }
 

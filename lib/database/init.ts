@@ -19,6 +19,11 @@ const nativeRequires: Record<string, () => any> = Platform.OS !== "web"
       "masaq/masaq-aggregated.json": () => require("../../assets/data/masaq/masaq-aggregated.json"),
       "layout/page-lines.json": () => require("../../assets/data/layout/page-lines.json"),
       "zilal.json": () => require("../../assets/data/zilal.json"),
+      "wbw-arabic-meanings.json": () => require("../../assets/data/wbw-arabic-meanings.json"),
+      "irab-per-word.json": () => require("../../assets/data/irab-per-word.json"),
+      "tajweed-rules-ar.json": () => require("../../assets/data/tajweed-rules-ar.json"),
+      "tajweed-rules-en.json": () => require("../../assets/data/tajweed-rules-en.json"),
+      "al-qira-at-al-mawsoo-ah-al-qur-aniyyah.json": () => require("../../assets/data/al-qira-at-al-mawsoo-ah-al-qur-aniyyah.json"),
     }
   : {};
 
@@ -565,6 +570,185 @@ async function importTajweed(
   console.log(`[Import] Tajweed done: ${allRows.length} rows`);
 }
 
+// ─── New tab dataset importers ───────────────────────────────
+
+async function importWordMeaningsAr(
+  db: SQLiteDatabase,
+  onProgress: ProgressCallback
+): Promise<void> {
+  const data = await loadData("wbw-arabic-meanings.json");
+  if (!Array.isArray(data)) return;
+  onProgress({ step: "Arabic Meanings", current: 13, total: TOTAL_STEPS, detail: `${data.length} words` });
+  console.log(`[Import] Importing ${data.length} word_meanings_ar rows...`);
+
+  const rows = data.map((w: any) => [
+    w.surah,
+    w.ayah,
+    w.word_pos,
+    w.word ?? null,
+    w.meaning ?? null,
+  ]);
+  await batchInsert(
+    db,
+    "INSERT OR IGNORE INTO word_meanings_ar (surah, ayah, word_pos, word, meaning) VALUES (?, ?, ?, ?, ?)",
+    rows
+  );
+  console.log(`[Import] word_meanings_ar done: ${rows.length} rows`);
+}
+
+async function importWordIrabDaas(
+  db: SQLiteDatabase,
+  onProgress: ProgressCallback
+): Promise<void> {
+  const data = await loadData("irab-per-word.json");
+  if (!Array.isArray(data)) return;
+  onProgress({ step: "Da'as Iʿrab", current: 14, total: TOTAL_STEPS, detail: `${data.length} words` });
+  console.log(`[Import] Importing ${data.length} word_irab_daas rows...`);
+
+  const rows = data.map((w: any) => [
+    w.surah,
+    w.ayah,
+    w.word_pos,
+    w.word ?? null,
+    w.irab ? stripHtml(String(w.irab)) : null,
+  ]);
+  await batchInsert(
+    db,
+    "INSERT OR IGNORE INTO word_irab_daas (surah, ayah, word_pos, word, irab) VALUES (?, ?, ?, ?, ?)",
+    rows
+  );
+  console.log(`[Import] word_irab_daas done: ${rows.length} rows`);
+}
+
+async function importTajweedRulesAr(
+  db: SQLiteDatabase,
+  onProgress: ProgressCallback
+): Promise<void> {
+  const data = await loadData("tajweed-rules-ar.json");
+  if (!data || typeof data !== "object") return;
+  const keys = Object.keys(data).filter((k) => !k.startsWith("_"));
+  onProgress({ step: "Tajweed (AR)", current: 15, total: TOTAL_STEPS, detail: `${keys.length} rules` });
+  console.log(`[Import] Importing ${keys.length} tajweed_rules_ar rows...`);
+
+  const rows = keys.map((key) => {
+    const v = (data as any)[key] ?? {};
+    return [key, v.name_ar ?? null, v.short_ar ?? null, v.description_ar ?? null];
+  });
+  await batchInsert(
+    db,
+    "INSERT OR REPLACE INTO tajweed_rules_ar (rule_key, name_ar, short_ar, description_ar) VALUES (?, ?, ?, ?)",
+    rows
+  );
+  console.log(`[Import] tajweed_rules_ar done: ${rows.length} rows`);
+}
+
+async function importTajweedRulesEn(
+  db: SQLiteDatabase,
+  onProgress: ProgressCallback
+): Promise<void> {
+  const data = await loadData("tajweed-rules-en.json");
+  if (!data || typeof data !== "object") return;
+  const keys = Object.keys(data).filter((k) => !k.startsWith("_"));
+  onProgress({ step: "Tajweed (EN)", current: 16, total: TOTAL_STEPS, detail: `${keys.length} rules` });
+  console.log(`[Import] Importing ${keys.length} tajweed_rules_en rows...`);
+
+  const rows = keys.map((key) => {
+    const v = (data as any)[key] ?? {};
+    return [key, v.name ?? null, v.name_ar ?? null, v.short ?? null, v.description ?? null];
+  });
+  await batchInsert(
+    db,
+    "INSERT OR REPLACE INTO tajweed_rules_en (rule_key, name, name_ar, short, description) VALUES (?, ?, ?, ?, ?)",
+    rows
+  );
+  console.log(`[Import] tajweed_rules_en done: ${rows.length} rows`);
+}
+
+async function importQiraatEncyclopedia(
+  db: SQLiteDatabase,
+  onProgress: ProgressCallback
+): Promise<void> {
+  const data = await loadData("al-qira-at-al-mawsoo-ah-al-qur-aniyyah.json");
+  if (!data || typeof data !== "object") return;
+  onProgress({ step: "Qiraʾat", current: 17, total: TOTAL_STEPS, detail: "…" });
+  console.log(`[Import] Building qiraat_encyclopedia rows...`);
+
+  // Two pass: first collect object entries (with text). Second pass: resolve string refs.
+  type Entry = { text: string; group: string[] };
+  const objects = new Map<string, Entry>();
+  const refs: Array<[string, string]> = [];
+
+  for (const key of Object.keys(data)) {
+    const v = (data as any)[key];
+    if (typeof v === "string") {
+      refs.push([key, v]);
+    } else if (v && typeof v === "object" && typeof v.text === "string") {
+      const group = Array.isArray(v.ayah_keys) && v.ayah_keys.length > 0
+        ? v.ayah_keys.map(String)
+        : [key];
+      const plain = stripHtml(v.text);
+      objects.set(key, { text: plain, group });
+    }
+  }
+
+  // Rows for object entries — insert one row per key in ayah_keys (or just the entry key if no group)
+  const rowsByKey = new Map<string, [number, number, string, string]>();
+  for (const [key, entry] of objects) {
+    const { text, group } = entry;
+    const groupJson = JSON.stringify(group);
+    for (const k of group) {
+      const [s, a] = k.split(":").map((n) => parseInt(n, 10));
+      if (Number.isFinite(s) && Number.isFinite(a)) {
+        rowsByKey.set(k, [s, a, text, groupJson]);
+      }
+    }
+    // Also make sure the primary key itself is present even if ayah_keys was empty
+    const [sk, ak] = key.split(":").map((n) => parseInt(n, 10));
+    if (Number.isFinite(sk) && Number.isFinite(ak) && !rowsByKey.has(key)) {
+      rowsByKey.set(key, [sk, ak, text, groupJson]);
+    }
+  }
+
+  // String refs: resolve to the target's text + group
+  for (const [key, target] of refs) {
+    const resolved = rowsByKey.get(target);
+    if (!resolved) continue;
+    const [sk, ak] = key.split(":").map((n) => parseInt(n, 10));
+    if (!Number.isFinite(sk) || !Number.isFinite(ak)) continue;
+    rowsByKey.set(key, [sk, ak, resolved[2], resolved[3]]);
+  }
+
+  const rows = Array.from(rowsByKey.values());
+  await batchInsert(
+    db,
+    "INSERT OR REPLACE INTO qiraat_encyclopedia (surah, ayah, text, ayah_group) VALUES (?, ?, ?, ?)",
+    rows
+  );
+  console.log(`[Import] qiraat_encyclopedia done: ${rows.length} rows`);
+}
+
+async function runNewTabImports(
+  db: SQLiteDatabase,
+  onProgress: ProgressCallback
+): Promise<void> {
+  // Idempotent: only import tables that are empty. Safe to call on fresh
+  // installs and existing installs alike.
+  const checks = await Promise.all([
+    db.getFirstAsync<{ c: number }>("SELECT COUNT(*) as c FROM word_meanings_ar"),
+    db.getFirstAsync<{ c: number }>("SELECT COUNT(*) as c FROM word_irab_daas"),
+    db.getFirstAsync<{ c: number }>("SELECT COUNT(*) as c FROM tajweed_rules_ar"),
+    db.getFirstAsync<{ c: number }>("SELECT COUNT(*) as c FROM tajweed_rules_en"),
+    db.getFirstAsync<{ c: number }>("SELECT COUNT(*) as c FROM qiraat_encyclopedia"),
+  ]);
+  const [meaningsC, irabDaasC, tajArC, tajEnC, qiraatC] = checks.map((r) => r?.c ?? 0);
+
+  if (meaningsC === 0) await importWordMeaningsAr(db, onProgress);
+  if (irabDaasC === 0) await importWordIrabDaas(db, onProgress);
+  if (tajArC === 0) await importTajweedRulesAr(db, onProgress);
+  if (tajEnC === 0) await importTajweedRulesEn(db, onProgress);
+  if (qiraatC === 0) await importQiraatEncyclopedia(db, onProgress);
+}
+
 // ─── Main initialization ─────────────────────────────────────
 
 export async function initializeDatabase(
@@ -713,6 +897,9 @@ export async function initializeDatabase(
       }
     }
 
+    // Import new tab datasets if their tables are empty (migration for existing installs).
+    await runNewTabImports(db, onProgress);
+
     console.log("[Import] Database already populated, skipping import.");
     onProgress({ step: "Complete", current: TOTAL_STEPS, total: TOTAL_STEPS, detail: "Already imported" });
     return;
@@ -735,6 +922,11 @@ export async function initializeDatabase(
     void loadData("masaq/masaq-aggregated.json");
     void loadData("tajweed.json");
     void loadData("layout/page-lines.json");
+    void loadData("wbw-arabic-meanings.json");
+    void loadData("irab-per-word.json");
+    void loadData("tajweed-rules-ar.json");
+    void loadData("tajweed-rules-en.json");
+    void loadData("al-qira-at-al-mawsoo-ah-al-qur-aniyyah.json");
     for (let i = 1; i <= 114; i++) void loadTafseerFile(i);
   }
 
@@ -750,6 +942,7 @@ export async function initializeDatabase(
   await importWordIrab(db, onProgress);
   await importTajweed(db, onProgress);
   await importPageLines(db, onProgress);
+  await runNewTabImports(db, onProgress);
 
   // Create tafseer source index (not in schema.ts to avoid error on old tables without source column)
   await db.execAsync("CREATE INDEX IF NOT EXISTS idx_tafseer_source ON tafseer(source)");

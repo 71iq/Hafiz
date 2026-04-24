@@ -1,10 +1,9 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { View, Text, Modal, Pressable, ScrollView } from "react-native";
 import { X } from "lucide-react-native";
 import { useWordInteraction } from "@/lib/word/context";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
-import { EnglishTab } from "./word-tabs/EnglishTab";
 import { MeaningTab } from "./word-tabs/MeaningTab";
 import { IrabTab } from "./word-tabs/IrabTab";
 import { TasreefTab } from "./word-tabs/TasreefTab";
@@ -12,33 +11,36 @@ import { TajweedTab } from "./word-tabs/TajweedTab";
 import { QiraatTab } from "./word-tabs/QiraatTab";
 import { OccurrencesTab } from "./word-tabs/OccurrencesTab";
 
-const TAB_KEYS = ["english", "meaning", "irab", "tasreef", "tajweed", "qiraat", "occurrences"] as const;
-type TabKey = (typeof TAB_KEYS)[number];
+type TabKey = "meaning" | "irab" | "tajweed" | "tasreef" | "qiraat" | "occurrences";
 
 export function WordDetailSheet() {
   const { detailWord, closeDetail } = useWordInteraction();
-  const { isDark } = useSettings();
+  const { isDark, uiLanguage } = useSettings();
   const s = useStrings();
-  const [activeTab, setActiveTab] = useState<TabKey>("english");
+  const [activeTab, setActiveTab] = useState<TabKey>("meaning");
 
-  const TABS = [
-    { key: "english" as TabKey, label: s.wordTabEnglish },
-    { key: "meaning" as TabKey, label: "المعنى" },
-    { key: "irab" as TabKey, label: "الإعراب" },
-    { key: "tasreef" as TabKey, label: "التصريف" },
-    { key: "tajweed" as TabKey, label: "التجويد" },
-    { key: "qiraat" as TabKey, label: "القراءات" },
-    { key: "occurrences" as TabKey, label: "المواضع" },
-  ];
+  const isArabicMode = uiLanguage === "ar";
+
+  const tabs = useMemo(
+    () => [
+      { key: "meaning" as TabKey, label: isArabicMode ? s.wordTabMeaning : s.wordTabMeaning },
+      { key: "irab" as TabKey, label: s.wordTabIrab },
+      { key: "tajweed" as TabKey, label: s.wordTabTajweed },
+      { key: "tasreef" as TabKey, label: s.wordTabTasreef },
+      { key: "qiraat" as TabKey, label: s.wordTabQiraat },
+      { key: "occurrences" as TabKey, label: s.wordTabOccurrences },
+    ],
+    [s, isArabicMode]
+  );
 
   const handleClose = useCallback(() => {
     closeDetail();
-    setActiveTab("english");
+    setActiveTab("meaning");
   }, [closeDetail]);
 
   if (!detailWord) return null;
 
-  const { surah, ayah, wordPos, v2Page } = detailWord;
+  const { surah, ayah, wordPos } = detailWord;
 
   return (
     <Modal visible={!!detailWord} transparent animationType="slide">
@@ -81,14 +83,14 @@ export function WordDetailSheet() {
             </Pressable>
           </View>
 
-          {/* Tab bar — scrollable pill tabs, no bottom border */}
+          {/* Tab bar — horizontally scrollable pill tabs */}
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             className="bg-surface-low dark:bg-surface-dark"
             contentContainerStyle={{ paddingHorizontal: 20, gap: 4, paddingVertical: 4 }}
           >
-            {TABS.map((tab) => {
+            {tabs.map((tab) => {
               const isActive = activeTab === tab.key;
               return (
                 <Pressable
@@ -120,22 +122,19 @@ export function WordDetailSheet() {
 
           {/* Tab content */}
           <ScrollView className="px-6" style={{ maxHeight: 400 }}>
-            {activeTab === "english" && (
-              <EnglishTab surah={surah} ayah={ayah} wordPos={wordPos} />
-            )}
             {activeTab === "meaning" && (
               <MeaningTab surah={surah} ayah={ayah} wordPos={wordPos} />
             )}
             {activeTab === "irab" && (
               <IrabTab surah={surah} ayah={ayah} wordPos={wordPos} />
             )}
-            {activeTab === "tasreef" && (
-              <TasreefTab surah={surah} ayah={ayah} wordPos={wordPos} />
-            )}
             {activeTab === "tajweed" && (
               <TajweedTab surah={surah} ayah={ayah} wordPos={wordPos} />
             )}
-            {activeTab === "qiraat" && <QiraatTab />}
+            {activeTab === "tasreef" && (
+              <TasreefTab surah={surah} ayah={ayah} wordPos={wordPos} />
+            )}
+            {activeTab === "qiraat" && <QiraatTab surah={surah} ayah={ayah} />}
             {activeTab === "occurrences" && (
               <OccurrencesTab surah={surah} ayah={ayah} wordPos={wordPos} />
             )}
