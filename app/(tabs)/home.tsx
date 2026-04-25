@@ -3,7 +3,10 @@ import { View, Text, ScrollView, Pressable, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
-import { Plus, Trash2, Play, Layers, Flame, Clock, Search, LayoutGrid } from "lucide-react-native";
+import { Plus, Trash2, Play, Layers, Flame, Clock, Search, LayoutGrid, Languages, UserPlus, X as XIcon } from "lucide-react-native";
+import { getVocabStats } from "@/lib/vocab/queries";
+import { useAuthStore } from "@/lib/auth/store";
+import { isSupabaseConfigured } from "@/lib/supabase";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
@@ -40,6 +43,10 @@ export default function HomeScreen() {
   const s = useStrings();
   const router = useRouter();
   const [decks, setDecks] = useState<DeckDisplay[]>([]);
+  const [vocabStats, setVocabStats] = useState<{ total: number; due: number }>({ total: 0, due: 0 });
+  const [authBannerDismissed, setAuthBannerDismissed] = useState(false);
+  const user = useAuthStore((state) => state.user);
+  const supabaseConfigured = isSupabaseConfigured();
   const [totalDue, setTotalDue] = useState(0);
   const [totalCards, setTotalCards] = useState(0);
   const [streak, setStreak] = useState(0);
@@ -73,6 +80,12 @@ export default function HomeScreen() {
     setTotalCards(await getTotalCardCount(db));
     setStreak(await getStudyStreak(db));
     setLastReview(await getLastReviewDate(db));
+    try {
+      setVocabStats(await getVocabStats(db));
+    } catch {
+      // table may not exist yet on very old installs
+      setVocabStats({ total: 0, due: 0 });
+    }
   }, [db]);
 
   useFocusEffect(
@@ -151,6 +164,59 @@ export default function HomeScreen() {
             {s.homeSubtitle}
           </Text>
         </View>
+
+        {/* Auth banner — only when sync is configured but the user isn't signed in */}
+        {supabaseConfigured && !user && !authBannerDismissed && (
+          <Card elevation="low" className="p-4 mb-6">
+            <View className="flex-row items-start gap-3">
+              <View className="w-10 h-10 rounded-full bg-primary-accent/10 dark:bg-primary-bright/15 items-center justify-center">
+                <UserPlus size={18} color={isDark ? "#2dd4bf" : "#0d9488"} />
+              </View>
+              <View className="flex-1">
+                <Text
+                  className="text-charcoal dark:text-neutral-200"
+                  style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}
+                  numberOfLines={1}
+                >
+                  {s.homeAuthCardTitle}
+                </Text>
+                <Text
+                  className="text-warm-400 dark:text-neutral-500 mt-0.5 mb-3"
+                  style={{ fontFamily: "Manrope_400Regular", fontSize: 12, lineHeight: 18 }}
+                >
+                  {s.homeAuthCardSubtitle}
+                </Text>
+                <View className="flex-row gap-2">
+                  <Pressable
+                    onPress={() => router.push("/auth/login")}
+                    className="rounded-full bg-primary-accent px-4 py-1.5"
+                    style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.97 : 1 }] })}
+                  >
+                    <Text className="text-white" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}>
+                      {s.homeAuthCardSignIn}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => router.push("/auth/signup")}
+                    className="rounded-full bg-surface-high dark:bg-surface-dark-high px-4 py-1.5"
+                    style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.97 : 1 }] })}
+                  >
+                    <Text className="text-charcoal dark:text-neutral-200" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}>
+                      {s.homeAuthCardSignUp}
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+              <Pressable
+                onPress={() => setAuthBannerDismissed(true)}
+                hitSlop={8}
+                className="w-7 h-7 items-center justify-center"
+              >
+                <XIcon size={14} color={isDark ? "#737373" : "#8B8178"} />
+              </Pressable>
+            </View>
+          </Card>
+        )}
 
         {/* Search bar trigger */}
         <Pressable
@@ -318,6 +384,53 @@ export default function HomeScreen() {
                 s={s}
               />
             ))}
+          </View>
+        )}
+
+        {/* Vocabulary deck — shown when at least one word has been saved */}
+        {vocabStats.total > 0 && (
+          <View className="gap-3 mt-3">
+            <Card elevation="low" className="p-5">
+              <View className="flex-row items-start justify-between mb-3">
+                <View className="flex-1 flex-row items-center gap-3">
+                  <View className="w-10 h-10 rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 items-center justify-center">
+                    <Languages size={18} color="#0d9488" />
+                  </View>
+                  <View className="flex-1">
+                    <Text
+                      className="text-charcoal dark:text-neutral-200"
+                      style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15 }}
+                      numberOfLines={1}
+                    >
+                      {s.vocabDeckTitle}
+                    </Text>
+                    <Text
+                      className="text-warm-400 dark:text-neutral-500 mt-0.5"
+                      style={{ fontFamily: "Manrope_400Regular", fontSize: 12 }}
+                    >
+                      {s.vocabDeckSubtitle}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+              <View className="flex-row items-center justify-between">
+                <Text
+                  className="text-warm-500 dark:text-neutral-400"
+                  style={{ fontFamily: "Manrope_500Medium", fontSize: 12 }}
+                >
+                  {vocabStats.due} {s.flashcardsDueToday?.toLowerCase?.() ?? "due"} · {vocabStats.total} {s.flashcardsTotalCards?.toLowerCase?.() ?? "cards"}
+                </Text>
+                <Pressable
+                  onPress={() => router.push("/flashcards/vocab" as any)}
+                  className="rounded-full bg-primary-accent px-4 py-1.5"
+                  style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.97 : 1 }] })}
+                >
+                  <Text className="text-white" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}>
+                    {s.flashcardsStartReview}
+                  </Text>
+                </Pressable>
+              </View>
+            </Card>
           </View>
         )}
       </ScrollView>

@@ -3,7 +3,13 @@ import { View, Text, Pressable, Platform } from "react-native";
 import { ChevronRight } from "lucide-react-native";
 import { useDatabase } from "@/lib/database/provider";
 import { useWordInteraction, type TooltipPosition } from "@/lib/word/context";
-import { fetchWordTranslation } from "@/lib/word/queries";
+import {
+  fetchWordTranslation,
+  fetchWordMeaningsArForAyah,
+  fetchWordText,
+  findBestWordMatch,
+} from "@/lib/word/queries";
+import { useSettings } from "@/lib/settings/context";
 
 const TOOLTIP_HEIGHT = 36;
 const ARROW_SIZE = 6;
@@ -99,15 +105,35 @@ function TooltipPopup({
 export function FloatingWordTooltip() {
   const { tooltipWord, tooltipPosition, openDetail, cancelTooltipClear, clearTooltipDelayed } = useWordInteraction();
   const db = useDatabase();
+  const { uiLanguage } = useSettings();
   const [translation, setTranslation] = useState<string | null>(null);
 
   useEffect(() => {
     if (!tooltipWord) return;
     setTranslation(null);
-    fetchWordTranslation(db, tooltipWord.surah, tooltipWord.ayah, tooltipWord.wordPos).then(
-      (row) => setTranslation(row?.translation_en ?? "—")
-    );
-  }, [db, tooltipWord?.surah, tooltipWord?.ayah, tooltipWord?.wordPos]);
+    const { surah, ayah, wordPos } = tooltipWord;
+    if (uiLanguage === "ar") {
+      Promise.all([
+        fetchWordMeaningsArForAyah(db, surah, ayah),
+        fetchWordText(db, surah, ayah, wordPos),
+      ])
+        .then(async ([rows, tappedText]) => {
+          const idx = findBestWordMatch(rows, wordPos, tappedText ?? "");
+          if (idx >= 0 && rows[idx]?.meaning) {
+            setTranslation(rows[idx].meaning);
+            return;
+          }
+          // Fall back to English translation if no Arabic meaning is recorded
+          const en = await fetchWordTranslation(db, surah, ayah, wordPos);
+          setTranslation(en?.translation_en ?? "—");
+        })
+        .catch(() => setTranslation("—"));
+    } else {
+      fetchWordTranslation(db, surah, ayah, wordPos).then(
+        (row) => setTranslation(row?.translation_en ?? "—")
+      );
+    }
+  }, [db, tooltipWord?.surah, tooltipWord?.ayah, tooltipWord?.wordPos, uiLanguage]);
 
   if (!tooltipWord || !tooltipPosition || Platform.OS !== "web") return null;
   if (typeof document === "undefined") return null;

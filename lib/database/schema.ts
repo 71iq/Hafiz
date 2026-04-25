@@ -194,6 +194,28 @@ export async function createSchema(db: SQLiteDatabase): Promise<void> {
       PRIMARY KEY (surah, ayah)
     );
 
+    -- Vocabulary flashcards (saved word meanings)
+    CREATE TABLE IF NOT EXISTS vocab_cards (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      surah INTEGER NOT NULL,
+      ayah INTEGER NOT NULL,
+      word_pos INTEGER NOT NULL,
+      word TEXT,
+      meaning_ar TEXT,
+      meaning_en TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      due TEXT,
+      stability REAL DEFAULT 0,
+      difficulty REAL DEFAULT 0,
+      elapsed_days INTEGER DEFAULT 0,
+      scheduled_days INTEGER DEFAULT 0,
+      reps INTEGER DEFAULT 0,
+      lapses INTEGER DEFAULT 0,
+      state INTEGER DEFAULT 0,
+      last_review TEXT,
+      UNIQUE (surah, ayah, word_pos)
+    );
+
     -- ============================================================
     -- USER DATA TABLES (read/write, synced)
     -- ============================================================

@@ -215,7 +215,9 @@ export type ImportProgress = {
 
 type ProgressCallback = (progress: ImportProgress) => void;
 
-const TOTAL_STEPS = 12;
+// Bump this whenever a new import step is added so the progress bar caps at
+// 100% and the step counter shows accurate "N / total" labels.
+const TOTAL_STEPS = 17;
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, "").trim();
@@ -603,21 +605,30 @@ async function importWordIrabDaas(
   const data = await loadData("irab-per-word.json");
   if (!Array.isArray(data)) return;
   onProgress({ step: "Da'as Iʿrab", current: 14, total: TOTAL_STEPS, detail: `${data.length} words` });
-  console.log(`[Import] Importing ${data.length} word_irab_daas rows...`);
+  console.log(`[Import] Importing ${data.length} word_irab_daas rows (expanding ayah_group)...`);
 
-  const rows = data.map((w: any) => [
-    w.surah,
-    w.ayah,
-    w.word_pos,
-    w.word ?? null,
-    w.irab ? stripHtml(String(w.irab)) : null,
-  ]);
+  // Each entry's ayah_group lists every ayah it applies to (the source data
+  // stores the i'rab once at the first ayah of a group). Replicate to each
+  // target so per-ayah lookups return results for every ayah in the group.
+  const rows: any[][] = [];
+  for (const w of data as any[]) {
+    const irab = w.irab ? stripHtml(String(w.irab)) : null;
+    const word = w.word ?? null;
+    const targets: string[] = Array.isArray(w.ayah_group) && w.ayah_group.length > 0
+      ? w.ayah_group.map(String)
+      : [`${w.surah}:${w.ayah}`];
+    for (const t of targets) {
+      const [s, a] = t.split(":").map((n) => parseInt(n, 10));
+      if (!Number.isFinite(s) || !Number.isFinite(a)) continue;
+      rows.push([s, a, w.word_pos, word, irab]);
+    }
+  }
   await batchInsert(
     db,
     "INSERT OR IGNORE INTO word_irab_daas (surah, ayah, word_pos, word, irab) VALUES (?, ?, ?, ?, ?)",
     rows
   );
-  console.log(`[Import] word_irab_daas done: ${rows.length} rows`);
+  console.log(`[Import] word_irab_daas done: ${rows.length} rows (from ${data.length} source entries)`);
 }
 
 async function importTajweedRulesAr(
@@ -732,21 +743,67 @@ async function runNewTabImports(
   onProgress: ProgressCallback
 ): Promise<void> {
   // Idempotent: only import tables that are empty. Safe to call on fresh
-  // installs and existing installs alike.
-  const checks = await Promise.all([
-    db.getFirstAsync<{ c: number }>("SELECT COUNT(*) as c FROM word_meanings_ar"),
-    db.getFirstAsync<{ c: number }>("SELECT COUNT(*) as c FROM word_irab_daas"),
-    db.getFirstAsync<{ c: number }>("SELECT COUNT(*) as c FROM tajweed_rules_ar"),
-    db.getFirstAsync<{ c: number }>("SELECT COUNT(*) as c FROM tajweed_rules_en"),
-    db.getFirstAsync<{ c: number }>("SELECT COUNT(*) as c FROM qiraat_encyclopedia"),
-  ]);
-  const [meaningsC, irabDaasC, tajArC, tajEnC, qiraatC] = checks.map((r) => r?.c ?? 0);
+  // installs and existing installs alike. Wrap each in try/catch so a
+  // single bad dataset doesn't block the rest.
+  const tableExists = async (table: string): Promise<boolean> => {
+    try {
+      await db.getFirstAsync(`SELECT 1 FROM ${table} LIMIT 1`);
+      return true;
+    } catch {
+      return false;
+    }
+  };
 
-  if (meaningsC === 0) await importWordMeaningsAr(db, onProgress);
-  if (irabDaasC === 0) await importWordIrabDaas(db, onProgress);
-  if (tajArC === 0) await importTajweedRulesAr(db, onProgress);
-  if (tajEnC === 0) await importTajweedRulesEn(db, onProgress);
-  if (qiraatC === 0) await importQiraatEncyclopedia(db, onProgress);
+  const safeCount = async (table: string): Promise<number> => {
+    try {
+      const r = await db.getFirstAsync<{ c: number }>(`SELECT COUNT(*) as c FROM ${table}`);
+      return r?.c ?? 0;
+    } catch {
+      return 0;
+    }
+  };
+
+  const safeImport = async (label: string, fn: () => Promise<void>): Promise<void> => {
+    try {
+      await fn();
+    } catch (e) {
+      console.error(`[Import] ${label} failed:`, e);
+    }
+  };
+
+  if ((await safeCount("word_meanings_ar")) === 0) {
+    await safeImport("word_meanings_ar", () => importWordMeaningsAr(db, onProgress));
+  }
+
+  // Detect old (non-expanded) word_irab_daas data: the source data stores
+  // 1:1 entries that should be replicated to 1:2..1:7. If 1:2 has no rows
+  // but 1:1 does, we have the pre-expansion data — wipe and re-import.
+  if (await tableExists("word_irab_daas")) {
+    const c11 = await db.getFirstAsync<{ c: number }>(
+      "SELECT COUNT(*) as c FROM word_irab_daas WHERE surah = 1 AND ayah = 1"
+    );
+    const c12 = await db.getFirstAsync<{ c: number }>(
+      "SELECT COUNT(*) as c FROM word_irab_daas WHERE surah = 1 AND ayah = 2"
+    );
+    const stale = (c11?.c ?? 0) > 0 && (c12?.c ?? 0) === 0;
+    if (stale) {
+      console.log("[Import] word_irab_daas: stale (pre-expansion) data detected — re-importing");
+      await db.execAsync("DELETE FROM word_irab_daas");
+    }
+  }
+  if ((await safeCount("word_irab_daas")) === 0) {
+    await safeImport("word_irab_daas", () => importWordIrabDaas(db, onProgress));
+  }
+
+  if ((await safeCount("tajweed_rules_ar")) === 0) {
+    await safeImport("tajweed_rules_ar", () => importTajweedRulesAr(db, onProgress));
+  }
+  if ((await safeCount("tajweed_rules_en")) === 0) {
+    await safeImport("tajweed_rules_en", () => importTajweedRulesEn(db, onProgress));
+  }
+  if ((await safeCount("qiraat_encyclopedia")) === 0) {
+    await safeImport("qiraat_encyclopedia", () => importQiraatEncyclopedia(db, onProgress));
+  }
 }
 
 // ─── Main initialization ─────────────────────────────────────

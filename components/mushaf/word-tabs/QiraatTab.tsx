@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { View, Text } from "react-native";
 import { useDatabase } from "@/lib/database/provider";
 import { fetchQiraat } from "@/lib/word/queries";
@@ -11,6 +11,56 @@ type Props = {
 
 function toArabicNumeral(n: number): string {
   return String(n).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[parseInt(d, 10)]);
+}
+
+type QiraatBlock = {
+  heading: string | null;
+  body: string;
+};
+
+/**
+ * Split the qira'at text into blocks. Each block typically opens with the
+ * Quranic word(s) being discussed followed by ":قرئ" or ":وقرئ" then a
+ * numbered list of variant readings. Insert newlines before numbered items
+ * so each variant lands on its own line.
+ */
+function parseQiraatText(raw: string): QiraatBlock[] {
+  const text = raw.trim();
+  if (!text) return [];
+  // Split on "قرئ" / "وقرئ" markers; capture the marker so we can prepend it
+  // back to the body for clarity.
+  const parts = text.split(/((?:و?قرئ)(?:\s*شاذا)?\s*:)/);
+  // parts is like [headingChunk, marker, bodyChunk, headingChunk, marker, bodyChunk, ...]
+  const blocks: QiraatBlock[] = [];
+  let i = 0;
+  // If the first chunk doesn't end with a marker, it might be a leading
+  // standalone block — skip past the first heading until we hit a marker.
+  if (parts.length === 1) return [{ heading: null, body: formatBody(parts[0]) }];
+
+  while (i < parts.length) {
+    const headingRaw = (parts[i] ?? "").trim();
+    const marker = (parts[i + 1] ?? "").trim();
+    const body = (parts[i + 2] ?? "").trim();
+    if (marker) {
+      const heading = headingRaw.replace(/[:\.\s]+$/, "").trim() || null;
+      blocks.push({ heading, body: formatBody(body) });
+      i += 3;
+    } else {
+      // Trailing chunk with no marker — append to previous body
+      if (blocks.length > 0 && headingRaw) {
+        blocks[blocks.length - 1].body += "\n" + formatBody(headingRaw);
+      } else if (headingRaw) {
+        blocks.push({ heading: null, body: formatBody(headingRaw) });
+      }
+      i += 1;
+    }
+  }
+  return blocks.filter((b) => b.body.trim().length > 0);
+}
+
+/** Insert a newline before numbered list items like "1-", "٢-" preceded by a period. */
+function formatBody(text: string): string {
+  return text.replace(/([.])\s*([\d٠-٩]+\s*-)/g, "$1\n$2");
 }
 
 export function QiraatTab({ surah, ayah }: Props) {
@@ -48,7 +98,9 @@ export function QiraatTab({ surah, ayah }: Props) {
     );
   }
 
-  if (!text) {
+  const blocks = useMemo(() => (text ? parseQiraatText(text) : []), [text]);
+
+  if (!text || blocks.length === 0) {
     return (
       <View className="py-10 items-center px-4">
         <Text className="text-3xl mb-4">{"📖"}</Text>
@@ -93,16 +145,24 @@ export function QiraatTab({ surah, ayah }: Props) {
         </View>
       )}
 
-      <Text
-        className="text-base text-charcoal dark:text-neutral-200 leading-8"
-        style={{
-          writingDirection: "rtl",
-          textAlign: "right",
-          fontFamily: "IBMPlexSansArabic, NotoSansArabic, system-ui",
-        }}
-      >
-        {text}
-      </Text>
+      {blocks.map((block, i) => (
+        <View key={i} className="mb-4">
+          {block.heading && (
+            <Text
+              className="text-lg text-primary-accent dark:text-primary-bright mb-1.5"
+              style={{ writingDirection: "rtl", textAlign: "right", fontWeight: "700" }}
+            >
+              {block.heading}
+            </Text>
+          )}
+          <Text
+            className="text-base text-charcoal dark:text-neutral-200 leading-8"
+            style={{ writingDirection: "rtl", textAlign: "right" }}
+          >
+            {block.body}
+          </Text>
+        </View>
+      ))}
 
       <Text
         className="text-xs text-warm-400 dark:text-neutral-500 mt-4"

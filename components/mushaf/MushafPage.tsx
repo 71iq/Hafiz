@@ -168,6 +168,20 @@ export function MushafPage({
   let content;
   if (hasLineLayout) {
     const lineWords = (pageWordsData ?? [])[pageNumber - 1] ?? {};
+    // 19 pages have a 1-line offset between page-lines and page-words: the
+    // "basmallah" slot in page-words actually holds the first ayah line's
+    // glyphs (see surah 22 page 332). Detect by checking if any basmallah
+    // line has non-empty page-words content; if so, shift ayah lookups by -1.
+    let lineKeyOffset = 0;
+    for (const l of lineLayout!) {
+      if (l.line_type === "basmallah") {
+        const k = String(l.line_number);
+        if (lineWords[k] && lineWords[k].trim().length > 0) {
+          lineKeyOffset = -1;
+          break;
+        }
+      }
+    }
     let wordIndex = 0;
 
     content = lineLayout.map((line) => {
@@ -215,7 +229,7 @@ export function MushafPage({
       }
 
       // Ayah line: get visual words and map to identities
-      const lineText = lineWords[String(line.line_number)];
+      const lineText = lineWords[String(line.line_number + lineKeyOffset)];
       if (!lineText) return null;
 
       const words = lineText.split(/\s+/).filter(Boolean);

@@ -11,9 +11,11 @@ type Props = {
 };
 
 export function LoadingScreen({ progress }: Props) {
-  const percentage = progress
-    ? Math.round((progress.current / progress.total) * 100)
-    : 0;
+  const rawPct = progress ? (progress.current / progress.total) * 100 : 0;
+  const percentage = Math.max(0, Math.min(100, Math.round(rawPct)));
+  const stepLabel = progress
+    ? `${progress.step} (${Math.min(progress.current, progress.total)}/${progress.total})`
+    : null;
 
   return (
     <View className="flex-1 items-center justify-center bg-surface dark:bg-surface-dark px-8">
@@ -48,7 +50,7 @@ export function LoadingScreen({ progress }: Props) {
               className="text-charcoal dark:text-neutral-200 text-center"
               style={{ fontFamily: "Manrope_500Medium", fontSize: 15 }}
             >
-              {progress.step}
+              {stepLabel}
             </Text>
             {progress.detail && (
               <Text

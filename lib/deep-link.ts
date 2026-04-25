@@ -21,3 +21,8 @@ export function consumePendingDeepLink(): DeepLinkTarget | null {
   pending = null;
   return target;
 }
+
+/** Peek at the pending deep link without consuming it. */
+export function peekPendingDeepLink(): DeepLinkTarget | null {
+  return pending;
+}

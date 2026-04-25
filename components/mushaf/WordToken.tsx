@@ -1,6 +1,7 @@
-import { memo, useCallback, useRef } from "react";
+import { memo, useCallback, useEffect, useRef } from "react";
 import { Text, Pressable, Platform, View } from "react-native";
 import { useWordInteraction } from "@/lib/word/context";
+import { useChrome } from "@/lib/ui/chrome";
 
 type Props = {
   glyph: string;
@@ -15,6 +16,8 @@ type Props = {
   highlightColor?: string;
 };
 
+const DOUBLE_TAP_MS = 260;
+
 function WordTokenInner({
   glyph,
   fontFamily,
@@ -27,8 +30,14 @@ function WordTokenInner({
   disabled = false,
   highlightColor,
 }: Props) {
-  const { tooltipWord, setTooltipWord, clearTooltipDelayed, openDetail } = useWordInteraction();
+  const { tooltipWord, setTooltipWord, openDetail } = useWordInteraction();
+  const { visible: chromeVisible, setVisible: setChromeVisible } = useChrome();
   const tokenRef = useRef<View>(null);
+  const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
+  }, []);
 
   const isTooltipSelected =
     tooltipWord !== null &&
@@ -38,27 +47,51 @@ function WordTokenInner({
 
   const wordRef = { surah, ayah, wordPos, v2Page };
 
-  const handlePress = useCallback(() => {
-    if (disabled) return;
+  const showTooltip = useCallback(() => {
     tokenRef.current?.measureInWindow((x, y, width, height) => {
       setTooltipWord(wordRef, { x, y, width, height });
     });
-  }, [disabled, surah, ayah, wordPos, v2Page, setTooltipWord]);
+  }, [surah, ayah, wordPos, v2Page, setTooltipWord]);
+
+  const handlePress = useCallback(() => {
+    if (disabled) return;
+    if (Platform.OS === "web") {
+      // Mouse / desktop: single click → tooltip
+      showTooltip();
+      return;
+    }
+    // Native touch: tap toggles chrome; double-tap shows tooltip
+    if (tapTimerRef.current) {
+      clearTimeout(tapTimerRef.current);
+      tapTimerRef.current = null;
+      // Second tap arrived in time → revert the pending chrome toggle (it
+      // hadn't fired yet, since we cleared the timer) and show tooltip.
+      showTooltip();
+      return;
+    }
+    tapTimerRef.current = setTimeout(() => {
+      tapTimerRef.current = null;
+      setChromeVisible(!chromeVisible);
+    }, DOUBLE_TAP_MS);
+  }, [disabled, chromeVisible, setChromeVisible, showTooltip]);
 
   const handleLongPress = useCallback(() => {
     if (disabled) return;
+    if (tapTimerRef.current) {
+      clearTimeout(tapTimerRef.current);
+      tapTimerRef.current = null;
+    }
     openDetail(wordRef);
   }, [disabled, surah, ayah, wordPos, v2Page, openDetail]);
 
-  const webProps =
+  // Web: right-click also opens the detail sheet (matches "long press" intent)
+  const webContextMenu =
     Platform.OS === "web" && !disabled
       ? {
-          onHoverIn: () => {
-            tokenRef.current?.measureInWindow((x, y, width, height) => {
-              setTooltipWord(wordRef, { x, y, width, height });
-            });
+          onContextMenu: (e: any) => {
+            e?.preventDefault?.();
+            openDetail(wordRef);
           },
-          onHoverOut: clearTooltipDelayed,
         }
       : {};
 
@@ -74,7 +107,7 @@ function WordTokenInner({
       onPress={handlePress}
       onLongPress={handleLongPress}
       delayLongPress={400}
-      {...webProps}
+      {...webContextMenu}
     >
       <Text
         className={

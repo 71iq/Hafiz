@@ -69,9 +69,9 @@ export function GoToNavigator({
   );
   const [selectedPage, setSelectedPage] = useState(currentPage);
   const [searchText, setSearchText] = useState("");
-  const [tab, setTab] = useState<TabKey>(
-    mode === "page" ? "page" : "surah"
-  );
+  // Default to Surah tab regardless of view mode — easier to find a destination
+  // by surah name than by raw page number.
+  const [tab, setTab] = useState<TabKey>("surah");
   const pickerRef = useRef<FlatList>(null);
   const selectedPageRef = useRef(currentPage);
   const searchTextRef = useRef("");

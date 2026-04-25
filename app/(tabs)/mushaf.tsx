@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useFocusEffect, router } from "expo-router";
-import { View, Text, Pressable, ActivityIndicator, useWindowDimensions } from "react-native";
+import { View, Text, Pressable, ActivityIndicator, Platform, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Animated, {
   useAnimatedStyle,
@@ -20,14 +20,17 @@ import { AyahBlock } from "@/components/mushaf/AyahBlock";
 import { FontSizeControl } from "@/components/mushaf/FontSizeControl";
 import { PageMushaf } from "@/components/mushaf/PageMushaf";
 import { GoToNavigator } from "@/components/mushaf/GoToNavigator";
+import { MushafIndicator } from "@/components/mushaf/MushafIndicator";
+import { MushafSlider } from "@/components/mushaf/MushafSlider";
 import { WordDetailSheet } from "@/components/mushaf/WordDetailSheet";
+import { loadMushafIndex, findJuzForAyah, topmostAyahForPage, type MushafIndex } from "@/lib/mushaf/position";
 import { FloatingWordTooltip } from "@/components/mushaf/WordTooltip";
 import { SelectionActionBar } from "@/components/mushaf/SelectionActionBar";
 import { BookmarksSheet } from "@/components/mushaf/BookmarksSheet";
 import { Toast } from "@/components/ui/Toast";
 import { SearchCommand } from "@/components/SearchCommand";
 import { useWordInteraction } from "@/lib/word/context";
-import { consumePendingDeepLink } from "@/lib/deep-link";
+import { consumePendingDeepLink, peekPendingDeepLink } from "@/lib/deep-link";
 
 /** Registers an ayah navigation callback inside WordInteractionProvider */
 function AyahNavigationRegistrar({
@@ -140,6 +143,9 @@ function MushafInner() {
       overflow: "hidden",
     };
   });
+  const sliderAnimStyle = useAnimatedStyle(() => ({
+    opacity: 1 - headerHidden.value,
+  }));
   const onHeaderLayout = useCallback(
     (e: { nativeEvent: { layout: { height: number } } }) => {
       const h = e.nativeEvent.layout.height;
@@ -155,6 +161,8 @@ function MushafInner() {
   const [showSearch, setShowSearch] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [hideMode, setHideMode] = useState(false);
+  const [mushafIndex, setMushafIndex] = useState<MushafIndex | null>(null);
+  const [topAyah, setTopAyah] = useState<{ surah: number; ayah: number } | null>(null);
   const goToPageRef = useRef<((page: number) => void) | null>(null);
   const flashListRef = useRef<FlashListRef<MushafItem>>(null);
 
@@ -164,6 +172,13 @@ function MushafInner() {
 
   // Deep link highlight: "surah:ayah" key that triggers pulse animation
   const [highlightedKey, setHighlightedKey] = useState<string | null>(null);
+
+  // Load shared juz/surah/page index once for the indicator
+  useEffect(() => {
+    loadMushafIndex(db).then(setMushafIndex).catch((e) => {
+      console.warn("[Mushaf] failed to load index:", e);
+    });
+  }, [db]);
 
   useEffect(() => {
     async function loadQuran() {
@@ -330,6 +345,117 @@ function MushafInner() {
 
   const isPageMode = viewMode === "page";
 
+  // For page view, derive the topmost ayah from the visible page
+  useEffect(() => {
+    if (!isPageMode || !mushafIndex) return;
+    const top = topmostAyahForPage(mushafIndex, currentPage);
+    if (top) setTopAyah(top);
+  }, [currentPage, mushafIndex, isPageMode]);
+
+  // Persist last visible position (debounced) so the next visit restores it
+  const lastSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (loading) return;
+    if (lastSaveTimerRef.current) clearTimeout(lastSaveTimerRef.current);
+    lastSaveTimerRef.current = setTimeout(() => {
+      const value = isPageMode
+        ? { mode: "page", page: currentPage }
+        : topAyah
+          ? { mode: "verse", surah: topAyah.surah, ayah: topAyah.ayah }
+          : null;
+      if (!value) return;
+      db.runAsync(
+        "INSERT OR REPLACE INTO user_settings (key, value) VALUES (?, ?)",
+        ["last_mushaf_position", JSON.stringify(value)]
+      ).catch(() => {});
+    }, 600);
+    return () => {
+      if (lastSaveTimerRef.current) {
+        clearTimeout(lastSaveTimerRef.current);
+        lastSaveTimerRef.current = null;
+      }
+    };
+  }, [db, loading, isPageMode, currentPage, topAyah?.surah, topAyah?.ayah]);
+
+  // Restore last position on first mount once items are loaded — skipped if a
+  // pending deep link will scroll us elsewhere (the deep-link handler runs in
+  // its own focus effect).
+  const restoredOnceRef = useRef(false);
+  useEffect(() => {
+    if (restoredOnceRef.current) return;
+    if (loading || items.length === 0 || !mushafIndex) return;
+    restoredOnceRef.current = true;
+    (async () => {
+      try {
+        const row = await db.getFirstAsync<{ value: string }>(
+          "SELECT value FROM user_settings WHERE key = 'last_mushaf_position'"
+        );
+        if (!row?.value) return;
+        const parsed = JSON.parse(row.value);
+        // Defer to deep-link handler if one is pending — peek without consuming
+        if (peekPendingDeepLink()) return;
+
+        if (parsed?.mode === "page" && isPageMode && goToPageRef.current) {
+          setTimeout(() => goToPageRef.current?.(parsed.page), 150);
+        } else if (parsed?.mode === "verse" && !isPageMode) {
+          const idx = items.findIndex(
+            (it) => it.type === "ayah" && it.surah === parsed.surah && it.ayah === parsed.ayah
+          );
+          if (idx >= 0) {
+            setTimeout(() => {
+              flashListRef.current?.scrollToIndex({ index: idx, animated: false });
+            }, 150);
+          }
+        }
+      } catch (e) {
+        console.warn("[Mushaf] restore last position failed:", e);
+      }
+    })();
+  }, [loading, items, mushafIndex, isPageMode, db]);
+
+  // Web only: ArrowLeft / ArrowRight in page mode → ±1 page (RTL aware)
+  useEffect(() => {
+    if (Platform.OS !== "web" || !isPageMode) return;
+    const handler = (e: KeyboardEvent) => {
+      if (showNavigator || showSearch || showBookmarks) return;
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName?.toLowerCase();
+      // Don't hijack typing inside inputs/textareas/contenteditable
+      if (tag === "input" || tag === "textarea" || target?.isContentEditable) return;
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      e.preventDefault();
+      // Arabic reads right-to-left: ArrowRight goes back, ArrowLeft advances.
+      // Under an LTR UI we still want this convention since the Mushaf itself
+      // is always RTL-paginated.
+      const dir = e.key === "ArrowLeft" ? +1 : -1;
+      const next = Math.max(1, Math.min(604, currentPage + dir));
+      goToPageRef.current?.(next);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [isPageMode, currentPage, showNavigator, showSearch, showBookmarks]);
+
+  // Verse-view: track topmost visible ayah via FlashList viewable items
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 }).current;
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: Array<{ item: MushafItem }> }) => {
+      const firstAyah = viewableItems
+        .map((v) => v.item)
+        .find((it) => it.type === "ayah");
+      if (firstAyah && firstAyah.type === "ayah") {
+        setTopAyah({ surah: firstAyah.surah, ayah: firstAyah.ayah });
+      }
+    }
+  ).current;
+
+  // Resolve indicator labels from current top ayah
+  const indicator = (() => {
+    if (!mushafIndex || !topAyah) return { name: null as string | null, juz: null as number | null };
+    const sm = mushafIndex.surahByNumber.get(topAyah.surah);
+    const juz = findJuzForAyah(mushafIndex, topAyah.surah, topAyah.ayah);
+    return { name: sm?.name_arabic ?? null, juz };
+  })();
+
   if (loading && !isPageMode) {
     return (
       <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark items-center justify-center">
@@ -480,6 +606,14 @@ function MushafInner() {
         </View>
         </Animated.View>
 
+        {/* Surah / Juz indicator — slim header that updates as you scroll */}
+        <Animated.View
+          pointerEvents="none"
+          style={headerAnimStyle}
+        >
+          <MushafIndicator surahName={indicator.name} juz={indicator.juz} />
+        </Animated.View>
+
         {/* Content */}
         {isPageMode ? (
           <View className="flex-1">
@@ -500,6 +634,8 @@ function MushafInner() {
             contentContainerStyle={{ paddingBottom: 40 }}
             onScroll={onScrollHide}
             scrollEventThrottle={16}
+            onViewableItemsChanged={onViewableItemsChanged}
+            viewabilityConfig={viewabilityConfig}
           />
         )}
 
@@ -531,6 +667,37 @@ function MushafInner() {
 
         {/* Selection action bar */}
         <SelectionActionBar />
+
+        {/* Bottom slider — fades with chrome */}
+        <Animated.View
+          pointerEvents={chromeVisible ? "auto" : "none"}
+          style={[
+            { position: "absolute", left: 0, right: 0, bottom: 0 },
+            sliderAnimStyle,
+          ]}
+          className="bg-surface/95 dark:bg-surface-dark/95"
+        >
+          <MushafSlider
+            currentPage={currentPage}
+            onCommit={(p) => {
+              if (isPageMode) goToPageRef.current?.(p);
+              else {
+                // Verse view: jump to the first ayah on that page
+                const ayah = mushafIndex
+                  ? topmostAyahForPage(mushafIndex, p)
+                  : null;
+                if (ayah) {
+                  const idx = items.findIndex(
+                    (it) => it.type === "ayah" && it.surah === ayah.surah && it.ayah === ayah.ayah
+                  );
+                  if (idx >= 0) flashListRef.current?.scrollToIndex({ index: idx, animated: true });
+                }
+              }
+            }}
+            onExpand={() => setShowNavigator(true)}
+            index={mushafIndex}
+          />
+        </Animated.View>
 
         {/* Toast notifications */}
         <Toast message={toastMessage} onDismiss={dismissToast} />
