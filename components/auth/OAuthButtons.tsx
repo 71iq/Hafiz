@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, Pressable, Platform } from "react-native";
 import * as WebBrowser from "expo-web-browser";
-import { supabase } from "@/lib/supabase";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { useSettings } from "@/lib/settings/context";
 
@@ -46,6 +46,8 @@ async function signInWithProvider(provider: "google" | "apple" | "facebook") {
 export function OAuthButtons({ onError }: Props) {
   const s = useStrings();
   const { isDark } = useSettings();
+
+  if (!isSupabaseConfigured()) return null;
 
   const handlePress = async (provider: "google" | "apple" | "facebook") => {
     try {

@@ -15,6 +15,7 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useAuthStore } from "@/lib/auth/store";
+import { isSupabaseConfigured } from "@/lib/supabase";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -39,6 +40,7 @@ export default function SignupScreen() {
   const s = useStrings();
   const { signUp, isLoading, error, clearError } = useAuthStore();
   const [showError, setShowError] = useState<string | null>(null);
+  const configured = isSupabaseConfigured();
 
   const usernameRef = useRef<TextInput>(null);
   const displayNameRef = useRef<TextInput>(null);
@@ -54,6 +56,10 @@ export default function SignupScreen() {
   });
 
   const onSubmit = async (data: SignupForm) => {
+    if (!configured) {
+      setShowError(s.authUnavailableSubtitle);
+      return;
+    }
     try {
       setShowError(null);
       await signUp(data.email, data.password, data.username, data.displayName || "");
@@ -96,9 +102,10 @@ export default function SignupScreen() {
             className="text-warm-400 dark:text-neutral-500 text-center mb-8"
             style={{ fontFamily: "Manrope_400Regular", fontSize: 15 }}
           >
-            {s.authSignupSubtitle}
+            {configured ? s.authSignupSubtitle : s.authUnavailableSubtitle}
           </Text>
 
+          {configured ? (
           <Card elevation="low" className="p-6 mb-6">
             {/* Error message */}
             {(showError || error) && (
@@ -227,11 +234,27 @@ export default function SignupScreen() {
               )}
             </Button>
           </Card>
+          ) : (
+            <Card elevation="low" className="p-6 mb-6">
+              <Text
+                className="text-charcoal dark:text-neutral-100 text-center mb-2"
+                style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16 }}
+              >
+                {s.authUnavailableTitle}
+              </Text>
+              <Text
+                className="text-warm-400 dark:text-neutral-500 text-center"
+                style={{ fontFamily: "Manrope_400Regular", fontSize: 14, lineHeight: 22 }}
+              >
+                {s.authUnavailableSubtitle}
+              </Text>
+            </Card>
+          )}
 
-          <OAuthButtons onError={(msg) => setShowError(msg)} />
+          {configured && <OAuthButtons onError={(msg) => setShowError(msg)} />}
 
           {/* Login link */}
-          <View className="flex-row items-center justify-center gap-1 mb-8">
+          {configured && <View className="flex-row items-center justify-center gap-1 mb-8">
             <Text
               className="text-warm-400 dark:text-neutral-500"
               style={{ fontFamily: "Manrope_400Regular", fontSize: 14 }}
@@ -246,7 +269,7 @@ export default function SignupScreen() {
                 {s.authLogin}
               </Text>
             </Pressable>
-          </View>
+          </View>}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
