@@ -23,7 +23,6 @@ import { TranslationLanguagePicker } from "@/components/settings/TranslationLang
 import { useStrings } from "@/lib/i18n/useStrings";
 import { ALL_TEST_MODES, DEFAULT_ENABLED_MODES, type TestMode } from "@/lib/fsrs/types";
 import { useAuthStore } from "@/lib/auth/store";
-import { isSupabaseConfigured } from "@/lib/supabase";
 import { useRouter } from "expo-router";
 
 export default function SettingsScreen() {
@@ -43,7 +42,6 @@ export default function SettingsScreen() {
   const currentLang = getLanguageByCode(translationLanguage);
   const [enabledModes, setEnabledModes] = useState<TestMode[]>(DEFAULT_ENABLED_MODES);
   const { user, profile, isLoading: authLoading, signOut } = useAuthStore();
-  const configured = isSupabaseConfigured();
 
   useEffect(() => {
     db.getFirstAsync<{ value: string }>(
@@ -130,7 +128,7 @@ export default function SettingsScreen() {
                 </Text>
               </Pressable>
             </View>
-          ) : configured ? (
+          ) : (
             <View className="gap-2">
               <Button
                 onPress={() => router.push("/auth/login")}
@@ -156,13 +154,6 @@ export default function SettingsScreen() {
                 </Text>
               </Button>
             </View>
-          ) : (
-            <Text
-              className="text-warm-400 dark:text-neutral-500 text-center py-2"
-              style={{ fontFamily: "Manrope_400Regular", fontSize: 13 }}
-            >
-              {s.authNotConfigured}
-            </Text>
           )}
         </Card>
 

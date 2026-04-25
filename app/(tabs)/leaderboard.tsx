@@ -28,7 +28,7 @@ export default function LeaderboardScreen() {
 
   const configured = isSupabaseConfigured();
 
-  if (configured && !user) {
+  if (!user) {
     return (
       <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
         <AuthGate
@@ -108,13 +108,13 @@ export default function LeaderboardScreen() {
 
       {/* Content */}
       {!configured ? (
-        <View className="flex-1 items-center justify-center px-6">
-          <Trophy size={40} color={mutedColor} />
-          <Text
-            style={{ fontFamily: "Manrope_400Regular", fontSize: 14, color: mutedColor, marginTop: 12, textAlign: "center" }}
-          >
-            {s.leaderboardNotConfigured}
-          </Text>
+        <View className="flex-1 items-center justify-center">
+          <EmptyState
+            icon={Trophy}
+            title={s.authGateLeaderboardTitle}
+            subtitle={s.leaderboardNotConfigured}
+            isDark={isDark}
+          />
         </View>
       ) : isLoading ? (
         <LeaderboardSkeleton isDark={isDark} className="flex-1" />

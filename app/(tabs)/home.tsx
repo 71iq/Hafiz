@@ -6,7 +6,6 @@ import { useFocusEffect } from "@react-navigation/native";
 import { Plus, Trash2, Play, Layers, Flame, Clock, Search, LayoutGrid, Languages, UserPlus, X as XIcon } from "lucide-react-native";
 import { getVocabStats } from "@/lib/vocab/queries";
 import { useAuthStore } from "@/lib/auth/store";
-import { isSupabaseConfigured } from "@/lib/supabase";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
@@ -46,7 +45,6 @@ export default function HomeScreen() {
   const [vocabStats, setVocabStats] = useState<{ total: number; due: number }>({ total: 0, due: 0 });
   const [authBannerDismissed, setAuthBannerDismissed] = useState(false);
   const user = useAuthStore((state) => state.user);
-  const supabaseConfigured = isSupabaseConfigured();
   const [totalDue, setTotalDue] = useState(0);
   const [totalCards, setTotalCards] = useState(0);
   const [streak, setStreak] = useState(0);
@@ -165,8 +163,8 @@ export default function HomeScreen() {
           </Text>
         </View>
 
-        {/* Auth banner — only when sync is configured but the user isn't signed in */}
-        {supabaseConfigured && !user && !authBannerDismissed && (
+        {/* Auth banner — only when the user isn't signed in */}
+        {!user && !authBannerDismissed && (
           <Card elevation="low" className="p-4 mb-6">
             <View className="flex-row items-start gap-3">
               <View className="w-10 h-10 rounded-full bg-primary-accent/10 dark:bg-primary-bright/15 items-center justify-center">
