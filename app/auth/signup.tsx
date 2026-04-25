@@ -39,8 +39,9 @@ type SignupForm = z.infer<typeof signupSchema>;
 export default function SignupScreen() {
   const router = useRouter();
   const s = useStrings();
-  const { signUp, isLoading, error, clearError } = useAuthStore();
+  const { signUp, resendSignupConfirmation, isLoading, error, clearError } = useAuthStore();
   const [showError, setShowError] = useState<string | null>(null);
+  const [pendingConfirmationEmail, setPendingConfirmationEmail] = useState<string | null>(null);
   const configured = isSupabaseConfigured();
 
   const usernameRef = useRef<TextInput>(null);
@@ -69,10 +70,22 @@ export default function SignupScreen() {
         return;
       }
       if (result.status === "needsEmailConfirmation") {
+        setPendingConfirmationEmail(data.email);
         setShowError(s.authSignupConfirmEmail);
         return;
       }
       router.back();
+    } catch (err: any) {
+      setShowError(err.message);
+    }
+  };
+
+  const handleResendConfirmation = async () => {
+    if (!pendingConfirmationEmail) return;
+    try {
+      setShowError(null);
+      await resendSignupConfirmation(pendingConfirmationEmail);
+      setShowError(s.authConfirmationResent);
     } catch (err: any) {
       setShowError(err.message);
     }
@@ -249,6 +262,21 @@ export default function SignupScreen() {
                 </Text>
               )}
             </Button>
+            {pendingConfirmationEmail && (
+              <Button
+                variant="outline"
+                onPress={handleResendConfirmation}
+                disabled={isLoading}
+                className="mt-3"
+              >
+                <Text
+                  className="text-charcoal dark:text-neutral-200 text-center"
+                  style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15 }}
+                >
+                  {s.authResendConfirmation}
+                </Text>
+              </Button>
+            )}
           </Card>
           ) : (
             <Card elevation="low" className="p-6 mb-6">

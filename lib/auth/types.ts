@@ -36,6 +36,7 @@ export type AuthActions = {
     displayName: string
   ) => Promise<SignUpResult>;
   signOut: () => Promise<void>;
+  resendSignupConfirmation: (email: string) => Promise<void>;
   fetchProfile: () => Promise<void>;
   clearError: () => void;
 };

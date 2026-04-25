@@ -1,8 +1,14 @@
 import { create } from "zustand";
+import { Platform } from "react-native";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import type { AuthState, AuthActions, Profile } from "./types";
 
 type AuthStore = AuthState & AuthActions;
+
+function getEmailRedirectTo(): string | undefined {
+  if (Platform.OS !== "web") return undefined;
+  return globalThis.location?.origin;
+}
 
 export const useAuthStore = create<AuthStore>((set, get) => ({
   // ─── State ──────────────────────────────────────────────────
@@ -90,7 +96,10 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       const { data, error } = await supabase.auth.signUp({
         email: email.trim().toLowerCase(),
         password,
-        options: { data: { username: username.trim(), display_name: displayName.trim() || null } },
+        options: {
+          data: { username: username.trim(), display_name: displayName.trim() || null },
+          emailRedirectTo: getEmailRedirectTo(),
+        },
       });
       if (error) throw error;
       if (!data.user) throw new Error("Signup failed — no user returned");
@@ -105,6 +114,23 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       set({ session: data.session, user: data.user });
       await get().fetchProfile();
       return { status: "signedIn" };
+    } catch (err: any) {
+      set({ error: err.message });
+      throw err;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  resendSignupConfirmation: async (email: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const { error } = await supabase.auth.resend({
+        type: "signup",
+        email: email.trim().toLowerCase(),
+        options: { emailRedirectTo: getEmailRedirectTo() },
+      });
+      if (error) throw error;
     } catch (err: any) {
       set({ error: err.message });
       throw err;
