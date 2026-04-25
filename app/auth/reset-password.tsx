@@ -87,6 +87,7 @@ export default function ResetPasswordScreen() {
       await updatePassword(data.password);
       setMessageType("success");
       setMessage(s.authPasswordUpdated);
+      await supabase.auth.signOut();
       router.replace("/auth/login");
     } catch (err: any) {
       setMessageType("error");
