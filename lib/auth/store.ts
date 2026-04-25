@@ -96,12 +96,15 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       if (!data.user) throw new Error("Signup failed — no user returned");
 
       if (!data.session) {
-        return { needsEmailConfirmation: true };
+        const identities = data.user.identities;
+        return {
+          status: identities && identities.length === 0 ? "alreadyRegistered" : "needsEmailConfirmation",
+        };
       }
 
       set({ session: data.session, user: data.user });
       await get().fetchProfile();
-      return { needsEmailConfirmation: false };
+      return { status: "signedIn" };
     } catch (err: any) {
       set({ error: err.message });
       throw err;

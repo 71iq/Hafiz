@@ -64,7 +64,11 @@ export default function SignupScreen() {
     try {
       setShowError(null);
       const result = await signUp(data.email, data.password, data.username, data.displayName || "");
-      if (result.needsEmailConfirmation) {
+      if (result.status === "alreadyRegistered") {
+        setShowError(s.authSignupAlreadyRegistered);
+        return;
+      }
+      if (result.status === "needsEmailConfirmation") {
         setShowError(s.authSignupConfirmEmail);
         return;
       }
@@ -224,7 +228,14 @@ export default function SignupScreen() {
 
             {/* Submit */}
             <Button
-              onPress={handleSubmit(onSubmit)}
+              onPress={handleSubmit(onSubmit, (formErrors) => {
+                const firstError =
+                  formErrors.email?.message ||
+                  formErrors.username?.message ||
+                  formErrors.displayName?.message ||
+                  formErrors.password?.message;
+                setShowError(firstError || s.authSignupValidationError);
+              })}
               disabled={isLoading}
             >
               {isLoading ? (

@@ -13,6 +13,10 @@ export type Profile = {
   created_at: string;
 };
 
+export type SignUpResult = {
+  status: "signedIn" | "needsEmailConfirmation" | "alreadyRegistered";
+};
+
 export type AuthState = {
   session: Session | null;
   user: User | null;
@@ -30,7 +34,7 @@ export type AuthActions = {
     password: string,
     username: string,
     displayName: string
-  ) => Promise<{ needsEmailConfirmation: boolean }>;
+  ) => Promise<SignUpResult>;
   signOut: () => Promise<void>;
   fetchProfile: () => Promise<void>;
   clearError: () => void;
