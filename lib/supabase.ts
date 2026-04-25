@@ -10,10 +10,16 @@ import { Platform } from "react-native";
 // 1. Create a project at https://supabase.com
 // 2. Run the SQL in supabase/schema.sql to create tables + RLS policies
 // 3. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY in .env
+//    Vercel's Supabase integration may expose NEXT_PUBLIC_* instead.
 
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? "YOUR_PROJECT_URL";
+const SUPABASE_URL =
+  process.env.EXPO_PUBLIC_SUPABASE_URL ??
+  process.env.NEXT_PUBLIC_SUPABASE_URL ??
+  "YOUR_PROJECT_URL";
 const SUPABASE_ANON_KEY =
-  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "YOUR_ANON_KEY";
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ??
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+  "YOUR_ANON_KEY";
 
 /** Returns true if the Supabase client is configured with real credentials */
 export function isSupabaseConfigured(): boolean {
