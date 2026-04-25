@@ -11,6 +11,7 @@ web-build/
 public/data/
 .env
 .env.local
+.codex/
 
 # Scripts & screenshots (not part of the app)
 scrape_zilal.py
