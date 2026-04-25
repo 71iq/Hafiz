@@ -60,6 +60,8 @@ export default function RootLayout() {
           <Stack.Screen name="flashcards/session" options={{ animation: "slide_from_bottom" }} />
           <Stack.Screen name="auth/login" options={{ animation: "slide_from_bottom" }} />
           <Stack.Screen name="auth/signup" options={{ animation: "slide_from_bottom" }} />
+          <Stack.Screen name="auth/forgot-password" options={{ animation: "slide_from_bottom" }} />
+          <Stack.Screen name="auth/reset-password" options={{ animation: "slide_from_bottom" }} />
         </Stack>
         <Analytics />
         <SpeedInsights />

@@ -10,6 +10,11 @@ function getEmailRedirectTo(): string | undefined {
   return globalThis.location?.origin;
 }
 
+function getPasswordResetRedirectTo(): string | undefined {
+  const baseUrl = getEmailRedirectTo();
+  return baseUrl ? `${baseUrl}/auth/reset-password` : undefined;
+}
+
 export const useAuthStore = create<AuthStore>((set, get) => ({
   // ─── State ──────────────────────────────────────────────────
   session: null,
@@ -131,6 +136,35 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         options: { emailRedirectTo: getEmailRedirectTo() },
       });
       if (error) throw error;
+    } catch (err: any) {
+      set({ error: err.message });
+      throw err;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  sendPasswordReset: async (email: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+        redirectTo: getPasswordResetRedirectTo(),
+      });
+      if (error) throw error;
+    } catch (err: any) {
+      set({ error: err.message });
+      throw err;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  updatePassword: async (password: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const { data, error } = await supabase.auth.updateUser({ password });
+      if (error) throw error;
+      set({ user: data.user });
     } catch (err: any) {
       set({ error: err.message });
       throw err;

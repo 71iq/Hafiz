@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -13,50 +13,79 @@ import { useRouter } from "expo-router";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { ChevronLeft } from "lucide-react-native";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { useAuthStore } from "@/lib/auth/store";
-import { isSupabaseConfigured } from "@/lib/supabase";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { OAuthButtons } from "@/components/auth/OAuthButtons";
-import { ChevronLeft } from "lucide-react-native";
 
-const loginSchema = z.object({
-  email: z.string().trim().toLowerCase().email("Invalid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
-});
+const resetPasswordSchema = z
+  .object({
+    password: z.string().min(6, "Password must be at least 6 characters"),
+    confirmPassword: z.string().min(6, "Password must be at least 6 characters"),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    path: ["confirmPassword"],
+    message: "Passwords do not match",
+  });
 
-type LoginForm = z.infer<typeof loginSchema>;
+type ResetPasswordForm = z.infer<typeof resetPasswordSchema>;
 
-export default function LoginScreen() {
+export default function ResetPasswordScreen() {
   const router = useRouter();
   const s = useStrings();
-  const { signIn, isLoading, error, clearError } = useAuthStore();
-  const [showError, setShowError] = useState<string | null>(null);
+  const { updatePassword, isLoading, error } = useAuthStore();
+  const [message, setMessage] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
   const configured = isSupabaseConfigured();
-
-  const passwordRef = useRef<TextInput>(null);
+  const confirmPasswordRef = useRef<TextInput>(null);
 
   const {
     control,
     handleSubmit,
     formState: { errors },
-  } = useForm<LoginForm>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: { email: "", password: "" },
+  } = useForm<ResetPasswordForm>({
+    resolver: zodResolver(resetPasswordSchema),
+    defaultValues: { password: "", confirmPassword: "" },
   });
 
-  const onSubmit = async (data: LoginForm) => {
-    if (!configured) {
-      setShowError(s.authUnavailableSubtitle);
+  useEffect(() => {
+    if (!configured || Platform.OS !== "web") {
+      setReady(configured);
       return;
     }
+
+    const params = new URLSearchParams(window.location.hash.slice(1));
+    const accessToken = params.get("access_token");
+    const refreshToken = params.get("refresh_token");
+
+    if (!accessToken || !refreshToken) {
+      setMessage(s.authResetLinkInvalid);
+      setReady(false);
+      return;
+    }
+
+    supabase.auth
+      .setSession({ access_token: accessToken, refresh_token: refreshToken })
+      .then(({ error: sessionError }) => {
+        if (sessionError) {
+          setMessage(sessionError.message);
+          setReady(false);
+          return;
+        }
+        setReady(true);
+      });
+  }, [configured, s.authResetLinkInvalid]);
+
+  const onSubmit = async (data: ResetPasswordForm) => {
     try {
-      setShowError(null);
-      await signIn(data.email, data.password);
-      router.back();
+      setMessage(null);
+      await updatePassword(data.password);
+      setMessage(s.authPasswordUpdated);
+      router.replace("/auth/login");
     } catch (err: any) {
-      setShowError(err.message === "Invalid login credentials" ? s.authInvalidCredentials : err.message);
+      setMessage(err.message);
     }
   };
 
@@ -66,7 +95,6 @@ export default function LoginScreen() {
         className="flex-1"
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        {/* Header */}
         <View className="flex-row items-center px-4 pt-4 pb-2">
           <Pressable
             onPress={() => router.back()}
@@ -78,90 +106,50 @@ export default function LoginScreen() {
         </View>
 
         <View className="flex-1 px-6 justify-center" style={{ marginTop: -60 }}>
-          {/* Title */}
           <Text
             className="text-charcoal dark:text-neutral-100 text-center mb-2"
             style={{ fontFamily: "NotoSerif_700Bold", fontSize: 28 }}
           >
-            {s.authLogin}
+            {s.authResetPasswordTitle}
           </Text>
           <Text
             className="text-warm-400 dark:text-neutral-500 text-center mb-8"
-            style={{ fontFamily: "Manrope_400Regular", fontSize: 15 }}
+            style={{ fontFamily: "Manrope_400Regular", fontSize: 15, lineHeight: 22 }}
           >
-            {configured ? s.authLoginSubtitle : s.authUnavailableSubtitle}
+            {configured ? s.authResetPasswordSubtitle : s.authUnavailableSubtitle}
           </Text>
 
-          {configured ? (
           <Card elevation="low" className="p-6 mb-6">
-            {/* Error message */}
-            {(showError || error) && (
+            {(message || error) && (
               <View className="bg-red-50 dark:bg-red-900/20 rounded-2xl p-3 mb-4">
                 <Text
                   className="text-red-600 dark:text-red-400 text-center"
                   style={{ fontFamily: "Manrope_500Medium", fontSize: 13 }}
                 >
-                  {showError || error}
+                  {message || error}
                 </Text>
               </View>
             )}
 
-            {/* Email */}
             <Text
               className="text-charcoal dark:text-neutral-300 mb-2"
               style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}
             >
-              {s.authEmail}
-            </Text>
-            <Controller
-              control={control}
-              name="email"
-              render={({ field: { onChange, onBlur, value } }) => (
-                <TextInput
-                  className="bg-surface dark:bg-surface-dark-high rounded-2xl px-4 py-3 text-charcoal dark:text-neutral-100 mb-1"
-                  style={{ fontFamily: "Manrope_400Regular", fontSize: 15 }}
-                  placeholder={s.authEmail}
-                  placeholderTextColor="#b9a085"
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  returnKeyType="next"
-                  onSubmitEditing={() => passwordRef.current?.focus()}
-                  blurOnSubmit={false}
-                  onBlur={onBlur}
-                  onChangeText={onChange}
-                  value={value}
-                />
-              )}
-            />
-            {errors.email && (
-              <Text className="text-red-500 text-xs mb-2" style={{ fontFamily: "Manrope_400Regular" }}>
-                {errors.email.message}
-              </Text>
-            )}
-
-            <View className="h-3" />
-
-            {/* Password */}
-            <Text
-              className="text-charcoal dark:text-neutral-300 mb-2"
-              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}
-            >
-              {s.authPassword}
+              {s.authNewPassword}
             </Text>
             <Controller
               control={control}
               name="password"
               render={({ field: { onChange, onBlur, value } }) => (
                 <TextInput
-                  ref={passwordRef}
                   className="bg-surface dark:bg-surface-dark-high rounded-2xl px-4 py-3 text-charcoal dark:text-neutral-100 mb-1"
                   style={{ fontFamily: "Manrope_400Regular", fontSize: 15 }}
-                  placeholder={s.authPassword}
+                  placeholder={s.authNewPassword}
                   placeholderTextColor="#b9a085"
                   secureTextEntry
-                  returnKeyType="done"
-                  onSubmitEditing={handleSubmit(onSubmit)}
+                  returnKeyType="next"
+                  onSubmitEditing={() => confirmPasswordRef.current?.focus()}
+                  blurOnSubmit={false}
                   onBlur={onBlur}
                   onChangeText={onChange}
                   value={value}
@@ -174,74 +162,49 @@ export default function LoginScreen() {
               </Text>
             )}
 
-            <Pressable
-              onPress={() => router.push("/auth/forgot-password" as any)}
-              className="self-end mt-1"
-              hitSlop={8}
+            <View className="h-3" />
+            <Text
+              className="text-charcoal dark:text-neutral-300 mb-2"
+              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}
             >
-              <Text
-                className="text-primary-accent dark:text-primary-bright"
-                style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}
-              >
-                {s.authForgotPassword}
+              {s.authConfirmPassword}
+            </Text>
+            <Controller
+              control={control}
+              name="confirmPassword"
+              render={({ field: { onChange, onBlur, value } }) => (
+                <TextInput
+                  ref={confirmPasswordRef}
+                  className="bg-surface dark:bg-surface-dark-high rounded-2xl px-4 py-3 text-charcoal dark:text-neutral-100 mb-1"
+                  style={{ fontFamily: "Manrope_400Regular", fontSize: 15 }}
+                  placeholder={s.authConfirmPassword}
+                  placeholderTextColor="#b9a085"
+                  secureTextEntry
+                  returnKeyType="done"
+                  onSubmitEditing={handleSubmit(onSubmit)}
+                  onBlur={onBlur}
+                  onChangeText={onChange}
+                  value={value}
+                />
+              )}
+            />
+            {errors.confirmPassword && (
+              <Text className="text-red-500 text-xs mb-2" style={{ fontFamily: "Manrope_400Regular" }}>
+                {errors.confirmPassword.message}
               </Text>
-            </Pressable>
+            )}
 
             <View className="h-5" />
-
-            {/* Submit */}
-            <Button
-              onPress={handleSubmit(onSubmit)}
-              disabled={isLoading}
-            >
+            <Button onPress={handleSubmit(onSubmit)} disabled={isLoading || !ready}>
               {isLoading ? (
                 <ActivityIndicator size="small" color="#fff" />
               ) : (
-                <Text
-                  className="text-white text-center"
-                  style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16 }}
-                >
-                  {s.authLogin}
+                <Text className="text-white text-center" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16 }}>
+                  {s.authUpdatePassword}
                 </Text>
               )}
             </Button>
           </Card>
-          ) : (
-            <Card elevation="low" className="p-6 mb-6">
-              <Text
-                className="text-charcoal dark:text-neutral-100 text-center mb-2"
-                style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16 }}
-              >
-                {s.authUnavailableTitle}
-              </Text>
-              <Text
-                className="text-warm-400 dark:text-neutral-500 text-center"
-                style={{ fontFamily: "Manrope_400Regular", fontSize: 14, lineHeight: 22 }}
-              >
-                {s.authUnavailableSubtitle}
-              </Text>
-            </Card>
-          )}
-
-          {configured && <OAuthButtons onError={(msg) => setShowError(msg)} />}
-
-          {/* Sign up link */}
-          {configured && <View className="flex-row items-center justify-center gap-1">
-            <Text
-              className="text-warm-400 dark:text-neutral-500"
-              style={{ fontFamily: "Manrope_400Regular", fontSize: 14 }}
-            >
-              {s.authNoAccount}
-            </Text>
-            <Pressable onPress={() => router.replace("/auth/signup")}>
-              <Text
-                className="text-primary-accent dark:text-primary-bright"
-                style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}
-              >
-                {s.authSignup}
-              </Text>
-            </Pressable>
-          </View>}
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
