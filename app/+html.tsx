@@ -54,6 +54,8 @@ body {
   margin: 0;
   overflow-x: hidden;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(13, 148, 136, 0.55) transparent;
   /* Anchor the visible content to the large viewport and add a sliver of
      extra height so window scroll is always possible. */
   min-height: calc(100dvh + 1px);
@@ -68,8 +70,46 @@ body {
   display: flex;
   flex-direction: column;
 }
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(13, 148, 136, 0.55) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(13, 148, 136, 0.45);
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(13, 148, 136, 0.7);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
 @media (prefers-color-scheme: dark) {
   body { background-color: #000; }
+  * {
+    scrollbar-color: rgba(45, 212, 191, 0.55) transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: rgba(45, 212, 191, 0.45);
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: rgba(45, 212, 191, 0.7);
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
 }`;
 
 const urlBarHideScript = `
