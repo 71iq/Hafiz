@@ -8,6 +8,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { DatabaseProvider } from "@/lib/database/provider";
 import { UI_FONTS, loadUiFontsWeb } from "@/lib/fonts/ui-fonts";
 import { useAuthStore } from "@/lib/auth/store";
+import { Analytics } from "@vercel/analytics/react";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -59,6 +60,7 @@ export default function RootLayout() {
           <Stack.Screen name="auth/login" options={{ animation: "slide_from_bottom" }} />
           <Stack.Screen name="auth/signup" options={{ animation: "slide_from_bottom" }} />
         </Stack>
+        <Analytics />
       </DatabaseProvider>
     </QueryClientProvider>
   );
