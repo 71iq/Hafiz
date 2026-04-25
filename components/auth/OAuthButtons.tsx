@@ -13,10 +13,10 @@ type Props = {
   onError?: (msg: string) => void;
 };
 
-const googleLogo = require("@/assets/images/auth/google.png");
-const appleLogo = require("@/assets/images/auth/apple.png");
-const appleDarkLogo = require("@/assets/images/auth/apple_dark.png");
-const facebookLogo = require("@/assets/images/auth/facebook-icon.png");
+const googleLogo = require("@/assets/images/auth/google-icon.png");
+const appleLogo = require("@/assets/images/auth/apple-icon.png");
+const appleDarkLogo = require("@/assets/images/auth/apple_dark-icon.png");
+const facebookLogo = require("@/assets/images/auth/facebook-icon-icon.png");
 
 async function signInWithProvider(provider: "google" | "apple" | "facebook") {
   if (Platform.OS === "web") {
@@ -92,21 +92,18 @@ export function OAuthButtons({ onError }: Props) {
           source={googleLogo}
           backgroundColor={buttonBackground}
           borderColor={buttonBorderColor}
-          iconSize={25}
         />
         <OAuthIconButton
           onPress={() => handlePress("apple")}
           source={appleSource}
           backgroundColor={buttonBackground}
           borderColor={buttonBorderColor}
-          iconSize={23}
         />
         <OAuthIconButton
           onPress={() => handlePress("facebook")}
           source={facebookLogo}
           backgroundColor={buttonBackground}
           borderColor={buttonBorderColor}
-          iconSize={26}
         />
       </View>
     </View>
@@ -118,13 +115,11 @@ function OAuthIconButton({
   source,
   backgroundColor,
   borderColor,
-  iconSize,
 }: {
   onPress: () => void;
   source: ImageSourcePropType;
   backgroundColor: string;
   borderColor: string;
-  iconSize: number;
 }) {
   return (
     <Pressable
@@ -141,7 +136,7 @@ function OAuthIconButton({
         transform: [{ scale: pressed ? 0.95 : 1 }],
       })}
     >
-      <Image source={source} style={{ width: iconSize, height: iconSize }} resizeMode="contain" />
+      <Image source={source} style={{ width: 32, height: 32 }} resizeMode="contain" />
     </Pressable>
   );
 }
