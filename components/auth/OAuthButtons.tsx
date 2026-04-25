@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, Pressable, Platform } from "react-native";
+import { View, Text, Pressable, Platform, Image, type ImageSourcePropType } from "react-native";
 import * as WebBrowser from "expo-web-browser";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -12,6 +12,11 @@ import { useSettings } from "@/lib/settings/context";
 type Props = {
   onError?: (msg: string) => void;
 };
+
+const googleLogo = require("@/assets/images/auth/google.png");
+const appleLogo = require("@/assets/images/auth/apple.png");
+const appleDarkLogo = require("@/assets/images/auth/apple_dark.png");
+const facebookLogo = require("@/assets/images/auth/facebook-icon.png");
 
 async function signInWithProvider(provider: "google" | "apple" | "facebook") {
   if (Platform.OS === "web") {
@@ -58,6 +63,9 @@ export function OAuthButtons({ onError }: Props) {
   };
 
   const mutedColor = isDark ? "#525252" : "#DFD9D1";
+  const appleSource = (isDark ? appleDarkLogo : appleLogo) as ImageSourcePropType;
+  const buttonBorderColor = isDark ? "#333" : "#E0E0E0";
+  const buttonBackground = isDark ? "#1a1a1a" : "#FFFFFF";
 
   return (
     <View>
@@ -79,56 +87,56 @@ export function OAuthButtons({ onError }: Props) {
 
       {/* OAuth buttons row */}
       <View style={{ flexDirection: "row", justifyContent: "center", gap: 12 }}>
-        {/* Google */}
-        <Pressable
+        <OAuthIconButton
           onPress={() => handlePress("google")}
-          style={({ pressed }) => ({
-            width: 52,
-            height: 52,
-            borderRadius: 26,
-            backgroundColor: isDark ? "#1a1a1a" : "#FFFFFF",
-            borderWidth: 1,
-            borderColor: isDark ? "#333" : "#E0E0E0",
-            alignItems: "center",
-            justifyContent: "center",
-            transform: [{ scale: pressed ? 0.95 : 1 }],
-          })}
-        >
-          <Text style={{ fontSize: 20 }}>G</Text>
-        </Pressable>
-
-        {/* Apple */}
-        <Pressable
+          source={googleLogo}
+          backgroundColor={buttonBackground}
+          borderColor={buttonBorderColor}
+        />
+        <OAuthIconButton
           onPress={() => handlePress("apple")}
-          style={({ pressed }) => ({
-            width: 52,
-            height: 52,
-            borderRadius: 26,
-            backgroundColor: isDark ? "#fff" : "#000",
-            alignItems: "center",
-            justifyContent: "center",
-            transform: [{ scale: pressed ? 0.95 : 1 }],
-          })}
-        >
-          <Text style={{ fontSize: 20, color: isDark ? "#000" : "#fff" }}></Text>
-        </Pressable>
-
-        {/* Facebook */}
-        <Pressable
+          source={appleSource}
+          backgroundColor={buttonBackground}
+          borderColor={buttonBorderColor}
+        />
+        <OAuthIconButton
           onPress={() => handlePress("facebook")}
-          style={({ pressed }) => ({
-            width: 52,
-            height: 52,
-            borderRadius: 26,
-            backgroundColor: "#1877F2",
-            alignItems: "center",
-            justifyContent: "center",
-            transform: [{ scale: pressed ? 0.95 : 1 }],
-          })}
-        >
-          <Text style={{ fontSize: 20, color: "#fff", fontWeight: "700" }}>f</Text>
-        </Pressable>
+          source={facebookLogo}
+          backgroundColor={buttonBackground}
+          borderColor={buttonBorderColor}
+        />
       </View>
     </View>
+  );
+}
+
+function OAuthIconButton({
+  onPress,
+  source,
+  backgroundColor,
+  borderColor,
+}: {
+  onPress: () => void;
+  source: ImageSourcePropType;
+  backgroundColor: string;
+  borderColor: string;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => ({
+        width: 52,
+        height: 52,
+        borderRadius: 26,
+        backgroundColor,
+        borderWidth: 1,
+        borderColor,
+        alignItems: "center",
+        justifyContent: "center",
+        transform: [{ scale: pressed ? 0.95 : 1 }],
+      })}
+    >
+      <Image source={source} style={{ width: 24, height: 24 }} resizeMode="contain" />
+    </Pressable>
   );
 }
