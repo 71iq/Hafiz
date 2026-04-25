@@ -31,6 +31,7 @@ export default function ForgotPasswordScreen() {
   const s = useStrings();
   const { sendPasswordReset, isLoading, error } = useAuthStore();
   const [message, setMessage] = useState<string | null>(null);
+  const [messageType, setMessageType] = useState<"success" | "error">("error");
   const configured = isSupabaseConfigured();
 
   const {
@@ -44,14 +45,17 @@ export default function ForgotPasswordScreen() {
 
   const onSubmit = async (data: ForgotPasswordForm) => {
     if (!configured) {
+      setMessageType("error");
       setMessage(s.authUnavailableSubtitle);
       return;
     }
     try {
       setMessage(null);
       await sendPasswordReset(data.email);
+      setMessageType("success");
       setMessage(s.authPasswordResetSent);
     } catch (err: any) {
+      setMessageType("error");
       setMessage(err.message);
     }
   };
@@ -88,9 +92,19 @@ export default function ForgotPasswordScreen() {
 
           <Card elevation="low" className="p-6 mb-6">
             {(message || error) && (
-              <View className="bg-red-50 dark:bg-red-900/20 rounded-2xl p-3 mb-4">
+              <View
+                className={`rounded-2xl p-3 mb-4 ${
+                  messageType === "success"
+                    ? "bg-primary-accent/10 dark:bg-primary-bright/10"
+                    : "bg-red-50 dark:bg-red-900/20"
+                }`}
+              >
                 <Text
-                  className="text-red-600 dark:text-red-400 text-center"
+                  className={`text-center ${
+                    messageType === "success"
+                      ? "text-primary-accent dark:text-primary-bright"
+                      : "text-red-600 dark:text-red-400"
+                  }`}
                   style={{ fontFamily: "Manrope_500Medium", fontSize: 13 }}
                 >
                   {message || error}

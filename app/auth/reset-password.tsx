@@ -37,6 +37,7 @@ export default function ResetPasswordScreen() {
   const s = useStrings();
   const { updatePassword, isLoading, error } = useAuthStore();
   const [message, setMessage] = useState<string | null>(null);
+  const [messageType, setMessageType] = useState<"success" | "error">("error");
   const [ready, setReady] = useState(false);
   const configured = isSupabaseConfigured();
   const confirmPasswordRef = useRef<TextInput>(null);
@@ -61,6 +62,7 @@ export default function ResetPasswordScreen() {
     const refreshToken = params.get("refresh_token");
 
     if (!accessToken || !refreshToken) {
+      setMessageType("error");
       setMessage(s.authResetLinkInvalid);
       setReady(false);
       return;
@@ -70,6 +72,7 @@ export default function ResetPasswordScreen() {
       .setSession({ access_token: accessToken, refresh_token: refreshToken })
       .then(({ error: sessionError }) => {
         if (sessionError) {
+          setMessageType("error");
           setMessage(sessionError.message);
           setReady(false);
           return;
@@ -82,9 +85,11 @@ export default function ResetPasswordScreen() {
     try {
       setMessage(null);
       await updatePassword(data.password);
+      setMessageType("success");
       setMessage(s.authPasswordUpdated);
       router.replace("/auth/login");
     } catch (err: any) {
+      setMessageType("error");
       setMessage(err.message);
     }
   };
@@ -121,9 +126,19 @@ export default function ResetPasswordScreen() {
 
           <Card elevation="low" className="p-6 mb-6">
             {(message || error) && (
-              <View className="bg-red-50 dark:bg-red-900/20 rounded-2xl p-3 mb-4">
+              <View
+                className={`rounded-2xl p-3 mb-4 ${
+                  messageType === "success"
+                    ? "bg-primary-accent/10 dark:bg-primary-bright/10"
+                    : "bg-red-50 dark:bg-red-900/20"
+                }`}
+              >
                 <Text
-                  className="text-red-600 dark:text-red-400 text-center"
+                  className={`text-center ${
+                    messageType === "success"
+                      ? "text-primary-accent dark:text-primary-bright"
+                      : "text-red-600 dark:text-red-400"
+                  }`}
                   style={{ fontFamily: "Manrope_500Medium", fontSize: 13 }}
                 >
                   {message || error}
