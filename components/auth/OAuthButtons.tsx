@@ -86,24 +86,27 @@ export function OAuthButtons({ onError }: Props) {
       </View>
 
       {/* OAuth buttons row */}
-      <View style={{ flexDirection: "row", justifyContent: "center", gap: 12 }}>
+      <View style={{ flexDirection: "row", justifyContent: "center", gap: 14 }}>
         <OAuthIconButton
           onPress={() => handlePress("google")}
           source={googleLogo}
           backgroundColor={buttonBackground}
           borderColor={buttonBorderColor}
+          iconSize={25}
         />
         <OAuthIconButton
           onPress={() => handlePress("apple")}
           source={appleSource}
           backgroundColor={buttonBackground}
           borderColor={buttonBorderColor}
+          iconSize={23}
         />
         <OAuthIconButton
           onPress={() => handlePress("facebook")}
           source={facebookLogo}
           backgroundColor={buttonBackground}
           borderColor={buttonBorderColor}
+          iconSize={26}
         />
       </View>
     </View>
@@ -115,19 +118,21 @@ function OAuthIconButton({
   source,
   backgroundColor,
   borderColor,
+  iconSize,
 }: {
   onPress: () => void;
   source: ImageSourcePropType;
   backgroundColor: string;
   borderColor: string;
+  iconSize: number;
 }) {
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => ({
-        width: 52,
-        height: 52,
-        borderRadius: 26,
+        width: 50,
+        height: 50,
+        borderRadius: 25,
         backgroundColor,
         borderWidth: 1,
         borderColor,
@@ -136,7 +141,7 @@ function OAuthIconButton({
         transform: [{ scale: pressed ? 0.95 : 1 }],
       })}
     >
-      <Image source={source} style={{ width: 24, height: 24 }} resizeMode="contain" />
+      <Image source={source} style={{ width: iconSize, height: iconSize }} resizeMode="contain" />
     </Pressable>
   );
 }

@@ -226,7 +226,7 @@ export default function LoginScreen() {
           {configured && <OAuthButtons onError={(msg) => setShowError(msg)} />}
 
           {/* Sign up link */}
-          {configured && <View className="flex-row items-center justify-center gap-1">
+          {configured && <View className="flex-row items-center justify-center gap-1 mt-5">
             <Text
               className="text-warm-400 dark:text-neutral-500"
               style={{ fontFamily: "Manrope_400Regular", fontSize: 14 }}
