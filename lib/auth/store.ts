@@ -62,7 +62,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+        email: email.trim().toLowerCase(),
         password,
       });
       if (error) throw error;
@@ -88,9 +88,9 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       // handle_new_user() database trigger can create the profile row
       // automatically via SECURITY DEFINER (bypasses RLS).
       const { data, error } = await supabase.auth.signUp({
-        email,
+        email: email.trim().toLowerCase(),
         password,
-        options: { data: { username, display_name: displayName || null } },
+        options: { data: { username: username.trim(), display_name: displayName.trim() || null } },
       });
       if (error) throw error;
       if (!data.user) throw new Error("Signup failed — no user returned");

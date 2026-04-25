@@ -22,7 +22,7 @@ import { OAuthButtons } from "@/components/auth/OAuthButtons";
 import { ChevronLeft } from "lucide-react-native";
 
 const loginSchema = z.object({
-  email: z.string().email("Invalid email address"),
+  email: z.string().trim().toLowerCase().email("Invalid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
@@ -56,7 +56,7 @@ export default function LoginScreen() {
       await signIn(data.email, data.password);
       router.back();
     } catch (err: any) {
-      setShowError(err.message);
+      setShowError(err.message === "Invalid login credentials" ? s.authInvalidCredentials : err.message);
     }
   };
 
