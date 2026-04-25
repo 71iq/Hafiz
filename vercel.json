@@ -1,5 +1,5 @@
 {
-  "buildCommand": "bash scripts/prepare-web-data.sh && expo export -p web",
+  "buildCommand": "bash scripts/vercel-build.sh",
   "outputDirectory": "dist",
   "cleanUrls": true,
   "trailingSlash": false
