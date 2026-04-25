@@ -42,6 +42,8 @@ export default function SettingsScreen() {
   const currentLang = getLanguageByCode(translationLanguage);
   const [enabledModes, setEnabledModes] = useState<TestMode[]>(DEFAULT_ENABLED_MODES);
   const { user, profile, isLoading: authLoading, signOut } = useAuthStore();
+  const accountName = profile?.display_name || profile?.username || user?.email || s.authProfile;
+  const accountHandle = profile?.username ? `@${profile.username}` : user?.email || "";
 
   useEffect(() => {
     db.getFirstAsync<{ value: string }>(
@@ -88,7 +90,7 @@ export default function SettingsScreen() {
         {/* Account Section */}
         <SectionLabel>{s.authAccount}</SectionLabel>
         <Card elevation="low" className="p-5 mb-8">
-          {user && profile ? (
+          {user ? (
             <View>
               <View className="flex-row items-center gap-3 mb-4">
                 <View className="w-12 h-12 rounded-full bg-primary-accent/10 dark:bg-primary-bright/15 items-center justify-center">
@@ -99,14 +101,16 @@ export default function SettingsScreen() {
                     className="text-charcoal dark:text-neutral-100"
                     style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16 }}
                   >
-                    {profile.display_name || profile.username}
+                    {accountName}
                   </Text>
-                  <Text
-                    className="text-warm-400 dark:text-neutral-500"
-                    style={{ fontFamily: "Manrope_400Regular", fontSize: 13 }}
-                  >
-                    @{profile.username}
-                  </Text>
+                  {!!accountHandle && (
+                    <Text
+                      className="text-warm-400 dark:text-neutral-500"
+                      style={{ fontFamily: "Manrope_400Regular", fontSize: 13 }}
+                    >
+                      {accountHandle}
+                    </Text>
+                  )}
                 </View>
               </View>
               <Pressable

@@ -5,6 +5,25 @@ import type { AuthState, AuthActions, Profile } from "./types";
 
 type AuthStore = AuthState & AuthActions;
 
+function buildFallbackProfile(user: NonNullable<AuthState["user"]>): Profile {
+  const metadata = user.user_metadata ?? {};
+  const emailName = user.email?.split("@")[0] || "user";
+  const username = String(metadata.username || emailName).replace(/[^a-zA-Z0-9_]/g, "_").slice(0, 20) || "user";
+
+  return {
+    id: user.id,
+    username,
+    display_name: typeof metadata.display_name === "string" ? metadata.display_name : null,
+    avatar_url: null,
+    total_score: 0,
+    current_streak: 0,
+    longest_streak: 0,
+    cards_reviewed: 0,
+    last_review_date: null,
+    created_at: user.created_at,
+  };
+}
+
 function getEmailRedirectTo(): string | undefined {
   if (Platform.OS !== "web") return undefined;
   return globalThis.location?.origin;
@@ -201,6 +220,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       set({ profile: data as Profile });
     } catch (err: any) {
       console.warn("[Auth] Failed to fetch profile:", err.message);
+      set({ profile: buildFallbackProfile(user) });
     }
   },
 
