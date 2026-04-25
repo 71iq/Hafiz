@@ -30,7 +30,7 @@ export type AuthActions = {
     password: string,
     username: string,
     displayName: string
-  ) => Promise<void>;
+  ) => Promise<{ needsEmailConfirmation: boolean }>;
   signOut: () => Promise<void>;
   fetchProfile: () => Promise<void>;
   clearError: () => void;

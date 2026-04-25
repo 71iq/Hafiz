@@ -63,7 +63,11 @@ export default function SignupScreen() {
     }
     try {
       setShowError(null);
-      await signUp(data.email, data.password, data.username, data.displayName || "");
+      const result = await signUp(data.email, data.password, data.username, data.displayName || "");
+      if (result.needsEmailConfirmation) {
+        setShowError(s.authSignupConfirmEmail);
+        return;
+      }
       router.back();
     } catch (err: any) {
       setShowError(err.message);
