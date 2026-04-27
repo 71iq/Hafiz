@@ -17,7 +17,7 @@ export async function fetchReflections(
 
   const { data, error } = await supabase
     .from("reflections")
-    .select("*, profiles(username, display_name)")
+    .select("*, profiles:profiles!reflections_user_id_fkey(username, display_name)")
     .eq("surah", surah)
     .lte("ayah_start", ayah)
     .gte("ayah_end", ayah)
@@ -87,7 +87,7 @@ export async function createReflection(
       ayah_end: ayahEnd,
       content,
     })
-    .select("*, profiles(username, display_name)")
+    .select("*, profiles:profiles!reflections_user_id_fkey(username, display_name)")
     .single();
 
   if (error) throw error;
@@ -123,7 +123,7 @@ export async function fetchComments(
 ): Promise<ReflectionComment[]> {
   const { data, error } = await supabase
     .from("reflection_comments")
-    .select("*, profiles(username, display_name)")
+    .select("*, profiles:profiles!reflection_comments_user_id_fkey(username, display_name)")
     .eq("reflection_id", reflectionId)
     .order("created_at", { ascending: true });
 
@@ -140,7 +140,7 @@ export async function addComment(
   const { data, error } = await supabase
     .from("reflection_comments")
     .insert({ user_id: userId, reflection_id: reflectionId, content })
-    .select("*, profiles(username, display_name)")
+    .select("*, profiles:profiles!reflection_comments_user_id_fkey(username, display_name)")
     .single();
 
   if (error) throw error;

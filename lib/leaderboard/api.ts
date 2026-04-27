@@ -15,7 +15,7 @@ export async function fetchDailyLeaderboard(): Promise<LeaderboardEntry[]> {
   const today = new Date().toISOString().split("T")[0];
   const { data, error } = await supabase
     .from("daily_scores")
-    .select("user_id, score, profiles(username, display_name)")
+    .select("user_id, score, profiles:profiles!daily_scores_user_id_fkey(username, display_name)")
     .eq("date", today)
     .order("score", { ascending: false })
     .limit(50);
@@ -41,7 +41,7 @@ export async function fetchWeeklyLeaderboard(): Promise<LeaderboardEntry[]> {
   // Fetch all daily_scores from last 7 days, aggregate in JS
   const { data, error } = await supabase
     .from("daily_scores")
-    .select("user_id, score, profiles(username, display_name)")
+    .select("user_id, score, profiles:profiles!daily_scores_user_id_fkey(username, display_name)")
     .gte("date", weekAgoStr)
     .order("score", { ascending: false });
 
