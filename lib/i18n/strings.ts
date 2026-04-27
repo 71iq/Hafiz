@@ -317,6 +317,7 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     reflectionSend: "Send",
     reflectionPosted: "Reflection posted",
     reflectionNoComments: "No comments yet",
+    reflectionSetupRequired: "Reflections are not set up yet. Run the Supabase reflections migration.",
     // Error
     databaseError: "Database Error",
     // Onboarding
@@ -641,6 +642,7 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     reflectionSend: "إرسال",
     reflectionPosted: "تم نشر التأمل",
     reflectionNoComments: "لا توجد تعليقات بعد",
+    reflectionSetupRequired: "لم يتم إعداد التأملات بعد. شغّل ترحيل Supabase الخاص بالتأملات.",
     databaseError: "خطأ في قاعدة البيانات",
     // Onboarding
     onboardingWelcome: "حافظ",
