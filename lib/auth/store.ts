@@ -24,6 +24,15 @@ function buildFallbackProfile(user: NonNullable<AuthState["user"]>): Profile {
   };
 }
 
+function buildProfileInsert(user: NonNullable<AuthState["user"]>) {
+  const profile = buildFallbackProfile(user);
+  return {
+    id: profile.id,
+    username: profile.username,
+    display_name: profile.display_name,
+  };
+}
+
 function getEmailRedirectTo(): string | undefined {
   if (Platform.OS !== "web") return undefined;
   return globalThis.location?.origin;
@@ -64,8 +73,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
       if (session) {
         set({ session, user: session.user });
-        // Fetch profile in background
-        get().fetchProfile();
+        get().ensureProfile();
       }
 
       // Listen for auth state changes
@@ -76,7 +84,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         });
 
         if (session?.user) {
-          get().fetchProfile();
+          get().ensureProfile();
         } else {
           set({ profile: null });
         }
@@ -97,7 +105,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       });
       if (error) throw error;
       set({ session: data.session, user: data.user });
-      await get().fetchProfile();
+      await get().ensureProfile();
     } catch (err: any) {
       set({ error: err.message });
       throw err;
@@ -136,7 +144,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       }
 
       set({ session: data.session, user: data.user });
-      await get().fetchProfile();
+      await get().ensureProfile();
       return { status: "signedIn" };
     } catch (err: any) {
       set({ error: err.message });
@@ -221,6 +229,30 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     } catch (err: any) {
       console.warn("[Auth] Failed to fetch profile:", err.message);
       set({ profile: buildFallbackProfile(user) });
+    }
+  },
+
+  ensureProfile: async () => {
+    const user = get().user;
+    if (!user) return null;
+
+    const fallback = buildFallbackProfile(user);
+
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .upsert(buildProfileInsert(user), { onConflict: "id", ignoreDuplicates: true })
+        .select("*")
+        .single();
+
+      if (error) throw error;
+      const profile = (data as Profile) ?? fallback;
+      set({ profile });
+      return profile;
+    } catch (err: any) {
+      console.warn("[Auth] Failed to ensure profile:", err.message);
+      set({ profile: fallback });
+      return fallback;
     }
   },
 

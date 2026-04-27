@@ -4,9 +4,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Trophy, Flame } from "lucide-react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useSettings } from "@/lib/settings/context";
+import { useDatabase } from "@/lib/database/provider";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { useAuthStore } from "@/lib/auth/store";
 import { isSupabaseConfigured } from "@/lib/supabase";
+import { syncDailyScore, updateProfileStats } from "@/lib/fsrs/leaderboard-sync";
 import { LeaderboardSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { AuthGate } from "@/components/ui/AuthGate";
@@ -22,11 +24,18 @@ type Tab = "daily" | "weekly" | "alltime" | "streak";
 
 export default function LeaderboardScreen() {
   const { isDark } = useSettings();
+  const db = useDatabase();
   const s = useStrings();
   const user = useAuthStore((s) => s.user);
   const [activeTab, setActiveTab] = useState<Tab>("daily");
 
   const configured = isSupabaseConfigured();
+
+  const syncLeaderboard = useCallback(async () => {
+    if (!configured || !user) return;
+    await syncDailyScore(db);
+    await updateProfileStats(db);
+  }, [configured, db, user]);
 
   if (!user) {
     return (
@@ -50,7 +59,10 @@ export default function LeaderboardScreen() {
 
   const { data: entries = [], isLoading, refetch, isRefetching } = useQuery({
     queryKey: ["leaderboard", activeTab],
-    queryFn,
+    queryFn: async () => {
+      await syncLeaderboard();
+      return queryFn();
+    },
     enabled: configured,
     staleTime: 1000 * 60 * 2, // 2 minutes
   });

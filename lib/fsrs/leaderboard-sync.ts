@@ -4,11 +4,18 @@ import { useAuthStore } from "@/lib/auth/store";
 import { getTodayScore, getTotalScore } from "./scoring";
 import { getStudyStreak, getLastReviewDate } from "./queries";
 
+async function ensureProfileRow() {
+  const { user, ensureProfile } = useAuthStore.getState();
+  if (!user) return null;
+  return ensureProfile();
+}
+
 /** Sync today's daily score to Supabase */
 export async function syncDailyScore(db: SQLiteDatabase): Promise<void> {
   if (!isSupabaseConfigured()) return;
   const user = useAuthStore.getState().user;
   if (!user) return;
+  await ensureProfileRow();
 
   const today = new Date().toISOString().split("T")[0];
   const { score, reviewsCount } = await getTodayScore(db);
@@ -34,6 +41,7 @@ export async function updateProfileStats(db: SQLiteDatabase): Promise<void> {
   if (!isSupabaseConfigured()) return;
   const user = useAuthStore.getState().user;
   if (!user) return;
+  await ensureProfileRow();
 
   const [totalScore, currentStreak, lastReviewDate, totalCards] = await Promise.all([
     getTotalScore(db),
@@ -54,14 +62,14 @@ export async function updateProfileStats(db: SQLiteDatabase): Promise<void> {
 
   const { error } = await supabase
     .from("profiles")
-    .update({
+    .upsert({
+      id: user.id,
       total_score: totalScore,
       current_streak: currentStreak,
       longest_streak: longestStreak,
       cards_reviewed: totalCards,
       last_review_date: lastReviewDay,
-    })
-    .eq("id", user.id);
+    });
 
   if (error) console.warn("[Leaderboard] Failed to update profile stats:", error.message);
 }
