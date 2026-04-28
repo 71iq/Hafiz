@@ -45,6 +45,8 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     ayahs: "Ayahs",
     // AyahBlock
     tafseer: "Tafseer",
+    addToReview: "Add to Review",
+    reviewActionUnavailable: "Create review decks from Flashcards",
     tapToReveal: "Tap to reveal",
     loading: "Loading...",
     // WordDetailSheet tabs (en mode)
@@ -387,6 +389,8 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     medinan: "مدنية",
     ayahs: "آيات",
     tafseer: "التفسير",
+    addToReview: "أضف للمراجعة",
+    reviewActionUnavailable: "أنشئ مجموعات المراجعة من البطاقات",
     tapToReveal: "اضغط للكشف",
     loading: "جارٍ التحميل...",
     wordTabEnglish: "الإنجليزية",
