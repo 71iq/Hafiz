@@ -5,6 +5,7 @@ import {
   FlatList,
   ActivityIndicator,
   useWindowDimensions,
+  type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from "react-native";
@@ -179,12 +180,21 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
   const db = useDatabase();
   const { fontSize, lineHeight, pageScroll, isRTL } = useSettings();
   const { width } = useWindowDimensions();
+  const [containerWidth, setContainerWidth] = useState(0);
+  const pageWidth = containerWidth || width;
   const horizontal = pageScroll === "horizontal";
   const [pageData, setPageData] = useState<PageData[]>([]);
   const [surahMap, setSurahMap] = useState<Map<number, SurahRow>>(new Map());
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const flatListRef = useRef<FlatList>(null);
+
+  const onContainerLayout = useCallback((e: LayoutChangeEvent) => {
+    const nextWidth = Math.round(e.nativeEvent.layout.width);
+    if (nextWidth > 0) {
+      setContainerWidth((current) => (current === nextWidth ? current : nextWidth));
+    }
+  }, []);
 
   // Layout offsets for getItemLayout — enables instant scrollToIndex
   const [layoutInfo, setLayoutInfo] = useState<{
@@ -269,7 +279,7 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
     (_data: ArrayLike<PageData> | null | undefined, index: number) => {
       // Horizontal swipe mode: every page is exactly one viewport wide.
       if (horizontal) {
-        return { length: width, offset: width * index, index };
+        return { length: pageWidth, offset: pageWidth * index, index };
       }
       if (!layoutInfo || index < 0 || index >= layoutInfo.heights.length) {
         // Fallback estimate
@@ -282,7 +292,7 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
         index,
       };
     },
-    [layoutInfo, lineHeight, horizontal, width]
+    [layoutInfo, lineHeight, horizontal, pageWidth]
   );
 
   // Expose goToPage function to parent — instant jump via getItemLayout
@@ -292,7 +302,7 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
         if (page >= 1 && page <= pageData.length) {
           if (horizontal) {
             flatListRef.current?.scrollToOffset({
-              offset: width * (page - 1),
+              offset: pageWidth * (page - 1),
               animated: false,
             });
             return;
@@ -305,7 +315,7 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
         }
       };
     }
-  }, [goToPageRef, horizontal, pageData.length, width]);
+  }, [goToPageRef, horizontal, pageData.length, pageWidth]);
 
   // Track which page is currently visible
   const viewabilityConfig = useRef({
@@ -326,14 +336,14 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
     ({ item, index }: { item: PageData; index: number }) => {
       if (horizontal) {
         return (
-          <View style={{ width, height: "100%" }}>
+          <View style={{ width: pageWidth, height: "100%" }}>
             <MushafPage
               pageNumber={item.page}
               ayahs={item.ayahs}
               surahMap={surahMap}
               fontSize={fontSize}
               lineHeight={lineHeight}
-              width={width}
+              width={pageWidth}
               lineLayout={item.lineLayout}
               globalWordOffset={item.globalWordOffset}
             />
@@ -348,7 +358,7 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
             surahMap={surahMap}
             fontSize={fontSize}
             lineHeight={lineHeight}
-            width={width}
+            width={pageWidth}
             lineLayout={item.lineLayout}
             globalWordOffset={item.globalWordOffset}
           />
@@ -356,7 +366,7 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
         </View>
       );
     },
-    [surahMap, fontSize, lineHeight, width, pageData.length, horizontal]
+    [surahMap, fontSize, lineHeight, pageWidth, pageData.length, horizontal]
   );
 
   const keyExtractor = useCallback(
@@ -376,14 +386,14 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
   }
 
   return (
-    <View className="flex-1">
+    <View className="flex-1" onLayout={onContainerLayout}>
       <FlatList
         ref={flatListRef}
         data={pageData}
         renderItem={renderPage}
         keyExtractor={keyExtractor}
         getItemLayout={horizontal ? undefined : getItemLayout}
-        extraData={fontSize}
+        extraData={{ fontSize, pageWidth }}
         horizontal={horizontal}
         pagingEnabled={horizontal}
         // Quran is Arabic — want Arabic-book swipe (swipe right → next page).
@@ -397,12 +407,9 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
         showsHorizontalScrollIndicator={false}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
-        // Horizontal paging mode needs a generous render window so virtualized
-        // items keep materializing as the user swipes forward. Vertical list
-        // items are tall so a smaller window suffices.
-        initialNumToRender={horizontal ? 5 : 3}
-        maxToRenderPerBatch={horizontal ? 5 : 3}
-        windowSize={horizontal ? 11 : 5}
+        initialNumToRender={horizontal ? 1 : 3}
+        maxToRenderPerBatch={horizontal ? 1 : 3}
+        windowSize={horizontal ? 3 : 5}
         removeClippedSubviews={!horizontal}
         contentContainerStyle={horizontal ? undefined : { paddingBottom: 60 }}
       />
