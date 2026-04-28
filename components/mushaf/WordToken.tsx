@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import { Text, Pressable, Platform, View } from "react-native";
 import { useWordInteraction } from "@/lib/word/context";
 import { useChrome } from "@/lib/ui/chrome";
@@ -34,6 +34,14 @@ function WordTokenInner({
   const { visible: chromeVisible, setVisible: setChromeVisible } = useChrome();
   const tokenRef = useRef<View>(null);
   const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isTouchInput = useMemo(() => {
+    if (Platform.OS !== "web") return true;
+    if (typeof navigator !== "undefined" && navigator.maxTouchPoints > 0) return true;
+    if (typeof window !== "undefined" && typeof window.matchMedia === "function") {
+      return window.matchMedia("(pointer: coarse)").matches;
+    }
+    return false;
+  }, []);
 
   useEffect(() => () => {
     if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
@@ -55,12 +63,12 @@ function WordTokenInner({
 
   const handlePress = useCallback(() => {
     if (disabled) return;
-    if (Platform.OS === "web") {
+    if (!isTouchInput) {
       // Mouse / desktop: single click → tooltip
       showTooltip();
       return;
     }
-    // Native touch: tap toggles chrome; double-tap shows tooltip
+    // Touch input: tap toggles chrome; double-tap shows tooltip
     if (tapTimerRef.current) {
       clearTimeout(tapTimerRef.current);
       tapTimerRef.current = null;
@@ -73,7 +81,7 @@ function WordTokenInner({
       tapTimerRef.current = null;
       setChromeVisible(!chromeVisible);
     }, DOUBLE_TAP_MS);
-  }, [disabled, chromeVisible, setChromeVisible, showTooltip]);
+  }, [disabled, isTouchInput, chromeVisible, setChromeVisible, showTooltip]);
 
   const handleLongPress = useCallback(() => {
     if (disabled) return;
