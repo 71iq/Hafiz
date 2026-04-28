@@ -290,6 +290,14 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
     if (goToPageRef) {
       goToPageRef.current = (page: number) => {
         if (page >= 1 && page <= pageData.length) {
+          if (horizontal) {
+            flatListRef.current?.scrollToOffset({
+              offset: width * (page - 1),
+              animated: false,
+            });
+            return;
+          }
+
           flatListRef.current?.scrollToIndex({
             index: page - 1,
             animated: false,
@@ -297,7 +305,7 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
         }
       };
     }
-  }, [goToPageRef, pageData.length]);
+  }, [goToPageRef, horizontal, pageData.length, width]);
 
   // Track which page is currently visible
   const viewabilityConfig = useRef({
@@ -374,7 +382,7 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
         data={pageData}
         renderItem={renderPage}
         keyExtractor={keyExtractor}
-        getItemLayout={getItemLayout}
+        getItemLayout={horizontal ? undefined : getItemLayout}
         extraData={fontSize}
         horizontal={horizontal}
         pagingEnabled={horizontal}
