@@ -93,7 +93,7 @@ export function SurahHeader({
   }
 
   return (
-    <View className="mx-5 mt-10 mb-5">
+    <View className="mx-5 mt-10 mb-5 w-full max-w-[840px] self-center">
       {/* Decorative surah card — tonal gradient, no borders */}
       <View
         className="rounded-4xl px-7 py-6 items-center overflow-hidden"

@@ -215,7 +215,7 @@ function AyahBlockInner({
   const activeIconColor = isDark ? "#2dd4bf" : "#0d9488";
 
   return (
-    <View className="mx-3 mb-3 rounded-3xl bg-surface-low dark:bg-surface-dark-low px-4 py-3" style={{ position: "relative" }}>
+    <View className="mx-3 mb-3 w-full max-w-[840px] self-center rounded-3xl bg-surface-low dark:bg-surface-dark-low px-4 py-3" style={{ position: "relative" }}>
       {/* Deep link pulse highlight overlay */}
       {highlighted && (
         <RNAnimated.View

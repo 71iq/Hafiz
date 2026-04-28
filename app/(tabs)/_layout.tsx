@@ -1,11 +1,11 @@
-import { View, Text, useWindowDimensions } from "react-native";
+import { View, Text } from "react-native";
 import { Tabs } from "expo-router";
 import { Sparkles, BookOpen, BarChart3, Settings, Trophy } from "lucide-react-native";
 import { useDatabaseStatus } from "@/lib/database/provider";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { SettingsProvider, useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
-import { AppNavigation, SIDEBAR_WIDTH, SIDEBAR_BREAKPOINT } from "@/components/ui/AppNavigation";
+import { AppNavigation } from "@/components/ui/AppNavigation";
 import { useSync } from "@/lib/sync/useSync";
 import { SyncIndicator } from "@/components/ui/SyncIndicator";
 import { OfflineBanner } from "@/components/ui/OfflineBanner";
@@ -38,8 +38,6 @@ function SyncOverlay() {
 function TabsWithStrings() {
   const { isRTL, uiLanguage } = useSettings();
   const s = useStrings();
-  const { width } = useWindowDimensions();
-  const hasSidebar = width >= SIDEBAR_BREAKPOINT;
 
   return (
     <View style={{ flex: 1, direction: isRTL ? "rtl" : "ltr" }}>
@@ -48,11 +46,6 @@ function TabsWithStrings() {
       <Tabs
         screenOptions={{
           headerShown: false,
-          sceneStyle: hasSidebar
-            ? isRTL
-              ? { marginRight: SIDEBAR_WIDTH }
-              : { marginLeft: SIDEBAR_WIDTH }
-            : undefined,
         }}
         tabBar={(props) => <AppNavigation {...props} isRTL={isRTL} />}
       >
