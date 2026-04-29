@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -187,6 +187,7 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
   const [surahMap, setSurahMap] = useState<Map<number, SurahRow>>(new Map());
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
+  const currentPageRef = useRef(1);
   const flatListRef = useRef<FlatList>(null);
 
   const onContainerLayout = useCallback((e: LayoutChangeEvent) => {
@@ -326,11 +327,18 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
     ({ viewableItems }: { viewableItems: Array<{ item: PageData }> }) => {
       if (viewableItems.length > 0) {
         const firstVisible = viewableItems[0].item.page;
+        if (currentPageRef.current === firstVisible) return;
+        currentPageRef.current = firstVisible;
         setCurrentPage(firstVisible);
         onPageChange?.(firstVisible);
       }
     }
   ).current;
+
+  const extraData = useMemo(
+    () => ({ fontSize, pageWidth, horizontal }),
+    [fontSize, pageWidth, horizontal]
+  );
 
   const renderPage = useCallback(
     ({ item, index }: { item: PageData; index: number }) => {
@@ -392,8 +400,8 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
         data={pageData}
         renderItem={renderPage}
         keyExtractor={keyExtractor}
-        getItemLayout={horizontal ? undefined : getItemLayout}
-        extraData={{ fontSize, pageWidth }}
+        getItemLayout={getItemLayout}
+        extraData={extraData}
         horizontal={horizontal}
         pagingEnabled={horizontal}
         // Quran is Arabic — want Arabic-book swipe (swipe right → next page).
@@ -407,10 +415,11 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
         showsHorizontalScrollIndicator={false}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
-        initialNumToRender={horizontal ? 1 : 3}
-        maxToRenderPerBatch={horizontal ? 1 : 3}
-        windowSize={horizontal ? 3 : 5}
-        removeClippedSubviews={!horizontal}
+        initialNumToRender={1}
+        maxToRenderPerBatch={1}
+        updateCellsBatchingPeriod={80}
+        windowSize={horizontal ? 2 : 3}
+        removeClippedSubviews
         contentContainerStyle={horizontal ? undefined : { paddingBottom: 60 }}
       />
 

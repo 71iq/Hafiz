@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { memo, useEffect, useState, useMemo, useCallback } from "react";
 import { View, Text, Pressable, ActivityIndicator, Platform } from "react-native";
 import { SurahHeader } from "./SurahHeader";
 import { WordToken } from "./WordToken";
@@ -105,7 +105,7 @@ function buildWordIdentities(ayahs: AyahData[]): WordIdentity[] {
   return identities;
 }
 
-export function MushafPage({
+function MushafPageInner({
   pageNumber,
   ayahs,
   surahMap,
@@ -342,3 +342,5 @@ export function MushafPage({
     </View>
   );
 }
+
+export const MushafPage = memo(MushafPageInner);
