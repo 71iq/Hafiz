@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
-import { View, Text, Pressable, Modal, ScrollView } from "react-native";
-import { X, BookMarked, Trash2, BookmarkX } from "lucide-react-native";
+import { View, Text, Pressable, Modal, ScrollView, useWindowDimensions } from "react-native";
+import { X, Trash2, BookmarkX } from "lucide-react-native";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useSelection } from "@/lib/selection/context";
 import { removeBookmark } from "@/lib/selection/queries";
@@ -25,9 +25,12 @@ type BookmarkWithName = {
 export function BookmarksSheet({ visible, onClose, onNavigate }: Props) {
   const db = useDatabase();
   const { isDark } = useSettings();
+  const { width, height } = useWindowDimensions();
   const s = useStrings();
   const { bookmarksList, showToast, refreshBookmarks } = useSelection();
   const [enriched, setEnriched] = useState<BookmarkWithName[]>([]);
+  const modalWidth = Math.min(width - 32, 560);
+  const modalHeight = Math.min(height - 48, 640);
 
   useEffect(() => {
     if (!visible || bookmarksList.length === 0) {
@@ -70,26 +73,31 @@ export function BookmarksSheet({ visible, onClose, onNavigate }: Props) {
   );
 
   return (
-    <Modal visible={visible} animationType="slide" transparent>
+    <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
       <View
         style={{
           flex: 1,
-          justifyContent: "flex-end",
+          alignItems: "center",
+          justifyContent: "center",
+          paddingHorizontal: 16,
+          backgroundColor: "rgba(0,0,0,0.45)",
         }}
       >
         <Pressable
-          style={{ flex: 1 }}
+          style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0 }}
           onPress={onClose}
         />
         <View
           style={{
-            maxHeight: "70%",
+            width: modalWidth,
+            height: modalHeight,
             backgroundColor: isDark ? "#1a1a1a" : "#FFF8F1",
-            borderTopLeftRadius: 24,
-            borderTopRightRadius: 24,
-            paddingTop: 16,
-            paddingBottom: 40,
+            borderRadius: 24,
+            paddingTop: 18,
+            paddingBottom: 20,
+            overflow: "hidden",
           }}
+          onStartShouldSetResponder={() => true}
         >
           {/* Header */}
           <View
@@ -124,7 +132,7 @@ export function BookmarksSheet({ visible, onClose, onNavigate }: Props) {
           </View>
 
           {/* Bookmark list */}
-          <ScrollView style={{ paddingHorizontal: 20 }}>
+          <ScrollView style={{ paddingHorizontal: 20 }} contentContainerStyle={{ paddingBottom: 8 }}>
             {enriched.length === 0 ? (
               <EmptyState
                 icon={BookmarkX}
