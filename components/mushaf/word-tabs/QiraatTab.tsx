@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { View, Text } from "react-native";
 import { useDatabase } from "@/lib/database/provider";
 import { fetchQiraat } from "@/lib/word/queries";
@@ -68,14 +68,23 @@ export function QiraatTab({ surah, ayah }: Props) {
   const s = useStrings();
   const [text, setText] = useState<string | null>(null);
   const [group, setGroup] = useState<string[]>([]);
+  const [blocks, setBlocks] = useState<QiraatBlock[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
+    setText(null);
+    setGroup([]);
+    setBlocks([]);
+
     fetchQiraat(db, surah, ayah)
       .then((row) => {
+        if (cancelled) return;
         const t = row?.text?.trim() ?? "";
         setText(t || null);
+        setBlocks(t ? parseQiraatText(t) : []);
+
         let g: string[] = [];
         if (row?.ayah_group) {
           try {
@@ -87,10 +96,17 @@ export function QiraatTab({ surah, ayah }: Props) {
         }
         setGroup(g);
       })
-      .finally(() => setLoading(false));
-  }, [db, surah, ayah]);
+      .catch((error) => {
+        console.warn("[QiraatTab] Failed to load qiraat:", error);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
 
-  const blocks = useMemo(() => (text ? parseQiraatText(text) : []), [text]);
+    return () => {
+      cancelled = true;
+    };
+  }, [db, surah, ayah]);
 
   if (loading) {
     return (
