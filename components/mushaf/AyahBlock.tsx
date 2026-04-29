@@ -290,7 +290,10 @@ function AyahBlockInner({
           </View>
         </Pressable>
       ) : (
-        <View className="items-end pt-4" style={{ opacity: fontVisible ? 1 : 0 }}>
+        <View
+          className="pt-4"
+          style={{ opacity: fontVisible ? 1 : 0, direction: "ltr", alignItems: "flex-end" }}
+        >
           <View
             className="self-end"
             style={{
