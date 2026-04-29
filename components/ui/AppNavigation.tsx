@@ -202,6 +202,8 @@ function FloatingPanel(props: BottomTabBarProps & { isRTL?: boolean }) {
   const menuColor = isDark ? "#a3a3a3" : "#8B8178";
   const sideStyle = isRTL ? { right: 16 } : { left: 16 };
   const edgeStyle = isRTL ? { right: 0 } : { left: 0 };
+  const triggerTop = Math.max(insets.top + 72, 88);
+  const panelTop = triggerTop + 56;
 
   return (
     <>
@@ -212,7 +214,7 @@ function FloatingPanel(props: BottomTabBarProps & { isRTL?: boolean }) {
         className="items-center justify-center rounded-full bg-surface-high/90 dark:bg-surface-dark-high/90"
         style={{
           position: "absolute",
-          top: Math.max(insets.top, 16),
+          top: triggerTop,
           width: 44,
           height: 44,
           zIndex: 60,
@@ -244,7 +246,7 @@ function FloatingPanel(props: BottomTabBarProps & { isRTL?: boolean }) {
         style={[
           {
             position: "absolute",
-            top: Math.max(insets.top + 56, 72),
+            top: panelTop,
             width: PANEL_WIDTH,
             zIndex: 55,
             ...sideStyle,
