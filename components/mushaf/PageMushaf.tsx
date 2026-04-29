@@ -188,6 +188,7 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const currentPageRef = useRef(1);
+  const swipeStartPageRef = useRef(1);
   const flatListRef = useRef<FlatList>(null);
 
   const onContainerLayout = useCallback((e: LayoutChangeEvent) => {
@@ -354,6 +355,30 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
     [pageWidth, updateCurrentPage]
   );
 
+  const handleHorizontalScrollBegin = useCallback(() => {
+    swipeStartPageRef.current = currentPageRef.current;
+  }, []);
+
+  const handleHorizontalScrollEnd = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (pageWidth <= 0) return;
+      const rawPage = Math.round(e.nativeEvent.contentOffset.x / pageWidth) + 1;
+      const startPage = swipeStartPageRef.current;
+      const nextPage = Math.max(
+        1,
+        Math.min(pageData.length, Math.max(startPage - 1, Math.min(startPage + 1, rawPage)))
+      );
+      if (nextPage !== rawPage) {
+        flatListRef.current?.scrollToOffset({
+          offset: pageWidth * (nextPage - 1),
+          animated: true,
+        });
+      }
+      updateCurrentPage(nextPage);
+    },
+    [pageData.length, pageWidth, updateCurrentPage]
+  );
+
   const extraData = useMemo(
     () => ({ fontSize, pageWidth, horizontal }),
     [fontSize, pageWidth, horizontal]
@@ -429,6 +454,9 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
         inverted={horizontal && !isRTL}
         // Horizontal mode tracks page by offset; vertical mode uses scroll direction to hide chrome.
         onScroll={horizontal ? handleHorizontalScroll : onScroll}
+        onScrollBeginDrag={horizontal ? handleHorizontalScrollBegin : undefined}
+        onMomentumScrollEnd={horizontal ? handleHorizontalScrollEnd : undefined}
+        onScrollEndDrag={horizontal ? handleHorizontalScrollEnd : undefined}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
         showsHorizontalScrollIndicator={false}
@@ -439,6 +467,8 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
         updateCellsBatchingPeriod={80}
         windowSize={horizontal ? 3 : 3}
         removeClippedSubviews={!horizontal}
+        disableIntervalMomentum={horizontal}
+        decelerationRate={horizontal ? "fast" : "normal"}
         contentContainerStyle={horizontal ? undefined : { paddingBottom: 60 }}
       />
 

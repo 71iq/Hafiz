@@ -77,10 +77,12 @@ export function GoToNavigator({
   const searchTextRef = useRef("");
   const scrollEndTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const initialScrollDone = useRef(false);
+  const suppressPickerScroll = useRef(false);
 
   useEffect(() => {
     if (!visible) {
       initialScrollDone.current = false;
+      suppressPickerScroll.current = false;
       if (scrollEndTimer.current) clearTimeout(scrollEndTimer.current);
       return;
     }
@@ -168,11 +170,15 @@ export function GoToNavigator({
       !initialScrollDone.current
     ) {
       initialScrollDone.current = true;
+      suppressPickerScroll.current = true;
       setTimeout(() => {
         pickerRef.current?.scrollToOffset({
           offset: (currentPage - 1) * ITEM_HEIGHT,
           animated: false,
         });
+        setTimeout(() => {
+          suppressPickerScroll.current = false;
+        }, 100);
       }, 100);
     }
   }, [visible, pages.length, tab, currentPage]);
@@ -212,6 +218,8 @@ export function GoToNavigator({
       const page = Math.max(1, Math.min(604, index + 1));
       selectedPageRef.current = page;
       setSelectedPage(page);
+
+      if (suppressPickerScroll.current) return;
 
       if (!searchTextRef.current) {
         if (scrollEndTimer.current) clearTimeout(scrollEndTimer.current);
