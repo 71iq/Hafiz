@@ -128,6 +128,9 @@ type Props = {
 const SEPARATOR_HEIGHT = 48; // py-4 (32) + text-xs line (16)
 const PAGE_PADDING = 40; // paddingTop 8 + paddingBottom 32
 const SURAH_HEADER_COMPACT_HEIGHT = 68; // mt-3(12) + card(48) + mb-2(8)
+const HORIZONTAL_PAGE_TOP_PADDING = 0;
+const HORIZONTAL_PAGE_BOTTOM_RESERVE = 56;
+const MUSHAF_LINE_COUNT = 15;
 
 function computePageItemHeight(
   page: PageData,
@@ -189,8 +192,9 @@ function PageSeparator({ page }: { page: number }) {
 export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
   const db = useDatabase();
   const { fontSize, lineHeight, pageScroll } = useSettings();
-  const { width } = useWindowDimensions();
+  const { width, height: windowHeight } = useWindowDimensions();
   const [containerWidth, setContainerWidth] = useState(0);
+  const [containerHeight, setContainerHeight] = useState(0);
   const pageWidth = containerWidth || width;
   const horizontal = pageScroll === "horizontal";
   const [pageData, setPageData] = useState<PageData[]>([]);
@@ -217,8 +221,12 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
 
   const onContainerLayout = useCallback((e: LayoutChangeEvent) => {
     const nextWidth = Math.round(e.nativeEvent.layout.width);
+    const nextHeight = Math.round(e.nativeEvent.layout.height);
     if (nextWidth > 0) {
       setContainerWidth((current) => (current === nextWidth ? current : nextWidth));
+    }
+    if (nextHeight > 0) {
+      setContainerHeight((current) => (current === nextHeight ? current : nextHeight));
     }
   }, []);
 
@@ -614,9 +622,26 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
     setDetailAyah({ surah, ayah });
   }, []);
 
+  const horizontalTypography = useMemo(() => {
+    const fitHeight = containerHeight || Math.max(0, windowHeight - 120);
+    if (!horizontal || fitHeight <= 0) {
+      return { fontSize, lineHeight };
+    }
+    const availableLineHeight = Math.floor(
+      (fitHeight - HORIZONTAL_PAGE_BOTTOM_RESERVE - HORIZONTAL_PAGE_TOP_PADDING) /
+        MUSHAF_LINE_COUNT
+    );
+    const fittedLineHeight = Math.max(42, Math.min(lineHeight, availableLineHeight));
+    const fittedFontSize = Math.min(fontSize, Math.floor(fontSize * (fittedLineHeight / lineHeight)));
+    return {
+      fontSize: Math.max(20, fittedFontSize),
+      lineHeight: fittedLineHeight,
+    };
+  }, [containerHeight, fontSize, horizontal, lineHeight, windowHeight]);
+
   const extraData = useMemo(
-    () => ({ fontSize, pageWidth }),
-    [fontSize, pageWidth]
+    () => ({ fontSize, pageWidth, horizontalTypography }),
+    [fontSize, horizontalTypography, pageWidth]
   );
 
   const renderPage = useCallback(
@@ -705,12 +730,14 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
                   pageNumber={item.page}
                   ayahs={item.ayahs}
                   surahMap={surahMap}
-                  fontSize={fontSize}
-                  lineHeight={lineHeight}
+                  fontSize={horizontalTypography.fontSize}
+                  lineHeight={horizontalTypography.lineHeight}
                   width={pageWidth}
                   lineLayout={item.lineLayout}
                   globalWordOffset={item.globalWordOffset}
                   onOpenAyahDetail={openAyahDetail}
+                  paddingTop={HORIZONTAL_PAGE_TOP_PADDING}
+                  paddingBottom={0}
                 />
               </View>
             ))}

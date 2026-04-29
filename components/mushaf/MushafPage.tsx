@@ -61,6 +61,8 @@ type Props = {
   lineLayout?: PageLineLayout[];
   globalWordOffset?: number;
   onOpenAyahDetail?: (surah: number, ayah: number) => void;
+  paddingTop?: number;
+  paddingBottom?: number;
 };
 
 // Identity for a single visual word on the page
@@ -116,6 +118,8 @@ function MushafPageInner({
   lineLayout,
   globalWordOffset,
   onOpenAyahDetail,
+  paddingTop = 8,
+  paddingBottom = 32,
 }: Props) {
   const [fontVisible, setFontVisible] = useState(false);
   const [wordsLoaded, setWordsLoaded] = useState(!!pageWordsData);
@@ -335,8 +339,8 @@ function MushafPageInner({
     <View style={{
       alignItems: "center",
       paddingHorizontal: 16,
-      paddingTop: 8,
-      paddingBottom: 32,
+      paddingTop,
+      paddingBottom,
       opacity: fontVisible ? 1 : 0,
     }}>
       <View style={{ width: contentWidth }}>
