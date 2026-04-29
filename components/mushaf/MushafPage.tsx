@@ -60,6 +60,7 @@ type Props = {
   width: number;
   lineLayout?: PageLineLayout[];
   globalWordOffset?: number;
+  onOpenAyahDetail?: (surah: number, ayah: number) => void;
 };
 
 // Identity for a single visual word on the page
@@ -114,10 +115,11 @@ function MushafPageInner({
   width,
   lineLayout,
   globalWordOffset,
+  onOpenAyahDetail,
 }: Props) {
   const [fontVisible, setFontVisible] = useState(false);
   const [wordsLoaded, setWordsLoaded] = useState(!!pageWordsData);
-  const { getHighlightColor, selectAyah } = useSelection();
+  const { getHighlightColor } = useSelection();
 
   // On web, trigger async load of page-words data
   useEffect(() => {
@@ -269,12 +271,13 @@ function MushafPageInner({
                 />
               );
             }
-            // Ayah end marker — long-pressable for context menu
+            // Ayah end marker — opens ayah details modal
             if (identity && identity.isMarker) {
               return (
                 <Pressable
                   key={`w-${line.line_number}-${i}`}
-                  onLongPress={() => selectAyah(identity.surah, identity.ayah)}
+                  onPress={() => onOpenAyahDetail?.(identity.surah, identity.ayah)}
+                  onLongPress={() => onOpenAyahDetail?.(identity.surah, identity.ayah)}
                   delayLongPress={300}
                   style={({ pressed }) => ({
                     transform: [{ scale: pressed ? 0.95 : 1 }],

@@ -90,6 +90,8 @@ export function QiraatTab({ surah, ayah }: Props) {
       .finally(() => setLoading(false));
   }, [db, surah, ayah]);
 
+  const blocks = useMemo(() => (text ? parseQiraatText(text) : []), [text]);
+
   if (loading) {
     return (
       <View className="py-6 items-center">
@@ -97,8 +99,6 @@ export function QiraatTab({ surah, ayah }: Props) {
       </View>
     );
   }
-
-  const blocks = useMemo(() => (text ? parseQiraatText(text) : []), [text]);
 
   if (!text || blocks.length === 0) {
     return (

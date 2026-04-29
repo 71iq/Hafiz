@@ -14,6 +14,7 @@ import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
 import { toArabicNumber } from "@/lib/arabic";
 import { MushafPage, type PageLineLayout } from "./MushafPage";
+import { AyahDetailModal } from "./AyahDetailModal";
 
 type PageRow = {
   page: number;
@@ -188,6 +189,7 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
   const [surahMap, setSurahMap] = useState<Map<number, SurahRow>>(new Map());
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
+  const [detailAyah, setDetailAyah] = useState<{ surah: number; ayah: number } | null>(null);
   const currentPageRef = useRef(1);
   const swipeStartPageRef = useRef(1);
   const flatListRef = useRef<FlatList>(null);
@@ -421,6 +423,10 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
     [pageData.length, pageWidth, updateCurrentPage]
   );
 
+  const openAyahDetail = useCallback((surah: number, ayah: number) => {
+    setDetailAyah({ surah, ayah });
+  }, []);
+
   const extraData = useMemo(
     () => ({ fontSize, pageWidth, horizontal }),
     [fontSize, pageWidth, horizontal]
@@ -440,6 +446,7 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
               width={pageWidth}
               lineLayout={item.lineLayout}
               globalWordOffset={item.globalWordOffset}
+              onOpenAyahDetail={openAyahDetail}
             />
           </View>
         );
@@ -455,12 +462,13 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
             width={pageWidth}
             lineLayout={item.lineLayout}
             globalWordOffset={item.globalWordOffset}
+            onOpenAyahDetail={openAyahDetail}
           />
           {index < pageData.length - 1 && <PageSeparator page={item.page} />}
         </View>
       );
     },
-    [surahMap, fontSize, lineHeight, pageWidth, pageData.length, horizontal]
+    [surahMap, fontSize, lineHeight, pageWidth, pageData.length, horizontal, openAyahDetail]
   );
 
   const keyExtractor = useCallback(
@@ -514,6 +522,8 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
         decelerationRate={horizontal ? "fast" : "normal"}
         contentContainerStyle={horizontal ? undefined : { paddingBottom: 60 }}
       />
+
+      <AyahDetailModal target={detailAyah} onClose={() => setDetailAyah(null)} />
 
       {/* Page indicator */}
       <View className="absolute bottom-3 left-0 right-0 items-center pointer-events-none">
