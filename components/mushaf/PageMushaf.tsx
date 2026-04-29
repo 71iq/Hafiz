@@ -3,8 +3,10 @@ import {
   View,
   Text,
   FlatList,
+  Animated as RNAnimated,
   ActivityIndicator,
   Platform,
+  PanResponder,
   useWindowDimensions,
   type LayoutChangeEvent,
   type NativeScrollEvent,
@@ -62,9 +64,15 @@ type PageData = {
   globalWordOffset?: number;
 };
 
-function ayahKey(surah: number, ayah: number): number {
-  return surah * 10000 + ayah;
-}
+type WebDragState = {
+  active: boolean;
+  claimed: boolean;
+  startX: number;
+  startY: number;
+  lastX: number;
+  lastTime: number;
+  vx: number;
+};
 
 /**
  * Build page data using v2_page assignments.
@@ -180,7 +188,7 @@ function PageSeparator({ page }: { page: number }) {
 
 export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
   const db = useDatabase();
-  const { fontSize, lineHeight, pageScroll, isRTL } = useSettings();
+  const { fontSize, lineHeight, pageScroll } = useSettings();
   const { width } = useWindowDimensions();
   const [containerWidth, setContainerWidth] = useState(0);
   const pageWidth = containerWidth || width;
@@ -191,8 +199,21 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
   const [currentPage, setCurrentPage] = useState(1);
   const [detailAyah, setDetailAyah] = useState<{ surah: number; ayah: number } | null>(null);
   const currentPageRef = useRef(1);
-  const swipeStartPageRef = useRef(1);
+  const dragStartPageRef = useRef(1);
+  const horizontalAnimatingRef = useRef(false);
+  const wheelLockedRef = useRef(false);
+  const webDragRef = useRef<WebDragState>({
+    active: false,
+    claimed: false,
+    startX: 0,
+    startY: 0,
+    lastX: 0,
+    lastTime: 0,
+    vx: 0,
+  });
+  const dragX = useRef(new RNAnimated.Value(0)).current;
   const flatListRef = useRef<FlatList>(null);
+  const [webDragging, setWebDragging] = useState(false);
 
   const onContainerLayout = useCallback((e: LayoutChangeEvent) => {
     const nextWidth = Math.round(e.nativeEvent.layout.width);
@@ -282,10 +303,6 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
   // getItemLayout enables instant scrollToIndex without rendering intermediate items
   const getItemLayout = useCallback(
     (_data: ArrayLike<PageData> | null | undefined, index: number) => {
-      // Horizontal swipe mode: every page is exactly one viewport wide.
-      if (horizontal) {
-        return { length: pageWidth, offset: pageWidth * index, index };
-      }
       if (!layoutInfo || index < 0 || index >= layoutInfo.heights.length) {
         // Fallback estimate
         const estHeight = 15 * lineHeight + PAGE_PADDING + (index > 0 ? SEPARATOR_HEIGHT : 0);
@@ -297,7 +314,7 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
         index,
       };
     },
-    [layoutInfo, lineHeight, horizontal, pageWidth]
+    [layoutInfo, lineHeight]
   );
 
   const updateCurrentPage = useCallback(
@@ -315,10 +332,9 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
     (page: number, animated = false) => {
       if (page < 1 || page > pageData.length) return;
       if (horizontal) {
-        flatListRef.current?.scrollToOffset({
-          offset: pageWidth * (page - 1),
-          animated,
-        });
+        horizontalAnimatingRef.current = false;
+        dragX.stopAnimation();
+        dragX.setValue(0);
       } else {
         flatListRef.current?.scrollToIndex({
           index: page - 1,
@@ -327,7 +343,7 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
       }
       updateCurrentPage(page);
     },
-    [horizontal, pageData.length, pageWidth, updateCurrentPage]
+    [dragX, horizontal, pageData.length, updateCurrentPage]
   );
 
   // Expose goToPage function to parent — instant jump via getItemLayout
@@ -347,13 +363,9 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
 
       const current = currentPageRef.current;
       let next: number | null = null;
-      if (horizontal) {
-        if (event.key === "ArrowLeft") next = current + 1;
-        if (event.key === "ArrowRight") next = current - 1;
-      } else {
-        if (event.key === "ArrowDown") next = current + 1;
-        if (event.key === "ArrowUp") next = current - 1;
-      }
+      if (horizontal) return;
+      if (event.key === "ArrowDown") next = current + 1;
+      if (event.key === "ArrowUp") next = current - 1;
       if (next === null) return;
 
       event.preventDefault();
@@ -390,37 +402,212 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
     [updateCurrentPage]
   );
 
-  const handleHorizontalScroll = useCallback(
-    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      if (pageWidth <= 0) return;
-      const index = Math.round(e.nativeEvent.contentOffset.x / pageWidth);
-      updateCurrentPage(index + 1);
+  const resetHorizontalDrag = useCallback(
+    (duration = 120) => {
+      RNAnimated.timing(dragX, {
+        toValue: 0,
+        duration,
+        useNativeDriver: Platform.OS !== "web",
+      }).start(() => {
+        horizontalAnimatingRef.current = false;
+      });
     },
-    [pageWidth, updateCurrentPage]
+    [dragX]
   );
 
-  const handleHorizontalScrollBegin = useCallback(() => {
-    swipeStartPageRef.current = currentPageRef.current;
-  }, []);
-
-  const handleHorizontalScrollEnd = useCallback(
-    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      if (pageWidth <= 0) return;
-      const rawPage = Math.round(e.nativeEvent.contentOffset.x / pageWidth) + 1;
-      const startPage = swipeStartPageRef.current;
-      const nextPage = Math.max(
-        1,
-        Math.min(pageData.length, Math.max(startPage - 1, Math.min(startPage + 1, rawPage)))
-      );
-      if (nextPage !== rawPage) {
-        flatListRef.current?.scrollToOffset({
-          offset: pageWidth * (nextPage - 1),
-          animated: true,
-        });
+  const animateHorizontalPageChange = useCallback(
+    (nextPage: number, direction: 1 | -1) => {
+      if (pageWidth <= 0 || nextPage < 1 || nextPage > pageData.length) {
+        resetHorizontalDrag();
+        return;
       }
-      updateCurrentPage(nextPage);
+      horizontalAnimatingRef.current = true;
+      RNAnimated.timing(dragX, {
+        toValue: direction === 1 ? -pageWidth : pageWidth,
+        duration: 150,
+        useNativeDriver: Platform.OS !== "web",
+      }).start(({ finished }) => {
+        if (!finished) {
+          resetHorizontalDrag(0);
+          return;
+        }
+        updateCurrentPage(nextPage);
+        requestAnimationFrame(() => {
+          dragX.setValue(0);
+          horizontalAnimatingRef.current = false;
+        });
+      });
     },
-    [pageData.length, pageWidth, updateCurrentPage]
+    [dragX, pageData.length, pageWidth, resetHorizontalDrag, updateCurrentPage]
+  );
+
+  const finishHorizontalGesture = useCallback(
+    (dx: number, vx: number) => {
+      if (horizontalAnimatingRef.current) return;
+      const startPage = dragStartPageRef.current;
+      const threshold = Math.max(48, pageWidth * 0.18);
+      const fastEnough = Math.abs(vx) > 0.35;
+      const farEnough = Math.abs(dx) > threshold;
+      if (!fastEnough && !farEnough) {
+        resetHorizontalDrag();
+        return;
+      }
+
+      const direction: 1 | -1 = fastEnough
+        ? vx < 0 ? 1 : -1
+        : dx < 0 ? 1 : -1;
+      const nextPage = Math.max(1, Math.min(pageData.length, startPage + direction));
+      if (nextPage === startPage) {
+        resetHorizontalDrag();
+        return;
+      }
+      animateHorizontalPageChange(nextPage, direction);
+    },
+    [animateHorizontalPageChange, pageData.length, pageWidth, resetHorizontalDrag]
+  );
+
+  const setHorizontalDragFromDelta = useCallback(
+    (dx: number) => {
+      if (pageWidth <= 0) return;
+      const startPage = dragStartPageRef.current;
+      const atFirst = startPage === 1 && dx > 0;
+      const atLast = startPage === pageData.length && dx < 0;
+      const boundedDx = Math.max(-pageWidth, Math.min(pageWidth, dx));
+      dragX.setValue(atFirst || atLast ? boundedDx * 0.25 : boundedDx);
+    },
+    [dragX, pageData.length, pageWidth]
+  );
+
+  const horizontalPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_event, gesture) =>
+          horizontal &&
+          !horizontalAnimatingRef.current &&
+          Math.abs(gesture.dx) > 8 &&
+          Math.abs(gesture.dx) > Math.abs(gesture.dy),
+        onMoveShouldSetPanResponderCapture: (_event, gesture) =>
+          horizontal &&
+          !horizontalAnimatingRef.current &&
+          Math.abs(gesture.dx) > 12 &&
+          Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.2,
+        onPanResponderGrant: () => {
+          dragStartPageRef.current = currentPageRef.current;
+          dragX.stopAnimation();
+        },
+        onPanResponderMove: (_event, gesture) => {
+          setHorizontalDragFromDelta(gesture.dx);
+        },
+        onPanResponderRelease: (_event, gesture) => {
+          finishHorizontalGesture(gesture.dx, gesture.vx);
+        },
+        onPanResponderTerminate: () => {
+          resetHorizontalDrag();
+        },
+      }),
+    [dragX, finishHorizontalGesture, horizontal, pageData.length, resetHorizontalDrag, setHorizontalDragFromDelta]
+  );
+
+  const handleHorizontalPointerDown = useCallback(
+    (event: { nativeEvent?: { button?: number; clientX?: number; clientY?: number } }) => {
+      const nativeEvent = event.nativeEvent;
+      if (
+        Platform.OS !== "web" ||
+        !nativeEvent ||
+        horizontalAnimatingRef.current ||
+        (nativeEvent.button !== undefined && nativeEvent.button !== 0)
+      ) {
+        return;
+      }
+      const x = nativeEvent.clientX ?? 0;
+      const y = nativeEvent.clientY ?? 0;
+      dragStartPageRef.current = currentPageRef.current;
+      dragX.stopAnimation();
+      webDragRef.current = {
+        active: true,
+        claimed: false,
+        startX: x,
+        startY: y,
+        lastX: x,
+        lastTime: performance.now(),
+        vx: 0,
+      };
+      setWebDragging(true);
+    },
+    [dragX]
+  );
+
+  useEffect(() => {
+    if (Platform.OS !== "web" || !webDragging) return;
+
+    const handlePointerMove = (event: PointerEvent) => {
+      const state = webDragRef.current;
+      if (!state.active) return;
+      const dx = event.clientX - state.startX;
+      const dy = event.clientY - state.startY;
+      if (!state.claimed) {
+        if (Math.abs(dx) <= 8 || Math.abs(dx) <= Math.abs(dy) * 1.2) return;
+        state.claimed = true;
+      }
+
+      event.preventDefault();
+      const now = performance.now();
+      const dt = Math.max(1, now - state.lastTime);
+      state.vx = (event.clientX - state.lastX) / dt;
+      state.lastX = event.clientX;
+      state.lastTime = now;
+      setHorizontalDragFromDelta(dx);
+    };
+
+    const handlePointerEnd = (event: PointerEvent) => {
+      const state = webDragRef.current;
+      if (!state.active) return;
+      state.active = false;
+      setWebDragging(false);
+      const dx = event.clientX - state.startX;
+      if (state.claimed) {
+        event.preventDefault();
+        finishHorizontalGesture(dx, state.vx);
+      } else {
+        resetHorizontalDrag(0);
+      }
+    };
+
+    document.addEventListener("pointermove", handlePointerMove, { passive: false });
+    document.addEventListener("pointerup", handlePointerEnd, { passive: false });
+    document.addEventListener("pointercancel", handlePointerEnd, { passive: false });
+
+    return () => {
+      document.removeEventListener("pointermove", handlePointerMove);
+      document.removeEventListener("pointerup", handlePointerEnd);
+      document.removeEventListener("pointercancel", handlePointerEnd);
+    };
+  }, [finishHorizontalGesture, resetHorizontalDrag, setHorizontalDragFromDelta, webDragging]);
+
+  const handleHorizontalWheel = useCallback(
+    (event: { nativeEvent?: { deltaX?: number; deltaY?: number; preventDefault?: () => void } }) => {
+      const nativeEvent = event.nativeEvent;
+      if (Platform.OS !== "web" || !nativeEvent || wheelLockedRef.current || horizontalAnimatingRef.current) {
+        return;
+      }
+      const deltaX = nativeEvent.deltaX ?? 0;
+      const deltaY = nativeEvent.deltaY ?? 0;
+      if (Math.abs(deltaX) < 36 || Math.abs(deltaX) < Math.abs(deltaY) * 1.25) return;
+
+      wheelLockedRef.current = true;
+      const direction: 1 | -1 = deltaX > 0 ? 1 : -1;
+      const startPage = currentPageRef.current;
+      const nextPage = Math.max(1, Math.min(pageData.length, startPage + direction));
+      if (nextPage !== startPage) {
+        animateHorizontalPageChange(nextPage, direction);
+      } else {
+        resetHorizontalDrag();
+      }
+      setTimeout(() => {
+        wheelLockedRef.current = false;
+      }, 320);
+    },
+    [animateHorizontalPageChange, pageData.length, resetHorizontalDrag]
   );
 
   const openAyahDetail = useCallback((surah: number, ayah: number) => {
@@ -428,29 +615,12 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
   }, []);
 
   const extraData = useMemo(
-    () => ({ fontSize, pageWidth, horizontal }),
-    [fontSize, pageWidth, horizontal]
+    () => ({ fontSize, pageWidth }),
+    [fontSize, pageWidth]
   );
 
   const renderPage = useCallback(
     ({ item, index }: { item: PageData; index: number }) => {
-      if (horizontal) {
-        return (
-          <View style={{ width: pageWidth, height: "100%" }}>
-            <MushafPage
-              pageNumber={item.page}
-              ayahs={item.ayahs}
-              surahMap={surahMap}
-              fontSize={fontSize}
-              lineHeight={lineHeight}
-              width={pageWidth}
-              lineLayout={item.lineLayout}
-              globalWordOffset={item.globalWordOffset}
-              onOpenAyahDetail={openAyahDetail}
-            />
-          </View>
-        );
-      }
       return (
         <View>
           <MushafPage
@@ -468,13 +638,32 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
         </View>
       );
     },
-    [surahMap, fontSize, lineHeight, pageWidth, pageData.length, horizontal, openAyahDetail]
+    [surahMap, fontSize, lineHeight, pageWidth, pageData.length, openAyahDetail]
   );
 
   const keyExtractor = useCallback(
     (item: PageData) => `page-${item.page}`,
     []
   );
+
+  const horizontalPages = useMemo(() => {
+    if (!horizontal || pageData.length === 0) return [];
+    const start = Math.max(1, currentPage - 1);
+    const end = Math.min(pageData.length, currentPage + 1);
+    const pages: PageData[] = [];
+    for (let page = start; page <= end; page++) {
+      const data = pageData[page - 1];
+      if (data) pages.push(data);
+    }
+    return pages;
+  }, [currentPage, horizontal, pageData]);
+
+  const horizontalGestureProps = Platform.OS === "web"
+    ? ({
+        onPointerDown: handleHorizontalPointerDown,
+        onWheel: handleHorizontalWheel,
+      } as Record<string, unknown>)
+    : horizontalPanResponder.panHandlers;
 
   if (loading) {
     return (
@@ -489,39 +678,66 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
 
   return (
     <View className="flex-1" onLayout={onContainerLayout}>
-      <FlatList
-        ref={flatListRef}
-        data={pageData}
-        renderItem={renderPage}
-        keyExtractor={keyExtractor}
-        getItemLayout={horizontal ? undefined : getItemLayout}
-        extraData={extraData}
-        horizontal={horizontal}
-        pagingEnabled={horizontal}
-        // Quran is Arabic — want Arabic-book swipe (swipe right → next page).
-        // If UI is Arabic the parent direction already does this; otherwise
-        // invert so we force that direction under an LTR parent.
-        inverted={horizontal && !isRTL}
-        // Horizontal mode tracks page by offset; vertical mode uses scroll direction to hide chrome.
-        onScroll={horizontal ? handleHorizontalScroll : onScroll}
-        onScrollBeginDrag={horizontal ? handleHorizontalScrollBegin : undefined}
-        onMomentumScrollEnd={horizontal ? handleHorizontalScrollEnd : undefined}
-        onScrollEndDrag={horizontal ? handleHorizontalScrollEnd : undefined}
-        onScrollToIndexFailed={handleScrollToIndexFailed}
-        scrollEventThrottle={16}
-        showsVerticalScrollIndicator={false}
-        showsHorizontalScrollIndicator={false}
-        onViewableItemsChanged={onViewableItemsChanged}
-        viewabilityConfig={viewabilityConfig}
-        initialNumToRender={1}
-        maxToRenderPerBatch={1}
-        updateCellsBatchingPeriod={80}
-        windowSize={horizontal ? 3 : 3}
-        removeClippedSubviews={!horizontal}
-        disableIntervalMomentum={horizontal}
-        decelerationRate={horizontal ? "fast" : "normal"}
-        contentContainerStyle={horizontal ? undefined : { paddingBottom: 60 }}
-      />
+      {horizontal ? (
+        <View
+          className="flex-1 overflow-hidden"
+          {...horizontalGestureProps}
+        >
+          <RNAnimated.View
+            style={{
+              flex: 1,
+              position: "relative",
+              transform: [{ translateX: dragX }],
+            }}
+          >
+            {horizontalPages.map((item) => (
+              <View
+                key={`page-${item.page}`}
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  bottom: 0,
+                  left: (item.page - currentPage) * pageWidth,
+                  width: pageWidth,
+                }}
+              >
+                <MushafPage
+                  pageNumber={item.page}
+                  ayahs={item.ayahs}
+                  surahMap={surahMap}
+                  fontSize={fontSize}
+                  lineHeight={lineHeight}
+                  width={pageWidth}
+                  lineLayout={item.lineLayout}
+                  globalWordOffset={item.globalWordOffset}
+                  onOpenAyahDetail={openAyahDetail}
+                />
+              </View>
+            ))}
+          </RNAnimated.View>
+        </View>
+      ) : (
+        <FlatList
+          ref={flatListRef}
+          data={pageData}
+          renderItem={renderPage}
+          keyExtractor={keyExtractor}
+          getItemLayout={getItemLayout}
+          extraData={extraData}
+          onScroll={onScroll}
+          onScrollToIndexFailed={handleScrollToIndexFailed}
+          scrollEventThrottle={16}
+          showsVerticalScrollIndicator={false}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
+          initialNumToRender={1}
+          maxToRenderPerBatch={1}
+          updateCellsBatchingPeriod={80}
+          windowSize={3}
+          removeClippedSubviews
+          contentContainerStyle={{ paddingBottom: 60 }}
+        />
+      )}
 
       <AyahDetailModal target={detailAyah} onClose={() => setDetailAyah(null)} />
 
