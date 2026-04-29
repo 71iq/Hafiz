@@ -28,6 +28,7 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     // Mushaf header
     goTo: "Go to",
     pageN: "Page {{n}}",
+    pageXOfY: "Page {{page}} of {{total}}",
     loadingQuran: "Loading Quran...",
     // GoToNavigator
     goToTitle: "Go To",
@@ -375,6 +376,7 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     appLanguageLabel: "لغة التطبيق",
     goTo: "انتقال",
     pageN: "الصفحة {{n}}",
+    pageXOfY: "الصفحة {{page}} من {{total}}",
     loadingQuran: "جارٍ تحميل القرآن...",
     goToTitle: "انتقال إلى",
     tabPage: "الصفحة",
@@ -482,7 +484,7 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     comingSoon: "قريبًا",
     translationLanguagePickerTitle: "لغة الترجمة",
     preparingDatabase: "جارٍ تهيئة قاعدة البيانات...",
-    appSubtitle: "احفظ بالتأمل",
+    appSubtitle: "احفظ بالتدبر",
     copy: "نسخ",
     addReflection: "تأمل",
     highlight: "تمييز",

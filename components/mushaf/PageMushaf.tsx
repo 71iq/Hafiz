@@ -15,6 +15,7 @@ import {
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
 import { toArabicNumber } from "@/lib/arabic";
+import { useStrings, interpolate } from "@/lib/i18n/useStrings";
 import { MushafPage, type PageLineLayout } from "./MushafPage";
 import { AyahDetailModal } from "./AyahDetailModal";
 
@@ -192,6 +193,7 @@ function PageSeparator({ page }: { page: number }) {
 export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
   const db = useDatabase();
   const { fontSize, lineHeight, pageScroll } = useSettings();
+  const s = useStrings();
   const { width, height: windowHeight } = useWindowDimensions();
   const [containerWidth, setContainerWidth] = useState(0);
   const [containerHeight, setContainerHeight] = useState(0);
@@ -204,6 +206,8 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
   const [detailAyah, setDetailAyah] = useState<{ surah: number; ayah: number } | null>(null);
   const currentPageRef = useRef(1);
   const dragStartPageRef = useRef(1);
+  const pageIndicatorMountedRef = useRef(false);
+  const pageIndicatorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const horizontalAnimatingRef = useRef(false);
   const wheelLockedRef = useRef(false);
   const webDragRef = useRef<WebDragState>({
@@ -218,6 +222,7 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
   const dragX = useRef(new RNAnimated.Value(0)).current;
   const flatListRef = useRef<FlatList>(null);
   const [webDragging, setWebDragging] = useState(false);
+  const [showPageIndicator, setShowPageIndicator] = useState(false);
 
   const onContainerLayout = useCallback((e: LayoutChangeEvent) => {
     const nextWidth = Math.round(e.nativeEvent.layout.width);
@@ -335,6 +340,25 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
     },
     [onPageChange, pageData.length]
   );
+
+  useEffect(() => {
+    if (!pageIndicatorMountedRef.current) {
+      pageIndicatorMountedRef.current = true;
+      return;
+    }
+    if (pageIndicatorTimerRef.current) clearTimeout(pageIndicatorTimerRef.current);
+    setShowPageIndicator(true);
+    pageIndicatorTimerRef.current = setTimeout(() => {
+      setShowPageIndicator(false);
+      pageIndicatorTimerRef.current = null;
+    }, 900);
+    return () => {
+      if (pageIndicatorTimerRef.current) {
+        clearTimeout(pageIndicatorTimerRef.current);
+        pageIndicatorTimerRef.current = null;
+      }
+    };
+  }, [currentPage]);
 
   const jumpToPage = useCallback(
     (page: number, animated = false) => {
@@ -768,14 +792,15 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
 
       <AyahDetailModal target={detailAyah} onClose={() => setDetailAyah(null)} />
 
-      {/* Page indicator */}
-      <View className="absolute bottom-3 left-0 right-0 items-center pointer-events-none">
-        <View className="bg-warm-800/80 dark:bg-neutral-800/90 rounded-full px-4 py-1.5">
-          <Text className="text-white text-xs font-semibold">
-            Page {currentPage} of 604
-          </Text>
+      {showPageIndicator && (
+        <View className="absolute bottom-3 left-0 right-0 items-center pointer-events-none">
+          <View className="bg-warm-800/80 dark:bg-neutral-800/90 rounded-full px-4 py-1.5">
+            <Text className="text-white text-xs font-semibold">
+              {interpolate(s.pageXOfY, { page: currentPage, total: 604 })}
+            </Text>
+          </View>
         </View>
-      </View>
+      )}
     </View>
   );
 }
