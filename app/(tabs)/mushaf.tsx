@@ -163,6 +163,7 @@ function MushafInner() {
   const [hideMode, setHideMode] = useState(false);
   const [mushafIndex, setMushafIndex] = useState<MushafIndex | null>(null);
   const [topAyah, setTopAyah] = useState<{ surah: number; ayah: number } | null>(null);
+  const currentPageRef = useRef(1);
   const goToPageRef = useRef<((page: number) => void) | null>(null);
   const flashListRef = useRef<FlashListRef<MushafItem>>(null);
 
@@ -345,6 +346,10 @@ function MushafInner() {
 
   const isPageMode = viewMode === "page";
 
+  useEffect(() => {
+    currentPageRef.current = currentPage;
+  }, [currentPage]);
+
   // For page view, derive the topmost ayah from the visible page
   useEffect(() => {
     if (!isPageMode || !mushafIndex) return;
@@ -395,8 +400,10 @@ function MushafInner() {
         // Defer to deep-link handler if one is pending — peek without consuming
         if (peekPendingDeepLink()) return;
 
-        if (parsed?.mode === "page" && isPageMode && goToPageRef.current) {
-          setTimeout(() => goToPageRef.current?.(parsed.page), 150);
+        if (parsed?.mode === "page" && isPageMode && parsed.page > 1 && goToPageRef.current) {
+          setTimeout(() => {
+            if (currentPageRef.current === 1) goToPageRef.current?.(parsed.page);
+          }, 150);
         } else if (parsed?.mode === "verse" && !isPageMode) {
           const idx = items.findIndex(
             (it) => it.type === "ayah" && it.surah === parsed.surah && it.ayah === parsed.ayah
