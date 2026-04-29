@@ -34,6 +34,7 @@ export type ViewMode = "verse" | "page";
 export type PageScroll = "vertical" | "horizontal";
 export type UILanguage = "en" | "ar";
 export type TafseerSource = "muyassar" | "zilal";
+const UI_LANGUAGE_CACHE_KEY = "hafiz_ui_language";
 
 type SettingsContextType = {
   fontSizeIndex: number;
@@ -93,6 +94,18 @@ const SettingsContext = createContext<SettingsContextType>({
   isLoaded: false,
 });
 
+function readCachedUiLanguage(): UILanguage {
+  if (Platform.OS !== "web" || typeof window === "undefined") return "en";
+  const cached = window.localStorage.getItem(UI_LANGUAGE_CACHE_KEY);
+  return cached === "ar" ? "ar" : "en";
+}
+
+function cacheUiLanguage(lang: UILanguage) {
+  if (Platform.OS === "web" && typeof window !== "undefined") {
+    window.localStorage.setItem(UI_LANGUAGE_CACHE_KEY, lang);
+  }
+}
+
 export function useSettings() {
   return useContext(SettingsContext);
 }
@@ -134,7 +147,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [translationLanguage, setTranslationLanguageState] = useState(DEFAULT_LANGUAGE);
   const [isTranslationLoading, setIsTranslationLoading] = useState(false);
   const [tafseerSource, setTafseerSourceState] = useState<TafseerSource>("muyassar");
-  const [uiLanguage, setUiLanguageState] = useState<UILanguage>("en");
+  const [uiLanguage, setUiLanguageState] = useState<UILanguage>(readCachedUiLanguage);
   const [dailyReviewLimit, setDailyReviewLimitState] = useState(DEFAULT_DAILY_REVIEW_LIMIT);
   const [isLoaded, setIsLoaded] = useState(false);
 
@@ -181,6 +194,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         const savedUiLang = await readSetting(db, "ui_language");
         if (savedUiLang === "en" || savedUiLang === "ar") {
           setUiLanguageState(savedUiLang);
+          cacheUiLanguage(savedUiLang);
         }
 
         const savedLimit = await readSetting(db, "daily_review_limit");
@@ -308,6 +322,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const setUiLanguage = useCallback(
     (lang: UILanguage) => {
       setUiLanguageState(lang);
+      cacheUiLanguage(lang);
       writeSetting(db, "ui_language", lang).catch(console.warn);
     },
     [db]

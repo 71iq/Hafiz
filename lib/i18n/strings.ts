@@ -153,7 +153,7 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     translationLanguagePickerTitle: "Translation Language",
     // LoadingScreen
     preparingDatabase: "Preparing database...",
-    appSubtitle: "Quran Retention App",
+    appSubtitle: "Memorize Through Reflection",
     // Selection & context menu
     copy: "Copy",
     addReflection: "Reflect",
@@ -482,7 +482,7 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     comingSoon: "قريبًا",
     translationLanguagePickerTitle: "لغة الترجمة",
     preparingDatabase: "جارٍ تهيئة قاعدة البيانات...",
-    appSubtitle: "تطبيق حفظ القرآن",
+    appSubtitle: "احفظ بالتأمل",
     copy: "نسخ",
     addReflection: "تأمل",
     highlight: "تمييز",
