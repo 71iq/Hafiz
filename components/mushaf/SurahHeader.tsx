@@ -57,20 +57,23 @@ export function SurahHeader({
   if (compact) {
     return (
       <View style={{ height: showBismillah ? 100 : 68 }} className="justify-center">
-        {/* Compact: tonal teal pill — no border */}
-        <View className="rounded-full bg-primary dark:bg-teal-950 px-5 py-2.5 items-center flex-row justify-center gap-3">
-          <Text
-            className="text-white text-center"
-            style={{ fontSize: 20, lineHeight: 32 }}
-          >
-            {nameArabic}
-          </Text>
-          <Text
-            className="text-teal-200/80"
-            style={{ fontFamily: "Manrope_500Medium", fontSize: 11 }}
-          >
-            {surahNumber}. {nameEnglish} · {ayahCount} {s.ayahs}
-          </Text>
+        <View className="flex-row items-center justify-center px-2">
+          <OrnamentLine />
+          <View className="mx-3 min-w-[190px] max-w-[300px] rounded-2xl bg-surface-low dark:bg-surface-dark-low px-4 py-2">
+            <Text
+              className="text-primary dark:text-primary-bright text-center"
+              style={{ fontSize: 22, lineHeight: 28 }}
+            >
+              {nameArabic}
+            </Text>
+            <Text
+              className="text-warm-500 dark:text-neutral-400 text-center"
+              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, lineHeight: 14 }}
+            >
+              {surahNumber}. {nameEnglish} · {ayahCount} {s.ayahs}
+            </Text>
+          </View>
+          <OrnamentLine />
         </View>
 
         {showBismillah && (
@@ -94,18 +97,17 @@ export function SurahHeader({
 
   return (
     <View className="mx-5 mt-10 mb-5 w-full max-w-[840px] self-center">
-      {/* Decorative surah card — tonal gradient, no borders */}
       <View
-        className="rounded-4xl px-7 py-6 items-center overflow-hidden"
-        style={{
-          backgroundColor: "#003638",
-          // Subtle gradient via layered views not supported in RN,
-          // so use solid primary with soft inner glow
-        }}
+        className="rounded-3xl bg-surface-low dark:bg-surface-dark-low px-7 py-6 items-center overflow-hidden"
       >
-        {/* Arabic surah name — Noto Serif for editorial feel */}
+        <View className="mb-4 w-full flex-row items-center justify-center">
+          <OrnamentLine />
+          <View className="mx-4 h-2 w-2 rounded-sm bg-gold" style={{ transform: [{ rotate: "45deg" }] }} />
+          <OrnamentLine />
+        </View>
+
         <Text
-          className="text-white text-center mb-1.5"
+          className="text-primary dark:text-primary-bright text-center mb-1.5"
           style={{
             fontSize: 34,
             lineHeight: 58,
@@ -114,27 +116,25 @@ export function SurahHeader({
           {nameArabic}
         </Text>
 
-        {/* English name — Manrope */}
         <Text
-          className="text-teal-200/90 text-center mb-4"
+          className="text-warm-500 dark:text-neutral-400 text-center mb-4"
           style={{ fontFamily: "Manrope_500Medium", fontSize: 15 }}
         >
           {surahNumber}. {nameEnglish}
         </Text>
 
-        {/* Meta info — no border badges, just text with spacing */}
         <View className="flex-row items-center gap-3">
-          <View className="bg-white/10 rounded-full px-3.5 py-1.5">
+          <View className="bg-primary-accent/10 dark:bg-primary-bright/10 rounded-full px-3.5 py-1.5">
             <Text
-              className="text-teal-100"
+              className="text-primary-accent dark:text-primary-bright"
               style={{ fontFamily: "Manrope_500Medium", fontSize: 12 }}
             >
               {revelationType === "Makkiyah" ? s.meccan : s.medinan}
             </Text>
           </View>
-          <View className="w-1 h-1 rounded-full bg-teal-300/30" />
+          <View className="w-1 h-1 rounded-full bg-gold" />
           <Text
-            className="text-teal-200/70"
+            className="text-warm-500 dark:text-neutral-400"
             style={{ fontFamily: "Manrope_500Medium", fontSize: 12 }}
           >
             {ayahCount} {s.ayahs}
@@ -158,6 +158,16 @@ export function SurahHeader({
           </Text>
         </View>
       )}
+    </View>
+  );
+}
+
+function OrnamentLine() {
+  return (
+    <View className="flex-1 flex-row items-center justify-center">
+      <View className="h-px flex-1 bg-warm-200 dark:bg-neutral-800" />
+      <View className="mx-2 h-1.5 w-1.5 rounded-sm bg-gold" style={{ transform: [{ rotate: "45deg" }] }} />
+      <View className="h-px flex-1 bg-warm-200 dark:bg-neutral-800" />
     </View>
   );
 }
