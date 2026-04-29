@@ -54,7 +54,7 @@ export default function LoginScreen() {
     try {
       setShowError(null);
       await signIn(data.email, data.password);
-      router.replace("/home");
+      router.replace("/(tabs)/mushaf");
     } catch (err: any) {
       setShowError(err.message === "Invalid login credentials" ? s.authInvalidCredentials : err.message);
     }

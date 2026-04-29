@@ -81,7 +81,7 @@ function OnboardingInner() {
     await db.runAsync(
       "INSERT OR REPLACE INTO user_settings (key, value) VALUES ('onboarding_completed', 'true')"
     );
-    router.replace("/(tabs)/home");
+    router.replace("/(tabs)/mushaf");
   }, [db, router]);
 
   const handleCreateDeck = useCallback(async () => {
