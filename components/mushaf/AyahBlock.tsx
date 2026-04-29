@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef, useMemo, memo } from "react";
-import { View, Text, Pressable, Animated as RNAnimated } from "react-native";
+import { View, Text, Pressable, Animated as RNAnimated, ScrollView } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -22,6 +22,7 @@ import {
 } from "lucide-react-native";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { ReflectionsSection } from "@/components/reflections/ReflectionsSection";
+import { Sheet, SheetContent, SheetHeader } from "@/components/ui/Sheet";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { fetchReflectionCount } from "@/lib/reflections/api";
 import {
@@ -454,13 +455,37 @@ function AyahBlockInner({
             })()}
           </View>
         )}
-
-        {reflectionsOpen && (
-          <View className="mt-3">
-            <ReflectionsSection surah={surah} ayah={ayah} initiallyExpanded showHeader={false} />
-          </View>
-        )}
       </View>
+
+      <Sheet open={reflectionsOpen} onClose={() => setReflectionsOpen(false)}>
+        <SheetHeader>
+          <Text
+            className="text-charcoal dark:text-neutral-100"
+            style={{
+              fontFamily: "Manrope_700Bold",
+              fontSize: 18,
+              textAlign: isRTL ? "right" : "left",
+            }}
+          >
+            {s.reflections}
+          </Text>
+          <Text
+            className="mt-1 text-warm-500 dark:text-neutral-400"
+            style={{
+              fontFamily: "Manrope_500Medium",
+              fontSize: 12,
+              textAlign: isRTL ? "right" : "left",
+            }}
+          >
+            {surah}:{ayah}
+          </Text>
+        </SheetHeader>
+        <SheetContent>
+          <ScrollView style={{ maxHeight: 520 }} showsVerticalScrollIndicator={false}>
+            <ReflectionsSection surah={surah} ayah={ayah} initiallyExpanded showHeader={false} />
+          </ScrollView>
+        </SheetContent>
+      </Sheet>
     </View>
   );
 }
