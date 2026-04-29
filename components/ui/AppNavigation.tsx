@@ -18,7 +18,7 @@ import Animated, {
 import { useEffect, useState, useCallback } from "react";
 import { useColorScheme } from "nativewind";
 import { useChrome } from "@/lib/ui/chrome";
-import { Menu } from "lucide-react-native";
+import { PanelLeftOpen, PanelRightOpen } from "lucide-react-native";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -187,6 +187,7 @@ function SidebarItem({
 function FloatingPanel(props: BottomTabBarProps & { isRTL?: boolean }) {
   const { state, descriptors, navigation, isRTL } = props;
   const insets = useSafeAreaInsets();
+  const { height } = useWindowDimensions();
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === "dark";
   const visibleRoutes = getVisibleRoutes(state, descriptors);
@@ -213,8 +214,9 @@ function FloatingPanel(props: BottomTabBarProps & { isRTL?: boolean }) {
   const menuColor = isDark ? "#a3a3a3" : "#8B8178";
   const sideStyle = isRTL ? { right: 16 } : { left: 16 };
   const edgeStyle = isRTL ? { right: 0 } : { left: 0 };
-  const triggerTop = Math.max(insets.top + 72, 88);
-  const panelTop = triggerTop + 56;
+  const triggerTop = Math.max(insets.top + 132, Math.round(height * 0.45) - 22);
+  const panelTop = Math.max(insets.top + 88, 96);
+  const SidebarTriggerIcon = isRTL ? PanelRightOpen : PanelLeftOpen;
 
   return (
     <>
@@ -236,7 +238,7 @@ function FloatingPanel(props: BottomTabBarProps & { isRTL?: boolean }) {
           }),
         }}
       >
-        <Menu size={18} color={menuColor} />
+        <SidebarTriggerIcon size={18} color={menuColor} />
       </Pressable>
 
       <Pressable
