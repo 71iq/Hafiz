@@ -63,7 +63,7 @@ function AyahBlockInner({
     isQpcFontLoaded(v2Page)
   );
   const [revealed, setRevealed] = useState(false);
-  const [translationOpen, setTranslationOpen] = useState(true);
+  const [translationOpen, setTranslationOpen] = useState(defaultShowTranslation);
   const [tafseerOpen, setTafseerOpen] = useState(false);
   const [reflectionsOpen, setReflectionsOpen] = useState(false);
   const [translationText, setTranslationText] = useState<string | null>(null);
@@ -93,7 +93,7 @@ function AyahBlockInner({
   }, [text]);
 
   useEffect(() => {
-    if (defaultShowTranslation) setTranslationOpen(true);
+    setTranslationOpen(defaultShowTranslation);
   }, [defaultShowTranslation]);
 
   useEffect(() => {
