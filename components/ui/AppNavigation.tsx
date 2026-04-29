@@ -15,7 +15,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from "react-native-reanimated";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useColorScheme } from "nativewind";
 import { useChrome } from "@/lib/ui/chrome";
 import { PanelLeftOpen, PanelRightOpen } from "lucide-react-native";
@@ -192,14 +192,38 @@ function FloatingPanel(props: BottomTabBarProps & { isRTL?: boolean }) {
   const isDark = colorScheme === "dark";
   const visibleRoutes = getVisibleRoutes(state, descriptors);
   const [open, setOpen] = useState(false);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const progress = useSharedValue(0);
+
+  useEffect(() => () => {
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+  }, []);
 
   useEffect(() => {
     progress.value = withTiming(open ? 1 : 0, { duration: 180 });
   }, [open, progress]);
 
-  const showPanel = useCallback(() => setOpen(true), []);
-  const hidePanel = useCallback(() => setOpen(false), []);
+  const cancelHide = useCallback(() => {
+    if (hideTimerRef.current) {
+      clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
+  }, []);
+  const showPanel = useCallback(() => {
+    cancelHide();
+    setOpen(true);
+  }, [cancelHide]);
+  const hidePanel = useCallback(() => {
+    cancelHide();
+    setOpen(false);
+  }, [cancelHide]);
+  const scheduleHidePanel = useCallback(() => {
+    cancelHide();
+    hideTimerRef.current = setTimeout(() => {
+      hideTimerRef.current = null;
+      setOpen(false);
+    }, 180);
+  }, [cancelHide]);
   const togglePanel = useCallback(() => setOpen((v) => !v), []);
 
   const panelStyle = useAnimatedStyle(() => {
@@ -222,7 +246,10 @@ function FloatingPanel(props: BottomTabBarProps & { isRTL?: boolean }) {
     <>
       <Pressable
         onPress={togglePanel}
+        onHoverIn={showPanel}
+        onHoverOut={scheduleHidePanel}
         onFocus={showPanel}
+        onBlur={scheduleHidePanel}
         accessibilityRole="button"
         className="items-center justify-center rounded-full bg-surface-high/90 dark:bg-surface-dark-high/90"
         style={{
@@ -243,7 +270,9 @@ function FloatingPanel(props: BottomTabBarProps & { isRTL?: boolean }) {
 
       <Pressable
         onHoverIn={showPanel}
+        onHoverOut={scheduleHidePanel}
         onFocus={showPanel}
+        onBlur={scheduleHidePanel}
         style={{
           position: "absolute",
           top: 0,
@@ -273,6 +302,9 @@ function FloatingPanel(props: BottomTabBarProps & { isRTL?: boolean }) {
       >
         <Pressable
           onHoverIn={showPanel}
+          onHoverOut={scheduleHidePanel}
+          onFocus={showPanel}
+          onBlur={scheduleHidePanel}
           className="rounded-3xl bg-surface/95 dark:bg-surface-dark/95 px-4 py-5"
         >
           <View className="px-3 pb-6">
