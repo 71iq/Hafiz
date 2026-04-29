@@ -5,14 +5,12 @@ import {
   TextInput,
   Pressable,
   FlatList,
-  ActivityIndicator,
   Keyboard,
   Modal,
-  Platform,
+  useWindowDimensions,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
-import { Search, X, Clock, Trash2, ChevronDown, ChevronRight } from "lucide-react-native";
+import { Search, X, Clock, ChevronDown, ChevronRight } from "lucide-react-native";
 import { SearchResultsSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useDatabase } from "@/lib/database/provider";
@@ -34,6 +32,7 @@ type TextResult = {
   surah: number;
   ayah: number;
   text_uthmani: string;
+  text_en: string | null;
   name_arabic: string;
   name_english: string;
 };
@@ -127,6 +126,26 @@ function highlightWord(
   return buildHighlightSegments(original, wordText);
 }
 
+function buildPlainHighlightSegments(
+  original: string,
+  searchTerm: string,
+): { text: string; highlight: boolean }[] {
+  const term = searchTerm.trim().toLowerCase();
+  if (!term) return [{ text: original, highlight: false }];
+
+  const lower = original.toLowerCase();
+  const matchIdx = lower.indexOf(term);
+  if (matchIdx === -1) return [{ text: original, highlight: false }];
+
+  return [
+    matchIdx > 0 ? { text: original.slice(0, matchIdx), highlight: false } : null,
+    { text: original.slice(matchIdx, matchIdx + term.length), highlight: true },
+    matchIdx + term.length < original.length
+      ? { text: original.slice(matchIdx + term.length), highlight: false }
+      : null,
+  ].filter(Boolean) as { text: string; highlight: boolean }[];
+}
+
 // ─── Main Component ───
 interface SearchCommandProps {
   visible: boolean;
@@ -136,6 +155,7 @@ interface SearchCommandProps {
 export function SearchCommand({ visible, onClose }: SearchCommandProps) {
   const db = useDatabase();
   const { isDark, isRTL } = useSettings();
+  const { width, height } = useWindowDimensions();
   const s = useStrings();
   const { clearTooltip, closeDetail } = useWordInteraction();
 
@@ -253,13 +273,15 @@ export function SearchCommand({ visible, onClose }: SearchCommandProps) {
       try {
         if (searchMode === "text") {
           const rows = await db.getAllAsync<TextResult>(
-            `SELECT q.surah, q.ayah, q.text_uthmani, s.name_arabic, s.name_english
+            `SELECT q.surah, q.ayah, q.text_uthmani, t.text_en, s.name_arabic, s.name_english
              FROM quran_text q
+             LEFT JOIN translations t ON q.surah = t.surah AND q.ayah = t.ayah
              JOIN surahs s ON q.surah = s.number
              WHERE q.text_search LIKE '%' || ? || '%'
+                OR LOWER(t.text_en) LIKE '%' || LOWER(?) || '%'
              ORDER BY q.surah, q.ayah
              LIMIT 200`,
-            [stripped]
+            [stripped, term.trim()]
           );
           setTextResults(rows);
           setRootResults([]);
@@ -425,15 +447,23 @@ export function SearchCommand({ visible, onClose }: SearchCommandProps) {
 
   const tealColor = "#0d9488";
   const mutedColor = isDark ? "#737373" : "#8B8178";
+  const modalWidth = Math.min(width - 32, 900);
+  const modalHeight = Math.min(height - 48, 760);
 
   return (
     <Modal
       visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
+      transparent
+      animationType="fade"
       onRequestClose={onClose}
     >
-      <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark" edges={["top"]}>
+      <View className="flex-1 items-center justify-center px-4" style={{ backgroundColor: "rgba(0,0,0,0.45)" }}>
+        <Pressable className="absolute inset-0" onPress={onClose} />
+        <View
+          className="overflow-hidden rounded-3xl bg-surface dark:bg-surface-dark"
+          style={{ width: modalWidth, height: modalHeight }}
+          onStartShouldSetResponder={() => true}
+        >
         {/* Search bar */}
         <View className="px-5 pt-4 pb-3">
           <View className="flex-row items-center bg-surface-high dark:bg-surface-dark-high rounded-full px-4 py-2.5">
@@ -455,8 +485,8 @@ export function SearchCommand({ visible, onClose }: SearchCommandProps) {
                 color: isDark ? "#e5e5e5" : "#2D2D2D",
                 marginLeft: 10,
                 marginRight: 8,
-                writingDirection: "rtl",
-                textAlign: "right",
+                writingDirection: isRTL ? "rtl" : "ltr",
+                textAlign: isRTL ? "right" : "left",
                 paddingVertical: 4,
               }}
             />
@@ -554,7 +584,8 @@ export function SearchCommand({ visible, onClose }: SearchCommandProps) {
                           fontFamily: "Manrope_500Medium",
                           fontSize: 15,
                           marginLeft: 12,
-                          writingDirection: "rtl",
+                          writingDirection: isRTL ? "rtl" : "ltr",
+                          textAlign: isRTL ? "right" : "left",
                         }}
                       >
                         {item.query}
@@ -619,6 +650,7 @@ export function SearchCommand({ visible, onClose }: SearchCommandProps) {
 
                   {group.results.map((r) => {
                     const segments = buildHighlightSegments(r.text_uthmani, query);
+                    const englishSegments = r.text_en ? buildPlainHighlightSegments(r.text_en, query) : [];
                     return (
                       <Pressable
                         key={`${r.surah}:${r.ayah}`}
@@ -664,6 +696,35 @@ export function SearchCommand({ visible, onClose }: SearchCommandProps) {
                             )
                           )}
                         </Text>
+                        {r.text_en && (
+                          <Text
+                            className="mt-2 text-warm-600 dark:text-neutral-400"
+                            style={{
+                              fontFamily: "Manrope_400Regular",
+                              fontSize: 14,
+                              lineHeight: 22,
+                              textAlign: "left",
+                            }}
+                            numberOfLines={2}
+                          >
+                            {englishSegments.map((seg, i) =>
+                              seg.highlight ? (
+                                <Text
+                                  key={i}
+                                  style={{
+                                    backgroundColor: isDark ? "rgba(13,148,136,0.25)" : "rgba(13,148,136,0.15)",
+                                    color: tealColor,
+                                    fontFamily: "Manrope_600SemiBold",
+                                  }}
+                                >
+                                  {seg.text}
+                                </Text>
+                              ) : (
+                                <Text key={i}>{seg.text}</Text>
+                              )
+                            )}
+                          </Text>
+                        )}
                       </Pressable>
                     );
                   })}
@@ -781,7 +842,8 @@ export function SearchCommand({ visible, onClose }: SearchCommandProps) {
             />
           </View>
         )}
-      </SafeAreaView>
+        </View>
+      </View>
     </Modal>
   );
 }
