@@ -4,6 +4,7 @@ import {
   Text,
   FlatList,
   ActivityIndicator,
+  Platform,
   useWindowDimensions,
   type LayoutChangeEvent,
   type NativeScrollEvent,
@@ -308,29 +309,70 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
     [onPageChange, pageData.length]
   );
 
+  const jumpToPage = useCallback(
+    (page: number, animated = false) => {
+      if (page < 1 || page > pageData.length) return;
+      if (horizontal) {
+        flatListRef.current?.scrollToOffset({
+          offset: pageWidth * (page - 1),
+          animated,
+        });
+      } else {
+        flatListRef.current?.scrollToIndex({
+          index: page - 1,
+          animated,
+        });
+      }
+      updateCurrentPage(page);
+    },
+    [horizontal, pageData.length, pageWidth, updateCurrentPage]
+  );
+
   // Expose goToPage function to parent — instant jump via getItemLayout
   useEffect(() => {
     if (goToPageRef) {
-      goToPageRef.current = (page: number) => {
-        if (page >= 1 && page <= pageData.length) {
-          if (horizontal) {
-            flatListRef.current?.scrollToOffset({
-              offset: pageWidth * (page - 1),
-              animated: false,
-            });
-            updateCurrentPage(page);
-            return;
-          }
-
-          flatListRef.current?.scrollToIndex({
-            index: page - 1,
-            animated: false,
-          });
-          updateCurrentPage(page);
-        }
-      };
+      goToPageRef.current = (page: number) => jumpToPage(page, false);
     }
-  }, [goToPageRef, horizontal, pageData.length, pageWidth, updateCurrentPage]);
+  }, [goToPageRef, jumpToPage]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+      const target = event.target as HTMLElement | null;
+      const tag = target?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || target?.isContentEditable) return;
+
+      const current = currentPageRef.current;
+      let next: number | null = null;
+      if (horizontal) {
+        if (event.key === "ArrowLeft") next = current + 1;
+        if (event.key === "ArrowRight") next = current - 1;
+      } else {
+        if (event.key === "ArrowDown") next = current + 1;
+        if (event.key === "ArrowUp") next = current - 1;
+      }
+      if (next === null) return;
+
+      event.preventDefault();
+      jumpToPage(Math.max(1, Math.min(pageData.length, next)), true);
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [horizontal, jumpToPage, pageData.length]);
+
+  const handleScrollToIndexFailed = useCallback(
+    ({ index }: { index: number }) => {
+      if (layoutInfo && index >= 0 && index < layoutInfo.offsets.length) {
+        flatListRef.current?.scrollToOffset({
+          offset: layoutInfo.offsets[index],
+          animated: false,
+        });
+      }
+    },
+    [layoutInfo]
+  );
 
   // Track which page is currently visible
   const viewabilityConfig = useRef({
@@ -457,6 +499,7 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
         onScrollBeginDrag={horizontal ? handleHorizontalScrollBegin : undefined}
         onMomentumScrollEnd={horizontal ? handleHorizontalScrollEnd : undefined}
         onScrollEndDrag={horizontal ? handleHorizontalScrollEnd : undefined}
+        onScrollToIndexFailed={handleScrollToIndexFailed}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
         showsHorizontalScrollIndicator={false}
