@@ -1,4 +1,12 @@
-import { View, Pressable, Text, Platform, StyleSheet, useWindowDimensions } from "react-native";
+import {
+  View,
+  Pressable,
+  Text,
+  Platform,
+  StyleSheet,
+  useWindowDimensions,
+  type GestureResponderEvent,
+} from "react-native";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
@@ -159,7 +167,10 @@ function SidebarItem({
 
   return (
     <Pressable
-      onPress={onPress}
+      onPress={(event: GestureResponderEvent) => {
+        event.stopPropagation();
+        onPress();
+      }}
       accessibilityRole="button"
       accessibilityState={isFocused ? { selected: true } : {}}
       className={`${isRTL ? "flex-row-reverse" : "flex-row"} items-center gap-3 rounded-2xl px-4 py-3 ${isFocused ? "bg-primary" : ""}`}
@@ -260,7 +271,6 @@ function FloatingPanel(props: BottomTabBarProps & { isRTL?: boolean }) {
       >
         <Pressable
           onHoverIn={showPanel}
-          onPress={showPanel}
           className="rounded-3xl bg-surface/95 dark:bg-surface-dark/95 px-4 py-5"
         >
           <View className="px-3 pb-6">
