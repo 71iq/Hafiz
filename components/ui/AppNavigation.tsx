@@ -258,7 +258,6 @@ function FloatingPanel(props: BottomTabBarProps & { isRTL?: boolean }) {
       >
         <Pressable
           onHoverIn={showPanel}
-          onHoverOut={hidePanel}
           onPress={showPanel}
           className="rounded-3xl bg-surface/95 dark:bg-surface-dark/95 px-4 py-5"
         >
