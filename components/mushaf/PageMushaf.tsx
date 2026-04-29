@@ -296,6 +296,17 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
     [layoutInfo, lineHeight, horizontal, pageWidth]
   );
 
+  const updateCurrentPage = useCallback(
+    (page: number) => {
+      if (page < 1 || page > pageData.length) return;
+      if (currentPageRef.current === page) return;
+      currentPageRef.current = page;
+      setCurrentPage(page);
+      onPageChange?.(page);
+    },
+    [onPageChange, pageData.length]
+  );
+
   // Expose goToPage function to parent — instant jump via getItemLayout
   useEffect(() => {
     if (goToPageRef) {
@@ -306,6 +317,7 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
               offset: pageWidth * (page - 1),
               animated: false,
             });
+            updateCurrentPage(page);
             return;
           }
 
@@ -313,27 +325,34 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
             index: page - 1,
             animated: false,
           });
+          updateCurrentPage(page);
         }
       };
     }
-  }, [goToPageRef, horizontal, pageData.length, pageWidth]);
+  }, [goToPageRef, horizontal, pageData.length, pageWidth, updateCurrentPage]);
 
   // Track which page is currently visible
   const viewabilityConfig = useRef({
     itemVisiblePercentThreshold: 50,
   }).current;
 
-  const onViewableItemsChanged = useRef(
+  const onViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: Array<{ item: PageData }> }) => {
       if (viewableItems.length > 0) {
-        const firstVisible = viewableItems[0].item.page;
-        if (currentPageRef.current === firstVisible) return;
-        currentPageRef.current = firstVisible;
-        setCurrentPage(firstVisible);
-        onPageChange?.(firstVisible);
+        updateCurrentPage(viewableItems[0].item.page);
       }
-    }
-  ).current;
+    },
+    [updateCurrentPage]
+  );
+
+  const handleHorizontalScroll = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (pageWidth <= 0) return;
+      const index = Math.round(e.nativeEvent.contentOffset.x / pageWidth);
+      updateCurrentPage(index + 1);
+    },
+    [pageWidth, updateCurrentPage]
+  );
 
   const extraData = useMemo(
     () => ({ fontSize, pageWidth, horizontal }),
@@ -400,7 +419,7 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
         data={pageData}
         renderItem={renderPage}
         keyExtractor={keyExtractor}
-        getItemLayout={getItemLayout}
+        getItemLayout={horizontal ? undefined : getItemLayout}
         extraData={extraData}
         horizontal={horizontal}
         pagingEnabled={horizontal}
@@ -408,8 +427,8 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
         // If UI is Arabic the parent direction already does this; otherwise
         // invert so we force that direction under an LTR parent.
         inverted={horizontal && !isRTL}
-        // Only hide chrome in vertical scroll mode — swipe mode has no scroll direction signal.
-        onScroll={horizontal ? undefined : onScroll}
+        // Horizontal mode tracks page by offset; vertical mode uses scroll direction to hide chrome.
+        onScroll={horizontal ? handleHorizontalScroll : onScroll}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
         showsHorizontalScrollIndicator={false}
@@ -418,8 +437,8 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
         initialNumToRender={1}
         maxToRenderPerBatch={1}
         updateCellsBatchingPeriod={80}
-        windowSize={horizontal ? 2 : 3}
-        removeClippedSubviews
+        windowSize={horizontal ? 3 : 3}
+        removeClippedSubviews={!horizontal}
         contentContainerStyle={horizontal ? undefined : { paddingBottom: 60 }}
       />
 
