@@ -1,5 +1,5 @@
 import "../global.css";
-import { Stack } from "expo-router";
+import { Stack, usePathname } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import * as Font from "expo-font";
 import { Platform } from "react-native";
@@ -23,6 +23,25 @@ const queryClient = new QueryClient({
 export { ErrorBoundary } from "expo-router";
 
 SplashScreen.preventAutoHideAsync();
+
+function StableDocumentTitle() {
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof document === "undefined") return;
+
+    const setTitle = () => {
+      document.title = "Hafiz";
+    };
+
+    setTitle();
+    requestAnimationFrame(setTitle);
+    const timer = setTimeout(setTitle, 0);
+    return () => clearTimeout(timer);
+  }, [pathname]);
+
+  return null;
+}
 
 export default function RootLayout() {
   // On web we never block render on fonts — FontFace with display:swap
@@ -53,6 +72,7 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <DatabaseProvider>
+        <StableDocumentTitle />
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="onboarding" options={{ animation: "fade" }} />
