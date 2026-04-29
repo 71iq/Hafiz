@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef, useMemo, memo } from "react";
 import { View, Text, Pressable, Animated as RNAnimated } from "react-native";
+import * as Clipboard from "expo-clipboard";
 import {
   loadQpcFont,
   qpcFontName,
@@ -13,15 +14,20 @@ import { WordToken } from "./WordToken";
 import {
   BookOpenText,
   Bookmark,
-  Copy,
   MessageCircle,
-  MoreHorizontal,
   Play,
   PlusCircle,
   Share2,
 } from "lucide-react-native";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { ReflectionsSection } from "@/components/reflections/ReflectionsSection";
+import {
+  addBookmark as dbAddBookmark,
+  fetchSurahName,
+  fetchUthmaniRange,
+  removeBookmark as dbRemoveBookmark,
+} from "@/lib/selection/queries";
+import { formatForCopy } from "@/lib/selection/format";
 
 type Props = {
   surah: number;
@@ -57,7 +63,7 @@ function AyahBlockInner({
   const langInfo = getLanguageByCode(translationLanguage);
   const isTranslationRtl = langInfo?.direction === "rtl";
   const s = useStrings();
-  const { selectAyah, isBookmarked, getHighlightColor, showToast } = useSelection();
+  const { isBookmarked, getHighlightColor, showToast, refreshBookmarks } = useSelection();
 
   const [fontVisible, setFontVisible] = useState(() =>
     isQpcFontLoaded(v2Page)
@@ -194,22 +200,42 @@ function AyahBlockInner({
     if (hideMode) setRevealed((prev) => !prev);
   }, [hideMode]);
 
-  const handleBadgeLongPress = useCallback(() => {
-    selectAyah(surah, ayah);
-  }, [surah, ayah, selectAyah]);
-
-  const handleMoreActions = useCallback(() => {
-    selectAyah(surah, ayah);
-  }, [surah, ayah, selectAyah]);
-
-  const handleAddToReview = useCallback(() => {
-    showToast(s.reviewActionUnavailable);
-  }, [showToast, s.reviewActionUnavailable]);
-
   const isBlurred = hideMode && !revealed;
   const fontFamily = qpcFontName(v2Page);
   const bookmarked = isBookmarked(surah, ayah);
   const highlightColor = getHighlightColor(surah, ayah);
+
+  const handleBookmark = useCallback(async () => {
+    try {
+      if (bookmarked) {
+        await dbRemoveBookmark(db, surah, ayah);
+        showToast(s.bookmarkRemoved);
+      } else {
+        await dbAddBookmark(db, surah, ayah);
+        showToast(s.bookmarkAdded);
+      }
+      await refreshBookmarks();
+    } catch (e) {
+      console.warn("[AyahBlock] Failed to toggle bookmark:", e);
+    }
+  }, [bookmarked, db, surah, ayah, showToast, s.bookmarkAdded, s.bookmarkRemoved, refreshBookmarks]);
+
+  const handleShare = useCallback(async () => {
+    try {
+      const [text, surahName] = await Promise.all([
+        fetchUthmaniRange(db, surah, ayah, ayah),
+        fetchSurahName(db, surah),
+      ]);
+      await Clipboard.setStringAsync(formatForCopy(text, surahName, surah, ayah, ayah));
+      showToast(s.copied);
+    } catch (e) {
+      console.warn("[AyahBlock] Failed to copy share text:", e);
+    }
+  }, [db, surah, ayah, showToast, s.copied]);
+
+  const handleAddToReview = useCallback(() => {
+    showToast(s.reviewActionUnavailable);
+  }, [showToast, s.reviewActionUnavailable]);
 
   const iconColor = isDark ? "#a3a3a3" : "#8B8178";
   const activeIconColor = isDark ? "#2dd4bf" : "#0d9488";
@@ -238,15 +264,13 @@ function AyahBlockInner({
       <View className={isRTL ? "flex-row-reverse items-center justify-between gap-3" : "flex-row items-center justify-between gap-3"}>
         <View className={isRTL ? "flex-row-reverse items-center gap-1.5" : "flex-row items-center gap-1.5"}>
           <Pressable
-            onLongPress={handleBadgeLongPress}
-            onPress={handleMoreActions}
-            delayLongPress={300}
+            disabled
             hitSlop={8}
-            style={({ pressed }) => ({
-              transform: [{ scale: pressed ? 0.95 : 1 }],
+            style={{
+              opacity: 0.8,
               // @ts-ignore — cursor is valid on web
-              cursor: "pointer",
-            })}
+              cursor: "auto",
+            }}
           >
             <View className="rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 px-3 py-2">
               <Text
@@ -260,17 +284,15 @@ function AyahBlockInner({
               )}
             </View>
           </Pressable>
-          <ActionIcon icon={<Play size={15} color={iconColor} />} onPress={handleMoreActions} />
+          <ActionIcon icon={<Play size={15} color={iconColor} />} onPress={() => {}} disabled />
           <ActionIcon
             icon={<Bookmark size={15} color={bookmarked ? "#FDDC91" : iconColor} fill={bookmarked ? "#FDDC91" : "none"} />}
-            onPress={handleMoreActions}
+            onPress={handleBookmark}
           />
         </View>
 
         <View className={isRTL ? "flex-row-reverse items-center gap-1.5" : "flex-row items-center gap-1.5"}>
-          <ActionIcon icon={<Copy size={15} color={iconColor} />} onPress={handleMoreActions} />
-          <ActionIcon icon={<Share2 size={15} color={iconColor} />} onPress={handleMoreActions} />
-          <ActionIcon icon={<MoreHorizontal size={17} color={iconColor} />} onPress={handleMoreActions} />
+          <ActionIcon icon={<Share2 size={15} color={iconColor} />} onPress={handleShare} />
         </View>
       </View>
 
@@ -434,12 +456,18 @@ function AyahBlockInner({
 
 export const AyahBlock = memo(AyahBlockInner);
 
-function ActionIcon({ icon, onPress }: { icon: React.ReactNode; onPress: () => void }) {
+function ActionIcon({ icon, onPress, disabled = false }: { icon: React.ReactNode; onPress: () => void; disabled?: boolean }) {
   return (
     <Pressable
       onPress={onPress}
+      disabled={disabled}
       hitSlop={8}
       className="h-8 w-8 items-center justify-center rounded-full bg-surface dark:bg-surface-dark"
+      style={{
+        opacity: disabled ? 0.45 : 1,
+        // @ts-ignore — cursor is valid on web
+        cursor: disabled ? "auto" : "pointer",
+      }}
     >
       {icon}
     </Pressable>
