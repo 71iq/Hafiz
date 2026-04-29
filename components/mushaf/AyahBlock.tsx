@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef, useMemo, memo } from "react";
 import { View, Text, Pressable, Animated as RNAnimated } from "react-native";
 import * as Clipboard from "expo-clipboard";
+import { useQuery } from "@tanstack/react-query";
 import {
   loadQpcFont,
   qpcFontName,
@@ -21,6 +22,8 @@ import {
 } from "lucide-react-native";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { ReflectionsSection } from "@/components/reflections/ReflectionsSection";
+import { isSupabaseConfigured } from "@/lib/supabase";
+import { fetchReflectionCount } from "@/lib/reflections/api";
 import {
   addBookmark as dbAddBookmark,
   fetchSurahName,
@@ -64,6 +67,13 @@ function AyahBlockInner({
   const isTranslationRtl = langInfo?.direction === "rtl";
   const s = useStrings();
   const { isBookmarked, getHighlightColor, showToast, refreshBookmarks } = useSelection();
+  const reflectionsEnabled = isSupabaseConfigured();
+  const { data: reflectionCount = 0 } = useQuery({
+    queryKey: ["reflectionCount", surah, ayah],
+    queryFn: () => fetchReflectionCount(surah, ayah),
+    enabled: reflectionsEnabled,
+    staleTime: 1000 * 60 * 5,
+  });
 
   const [fontVisible, setFontVisible] = useState(() =>
     isQpcFontLoaded(v2Page)
@@ -395,6 +405,7 @@ function AyahBlockInner({
           <ActionPill
             label={s.reflections}
             active={reflectionsOpen}
+            badge={reflectionCount}
             icon={<MessageCircle size={14} color={reflectionsOpen ? activeIconColor : iconColor} />}
             onPress={toggleReflections}
           />
@@ -446,7 +457,7 @@ function AyahBlockInner({
 
         {reflectionsOpen && (
           <View className="mt-3">
-            <ReflectionsSection surah={surah} ayah={ayah} />
+            <ReflectionsSection surah={surah} ayah={ayah} initiallyExpanded showHeader={false} />
           </View>
         )}
       </View>
@@ -478,11 +489,13 @@ function ActionPill({
   label,
   icon,
   active,
+  badge,
   onPress,
 }: {
   label: string;
   icon: React.ReactNode;
   active?: boolean;
+  badge?: number;
   onPress: () => void;
 }) {
   return (
@@ -501,6 +514,16 @@ function ActionPill({
       >
         {label}
       </Text>
+      {badge !== undefined && badge > 0 && (
+        <View className="rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 px-1.5 py-0.5">
+          <Text
+            className="text-primary-accent dark:text-primary-bright"
+            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10 }}
+          >
+            {badge}
+          </Text>
+        </View>
+      )}
     </Pressable>
   );
 }

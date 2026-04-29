@@ -17,14 +17,16 @@ import type { Reflection } from "@/lib/reflections/types";
 type Props = {
   surah: number;
   ayah: number;
+  initiallyExpanded?: boolean;
+  showHeader?: boolean;
 };
 
-export function ReflectionsSection({ surah, ayah }: Props) {
+export function ReflectionsSection({ surah, ayah, initiallyExpanded = false, showHeader = true }: Props) {
   const { isDark } = useSettings();
   const s = useStrings();
   const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(initiallyExpanded);
   const [page, setPage] = useState(0);
   const [allReflections, setAllReflections] = useState<Reflection[]>([]);
   const [hasMore, setHasMore] = useState(false);
@@ -103,40 +105,41 @@ export function ReflectionsSection({ surah, ayah }: Props) {
 
   return (
     <>
-      {/* Toggle header */}
-      <Pressable
-        onPress={() => setExpanded((v) => !v)}
-        className="flex-row items-center justify-between py-2.5"
-      >
-        <View className="flex-row items-center gap-2">
-          <Text
-            className="text-warm-400 dark:text-neutral-500"
-            style={{
-              fontFamily: "Manrope_600SemiBold",
-              fontSize: 10,
-              letterSpacing: 1,
-              textTransform: "uppercase",
-            }}
-          >
-            {s.reflections}
-          </Text>
-          {count > 0 && (
-            <View className="rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 px-2 py-0.5">
-              <Text
-                className="text-primary-accent dark:text-primary-bright"
-                style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10 }}
-              >
-                {count}
-              </Text>
-            </View>
+      {showHeader && (
+        <Pressable
+          onPress={() => setExpanded((v) => !v)}
+          className="flex-row items-center justify-between py-2.5"
+        >
+          <View className="flex-row items-center gap-2">
+            <Text
+              className="text-warm-400 dark:text-neutral-500"
+              style={{
+                fontFamily: "Manrope_600SemiBold",
+                fontSize: 10,
+                letterSpacing: 1,
+                textTransform: "uppercase",
+              }}
+            >
+              {s.reflections}
+            </Text>
+            {count > 0 && (
+              <View className="rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 px-2 py-0.5">
+                <Text
+                  className="text-primary-accent dark:text-primary-bright"
+                  style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10 }}
+                >
+                  {count}
+                </Text>
+              </View>
+            )}
+          </View>
+          {expanded ? (
+            <ChevronUp size={14} color={chevronColor} />
+          ) : (
+            <ChevronDown size={14} color={chevronColor} />
           )}
-        </View>
-        {expanded ? (
-          <ChevronUp size={14} color={chevronColor} />
-        ) : (
-          <ChevronDown size={14} color={chevronColor} />
-        )}
-      </Pressable>
+        </Pressable>
+      )}
 
       {/* Expanded content */}
       {expanded && (
