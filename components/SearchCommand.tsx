@@ -205,7 +205,7 @@ export function SearchCommand({ visible, onClose }: SearchCommandProps) {
   // Auto-focus input when opened
   useEffect(() => {
     if (visible) {
-      // Dismiss any lingering Mushaf word tooltip/detail sheet — otherwise
+      // Dismiss any lingering Mushaf word tooltip/detail modal — otherwise
       // they float above the search modal.
       clearTooltip();
       closeDetail();

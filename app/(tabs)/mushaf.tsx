@@ -669,7 +669,7 @@ function MushafInner() {
         {/* Search command modal */}
         <SearchCommand visible={showSearch} onClose={() => setShowSearch(false)} />
 
-        {/* Word detail sheet */}
+        {/* Word detail modal */}
         <WordDetailSheet />
 
         {/* Selection action bar */}

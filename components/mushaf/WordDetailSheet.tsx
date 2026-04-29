@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { View, Text, Modal, Pressable, ScrollView } from "react-native";
+import { View, Text, Modal, Pressable, ScrollView, useWindowDimensions } from "react-native";
 import { ArrowLeft, ArrowRight, BookOpen, X } from "lucide-react-native";
 import { useWordInteraction } from "@/lib/word/context";
 import { useSettings } from "@/lib/settings/context";
@@ -24,11 +24,15 @@ type AyahCtx = {
 export function WordDetailSheet() {
   const { detailWord, closeDetail } = useWordInteraction();
   const { isDark, isRTL, fontSize, lineHeight } = useSettings();
+  const { width, height } = useWindowDimensions();
   const s = useStrings();
   const db = useDatabase();
   const [activeTab, setActiveTab] = useState<TabKey>("meaning");
   const [view, setView] = useState<SheetView>("tabs");
   const [ayahCtx, setAyahCtx] = useState<AyahCtx | null>(null);
+  const modalWidth = Math.max(280, Math.min(width - 32, 760));
+  const maxModalHeight = Math.max(320, Math.min(height - 48, 680));
+  const contentMaxHeight = Math.max(220, maxModalHeight - 150);
 
   const tabs = useMemo(
     () => [
@@ -72,25 +76,25 @@ export function WordDetailSheet() {
   const BackIcon = isRTL ? ArrowRight : ArrowLeft;
 
   return (
-    <Modal visible={!!detailWord} transparent animationType="slide">
-      <Pressable
-        className="flex-1"
-        style={{ backgroundColor: "rgba(0,0,0,0.3)" }}
-        onPress={handleClose}
+    <Modal
+      visible={!!detailWord}
+      transparent
+      animationType="fade"
+      statusBarTranslucent
+      onRequestClose={handleClose}
+    >
+      <View
+        className="flex-1 items-center justify-center px-4 py-6"
+        style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
       >
-        <View className="flex-1" />
-        <Pressable
-          className="bg-surface dark:bg-surface-dark-low rounded-t-4xl"
-          style={{ maxHeight: "80%" }}
-          onPress={() => {}}
+        <Pressable className="absolute inset-0" onPress={handleClose} />
+        <View
+          className="overflow-hidden rounded-3xl bg-surface dark:bg-surface-dark-low"
+          style={{ width: modalWidth, maxHeight: maxModalHeight }}
+          onStartShouldSetResponder={() => true}
         >
-          {/* Drag handle */}
-          <View className="items-center pt-3 pb-1">
-            <View className="w-10 h-1 rounded-full bg-surface-high dark:bg-surface-dark-high" />
-          </View>
-
           {/* Header — context-sensitive */}
-          <View className="flex-row items-center justify-between px-6 pt-3 pb-3">
+          <View className="flex-row items-center justify-between border-b border-warm-200 dark:border-neutral-800 px-5 py-4">
             <View className="flex-row items-center gap-2">
               {view === "ayah" ? (
                 <Pressable
@@ -188,7 +192,7 @@ export function WordDetailSheet() {
               </ScrollView>
 
               {/* Tab content */}
-              <ScrollView className="px-6" style={{ maxHeight: 400 }}>
+              <ScrollView className="px-6" style={{ maxHeight: contentMaxHeight }}>
                 {activeTab === "meaning" && (
                   <MeaningTab surah={surah} ayah={ayah} wordPos={wordPos} />
                 )}
@@ -208,7 +212,7 @@ export function WordDetailSheet() {
               </ScrollView>
             </>
           ) : (
-            <ScrollView style={{ maxHeight: 500 }}>
+            <ScrollView style={{ maxHeight: contentMaxHeight }}>
               {ayahCtx ? (
                 <AyahBlock
                   surah={surah}
@@ -229,8 +233,8 @@ export function WordDetailSheet() {
           )}
 
           <View style={{ height: 24 }} />
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
     </Modal>
   );
 }
