@@ -625,7 +625,10 @@ function MushafInner() {
 
         {/* Content */}
         {isPageMode ? (
-          <View className="flex-1">
+          <View
+            className="flex-1"
+            style={{ paddingTop: chromeVisible ? 0 : 10 }}
+          >
             <PageMushaf
               onPageChange={setCurrentPage}
               goToPageRef={goToPageRef}
