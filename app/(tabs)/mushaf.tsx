@@ -23,7 +23,7 @@ import { GoToNavigator } from "@/components/mushaf/GoToNavigator";
 import { MushafIndicator } from "@/components/mushaf/MushafIndicator";
 import { MushafSlider } from "@/components/mushaf/MushafSlider";
 import { WordDetailSheet } from "@/components/mushaf/WordDetailSheet";
-import { loadMushafIndex, findJuzForAyah, topmostAyahForPage, type MushafIndex } from "@/lib/mushaf/position";
+import { loadMushafIndex, findJuzForAyah, findHizbForAyah, topmostAyahForPage, type MushafIndex } from "@/lib/mushaf/position";
 import { FloatingWordTooltip } from "@/components/mushaf/WordTooltip";
 import { SelectionActionBar } from "@/components/mushaf/SelectionActionBar";
 import { BookmarksSheet } from "@/components/mushaf/BookmarksSheet";
@@ -31,6 +31,7 @@ import { Toast } from "@/components/ui/Toast";
 import { SearchCommand } from "@/components/SearchCommand";
 import { useWordInteraction } from "@/lib/word/context";
 import { consumePendingDeepLink, peekPendingDeepLink } from "@/lib/deep-link";
+import { toArabicNumber } from "@/lib/arabic";
 
 /** Registers an ayah navigation callback inside WordInteractionProvider */
 function AyahNavigationRegistrar({
@@ -457,10 +458,17 @@ function MushafInner() {
 
   // Resolve indicator labels from current top ayah
   const indicator = (() => {
-    if (!mushafIndex || !topAyah) return { name: null as string | null, juz: null as number | null };
+    if (!mushafIndex || !topAyah) {
+      return {
+        name: null as string | null,
+        juz: null as number | null,
+        hizb: null as number | null,
+      };
+    }
     const sm = mushafIndex.surahByNumber.get(topAyah.surah);
     const juz = findJuzForAyah(mushafIndex, topAyah.surah, topAyah.ayah);
-    return { name: sm?.name_arabic ?? null, juz };
+    const hizb = findHizbForAyah(mushafIndex, topAyah.surah, topAyah.ayah);
+    return { name: sm?.name_arabic ?? null, juz, hizb };
   })();
 
   if (loading && !isPageMode) {
@@ -634,6 +642,55 @@ function MushafInner() {
               goToPageRef={goToPageRef}
               onScroll={onScrollHide}
             />
+            {!chromeVisible && (
+              <>
+                <View
+                  pointerEvents="none"
+                  style={{
+                    position: "absolute",
+                    top: 12,
+                    left: 12,
+                    right: 12,
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <Text
+                    className="text-warm-500 dark:text-neutral-400"
+                    style={{ fontFamily: "Manrope_500Medium", fontSize: 12 }}
+                    numberOfLines={1}
+                  >
+                    {indicator.name ? `سورة ${indicator.name}` : ""}
+                  </Text>
+                  <Text
+                    className="text-warm-500 dark:text-neutral-400"
+                    style={{ fontFamily: "Manrope_500Medium", fontSize: 12 }}
+                    numberOfLines={1}
+                  >
+                    {indicator.juz && indicator.hizb
+                      ? `الجزء ${toArabicNumber(indicator.juz)} • الحزب ${toArabicNumber(indicator.hizb)}`
+                      : ""}
+                  </Text>
+                </View>
+                <View
+                  pointerEvents="none"
+                  style={{
+                    position: "absolute",
+                    bottom: 12,
+                    left: currentPage % 2 === 0 ? 12 : undefined,
+                    right: currentPage % 2 === 0 ? undefined : 12,
+                  }}
+                >
+                  <Text
+                    className="text-warm-500 dark:text-neutral-400"
+                    style={{ fontFamily: "Manrope_500Medium", fontSize: 12 }}
+                  >
+                    {toArabicNumber(currentPage)}
+                  </Text>
+                </View>
+              </>
+            )}
           </View>
         ) : (
           <FlashList

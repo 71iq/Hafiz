@@ -7,6 +7,14 @@ export type JuzRow = {
   ayah_end: number;
 };
 
+export type HizbRow = {
+  hizb: number;
+  surah_start: number;
+  ayah_start: number;
+  surah_end: number;
+  ayah_end: number;
+};
+
 export type SurahMeta = {
   number: number;
   name_arabic: string;
@@ -24,6 +32,7 @@ export type PageRow = {
 /** Snapshot loaded once and cached so the indicator does not re-query SQLite per scroll tick. */
 export type MushafIndex = {
   juzRows: JuzRow[];
+  hizbRows: HizbRow[];
   surahByNumber: Map<number, SurahMeta>;
   pageByNumber: Map<number, PageRow>;
 };
@@ -32,9 +41,12 @@ let cachedIndex: MushafIndex | null = null;
 
 export async function loadMushafIndex(db: SQLiteDatabase): Promise<MushafIndex> {
   if (cachedIndex) return cachedIndex;
-  const [juzRows, surahs, pages] = await Promise.all([
+  const [juzRows, hizbRows, surahs, pages] = await Promise.all([
     db.getAllAsync<JuzRow>(
       "SELECT juz, surah, ayah_start, ayah_end FROM juz_map ORDER BY juz, surah, ayah_start"
+    ),
+    db.getAllAsync<HizbRow>(
+      "SELECT hizb, surah_start, ayah_start, surah_end, ayah_end FROM hizb_map ORDER BY hizb"
     ),
     db.getAllAsync<SurahMeta>(
       "SELECT number, name_arabic, name_english FROM surahs ORDER BY number"
@@ -50,7 +62,7 @@ export async function loadMushafIndex(db: SQLiteDatabase): Promise<MushafIndex> 
   const pageByNumber = new Map<number, PageRow>();
   for (const p of pages) pageByNumber.set(p.page, p);
 
-  cachedIndex = { juzRows, surahByNumber, pageByNumber };
+  cachedIndex = { juzRows, hizbRows, surahByNumber, pageByNumber };
   return cachedIndex;
 }
 
@@ -65,6 +77,23 @@ export function findJuzForAyah(index: MushafIndex, surah: number, ayah: number):
   for (const r of index.juzRows) {
     if (r.surah < surah || (r.surah === surah && r.ayah_start <= ayah)) {
       best = r.juz;
+    }
+  }
+  return best;
+}
+
+export function findHizbForAyah(index: MushafIndex, surah: number, ayah: number): number {
+  for (const r of index.hizbRows) {
+    const isAfterStart =
+      surah > r.surah_start || (surah === r.surah_start && ayah >= r.ayah_start);
+    const isBeforeEnd =
+      surah < r.surah_end || (surah === r.surah_end && ayah <= r.ayah_end);
+    if (isAfterStart && isBeforeEnd) return r.hizb;
+  }
+  let best = 1;
+  for (const r of index.hizbRows) {
+    if (surah > r.surah_start || (surah === r.surah_start && ayah >= r.ayah_start)) {
+      best = r.hizb;
     }
   }
   return best;
