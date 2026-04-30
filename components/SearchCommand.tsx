@@ -488,6 +488,12 @@ export function SearchCommand({ visible, onClose }: SearchCommandProps) {
                 writingDirection: isRTL ? "rtl" : "ltr",
                 textAlign: isRTL ? "right" : "left",
                 paddingVertical: 4,
+                ...(Platform.OS === "web"
+                  ? ({
+                      outlineStyle: "none",
+                      outlineWidth: 0,
+                    } as never)
+                  : {}),
               }}
             />
             {query.length > 0 ? (
