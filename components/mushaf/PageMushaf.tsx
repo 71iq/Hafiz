@@ -42,6 +42,13 @@ type SurahRow = {
   revelation_type: string;
 };
 
+type JuzRangeRow = {
+  juz: number;
+  surah: number;
+  ayah_start: number;
+  ayah_end: number;
+};
+
 type AyahData = {
   surah: number;
   ayah: number;
@@ -176,15 +183,53 @@ function buildLayoutOffsets(
   return { heights, offsets };
 }
 
-function PageSeparator({ page }: { page: number }) {
+function findJuzForPageAyah(
+  ranges: JuzRangeRow[],
+  surah: number,
+  ayah: number
+): number | null {
+  for (const r of ranges) {
+    if (r.surah !== surah) continue;
+    if (ayah >= r.ayah_start && ayah <= r.ayah_end) return r.juz;
+  }
+  return null;
+}
+
+function PageSeparator({
+  page,
+  surahName,
+  juz,
+}: {
+  page: number;
+  surahName: string | null;
+  juz: number | null;
+}) {
   return (
-    <View className="items-center" style={{ height: SEPARATOR_HEIGHT, justifyContent: "center" }}>
-      <View className="flex-row items-center" style={{ width: "60%" }}>
-        <View className="flex-1 h-px bg-warm-200 dark:bg-neutral-700" />
-        <Text className="px-3 text-xs text-warm-400 dark:text-neutral-500">
-          {toArabicNumber(page)}
+    <View className="items-center justify-center px-3" style={{ height: SEPARATOR_HEIGHT }}>
+      <View className="w-full flex-row items-center justify-between" style={{ direction: "rtl" }}>
+        <Text
+          className="text-warm-500 dark:text-neutral-400"
+          style={{ fontFamily: "Manrope_500Medium", fontSize: 12 }}
+          numberOfLines={1}
+        >
+          {surahName ? `سورة ${surahName}` : ""}
         </Text>
-        <View className="flex-1 h-px bg-warm-200 dark:bg-neutral-700" />
+
+        <View className="flex-row items-center" style={{ width: "40%" }}>
+          <View className="flex-1 h-px bg-warm-200 dark:bg-neutral-700" />
+          <Text className="px-3 text-xs text-warm-400 dark:text-neutral-500">
+            {toArabicNumber(page)}
+          </Text>
+          <View className="flex-1 h-px bg-warm-200 dark:bg-neutral-700" />
+        </View>
+
+        <Text
+          className="text-warm-500 dark:text-neutral-400"
+          style={{ fontFamily: "Manrope_500Medium", fontSize: 12 }}
+          numberOfLines={1}
+        >
+          {juz ? `الجزء ${toArabicNumber(juz)}` : ""}
+        </Text>
       </View>
     </View>
   );
@@ -201,6 +246,7 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
   const horizontal = pageScroll === "horizontal";
   const [pageData, setPageData] = useState<PageData[]>([]);
   const [surahMap, setSurahMap] = useState<Map<number, SurahRow>>(new Map());
+  const [pageMetaMap, setPageMetaMap] = useState<Map<number, { surahName: string | null; juz: number | null }>>(new Map());
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [detailAyah, setDetailAyah] = useState<{ surah: number; ayah: number } | null>(null);
@@ -244,7 +290,7 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
   useEffect(() => {
     async function loadData() {
       try {
-        const [pages, ayahs, surahs, pageLines] = await Promise.all([
+        const [pages, ayahs, surahs, pageLines, juzRanges] = await Promise.all([
           db.getAllAsync<PageRow>(
             "SELECT page, surah_start, ayah_start, surah_end, ayah_end FROM page_map ORDER BY page"
           ),
@@ -257,6 +303,9 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
           db.getAllAsync<PageLineRow>(
             "SELECT page_number, line_number, line_type, is_centered, first_word_id, last_word_id, surah_number FROM page_lines ORDER BY page_number, line_number"
           ),
+          db.getAllAsync<JuzRangeRow>(
+            "SELECT juz, surah, ayah_start, ayah_end FROM juz_map ORDER BY juz, surah, ayah_start"
+          ),
         ]);
 
         const map = new Map<number, SurahRow>();
@@ -264,6 +313,14 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
           map.set(s.number, s);
         }
         setSurahMap(map);
+
+        const meta = new Map<number, { surahName: string | null; juz: number | null }>();
+        for (const p of pages) {
+          const surahName = map.get(p.surah_start)?.name_arabic ?? null;
+          const juz = findJuzForPageAyah(juzRanges, p.surah_start, p.ayah_start);
+          meta.set(p.page, { surahName, juz });
+        }
+        setPageMetaMap(meta);
 
         // Group page lines by page number and compute globalWordOffset per page
         const lineLookup = new Map<number, PageLineLayout[]>();
@@ -683,11 +740,17 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
             globalWordOffset={item.globalWordOffset}
             onOpenAyahDetail={openAyahDetail}
           />
-          {index < pageData.length - 1 && <PageSeparator page={item.page} />}
+          {index < pageData.length - 1 && (
+            <PageSeparator
+              page={item.page}
+              surahName={pageMetaMap.get(item.page)?.surahName ?? null}
+              juz={pageMetaMap.get(item.page)?.juz ?? null}
+            />
+          )}
         </View>
       );
     },
-    [surahMap, fontSize, lineHeight, pageWidth, pageData.length, openAyahDetail]
+    [surahMap, fontSize, lineHeight, pageWidth, pageData.length, openAyahDetail, pageMetaMap]
   );
 
   const keyExtractor = useCallback(

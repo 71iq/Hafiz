@@ -613,13 +613,15 @@ function MushafInner() {
         </View>
         </Animated.View>
 
-        {/* Surah / Juz indicator — slim header that updates as you scroll */}
-        <Animated.View
-          pointerEvents="none"
-          style={headerAnimStyle}
-        >
-          <MushafIndicator surahName={indicator.name} juz={indicator.juz} />
-        </Animated.View>
+        {/* Surah / Juz indicator — verse mode only (page mode shows it in page separator). */}
+        {!isPageMode && (
+          <Animated.View
+            pointerEvents="none"
+            style={headerAnimStyle}
+          >
+            <MushafIndicator surahName={indicator.name} juz={indicator.juz} />
+          </Animated.View>
+        )}
 
         {/* Content */}
         {isPageMode ? (
