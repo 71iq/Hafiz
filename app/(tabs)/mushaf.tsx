@@ -32,6 +32,7 @@ import { SearchCommand } from "@/components/SearchCommand";
 import { useWordInteraction } from "@/lib/word/context";
 import { consumePendingDeepLink, peekPendingDeepLink } from "@/lib/deep-link";
 import { toArabicNumber } from "@/lib/arabic";
+import { SIDEBAR_BREAKPOINT } from "@/components/ui/AppNavigation";
 
 /** Registers an ayah navigation callback inside WordInteractionProvider */
 function AyahNavigationRegistrar({
@@ -116,9 +117,10 @@ export default function MushafScreen() {
 
 function MushafInner() {
   const db = useDatabase();
-  const { fontSize, lineHeight, viewMode, setViewMode, isDark } = useSettings();
+  const { fontSize, lineHeight, viewMode, setViewMode, isDark, isRTL } = useSettings();
   const s = useStrings();
   const { width: windowWidth } = useWindowDimensions();
+  const isPhone = windowWidth < SIDEBAR_BREAKPOINT;
   // Compact layout under ~480px — phones. Drops labels and tightens gaps.
   const isNarrow = windowWidth < 480;
   const { selection, toastMessage, dismissToast } = useSelection();
@@ -470,6 +472,22 @@ function MushafInner() {
     const hizb = findHizbForAyah(mushafIndex, topAyah.surah, topAyah.ayah);
     return { name: sm?.name_arabic ?? null, juz, hizb };
   })();
+  const mobileTop = (() => {
+    const page = isPageMode
+      ? currentPage
+      : topAyah
+        ? (items.find(
+            (it) => it.type === "ayah" && it.surah === topAyah.surah && it.ayah === topAyah.ayah
+          ) as Extract<MushafItem, { type: "ayah" }> | undefined)?.v2Page ?? currentPage
+        : currentPage;
+    const surah = mushafIndex?.pageByNumber.get(page)?.surah_start ?? topAyah?.surah ?? null;
+    const surahName = surah ? mushafIndex?.surahByNumber.get(surah)?.name_arabic ?? null : null;
+    const ayah = isPageMode
+      ? (mushafIndex?.pageByNumber.get(page)?.ayah_start ?? 1)
+      : (topAyah?.ayah ?? 1);
+    const juz = surah && mushafIndex ? findJuzForAyah(mushafIndex, surah, ayah) : null;
+    return { page, surahName, juz };
+  })();
 
   if (loading && !isPageMode) {
     return (
@@ -497,136 +515,183 @@ function MushafInner() {
         className="flex-1 bg-surface dark:bg-surface-dark"
         edges={["top"]}
       >
-        {/* Header — tonal background, no border. Hides on scroll down.
-            NativeWind's className doesn't flow into Animated.View, so we
-            keep the animated wrapper style-only and put layout classes on
-            the inner View. */}
-        <Animated.View
-          pointerEvents={chromeVisible ? "auto" : "none"}
-          style={headerAnimStyle}
-        >
-        <View
-          onLayout={onHeaderLayout}
-          className={`flex-row items-center justify-between bg-surface dark:bg-surface-dark ${
-            isNarrow ? "px-2 py-2" : "px-4 py-3"
-          }`}
-        >
-          {/* Left: View toggle + Go-to */}
-          <View className={`flex-row items-center ${isNarrow ? "gap-1.5" : "gap-2.5"}`}>
-            {/* View mode toggle — pill group */}
-            <View className="flex-row bg-surface-high dark:bg-surface-dark-high rounded-full p-1">
-              <Pressable
-                onPress={() => setViewMode("verse")}
-                className={`rounded-full ${isNarrow ? "px-2 py-1" : "px-3 py-1.5"} ${
-                  !isPageMode ? "bg-surface-bright dark:bg-surface-dark-bright" : ""
-                }`}
-                style={({ pressed }) => ({
-                  transform: [{ scale: pressed ? 0.98 : 1 }],
-                })}
+        {/* Header chrome — phone gets the new glass top bar, desktop keeps current layout. */}
+        <Animated.View pointerEvents={chromeVisible ? "auto" : "none"} style={headerAnimStyle}>
+          {isPhone ? (
+            <View onLayout={onHeaderLayout} className="px-3 pt-2 pb-2 bg-surface dark:bg-surface-dark">
+              <View
+                className="rounded-3xl border border-white/15 px-3 py-2"
+                style={{
+                  backgroundColor: isDark ? "rgba(28,25,23,0.82)" : "rgba(255,248,241,0.82)",
+                  ...(Platform.OS === "web"
+                    ? ({ backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)" } as any)
+                    : null),
+                }}
               >
-                <AlignJustify
-                  size={16}
-                  color={!isPageMode ? "#0d9488" : (isDark ? "#737373" : "#8B8178")}
-                />
-              </Pressable>
-              <Pressable
-                onPress={() => setViewMode("page")}
-                className={`rounded-full ${isNarrow ? "px-2 py-1" : "px-3 py-1.5"} ${
-                  isPageMode ? "bg-surface-bright dark:bg-surface-dark-bright" : ""
-                }`}
-                style={({ pressed }) => ({
-                  transform: [{ scale: pressed ? 0.98 : 1 }],
-                })}
-              >
-                <BookOpen
-                  size={16}
-                  color={isPageMode ? "#0d9488" : (isDark ? "#737373" : "#8B8178")}
-                />
-              </Pressable>
+                <View className={`flex-row items-center justify-between ${isRTL ? "flex-row-reverse" : ""}`}>
+                  <View className={`max-w-[38%] ${isRTL ? "items-end" : "items-start"}`}>
+                    <Text className="text-warm-400 dark:text-neutral-500" style={{ fontFamily: "Manrope_500Medium", fontSize: 10 }}>
+                      {s.flashcardsScopeBysurah}
+                    </Text>
+                    <Text
+                      numberOfLines={1}
+                      className="text-charcoal dark:text-neutral-100"
+                      style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
+                    >
+                      {mobileTop.surahName ? `سورة ${mobileTop.surahName}` : "—"}
+                    </Text>
+                  </View>
+                  <Pressable
+                    onPress={() => setShowNavigator(true)}
+                    className="rounded-full bg-primary-soft px-4 py-1.5"
+                    style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+                  >
+                    <Text className="text-gold" style={{ fontFamily: "Manrope_700Bold", fontSize: 12 }}>
+                      {interpolate(s.pageN, { n: mobileTop.page })}
+                    </Text>
+                  </Pressable>
+                  <View className={`max-w-[32%] ${isRTL ? "items-start" : "items-end"}`}>
+                    <Text className="text-warm-400 dark:text-neutral-500" style={{ fontFamily: "Manrope_500Medium", fontSize: 10 }}>
+                      {s.flashcardsScopeByjuz}
+                    </Text>
+                    <Text className="text-charcoal dark:text-neutral-100" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}>
+                      {mobileTop.juz ? toArabicNumber(mobileTop.juz) : "—"}
+                    </Text>
+                  </View>
+                </View>
+                <View className={`mt-2 flex-row items-center justify-between ${isRTL ? "flex-row-reverse" : ""}`}>
+                  <View className="flex-row items-center gap-1.5">
+                    <View className="flex-row bg-surface-high dark:bg-surface-dark-high rounded-full p-1">
+                      <Pressable
+                        onPress={() => setViewMode("verse")}
+                        className={`rounded-full px-2.5 py-1 ${!isPageMode ? "bg-surface-bright dark:bg-surface-dark-bright" : ""}`}
+                        style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+                      >
+                        <AlignJustify size={16} color={!isPageMode ? "#0d9488" : (isDark ? "#737373" : "#8B8178")} />
+                      </Pressable>
+                      <Pressable
+                        onPress={() => setViewMode("page")}
+                        className={`rounded-full px-2.5 py-1 ${isPageMode ? "bg-surface-bright dark:bg-surface-dark-bright" : ""}`}
+                        style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+                      >
+                        <BookOpen size={16} color={isPageMode ? "#0d9488" : (isDark ? "#737373" : "#8B8178")} />
+                      </Pressable>
+                    </View>
+                    <Pressable
+                      onPress={() => setShowNavigator(true)}
+                      className="flex-row items-center rounded-full bg-surface-high dark:bg-surface-dark-high px-2.5 py-2"
+                      style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+                    >
+                      <Navigation size={13} color="#0d9488" />
+                    </Pressable>
+                  </View>
+                  <View className="flex-row items-center gap-1">
+                    <Pressable
+                      onPress={() => setShowBookmarks(true)}
+                      className="rounded-full bg-surface-high dark:bg-surface-dark-high px-2.5 py-2"
+                      style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+                    >
+                      <BookMarked size={16} color={isDark ? "#737373" : "#8B8178"} />
+                    </Pressable>
+                    {viewMode === "verse" && (
+                      <Pressable
+                        onPress={() => setHideMode((prev) => !prev)}
+                        className={`rounded-full px-2.5 py-2 ${hideMode ? "bg-primary-accent/15 dark:bg-primary-bright/15" : "bg-surface-high dark:bg-surface-dark-high"}`}
+                        style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+                      >
+                        {hideMode ? <EyeOff size={16} color="#0d9488" /> : <Eye size={16} color={isDark ? "#737373" : "#8B8178"} />}
+                      </Pressable>
+                    )}
+                    <Pressable
+                      onPress={() => setShowSearch(true)}
+                      className="rounded-full bg-surface-high dark:bg-surface-dark-high px-2.5 py-2"
+                      style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+                    >
+                      <Search size={16} color={isDark ? "#737373" : "#8B8178"} />
+                    </Pressable>
+                  </View>
+                </View>
+              </View>
             </View>
-
-            {/* Go-to navigator — pill button. Drops label on narrow. */}
-            <Pressable
-              onPress={() => setShowNavigator(true)}
-              className={`flex-row items-center rounded-full bg-surface-high dark:bg-surface-dark-high ${
-                isNarrow ? "px-2 py-2" : "gap-1.5 px-3.5 py-2"
+          ) : (
+            <View
+              onLayout={onHeaderLayout}
+              className={`flex-row items-center justify-between bg-surface dark:bg-surface-dark ${
+                isNarrow ? "px-2 py-2" : "px-4 py-3"
               }`}
-              style={({ pressed }) => ({
-                transform: [{ scale: pressed ? 0.98 : 1 }],
-              })}
             >
-              <Navigation size={13} color="#0d9488" />
-              {!isNarrow && (
-                <Text
-                  className="text-charcoal dark:text-neutral-300"
-                  style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
+              <View className={`flex-row items-center ${isNarrow ? "gap-1.5" : "gap-2.5"}`}>
+                <View className="flex-row bg-surface-high dark:bg-surface-dark-high rounded-full p-1">
+                  <Pressable
+                    onPress={() => setViewMode("verse")}
+                    className={`rounded-full ${isNarrow ? "px-2 py-1" : "px-3 py-1.5"} ${
+                      !isPageMode ? "bg-surface-bright dark:bg-surface-dark-bright" : ""
+                    }`}
+                    style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+                  >
+                    <AlignJustify size={16} color={!isPageMode ? "#0d9488" : (isDark ? "#737373" : "#8B8178")} />
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setViewMode("page")}
+                    className={`rounded-full ${isNarrow ? "px-2 py-1" : "px-3 py-1.5"} ${
+                      isPageMode ? "bg-surface-bright dark:bg-surface-dark-bright" : ""
+                    }`}
+                    style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+                  >
+                    <BookOpen size={16} color={isPageMode ? "#0d9488" : (isDark ? "#737373" : "#8B8178")} />
+                  </Pressable>
+                </View>
+                <Pressable
+                  onPress={() => setShowNavigator(true)}
+                  className={`flex-row items-center rounded-full bg-surface-high dark:bg-surface-dark-high ${
+                    isNarrow ? "px-2 py-2" : "gap-1.5 px-3.5 py-2"
+                  }`}
+                  style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
                 >
-                  {isPageMode ? interpolate(s.pageN, { n: currentPage }) : s.goTo}
-                </Text>
-              )}
-            </Pressable>
-          </View>
-
-          {/* Right: Bookmarks + Hide mode + Search + Font size */}
-          <View className={`flex-row items-center ${isNarrow ? "gap-1" : "gap-2.5"}`}>
-            {/* Bookmarks button */}
-            <Pressable
-              onPress={() => setShowBookmarks(true)}
-              className={`rounded-full bg-surface-high dark:bg-surface-dark-high ${
-                isNarrow ? "px-2 py-2" : "px-3 py-2"
-              }`}
-              style={({ pressed }) => ({
-                transform: [{ scale: pressed ? 0.98 : 1 }],
-              })}
-            >
-              <BookMarked size={16} color={isDark ? "#737373" : "#8B8178"} />
-            </Pressable>
-            {/* Hide-mode toggle only makes sense in verse-by-verse view —
-                page view renders whole pages with no per-ayah blur target. */}
-            {viewMode === "verse" && (
-              <Pressable
-                onPress={() => setHideMode((prev) => !prev)}
-                className={`rounded-full ${isNarrow ? "px-2 py-2" : "px-3 py-2"} ${
-                  hideMode
-                    ? "bg-primary-accent/15 dark:bg-primary-bright/15"
-                    : "bg-surface-high dark:bg-surface-dark-high"
-                }`}
-                style={({ pressed }) => ({
-                  transform: [{ scale: pressed ? 0.98 : 1 }],
-                })}
-              >
-                {hideMode ? (
-                  <EyeOff size={16} color="#0d9488" />
-                ) : (
-                  <Eye size={16} color={isDark ? "#737373" : "#8B8178"} />
+                  <Navigation size={13} color="#0d9488" />
+                  {!isNarrow && (
+                    <Text className="text-charcoal dark:text-neutral-300" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}>
+                      {isPageMode ? interpolate(s.pageN, { n: currentPage }) : s.goTo}
+                    </Text>
+                  )}
+                </Pressable>
+              </View>
+              <View className={`flex-row items-center ${isNarrow ? "gap-1" : "gap-2.5"}`}>
+                <Pressable
+                  onPress={() => setShowBookmarks(true)}
+                  className={`rounded-full bg-surface-high dark:bg-surface-dark-high ${isNarrow ? "px-2 py-2" : "px-3 py-2"}`}
+                  style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+                >
+                  <BookMarked size={16} color={isDark ? "#737373" : "#8B8178"} />
+                </Pressable>
+                {viewMode === "verse" && (
+                  <Pressable
+                    onPress={() => setHideMode((prev) => !prev)}
+                    className={`rounded-full ${isNarrow ? "px-2 py-2" : "px-3 py-2"} ${
+                      hideMode
+                        ? "bg-primary-accent/15 dark:bg-primary-bright/15"
+                        : "bg-surface-high dark:bg-surface-dark-high"
+                    }`}
+                    style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+                  >
+                    {hideMode ? <EyeOff size={16} color="#0d9488" /> : <Eye size={16} color={isDark ? "#737373" : "#8B8178"} />}
+                  </Pressable>
                 )}
-              </Pressable>
-            )}
-            {/* Search — open search modal */}
-            <Pressable
-              onPress={() => setShowSearch(true)}
-              className={`rounded-full bg-surface-high dark:bg-surface-dark-high ${
-                isNarrow ? "px-2 py-2" : "px-3 py-2"
-              }`}
-              style={({ pressed }) => ({
-                transform: [{ scale: pressed ? 0.98 : 1 }],
-              })}
-            >
-              <Search size={16} color={isDark ? "#737373" : "#8B8178"} />
-            </Pressable>
-            {/* Font size adjuster lives in Settings on narrow viewports to
-                keep the top bar fitting on phone widths. */}
-            {!isNarrow && <FontSizeControl />}
-          </View>
-        </View>
+                <Pressable
+                  onPress={() => setShowSearch(true)}
+                  className={`rounded-full bg-surface-high dark:bg-surface-dark-high ${isNarrow ? "px-2 py-2" : "px-3 py-2"}`}
+                  style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+                >
+                  <Search size={16} color={isDark ? "#737373" : "#8B8178"} />
+                </Pressable>
+                {!isNarrow && <FontSizeControl />}
+              </View>
+            </View>
+          )}
         </Animated.View>
 
-        {/* Surah / Juz indicator — verse mode only (page mode shows it in page separator). */}
-        {!isPageMode && (
-          <Animated.View
-            pointerEvents="none"
-            style={headerAnimStyle}
-          >
+        {!isPhone && !isPageMode && (
+          <Animated.View pointerEvents="none" style={headerAnimStyle}>
             <MushafIndicator surahName={indicator.name} juz={indicator.juz} />
           </Animated.View>
         )}
@@ -635,7 +700,7 @@ function MushafInner() {
         {isPageMode ? (
           <View
             className="flex-1"
-            style={{ paddingTop: chromeVisible ? 0 : 10 }}
+            style={{ paddingTop: chromeVisible ? 0 : 10, paddingBottom: isPhone ? 72 : 56 }}
           >
             <PageMushaf
               onPageChange={setCurrentPage}
@@ -700,7 +765,7 @@ function MushafInner() {
             getItemType={getItemType}
             keyExtractor={keyExtractor}
             extraData={{ fontSize, hideMode, highlightedKey }}
-            contentContainerStyle={{ paddingBottom: 40 }}
+            contentContainerStyle={{ paddingBottom: isPhone ? 96 : 56 }}
             onScroll={onScrollHide}
             scrollEventThrottle={16}
             onViewableItemsChanged={onViewableItemsChanged}

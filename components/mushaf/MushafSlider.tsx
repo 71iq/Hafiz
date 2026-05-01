@@ -25,7 +25,7 @@ type Props = {
   index: MushafIndex | null;
 };
 
-const TRACK_HEIGHT = 4;
+const TRACK_HEIGHT = 2;
 const THUMB_SIZE = 18;
 
 export function MushafSlider({
@@ -55,11 +55,12 @@ export function MushafSlider({
       if (trackWidth <= 0) return currentPage;
       const local = Math.max(0, Math.min(trackWidth, touchPageX - trackXRef.current));
       const ratioLtr = local / trackWidth;
-      // RTL: thumb on the right means low page; on the left means high page.
-      const ratio = isRTL ? 1 - ratioLtr : ratioLtr;
+      // Mushaf progression is always RTL-paginated:
+      // page 1 on the right, page 604 on the left.
+      const ratio = 1 - ratioLtr;
       return Math.max(1, Math.min(max, Math.round(1 + ratio * (max - 1))));
     },
-    [trackWidth, currentPage, max, isRTL]
+    [trackWidth, currentPage, max]
   );
 
   const pageToOffset = useCallback(
@@ -67,9 +68,9 @@ export function MushafSlider({
       if (trackWidth <= 0) return 0;
       const ratio = (Math.max(1, Math.min(max, page)) - 1) / Math.max(1, max - 1);
       const ltrOffset = ratio * trackWidth;
-      return isRTL ? trackWidth - ltrOffset : ltrOffset;
+      return trackWidth - ltrOffset;
     },
-    [trackWidth, max, isRTL]
+    [trackWidth, max]
   );
 
   const livePage = previewPage ?? currentPage;
@@ -140,6 +141,24 @@ export function MushafSlider({
 
       {/* Track + thumb */}
       <View style={{ flex: 1, height: 28, justifyContent: "center" }} {...panResponder.panHandlers}>
+        <View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            top: -11,
+            flexDirection: isRTL ? "row-reverse" : "row",
+            justifyContent: "space-between",
+          }}
+        >
+          <Text style={{ color: isDark ? "#8a8a8a" : "#8B8178", fontFamily: "Manrope_500Medium", fontSize: 10 }}>
+            {toArabicNumber(604)}
+          </Text>
+          <Text style={{ color: isDark ? "#8a8a8a" : "#8B8178", fontFamily: "Manrope_500Medium", fontSize: 10 }}>
+            {toArabicNumber(1)}
+          </Text>
+        </View>
         <View
           onLayout={onTrackLayout}
           style={{

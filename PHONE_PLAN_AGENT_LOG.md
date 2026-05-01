@@ -143,3 +143,43 @@ Compared current routes/components against the phone mockup inventory:
 - Navigation is usable on phone widths with updated chrome behavior.
 - Existing routes continue to navigate correctly.
 - No desktop sidebar regression introduced in this phase.
+
+## 2026-05-01 — Phase 3 Completed
+
+### Scope decisions for this phase
+1. Implemented new Mushaf chrome only on phone widths (`< SIDEBAR_BREAKPOINT`); desktop/tablet keeps existing header/indicator.
+2. Kept existing GoTo/search/bookmark/hide-mode capabilities but moved them into compact mobile chrome controls.
+3. Slider progression is now forced to Mushaf RTL pagination semantics regardless of UI direction:
+- page `1` on the right, page `604` on the left.
+
+### Implemented in this step
+- `app/(tabs)/mushaf.tsx`:
+  - Added phone detection using `SIDEBAR_BREAKPOINT`.
+  - Replaced phone header with a glass top bar composed of:
+    - surah block
+    - center page chip button (`Page N`) opening `GoToNavigator`
+    - juz block
+  - Added compact control row in mobile chrome:
+    - verse/page toggle
+    - go-to button
+    - bookmarks
+    - hide-mode (verse only)
+    - search
+  - Preserved desktop header + `MushafIndicator` path unchanged.
+  - Ensured content bottom padding accounts for bottom slider on phone:
+    - page mode container padding
+    - verse mode list `contentContainerStyle` padding
+- `components/mushaf/MushafSlider.tsx`:
+  - Track height changed from `4px` to `2px`.
+  - Enforced fixed RTL page mapping math (independent of UI RTL/LTR).
+  - Added compact endpoint labels (`604` at left side, `1` at right side visually for RTL pagination).
+  - Kept dragging preview bubble with surah name + page number.
+
+### Validation result
+- `npx tsc --noEmit`: passed.
+- `npx expo export --platform web`: passed.
+
+### Phase 3 completion status
+- Page and verse modes now share the new mobile chrome shell.
+- Go-to navigator remains connected and functional.
+- Slider updates current page and preserves RTL pagination behavior.
