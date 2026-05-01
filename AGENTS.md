@@ -172,6 +172,6 @@ If the user invokes `/audit` it triggers a sweep that reads several of these in 
 
 ## Phone Redesign Continuity
 
-- Persistent log file: `.codex/PHONE_PLAN_AGENT_LOG.md`.
+- Persistent log file: `PHONE_PLAN_AGENT_LOG.md`.
 - For the new phone redesign plan, every decision, scope change, phase progress update, and blocker must be appended there as part of the same change.
 - Start each new redesign session by reading that file first, then continue from the latest entry.
