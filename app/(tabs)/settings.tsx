@@ -29,7 +29,6 @@ import { useRouter } from "expo-router";
 export default function SettingsScreen() {
   const {
     theme, setTheme, fontSizeIndex, setFontSizeIndex, fontSize,
-    showTranslation, setShowTranslation, showTafseer, setShowTafseer,
     translationLanguage, isTranslationLoading, isDark, isRTL,
     tafseerSource, setTafseerSource,
     uiLanguage, setUiLanguage,
@@ -340,17 +339,6 @@ export default function SettingsScreen() {
             {s.sectionInlineContent}
           </Text>
 
-          {/* Translation toggle */}
-          <SettingRow
-            label={s.showTranslationLabel}
-            description={s.wordTranslation}
-            isRTL={isRTL}
-          >
-            <Switch value={showTranslation} onValueChange={setShowTranslation} />
-          </SettingRow>
-
-          <View className="h-4" />
-
           {/* Translation Language */}
           <Pressable
             onPress={() => setPickerVisible(true)}
@@ -385,18 +373,6 @@ export default function SettingsScreen() {
 
           <View className="h-4" />
 
-          {/* Tafseer toggle */}
-          <SettingRow
-            label={s.showTafseerLabel}
-            description={tafseerSource === "muyassar" ? s.tafseerMuyassar : s.tafseerZilal}
-            isRTL={isRTL}
-            descriptionRTL
-          >
-            <Switch value={showTafseer} onValueChange={setShowTafseer} />
-          </SettingRow>
-
-          <View className="h-4" />
-
           {/* Tafsir source selector */}
           <Text
             className="text-charcoal dark:text-neutral-300 mb-3"
@@ -412,6 +388,7 @@ export default function SettingsScreen() {
               isActive={tafseerSource === "muyassar"}
               onPress={() => setTafseerSource("muyassar")}
               isDark={isDark}
+              isRTL={isRTL}
             />
             <TafseerSourceOption
               value="zilal"
@@ -420,6 +397,7 @@ export default function SettingsScreen() {
               isActive={tafseerSource === "zilal"}
               onPress={() => setTafseerSource("zilal")}
               isDark={isDark}
+              isRTL={isRTL}
             />
           </View>
         </Card>
@@ -553,6 +531,7 @@ function TafseerSourceOption({
   isActive,
   onPress,
   isDark,
+  isRTL,
 }: {
   value: string;
   title: string;
@@ -560,6 +539,7 @@ function TafseerSourceOption({
   isActive: boolean;
   onPress: () => void;
   isDark: boolean;
+  isRTL: boolean;
 }) {
   return (
     <Pressable
@@ -581,7 +561,8 @@ function TafseerSourceOption({
         style={{
           fontFamily: isActive ? "Manrope_600SemiBold" : "Manrope_500Medium",
           fontSize: 14,
-          writingDirection: "rtl",
+          writingDirection: isRTL ? "rtl" : "ltr",
+          textAlign: isRTL ? "right" : "left",
         }}
       >
         {title}
@@ -591,50 +572,12 @@ function TafseerSourceOption({
         style={{
           fontFamily: "Manrope_400Regular",
           fontSize: 12,
-          writingDirection: "rtl",
+          writingDirection: isRTL ? "rtl" : "ltr",
+          textAlign: isRTL ? "right" : "left",
         }}
       >
         {description}
       </Text>
     </Pressable>
-  );
-}
-
-function SettingRow({
-  label,
-  description,
-  isRTL,
-  descriptionRTL,
-  children,
-}: {
-  label: string;
-  description: string;
-  isRTL?: boolean;
-  descriptionRTL?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <View className="flex-row items-center justify-between gap-3">
-      <View className="flex-1">
-        <Text
-          className="text-charcoal dark:text-neutral-300"
-          style={{ fontFamily: "Manrope_500Medium", fontSize: 14 }}
-        >
-          {label}
-        </Text>
-        <Text
-          className="text-warm-400 dark:text-neutral-500 mt-0.5"
-          style={{
-            fontFamily: "Manrope_400Regular",
-            fontSize: 12,
-            ...(descriptionRTL ? { writingDirection: "rtl" } : {}),
-            ...(isRTL ? { textAlign: "right" } : {}),
-          }}
-        >
-          {description}
-        </Text>
-      </View>
-      {children}
-    </View>
   );
 }

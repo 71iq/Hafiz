@@ -9,5 +9,5 @@ export function formatForCopy(
     ? `[${surahName} : ${ayahStart}]`
     : `[${surahName} : ${ayahStart}-${ayahEnd}]`;
 
-  return `"${text.trim()}"\n${ref}\nhafiz://open?surah=${surah}&ayah=${ayahStart}`;
+  return `"${text.trim()}"\n${ref}\nhttps://hafiz.app/open?surah=${surah}&ayah=${ayahStart}`;
 }

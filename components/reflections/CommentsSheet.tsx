@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
-import { View, Text, TextInput, Pressable, ScrollView, ActivityIndicator } from "react-native";
+import { View, Text, TextInput, Pressable, ScrollView, ActivityIndicator, Modal } from "react-native";
 import { Send } from "lucide-react-native";
-import { Sheet, SheetHeader, SheetContent } from "@/components/ui/Sheet";
 import { useAuthStore } from "@/lib/auth/store";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -61,8 +60,10 @@ export function CommentsSheet({ reflectionId, onClose, onCommentAdded }: Props) 
   const mutedColor = isDark ? "#737373" : "#A39B93";
 
   return (
-    <Sheet open={!!reflectionId} onClose={onClose}>
-      <SheetHeader>
+    <Modal visible={!!reflectionId} transparent animationType="fade" onRequestClose={onClose}>
+      <View className="flex-1 items-center justify-center px-4" style={{ backgroundColor: "rgba(0,0,0,0.55)" }}>
+        <Pressable className="absolute inset-0" onPress={onClose} />
+        <View className="w-full max-w-[760px] max-h-[88%] rounded-3xl bg-surface dark:bg-surface-dark p-5">
         <View className="items-center">
           <Text
             style={{
@@ -82,8 +83,7 @@ export function CommentsSheet({ reflectionId, onClose, onCommentAdded }: Props) 
             {s.reflectionComments}
           </Text>
         </View>
-      </SheetHeader>
-      <SheetContent>
+      
         <View
           className="mb-3 rounded-2xl px-3 py-2"
           style={{ backgroundColor: isDark ? "#141414" : "#F7F3EC" }}
@@ -101,7 +101,7 @@ export function CommentsSheet({ reflectionId, onClose, onCommentAdded }: Props) 
           </Text>
         </View>
 
-        <ScrollView style={{ maxHeight: 300, marginBottom: 12 }}>
+        <ScrollView style={{ maxHeight: 360, marginBottom: 12 }}>
           {loading ? (
             <ActivityIndicator style={{ padding: 20 }} />
           ) : comments.length === 0 ? (
@@ -144,21 +144,28 @@ export function CommentsSheet({ reflectionId, onClose, onCommentAdded }: Props) 
         {/* Comment input */}
         {user && (
           <View
-            className="flex-row items-center gap-2 rounded-3xl bg-surface-low dark:bg-surface-dark-low px-3.5 py-2.5"
+            className="flex-row items-center gap-2 rounded-2xl border border-warm-200 bg-surface-low px-3.5 py-2.5 dark:border-neutral-700 dark:bg-surface-dark-low"
           >
             <TextInput
               value={text}
               onChangeText={setText}
               placeholder={s.reflectionAddComment}
               placeholderTextColor={mutedColor}
-              multiline
+              multiline={false}
               maxLength={2000}
               className="flex-1 text-charcoal dark:text-neutral-100"
               style={{
                 fontFamily: "Manrope_400Regular",
                 fontSize: 14,
-                maxHeight: 80,
                 padding: 0,
+              }}
+              returnKeyType="send"
+              blurOnSubmit
+              onSubmitEditing={handleSubmit}
+              onKeyPress={(e) => {
+                if (e.nativeEvent.key === "Enter") {
+                  handleSubmit();
+                }
               }}
             />
             <Pressable
@@ -173,7 +180,8 @@ export function CommentsSheet({ reflectionId, onClose, onCommentAdded }: Props) 
             </Pressable>
           </View>
         )}
-      </SheetContent>
-    </Sheet>
+        </View>
+      </View>
+    </Modal>
   );
 }
