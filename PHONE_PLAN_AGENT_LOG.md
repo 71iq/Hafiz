@@ -225,3 +225,39 @@ Compared current routes/components against the phone mockup inventory:
 - Phone page view now has explicit top/bottom/side spacing tuned for the new glass chrome.
 - QCF2 rendering path and page-lines/page-words integration remain intact.
 - No virtualization regression introduced.
+
+## 2026-05-01 — Phase 5 Completed
+
+### Scope decisions for this phase
+1. Refactored verse presentation only in `AyahBlock` (no FlashList architecture changes).
+2. Kept reflections interaction modal-based via existing `Sheet` + `ReflectionsSection` (no inline reflections body).
+3. Deferred sticky write-reflection CTA (bottom pill) until explicit product confirmation; current selection/reflection flow remains via existing reflection surfaces.
+
+### Implemented in this step
+- `components/mushaf/AyahBlock.tsx`:
+  - Softer editorial card treatment:
+    - moved to `bg-surface`/`bg-surface-dark` container
+    - lighter control surfaces (`surface-low` ladder)
+    - added extra vertical whitespace around Quran line on phone.
+  - Number badge repositioned to top corner with RTL-aware placement:
+    - top-right in RTL
+    - top-left in LTR.
+  - Header action simplification with direct actions:
+    - play (disabled placeholder as before)
+    - share
+    - bookmark.
+  - Replaced translation/tafseer pills with collapsible rows:
+    - explicit row headers with chevron up/down
+    - translation row still defaults from `showTranslation` setting
+    - tafseer row still defaults from `showTafseer` setting
+    - translation direction/alignment still follows selected translation language.
+  - Preserved QCF2 right-aligned word layout and existing hide/reveal behavior.
+  - Preserved bookmark toggle and share/copy behavior using Uthmani source text.
+
+### Validation result
+- `npx tsc --noEmit`: passed.
+- `npx expo export --platform web`: passed.
+
+### Phase 5 completion status
+- Verse cards now follow a lighter editorial composition with collapsible translation/tafseer sections.
+- No regressions introduced in translation, tafseer, bookmark, share, or hide mode flows during this phase.

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef, useMemo, memo } from "react";
-import { View, Text, Pressable, Animated as RNAnimated, ScrollView } from "react-native";
+import { View, Text, Pressable, Animated as RNAnimated, ScrollView, useWindowDimensions } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -15,6 +15,8 @@ import { WordToken } from "./WordToken";
 import {
   BookOpenText,
   Bookmark,
+  ChevronDown,
+  ChevronUp,
   MessageCircle,
   Play,
   PlusCircle,
@@ -32,6 +34,7 @@ import {
   removeBookmark as dbRemoveBookmark,
 } from "@/lib/selection/queries";
 import { formatForCopy } from "@/lib/selection/format";
+import { SIDEBAR_BREAKPOINT } from "@/components/ui/AppNavigation";
 
 type Props = {
   surah: number;
@@ -54,6 +57,8 @@ function AyahBlockInner({
   hideMode = false,
   highlighted = false,
 }: Props) {
+  const { width } = useWindowDimensions();
+  const isPhone = width < SIDEBAR_BREAKPOINT;
   const db = useDatabase();
   const {
     showTranslation: defaultShowTranslation,
@@ -252,7 +257,10 @@ function AyahBlockInner({
   const activeIconColor = isDark ? "#2dd4bf" : "#0d9488";
 
   return (
-    <View className="mx-3 mb-3 w-full max-w-[840px] self-center rounded-3xl bg-surface-low dark:bg-surface-dark-low px-4 py-3" style={{ position: "relative" }}>
+    <View
+      className="mx-3 mb-4 w-full max-w-[840px] self-center rounded-3xl bg-surface dark:bg-surface-dark px-4 py-4"
+      style={{ position: "relative" }}
+    >
       {/* Deep link pulse highlight overlay */}
       {highlighted && (
         <RNAnimated.View
@@ -272,38 +280,29 @@ function AyahBlockInner({
           }}
         />
       )}
+      <View
+        className="rounded-2xl bg-primary-accent/10 dark:bg-primary-bright/10 px-3 py-2"
+        style={{ position: "absolute", top: 10, ...(isRTL ? { right: 10 } : { left: 10 }), zIndex: 5 }}
+      >
+        <Text className="text-primary-accent dark:text-primary-bright" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11 }}>
+          {surah}:{ayah}
+        </Text>
+        {bookmarked && (
+          <View className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-gold" />
+        )}
+      </View>
+
       <View className={isRTL ? "flex-row-reverse items-center justify-between gap-3" : "flex-row items-center justify-between gap-3"}>
         <View className={isRTL ? "flex-row-reverse items-center gap-1.5" : "flex-row items-center gap-1.5"}>
-          <Pressable
-            disabled
-            hitSlop={8}
-            style={{
-              opacity: 0.8,
-              // @ts-ignore — cursor is valid on web
-              cursor: "auto",
-            }}
-          >
-            <View className="rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 px-3 py-2">
-              <Text
-                className="text-primary-accent dark:text-primary-bright"
-                style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11 }}
-              >
-                {surah}:{ayah}
-              </Text>
-              {bookmarked && (
-                <View className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-gold" />
-              )}
-            </View>
-          </Pressable>
           <ActionIcon icon={<Play size={15} color={iconColor} />} onPress={() => {}} disabled />
+          <ActionIcon icon={<Share2 size={15} color={iconColor} />} onPress={handleShare} />
+        </View>
+
+        <View className={isRTL ? "flex-row-reverse items-center gap-1.5" : "flex-row items-center gap-1.5"}>
           <ActionIcon
             icon={<Bookmark size={15} color={bookmarked ? "#FDDC91" : iconColor} fill={bookmarked ? "#FDDC91" : "none"} />}
             onPress={handleBookmark}
           />
-        </View>
-
-        <View className={isRTL ? "flex-row-reverse items-center gap-1.5" : "flex-row items-center gap-1.5"}>
-          <ActionIcon icon={<Share2 size={15} color={iconColor} />} onPress={handleShare} />
         </View>
       </View>
 
@@ -324,7 +323,7 @@ function AyahBlockInner({
         </Pressable>
       ) : (
         <View
-          className="pt-4"
+          className={isPhone ? "pt-8 pb-1" : "pt-6 pb-1"}
           style={{ opacity: fontVisible ? 1 : 0, direction: "ltr", alignItems: "flex-end" }}
         >
           <View
@@ -373,8 +372,25 @@ function AyahBlockInner({
       )}
 
       <View className="pt-3">
+        <Pressable
+          onPress={toggleTranslation}
+          className="flex-row items-center justify-between rounded-2xl bg-surface-low dark:bg-surface-dark-low px-4 py-3"
+          style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+        >
+          <View className={isRTL ? "flex-row-reverse items-center gap-2" : "flex-row items-center gap-2"}>
+            <BookOpenText size={14} color={translationOpen ? activeIconColor : iconColor} />
+            <Text
+              className={translationOpen ? "text-primary-accent dark:text-primary-bright" : "text-warm-500 dark:text-neutral-400"}
+              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
+            >
+              {langInfo?.nameEnglish ?? s.wordTranslation}
+            </Text>
+          </View>
+          {translationOpen ? <ChevronUp size={14} color={iconColor} /> : <ChevronDown size={14} color={iconColor} />}
+        </Pressable>
+
         {translationOpen && (
-          <View className="rounded-2xl bg-surface dark:bg-surface-dark px-4 py-3">
+          <View className="mt-2 rounded-2xl bg-surface-low dark:bg-surface-dark-low px-4 py-3">
             <Text
               className="text-charcoal dark:text-neutral-200"
               style={{
@@ -392,18 +408,6 @@ function AyahBlockInner({
 
         <View className={isRTL ? "mt-3 flex-row-reverse flex-wrap gap-2" : "mt-3 flex-row flex-wrap gap-2"}>
           <ActionPill
-            label={langInfo?.nameEnglish ?? s.wordTranslation}
-            active={translationOpen}
-            icon={<BookOpenText size={14} color={translationOpen ? activeIconColor : iconColor} />}
-            onPress={toggleTranslation}
-          />
-          <ActionPill
-            label={s.tafseer}
-            active={tafseerOpen}
-            icon={<BookOpenText size={14} color={tafseerOpen ? activeIconColor : iconColor} />}
-            onPress={toggleTafseer}
-          />
-          <ActionPill
             label={s.reflections}
             active={reflectionsOpen}
             badge={reflectionCount}
@@ -417,8 +421,25 @@ function AyahBlockInner({
           />
         </View>
 
+        <Pressable
+          onPress={toggleTafseer}
+          className="mt-3 flex-row items-center justify-between rounded-2xl bg-surface-low dark:bg-surface-dark-low px-4 py-3"
+          style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+        >
+          <View className={isRTL ? "flex-row-reverse items-center gap-2" : "flex-row items-center gap-2"}>
+            <BookOpenText size={14} color={tafseerOpen ? activeIconColor : iconColor} />
+            <Text
+              className={tafseerOpen ? "text-primary-accent dark:text-primary-bright" : "text-warm-500 dark:text-neutral-400"}
+              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
+            >
+              {s.tafseer}
+            </Text>
+          </View>
+          {tafseerOpen ? <ChevronUp size={14} color={iconColor} /> : <ChevronDown size={14} color={iconColor} />}
+        </Pressable>
+
         {tafseerOpen && (
-          <View className="mt-3 rounded-2xl bg-surface dark:bg-surface-dark px-4 py-3">
+          <View className="mt-2 rounded-2xl bg-surface-low dark:bg-surface-dark-low px-4 py-3">
             {(() => {
               const text = tafseerText ?? s.loading;
               const TRUNCATE_LIMIT = 200;
@@ -498,7 +519,7 @@ function ActionIcon({ icon, onPress, disabled = false }: { icon: React.ReactNode
       onPress={onPress}
       disabled={disabled}
       hitSlop={8}
-      className="h-8 w-8 items-center justify-center rounded-full bg-surface dark:bg-surface-dark"
+      className="h-8 w-8 items-center justify-center rounded-full bg-surface-low dark:bg-surface-dark-low"
       style={{
         opacity: disabled ? 0.45 : 1,
         // @ts-ignore — cursor is valid on web
