@@ -467,3 +467,34 @@ Compared current routes/components against the phone mockup inventory:
 
 ### Phase 11 completion status
 - Settings screen remains fully functional and persisted, now with complete required control coverage and improved mobile-first section flow.
+
+## 2026-05-01 — Phase 12 Completed
+
+### Scope decisions for this phase
+1. Preserved onboarding gate mechanics exactly:
+- `user_settings.onboarding_completed`
+- post-onboarding default continue path to Mushaf.
+2. Added a true “step 3 confirmation” state after deck creation (instead of immediate completion), while keeping existing deck-creation internals.
+3. Kept Supabase-unconfigured auth behavior unchanged (offline app remains usable and auth UI surfaces unavailable copy).
+
+### Implemented in this step
+- `app/onboarding.tsx`:
+  - Added `createdDeckId` post-create state.
+  - Updated step 3 flow:
+    - after successful `createDeck`, show confirmation state in-place
+    - offer `Start Review` (goes to `/flashcards/session` with created `deckId` after setting onboarding complete)
+    - offer continue action to Mushaf (existing completion path).
+  - Preserved real surah list selection and real selected-surah/ayah totals.
+- `app/auth/login.tsx` and `app/auth/signup.tsx`:
+  - Applied onboarding/auth visual refresh with stronger editorial hero treatment (icon + eyebrow + title hierarchy).
+  - Kept form validation, Supabase checks, OAuth availability behavior, and routing logic intact.
+- `app/auth/forgot-password.tsx` and `app/auth/reset-password.tsx`:
+  - No logic changes; flows remain functional and unchanged.
+
+### Validation result
+- `npx tsc --noEmit`: passed.
+- `npx expo export --platform web`: passed.
+
+### Phase 12 completion status
+- Onboarding is now closer to target flow with explicit post-create confirmation and action choice.
+- Auth and reset flows remain robust, including unconfigured/offline-safe behavior.

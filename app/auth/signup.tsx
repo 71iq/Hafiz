@@ -20,7 +20,7 @@ import { useStrings } from "@/lib/i18n/useStrings";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { OAuthButtons } from "@/components/auth/OAuthButtons";
-import { ChevronLeft } from "lucide-react-native";
+import { ChevronLeft, UserPlus } from "lucide-react-native";
 
 const signupSchema = z.object({
   email: z.string().trim().toLowerCase().email("Invalid email address"),
@@ -114,12 +114,23 @@ export default function SignupScreen() {
           keyboardShouldPersistTaps="handled"
         >
           {/* Title */}
-          <Text
-            className="text-charcoal dark:text-neutral-100 text-center mb-2"
-            style={{ fontFamily: "NotoSerif_700Bold", fontSize: 28 }}
-          >
-            {s.authSignup}
-          </Text>
+          <View className="items-center mb-3">
+            <View className="w-14 h-14 rounded-full bg-primary-accent/10 dark:bg-primary-bright/15 items-center justify-center mb-3">
+              <UserPlus size={24} color={configured ? "#0d9488" : "#8B8178"} />
+            </View>
+            <Text
+              className="text-warm-400 dark:text-neutral-500 uppercase mb-1"
+              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, letterSpacing: 1.8 }}
+            >
+              {s.authPromptCloudSync}
+            </Text>
+            <Text
+              className="text-charcoal dark:text-neutral-100 text-center mb-1"
+              style={{ fontFamily: "NotoSerif_700Bold", fontSize: 28 }}
+            >
+              {s.authSignup}
+            </Text>
+          </View>
           <Text
             className="text-warm-400 dark:text-neutral-500 text-center mb-8"
             style={{ fontFamily: "Manrope_400Regular", fontSize: 15 }}

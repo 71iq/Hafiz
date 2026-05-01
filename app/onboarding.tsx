@@ -45,6 +45,7 @@ function OnboardingInner() {
 
   // Screen 3 state
   const [creating, setCreating] = useState(false);
+  const [createdDeckId, setCreatedDeckId] = useState<string | null>(null);
 
   // Load surahs
   useEffect(() => {
@@ -94,12 +95,21 @@ function OnboardingInner() {
       };
       const deckId = generateDeckId(scope);
       await createDeck(db, deckId, scope);
-      await completeOnboarding();
+      setCreatedDeckId(deckId);
+      setCreating(false);
     } catch (err) {
       console.error("[Onboarding] Failed to create deck:", err);
       setCreating(false);
     }
-  }, [db, selectedSurahs, completeOnboarding]);
+  }, [db, selectedSurahs]);
+
+  const handleStartReview = useCallback(async () => {
+    if (!createdDeckId) return;
+    await db.runAsync(
+      "INSERT OR REPLACE INTO user_settings (key, value) VALUES ('onboarding_completed', 'true')"
+    );
+    router.replace({ pathname: "/flashcards/session", params: { deckId: createdDeckId } });
+  }, [createdDeckId, db, router]);
 
   const toggleSurah = useCallback((n: number) => {
     setSelectedSurahs((prev) => {
@@ -438,7 +448,7 @@ function OnboardingInner() {
             textAlign: "center",
           }}
         >
-          {s.onboardingCreateDeckTitle}
+          {createdDeckId ? s.flashcardsSummaryTitle : s.onboardingCreateDeckTitle}
         </Text>
 
         {/* Summary card */}
@@ -490,64 +500,111 @@ function OnboardingInner() {
             paddingHorizontal: 8,
           }}
         >
-          {s.onboardingCreateDeckDesc}
+          {createdDeckId ? s.onboardingCreateDeckDesc : s.onboardingCreateDeckDesc}
         </Text>
       </View>
 
       {/* Bottom actions */}
       <View style={{ paddingBottom: 40, alignItems: "center" }}>
-        {/* Create button */}
-        <Pressable
-          onPress={handleCreateDeck}
-          disabled={creating}
-          style={(state) => ({
-            backgroundColor: accentColor,
-            paddingHorizontal: 48,
-            height: 52,
-            borderRadius: 26,
-            justifyContent: "center",
-            alignItems: "center",
-            flexDirection: "row",
-            gap: 8,
-            opacity: creating ? 0.7 : 1,
-            transform: [{ scale: state.pressed && !creating ? 0.98 : 1 }],
-            width: "100%",
-          })}
-        >
-          {creating ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : null}
-          <Text
-            style={{
-              fontFamily: "Manrope_600SemiBold",
-              fontSize: 17,
-              color: "#FFFFFF",
-            }}
-          >
-            {creating ? s.onboardingCreating : s.onboardingCreateAndStart}
-          </Text>
-        </Pressable>
+        {!createdDeckId ? (
+          <>
+            <Pressable
+              onPress={handleCreateDeck}
+              disabled={creating}
+              style={(state) => ({
+                backgroundColor: accentColor,
+                paddingHorizontal: 48,
+                height: 52,
+                borderRadius: 26,
+                justifyContent: "center",
+                alignItems: "center",
+                flexDirection: "row",
+                gap: 8,
+                opacity: creating ? 0.7 : 1,
+                transform: [{ scale: state.pressed && !creating ? 0.98 : 1 }],
+                width: "100%",
+              })}
+            >
+              {creating ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : null}
+              <Text
+                style={{
+                  fontFamily: "Manrope_600SemiBold",
+                  fontSize: 17,
+                  color: "#FFFFFF",
+                }}
+              >
+                {creating ? s.onboardingCreating : s.onboardingCreateAndStart}
+              </Text>
+            </Pressable>
 
-        {/* Skip for now */}
-        <Pressable
-          onPress={completeOnboarding}
-          disabled={creating}
-          style={(state) => ({
-            marginTop: 16,
-            alignItems: "center",
-            transform: [{ scale: state.pressed ? 0.98 : 1 }],
-          })}
-        >
-          <Text
-            style={{
-              fontFamily: "Manrope_400Regular",
-              fontSize: 15,
-              color: textMuted,
-            }}
-          >
-            {s.onboardingSkipForNow}
-          </Text>
-        </Pressable>
+            <Pressable
+              onPress={completeOnboarding}
+              disabled={creating}
+              style={(state) => ({
+                marginTop: 16,
+                alignItems: "center",
+                transform: [{ scale: state.pressed ? 0.98 : 1 }],
+              })}
+            >
+              <Text
+                style={{
+                  fontFamily: "Manrope_400Regular",
+                  fontSize: 15,
+                  color: textMuted,
+                }}
+              >
+                {s.onboardingSkipForNow}
+              </Text>
+            </Pressable>
+          </>
+        ) : (
+          <>
+            <Pressable
+              onPress={handleStartReview}
+              style={(state) => ({
+                backgroundColor: accentColor,
+                paddingHorizontal: 48,
+                height: 52,
+                borderRadius: 26,
+                justifyContent: "center",
+                alignItems: "center",
+                transform: [{ scale: state.pressed ? 0.98 : 1 }],
+                width: "100%",
+              })}
+            >
+              <Text
+                style={{
+                  fontFamily: "Manrope_600SemiBold",
+                  fontSize: 17,
+                  color: "#FFFFFF",
+                }}
+              >
+                {s.flashcardsStartReview}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              onPress={completeOnboarding}
+              style={(state) => ({
+                marginTop: 16,
+                alignItems: "center",
+                transform: [{ scale: state.pressed ? 0.98 : 1 }],
+              })}
+            >
+              <Text
+                style={{
+                  fontFamily: "Manrope_400Regular",
+                  fontSize: 15,
+                  color: textMuted,
+                }}
+              >
+                {s.onboardingContinue}
+              </Text>
+            </Pressable>
+          </>
+        )}
       </View>
     </View>
   );

@@ -19,7 +19,7 @@ import { useStrings } from "@/lib/i18n/useStrings";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { OAuthButtons } from "@/components/auth/OAuthButtons";
-import { ChevronLeft } from "lucide-react-native";
+import { ChevronLeft, ShieldCheck } from "lucide-react-native";
 
 const loginSchema = z.object({
   email: z.string().trim().toLowerCase().email("Invalid email address"),
@@ -79,12 +79,23 @@ export default function LoginScreen() {
 
         <View className="flex-1 px-6 justify-center" style={{ marginTop: -60 }}>
           {/* Title */}
-          <Text
-            className="text-charcoal dark:text-neutral-100 text-center mb-2"
-            style={{ fontFamily: "NotoSerif_700Bold", fontSize: 28 }}
-          >
-            {s.authLogin}
-          </Text>
+          <View className="items-center mb-3">
+            <View className="w-14 h-14 rounded-full bg-primary-accent/10 dark:bg-primary-bright/15 items-center justify-center mb-3">
+              <ShieldCheck size={24} color={configured ? "#0d9488" : "#8B8178"} />
+            </View>
+            <Text
+              className="text-warm-400 dark:text-neutral-500 uppercase mb-1"
+              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, letterSpacing: 1.8 }}
+            >
+              {s.authPromptCloudSync}
+            </Text>
+            <Text
+              className="text-charcoal dark:text-neutral-100 text-center mb-1"
+              style={{ fontFamily: "NotoSerif_700Bold", fontSize: 28 }}
+            >
+              {s.authLogin}
+            </Text>
+          </View>
           <Text
             className="text-warm-400 dark:text-neutral-500 text-center mb-8"
             style={{ fontFamily: "Manrope_400Regular", fontSize: 15 }}
