@@ -25,6 +25,8 @@ import { ReflectionsSection } from "@/components/reflections/ReflectionsSection"
 import { Sheet, SheetContent, SheetHeader } from "@/components/ui/Sheet";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { fetchReflectionCount } from "@/lib/reflections/api";
+import { createDeck, generateDeckId } from "@/lib/fsrs/queries";
+import type { DeckScope } from "@/lib/fsrs/types";
 import {
   addBookmark as dbAddBookmark,
   fetchSurahName,
@@ -89,6 +91,7 @@ function AyahBlockInner({
   const [translationText, setTranslationText] = useState<string | null>(null);
   const [tafseerText, setTafseerText] = useState<string | null>(null);
   const [tafseerExpanded, setTafseerExpanded] = useState(false);
+  const [reviewBusy, setReviewBusy] = useState(false);
 
   // Deep link pulse highlight
   const pulseAnim = useRef(new RNAnimated.Value(0)).current;
@@ -247,9 +250,27 @@ function AyahBlockInner({
     }
   }, [db, surah, ayah, showToast, s.copied]);
 
-  const handleAddToReview = useCallback(() => {
-    showToast(s.reviewActionUnavailable);
-  }, [showToast, s.reviewActionUnavailable]);
+  const handleAddToReview = useCallback(async () => {
+    if (reviewBusy) return;
+    setReviewBusy(true);
+    try {
+      const scope: DeckScope = {
+        type: "custom",
+        surahStart: surah,
+        ayahStart: ayah,
+        surahEnd: surah,
+        ayahEnd: ayah,
+      };
+      const deckId = generateDeckId(scope);
+      await createDeck(db, deckId, scope);
+      showToast(s.reviewActionAdded);
+    } catch (e) {
+      console.warn("[AyahBlock] Failed to add to review:", e);
+      showToast(s.reviewActionFailed);
+    } finally {
+      setReviewBusy(false);
+    }
+  }, [reviewBusy, surah, ayah, db, showToast, s.reviewActionAdded, s.reviewActionFailed]);
 
   const iconColor = isDark ? "#a3a3a3" : "#8B8178";
   const activeIconColor = isDark ? "#2dd4bf" : "#0d9488";
@@ -395,6 +416,7 @@ function AyahBlockInner({
             label={s.addToReview}
             icon={<PlusCircle size={14} color={iconColor} />}
             onPress={handleAddToReview}
+            active={reviewBusy}
           />
           <ActionPill
             label={s.tafseer}

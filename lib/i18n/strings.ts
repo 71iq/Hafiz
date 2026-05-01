@@ -51,6 +51,8 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     tafseer: "Tafseer",
     addToReview: "Add to Review",
     reviewActionUnavailable: "Create review decks from Flashcards",
+    reviewActionAdded: "Added to review",
+    reviewActionFailed: "Could not add to review",
     tapToReveal: "Tap to reveal",
     loading: "Loading...",
     // WordDetailSheet tabs (en mode)
@@ -406,6 +408,8 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     tafseer: "التفسير",
     addToReview: "أضف للمراجعة",
     reviewActionUnavailable: "أنشئ مجموعات المراجعة من البطاقات",
+    reviewActionAdded: "تمت الإضافة للمراجعة",
+    reviewActionFailed: "تعذر الإضافة للمراجعة",
     tapToReveal: "اضغط للكشف",
     loading: "جارٍ التحميل...",
     wordTabEnglish: "الإنجليزية",

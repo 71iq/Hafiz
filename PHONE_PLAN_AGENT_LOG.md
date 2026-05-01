@@ -883,3 +883,23 @@ Saved in `phase19/`:
 ### Validation result
 - `npx tsc --noEmit`: passed.
 - `npx expo export --platform web`: passed.
+
+## 2026-05-01 — Ayah Add-To-Review Action Now Works
+
+### User-reported issue
+- Tapping `Add to Review` on an ayah only showed the old unavailable message and did not perform any action.
+
+### Implemented fix
+- `components/mushaf/AyahBlock.tsx`:
+  - replaced the stub toast path with a real review-deck creation action.
+  - on tap, creates a `custom` deck for the single current ayah (`surahStart = surahEnd`, `ayahStart = ayahEnd`).
+  - reuses `createDeck` + `generateDeckId` so the result lands in the existing flashcards system.
+  - shows success/failure toasts with new bilingual strings.
+- `lib/i18n/strings.ts`:
+  - added bilingual copy for:
+    - `reviewActionAdded`
+    - `reviewActionFailed`.
+
+### Validation result
+- `npx tsc --noEmit`: passed.
+- `npx expo export --platform web`: passed.
