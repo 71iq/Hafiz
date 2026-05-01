@@ -818,3 +818,19 @@ Saved in `phase19/`:
 
 ### Current observed state in this run
 - Probe is functioning and reported `QA_WAITING` (expected while DB import is still in progress).
+
+## 2026-05-01 — Phone Page-View Vertical Centering Fix
+
+### User-reported issue
+- In phone page view, Mushaf page content was top-aligned; expected vertical centering.
+
+### Implemented fix
+- `components/mushaf/PageMushaf.tsx`:
+  - Added `centerVerticalOnPhone` prop.
+  - For vertical page mode, each page item now gets a viewport-aware min height and `justifyContent: "center"` when this flag is enabled.
+- `app/(tabs)/mushaf.tsx`:
+  - Enabled `centerVerticalOnPhone` for phone page mode.
+
+### Validation result
+- `npx tsc --noEmit`: passed.
+- `npx expo export --platform web`: passed.

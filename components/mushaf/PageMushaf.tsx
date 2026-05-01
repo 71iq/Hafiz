@@ -133,6 +133,7 @@ type Props = {
   pagePaddingTop?: number;
   pagePaddingBottom?: number;
   pageSidePadding?: number;
+  centerVerticalOnPhone?: boolean;
 };
 
 // Fixed heights for getItemLayout calculation
@@ -254,6 +255,7 @@ export function PageMushaf({
   pagePaddingTop = 8,
   pagePaddingBottom = 32,
   pageSidePadding = 16,
+  centerVerticalOnPhone = false,
 }: Props) {
   const db = useDatabase();
   const { fontSize, lineHeight, pageScroll } = useSettings();
@@ -746,8 +748,13 @@ export function PageMushaf({
 
   const renderPage = useCallback(
     ({ item, index }: { item: PageData; index: number }) => {
+      const shouldCenter = centerVerticalOnPhone && !horizontal && containerHeight > 0;
+      const minPageHeight = shouldCenter
+        ? Math.max(0, containerHeight - (index < pageData.length - 1 ? SEPARATOR_HEIGHT : 0))
+        : undefined;
+
       return (
-        <View>
+        <View style={minPageHeight ? { minHeight: minPageHeight, justifyContent: "center" } : undefined}>
           <MushafPage
             pageNumber={item.page}
             ayahs={item.ayahs}
@@ -783,6 +790,9 @@ export function PageMushaf({
       pagePaddingTop,
       pagePaddingBottom,
       pageSidePadding,
+      centerVerticalOnPhone,
+      horizontal,
+      containerHeight,
     ]
   );
 
