@@ -834,3 +834,19 @@ Saved in `phase19/`:
 ### Validation result
 - `npx tsc --noEmit`: passed.
 - `npx expo export --platform web`: passed.
+
+## 2026-05-01 — Create Deck Sheet Tab-Rail Fix
+
+### User-reported issue
+- `Create Deck` scope tabs rendered as tall stretched columns on phone, causing broken visual layout.
+
+### Implemented fix
+- `components/flashcards/CreateDeckSheet.tsx`:
+  - replaced the tab strip container with a constrained-height horizontal rail.
+  - set explicit tab chip height (`h-11`) and centered content.
+  - added `contentContainerStyle.alignItems = "center"` and removed stretch-prone layout.
+  - kept all deck creation behavior and data flow unchanged.
+
+### Validation result
+- `npx tsc --noEmit`: passed.
+- `npx expo export --platform web`: passed.

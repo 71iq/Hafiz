@@ -146,35 +146,43 @@ export function CreateDeckSheet({ visible, onClose, onCreated }: Props) {
         </View>
 
         {/* Scope type tabs */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          className="px-6 mb-4"
-          contentContainerStyle={{ gap: 8 }}
-        >
-          {SCOPE_TABS.map((tab) => (
-            <Pressable
-              key={tab.value}
-              onPress={() => setScopeType(tab.value)}
-              className={`px-5 py-2.5 rounded-full ${
-                scopeType === tab.value
-                  ? "bg-primary-accent"
-                  : "bg-surface-low dark:bg-surface-dark-low"
-              }`}
-              style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-            >
-              <Text
-                style={{
-                  fontFamily: scopeType === tab.value ? "Manrope_600SemiBold" : "Manrope_500Medium",
-                  fontSize: 13,
-                  color: scopeType === tab.value ? "#fff" : (isDark ? "#a3a3a3" : "#6e5a47"),
-                }}
+        <View className="mb-4">
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{
+              gap: 8,
+              alignItems: "center",
+              paddingHorizontal: 24,
+              paddingVertical: 2,
+            }}
+            style={{ maxHeight: 52 }}
+          >
+            {SCOPE_TABS.map((tab) => (
+              <Pressable
+                key={tab.value}
+                onPress={() => setScopeType(tab.value)}
+                className={`h-11 rounded-full px-5 items-center justify-center ${
+                  scopeType === tab.value
+                    ? "bg-primary-accent"
+                    : "bg-surface-low dark:bg-surface-dark-low"
+                }`}
+                style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
               >
-                {tab.label}
-              </Text>
-            </Pressable>
-          ))}
-        </ScrollView>
+                <Text
+                  numberOfLines={1}
+                  style={{
+                    fontFamily: scopeType === tab.value ? "Manrope_600SemiBold" : "Manrope_500Medium",
+                    fontSize: 13,
+                    color: scopeType === tab.value ? "#fff" : (isDark ? "#a3a3a3" : "#6e5a47"),
+                  }}
+                >
+                  {tab.label}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
 
         {/* Content area */}
         <ScrollView className="flex-1 px-6" contentContainerStyle={{ paddingBottom: 120 }}>
