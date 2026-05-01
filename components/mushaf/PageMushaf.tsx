@@ -14,7 +14,6 @@ import {
 } from "react-native";
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
-import { toArabicNumber } from "@/lib/arabic";
 import { useStrings, interpolate } from "@/lib/i18n/useStrings";
 import { MushafPage, type PageLineLayout } from "./MushafPage";
 import { AyahDetailModal } from "./AyahDetailModal";
@@ -212,26 +211,31 @@ function PageSeparator({
   page,
   surahName,
   juz,
+  isRTL,
 }: {
   page: number;
   surahName: string | null;
   juz: number | null;
+  isRTL: boolean;
 }) {
+  const pageLabel = isRTL ? String(page).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[Number(d)]) : String(page);
+  const surahLabel = surahName ? (isRTL ? `سورة ${surahName}` : `Surah ${surahName}`) : "";
+  const juzLabel = juz ? (isRTL ? `الجزء ${String(juz).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[Number(d)])}` : `Juz ${juz}`) : "";
   return (
     <View className="items-center justify-center px-3" style={{ height: SEPARATOR_HEIGHT }}>
-      <View className="w-full flex-row items-center justify-between" style={{ direction: "rtl" }}>
+      <View className="w-full flex-row items-center justify-between" style={{ direction: isRTL ? "rtl" : "ltr" }}>
         <Text
           className="text-warm-500 dark:text-neutral-400"
           style={{ fontFamily: "Manrope_500Medium", fontSize: 12 }}
           numberOfLines={1}
         >
-          {surahName ? `سورة ${surahName}` : ""}
+          {surahLabel}
         </Text>
 
         <View className="flex-row items-center" style={{ width: "40%" }}>
           <View className="flex-1 h-px bg-warm-200 dark:bg-neutral-700" />
           <Text className="px-3 text-xs text-warm-400 dark:text-neutral-500">
-            {toArabicNumber(page)}
+            {pageLabel}
           </Text>
           <View className="flex-1 h-px bg-warm-200 dark:bg-neutral-700" />
         </View>
@@ -241,7 +245,7 @@ function PageSeparator({
           style={{ fontFamily: "Manrope_500Medium", fontSize: 12 }}
           numberOfLines={1}
         >
-          {juz ? `الجزء ${toArabicNumber(juz)}` : ""}
+          {juzLabel}
         </Text>
       </View>
     </View>
@@ -258,7 +262,7 @@ export function PageMushaf({
   centerVerticalOnPhone = false,
 }: Props) {
   const db = useDatabase();
-  const { fontSize, lineHeight, pageScroll } = useSettings();
+  const { fontSize, lineHeight, pageScroll, isRTL } = useSettings();
   const s = useStrings();
   const { width, height: windowHeight } = useWindowDimensions();
   const [containerWidth, setContainerWidth] = useState(0);
@@ -337,7 +341,9 @@ export function PageMushaf({
 
         const meta = new Map<number, { surahName: string | null; juz: number | null }>();
         for (const p of pages) {
-          const surahName = map.get(p.surah_start)?.name_arabic ?? null;
+          const surahName = isRTL
+            ? map.get(p.surah_start)?.name_arabic ?? null
+            : map.get(p.surah_start)?.name_english ?? null;
           const juz = findJuzForPageAyah(juzRanges, p.surah_start, p.ayah_start);
           meta.set(p.page, { surahName, juz });
         }
@@ -382,7 +388,7 @@ export function PageMushaf({
     }
 
     loadData();
-  }, [db, lineHeight, pagePaddingTop, pagePaddingBottom]);
+  }, [db, isRTL, lineHeight, pagePaddingTop, pagePaddingBottom]);
 
   // Rebuild layout offsets when lineHeight changes (font size adjustment)
   useEffect(() => {
@@ -774,6 +780,7 @@ export function PageMushaf({
               page={item.page}
               surahName={pageMetaMap.get(item.page)?.surahName ?? null}
               juz={pageMetaMap.get(item.page)?.juz ?? null}
+              isRTL={isRTL}
             />
           )}
         </View>
@@ -793,6 +800,7 @@ export function PageMushaf({
       centerVerticalOnPhone,
       horizontal,
       containerHeight,
+      isRTL,
     ]
   );
 

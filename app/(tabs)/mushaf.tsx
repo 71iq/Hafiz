@@ -117,7 +117,7 @@ export default function MushafScreen() {
 
 function MushafInner() {
   const db = useDatabase();
-  const { fontSize, lineHeight, viewMode, setViewMode, isDark, isRTL } = useSettings();
+  const { fontSize, lineHeight, viewMode, setViewMode, pageScroll, isDark, isRTL } = useSettings();
   const s = useStrings();
   const { width: windowWidth } = useWindowDimensions();
   const isPhone = windowWidth < SIDEBAR_BREAKPOINT;
@@ -538,7 +538,9 @@ function MushafInner() {
                       className="text-charcoal dark:text-neutral-100"
                       style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
                     >
-                      {mobileTop.surahName ? `سورة ${mobileTop.surahName}` : "—"}
+                      {mobileTop.surahName
+                        ? (isRTL ? `سورة ${mobileTop.surahName}` : `Surah ${mobileTop.surahName}`)
+                        : "—"}
                     </Text>
                   </View>
                   <Pressable
@@ -555,7 +557,9 @@ function MushafInner() {
                       {s.flashcardsScopeByjuz}
                     </Text>
                     <Text className="text-charcoal dark:text-neutral-100" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}>
-                      {mobileTop.juz ? toArabicNumber(mobileTop.juz) : "—"}
+                      {mobileTop.juz
+                        ? (isRTL ? toArabicNumber(mobileTop.juz) : String(mobileTop.juz))
+                        : "—"}
                     </Text>
                   </View>
                 </View>
@@ -730,7 +734,7 @@ function MushafInner() {
                     style={{ fontFamily: "Manrope_500Medium", fontSize: 12 }}
                     numberOfLines={1}
                   >
-                    {indicator.name ? `سورة ${indicator.name}` : ""}
+                    {indicator.name ? (isRTL ? `سورة ${indicator.name}` : `Surah ${indicator.name}`) : ""}
                   </Text>
                   <Text
                     className="text-warm-500 dark:text-neutral-400"
@@ -738,26 +742,30 @@ function MushafInner() {
                     numberOfLines={1}
                   >
                     {indicator.juz && indicator.hizb
-                      ? `الجزء ${toArabicNumber(indicator.juz)} • الحزب ${toArabicNumber(indicator.hizb)}`
+                      ? (isRTL
+                        ? `الجزء ${toArabicNumber(indicator.juz)} • الحزب ${toArabicNumber(indicator.hizb)}`
+                        : `Juz ${indicator.juz} • Hizb ${indicator.hizb}`)
                       : ""}
                   </Text>
                 </View>
-                <View
-                  pointerEvents="none"
-                  style={{
-                    position: "absolute",
-                    bottom: 12,
-                    left: currentPage % 2 === 0 ? 12 : undefined,
-                    right: currentPage % 2 === 0 ? undefined : 12,
-                  }}
-                >
-                  <Text
-                    className="text-warm-500 dark:text-neutral-400"
-                    style={{ fontFamily: "Manrope_500Medium", fontSize: 12 }}
+                {pageScroll === "horizontal" && (
+                  <View
+                    pointerEvents="none"
+                    style={{
+                      position: "absolute",
+                      bottom: 12,
+                      left: currentPage % 2 === 0 ? 12 : undefined,
+                      right: currentPage % 2 === 0 ? undefined : 12,
+                    }}
                   >
-                    {toArabicNumber(currentPage)}
-                  </Text>
-                </View>
+                    <Text
+                      className="text-warm-500 dark:text-neutral-400"
+                      style={{ fontFamily: "Manrope_500Medium", fontSize: 12 }}
+                    >
+                      {isRTL ? toArabicNumber(currentPage) : String(currentPage)}
+                    </Text>
+                  </View>
+                )}
               </>
             )}
           </View>

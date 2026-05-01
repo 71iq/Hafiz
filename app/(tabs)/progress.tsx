@@ -181,6 +181,19 @@ export default function ProgressScreen() {
           >
             {s.progressHadith}
           </Text>
+          {!isRTL && (
+            <Text
+              className="text-neutral-200 mt-2"
+              style={{
+                fontFamily: "Manrope_400Regular",
+                fontSize: 14,
+                lineHeight: 22,
+                textAlign: "center",
+              }}
+            >
+              {s.progressHadithTranslation}
+            </Text>
+          )}
         </Card>
 
         {/* Stats grid — real data */}

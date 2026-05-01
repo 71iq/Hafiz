@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { View, Text, Pressable, ScrollView } from "react-native";
+import React, { useMemo, useState } from "react";
+import { View, Text, Pressable, useWindowDimensions } from "react-native";
 
 type DayData = { date: string; count: number };
 
@@ -10,7 +10,7 @@ type Props = {
   isRTL?: boolean;
 };
 
-const CELL_SIZE = 13;
+const BASE_CELL_SIZE = 13;
 const CELL_GAP = 3;
 const TOTAL_DAYS = 91; // 13 weeks
 
@@ -38,7 +38,11 @@ function getDayLabel(dayIndex: number, isArabic: boolean): string | null {
 
 export function ActivityHeatmap({ data, isDark, s, isRTL }: Props) {
   const [tooltip, setTooltip] = useState<{ date: string; count: number } | null>(null);
+  const { width } = useWindowDimensions();
   const isArabic = !!isRTL;
+  const DAY_LABEL_WIDTH = 28;
+  const gridWidth = Math.max(260, width - 90 - DAY_LABEL_WIDTH);
+  const CELL_SIZE = Math.max(10, Math.min(BASE_CELL_SIZE, Math.floor((gridWidth - CELL_GAP * 12) / 13)));
 
   // Build date lookup
   const countMap = new Map<string, number>();
@@ -88,13 +92,23 @@ export function ActivityHeatmap({ data, isDark, s, isRTL }: Props) {
   const activeDays = data.filter((d) => d.count > 0).length;
   const totalReviews = data.reduce((sum, d) => sum + d.count, 0);
 
-  const DAY_LABEL_WIDTH = 28;
+  const spacedMonthLabels = useMemo(() => {
+    const result: { label: string; left: number }[] = [];
+    let lastLeft = -1000;
+    for (const m of monthLabels) {
+      const left = m.weekIndex * (CELL_SIZE + CELL_GAP);
+      if (left - lastLeft < 22) continue;
+      result.push({ label: m.label, left });
+      lastLeft = left;
+    }
+    return result;
+  }, [monthLabels, CELL_SIZE]);
 
   return (
     <View>
       {/* Month labels row */}
       <View style={{ flexDirection: "row", marginLeft: DAY_LABEL_WIDTH, marginBottom: 4 }}>
-        {monthLabels.map((m, i) => (
+        {spacedMonthLabels.map((m, i) => (
           <Text
             key={i}
             style={{
@@ -102,7 +116,7 @@ export function ActivityHeatmap({ data, isDark, s, isRTL }: Props) {
               fontSize: 10,
               color: isDark ? "#737373" : "#8B8178",
               position: "absolute",
-              left: m.weekIndex * (CELL_SIZE + CELL_GAP),
+              left: m.left,
             }}
           >
             {m.label}
@@ -113,8 +127,7 @@ export function ActivityHeatmap({ data, isDark, s, isRTL }: Props) {
       <View style={{ height: 14 }} />
 
       {/* Grid */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        <View style={{ flexDirection: "row", minWidth: 320 }}>
+      <View style={{ flexDirection: "row", width: "100%" }}>
           {/* Day labels */}
           <View style={{ width: DAY_LABEL_WIDTH, justifyContent: "flex-start" }}>
             {Array.from({ length: 7 }, (_, i) => {
@@ -157,9 +170,8 @@ export function ActivityHeatmap({ data, isDark, s, isRTL }: Props) {
                 })}
               </View>
             ))}
-          </View>
-        </View>
-      </ScrollView>
+      </View>
+      </View>
 
       {/* Tooltip */}
       {tooltip && (
