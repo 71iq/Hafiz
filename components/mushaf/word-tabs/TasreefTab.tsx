@@ -13,7 +13,7 @@ type Props = {
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <View className="flex-row items-start justify-between py-2.5 mb-2">
+    <View className="flex-row items-start justify-between py-2 mb-1.5">
       <Text className="text-sm text-warm-400 dark:text-neutral-500 w-28">
         {label}
       </Text>
@@ -70,7 +70,7 @@ export function TasreefTab({ surah, ayah, wordPos }: Props) {
   }
 
   return (
-    <View className="py-4 px-1">
+    <View className="pt-2 pb-1 px-0">
       {root && <InfoRow label={s.rootLabel} value={root} />}
       {lemma && <InfoRow label={s.lemmaLabel} value={lemma} />}
       {pattern && (

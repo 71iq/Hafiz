@@ -136,8 +136,6 @@ export function WordDetailSheet() {
   if (!detailWord) return null;
 
   const { surah, ayah, wordPos } = detailWord;
-  const tabLabel = tabs.find((t) => t.key === activeTab)?.label ?? s.wordTabMeaning;
-
   return (
     <Modal
       visible={!!detailWord}
@@ -260,11 +258,6 @@ export function WordDetailSheet() {
                 {activeTab === "occurrences" && <OccurrencesTab surah={surah} ayah={ayah} wordPos={wordPos} />}
               </ScrollView>
 
-              <View className={`flex-shrink-0 px-5 py-3 ${isRTL ? "items-end" : "items-start"}`}>
-                <Text className="text-warm-400 dark:text-neutral-500" style={{ fontFamily: "Manrope_500Medium", fontSize: 11 }}>
-                  {tabLabel}
-                </Text>
-              </View>
             </View>
           ) : (
             <ScrollView className="flex-1 min-h-0">
