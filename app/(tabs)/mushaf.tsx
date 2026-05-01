@@ -472,23 +472,6 @@ function MushafInner() {
     const hizb = findHizbForAyah(mushafIndex, topAyah.surah, topAyah.ayah);
     return { name: sm?.name_arabic ?? null, juz, hizb };
   })();
-  const mobileTop = (() => {
-    const page = isPageMode
-      ? currentPage
-      : topAyah
-        ? (items.find(
-            (it) => it.type === "ayah" && it.surah === topAyah.surah && it.ayah === topAyah.ayah
-          ) as Extract<MushafItem, { type: "ayah" }> | undefined)?.v2Page ?? currentPage
-        : currentPage;
-    const surah = mushafIndex?.pageByNumber.get(page)?.surah_start ?? topAyah?.surah ?? null;
-    const surahName = surah ? mushafIndex?.surahByNumber.get(surah)?.name_arabic ?? null : null;
-    const ayah = isPageMode
-      ? (mushafIndex?.pageByNumber.get(page)?.ayah_start ?? 1)
-      : (topAyah?.ayah ?? 1);
-    const juz = surah && mushafIndex ? findJuzForAyah(mushafIndex, surah, ayah) : null;
-    return { page, surahName, juz };
-  })();
-
   if (loading && !isPageMode) {
     return (
       <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark items-center justify-center">
@@ -528,41 +511,6 @@ function MushafInner() {
                     : null),
                 }}
               >
-                <View className={`flex-row items-center justify-between ${isRTL ? "flex-row-reverse" : ""}`}>
-                  <View className={`max-w-[38%] ${isRTL ? "items-end" : "items-start"}`}>
-                    <Text className="text-warm-400 dark:text-neutral-500" style={{ fontFamily: "Manrope_500Medium", fontSize: 10 }}>
-                      {s.flashcardsScopeBysurah}
-                    </Text>
-                    <Text
-                      numberOfLines={1}
-                      className="text-charcoal dark:text-neutral-100"
-                      style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
-                    >
-                      {mobileTop.surahName
-                        ? (isRTL ? `سورة ${mobileTop.surahName}` : `Surah ${mobileTop.surahName}`)
-                        : "—"}
-                    </Text>
-                  </View>
-                  <Pressable
-                    onPress={() => setShowNavigator(true)}
-                    className="rounded-full bg-primary-soft px-4 py-1.5"
-                    style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-                  >
-                    <Text className="text-gold" style={{ fontFamily: "Manrope_700Bold", fontSize: 12 }}>
-                      {interpolate(s.pageN, { n: mobileTop.page })}
-                    </Text>
-                  </Pressable>
-                  <View className={`max-w-[32%] ${isRTL ? "items-start" : "items-end"}`}>
-                    <Text className="text-warm-400 dark:text-neutral-500" style={{ fontFamily: "Manrope_500Medium", fontSize: 10 }}>
-                      {s.flashcardsScopeByjuz}
-                    </Text>
-                    <Text className="text-charcoal dark:text-neutral-100" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}>
-                      {mobileTop.juz
-                        ? (isRTL ? toArabicNumber(mobileTop.juz) : String(mobileTop.juz))
-                        : "—"}
-                    </Text>
-                  </View>
-                </View>
                 <View className={`mt-2 flex-row items-center justify-between ${isRTL ? "flex-row-reverse" : ""}`}>
                   <View className="flex-row items-center gap-1.5">
                     <View className="flex-row bg-surface-high dark:bg-surface-dark-high rounded-full p-1">
