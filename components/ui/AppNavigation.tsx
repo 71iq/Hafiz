@@ -405,6 +405,7 @@ const styles = StyleSheet.create({
   bottomLabel: {
     fontFamily: "Manrope_500Medium",
     fontSize: 10,
+    lineHeight: 13,
     letterSpacing: 0.5,
     marginTop: 2,
   },
