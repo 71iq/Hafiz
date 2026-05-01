@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef, useMemo, memo } from "react";
-import { View, Text, Pressable, Animated as RNAnimated, ScrollView, useWindowDimensions } from "react-native";
+import { View, Text, Pressable, Animated as RNAnimated, useWindowDimensions } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -9,20 +9,17 @@ import {
 } from "@/lib/fonts/loader";
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
-import { DEFAULT_LANGUAGE, getLanguageByCode } from "@/lib/translations/languages";
+import { getLanguageByCode } from "@/lib/translations/languages";
 import { useSelection } from "@/lib/selection/context";
 import { WordToken } from "./WordToken";
 import {
   BookOpenText,
   Bookmark,
-  MessageCircle,
   Play,
   PlusCircle,
   Share2,
 } from "lucide-react-native";
 import { useStrings } from "@/lib/i18n/useStrings";
-import { ReflectionsSection } from "@/components/reflections/ReflectionsSection";
-import { Sheet, SheetContent, SheetHeader } from "@/components/ui/Sheet";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { fetchReflectionCount } from "@/lib/reflections/api";
 import { createDeck, generateDeckId } from "@/lib/fsrs/queries";
@@ -35,6 +32,7 @@ import {
 } from "@/lib/selection/queries";
 import { formatForCopy } from "@/lib/selection/format";
 import { SIDEBAR_BREAKPOINT } from "@/components/ui/AppNavigation";
+import { AyahDetailModal } from "./AyahDetailModal";
 
 type Props = {
   surah: number;
@@ -60,17 +58,8 @@ function AyahBlockInner({
   const { width } = useWindowDimensions();
   const isPhone = width < SIDEBAR_BREAKPOINT;
   const db = useDatabase();
-  const {
-    showTranslation: defaultShowTranslation,
-    showTafseer: defaultShowTafseer,
-    translationLanguage,
-    isTranslationLoading,
-    tafseerSource,
-    isRTL,
-    isDark,
-  } = useSettings();
+  const { translationLanguage, isRTL, isDark } = useSettings();
   const langInfo = getLanguageByCode(translationLanguage);
-  const isTranslationRtl = langInfo?.direction === "rtl";
   const s = useStrings();
   const { isBookmarked, getHighlightColor, showToast, refreshBookmarks } = useSelection();
   const reflectionsEnabled = isSupabaseConfigured();
@@ -85,12 +74,8 @@ function AyahBlockInner({
     isQpcFontLoaded(v2Page)
   );
   const [revealed, setRevealed] = useState(false);
-  const [translationOpen, setTranslationOpen] = useState(defaultShowTranslation);
-  const [tafseerOpen, setTafseerOpen] = useState(false);
-  const [reflectionsOpen, setReflectionsOpen] = useState(false);
-  const [translationText, setTranslationText] = useState<string | null>(null);
-  const [tafseerText, setTafseerText] = useState<string | null>(null);
-  const [tafseerExpanded, setTafseerExpanded] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailTab, setDetailTab] = useState<"translation" | "tafsir" | "reflections">("translation");
   const [reviewBusy, setReviewBusy] = useState(false);
 
   // Deep link pulse highlight
@@ -116,14 +101,6 @@ function AyahBlockInner({
   }, [text]);
 
   useEffect(() => {
-    setTranslationOpen(defaultShowTranslation);
-  }, [defaultShowTranslation]);
-
-  useEffect(() => {
-    setTafseerOpen(defaultShowTafseer);
-  }, [defaultShowTafseer]);
-
-  useEffect(() => {
     if (isQpcFontLoaded(v2Page)) {
       setFontVisible(true);
       return;
@@ -140,77 +117,12 @@ function AyahBlockInner({
   }, [v2Page]);
 
   useEffect(() => {
-    setTranslationText(null);
-    setTafseerText(null);
-    setTafseerExpanded(false);
-  }, [surah, ayah]);
-
-  const fetchedLangRef = useRef(translationLanguage);
-
-  useEffect(() => {
-    if (!translationOpen || isTranslationLoading) return;
-
-    const langChanged = fetchedLangRef.current !== translationLanguage;
-    if (!langChanged && translationText !== null) return;
-
-    if (langChanged) {
-      setTranslationText(null);
-      fetchedLangRef.current = translationLanguage;
-    }
-
-    if (translationLanguage === DEFAULT_LANGUAGE) {
-      db.getFirstAsync<{ text_en: string }>(
-        "SELECT text_en FROM translations WHERE surah = ? AND ayah = ?",
-        [surah, ayah]
-      ).then((row) => {
-        setTranslationText(row?.text_en ?? "");
-      }).catch(console.warn);
-    } else {
-      db.getFirstAsync<{ text: string }>(
-        "SELECT text FROM translation_active WHERE surah = ? AND ayah = ?",
-        [surah, ayah]
-      ).then((row) => {
-        setTranslationText(row?.text ?? "");
-      }).catch(console.warn);
-    }
-  }, [translationOpen, surah, ayah, db, translationText, translationLanguage, isTranslationLoading]);
-
-  const fetchedSourceRef = useRef(tafseerSource);
-
-  useEffect(() => {
-    if (!tafseerOpen) return;
-
-    const sourceChanged = fetchedSourceRef.current !== tafseerSource;
-    if (!sourceChanged && tafseerText !== null) return;
-
-    if (sourceChanged) {
-      setTafseerText(null);
-      setTafseerExpanded(false);
-      fetchedSourceRef.current = tafseerSource;
-    }
-
-    db.getFirstAsync<{ text: string }>(
-      "SELECT text FROM tafseer WHERE surah = ? AND ayah = ? AND source = ?",
-      [surah, ayah, tafseerSource]
-    ).then((row) => {
-      setTafseerText(row?.text ?? "");
-    }).catch(console.warn);
-  }, [tafseerOpen, surah, ayah, db, tafseerText, tafseerSource]);
-
-  useEffect(() => {
     setRevealed(false);
   }, [hideMode]);
 
-  const toggleTranslation = useCallback(() => {
-    setTranslationOpen((prev) => !prev);
-  }, []);
-
-  const toggleTafseer = useCallback(() => {
-    setTafseerOpen((prev) => !prev);
-  }, []);
-
-  const toggleReflections = useCallback(() => {
-    setReflectionsOpen((prev) => !prev);
+  const openDetail = useCallback((tab: "translation" | "tafsir" | "reflections") => {
+    setDetailTab(tab);
+    setDetailOpen(true);
   }, []);
 
   const handleReveal = useCallback(() => {
@@ -273,7 +185,6 @@ function AyahBlockInner({
   }, [reviewBusy, surah, ayah, db, showToast, s.reviewActionAdded, s.reviewActionFailed]);
 
   const iconColor = isDark ? "#a3a3a3" : "#8B8178";
-  const activeIconColor = isDark ? "#2dd4bf" : "#0d9488";
 
   return (
     <View
@@ -300,18 +211,6 @@ function AyahBlockInner({
         />
       )}
       <View
-        className="rounded-2xl bg-primary-accent/10 dark:bg-primary-bright/10 px-3 py-2"
-        style={{ position: "absolute", top: 10, ...(isRTL ? { right: 10 } : { left: 10 }), zIndex: 5 }}
-      >
-        <Text className="text-primary-accent dark:text-primary-bright" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11 }}>
-          {surah}:{ayah}
-        </Text>
-        {bookmarked && (
-          <View className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-gold" />
-        )}
-      </View>
-
-      <View
         className={isRTL ? "flex-row-reverse items-center justify-between gap-3" : "flex-row items-center justify-between gap-3"}
         style={{
           paddingTop: isPhone ? 34 : 28,
@@ -320,6 +219,14 @@ function AyahBlockInner({
         }}
       >
         <View className={isRTL ? "flex-row-reverse items-center gap-1.5" : "flex-row items-center gap-1.5"}>
+          <View className="rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 px-3 py-2" style={{ position: "relative" }}>
+            <Text className="text-primary-accent dark:text-primary-bright" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11 }}>
+              {surah}:{ayah}
+            </Text>
+            {bookmarked && (
+              <View className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-gold" />
+            )}
+          </View>
           <ActionIcon icon={<Play size={15} color={iconColor} />} onPress={() => {}} disabled />
           <ActionIcon icon={<Share2 size={15} color={iconColor} />} onPress={handleShare} />
         </View>
@@ -401,16 +308,14 @@ function AyahBlockInner({
         <View className={isRTL ? "mt-1 flex-row-reverse flex-wrap gap-2" : "mt-1 flex-row flex-wrap gap-2"}>
           <ActionPill
             label={langInfo?.nameEnglish ?? s.wordTranslation}
-            active={translationOpen}
-            icon={<BookOpenText size={14} color={translationOpen ? activeIconColor : iconColor} />}
-            onPress={toggleTranslation}
+            icon={<BookOpenText size={14} color={iconColor} />}
+            onPress={() => openDetail("translation")}
           />
           <ActionPill
             label={s.reflections}
-            active={reflectionsOpen}
             badge={reflectionCount}
-            icon={<MessageCircle size={14} color={reflectionsOpen ? activeIconColor : iconColor} />}
-            onPress={toggleReflections}
+            icon={<BookOpenText size={14} color={iconColor} />}
+            onPress={() => openDetail("reflections")}
           />
           <ActionPill
             label={s.addToReview}
@@ -420,98 +325,16 @@ function AyahBlockInner({
           />
           <ActionPill
             label={s.tafseer}
-            active={tafseerOpen}
-            icon={<BookOpenText size={14} color={tafseerOpen ? activeIconColor : iconColor} />}
-            onPress={toggleTafseer}
+            icon={<BookOpenText size={14} color={iconColor} />}
+            onPress={() => openDetail("tafsir")}
           />
         </View>
-
-        {translationOpen && (
-          <View className="mt-2 rounded-2xl bg-surface-low dark:bg-surface-dark-low px-4 py-3">
-            <Text
-              className="text-charcoal dark:text-neutral-200"
-              style={{
-                fontFamily: "Manrope_400Regular",
-                fontSize: 15,
-                lineHeight: 24,
-                writingDirection: isTranslationRtl ? "rtl" : "ltr",
-                textAlign: isTranslationRtl ? "right" : "left",
-              }}
-            >
-              {translationText ?? s.loading}
-            </Text>
-          </View>
-        )}
-
-        {tafseerOpen && (
-          <View className="mt-2 rounded-2xl bg-surface-low dark:bg-surface-dark-low px-4 py-3">
-            {(() => {
-              const text = tafseerText ?? s.loading;
-              const TRUNCATE_LIMIT = 200;
-              const isLong = text.length > TRUNCATE_LIMIT;
-              const displayText = isLong && !tafseerExpanded
-                ? text.slice(0, TRUNCATE_LIMIT) + "..."
-                : text;
-              return (
-                <>
-                  <Text
-                    className="text-warm-700 dark:text-neutral-300"
-                    style={{
-                      fontFamily: "Manrope_400Regular",
-                      fontSize: 14,
-                      lineHeight: 24,
-                      writingDirection: "rtl",
-                      textAlign: "right",
-                    }}
-                  >
-                    {displayText}
-                  </Text>
-                  {isLong && !tafseerExpanded && (
-                    <Pressable onPress={() => setTafseerExpanded(true)} className="mt-1">
-                      <Text
-                        className="text-primary-accent dark:text-primary-bright"
-                        style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
-                      >
-                        {s.readMore}
-                      </Text>
-                    </Pressable>
-                  )}
-                </>
-              );
-            })()}
-          </View>
-        )}
       </View>
-
-      <Sheet open={reflectionsOpen} onClose={() => setReflectionsOpen(false)}>
-        <SheetHeader>
-          <Text
-            className="text-charcoal dark:text-neutral-100"
-            style={{
-              fontFamily: "Manrope_700Bold",
-              fontSize: 18,
-              textAlign: isRTL ? "right" : "left",
-            }}
-          >
-            {s.reflections}
-          </Text>
-          <Text
-            className="mt-1 text-warm-500 dark:text-neutral-400"
-            style={{
-              fontFamily: "Manrope_500Medium",
-              fontSize: 12,
-              textAlign: isRTL ? "right" : "left",
-            }}
-          >
-            {surah}:{ayah}
-          </Text>
-        </SheetHeader>
-        <SheetContent>
-          <ScrollView style={{ maxHeight: 520 }} showsVerticalScrollIndicator={false}>
-            <ReflectionsSection surah={surah} ayah={ayah} initiallyExpanded showHeader={false} />
-          </ScrollView>
-        </SheetContent>
-      </Sheet>
+      <AyahDetailModal
+        target={detailOpen ? { surah, ayah } : null}
+        onClose={() => setDetailOpen(false)}
+        initialTab={detailTab}
+      />
     </View>
   );
 }

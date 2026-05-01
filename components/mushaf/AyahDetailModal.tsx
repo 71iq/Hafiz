@@ -28,14 +28,15 @@ type AyahRow = {
   v2_page: number;
 };
 
-type TabKey = "tafsir" | "qiraat" | "reflections";
+type TabKey = "translation" | "tafsir" | "qiraat" | "reflections";
 
 type Props = {
   target: TargetAyah | null;
   onClose: () => void;
+  initialTab?: TabKey;
 };
 
-export function AyahDetailModal({ target, onClose }: Props) {
+export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Props) {
   const db = useDatabase();
   const s = useStrings();
   const { width, height } = useWindowDimensions();
@@ -54,7 +55,7 @@ export function AyahDetailModal({ target, onClose }: Props) {
   const [translationText, setTranslationText] = useState<string | null>(null);
   const [tafseerText, setTafseerText] = useState<string | null>(null);
   const [fontVisible, setFontVisible] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabKey>("tafsir");
+  const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
 
   const open = target !== null;
   const showTranslation = open && uiLanguage !== "ar";
@@ -68,12 +69,12 @@ export function AyahDetailModal({ target, onClose }: Props) {
   const iconColor = isDark ? "#a3a3a3" : "#8B8178";
 
   useEffect(() => {
-    setActiveTab("tafsir");
+    setActiveTab(initialTab);
     setAyahRow(null);
     setTranslationText(null);
     setTafseerText(null);
     setFontVisible(false);
-  }, [target?.surah, target?.ayah]);
+  }, [target?.surah, target?.ayah, initialTab]);
 
   useEffect(() => {
     if (!target) return;
@@ -180,6 +181,7 @@ export function AyahDetailModal({ target, onClose }: Props) {
   if (!target) return null;
 
   const tabs: Array<{ key: TabKey; label: string; icon: ReactNode }> = [
+    { key: "translation", label: langInfo?.nameEnglish ?? s.wordTranslation, icon: <BookOpenText size={15} color={activeTab === "translation" ? "#0d9488" : iconColor} /> },
     { key: "tafsir", label: s.tafseer, icon: <BookOpenText size={15} color={activeTab === "tafsir" ? "#0d9488" : iconColor} /> },
     { key: "qiraat", label: s.wordTabQiraat, icon: <BookOpenText size={15} color={activeTab === "qiraat" ? "#0d9488" : iconColor} /> },
     { key: "reflections", label: s.reflections, icon: <MessageCircle size={15} color={activeTab === "reflections" ? "#0d9488" : iconColor} /> },
@@ -257,23 +259,6 @@ export function AyahDetailModal({ target, onClose }: Props) {
               </View>
             </View>
 
-            {showTranslation && (
-              <View className="mt-5 rounded-2xl bg-surface-low dark:bg-surface-dark-low px-4 py-3">
-                <Text
-                  className="text-charcoal dark:text-neutral-200"
-                  style={{
-                    fontFamily: "Manrope_400Regular",
-                    fontSize: 16,
-                    lineHeight: 26,
-                    writingDirection: translationIsRtl ? "rtl" : "ltr",
-                    textAlign: translationIsRtl ? "right" : "left",
-                  }}
-                >
-                  {translationText ?? s.loading}
-                </Text>
-              </View>
-            )}
-
             <View className={isRTL ? "mt-5 flex-row-reverse flex-wrap gap-2" : "mt-5 flex-row flex-wrap gap-2"}>
               {tabs.map((tab) => (
                 <TabButton
@@ -287,6 +272,20 @@ export function AyahDetailModal({ target, onClose }: Props) {
             </View>
 
             <View className="mt-4 rounded-2xl bg-surface-low dark:bg-surface-dark-low px-4 py-3">
+              {activeTab === "translation" && (
+                <Text
+                  className="text-charcoal dark:text-neutral-200"
+                  style={{
+                    fontFamily: "Manrope_400Regular",
+                    fontSize: 16,
+                    lineHeight: 26,
+                    writingDirection: translationIsRtl ? "rtl" : "ltr",
+                    textAlign: translationIsRtl ? "right" : "left",
+                  }}
+                >
+                  {showTranslation ? (translationText ?? s.loading) : s.loading}
+                </Text>
+              )}
               {activeTab === "tafsir" && (
                 <Text
                   className="text-warm-700 dark:text-neutral-300"

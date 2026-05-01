@@ -39,11 +39,6 @@ export function TranslationLanguagePicker({ visible, onClose }: Props) {
           className="bg-surface dark:bg-surface-dark-low rounded-t-4xl"
           style={{ maxHeight: "70%" }}
         >
-          {/* Drag handle */}
-          <View className="items-center pt-3 pb-1">
-            <View className="w-10 h-1 rounded-full bg-surface-high dark:bg-surface-dark-high" />
-          </View>
-
           {/* Header */}
           <View className="flex-row items-center justify-between px-6 pt-3 pb-4">
             <Text

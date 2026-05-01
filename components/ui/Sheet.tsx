@@ -67,10 +67,6 @@ export const Sheet = forwardRef<View, SheetProps>(
             ],
           }}
         >
-          {/* Drag handle */}
-          <View className="items-center pt-3 pb-2">
-            <View className="w-10 h-1 rounded-full bg-surface-high dark:bg-surface-dark-high" />
-          </View>
           {children}
         </Animated.View>
       </Modal>
