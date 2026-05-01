@@ -43,6 +43,7 @@ export default function ProgressScreen() {
   const [streak, setStreak] = useState(0);
   const [longestStreak, setLongestStreak] = useState(0);
   const [totalReviews, setTotalReviews] = useState(0);
+  const [totalSessions, setTotalSessions] = useState(0);
   const [heatmapData, setHeatmapData] = useState<HeatmapDay[]>([]);
   const [surahProgress, setSurahProgress] = useState<SurahProgress[]>([]);
 
@@ -55,6 +56,10 @@ export default function ProgressScreen() {
     setTotalCards(cards);
     setStreak(currentStreak);
     setTotalReviews(reviewCount?.count ?? 0);
+    const sessions = await db.getFirstAsync<{ count: number }>(
+      "SELECT COUNT(DISTINCT DATE(reviewed_at)) as count FROM study_log"
+    );
+    setTotalSessions(sessions?.count ?? 0);
 
     // Compute longest streak from study_log
     const rows = await db.getAllAsync<{ review_date: string }>(
@@ -135,12 +140,19 @@ export default function ProgressScreen() {
   );
 
   const formatStat = (val: number) => val > 0 ? val.toLocaleString() : "—";
+  const masteryPct = totalCards > 0 ? Math.round((totalCards > 0 ? (surahProgress.reduce((acc, item) => acc + item.memorized, 0) / totalCards) : 0) * 100) : 0;
 
   return (
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
       <ScrollView className="flex-1 px-6" contentContainerStyle={{ paddingBottom: 100 }}>
         {/* Header */}
-        <View className="pt-8 pb-6">
+        <View className="pt-8 pb-5">
+          <Text
+            className="text-warm-400 dark:text-neutral-500 uppercase"
+            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, letterSpacing: 1.8 }}
+          >
+            {s.progressActivity}
+          </Text>
           <Text
             className="text-charcoal dark:text-neutral-100"
             style={{ fontFamily: "NotoSerif_700Bold", fontSize: 28 }}
@@ -153,7 +165,7 @@ export default function ProgressScreen() {
         <Card elevation="low" className="p-6 mb-6 bg-primary-soft dark:bg-primary-soft">
           <Text
             className="text-gold mb-2"
-            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 18, letterSpacing: 0.5 }}
+            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16, letterSpacing: 0.5 }}
           >
             {s.progressDailyReminder}
           </Text>
@@ -173,10 +185,24 @@ export default function ProgressScreen() {
 
         {/* Stats grid — real data */}
         <View className="flex-row gap-3 mb-3">
-          <Card elevation="low" className="flex-1 p-5 items-center">
+          <Card elevation="low" className="flex-1 p-5">
             <Text
               className="text-charcoal dark:text-neutral-100"
-              style={{ fontFamily: "Manrope_700Bold", fontSize: 24 }}
+              style={{ fontFamily: "NotoSerif_700Bold", fontSize: 26 }}
+            >
+              {masteryPct}%
+            </Text>
+            <Text
+              className="text-warm-400 dark:text-neutral-500 mt-1"
+              style={{ fontFamily: "Manrope_500Medium", fontSize: 11 }}
+            >
+              {s.progressRetention}
+            </Text>
+          </Card>
+          <Card elevation="low" className="flex-1 p-5">
+            <Text
+              className="text-charcoal dark:text-neutral-100"
+              style={{ fontFamily: "NotoSerif_700Bold", fontSize: 26 }}
             >
               {formatStat(totalCards)}
             </Text>
@@ -187,40 +213,12 @@ export default function ProgressScreen() {
               {s.progressTotalMemorized}
             </Text>
           </Card>
-          <Card elevation="low" className="flex-1 p-5 items-center">
-            <Text
-              className="text-charcoal dark:text-neutral-100"
-              style={{ fontFamily: "Manrope_700Bold", fontSize: 24 }}
-            >
-              {formatStat(totalReviews)}
-            </Text>
-            <Text
-              className="text-warm-400 dark:text-neutral-500 mt-1"
-              style={{ fontFamily: "Manrope_500Medium", fontSize: 11 }}
-            >
-              {s.progressRetention}
-            </Text>
-          </Card>
         </View>
         <View className="flex-row gap-3 mb-6">
-          <Card elevation="low" className="flex-1 p-5 items-center">
+          <Card elevation="low" className="flex-1 p-5">
             <Text
               className="text-charcoal dark:text-neutral-100"
-              style={{ fontFamily: "Manrope_700Bold", fontSize: 24 }}
-            >
-              {formatStat(streak)}
-            </Text>
-            <Text
-              className="text-warm-400 dark:text-neutral-500 mt-1"
-              style={{ fontFamily: "Manrope_500Medium", fontSize: 11 }}
-            >
-              {s.progressAvgDaily}
-            </Text>
-          </Card>
-          <Card elevation="low" className="flex-1 p-5 items-center">
-            <Text
-              className="text-charcoal dark:text-neutral-100"
-              style={{ fontFamily: "Manrope_700Bold", fontSize: 24 }}
+              style={{ fontFamily: "NotoSerif_700Bold", fontSize: 26 }}
             >
               {formatStat(longestStreak)}
             </Text>
@@ -229,6 +227,20 @@ export default function ProgressScreen() {
               style={{ fontFamily: "Manrope_500Medium", fontSize: 11 }}
             >
               {s.progressLongestStreak}
+            </Text>
+          </Card>
+          <Card elevation="low" className="flex-1 p-5">
+            <Text
+              className="text-charcoal dark:text-neutral-100"
+              style={{ fontFamily: "NotoSerif_700Bold", fontSize: 26 }}
+            >
+              {formatStat(totalSessions)}
+            </Text>
+            <Text
+              className="text-warm-400 dark:text-neutral-500 mt-1"
+              style={{ fontFamily: "Manrope_500Medium", fontSize: 11 }}
+            >
+              {s.progressAvgDaily}
             </Text>
           </Card>
         </View>
@@ -242,6 +254,12 @@ export default function ProgressScreen() {
             {s.progressActivity}
           </Text>
           <ActivityHeatmap data={heatmapData} isDark={isDark} s={s} isRTL={isRTL} />
+          <Text
+            className="text-warm-500 dark:text-neutral-400 mt-3"
+            style={{ fontFamily: "Manrope_400Regular", fontSize: 11 }}
+          >
+            {formatStat(totalReviews)} {s.heatmapTotalReviews}
+          </Text>
         </Card>
 
         {/* Surah progress */}

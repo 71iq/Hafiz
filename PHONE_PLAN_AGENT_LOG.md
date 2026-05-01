@@ -331,3 +331,40 @@ Compared current routes/components against the phone mockup inventory:
 ### Phase 7 completion status
 - Home composition now aligns closer to HomeV1 editorial mobile direction while staying fully real-data-driven.
 - Authenticated/unauthenticated and empty/non-empty deck paths remain functional.
+
+## 2026-05-01 — Phase 8 Completed
+
+### Scope decisions for this phase
+1. Reused existing progress calculations and DB queries; no scoring algorithm changes.
+2. Reinterpreted existing fields to match target stat intent:
+- mastery % computed from memorized cards over total cards
+- total sessions computed as distinct review dates from `study_log`.
+3. Kept daily reminder card because bilingual copy already exists in `strings.ts`.
+
+### Implemented in this step
+- `app/(tabs)/progress.tsx`:
+  - Editorial header update with eyebrow + display title.
+  - Stats grid redesigned to focus on:
+    - mastery percentage
+    - memorized ayah/card count
+    - longest streak
+    - total sessions.
+  - Kept all data local and existing query-based.
+  - Added total review summary line below heatmap.
+- `components/progress/ActivityHeatmap.tsx`:
+  - Made grid horizontally scrollable on phone (`ScrollView horizontal`).
+  - Added today-cell outline.
+  - Added tonal intensity legend row.
+  - Kept low-border visual language.
+- `components/progress/SurahProgressList.tsx`:
+  - Updated surah badge visual treatment.
+  - Switched progress bar to thin hairline (2px) style.
+  - Preserved Arabic + English naming and deep-link behavior.
+
+### Validation result
+- `npx tsc --noEmit`: passed.
+- `npx expo export --platform web`: passed.
+
+### Phase 8 completion status
+- Progress screen now aligns closer to mobile target composition.
+- Existing scoring/progress calculation behavior remains unchanged.

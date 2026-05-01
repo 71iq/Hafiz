@@ -56,10 +56,10 @@ export function SurahProgressList({ data, isDark, s }: Props) {
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1 }}>
                   <View
                     style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: 14,
-                      backgroundColor: isDark ? "#1a2e2e" : "#f0fdfa",
+                      width: 30,
+                      height: 30,
+                      borderRadius: 15,
+                      backgroundColor: isDark ? "rgba(45,212,191,0.12)" : "rgba(13,148,136,0.10)",
                       alignItems: "center",
                       justifyContent: "center",
                     }}
@@ -91,8 +91,8 @@ export function SurahProgressList({ data, isDark, s }: Props) {
               {/* Progress bar */}
               <View
                 style={{
-                  height: 6,
-                  borderRadius: 3,
+                  height: 2,
+                  borderRadius: 999,
                   backgroundColor: isDark ? "#262626" : "#E8E1DA",
                   overflow: "hidden",
                 }}
@@ -101,7 +101,7 @@ export function SurahProgressList({ data, isDark, s }: Props) {
                   <View
                     style={{
                       height: "100%",
-                      borderRadius: 3,
+                      borderRadius: 999,
                       backgroundColor: isDark ? "#14b8a6" : "#0d9488",
                       width: `${Math.min(pct, 100)}%`,
                     }}

@@ -1,6 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, Pressable } from "react-native";
-import { Card } from "@/components/ui/Card";
+import { View, Text, Pressable, ScrollView } from "react-native";
 
 type DayData = { date: string; count: number };
 
@@ -114,49 +113,53 @@ export function ActivityHeatmap({ data, isDark, s, isRTL }: Props) {
       <View style={{ height: 14 }} />
 
       {/* Grid */}
-      <View style={{ flexDirection: "row" }}>
-        {/* Day labels */}
-        <View style={{ width: DAY_LABEL_WIDTH, justifyContent: "flex-start" }}>
-          {Array.from({ length: 7 }, (_, i) => {
-            const label = getDayLabel(i, isArabic);
-            return (
-              <View key={i} style={{ height: CELL_SIZE + CELL_GAP, justifyContent: "center" }}>
-                {label && (
-                  <Text style={{ fontFamily: "Manrope_500Medium", fontSize: 9, color: isDark ? "#525252" : "#b9a085" }}>
-                    {label}
-                  </Text>
-                )}
-              </View>
-            );
-          })}
-        </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <View style={{ flexDirection: "row", minWidth: 320 }}>
+          {/* Day labels */}
+          <View style={{ width: DAY_LABEL_WIDTH, justifyContent: "flex-start" }}>
+            {Array.from({ length: 7 }, (_, i) => {
+              const label = getDayLabel(i, isArabic);
+              return (
+                <View key={i} style={{ height: CELL_SIZE + CELL_GAP, justifyContent: "center" }}>
+                  {label && (
+                    <Text style={{ fontFamily: "Manrope_500Medium", fontSize: 9, color: isDark ? "#525252" : "#b9a085" }}>
+                      {label}
+                    </Text>
+                  )}
+                </View>
+              );
+            })}
+          </View>
 
-        {/* Week columns */}
-        <View style={{ flexDirection: "row", gap: CELL_GAP }}>
-          {weeks.map((week, wi) => (
-            <View key={wi} style={{ gap: CELL_GAP }}>
-              {week.map((day) => {
-                if (day.count === -1) {
-                  // Future day — invisible
-                  return <View key={day.dateStr} style={{ width: CELL_SIZE, height: CELL_SIZE }} />;
-                }
-                return (
-                  <Pressable
-                    key={day.dateStr}
-                    onPress={() => setTooltip(tooltip?.date === day.dateStr ? null : { date: day.dateStr, count: day.count })}
-                    style={{
-                      width: CELL_SIZE,
-                      height: CELL_SIZE,
-                      borderRadius: 3,
-                      backgroundColor: getColor(day.count, isDark),
-                    }}
-                  />
-                );
-              })}
-            </View>
-          ))}
+          {/* Week columns */}
+          <View style={{ flexDirection: "row", gap: CELL_GAP }}>
+            {weeks.map((week, wi) => (
+              <View key={wi} style={{ gap: CELL_GAP }}>
+                {week.map((day) => {
+                  if (day.count === -1) {
+                    return <View key={day.dateStr} style={{ width: CELL_SIZE, height: CELL_SIZE }} />;
+                  }
+                  const isToday = day.dateStr === today.toISOString().slice(0, 10);
+                  return (
+                    <Pressable
+                      key={day.dateStr}
+                      onPress={() => setTooltip(tooltip?.date === day.dateStr ? null : { date: day.dateStr, count: day.count })}
+                      style={{
+                        width: CELL_SIZE,
+                        height: CELL_SIZE,
+                        borderRadius: 3,
+                        backgroundColor: getColor(day.count, isDark),
+                        borderWidth: isToday ? 1 : 0,
+                        borderColor: isToday ? (isDark ? "#FDDC91" : "#785F22") : "transparent",
+                      }}
+                    />
+                  );
+                })}
+              </View>
+            ))}
+          </View>
         </View>
-      </View>
+      </ScrollView>
 
       {/* Tooltip */}
       {tooltip && (
@@ -170,14 +173,29 @@ export function ActivityHeatmap({ data, isDark, s, isRTL }: Props) {
         </View>
       )}
 
-      {/* Summary stats */}
-      <View style={{ flexDirection: "row", justifyContent: "center", gap: 24, marginTop: 12 }}>
+      {/* Legend + summary */}
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          {[0, 1, 2, 3].map((l) => (
+            <View
+              key={l}
+              style={{
+                width: 10,
+                height: 10,
+                borderRadius: 2,
+                backgroundColor: getColor(l === 0 ? 0 : l === 1 ? 5 : l === 2 ? 18 : 28, isDark),
+              }}
+            />
+          ))}
+        </View>
+        <View style={{ flexDirection: "row", justifyContent: "center", gap: 18 }}>
         <Text style={{ fontFamily: "Manrope_500Medium", fontSize: 12, color: isDark ? "#737373" : "#8B8178" }}>
           {activeDays} {s.heatmapActiveDays}
         </Text>
         <Text style={{ fontFamily: "Manrope_500Medium", fontSize: 12, color: isDark ? "#737373" : "#8B8178" }}>
           {totalReviews} {s.heatmapTotalReviews}
         </Text>
+        </View>
       </View>
     </View>
   );
