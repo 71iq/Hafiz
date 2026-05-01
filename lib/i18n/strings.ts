@@ -61,11 +61,11 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     // WordDetailSheet tabs (en mode)
     wordTabEnglish: "English",
     wordTabMeaning: "Meaning",
-    wordTabIrab: "الإعراب",
+    wordTabIrab: "I'rab",
     wordTabTajweed: "Tajweed",
-    wordTabTasreef: "التصريف",
+    wordTabTasreef: "Tasreef",
     wordTabQiraat: "Qira'at",
-    wordTabOccurrences: "المواضع",
+    wordTabOccurrences: "Occurrences",
     // Tab-content strings (both modes use EN keys when in English UI)
     tapToExpand: "Tap to expand",
     qiraatHeader: "From the Qurʾanic Encyclopedia of Qiraʾat",

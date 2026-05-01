@@ -113,6 +113,7 @@ export function WordDetailSheet() {
 
   const { surah, ayah, wordPos } = detailWord;
   const isArabicMode = uiLanguage === "ar";
+  const surahLabel = isArabicMode ? "السورة" : "Surah";
   const ayahLabel = isArabicMode ? "الآية" : "Ayah";
   const wordLabel = isArabicMode ? "الكلمة" : "Word";
   return (
@@ -167,7 +168,7 @@ export function WordDetailSheet() {
                 className="mt-3 text-charcoal dark:text-neutral-100"
                 style={{ fontFamily: "NotoSerif_700Bold", fontSize: 27, writingDirection: "rtl" }}
               >
-                {headerMeta.wordText ?? "…"}
+                {headerMeta.wordText?.trim() ? headerMeta.wordText : "—"}
               </Text>
               {!isArabicMode && !!headerMeta.translationEn && (
                 <Text
@@ -185,7 +186,7 @@ export function WordDetailSheet() {
               </View>
 
               <View className={`mt-2 flex-row gap-2 ${isRTL ? "flex-row-reverse" : ""}`}>
-                <QuickStat label={s.surah} value={String(surah)} />
+                <QuickStat label={surahLabel} value={String(surah)} />
                 <QuickStat label={ayahLabel} value={String(ayah)} />
                 <QuickStat label={wordLabel} value={String(wordPos)} />
               </View>

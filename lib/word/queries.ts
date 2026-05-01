@@ -86,11 +86,31 @@ export async function fetchWordText(
   ayah: number,
   wordPos: number,
 ): Promise<string | null> {
-  const row = await db.getFirstAsync<{ word_text: string }>(
+  const row = await db.getFirstAsync<{ word_text: string | null }>(
     "SELECT word_text FROM word_roots WHERE surah = ? AND ayah = ? AND word_pos = ?",
     [surah, ayah, wordPos],
   );
-  return row?.word_text ?? null;
+  if (row?.word_text?.trim()) return row.word_text;
+
+  const translationRow = await db.getFirstAsync<{ word_arabic: string | null }>(
+    "SELECT word_arabic FROM word_translations WHERE surah = ? AND ayah = ? AND word_pos = ?",
+    [surah, ayah, wordPos],
+  );
+  if (translationRow?.word_arabic?.trim()) return translationRow.word_arabic;
+
+  const irabRow = await db.getFirstAsync<{ arabic_word: string | null }>(
+    "SELECT arabic_word FROM word_irab WHERE surah = ? AND ayah = ? AND word_pos = ?",
+    [surah, ayah, wordPos],
+  );
+  if (irabRow?.arabic_word?.trim()) return irabRow.arabic_word;
+
+  const ayahRow = await db.getFirstAsync<{ text_uthmani: string | null }>(
+    "SELECT text_uthmani FROM quran_text WHERE surah = ? AND ayah = ?",
+    [surah, ayah],
+  );
+  if (!ayahRow?.text_uthmani) return null;
+  const words = ayahRow.text_uthmani.trim().split(/\s+/);
+  return words[wordPos - 1] ?? null;
 }
 
 export async function fetchRootOccurrences(
