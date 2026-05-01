@@ -720,6 +720,30 @@ Exit criteria:
 - New mobile design is implemented incrementally.
 - Each phase can be reverted independently if needed.
 
+## Phase 19 — QA Unblock And Stabilization
+
+Goal: remove the remaining blocker from Phase 17 so visual QA can run deterministically.
+
+Tasks:
+
+- Add a deterministic web QA bootstrap flow for screenshot sessions:
+  - ensure database initialization completes before route capture starts.
+  - avoid route captures while app is in global loading shell.
+- Re-run screenshot matrix coverage for deferred states from Phase 17:
+  - Mushaf page and verse states.
+  - Search empty and populated states.
+  - Flashcard question and answer states.
+  - Reflections modal/sheet state.
+  - Settings top/middle/bottom scrolled sections.
+  - Arabic mode and dark mode parity set.
+- Document capture preconditions and known limits in `PHONE_PLAN_AGENT_LOG.md`.
+- Keep all checks non-destructive and avoid introducing mock data paths.
+
+Exit criteria:
+
+- Visual QA run no longer stalls on `Preparing database...`/`Database not initialized yet`.
+- Deferred matrix items from Phase 17 are either captured or explicitly documented with reproducible blockers.
+
 ## Suggested Implementation Order
 
 1. Phase 0: Baseline audit and final decisions.

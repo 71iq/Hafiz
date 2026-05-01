@@ -738,3 +738,16 @@ Saved in `phase17/`:
 
 ### Phase 18 completion status
 - Rollout strategy goals are satisfied: incremental deployability, independent reverts, and explicit residual-risk logging.
+
+## 2026-05-01 — Phase 19 Started
+
+### Scope decision for this phase
+1. Phase 19 was not present in the original plan; it is now formalized as a stabilization phase focused on unblocking deterministic web visual QA after the Phase 17 DB-init blocker.
+
+### Implemented in this step
+- Added `Phase 19 — QA Unblock And Stabilization` to `NEW_PHONE_DESIGN_IMPLEMENTATION_PLAN.md` with:
+  - explicit tasks for deterministic web bootstrap and deferred matrix recapture
+  - clear exit criteria tied to removing `Preparing database...`/`Database not initialized yet` capture stalls.
+
+### Next step
+- Implement deterministic QA bootstrap and rerun deferred screenshot matrix items.
