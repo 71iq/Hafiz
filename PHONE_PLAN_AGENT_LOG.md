@@ -65,3 +65,49 @@ Compared current routes/components against the phone mockup inventory:
 - Baseline mapping complete.
 - No UI implementation changes made yet.
 - Next step: start Phase 1 tokens/primitives audit and mapping.
+
+## 2026-05-01 — Phase 1 In Progress
+
+### Audit decisions
+1. Token mapping status: **accepted as already present**.
+- Verified in `tailwind.config.js`: `surface` ladder (`surface`, `surface-low`, `surface-mid`, `surface-high`, `surface-dim`, `surface-bright`), `primary` ladder (`primary`, `primary-soft`, `primary-accent`, `primary-bright`), `gold` ladder (`gold`, `gold-light`, `gold-dark`), `charcoal`, `warm-400`, and dark ladder (`surface-dark-*`).
+
+2. Font audit status: **partially complete**.
+- Confirmed loaded: Manrope + Noto Serif (`lib/fonts/ui-fonts.ts`, `app/_layout.tsx`).
+- Confirmed Quran-only font path remains QCF2 per-page (`lib/fonts/qpc-v2-fonts.ts`).
+- Gap identified: explicit Arabic UI font family for non-Quran Arabic is not yet loaded as a dedicated family; current UI relies on existing mixed font/system behavior.
+- Decision: keep current behavior in this phase (to avoid introducing new font package risk during primitives setup), then add a dedicated Arabic UI font in a focused follow-up once first mobile primitives/screens are wired.
+
+3. Primitive rollout strategy: **add shared mobile primitives in a single module first**, then adopt incrementally in later phases/screens.
+- Rationale: avoids broad churn while creating a stable base for Phase 2+.
+
+### Implemented in this step
+- Added `components/ui/MobilePrimitives.tsx` with:
+  - `ScreenScaffold`
+  - `EditorialHeader`
+  - `Eyebrow`
+  - `PillButton`
+  - `IconCircleButton`
+  - `SegmentedControl`
+  - `StatNumber`
+  - `HairlineProgress`
+  - `MobileGlassBar`
+  - `MobileBottomSheet`
+  - `MobileSectionLabel`
+- Exported all above from `components/ui/index.ts`.
+
+### Phase 1 status after this step
+- Shared primitives added, data-agnostic.
+- No full screen redesign performed yet.
+- Next immediate step: run `npx tsc --noEmit` and `npx expo export --platform web` to validate Phase 1 exit criteria.
+
+### Validation result
+- `npx tsc --noEmit`: passed.
+- `npx expo export --platform web`: passed.
+
+### Additional fix made during validation
+- `components/SearchCommand.tsx`: added missing `Platform` import to satisfy type-check.
+
+### Phase 1 completion status
+- Exit criteria satisfied for primitives/tokens foundation.
+- Ready to start Phase 2 (mobile navigation and app chrome) using the new shared primitives where appropriate.

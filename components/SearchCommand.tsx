@@ -7,6 +7,7 @@ import {
   FlatList,
   Keyboard,
   Modal,
+  Platform,
   useWindowDimensions,
 } from "react-native";
 import { router } from "expo-router";
