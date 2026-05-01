@@ -167,3 +167,11 @@ If the user invokes `/audit` it triggers a sweep that reads several of these in 
 - **Reference code with `path:line`** so the user can jump straight there.
 - **Run `npx expo start --web`** (or `npx expo export --platform web`) before claiming a UI change is done. Type-check ≠ feature-correct.
 - **Memory / persistence**: Treat each session as cold; rely on `AGENTS.md`, the spec, and the codebase. If the user wants something durable, write it into `AGENTS.md` or `HAFIZ_SPEC.md`.
+
+---
+
+## Phone Redesign Continuity
+
+- Persistent log file: `.codex/PHONE_PLAN_AGENT_LOG.md`.
+- For the new phone redesign plan, every decision, scope change, phase progress update, and blocker must be appended there as part of the same change.
+- Start each new redesign session by reading that file first, then continue from the latest entry.
