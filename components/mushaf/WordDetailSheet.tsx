@@ -276,26 +276,6 @@ export function WordDetailSheet() {
             </ScrollView>
           )}
 
-          <View className={`flex-row gap-2 px-4 pb-4 pt-2 ${isRTL ? "flex-row-reverse" : ""}`}>
-            <Pressable
-              onPress={() => setView("ayah")}
-              className="flex-1 items-center rounded-full bg-surface-low dark:bg-surface-dark py-2.5"
-              style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-            >
-              <Text className="text-charcoal dark:text-neutral-200" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}>
-                {s.viewFullAyah}
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={handleClose}
-              className="flex-1 items-center rounded-full bg-primary-soft py-2.5"
-              style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-            >
-              <Text className="text-gold" style={{ fontFamily: "Manrope_700Bold", fontSize: 12 }}>
-                {s.close ?? "Close"}
-              </Text>
-            </Pressable>
-          </View>
         </View>
       </View>
     </Modal>
