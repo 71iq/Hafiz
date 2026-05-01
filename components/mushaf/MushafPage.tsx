@@ -63,6 +63,7 @@ type Props = {
   onOpenAyahDetail?: (surah: number, ayah: number) => void;
   paddingTop?: number;
   paddingBottom?: number;
+  sidePadding?: number;
 };
 
 // Identity for a single visual word on the page
@@ -120,6 +121,7 @@ function MushafPageInner({
   onOpenAyahDetail,
   paddingTop = 8,
   paddingBottom = 32,
+  sidePadding = 16,
 }: Props) {
   const [fontVisible, setFontVisible] = useState(false);
   const [wordsLoaded, setWordsLoaded] = useState(!!pageWordsData);
@@ -159,7 +161,7 @@ function MushafPageInner({
   );
 
   const hasLineLayout = lineLayout && lineLayout.length > 0;
-  const contentWidth = Math.min(fontSize * FONT_WIDTH_SCALE, width - 32);
+  const contentWidth = Math.min(fontSize * FONT_WIDTH_SCALE, width - sidePadding * 2);
   const fontFamily = qpcFontName(pageNumber);
 
   // Show loading indicator while font is not loaded at all
@@ -338,7 +340,7 @@ function MushafPageInner({
   return (
     <View style={{
       alignItems: "center",
-      paddingHorizontal: 16,
+      paddingHorizontal: sidePadding,
       paddingTop,
       paddingBottom,
       opacity: fontVisible ? 1 : 0,

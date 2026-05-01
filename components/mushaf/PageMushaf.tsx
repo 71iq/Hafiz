@@ -130,11 +130,13 @@ type Props = {
   onPageChange?: (page: number) => void;
   goToPageRef?: React.MutableRefObject<((page: number) => void) | null>;
   onScroll?: (e: NativeSyntheticEvent<NativeScrollEvent>) => void;
+  pagePaddingTop?: number;
+  pagePaddingBottom?: number;
+  pageSidePadding?: number;
 };
 
 // Fixed heights for getItemLayout calculation
 const SEPARATOR_HEIGHT = 48; // py-4 (32) + text-xs line (16)
-const PAGE_PADDING = 40; // paddingTop 8 + paddingBottom 32
 const SURAH_HEADER_COMPACT_HEIGHT = 68; // mt-3(12) + card(48) + mb-2(8)
 const HORIZONTAL_PAGE_TOP_PADDING = 0;
 const HORIZONTAL_PAGE_BOTTOM_RESERVE = 56;
@@ -143,10 +145,12 @@ const MUSHAF_LINE_COUNT = 15;
 function computePageItemHeight(
   page: PageData,
   lineHeight: number,
-  isLast: boolean
+  isLast: boolean,
+  pagePaddingTop: number,
+  pagePaddingBottom: number
 ): number {
   let h = isLast ? 0 : SEPARATOR_HEIGHT;
-  h += PAGE_PADDING;
+  h += pagePaddingTop + pagePaddingBottom;
 
   if (page.lineLayout && page.lineLayout.length > 0) {
     for (const line of page.lineLayout) {
@@ -167,14 +171,22 @@ function computePageItemHeight(
 
 function buildLayoutOffsets(
   pages: PageData[],
-  lineHeight: number
+  lineHeight: number,
+  pagePaddingTop: number,
+  pagePaddingBottom: number
 ): { heights: number[]; offsets: number[] } {
   const heights: number[] = [];
   const offsets: number[] = [];
   let cumOffset = 0;
 
   for (let i = 0; i < pages.length; i++) {
-    const h = computePageItemHeight(pages[i], lineHeight, i === pages.length - 1);
+    const h = computePageItemHeight(
+      pages[i],
+      lineHeight,
+      i === pages.length - 1,
+      pagePaddingTop,
+      pagePaddingBottom
+    );
     heights.push(h);
     offsets.push(cumOffset);
     cumOffset += h;
@@ -235,7 +247,14 @@ function PageSeparator({
   );
 }
 
-export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
+export function PageMushaf({
+  onPageChange,
+  goToPageRef,
+  onScroll,
+  pagePaddingTop = 8,
+  pagePaddingBottom = 32,
+  pageSidePadding = 16,
+}: Props) {
   const db = useDatabase();
   const { fontSize, lineHeight, pageScroll } = useSettings();
   const s = useStrings();
@@ -352,7 +371,7 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
 
         const data = buildPageData(pages, ayahs, lineLookup, offsetLookup);
         setPageData(data);
-        setLayoutInfo(buildLayoutOffsets(data, lineHeight));
+        setLayoutInfo(buildLayoutOffsets(data, lineHeight, pagePaddingTop, pagePaddingBottom));
       } catch (err) {
         console.error("[PageMushaf] Failed to load data:", err);
       } finally {
@@ -361,21 +380,21 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
     }
 
     loadData();
-  }, [db, lineHeight]);
+  }, [db, lineHeight, pagePaddingTop, pagePaddingBottom]);
 
   // Rebuild layout offsets when lineHeight changes (font size adjustment)
   useEffect(() => {
     if (pageData.length > 0) {
-      setLayoutInfo(buildLayoutOffsets(pageData, lineHeight));
+      setLayoutInfo(buildLayoutOffsets(pageData, lineHeight, pagePaddingTop, pagePaddingBottom));
     }
-  }, [lineHeight, pageData]);
+  }, [lineHeight, pageData, pagePaddingTop, pagePaddingBottom]);
 
   // getItemLayout enables instant scrollToIndex without rendering intermediate items
   const getItemLayout = useCallback(
     (_data: ArrayLike<PageData> | null | undefined, index: number) => {
       if (!layoutInfo || index < 0 || index >= layoutInfo.heights.length) {
         // Fallback estimate
-        const estHeight = 15 * lineHeight + PAGE_PADDING + (index > 0 ? SEPARATOR_HEIGHT : 0);
+        const estHeight = 15 * lineHeight + pagePaddingTop + pagePaddingBottom + (index > 0 ? SEPARATOR_HEIGHT : 0);
         return { length: estHeight, offset: index * estHeight, index };
       }
       return {
@@ -384,7 +403,7 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
         index,
       };
     },
-    [layoutInfo, lineHeight]
+    [layoutInfo, lineHeight, pagePaddingTop, pagePaddingBottom]
   );
 
   const updateCurrentPage = useCallback(
@@ -739,6 +758,9 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
             lineLayout={item.lineLayout}
             globalWordOffset={item.globalWordOffset}
             onOpenAyahDetail={openAyahDetail}
+            paddingTop={pagePaddingTop}
+            paddingBottom={pagePaddingBottom}
+            sidePadding={pageSidePadding}
           />
           {index < pageData.length - 1 && (
             <PageSeparator
@@ -750,7 +772,18 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
         </View>
       );
     },
-    [surahMap, fontSize, lineHeight, pageWidth, pageData.length, openAyahDetail, pageMetaMap]
+    [
+      surahMap,
+      fontSize,
+      lineHeight,
+      pageWidth,
+      pageData.length,
+      openAyahDetail,
+      pageMetaMap,
+      pagePaddingTop,
+      pagePaddingBottom,
+      pageSidePadding,
+    ]
   );
 
   const keyExtractor = useCallback(
@@ -825,6 +858,7 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
                   onOpenAyahDetail={openAyahDetail}
                   paddingTop={HORIZONTAL_PAGE_TOP_PADDING}
                   paddingBottom={0}
+                  sidePadding={pageSidePadding}
                 />
               </View>
             ))}
@@ -849,7 +883,7 @@ export function PageMushaf({ onPageChange, goToPageRef, onScroll }: Props) {
           updateCellsBatchingPeriod={80}
           windowSize={3}
           removeClippedSubviews
-          contentContainerStyle={{ paddingBottom: 60 }}
+          contentContainerStyle={{ paddingBottom: pagePaddingBottom + 24 }}
         />
       )}
 

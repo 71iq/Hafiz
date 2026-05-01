@@ -183,3 +183,45 @@ Compared current routes/components against the phone mockup inventory:
 - Page and verse modes now share the new mobile chrome shell.
 - Go-to navigator remains connected and functional.
 - Slider updates current page and preserves RTL pagination behavior.
+
+## 2026-05-01 — Phase 4 Completed
+
+### Scope decisions for this phase
+1. Kept `PageMushaf` virtualization architecture unchanged:
+- still `FlatList`-based
+- still `getItemLayout`
+- still `initialNumToRender={1}`
+- still `maxToRenderPerBatch={1}`
+- still `windowSize={3}`
+- no whole-Mushaf render path introduced
+2. Implemented spacing via configurable paddings instead of structural rewrites, to preserve performance and QCF2 layout behavior.
+
+### Implemented in this step
+- `components/mushaf/MushafPage.tsx`:
+  - Added `sidePadding` prop (default `16`).
+  - Updated content width math to use `sidePadding` (`width - sidePadding * 2`).
+  - Kept QCF2 font loading and line/word mapping logic unchanged.
+- `components/mushaf/PageMushaf.tsx`:
+  - Added props: `pagePaddingTop`, `pagePaddingBottom`, `pageSidePadding`.
+  - Wired those paddings into:
+    - `MushafPage` render
+    - `getItemLayout`/height calculations
+    - layout offset rebuild logic
+    - vertical list bottom content padding
+    - horizontal page render side padding
+  - Preserved all existing virtualization and interaction behavior.
+- `app/(tabs)/mushaf.tsx`:
+  - In page mode, passed phone-specific spacing:
+    - `pagePaddingTop={14}`
+    - `pagePaddingBottom={44}`
+    - `pageSidePadding={22}`
+  - Desktop spacing remains at previous defaults (`8/32/16`).
+
+### Validation result
+- `npx tsc --noEmit`: passed.
+- `npx expo export --platform web`: passed.
+
+### Phase 4 completion status
+- Phone page view now has explicit top/bottom/side spacing tuned for the new glass chrome.
+- QCF2 rendering path and page-lines/page-words integration remain intact.
+- No virtualization regression introduced.
