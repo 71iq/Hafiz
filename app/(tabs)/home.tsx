@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from "react";
-import { View, Text, ScrollView, Pressable, Alert } from "react-native";
+import { View, Text, ScrollView, Pressable, Alert, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
@@ -130,22 +130,26 @@ export default function HomeScreen() {
   );
 
   const handleDeleteDeck = (deckId: string) => {
+    const runDelete = async () => {
+      try {
+        await deleteDeck(db, deckId);
+        setDecks((prev) => prev.filter((d) => d.id !== deckId));
+        await loadData();
+      } catch (e) {
+        console.warn("[Home] Failed to delete deck:", e);
+        setToast(s.reviewActionFailed);
+      }
+    };
+
+    if (Platform.OS === "web") {
+      const confirmed = globalThis.confirm?.(`${s.flashcardsDeleteDeck}\n${s.flashcardsDeleteConfirm}`) ?? false;
+      if (confirmed) runDelete();
+      return;
+    }
+
     Alert.alert(s.flashcardsDeleteDeck, s.flashcardsDeleteConfirm, [
       { text: s.flashcardsCancel, style: "cancel" },
-      {
-        text: s.flashcardsDelete,
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await deleteDeck(db, deckId);
-            setDecks((prev) => prev.filter((d) => d.id !== deckId));
-            await loadData();
-          } catch (e) {
-            console.warn("[Home] Failed to delete deck:", e);
-            setToast(s.reviewActionFailed);
-          }
-        },
-      },
+      { text: s.flashcardsDelete, style: "destructive", onPress: runDelete },
     ]);
   };
 
@@ -409,6 +413,7 @@ export default function HomeScreen() {
                 onStartReview={() => handleStartReview(deck.id)}
                 onDelete={() => handleDeleteDeck(deck.id)}
                 isDark={isDark}
+                isRTL={isRTL}
                 s={s}
               />
             ))}
@@ -485,6 +490,7 @@ function DeckCard({
   onStartReview,
   onDelete,
   isDark,
+  isRTL,
   s,
 }: {
   deck: DeckDisplay;
@@ -492,22 +498,23 @@ function DeckCard({
   onStartReview: () => void;
   onDelete: () => void;
   isDark: boolean;
+  isRTL: boolean;
   s: any;
 }) {
   return (
     <Card elevation="low" className="p-5">
-      <View className="flex-row items-start justify-between mb-3">
-        <View className="flex-1">
+      <View className={`mb-3 flex-row items-start justify-between ${isRTL ? "flex-row-reverse" : ""}`}>
+        <View className={`flex-1 ${isRTL ? "items-end" : "items-start"}`}>
           <Text
             className="text-charcoal dark:text-neutral-200"
-            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15 }}
+            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15, textAlign: isRTL ? "right" : "left" }}
             numberOfLines={1}
           >
             {getDeckLabel(deck.scope)}
           </Text>
           <Text
             className="text-warm-400 dark:text-neutral-500 mt-0.5"
-            style={{ fontFamily: "Manrope_400Regular", fontSize: 12 }}
+            style={{ fontFamily: "Manrope_400Regular", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
           >
             {deck.cardCount} {s.flashcardsTotalCards?.toLowerCase?.() ?? "cards"}
           </Text>
@@ -521,21 +528,21 @@ function DeckCard({
         </Pressable>
       </View>
 
-      <View className="flex-row gap-3">
-        <View className="flex-row items-center gap-1.5">
+      <View className={`flex-row gap-3 ${isRTL ? "flex-row-reverse self-end" : ""}`}>
+        <View className={`flex-row items-center gap-1.5 ${isRTL ? "flex-row-reverse" : ""}`}>
           <View className="w-2 h-2 rounded-full bg-primary-accent" />
           <Text
             className="text-charcoal dark:text-neutral-300"
-            style={{ fontFamily: "Manrope_500Medium", fontSize: 12 }}
+            style={{ fontFamily: "Manrope_500Medium", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
           >
             {deck.dueCount} {s.flashcardsDueToday?.toLowerCase?.() ?? "due"}
           </Text>
         </View>
-        <View className="flex-row items-center gap-1.5">
+        <View className={`flex-row items-center gap-1.5 ${isRTL ? "flex-row-reverse" : ""}`}>
           <View className="w-2 h-2 rounded-full bg-blue-400" />
           <Text
             className="text-charcoal dark:text-neutral-300"
-            style={{ fontFamily: "Manrope_500Medium", fontSize: 12 }}
+            style={{ fontFamily: "Manrope_500Medium", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
           >
             {deck.newCount} {s.flashcardsNewCards?.toLowerCase?.() ?? "new"}
           </Text>
@@ -543,8 +550,8 @@ function DeckCard({
       </View>
 
       {deck.dueCount > 0 && (
-        <Button onPress={onStartReview} size="sm" className="mt-4 self-start">
-          <View className="flex-row items-center gap-2">
+        <Button onPress={onStartReview} size="sm" className={`mt-4 ${isRTL ? "self-end" : "self-start"}`}>
+          <View className={`flex-row items-center gap-2 ${isRTL ? "flex-row-reverse" : ""}`}>
             <Play size={14} color="#fff" />
             <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13, color: "#fff" }}>
               {s.flashcardsStartReview}
