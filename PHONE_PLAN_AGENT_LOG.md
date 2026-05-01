@@ -798,3 +798,23 @@ Saved in `phase19/`:
 
 ### Recommended next technical step (for follow-up phase)
 - Introduce an explicit QA readiness signal route/state for Playwright (e.g., wait-until-ready endpoint/flag), then start per-route screenshot workflow only after readiness confirmation.
+
+## 2026-05-01 — Phase 19 Progress (QA Ready Signal Added)
+
+### Implemented in this step
+- Added deterministic QA probe route: `app/qa-ready.tsx`.
+- Route behavior:
+  - emits `QA_WAITING` while DB is still initializing.
+  - emits `QA_READY` when `useDatabaseStatus().isReady` is true.
+  - emits `QA_ERROR` with message when DB init fails.
+- Captured evidence:
+  - `phase19/qa-ready.png`
+  - `phase19/qa-ready-snapshot.md`.
+
+### How to use for Playwright
+1. Navigate to `/qa-ready` first.
+2. Wait until page contains literal `QA_READY`.
+3. Only then navigate through screenshot routes in the same browser tab/session.
+
+### Current observed state in this run
+- Probe is functioning and reported `QA_WAITING` (expected while DB import is still in progress).
