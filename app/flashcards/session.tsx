@@ -586,12 +586,6 @@ function FlashcardSessionScreen() {
         {((phase === "side" && revealed && isLastSide) || phase === "grading") && (
           <>
             <GradingButtons onGrade={handleGrade} isDark={isDark} s={s} />
-            <Text
-              className="text-warm-400 dark:text-neutral-500 text-center mt-2"
-              style={{ fontFamily: "Manrope_500Medium", fontSize: 11 }}
-            >
-              {s.flashcardsGrade}
-            </Text>
           </>
         )}
       </View>
@@ -609,16 +603,6 @@ function TestModePrompt({
   const label = getModeName(mode, s);
   const color = isWordTestMode(mode) ? WORD_TEST_MODE_COLORS[mode] : TEST_MODE_COLORS[mode];
 
-  const promptText: Record<string, string> = {
-    nextAyah: s.flashcardsModeNextAyah,
-    previousAyah: s.flashcardsModePreviousAyah,
-    translation: s.flashcardsModeTranslation,
-    tafseer: "",
-    surahName: s.flashcardsModeSurahName,
-    wordMeaningArabic: s.flashcardsModeWordMeaningArabic,
-    wordMeaningTranslation: s.flashcardsModeWordMeaningTranslation,
-  };
-
   // Surah Name mode hides the surah context
   return (
     <View>
@@ -628,11 +612,6 @@ function TestModePrompt({
             {label}
           </Text>
         </View>
-        {promptText[mode] ? (
-          <Text className="text-warm-400 dark:text-neutral-500" style={{ fontFamily: "Manrope_400Regular", fontSize: 11 }}>
-            {promptText[mode]}
-          </Text>
-        ) : null}
       </View>
       <Text
         className="text-charcoal dark:text-neutral-100 text-center"
