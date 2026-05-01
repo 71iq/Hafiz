@@ -4,7 +4,6 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import { Plus, Trash2, Play, Layers, Flame, Search, LayoutGrid, Languages, UserPlus, X as XIcon } from "lucide-react-native";
-import { getVocabStats } from "@/lib/vocab/queries";
 import { useAuthStore } from "@/lib/auth/store";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useDatabase } from "@/lib/database/provider";
@@ -24,6 +23,7 @@ import {
   deleteDeck,
   getStudyStreak,
   getLastReviewDate,
+  MEANINGS_DECK_ID,
 } from "@/lib/fsrs/queries";
 import type { DeckScope } from "@/lib/fsrs/types";
 
@@ -64,7 +64,7 @@ export default function HomeScreen() {
     for (const row of surahRows) nameMap[row.number] = row.name_arabic;
     setSurahNames(nameMap);
 
-    const rawDecks = await getDecks(db);
+    const rawDecks = (await getDecks(db)).filter((d) => d.id !== MEANINGS_DECK_ID);
     const deckDisplays: DeckDisplay[] = [];
     for (const d of rawDecks) {
       const [cardCount, dueCount, newCount] = await Promise.all([
@@ -79,12 +79,10 @@ export default function HomeScreen() {
     setTotalCards(await getTotalCardCount(db));
     setStreak(await getStudyStreak(db));
     setLastReview(await getLastReviewDate(db));
-    try {
-      setVocabStats(await getVocabStats(db));
-    } catch {
-      // table may not exist yet on very old installs
-      setVocabStats({ total: 0, due: 0 });
-    }
+    setVocabStats({
+      total: await getTotalCardCount(db, MEANINGS_DECK_ID),
+      due: await getDueCount(db, MEANINGS_DECK_ID),
+    });
 
     try {
       const row = await db.getFirstAsync<{ value: string }>(
@@ -454,7 +452,7 @@ export default function HomeScreen() {
                   {vocabStats.due} {s.flashcardsDueToday?.toLowerCase?.() ?? "due"} · {vocabStats.total} {s.flashcardsTotalCards?.toLowerCase?.() ?? "cards"}
                 </Text>
                 <Pressable
-                  onPress={() => router.push("/flashcards/vocab" as any)}
+                  onPress={() => router.push({ pathname: "/flashcards/session", params: { deckId: MEANINGS_DECK_ID } })}
                   className="rounded-full bg-primary-accent px-4 py-1.5"
                   style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.97 : 1 }] })}
                 >

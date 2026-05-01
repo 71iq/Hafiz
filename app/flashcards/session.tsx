@@ -27,6 +27,8 @@ import { Skeleton, SkeletonText } from "@/components/ui/Skeleton";
 import { syncDailyScore, updateProfileStats } from "@/lib/fsrs/leaderboard-sync";
 import type { StudyCardRow, TestMode } from "@/lib/fsrs/types";
 import { DEFAULT_ENABLED_MODES, TEST_MODE_COLORS } from "@/lib/fsrs/types";
+import { fetchWordMeaningsArForAyah, fetchWordTranslation } from "@/lib/word/queries";
+import { MEANINGS_DECK_ID } from "@/lib/fsrs/queries";
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -36,6 +38,11 @@ type CardData = {
   card: StudyCardRow;
   surah: number;
   ayah: number;
+  wordPos?: number;
+  isWordCard?: boolean;
+  wordText?: string;
+  wordMeaningAr?: string;
+  wordMeaningEn?: string;
   surahName: string;
   textUthmani: string;
   uniqueFront: { text: string; surahName: string; contextCount: number; needsExplicitLabel: boolean };
@@ -52,6 +59,14 @@ type SessionSummary = {
   relearningCount: number;
   durationMs: number;
   nextReviewDate: string | null;
+};
+
+type WordTestMode = "wordMeaningArabic" | "wordMeaningTranslation";
+const ALL_WORD_TEST_MODES: WordTestMode[] = ["wordMeaningArabic", "wordMeaningTranslation"];
+const DEFAULT_WORD_TEST_MODES: WordTestMode[] = ["wordMeaningArabic", "wordMeaningTranslation"];
+const WORD_TEST_MODE_COLORS: Record<WordTestMode, string> = {
+  wordMeaningArabic: "#0d9488",
+  wordMeaningTranslation: "#3b82f6",
 };
 
 // ─── Main Component ──────────────────────────────────────────
@@ -114,11 +129,14 @@ function FlashcardSessionScreen() {
   const [currentSideIndex, setCurrentSideIndex] = useState(0);
   const [revealed, setRevealed] = useState(false);
   const [enabledModes, setEnabledModes] = useState<TestMode[]>(DEFAULT_ENABLED_MODES);
+  const [wordEnabledModes, setWordEnabledModes] = useState<WordTestMode[]>(DEFAULT_WORD_TEST_MODES);
   const [summary, setSummary] = useState<SessionSummary | null>(null);
   const sessionStartRef = useRef(Date.now());
   const streakRef = useRef(0);
   const sessionPointsRef = useRef(0);
   const flipAnim = useRef(new RNAnimated.Value(0)).current;
+  const normalizedDeckId = Array.isArray(deckId) ? deckId[0] : deckId;
+  const isMeaningsDeck = normalizedDeckId === MEANINGS_DECK_ID;
 
   // Load enabled test modes from settings
   useEffect(() => {
@@ -138,13 +156,26 @@ function FlashcardSessionScreen() {
     });
   }, [db]);
 
+  useEffect(() => {
+    db.getFirstAsync<{ value: string }>(
+      "SELECT value FROM user_settings WHERE key = 'word_flashcard_test_modes'"
+    ).then((row) => {
+      if (row?.value) {
+        try {
+          const modes = JSON.parse(row.value) as WordTestMode[];
+          const valid = modes.filter((m) => ALL_WORD_TEST_MODES.includes(m));
+          if (valid.length > 0) setWordEnabledModes(valid);
+        } catch {}
+      }
+    });
+  }, [db]);
+
   // Load due cards and pre-fetch all card data
   useEffect(() => {
     async function load() {
       try {
         // Pre-load streak for scoring
         streakRef.current = await getStudyStreak(db);
-        const normalizedDeckId = Array.isArray(deckId) ? deckId[0] : deckId;
         const dueRows = await getDueCards(db, normalizedDeckId, dailyReviewLimit);
         if (dueRows.length === 0) {
           setSummary({ total: 0, newCount: 0, reviewCount: 0, relearningCount: 0, durationMs: 0, nextReviewDate: null });
@@ -154,11 +185,13 @@ function FlashcardSessionScreen() {
 
         const loaded: CardData[] = [];
         for (const row of dueRows) {
-          const [surahStr, ayahStr] = row.id.split(":");
-          const surah = parseInt(surahStr);
-          const ayah = parseInt(ayahStr);
+          const parts = row.id.split(":");
+          const isWordCard = parts[0] === "word" && parts.length >= 4;
+          const surah = parseInt(isWordCard ? parts[1] : parts[0]);
+          const ayah = parseInt(isWordCard ? parts[2] : parts[1]);
+          const wordPos = isWordCard ? parseInt(parts[3]) : undefined;
 
-          const [ayahRow, surahRow, translationRow, tafseerRow, prevRow, nextRow, uniqueFront] = await Promise.all([
+          const [ayahRow, surahRow, translationRow, tafseerRow, prevRow, nextRow, uniqueFront, arMeanings, wordTranslation] = await Promise.all([
             db.getFirstAsync<{ text_uthmani: string }>(
               "SELECT text_uthmani FROM quran_text WHERE surah = ? AND ayah = ?",
               [surah, ayah]
@@ -186,15 +219,31 @@ function FlashcardSessionScreen() {
               [surah, ayah + 1]
             ),
             computeUniqueFront(db, surah, ayah),
+            isWordCard ? fetchWordMeaningsArForAyah(db, surah, ayah) : Promise.resolve([]),
+            isWordCard && wordPos ? fetchWordTranslation(db, surah, ayah, wordPos) : Promise.resolve(null),
           ]);
+
+          const wordMeaningAr = isWordCard && wordPos
+            ? (arMeanings.find((r) => r.word_pos === wordPos)?.meaning ?? null)
+            : null;
+          const wordText = isWordCard && wordPos
+            ? (arMeanings.find((r) => r.word_pos === wordPos)?.word ?? wordTranslation?.word_arabic ?? null)
+            : null;
+          const wordMeaningEn = isWordCard ? (wordTranslation?.translation_en ?? null) : null;
+          const frontText = isWordCard ? (wordText ?? uniqueFront.text) : uniqueFront.text;
 
           loaded.push({
             card: row,
             surah,
             ayah,
+            wordPos,
+            isWordCard,
+            wordText: wordText ?? undefined,
+            wordMeaningAr: wordMeaningAr ?? undefined,
+            wordMeaningEn: wordMeaningEn ?? undefined,
             surahName: surahRow?.name_arabic ?? "",
             textUthmani: ayahRow?.text_uthmani ?? "",
-            uniqueFront,
+            uniqueFront: { ...uniqueFront, text: frontText },
             translation: translationRow?.text_en ?? "",
             tafseer: tafseerRow?.text ?? "",
             prevAyahText: prevRow?.text_uthmani ?? null,
@@ -212,11 +261,18 @@ function FlashcardSessionScreen() {
       }
     }
     load();
-  }, [db, deckId, tafseerSource, dailyReviewLimit]);
+  }, [db, normalizedDeckId, tafseerSource, dailyReviewLimit]);
 
   const currentCard = cards[currentIndex] ?? null;
   const activeModes = useMemo(() => {
-    if (!currentCard) return [];
+    if (!currentCard) return [] as Array<TestMode | WordTestMode>;
+    if (currentCard.isWordCard) {
+      return wordEnabledModes.filter((mode) => {
+        if (mode === "wordMeaningArabic" && !currentCard.wordMeaningAr) return false;
+        if (mode === "wordMeaningTranslation" && !currentCard.wordMeaningEn) return false;
+        return true;
+      });
+    }
     return enabledModes.filter((mode) => {
       if (mode === "previousAyah" && (!currentCard.prevAyahText || currentCard.uniqueFront.contextCount > 0)) return false;
       if (mode === "nextAyah" && !currentCard.nextAyahText) return false;
@@ -224,7 +280,7 @@ function FlashcardSessionScreen() {
       if (mode === "tafseer" && !currentCard.tafseer) return false;
       return true;
     });
-  }, [enabledModes, currentCard]);
+  }, [enabledModes, wordEnabledModes, currentCard]);
 
   const currentMode = activeModes[currentSideIndex] ?? null;
   const isLastSide = currentSideIndex >= activeModes.length - 1;
@@ -409,7 +465,7 @@ function FlashcardSessionScreen() {
       {phase === "side" && activeModes.length > 0 && (
         <View className="flex-row flex-wrap gap-2 px-6 pb-3">
           {activeModes.map((mode, i) => {
-            const color = TEST_MODE_COLORS[mode];
+            const color = isWordTestMode(mode) ? WORD_TEST_MODE_COLORS[mode] : TEST_MODE_COLORS[mode];
             const isActive = i === currentSideIndex;
             const isDone = i < currentSideIndex;
             return (
@@ -446,7 +502,7 @@ function FlashcardSessionScreen() {
           {/* Front of card */}
           {phase === "front" && (
             <Card elevation="low" className="p-6 mb-6 rounded-3xl bg-surface-low dark:bg-surface-dark-low">
-              {currentCard.uniqueFront.contextCount > 0 && (
+              {!currentCard.isWordCard && currentCard.uniqueFront.contextCount > 0 && (
                 <Text
                   className="text-warm-400 dark:text-neutral-500 text-center mb-3"
                   style={{ fontFamily: "Manrope_400Regular", fontSize: 11 }}
@@ -548,10 +604,10 @@ function FlashcardSessionScreen() {
 function TestModePrompt({
   mode, card, fontSize, lineHeight, s,
 }: {
-  mode: TestMode; card: CardData; fontSize: number; lineHeight: number; s: any;
+  mode: TestMode | WordTestMode; card: CardData; fontSize: number; lineHeight: number; s: any;
 }) {
   const label = getModeName(mode, s);
-  const color = TEST_MODE_COLORS[mode];
+  const color = isWordTestMode(mode) ? WORD_TEST_MODE_COLORS[mode] : TEST_MODE_COLORS[mode];
 
   const promptText: Record<string, string> = {
     nextAyah: s.flashcardsModeNextAyah,
@@ -559,6 +615,8 @@ function TestModePrompt({
     translation: s.flashcardsModeTranslation,
     tafseer: "",
     surahName: s.flashcardsModeSurahName,
+    wordMeaningArabic: s.flashcardsModeWordMeaningArabic,
+    wordMeaningTranslation: s.flashcardsModeWordMeaningTranslation,
   };
 
   // Surah Name mode hides the surah context
@@ -589,7 +647,7 @@ function TestModePrompt({
 function TestModeAnswer({
   mode, card, fontSize, lineHeight,
 }: {
-  mode: TestMode; card: CardData; fontSize: number; lineHeight: number;
+  mode: TestMode | WordTestMode; card: CardData; fontSize: number; lineHeight: number;
 }) {
   switch (mode) {
     case "nextAyah":
@@ -628,6 +686,18 @@ function TestModeAnswer({
           style={{ fontFamily: "Manrope_700Bold", fontSize: 22, writingDirection: "rtl" }}
         >
           {card.surahName}
+        </Text>
+      );
+    case "wordMeaningArabic":
+      return (
+        <Text className="text-charcoal dark:text-neutral-100 text-center" style={{ fontSize, lineHeight, writingDirection: "rtl" }}>
+          {card.wordMeaningAr ?? "—"}
+        </Text>
+      );
+    case "wordMeaningTranslation":
+      return (
+        <Text className="text-charcoal dark:text-neutral-200" style={{ fontFamily: "Manrope_400Regular", fontSize: 15, lineHeight: 24 }}>
+          {card.wordMeaningEn ?? "—"}
         </Text>
       );
     default:
@@ -748,13 +818,19 @@ function SummaryCard({ label, value, color }: { label: string; value: string; co
 
 // ─── Helpers ─────────────────────────────────────────────────
 
-function getModeName(mode: TestMode, s: any): string {
-  const map: Record<TestMode, string> = {
+function getModeName(mode: TestMode | WordTestMode, s: any): string {
+  const map: Record<TestMode | WordTestMode, string> = {
     nextAyah: s.flashcardsModeNextAyah,
     previousAyah: s.flashcardsModePreviousAyah,
     translation: s.flashcardsModeTranslation,
     tafseer: s.flashcardsModeTafseer,
     surahName: s.flashcardsModeSurahName,
+    wordMeaningArabic: s.flashcardsModeWordMeaningArabic,
+    wordMeaningTranslation: s.flashcardsModeWordMeaningTranslation,
   };
   return map[mode] ?? mode;
+}
+
+function isWordTestMode(mode: TestMode | WordTestMode): mode is WordTestMode {
+  return mode === "wordMeaningArabic" || mode === "wordMeaningTranslation";
 }

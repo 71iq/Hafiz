@@ -238,6 +238,8 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     flashcardsModeTranslation: "Translation",
     flashcardsModeTafseer: "Tafseer",
     flashcardsModeSurahName: "Surah Name",
+    flashcardsModeWordMeaningArabic: "Arabic Meaning",
+    flashcardsModeWordMeaningTranslation: "Translation",
     // Session summary
     flashcardsSummaryTitle: "Session Complete",
     flashcardsSummaryReviewed: "Cards Reviewed",
@@ -250,6 +252,7 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     flashcardsSummaryMinutes: "{{n}} min",
     // Settings
     flashcardsTestModes: "Flashcard Test Modes",
+    wordFlashcardsTestModes: "Word Review Sides",
     flashcardsDailyLimit: "Daily Review Limit",
     flashcardsDailyLimitDesc: "Max cards per session",
     flashcardsDueTodayLimit: "{{due}} due ({{limit}} today)",
@@ -582,6 +585,8 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     flashcardsModeTranslation: "الترجمة",
     flashcardsModeTafseer: "التفسير",
     flashcardsModeSurahName: "اسم السورة",
+    flashcardsModeWordMeaningArabic: "المعنى العربي",
+    flashcardsModeWordMeaningTranslation: "الترجمة",
     // Session summary
     flashcardsSummaryTitle: "اكتملت الجلسة",
     flashcardsSummaryReviewed: "البطاقات المراجعة",
@@ -594,6 +599,7 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     flashcardsSummaryMinutes: "{{n}} دقيقة",
     // Settings
     flashcardsTestModes: "أوضاع اختبار البطاقات",
+    wordFlashcardsTestModes: "أوجه مراجعة المعاني",
     flashcardsDailyLimit: "حد المراجعة اليومي",
     flashcardsDailyLimitDesc: "أقصى عدد بطاقات في الجلسة",
     flashcardsDueTodayLimit: "{{due}} مستحقة ({{limit}} اليوم)",

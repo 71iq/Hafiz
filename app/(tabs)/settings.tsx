@@ -42,6 +42,10 @@ export default function SettingsScreen() {
   const [pickerVisible, setPickerVisible] = useState(false);
   const currentLang = getLanguageByCode(translationLanguage);
   const [enabledModes, setEnabledModes] = useState<TestMode[]>(DEFAULT_ENABLED_MODES);
+  const [wordModes, setWordModes] = useState<Array<"wordMeaningArabic" | "wordMeaningTranslation">>([
+    "wordMeaningArabic",
+    "wordMeaningTranslation",
+  ]);
   const { user, profile, isLoading: authLoading, signOut } = useAuthStore();
   const accountName = profile?.display_name || profile?.username || user?.email || s.authProfile;
   const accountHandle = profile?.username ? `@${profile.username}` : user?.email || "";
@@ -56,6 +60,19 @@ export default function SettingsScreen() {
     });
   }, [db]);
 
+  useEffect(() => {
+    db.getFirstAsync<{ value: string }>(
+      "SELECT value FROM user_settings WHERE key = 'word_flashcard_test_modes'"
+    ).then((row) => {
+      if (!row?.value) return;
+      try {
+        const parsed = JSON.parse(row.value) as Array<"wordMeaningArabic" | "wordMeaningTranslation">;
+        const valid = parsed.filter((m) => m === "wordMeaningArabic" || m === "wordMeaningTranslation");
+        if (valid.length > 0) setWordModes(valid);
+      } catch {}
+    });
+  }, [db]);
+
   const toggleTestMode = useCallback((mode: TestMode) => {
     setEnabledModes((prev) => {
       const next = prev.includes(mode) ? prev.filter((m) => m !== mode) : [...prev, mode];
@@ -63,6 +80,18 @@ export default function SettingsScreen() {
       db.runAsync(
         "INSERT OR REPLACE INTO user_settings (key, value) VALUES (?, ?)",
         ["flashcard_test_modes", JSON.stringify(next)]
+      );
+      return next;
+    });
+  }, [db]);
+
+  const toggleWordMode = useCallback((mode: "wordMeaningArabic" | "wordMeaningTranslation") => {
+    setWordModes((prev) => {
+      const next = prev.includes(mode) ? prev.filter((m) => m !== mode) : [...prev, mode];
+      if (next.length === 0) return prev;
+      db.runAsync(
+        "INSERT OR REPLACE INTO user_settings (key, value) VALUES (?, ?)",
+        ["word_flashcard_test_modes", JSON.stringify(next)]
       );
       return next;
     });
@@ -166,6 +195,29 @@ export default function SettingsScreen() {
               </Button>
             </View>
           )}
+        </Card>
+
+        <SectionLabel>{s.wordFlashcardsTestModes}</SectionLabel>
+        <Card elevation="low" className="p-5 mb-8">
+          <View className="gap-3">
+            {[
+              { key: "wordMeaningArabic" as const, label: s.flashcardsModeWordMeaningArabic },
+              { key: "wordMeaningTranslation" as const, label: s.flashcardsModeWordMeaningTranslation },
+            ].map((mode) => (
+              <View key={mode.key} className="flex-row items-center justify-between">
+                <Text
+                  className="text-charcoal dark:text-neutral-300 flex-1"
+                  style={{ fontFamily: "Manrope_500Medium", fontSize: 14 }}
+                >
+                  {mode.label}
+                </Text>
+                <Switch
+                  value={wordModes.includes(mode.key)}
+                  onValueChange={() => toggleWordMode(mode.key)}
+                />
+              </View>
+            ))}
+          </View>
         </Card>
 
         {/* Language Section */}

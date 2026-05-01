@@ -12,7 +12,7 @@ import {
 } from "@/lib/word/queries";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
-import { addVocabCard, isVocabCardSaved } from "@/lib/vocab/queries";
+import { addMeaningCard, isMeaningCardSaved } from "@/lib/fsrs/queries";
 
 type Props = {
   surah: number;
@@ -41,25 +41,13 @@ export function MeaningTab({ surah, ayah, wordPos }: Props) {
   const [savedToVocab, setSavedToVocab] = useState(false);
 
   useEffect(() => {
-    isVocabCardSaved(db, surah, ayah, wordPos).then(setSavedToVocab).catch(() => {});
+    isMeaningCardSaved(db, surah, ayah, wordPos).then(setSavedToVocab).catch(() => {});
   }, [db, surah, ayah, wordPos]);
 
   const saveToVocab = async () => {
     if (savedToVocab) return;
-    const meaningAr = arMatchIdx >= 0 ? arRows[arMatchIdx]?.meaning ?? null : null;
-    const word =
-      (arMatchIdx >= 0 ? arRows[arMatchIdx]?.word : null) ??
-      enData?.wordArabic ??
-      null;
     try {
-      await addVocabCard(db, {
-        surah,
-        ayah,
-        wordPos,
-        word,
-        meaningAr,
-        meaningEn: enData?.translationEn ?? null,
-      });
+      await addMeaningCard(db, surah, ayah, wordPos);
       setSavedToVocab(true);
     } catch (e) {
       console.warn("[MeaningTab] saveToVocab failed:", e);

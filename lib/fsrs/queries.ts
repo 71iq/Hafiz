@@ -183,6 +183,71 @@ export async function addAyahToDeck(
   return true;
 }
 
+export const MEANINGS_DECK_ID = "meanings";
+
+export function meaningCardId(surah: number, ayah: number, wordPos: number): string {
+  return `word:${surah}:${ayah}:${wordPos}`;
+}
+
+export async function isMeaningCardSaved(
+  db: SQLiteDatabase,
+  surah: number,
+  ayah: number,
+  wordPos: number
+): Promise<boolean> {
+  const row = await db.getFirstAsync<{ c: number }>(
+    "SELECT COUNT(*) as c FROM study_cards WHERE id = ? AND deck_id = ?",
+    [meaningCardId(surah, ayah, wordPos), MEANINGS_DECK_ID]
+  );
+  return (row?.c ?? 0) > 0;
+}
+
+export async function addMeaningCard(
+  db: SQLiteDatabase,
+  surah: number,
+  ayah: number,
+  wordPos: number
+): Promise<{ created: boolean }> {
+  const now = new Date().toISOString();
+  const emptyCard = createEmptyCard();
+  const cardId = meaningCardId(surah, ayah, wordPos);
+
+  await db.runAsync(
+    "INSERT OR IGNORE INTO user_settings (key, value) VALUES (?, ?)",
+    [
+      `deck_${MEANINGS_DECK_ID}`,
+      JSON.stringify({
+        id: MEANINGS_DECK_ID,
+        scope: { type: "custom", surahStart: 1, ayahStart: 1, surahEnd: 1, ayahEnd: 1 },
+        createdAt: now,
+      }),
+    ]
+  );
+
+  const result = await db.runAsync(
+    `INSERT OR IGNORE INTO study_cards (id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days, learning_steps, reps, lapses, state, last_review, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      cardId,
+      MEANINGS_DECK_ID,
+      emptyCard.due.toISOString(),
+      emptyCard.stability,
+      emptyCard.difficulty,
+      emptyCard.elapsed_days,
+      emptyCard.scheduled_days,
+      emptyCard.learning_steps,
+      emptyCard.reps,
+      emptyCard.lapses,
+      emptyCard.state,
+      null,
+      now,
+      now,
+    ]
+  );
+
+  return { created: (result.changes ?? 0) > 0 };
+}
+
 // ─── Query helpers ───────────────────────────────────────────
 
 export async function getDueCards(
