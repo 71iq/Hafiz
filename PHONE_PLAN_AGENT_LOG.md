@@ -403,3 +403,32 @@ Compared current routes/components against the phone mockup inventory:
 
 ### Phase 9 completion status
 - Session UI now matches the intended mobile hierarchy more closely while preserving review behavior and FSRS logic.
+
+## 2026-05-01 — Phase 10 Completed
+
+### Scope decisions for this phase
+1. Route strategy: **kept current command-modal architecture** for search in this phase.
+- `app/(tabs)/search.tsx` remains a redirect placeholder.
+- Mobile search redesign is applied to `SearchCommand` modal shell used by existing entry points.
+2. Preserved all local SQLite query logic, history persistence, deep-link navigation, and minimum-character guard.
+
+### Implemented in this step
+- `components/SearchCommand.tsx` UI redesign:
+  - mobile-first bottom-sheet-like modal framing (phone) with stronger dim backdrop.
+  - editorial header block:
+    - eyebrow (`Text / Root`)
+    - large title.
+  - full-pill input refinement on tonal surface with clear/close behavior preserved.
+  - mode pills restyled:
+    - active = `primary-soft` with gold text
+    - inactive tonal text.
+  - results/hierarchy styling tuned for readability without changing query behavior.
+  - preserved grouped text results and expandable root lemma groups.
+  - preserved persisted recent history display and clear-history action.
+
+### Validation result
+- `npx tsc --noEmit`: passed.
+- `npx expo export --platform web`: passed.
+
+### Phase 10 completion status
+- Search remains fast/local and now aligns more closely with the mobile visual direction while keeping current navigation strategy.

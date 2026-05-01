@@ -448,8 +448,9 @@ export function SearchCommand({ visible, onClose }: SearchCommandProps) {
 
   const tealColor = "#0d9488";
   const mutedColor = isDark ? "#737373" : "#8B8178";
-  const modalWidth = Math.min(width - 32, 900);
-  const modalHeight = Math.min(height - 48, 760);
+  const isPhone = width < 768;
+  const modalWidth = isPhone ? Math.max(280, Math.min(width - 12, 430)) : Math.min(width - 32, 900);
+  const modalHeight = isPhone ? Math.min(height - 16, 900) : Math.min(height - 48, 760);
 
   return (
     <Modal
@@ -458,16 +459,35 @@ export function SearchCommand({ visible, onClose }: SearchCommandProps) {
       animationType="fade"
       onRequestClose={onClose}
     >
-      <View className="flex-1 items-center justify-center px-4" style={{ backgroundColor: "rgba(0,0,0,0.45)" }}>
+      <View className={`flex-1 items-center ${isPhone ? "justify-end px-1 pb-1" : "justify-center px-4"}`} style={{ backgroundColor: "rgba(0,0,0,0.52)" }}>
         <Pressable className="absolute inset-0" onPress={onClose} />
         <View
-          className="overflow-hidden rounded-3xl bg-surface dark:bg-surface-dark"
+          className={`overflow-hidden bg-surface dark:bg-surface-dark ${isPhone ? "rounded-t-3xl" : "rounded-3xl"}`}
           style={{ width: modalWidth, height: modalHeight }}
           onStartShouldSetResponder={() => true}
         >
+        {/* Editorial header */}
+        <View className="px-5 pt-3 pb-3">
+          <View className="items-center pb-2">
+            <View className="h-1 w-10 rounded-full bg-surface-high dark:bg-surface-dark-high" />
+          </View>
+          <Text
+            className="text-warm-400 dark:text-neutral-500 uppercase"
+            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, letterSpacing: 1.8 }}
+          >
+            {`${s.searchTextMode} / ${s.searchRootMode}`}
+          </Text>
+          <Text
+            className="text-charcoal dark:text-neutral-100 mt-1"
+            style={{ fontFamily: "NotoSerif_700Bold", fontSize: 26 }}
+          >
+            {s.searchPlaceholder}
+          </Text>
+        </View>
+
         {/* Search bar */}
-        <View className="px-5 pt-4 pb-3">
-          <View className="flex-row items-center bg-surface-high dark:bg-surface-dark-high rounded-full px-4 py-2.5">
+        <View className="px-5 pb-3">
+          <View className="flex-row items-center bg-surface-low dark:bg-surface-dark-low rounded-full px-4 py-2.5">
             <Search size={18} color={mutedColor} />
             <TextInput
               ref={inputRef}
@@ -511,11 +531,11 @@ export function SearchCommand({ visible, onClose }: SearchCommandProps) {
 
         {/* Mode toggle */}
         <View className="px-5 pb-3">
-          <View className="flex-row bg-surface-high dark:bg-surface-dark-high rounded-full p-1">
+          <View className="flex-row bg-surface-low dark:bg-surface-dark-low rounded-full p-1">
             <Pressable
               onPress={() => handleModeChange("text")}
               className={`flex-1 py-2 rounded-full items-center ${
-                mode === "text" ? "bg-surface-bright dark:bg-surface-dark-bright" : ""
+                mode === "text" ? "bg-primary-soft" : ""
               }`}
               style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
             >
@@ -523,7 +543,7 @@ export function SearchCommand({ visible, onClose }: SearchCommandProps) {
                 style={{
                   fontFamily: "Manrope_600SemiBold",
                   fontSize: 13,
-                  color: mode === "text" ? tealColor : mutedColor,
+                  color: mode === "text" ? "#FDDC91" : mutedColor,
                 }}
               >
                 {s.searchTextMode}
@@ -532,7 +552,7 @@ export function SearchCommand({ visible, onClose }: SearchCommandProps) {
             <Pressable
               onPress={() => handleModeChange("root")}
               className={`flex-1 py-2 rounded-full items-center ${
-                mode === "root" ? "bg-surface-bright dark:bg-surface-dark-bright" : ""
+                mode === "root" ? "bg-primary-soft" : ""
               }`}
               style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
             >
@@ -540,7 +560,7 @@ export function SearchCommand({ visible, onClose }: SearchCommandProps) {
                 style={{
                   fontFamily: "Manrope_600SemiBold",
                   fontSize: 13,
-                  color: mode === "root" ? tealColor : mutedColor,
+                  color: mode === "root" ? "#FDDC91" : mutedColor,
                 }}
               >
                 {s.searchRootMode}
