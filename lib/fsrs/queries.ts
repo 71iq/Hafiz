@@ -407,27 +407,29 @@ export async function getStudyStreak(db: SQLiteDatabase): Promise<number> {
   );
   if (rows.length === 0) return 0;
 
+  const dateToDayIndex = (d: Date) => Math.floor(d.getTime() / 86400000);
+  const parseYmdToDayIndex = (ymd: string): number => {
+    const [y, m, d] = ymd.split("-").map(Number);
+    return dateToDayIndex(new Date(y, (m || 1) - 1, d || 1));
+  };
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-
-  const firstDate = new Date(rows[0].review_date);
-  firstDate.setHours(0, 0, 0, 0);
+  const todayIdx = dateToDayIndex(today);
+  const yesterdayIdx = todayIdx - 1;
+  const firstIdx = parseYmdToDayIndex(rows[0].review_date);
 
   // Streak must start from today or yesterday
-  if (firstDate < yesterday) return 0;
+  if (firstIdx < yesterdayIdx) return 0;
 
   let streak = 0;
-  let expected = firstDate;
+  let expectedIdx = firstIdx;
 
   for (const row of rows) {
-    const d = new Date(row.review_date);
-    d.setHours(0, 0, 0, 0);
-    if (d.getTime() === expected.getTime()) {
+    const idx = parseYmdToDayIndex(row.review_date);
+    if (idx === expectedIdx) {
       streak++;
-      expected = new Date(expected);
-      expected.setDate(expected.getDate() - 1);
+      expectedIdx--;
     } else {
       break;
     }

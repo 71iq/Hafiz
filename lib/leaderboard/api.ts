@@ -90,19 +90,36 @@ export async function fetchAllTimeLeaderboard(): Promise<LeaderboardEntry[]> {
   if (!isSupabaseConfigured()) return [];
 
   const { data, error } = await supabase
-    .from("profiles")
-    .select("id, username, display_name, total_score")
-    .order("total_score", { ascending: false })
-    .limit(50);
+    .from("daily_scores")
+    .select("user_id, score, profiles:profiles!daily_scores_user_id_fkey(username, display_name)")
+    .order("score", { ascending: false });
 
   if (error) throw error;
-  return (data ?? []).map((row: any, i: number) => ({
-    user_id: row.id,
-    username: row.username,
-    display_name: row.display_name,
-    score: row.total_score,
-    rank: i + 1,
-  }));
+
+  const userMap = new Map<string, { username: string; display_name: string | null; score: number }>();
+  for (const row of data ?? []) {
+    const existing = userMap.get(row.user_id);
+    if (existing) {
+      existing.score += row.score;
+    } else {
+      userMap.set(row.user_id, {
+        username: (row as any).profiles?.username ?? "unknown",
+        display_name: (row as any).profiles?.display_name ?? null,
+        score: row.score,
+      });
+    }
+  }
+
+  return Array.from(userMap.entries())
+    .sort((a, b) => b[1].score - a[1].score)
+    .slice(0, 50)
+    .map(([user_id, info], i) => ({
+      user_id,
+      username: info.username,
+      display_name: info.display_name,
+      score: info.score,
+      rank: i + 1,
+    }));
 }
 
 /** Streak leaderboard: by current_streak from profiles */
@@ -110,19 +127,66 @@ export async function fetchStreakLeaderboard(): Promise<LeaderboardEntry[]> {
   if (!isSupabaseConfigured()) return [];
 
   const { data, error } = await supabase
-    .from("profiles")
-    .select("id, username, display_name, current_streak")
-    .order("current_streak", { ascending: false })
-    .limit(50);
+    .from("daily_scores")
+    .select("user_id, date, profiles:profiles!daily_scores_user_id_fkey(username, display_name)")
+    .order("date", { ascending: false });
 
   if (error) throw error;
-  return (data ?? []).map((row: any, i: number) => ({
-    user_id: row.id,
-    username: row.username,
-    display_name: row.display_name,
-    score: row.current_streak,
-    rank: i + 1,
-  }));
+
+  const toDayIndex = (ymd: string) => {
+    const [y, m, d] = ymd.split("-").map(Number);
+    return Math.floor(new Date(y, (m || 1) - 1, d || 1).getTime() / 86400000);
+  };
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayIdx = Math.floor(today.getTime() / 86400000);
+  const yesterdayIdx = todayIdx - 1;
+
+  const byUser = new Map<string, { username: string; display_name: string | null; dates: Set<string> }>();
+  for (const row of data ?? []) {
+    const existing = byUser.get(row.user_id);
+    if (existing) {
+      existing.dates.add(row.date);
+    } else {
+      byUser.set(row.user_id, {
+        username: (row as any).profiles?.username ?? "unknown",
+        display_name: (row as any).profiles?.display_name ?? null,
+        dates: new Set([row.date]),
+      });
+    }
+  }
+
+  const ranked = Array.from(byUser.entries()).map(([user_id, info]) => {
+    const indices = Array.from(info.dates).map(toDayIndex).sort((a, b) => b - a);
+    if (indices.length === 0) {
+      return { user_id, username: info.username, display_name: info.display_name, score: 0 };
+    }
+    if (indices[0] < yesterdayIdx) {
+      return { user_id, username: info.username, display_name: info.display_name, score: 0 };
+    }
+    let streak = 0;
+    let expected = indices[0];
+    for (const idx of indices) {
+      if (idx === expected) {
+        streak++;
+        expected--;
+      } else if (idx < expected) {
+        break;
+      }
+    }
+    return { user_id, username: info.username, display_name: info.display_name, score: streak };
+  });
+
+  return ranked
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 50)
+    .map((row, i) => ({
+      user_id: row.user_id,
+      username: row.username,
+      display_name: row.display_name,
+      score: row.score,
+      rank: i + 1,
+    }));
 }
 
 /** Public profile for leaderboard users */
