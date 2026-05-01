@@ -12,7 +12,7 @@ import { TajweedTab } from "./word-tabs/TajweedTab";
 import { QiraatTab } from "./word-tabs/QiraatTab";
 import { OccurrencesTab } from "./word-tabs/OccurrencesTab";
 import { AyahBlock } from "./AyahBlock";
-import { fetchWordRoot, fetchWordText } from "@/lib/word/queries";
+import { fetchWordRoot, fetchWordText, fetchWordTranslation } from "@/lib/word/queries";
 
 type TabKey = "meaning" | "irab" | "tajweed" | "tasreef" | "qiraat" | "occurrences";
 type SheetView = "tabs" | "ayah";
@@ -27,6 +27,7 @@ type WordHeaderMeta = {
   root: string | null;
   lemma: string | null;
   rootCount: number | null;
+  translationEn: string | null;
 };
 
 export function WordDetailSheet() {
@@ -44,6 +45,7 @@ export function WordDetailSheet() {
     root: null,
     lemma: null,
     rootCount: null,
+    translationEn: null,
   });
 
   const isPhone = width < 768;
@@ -75,8 +77,9 @@ export function WordDetailSheet() {
     Promise.all([
       fetchWordText(db, detailWord.surah, detailWord.ayah, detailWord.wordPos),
       fetchWordRoot(db, detailWord.surah, detailWord.ayah, detailWord.wordPos),
+      fetchWordTranslation(db, detailWord.surah, detailWord.ayah, detailWord.wordPos),
     ])
-      .then(async ([wordText, rootMeta]) => {
+      .then(async ([wordText, rootMeta, wordTranslation]) => {
         if (cancelled) return;
         let rootCount: number | null = null;
         if (rootMeta?.root) {
@@ -92,11 +95,12 @@ export function WordDetailSheet() {
           root: rootMeta?.root ?? null,
           lemma: rootMeta?.lemma ?? null,
           rootCount,
+          translationEn: wordTranslation?.translation_en ?? null,
         });
       })
       .catch(() => {
         if (!cancelled) {
-          setHeaderMeta({ wordText: null, root: null, lemma: null, rootCount: null });
+          setHeaderMeta({ wordText: null, root: null, lemma: null, rootCount: null, translationEn: null });
         }
       });
     return () => {
@@ -181,6 +185,14 @@ export function WordDetailSheet() {
                 >
                   {headerMeta.wordText ?? "…"}
                 </Text>
+                {!!headerMeta.translationEn && (
+                  <Text
+                    className={`mt-1 text-warm-500 dark:text-neutral-400 ${isRTL ? "text-right" : "text-left"}`}
+                    style={{ fontFamily: "Manrope_500Medium", fontSize: 13 }}
+                  >
+                    {s.wordMeaningTranslation ?? "Translation"}: {headerMeta.translationEn}
+                  </Text>
+                )}
 
                 <View className={`mt-2 flex-row flex-wrap gap-2 ${isRTL ? "flex-row-reverse" : ""}`}>
                   <MetaPill label={s.rootLabel ?? "Root"} value={headerMeta.root ?? "—"} />

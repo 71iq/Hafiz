@@ -213,14 +213,6 @@ export function MeaningTab({ surah, ayah, wordPos }: Props) {
       {enData.translationEn && (
         <Row label={s.wordMeaningTranslation ?? "Translation"} value={enData.translationEn} />
       )}
-
-      {enData.root && (
-        <Row label={s.wordMeaningRoot ?? "Root"} value={enData.root} rtl />
-      )}
-
-      {enData.lemma && (
-        <Row label={s.wordMeaningLemma ?? "Lemma"} value={enData.lemma} rtl />
-      )}
       <SaveToVocabButton saved={savedToVocab} onPress={saveToVocab} label={savedToVocab ? s.addedToVocab : s.addToVocab} />
     </View>
   );
