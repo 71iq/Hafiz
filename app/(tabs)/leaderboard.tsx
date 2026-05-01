@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
 import { View, Text, Pressable, ScrollView, RefreshControl } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Trophy, Flame } from "lucide-react-native";
+import { Trophy, Flame, Medal } from "lucide-react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useSettings } from "@/lib/settings/context";
 import { useDatabase } from "@/lib/database/provider";
@@ -76,38 +76,51 @@ export default function LeaderboardScreen() {
   ];
 
   const scoreUnit = activeTab === "streak" ? s.leaderboardDays : s.leaderboardPoints;
+  const activeTabLabel = tabs.find((tab) => tab.key === activeTab)?.label ?? "";
 
   return (
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
-      {/* Header */}
-      <View className="px-6 pt-4 pb-2">
+      <View className="px-6 pt-4">
         <Text
-          className="text-charcoal dark:text-neutral-100"
-          style={{ fontFamily: "NotoSerif_700Bold", fontSize: 24 }}
+          style={{
+            fontFamily: "Manrope_600SemiBold",
+            fontSize: 10,
+            letterSpacing: 2,
+            textTransform: "uppercase",
+            color: mutedColor,
+          }}
+        >
+          {s.tabLeaderboard}
+        </Text>
+        <Text
+          className="text-primary dark:text-gold-light"
+          style={{ fontFamily: "NotoSerif_700Bold", fontSize: 32, lineHeight: 36, marginTop: 6 }}
         >
           {s.leaderboardTitle}
         </Text>
       </View>
 
-      {/* Tab bar */}
-      <View className="flex-row px-4 pb-3 gap-2">
+      <View
+        className="mx-6 mt-5 mb-5 flex-row rounded-full p-1.5"
+        style={{ backgroundColor: isDark ? "#161616" : "#EFE8DE" }}
+      >
         {tabs.map((tab) => {
           const isActive = activeTab === tab.key;
           return (
             <Pressable
               key={tab.key}
               onPress={() => setActiveTab(tab.key)}
-              className="flex-1 py-2.5 rounded-full items-center"
+              className="flex-1 h-10 rounded-full items-center justify-center"
               style={{
                 backgroundColor: isActive
                   ? (isDark ? "#1B4D4F" : "#003638")
-                  : (isDark ? "#1a1a1a" : "#F0EAE2"),
+                  : "transparent",
               }}
             >
               <Text
                 style={{
                   fontFamily: isActive ? "Manrope_600SemiBold" : "Manrope_500Medium",
-                  fontSize: 12,
+                  fontSize: 13,
                   color: isActive ? "#FDDC91" : mutedColor,
                 }}
               >
@@ -141,11 +154,27 @@ export default function LeaderboardScreen() {
         </View>
       ) : (
         <ScrollView
-          className="flex-1 px-4"
+          className="flex-1 px-6"
           refreshControl={
             <RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} />
           }
         >
+          <View className="mb-3 flex-row items-end justify-between">
+            <Text
+              style={{
+                fontFamily: "Manrope_600SemiBold",
+                fontSize: 10,
+                letterSpacing: 2,
+                textTransform: "uppercase",
+                color: mutedColor,
+              }}
+            >
+              {`${activeTabLabel}`}
+            </Text>
+            <Text style={{ fontFamily: "Manrope_500Medium", fontSize: 11, color: mutedColor }}>
+              {`${entries.length} ${s.leaderboardPlayers}`}
+            </Text>
+          </View>
           {entries.map((entry) => (
             <LeaderboardRow
               key={entry.user_id}
@@ -182,54 +211,43 @@ function LeaderboardRow({
   const displayName = entry.display_name || entry.username;
   const mutedColor = isDark ? "#737373" : "#A39B93";
 
-  // Medal for top 3
-  const medal = entry.rank <= 3
-    ? ["", "\uD83E\uDD47", "\uD83E\uDD48", "\uD83E\uDD49"][entry.rank]
-    : null;
+  const medalColor = entry.rank === 1 ? "#F5C24B" : entry.rank === 2 ? "#B7BECF" : "#C49A62";
+  const hasMedal = entry.rank <= 3;
+  const rankColor = hasMedal ? (isDark ? "#F5EBD7" : "#4A4034") : mutedColor;
+  const scoreColor = isDark ? "#F3F2EF" : "#1D1D1B";
 
   return (
     <View
-      className="flex-row items-center px-4 py-3 mb-2 rounded-2xl"
+      className="flex-row items-center px-4 py-3.5 mb-2.5 rounded-2xl"
       style={{
         backgroundColor: isCurrentUser
-          ? (isDark ? "rgba(27, 77, 79, 0.3)" : "rgba(0, 54, 56, 0.06)")
-          : (isDark ? "#141414" : "#FFFFFF"),
+          ? (isDark ? "rgba(45, 212, 191, 0.12)" : "rgba(13, 148, 136, 0.08)")
+          : (isDark ? "#141414" : "#FAF8F5"),
       }}
     >
-      {/* Rank */}
-      <View className="w-10 items-center">
-        {medal ? (
-          <Text style={{ fontSize: 20 }}>{medal}</Text>
-        ) : (
-          <Text
-            style={{ fontFamily: "Manrope_700Bold", fontSize: 16, color: mutedColor }}
-          >
-            {entry.rank}
-          </Text>
-        )}
+      <View className="w-8 items-center">
+        <Text style={{ fontFamily: "NotoSerif_700Bold", fontSize: 16, color: rankColor }}>
+          {entry.rank}
+        </Text>
       </View>
 
-      {/* Avatar placeholder */}
       <View
         className="w-10 h-10 rounded-full items-center justify-center mx-3"
         style={{
-          backgroundColor: isCurrentUser
-            ? (isDark ? "#1B4D4F" : "#003638")
-            : (isDark ? "#262626" : "#F0EAE2"),
+          backgroundColor: isDark ? "#003638" : "#00595B",
         }}
       >
         <Text
           style={{
             fontFamily: "Manrope_600SemiBold",
-            fontSize: 14,
-            color: isCurrentUser ? "#FDDC91" : mutedColor,
+            fontSize: 15,
+            color: "#FDDC91",
           }}
         >
           {displayName.charAt(0).toUpperCase()}
         </Text>
       </View>
 
-      {/* Name */}
       <View className="flex-1">
         <View className="flex-row items-center gap-2">
           <Text
@@ -257,13 +275,12 @@ function LeaderboardRow({
         </Text>
       </View>
 
-      {/* Score */}
-      <View className="items-end">
-        <View className="flex-row items-center gap-1">
+      <View className="items-end ml-2">
+        <View className="flex-row items-center gap-1.5">
+          {hasMedal && <Medal size={15} color={medalColor} />}
           {isStreak && <Flame size={14} color={isDark ? "#f97316" : "#d97706"} />}
           <Text
-            className="text-charcoal dark:text-neutral-100"
-            style={{ fontFamily: "Manrope_700Bold", fontSize: 18 }}
+            style={{ fontFamily: "NotoSerif_700Bold", fontSize: 20, color: scoreColor }}
           >
             {entry.score.toLocaleString()}
           </Text>

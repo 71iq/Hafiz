@@ -498,3 +498,39 @@ Compared current routes/components against the phone mockup inventory:
 ### Phase 12 completion status
 - Onboarding is now closer to target flow with explicit post-create confirmation and action choice.
 - Auth and reset flows remain robust, including unconfigured/offline-safe behavior.
+
+## 2026-05-01 — Phase 13 Completed
+
+### Scope decisions for this phase
+1. Preserved all Supabase/TanStack Query behavior and auth-gate flow exactly; only presentation layer changed.
+2. Applied leaderboard redesign directly in `app/(tabs)/leaderboard.tsx` (no new mock-data paths, no API changes).
+3. Used a safe empty state (existing `EmptyState`) instead of invite/share CTA, since sharing is not wired as a first-class feature here.
+
+### Implemented in this step
+- `app/(tabs)/leaderboard.tsx`:
+  - Redesigned header with:
+    - compact eyebrow (`tabLeaderboard`)
+    - display-style title treatment.
+  - Redesigned segmented control container/pills for:
+    - Daily
+    - Weekly
+    - All-time
+    - Streak.
+  - Added list meta row showing active leaderboard scope label and participant count.
+  - Redesigned leaderboard rows:
+    - rank emphasis with display serif style
+    - fixed avatar-initial treatment
+    - username + handle hierarchy
+    - top-3 medal icon accenting
+    - streak flame icon retained for streak tab
+    - current-user highlight chip (`leaderboardYou`) and row tint.
+  - Kept pull-to-refresh, loading skeleton, empty, and not-configured states unchanged in behavior.
+- `lib/i18n/strings.ts`:
+  - Added bilingual `leaderboardPlayers` key for participant count label.
+
+### Validation result
+- `npx tsc --noEmit`: passed.
+- `npx expo export --platform web`: passed.
+
+### Phase 13 completion status
+- Leaderboard now matches the target mobile direction while still using live Supabase-backed query data and existing auth/availability gating.
