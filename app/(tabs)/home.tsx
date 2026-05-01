@@ -38,7 +38,7 @@ type DeckDisplay = {
 
 export default function HomeScreen() {
   const db = useDatabase();
-  const { isDark, dailyReviewLimit, isRTL } = useSettings();
+  const { isDark, dailyReviewLimit, isRTL, uiLanguage } = useSettings();
   const s = useStrings();
   const router = useRouter();
   const [decks, setDecks] = useState<DeckDisplay[]>([]);
@@ -57,11 +57,13 @@ export default function HomeScreen() {
 
   const loadData = useCallback(async () => {
     // Load surah names for deck labels
-    const surahRows = await db.getAllAsync<{ number: number; name_arabic: string }>(
-      "SELECT number, name_arabic FROM surahs"
+    const surahRows = await db.getAllAsync<{ number: number; name_arabic: string; name_english: string }>(
+      "SELECT number, name_arabic, name_english FROM surahs"
     );
     const nameMap: Record<number, string> = {};
-    for (const row of surahRows) nameMap[row.number] = row.name_arabic;
+    for (const row of surahRows) {
+      nameMap[row.number] = uiLanguage === "ar" ? row.name_arabic : row.name_english;
+    }
     setSurahNames(nameMap);
 
     const rawDecks = (await getDecks(db)).filter((d) => d.id !== MEANINGS_DECK_ID);
@@ -119,7 +121,7 @@ export default function HomeScreen() {
     } catch {
       setResume(null);
     }
-  }, [db]);
+  }, [db, uiLanguage]);
 
   useFocusEffect(
     useCallback(() => {
