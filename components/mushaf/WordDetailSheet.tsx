@@ -11,16 +11,10 @@ import { TasreefTab } from "./word-tabs/TasreefTab";
 import { TajweedTab } from "./word-tabs/TajweedTab";
 import { QiraatTab } from "./word-tabs/QiraatTab";
 import { OccurrencesTab } from "./word-tabs/OccurrencesTab";
-import { AyahBlock } from "./AyahBlock";
+import { AyahDetailModal } from "./AyahDetailModal";
 import { fetchWordRoot, fetchWordText, fetchWordTranslation } from "@/lib/word/queries";
 
 type TabKey = "meaning" | "irab" | "tajweed" | "tasreef" | "qiraat" | "occurrences";
-type SheetView = "tabs" | "ayah";
-
-type AyahCtx = {
-  text: string;
-  v2Page: number;
-};
 
 type WordHeaderMeta = {
   wordText: string | null;
@@ -38,8 +32,7 @@ export function WordDetailSheet() {
   const db = useDatabase();
 
   const [activeTab, setActiveTab] = useState<TabKey>("meaning");
-  const [view, setView] = useState<SheetView>("tabs");
-  const [ayahCtx, setAyahCtx] = useState<AyahCtx | null>(null);
+  const [ayahModalOpen, setAyahModalOpen] = useState(false);
   const [headerMeta, setHeaderMeta] = useState<WordHeaderMeta>({
     wordText: null,
     root: null,
@@ -51,7 +44,7 @@ export function WordDetailSheet() {
 
   const isPhone = width < 768;
   const modalWidth = isPhone ? Math.max(280, Math.min(width - 16, 430)) : Math.max(280, Math.min(width - 32, 760));
-  const maxModalHeight = Math.max(320, Math.min(height - (isPhone ? 20 : 48), 760));
+  const maxModalHeight = Math.max(320, Math.min(Math.floor(height * 0.72), 620));
 
   const tabs = useMemo(
     () => [
@@ -68,7 +61,7 @@ export function WordDetailSheet() {
   const handleClose = useCallback(() => {
     closeDetail();
     setActiveTab("meaning");
-    setView("tabs");
+    setAyahModalOpen(false);
   }, [closeDetail]);
 
   useEffect(() => {
@@ -109,29 +102,12 @@ export function WordDetailSheet() {
   }, [db, detailWord?.surah, detailWord?.ayah, detailWord?.wordPos]);
 
   useEffect(() => {
-    if (view !== "ayah" || !detailWord) return;
-    let cancelled = false;
-    db.getFirstAsync<{ text_qcf2: string; v2_page: number }>(
-      "SELECT text_qcf2, v2_page FROM quran_text WHERE surah = ? AND ayah = ?",
-      [detailWord.surah, detailWord.ayah]
-    )
-      .then((row) => {
-        if (cancelled || !row) return;
-        setAyahCtx({ text: row.text_qcf2, v2Page: row.v2_page });
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [view, detailWord?.surah, detailWord?.ayah, db]);
-
-  useEffect(() => {
-    if (view !== "tabs" || !isRTL) return;
+    if (!isRTL) return;
     const frame = requestAnimationFrame(() => {
       tabScrollRef.current?.scrollToEnd({ animated: false });
     });
     return () => cancelAnimationFrame(frame);
-  }, [view, isRTL, activeTab]);
+  }, [isRTL, activeTab]);
 
   if (!detailWord) return null;
 
@@ -167,13 +143,13 @@ export function WordDetailSheet() {
                   </Text>
                 </View>
                 <Pressable
-                  onPress={() => setView(view === "tabs" ? "ayah" : "tabs")}
+                  onPress={() => setAyahModalOpen(true)}
                   className="flex-row items-center gap-1.5 rounded-full bg-surface-low dark:bg-surface-dark px-3 py-1.5"
                   style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
                 >
                   <BookOpen size={13} color={isDark ? "#a3a3a3" : "#003638"} />
                   <Text className="text-charcoal dark:text-neutral-200" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}>
-                    {view === "ayah" ? (s.backToWord ?? "Back") : s.viewFullAyah}
+                    {s.viewFullAyah}
                   </Text>
                 </Pressable>
               </View>
@@ -186,53 +162,50 @@ export function WordDetailSheet() {
               </Pressable>
             </View>
 
-            {view === "tabs" && (
-              <>
+            <>
+              <Text
+                className="mt-3 text-charcoal dark:text-neutral-100"
+                style={{ fontFamily: "NotoSerif_700Bold", fontSize: 27, writingDirection: "rtl" }}
+              >
+                {headerMeta.wordText ?? "…"}
+              </Text>
+              {!isArabicMode && !!headerMeta.translationEn && (
                 <Text
-                  className="mt-3 text-charcoal dark:text-neutral-100"
-                  style={{ fontFamily: "NotoSerif_700Bold", fontSize: 27, writingDirection: "rtl" }}
+                  className={`mt-1 text-warm-500 dark:text-neutral-400 ${isRTL ? "text-right" : "text-left"}`}
+                  style={{ fontFamily: "Manrope_500Medium", fontSize: 13 }}
                 >
-                  {headerMeta.wordText ?? "…"}
+                  {s.wordMeaningTranslation ?? "Translation"}: {headerMeta.translationEn}
                 </Text>
-                {!isArabicMode && !!headerMeta.translationEn && (
-                  <Text
-                    className={`mt-1 text-warm-500 dark:text-neutral-400 ${isRTL ? "text-right" : "text-left"}`}
-                    style={{ fontFamily: "Manrope_500Medium", fontSize: 13 }}
-                  >
-                    {s.wordMeaningTranslation ?? "Translation"}: {headerMeta.translationEn}
-                  </Text>
-                )}
+              )}
 
-                <View className={`mt-2 flex-row flex-wrap gap-2 ${isRTL ? "flex-row-reverse" : ""}`}>
-                  <MetaPill label={s.rootLabel ?? "Root"} value={headerMeta.root ?? "—"} />
-                  <MetaPill label={s.lemmaLabel ?? "Lemma"} value={headerMeta.lemma ?? "—"} />
-                  <MetaPill label={s.wordTabOccurrences} value={headerMeta.rootCount == null ? "—" : String(headerMeta.rootCount)} />
-                </View>
+              <View className={`mt-2 flex-row flex-wrap gap-2 ${isRTL ? "flex-row-reverse" : ""}`}>
+                <MetaPill label={s.rootLabel ?? "Root"} value={headerMeta.root ?? "—"} />
+                <MetaPill label={s.lemmaLabel ?? "Lemma"} value={headerMeta.lemma ?? "—"} />
+                <MetaPill label={s.wordTabOccurrences} value={headerMeta.rootCount == null ? "—" : String(headerMeta.rootCount)} />
+              </View>
 
-                <View className={`mt-2 flex-row gap-2 ${isRTL ? "flex-row-reverse" : ""}`}>
-                  <QuickStat label={s.surah} value={String(surah)} />
-                  <QuickStat label={ayahLabel} value={String(ayah)} />
-                  <QuickStat label={wordLabel} value={String(wordPos)} />
-                </View>
-              </>
-            )}
+              <View className={`mt-2 flex-row gap-2 ${isRTL ? "flex-row-reverse" : ""}`}>
+                <QuickStat label={s.surah} value={String(surah)} />
+                <QuickStat label={ayahLabel} value={String(ayah)} />
+                <QuickStat label={wordLabel} value={String(wordPos)} />
+              </View>
+            </>
           </View>
 
-          {view === "tabs" ? (
-            <View className="flex-1 min-h-0">
-              <View className="h-14 justify-center bg-surface-low dark:bg-surface-dark">
-                <ScrollView
-                  ref={tabScrollRef}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{
-                    paddingHorizontal: 16,
-                    gap: 6,
-                    paddingVertical: 6,
-                    alignItems: "center",
-                    flexDirection: isRTL ? "row-reverse" : "row",
-                  }}
-                >
+          <View className="flex-1 min-h-0">
+            <View className="h-14 justify-center bg-surface-low dark:bg-surface-dark">
+              <ScrollView
+                ref={tabScrollRef}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{
+                  paddingHorizontal: 16,
+                  gap: 6,
+                  paddingVertical: 6,
+                  alignItems: "center",
+                  flexDirection: isRTL ? "row-reverse" : "row",
+                }}
+              >
                 {tabs.map((tab) => {
                   const isActive = activeTab === tab.key;
                   return (
@@ -254,39 +227,26 @@ export function WordDetailSheet() {
                     </Pressable>
                   );
                 })}
-                </ScrollView>
-              </View>
-
-              <ScrollView className="flex-1 min-h-0 px-5">
-                {activeTab === "meaning" && <MeaningTab surah={surah} ayah={ayah} wordPos={wordPos} />}
-                {activeTab === "irab" && <IrabTab surah={surah} ayah={ayah} wordPos={wordPos} />}
-                {activeTab === "tajweed" && <TajweedTab surah={surah} ayah={ayah} wordPos={wordPos} />}
-                {activeTab === "tasreef" && <TasreefTab surah={surah} ayah={ayah} wordPos={wordPos} />}
-                {activeTab === "qiraat" && <QiraatTab surah={surah} ayah={ayah} />}
-                {activeTab === "occurrences" && <OccurrencesTab surah={surah} ayah={ayah} wordPos={wordPos} />}
               </ScrollView>
-
             </View>
-          ) : (
-            <ScrollView className="flex-1 min-h-0">
-              {ayahCtx ? (
-                <AyahBlock
-                  surah={surah}
-                  ayah={ayah}
-                  text={ayahCtx.text}
-                  v2Page={ayahCtx.v2Page}
-                  fontSize={fontSize}
-                  lineHeight={lineHeight}
-                />
-              ) : (
-                <View className="py-10 items-center">
-                  <Text className="text-warm-400 dark:text-neutral-500 text-sm">{s.loading}</Text>
-                </View>
-              )}
+
+            <ScrollView className="flex-1 min-h-0 px-5">
+              {activeTab === "meaning" && <MeaningTab surah={surah} ayah={ayah} wordPos={wordPos} />}
+              {activeTab === "irab" && <IrabTab surah={surah} ayah={ayah} wordPos={wordPos} />}
+              {activeTab === "tajweed" && <TajweedTab surah={surah} ayah={ayah} wordPos={wordPos} />}
+              {activeTab === "tasreef" && <TasreefTab surah={surah} ayah={ayah} wordPos={wordPos} />}
+              {activeTab === "qiraat" && <QiraatTab surah={surah} ayah={ayah} />}
+              {activeTab === "occurrences" && <OccurrencesTab surah={surah} ayah={ayah} wordPos={wordPos} />}
             </ScrollView>
-          )}
+
+          </View>
         </View>
       </View>
+      <AyahDetailModal
+        target={ayahModalOpen ? { surah, ayah } : null}
+        onClose={() => setAyahModalOpen(false)}
+        initialTab={activeTab === "qiraat" ? "qiraat" : activeTab === "meaning" ? "translation" : "tafsir"}
+      />
     </Modal>
   );
 }
