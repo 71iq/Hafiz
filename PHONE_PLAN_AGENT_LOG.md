@@ -608,3 +608,51 @@ Compared current routes/components against the phone mockup inventory:
 ### Phase 15 completion status
 - Key i18n parity and RTL mirroring issues on redesigned community/auth surfaces are fixed.
 - No regressions introduced to reflections network behavior or auth routing.
+
+## 2026-05-01 — Phase 16 Completed
+
+### Scope decisions for this phase
+1. Followed `.codex/skills/build-and-test.md` workflow for prebuild/build/postbuild checks.
+2. Focused optimizations on persistent chrome effects (where render cost is paid continuously) instead of changing Quran data-flow or virtualization logic.
+3. Preserved page/verse rendering architecture and QCF2 loading behavior to avoid regression risk.
+
+### Performance audit and changes applied
+- Reduced expensive web blur effects in persistent navigation/surface chrome:
+  - `components/ui/AppNavigation.tsx`
+    - bottom bar blur: `24px -> 14px`
+    - desktop trigger blur: `18px -> 12px`
+    - floating panel blur: `24px -> 14px`
+    - ambient shadow softened (`radius 20 -> 12`, `opacity 0.04 -> 0.03`, `elevation 8 -> 5`).
+  - `components/ui/MobilePrimitives.tsx`
+    - `MobileGlassBar` blur: `20px -> 12px`.
+  - `app/(tabs)/mushaf.tsx`
+    - phone top glass bar blur: `20px -> 12px`.
+  - `components/ui/CustomTabBar.tsx`
+    - blur: `24px -> 14px`
+    - ambient shadow softened (`radius 20 -> 12`, `opacity 0.04 -> 0.03`, `elevation 8 -> 5`).
+
+### Rendering architecture verification (no regressions introduced)
+- Page mode virtualization remains constrained:
+  - `components/mushaf/PageMushaf.tsx`
+    - `getItemLayout` retained
+    - `initialNumToRender={1}`
+    - `maxToRenderPerBatch={1}`
+    - `windowSize={3}`.
+- Verse mode remains FlashList-based (no full-Quran render path introduced).
+- QCF2 reveal opacity/requestAnimationFrame path unchanged.
+
+### Build and bundle checks
+- Prebuild scan:
+  - reviewed `require(...assets/data...)` usage; existing patterns remain intentional for local/offline dataset bootstrapping and translation import strategy.
+- `npx tsc --noEmit`: passed.
+- `npx expo export --platform web`: passed.
+- Output size:
+  - `dist/`: `311M` (includes static data assets)
+  - JS chunks:
+    - `dist/_expo/static/js/web/entry-5bb18170f0dec95f5435f7d166da9610.js` ≈ `5.0M`
+    - `dist/_expo/static/js/web/worker-1b14df5272f67b595305b1aeb70bf2d4.js` ≈ `132K`
+  - total JS static bundle remains under the 10 MB threshold.
+
+### Phase 16 completion status
+- Web export succeeds without OOM.
+- Core reading screens retain virtualization and remain architecturally performance-safe, with reduced persistent blur/shadow overhead on mobile/desktop chrome.

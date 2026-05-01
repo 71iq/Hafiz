@@ -116,7 +116,7 @@ function BottomBar(props: BottomTabBarProps) {
           paddingBottom: Math.max(insets.bottom, 12),
           backgroundColor: isDark ? BAR_BG_DARK : BAR_BG_LIGHT,
           ...Platform.select({
-            web: { backdropFilter: "blur(24px)", WebkitBackdropFilter: "blur(24px)" } as any,
+            web: { backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)" } as any,
             default: {
               backgroundColor: isDark ? "rgba(28,25,23,0.95)" : "rgba(255,248,241,0.95)",
             },
@@ -266,7 +266,7 @@ function FloatingPanel(props: BottomTabBarProps & { isRTL?: boolean }) {
           zIndex: 60,
           ...sideStyle,
           ...Platform.select({
-            web: { backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)" } as any,
+            web: { backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" } as any,
             default: {},
           }),
         }}
@@ -299,7 +299,7 @@ function FloatingPanel(props: BottomTabBarProps & { isRTL?: boolean }) {
             zIndex: 55,
             ...sideStyle,
             ...Platform.select({
-              web: { backdropFilter: "blur(24px)", WebkitBackdropFilter: "blur(24px)" } as any,
+              web: { backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)" } as any,
               default: {},
             }),
           },
@@ -387,9 +387,9 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 44,
     shadowColor: "#003638",
     shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 20,
-    elevation: 8,
+    shadowOpacity: 0.03,
+    shadowRadius: 12,
+    elevation: 5,
   },
   bottomTabItem: {
     flexDirection: "column",

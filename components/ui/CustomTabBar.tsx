@@ -112,8 +112,8 @@ export function CustomTabBar({
           backgroundColor: isDark ? BAR_BG_DARK : BAR_BG_LIGHT,
           ...Platform.select({
             web: {
-              backdropFilter: "blur(24px)",
-              WebkitBackdropFilter: "blur(24px)",
+              backdropFilter: "blur(14px)",
+              WebkitBackdropFilter: "blur(14px)",
             } as any,
             default: {
               // On native without expo-blur, use slightly higher opacity
@@ -179,9 +179,9 @@ const styles = StyleSheet.create({
     // Teal-tinted ambient shadow
     shadowColor: "#003638",
     shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 20,
-    elevation: 8,
+    shadowOpacity: 0.03,
+    shadowRadius: 12,
+    elevation: 5,
   },
   tabItem: {
     flexDirection: "column",

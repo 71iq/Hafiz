@@ -190,8 +190,8 @@ export function MobileGlassBar({ className, ...props }: ViewProps) {
       style={{
         backgroundColor: isDark ? "rgba(28,25,23,0.80)" : "rgba(255,248,241,0.80)",
         ...(typeof window !== "undefined" ? ({
-          backdropFilter: "blur(20px)",
-          WebkitBackdropFilter: "blur(20px)",
+          backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
         } as any) : null),
       }}
       {...props}

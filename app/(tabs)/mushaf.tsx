@@ -524,7 +524,7 @@ function MushafInner() {
                 style={{
                   backgroundColor: isDark ? "rgba(28,25,23,0.82)" : "rgba(255,248,241,0.82)",
                   ...(Platform.OS === "web"
-                    ? ({ backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)" } as any)
+                    ? ({ backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" } as any)
                     : null),
                 }}
               >
