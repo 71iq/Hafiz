@@ -145,6 +145,44 @@ export async function createDeck(
   return ayahs.length;
 }
 
+export async function addAyahToDeck(
+  db: SQLiteDatabase,
+  deckId: string,
+  surah: number,
+  ayah: number
+): Promise<boolean> {
+  const now = new Date().toISOString();
+  const emptyCard = createEmptyCard();
+  const cardId = `${surah}:${ayah}`;
+  const existing = await db.getFirstAsync<{ id: string }>(
+    "SELECT id FROM study_cards WHERE id = ? AND deck_id = ?",
+    [cardId, deckId]
+  );
+  if (existing?.id) return false;
+
+  await db.runAsync(
+    `INSERT INTO study_cards (id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days, learning_steps, reps, lapses, state, last_review, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      cardId,
+      deckId,
+      emptyCard.due.toISOString(),
+      emptyCard.stability,
+      emptyCard.difficulty,
+      emptyCard.elapsed_days,
+      emptyCard.scheduled_days,
+      emptyCard.learning_steps,
+      emptyCard.reps,
+      emptyCard.lapses,
+      emptyCard.state,
+      null,
+      now,
+      now,
+    ]
+  );
+  return true;
+}
+
 // ─── Query helpers ───────────────────────────────────────────
 
 export async function getDueCards(
