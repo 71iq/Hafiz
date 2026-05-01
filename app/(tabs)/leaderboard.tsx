@@ -1,8 +1,8 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { View, Text, Pressable, ScrollView, RefreshControl } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Trophy, Flame, Medal } from "lucide-react-native";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSettings } from "@/lib/settings/context";
 import { useDatabase } from "@/lib/database/provider";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -27,6 +27,7 @@ export default function LeaderboardScreen() {
   const db = useDatabase();
   const s = useStrings();
   const user = useAuthStore((s) => s.user);
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<Tab>("daily");
 
   const configured = isSupabaseConfigured();
@@ -56,6 +57,26 @@ export default function LeaderboardScreen() {
       case "streak": return fetchStreakLeaderboard();
     }
   }, [activeTab]);
+
+  useEffect(() => {
+    if (!configured || !user) return;
+    const loaders: Record<Tab, () => Promise<LeaderboardEntry[]>> = {
+      daily: fetchDailyLeaderboard,
+      weekly: fetchWeeklyLeaderboard,
+      alltime: fetchAllTimeLeaderboard,
+      streak: fetchStreakLeaderboard,
+    };
+    (Object.keys(loaders) as Tab[]).forEach((tab) => {
+      queryClient.prefetchQuery({
+        queryKey: ["leaderboard", tab],
+        queryFn: async () => {
+          await syncLeaderboard();
+          return loaders[tab]();
+        },
+        staleTime: 1000 * 60 * 2,
+      }).catch(console.warn);
+    });
+  }, [configured, queryClient, syncLeaderboard, user]);
 
   const { data: entries = [], isLoading, refetch, isRefetching } = useQuery({
     queryKey: ["leaderboard", activeTab],

@@ -136,8 +136,14 @@ export default function HomeScreen() {
         text: s.flashcardsDelete,
         style: "destructive",
         onPress: async () => {
-          await deleteDeck(db, deckId);
-          loadData();
+          try {
+            await deleteDeck(db, deckId);
+            setDecks((prev) => prev.filter((d) => d.id !== deckId));
+            await loadData();
+          } catch (e) {
+            console.warn("[Home] Failed to delete deck:", e);
+            setToast(s.reviewActionFailed);
+          }
         },
       },
     ]);

@@ -141,68 +141,75 @@ function FlashcardSessionScreen() {
   // Load due cards and pre-fetch all card data
   useEffect(() => {
     async function load() {
-      // Pre-load streak for scoring
-      streakRef.current = await getStudyStreak(db);
-      const dueRows = await getDueCards(db, deckId, dailyReviewLimit);
-      if (dueRows.length === 0) {
+      try {
+        // Pre-load streak for scoring
+        streakRef.current = await getStudyStreak(db);
+        const normalizedDeckId = Array.isArray(deckId) ? deckId[0] : deckId;
+        const dueRows = await getDueCards(db, normalizedDeckId, dailyReviewLimit);
+        if (dueRows.length === 0) {
+          setSummary({ total: 0, newCount: 0, reviewCount: 0, relearningCount: 0, durationMs: 0, nextReviewDate: null });
+          setPhase("summary");
+          return;
+        }
+
+        const loaded: CardData[] = [];
+        for (const row of dueRows) {
+          const [surahStr, ayahStr] = row.id.split(":");
+          const surah = parseInt(surahStr);
+          const ayah = parseInt(ayahStr);
+
+          const [ayahRow, surahRow, translationRow, tafseerRow, prevRow, nextRow, uniqueFront] = await Promise.all([
+            db.getFirstAsync<{ text_uthmani: string }>(
+              "SELECT text_uthmani FROM quran_text WHERE surah = ? AND ayah = ?",
+              [surah, ayah]
+            ),
+            db.getFirstAsync<{ name_arabic: string }>(
+              "SELECT name_arabic FROM surahs WHERE number = ?",
+              [surah]
+            ),
+            db.getFirstAsync<{ text_en: string }>(
+              "SELECT text_en FROM translations WHERE surah = ? AND ayah = ?",
+              [surah, ayah]
+            ),
+            db.getFirstAsync<{ text: string }>(
+              "SELECT text FROM tafseer WHERE surah = ? AND ayah = ? AND source = ?",
+              [surah, ayah, tafseerSource]
+            ),
+            ayah > 1
+              ? db.getFirstAsync<{ text_uthmani: string }>(
+                  "SELECT text_uthmani FROM quran_text WHERE surah = ? AND ayah = ?",
+                  [surah, ayah - 1]
+                )
+              : null,
+            db.getFirstAsync<{ text_uthmani: string }>(
+              "SELECT text_uthmani FROM quran_text WHERE surah = ? AND ayah = ?",
+              [surah, ayah + 1]
+            ),
+            computeUniqueFront(db, surah, ayah),
+          ]);
+
+          loaded.push({
+            card: row,
+            surah,
+            ayah,
+            surahName: surahRow?.name_arabic ?? "",
+            textUthmani: ayahRow?.text_uthmani ?? "",
+            uniqueFront,
+            translation: translationRow?.text_en ?? "",
+            tafseer: tafseerRow?.text ?? "",
+            prevAyahText: prevRow?.text_uthmani ?? null,
+            nextAyahText: nextRow?.text_uthmani ?? null,
+          });
+        }
+
+        shuffle(loaded);
+        setCards(loaded);
+        setPhase("front");
+      } catch (e) {
+        console.warn("[FlashcardSession] Failed to load session:", e);
         setSummary({ total: 0, newCount: 0, reviewCount: 0, relearningCount: 0, durationMs: 0, nextReviewDate: null });
         setPhase("summary");
-        return;
       }
-
-      const loaded: CardData[] = [];
-      for (const row of dueRows) {
-        const [surahStr, ayahStr] = row.id.split(":");
-        const surah = parseInt(surahStr);
-        const ayah = parseInt(ayahStr);
-
-        const [ayahRow, surahRow, translationRow, tafseerRow, prevRow, nextRow, uniqueFront] = await Promise.all([
-          db.getFirstAsync<{ text_uthmani: string }>(
-            "SELECT text_uthmani FROM quran_text WHERE surah = ? AND ayah = ?",
-            [surah, ayah]
-          ),
-          db.getFirstAsync<{ name_arabic: string }>(
-            "SELECT name_arabic FROM surahs WHERE number = ?",
-            [surah]
-          ),
-          db.getFirstAsync<{ text_en: string }>(
-            "SELECT text_en FROM translations WHERE surah = ? AND ayah = ?",
-            [surah, ayah]
-          ),
-          db.getFirstAsync<{ text: string }>(
-            "SELECT text FROM tafseer WHERE surah = ? AND ayah = ? AND source = ?",
-            [surah, ayah, tafseerSource]
-          ),
-          ayah > 1
-            ? db.getFirstAsync<{ text_uthmani: string }>(
-                "SELECT text_uthmani FROM quran_text WHERE surah = ? AND ayah = ?",
-                [surah, ayah - 1]
-              )
-            : null,
-          db.getFirstAsync<{ text_uthmani: string }>(
-            "SELECT text_uthmani FROM quran_text WHERE surah = ? AND ayah = ?",
-            [surah, ayah + 1]
-          ),
-          computeUniqueFront(db, surah, ayah),
-        ]);
-
-        loaded.push({
-          card: row,
-          surah,
-          ayah,
-          surahName: surahRow?.name_arabic ?? "",
-          textUthmani: ayahRow?.text_uthmani ?? "",
-          uniqueFront,
-          translation: translationRow?.text_en ?? "",
-          tafseer: tafseerRow?.text ?? "",
-          prevAyahText: prevRow?.text_uthmani ?? null,
-          nextAyahText: nextRow?.text_uthmani ?? null,
-        });
-      }
-
-      shuffle(loaded);
-      setCards(loaded);
-      setPhase("front");
     }
     load();
   }, [db, deckId, tafseerSource, dailyReviewLimit]);
@@ -335,7 +342,7 @@ function FlashcardSessionScreen() {
   };
 
   const handleEndSession = () => {
-    router.back();
+    router.replace("/(tabs)/home");
   };
 
   // ─── Render ────────────────────────────────────────────────
@@ -436,25 +443,9 @@ function FlashcardSessionScreen() {
         contentContainerStyle={{ alignItems: "center", paddingHorizontal: 24, paddingBottom: 140 }}
       >
         <View style={{ width: "100%", maxWidth }}>
-          {/* Surah context */}
-          <Text
-            className="text-warm-400 dark:text-neutral-500 text-center mb-2 mt-2"
-            style={{ fontFamily: "Manrope_500Medium", fontSize: 12, writingDirection: "rtl" }}
-          >
-            {currentCard.surahName} - {s.ayahs} {currentCard.ayah}
-          </Text>
-
           {/* Front of card */}
           {phase === "front" && (
             <Card elevation="low" className="p-6 mb-6 rounded-3xl bg-surface-low dark:bg-surface-dark-low">
-              {currentCard.uniqueFront.needsExplicitLabel && (
-                <Text
-                  className="text-primary-accent dark:text-primary-bright text-center mb-3"
-                  style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}
-                >
-                  {currentCard.surahName} ({currentCard.ayah})
-                </Text>
-              )}
               {currentCard.uniqueFront.contextCount > 0 && (
                 <Text
                   className="text-warm-400 dark:text-neutral-500 text-center mb-3"
@@ -571,8 +562,6 @@ function TestModePrompt({
   };
 
   // Surah Name mode hides the surah context
-  const showAyah = mode !== "surahName" || true;
-
   return (
     <View>
       <View className="flex-row items-center gap-2 mb-3">
@@ -680,17 +669,6 @@ function GradingButtons({ onGrade, isDark, s }: { onGrade: (rating: Grade) => vo
               {labels[rating]}
             </Text>
           </Pressable>
-        ))}
-      </View>
-      <View className="flex-row justify-between px-1">
-        {GRADE_BUTTONS.map(({ rating }) => (
-          <Text
-            key={`hint-${rating}`}
-            className="text-warm-500 dark:text-neutral-500"
-            style={{ fontFamily: "Manrope_500Medium", fontSize: 10 }}
-          >
-            {labels[rating]}
-          </Text>
         ))}
       </View>
     </View>
