@@ -44,7 +44,6 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
     fontSize,
     lineHeight,
     translationLanguage,
-    isTranslationLoading,
     tafseerSource,
     uiLanguage,
     isRTL,
@@ -107,7 +106,7 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
   }, [ayahRow?.v2_page]);
 
   useEffect(() => {
-    if (!target || !showTranslation || isTranslationLoading) return;
+    if (!target || !showTranslation) return;
     setTranslationText(null);
     const query =
       translationLanguage === DEFAULT_LANGUAGE
@@ -127,7 +126,7 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
     return () => {
       cancelled = true;
     };
-  }, [db, target, showTranslation, translationLanguage, isTranslationLoading]);
+  }, [db, target, showTranslation, translationLanguage]);
 
   useEffect(() => {
     if (!target) return;
