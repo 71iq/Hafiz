@@ -432,3 +432,38 @@ Compared current routes/components against the phone mockup inventory:
 
 ### Phase 10 completion status
 - Search remains fast/local and now aligns more closely with the mobile visual direction while keeping current navigation strategy.
+
+## 2026-05-01 — Phase 11 Completed
+
+### Scope decisions for this phase
+1. Preserved all existing settings persistence behavior and user_settings keys; changed layout/grouping and filled a missing control.
+2. Added the missing Mushaf view-mode control to settings (verse/page) since it is part of required settings scope.
+3. Kept the existing section breakdown and cards approach, with editorial header polish and spacing adjustments rather than risky full rewrites.
+
+### Implemented in this step
+- `app/(tabs)/settings.tsx`:
+  - Added editorial eyebrow in settings header.
+  - Integrated Mushaf view-mode selector (`verse` / `page`) using `ToggleGroup`, wired to `viewMode`/`setViewMode`.
+  - Kept existing controls for:
+    - app language
+    - theme
+    - font size
+    - page scroll mode
+    - translation toggle/language
+    - tafseer toggle/source
+    - flashcard test modes
+    - daily review limit
+    - account/auth actions.
+  - Removed one hardcoded translation description and replaced with string-backed label.
+- `lib/i18n/strings.ts`:
+  - Added bilingual keys for Mushaf view-mode setting:
+    - `mushafViewModeLabel`
+    - `mushafViewVerse`
+    - `mushafViewPage`.
+
+### Validation result
+- `npx tsc --noEmit`: passed.
+- `npx expo export --platform web`: passed.
+
+### Phase 11 completion status
+- Settings screen remains fully functional and persisted, now with complete required control coverage and improved mobile-first section flow.

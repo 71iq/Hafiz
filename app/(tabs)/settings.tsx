@@ -16,6 +16,7 @@ import {
   type UILanguage,
   type TafseerSource,
   type PageScroll,
+  type ViewMode,
 } from "@/lib/settings/context";
 import { useDatabase } from "@/lib/database/provider";
 import { getLanguageByCode } from "@/lib/translations/languages";
@@ -34,6 +35,7 @@ export default function SettingsScreen() {
     uiLanguage, setUiLanguage,
     dailyReviewLimit, setDailyReviewLimit,
     pageScroll, setPageScroll,
+    viewMode, setViewMode,
   } = useSettings();
   const db = useDatabase();
   const s = useStrings();
@@ -75,8 +77,14 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
-      {/* Header — Gallery feel with generous top spacing */}
+      {/* Header */}
       <View className="px-6 pt-8 pb-4">
+        <Text
+          className="text-warm-400 dark:text-neutral-500 uppercase mb-1"
+          style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, letterSpacing: 1.8 }}
+        >
+          {s.tabSettings}
+        </Text>
         <Text
           className="text-charcoal dark:text-neutral-100"
           style={{ fontFamily: "NotoSerif_700Bold", fontSize: 28 }}
@@ -230,6 +238,23 @@ export default function SettingsScreen() {
         <SectionLabel>{s.sectionReading}</SectionLabel>
         <Card elevation="low" className="p-5 mb-8">
           <Text
+            className="text-charcoal dark:text-neutral-200 mb-3"
+            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15 }}
+          >
+            {s.mushafViewModeLabel}
+          </Text>
+          <ToggleGroup<ViewMode>
+            value={viewMode}
+            onValueChange={setViewMode}
+            items={[
+              { value: "verse", label: s.mushafViewVerse },
+              { value: "page", label: s.mushafViewPage },
+            ]}
+          />
+
+          <View className="h-5" />
+
+          <Text
             className="text-charcoal dark:text-neutral-200 mb-4"
             style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15 }}
           >
@@ -318,7 +343,7 @@ export default function SettingsScreen() {
           {/* Translation toggle */}
           <SettingRow
             label={s.showTranslationLabel}
-            description="Sahih International English"
+            description={s.wordTranslation}
             isRTL={isRTL}
           >
             <Switch value={showTranslation} onValueChange={setShowTranslation} />
