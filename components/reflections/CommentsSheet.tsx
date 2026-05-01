@@ -14,11 +14,11 @@ type Props = {
   onCommentAdded: (reflectionId: string) => void;
 };
 
-function timeAgo(dateStr: string): string {
+function timeAgo(dateStr: string, justNowLabel: string): string {
   const now = Date.now();
   const then = new Date(dateStr).getTime();
   const diff = Math.floor((now - then) / 1000);
-  if (diff < 60) return "just now";
+  if (diff < 60) return justNowLabel;
   if (diff < 3600) return `${Math.floor(diff / 60)}m`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
   if (diff < 604800) return `${Math.floor(diff / 86400)}d`;
@@ -124,10 +124,10 @@ export function CommentsSheet({ reflectionId, onClose, onCommentAdded }: Props) 
                     className="text-charcoal dark:text-neutral-200"
                     style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
                   >
-                    {c.profiles?.display_name || c.profiles?.username || "Anonymous"}
+                    {c.profiles?.display_name || c.profiles?.username || s.genericAnonymous}
                   </Text>
                   <Text style={{ fontFamily: "Manrope_400Regular", fontSize: 10, color: mutedColor }}>
-                    {timeAgo(c.created_at)}
+                    {timeAgo(c.created_at, s.justNow)}
                   </Text>
                 </View>
                 <Text

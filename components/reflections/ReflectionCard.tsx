@@ -14,12 +14,12 @@ type Props = {
   onCommentsPress: (reflectionId: string) => void;
 };
 
-function timeAgo(dateStr: string): string {
+function timeAgo(dateStr: string, justNowLabel: string): string {
   const now = Date.now();
   const then = new Date(dateStr).getTime();
   const diff = Math.floor((now - then) / 1000);
 
-  if (diff < 60) return "just now";
+  if (diff < 60) return justNowLabel;
   if (diff < 3600) return `${Math.floor(diff / 60)}m`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
   if (diff < 604800) return `${Math.floor(diff / 86400)}d`;
@@ -36,7 +36,7 @@ export function ReflectionCard({ reflection, onLikeToggled, onCommentsPress }: P
   const [reported, setReported] = useState(false);
 
   const authorName =
-    reflection.profiles?.display_name || reflection.profiles?.username || "Anonymous";
+    reflection.profiles?.display_name || reflection.profiles?.username || s.genericAnonymous;
 
   const handleLike = useCallback(async () => {
     if (!user) return;
@@ -97,7 +97,7 @@ export function ReflectionCard({ reflection, onLikeToggled, onCommentsPress }: P
           <Text
             style={{ fontFamily: "Manrope_400Regular", fontSize: 11, color: mutedColor }}
           >
-            {timeAgo(reflection.created_at)}
+            {timeAgo(reflection.created_at, s.justNow)}
           </Text>
         </View>
 

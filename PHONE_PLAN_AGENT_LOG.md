@@ -572,3 +572,39 @@ Compared current routes/components against the phone mockup inventory:
 
 ### Phase 14 completion status
 - Reflections/community surfaces now match the new sheet visual language while keeping existing data/network behavior stable.
+
+## 2026-05-01 — Phase 15 Completed
+
+### Scope decisions for this phase
+1. Ran focused i18n/RTL audit based on `.codex/skills/i18n-check.md` and `.codex/skills/rtl-audit.md` with emphasis on redesigned/auth-adjacent surfaces.
+2. Prioritized fixes that impact user-facing parity and RTL affordances without changing business logic.
+3. Kept Quran rendering direction invariants untouched (no changes to QCF2 word container direction logic).
+
+### Audit findings and fixes applied
+- i18n hardcoded labels fixed in reflections flows:
+  - Replaced hardcoded fallback author label (`Anonymous`) with i18n key.
+  - Replaced hardcoded relative-time text (`just now`) with i18n key.
+  - Replaced hardcoded post failure fallback (`Failed to post reflection`) with i18n key.
+- RTL directional affordance fixed in auth flows:
+  - Back button chevron now mirrors by locale direction (`I18nManager.isRTL`) on:
+    - `app/auth/login.tsx`
+    - `app/auth/signup.tsx`
+    - `app/auth/forgot-password.tsx`
+    - `app/auth/reset-password.tsx`.
+- Added bilingual string keys in `lib/i18n/strings.ts`:
+  - `genericAnonymous`
+  - `justNow`
+  - `reflectionPostFailed`.
+
+### Notes from automated checks
+- Ran `node scripts/verify-translations.js`:
+  - 20/21 languages fully verified.
+  - English source comparison showed expected wording/punctuation drift vs API samples (not missing-key failure in app UI strings).
+
+### Validation result
+- `npx tsc --noEmit`: passed.
+- `npx expo export --platform web`: passed.
+
+### Phase 15 completion status
+- Key i18n parity and RTL mirroring issues on redesigned community/auth surfaces are fixed.
+- No regressions introduced to reflections network behavior or auth routing.

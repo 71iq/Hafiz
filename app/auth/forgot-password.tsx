@@ -7,13 +7,14 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  I18nManager,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { ChevronLeft } from "lucide-react-native";
+import { ChevronLeft, ChevronRight } from "lucide-react-native";
 import { useAuthStore } from "@/lib/auth/store";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -33,6 +34,7 @@ export default function ForgotPasswordScreen() {
   const [message, setMessage] = useState<string | null>(null);
   const [messageType, setMessageType] = useState<"success" | "error">("error");
   const configured = isSupabaseConfigured();
+  const BackIcon = I18nManager.isRTL ? ChevronRight : ChevronLeft;
 
   const {
     control,
@@ -72,7 +74,7 @@ export default function ForgotPasswordScreen() {
             className="w-10 h-10 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center"
             style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
           >
-            <ChevronLeft size={20} color="#6e5a47" />
+            <BackIcon size={20} color="#6e5a47" />
           </Pressable>
         </View>
 

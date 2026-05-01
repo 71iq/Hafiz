@@ -57,7 +57,7 @@ export function WriteReflectionSheet({
     } catch (e: any) {
       const message = e.code === "PGRST205" || e.message?.includes("schema cache")
         ? s.reflectionSetupRequired
-        : e.message || "Failed to post reflection";
+        : e.message || s.reflectionPostFailed;
       setError(message);
     } finally {
       setSubmitting(false);

@@ -8,6 +8,7 @@ import {
   Platform,
   ActivityIndicator,
   ScrollView,
+  I18nManager,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -20,7 +21,7 @@ import { useStrings } from "@/lib/i18n/useStrings";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { OAuthButtons } from "@/components/auth/OAuthButtons";
-import { ChevronLeft, UserPlus } from "lucide-react-native";
+import { ChevronLeft, ChevronRight, UserPlus } from "lucide-react-native";
 
 const signupSchema = z.object({
   email: z.string().trim().toLowerCase().email("Invalid email address"),
@@ -47,6 +48,7 @@ export default function SignupScreen() {
   const usernameRef = useRef<TextInput>(null);
   const displayNameRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
+  const BackIcon = I18nManager.isRTL ? ChevronRight : ChevronLeft;
 
   const {
     control,
@@ -104,7 +106,7 @@ export default function SignupScreen() {
             className="w-10 h-10 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center"
             style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
           >
-            <ChevronLeft size={20} color="#6e5a47" />
+            <BackIcon size={20} color="#6e5a47" />
           </Pressable>
         </View>
 
