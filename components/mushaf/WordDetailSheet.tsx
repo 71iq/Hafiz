@@ -32,7 +32,7 @@ type WordHeaderMeta = {
 
 export function WordDetailSheet() {
   const { detailWord, closeDetail } = useWordInteraction();
-  const { isDark, isRTL, fontSize, lineHeight } = useSettings();
+  const { isDark, isRTL, uiLanguage, fontSize, lineHeight } = useSettings();
   const { width, height } = useWindowDimensions();
   const s = useStrings();
   const db = useDatabase();
@@ -136,6 +136,9 @@ export function WordDetailSheet() {
   if (!detailWord) return null;
 
   const { surah, ayah, wordPos } = detailWord;
+  const isArabicMode = uiLanguage === "ar";
+  const ayahLabel = isArabicMode ? "الآية" : "Ayah";
+  const wordLabel = isArabicMode ? "الكلمة" : "Word";
   return (
     <Modal
       visible={!!detailWord}
@@ -191,7 +194,7 @@ export function WordDetailSheet() {
                 >
                   {headerMeta.wordText ?? "…"}
                 </Text>
-                {!!headerMeta.translationEn && (
+                {!isArabicMode && !!headerMeta.translationEn && (
                   <Text
                     className={`mt-1 text-warm-500 dark:text-neutral-400 ${isRTL ? "text-right" : "text-left"}`}
                     style={{ fontFamily: "Manrope_500Medium", fontSize: 13 }}
@@ -208,8 +211,8 @@ export function WordDetailSheet() {
 
                 <View className={`mt-2 flex-row gap-2 ${isRTL ? "flex-row-reverse" : ""}`}>
                   <QuickStat label={s.surah} value={String(surah)} />
-                  <QuickStat label={s.ayahLabel ?? "Ayah"} value={String(ayah)} />
-                  <QuickStat label={s.wordLabel ?? "Word"} value={String(wordPos)} />
+                  <QuickStat label={ayahLabel} value={String(ayah)} />
+                  <QuickStat label={wordLabel} value={String(wordPos)} />
                 </View>
               </>
             )}
