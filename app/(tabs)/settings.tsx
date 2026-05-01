@@ -191,29 +191,6 @@ export default function SettingsScreen() {
           )}
         </Card>
 
-        <SectionLabel>{s.wordFlashcardsTestModes}</SectionLabel>
-        <Card elevation="low" className="p-5 mb-8">
-          <View className="gap-3">
-            {[
-              { key: "wordMeaningArabic" as const, label: s.flashcardsModeWordMeaningArabic },
-              { key: "wordMeaningTranslation" as const, label: s.flashcardsModeWordMeaningTranslation },
-            ].map((mode) => (
-              <View key={mode.key} className="flex-row items-center justify-between">
-                <Text
-                  className="text-charcoal dark:text-neutral-300 flex-1"
-                  style={{ fontFamily: "Manrope_500Medium", fontSize: 14 }}
-                >
-                  {mode.label}
-                </Text>
-                <Switch
-                  value={wordModes.includes(mode.key)}
-                  onValueChange={() => toggleWordMode(mode.key)}
-                />
-              </View>
-            ))}
-          </View>
-        </Card>
-
         {/* Language Section */}
         <SectionLabel>{s.sectionLanguage}</SectionLabel>
         <Card elevation="low" className="p-5 mb-8">
@@ -475,6 +452,32 @@ export default function SettingsScreen() {
                 </View>
               );
             })}
+          </View>
+          <View className="h-px my-4 bg-surface-high dark:bg-surface-dark-high" />
+          <Text
+            className="text-warm-400 dark:text-neutral-500 mb-3"
+            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
+          >
+            {s.wordFlashcardsTestModes}
+          </Text>
+          <View className="gap-3">
+            {[
+              { key: "wordMeaningArabic" as const, label: s.flashcardsModeWordMeaningArabic },
+              { key: "wordMeaningTranslation" as const, label: s.flashcardsModeWordMeaningTranslation },
+            ].map((mode) => (
+              <View key={mode.key} className="flex-row items-center justify-between">
+                <Text
+                  className="text-charcoal dark:text-neutral-300 flex-1"
+                  style={{ fontFamily: "Manrope_500Medium", fontSize: 14 }}
+                >
+                  {mode.label}
+                </Text>
+                <Switch
+                  value={wordModes.includes(mode.key)}
+                  onValueChange={() => toggleWordMode(mode.key)}
+                />
+              </View>
+            ))}
           </View>
         </Card>
 
