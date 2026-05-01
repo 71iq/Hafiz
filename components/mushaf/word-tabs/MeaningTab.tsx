@@ -138,12 +138,6 @@ export function MeaningTab({ surah, ayah, wordPos }: Props) {
             {matched.meaning}
           </Text>
           <SaveToVocabButton saved={savedToVocab} onPress={saveToVocab} label={savedToVocab ? s.addedToVocab : s.addToVocab} />
-          <Text
-            className="text-xs text-warm-400 dark:text-neutral-500 mt-4"
-            style={{ writingDirection: "rtl", textAlign: "right" }}
-          >
-            {s.meaningSourceAttribution}
-          </Text>
         </View>
       );
     }
@@ -171,12 +165,6 @@ export function MeaningTab({ surah, ayah, wordPos }: Props) {
             )}
           </View>
         ))}
-        <Text
-          className="text-xs text-warm-400 dark:text-neutral-500 mt-2"
-          style={{ writingDirection: "rtl", textAlign: "right" }}
-        >
-          {s.meaningSourceAttribution}
-        </Text>
       </View>
     );
   }

@@ -96,12 +96,6 @@ export function IrabTab({ surah, ayah, wordPos }: Props) {
           </View>
         );
       })}
-      <Text
-        className="text-xs text-warm-400 dark:text-neutral-500 mt-2"
-        style={{ writingDirection: "rtl", textAlign: "right" }}
-      >
-        {s.irabSourceAttribution}
-      </Text>
     </View>
   );
 }

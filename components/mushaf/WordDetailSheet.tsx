@@ -255,9 +255,6 @@ export function WordDetailSheet() {
                 <Text className="text-warm-400 dark:text-neutral-500" style={{ fontFamily: "Manrope_500Medium", fontSize: 11 }}>
                   {tabLabel}
                 </Text>
-                <Text className="mt-1 text-warm-500 dark:text-neutral-400" style={{ fontFamily: "Manrope_400Regular", fontSize: 11 }}>
-                  {s.wordSourceLabel ?? "Source"}: SQLite local datasets
-                </Text>
               </View>
             </>
           ) : (

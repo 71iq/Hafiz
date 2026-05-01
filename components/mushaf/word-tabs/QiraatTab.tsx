@@ -179,13 +179,6 @@ export function QiraatTab({ surah, ayah }: Props) {
           </Text>
         </View>
       ))}
-
-      <Text
-        className="text-xs text-warm-400 dark:text-neutral-500 mt-4"
-        style={{ writingDirection: "rtl", textAlign: "right" }}
-      >
-        {s.qiraatSourceAttribution}
-      </Text>
     </View>
   );
 }
