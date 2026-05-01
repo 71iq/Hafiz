@@ -6,7 +6,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/lib/auth/store";
 import { useSettings } from "@/lib/settings/context";
-import { useStrings, interpolate } from "@/lib/i18n/useStrings";
+import { useStrings } from "@/lib/i18n/useStrings";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { fetchReflections, fetchReflectionCount } from "@/lib/reflections/api";
 import { ReflectionCard } from "./ReflectionCard";
@@ -108,7 +108,8 @@ export function ReflectionsSection({ surah, ayah, initiallyExpanded = false, sho
       {showHeader && (
         <Pressable
           onPress={() => setExpanded((v) => !v)}
-          className="flex-row items-center justify-between py-2.5"
+          className="flex-row items-center justify-between rounded-2xl px-4 py-3"
+          style={{ backgroundColor: isDark ? "#141414" : "#FAF8F5" }}
         >
           <View className="flex-row items-center gap-2">
             <Text
@@ -123,10 +124,10 @@ export function ReflectionsSection({ surah, ayah, initiallyExpanded = false, sho
               {s.reflections}
             </Text>
             {count > 0 && (
-              <View className="rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 px-2 py-0.5">
+              <View className="rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 px-2.5 py-1">
                 <Text
                   className="text-primary-accent dark:text-primary-bright"
-                  style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10 }}
+                  style={{ fontFamily: "Manrope_700Bold", fontSize: 10 }}
                 >
                   {count}
                 </Text>
@@ -143,7 +144,7 @@ export function ReflectionsSection({ surah, ayah, initiallyExpanded = false, sho
 
       {/* Expanded content */}
       {expanded && (
-        <View className="pb-3">
+        <View className="pb-3 pt-3">
           {isLoading ? (
             <ReflectionsSkeleton isDark={isDark} />
           ) : allReflections.length === 0 ? (
@@ -168,7 +169,7 @@ export function ReflectionsSection({ surah, ayah, initiallyExpanded = false, sho
           {hasMore && (
             <Pressable
               onPress={handleLoadMore}
-              className="items-center py-2"
+              className="items-center py-2.5"
               style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
             >
               <Text
@@ -183,13 +184,15 @@ export function ReflectionsSection({ surah, ayah, initiallyExpanded = false, sho
           {/* Write reflection button */}
           <Pressable
             onPress={() => setWriteOpen(true)}
-            className="flex-row items-center justify-center gap-2 rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 py-2.5 mt-1"
-            style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+            className="flex-row items-center justify-center gap-2 rounded-full py-3.5 mt-1"
+            style={({ pressed }) => ({
+              opacity: pressed ? 0.7 : 1,
+              backgroundColor: isDark ? "#0D4B4D" : "#003638",
+            })}
           >
-            <PenLine size={14} color={isDark ? "#5eead4" : "#003638"} />
+            <PenLine size={15} color="#FDDC91" />
             <Text
-              className="text-primary-accent dark:text-primary-bright"
-              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
+              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13, color: "#FDDC91" }}
             >
               {s.reflectionWrite}
             </Text>

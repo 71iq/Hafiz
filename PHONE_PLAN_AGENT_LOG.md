@@ -534,3 +534,41 @@ Compared current routes/components against the phone mockup inventory:
 
 ### Phase 13 completion status
 - Leaderboard now matches the target mobile direction while still using live Supabase-backed query data and existing auth/availability gating.
+
+## 2026-05-01 — Phase 14 Completed
+
+### Scope decisions for this phase
+1. Kept all reflections/community networking behavior unchanged (Supabase guards, optimistic likes with rollback, pagination, and comment posting).
+2. Restyled only the presentation layer across reflections components and sheets to align with the new mobile sheet language.
+3. Preserved modal/sheet behavior for verse reflections and kept the count badge in the reflections header.
+
+### Implemented in this step
+- `components/reflections/ReflectionsSection.tsx`:
+  - Restyled header row and count badge container.
+  - Tuned expanded-state spacing and load-more affordance.
+  - Restyled write-reflection CTA to a stronger filled action while keeping the same open/close flow.
+- `components/reflections/ReflectionCard.tsx`:
+  - Updated card surface/radius and avatar treatment.
+  - Refined hierarchy for author/time/content.
+  - Restyled like/comment actions as chip controls.
+  - Preserved report menu behavior and optimistic like rollback logic.
+- `components/reflections/WriteReflectionSheet.tsx`:
+  - Redesigned header (eyebrow + display title).
+  - Improved ayah preview block styling and textarea structure.
+  - Kept auth gate path, submit state, and query invalidation behavior intact.
+- `components/reflections/CommentsSheet.tsx`:
+  - Redesigned header (eyebrow + display title).
+  - Added nested thread label block and refreshed input container style.
+  - Preserved loading/empty states and comment submit behavior.
+- `lib/i18n/strings.ts`:
+  - Added bilingual keys for new sheet labels:
+    - `reflectionMinChars`
+    - `reflectionAyahLabel`
+    - `reflectionThreadLabel`.
+
+### Validation result
+- `npx tsc --noEmit`: passed.
+- `npx expo export --platform web`: passed.
+
+### Phase 14 completion status
+- Reflections/community surfaces now match the new sheet visual language while keeping existing data/network behavior stable.

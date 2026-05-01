@@ -63,14 +63,44 @@ export function CommentsSheet({ reflectionId, onClose, onCommentAdded }: Props) 
   return (
     <Sheet open={!!reflectionId} onClose={onClose}>
       <SheetHeader>
-        <Text
-          className="text-charcoal dark:text-neutral-100"
-          style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16, textAlign: "center" }}
-        >
-          {s.reflectionComments}
-        </Text>
+        <View className="items-center">
+          <Text
+            style={{
+              fontFamily: "Manrope_600SemiBold",
+              fontSize: 10,
+              letterSpacing: 1.6,
+              textTransform: "uppercase",
+              color: mutedColor,
+            }}
+          >
+            {s.reflections}
+          </Text>
+          <Text
+            className="text-charcoal dark:text-neutral-100"
+            style={{ fontFamily: "NotoSerif_700Bold", fontSize: 24, marginTop: 6 }}
+          >
+            {s.reflectionComments}
+          </Text>
+        </View>
       </SheetHeader>
       <SheetContent>
+        <View
+          className="mb-3 rounded-2xl px-3 py-2"
+          style={{ backgroundColor: isDark ? "#141414" : "#F7F3EC" }}
+        >
+          <Text
+            style={{
+              fontFamily: "Manrope_600SemiBold",
+              fontSize: 10,
+              letterSpacing: 1,
+              textTransform: "uppercase",
+              color: mutedColor,
+            }}
+          >
+            {s.reflectionThreadLabel}
+          </Text>
+        </View>
+
         <ScrollView style={{ maxHeight: 300, marginBottom: 12 }}>
           {loading ? (
             <ActivityIndicator style={{ padding: 20 }} />
@@ -114,7 +144,7 @@ export function CommentsSheet({ reflectionId, onClose, onCommentAdded }: Props) 
         {/* Comment input */}
         {user && (
           <View
-            className="flex-row items-center gap-2 rounded-2xl bg-surface-low dark:bg-surface-dark-low px-3 py-2"
+            className="flex-row items-center gap-2 rounded-3xl bg-surface-low dark:bg-surface-dark-low px-3.5 py-2.5"
           >
             <TextInput
               value={text}

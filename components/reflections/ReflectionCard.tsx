@@ -73,19 +73,17 @@ export function ReflectionCard({ reflection, onLikeToggled, onCommentsPress }: P
 
   return (
     <View
-      className="rounded-2xl bg-surface-low dark:bg-surface-dark-low px-4 py-3 mb-2"
-      style={{ position: "relative" }}
+      className="rounded-3xl px-4 py-3.5 mb-2.5"
+      style={{ backgroundColor: isDark ? "#171717" : "#FAF8F5", position: "relative" }}
     >
-      {/* Header: author + time + menu */}
       <View className="flex-row items-center justify-between mb-2">
         <View className="flex-row items-center gap-2">
-          {/* Author avatar placeholder */}
           <View
-            className="w-7 h-7 rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 items-center justify-center"
+            className="w-8 h-8 rounded-full items-center justify-center"
+            style={{ backgroundColor: isDark ? "#003638" : "#00595B" }}
           >
             <Text
-              className="text-primary-accent dark:text-primary-bright"
-              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11 }}
+              style={{ fontFamily: "Manrope_700Bold", fontSize: 12, color: "#FDDC91" }}
             >
               {authorName.charAt(0).toUpperCase()}
             </Text>
@@ -103,7 +101,6 @@ export function ReflectionCard({ reflection, onLikeToggled, onCommentsPress }: P
           </Text>
         </View>
 
-        {/* Three-dot menu */}
         {user && (
           <Pressable
             onPress={() => setShowMenu((v) => !v)}
@@ -115,7 +112,6 @@ export function ReflectionCard({ reflection, onLikeToggled, onCommentsPress }: P
         )}
       </View>
 
-      {/* Report dropdown */}
       {showMenu && (
         <View
           style={{
@@ -153,26 +149,27 @@ export function ReflectionCard({ reflection, onLikeToggled, onCommentsPress }: P
         </View>
       )}
 
-      {/* Reflection text */}
       <Text
         className="text-charcoal dark:text-neutral-200"
         style={{
           fontFamily: "Manrope_400Regular",
           fontSize: 14,
-          lineHeight: 22,
-          marginBottom: 8,
+          lineHeight: 23,
+          marginBottom: 12,
         }}
       >
         {reflection.content}
       </Text>
 
-      {/* Footer: like + comments */}
-      <View className="flex-row items-center gap-4">
+      <View className="flex-row items-center gap-2">
         <Pressable
           onPress={handleLike}
           disabled={!user}
-          className="flex-row items-center gap-1"
-          style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+          className="flex-row items-center gap-1 rounded-full px-2.5 py-1.5"
+          style={({ pressed }) => ({
+            opacity: pressed ? 0.6 : 1,
+            backgroundColor: isDark ? "#202020" : "#F0EAE2",
+          })}
         >
           <Heart
             size={15}
@@ -188,8 +185,11 @@ export function ReflectionCard({ reflection, onLikeToggled, onCommentsPress }: P
 
         <Pressable
           onPress={() => onCommentsPress(reflection.id)}
-          className="flex-row items-center gap-1"
-          style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+          className="flex-row items-center gap-1 rounded-full px-2.5 py-1.5"
+          style={({ pressed }) => ({
+            opacity: pressed ? 0.6 : 1,
+            backgroundColor: isDark ? "#202020" : "#F0EAE2",
+          })}
         >
           <MessageCircle size={15} color={mutedColor} />
           {reflection.comments_count > 0 && (
