@@ -868,3 +868,18 @@ Saved in `phase19/`:
 ### Validation result
 - `npx tsc --noEmit`: passed.
 - `npx expo export --platform web`: passed.
+
+## 2026-05-01 — Home Header RTL/LTR Alignment Fix
+
+### User-reported issue
+- In English UI, the home header title/name block was pinned to the right instead of the left.
+
+### Implemented fix
+- `app/(tabs)/home.tsx`:
+  - made header row direction-aware with `isRTL`.
+  - aligned the title/name block to `items-start` in English and `items-end` in Arabic.
+  - kept the search icon on the mirrored side according to layout direction.
+
+### Validation result
+- `npx tsc --noEmit`: passed.
+- `npx expo export --platform web`: passed.
