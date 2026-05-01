@@ -133,6 +133,8 @@ type Props = {
   pagePaddingBottom?: number;
   pageSidePadding?: number;
   centerVerticalOnPhone?: boolean;
+  horizontalTopInset?: number;
+  horizontalBottomInset?: number;
 };
 
 // Fixed heights for getItemLayout calculation
@@ -260,6 +262,8 @@ export function PageMushaf({
   pagePaddingBottom = 32,
   pageSidePadding = 16,
   centerVerticalOnPhone = false,
+  horizontalTopInset = 0,
+  horizontalBottomInset = 0,
 }: Props) {
   const db = useDatabase();
   const { fontSize, lineHeight, pageScroll, isRTL } = useSettings();
@@ -731,7 +735,8 @@ export function PageMushaf({
   }, []);
 
   const horizontalTypography = useMemo(() => {
-    const fitHeight = containerHeight || Math.max(0, windowHeight - 120);
+    const fitHeightRaw = containerHeight || Math.max(0, windowHeight - 120);
+    const fitHeight = Math.max(0, fitHeightRaw - horizontalTopInset - horizontalBottomInset);
     if (!horizontal || fitHeight <= 0) {
       return { fontSize, lineHeight };
     }
@@ -745,7 +750,7 @@ export function PageMushaf({
       fontSize: Math.max(20, fittedFontSize),
       lineHeight: fittedLineHeight,
     };
-  }, [containerHeight, fontSize, horizontal, lineHeight, windowHeight]);
+  }, [containerHeight, fontSize, horizontal, horizontalBottomInset, horizontalTopInset, lineHeight, windowHeight]);
 
   const extraData = useMemo(
     () => ({ fontSize, pageWidth, horizontalTypography }),
@@ -864,20 +869,29 @@ export function PageMushaf({
                   width: pageWidth,
                 }}
               >
-                <MushafPage
-                  pageNumber={item.page}
-                  ayahs={item.ayahs}
-                  surahMap={surahMap}
-                  fontSize={horizontalTypography.fontSize}
-                  lineHeight={horizontalTypography.lineHeight}
-                  width={pageWidth}
-                  lineLayout={item.lineLayout}
-                  globalWordOffset={item.globalWordOffset}
-                  onOpenAyahDetail={openAyahDetail}
-                  paddingTop={HORIZONTAL_PAGE_TOP_PADDING}
-                  paddingBottom={0}
-                  sidePadding={pageSidePadding}
-                />
+                <View
+                  style={{
+                    flex: 1,
+                    justifyContent: "center",
+                    paddingTop: horizontalTopInset,
+                    paddingBottom: horizontalBottomInset,
+                  }}
+                >
+                  <MushafPage
+                    pageNumber={item.page}
+                    ayahs={item.ayahs}
+                    surahMap={surahMap}
+                    fontSize={horizontalTypography.fontSize}
+                    lineHeight={horizontalTypography.lineHeight}
+                    width={pageWidth}
+                    lineLayout={item.lineLayout}
+                    globalWordOffset={item.globalWordOffset}
+                    onOpenAyahDetail={openAyahDetail}
+                    paddingTop={HORIZONTAL_PAGE_TOP_PADDING}
+                    paddingBottom={0}
+                    sidePadding={pageSidePadding}
+                  />
+                </View>
               </View>
             ))}
           </RNAnimated.View>
