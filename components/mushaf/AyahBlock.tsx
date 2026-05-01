@@ -15,8 +15,6 @@ import { WordToken } from "./WordToken";
 import {
   BookOpenText,
   Bookmark,
-  ChevronDown,
-  ChevronUp,
   MessageCircle,
   Play,
   PlusCircle,
@@ -379,22 +377,32 @@ function AyahBlockInner({
       )}
 
       <View className="pt-3">
-        <Pressable
-          onPress={toggleTranslation}
-          className="flex-row items-center justify-between rounded-2xl bg-surface-low dark:bg-surface-dark-low px-4 py-3"
-          style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-        >
-          <View className={isRTL ? "flex-row-reverse items-center gap-2" : "flex-row items-center gap-2"}>
-            <BookOpenText size={14} color={translationOpen ? activeIconColor : iconColor} />
-            <Text
-              className={translationOpen ? "text-primary-accent dark:text-primary-bright" : "text-warm-500 dark:text-neutral-400"}
-              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
-            >
-              {langInfo?.nameEnglish ?? s.wordTranslation}
-            </Text>
-          </View>
-          {translationOpen ? <ChevronUp size={14} color={iconColor} /> : <ChevronDown size={14} color={iconColor} />}
-        </Pressable>
+        <View className={isRTL ? "mt-1 flex-row-reverse flex-wrap gap-2" : "mt-1 flex-row flex-wrap gap-2"}>
+          <ActionPill
+            label={langInfo?.nameEnglish ?? s.wordTranslation}
+            active={translationOpen}
+            icon={<BookOpenText size={14} color={translationOpen ? activeIconColor : iconColor} />}
+            onPress={toggleTranslation}
+          />
+          <ActionPill
+            label={s.reflections}
+            active={reflectionsOpen}
+            badge={reflectionCount}
+            icon={<MessageCircle size={14} color={reflectionsOpen ? activeIconColor : iconColor} />}
+            onPress={toggleReflections}
+          />
+          <ActionPill
+            label={s.addToReview}
+            icon={<PlusCircle size={14} color={iconColor} />}
+            onPress={handleAddToReview}
+          />
+          <ActionPill
+            label={s.tafseer}
+            active={tafseerOpen}
+            icon={<BookOpenText size={14} color={tafseerOpen ? activeIconColor : iconColor} />}
+            onPress={toggleTafseer}
+          />
+        </View>
 
         {translationOpen && (
           <View className="mt-2 rounded-2xl bg-surface-low dark:bg-surface-dark-low px-4 py-3">
@@ -412,38 +420,6 @@ function AyahBlockInner({
             </Text>
           </View>
         )}
-
-        <View className={isRTL ? "mt-3 flex-row-reverse flex-wrap gap-2" : "mt-3 flex-row flex-wrap gap-2"}>
-          <ActionPill
-            label={s.reflections}
-            active={reflectionsOpen}
-            badge={reflectionCount}
-            icon={<MessageCircle size={14} color={reflectionsOpen ? activeIconColor : iconColor} />}
-            onPress={toggleReflections}
-          />
-          <ActionPill
-            label={s.addToReview}
-            icon={<PlusCircle size={14} color={iconColor} />}
-            onPress={handleAddToReview}
-          />
-        </View>
-
-        <Pressable
-          onPress={toggleTafseer}
-          className="mt-3 flex-row items-center justify-between rounded-2xl bg-surface-low dark:bg-surface-dark-low px-4 py-3"
-          style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-        >
-          <View className={isRTL ? "flex-row-reverse items-center gap-2" : "flex-row items-center gap-2"}>
-            <BookOpenText size={14} color={tafseerOpen ? activeIconColor : iconColor} />
-            <Text
-              className={tafseerOpen ? "text-primary-accent dark:text-primary-bright" : "text-warm-500 dark:text-neutral-400"}
-              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
-            >
-              {s.tafseer}
-            </Text>
-          </View>
-          {tafseerOpen ? <ChevronUp size={14} color={iconColor} /> : <ChevronDown size={14} color={iconColor} />}
-        </Pressable>
 
         {tafseerOpen && (
           <View className="mt-2 rounded-2xl bg-surface-low dark:bg-surface-dark-low px-4 py-3">
