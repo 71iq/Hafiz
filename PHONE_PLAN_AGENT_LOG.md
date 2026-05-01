@@ -295,3 +295,39 @@ Compared current routes/components against the phone mockup inventory:
 ### Phase 6 completion status
 - Word long-press panel structure now aligns with the target composition while preserving existing data/model behavior.
 - All existing tabs remain wired and functional with local SQLite-backed data or existing placeholders.
+
+## 2026-05-01 — Phase 7 Completed
+
+### Scope decisions for this phase
+1. Kept canonical target as **HomeV1 (Sanctuary Feed)** from Phase 0.
+2. Preserved existing home route data model and actions (decks, start review, vocab, auth banner); redesigned composition around them.
+3. Added real “resume reading” surface using persisted local state from `user_settings.last_mushaf_position` (no mock data).
+
+### Implemented in this step
+- `app/(tabs)/home.tsx`:
+  - Editorial header refresh:
+    - search icon action in header
+    - date eyebrow
+    - two-line display title with user-derived handle.
+  - Added resume-reading card:
+    - reads `last_mushaf_position` from `user_settings`
+    - resolves page/surah/ayah via local SQLite (`page_map`, `quran_text`)
+    - deep-links user back to Mushaf tab.
+  - Reframed today section:
+    - large due-count focal numeral
+    - secondary memorized count
+    - quieter streak/last-review row.
+  - Kept existing real-data sections and actions:
+    - auth CTA banner
+    - start review CTA
+    - deck list and deck actions
+    - vocabulary deck card.
+  - Ensured no one-language-only hardcoded UI labels were introduced.
+
+### Validation result
+- `npx tsc --noEmit`: passed.
+- `npx expo export --platform web`: passed.
+
+### Phase 7 completion status
+- Home composition now aligns closer to HomeV1 editorial mobile direction while staying fully real-data-driven.
+- Authenticated/unauthenticated and empty/non-empty deck paths remain functional.

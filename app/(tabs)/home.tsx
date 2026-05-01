@@ -3,7 +3,7 @@ import { View, Text, ScrollView, Pressable, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
-import { Plus, Trash2, Play, Layers, Flame, Clock, Search, LayoutGrid, Languages, UserPlus, X as XIcon } from "lucide-react-native";
+import { Plus, Trash2, Play, Layers, Flame, Search, LayoutGrid, Languages, UserPlus, X as XIcon } from "lucide-react-native";
 import { getVocabStats } from "@/lib/vocab/queries";
 import { useAuthStore } from "@/lib/auth/store";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -53,6 +53,7 @@ export default function HomeScreen() {
   const [showSearch, setShowSearch] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [surahNames, setSurahNames] = useState<Record<number, string>>({});
+  const [resume, setResume] = useState<{ surah: number; ayah: number; page: number } | null>(null);
 
   const loadData = useCallback(async () => {
     // Load surah names for deck labels
@@ -84,6 +85,42 @@ export default function HomeScreen() {
       // table may not exist yet on very old installs
       setVocabStats({ total: 0, due: 0 });
     }
+
+    try {
+      const row = await db.getFirstAsync<{ value: string }>(
+        "SELECT value FROM user_settings WHERE key = 'last_mushaf_position'"
+      );
+      if (!row?.value) {
+        setResume(null);
+        return;
+      }
+      const parsed = JSON.parse(row.value);
+      if (parsed?.mode === "page" && typeof parsed.page === "number") {
+        const pageMeta = await db.getFirstAsync<{ surah_start: number; ayah_start: number }>(
+          "SELECT surah_start, ayah_start FROM page_map WHERE page = ?",
+          [parsed.page]
+        );
+        if (pageMeta) {
+          setResume({ surah: pageMeta.surah_start, ayah: pageMeta.ayah_start, page: parsed.page });
+        } else {
+          setResume(null);
+        }
+      } else if (
+        parsed?.mode === "verse" &&
+        typeof parsed.surah === "number" &&
+        typeof parsed.ayah === "number"
+      ) {
+        const page = await db.getFirstAsync<{ v2_page: number }>(
+          "SELECT v2_page FROM quran_text WHERE surah = ? AND ayah = ?",
+          [parsed.surah, parsed.ayah]
+        );
+        setResume({ surah: parsed.surah, ayah: parsed.ayah, page: page?.v2_page ?? 1 });
+      } else {
+        setResume(null);
+      }
+    } catch {
+      setResume(null);
+    }
   }, [db]);
 
   useFocusEffect(
@@ -114,7 +151,7 @@ export default function HomeScreen() {
     switch (scope.type) {
       case "surah": {
         const nums = [...scope.surahs].sort((a, b) => a - b);
-        const getName = (n: number) => surahNames[n] ? `سورة ${surahNames[n]}` : String(n);
+        const getName = (n: number) => surahNames[n] ? `${s.flashcardsScopeBysurah} ${surahNames[n]}` : String(n);
         if (nums.length === 1) {
           return `${getName(nums[0])} (${nums[0]})`;
         }
@@ -148,19 +185,103 @@ export default function HomeScreen() {
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
       <ScrollView className="flex-1 px-6" contentContainerStyle={{ paddingBottom: 100 }}>
         {/* Header */}
-        <View className="pt-8 pb-6">
-          <Text
-            className="text-charcoal dark:text-neutral-100"
-            style={{ fontFamily: "NotoSerif_700Bold", fontSize: 28 }}
+        <View className="pt-8 pb-4">
+          <View className="flex-row items-start justify-between">
+            <Pressable
+              onPress={() => setShowSearch(true)}
+              className="w-10 h-10 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center mt-1"
+              style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+            >
+              <Search size={16} color={isDark ? "#a3a3a3" : "#8B8178"} />
+            </Pressable>
+            <View className="items-end">
+              <Text
+                className="text-warm-400 dark:text-neutral-500 uppercase"
+                style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, letterSpacing: 1.8 }}
+              >
+                {new Date().toLocaleDateString()}
+              </Text>
+              <Text
+                className="text-charcoal dark:text-neutral-100 mt-1"
+                style={{ fontFamily: "NotoSerif_700Bold", fontSize: 28 }}
+              >
+                {s.homeTitle}
+              </Text>
+              <Text
+                className="text-charcoal dark:text-neutral-100"
+                style={{ fontFamily: "NotoSerif_700Bold", fontSize: 28, marginTop: -4 }}
+              >
+                {user ? (user.email?.split("@")[0] ?? "Hafiz") : "Hafiz"}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Resume reading */}
+        {resume && (
+          <Pressable
+            onPress={() => router.push("/(tabs)/mushaf")}
+            style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+            className="mb-6"
           >
-            {s.homeTitle}
+            <Card elevation="low" className="p-4 rounded-3xl">
+              <View className="flex-row items-center gap-3">
+                <View className="w-11 h-11 rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 items-center justify-center">
+                  <Play size={16} color={isDark ? "#2dd4bf" : "#0d9488"} />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-warm-400 dark:text-neutral-500 uppercase" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, letterSpacing: 1.5 }}>
+                    {s.goTo}
+                  </Text>
+                  <Text className="text-charcoal dark:text-neutral-100" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15 }}>
+                    {`${s.flashcardsScopeBysurah} ${surahNames[resume.surah] ?? resume.surah} · ${resume.surah}:${resume.ayah}`}
+                  </Text>
+                  <Text className="text-warm-400 dark:text-neutral-500" style={{ fontFamily: "Manrope_500Medium", fontSize: 12 }}>
+                    {interpolate(s.pageN, { n: resume.page })}
+                  </Text>
+                </View>
+              </View>
+            </Card>
+          </Pressable>
+        )}
+
+        {/* Today focus */}
+        <View className="mb-6">
+          <Text className="text-warm-400 dark:text-neutral-500 uppercase" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, letterSpacing: 1.8 }}>
+            {s.flashcardsDueToday}
           </Text>
-          <Text
-            className="text-warm-400 dark:text-neutral-500 mt-1"
-            style={{ fontFamily: "Manrope_400Regular", fontSize: 14 }}
-          >
-            {s.homeSubtitle}
-          </Text>
+          <View className="flex-row items-end justify-between mt-2">
+            <View>
+              <Text className="text-charcoal dark:text-neutral-100" style={{ fontFamily: "NotoSerif_700Bold", fontSize: 68, lineHeight: 68 }}>
+                {totalDue > dailyReviewLimit ? dailyReviewLimit : totalDue}
+              </Text>
+              <Text className="text-warm-400 dark:text-neutral-500" style={{ fontFamily: "Manrope_500Medium", fontSize: 12 }}>
+                {s.homeTodayReviews}
+              </Text>
+            </View>
+            <View className="items-end">
+              <Text className="text-charcoal dark:text-neutral-100" style={{ fontFamily: "NotoSerif_700Bold", fontSize: 28 }}>
+                {totalCards || "—"}
+              </Text>
+              <Text className="text-warm-400 dark:text-neutral-500" style={{ fontFamily: "Manrope_500Medium", fontSize: 11 }}>
+                {s.homeMemorized}
+              </Text>
+            </View>
+          </View>
+          <View className="flex-row items-center justify-between mt-4 pt-4 border-t border-warm-200 dark:border-neutral-800">
+            <View className="flex-row items-center gap-1.5">
+              <Flame size={14} color={isDark ? "#2dd4bf" : "#0d9488"} />
+              <Text className="text-charcoal dark:text-neutral-100" style={{ fontFamily: "Manrope_700Bold", fontSize: 16 }}>
+                {streak}
+              </Text>
+              <Text className="text-warm-400 dark:text-neutral-500" style={{ fontFamily: "Manrope_500Medium", fontSize: 11 }}>
+                {s.homeStreak}
+              </Text>
+            </View>
+            <Text className="text-warm-500 dark:text-neutral-400" style={{ fontFamily: "Manrope_500Medium", fontSize: 12 }}>
+              {formatLastReview()}
+            </Text>
+          </View>
         </View>
 
         {/* Auth banner — only when the user isn't signed in */}
@@ -215,103 +336,6 @@ export default function HomeScreen() {
             </View>
           </Card>
         )}
-
-        {/* Search bar trigger */}
-        <Pressable
-          onPress={() => setShowSearch(true)}
-          className="mb-6"
-          style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-        >
-          <View className="flex-row items-center bg-surface-low dark:bg-surface-dark-low rounded-full px-4 py-3.5">
-            <Search size={18} color={isDark ? "#737373" : "#8B8178"} />
-            <Text
-              className="text-warm-400 dark:text-neutral-600 flex-1"
-              style={{ fontFamily: "Manrope_500Medium", fontSize: 15, marginLeft: 12 }}
-            >
-              {s.searchPlaceholder}
-            </Text>
-          </View>
-        </Pressable>
-
-        {/* Progress ring */}
-        <Card elevation="low" className="p-8 mb-6 items-center">
-          <View
-            className="w-40 h-40 rounded-full items-center justify-center"
-            style={{ borderWidth: 4, borderColor: isDark ? "#2dd4bf" : "#003638" }}
-          >
-            <Text
-              className="text-charcoal dark:text-neutral-100"
-              style={{ fontFamily: "Manrope_700Bold", fontSize: 36 }}
-            >
-              {totalCards || "—"}
-            </Text>
-            <Text
-              className="text-warm-400 dark:text-neutral-500"
-              style={{ fontFamily: "Manrope_500Medium", fontSize: 11, letterSpacing: 1 }}
-            >
-              {s.homeMemorized}
-            </Text>
-          </View>
-        </Card>
-
-        {/* Stats row */}
-        <View className="flex-row gap-3 mb-6">
-          <Card elevation="low" className="flex-1 p-5 items-center">
-            <Text
-              className="text-primary-accent dark:text-primary-bright"
-              style={{ fontFamily: "Manrope_700Bold", fontSize: 24 }}
-            >
-              {totalDue > dailyReviewLimit ? dailyReviewLimit : totalDue}
-            </Text>
-            <Text
-              className="text-warm-400 dark:text-neutral-500 mt-1"
-              style={{ fontFamily: "Manrope_500Medium", fontSize: 11 }}
-            >
-              {s.homeTodayReviews}
-            </Text>
-            {totalDue > dailyReviewLimit && (
-              <Text
-                className="text-warm-400 dark:text-neutral-600 mt-0.5"
-                style={{ fontFamily: "Manrope_400Regular", fontSize: 10 }}
-              >
-                {interpolate(s.flashcardsDueTodayLimit, { due: String(totalDue), limit: String(dailyReviewLimit) })}
-              </Text>
-            )}
-          </Card>
-          <Card elevation="low" className="flex-1 p-5 items-center">
-            <View className="flex-row items-center gap-1">
-              <Flame size={16} color={isDark ? "#2dd4bf" : "#0d9488"} />
-              <Text
-                className="text-charcoal dark:text-neutral-100"
-                style={{ fontFamily: "Manrope_700Bold", fontSize: 24 }}
-              >
-                {streak}
-              </Text>
-            </View>
-            <Text
-              className="text-warm-400 dark:text-neutral-500 mt-1"
-              style={{ fontFamily: "Manrope_500Medium", fontSize: 11 }}
-            >
-              {s.homeStreak}
-            </Text>
-          </Card>
-          <Card elevation="low" className="flex-1 p-5 items-center">
-            <Clock size={16} color={isDark ? "#a3a3a3" : "#b9a085"} />
-            <Text
-              className="text-charcoal dark:text-neutral-200 mt-1"
-              style={{ fontFamily: "Manrope_500Medium", fontSize: 12 }}
-              numberOfLines={1}
-            >
-              {formatLastReview()}
-            </Text>
-            <Text
-              className="text-warm-400 dark:text-neutral-500 mt-0.5"
-              style={{ fontFamily: "Manrope_500Medium", fontSize: 11 }}
-            >
-              {s.flashcardsLastReview}
-            </Text>
-          </Card>
-        </View>
 
         {/* Start Review CTA */}
         {totalDue > 0 && (
