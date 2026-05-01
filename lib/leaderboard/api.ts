@@ -8,6 +8,17 @@ export type LeaderboardEntry = {
   rank: number;
 };
 
+export type PublicProfile = {
+  id: string;
+  username: string;
+  display_name: string | null;
+  total_score: number;
+  current_streak: number;
+  longest_streak: number;
+  cards_reviewed: number;
+  last_review_date: string | null;
+};
+
 /** Daily leaderboard: top scorers today */
 export async function fetchDailyLeaderboard(): Promise<LeaderboardEntry[]> {
   if (!isSupabaseConfigured()) return [];
@@ -112,4 +123,18 @@ export async function fetchStreakLeaderboard(): Promise<LeaderboardEntry[]> {
     score: row.current_streak,
     rank: i + 1,
   }));
+}
+
+/** Public profile for leaderboard users */
+export async function fetchPublicProfile(userId: string): Promise<PublicProfile | null> {
+  if (!isSupabaseConfigured()) return null;
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, username, display_name, total_score, current_streak, longest_streak, cards_reviewed, last_review_date")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return (data as PublicProfile | null) ?? null;
 }

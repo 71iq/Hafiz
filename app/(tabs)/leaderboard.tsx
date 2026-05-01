@@ -3,6 +3,7 @@ import { View, Text, Pressable, ScrollView, RefreshControl } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Trophy, Flame, Medal } from "lucide-react-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "expo-router";
 import { useSettings } from "@/lib/settings/context";
 import { useDatabase } from "@/lib/database/provider";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -26,6 +27,7 @@ export default function LeaderboardScreen() {
   const { isDark } = useSettings();
   const db = useDatabase();
   const s = useStrings();
+  const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<Tab>("daily");
@@ -194,6 +196,7 @@ export default function LeaderboardScreen() {
               unit={scoreUnit}
               isStreak={activeTab === "streak"}
               s={s}
+              onPress={() => router.push(`/profile/${entry.user_id}`)}
             />
           ))}
           <View style={{ height: 40 }} />
@@ -210,6 +213,7 @@ function LeaderboardRow({
   unit,
   isStreak,
   s,
+  onPress,
 }: {
   entry: LeaderboardEntry;
   isCurrentUser: boolean;
@@ -217,6 +221,7 @@ function LeaderboardRow({
   unit: string;
   isStreak: boolean;
   s: any;
+  onPress: () => void;
 }) {
   const displayName = entry.display_name || entry.username;
   const mutedColor = isDark ? "#737373" : "#A39B93";
@@ -227,7 +232,8 @@ function LeaderboardRow({
   const scoreColor = isDark ? "#F3F2EF" : "#1D1D1B";
 
   return (
-    <View
+    <Pressable
+      onPress={onPress}
       className="flex-row items-center px-4 py-3.5 mb-2.5 rounded-2xl"
       style={{
         backgroundColor: isCurrentUser
@@ -299,6 +305,6 @@ function LeaderboardRow({
           {unit}
         </Text>
       </View>
-    </View>
+    </Pressable>
   );
 }
