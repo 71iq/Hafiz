@@ -24,6 +24,7 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 const ACTIVE_BG = "#1B4D4F";
 const ACTIVE_TEXT = "#FDDC91";
+const INACTIVE_OPACITY = 0.5;
 const INACTIVE_LIGHT = "rgba(45, 45, 45, 0.5)";
 const INACTIVE_DARK = "rgba(232, 225, 218, 0.5)";
 const BAR_BG_LIGHT = "rgba(255, 248, 241, 0.80)";
@@ -69,11 +70,16 @@ function BottomTabItem({
     <AnimatedPressable
       onPress={onPress}
       onLongPress={onLongPress}
-      onPressIn={() => { scale.value = withSpring(0.9, { damping: 15, stiffness: 400 }); }}
+      onPressIn={() => { scale.value = withSpring(0.98, { damping: 15, stiffness: 400 }); }}
       onPressOut={() => { scale.value = withSpring(1, { damping: 15, stiffness: 400 }); }}
       accessibilityRole="button"
       accessibilityState={isFocused ? { selected: true } : {}}
-      style={[animatedStyle, styles.bottomTabItem, isFocused && styles.bottomTabItemActive]}
+      style={[
+        animatedStyle,
+        styles.bottomTabItem,
+        isFocused && styles.bottomTabItemActive,
+        !isFocused && { opacity: INACTIVE_OPACITY },
+      ]}
     >
       {options.tabBarIcon?.({ focused: isFocused, color: iconColor, size: 22 })}
       <Text style={[styles.bottomLabel, { color: iconColor }]}>{label}</Text>
@@ -377,8 +383,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 16,
     paddingTop: 12,
-    borderTopLeftRadius: 40,
-    borderTopRightRadius: 40,
+    borderTopLeftRadius: 44,
+    borderTopRightRadius: 44,
     shadowColor: "#003638",
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.04,

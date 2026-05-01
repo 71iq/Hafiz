@@ -53,7 +53,10 @@ function TabsWithStrings() {
           name="index"
           options={{ href: null }}
         />
-        {/* Hidden routes */}
+        {/* Hidden routes.
+            `search` stays hidden in Phase 2 because /search is currently a
+            redirect placeholder. It will become a visible mobile tab once the
+            real full-screen search UI ships. */}
         <Tabs.Screen
           name="flashcards"
           options={{ href: null }}

@@ -111,3 +111,35 @@ Compared current routes/components against the phone mockup inventory:
 ### Phase 1 completion status
 - Exit criteria satisfied for primitives/tokens foundation.
 - Ready to start Phase 2 (mobile navigation and app chrome) using the new shared primitives where appropriate.
+
+## 2026-05-01 — Phase 2 In Progress
+
+### Scope decisions for this phase
+1. `AppNavigation` mobile bar is the only chrome component changed in this step.
+- Desktop floating sidebar behavior remains unchanged by design.
+
+2. Search tab visibility remains deferred in Phase 2.
+- Reason: `app/(tabs)/search.tsx` is still a redirect placeholder, not the target full mobile search screen.
+- Decision: keep `search` hidden until Phase 7 implementation lands.
+
+### Implemented in this step
+- Updated `components/ui/AppNavigation.tsx` mobile bottom bar interaction/style:
+  - Press animation scale changed from `0.9` to `0.98` to match the design spec.
+  - Explicit inactive opacity (`0.5`) applied at item level.
+  - Kept active pill using `primary-soft`/gold mapping constants (`#1B4D4F`, `#FDDC91`).
+  - Increased top corner radius from `40` to `44` for stronger rounded chrome.
+- Added a route comment in `app/(tabs)/_layout.tsx` documenting why `search` is intentionally hidden in Phase 2.
+
+### Phase 2 status after this step
+- Mobile navigation chrome aligned closer to mockup rules.
+- Existing route graph preserved, desktop unaffected.
+- Next immediate step: run `npx tsc --noEmit` and `npx expo export --platform web` for exit criteria verification.
+
+### Validation result
+- `npx tsc --noEmit`: passed.
+- `npx expo export --platform web`: passed.
+
+### Phase 2 completion status
+- Navigation is usable on phone widths with updated chrome behavior.
+- Existing routes continue to navigate correctly.
+- No desktop sidebar regression introduced in this phase.
