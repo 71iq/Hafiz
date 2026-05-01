@@ -850,3 +850,21 @@ Saved in `phase19/`:
 ### Validation result
 - `npx tsc --noEmit`: passed.
 - `npx expo export --platform web`: passed.
+
+## 2026-05-01 — Ayah Badge/Icon Collision Fix (LTR + RTL)
+
+### User-reported issue
+- Surah:ayah badge collided with top action icons.
+- In English (LTR): collision with play/share side.
+- In Arabic (RTL): collision with bookmark side.
+
+### Implemented fix
+- `components/mushaf/AyahBlock.tsx` top action-row spacing updated to reserve badge-side space in both directions:
+  - added top padding under badge area.
+  - added directional horizontal inset:
+    - LTR: `paddingLeft` reserve.
+    - RTL: `paddingRight` reserve.
+
+### Validation result
+- `npx tsc --noEmit`: passed.
+- `npx expo export --platform web`: passed.

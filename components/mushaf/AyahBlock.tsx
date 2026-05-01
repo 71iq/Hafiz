@@ -292,7 +292,14 @@ function AyahBlockInner({
         )}
       </View>
 
-      <View className={isRTL ? "flex-row-reverse items-center justify-between gap-3" : "flex-row items-center justify-between gap-3"}>
+      <View
+        className={isRTL ? "flex-row-reverse items-center justify-between gap-3" : "flex-row items-center justify-between gap-3"}
+        style={{
+          paddingTop: isPhone ? 34 : 28,
+          paddingLeft: isRTL ? 0 : 56,
+          paddingRight: isRTL ? 56 : 0,
+        }}
+      >
         <View className={isRTL ? "flex-row-reverse items-center gap-1.5" : "flex-row items-center gap-1.5"}>
           <ActionIcon icon={<Play size={15} color={iconColor} />} onPress={() => {}} disabled />
           <ActionIcon icon={<Share2 size={15} color={iconColor} />} onPress={handleShare} />
