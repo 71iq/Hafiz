@@ -11,7 +11,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { BookOpen, Check, Layers } from "lucide-react-native";
-import { useDatabase } from "@/lib/database/provider";
+import { useDatabase, useDatabaseStatus } from "@/lib/database/provider";
+import { LoadingScreen } from "@/components/LoadingScreen";
 import { SettingsProvider, useSettings } from "@/lib/settings/context";
 import { useStrings, interpolate } from "@/lib/i18n/useStrings";
 import { createDeck, generateDeckId } from "@/lib/fsrs/queries";
@@ -664,6 +665,32 @@ function OnboardingInner() {
 // ─── Exported screen (wraps with SettingsProvider) ───────────
 
 export default function OnboardingScreen() {
+  const { isReady, progress, error } = useDatabaseStatus();
+  const s = useStrings();
+
+  if (error) {
+    return (
+      <View className="flex-1 items-center justify-center bg-surface dark:bg-surface-dark px-6">
+        <Text
+          className="text-red-600 mb-4"
+          style={{ fontFamily: "Manrope_700Bold", fontSize: 18 }}
+        >
+          {s.databaseError}
+        </Text>
+        <Text
+          className="text-red-500 text-center"
+          style={{ fontFamily: "Manrope_400Regular", fontSize: 15 }}
+        >
+          {error}
+        </Text>
+      </View>
+    );
+  }
+
+  if (!isReady) {
+    return <LoadingScreen progress={progress} />;
+  }
+
   return (
     <SettingsProvider>
       <OnboardingInner />

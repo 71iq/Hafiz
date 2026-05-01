@@ -751,3 +751,27 @@ Saved in `phase17/`:
 
 ### Next step
 - Implement deterministic QA bootstrap and rerun deferred screenshot matrix items.
+
+## 2026-05-01 — Phase 19 Progress (QA Unblock Implemented)
+
+### Implemented in this step
+1. Removed crash-prone DB timing path on routes outside tabs that were breaking Phase 17 captures.
+- `app/onboarding.tsx`
+  - added `useDatabaseStatus` gate before rendering onboarding internals.
+  - now shows shared `LoadingScreen` until DB ready.
+  - now shows shared database error surface instead of throwing from `useDatabase()`.
+- `app/flashcards/session.tsx`
+  - added `useDatabaseStatus` gate in wrapper before session internals.
+  - now shows shared `LoadingScreen` until DB ready.
+  - now shows shared database error surface instead of throwing from `useDatabase()`.
+
+### Rationale
+- Phase 17 blocker included `Database not initialized yet` hard failures on these screens.
+- This change converts those hard failures into deterministic readiness/error states aligned with tab behavior.
+
+### Validation result
+- `npx tsc --noEmit`: passed.
+- `npx expo export --platform web`: passed.
+
+### Remaining for full Phase 19 closure
+- Re-run deferred screenshot matrix items after this unblock and record capture outcomes.
