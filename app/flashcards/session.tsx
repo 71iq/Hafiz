@@ -345,30 +345,30 @@ function FlashcardSessionScreen() {
   return (
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
       {/* Header */}
-      <View className="flex-row items-center justify-between px-6 py-3">
+      <View className="px-6 pt-3 pb-2">
+        <View className="flex-row items-center justify-between">
         <Pressable
           onPress={handleEndSession}
-          className="w-11 h-11 rounded-full bg-surface-high dark:bg-surface-dark-high items-center justify-center"
+          className="w-11 h-11 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center"
         >
           <X size={18} color={isDark ? "#d4d4d4" : "#6e5a47"} />
         </Pressable>
 
-        <View className="flex-1 mx-4">
-          <View className="h-2 rounded-full bg-surface-high dark:bg-surface-dark-high overflow-hidden">
-            <View
-              className="h-full rounded-full bg-primary-accent"
-              style={{ width: `${((currentIndex + 1) / cards.length) * 100}%` }}
-            />
-          </View>
-          <Text
-            className="text-warm-400 dark:text-neutral-500 mt-1 text-center"
-            style={{ fontFamily: "Manrope_500Medium", fontSize: 11 }}
-          >
-            {currentIndex + 1} / {cards.length}
-          </Text>
-        </View>
+        <Text
+          className="text-warm-500 dark:text-neutral-400"
+          style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
+        >
+          {currentIndex + 1} / {cards.length}
+        </Text>
 
         <CardStateBadge state={currentCard.card.state} s={s} />
+        </View>
+        <View className="mt-2 h-[2px] rounded-full bg-surface-high dark:bg-surface-dark-high overflow-hidden">
+          <View
+            className="h-full rounded-full bg-primary-accent dark:bg-primary-bright"
+            style={{ width: `${((currentIndex + 1) / cards.length) * 100}%` }}
+          />
+        </View>
       </View>
 
       {/* Mode tags row */}
@@ -411,7 +411,7 @@ function FlashcardSessionScreen() {
         <View style={{ width: "100%", maxWidth }}>
           {/* Surah context */}
           <Text
-            className="text-warm-400 dark:text-neutral-500 text-center mb-2 mt-4"
+            className="text-warm-400 dark:text-neutral-500 text-center mb-2 mt-2"
             style={{ fontFamily: "Manrope_500Medium", fontSize: 12, writingDirection: "rtl" }}
           >
             {currentCard.surahName} - {s.ayahs} {currentCard.ayah}
@@ -419,7 +419,7 @@ function FlashcardSessionScreen() {
 
           {/* Front of card */}
           {phase === "front" && (
-            <Card elevation="low" className="p-8 mb-6">
+            <Card elevation="low" className="p-6 mb-6 rounded-3xl bg-surface-low dark:bg-surface-dark-low">
               {currentCard.uniqueFront.needsExplicitLabel && (
                 <Text
                   className="text-primary-accent dark:text-primary-bright text-center mb-3"
@@ -448,13 +448,13 @@ function FlashcardSessionScreen() {
           {/* Side (test mode) */}
           {phase === "side" && currentMode && (
             <View>
-              <Card elevation="low" className="p-5 mb-4">
+              <Card elevation="low" className="p-5 mb-4 rounded-3xl bg-surface-low dark:bg-surface-dark-low">
                 <TestModePrompt mode={currentMode} card={currentCard} fontSize={fontSize * 0.85} lineHeight={lineHeight * 0.85} s={s} />
               </Card>
 
               {revealed && (
                 <RNAnimated.View style={{ transform: [{ translateY }], opacity }}>
-                  <Card elevation="mid" className="p-6">
+                  <Card elevation="mid" className="p-6 rounded-3xl bg-surface-bright dark:bg-surface-dark-mid">
                     <TestModeAnswer mode={currentMode} card={currentCard} fontSize={fontSize} lineHeight={lineHeight} />
                   </Card>
                 </RNAnimated.View>
@@ -464,7 +464,7 @@ function FlashcardSessionScreen() {
 
           {/* Grading phase */}
           {phase === "grading" && (
-            <Card elevation="low" className="p-6 mb-4">
+            <Card elevation="low" className="p-6 mb-4 rounded-3xl bg-surface-low dark:bg-surface-dark-low">
               <Text
                 className="text-charcoal dark:text-neutral-100 text-center"
                 style={{ fontSize: fontSize * 0.8, lineHeight: lineHeight * 0.8, writingDirection: "rtl" }}
@@ -510,7 +510,15 @@ function FlashcardSessionScreen() {
 
         {/* Grading: show directly after last side is revealed, or in grading phase */}
         {((phase === "side" && revealed && isLastSide) || phase === "grading") && (
-          <GradingButtons onGrade={handleGrade} isDark={isDark} s={s} />
+          <>
+            <GradingButtons onGrade={handleGrade} isDark={isDark} s={s} />
+            <Text
+              className="text-warm-400 dark:text-neutral-500 text-center mt-2"
+              style={{ fontFamily: "Manrope_500Medium", fontSize: 11 }}
+            >
+              {s.flashcardsGrade}
+            </Text>
+          </>
         )}
       </View>
     </SafeAreaView>
@@ -528,11 +536,11 @@ function TestModePrompt({
   const color = TEST_MODE_COLORS[mode];
 
   const promptText: Record<string, string> = {
-    nextAyah: "What comes next?",
-    previousAyah: "What came before?",
-    translation: "What does this mean?",
+    nextAyah: s.flashcardsModeNextAyah,
+    previousAyah: s.flashcardsModePreviousAyah,
+    translation: s.flashcardsModeTranslation,
     tafseer: "",
-    surahName: "Which surah is this from?",
+    surahName: s.flashcardsModeSurahName,
   };
 
   // Surah Name mode hides the surah context
@@ -629,22 +637,35 @@ function GradingButtons({ onGrade, isDark, s }: { onGrade: (rating: Grade) => vo
   };
 
   return (
-    <View className="flex-row gap-3">
-      {GRADE_BUTTONS.map(({ rating, bgLight, bgDark }) => (
-        <Pressable
-          key={rating}
-          onPress={() => onGrade(rating)}
-          className="flex-1 rounded-full items-center"
-          style={{
-            backgroundColor: isDark ? bgDark : bgLight,
-            paddingVertical: 16,
-          }}
-        >
-          <Text style={{ fontFamily: "Manrope_700Bold", fontSize: 14, color: "#fff" }}>
+    <View className="gap-3">
+      <View className="flex-row gap-3">
+        {GRADE_BUTTONS.map(({ rating, bgLight, bgDark }) => (
+          <Pressable
+            key={rating}
+            onPress={() => onGrade(rating)}
+            className="flex-1 rounded-2xl items-center"
+            style={{
+              backgroundColor: isDark ? bgDark : bgLight,
+              paddingVertical: 14,
+            }}
+          >
+            <Text style={{ fontFamily: "Manrope_700Bold", fontSize: 14, color: "#fff" }}>
+              {labels[rating]}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+      <View className="flex-row justify-between px-1">
+        {GRADE_BUTTONS.map(({ rating }) => (
+          <Text
+            key={`hint-${rating}`}
+            className="text-warm-500 dark:text-neutral-500"
+            style={{ fontFamily: "Manrope_500Medium", fontSize: 10 }}
+          >
             {labels[rating]}
           </Text>
-        </Pressable>
-      ))}
+        ))}
+      </View>
     </View>
   );
 }

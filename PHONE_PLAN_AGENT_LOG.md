@@ -368,3 +368,38 @@ Compared current routes/components against the phone mockup inventory:
 ### Phase 8 completion status
 - Progress screen now aligns closer to mobile target composition.
 - Existing scoring/progress calculation behavior remains unchanged.
+
+## 2026-05-01 — Phase 9 Completed
+
+### Scope decisions for this phase
+1. Preserved FSRS workflow/scheduling behavior and state transitions exactly; changed UI hierarchy only.
+2. Kept prefetch-at-session-start and offline-only behavior unchanged.
+3. Upgraded prompt labels to existing bilingual test-mode strings instead of hardcoded English-only prompt copy.
+
+### Implemented in this step
+- `app/flashcards/session.tsx`:
+  - Top chrome redesign:
+    - close button
+    - hairline progress
+    - centered card index
+    - state badge.
+  - Question/answer visual hierarchy refresh:
+    - softened prompt/answer card surfaces
+    - clearer separation between prompt and revealed answer states
+    - preserved existing mode tags and reveal/next flow.
+  - Grading area redesign:
+    - 4 prominent grading buttons with refined shape/spacing
+    - supplemental inline labels beneath grades
+    - explicit grading helper label (`flashcardsGrade`).
+  - Prompt copy now uses existing bilingual mode labels:
+    - next ayah
+    - previous ayah
+    - translation
+    - surah name.
+
+### Validation result
+- `npx tsc --noEmit`: passed.
+- `npx expo export --platform web`: passed.
+
+### Phase 9 completion status
+- Session UI now matches the intended mobile hierarchy more closely while preserving review behavior and FSRS logic.
