@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { View, Text, Modal, Pressable, ScrollView, useWindowDimensions } from "react-native";
 import { BookOpen, X } from "lucide-react-native";
 import { useWordInteraction } from "@/lib/word/context";
@@ -47,6 +47,7 @@ export function WordDetailSheet() {
     rootCount: null,
     translationEn: null,
   });
+  const tabScrollRef = useRef<ScrollView>(null);
 
   const isPhone = width < 768;
   const modalWidth = isPhone ? Math.max(280, Math.min(width - 16, 430)) : Math.max(280, Math.min(width - 32, 760));
@@ -123,6 +124,14 @@ export function WordDetailSheet() {
       cancelled = true;
     };
   }, [view, detailWord?.surah, detailWord?.ayah, db]);
+
+  useEffect(() => {
+    if (view !== "tabs" || !isRTL) return;
+    const frame = requestAnimationFrame(() => {
+      tabScrollRef.current?.scrollToEnd({ animated: false });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [view, isRTL, activeTab]);
 
   if (!detailWord) return null;
 
@@ -211,6 +220,7 @@ export function WordDetailSheet() {
           {view === "tabs" ? (
             <View className="flex-1 min-h-0">
               <ScrollView
+                ref={tabScrollRef}
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 className="bg-surface-low dark:bg-surface-dark"
