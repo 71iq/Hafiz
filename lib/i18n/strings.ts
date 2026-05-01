@@ -64,7 +64,7 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     wordTabIrab: "الإعراب",
     wordTabTajweed: "Tajweed",
     wordTabTasreef: "التصريف",
-    wordTabQiraat: "القراءات",
+    wordTabQiraat: "Qira'at",
     wordTabOccurrences: "المواضع",
     // Tab-content strings (both modes use EN keys when in English UI)
     tapToExpand: "Tap to expand",
