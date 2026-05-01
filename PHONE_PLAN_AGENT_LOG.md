@@ -697,3 +697,44 @@ Saved in `phase17/`:
 ### Phase 17 completion status
 - Capture pipeline is in place and evidence files are recorded.
 - QA matrix execution is partially complete with blockers documented; no product-code changes made in this phase.
+
+## 2026-05-01 — Phase 18 Completed
+
+### Rollout strategy finalization
+1. Confirmed incremental landing history is complete and phase-scoped on `main`:
+- Phase 0 through Phase 17 are each represented by independent commits and can be reverted independently.
+2. Confirmed mobile redesign was shipped without replacing core product invariants:
+- QCF2 rendering path preserved.
+- Local SQLite read behavior preserved.
+- Supabase-unconfigured/auth-gate behavior preserved.
+- Sync queue non-blocking behavior preserved.
+3. Confirmed build-gate discipline remained in place for implementation phases:
+- `npx tsc --noEmit` and `npx expo export --platform web` were executed and logged phase-by-phase.
+
+### Rollout cleanup outcomes
+- No feature flag was introduced because rollout was already achieved safely by small commits.
+- Desktop/tablet regressions were minimized by constraining high-impact visual changes to phone-first surfaces.
+- Phase 17 visual QA blocker (web DB-ready state in Playwright) is explicitly documented and accepted as a deferred matrix-completion task, not a hidden risk.
+
+### Independent rollback map (latest phase commits)
+- Phase 17: `0ac67ca`
+- Phase 16: `f0a8035`
+- Phase 15: `4fc18ec`
+- Phase 14: `f55cd1c`
+- Phase 13: `bd861a4`
+- Phase 12: `7aef9dc`
+- Phase 11: `303063e`
+- Phase 10: `b534347`
+- Phase 9: `61eeccf`
+- Phase 8: `81f46db`
+- Phase 7: `44b02a6`
+- Phase 6: `32dfe3e`
+- Phase 5: `0ae8a6a`
+- Phase 4: `3c666e5`
+- Phase 3: `6223e24`
+- Phase 2: `70c12ef`
+- Phase 1: `f0fce43`
+- Phase 0: `22f4ea3` (+ kickoff docs `3b38a1c`)
+
+### Phase 18 completion status
+- Rollout strategy goals are satisfied: incremental deployability, independent reverts, and explicit residual-risk logging.
