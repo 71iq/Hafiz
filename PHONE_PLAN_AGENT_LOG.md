@@ -775,3 +775,26 @@ Saved in `phase17/`:
 
 ### Remaining for full Phase 19 closure
 - Re-run deferred screenshot matrix items after this unblock and record capture outcomes.
+
+## 2026-05-01 — Phase 19 Rerun Results (Deferred Matrix Re-check)
+
+### Captures produced in this rerun
+Saved in `phase19/`:
+- `onboarding-rerun-light-en.png`
+- `flashcards-session-rerun-light-en.png`
+- `mushaf-rerun-light-en.png`
+- `search-rerun-light-en.png`
+- `settings-rerun-light-en.png`
+
+### Outcome assessment
+- ✅ `onboarding` is now functional in web Playwright session (no `Database not initialized yet` failure).
+- ✅ `flashcards/session` no longer crashes with DB-not-initialized error; now gracefully waits on loading shell.
+- ⚠️ Remaining blocker persists for full matrix completion:
+  - most data-driven routes in this Playwright runtime remain on `Preparing database...` long enough to prevent meaningful visual state capture.
+
+### Interpretation
+- The phase-19 code fix resolved the hard failure path (throwing before DB readiness) for non-tab routes.
+- A separate deterministic QA bootstrap problem remains (ensuring DB-import completion before timed capture sequence begins in Playwright runs).
+
+### Recommended next technical step (for follow-up phase)
+- Introduce an explicit QA readiness signal route/state for Playwright (e.g., wait-until-ready endpoint/flag), then start per-route screenshot workflow only after readiness confirmation.
