@@ -217,18 +217,19 @@ export function WordDetailSheet() {
 
           {view === "tabs" ? (
             <View className="flex-1 min-h-0">
-              <ScrollView
-                ref={tabScrollRef}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                className="bg-surface-low dark:bg-surface-dark"
-                contentContainerStyle={{
-                  paddingHorizontal: 16,
-                  gap: 6,
-                  paddingVertical: 6,
-                  flexDirection: isRTL ? "row-reverse" : "row",
-                }}
-              >
+              <View className="h-14 justify-center bg-surface-low dark:bg-surface-dark">
+                <ScrollView
+                  ref={tabScrollRef}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{
+                    paddingHorizontal: 16,
+                    gap: 6,
+                    paddingVertical: 6,
+                    alignItems: "center",
+                    flexDirection: isRTL ? "row-reverse" : "row",
+                  }}
+                >
                 {tabs.map((tab) => {
                   const isActive = activeTab === tab.key;
                   return (
@@ -236,7 +237,10 @@ export function WordDetailSheet() {
                       key={tab.key}
                       onPress={() => setActiveTab(tab.key)}
                       className={`rounded-full px-4 py-2.5 ${isActive ? "bg-primary-soft" : "bg-transparent"}`}
-                      style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+                      style={({ pressed }) => ({
+                        alignSelf: "center",
+                        transform: [{ scale: pressed ? 0.98 : 1 }],
+                      })}
                     >
                       <Text
                         className={isActive ? "text-gold" : "text-warm-400 dark:text-neutral-500"}
@@ -247,7 +251,8 @@ export function WordDetailSheet() {
                     </Pressable>
                   );
                 })}
-              </ScrollView>
+                </ScrollView>
+              </View>
 
               <ScrollView className="flex-1 min-h-0 px-5">
                 {activeTab === "meaning" && <MeaningTab surah={surah} ayah={ayah} wordPos={wordPos} />}
