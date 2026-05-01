@@ -662,8 +662,8 @@ function MushafInner() {
               pagePaddingBottom={isPhone ? 44 : 32}
               pageSidePadding={isPhone ? 22 : 16}
               centerVerticalOnPhone={isPhone}
-              horizontalTopInset={isPhone && !chromeVisible && pageScroll === "horizontal" ? 34 : 0}
-              horizontalBottomInset={isPhone && !chromeVisible && pageScroll === "horizontal" ? 30 : 0}
+              horizontalTopInset={isPhone && !chromeVisible && pageScroll === "horizontal" ? 52 : 0}
+              horizontalBottomInset={isPhone && !chromeVisible && pageScroll === "horizontal" ? 18 : 0}
             />
             {!chromeVisible && (
               <>
