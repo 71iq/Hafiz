@@ -261,3 +261,37 @@ Compared current routes/components against the phone mockup inventory:
 ### Phase 5 completion status
 - Verse cards now follow a lighter editorial composition with collapsible translation/tafseer sections.
 - No regressions introduced in translation, tafseer, bookmark, share, or hide mode flows during this phase.
+
+## 2026-05-01 — Phase 6 Completed
+
+### Scope decisions for this phase
+1. Kept all existing tab data components unchanged (`MeaningTab`, `IrabTab`, `TajweedTab`, `TasreefTab`, `QiraatTab`, `OccurrencesTab`) and redesigned only the panel shell/layout.
+2. Kept full-ayah expansion flow inside the same sheet (`view` toggle) using existing `AyahBlock`.
+3. Added lightweight header metadata from local SQLite only:
+- focused word text
+- root
+- lemma
+- root occurrence count.
+
+### Implemented in this step
+- `components/mushaf/WordDetailSheet.tsx` redesign:
+  - stronger dimmed backdrop and rounded top sheet treatment.
+  - drag handle at the top of the panel.
+  - context chip (`surah:ayah:word`) in header.
+  - explicit `View Full Ayah` control + close control in header and footer.
+  - large focused word display block under header.
+  - root/lemma/occurrence metadata chips.
+  - quick stats row (`surah`, `ayah`, `word`).
+  - horizontal tab strip with RTL-aware ordering.
+  - source attribution line at bottom of tabs view.
+  - footer action row as quick actions.
+- Preserved nested scroll behavior in tab content and ayah view.
+- Preserved existing long-content handling by keeping tab internals unchanged.
+
+### Validation result
+- `npx tsc --noEmit`: passed.
+- `npx expo export --platform web`: passed.
+
+### Phase 6 completion status
+- Word long-press panel structure now aligns with the target composition while preserving existing data/model behavior.
+- All existing tabs remain wired and functional with local SQLite-backed data or existing placeholders.
