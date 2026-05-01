@@ -51,7 +51,6 @@ export function WordDetailSheet() {
   const isPhone = width < 768;
   const modalWidth = isPhone ? Math.max(280, Math.min(width - 16, 430)) : Math.max(280, Math.min(width - 32, 760));
   const maxModalHeight = Math.max(320, Math.min(height - (isPhone ? 20 : 48), 760));
-  const contentMaxHeight = Math.max(220, maxModalHeight - 290);
 
   const tabs = useMemo(
     () => [
@@ -142,14 +141,14 @@ export function WordDetailSheet() {
         <Pressable className="absolute inset-0" onPress={handleClose} />
         <View
           className="overflow-hidden rounded-t-3xl bg-surface dark:bg-surface-dark-low"
-          style={{ width: modalWidth, maxHeight: maxModalHeight }}
+          style={{ width: modalWidth, height: maxModalHeight }}
           onStartShouldSetResponder={() => true}
         >
           <View className="items-center pt-2 pb-1">
             <View className="h-1 w-10 rounded-full bg-surface-high dark:bg-surface-dark-high" />
           </View>
 
-          <View className={`px-4 pb-3 ${isRTL ? "items-end" : "items-start"}`}>
+          <View className={`px-4 pb-3 flex-shrink-0 ${isRTL ? "items-end" : "items-start"}`}>
             <View className={`w-full flex-row items-center justify-between ${isRTL ? "flex-row-reverse" : ""}`}>
               <View className="flex-row items-center gap-2">
                 <View className="rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 px-3 py-1.5">
@@ -210,7 +209,7 @@ export function WordDetailSheet() {
           </View>
 
           {view === "tabs" ? (
-            <>
+            <View className="flex-1 min-h-0">
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -242,7 +241,7 @@ export function WordDetailSheet() {
                 })}
               </ScrollView>
 
-              <ScrollView className="px-5" style={{ maxHeight: contentMaxHeight }}>
+              <ScrollView className="flex-1 min-h-0 px-5">
                 {activeTab === "meaning" && <MeaningTab surah={surah} ayah={ayah} wordPos={wordPos} />}
                 {activeTab === "irab" && <IrabTab surah={surah} ayah={ayah} wordPos={wordPos} />}
                 {activeTab === "tajweed" && <TajweedTab surah={surah} ayah={ayah} wordPos={wordPos} />}
@@ -251,14 +250,14 @@ export function WordDetailSheet() {
                 {activeTab === "occurrences" && <OccurrencesTab surah={surah} ayah={ayah} wordPos={wordPos} />}
               </ScrollView>
 
-              <View className={`px-5 py-3 ${isRTL ? "items-end" : "items-start"}`}>
+              <View className={`flex-shrink-0 px-5 py-3 ${isRTL ? "items-end" : "items-start"}`}>
                 <Text className="text-warm-400 dark:text-neutral-500" style={{ fontFamily: "Manrope_500Medium", fontSize: 11 }}>
                   {tabLabel}
                 </Text>
               </View>
-            </>
+            </View>
           ) : (
-            <ScrollView style={{ maxHeight: contentMaxHeight }}>
+            <ScrollView className="flex-1 min-h-0">
               {ayahCtx ? (
                 <AyahBlock
                   surah={surah}
