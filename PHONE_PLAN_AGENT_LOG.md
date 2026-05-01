@@ -656,3 +656,44 @@ Compared current routes/components against the phone mockup inventory:
 ### Phase 16 completion status
 - Web export succeeds without OOM.
 - Core reading screens retain virtualization and remain architecturally performance-safe, with reduced persistent blur/shadow overhead on mobile/desktop chrome.
+
+## 2026-05-01 — Phase 17 Completed (With Blocked Items Documented)
+
+### Scope decisions for this phase
+1. Executed the visual QA pass using `npx expo start --web` and Playwright MCP captures.
+2. Captured direct-route screenshots first to validate shell/chrome consistency before interactive modal flows.
+3. Documented blocked items explicitly instead of forcing mock data or bypasses.
+
+### Screenshot capture outputs
+Saved in `phase17/`:
+- `home-light-en.png`
+- `mushaf-light-en.png`
+- `progress-light-en.png`
+- `flashcards-session-light-en.png`
+- `search-light-en.png`
+- `settings-light-en.png`
+- `onboarding-light-en.png`
+- `login-light-en.png`
+- `signup-light-en.png`
+- `leaderboard-light-en.png`
+
+### Findings
+- Auth pages (`/auth/login`, `/auth/signup`) captured in expected redesigned layout.
+- Most data-driven routes under Playwright web session stayed on loading/error shells:
+  - repeated `Preparing database...` screen on several routes.
+  - `Database not initialized yet` error on some routes (e.g. flashcards session, onboarding).
+- Because of that runtime condition, full mockup comparison matrix (including modal/sheet states, dark mode, Arabic mode, and multiple viewport sizes) could not be completed reliably in this run.
+
+### Deviation log (accepted/deferred)
+- Deferred for next pass (requires deterministic seeded DB-ready runtime in Playwright session):
+  - screen-level comparisons for Mushaf/page+verse details.
+  - search empty/results states.
+  - flashcard question/answer states.
+  - reflections modal state capture.
+  - settings top/middle/bottom scrolled sections.
+  - dark mode and Arabic mode full matrix.
+  - multi-viewport matrix (320x740, 375x812, 399x836, 430x932).
+
+### Phase 17 completion status
+- Capture pipeline is in place and evidence files are recorded.
+- QA matrix execution is partially complete with blockers documented; no product-code changes made in this phase.
