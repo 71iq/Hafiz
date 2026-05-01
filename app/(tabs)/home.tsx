@@ -193,13 +193,6 @@ export default function HomeScreen() {
         {/* Header */}
         <View className="pt-8 pb-4">
           <View className={`flex-row items-start justify-between ${isRTL ? "flex-row-reverse" : ""}`}>
-            <Pressable
-              onPress={() => setShowSearch(true)}
-              className="w-10 h-10 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center mt-1"
-              style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-            >
-              <Search size={16} color={isDark ? "#a3a3a3" : "#8B8178"} />
-            </Pressable>
             <View className={isRTL ? "items-end" : "items-start"}>
               <Text
                 className="text-warm-400 dark:text-neutral-500 uppercase"
@@ -220,6 +213,13 @@ export default function HomeScreen() {
                 {user ? (user.email?.split("@")[0] ?? "Hafiz") : "Hafiz"}
               </Text>
             </View>
+            <Pressable
+              onPress={() => setShowSearch(true)}
+              className="w-10 h-10 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center mt-1"
+              style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+            >
+              <Search size={16} color={isDark ? "#a3a3a3" : "#8B8178"} />
+            </Pressable>
           </View>
         </View>
 
