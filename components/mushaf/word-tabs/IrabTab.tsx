@@ -56,15 +56,10 @@ export function IrabTab({ surah, ayah, wordPos }: Props) {
     );
   }
 
-  // Move the matched entry to the top when present
-  const ordered = matchIdx > 0
-    ? [rows[matchIdx], ...rows.filter((_, i) => i !== matchIdx)]
-    : rows;
-
   return (
     <View className="py-4 px-1">
-      {ordered.map((row, visibleIdx) => {
-        const isMatch = matchIdx !== -1 && visibleIdx === 0 && row === rows[matchIdx];
+      {rows.map((row, idx) => {
+        const isMatch = matchIdx !== -1 && idx === matchIdx;
         return (
           <View
             key={`${row.surah}-${row.ayah}-${row.word_pos}`}
