@@ -165,18 +165,16 @@ export function WordDetailSheet() {
                     {surah}:{ayah}:{wordPos}
                   </Text>
                 </View>
-                {view === "tabs" && (
-                  <Pressable
-                    onPress={() => setView("ayah")}
-                    className="flex-row items-center gap-1.5 rounded-full bg-surface-low dark:bg-surface-dark px-3 py-1.5"
-                    style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-                  >
-                    <BookOpen size={13} color={isDark ? "#a3a3a3" : "#003638"} />
-                    <Text className="text-charcoal dark:text-neutral-200" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}>
-                      {s.viewFullAyah}
-                    </Text>
-                  </Pressable>
-                )}
+                <Pressable
+                  onPress={() => setView(view === "tabs" ? "ayah" : "tabs")}
+                  className="flex-row items-center gap-1.5 rounded-full bg-surface-low dark:bg-surface-dark px-3 py-1.5"
+                  style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+                >
+                  <BookOpen size={13} color={isDark ? "#a3a3a3" : "#003638"} />
+                  <Text className="text-charcoal dark:text-neutral-200" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}>
+                    {view === "ayah" ? (s.backToWord ?? "Back") : s.viewFullAyah}
+                  </Text>
+                </Pressable>
               </View>
               <Pressable
                 onPress={handleClose}
