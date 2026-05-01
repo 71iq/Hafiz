@@ -103,19 +103,8 @@ export default function LeaderboardScreen() {
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
       <View className="px-6 pt-4">
         <Text
-          style={{
-            fontFamily: "Manrope_600SemiBold",
-            fontSize: 10,
-            letterSpacing: 2,
-            textTransform: "uppercase",
-            color: mutedColor,
-          }}
-        >
-          {s.tabLeaderboard}
-        </Text>
-        <Text
           className="text-primary dark:text-gold-light"
-          style={{ fontFamily: "NotoSerif_700Bold", fontSize: 32, lineHeight: 36, marginTop: 6 }}
+          style={{ fontFamily: "NotoSerif_700Bold", fontSize: 32, lineHeight: 36 }}
         >
           {s.leaderboardTitle}
         </Text>

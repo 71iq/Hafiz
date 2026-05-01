@@ -108,12 +108,6 @@ export default function SettingsScreen() {
       {/* Header */}
       <View className="px-6 pt-8 pb-4">
         <Text
-          className="text-warm-400 dark:text-neutral-500 uppercase mb-1"
-          style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, letterSpacing: 1.8 }}
-        >
-          {s.tabSettings}
-        </Text>
-        <Text
           className="text-charcoal dark:text-neutral-100"
           style={{ fontFamily: "NotoSerif_700Bold", fontSize: 28 }}
         >
