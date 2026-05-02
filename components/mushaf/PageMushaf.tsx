@@ -5,6 +5,7 @@ import {
   FlatList,
   Animated as RNAnimated,
   ActivityIndicator,
+  Easing,
   Platform,
   PanResponder,
   useWindowDimensions,
@@ -143,6 +144,12 @@ const SURAH_HEADER_COMPACT_HEIGHT = 68; // mt-3(12) + card(48) + mb-2(8)
 const HORIZONTAL_PAGE_TOP_PADDING = 0;
 const HORIZONTAL_PAGE_BOTTOM_RESERVE = 56;
 const MUSHAF_LINE_COUNT = 15;
+const HORIZONTAL_CANCEL_DURATION = 190;
+const HORIZONTAL_PAGE_TURN_MIN_DURATION = 240;
+const HORIZONTAL_PAGE_TURN_MAX_DURATION = 320;
+const HORIZONTAL_FLICK_MIN_DISTANCE = 18;
+const HORIZONTAL_FLICK_VELOCITY = 0.45;
+const HORIZONTAL_EASING = Easing.out(Easing.cubic);
 
 function computePageItemHeight(
   page: PageData,
@@ -285,6 +292,7 @@ export function PageMushaf({
   const pageIndicatorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const horizontalAnimatingRef = useRef(false);
   const wheelLockedRef = useRef(false);
+  const horizontalDragOffsetRef = useRef(0);
   const webDragRef = useRef<WebDragState>({
     active: false,
     claimed: false,
@@ -454,6 +462,7 @@ export function PageMushaf({
       if (horizontal) {
         horizontalAnimatingRef.current = false;
         dragX.stopAnimation();
+        horizontalDragOffsetRef.current = 0;
         dragX.setValue(0);
       } else {
         flatListRef.current?.scrollToIndex({
@@ -523,12 +532,14 @@ export function PageMushaf({
   );
 
   const resetHorizontalDrag = useCallback(
-    (duration = 120) => {
+    (duration = HORIZONTAL_CANCEL_DURATION) => {
       RNAnimated.timing(dragX, {
         toValue: 0,
         duration,
+        easing: HORIZONTAL_EASING,
         useNativeDriver: Platform.OS !== "web",
       }).start(() => {
+        horizontalDragOffsetRef.current = 0;
         horizontalAnimatingRef.current = false;
       });
     },
@@ -542,9 +553,17 @@ export function PageMushaf({
         return;
       }
       horizontalAnimatingRef.current = true;
+      const targetX = direction === 1 ? -pageWidth : pageWidth;
+      const remainingDistance = Math.abs(targetX - horizontalDragOffsetRef.current);
+      const remainingRatio = Math.max(0, Math.min(1, remainingDistance / pageWidth));
+      const duration = Math.round(
+        HORIZONTAL_PAGE_TURN_MIN_DURATION +
+          (HORIZONTAL_PAGE_TURN_MAX_DURATION - HORIZONTAL_PAGE_TURN_MIN_DURATION) * remainingRatio
+      );
       RNAnimated.timing(dragX, {
-        toValue: direction === 1 ? -pageWidth : pageWidth,
-        duration: 150,
+        toValue: targetX,
+        duration,
+        easing: HORIZONTAL_EASING,
         useNativeDriver: Platform.OS !== "web",
       }).start(({ finished }) => {
         if (!finished) {
@@ -553,6 +572,7 @@ export function PageMushaf({
         }
         updateCurrentPage(nextPage);
         requestAnimationFrame(() => {
+          horizontalDragOffsetRef.current = 0;
           dragX.setValue(0);
           horizontalAnimatingRef.current = false;
         });
@@ -566,16 +586,22 @@ export function PageMushaf({
       if (horizontalAnimatingRef.current) return;
       const startPage = dragStartPageRef.current;
       const threshold = Math.max(48, pageWidth * 0.18);
-      const fastEnough = Math.abs(vx) > 0.35;
+      const fastEnough = Math.abs(vx) > HORIZONTAL_FLICK_VELOCITY;
       const farEnough = Math.abs(dx) > threshold;
-      if (!fastEnough && !farEnough) {
+      const hasIntentionalDistance = Math.abs(dx) > HORIZONTAL_FLICK_MIN_DISTANCE;
+      const dragDirection: 1 | -1 = dx < 0 ? 1 : -1;
+      const velocityDirection: 1 | -1 = vx < 0 ? 1 : -1;
+
+      const direction: 1 | -1 | null = farEnough
+        ? dragDirection
+        : fastEnough && (!hasIntentionalDistance || velocityDirection === dragDirection)
+          ? velocityDirection
+          : null;
+
+      if (direction === null) {
         resetHorizontalDrag();
         return;
       }
-
-      const direction: 1 | -1 = fastEnough
-        ? vx < 0 ? 1 : -1
-        : dx < 0 ? 1 : -1;
       const nextPage = Math.max(1, Math.min(pageData.length, startPage + direction));
       if (nextPage === startPage) {
         resetHorizontalDrag();
@@ -593,7 +619,9 @@ export function PageMushaf({
       const atFirst = startPage === 1 && dx > 0;
       const atLast = startPage === pageData.length && dx < 0;
       const boundedDx = Math.max(-pageWidth, Math.min(pageWidth, dx));
-      dragX.setValue(atFirst || atLast ? boundedDx * 0.25 : boundedDx);
+      const nextOffset = atFirst || atLast ? boundedDx * 0.25 : boundedDx;
+      horizontalDragOffsetRef.current = nextOffset;
+      dragX.setValue(nextOffset);
     },
     [dragX, pageData.length, pageWidth]
   );
@@ -684,7 +712,7 @@ export function PageMushaf({
       if (!state.active) return;
       state.active = false;
       setWebDragging(false);
-      const dx = event.clientX - state.startX;
+      const dx = state.lastX - state.startX;
       if (state.claimed) {
         event.preventDefault();
         finishHorizontalGesture(dx, state.vx);

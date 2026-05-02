@@ -196,7 +196,7 @@ export default function LeaderboardScreen() {
               unit={scoreUnit}
               isStreak={activeTab === "streak"}
               s={s}
-              onPress={() => router.push(`/profile/${entry.user_id}`)}
+              onPress={() => router.push(`/profile/${entry.user_id}` as any)}
             />
           ))}
           <View style={{ height: 40 }} />

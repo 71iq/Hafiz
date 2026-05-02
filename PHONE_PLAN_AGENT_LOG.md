@@ -903,3 +903,20 @@ Saved in `phase19/`:
 ### Validation result
 - `npx tsc --noEmit`: passed.
 - `npx expo export --platform web`: passed.
+
+## 2026-05-02 — Phone Horizontal Page Swipe Direction Fix
+
+### User-reported issue
+- In phone page-swipe mode, dragging back visually moved toward the previous page but release still advanced to the next page.
+- The page-turn animation felt too fast and abrupt.
+
+### Implemented fix
+- `components/mushaf/PageMushaf.tsx`:
+  - made drag distance authoritative when the swipe crosses the page threshold.
+  - uses velocity only for short flicks when the velocity direction agrees with the visible drag direction.
+  - bases web pointer release distance on the last tracked move position instead of the potentially unreliable pointer-up coordinate.
+  - slowed and eased page-turn/cancel animations with an `Easing.out(Easing.cubic)` curve and distance-aware duration.
+
+### Validation result
+- `npx tsc --noEmit`: passed.
+- `npx expo export --platform web`: passed.
