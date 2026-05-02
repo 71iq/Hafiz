@@ -147,8 +147,11 @@ const MUSHAF_LINE_COUNT = 15;
 const HORIZONTAL_CANCEL_DURATION = 190;
 const HORIZONTAL_PAGE_TURN_MIN_DURATION = 240;
 const HORIZONTAL_PAGE_TURN_MAX_DURATION = 320;
-const HORIZONTAL_FLICK_MIN_DISTANCE = 18;
-const HORIZONTAL_FLICK_VELOCITY = 0.45;
+const HORIZONTAL_PAN_ACTIVATE_DX = 4;
+const HORIZONTAL_PAN_CAPTURE_DX = 6;
+const HORIZONTAL_PAN_DIRECTION_RATIO = 0.8;
+const HORIZONTAL_FLICK_MIN_DISTANCE = 12;
+const HORIZONTAL_FLICK_VELOCITY = 0.26;
 const HORIZONTAL_EASING = Easing.out(Easing.cubic);
 
 function computePageItemHeight(
@@ -585,7 +588,7 @@ export function PageMushaf({
     (dx: number, vx: number) => {
       if (horizontalAnimatingRef.current) return;
       const startPage = dragStartPageRef.current;
-      const threshold = Math.max(48, pageWidth * 0.18);
+      const threshold = Math.max(28, pageWidth * 0.1);
       const fastEnough = Math.abs(vx) > HORIZONTAL_FLICK_VELOCITY;
       const farEnough = Math.abs(dx) > threshold;
       const hasIntentionalDistance = Math.abs(dx) > HORIZONTAL_FLICK_MIN_DISTANCE;
@@ -632,13 +635,14 @@ export function PageMushaf({
         onMoveShouldSetPanResponder: (_event, gesture) =>
           horizontal &&
           !horizontalAnimatingRef.current &&
-          Math.abs(gesture.dx) > 8 &&
-          Math.abs(gesture.dx) > Math.abs(gesture.dy),
+          Math.abs(gesture.dx) > HORIZONTAL_PAN_ACTIVATE_DX &&
+          Math.abs(gesture.dx) > Math.abs(gesture.dy) * HORIZONTAL_PAN_DIRECTION_RATIO,
         onMoveShouldSetPanResponderCapture: (_event, gesture) =>
           horizontal &&
           !horizontalAnimatingRef.current &&
-          Math.abs(gesture.dx) > 12 &&
-          Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.2,
+          Math.abs(gesture.dx) > HORIZONTAL_PAN_CAPTURE_DX &&
+          Math.abs(gesture.dx) > Math.abs(gesture.dy) * HORIZONTAL_PAN_DIRECTION_RATIO,
+        onPanResponderTerminationRequest: () => false,
         onPanResponderGrant: () => {
           dragStartPageRef.current = currentPageRef.current;
           dragX.stopAnimation();
