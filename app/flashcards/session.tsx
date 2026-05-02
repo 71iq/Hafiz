@@ -27,7 +27,7 @@ import { Skeleton, SkeletonText } from "@/components/ui/Skeleton";
 import { syncDailyScore, updateProfileStats } from "@/lib/fsrs/leaderboard-sync";
 import type { StudyCardRow, TestMode } from "@/lib/fsrs/types";
 import { DEFAULT_ENABLED_MODES, TEST_MODE_COLORS } from "@/lib/fsrs/types";
-import { fetchWordMeaningsArForAyah, fetchWordTranslation } from "@/lib/word/queries";
+import { fetchWordMeaningAr, fetchWordText, fetchWordTranslation } from "@/lib/word/queries";
 import { MEANINGS_DECK_ID } from "@/lib/fsrs/queries";
 
 // ─── Types ───────────────────────────────────────────────────
@@ -191,7 +191,18 @@ function FlashcardSessionScreen() {
           const ayah = parseInt(isWordCard ? parts[2] : parts[1]);
           const wordPos = isWordCard ? parseInt(parts[3]) : undefined;
 
-          const [ayahRow, surahRow, translationRow, tafseerRow, prevRow, nextRow, uniqueFront, arMeanings, wordTranslation] = await Promise.all([
+          const [
+            ayahRow,
+            surahRow,
+            translationRow,
+            tafseerRow,
+            prevRow,
+            nextRow,
+            uniqueFront,
+            wordMeaningArRow,
+            canonicalWordText,
+            wordTranslation,
+          ] = await Promise.all([
             db.getFirstAsync<{ text_uthmani: string }>(
               "SELECT text_uthmani FROM quran_text WHERE surah = ? AND ayah = ?",
               [surah, ayah]
@@ -219,15 +230,16 @@ function FlashcardSessionScreen() {
               [surah, ayah + 1]
             ),
             computeUniqueFront(db, surah, ayah),
-            isWordCard ? fetchWordMeaningsArForAyah(db, surah, ayah) : Promise.resolve([]),
+            isWordCard && wordPos ? fetchWordMeaningAr(db, surah, ayah, wordPos) : Promise.resolve(null),
+            isWordCard && wordPos ? fetchWordText(db, surah, ayah, wordPos) : Promise.resolve(null),
             isWordCard && wordPos ? fetchWordTranslation(db, surah, ayah, wordPos) : Promise.resolve(null),
           ]);
 
           const wordMeaningAr = isWordCard && wordPos
-            ? (arMeanings.find((r) => r.word_pos === wordPos)?.meaning ?? null)
+            ? (wordMeaningArRow?.meaning ?? null)
             : null;
           const wordText = isWordCard && wordPos
-            ? (arMeanings.find((r) => r.word_pos === wordPos)?.word ?? wordTranslation?.word_arabic ?? null)
+            ? (canonicalWordText ?? wordTranslation?.word_arabic ?? null)
             : null;
           const wordMeaningEn = isWordCard ? (wordTranslation?.translation_en ?? null) : null;
           const frontText = isWordCard ? (wordText ?? uniqueFront.text) : uniqueFront.text;

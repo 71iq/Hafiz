@@ -4,6 +4,7 @@ import { useDatabase } from "@/lib/database/provider";
 import { fetchWordIrab, fetchWordRoot, type WordIrabRow, type WordRootRow } from "@/lib/word/queries";
 import { decodeLabel, getVerbFormName } from "@/lib/word/morphology-labels";
 import { useStrings } from "@/lib/i18n/useStrings";
+import { useSettings } from "@/lib/settings/context";
 
 type Props = {
   surah: number;
@@ -11,14 +12,14 @@ type Props = {
   wordPos: number;
 };
 
-function InfoRow({ label, value }: { label: string; value: string }) {
+function InfoRow({ label, value, isRTL }: { label: string; value: string; isRTL: boolean }) {
   return (
-    <View className="flex-row items-start justify-between py-2 mb-1.5">
-      <Text className="text-sm text-warm-400 dark:text-neutral-500 w-28">
+    <View className={`${isRTL ? "flex-row-reverse" : "flex-row"} items-start py-2 mb-1.5`}>
+      <Text className={`text-sm text-warm-400 dark:text-neutral-500 ${isRTL ? "w-24 text-right" : "w-28"}`}>
         {label}
       </Text>
       <Text
-        className="text-base text-charcoal dark:text-neutral-100 flex-1 text-right"
+        className={`text-base text-charcoal dark:text-neutral-100 flex-1 text-right ${isRTL ? "pr-3" : ""}`}
         style={{ writingDirection: "rtl" }}
       >
         {value}
@@ -30,6 +31,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 export function TasreefTab({ surah, ayah, wordPos }: Props) {
   const db = useDatabase();
   const s = useStrings();
+  const { isRTL } = useSettings();
   const [irab, setIrab] = useState<WordIrabRow | null>(null);
   const [rootData, setRootData] = useState<WordRootRow | null>(null);
   const [loading, setLoading] = useState(true);
@@ -71,12 +73,13 @@ export function TasreefTab({ surah, ayah, wordPos }: Props) {
 
   return (
     <View className="pt-2 pb-1 px-0">
-      {root && <InfoRow label={s.rootLabel} value={root} />}
-      {lemma && <InfoRow label={s.lemmaLabel} value={lemma} />}
+      {root && <InfoRow label={s.rootLabel} value={root} isRTL={isRTL} />}
+      {lemma && <InfoRow label={s.lemmaLabel} value={lemma} isRTL={isRTL} />}
       {pattern && (
         <InfoRow
           label={s.patternLabel}
           value={getVerbFormName(pattern) ?? pattern}
+          isRTL={isRTL}
         />
       )}
     </View>

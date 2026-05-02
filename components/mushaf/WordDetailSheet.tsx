@@ -41,6 +41,7 @@ export function WordDetailSheet() {
     translationEn: null,
   });
   const tabScrollRef = useRef<ScrollView>(null);
+  const contentScrollRef = useRef<ScrollView>(null);
 
   const isPhone = width < 768;
   const modalWidth = isPhone ? Math.max(280, Math.min(width - 16, 430)) : Math.max(280, Math.min(width - 32, 760));
@@ -67,6 +68,7 @@ export function WordDetailSheet() {
   useEffect(() => {
     if (!detailWord) return;
     let cancelled = false;
+    setHeaderMeta({ wordText: null, root: null, lemma: null, rootCount: null, translationEn: null });
     Promise.all([
       fetchWordText(db, detailWord.surah, detailWord.ayah, detailWord.wordPos),
       fetchWordRoot(db, detailWord.surah, detailWord.ayah, detailWord.wordPos),
@@ -100,6 +102,14 @@ export function WordDetailSheet() {
       cancelled = true;
     };
   }, [db, detailWord?.surah, detailWord?.ayah, detailWord?.wordPos]);
+
+  useEffect(() => {
+    if (activeTab === "irab") return;
+    const frame = requestAnimationFrame(() => {
+      contentScrollRef.current?.scrollTo({ y: 0, animated: false });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [activeTab, detailWord?.surah, detailWord?.ayah, detailWord?.wordPos]);
 
   useEffect(() => {
     if (!isRTL) return;
@@ -231,9 +241,16 @@ export function WordDetailSheet() {
               </ScrollView>
             </View>
 
-            <ScrollView className="flex-1 min-h-0 px-5">
+            <ScrollView ref={contentScrollRef} className="flex-1 min-h-0 px-5">
               {activeTab === "meaning" && <MeaningTab surah={surah} ayah={ayah} wordPos={wordPos} />}
-              {activeTab === "irab" && <IrabTab surah={surah} ayah={ayah} wordPos={wordPos} />}
+              {activeTab === "irab" && (
+                <IrabTab
+                  surah={surah}
+                  ayah={ayah}
+                  wordPos={wordPos}
+                  onScrollToMatch={(y) => contentScrollRef.current?.scrollTo({ y, animated: true })}
+                />
+              )}
               {activeTab === "tajweed" && <TajweedTab surah={surah} ayah={ayah} wordPos={wordPos} />}
               {activeTab === "tasreef" && <TasreefTab surah={surah} ayah={ayah} wordPos={wordPos} />}
               {activeTab === "qiraat" && <QiraatTab surah={surah} ayah={ayah} />}

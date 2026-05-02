@@ -920,3 +920,33 @@ Saved in `phase19/`:
 ### Validation result
 - `npx tsc --noEmit`: passed.
 - `npx expo export --platform web`: passed.
+
+## 2026-05-02 — Word Panel Canonical Word Identity Fix
+
+### User-reported issue
+- Arabic word meanings often resolved to the wrong word; tapping an unglossed word could show a later/glossed word.
+- Saved word-review cards could inherit that wrong Arabic meaning.
+- The word shown at the top of the word panel was sometimes not the tapped word.
+- Da'as i'rab should jump to the selected word.
+- Arabic tasreef rows had redundant left-side spacing.
+
+### Root cause
+- `word_meanings_ar.word_pos` from quran-words.com was treated as a Mushaf word position, but it is a source-local meaning-entry index.
+- Da'as grouped rows could also be copied by source position into every ayah in a group.
+- UI fallback matching used "best nearby" text/position matching, which made missing Arabic meanings resolve to unrelated rows.
+
+### Implemented fix
+- `lib/database/init.ts` now maps quran-words.com and Da'as rows to canonical MASAQ/Mushaf word positions by Arabic text before insertion.
+- Existing stale `word_meanings_ar` and `word_irab_daas` rows are detected and rebuilt on next DB initialization.
+- Arabic meaning UI, tooltip, and word-review loading now use exact canonical rows only.
+- Word panel header now resolves exact displayed word text from canonical MASAQ data first.
+- Da'as i'rab tab scrolls to the selected canonical word.
+- Arabic tasreef rows are RTL-aware so the label column no longer leaves left-side dead space.
+
+### Validation result
+- Dataset mapping spot-check:
+  - Ayat al-Kursi `الحي` maps to canonical word 6, not source index 1.
+  - Ayat al-Kursi `حفظهما` maps to canonical word 47, not source index 11.
+  - Fatiha Da'as rows map to actual words in each ayah after grouped-row expansion.
+- `npx tsc --noEmit`: passed.
+- `npx expo export --platform web`: passed.

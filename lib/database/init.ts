@@ -1,6 +1,7 @@
 import { Platform } from "react-native";
 import type { SQLiteDatabase } from "expo-sqlite";
 import { createSchema, createTextSearchIndex } from "./schema";
+import { normalizeArabicCore, normalizeArabicWord } from "@/lib/arabic";
 
 // ─── Platform-aware data loading ─────────────────────────────
 // On web: fetch from /data/ (static files served from public/)
@@ -227,6 +228,216 @@ function stripHtml(html: string): string {
 const ARABIC_DIACRITICS = /[\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E4\u06E7\u06E8\u06EA-\u06ED\u0640]/g;
 function stripDiacritics(text: string): string {
   return text.replace(ARABIC_DIACRITICS, "");
+}
+
+type CanonicalWord = {
+  pos: number;
+  word: string;
+  normalized: string;
+  core: string;
+};
+
+type MappedWordRow = [number, number, number, string | null, string | null];
+
+// quran-words.com and Da'as use source-local entry indices; map by Arabic
+// text to MASAQ's canonical Mushaf word positions before storing them.
+function splitArabicParts(text: string | null | undefined): string[] {
+  return String(text ?? "")
+    .split(/\s+/)
+    .map(normalizeArabicWord)
+    .filter(Boolean);
+}
+
+function arabicVariants(value: string): string[] {
+  const core = normalizeArabicCore(value);
+  const variants = [value, core];
+  if (core.length > 2 && core.startsWith("ا")) variants.push(core.slice(1));
+  return Array.from(new Set(variants.filter((v) => v.length > 0)));
+}
+
+function compatibleArabicToken(a: string, b: string): boolean {
+  const aVariants = arabicVariants(a);
+  const bVariants = arabicVariants(b);
+  for (const av of aVariants) {
+    for (const bv of bVariants) {
+      if (av === bv) return true;
+      const min = Math.min(av.length, bv.length);
+      if (min >= 3 && (av.endsWith(bv) || bv.endsWith(av) || av.startsWith(bv) || bv.startsWith(av))) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function scoreCanonicalSpan(
+  canonicalWords: CanonicalWord[],
+  start: number,
+  end: number,
+  sourceParts: string[],
+): number {
+  const span = canonicalWords.slice(start, end);
+  if (span.length === 0 || sourceParts.length === 0) return -1;
+
+  const spanParts = span.map((w) => w.normalized).filter(Boolean);
+  const spanText = spanParts.join("");
+  const sourceText = sourceParts.join("");
+  const spanCore = span.map((w) => w.core).join("");
+  const sourceCore = sourceParts.map(normalizeArabicCore).join("");
+
+  let score = -1;
+  if (
+    spanParts.length === sourceParts.length &&
+    spanParts.every((part, index) => compatibleArabicToken(part, sourceParts[index]))
+  ) {
+    score = 1000;
+  } else if (spanText === sourceText) {
+    score = 920;
+  } else if (spanCore && sourceCore && spanCore === sourceCore) {
+    score = 880;
+  } else {
+    const min = Math.min(spanText.length, sourceText.length);
+    if (min >= 4 && (spanText.endsWith(sourceText) || sourceText.endsWith(spanText))) {
+      score = 760;
+    } else if (min >= 5 && (spanText.includes(sourceText) || sourceText.includes(spanText))) {
+      score = 620;
+    }
+  }
+
+  if (score < 0) return -1;
+  score -= Math.abs(spanParts.length - sourceParts.length) * 20;
+  score -= spanParts.length;
+  return score;
+}
+
+function findCanonicalSpan(
+  canonicalWords: CanonicalWord[],
+  sourceWord: string | null | undefined,
+  cursor: number,
+): { start: number; end: number } | null {
+  const sourceParts = splitArabicParts(sourceWord);
+  if (canonicalWords.length === 0 || sourceParts.length === 0) return null;
+
+  let best: { start: number; end: number; score: number } | null = null;
+  const scan = (from: number) => {
+    for (let start = from; start < canonicalWords.length; start++) {
+      const maxEnd = Math.min(canonicalWords.length, start + Math.max(sourceParts.length + 2, 3));
+      for (let end = start + 1; end <= maxEnd; end++) {
+        const score = scoreCanonicalSpan(canonicalWords, start, end, sourceParts);
+        if (
+          score >= 0 &&
+          (!best ||
+            score > best.score ||
+            (score === best.score && start >= cursor && best.start < cursor) ||
+            (score === best.score && Math.abs(start - cursor) < Math.abs(best.start - cursor)))
+        ) {
+          best = { start, end, score };
+        }
+      }
+    }
+  };
+
+  scan(Math.max(0, Math.min(cursor, canonicalWords.length - 1)));
+  if (!best) scan(0);
+  const result = best as { start: number; end: number; score: number } | null;
+  return result ? { start: result.start, end: result.end } : null;
+}
+
+function appendMappedWordRow(
+  rowsByKey: Map<string, MappedWordRow>,
+  surah: number,
+  ayah: number,
+  wordPos: number,
+  word: string | null,
+  value: string | null,
+  valueSeparator: string,
+) {
+  const key = `${surah}:${ayah}:${wordPos}`;
+  const existing = rowsByKey.get(key);
+  if (!existing) {
+    rowsByKey.set(key, [surah, ayah, wordPos, word, value]);
+    return;
+  }
+
+  if (word && existing[3] && !existing[3]!.includes(word)) {
+    existing[3] = `${existing[3]} / ${word}`;
+  } else if (word && !existing[3]) {
+    existing[3] = word;
+  }
+
+  if (value && existing[4] && !existing[4]!.includes(value)) {
+    existing[4] = `${existing[4]}${valueSeparator}${value}`;
+  } else if (value && !existing[4]) {
+    existing[4] = value;
+  }
+}
+
+async function loadCanonicalWordsByAyah(db: SQLiteDatabase): Promise<Map<string, CanonicalWord[]>> {
+  const rows = await db.getAllAsync<{
+    surah: number;
+    ayah: number;
+    word_pos: number;
+    arabic_word: string | null;
+  }>(
+    "SELECT surah, ayah, word_pos, arabic_word FROM word_irab ORDER BY surah, ayah, word_pos"
+  );
+  const byAyah = new Map<string, CanonicalWord[]>();
+  for (const row of rows) {
+    if (!row.arabic_word) continue;
+    const key = `${row.surah}:${row.ayah}`;
+    let words = byAyah.get(key);
+    if (!words) {
+      words = [];
+      byAyah.set(key, words);
+    }
+    words.push({
+      pos: row.word_pos,
+      word: row.arabic_word,
+      normalized: normalizeArabicWord(row.arabic_word),
+      core: normalizeArabicCore(row.arabic_word),
+    });
+  }
+  return byAyah;
+}
+
+function mapRowsToCanonicalWords(
+  canonicalByAyah: Map<string, CanonicalWord[]>,
+  sourceRows: any[],
+  getTargets: (row: any) => string[],
+  getValue: (row: any) => string | null,
+  valueSeparator: string,
+): MappedWordRow[] {
+  const cursors = new Map<string, number>();
+  const rowsByKey = new Map<string, MappedWordRow>();
+
+  for (const source of sourceRows) {
+    const word = source.word ? String(source.word) : null;
+    const value = getValue(source);
+    for (const target of getTargets(source)) {
+      const [surah, ayah] = target.split(":").map((n) => parseInt(n, 10));
+      if (!Number.isFinite(surah) || !Number.isFinite(ayah)) continue;
+
+      const canonicalWords = canonicalByAyah.get(`${surah}:${ayah}`) ?? [];
+      const cursor = cursors.get(target) ?? 0;
+      const span = findCanonicalSpan(canonicalWords, word, cursor);
+      if (!span) continue;
+
+      cursors.set(target, span.end);
+      for (let index = span.start; index < span.end; index++) {
+        appendMappedWordRow(
+          rowsByKey,
+          surah,
+          ayah,
+          canonicalWords[index].pos,
+          word,
+          value,
+          valueSeparator,
+        );
+      }
+    }
+  }
+
+  return Array.from(rowsByKey.values()).sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]);
 }
 
 async function isPopulated(db: SQLiteDatabase): Promise<boolean> {
@@ -581,21 +792,22 @@ async function importWordMeaningsAr(
   const data = await loadData("wbw-arabic-meanings.json");
   if (!Array.isArray(data)) return;
   onProgress({ step: "Arabic Meanings", current: 13, total: TOTAL_STEPS, detail: `${data.length} words` });
-  console.log(`[Import] Importing ${data.length} word_meanings_ar rows...`);
+  console.log(`[Import] Importing ${data.length} word_meanings_ar rows with canonical word mapping...`);
 
-  const rows = data.map((w: any) => [
-    w.surah,
-    w.ayah,
-    w.word_pos,
-    w.word ?? null,
-    w.meaning ?? null,
-  ]);
+  const canonicalByAyah = await loadCanonicalWordsByAyah(db);
+  const rows = mapRowsToCanonicalWords(
+    canonicalByAyah,
+    data,
+    (w) => [`${w.surah}:${w.ayah}`],
+    (w) => w.meaning ? String(w.meaning) : null,
+    "\n\n",
+  );
   await batchInsert(
     db,
-    "INSERT OR IGNORE INTO word_meanings_ar (surah, ayah, word_pos, word, meaning) VALUES (?, ?, ?, ?, ?)",
+    "INSERT OR REPLACE INTO word_meanings_ar (surah, ayah, word_pos, word, meaning) VALUES (?, ?, ?, ?, ?)",
     rows
   );
-  console.log(`[Import] word_meanings_ar done: ${rows.length} rows`);
+  console.log(`[Import] word_meanings_ar done: ${rows.length} canonical rows`);
 }
 
 async function importWordIrabDaas(
@@ -607,28 +819,23 @@ async function importWordIrabDaas(
   onProgress({ step: "Da'as Iʿrab", current: 14, total: TOTAL_STEPS, detail: `${data.length} words` });
   console.log(`[Import] Importing ${data.length} word_irab_daas rows (expanding ayah_group)...`);
 
-  // Each entry's ayah_group lists every ayah it applies to (the source data
-  // stores the i'rab once at the first ayah of a group). Replicate to each
-  // target so per-ayah lookups return results for every ayah in the group.
-  const rows: any[][] = [];
-  for (const w of data as any[]) {
-    const irab = w.irab ? stripHtml(String(w.irab)) : null;
-    const word = w.word ?? null;
-    const targets: string[] = Array.isArray(w.ayah_group) && w.ayah_group.length > 0
-      ? w.ayah_group.map(String)
-      : [`${w.surah}:${w.ayah}`];
-    for (const t of targets) {
-      const [s, a] = t.split(":").map((n) => parseInt(n, 10));
-      if (!Number.isFinite(s) || !Number.isFinite(a)) continue;
-      rows.push([s, a, w.word_pos, word, irab]);
-    }
-  }
+  const canonicalByAyah = await loadCanonicalWordsByAyah(db);
+  const rows = mapRowsToCanonicalWords(
+    canonicalByAyah,
+    data,
+    (w) =>
+      Array.isArray(w.ayah_group) && w.ayah_group.length > 0
+        ? w.ayah_group.map(String)
+        : [`${w.surah}:${w.ayah}`],
+    (w) => w.irab ? stripHtml(String(w.irab)) : null,
+    "\n",
+  );
   await batchInsert(
     db,
-    "INSERT OR IGNORE INTO word_irab_daas (surah, ayah, word_pos, word, irab) VALUES (?, ?, ?, ?, ?)",
+    "INSERT OR REPLACE INTO word_irab_daas (surah, ayah, word_pos, word, irab) VALUES (?, ?, ?, ?, ?)",
     rows
   );
-  console.log(`[Import] word_irab_daas done: ${rows.length} rows (from ${data.length} source entries)`);
+  console.log(`[Import] word_irab_daas done: ${rows.length} canonical rows (from ${data.length} source entries)`);
 }
 
 async function importTajweedRulesAr(
@@ -771,23 +978,41 @@ async function runNewTabImports(
     }
   };
 
+  if (await tableExists("word_meanings_ar")) {
+    const staleMeaningAtSourcePos = await db.getFirstAsync<{ word: string | null }>(
+      "SELECT word FROM word_meanings_ar WHERE surah = 2 AND ayah = 255 AND word_pos = 1"
+    );
+    const missingCanonicalMeaning = await db.getFirstAsync<{ c: number }>(
+      "SELECT COUNT(*) as c FROM word_meanings_ar WHERE surah = 2 AND ayah = 255 AND word_pos = 6"
+    );
+    const stale =
+      !!staleMeaningAtSourcePos?.word ||
+      (await safeCount("word_meanings_ar")) > 0 && (missingCanonicalMeaning?.c ?? 0) === 0;
+    if (stale) {
+      console.log("[Import] word_meanings_ar: stale source-position data detected — re-importing");
+      await db.execAsync("DELETE FROM word_meanings_ar");
+    }
+  }
   if ((await safeCount("word_meanings_ar")) === 0) {
     await safeImport("word_meanings_ar", () => importWordMeaningsAr(db, onProgress));
   }
 
-  // Detect old (non-expanded) word_irab_daas data: the source data stores
-  // 1:1 entries that should be replicated to 1:2..1:7. If 1:2 has no rows
-  // but 1:1 does, we have the pre-expansion data — wipe and re-import.
+  // Detect old Da'as data. Earlier imports copied source positions directly,
+  // so grouped Fatiha rows made 1:2 word 1 point at "اسْمَ" instead of
+  // "الْحَمْدُ". Rebuild with canonical MASAQ word positions.
   if (await tableExists("word_irab_daas")) {
+    const staleFatihaRow = await db.getFirstAsync<{ word: string | null }>(
+      "SELECT word FROM word_irab_daas WHERE surah = 1 AND ayah = 2 AND word_pos = 1"
+    );
     const c11 = await db.getFirstAsync<{ c: number }>(
       "SELECT COUNT(*) as c FROM word_irab_daas WHERE surah = 1 AND ayah = 1"
     );
-    const c12 = await db.getFirstAsync<{ c: number }>(
-      "SELECT COUNT(*) as c FROM word_irab_daas WHERE surah = 1 AND ayah = 2"
-    );
-    const stale = (c11?.c ?? 0) > 0 && (c12?.c ?? 0) === 0;
+    const stale =
+      ((c11?.c ?? 0) > 0 && staleFatihaRow?.word == null) ||
+      (staleFatihaRow?.word != null && normalizeArabicWord(staleFatihaRow.word) !== normalizeArabicWord("الْحَمْدُ")) ||
+      ((c11?.c ?? 0) > 0 && (await safeCount("word_irab_daas")) < 1000);
     if (stale) {
-      console.log("[Import] word_irab_daas: stale (pre-expansion) data detected — re-importing");
+      console.log("[Import] word_irab_daas: stale source-position data detected — re-importing");
       await db.execAsync("DELETE FROM word_irab_daas");
     }
   }

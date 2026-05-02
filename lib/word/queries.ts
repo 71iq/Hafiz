@@ -1,4 +1,5 @@
 import type { SQLiteDatabase } from "expo-sqlite";
+import { normalizeArabicWord } from "@/lib/arabic";
 
 export type WordTranslationRow = {
   word_arabic: string | null;
@@ -86,6 +87,12 @@ export async function fetchWordText(
   ayah: number,
   wordPos: number,
 ): Promise<string | null> {
+  const irabRow = await db.getFirstAsync<{ arabic_word: string | null }>(
+    "SELECT arabic_word FROM word_irab WHERE surah = ? AND ayah = ? AND word_pos = ?",
+    [surah, ayah, wordPos],
+  );
+  if (irabRow?.arabic_word?.trim()) return irabRow.arabic_word;
+
   const row = await db.getFirstAsync<{ word_text: string | null }>(
     "SELECT word_text FROM word_roots WHERE surah = ? AND ayah = ? AND word_pos = ?",
     [surah, ayah, wordPos],
@@ -98,18 +105,16 @@ export async function fetchWordText(
   );
   if (translationRow?.word_arabic?.trim()) return translationRow.word_arabic;
 
-  const irabRow = await db.getFirstAsync<{ arabic_word: string | null }>(
-    "SELECT arabic_word FROM word_irab WHERE surah = ? AND ayah = ? AND word_pos = ?",
-    [surah, ayah, wordPos],
-  );
-  if (irabRow?.arabic_word?.trim()) return irabRow.arabic_word;
-
   const ayahRow = await db.getFirstAsync<{ text_uthmani: string | null }>(
     "SELECT text_uthmani FROM quran_text WHERE surah = ? AND ayah = ?",
     [surah, ayah],
   );
   if (!ayahRow?.text_uthmani) return null;
   const words = ayahRow.text_uthmani.trim().split(/\s+/);
+  // quran_text includes the opening basmallah prefix, but QCF2 wordPos does not.
+  if (ayah === 1 && surah !== 1 && surah !== 9 && words.length > 4) {
+    return words.slice(4)[wordPos - 1] ?? null;
+  }
   return words[wordPos - 1] ?? null;
 }
 
@@ -185,16 +190,6 @@ export type QiraatRow = {
   ayah_group: string | null;
 };
 
-/** Strip Arabic diacritics (tashkeel) for loose matching of word text. */
-const ARABIC_DIACRITICS_RE = /[ً-ٰٟۖ-ۜ۟-۪ۤۧۨ-ۭـ]/g;
-export function normalizeArabicWord(s: string): string {
-  return s
-    .replace(ARABIC_DIACRITICS_RE, "")
-    .replace(/[ً-ٟ]/g, "")
-    .replace(/\s+/g, "")
-    .trim();
-}
-
 export async function fetchWordMeaningsArForAyah(
   db: SQLiteDatabase,
   surah: number,
@@ -203,6 +198,18 @@ export async function fetchWordMeaningsArForAyah(
   return db.getAllAsync<WordMeaningArRow>(
     "SELECT surah, ayah, word_pos, word, meaning FROM word_meanings_ar WHERE surah = ? AND ayah = ? ORDER BY word_pos",
     [surah, ayah],
+  );
+}
+
+export async function fetchWordMeaningAr(
+  db: SQLiteDatabase,
+  surah: number,
+  ayah: number,
+  wordPos: number,
+): Promise<WordMeaningArRow | null> {
+  return db.getFirstAsync<WordMeaningArRow>(
+    "SELECT surah, ayah, word_pos, word, meaning FROM word_meanings_ar WHERE surah = ? AND ayah = ? AND word_pos = ?",
+    [surah, ayah, wordPos],
   );
 }
 

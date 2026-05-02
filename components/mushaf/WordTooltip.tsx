@@ -5,9 +5,7 @@ import { useDatabase } from "@/lib/database/provider";
 import { useWordInteraction, type TooltipPosition } from "@/lib/word/context";
 import {
   fetchWordTranslation,
-  fetchWordMeaningsArForAyah,
-  fetchWordText,
-  findBestWordMatch,
+  fetchWordMeaningAr,
 } from "@/lib/word/queries";
 import { useSettings } from "@/lib/settings/context";
 
@@ -113,14 +111,10 @@ export function FloatingWordTooltip() {
     setTranslation(null);
     const { surah, ayah, wordPos } = tooltipWord;
     if (uiLanguage === "ar") {
-      Promise.all([
-        fetchWordMeaningsArForAyah(db, surah, ayah),
-        fetchWordText(db, surah, ayah, wordPos),
-      ])
-        .then(async ([rows, tappedText]) => {
-          const idx = findBestWordMatch(rows, wordPos, tappedText ?? "");
-          if (idx >= 0 && rows[idx]?.meaning) {
-            setTranslation(rows[idx].meaning);
+      fetchWordMeaningAr(db, surah, ayah, wordPos)
+        .then(async (row) => {
+          if (row?.meaning) {
+            setTranslation(row.meaning);
             return;
           }
           // Fall back to English translation if no Arabic meaning is recorded

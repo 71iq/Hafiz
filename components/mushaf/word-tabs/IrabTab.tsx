@@ -1,10 +1,8 @@
 import { useEffect, useState } from "react";
-import { View, Text } from "react-native";
+import { View, Text, type LayoutChangeEvent } from "react-native";
 import { useDatabase } from "@/lib/database/provider";
 import {
   fetchWordIrabDaasForAyah,
-  fetchWordText,
-  findBestWordMatch,
   type WordIrabDaasRow,
 } from "@/lib/word/queries";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -13,27 +11,33 @@ type Props = {
   surah: number;
   ayah: number;
   wordPos: number;
+  onScrollToMatch?: (y: number) => void;
 };
 
-export function IrabTab({ surah, ayah, wordPos }: Props) {
+export function IrabTab({ surah, ayah, wordPos, onScrollToMatch }: Props) {
   const db = useDatabase();
   const s = useStrings();
   const [rows, setRows] = useState<WordIrabDaasRow[]>([]);
-  const [matchIdx, setMatchIdx] = useState<number>(-1);
+  const [matchY, setMatchY] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([
-      fetchWordIrabDaasForAyah(db, surah, ayah),
-      fetchWordText(db, surah, ayah, wordPos),
-    ])
-      .then(([r, tappedText]) => {
-        setRows(r);
-        setMatchIdx(findBestWordMatch(r, wordPos, tappedText ?? ""));
-      })
+    setMatchY(null);
+    fetchWordIrabDaasForAyah(db, surah, ayah)
+      .then(setRows)
       .finally(() => setLoading(false));
   }, [db, surah, ayah, wordPos]);
+
+  useEffect(() => {
+    if (loading || matchY == null) return;
+    const frame = requestAnimationFrame(() => onScrollToMatch?.(Math.max(0, matchY - 12)));
+    return () => cancelAnimationFrame(frame);
+  }, [loading, matchY, onScrollToMatch]);
+
+  const handleMatchLayout = (event: LayoutChangeEvent) => {
+    setMatchY(event.nativeEvent.layout.y);
+  };
 
   if (loading) {
     return (
@@ -58,11 +62,12 @@ export function IrabTab({ surah, ayah, wordPos }: Props) {
 
   return (
     <View className="py-4 px-1">
-      {rows.map((row, idx) => {
-        const isMatch = matchIdx !== -1 && idx === matchIdx;
+      {rows.map((row) => {
+        const isMatch = row.word_pos === wordPos;
         return (
           <View
             key={`${row.surah}-${row.ayah}-${row.word_pos}`}
+            onLayout={isMatch ? handleMatchLayout : undefined}
             className={`mb-3 p-3 rounded-2xl ${
               isMatch
                 ? "bg-primary-accent/10 dark:bg-primary-bright/10"

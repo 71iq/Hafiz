@@ -5,9 +5,7 @@ import { useDatabase } from "@/lib/database/provider";
 import {
   fetchWordTranslation,
   fetchWordRoot,
-  fetchWordText,
-  fetchWordMeaningsArForAyah,
-  findBestWordMatch,
+  fetchWordMeaningAr,
   type WordMeaningArRow,
 } from "@/lib/word/queries";
 import { useSettings } from "@/lib/settings/context";
@@ -35,8 +33,7 @@ export function MeaningTab({ surah, ayah, wordPos }: Props) {
   const isArabicMode = uiLanguage === "ar";
 
   const [enData, setEnData] = useState<EnglishMeaning | null>(null);
-  const [arRows, setArRows] = useState<WordMeaningArRow[]>([]);
-  const [arMatchIdx, setArMatchIdx] = useState<number>(-1);
+  const [arMeaning, setArMeaning] = useState<WordMeaningArRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [savedToVocab, setSavedToVocab] = useState(false);
 
@@ -57,14 +54,8 @@ export function MeaningTab({ surah, ayah, wordPos }: Props) {
   useEffect(() => {
     setLoading(true);
     if (isArabicMode) {
-      Promise.all([
-        fetchWordMeaningsArForAyah(db, surah, ayah),
-        fetchWordText(db, surah, ayah, wordPos),
-      ])
-        .then(([rows, tappedText]) => {
-          setArRows(rows);
-          setArMatchIdx(findBestWordMatch(rows, wordPos, tappedText ?? ""));
-        })
+      fetchWordMeaningAr(db, surah, ayah, wordPos)
+        .then(setArMeaning)
         .finally(() => setLoading(false));
     } else {
       Promise.all([
@@ -93,7 +84,7 @@ export function MeaningTab({ surah, ayah, wordPos }: Props) {
   }
 
   if (isArabicMode) {
-    if (arRows.length === 0) {
+    if (!arMeaning?.meaning) {
       return (
         <View className="py-6 items-center">
           <Text
@@ -105,54 +96,24 @@ export function MeaningTab({ surah, ayah, wordPos }: Props) {
         </View>
       );
     }
-    // If we matched a specific word, show only its meaning. Otherwise show
-    // every meaning available for the ayah so the user can read context.
-    const matched = arMatchIdx >= 0 ? arRows[arMatchIdx] : null;
-    if (matched && matched.meaning) {
-      return (
-        <View className="py-4 px-1">
-          {matched.word && (
-            <Text
-              className="text-2xl text-charcoal dark:text-neutral-100 mb-3"
-              style={{ writingDirection: "rtl", textAlign: "right", fontWeight: "600" }}
-            >
-              {matched.word}
-            </Text>
-          )}
-          <Text
-            className="text-base text-charcoal dark:text-neutral-200 leading-8"
-            style={{ writingDirection: "rtl", textAlign: "right" }}
-          >
-            {matched.meaning}
-          </Text>
-          <SaveToVocabButton saved={savedToVocab} onPress={saveToVocab} label={savedToVocab ? s.addedToVocab : s.addToVocab} />
-        </View>
-      );
-    }
 
-    // No exact match — fall back to listing every meaning for the ayah.
     return (
       <View className="py-4 px-1">
-        {arRows.map((row) => (
-          <View key={`${row.surah}-${row.ayah}-${row.word_pos}`} className="mb-4">
-            {row.word && (
-              <Text
-                className="text-lg text-charcoal dark:text-neutral-100 mb-1"
-                style={{ writingDirection: "rtl", textAlign: "right", fontWeight: "600" }}
-              >
-                {row.word}
-              </Text>
-            )}
-            {row.meaning && (
-              <Text
-                className="text-base text-charcoal dark:text-neutral-200 leading-7"
-                style={{ writingDirection: "rtl", textAlign: "right" }}
-              >
-                {row.meaning}
-              </Text>
-            )}
-          </View>
-        ))}
+        {arMeaning.word && (
+          <Text
+            className="text-2xl text-charcoal dark:text-neutral-100 mb-3"
+            style={{ writingDirection: "rtl", textAlign: "right", fontWeight: "600" }}
+          >
+            {arMeaning.word}
+          </Text>
+        )}
+        <Text
+          className="text-base text-charcoal dark:text-neutral-200 leading-8"
+          style={{ writingDirection: "rtl", textAlign: "right" }}
+        >
+          {arMeaning.meaning}
+        </Text>
+        <SaveToVocabButton saved={savedToVocab} onPress={saveToVocab} label={savedToVocab ? s.addedToVocab : s.addToVocab} />
       </View>
     );
   }
