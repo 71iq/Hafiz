@@ -983,3 +983,21 @@ Saved in `phase19/`:
   - Confirmed fallback on the 36 divergent pages listed above.
 - `npx tsc --noEmit`: passed.
 - `npx expo export --platform web`: passed.
+
+## 2026-05-03 — Phone Horizontal Swipe Reliability Tuning
+
+### User-reported issue
+- In page mode with swipe navigation on phone, horizontal swipes were often ignored (roughly 90% failure).
+
+### Root cause
+- The horizontal `PanResponder` activation was too strict (`dx` thresholds and horizontal-direction ratio), so child pressables frequently won the touch sequence before the swipe responder could claim it.
+- Page-turn acceptance thresholds were also high (distance and flick velocity), so many valid short phone swipes were canceled.
+
+### Implemented fix
+- `components/mushaf/PageMushaf.tsx`:
+  - lowered pan activation/capture thresholds and relaxed direction ratio so horizontal swipes are claimed earlier.
+  - lowered page-turn distance and flick-velocity thresholds to match shorter phone gestures.
+  - set `onPanResponderTerminationRequest` to `false` to avoid losing an active horizontal gesture mid-drag.
+
+### Validation result
+- `npx expo export --platform web`: passed.
