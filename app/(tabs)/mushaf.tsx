@@ -348,6 +348,7 @@ function MushafInner() {
   );
 
   const isPageMode = viewMode === "page";
+  const showBottomSlider = isPageMode && pageScroll === "horizontal";
 
   useEffect(() => {
     currentPageRef.current = currentPage;
@@ -652,7 +653,10 @@ function MushafInner() {
         {isPageMode ? (
           <View
             className="flex-1"
-            style={{ paddingTop: chromeVisible ? 0 : 10, paddingBottom: isPhone ? 72 : 56 }}
+            style={{
+              paddingTop: chromeVisible ? 0 : 10,
+              paddingBottom: showBottomSlider ? (isPhone ? 72 : 56) : isPhone ? 16 : 0,
+            }}
           >
             <PageMushaf
               onPageChange={setCurrentPage}
@@ -765,35 +769,37 @@ function MushafInner() {
         <SelectionActionBar />
 
         {/* Bottom slider — fades with chrome */}
-        <Animated.View
-          pointerEvents={chromeVisible ? "auto" : "none"}
-          style={[
-            { position: "absolute", left: 0, right: 0, bottom: 0 },
-            sliderAnimStyle,
-          ]}
-          className="bg-surface/95 dark:bg-surface-dark/95"
-        >
-          <MushafSlider
-            currentPage={currentPage}
-            onCommit={(p) => {
-              if (isPageMode) goToPageRef.current?.(p);
-              else {
-                // Verse view: jump to the first ayah on that page
-                const ayah = mushafIndex
-                  ? topmostAyahForPage(mushafIndex, p)
-                  : null;
-                if (ayah) {
-                  const idx = items.findIndex(
-                    (it) => it.type === "ayah" && it.surah === ayah.surah && it.ayah === ayah.ayah
-                  );
-                  if (idx >= 0) flashListRef.current?.scrollToIndex({ index: idx, animated: true });
+        {showBottomSlider && (
+          <Animated.View
+            pointerEvents={chromeVisible ? "auto" : "none"}
+            style={[
+              { position: "absolute", left: 0, right: 0, bottom: 0 },
+              sliderAnimStyle,
+            ]}
+            className="bg-surface/95 dark:bg-surface-dark/95"
+          >
+            <MushafSlider
+              currentPage={currentPage}
+              onCommit={(p) => {
+                if (isPageMode) goToPageRef.current?.(p);
+                else {
+                  // Verse view: jump to the first ayah on that page
+                  const ayah = mushafIndex
+                    ? topmostAyahForPage(mushafIndex, p)
+                    : null;
+                  if (ayah) {
+                    const idx = items.findIndex(
+                      (it) => it.type === "ayah" && it.surah === ayah.surah && it.ayah === ayah.ayah
+                    );
+                    if (idx >= 0) flashListRef.current?.scrollToIndex({ index: idx, animated: true });
+                  }
                 }
-              }
-            }}
-            onExpand={() => setShowNavigator(true)}
-            index={mushafIndex}
-          />
-        </Animated.View>
+              }}
+              onExpand={() => setShowNavigator(true)}
+              index={mushafIndex}
+            />
+          </Animated.View>
+        )}
 
         {/* Toast notifications */}
         <Toast message={toastMessage} onDismiss={dismissToast} />
