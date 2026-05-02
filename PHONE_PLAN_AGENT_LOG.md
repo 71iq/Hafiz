@@ -950,3 +950,36 @@ Saved in `phase19/`:
   - Fatiha Da'as rows map to actual words in each ayah after grouped-row expansion.
 - `npx tsc --noEmit`: passed.
 - `npx expo export --platform web`: passed.
+
+## 2026-05-03 — Global Mushaf Page Missing-Ayah Fix
+
+### User-reported issue
+- Some page-view ayahs were not displaying.
+- Concrete example: around page 584, Surah 79 ayah 16 was skipped between ayah 15 and ayah 17.
+- Similar missing/drifting output appeared near the last ayahs of Surah 80.
+
+### Investigation result
+- This was a global token-stream correctness issue, not a single-page layout issue.
+- `assets/data/layout/page-words.json` diverges from the canonical QCF2 `v2_page` glyph stream on 36 pages:
+  - 120, 121, 122, 123, 144, 145, 531, 532, 533, 534, 564, 565, 567, 568, 569, 570, 575, 576, 583, 584, 585, 586, 587, 588, 589, 590, 591, 592, 593, 594, 595, 596, 597, 598, 599, 600.
+- Page 583 contains QCF2 tokens for `79:16`, but `page-words.json` page 583 is 7 glyph tokens short.
+- Page 584 is 7 glyph tokens long/stale in the opposite direction, causing the visible skip/duplicate boundary.
+- Page 585/586 show the same class of drift around Surah 80.
+- `page_lines.first_word_id` / `last_word_id` are already loaded and match the canonical QCF2 stream for these divergent pages, but `MushafPage` was not using them.
+
+### Implemented fix
+- `components/mushaf/MushafPage.tsx`:
+  - builds a canonical flat QCF2 glyph stream from the page ayahs.
+  - uses `page-words.json` only when its flattened glyph sequence exactly equals the canonical QCF2 page stream.
+  - falls back to slicing the canonical QCF2 stream with `page_lines.first_word_id` / `last_word_id` and `globalWordOffset` on divergent pages.
+  - appends any final missing end-marker token to the last ayah line when a line range undercounts by one.
+- `scripts/verify-mushaf-page-tokens.js`:
+  - verifies all 604 rendered page glyph streams exactly match canonical QCF2 `v2_page` glyph streams.
+  - reports which pages use the `page_lines` fallback.
+
+### Validation result
+- `node scripts/verify-mushaf-page-tokens.js`: passed.
+  - Verified all 604 pages.
+  - Confirmed fallback on the 36 divergent pages listed above.
+- `npx tsc --noEmit`: passed.
+- `npx expo export --platform web`: passed.

@@ -1,4 +1,4 @@
-import { memo, useEffect, useState, useMemo, useCallback } from "react";
+import { memo, useEffect, useState, useMemo } from "react";
 import { View, Text, Pressable, ActivityIndicator, Platform } from "react-native";
 import { SurahHeader } from "./SurahHeader";
 import { WordToken } from "./WordToken";
@@ -74,6 +74,11 @@ type WordIdentity = {
   isMarker: boolean;
 };
 
+type PageGlyph = {
+  glyph: string;
+  identity: WordIdentity;
+};
+
 // QCF2 Basmallah: 4 word glyphs from page 1's font (Surah 1 Ayah 1 = the Basmallah)
 const BISMILLAH_QCF2 = "\uFC41 \uFC42 \uFC43 \uFC44";
 
@@ -81,32 +86,51 @@ const BISMILLAH_QCF2 = "\uFC41 \uFC42 \uFC43 \uFC44";
 const FONT_WIDTH_SCALE = 19;
 
 /**
- * Build a flat ordered list of word identities from the page's ayahs.
- * Each QCF2 token gets an identity. The last token of each ayah is the end marker.
+ * Build the canonical QCF2 token stream for this page. `page-words.json`
+ * is stale on some v2 page boundaries, so this stream is the source of truth.
  */
-function buildWordIdentities(ayahs: AyahData[]): WordIdentity[] {
-  const identities: WordIdentity[] = [];
+function buildPageGlyphs(ayahs: AyahData[]): PageGlyph[] {
+  const glyphs: PageGlyph[] = [];
   for (const a of ayahs) {
     const tokens = a.textQcf2.split(" ").filter(Boolean);
     if (tokens.length === 0) continue;
-    // All tokens except last are real words; last is ayah end marker
     for (let i = 0; i < tokens.length - 1; i++) {
-      identities.push({
-        surah: a.surah,
-        ayah: a.ayah,
-        wordPos: i + 1,
-        isMarker: false,
+      glyphs.push({
+        glyph: tokens[i],
+        identity: {
+          surah: a.surah,
+          ayah: a.ayah,
+          wordPos: i + 1,
+          isMarker: false,
+        },
       });
     }
-    // Last token is the ayah marker
-    identities.push({
-      surah: a.surah,
-      ayah: a.ayah,
-      wordPos: 0,
-      isMarker: true,
+    glyphs.push({
+      glyph: tokens[tokens.length - 1],
+      identity: {
+        surah: a.surah,
+        ayah: a.ayah,
+        wordPos: 0,
+        isMarker: true,
+      },
     });
   }
-  return identities;
+  return glyphs;
+}
+
+function splitGlyphs(text: string | undefined): string[] {
+  return text?.split(/\s+/).filter(Boolean) ?? [];
+}
+
+function flattenPageWords(lineWords: Record<string, string>): string[] {
+  return Object.keys(lineWords)
+    .sort((a, b) => Number(a) - Number(b))
+    .flatMap((key) => splitGlyphs(lineWords[key]));
+}
+
+function glyphsMatchCanonical(pageWordGlyphs: string[], pageGlyphs: PageGlyph[]): boolean {
+  return pageWordGlyphs.length === pageGlyphs.length &&
+    pageWordGlyphs.every((glyph, index) => glyph === pageGlyphs[index]?.glyph);
 }
 
 function MushafPageInner({
@@ -154,9 +178,8 @@ function MushafPageInner({
       .catch(console.warn);
   }, [pageNumber]);
 
-  // Build word identities for this page
-  const wordIdentities = useMemo(
-    () => buildWordIdentities(ayahs),
+  const pageGlyphs = useMemo(
+    () => buildPageGlyphs(ayahs),
     [ayahs],
   );
 
@@ -176,6 +199,12 @@ function MushafPageInner({
   let content;
   if (hasLineLayout) {
     const lineWords = (pageWordsData ?? [])[pageNumber - 1] ?? {};
+    const pageWordGlyphs = wordsLoaded ? flattenPageWords(lineWords) : [];
+    const usePageWords = glyphsMatchCanonical(pageWordGlyphs, pageGlyphs);
+    const lastAyahLineNumber = lineLayout!
+      .filter((line) => line.line_type === "ayah")
+      .at(-1)?.line_number ?? null;
+
     // 19 pages have a 1-line offset between page-lines and page-words: the
     // "basmallah" slot in page-words actually holds the first ayah line's
     // glyphs (see surah 22 page 332). Detect by checking if any basmallah
@@ -236,15 +265,26 @@ function MushafPageInner({
         );
       }
 
-      // Ayah line: get visual words and map to identities
-      const lineText = lineWords[String(line.line_number + lineKeyOffset)];
-      if (!lineText) return null;
-
-      const words = lineText.split(/\s+/).filter(Boolean);
+      let lineStartIndex = wordIndex;
+      let words: string[];
+      if (usePageWords) {
+        words = splitGlyphs(lineWords[String(line.line_number + lineKeyOffset)]);
+        wordIndex += words.length;
+      } else if (
+        typeof line.first_word_id === "number" &&
+        typeof line.last_word_id === "number" &&
+        typeof globalWordOffset === "number"
+      ) {
+        lineStartIndex = Math.max(0, line.first_word_id - globalWordOffset - 1);
+        let lineEndIndex = Math.max(lineStartIndex, line.last_word_id - globalWordOffset);
+        if (line.line_number === lastAyahLineNumber && lineEndIndex < pageGlyphs.length) {
+          lineEndIndex = pageGlyphs.length;
+        }
+        words = pageGlyphs.slice(lineStartIndex, lineEndIndex).map((token) => token.glyph);
+      } else {
+        return null;
+      }
       if (words.length === 0) return null;
-
-      const lineStartIndex = wordIndex;
-      wordIndex += words.length;
 
       return (
         <View
@@ -259,7 +299,7 @@ function MushafPageInner({
           }}
         >
           {words.map((w, i) => {
-            const identity = wordIdentities[lineStartIndex + i];
+            const identity = pageGlyphs[lineStartIndex + i]?.identity;
             if (identity && !identity.isMarker) {
               const hlColor = getHighlightColor(identity.surah, identity.ayah);
               return (
