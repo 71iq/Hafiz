@@ -760,7 +760,11 @@ function MushafInner() {
         <FloatingWordTooltip />
 
         {/* Search command modal */}
-        <SearchCommand visible={showSearch} onClose={() => setShowSearch(false)} />
+        <SearchCommand
+          visible={showSearch}
+          onClose={() => setShowSearch(false)}
+          onNavigateToAyah={handleBookmarkNavigate}
+        />
 
         {/* Word detail modal */}
         <WordDetailSheet />

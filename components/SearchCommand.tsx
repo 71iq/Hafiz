@@ -151,9 +151,10 @@ function buildPlainHighlightSegments(
 interface SearchCommandProps {
   visible: boolean;
   onClose: () => void;
+  onNavigateToAyah?: (surah: number, ayah: number) => void;
 }
 
-export function SearchCommand({ visible, onClose }: SearchCommandProps) {
+export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchCommandProps) {
   const db = useDatabase();
   const { isDark, isRTL } = useSettings();
   const { width, height } = useWindowDimensions();
@@ -394,13 +395,16 @@ export function SearchCommand({ visible, onClose }: SearchCommandProps) {
 
   const handleResultTap = useCallback((surah: number, ayah: number) => {
     Keyboard.dismiss();
-    setPendingDeepLink({ surah, ayah });
     onClose();
-    // Small delay to let modal close before navigating
     setTimeout(() => {
+      if (onNavigateToAyah) {
+        onNavigateToAyah(surah, ayah);
+        return;
+      }
+      setPendingDeepLink({ surah, ayah });
       router.navigate("/(tabs)/mushaf");
     }, 150);
-  }, [onClose]);
+  }, [onClose, onNavigateToAyah]);
 
   const handleHistoryTap = useCallback(
     (entry: HistoryEntry) => {
