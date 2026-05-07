@@ -4,10 +4,11 @@
   "version": "1.0.0",
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web",
-    "prebuild:web": "bash scripts/prepare-web-data.sh"
+    "prebuild:web": "bash scripts/prepare-web-data.sh",
+    "postinstall": "node scripts/fix-rn-gradle-plugin.js"
   },
   "dependencies": {
     "@expo-google-fonts/manrope": "^0.4.2",

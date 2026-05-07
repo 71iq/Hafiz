@@ -22,7 +22,8 @@
         "foregroundImage": "./assets/images/logo.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.anonymous.hafiz"
     },
     "web": {
       "bundler": "metro",
