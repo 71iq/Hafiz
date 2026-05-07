@@ -1,4 +1,4 @@
-import { memo, useEffect, useState, useMemo } from "react";
+import { memo, useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { View, Text, Pressable, ActivityIndicator, Platform } from "react-native";
 import { SurahHeader } from "./SurahHeader";
 import { WordToken } from "./WordToken";
@@ -84,6 +84,7 @@ const BISMILLAH_QCF2 = "\uFC41 \uFC42 \uFC43 \uFC44";
 
 // Content width scales with font size — a standard Mushaf line fills this width
 const FONT_WIDTH_SCALE = 19;
+const MARKER_DOUBLE_TAP_MS = 260;
 
 /**
  * Build the canonical QCF2 token stream for this page. `page-words.json`
@@ -150,6 +151,8 @@ function MushafPageInner({
   const [fontVisible, setFontVisible] = useState(false);
   const [wordsLoaded, setWordsLoaded] = useState(!!pageWordsData);
   const { getHighlightColor } = useSelection();
+  const lastMarkerTapRef = useRef<{ key: string; at: number } | null>(null);
+  const skipNextMarkerPressRef = useRef<string | null>(null);
 
   // On web, trigger async load of page-words data
   useEffect(() => {
@@ -182,6 +185,35 @@ function MushafPageInner({
     () => buildPageGlyphs(ayahs),
     [ayahs],
   );
+
+  const handleMarkerPress = useCallback((surah: number, ayah: number) => {
+    if (!onOpenAyahDetail) return;
+    const key = `${surah}:${ayah}`;
+    if (skipNextMarkerPressRef.current === key) {
+      skipNextMarkerPressRef.current = null;
+      return;
+    }
+    if (Platform.OS === "web") {
+      onOpenAyahDetail(surah, ayah);
+      return;
+    }
+    const now = Date.now();
+    const lastTap = lastMarkerTapRef.current;
+    if (lastTap?.key === key && now - lastTap.at <= MARKER_DOUBLE_TAP_MS) {
+      lastMarkerTapRef.current = null;
+      onOpenAyahDetail(surah, ayah);
+      return;
+    }
+    lastMarkerTapRef.current = { key, at: now };
+  }, [onOpenAyahDetail]);
+
+  const handleMarkerLongPress = useCallback((surah: number, ayah: number) => {
+    if (!onOpenAyahDetail) return;
+    const key = `${surah}:${ayah}`;
+    skipNextMarkerPressRef.current = key;
+    lastMarkerTapRef.current = null;
+    onOpenAyahDetail(surah, ayah);
+  }, [onOpenAyahDetail]);
 
   const hasLineLayout = lineLayout && lineLayout.length > 0;
   const contentWidth = Math.min(fontSize * FONT_WIDTH_SCALE, width - sidePadding * 2);
@@ -322,8 +354,8 @@ function MushafPageInner({
               return (
                 <Pressable
                   key={`w-${line.line_number}-${i}`}
-                  onPress={() => onOpenAyahDetail?.(identity.surah, identity.ayah)}
-                  onLongPress={() => onOpenAyahDetail?.(identity.surah, identity.ayah)}
+                  onPress={() => handleMarkerPress(identity.surah, identity.ayah)}
+                  onLongPress={() => handleMarkerLongPress(identity.surah, identity.ayah)}
                   delayLongPress={300}
                   style={({ pressed }) => ({
                     transform: [{ scale: pressed ? 0.95 : 1 }],
