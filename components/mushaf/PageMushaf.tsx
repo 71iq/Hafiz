@@ -556,7 +556,7 @@ export function PageMushaf({
         return;
       }
       horizontalAnimatingRef.current = true;
-      const targetX = direction === 1 ? -pageWidth : pageWidth;
+      const targetX = direction === 1 ? pageWidth : -pageWidth;
       const remainingDistance = Math.abs(targetX - horizontalDragOffsetRef.current);
       const remainingRatio = Math.max(0, Math.min(1, remainingDistance / pageWidth));
       const duration = Math.round(
@@ -592,8 +592,8 @@ export function PageMushaf({
       const fastEnough = Math.abs(vx) > HORIZONTAL_FLICK_VELOCITY;
       const farEnough = Math.abs(dx) > threshold;
       const hasIntentionalDistance = Math.abs(dx) > HORIZONTAL_FLICK_MIN_DISTANCE;
-      const dragDirection: 1 | -1 = dx < 0 ? 1 : -1;
-      const velocityDirection: 1 | -1 = vx < 0 ? 1 : -1;
+      const dragDirection: 1 | -1 = dx > 0 ? 1 : -1;
+      const velocityDirection: 1 | -1 = vx > 0 ? 1 : -1;
 
       const direction: 1 | -1 | null = farEnough
         ? dragDirection
@@ -619,8 +619,8 @@ export function PageMushaf({
     (dx: number) => {
       if (pageWidth <= 0) return;
       const startPage = dragStartPageRef.current;
-      const atFirst = startPage === 1 && dx > 0;
-      const atLast = startPage === pageData.length && dx < 0;
+      const atFirst = startPage === 1 && dx < 0;
+      const atLast = startPage === pageData.length && dx > 0;
       const boundedDx = Math.max(-pageWidth, Math.min(pageWidth, dx));
       const nextOffset = atFirst || atLast ? boundedDx * 0.25 : boundedDx;
       horizontalDragOffsetRef.current = nextOffset;
@@ -747,7 +747,7 @@ export function PageMushaf({
       if (Math.abs(deltaX) < 36 || Math.abs(deltaX) < Math.abs(deltaY) * 1.25) return;
 
       wheelLockedRef.current = true;
-      const direction: 1 | -1 = deltaX > 0 ? 1 : -1;
+      const direction: 1 | -1 = deltaX > 0 ? -1 : 1;
       const startPage = currentPageRef.current;
       const nextPage = Math.max(1, Math.min(pageData.length, startPage + direction));
       if (nextPage !== startPage) {
@@ -897,7 +897,7 @@ export function PageMushaf({
                   position: "absolute",
                   top: 0,
                   bottom: 0,
-                  left: (item.page - currentPage) * pageWidth,
+                  left: (currentPage - item.page) * pageWidth,
                   width: pageWidth,
                 }}
               >
