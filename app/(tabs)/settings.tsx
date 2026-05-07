@@ -365,12 +365,12 @@ export default function SettingsScreen() {
           {/* Translation Language */}
           <Pressable
             onPress={() => setPickerVisible(true)}
-            className="flex-row items-center justify-between gap-3"
+            className={`items-center justify-between gap-3 ${isRTL ? "flex-row-reverse" : "flex-row"}`}
           >
-            <View className="flex-1">
+            <View className={`flex-1 ${isRTL ? "items-end" : "items-start"}`}>
               <Text
                 className="text-charcoal dark:text-neutral-300"
-                style={{ fontFamily: "Manrope_500Medium", fontSize: 14 }}
+                style={{ fontFamily: "Manrope_500Medium", fontSize: 14, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
               >
                 {s.translationLanguageLabel}
               </Text>
@@ -532,18 +532,26 @@ export default function SettingsScreen() {
               s.creditTajweedRules,
               s.creditTajweedDesc,
             ].map((line, i) => (
-              <Text
+              <View
                 key={i}
-                className="text-warm-500 dark:text-neutral-400"
-                style={{
-                  fontFamily: "Manrope_400Regular",
-                  fontSize: 12,
-                  lineHeight: 18,
-                  ...(isRTL ? { writingDirection: "rtl", textAlign: "right" } : {}),
-                }}
+                className={`gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`}
               >
-                • {line}
-              </Text>
+                <Text className="text-warm-500 dark:text-neutral-400" style={{ fontFamily: "Manrope_400Regular", fontSize: 12, lineHeight: 18 }}>
+                  •
+                </Text>
+                <Text
+                  className="flex-1 text-warm-500 dark:text-neutral-400"
+                  style={{
+                    fontFamily: "Manrope_400Regular",
+                    fontSize: 12,
+                    lineHeight: 18,
+                    writingDirection: isRTL ? "rtl" : "ltr",
+                    textAlign: isRTL ? "right" : "left",
+                  }}
+                >
+                  {line}
+                </Text>
+              </View>
             ))}
           </View>
         </Card>
@@ -558,6 +566,7 @@ export default function SettingsScreen() {
 }
 
 function SectionLabel({ children }: { children: string }) {
+  const { isRTL } = useSettings();
   return (
     <Text
       className="text-warm-400 dark:text-neutral-500 mb-3"
@@ -566,6 +575,8 @@ function SectionLabel({ children }: { children: string }) {
         fontSize: 11,
         letterSpacing: 1.2,
         textTransform: "uppercase",
+        textAlign: isRTL ? "right" : "left",
+        writingDirection: isRTL ? "rtl" : "ltr",
       }}
     >
       {children}

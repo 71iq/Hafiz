@@ -17,10 +17,6 @@ export const FONT_SIZE_STEPS_MOBILE = [14, 17, 20, 23, 26, 29, 32] as const;
 export const FONT_SIZE_LINE_HEIGHTS_MOBILE = [32, 38, 44, 50, 56, 62, 68] as const;
 
 const DEFAULT_FONT_SIZE_INDEX = 2; // desktop 30px / mobile 20px (verse view)
-// On phone, page view auto-shifts down by this many steps vs verse view —
-// pages fit 15 lines into one screen, so they need smaller glyphs.
-const MOBILE_PAGE_VIEW_INDEX_OFFSET = 2;
-
 // Web viewports narrower than this use the mobile scale; native is always mobile.
 const MOBILE_BREAKPOINT = 768;
 
@@ -135,12 +131,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [fontSizeIndex, setFontSizeIndexState] = useState(DEFAULT_FONT_SIZE_INDEX);
   const [theme, setThemeState] = useState<ThemeMode>("system");
   const [viewMode, setViewModeState] = useState<ViewMode>("verse");
-  // On phone, page view renders two steps smaller than verse view so a
-  // 15-line page fits the viewport. Clamped to the bottom of the scale.
-  const effectiveFontIndex =
-    isCompact && viewMode === "page"
-      ? Math.max(0, fontSizeIndex - MOBILE_PAGE_VIEW_INDEX_OFFSET)
-      : fontSizeIndex;
+  const effectiveFontIndex = fontSizeIndex;
   const [pageScroll, setPageScrollState] = useState<PageScroll>("vertical");
   const [showTranslation, setShowTranslationState] = useState(false);
   const [showTafseer, setShowTafseerState] = useState(false);

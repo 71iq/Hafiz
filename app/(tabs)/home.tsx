@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from "react";
-import { View, Text, ScrollView, Pressable, Alert, Platform } from "react-native";
+import { View, Text, ScrollView, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/Button";
 import { CreateDeckSheet } from "@/components/flashcards/CreateDeckSheet";
 import { SearchCommand } from "@/components/SearchCommand";
 import { Toast } from "@/components/ui/Toast";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
   getDecks,
   getDueCount,
@@ -53,6 +54,7 @@ export default function HomeScreen() {
   const [showCreate, setShowCreate] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [deckToDelete, setDeckToDelete] = useState<string | null>(null);
   const [surahNames, setSurahNames] = useState<Record<number, string>>({});
   const [resume, setResume] = useState<{ surah: number; ayah: number; page: number } | null>(null);
 
@@ -132,28 +134,18 @@ export default function HomeScreen() {
 
   useEffect(() => subscribeReviewActivity(loadData), [loadData]);
 
-  const handleDeleteDeck = (deckId: string) => {
-    const runDelete = async () => {
-      try {
-        await deleteDeck(db, deckId);
-        setDecks((prev) => prev.filter((d) => d.id !== deckId));
-        await loadData();
-      } catch (e) {
-        console.warn("[Home] Failed to delete deck:", e);
-        setToast(s.reviewActionFailed);
-      }
-    };
-
-    if (Platform.OS === "web") {
-      const confirmed = globalThis.confirm?.(`${s.flashcardsDeleteDeck}\n${s.flashcardsDeleteConfirm}`) ?? false;
-      if (confirmed) runDelete();
-      return;
+  const confirmDeleteDeck = async () => {
+    if (!deckToDelete) return;
+    const deckId = deckToDelete;
+    setDeckToDelete(null);
+    try {
+      await deleteDeck(db, deckId);
+      setDecks((prev) => prev.filter((d) => d.id !== deckId));
+      await loadData();
+    } catch (e) {
+      console.warn("[Home] Failed to delete deck:", e);
+      setToast(s.reviewActionFailed);
     }
-
-    Alert.alert(s.flashcardsDeleteDeck, s.flashcardsDeleteConfirm, [
-      { text: s.flashcardsCancel, style: "cancel" },
-      { text: s.flashcardsDelete, style: "destructive", onPress: runDelete },
-    ]);
   };
 
   const handleStartReview = (deckId?: string) => {
@@ -408,7 +400,7 @@ export default function HomeScreen() {
                 deck={deck}
                 getDeckLabel={getDeckLabel}
                 onStartReview={() => handleStartReview(deck.id)}
-                onDelete={() => handleDeleteDeck(deck.id)}
+                onDelete={() => setDeckToDelete(deck.id)}
                 isDark={isDark}
                 isRTL={isRTL}
                 s={s}
@@ -477,6 +469,18 @@ export default function HomeScreen() {
       />
 
       {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}
+      <ConfirmDialog
+        visible={!!deckToDelete}
+        title={s.flashcardsDeleteDeck}
+        message={s.flashcardsDeleteConfirm}
+        cancelLabel={s.flashcardsCancel}
+        confirmLabel={s.flashcardsDelete}
+        destructive
+        isDark={isDark}
+        isRTL={isRTL}
+        onCancel={() => setDeckToDelete(null)}
+        onConfirm={confirmDeleteDeck}
+      />
     </SafeAreaView>
   );
 }

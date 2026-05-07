@@ -10,7 +10,7 @@ type Props = {
 };
 
 export function TranslationLanguagePicker({ visible, onClose }: Props) {
-  const { translationLanguage, setTranslationLanguage, isDark } =
+  const { translationLanguage, setTranslationLanguage, isDark, isRTL } =
     useSettings();
   const s = useStrings();
 
@@ -40,10 +40,10 @@ export function TranslationLanguagePicker({ visible, onClose }: Props) {
           style={{ maxHeight: "70%" }}
         >
           {/* Header */}
-          <View className="flex-row items-center justify-between px-6 pt-3 pb-4">
+          <View className={`items-center justify-between px-6 pt-3 pb-4 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
             <Text
               className="text-charcoal dark:text-neutral-100"
-              style={{ fontFamily: "NotoSerif_700Bold", fontSize: 20 }}
+              style={{ fontFamily: "NotoSerif_700Bold", fontSize: 20, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
             >
               {s.translationLanguagePickerTitle}
             </Text>
@@ -67,7 +67,7 @@ export function TranslationLanguagePicker({ visible, onClose }: Props) {
                   <Pressable
                     key={lang.code}
                     onPress={() => handleSelect(lang.code)}
-                    className="flex-row items-center justify-between py-3.5 px-3 rounded-2xl"
+                    className={`items-center justify-between py-3.5 px-3 rounded-2xl ${isRTL ? "flex-row-reverse" : "flex-row"}`}
                     style={({ pressed }) => ({
                       backgroundColor: isSelected
                         ? (isDark ? "rgba(45,212,191,0.08)" : "rgba(13,148,136,0.06)")
@@ -76,7 +76,7 @@ export function TranslationLanguagePicker({ visible, onClose }: Props) {
                           : "transparent",
                     })}
                   >
-                    <View className="flex-1">
+                    <View className={`flex-1 ${isRTL ? "items-end" : "items-start"}`}>
                       <Text
                         className={
                           isSelected
@@ -86,6 +86,7 @@ export function TranslationLanguagePicker({ visible, onClose }: Props) {
                         style={{
                           fontFamily: isSelected ? "Manrope_600SemiBold" : "Manrope_500Medium",
                           fontSize: 15,
+                          textAlign: isRTL ? "right" : "left",
                         }}
                       >
                         {lang.nameEnglish}
@@ -95,7 +96,7 @@ export function TranslationLanguagePicker({ visible, onClose }: Props) {
                         style={{
                           fontFamily: "Manrope_400Regular",
                           fontSize: 13,
-                          ...(lang.direction === "rtl"
+                          ...(isRTL || lang.direction === "rtl"
                             ? { writingDirection: "rtl", textAlign: "right" }
                             : {}),
                         }}
