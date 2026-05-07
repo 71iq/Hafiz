@@ -76,6 +76,12 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
   }, [target?.surah, target?.ayah, initialTab]);
 
   useEffect(() => {
+    if (!showTranslation && activeTab === "translation") {
+      setActiveTab("tafsir");
+    }
+  }, [activeTab, showTranslation]);
+
+  useEffect(() => {
     if (!target) return;
     let cancelled = false;
     db.getFirstAsync<AyahRow>(
@@ -180,7 +186,13 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
   if (!target) return null;
 
   const tabs: Array<{ key: TabKey; label: string; icon: ReactNode }> = [
-    { key: "translation", label: langInfo?.nameEnglish ?? s.wordTranslation, icon: <BookOpenText size={15} color={activeTab === "translation" ? "#0d9488" : iconColor} /> },
+    ...(showTranslation
+      ? [{
+          key: "translation" as TabKey,
+          label: langInfo?.nameEnglish ?? s.wordTranslation,
+          icon: <BookOpenText size={15} color={activeTab === "translation" ? "#0d9488" : iconColor} />,
+        }]
+      : []),
     { key: "tafsir", label: s.tafseer, icon: <BookOpenText size={15} color={activeTab === "tafsir" ? "#0d9488" : iconColor} /> },
     { key: "qiraat", label: s.wordTabQiraat, icon: <BookOpenText size={15} color={activeTab === "qiraat" ? "#0d9488" : iconColor} /> },
     { key: "reflections", label: s.reflections, icon: <MessageCircle size={15} color={activeTab === "reflections" ? "#0d9488" : iconColor} /> },
