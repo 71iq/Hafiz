@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { View, Text, ScrollView, Pressable, Alert, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -26,6 +26,7 @@ import {
   MEANINGS_DECK_ID,
 } from "@/lib/fsrs/queries";
 import type { DeckScope } from "@/lib/fsrs/types";
+import { subscribeReviewActivity } from "@/lib/fsrs/review-events";
 
 type DeckDisplay = {
   id: string;
@@ -128,6 +129,8 @@ export default function HomeScreen() {
       loadData();
     }, [loadData])
   );
+
+  useEffect(() => subscribeReviewActivity(loadData), [loadData]);
 
   const handleDeleteDeck = (deckId: string) => {
     const runDelete = async () => {
@@ -360,12 +363,6 @@ export default function HomeScreen() {
                   style={{ fontFamily: "Manrope_600SemiBold", fontSize: 17 }}
                 >
                   {s.flashcardsStartReview}
-                </Text>
-                <Text
-                  className="text-neutral-300"
-                  style={{ fontFamily: "Manrope_400Regular", fontSize: 13 }}
-                >
-                  {interpolate(s.flashcardsCardsRemaining, { n: String(Math.min(totalDue, dailyReviewLimit)) })}
                 </Text>
               </View>
               <View className="w-12 h-12 rounded-full bg-gold items-center justify-center">

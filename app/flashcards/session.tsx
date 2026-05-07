@@ -29,6 +29,7 @@ import type { StudyCardRow, TestMode } from "@/lib/fsrs/types";
 import { DEFAULT_ENABLED_MODES, TEST_MODE_COLORS } from "@/lib/fsrs/types";
 import { fetchWordMeaningAr, fetchWordText, fetchWordTranslation } from "@/lib/word/queries";
 import { MEANINGS_DECK_ID } from "@/lib/fsrs/queries";
+import { emitReviewActivity } from "@/lib/fsrs/review-events";
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -131,6 +132,7 @@ function FlashcardSessionScreen() {
   const [enabledModes, setEnabledModes] = useState<TestMode[]>(DEFAULT_ENABLED_MODES);
   const [wordEnabledModes, setWordEnabledModes] = useState<WordTestMode[]>(DEFAULT_WORD_TEST_MODES);
   const [summary, setSummary] = useState<SessionSummary | null>(null);
+  const [reviewedCount, setReviewedCount] = useState(0);
   const sessionStartRef = useRef(Date.now());
   const streakRef = useRef(0);
   const sessionPointsRef = useRef(0);
@@ -264,6 +266,11 @@ function FlashcardSessionScreen() {
         }
 
         shuffle(loaded);
+        sessionStartRef.current = Date.now();
+        setReviewedCount(0);
+        setCurrentIndex(0);
+        setCurrentSideIndex(0);
+        setRevealed(false);
         setCards(loaded);
         setPhase("front");
       } catch (e) {
@@ -365,6 +372,8 @@ function FlashcardSessionScreen() {
       result.log.scheduled_days,
       now.toISOString()
     );
+    setReviewedCount((count) => count + 1);
+    emitReviewActivity();
 
     // Compute and store leaderboard points
     const points = computeReviewPoints(
@@ -460,7 +469,7 @@ function FlashcardSessionScreen() {
           className="text-warm-500 dark:text-neutral-400"
           style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
         >
-          {currentIndex + 1} / {cards.length}
+          {Math.min(reviewedCount + 1, cards.length)} / {cards.length}
         </Text>
 
         <CardStateBadge state={currentCard.card.state} s={s} />
@@ -468,7 +477,7 @@ function FlashcardSessionScreen() {
         <View className="mt-2 h-[2px] rounded-full bg-surface-high dark:bg-surface-dark-high overflow-hidden">
           <View
             className="h-full rounded-full bg-primary-accent dark:bg-primary-bright"
-            style={{ width: `${((currentIndex + 1) / cards.length) * 100}%` }}
+            style={{ width: `${((reviewedCount + 1) / cards.length) * 100}%` }}
           />
         </View>
       </View>
@@ -568,7 +577,7 @@ function FlashcardSessionScreen() {
         style={{ backgroundColor: isDark ? "rgba(10,10,10,0.95)" : "rgba(255,248,241,0.95)" }}
       >
         {phase === "front" && (
-          <Button onPress={() => { setPhase("side"); setCurrentSideIndex(0); setRevealed(false); }} className="w-full">
+          <Button onPress={() => { setPhase(activeModes.length > 0 ? "side" : "grading"); setCurrentSideIndex(0); setRevealed(false); }} className="w-full">
             <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16, color: "#fff" }}>
               {s.flashcardsReveal}
             </Text>

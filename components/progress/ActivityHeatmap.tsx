@@ -12,7 +12,7 @@ type Props = {
 
 const BASE_CELL_SIZE = 13;
 const CELL_GAP = 3;
-const TOTAL_DAYS = 91; // 13 weeks
+const TOTAL_WEEKS = 13;
 
 function getColor(count: number, isDark: boolean): string {
   if (count === 0) return isDark ? "#262626" : "#E8E1DA";
@@ -36,43 +36,49 @@ function getDayLabel(dayIndex: number, isArabic: boolean): string | null {
   return null;
 }
 
+function formatDateKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export function ActivityHeatmap({ data, isDark, s, isRTL }: Props) {
   const [tooltip, setTooltip] = useState<{ date: string; count: number } | null>(null);
   const { width } = useWindowDimensions();
   const isArabic = !!isRTL;
   const DAY_LABEL_WIDTH = 28;
   const gridWidth = Math.max(260, width - 90 - DAY_LABEL_WIDTH);
-  const CELL_SIZE = Math.max(10, Math.min(BASE_CELL_SIZE, Math.floor((gridWidth - CELL_GAP * 12) / 13)));
+  const CELL_SIZE = Math.max(10, Math.min(BASE_CELL_SIZE, Math.floor((gridWidth - CELL_GAP * (TOTAL_WEEKS - 1)) / TOTAL_WEEKS)));
 
   // Build date lookup
   const countMap = new Map<string, number>();
   for (const d of data) countMap.set(d.date, d.count);
 
-  // Build grid: 13 weeks x 7 days
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  const todayKey = formatDateKey(today);
 
-  // Find the start: go back TOTAL_DAYS - 1 days, then back to that week's Sunday
   const startRaw = new Date(today);
-  startRaw.setDate(startRaw.getDate() - (TOTAL_DAYS - 1));
-  const startDay = startRaw.getDay(); // 0=Sun
-  startRaw.setDate(startRaw.getDate() - startDay);
+  startRaw.setDate(startRaw.getDate() - (TOTAL_WEEKS - 1) * 7);
+  startRaw.setDate(startRaw.getDate() - startRaw.getDay());
 
   const weeks: { date: Date; dateStr: string; count: number }[][] = [];
   const cursor = new Date(startRaw);
 
-  while (cursor <= today || weeks.length === 0 || weeks[weeks.length - 1].length < 7) {
-    if (weeks.length === 0 || weeks[weeks.length - 1].length === 7) {
-      weeks.push([]);
+  for (let w = 0; w < TOTAL_WEEKS; w++) {
+    const week: { date: Date; dateStr: string; count: number }[] = [];
+    for (let d = 0; d < 7; d++) {
+      const dateStr = formatDateKey(cursor);
+      const isFuture = cursor > today;
+      week.push({
+        date: new Date(cursor),
+        dateStr,
+        count: isFuture ? -1 : (countMap.get(dateStr) ?? 0),
+      });
+      cursor.setDate(cursor.getDate() + 1);
     }
-    const dateStr = cursor.toISOString().slice(0, 10);
-    const isFuture = cursor > today;
-    weeks[weeks.length - 1].push({
-      date: new Date(cursor),
-      dateStr,
-      count: isFuture ? -1 : (countMap.get(dateStr) ?? 0),
-    });
-    cursor.setDate(cursor.getDate() + 1);
+    weeks.push(week);
   }
 
   // Month labels: find first occurrence of each month in weeks
@@ -92,22 +98,28 @@ export function ActivityHeatmap({ data, isDark, s, isRTL }: Props) {
   const activeDays = data.filter((d) => d.count > 0).length;
   const totalReviews = data.reduce((sum, d) => sum + d.count, 0);
 
+  const displayWeeks = isRTL ? [...weeks].reverse() : weeks;
   const spacedMonthLabels = useMemo(() => {
     const result: { label: string; left: number }[] = [];
+    const candidates = monthLabels
+      .map((m) => {
+        const visualWeekIndex = isRTL ? TOTAL_WEEKS - 1 - m.weekIndex : m.weekIndex;
+        return { label: m.label, left: visualWeekIndex * (CELL_SIZE + CELL_GAP) };
+      })
+      .sort((a, b) => a.left - b.left);
     let lastLeft = -1000;
-    for (const m of monthLabels) {
-      const left = m.weekIndex * (CELL_SIZE + CELL_GAP);
-      if (left - lastLeft < 22) continue;
-      result.push({ label: m.label, left });
-      lastLeft = left;
+    for (const candidate of candidates) {
+      if (candidate.left - lastLeft < 22) continue;
+      result.push(candidate);
+      lastLeft = candidate.left;
     }
     return result;
-  }, [monthLabels, CELL_SIZE]);
+  }, [monthLabels, CELL_SIZE, isRTL]);
 
   return (
     <View>
       {/* Month labels row */}
-      <View style={{ flexDirection: "row", marginLeft: DAY_LABEL_WIDTH, marginBottom: 4 }}>
+      <View style={{ flexDirection: "row", marginLeft: isRTL ? 0 : DAY_LABEL_WIDTH, marginRight: isRTL ? DAY_LABEL_WIDTH : 0, marginBottom: 4 }}>
         {spacedMonthLabels.map((m, i) => (
           <Text
             key={i}
@@ -127,7 +139,7 @@ export function ActivityHeatmap({ data, isDark, s, isRTL }: Props) {
       <View style={{ height: 14 }} />
 
       {/* Grid */}
-      <View style={{ flexDirection: "row", width: "100%" }}>
+      <View style={{ flexDirection: isRTL ? "row-reverse" : "row", width: "100%" }}>
           {/* Day labels */}
           <View style={{ width: DAY_LABEL_WIDTH, justifyContent: "flex-start" }}>
             {Array.from({ length: 7 }, (_, i) => {
@@ -146,13 +158,13 @@ export function ActivityHeatmap({ data, isDark, s, isRTL }: Props) {
 
           {/* Week columns */}
           <View style={{ flexDirection: "row", gap: CELL_GAP }}>
-            {weeks.map((week, wi) => (
+            {displayWeeks.map((week, wi) => (
               <View key={wi} style={{ gap: CELL_GAP }}>
                 {week.map((day) => {
                   if (day.count === -1) {
                     return <View key={day.dateStr} style={{ width: CELL_SIZE, height: CELL_SIZE }} />;
                   }
-                  const isToday = day.dateStr === today.toISOString().slice(0, 10);
+                  const isToday = day.dateStr === todayKey;
                   return (
                     <Pressable
                       key={day.dateStr}

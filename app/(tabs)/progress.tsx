@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { View, Text, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
@@ -12,6 +12,7 @@ import { useDatabase } from "@/lib/database/provider";
 import { useAuthStore } from "@/lib/auth/store";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { getTotalCardCount, getStudyStreak } from "@/lib/fsrs/queries";
+import { subscribeReviewActivity } from "@/lib/fsrs/review-events";
 
 type HeatmapDay = { date: string; count: number };
 type SurahProgress = {
@@ -21,6 +22,13 @@ type SurahProgress = {
   totalCards: number;
   memorized: number;
 };
+
+function formatDateKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
 
 export default function ProgressScreen() {
   const s = useStrings();
@@ -42,20 +50,17 @@ export default function ProgressScreen() {
   const [totalCards, setTotalCards] = useState(0);
   const [streak, setStreak] = useState(0);
   const [longestStreak, setLongestStreak] = useState(0);
-  const [totalReviews, setTotalReviews] = useState(0);
   const [totalSessions, setTotalSessions] = useState(0);
   const [heatmapData, setHeatmapData] = useState<HeatmapDay[]>([]);
   const [surahProgress, setSurahProgress] = useState<SurahProgress[]>([]);
 
   const loadData = useCallback(async () => {
-    const [cards, currentStreak, reviewCount] = await Promise.all([
+    const [cards, currentStreak] = await Promise.all([
       getTotalCardCount(db),
       getStudyStreak(db),
-      db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM study_log"),
     ]);
     setTotalCards(cards);
     setStreak(currentStreak);
-    setTotalReviews(reviewCount?.count ?? 0);
     const sessions = await db.getFirstAsync<{ count: number }>(
       "SELECT COUNT(DISTINCT DATE(reviewed_at)) as count FROM study_log"
     );
@@ -85,15 +90,19 @@ export default function ProgressScreen() {
     // Heatmap: reviews per day for the last 90 days
     const ninetyDaysAgo = new Date();
     ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-    const heatRows = await db.getAllAsync<{ review_date: string; cnt: number }>(
-      `SELECT DATE(reviewed_at) as review_date, COUNT(*) as cnt
+    const heatRows = await db.getAllAsync<{ reviewed_at: string }>(
+      `SELECT reviewed_at
        FROM study_log
        WHERE reviewed_at >= ?
-       GROUP BY review_date
-       ORDER BY review_date`,
+       ORDER BY reviewed_at`,
       [ninetyDaysAgo.toISOString()]
     );
-    setHeatmapData(heatRows.map((r) => ({ date: r.review_date, count: r.cnt })));
+    const heatCounts = new Map<string, number>();
+    for (const row of heatRows) {
+      const key = formatDateKey(new Date(row.reviewed_at));
+      heatCounts.set(key, (heatCounts.get(key) ?? 0) + 1);
+    }
+    setHeatmapData([...heatCounts].map(([date, count]) => ({ date, count })));
 
     // Surah progress: per-surah card counts with memorization state
     const surahRows = await db.getAllAsync<{
@@ -138,6 +147,8 @@ export default function ProgressScreen() {
       loadData();
     }, [loadData])
   );
+
+  useEffect(() => subscribeReviewActivity(loadData), [loadData]);
 
   const formatStat = (val: number) => val > 0 ? val.toLocaleString() : "—";
   const masteryPct = totalCards > 0 ? Math.round((totalCards > 0 ? (surahProgress.reduce((acc, item) => acc + item.memorized, 0) / totalCards) : 0) * 100) : 0;
@@ -261,12 +272,6 @@ export default function ProgressScreen() {
             {s.progressActivity}
           </Text>
           <ActivityHeatmap data={heatmapData} isDark={isDark} s={s} isRTL={isRTL} />
-          <Text
-            className="text-warm-500 dark:text-neutral-400 mt-3"
-            style={{ fontFamily: "Manrope_400Regular", fontSize: 11 }}
-          >
-            {formatStat(totalReviews)} {s.heatmapTotalReviews}
-          </Text>
         </Card>
 
         {/* Surah progress */}
