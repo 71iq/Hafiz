@@ -126,6 +126,7 @@ export function WordDetailSheet() {
   const surahLabel = isArabicMode ? "السورة" : "Surah";
   const ayahLabel = isArabicMode ? "الآية" : "Ayah";
   const wordLabel = isArabicMode ? "الكلمة" : "Word";
+  const showRootLemma = isArabicMode || activeTab !== "tajweed";
   return (
     <Modal
       visible={!!detailWord}
@@ -190,8 +191,12 @@ export function WordDetailSheet() {
               )}
 
               <View className={`mt-2 flex-row flex-wrap gap-2 ${isRTL ? "flex-row-reverse" : ""}`}>
-                <MetaPill label={s.rootLabel ?? "Root"} value={headerMeta.root ?? "—"} />
-                <MetaPill label={s.lemmaLabel ?? "Lemma"} value={headerMeta.lemma ?? "—"} />
+                {showRootLemma && (
+                  <>
+                    <MetaPill label={s.rootLabel ?? "Root"} value={headerMeta.root ?? "—"} />
+                    <MetaPill label={s.lemmaLabel ?? "Lemma"} value={headerMeta.lemma ?? "—"} />
+                  </>
+                )}
                 <MetaPill label={s.wordTabOccurrences} value={headerMeta.rootCount == null ? "—" : String(headerMeta.rootCount)} />
               </View>
 

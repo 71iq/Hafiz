@@ -118,7 +118,6 @@ export function MeaningTab({ surah, ayah, wordPos }: Props) {
     );
   }
 
-  // English mode — unchanged legacy rendering
   if (!enData || (!enData.wordArabic && !enData.translationEn)) {
     return (
       <View className="py-6 items-center">
@@ -148,7 +147,12 @@ export function MeaningTab({ surah, ayah, wordPos }: Props) {
       )}
 
       {enData.translationEn && (
-        <Row label={s.wordMeaningTranslation ?? "Translation"} value={enData.translationEn} />
+        <Text
+          className="text-lg text-charcoal dark:text-neutral-100"
+          style={{ fontFamily: "Manrope_600SemiBold", lineHeight: 28 }}
+        >
+          {enData.translationEn}
+        </Text>
       )}
       <SaveToVocabButton saved={savedToVocab} onPress={saveToVocab} label={savedToVocab ? s.addedToVocab : s.addToVocab} />
     </View>
@@ -181,21 +185,5 @@ function SaveToVocabButton({
         {label}
       </Text>
     </Pressable>
-  );
-}
-
-function Row({ label, value, rtl }: { label: string; value: string; rtl?: boolean }) {
-  return (
-    <View className="flex-row items-center justify-between py-2.5 mb-2">
-      <Text className="text-xs font-medium text-warm-400 dark:text-neutral-500 uppercase tracking-wider">
-        {label}
-      </Text>
-      <Text
-        className="text-base text-charcoal dark:text-neutral-100 font-medium"
-        style={rtl ? { writingDirection: "rtl" } : undefined}
-      >
-        {value}
-      </Text>
-    </View>
   );
 }

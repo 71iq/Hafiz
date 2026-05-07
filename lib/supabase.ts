@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
+import Constants from "expo-constants";
 
 // ─── Supabase Configuration ────────────────────────────────────
 // These are the PUBLIC anon key and URL — safe to embed in client code.
@@ -12,10 +13,16 @@ import { Platform } from "react-native";
 // 3. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY in .env.
 //    Vercel builds map Supabase integration vars in scripts/vercel-build.sh.
 
+const expoExtra = (Constants.expoConfig?.extra ?? Constants.manifest2?.extra ?? {}) as Record<string, string | undefined>;
+
 const SUPABASE_URL =
   process.env.EXPO_PUBLIC_SUPABASE_URL ??
   process.env.NEXT_PUBLIC_SUPABASE_URL ??
   process.env.SUPABASE_URL ??
+  expoExtra.EXPO_PUBLIC_SUPABASE_URL ??
+  expoExtra.NEXT_PUBLIC_SUPABASE_URL ??
+  expoExtra.SUPABASE_URL ??
+  expoExtra.supabaseUrl ??
   "YOUR_PROJECT_URL";
 const SUPABASE_ANON_KEY =
   process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ??
@@ -24,6 +31,14 @@ const SUPABASE_ANON_KEY =
   process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
   process.env.SUPABASE_ANON_KEY ??
   process.env.SUPABASE_PUBLISHABLE_KEY ??
+  expoExtra.EXPO_PUBLIC_SUPABASE_ANON_KEY ??
+  expoExtra.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+  expoExtra.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+  expoExtra.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+  expoExtra.SUPABASE_ANON_KEY ??
+  expoExtra.SUPABASE_PUBLISHABLE_KEY ??
+  expoExtra.supabaseAnonKey ??
+  expoExtra.supabasePublishableKey ??
   "YOUR_ANON_KEY";
 
 /** Returns true if the Supabase client is configured with real credentials */
