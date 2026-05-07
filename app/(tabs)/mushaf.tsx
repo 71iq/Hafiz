@@ -40,17 +40,20 @@ function AyahNavigationRegistrar({
   flashListRef,
   goToPageRef,
   viewMode,
+  onHighlightTarget,
 }: {
   items: MushafItem[];
   flashListRef: React.RefObject<FlashListRef<MushafItem> | null>;
   goToPageRef: React.RefObject<((page: number) => void) | null>;
   viewMode: string;
+  onHighlightTarget: (target: { surah: number; ayah: number; wordPos?: number }) => void;
 }) {
   const { setNavigateToAyah, closeDetail } = useWordInteraction();
 
   useEffect(() => {
-    setNavigateToAyah((surah: number, ayah: number) => {
+    setNavigateToAyah((surah: number, ayah: number, wordPos?: number) => {
       closeDetail();
+      onHighlightTarget({ surah, ayah, wordPos });
 
       if (viewMode === "verse") {
         const idx = items.findIndex(
@@ -68,7 +71,7 @@ function AyahNavigationRegistrar({
         }
       }
     });
-  }, [items, viewMode, flashListRef, goToPageRef, setNavigateToAyah, closeDetail]);
+  }, [items, viewMode, flashListRef, goToPageRef, setNavigateToAyah, closeDetail, onHighlightTarget]);
 
   return null;
 }
@@ -176,6 +179,27 @@ function MushafInner() {
 
   // Deep link highlight: "surah:ayah" key that triggers pulse animation
   const [highlightedKey, setHighlightedKey] = useState<string | null>(null);
+  const [highlightedWord, setHighlightedWord] = useState<{ surah: number; ayah: number; wordPos: number } | null>(null);
+  const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const highlightTarget = useCallback((target: { surah: number; ayah: number; wordPos?: number }) => {
+    if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+    setHighlightedKey(`${target.surah}:${target.ayah}`);
+    setHighlightedWord(
+      typeof target.wordPos === "number"
+        ? { surah: target.surah, ayah: target.ayah, wordPos: target.wordPos }
+        : null
+    );
+    highlightTimerRef.current = setTimeout(() => {
+      setHighlightedKey(null);
+      setHighlightedWord(null);
+      highlightTimerRef.current = null;
+    }, 2200);
+  }, []);
+
+  useEffect(() => () => {
+    if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+  }, []);
 
   // Load shared juz/surah/page index once for the indicator
   useEffect(() => {
@@ -248,11 +272,7 @@ function MushafInner() {
       const target = consumePendingDeepLink();
       if (!target) return;
 
-      const key = `${target.surah}:${target.ayah}`;
-      setHighlightedKey(key);
-
-      // Clear highlight after animation completes
-      const timer = setTimeout(() => setHighlightedKey(null), 2000);
+      highlightTarget(target);
 
       // Scroll to the target ayah
       if (viewMode === "verse") {
@@ -274,9 +294,7 @@ function MushafInner() {
           }, 100);
         }
       }
-
-      return () => clearTimeout(timer);
-    }, [loading, items, viewMode])
+    }, [loading, items, viewMode, highlightTarget])
   );
 
   const renderItem = useCallback(
@@ -302,10 +320,15 @@ function MushafInner() {
           lineHeight={lineHeight}
           hideMode={hideMode}
           highlighted={highlightedKey === `${item.surah}:${item.ayah}`}
+          highlightedWordPos={
+            highlightedWord?.surah === item.surah && highlightedWord?.ayah === item.ayah
+              ? highlightedWord.wordPos
+              : null
+          }
         />
       );
     },
-    [fontSize, lineHeight, hideMode, highlightedKey]
+    [fontSize, lineHeight, hideMode, highlightedKey, highlightedWord]
   );
 
   const getItemType = useCallback((item: MushafItem) => item.type, []);
@@ -341,8 +364,8 @@ function MushafInner() {
   );
 
   const handleBookmarkNavigate = useCallback(
-    (surah: number, ayah: number) => {
-      navigateToAyah(surah, ayah);
+    (surah: number, ayah: number, wordPos?: number) => {
+      navigateToAyah(surah, ayah, wordPos);
     },
     [navigateToAyah]
   );
@@ -494,6 +517,7 @@ function MushafInner() {
         flashListRef={flashListRef}
         goToPageRef={goToPageRef}
         viewMode={viewMode}
+        onHighlightTarget={highlightTarget}
       />
       <SafeAreaView
         className="flex-1 bg-surface dark:bg-surface-dark"
@@ -668,6 +692,7 @@ function MushafInner() {
               centerVerticalOnPhone={isPhone}
               horizontalTopInset={isPhone && !chromeVisible && pageScroll === "horizontal" ? 52 : 0}
               horizontalBottomInset={isPhone && !chromeVisible && pageScroll === "horizontal" ? 18 : 0}
+              highlightedWord={highlightedWord}
             />
             {!chromeVisible && (
               <>

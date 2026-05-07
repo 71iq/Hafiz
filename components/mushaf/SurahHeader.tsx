@@ -62,7 +62,7 @@ export function SurahHeader({
           <View className="mx-3 min-w-[190px] max-w-[300px] rounded-2xl bg-surface-low dark:bg-surface-dark-low px-4 py-2">
             <Text
               className="text-primary dark:text-primary-bright text-center"
-              style={{ fontSize: 22, lineHeight: 28 }}
+              style={{ fontSize: 22, lineHeight: 32, writingDirection: "rtl", paddingHorizontal: 6 }}
             >
               {nameArabic}
             </Text>
@@ -96,9 +96,9 @@ export function SurahHeader({
   }
 
   return (
-    <View className="mx-5 mt-10 mb-5 w-full max-w-[840px] self-center">
+    <View className="mt-10 mb-5 self-center" style={{ width: "100%", maxWidth: 840, paddingHorizontal: 20 }}>
       <View
-        className="rounded-3xl bg-surface-low dark:bg-surface-dark-low px-7 py-6 items-center overflow-hidden"
+        className="rounded-3xl bg-surface-low dark:bg-surface-dark-low px-7 py-6 items-center"
       >
         <View className="mb-4 w-full flex-row items-center justify-center">
           <OrnamentLine />
@@ -111,6 +111,8 @@ export function SurahHeader({
           style={{
             fontSize: 34,
             lineHeight: 58,
+            writingDirection: "rtl",
+            paddingHorizontal: 8,
           }}
         >
           {nameArabic}

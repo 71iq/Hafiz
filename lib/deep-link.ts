@@ -6,6 +6,7 @@
 export type DeepLinkTarget = {
   surah: number;
   ayah: number;
+  wordPos?: number;
 };
 
 let pending: DeepLinkTarget | null = null;

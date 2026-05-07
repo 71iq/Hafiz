@@ -80,7 +80,7 @@ export function OccurrencesTab({ surah, ayah, wordPos }: Props) {
           return (
             <Pressable
               key={`${occ.surah}-${occ.ayah}-${occ.word_pos}`}
-              onPress={() => navigateToAyah(occ.surah, occ.ayah)}
+              onPress={() => navigateToAyah(occ.surah, occ.ayah, occ.word_pos)}
               className={`flex-row items-center justify-between py-2 mb-2 ${
                 isCurrent ? "bg-teal-50 dark:bg-teal-900/20 -mx-1 px-1 rounded" : ""
               }`}

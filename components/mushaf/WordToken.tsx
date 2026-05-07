@@ -115,6 +115,7 @@ function WordTokenInner({
       onPress={handlePress}
       onLongPress={handleLongPress}
       delayLongPress={400}
+      style={{ paddingHorizontal: 1, overflow: "visible" }}
       {...webContextMenu}
     >
       <Text
@@ -127,6 +128,7 @@ function WordTokenInner({
           fontFamily,
           fontSize,
           lineHeight,
+          paddingHorizontal: 1,
           ...(bgColor && {
             backgroundColor: bgColor,
             borderRadius: 6,

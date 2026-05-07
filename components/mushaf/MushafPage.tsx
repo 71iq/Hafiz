@@ -61,6 +61,7 @@ type Props = {
   lineLayout?: PageLineLayout[];
   globalWordOffset?: number;
   onOpenAyahDetail?: (surah: number, ayah: number) => void;
+  highlightedWord?: { surah: number; ayah: number; wordPos: number } | null;
   paddingTop?: number;
   paddingBottom?: number;
   sidePadding?: number;
@@ -144,6 +145,7 @@ function MushafPageInner({
   lineLayout,
   globalWordOffset,
   onOpenAyahDetail,
+  highlightedWord,
   paddingTop = 8,
   paddingBottom = 32,
   sidePadding = 16,
@@ -216,7 +218,7 @@ function MushafPageInner({
   }, [onOpenAyahDetail]);
 
   const hasLineLayout = lineLayout && lineLayout.length > 0;
-  const contentWidth = Math.min(fontSize * FONT_WIDTH_SCALE, width - sidePadding * 2);
+  const contentWidth = Math.max(0, Math.min(fontSize * FONT_WIDTH_SCALE, width - sidePadding * 2 - 8));
   const fontFamily = qpcFontName(pageNumber);
 
   // Show loading indicator while font is not loaded at all
@@ -328,12 +330,21 @@ function MushafPageInner({
             width: contentWidth,
             height: lineHeight,
             gap: centered ? fontSize * 0.3 : undefined,
+            alignItems: "center",
+            paddingHorizontal: 2,
+            overflow: "visible",
           }}
         >
           {words.map((w, i) => {
             const identity = pageGlyphs[lineStartIndex + i]?.identity;
             if (identity && !identity.isMarker) {
-              const hlColor = getHighlightColor(identity.surah, identity.ayah);
+              const hlColor =
+                highlightedWord &&
+                highlightedWord.surah === identity.surah &&
+                highlightedWord.ayah === identity.ayah &&
+                highlightedWord.wordPos === identity.wordPos
+                  ? "#0d9488"
+                  : getHighlightColor(identity.surah, identity.ayah);
               return (
                 <WordToken
                   key={`w-${line.line_number}-${i}`}
@@ -365,7 +376,7 @@ function MushafPageInner({
                 >
                   <Text
                     className="text-charcoal dark:text-neutral-100"
-                    style={{ fontFamily, fontSize, lineHeight }}
+                    style={{ fontFamily, fontSize, lineHeight, paddingHorizontal: 2 }}
                   >
                     {w}
                   </Text>
@@ -377,7 +388,7 @@ function MushafPageInner({
               <Text
                 key={`w-${line.line_number}-${i}`}
                 className="text-charcoal dark:text-neutral-100"
-                style={{ fontFamily, fontSize, lineHeight }}
+                style={{ fontFamily, fontSize, lineHeight, paddingHorizontal: 2 }}
               >
                 {w}
               </Text>

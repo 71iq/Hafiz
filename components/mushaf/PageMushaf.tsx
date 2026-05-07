@@ -136,6 +136,7 @@ type Props = {
   centerVerticalOnPhone?: boolean;
   horizontalTopInset?: number;
   horizontalBottomInset?: number;
+  highlightedWord?: { surah: number; ayah: number; wordPos: number } | null;
 };
 
 // Fixed heights for getItemLayout calculation
@@ -274,6 +275,7 @@ export function PageMushaf({
   centerVerticalOnPhone = false,
   horizontalTopInset = 0,
   horizontalBottomInset = 0,
+  highlightedWord = null,
 }: Props) {
   const db = useDatabase();
   const { fontSize, lineHeight, pageScroll, isRTL } = useSettings();
@@ -785,8 +787,8 @@ export function PageMushaf({
   }, [containerHeight, fontSize, horizontal, horizontalBottomInset, horizontalTopInset, lineHeight, windowHeight]);
 
   const extraData = useMemo(
-    () => ({ fontSize, pageWidth, horizontalTypography }),
-    [fontSize, horizontalTypography, pageWidth]
+    () => ({ fontSize, pageWidth, horizontalTypography, highlightedWord }),
+    [fontSize, horizontalTypography, highlightedWord, pageWidth]
   );
 
   const renderPage = useCallback(
@@ -808,6 +810,7 @@ export function PageMushaf({
             lineLayout={item.lineLayout}
             globalWordOffset={item.globalWordOffset}
             onOpenAyahDetail={openAyahDetail}
+            highlightedWord={highlightedWord}
             paddingTop={pagePaddingTop}
             paddingBottom={pagePaddingBottom}
             sidePadding={pageSidePadding}
@@ -838,6 +841,7 @@ export function PageMushaf({
       horizontal,
       containerHeight,
       isRTL,
+      highlightedWord,
     ]
   );
 
@@ -919,6 +923,7 @@ export function PageMushaf({
                     lineLayout={item.lineLayout}
                     globalWordOffset={item.globalWordOffset}
                     onOpenAyahDetail={openAyahDetail}
+                    highlightedWord={highlightedWord}
                     paddingTop={HORIZONTAL_PAGE_TOP_PADDING}
                     paddingBottom={0}
                     sidePadding={pageSidePadding}

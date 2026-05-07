@@ -50,6 +50,7 @@ type Props = {
   lineHeight: number;
   hideMode?: boolean;
   highlighted?: boolean;
+  highlightedWordPos?: number | null;
 };
 
 function AyahBlockInner({
@@ -61,6 +62,7 @@ function AyahBlockInner({
   lineHeight,
   hideMode = false,
   highlighted = false,
+  highlightedWordPos = null,
 }: Props) {
   const { width } = useWindowDimensions();
   const isPhone = width < SIDEBAR_BREAKPOINT;
@@ -257,8 +259,13 @@ function AyahBlockInner({
 
   return (
     <View
-      className="mx-3 mb-4 w-full max-w-[840px] self-center rounded-3xl bg-surface dark:bg-surface-dark px-4 py-4"
-      style={{ position: "relative" }}
+      className="mb-4 rounded-3xl bg-surface dark:bg-surface-dark px-4 py-4"
+      style={{
+        position: "relative",
+        width: Math.max(0, Math.min(width - 24, 840)),
+        alignSelf: "center",
+        overflow: "visible",
+      }}
     >
       {/* Deep link pulse highlight overlay */}
       {highlighted && (
@@ -324,7 +331,7 @@ function AyahBlockInner({
       ) : (
         <View
           className={isPhone ? "pt-8 pb-1" : "pt-6 pb-1"}
-          style={{ opacity: fontVisible ? 1 : 0, direction: "ltr", alignItems: "flex-end" }}
+          style={{ opacity: fontVisible ? 1 : 0, direction: "ltr", alignItems: "flex-end", paddingHorizontal: 3 }}
         >
           <View
             className="self-end"
@@ -356,13 +363,14 @@ function AyahBlockInner({
                 wordPos={i + 1}
                 v2Page={v2Page}
                 disabled={hideMode}
+                highlightColor={highlightedWordPos === i + 1 ? "#0d9488" : undefined}
               />
             ))}
             {/* Ayah end marker */}
             {wordTokens.marker && (
               <Text
                 className="text-charcoal dark:text-neutral-100"
-                style={{ fontFamily, fontSize, lineHeight }}
+                style={{ fontFamily, fontSize, lineHeight, paddingHorizontal: 2 }}
               >
                 {wordTokens.marker}
               </Text>

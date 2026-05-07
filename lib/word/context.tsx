@@ -24,8 +24,8 @@ type WordInteractionContextType = {
   clearTooltip: () => void;
   clearTooltipDelayed: () => void;
   cancelTooltipClear: () => void;
-  navigateToAyah: (surah: number, ayah: number) => void;
-  setNavigateToAyah: (fn: (surah: number, ayah: number) => void) => void;
+  navigateToAyah: (surah: number, ayah: number, wordPos?: number) => void;
+  setNavigateToAyah: (fn: (surah: number, ayah: number, wordPos?: number) => void) => void;
 };
 
 const WordInteractionContext = createContext<WordInteractionContextType>({
@@ -107,13 +107,13 @@ export function WordInteractionProvider({ children }: { children: React.ReactNod
     setDetailWord(null);
   }, []);
 
-  const navigateRef = useRef<(surah: number, ayah: number) => void>(() => {});
+  const navigateRef = useRef<(surah: number, ayah: number, wordPos?: number) => void>(() => {});
 
-  const navigateToAyah = useCallback((surah: number, ayah: number) => {
-    navigateRef.current(surah, ayah);
+  const navigateToAyah = useCallback((surah: number, ayah: number, wordPos?: number) => {
+    navigateRef.current(surah, ayah, wordPos);
   }, []);
 
-  const setNavigateToAyah = useCallback((fn: (surah: number, ayah: number) => void) => {
+  const setNavigateToAyah = useCallback((fn: (surah: number, ayah: number, wordPos?: number) => void) => {
     navigateRef.current = fn;
   }, []);
 

@@ -151,7 +151,7 @@ function buildPlainHighlightSegments(
 interface SearchCommandProps {
   visible: boolean;
   onClose: () => void;
-  onNavigateToAyah?: (surah: number, ayah: number) => void;
+  onNavigateToAyah?: (surah: number, ayah: number, wordPos?: number) => void;
 }
 
 export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchCommandProps) {
@@ -393,15 +393,15 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
     inputRef.current?.focus();
   }, []);
 
-  const handleResultTap = useCallback((surah: number, ayah: number) => {
+  const handleResultTap = useCallback((surah: number, ayah: number, wordPos?: number) => {
     Keyboard.dismiss();
     onClose();
     setTimeout(() => {
       if (onNavigateToAyah) {
-        onNavigateToAyah(surah, ayah);
+        onNavigateToAyah(surah, ayah, wordPos);
         return;
       }
-      setPendingDeepLink({ surah, ayah });
+      setPendingDeepLink({ surah, ayah, wordPos });
       router.navigate("/(tabs)/mushaf");
     }, 150);
   }, [onClose, onNavigateToAyah]);
@@ -670,7 +670,7 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
                   <View className="px-5 py-2 bg-surface-low dark:bg-surface-dark-low">
                     <Text
                       className="text-primary-accent dark:text-primary-bright"
-                      style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}
+                      style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13, paddingRight: 4, writingDirection: "rtl" }}
                     >
                       {group.nameArabic} — {group.nameEnglish}
                       <Text className="text-warm-400 dark:text-neutral-500" style={{ fontSize: 11 }}>
@@ -795,7 +795,7 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
                         )}
                         <Text
                           className="text-charcoal dark:text-neutral-100"
-                          style={{ fontFamily: "Manrope_700Bold", fontSize: 17, writingDirection: "rtl" }}
+                          style={{ fontFamily: "Manrope_700Bold", fontSize: 17, writingDirection: "rtl", paddingHorizontal: 4 }}
                         >
                           {group.lemma}
                         </Text>
@@ -816,7 +816,7 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
                         return (
                           <Pressable
                             key={`${occ.surah}:${occ.ayah}:${occ.word_pos}`}
-                            onPress={() => handleResultTap(occ.surah, occ.ayah)}
+                            onPress={() => handleResultTap(occ.surah, occ.ayah, occ.word_pos)}
                             className="px-5 py-3 ml-5"
                             style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
                           >
