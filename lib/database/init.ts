@@ -237,6 +237,12 @@ type CanonicalWord = {
   core: string;
 };
 
+type SourceWordMatch = {
+  parts: string[];
+  text: string;
+  coreText: string;
+};
+
 type MappedWordRow = [number, number, number, string | null, string | null];
 
 // quran-words.com and Da'as use source-local entry indices; map by Arabic
@@ -270,25 +276,36 @@ function compatibleArabicToken(a: string, b: string): boolean {
   return false;
 }
 
+function buildSourceWordMatch(text: string | null | undefined): SourceWordMatch | null {
+  const parts = splitArabicParts(text);
+  if (parts.length === 0) return null;
+  const coreParts = parts.map(normalizeArabicCore);
+  return {
+    parts,
+    text: parts.join(""),
+    coreText: coreParts.join(""),
+  };
+}
+
 function scoreCanonicalSpan(
   canonicalWords: CanonicalWord[],
   start: number,
   end: number,
-  sourceParts: string[],
+  source: SourceWordMatch,
 ): number {
   const span = canonicalWords.slice(start, end);
-  if (span.length === 0 || sourceParts.length === 0) return -1;
+  if (span.length === 0 || source.parts.length === 0) return -1;
 
   const spanParts = span.map((w) => w.normalized).filter(Boolean);
   const spanText = spanParts.join("");
-  const sourceText = sourceParts.join("");
+  const sourceText = source.text;
   const spanCore = span.map((w) => w.core).join("");
-  const sourceCore = sourceParts.map(normalizeArabicCore).join("");
+  const sourceCore = source.coreText;
 
   let score = -1;
   if (
-    spanParts.length === sourceParts.length &&
-    spanParts.every((part, index) => compatibleArabicToken(part, sourceParts[index]))
+    spanParts.length === source.parts.length &&
+    spanParts.every((part, index) => compatibleArabicToken(part, source.parts[index]))
   ) {
     score = 1000;
   } else if (spanText === sourceText) {
@@ -305,17 +322,17 @@ function scoreCanonicalSpan(
   }
 
   if (score < 0) return -1;
-  score -= Math.abs(spanParts.length - sourceParts.length) * 20;
+  score -= Math.abs(spanParts.length - source.parts.length) * 20;
   score -= spanParts.length;
   return score;
 }
 
 function findCanonicalSpan(
   canonicalWords: CanonicalWord[],
-  sourceWord: string | null | undefined,
+  source: SourceWordMatch,
   cursor: number,
 ): { start: number; end: number } | null {
-  const sourceParts = splitArabicParts(sourceWord);
+  const sourceParts = source.parts;
   if (canonicalWords.length === 0 || sourceParts.length === 0) return null;
 
   let best: { start: number; end: number; score: number } | null = null;
@@ -323,7 +340,7 @@ function findCanonicalSpan(
     for (let start = from; start < canonicalWords.length; start++) {
       const maxEnd = Math.min(canonicalWords.length, start + Math.max(sourceParts.length + 2, 3));
       for (let end = start + 1; end <= maxEnd; end++) {
-        const score = scoreCanonicalSpan(canonicalWords, start, end, sourceParts);
+        const score = scoreCanonicalSpan(canonicalWords, start, end, source);
         if (
           score >= 0 &&
           (!best ||
@@ -412,14 +429,17 @@ function mapRowsToCanonicalWords(
 
   for (const source of sourceRows) {
     const word = source.word ? String(source.word) : null;
+    const wordMatch = buildSourceWordMatch(word);
+    if (!wordMatch) continue;
     const value = getValue(source);
-    for (const target of getTargets(source)) {
+    const targets = getTargets(source);
+    for (const target of targets) {
       const [surah, ayah] = target.split(":").map((n) => parseInt(n, 10));
       if (!Number.isFinite(surah) || !Number.isFinite(ayah)) continue;
 
       const canonicalWords = canonicalByAyah.get(`${surah}:${ayah}`) ?? [];
       const cursor = cursors.get(target) ?? 0;
-      const span = findCanonicalSpan(canonicalWords, word, cursor);
+      const span = findCanonicalSpan(canonicalWords, wordMatch, cursor);
       if (!span) continue;
 
       cursors.set(target, span.end);
