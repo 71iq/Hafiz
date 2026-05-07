@@ -17,6 +17,7 @@ import { SettingsProvider, useSettings } from "@/lib/settings/context";
 import { useStrings, interpolate } from "@/lib/i18n/useStrings";
 import { createDeck, generateDeckId } from "@/lib/fsrs/queries";
 import type { DeckScope } from "@/lib/fsrs/types";
+import { StatusBar } from "expo-status-bar";
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -640,6 +641,7 @@ function OnboardingInner() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: bgColor }}>
+      <StatusBar style={isDark ? "light" : "dark"} backgroundColor={bgColor} />
       {/* Screens container */}
       <View style={{ flex: 1, overflow: "hidden" }}>
         <Animated.View

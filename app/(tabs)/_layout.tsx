@@ -12,6 +12,7 @@ import { OfflineBanner } from "@/components/ui/OfflineBanner";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ChromeProvider } from "@/lib/ui/chrome";
+import { StatusBar } from "expo-status-bar";
 
 function SyncOverlay() {
   const { status } = useSync();
@@ -36,11 +37,12 @@ function SyncOverlay() {
 }
 
 function TabsWithStrings() {
-  const { isRTL, uiLanguage } = useSettings();
+  const { isDark, isRTL, uiLanguage } = useSettings();
   const s = useStrings();
 
   return (
     <View style={{ flex: 1, direction: isRTL ? "rtl" : "ltr" }}>
+      <StatusBar style={isDark ? "light" : "dark"} backgroundColor={isDark ? "#0A0A0A" : "#FFF8F1"} />
       <SyncOverlay />
       <OfflineBanner uiLanguage={uiLanguage} />
       <Tabs
