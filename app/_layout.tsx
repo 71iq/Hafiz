@@ -8,8 +8,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { DatabaseProvider } from "@/lib/database/provider";
 import { UI_FONTS, loadUiFontsWeb } from "@/lib/fonts/ui-fonts";
 import { useAuthStore } from "@/lib/auth/store";
-import { Analytics } from "@vercel/analytics/react";
-import { SpeedInsights } from "@vercel/speed-insights/react";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -41,6 +39,20 @@ function StableDocumentTitle() {
   }, [pathname]);
 
   return null;
+}
+
+function WebTelemetry() {
+  if (Platform.OS !== "web") return null;
+
+  const { Analytics } = require("@vercel/analytics/react");
+  const { SpeedInsights } = require("@vercel/speed-insights/react");
+
+  return (
+    <>
+      <Analytics />
+      <SpeedInsights />
+    </>
+  );
 }
 
 export default function RootLayout() {
@@ -77,15 +89,32 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="onboarding" options={{ animation: "fade" }} />
           <Stack.Screen name="open" />
-          <Stack.Screen name="flashcards/session" options={{ animation: "slide_from_bottom" }} />
-          <Stack.Screen name="auth/login" options={{ animation: "slide_from_bottom" }} />
-          <Stack.Screen name="auth/signup" options={{ animation: "slide_from_bottom" }} />
-          <Stack.Screen name="auth/forgot-password" options={{ animation: "slide_from_bottom" }} />
-          <Stack.Screen name="auth/reset-password" options={{ animation: "slide_from_bottom" }} />
-          <Stack.Screen name="profile/[userId]" options={{ animation: "slide_from_right" }} />
+          <Stack.Screen
+            name="flashcards/session"
+            options={{ animation: "slide_from_bottom" }}
+          />
+          <Stack.Screen
+            name="auth/login"
+            options={{ animation: "slide_from_bottom" }}
+          />
+          <Stack.Screen
+            name="auth/signup"
+            options={{ animation: "slide_from_bottom" }}
+          />
+          <Stack.Screen
+            name="auth/forgot-password"
+            options={{ animation: "slide_from_bottom" }}
+          />
+          <Stack.Screen
+            name="auth/reset-password"
+            options={{ animation: "slide_from_bottom" }}
+          />
+          <Stack.Screen
+            name="profile/[userId]"
+            options={{ animation: "slide_from_right" }}
+          />
         </Stack>
-        <Analytics />
-        <SpeedInsights />
+        <WebTelemetry />
       </DatabaseProvider>
     </QueryClientProvider>
   );
