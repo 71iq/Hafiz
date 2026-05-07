@@ -31,6 +31,7 @@ import { subscribeReviewActivity } from "@/lib/fsrs/review-events";
 
 type DeckDisplay = {
   id: string;
+  name?: string;
   scope: DeckScope;
   createdAt: string;
   cardCount: number;
@@ -152,7 +153,9 @@ export default function HomeScreen() {
     router.push({ pathname: "/flashcards/session", params: deckId ? { deckId } : {} });
   };
 
-  const getDeckLabel = (scope: DeckScope): string => {
+  const getDeckLabel = (deck: DeckDisplay): string => {
+    const { scope } = deck;
+    if (deck.name?.trim()) return deck.name.trim();
     switch (scope.type) {
       case "surah": {
         const nums = [...scope.surahs].sort((a, b) => a - b);
@@ -495,7 +498,7 @@ function DeckCard({
   s,
 }: {
   deck: DeckDisplay;
-  getDeckLabel: (scope: DeckScope) => string;
+  getDeckLabel: (deck: DeckDisplay) => string;
   onStartReview: () => void;
   onDelete: () => void;
   isDark: boolean;
@@ -511,7 +514,7 @@ function DeckCard({
             style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15, textAlign: isRTL ? "right" : "left" }}
             numberOfLines={1}
           >
-            {getDeckLabel(deck.scope)}
+            {getDeckLabel(deck)}
           </Text>
           <Text
             className="text-warm-400 dark:text-neutral-500 mt-0.5"

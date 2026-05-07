@@ -56,6 +56,8 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     reviewActionAlreadyExists: "Already in this deck",
     reviewSelectDeck: "Add To Deck",
     reviewCreateNewDeck: "Create New Deck",
+    reviewNewDeckName: "New deck name",
+    reviewCreateAndSelectDeck: "Create and add this ayah",
     tapToReveal: "Tap to reveal",
     loading: "Loading...",
     // WordDetailSheet tabs (en mode)
@@ -420,6 +422,8 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     reviewActionAlreadyExists: "موجودة بالفعل في هذه المجموعة",
     reviewSelectDeck: "أضف إلى مجموعة",
     reviewCreateNewDeck: "إنشاء مجموعة جديدة",
+    reviewNewDeckName: "اسم المجموعة الجديدة",
+    reviewCreateAndSelectDeck: "أنشئ المجموعة وأضف هذه الآية",
     tapToReveal: "اضغط للكشف",
     loading: "جارٍ التحميل...",
     wordTabEnglish: "الإنجليزية",

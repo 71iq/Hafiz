@@ -95,7 +95,8 @@ export async function resolveScope(
 export async function createDeck(
   db: SQLiteDatabase,
   deckId: string,
-  scope: DeckScope
+  scope: DeckScope,
+  name?: string
 ): Promise<number> {
   const ayahs = await resolveScope(db, scope);
   if (ayahs.length === 0) return 0;
@@ -107,7 +108,7 @@ export async function createDeck(
     // Store deck metadata in user_settings
     await db.runAsync(
       "INSERT OR REPLACE INTO user_settings (key, value) VALUES (?, ?)",
-      [`deck_${deckId}`, JSON.stringify({ id: deckId, scope, createdAt: now })]
+      [`deck_${deckId}`, JSON.stringify({ id: deckId, name, scope, createdAt: now })]
     );
 
     // Insert cards in batches
@@ -315,7 +316,7 @@ export async function getNewCount(db: SQLiteDatabase, deckId?: string): Promise<
   return row?.count ?? 0;
 }
 
-export async function getDecks(db: SQLiteDatabase): Promise<{ id: string; scope: DeckScope; createdAt: string }[]> {
+export async function getDecks(db: SQLiteDatabase): Promise<{ id: string; name?: string; scope: DeckScope; createdAt: string }[]> {
   const rows = await db.getAllAsync<{ key: string; value: string }>(
     "SELECT key, value FROM user_settings WHERE key LIKE 'deck_%'"
   );

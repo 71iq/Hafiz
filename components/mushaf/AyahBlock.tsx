@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef, useMemo, memo } from "react";
-import { View, Text, Pressable, Animated as RNAnimated, useWindowDimensions, Modal, ScrollView } from "react-native";
+import { View, Text, Pressable, Animated as RNAnimated, useWindowDimensions, Modal, ScrollView, TextInput } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -37,6 +37,7 @@ import { X } from "lucide-react-native";
 
 type DeckOption = {
   id: string;
+  name?: string;
   scope: DeckScope;
   createdAt: string;
 };
@@ -89,6 +90,7 @@ function AyahBlockInner({
   const [deckPickerOpen, setDeckPickerOpen] = useState(false);
   const [deckOptions, setDeckOptions] = useState<DeckOption[]>([]);
   const [deckLoading, setDeckLoading] = useState(false);
+  const [newDeckName, setNewDeckName] = useState("");
   const [surahNames, setSurahNames] = useState<Record<number, string>>({});
 
   // Deep link pulse highlight
@@ -175,7 +177,9 @@ function AyahBlockInner({
     }
   }, [db, surah, ayah, showToast, s.copied]);
 
-  const formatDeckLabel = useCallback((scope: DeckScope): string => {
+  const formatDeckLabel = useCallback((deck: DeckOption): string => {
+    if (deck.name?.trim()) return deck.name.trim();
+    const { scope } = deck;
     switch (scope.type) {
       case "surah": {
         const nums = [...scope.surahs].sort((a, b) => a - b);
@@ -193,6 +197,7 @@ function AyahBlockInner({
 
   const loadDeckPicker = useCallback(async () => {
     setDeckLoading(true);
+    setNewDeckName("");
     try {
       const [decks, surahRows] = await Promise.all([
         getDecks(db),
@@ -221,6 +226,7 @@ function AyahBlockInner({
     if (reviewBusy) return;
     setReviewBusy(true);
     try {
+      const trimmedName = newDeckName.trim();
       const scope: DeckScope = {
         type: "custom",
         surahStart: surah,
@@ -229,7 +235,7 @@ function AyahBlockInner({
         ayahEnd: ayah,
       };
       const deckId = generateDeckId(scope);
-      await createDeck(db, deckId, scope);
+      await createDeck(db, deckId, scope, trimmedName || undefined);
       showToast(s.reviewActionAdded);
       setDeckPickerOpen(false);
     } catch (e) {
@@ -238,7 +244,7 @@ function AyahBlockInner({
     } finally {
       setReviewBusy(false);
     }
-  }, [reviewBusy, surah, ayah, db, showToast, s.reviewActionAdded, s.reviewActionFailed]);
+  }, [reviewBusy, newDeckName, surah, ayah, db, showToast, s.reviewActionAdded, s.reviewActionFailed]);
 
   const handleAddToExistingDeck = useCallback(async (deckId: string) => {
     if (reviewBusy) return;
@@ -422,16 +428,34 @@ function AyahBlockInner({
                 <X size={16} color={isDark ? "#a3a3a3" : "#6e5a47"} />
               </Pressable>
             </View>
-            <Pressable
-              onPress={handleCreateDeckAndAdd}
-              disabled={reviewBusy}
-              className="mt-4 rounded-2xl bg-primary-soft px-4 py-3"
-              style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }], opacity: reviewBusy ? 0.7 : 1 })}
-            >
-              <Text className="text-gold" style={{ fontFamily: "Manrope_700Bold", fontSize: 14 }}>
-                {s.reviewCreateNewDeck ?? s.flashcardsCreateDeck}
-              </Text>
-            </Pressable>
+            <View className="mt-4 rounded-2xl bg-surface-low dark:bg-surface-dark-low p-3">
+              <TextInput
+                value={newDeckName}
+                onChangeText={setNewDeckName}
+                placeholder={s.reviewNewDeckName}
+                placeholderTextColor={isDark ? "#525252" : "#b9a085"}
+                className="rounded-xl bg-surface dark:bg-surface-dark px-3 py-2 text-charcoal dark:text-neutral-100"
+                style={{
+                  fontFamily: "Manrope_500Medium",
+                  fontSize: 14,
+                  textAlign: isRTL ? "right" : "left",
+                  writingDirection: isRTL ? "rtl" : "ltr",
+                }}
+              />
+              <Pressable
+                onPress={handleCreateDeckAndAdd}
+                disabled={reviewBusy || newDeckName.trim().length === 0}
+                className="mt-3 rounded-2xl bg-primary-soft px-4 py-3"
+                style={({ pressed }) => ({
+                  transform: [{ scale: pressed ? 0.98 : 1 }],
+                  opacity: reviewBusy || newDeckName.trim().length === 0 ? 0.55 : 1,
+                })}
+              >
+                <Text className="text-gold" style={{ fontFamily: "Manrope_700Bold", fontSize: 14, textAlign: isRTL ? "right" : "left" }}>
+                  {s.reviewCreateAndSelectDeck}
+                </Text>
+              </Pressable>
+            </View>
             <ScrollView style={{ maxHeight: 280, marginTop: 10 }}>
               {deckLoading ? (
                 <Text className="text-warm-500 dark:text-neutral-400" style={{ fontFamily: "Manrope_500Medium", fontSize: 13 }}>
@@ -451,7 +475,7 @@ function AyahBlockInner({
                     style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.99 : 1 }], opacity: reviewBusy ? 0.7 : 1 })}
                   >
                     <Text className="text-charcoal dark:text-neutral-100" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}>
-                      {formatDeckLabel(deck.scope)}
+                      {formatDeckLabel(deck)}
                     </Text>
                   </Pressable>
                 ))
