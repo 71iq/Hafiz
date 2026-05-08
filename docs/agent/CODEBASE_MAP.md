@@ -1,7 +1,7 @@
 # Hafiz Codebase Map
 
 ## Purpose
-This document maps the current web-facing UI surfaces in Hafiz before the stabilization pass. It is the baseline for responsive, RTL, i18n, modal, and verification work.
+This document maps the current web-facing UI surfaces in Hafiz before the stabilization pass. It is a descriptive baseline for responsive, RTL, i18n, modal, and verification work; `docs/agent/WEB_UI_CONTRACT.md` remains authoritative when rules overlap.
 
 ## Route Graph
 
@@ -222,13 +222,10 @@ These limits are valid as local decisions, but they are not yet governed by one 
   - `npx expo export --platform web`
   - `npx expo start --web`
 
-### Known local verification hazard
-- `tsconfig.json` includes `**/*.ts` and `**/*.tsx` across the repository.
-- A local reference checkout at `quran.com-frontend-next/` therefore becomes part of Hafiz TypeScript scope whenever it exists, even though it is not app code and should remain read-only and uncommitted.
-- Observed `npx tsc --noEmit` failure mode on this repo state:
-  - missing reference-checkout dependencies such as `@playwright/test`, `next`, `@sentry/nextjs`, `@sentry/profiling-node`, `dotenv`, and other Quran.com-only packages
-  - unresolved Quran.com path aliases such as `@/...`, `types/...`, and `src/...`
-  - follow-on reference-checkout typing noise such as implicit-`any`, `JSX` namespace, and unknown-service errors
+### TypeScript scope boundary
+- `tsconfig.json` includes Hafiz source files broadly, but now explicitly excludes `quran.com-frontend-next/**`.
+- The optional local Quran.com reference checkout is therefore outside Hafiz TypeScript scope by design, even when it exists in the worktree.
+- `npx tsc --noEmit` is expected to validate Hafiz code only; future reference-only checkouts should keep the same boundary.
 
 ### Reader invariants that must survive every UI phase
 - Quran display uses QCF2 per-page fonts only.

@@ -1,10 +1,11 @@
 # Hafiz Web UI Contract
 
 ## Purpose
-This document is the execution contract for the Hafiz web UI stabilization pass. It defines the shared responsive rules, overlay rules, reader invariants, and verification gates that all later changes must satisfy.
+This document is the authoritative execution contract for the Hafiz web UI stabilization pass. It defines the shared responsive rules, overlay rules, reader invariants, and verification gates that all later changes must satisfy.
 
 ## Scope
 - Applies to all web-facing UI routes and overlays in Hafiz.
+- When another agent or product doc overlaps with UI implementation or verification rules, this document wins.
 - Uses Quran.com only as a conceptual reference for reader hierarchy and QA discipline.
 - Does not authorize architecture changes away from Expo, local SQLite reads, or the current route graph unless explicitly stated below.
 
@@ -141,8 +142,8 @@ These rules are non-negotiable across all UI phases:
 
 ### Documentation-only gate
 - Path references should be verified with `rg` after doc edits.
-- `git diff -- docs/agent docs/product` should show documentation-only changes for this phase.
-- `npx tsc --noEmit` is currently expected to fail while `quran.com-frontend-next/**` remains inside Hafiz TypeScript scope.
+- `git diff -- AGENTS.md tsconfig.json docs/agent docs/product` should stay scoped to docs plus the TypeScript config boundary for this cleanup.
+- `npx tsc --noEmit` should pass even when the optional `quran.com-frontend-next/` checkout exists locally, because it is excluded from Hafiz TypeScript scope by design.
 
 ### Required commands for implementation phases
 - `npx tsc --noEmit`

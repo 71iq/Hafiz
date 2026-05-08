@@ -1,6 +1,6 @@
 # Phone Plan Agent Log
 
-Purpose: persistent continuity log for the new phone redesign so future sessions can resume without relying on chat history.
+Purpose: persistent continuity log for the new phone redesign so future sessions can resume without relying on chat history. This file is historical and descriptive; when it overlaps with live UI rules, `docs/agent/WEB_UI_CONTRACT.md` is authoritative.
 
 ## Update Protocol
 - For every phone-plan decision, scope change, or phase progress, append an entry here in chronological order.
@@ -745,7 +745,7 @@ Saved in `phase17/`:
 1. Phase 19 was not present in the original plan; it is now formalized as a stabilization phase focused on unblocking deterministic web visual QA after the Phase 17 DB-init blocker.
 
 ### Implemented in this step
-- Added `Phase 19 — QA Unblock And Stabilization` to `NEW_PHONE_DESIGN_IMPLEMENTATION_PLAN.md` with:
+- Added `Phase 19 — QA Unblock And Stabilization` to `docs/agent/NEW_PHONE_DESIGN_IMPLEMENTATION_PLAN.md` with:
   - explicit tasks for deterministic web bootstrap and deferred matrix recapture
   - clear exit criteria tied to removing `Preparing database...`/`Database not initialized yet` capture stalls.
 
@@ -1021,14 +1021,14 @@ Saved in `phase19/`:
 - `CODEBASE_MAP.md`
 - `QURAN_FRONTEND_REFERENCE_NOTES.md`
 - `UI_AUDIT.md`
-- `WEB_UI_CONTRACT.md`
+- `docs/agent/WEB_UI_CONTRACT.md`
 
 ### Key decisions captured
 1. No app source changes are included in this step.
 - Rationale: the repo needed a written contract before more responsive or overlay edits.
 
 2. Verification hygiene is the next implementation step.
-- Rationale: `tsconfig.json` currently includes the local `quran.com-frontend-next/` checkout whenever it exists, which makes Hafiz type-check results environment-dependent.
+- Rationale: at that point, `tsconfig.json` included the local `quran.com-frontend-next/` checkout whenever it existed, which made Hafiz type-check results environment-dependent.
 
 3. Search remains unresolved at the route-contract level.
 - Current state:
@@ -1079,9 +1079,28 @@ Saved in `phase19/`:
 2. No app source changed in this step.
 - Impacted files are documentation only under `docs/agent/` and `docs/product/`.
 
-3. `npx tsc --noEmit` still fails in the current repo state because `tsconfig.json` includes the optional local `quran.com-frontend-next/` reference checkout.
+3. At the time of that validation, `npx tsc --noEmit` still failed because `tsconfig.json` included the optional local `quran.com-frontend-next/` reference checkout.
 - Observed failure categories include missing Quran.com-only packages such as `@playwright/test`, `next`, and `@sentry/nextjs`, plus unresolved Quran.com alias imports.
 
 ### Status
 - Documentation updated to reflect the current shipped route graph and provider boundaries.
 - Verification hygiene remains a follow-up implementation step, not part of this doc-only change.
+
+## 2026-05-08 — Docs And TypeScript Scope Consistency Cleanup
+
+### Hierarchy and path updates
+1. `docs/agent/WEB_UI_CONTRACT.md` is now the explicit authoritative UI contract.
+- `docs/agent/NEW_PHONE_DESIGN_IMPLEMENTATION_PLAN.md` remains reference-only and subordinate whenever guidance overlaps.
+
+2. Moved doc references were normalized in shared agent docs.
+- Updated paths now point at `docs/product/HAFIZ_SPEC.md`, `docs/product/DESIGN_SYSTEM.md`, and `docs/agent/PHONE_PLAN_AGENT_LOG.md`.
+
+### Verification hygiene update
+1. `tsconfig.json` now explicitly excludes `quran.com-frontend-next/**`.
+- Rationale: keep the optional Quran.com checkout outside Hafiz runtime and TypeScript scope by design.
+
+2. `npx tsc --noEmit` now passes with the optional `quran.com-frontend-next/` checkout present locally.
+
+### Status
+- No app UI source changed in this step.
+- Contract, audit, map, and reference docs now reflect the post-fix verification state.

@@ -1,22 +1,18 @@
 # Hafiz Web UI Audit
 
 ## Scope
-This audit records the current UI stabilization risks before app code changes for the web pass. It focuses on responsive behavior, overlays, search/navigation, i18n/RTL, design-system drift, and verification reliability.
+This audit records the current UI stabilization risks before app UI code changes for the web pass. It focuses on responsive behavior, overlays, search/navigation, i18n/RTL, design-system drift, and verification reliability. It is descriptive; `docs/agent/WEB_UI_CONTRACT.md` remains authoritative for live UI rules and verification gates.
 
 ## Primary Findings
 
-### 1. TypeScript verification is polluted by the local Quran.com reference checkout
-- `tsconfig.json` includes every `**/*.ts` and `**/*.tsx` file in the repository.
-- The untracked `quran.com-frontend-next/` directory is therefore treated as Hafiz source by `npx tsc --noEmit` whenever it exists locally.
-- Observed failure categories from `npx tsc --noEmit` on the current worktree:
-  - missing external reference-only packages such as `@playwright/test`, `next`, `@sentry/nextjs`, `@sentry/profiling-node`, `dotenv`, `vitest`, `@testing-library/react`, and related Quran.com dependencies
-  - unresolved Quran.com-internal aliases such as `@/...`, `types/...`, and `src/...`
-  - follow-on type noise inside the reference checkout such as implicit-`any`, missing `JSX` namespace entries, and unknown-service errors
+### 1. TypeScript verification hygiene now isolates the local Quran.com reference checkout
+- `tsconfig.json` still uses broad Hafiz include globs, but it now explicitly excludes `quran.com-frontend-next/**`.
+- The untracked `quran.com-frontend-next/` directory no longer enters Hafiz source scope when it exists locally.
 - Impact:
-  - local validation results are noisy and environment-dependent
-  - reference code can fail Hafiz verification even though it is read-only and outside product scope
+  - `npx tsc --noEmit` is now a stable Hafiz-only verification step instead of an environment-dependent mixed-repo check
+  - the Quran.com checkout stays read-only reference material rather than a hidden validation dependency
 - Required follow-up:
-  - exclude `quran.com-frontend-next/**` from Hafiz TypeScript scope before starting the main UI edits
+  - keep future reference-only checkouts out of Hafiz runtime, Metro, and TypeScript scope by default
 
 ### 2. Root-stack settings and i18n ownership is inconsistent outside tabs
 - `app/(tabs)/_layout.tsx` is the shared owner of `SettingsProvider`, but several root-level routes sit outside that boundary.
@@ -155,4 +151,4 @@ This audit records the current UI stabilization risks before app code changes fo
 
 ## Immediate Conclusions
 - Documentation is required before more UI edits because the repo now has enough responsive and overlay surface area to drift without a contract.
-- The first code change after this docs phase should be verification hygiene, followed by breakpoint consolidation, then overlay standardization.
+- Verification hygiene is now in place, so the next runtime change should be breakpoint consolidation, followed by overlay standardization.

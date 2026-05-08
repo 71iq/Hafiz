@@ -2,6 +2,7 @@
 
 ## Scope
 This note treats Quran.com as a read-only UX and engineering reference. `quran.com-frontend-next/` is an optional local, untracked checkout that may or may not exist in a given Hafiz worktree, and it is not a committed Hafiz dependency.
+Hafiz intentionally excludes `quran.com-frontend-next/**` from TypeScript scope in `tsconfig.json`, so the checkout stays reference-only even when it exists locally.
 
 When that reference checkout is available locally, useful read-only entry points include:
 - `quran.com-frontend-next/README.md`
@@ -109,7 +110,7 @@ The goal is to borrow patterns, not architecture or code.
 ### Not importing reference code into Hafiz runtime or type-check scope
 - Any future validation against Quran.com must stay read-only.
 - The optional `quran.com-frontend-next/` checkout must not add dependencies, source files, aliases, or test files to Hafiz runtime, Metro, or TypeScript scope.
-- It should stay uncommitted and out of Hafiz's TypeScript checks once verification hygiene is fixed.
+- It should stay uncommitted and out of Hafiz's TypeScript checks by design.
 
 ## Practical Takeaway
 Quran.com is useful here as a standard for discipline:
