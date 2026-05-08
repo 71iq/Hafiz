@@ -1001,3 +1001,70 @@ Saved in `phase19/`:
 
 ### Validation result
 - `npx expo export --platform web`: passed.
+
+## 2026-05-08 — Web UI Stabilization Contract Baseline
+
+### Scope change recorded
+1. The redesign effort is now being stabilized across web widths instead of remaining implicitly phone-only.
+- Canonical verification widths are now:
+  - `360`
+  - `412`
+  - `768`
+  - `1024` when sidebar behavior differs
+  - `1440`
+
+2. Quran.com remains a read-only reference for patterns only.
+- Rationale: useful for reader hierarchy, shared primitives discipline, and QA shape.
+- Explicitly not adopted: its architecture, code, or runtime dependencies.
+
+### Documentation artifacts added in this step
+- `CODEBASE_MAP.md`
+- `QURAN_FRONTEND_REFERENCE_NOTES.md`
+- `UI_AUDIT.md`
+- `WEB_UI_CONTRACT.md`
+
+### Key decisions captured
+1. No app source changes are included in this step.
+- Rationale: the repo needed a written contract before more responsive or overlay edits.
+
+2. Verification hygiene is the next implementation step.
+- Rationale: `tsconfig.json` currently includes the local `quran.com-frontend-next/` checkout whenever it exists, which makes Hafiz type-check results environment-dependent.
+
+3. Search remains unresolved at the route-contract level.
+- Current state:
+  - `app/(tabs)/search.tsx` is still a redirect placeholder.
+  - real behavior lives in `components/SearchCommand.tsx`.
+- Decision: keep that as an explicit stabilization phase item instead of changing it implicitly during unrelated screen work.
+
+4. Overlay standardization is required before further route polish.
+- Rationale: Hafiz currently mixes one shared `Sheet`, many raw `Modal` surfaces, and an unused `MobileBottomSheet` primitive.
+
+### Impacted files and surfaces
+- Root and tab shells:
+  - `app/_layout.tsx`
+  - `app/(tabs)/_layout.tsx`
+- Routes:
+  - `app/(tabs)/home.tsx`
+  - `app/(tabs)/mushaf.tsx`
+  - `app/(tabs)/progress.tsx`
+  - `app/(tabs)/leaderboard.tsx`
+  - `app/(tabs)/settings.tsx`
+  - `app/onboarding.tsx`
+  - `app/auth/login.tsx`
+  - `app/auth/signup.tsx`
+  - `app/flashcards/session.tsx`
+  - `app/profile/[userId].tsx`
+- Shared chrome and overlays:
+  - `components/ui/AppNavigation.tsx`
+  - `components/ui/Sheet.tsx`
+  - `components/ui/MobilePrimitives.tsx`
+  - `components/SearchCommand.tsx`
+  - `components/mushaf/*`
+  - `components/reflections/*`
+  - `components/flashcards/CreateDeckSheet.tsx`
+  - `components/settings/TranslationLanguagePicker.tsx`
+
+### Status
+- Contract docs complete.
+- No runtime behavior changed.
+- Next step: implement verification hygiene, then centralize viewport constants.
