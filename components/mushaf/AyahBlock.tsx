@@ -31,7 +31,7 @@ import {
   removeBookmark as dbRemoveBookmark,
 } from "@/lib/selection/queries";
 import { formatForCopy } from "@/lib/selection/format";
-import { SIDEBAR_BREAKPOINT } from "@/components/ui/AppNavigation";
+import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { AyahDetailModal } from "./AyahDetailModal";
 import { X } from "lucide-react-native";
 

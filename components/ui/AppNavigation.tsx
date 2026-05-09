@@ -18,6 +18,7 @@ import Animated, {
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useColorScheme } from "nativewind";
 import { useChrome } from "@/lib/ui/chrome";
+import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { PanelLeftOpen, PanelRightOpen } from "lucide-react-native";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -29,7 +30,6 @@ const INACTIVE_LIGHT = "rgba(45, 45, 45, 0.5)";
 const INACTIVE_DARK = "rgba(232, 225, 218, 0.5)";
 const BAR_BG_LIGHT = "rgba(255, 248, 241, 0.80)";
 const BAR_BG_DARK = "rgba(28, 25, 23, 0.80)";
-export const SIDEBAR_BREAKPOINT = 768;
 const PANEL_WIDTH = 248;
 
 function getVisibleRoutes(state: BottomTabBarProps["state"], descriptors: BottomTabBarProps["descriptors"]) {

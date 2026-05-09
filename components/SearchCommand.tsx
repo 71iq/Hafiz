@@ -18,6 +18,7 @@ import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings, interpolate } from "@/lib/i18n/useStrings";
 import { setPendingDeepLink } from "@/lib/deep-link";
+import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { useWordInteraction } from "@/lib/word/context";
 
 // ─── Arabic diacritics stripping ───
@@ -452,7 +453,7 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
 
   const tealColor = "#0d9488";
   const mutedColor = isDark ? "#737373" : "#8B8178";
-  const isPhone = width < 768;
+  const isPhone = width < SIDEBAR_BREAKPOINT;
   const modalWidth = isPhone ? Math.max(280, Math.min(width - 12, 430)) : Math.min(width - 32, 900);
   const modalHeight = isPhone ? Math.min(height - 16, 900) : Math.min(height - 48, 760);
 

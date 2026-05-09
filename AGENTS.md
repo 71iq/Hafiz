@@ -166,7 +166,7 @@ If the user invokes `/audit` it triggers a sweep that reads several of these in 
 - **Comments**: default to none. Only add when the _why_ is non-obvious (hidden constraint, surprising invariant, workaround for a known bug). Never describe what the code does — names should do that.
 - **No speculative abstractions.** Three similar lines beat a premature helper. Don't add error handling for impossible states; trust internal callers, validate only at system boundaries.
 - **Reference code with `path:line`** so the user can jump straight there.
-- **Run `npx expo start --web`** (or `npx expo export --platform web`) before claiming a UI change is done. Type-check ≠ feature-correct.
+- **Run `npm run typecheck` and `npm run build:web`** (or `npx expo start --web`) before claiming a UI change is done. Type-check ≠ feature-correct.
 - **Memory / persistence**: Treat each session as cold; rely on `AGENTS.md`, the spec, and the codebase. If the user wants something durable, write it into `AGENTS.md` or `docs/product/HAFIZ_SPEC.md`.
 
 ---

@@ -5,6 +5,7 @@ import type { SQLiteDatabase } from "expo-sqlite";
 import { useDatabase } from "@/lib/database/provider";
 import { DEFAULT_LANGUAGE } from "@/lib/translations/languages";
 import { importTranslation } from "@/lib/translations/import";
+import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 
 // Desktop / large-viewport scale. Also the canonical length (7 steps) used
 // by UI controls like the font size picker.
@@ -17,8 +18,8 @@ export const FONT_SIZE_STEPS_MOBILE = [14, 17, 20, 23, 26, 29, 32] as const;
 export const FONT_SIZE_LINE_HEIGHTS_MOBILE = [32, 38, 44, 50, 56, 62, 68] as const;
 
 const DEFAULT_FONT_SIZE_INDEX = 2; // desktop 30px / mobile 20px (verse view)
-// Web viewports narrower than this use the mobile scale; native is always mobile.
-const MOBILE_BREAKPOINT = 768;
+// Web viewports narrower than the shared sidebar breakpoint use the mobile
+// scale; native is always mobile.
 
 export const DEFAULT_DAILY_REVIEW_LIMIT = 50;
 export const MIN_DAILY_REVIEW_LIMIT = 10;
@@ -125,7 +126,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const db = useDatabase();
   const { colorScheme: nwScheme, setColorScheme } = useNativeWindColorScheme();
   const { width } = useWindowDimensions();
-  const isCompact = Platform.OS !== "web" || width < MOBILE_BREAKPOINT;
+  const isCompact = Platform.OS !== "web" || width < SIDEBAR_BREAKPOINT;
   const activeSteps = isCompact ? FONT_SIZE_STEPS_MOBILE : FONT_SIZE_STEPS;
   const activeLineHeights = isCompact ? FONT_SIZE_LINE_HEIGHTS_MOBILE : FONT_SIZE_LINE_HEIGHTS;
   const [fontSizeIndex, setFontSizeIndexState] = useState(DEFAULT_FONT_SIZE_INDEX);

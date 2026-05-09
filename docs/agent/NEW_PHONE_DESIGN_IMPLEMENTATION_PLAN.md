@@ -66,7 +66,7 @@ Tasks:
   - Option A: `HomeV1`, “Sanctuary Feed”, resume rail plus quiet stats.
   - Option B: `HomeV2`, “Editorial Hero”, verse-of-day focal screen.
 - Decide whether search remains a command modal or becomes a full mobile tab/screen matching `m-search.jsx`.
-- Decide whether the new phone design applies only below `SIDEBAR_BREAKPOINT` or also changes tablet widths.
+- Decide whether the new phone design applies only below the shared sidebar breakpoint (`lib/ui/viewport.ts`) or also changes tablet widths.
 - Identify current features not represented in mockups:
   - bookmarks sheet
   - reflections modal
@@ -134,8 +134,8 @@ Exit criteria:
 
 - Shared components render in isolation inside real screens or a lightweight dev harness.
 - No screen has been fully redesigned yet.
-- `npx tsc --noEmit` passes.
-- `npx expo export --platform web` passes.
+- `npm run typecheck` passes.
+- `npm run build:web` passes.
 
 ## Phase 2 — Mobile Navigation And App Chrome
 
@@ -715,8 +715,8 @@ Tasks:
 - Prefer small commits by phase, pushed to `main` per repo rules.
 - Avoid a single massive rewrite.
 - After each phase:
-  - `npx tsc --noEmit`.
-  - `npx expo export --platform web`.
+  - `npm run typecheck`.
+  - `npm run build:web`.
   - targeted manual check.
 - Consider temporary feature flag only if a phase must land partially:
   - mobile-only flag.
@@ -796,5 +796,5 @@ Use this when asking Codex to implement a phase:
 Implement Phase N from `docs/agent/NEW_PHONE_DESIGN_IMPLEMENTATION_PLAN.md` as reference guidance only.
 Read `AGENTS.md`, `docs/agent/WEB_UI_CONTRACT.md`, `docs/product/HAFIZ_SPEC.md`, and any relevant archival design files if they are present locally.
 Do not use mock data. Preserve i18n, RTL, QCF2, offline SQLite reads, and non-blocking sync.
-Run npx tsc --noEmit and npx expo export --platform web, then commit and push to main.
+Run `npm run typecheck` and `npm run build:web`, then commit and push to main.
 ```

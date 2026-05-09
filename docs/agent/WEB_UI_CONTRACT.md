@@ -20,7 +20,8 @@ This document is the authoritative execution contract for the Hafiz web UI stabi
 
 ### Implementation rule
 - One shared source of truth must own viewport breakpoints for the app.
-- The intended end state is a shared viewport module or constant set such as `lib/ui/viewport.ts`, consumed by `AppNavigation`, settings-responsive font scaling, search, word detail, and overlay shells.
+- The shared source of truth is `lib/ui/viewport.ts`.
+- The current shared consumers must include `AppNavigation`, settings-responsive font scaling, search, word detail, and other readers of the sidebar/mobile split.
 - Raw `768` checks in feature files should be replaced with the shared contract without changing behavior first.
 
 ## Content Width Contract
@@ -143,11 +144,11 @@ These rules are non-negotiable across all UI phases:
 ### Documentation-only gate
 - Path references should be verified with `rg` after doc edits.
 - `git diff -- AGENTS.md tsconfig.json docs/agent docs/product` should stay scoped to docs plus the TypeScript config boundary for this cleanup.
-- `npx tsc --noEmit` should pass even when the optional `quran.com-frontend-next/` checkout exists locally, because it is excluded from Hafiz TypeScript scope by design.
+- `npm run typecheck` should pass even when the optional `quran.com-frontend-next/` checkout exists locally, because it is excluded from Hafiz TypeScript scope by design.
 
 ### Required commands for implementation phases
-- `npx tsc --noEmit`
-- `npx expo export --platform web`
+- `npm run typecheck`
+- `npm run build:web`
 - `npx expo start --web`
 
 ### Required manual coverage
@@ -184,7 +185,7 @@ These rules are non-negotiable across all UI phases:
 - Prevent the read-only `quran.com-frontend-next/` checkout from entering Hafiz TypeScript verification
 
 ### Phase 3. Responsive contract consolidation
-- Centralize viewport constants around `360`, `412`, `768`, and desktop
+- Centralize viewport constants in `lib/ui/viewport.ts` around `360`, `412`, `768`, `1024`, and `1440`
 - Replace existing raw `768` checks with shared contract reads without changing behavior
 
 ### Phase 4. Modal and sheet standardization

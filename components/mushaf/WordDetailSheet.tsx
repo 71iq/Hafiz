@@ -5,6 +5,7 @@ import { useWordInteraction } from "@/lib/word/context";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { useDatabase } from "@/lib/database/provider";
+import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { MeaningTab } from "./word-tabs/MeaningTab";
 import { IrabTab } from "./word-tabs/IrabTab";
 import { TasreefTab } from "./word-tabs/TasreefTab";
@@ -43,7 +44,7 @@ export function WordDetailSheet() {
   const tabScrollRef = useRef<ScrollView>(null);
   const contentScrollRef = useRef<ScrollView>(null);
 
-  const isPhone = width < 768;
+  const isPhone = width < SIDEBAR_BREAKPOINT;
   const modalWidth = isPhone ? Math.max(280, Math.min(width - 16, 430)) : Math.max(280, Math.min(width - 32, 760));
   const maxModalHeight = Math.max(320, Math.min(Math.floor(height * 0.72), 620));
 

@@ -1104,3 +1104,30 @@ Saved in `phase19/`:
 ### Status
 - No app UI source changed in this step.
 - Contract, audit, map, and reference docs now reflect the post-fix verification state.
+
+## 2026-05-09 — Web-First Stabilization Prep
+
+### Scope decisions
+1. No screen redesign is included in this step.
+- Purpose: prepare the current UI for later stabilization work without changing the live visual behavior.
+
+2. The shared viewport contract now has one runtime owner.
+- `lib/ui/viewport.ts` defines `360`, `412`, `768`, `1024`, and `1440`.
+- Current code adoption is intentionally limited to the safe `768` consumers already named by the contract and audit docs.
+
+3. Verification is now formalized as npm scripts.
+- `package.json` owns `typecheck` and `build:web`.
+- The existing `prebuild:web` data-copy step remains in place and continues to run before `build:web`.
+
+### Implemented in this step
+- Added `lib/ui/viewport.ts`.
+- Rewired `components/ui/AppNavigation.tsx`, `lib/settings/context.tsx`, `components/SearchCommand.tsx`, `components/mushaf/WordDetailSheet.tsx`, `app/(tabs)/mushaf.tsx`, and `components/mushaf/AyahBlock.tsx` to the shared sidebar breakpoint.
+- Updated agent docs so `docs/agent/WEB_UI_CONTRACT.md` remains authoritative and the supporting docs describe the new viewport owner and verification commands.
+
+### Validation result
+- `npm run typecheck`: passed.
+- `npm run build:web`: passed.
+
+### Status
+- Shared breakpoint ownership is centralized without changing screen behavior.
+- Next step: verify with the npm scripts and continue route-by-route stabilization without widening this pass into a redesign.

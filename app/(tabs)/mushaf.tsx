@@ -32,7 +32,7 @@ import { SearchCommand } from "@/components/SearchCommand";
 import { useWordInteraction } from "@/lib/word/context";
 import { consumePendingDeepLink, peekPendingDeepLink } from "@/lib/deep-link";
 import { toArabicNumber } from "@/lib/arabic";
-import { SIDEBAR_BREAKPOINT } from "@/components/ui/AppNavigation";
+import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 
 /** Registers an ayah navigation callback inside WordInteractionProvider */
 function AyahNavigationRegistrar({

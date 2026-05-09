@@ -85,6 +85,7 @@ The goal is to borrow patterns, not architecture or code.
 
 ### Responsive contract
 - Replace raw breakpoint checks with one shared viewport contract for `360`, `412`, `768`, `1024`, and `1440`.
+- In Hafiz, that shared contract now starts at `lib/ui/viewport.ts`; later phases should extend adoption from there instead of adding new local breakpoint owners.
 - Search, word detail, navigation chrome, and form surfaces should all consume the same contract.
 
 ### QA strategy

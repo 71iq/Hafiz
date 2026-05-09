@@ -173,10 +173,10 @@ Current implication: Hafiz has one shared sheet primitive and many one-off modal
 ## Responsive Breakpoints And Width Rules
 
 ### Breakpoint sources in code today
-- `components/ui/AppNavigation.tsx`: `SIDEBAR_BREAKPOINT = 768`
-- `lib/settings/context.tsx`: `MOBILE_BREAKPOINT = 768`
-- `components/SearchCommand.tsx`: raw `width < 768`
-- `components/mushaf/WordDetailSheet.tsx`: raw `width < 768`
+- `lib/ui/viewport.ts`: shared viewport contract for `360`, `412`, `768`, `1024`, and `1440`
+- `components/ui/AppNavigation.tsx`: consumes `SIDEBAR_BREAKPOINT` for the mobile/desktop navigation split
+- `lib/settings/context.tsx`: consumes `SIDEBAR_BREAKPOINT` for web font-scaling mode
+- `components/SearchCommand.tsx` and `components/mushaf/WordDetailSheet.tsx`: consume `SIDEBAR_BREAKPOINT` for their phone-vs-wide shell split
 
 ### Screen widths to stabilize against
 - `360px`: compact phone baseline
@@ -218,14 +218,14 @@ These limits are valid as local decisions, but they are not yet governed by one 
 ### Current truth
 - Documentation-only changes should be validated against the current code paths, not by changing runtime behavior.
 - Later UI phases must run:
-  - `npx tsc --noEmit`
-  - `npx expo export --platform web`
+  - `npm run typecheck`
+  - `npm run build:web`
   - `npx expo start --web`
 
 ### TypeScript scope boundary
 - `tsconfig.json` includes Hafiz source files broadly, but now explicitly excludes `quran.com-frontend-next/**`.
 - The optional local Quran.com reference checkout is therefore outside Hafiz TypeScript scope by design, even when it exists in the worktree.
-- `npx tsc --noEmit` is expected to validate Hafiz code only; future reference-only checkouts should keep the same boundary.
+- `npm run typecheck` is expected to validate Hafiz code only; future reference-only checkouts should keep the same boundary.
 
 ### Reader invariants that must survive every UI phase
 - Quran display uses QCF2 per-page fonts only.

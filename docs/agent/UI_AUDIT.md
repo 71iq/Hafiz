@@ -9,7 +9,7 @@ This audit records the current UI stabilization risks before app UI code changes
 - `tsconfig.json` still uses broad Hafiz include globs, but it now explicitly excludes `quran.com-frontend-next/**`.
 - The untracked `quran.com-frontend-next/` directory no longer enters Hafiz source scope when it exists locally.
 - Impact:
-  - `npx tsc --noEmit` is now a stable Hafiz-only verification step instead of an environment-dependent mixed-repo check
+  - `npm run typecheck` is now a stable Hafiz-only verification step instead of an environment-dependent mixed-repo check
   - the Quran.com checkout stays read-only reference material rather than a hidden validation dependency
 - Required follow-up:
   - keep future reference-only checkouts out of Hafiz runtime, Metro, and TypeScript scope by default
@@ -42,14 +42,13 @@ This audit records the current UI stabilization risks before app UI code changes
   - search cannot yet be stabilized as a full page across `360`, `412`, `768`, and desktop
   - navigation/history/focus decisions are trapped inside a modal-only implementation
 
-### 4. Breakpoint ownership is duplicated and partially hardcoded
-- `components/ui/AppNavigation.tsx` defines `SIDEBAR_BREAKPOINT = 768`.
-- `lib/settings/context.tsx` separately defines `MOBILE_BREAKPOINT = 768`.
-- `components/SearchCommand.tsx` uses raw `width < 768`.
-- `components/mushaf/WordDetailSheet.tsx` uses raw `width < 768`.
+### 4. Breakpoint ownership is now centralized, but wider width rules are still local
+- `lib/ui/viewport.ts` is the shared owner of the viewport contract for `360`, `412`, `768`, `1024`, and `1440`.
+- `components/ui/AppNavigation.tsx`, `lib/settings/context.tsx`, `components/SearchCommand.tsx`, and `components/mushaf/WordDetailSheet.tsx` now consume the shared sidebar breakpoint instead of owning their own `768` split.
+- Many other width caps remain intentionally route-local in this phase, such as search/dialog max widths and reader-specific content widths.
 - Impact:
-  - behavior stays mostly aligned today only because every place happens to use the same number
-  - future changes will drift quickly because the contract is not centralized
+  - the primary mobile/desktop split is less likely to drift across navigation, settings, search, and word detail
+  - a broader content-width system is still pending because this pass does not redesign or normalize route-local width caps
 
 ### 5. Overlay behavior is fragmented across many one-off modals
 - Shared `Sheet` is used by:
