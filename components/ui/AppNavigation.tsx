@@ -81,7 +81,7 @@ function BottomTabItem({
         !isFocused && { opacity: INACTIVE_OPACITY },
       ]}
     >
-      {options.tabBarIcon?.({ focused: isFocused, color: iconColor, size: 22 })}
+      {options.tabBarIcon?.({ focused: isFocused, color: iconColor, size: 20 })}
       <Text style={[styles.bottomLabel, { color: iconColor }]}>{label}</Text>
     </AnimatedPressable>
   );
@@ -115,7 +115,7 @@ function BottomBar(props: BottomTabBarProps) {
         {
           position: Platform.OS === "web" ? "fixed" as any : "absolute",
           bottom: Math.max(insets.bottom, 10),
-          paddingBottom: 8,
+          paddingBottom: 6,
           zIndex: 80,
           backgroundColor: isDark ? BAR_BG_DARK : BAR_BG_LIGHT,
           ...Platform.select({
@@ -383,9 +383,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-around",
     alignItems: "center",
-    paddingHorizontal: 10,
-    paddingTop: 8,
-    borderRadius: 32,
+    paddingHorizontal: 8,
+    paddingTop: 6,
+    borderRadius: 28,
     shadowColor: "#003638",
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.08,
@@ -396,8 +396,8 @@ const styles = StyleSheet.create({
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 11,
+    paddingVertical: 5,
     borderRadius: 9999,
   },
   bottomTabItemActive: {
@@ -405,9 +405,9 @@ const styles = StyleSheet.create({
   },
   bottomLabel: {
     fontFamily: "Manrope_500Medium",
-    fontSize: 10,
-    lineHeight: 13,
-    letterSpacing: 0.5,
+    fontSize: 9,
+    lineHeight: 11,
+    letterSpacing: 0,
     marginTop: 2,
   },
   sidebarLabel: {

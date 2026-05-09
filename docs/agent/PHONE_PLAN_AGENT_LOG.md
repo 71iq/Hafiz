@@ -1224,3 +1224,28 @@ Saved in `phase19/`:
 - Static web smoke via `npx serve dist -l 8084`:
   - `360px`: mobile tab bar fixed at bottom; page navigator fixed above it; content scrolls behind without the previous large reserved gap.
   - `412px`: same fixed floating positions confirmed.
+
+## 2026-05-09 — Compact Mobile Page Rail
+
+### Scope decisions
+1. Kept the page rail and bottom tab bar floating and non-layout-consuming.
+2. Removed endpoint labels from the page rail; the current page is the only explicit page number.
+3. Preserved Mushaf pagination direction by keeping the rail data ordered visually as `604 ... 1`, independent of UI language.
+
+### Implemented in this step
+- `components/mushaf/MushafSlider.tsx`:
+  - Reduced tick width/height and rail padding.
+  - Replaced the circular expand button and separate page counter with a compact current-page navigation pill.
+  - Added web-safe scroll handling so scroll/drag events begin preview even when `onScrollBeginDrag` is not emitted.
+  - Kept release/momentum/fallback settle paths committing to the selected page.
+- `components/ui/AppNavigation.tsx`:
+  - Reduced mobile tab icon size, label size, item padding, and container padding/radius.
+- `app/(tabs)/mushaf.tsx`:
+  - Adjusted page rail offset to match the reduced bottom nav height.
+
+### Validation result
+- `npm run typecheck`: passed.
+- `npm run build:web`: passed.
+- Static web smoke via `npx serve dist -l 8084`:
+  - `360px`: rail height reduced to 38px, bottom nav to 55px, endpoint labels absent, drag/wheel settle navigated and updated the page pill.
+  - `412px`: compact floating rail and bottom nav positions confirmed.

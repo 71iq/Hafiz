@@ -373,8 +373,8 @@ function MushafInner() {
 
   const isPageMode = viewMode === "page";
   const showBottomSlider = isPageMode;
-  const mobileBottomNavHeight = 69;
-  const mobileBottomNavGap = 8;
+  const mobileBottomNavHeight = 54;
+  const mobileBottomNavGap = 6;
   const mobileBottomNavOffset = isPhone
     ? Math.max(insets.bottom, 10) + mobileBottomNavHeight + mobileBottomNavGap
     : 0;
@@ -799,7 +799,7 @@ function MushafInner() {
                 right: isPhone ? 12 : 0,
                 bottom: mobileBottomNavOffset,
                 zIndex: 70,
-                borderRadius: isPhone ? 28 : 0,
+                borderRadius: isPhone ? 22 : 0,
                 overflow: "hidden",
                 ...(Platform.OS === "web" && isPhone
                   ? ({ backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)" } as any)

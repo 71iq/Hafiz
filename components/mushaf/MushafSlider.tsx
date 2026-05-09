@@ -9,7 +9,7 @@ import {
   type NativeSyntheticEvent,
   type LayoutChangeEvent,
 } from "react-native";
-import { ChevronUp } from "lucide-react-native";
+import { ChevronsUp } from "lucide-react-native";
 import { toArabicNumber } from "@/lib/arabic";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -29,8 +29,8 @@ type Props = {
   index: MushafIndex | null;
 };
 
-const TICK_WIDTH = 38;
-const TICK_HEIGHT = 30;
+const TICK_WIDTH = 26;
+const TICK_HEIGHT = 20;
 
 export function MushafSlider({
   currentPage,
@@ -48,7 +48,10 @@ export function MushafSlider({
   const [dragging, setDragging] = useState(false);
   const userScrollingRef = useRef(false);
   const momentumRef = useRef(false);
+  const programmaticScrollRef = useRef(false);
   const fallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const programmaticTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastPreviewRef = useRef(currentPage);
   const lastCommitRef = useRef(currentPage);
 
@@ -75,10 +78,16 @@ export function MushafSlider({
   const scrollToPage = useCallback(
     (page: number, animated: boolean) => {
       if (!viewportWidth) return;
+      programmaticScrollRef.current = true;
+      if (programmaticTimerRef.current) clearTimeout(programmaticTimerRef.current);
       listRef.current?.scrollToOffset({
         offset: pageToOffset(page),
         animated,
       });
+      programmaticTimerRef.current = setTimeout(() => {
+        programmaticScrollRef.current = false;
+        programmaticTimerRef.current = null;
+      }, animated ? 320 : 80);
     },
     [pageToOffset, viewportWidth]
   );
@@ -95,6 +104,8 @@ export function MushafSlider({
   useEffect(() => {
     return () => {
       if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
+      if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
+      if (programmaticTimerRef.current) clearTimeout(programmaticTimerRef.current);
     };
   }, []);
 
@@ -135,14 +146,24 @@ export function MushafSlider({
 
   const handleScroll = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      if (!userScrollingRef.current) return;
-      updatePreviewFromOffset(e.nativeEvent.contentOffset.x);
+      if (programmaticScrollRef.current) return;
+      if (!userScrollingRef.current) {
+        userScrollingRef.current = true;
+        setDragging(true);
+      }
+      const offsetX = e.nativeEvent.contentOffset.x;
+      updatePreviewFromOffset(offsetX);
+      if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
+      settleTimerRef.current = setTimeout(() => {
+        if (userScrollingRef.current && !momentumRef.current) commitFromOffset(offsetX);
+      }, 180);
     },
-    [updatePreviewFromOffset]
+    [commitFromOffset, updatePreviewFromOffset]
   );
 
   const handleScrollBeginDrag = useCallback(() => {
     if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
+    if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
     userScrollingRef.current = true;
     momentumRef.current = false;
     setDragging(true);
@@ -157,9 +178,10 @@ export function MushafSlider({
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
       const offsetX = e.nativeEvent.contentOffset.x;
       if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
+      if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
       fallbackTimerRef.current = setTimeout(() => {
         if (!momentumRef.current) commitFromOffset(offsetX);
-      }, 120);
+      }, 160);
     },
     [commitFromOffset]
   );
@@ -167,6 +189,7 @@ export function MushafSlider({
   const handleMomentumScrollEnd = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
       if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
+      if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
       commitFromOffset(e.nativeEvent.contentOffset.x);
     },
     [commitFromOffset]
@@ -186,8 +209,8 @@ export function MushafSlider({
         <View style={{ width: TICK_WIDTH, height: TICK_HEIGHT, alignItems: "center", justifyContent: "center" }}>
           <View
             style={{
-              width: active ? 4 : 2,
-              height: active ? 22 : major ? 14 : 8,
+              width: active ? 3 : 2,
+              height: active ? 16 : major ? 10 : 6,
               borderRadius: 2,
               backgroundColor: active
                 ? "#0d9488"
@@ -208,9 +231,9 @@ export function MushafSlider({
       style={{
         flexDirection: isRTL ? "row-reverse" : "row",
         alignItems: "center",
-        gap: 12,
-        paddingHorizontal: 16,
-        paddingVertical: 8,
+        gap: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
       }}
     >
       <Pressable
@@ -218,58 +241,47 @@ export function MushafSlider({
         hitSlop={10}
         accessibilityLabel={s.goTo}
         style={({ pressed }) => ({
-          width: 32,
-          height: 32,
-          borderRadius: 16,
-          backgroundColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,54,56,0.08)",
+          height: 28,
+          minWidth: 58,
+          borderRadius: 999,
+          paddingHorizontal: 9,
+          backgroundColor: isDark ? "rgba(255,255,255,0.09)" : "rgba(0,54,56,0.08)",
+          flexDirection: isRTL ? "row-reverse" : "row",
           alignItems: "center",
           justifyContent: "center",
+          gap: 5,
           transform: [{ scale: pressed ? 0.95 : 1 }],
         })}
       >
-        <ChevronUp size={16} color={isDark ? "#a3a3a3" : "#003638"} />
+        <Text
+          className="text-primary-accent dark:text-primary-bright"
+          style={{ fontFamily: "Manrope_700Bold", fontSize: 12 }}
+        >
+          {toArabicNumber(livePage)}
+        </Text>
+        <ChevronsUp size={12} color={isDark ? "#a3a3a3" : "#003638"} />
       </Pressable>
 
       <View style={{ flex: 1, minWidth: 0 }} onLayout={handleLayout}>
-        <View
-          pointerEvents="none"
-          style={{
-            position: "absolute",
-            left: 0,
-            right: 0,
-            top: -3,
-            zIndex: 2,
-            flexDirection: "row",
-            justifyContent: "space-between",
-          }}
-        >
-          <Text style={{ color: isDark ? "#8a8a8a" : "#8B8178", fontFamily: "Manrope_500Medium", fontSize: 10 }}>
-            {toArabicNumber(max)}
-          </Text>
-          <Text style={{ color: isDark ? "#8a8a8a" : "#8B8178", fontFamily: "Manrope_500Medium", fontSize: 10 }}>
-            {toArabicNumber(1)}
-          </Text>
-        </View>
-
         {dragging && (
           <View
             pointerEvents="none"
             style={{
               position: "absolute",
               alignSelf: "center",
-              top: -34,
+              top: -30,
               zIndex: 3,
               backgroundColor: "#003638",
               borderRadius: 999,
               paddingHorizontal: 10,
-              paddingVertical: 4,
-              minWidth: 110,
+              paddingVertical: 3,
+              minWidth: 96,
               alignItems: "center",
             }}
           >
             <Text
               numberOfLines={1}
-              style={{ color: "#fff", fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
+              style={{ color: "#fff", fontFamily: "Manrope_600SemiBold", fontSize: 11 }}
             >
               {surahName ? `${surahName} · ` : ""}
               {`ص ${toArabicNumber(livePage)}`}
@@ -301,22 +313,13 @@ export function MushafSlider({
           contentContainerStyle={{
             paddingLeft: centerPadding,
             paddingRight: centerPadding,
-            paddingTop: 8,
+            paddingTop: 4,
           }}
-          style={{ height: 38 }}
+          style={{ height: 26 }}
           initialNumToRender={24}
           maxToRenderPerBatch={24}
           windowSize={9}
         />
-      </View>
-
-      <View style={{ width: 44, alignItems: "center" }} pointerEvents="none">
-        <Text
-          className="text-primary-accent dark:text-primary-bright"
-          style={{ fontFamily: "Manrope_700Bold", fontSize: 13 }}
-        >
-          {toArabicNumber(livePage)}
-        </Text>
       </View>
     </View>
   );
