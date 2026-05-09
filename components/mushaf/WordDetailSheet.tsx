@@ -1,11 +1,12 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
-import { View, Text, Modal, Pressable, ScrollView, useWindowDimensions } from "react-native";
-import { BookOpen, X } from "lucide-react-native";
+import { View, Text, Pressable, ScrollView, useWindowDimensions } from "react-native";
+import { BookOpen } from "lucide-react-native";
 import { useWordInteraction } from "@/lib/word/context";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { useDatabase } from "@/lib/database/provider";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
+import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { MeaningTab } from "./word-tabs/MeaningTab";
 import { IrabTab } from "./word-tabs/IrabTab";
 import { TasreefTab } from "./word-tabs/TasreefTab";
@@ -27,7 +28,7 @@ type WordHeaderMeta = {
 
 export function WordDetailSheet() {
   const { detailWord, closeDetail } = useWordInteraction();
-  const { isDark, isRTL, uiLanguage, fontSize, lineHeight } = useSettings();
+  const { isDark, isRTL, uiLanguage } = useSettings();
   const { width, height } = useWindowDimensions();
   const s = useStrings();
   const db = useDatabase();
@@ -45,8 +46,8 @@ export function WordDetailSheet() {
   const contentScrollRef = useRef<ScrollView>(null);
 
   const isPhone = width < SIDEBAR_BREAKPOINT;
-  const modalWidth = isPhone ? Math.max(280, Math.min(width - 16, 430)) : Math.max(280, Math.min(width - 32, 760));
-  const maxModalHeight = Math.max(320, Math.min(Math.floor(height * 0.72), 620));
+  const maxModalHeight = Math.min(height - (isPhone ? 12 : 48), isPhone ? height * 0.94 : 720);
+  const surfaceColor = isDark ? "#0A0A0A" : "#FFF8F1";
 
   const tabs = useMemo(
     () => [
@@ -129,149 +130,133 @@ export function WordDetailSheet() {
   const wordLabel = isArabicMode ? "الكلمة" : "Word";
   const showRootLemma = isArabicMode || activeTab !== "tajweed";
   return (
-    <Modal
-      visible={!!detailWord}
-      transparent
-      animationType="fade"
-      statusBarTranslucent
-      onRequestClose={handleClose}
-    >
-      <View className="flex-1 items-center justify-end px-2 py-2" style={{ backgroundColor: "rgba(0,0,0,0.58)" }}>
-        <Pressable className="absolute inset-0" onPress={handleClose} />
-        <View
-          className="overflow-hidden rounded-t-3xl bg-surface dark:bg-surface-dark-low"
-          style={{ width: modalWidth, height: maxModalHeight }}
-          onStartShouldSetResponder={() => true}
-        >
-          <View className="items-center pt-2 pb-1">
-            <View className="h-1 w-10 rounded-full bg-surface-high dark:bg-surface-dark-high" />
-          </View>
-
-          <View className={`px-4 pb-3 flex-shrink-0 ${isRTL ? "items-end" : "items-start"}`}>
-            <View className={`w-full flex-row items-center justify-between ${isRTL ? "flex-row-reverse" : ""}`}>
-              <View className="flex-row items-center gap-2">
-                <View className="rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 px-3 py-1.5">
-                  <Text className="text-primary-accent dark:text-primary-bright" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11 }}>
-                    {surah}:{ayah}:{wordPos}
-                  </Text>
-                </View>
-                <Pressable
-                  onPress={() => setAyahModalOpen(true)}
-                  className="flex-row items-center gap-1.5 rounded-full bg-surface-low dark:bg-surface-dark px-3 py-1.5"
-                  style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-                >
-                  <BookOpen size={13} color={isDark ? "#a3a3a3" : "#003638"} />
-                  <Text className="text-charcoal dark:text-neutral-200" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}>
-                    {s.viewFullAyah}
-                  </Text>
-                </Pressable>
+    <>
+      <ResponsiveSheet
+        open={!!detailWord}
+        onClose={handleClose}
+        maxWidth={760}
+        maxHeight={maxModalHeight}
+        surfaceColor={surfaceColor}
+      >
+        <OverlayHeader
+          isRTL={isRTL}
+          onClose={handleClose}
+          showHandle={isPhone}
+          leading={
+            <View className={`flex-row items-center gap-2 ${isRTL ? "flex-row-reverse" : ""}`}>
+              <View className="rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 px-3 py-1.5">
+                <Text className="text-primary-accent dark:text-primary-bright" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11 }}>
+                  {surah}:{ayah}:{wordPos}
+                </Text>
               </View>
               <Pressable
-                onPress={handleClose}
-                className="h-9 w-9 items-center justify-center rounded-full bg-surface-low dark:bg-surface-dark"
-                style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.95 : 1 }] })}
+                onPress={() => setAyahModalOpen(true)}
+                className="flex-row items-center gap-1.5 rounded-full bg-surface-low dark:bg-surface-dark-low px-3 py-1.5"
+                style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
               >
-                <X size={16} color={isDark ? "#a3a3a3" : "#6e5a47"} />
+                <BookOpen size={13} color={isDark ? "#a3a3a3" : "#003638"} />
+                <Text className="text-charcoal dark:text-neutral-200" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}>
+                  {s.viewFullAyah}
+                </Text>
               </Pressable>
             </View>
+          }
+        />
 
-            <>
+        <View className="flex-1 min-h-0">
+          <View className={`px-4 py-3 flex-shrink-0 ${isRTL ? "items-end" : "items-start"}`}>
+            <Text
+              className="text-charcoal dark:text-neutral-100"
+              style={{ fontFamily: "NotoSerif_700Bold", fontSize: 27, writingDirection: "rtl" }}
+            >
+              {headerMeta.wordText?.trim() ? headerMeta.wordText : "—"}
+            </Text>
+            {!isArabicMode && !!headerMeta.translationEn && (
               <Text
-                className="mt-3 text-charcoal dark:text-neutral-100"
-                style={{ fontFamily: "NotoSerif_700Bold", fontSize: 27, writingDirection: "rtl" }}
+                className={`mt-1 text-warm-500 dark:text-neutral-400 ${isRTL ? "text-right" : "text-left"}`}
+                style={{ fontFamily: "Manrope_500Medium", fontSize: 13 }}
               >
-                {headerMeta.wordText?.trim() ? headerMeta.wordText : "—"}
+                {s.wordMeaningTranslation ?? "Translation"}: {headerMeta.translationEn}
               </Text>
-              {!isArabicMode && !!headerMeta.translationEn && (
-                <Text
-                  className={`mt-1 text-warm-500 dark:text-neutral-400 ${isRTL ? "text-right" : "text-left"}`}
-                  style={{ fontFamily: "Manrope_500Medium", fontSize: 13 }}
-                >
-                  {s.wordMeaningTranslation ?? "Translation"}: {headerMeta.translationEn}
-                </Text>
+            )}
+
+            <View className={`mt-2 flex-row flex-wrap gap-2 ${isRTL ? "flex-row-reverse" : ""}`}>
+              {showRootLemma && (
+                <>
+                  <MetaPill label={s.rootLabel ?? "Root"} value={headerMeta.root ?? "—"} />
+                  <MetaPill label={s.lemmaLabel ?? "Lemma"} value={headerMeta.lemma ?? "—"} />
+                </>
               )}
-
-              <View className={`mt-2 flex-row flex-wrap gap-2 ${isRTL ? "flex-row-reverse" : ""}`}>
-                {showRootLemma && (
-                  <>
-                    <MetaPill label={s.rootLabel ?? "Root"} value={headerMeta.root ?? "—"} />
-                    <MetaPill label={s.lemmaLabel ?? "Lemma"} value={headerMeta.lemma ?? "—"} />
-                  </>
-                )}
-                <MetaPill label={s.wordTabOccurrences} value={headerMeta.rootCount == null ? "—" : String(headerMeta.rootCount)} />
-              </View>
-
-              <View className={`mt-2 flex-row gap-2 ${isRTL ? "flex-row-reverse" : ""}`}>
-                <QuickStat label={surahLabel} value={String(surah)} />
-                <QuickStat label={ayahLabel} value={String(ayah)} />
-                <QuickStat label={wordLabel} value={String(wordPos)} />
-              </View>
-            </>
-          </View>
-
-          <View className="flex-1 min-h-0">
-            <View className="h-14 justify-center bg-surface-low dark:bg-surface-dark">
-              <ScrollView
-                ref={tabScrollRef}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{
-                  paddingHorizontal: 16,
-                  gap: 6,
-                  paddingVertical: 6,
-                  alignItems: "center",
-                  flexDirection: isRTL ? "row-reverse" : "row",
-                }}
-              >
-                {tabs.map((tab) => {
-                  const isActive = activeTab === tab.key;
-                  return (
-                    <Pressable
-                      key={tab.key}
-                      onPress={() => setActiveTab(tab.key)}
-                      className={`rounded-full px-4 py-2.5 ${isActive ? "bg-primary-soft" : "bg-transparent"}`}
-                      style={({ pressed }) => ({
-                        alignSelf: "center",
-                        transform: [{ scale: pressed ? 0.98 : 1 }],
-                      })}
-                    >
-                      <Text
-                        className={isActive ? "text-gold" : "text-warm-400 dark:text-neutral-500"}
-                        style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
-                      >
-                        {tab.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
+              <MetaPill label={s.wordTabOccurrences} value={headerMeta.rootCount == null ? "—" : String(headerMeta.rootCount)} />
             </View>
 
-            <ScrollView ref={contentScrollRef} className="flex-1 min-h-0 px-5">
-              {activeTab === "meaning" && <MeaningTab surah={surah} ayah={ayah} wordPos={wordPos} />}
-              {activeTab === "irab" && (
-                <IrabTab
-                  surah={surah}
-                  ayah={ayah}
-                  wordPos={wordPos}
-                  onScrollToMatch={(y) => contentScrollRef.current?.scrollTo({ y, animated: true })}
-                />
-              )}
-              {activeTab === "tajweed" && <TajweedTab surah={surah} ayah={ayah} wordPos={wordPos} />}
-              {activeTab === "tasreef" && <TasreefTab surah={surah} ayah={ayah} wordPos={wordPos} />}
-              {activeTab === "qiraat" && <QiraatTab surah={surah} ayah={ayah} />}
-              {activeTab === "occurrences" && <OccurrencesTab surah={surah} ayah={ayah} wordPos={wordPos} />}
-            </ScrollView>
-
+            <View className={`mt-2 flex-row gap-2 ${isRTL ? "flex-row-reverse" : ""}`}>
+              <QuickStat label={surahLabel} value={String(surah)} />
+              <QuickStat label={ayahLabel} value={String(ayah)} />
+              <QuickStat label={wordLabel} value={String(wordPos)} />
+            </View>
           </View>
+
+          <View className="h-14 justify-center bg-surface-low dark:bg-surface-dark-low">
+            <ScrollView
+              ref={tabScrollRef}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{
+                paddingHorizontal: 16,
+                gap: 6,
+                paddingVertical: 6,
+                alignItems: "center",
+                flexDirection: isRTL ? "row-reverse" : "row",
+              }}
+            >
+              {tabs.map((tab) => {
+                const isActive = activeTab === tab.key;
+                return (
+                  <Pressable
+                    key={tab.key}
+                    onPress={() => setActiveTab(tab.key)}
+                    className={`rounded-full px-4 py-2.5 ${isActive ? "bg-primary-soft" : "bg-transparent"}`}
+                    style={({ pressed }) => ({
+                      alignSelf: "center",
+                      transform: [{ scale: pressed ? 0.98 : 1 }],
+                    })}
+                  >
+                    <Text
+                      className={isActive ? "text-gold" : "text-warm-400 dark:text-neutral-500"}
+                      style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
+                    >
+                      {tab.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+
+          <OverlayBody scrollRef={contentScrollRef} contentContainerClassName="px-5">
+            {activeTab === "meaning" && <MeaningTab surah={surah} ayah={ayah} wordPos={wordPos} />}
+            {activeTab === "irab" && (
+              <IrabTab
+                surah={surah}
+                ayah={ayah}
+                wordPos={wordPos}
+                onScrollToMatch={(y) => contentScrollRef.current?.scrollTo({ y, animated: true })}
+              />
+            )}
+            {activeTab === "tajweed" && <TajweedTab surah={surah} ayah={ayah} wordPos={wordPos} />}
+            {activeTab === "tasreef" && <TasreefTab surah={surah} ayah={ayah} wordPos={wordPos} />}
+            {activeTab === "qiraat" && <QiraatTab surah={surah} ayah={ayah} />}
+            {activeTab === "occurrences" && <OccurrencesTab surah={surah} ayah={ayah} wordPos={wordPos} />}
+          </OverlayBody>
         </View>
-      </View>
+      </ResponsiveSheet>
       <AyahDetailModal
         target={ayahModalOpen ? { surah, ayah } : null}
         onClose={() => setAyahModalOpen(false)}
         initialTab={activeTab === "qiraat" ? "qiraat" : activeTab === "meaning" ? "translation" : "tafsir"}
       />
-    </Modal>
+    </>
   );
 }
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, type Ref } from "react";
 import {
   Animated,
   Modal,
@@ -45,6 +45,7 @@ type OverlayHeaderProps = {
 
 type OverlayBodyProps = {
   children: React.ReactNode;
+  scrollRef?: Ref<ScrollView>;
   scrollEnabled?: boolean;
   className?: string;
   contentContainerClassName?: string;
@@ -292,6 +293,7 @@ export function OverlayHeader({
 
 export function OverlayBody({
   children,
+  scrollRef,
   scrollEnabled = true,
   className,
   contentContainerClassName,
@@ -303,6 +305,7 @@ export function OverlayBody({
 
   return (
     <ScrollView
+      ref={scrollRef}
       className={cn("flex-1 min-h-0", className)}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={contentContainerStyle}
