@@ -371,7 +371,8 @@ function MushafInner() {
   );
 
   const isPageMode = viewMode === "page";
-  const showBottomSlider = isPageMode && pageScroll === "horizontal";
+  const showBottomSlider = isPageMode;
+  const mobileBottomNavOffset = isPhone ? 77 : 0;
 
   useEffect(() => {
     currentPageRef.current = currentPage;
@@ -679,7 +680,7 @@ function MushafInner() {
             className="flex-1"
             style={{
               paddingTop: chromeVisible ? 0 : 10,
-              paddingBottom: showBottomSlider ? (isPhone ? 72 : 56) : isPhone ? 16 : 0,
+              paddingBottom: showBottomSlider ? (isPhone ? 149 : 56) : isPhone ? 16 : 0,
             }}
           >
             <PageMushaf
@@ -691,7 +692,17 @@ function MushafInner() {
               pageSidePadding={isPhone ? 22 : 16}
               centerVerticalOnPhone={isPhone}
               horizontalTopInset={isPhone && !chromeVisible && pageScroll === "horizontal" ? 52 : 0}
-              horizontalBottomInset={isPhone && !chromeVisible && pageScroll === "horizontal" ? 18 : 0}
+              horizontalBottomInset={
+                pageScroll === "horizontal"
+                  ? isPhone
+                    ? chromeVisible
+                      ? 72
+                      : 18
+                    : showBottomSlider
+                      ? 56
+                      : 0
+                  : 0
+              }
               highlightedWord={highlightedWord}
             />
             {!chromeVisible && (
@@ -802,7 +813,7 @@ function MushafInner() {
           <Animated.View
             pointerEvents={chromeVisible ? "auto" : "none"}
             style={[
-              { position: "absolute", left: 0, right: 0, bottom: 0 },
+              { position: "absolute", left: 0, right: 0, bottom: mobileBottomNavOffset },
               sliderAnimStyle,
             ]}
             className="bg-surface/95 dark:bg-surface-dark/95"

@@ -1,14 +1,18 @@
-import { useState, useRef, useCallback, useMemo } from "react";
+import { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import {
   View,
   Text,
   Pressable,
-  PanResponder,
+  FlatList,
+  type ListRenderItemInfo,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   type LayoutChangeEvent,
 } from "react-native";
 import { ChevronUp } from "lucide-react-native";
 import { toArabicNumber } from "@/lib/arabic";
 import { useSettings } from "@/lib/settings/context";
+import { useStrings } from "@/lib/i18n/useStrings";
 import type { MushafIndex } from "@/lib/mushaf/position";
 
 type Props = {
@@ -25,8 +29,8 @@ type Props = {
   index: MushafIndex | null;
 };
 
-const TRACK_HEIGHT = 2;
-const THUMB_SIZE = 18;
+const TICK_WIDTH = 38;
+const TICK_HEIGHT = 30;
 
 export function MushafSlider({
   currentPage,
@@ -37,79 +41,166 @@ export function MushafSlider({
   index,
 }: Props) {
   const { isRTL, isDark } = useSettings();
-  const [trackWidth, setTrackWidth] = useState(0);
-  const trackXRef = useRef(0);
+  const s = useStrings();
+  const listRef = useRef<FlatList<number>>(null);
+  const [viewportWidth, setViewportWidth] = useState(0);
   const [previewPage, setPreviewPage] = useState<number | null>(null);
   const [dragging, setDragging] = useState(false);
+  const userScrollingRef = useRef(false);
+  const momentumRef = useRef(false);
+  const fallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastPreviewRef = useRef(currentPage);
+  const lastCommitRef = useRef(currentPage);
 
-  const onTrackLayout = useCallback((e: LayoutChangeEvent) => {
-    setTrackWidth(e.nativeEvent.layout.width);
-    // measureInWindow gets the page-X for absolute touch math
-    (e.target as any)?.measureInWindow?.((x: number) => {
-      trackXRef.current = x;
-    });
-  }, []);
-
-  const xToPage = useCallback(
-    (touchPageX: number): number => {
-      if (trackWidth <= 0) return currentPage;
-      const local = Math.max(0, Math.min(trackWidth, touchPageX - trackXRef.current));
-      const ratioLtr = local / trackWidth;
-      // Mushaf progression is always RTL-paginated:
-      // page 1 on the right, page 604 on the left.
-      const ratio = 1 - ratioLtr;
-      return Math.max(1, Math.min(max, Math.round(1 + ratio * (max - 1))));
-    },
-    [trackWidth, currentPage, max]
+  const pages = useMemo(
+    () => Array.from({ length: max }, (_, index) => max - index),
+    [max]
   );
 
+  const centerPadding = Math.max(0, (viewportWidth - TICK_WIDTH) / 2);
+
   const pageToOffset = useCallback(
-    (page: number): number => {
-      if (trackWidth <= 0) return 0;
-      const ratio = (Math.max(1, Math.min(max, page)) - 1) / Math.max(1, max - 1);
-      const ltrOffset = ratio * trackWidth;
-      return trackWidth - ltrOffset;
+    (page: number) => (max - Math.max(1, Math.min(max, page))) * TICK_WIDTH,
+    [max]
+  );
+
+  const offsetToPage = useCallback(
+    (offsetX: number) => {
+      const index = Math.round(Math.max(0, offsetX) / TICK_WIDTH);
+      return Math.max(1, Math.min(max, max - index));
     },
-    [trackWidth, max]
+    [max]
+  );
+
+  const scrollToPage = useCallback(
+    (page: number, animated: boolean) => {
+      if (!viewportWidth) return;
+      listRef.current?.scrollToOffset({
+        offset: pageToOffset(page),
+        animated,
+      });
+    },
+    [pageToOffset, viewportWidth]
+  );
+
+  useEffect(() => {
+    lastPreviewRef.current = currentPage;
+    lastCommitRef.current = currentPage;
+    if (!userScrollingRef.current) {
+      setPreviewPage(null);
+      scrollToPage(currentPage, false);
+    }
+  }, [currentPage, scrollToPage]);
+
+  useEffect(() => {
+    return () => {
+      if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
+    };
+  }, []);
+
+  const updatePreviewFromOffset = useCallback(
+    (offsetX: number) => {
+      const page = offsetToPage(offsetX);
+      if (page === lastPreviewRef.current) return;
+      lastPreviewRef.current = page;
+      setPreviewPage(page);
+      onPreview?.(page);
+    },
+    [offsetToPage, onPreview]
+  );
+
+  const commitFromOffset = useCallback(
+    (offsetX: number) => {
+      const page = offsetToPage(offsetX);
+      userScrollingRef.current = false;
+      momentumRef.current = false;
+      setDragging(false);
+      setPreviewPage(null);
+      lastPreviewRef.current = page;
+      if (lastCommitRef.current !== page) {
+        lastCommitRef.current = page;
+        onCommit(page);
+      }
+      scrollToPage(page, true);
+    },
+    [offsetToPage, onCommit, scrollToPage]
+  );
+
+  const handleLayout = useCallback(
+    (e: LayoutChangeEvent) => {
+      setViewportWidth(e.nativeEvent.layout.width);
+    },
+    []
+  );
+
+  const handleScroll = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (!userScrollingRef.current) return;
+      updatePreviewFromOffset(e.nativeEvent.contentOffset.x);
+    },
+    [updatePreviewFromOffset]
+  );
+
+  const handleScrollBeginDrag = useCallback(() => {
+    if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
+    userScrollingRef.current = true;
+    momentumRef.current = false;
+    setDragging(true);
+  }, []);
+
+  const handleMomentumScrollBegin = useCallback(() => {
+    momentumRef.current = true;
+    if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
+  }, []);
+
+  const handleScrollEndDrag = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const offsetX = e.nativeEvent.contentOffset.x;
+      if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
+      fallbackTimerRef.current = setTimeout(() => {
+        if (!momentumRef.current) commitFromOffset(offsetX);
+      }, 120);
+    },
+    [commitFromOffset]
+  );
+
+  const handleMomentumScrollEnd = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
+      commitFromOffset(e.nativeEvent.contentOffset.x);
+    },
+    [commitFromOffset]
   );
 
   const livePage = previewPage ?? currentPage;
-
-  const panResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: () => true,
-        onPanResponderGrant: (e) => {
-          setDragging(true);
-          const p = xToPage(e.nativeEvent.pageX);
-          setPreviewPage(p);
-          onPreview?.(p);
-        },
-        onPanResponderMove: (e) => {
-          const p = xToPage(e.nativeEvent.pageX);
-          setPreviewPage(p);
-          onPreview?.(p);
-        },
-        onPanResponderRelease: (e) => {
-          const p = xToPage(e.nativeEvent.pageX);
-          setDragging(false);
-          setPreviewPage(null);
-          onCommit(p);
-        },
-        onPanResponderTerminate: () => {
-          setDragging(false);
-          setPreviewPage(null);
-        },
-      }),
-    [xToPage, onCommit, onPreview]
-  );
-
   const surahName = index?.pageByNumber.get(livePage)
     ? index.surahByNumber.get(index.pageByNumber.get(livePage)!.surah_start)?.name_arabic ?? null
     : null;
 
-  const thumbOffset = pageToOffset(livePage) - THUMB_SIZE / 2;
+  const renderTick = useCallback(
+    ({ item }: ListRenderItemInfo<number>) => {
+      const distance = Math.abs(item - livePage);
+      const active = distance === 0;
+      const major = item === 1 || item === max || item % 20 === 0;
+      return (
+        <View style={{ width: TICK_WIDTH, height: TICK_HEIGHT, alignItems: "center", justifyContent: "center" }}>
+          <View
+            style={{
+              width: active ? 4 : 2,
+              height: active ? 22 : major ? 14 : 8,
+              borderRadius: 2,
+              backgroundColor: active
+                ? "#0d9488"
+                : isDark
+                  ? "rgba(255,255,255,0.2)"
+                  : "rgba(0,54,56,0.22)",
+            }}
+          />
+        </View>
+      );
+    },
+    [isDark, livePage, max]
+  );
 
   return (
     <View
@@ -122,10 +213,10 @@ export function MushafSlider({
         paddingVertical: 8,
       }}
     >
-      {/* Expand button */}
       <Pressable
         onPress={onExpand}
         hitSlop={10}
+        accessibilityLabel={s.goTo}
         style={({ pressed }) => ({
           width: 32,
           height: 32,
@@ -139,61 +230,35 @@ export function MushafSlider({
         <ChevronUp size={16} color={isDark ? "#a3a3a3" : "#003638"} />
       </Pressable>
 
-      {/* Track + thumb */}
-      <View style={{ flex: 1, height: 28, justifyContent: "center" }} {...panResponder.panHandlers}>
+      <View style={{ flex: 1, minWidth: 0 }} onLayout={handleLayout}>
         <View
           pointerEvents="none"
           style={{
             position: "absolute",
             left: 0,
             right: 0,
-            top: -11,
-            flexDirection: isRTL ? "row-reverse" : "row",
+            top: -3,
+            zIndex: 2,
+            flexDirection: "row",
             justifyContent: "space-between",
           }}
         >
           <Text style={{ color: isDark ? "#8a8a8a" : "#8B8178", fontFamily: "Manrope_500Medium", fontSize: 10 }}>
-            {toArabicNumber(604)}
+            {toArabicNumber(max)}
           </Text>
           <Text style={{ color: isDark ? "#8a8a8a" : "#8B8178", fontFamily: "Manrope_500Medium", fontSize: 10 }}>
             {toArabicNumber(1)}
           </Text>
         </View>
-        <View
-          onLayout={onTrackLayout}
-          style={{
-            height: TRACK_HEIGHT,
-            borderRadius: TRACK_HEIGHT / 2,
-            backgroundColor: isDark ? "rgba(255,255,255,0.12)" : "rgba(0,54,56,0.15)",
-          }}
-        />
-        {trackWidth > 0 && (
+
+        {dragging && (
           <View
             pointerEvents="none"
             style={{
               position: "absolute",
-              top: 14 - THUMB_SIZE / 2,
-              left: thumbOffset,
-              width: THUMB_SIZE,
-              height: THUMB_SIZE,
-              borderRadius: THUMB_SIZE / 2,
-              backgroundColor: "#0d9488",
-              shadowColor: "#003638",
-              shadowOpacity: 0.18,
-              shadowRadius: 6,
-              shadowOffset: { width: 0, height: 2 },
-              elevation: 3,
-            }}
-          />
-        )}
-        {/* Floating preview label while dragging */}
-        {dragging && trackWidth > 0 && (
-          <View
-            pointerEvents="none"
-            style={{
-              position: "absolute",
-              left: Math.max(0, Math.min(trackWidth - 110, thumbOffset - 50 + THUMB_SIZE / 2)),
+              alignSelf: "center",
               top: -34,
+              zIndex: 3,
               backgroundColor: "#003638",
               borderRadius: 999,
               paddingHorizontal: 10,
@@ -211,6 +276,47 @@ export function MushafSlider({
             </Text>
           </View>
         )}
+
+        <FlatList
+          ref={listRef}
+          horizontal
+          data={pages}
+          renderItem={renderTick}
+          keyExtractor={(item) => `p-${item}`}
+          getItemLayout={(_, index) => ({
+            length: TICK_WIDTH,
+            offset: TICK_WIDTH * index,
+            index,
+          })}
+          showsHorizontalScrollIndicator={false}
+          snapToInterval={TICK_WIDTH}
+          decelerationRate="fast"
+          disableIntervalMomentum
+          scrollEventThrottle={16}
+          onScroll={handleScroll}
+          onScrollBeginDrag={handleScrollBeginDrag}
+          onMomentumScrollBegin={handleMomentumScrollBegin}
+          onScrollEndDrag={handleScrollEndDrag}
+          onMomentumScrollEnd={handleMomentumScrollEnd}
+          contentContainerStyle={{
+            paddingLeft: centerPadding,
+            paddingRight: centerPadding,
+            paddingTop: 8,
+          }}
+          style={{ height: 38 }}
+          initialNumToRender={24}
+          maxToRenderPerBatch={24}
+          windowSize={9}
+        />
+      </View>
+
+      <View style={{ width: 44, alignItems: "center" }} pointerEvents="none">
+        <Text
+          className="text-primary-accent dark:text-primary-bright"
+          style={{ fontFamily: "Manrope_700Bold", fontSize: 13 }}
+        >
+          {toArabicNumber(livePage)}
+        </Text>
       </View>
     </View>
   );

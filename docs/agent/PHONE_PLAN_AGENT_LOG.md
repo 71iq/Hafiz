@@ -1172,3 +1172,31 @@ Saved in `phase19/`:
   - nested `WordDetailSheet` -> `AyahDetailModal` close path
   - top-most `Escape`
   - body scroll lock and internal overlay scrolling
+
+## 2026-05-09 — Mushaf Navigation Redesign Completed
+
+### Scope decisions
+1. Removed the page picker from `GoToNavigator`; it now exposes only Surah and Juz navigation while retaining its existing props for caller compatibility.
+2. Moved `GoToNavigator` onto `ResponsiveSheet`, `OverlayHeader`, and `OverlayBody`; bookmarks, search, word detail, and other overlays were left unchanged.
+3. Made the bottom page navigator available in all page-mode settings and kept page ordering Mushaf-correct: page `604` is visually left, page `1` is visually right, independent of UI language.
+
+### Implemented in this step
+- `components/mushaf/GoToNavigator.tsx`:
+  - Removed page tab state, page wheel state/effects, page search submit handling, and page tab rendering.
+  - Switched Surah/Juz page resolution to `quran_text.v2_page` so page-mode jumps match QCF2 rendering.
+  - Added shared overlay shell with one internal scroll owner for the active Surah/Juz list.
+- `components/mushaf/MushafSlider.tsx`:
+  - Replaced PanResponder scrubber with a horizontal snap `FlatList` over lightweight page ticks.
+  - Added live preview page state and deferred commit until momentum settles, with a no-momentum fallback.
+- `app/(tabs)/mushaf.tsx`:
+  - Shows the bottom page navigator for page mode regardless of vertical/horizontal page navigation setting.
+  - Raised the phone slider above the mobile tab bar and increased page-mode bottom padding to avoid overlap.
+
+### Validation result
+- `npm run typecheck`: passed.
+- `npm run build:web`: passed.
+- `npx expo start --web --port 8082`: Metro started and served `http://localhost:8082`.
+- Browser smoke:
+  - `360px`: page mode displayed the bottom slider above the mobile tab bar with visual `604 ... 1` ordering.
+  - `768px` and `1024px`: `GoToNavigator` opened as the shared responsive panel and showed only Surah/Juz tabs.
+  - Search, bookmarks, and word detail overlays were not migrated in this scope.
