@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useFocusEffect, router } from "expo-router";
 import { View, Text, Pressable, ActivityIndicator, Platform, useWindowDimensions } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -123,6 +123,7 @@ function MushafInner() {
   const { fontSize, lineHeight, viewMode, setViewMode, pageScroll, isDark, isRTL } = useSettings();
   const s = useStrings();
   const { width: windowWidth } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const isPhone = windowWidth < SIDEBAR_BREAKPOINT;
   // Compact layout under ~480px — phones. Drops labels and tightens gaps.
   const isNarrow = windowWidth < 480;
@@ -372,7 +373,11 @@ function MushafInner() {
 
   const isPageMode = viewMode === "page";
   const showBottomSlider = isPageMode;
-  const mobileBottomNavOffset = isPhone ? 77 : 0;
+  const mobileBottomNavHeight = 69;
+  const mobileBottomNavGap = 8;
+  const mobileBottomNavOffset = isPhone
+    ? Math.max(insets.bottom, 10) + mobileBottomNavHeight + mobileBottomNavGap
+    : 0;
 
   useEffect(() => {
     currentPageRef.current = currentPage;
@@ -680,7 +685,7 @@ function MushafInner() {
             className="flex-1"
             style={{
               paddingTop: chromeVisible ? 0 : 10,
-              paddingBottom: showBottomSlider ? (isPhone ? 149 : 56) : isPhone ? 16 : 0,
+              paddingBottom: isPhone ? 8 : 0,
             }}
           >
             <PageMushaf
@@ -688,19 +693,15 @@ function MushafInner() {
               goToPageRef={goToPageRef}
               onScroll={onScrollHide}
               pagePaddingTop={isPhone ? 14 : 8}
-              pagePaddingBottom={isPhone ? 44 : 32}
+              pagePaddingBottom={isPhone ? 12 : 32}
               pageSidePadding={isPhone ? 22 : 16}
               centerVerticalOnPhone={isPhone}
               horizontalTopInset={isPhone && !chromeVisible && pageScroll === "horizontal" ? 52 : 0}
               horizontalBottomInset={
                 pageScroll === "horizontal"
                   ? isPhone
-                    ? chromeVisible
-                      ? 72
-                      : 18
-                    : showBottomSlider
-                      ? 56
-                      : 0
+                    ? 12
+                    : 18
                   : 0
               }
               highlightedWord={highlightedWord}
@@ -767,7 +768,7 @@ function MushafInner() {
             getItemType={getItemType}
             keyExtractor={keyExtractor}
             extraData={{ fontSize, hideMode, highlightedKey }}
-            contentContainerStyle={{ paddingBottom: isPhone ? 96 : 56 }}
+            contentContainerStyle={{ paddingBottom: isPhone ? 24 : 56 }}
             onScroll={onScrollHide}
             scrollEventThrottle={16}
             onViewableItemsChanged={onViewableItemsChanged}
@@ -813,7 +814,18 @@ function MushafInner() {
           <Animated.View
             pointerEvents={chromeVisible ? "auto" : "none"}
             style={[
-              { position: "absolute", left: 0, right: 0, bottom: mobileBottomNavOffset },
+              {
+                position: Platform.OS === "web" && isPhone ? "fixed" as any : "absolute",
+                left: isPhone ? 12 : 0,
+                right: isPhone ? 12 : 0,
+                bottom: mobileBottomNavOffset,
+                zIndex: 70,
+                borderRadius: isPhone ? 28 : 0,
+                overflow: "hidden",
+                ...(Platform.OS === "web" && isPhone
+                  ? ({ backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)" } as any)
+                  : null),
+              },
               sliderAnimStyle,
             ]}
             className="bg-surface/95 dark:bg-surface-dark/95"

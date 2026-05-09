@@ -1200,3 +1200,27 @@ Saved in `phase19/`:
   - `360px`: page mode displayed the bottom slider above the mobile tab bar with visual `604 ... 1` ordering.
   - `768px` and `1024px`: `GoToNavigator` opened as the shared responsive panel and showed only Surah/Juz tabs.
   - Search, bookmarks, and word detail overlays were not migrated in this scope.
+
+## 2026-05-09 — Mobile Mushaf Bottom Chrome Fix
+
+### Scope decisions
+1. Treated the page navigator and mobile tab bar as floating chrome, not layout-reserving surfaces.
+2. Preserved existing chrome hide/show behavior; hidden chrome still translates out and fades.
+3. Kept content padding minimal so page and verse content can scroll behind the floating controls without a large reserved gap.
+
+### Implemented in this step
+- `components/ui/AppNavigation.tsx`:
+  - Mobile bottom tab bar now uses fixed positioning on web and absolute positioning on native.
+  - Restyled the tab bar as an inset floating glass/surface rail with full rounded corners.
+- `app/(tabs)/mushaf.tsx`:
+  - Page navigator now uses fixed positioning on web and absolute positioning on native.
+  - Page navigator is inset and visually paired above the floating tab bar.
+  - Reduced page-mode screen padding and phone page padding.
+  - Reduced verse-mode phone bottom padding.
+
+### Validation result
+- `npm run typecheck`: passed.
+- `npm run build:web`: passed.
+- Static web smoke via `npx serve dist -l 8084`:
+  - `360px`: mobile tab bar fixed at bottom; page navigator fixed above it; content scrolls behind without the previous large reserved gap.
+  - `412px`: same fixed floating positions confirmed.

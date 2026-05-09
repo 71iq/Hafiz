@@ -113,7 +113,10 @@ function BottomBar(props: BottomTabBarProps) {
       style={[
         styles.bottomContainer,
         {
-          paddingBottom: Math.max(insets.bottom, 12),
+          position: Platform.OS === "web" ? "fixed" as any : "absolute",
+          bottom: Math.max(insets.bottom, 10),
+          paddingBottom: 8,
+          zIndex: 80,
           backgroundColor: isDark ? BAR_BG_DARK : BAR_BG_LIGHT,
           ...Platform.select({
             web: { backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)" } as any,
@@ -375,21 +378,19 @@ const styles = StyleSheet.create({
   // Bottom bar
   bottomContainer: {
     position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
+    left: 12,
+    right: 12,
     flexDirection: "row",
     justifyContent: "space-around",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    borderTopLeftRadius: 44,
-    borderTopRightRadius: 44,
+    paddingHorizontal: 10,
+    paddingTop: 8,
+    borderRadius: 32,
     shadowColor: "#003638",
     shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.03,
-    shadowRadius: 12,
-    elevation: 5,
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    elevation: 8,
   },
   bottomTabItem: {
     flexDirection: "column",
