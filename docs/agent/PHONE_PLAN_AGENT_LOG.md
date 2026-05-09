@@ -1131,3 +1131,44 @@ Saved in `phase19/`:
 ### Status
 - Shared breakpoint ownership is centralized without changing screen behavior.
 - Next step: verify with the npm scripts and continue route-by-route stabilization without widening this pass into a redesign.
+
+## 2026-05-09 — Shared Overlay System Pass
+
+### Scope decisions
+1. Added one canonical adaptive overlay module without redirecting legacy overlay consumers yet.
+- New shared module: `components/ui/ResponsiveOverlay.tsx`.
+
+2. Limited migration scope to:
+- `components/ui/ConfirmDialog.tsx`
+- `components/mushaf/AyahDetailModal.tsx`
+
+3. Left the rest of the overlay fleet on the legacy system for now.
+- This explicitly includes `SearchCommand`, `TranslationLanguagePicker`, `CreateDeckSheet`, `CommentsSheet`, `BookmarksSheet`, `GoToNavigator`, the deck picker inside `AyahBlock`, `WordDetailSheet`, and `Sheet` consumers such as `WriteReflectionSheet` and `SelectionActionBar`.
+
+### Implemented in this step
+- `components/ui/ResponsiveOverlay.tsx` now owns:
+  - shared backdrop
+  - phone sheet versus desktop panel/dialog presentation
+  - web body scroll locking with module-level lock counting
+  - top-most overlay `Escape` handling for nested overlays
+  - shared `OverlayHeader`, `OverlayBody`, and `OverlayFooter` slots
+- `components/ui/ConfirmDialog.tsx` now composes `ResponsiveModal` and preserves the existing public props and destructive confirmation semantics.
+- `components/mushaf/AyahDetailModal.tsx` now composes `ResponsiveSheet` while preserving its public props, QCF2 rendering path, tabs, and nested use from `WordDetailSheet`.
+- `components/ui/index.ts` now re-exports the new shared overlay primitives.
+- Updated:
+  - `docs/agent/WEB_UI_CONTRACT.md`
+  - `docs/agent/UI_AUDIT.md`
+  - `docs/agent/CODEBASE_MAP.md`
+  - `docs/agent/PHONE_PLAN_AGENT_LOG.md`
+
+### Verification target for this pass
+- Required commands:
+  - `npm run typecheck`
+  - `npm run build:web`
+- Manual checks to cover after build:
+  - `360`, `412`, `768`, `1024`
+  - confirm dialog stays compact and centered
+  - ayah detail becomes phone sheet and desktop panel
+  - nested `WordDetailSheet` -> `AyahDetailModal` close path
+  - top-most `Escape`
+  - body scroll lock and internal overlay scrolling

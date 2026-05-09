@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { Modal, Platform, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
+import { Platform, Pressable, Text, View, useWindowDimensions } from "react-native";
 import * as Clipboard from "expo-clipboard";
-import { BookOpenText, Bookmark, MessageCircle, Play, Share2, X } from "lucide-react-native";
+import { BookOpenText, Bookmark, MessageCircle, Play, Share2 } from "lucide-react-native";
 import { ReflectionsSection } from "@/components/reflections/ReflectionsSection";
 import { QiraatTab } from "@/components/mushaf/word-tabs/QiraatTab";
+import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { useDatabase } from "@/lib/database/provider";
 import { isQpcFontLoaded, loadQpcFont, qpcFontName } from "@/lib/fonts/loader";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -61,11 +62,11 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
   const langInfo = getLanguageByCode(translationLanguage);
   const translationIsRtl = langInfo?.direction === "rtl";
   const bookmarked = target ? isBookmarked(target.surah, target.ayah) : false;
-  const modalWidth = Math.min(width - 32, 1080);
-  const maxModalHeight = Math.min(height - 48, 720);
   const quranFontSize = Math.max(fontSize + 6, 32);
   const quranLineHeight = Math.max(lineHeight + 8, 54);
   const iconColor = isDark ? "#a3a3a3" : "#8B8178";
+  const isPhone = width < 768;
+  const maxOverlayHeight = Math.min(height - (isPhone ? 12 : 48), isPhone ? height * 0.94 : 720);
 
   useEffect(() => {
     setActiveTab(initialTab);
@@ -199,127 +200,115 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
   ];
 
   return (
-    <Modal
-      visible={open}
-      transparent
-      animationType="fade"
-      statusBarTranslucent
-      onRequestClose={onClose}
-    >
-      <View className="flex-1 items-center justify-center px-4" style={{ backgroundColor: "rgba(0,0,0,0.55)" }}>
-        <Pressable className="absolute inset-0" onPress={onClose} />
-        <View
-          className="overflow-hidden rounded-3xl bg-surface dark:bg-surface-dark"
-          style={{ width: modalWidth, maxHeight: maxModalHeight }}
-        >
-          <View className={isRTL ? "flex-row-reverse items-center justify-between gap-3 border-b border-warm-200 dark:border-neutral-800 px-5 py-4" : "flex-row items-center justify-between gap-3 border-b border-warm-200 dark:border-neutral-800 px-5 py-4"}>
-            <View className={isRTL ? "flex-row-reverse items-center gap-1.5" : "flex-row items-center gap-1.5"}>
-              <Pressable
-                disabled
-                hitSlop={8}
-                className="rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 px-3 py-2"
-                style={{ opacity: 0.8, cursor: Platform.OS === "web" ? "auto" : undefined }}
+    <ResponsiveSheet open={open} onClose={onClose} maxWidth={1080} maxHeight={maxOverlayHeight}>
+      <OverlayHeader
+        isRTL={isRTL}
+        onClose={onClose}
+        showHandle={isPhone}
+        leading={
+          <View className={isRTL ? "flex-row-reverse items-center gap-1.5" : "flex-row items-center gap-1.5"}>
+            <Pressable
+              disabled
+              hitSlop={8}
+              className="rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 px-3 py-2"
+              style={{ opacity: 0.8, cursor: Platform.OS === "web" ? "auto" : undefined }}
+            >
+              <Text
+                className="text-primary-accent dark:text-primary-bright"
+                style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11 }}
               >
-                <Text
-                  className="text-primary-accent dark:text-primary-bright"
-                  style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11 }}
-                >
-                  {target.surah}:{target.ayah}
-                </Text>
-                {bookmarked && (
-                  <View className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-gold" />
-                )}
-              </Pressable>
-              <ActionIcon icon={<Play size={15} color={iconColor} />} onPress={() => {}} disabled />
-              <ActionIcon
-                icon={<Bookmark size={15} color={bookmarked ? "#FDDC91" : iconColor} fill={bookmarked ? "#FDDC91" : "none"} />}
-                onPress={handleBookmark}
-              />
-              <ActionIcon icon={<Share2 size={15} color={iconColor} />} onPress={handleShare} />
-            </View>
-            <ActionIcon icon={<X size={18} color={isDark ? "#f5f5f5" : "#1f1f1f"} />} onPress={onClose} />
+                {target.surah}:{target.ayah}
+              </Text>
+              {bookmarked && <View className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-gold" />}
+            </Pressable>
+            <ActionIcon icon={<Play size={15} color={iconColor} />} onPress={() => {}} disabled />
+            <ActionIcon
+              icon={<Bookmark size={15} color={bookmarked ? "#FDDC91" : iconColor} fill={bookmarked ? "#FDDC91" : "none"} />}
+              onPress={handleBookmark}
+            />
+            <ActionIcon icon={<Share2 size={15} color={iconColor} />} onPress={handleShare} />
           </View>
+        }
+      />
 
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20 }}>
-            <View style={{ opacity: fontVisible ? 1 : 0, direction: "ltr", alignItems: "flex-end" }}>
-              <View
-                className="self-end"
+      <OverlayBody contentContainerStyle={{ padding: 20 }}>
+        <View style={{ opacity: fontVisible ? 1 : 0, direction: "ltr", alignItems: "flex-end" }}>
+          <View
+            className="self-end"
+            style={{
+              direction: "ltr",
+              flexDirection: "row-reverse",
+              flexWrap: "wrap",
+              justifyContent: "flex-start",
+              alignItems: "center",
+              gap: 4,
+              maxWidth: "100%",
+            }}
+          >
+            {qcf2Words.map((word, index) => (
+              <Text
+                key={`${target.surah}-${target.ayah}-${index}`}
+                className="text-charcoal dark:text-neutral-100"
                 style={{
-                  direction: "ltr",
-                  flexDirection: "row-reverse",
-                  flexWrap: "wrap",
-                  justifyContent: "flex-start",
-                  alignItems: "center",
-                  gap: 4,
-                  maxWidth: "100%",
+                  fontFamily: ayahRow ? qpcFontName(ayahRow.v2_page) : undefined,
+                  fontSize: quranFontSize,
+                  lineHeight: quranLineHeight,
                 }}
               >
-                {qcf2Words.map((word, index) => (
-                  <Text
-                    key={`${target.surah}-${target.ayah}-${index}`}
-                    className="text-charcoal dark:text-neutral-100"
-                    style={{
-                      fontFamily: ayahRow ? qpcFontName(ayahRow.v2_page) : undefined,
-                      fontSize: quranFontSize,
-                      lineHeight: quranLineHeight,
-                    }}
-                  >
-                    {word}
-                  </Text>
-                ))}
-              </View>
-            </View>
-
-            <View className={isRTL ? "mt-5 flex-row-reverse flex-wrap gap-2" : "mt-5 flex-row flex-wrap gap-2"}>
-              {tabs.map((tab) => (
-                <TabButton
-                  key={tab.key}
-                  label={tab.label}
-                  icon={tab.icon}
-                  active={activeTab === tab.key}
-                  onPress={() => setActiveTab(tab.key)}
-                />
-              ))}
-            </View>
-
-            <View className="mt-4 rounded-2xl bg-surface-low dark:bg-surface-dark-low px-4 py-3">
-              {activeTab === "translation" && (
-                <Text
-                  className="text-charcoal dark:text-neutral-200"
-                  style={{
-                    fontFamily: "Manrope_400Regular",
-                    fontSize: 16,
-                    lineHeight: 26,
-                    writingDirection: translationIsRtl ? "rtl" : "ltr",
-                    textAlign: translationIsRtl ? "right" : "left",
-                  }}
-                >
-                  {showTranslation ? (translationText ?? s.loading) : s.loading}
-                </Text>
-              )}
-              {activeTab === "tafsir" && (
-                <Text
-                  className="text-warm-700 dark:text-neutral-300"
-                  style={{
-                    fontFamily: "Manrope_400Regular",
-                    fontSize: 15,
-                    lineHeight: 26,
-                    writingDirection: "rtl",
-                    textAlign: "right",
-                  }}
-                >
-                  {tafseerText ?? s.loading}
-                </Text>
-              )}
-              {activeTab === "qiraat" && <QiraatTab surah={target.surah} ayah={target.ayah} />}
-              {activeTab === "reflections" && (
-                <ReflectionsSection surah={target.surah} ayah={target.ayah} initiallyExpanded showHeader={false} />
-              )}
-            </View>
-          </ScrollView>
+                {word}
+              </Text>
+            ))}
+          </View>
         </View>
-      </View>
-    </Modal>
+
+        <View className={isRTL ? "mt-5 flex-row-reverse flex-wrap gap-2" : "mt-5 flex-row flex-wrap gap-2"}>
+          {tabs.map((tab) => (
+            <TabButton
+              key={tab.key}
+              label={tab.label}
+              icon={tab.icon}
+              active={activeTab === tab.key}
+              onPress={() => setActiveTab(tab.key)}
+            />
+          ))}
+        </View>
+
+        <View className="mt-4 rounded-2xl bg-surface-low dark:bg-surface-dark-low px-4 py-3">
+          {activeTab === "translation" && (
+            <Text
+              className="text-charcoal dark:text-neutral-200"
+              style={{
+                fontFamily: "Manrope_400Regular",
+                fontSize: 16,
+                lineHeight: 26,
+                writingDirection: translationIsRtl ? "rtl" : "ltr",
+                textAlign: translationIsRtl ? "right" : "left",
+              }}
+            >
+              {showTranslation ? (translationText ?? s.loading) : s.loading}
+            </Text>
+          )}
+          {activeTab === "tafsir" && (
+            <Text
+              className="text-warm-700 dark:text-neutral-300"
+              style={{
+                fontFamily: "Manrope_400Regular",
+                fontSize: 15,
+                lineHeight: 26,
+                writingDirection: "rtl",
+                textAlign: "right",
+              }}
+            >
+              {tafseerText ?? s.loading}
+            </Text>
+          )}
+          {activeTab === "qiraat" && <QiraatTab surah={target.surah} ayah={target.ayah} />}
+          {activeTab === "reflections" && (
+            <ReflectionsSection surah={target.surah} ayah={target.ayah} initiallyExpanded showHeader={false} />
+          )}
+        </View>
+      </OverlayBody>
+    </ResponsiveSheet>
   );
 }
 

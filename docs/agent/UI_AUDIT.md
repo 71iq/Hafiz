@@ -51,6 +51,16 @@ This audit records the current UI stabilization risks before app UI code changes
   - a broader content-width system is still pending because this pass does not redesign or normalize route-local width caps
 
 ### 5. Overlay behavior is fragmented across many one-off modals
+- Partial remediation is now in place through `components/ui/ResponsiveOverlay.tsx`, the canonical adaptive overlay shell for this pass.
+- Migrated consumers in this pass:
+  - `components/ui/ConfirmDialog.tsx`
+  - `components/mushaf/AyahDetailModal.tsx`
+- Shared behavior now covered for migrated consumers:
+  - matching backdrop
+  - web body scroll locking
+  - top-most `Escape` dismissal
+  - shared header/body/footer slots
+  - phone sheet versus desktop panel/dialog presentation
 - Shared `Sheet` is used by:
   - `components/mushaf/SelectionActionBar.tsx`
   - `components/reflections/WriteReflectionSheet.tsx`
@@ -66,6 +76,16 @@ This audit records the current UI stabilization risks before app UI code changes
   - `components/mushaf/WordDetailSheet.tsx`
   - the deck picker inside `components/mushaf/AyahBlock.tsx`
 - `components/ui/MobilePrimitives.tsx` includes `MobileBottomSheet`, but nothing consumes it yet.
+- Remaining legacy overlay backlog after this pass:
+  - `components/SearchCommand.tsx`
+  - `components/settings/TranslationLanguagePicker.tsx`
+  - `components/flashcards/CreateDeckSheet.tsx`
+  - `components/reflections/CommentsSheet.tsx`
+  - `components/mushaf/BookmarksSheet.tsx`
+  - `components/mushaf/GoToNavigator.tsx`
+  - deck picker inside `components/mushaf/AyahBlock.tsx`
+  - `components/mushaf/WordDetailSheet.tsx`
+  - legacy `Sheet` consumers such as `components/reflections/WriteReflectionSheet.tsx` and `components/mushaf/SelectionActionBar.tsx`
 - Impact:
   - inconsistent backdrop opacity
   - inconsistent animation styles

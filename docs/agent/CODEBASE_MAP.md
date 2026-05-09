@@ -83,6 +83,7 @@ This document maps the current web-facing UI surfaces in Hafiz before the stabil
 - `components/ui/Toast.tsx`
 - `components/ui/AuthGate.tsx`
 - `components/ui/ConfirmDialog.tsx`
+- `components/ui/ResponsiveOverlay.tsx`
 - `components/ui/Sheet.tsx`
 - `components/ui/ErrorBoundary.tsx`
 - `components/ui/AppNavigation.tsx`
@@ -155,12 +156,12 @@ These exports currently exist as a parallel primitive layer or dormant surface a
 | Surface | File | Primitive |
 | --- | --- | --- |
 | Search | `components/SearchCommand.tsx` | raw `Modal` |
-| Confirm dialog | `components/ui/ConfirmDialog.tsx` | raw `Modal` |
+| Confirm dialog | `components/ui/ConfirmDialog.tsx` | `ResponsiveModal` |
 | Translation language picker | `components/settings/TranslationLanguagePicker.tsx` | raw `Modal` |
 | Create deck | `components/flashcards/CreateDeckSheet.tsx` | raw `Modal` |
 | Bookmarks | `components/mushaf/BookmarksSheet.tsx` | raw `Modal` |
 | Go to page/surah/juz | `components/mushaf/GoToNavigator.tsx` | raw `Modal` |
-| Ayah detail | `components/mushaf/AyahDetailModal.tsx` | raw `Modal` |
+| Ayah detail | `components/mushaf/AyahDetailModal.tsx` | `ResponsiveSheet` |
 | Word detail | `components/mushaf/WordDetailSheet.tsx` | raw `Modal` |
 | Reflections comments | `components/reflections/CommentsSheet.tsx` | raw `Modal` |
 | Selection actions | `components/mushaf/SelectionActionBar.tsx` | shared `Sheet` |
@@ -168,7 +169,7 @@ These exports currently exist as a parallel primitive layer or dormant surface a
 | Mobile bottom sheet prototype | `components/ui/MobilePrimitives.tsx` | `MobileBottomSheet` export, not adopted |
 | Deck picker inside ayah block | `components/mushaf/AyahBlock.tsx` | inline raw `Modal` |
 
-Current implication: Hafiz has one shared sheet primitive and many one-off modal shells with separate width, backdrop, safe-area, animation, and close behavior rules.
+Current implication: `components/ui/ResponsiveOverlay.tsx` is now the canonical adaptive overlay shell, but most overlays still remain on the legacy `Modal` or `Sheet` paths with separate width, backdrop, safe-area, animation, and close behavior rules.
 
 ## Responsive Breakpoints And Width Rules
 

@@ -60,6 +60,9 @@ This document is the authoritative execution contract for the Hafiz web UI stabi
 - Use one shared adaptive content-sheet pattern for non-destructive content overlays.
 - Use one shared confirmation-dialog pattern for destructive actions.
 - Use route-local specialization only for reader-specific behavior that cannot fit the shared shell.
+- The canonical shared module is `components/ui/ResponsiveOverlay.tsx`.
+- In the current pass, only `components/ui/ConfirmDialog.tsx` and `components/mushaf/AyahDetailModal.tsx` are migrated to that shared shell.
+- Legacy overlay systems such as `components/ui/Sheet.tsx`, `MobileBottomSheet`, `WordDetailSheet`, search, comments, bookmarks, go-to, deck picker, and translation picker remain in place until later migration passes.
 
 ### Required shared behaviors
 - consistent backdrop opacity
@@ -68,6 +71,8 @@ This document is the authoritative execution contract for the Hafiz web UI stabi
 - safe-area aware bottom padding
 - scroll ownership inside the overlay, not accidental body scrolling
 - width and max-height rules derived from the shared viewport contract
+- web body scroll locking while overlays are open
+- top-most `Escape` handling so nested overlays close one level at a time
 
 ### Nested overlay rule
 - Nested overlays are allowed only when the parent context must stay active and the child is clearly subordinate.
