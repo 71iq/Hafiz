@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Platform, Pressable, Text, View, useWindowDimensions } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { BookOpenText, Bookmark, MessageCircle, Play, Share2 } from "lucide-react-native";
@@ -6,7 +6,6 @@ import { ReflectionsSection } from "@/components/reflections/ReflectionsSection"
 import { QiraatTab } from "@/components/mushaf/word-tabs/QiraatTab";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { useDatabase } from "@/lib/database/provider";
-import { isQpcFontLoaded, loadQpcFont, qpcFontName } from "@/lib/fonts/loader";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { formatForCopy } from "@/lib/selection/format";
 import {
@@ -24,9 +23,7 @@ type TargetAyah = {
 };
 
 type AyahRow = {
-  text_qcf2: string;
   text_uthmani: string;
-  v2_page: number;
 };
 
 type TabKey = "translation" | "tafsir" | "qiraat" | "reflections";
@@ -42,8 +39,6 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
   const s = useStrings();
   const { width, height } = useWindowDimensions();
   const {
-    fontSize,
-    lineHeight,
     translationLanguage,
     tafseerSource,
     uiLanguage,
@@ -54,7 +49,6 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
   const [ayahRow, setAyahRow] = useState<AyahRow | null>(null);
   const [translationText, setTranslationText] = useState<string | null>(null);
   const [tafseerText, setTafseerText] = useState<string | null>(null);
-  const [fontVisible, setFontVisible] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
 
   const open = target !== null;
@@ -62,8 +56,6 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
   const langInfo = getLanguageByCode(translationLanguage);
   const translationIsRtl = langInfo?.direction === "rtl";
   const bookmarked = target ? isBookmarked(target.surah, target.ayah) : false;
-  const quranFontSize = Math.max(fontSize + 6, 32);
-  const quranLineHeight = Math.max(lineHeight + 8, 54);
   const iconColor = isDark ? "#a3a3a3" : "#8B8178";
   const isPhone = width < 768;
   const maxOverlayHeight = Math.min(height - (isPhone ? 12 : 48), isPhone ? height * 0.94 : 720);
@@ -73,7 +65,6 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
     setAyahRow(null);
     setTranslationText(null);
     setTafseerText(null);
-    setFontVisible(false);
   }, [target?.surah, target?.ayah, initialTab]);
 
   useEffect(() => {
@@ -86,7 +77,7 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
     if (!target) return;
     let cancelled = false;
     db.getFirstAsync<AyahRow>(
-      "SELECT text_qcf2, text_uthmani, v2_page FROM quran_text WHERE surah = ? AND ayah = ?",
+      "SELECT text_uthmani FROM quran_text WHERE surah = ? AND ayah = ?",
       [target.surah, target.ayah]
     ).then((row) => {
       if (!cancelled) setAyahRow(row ?? null);
@@ -95,22 +86,6 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
       cancelled = true;
     };
   }, [db, target]);
-
-  useEffect(() => {
-    const page = ayahRow?.v2_page;
-    if (!page) return;
-    if (isQpcFontLoaded(page)) {
-      setFontVisible(true);
-      return;
-    }
-    let cancelled = false;
-    loadQpcFont(page).then(() => {
-      if (!cancelled) requestAnimationFrame(() => setFontVisible(true));
-    }).catch(console.warn);
-    return () => {
-      cancelled = true;
-    };
-  }, [ayahRow?.v2_page]);
 
   useEffect(() => {
     if (!target || !showTranslation) return;
@@ -149,11 +124,6 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
       cancelled = true;
     };
   }, [db, target, tafseerSource]);
-
-  const qcf2Words = useMemo(
-    () => ayahRow?.text_qcf2.split(" ").filter(Boolean) ?? [],
-    [ayahRow?.text_qcf2]
-  );
 
   const handleBookmark = useCallback(async () => {
     if (!target) return;
@@ -232,36 +202,7 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
       />
 
       <OverlayBody contentContainerStyle={{ padding: 20 }}>
-        <View style={{ opacity: fontVisible ? 1 : 0, direction: "ltr", alignItems: "flex-end" }}>
-          <View
-            className="self-end"
-            style={{
-              direction: "ltr",
-              flexDirection: "row-reverse",
-              flexWrap: "wrap",
-              justifyContent: "flex-start",
-              alignItems: "center",
-              gap: 4,
-              maxWidth: "100%",
-            }}
-          >
-            {qcf2Words.map((word, index) => (
-              <Text
-                key={`${target.surah}-${target.ayah}-${index}`}
-                className="text-charcoal dark:text-neutral-100"
-                style={{
-                  fontFamily: ayahRow ? qpcFontName(ayahRow.v2_page) : undefined,
-                  fontSize: quranFontSize,
-                  lineHeight: quranLineHeight,
-                }}
-              >
-                {word}
-              </Text>
-            ))}
-          </View>
-        </View>
-
-        <View className={isRTL ? "mt-5 flex-row-reverse flex-wrap gap-2" : "mt-5 flex-row flex-wrap gap-2"}>
+        <View className={isRTL ? "flex-row-reverse flex-wrap gap-2" : "flex-row flex-wrap gap-2"}>
           {tabs.map((tab) => (
             <TabButton
               key={tab.key}
