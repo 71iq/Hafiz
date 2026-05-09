@@ -1,0 +1,6 @@
+- generic [ref=e8]:
+  - generic [ref=e9]: QA Readiness
+  - generic [ref=e10]: Wait for ready before starting screenshot capture.
+  - generic [ref=e11]:
+    - generic [ref=e12]: QA_WAITING
+    - generic [ref=e13]: Preparing database...
