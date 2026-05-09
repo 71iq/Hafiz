@@ -299,10 +299,17 @@ export function GoToNavigator({
   );
 
   return (
-    <ResponsiveSheet open={visible} onClose={onClose} maxWidth={520} maxHeight="88%" dismissOnBackdrop>
+    <ResponsiveSheet
+      open={visible}
+      onClose={onClose}
+      maxWidth={520}
+      maxHeight="88%"
+      dismissOnBackdrop
+      surfaceColor={isDark ? "#1C1917" : "#FFF8F1"}
+    >
       <OverlayHeader title={s.goToTitle} onClose={onClose} showHandle isRTL={isRTL} />
 
-      <View className="px-5 pt-4">
+      <View className="bg-surface dark:bg-surface-dark px-5 pt-4">
         <View
           className={`items-center bg-surface-low dark:bg-surface-dark-mid rounded-2xl px-4 py-3 ${isRTL ? "flex-row-reverse" : "flex-row"}`}
         >
@@ -360,8 +367,13 @@ export function GoToNavigator({
         </View>
       </View>
 
-      <OverlayBody className="px-5" contentContainerClassName="pb-6">
-        {tab === "surah" ? renderSurahList() : renderJuzList()}
+      <OverlayBody
+        className="bg-surface dark:bg-surface-dark px-5"
+        contentContainerClassName="bg-surface dark:bg-surface-dark pb-6"
+      >
+        <View className="bg-surface dark:bg-surface-dark">
+          {tab === "surah" ? renderSurahList() : renderJuzList()}
+        </View>
       </OverlayBody>
     </ResponsiveSheet>
   );
