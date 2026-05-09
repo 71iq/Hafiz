@@ -5,7 +5,7 @@ import { useDatabase } from "@/lib/database/provider";
 import { toArabicNumber } from "@/lib/arabic";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { useSettings } from "@/lib/settings/context";
-import { ResponsiveSheet, OverlayHeader, OverlayBody } from "@/components/ui/ResponsiveOverlay";
+import { ResponsiveOverlay, OverlayHeader, OverlayBody } from "@/components/ui/ResponsiveOverlay";
 
 type SurahRow = {
   number: number;
@@ -299,15 +299,17 @@ export function GoToNavigator({
   );
 
   return (
-    <ResponsiveSheet
+    <ResponsiveOverlay
       open={visible}
       onClose={onClose}
+      phonePresentation="sheet"
+      desktopPresentation="dialog"
       maxWidth={520}
       maxHeight="88%"
       dismissOnBackdrop
       surfaceColor={isDark ? "#1C1917" : "#FFF8F1"}
     >
-      <OverlayHeader title={s.goToTitle} onClose={onClose} showHandle isRTL={isRTL} />
+      <OverlayHeader title={s.goToTitle} onClose={onClose} showHandle={Platform.OS !== "web"} isRTL={isRTL} />
 
       <View className="bg-surface dark:bg-surface-dark px-5 pt-4">
         <View
@@ -375,6 +377,6 @@ export function GoToNavigator({
           {tab === "surah" ? renderSurahList() : renderJuzList()}
         </View>
       </OverlayBody>
-    </ResponsiveSheet>
+    </ResponsiveOverlay>
   );
 }

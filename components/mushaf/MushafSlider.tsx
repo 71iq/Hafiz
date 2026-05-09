@@ -4,6 +4,7 @@ import {
   Text,
   Pressable,
   FlatList,
+  Platform,
   type ListRenderItemInfo,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -31,6 +32,7 @@ type Props = {
 
 const TICK_WIDTH = 26;
 const TICK_HEIGHT = 20;
+const WHEEL_STEP = TICK_WIDTH * 2;
 
 export function MushafSlider({
   currentPage,
@@ -46,9 +48,17 @@ export function MushafSlider({
   const [viewportWidth, setViewportWidth] = useState(0);
   const [previewPage, setPreviewPage] = useState<number | null>(null);
   const [dragging, setDragging] = useState(false);
+  const activeOffsetRef = useRef(0);
   const userScrollingRef = useRef(false);
   const momentumRef = useRef(false);
   const programmaticScrollRef = useRef(false);
+  const pointerDragRef = useRef<{
+    active: boolean;
+    pointerId: number | null;
+    startX: number;
+    startOffset: number;
+    moved: boolean;
+  }>({ active: false, pointerId: null, startX: 0, startOffset: 0, moved: false });
   const fallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const programmaticTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -84,6 +94,7 @@ export function MushafSlider({
         offset: pageToOffset(page),
         animated,
       });
+      activeOffsetRef.current = pageToOffset(page);
       programmaticTimerRef.current = setTimeout(() => {
         programmaticScrollRef.current = false;
         programmaticTimerRef.current = null;
@@ -152,6 +163,7 @@ export function MushafSlider({
         setDragging(true);
       }
       const offsetX = e.nativeEvent.contentOffset.x;
+      activeOffsetRef.current = offsetX;
       updatePreviewFromOffset(offsetX);
       if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
       settleTimerRef.current = setTimeout(() => {
@@ -177,6 +189,7 @@ export function MushafSlider({
   const handleScrollEndDrag = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
       const offsetX = e.nativeEvent.contentOffset.x;
+      activeOffsetRef.current = offsetX;
       if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
       if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
       fallbackTimerRef.current = setTimeout(() => {
@@ -190,15 +203,110 @@ export function MushafSlider({
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
       if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
       if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
+      activeOffsetRef.current = e.nativeEvent.contentOffset.x;
       commitFromOffset(e.nativeEvent.contentOffset.x);
     },
     [commitFromOffset]
   );
 
+  const beginPointerDrag = useCallback((pointerId: number, clientX: number) => {
+    if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
+    if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
+    pointerDragRef.current = {
+      active: true,
+      pointerId,
+      startX: clientX,
+      startOffset: activeOffsetRef.current,
+      moved: false,
+    };
+    userScrollingRef.current = true;
+    momentumRef.current = false;
+    setDragging(true);
+  }, []);
+
+  const updatePointerDrag = useCallback(
+    (clientX: number) => {
+      const state = pointerDragRef.current;
+      if (!state.active) return;
+      const deltaX = clientX - state.startX;
+      const nextOffset = Math.max(0, Math.min(pageToOffset(1), state.startOffset + deltaX));
+      if (Math.abs(deltaX) > 2) state.moved = true;
+      activeOffsetRef.current = nextOffset;
+      listRef.current?.scrollToOffset({ offset: nextOffset, animated: false });
+      updatePreviewFromOffset(nextOffset);
+    },
+    [pageToOffset, updatePreviewFromOffset]
+  );
+
+  const endPointerDrag = useCallback(() => {
+    if (!pointerDragRef.current.active) return;
+    pointerDragRef.current = {
+      active: false,
+      pointerId: null,
+      startX: 0,
+      startOffset: 0,
+      moved: false,
+    };
+    commitFromOffset(activeOffsetRef.current);
+  }, [commitFromOffset]);
+
+  const handlePointerDown = useCallback((e: any) => {
+    if (Platform.OS !== "web") return;
+    beginPointerDrag(e.nativeEvent.pointerId ?? 0, e.nativeEvent.clientX ?? 0);
+  }, [beginPointerDrag]);
+
+  const handlePointerMove = useCallback((e: any) => {
+    if (Platform.OS !== "web") return;
+    const state = pointerDragRef.current;
+    if (!state.active) return;
+    if (state.pointerId != null && e.nativeEvent.pointerId !== state.pointerId) return;
+    updatePointerDrag(e.nativeEvent.clientX ?? 0);
+  }, [updatePointerDrag]);
+
+  const handlePointerUp = useCallback((e: any) => {
+    if (Platform.OS !== "web") return;
+    const state = pointerDragRef.current;
+    if (!state.active) return;
+    if (state.pointerId != null && e.nativeEvent.pointerId !== state.pointerId) return;
+    endPointerDrag();
+  }, [endPointerDrag]);
+
+  const handleWheel = useCallback((e: any) => {
+    if (Platform.OS !== "web") return;
+    const nativeEvent = e.nativeEvent;
+    const delta = Math.abs(nativeEvent.deltaX) > Math.abs(nativeEvent.deltaY)
+      ? nativeEvent.deltaX
+      : nativeEvent.deltaY;
+    if (!delta) return;
+    if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
+    if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
+    userScrollingRef.current = true;
+    momentumRef.current = false;
+    setDragging(true);
+    const nextOffset = Math.max(0, Math.min(pageToOffset(1), activeOffsetRef.current + (delta > 0 ? WHEEL_STEP : -WHEEL_STEP)));
+    activeOffsetRef.current = nextOffset;
+    listRef.current?.scrollToOffset({ offset: nextOffset, animated: false });
+    updatePreviewFromOffset(nextOffset);
+    settleTimerRef.current = setTimeout(() => {
+      commitFromOffset(nextOffset);
+    }, 140);
+  }, [commitFromOffset, pageToOffset, updatePreviewFromOffset]);
+
   const livePage = previewPage ?? currentPage;
   const surahName = index?.pageByNumber.get(livePage)
     ? index.surahByNumber.get(index.pageByNumber.get(livePage)!.surah_start)?.name_arabic ?? null
     : null;
+  const webPointerProps =
+    Platform.OS === "web"
+      ? ({
+          onPointerDown: handlePointerDown,
+          onPointerMove: handlePointerMove,
+          onPointerUp: handlePointerUp,
+          onPointerCancel: handlePointerUp,
+          onPointerLeave: handlePointerUp,
+          onWheel: handleWheel,
+        } as any)
+      : undefined;
 
   const renderTick = useCallback(
     ({ item }: ListRenderItemInfo<number>) => {
@@ -262,7 +370,11 @@ export function MushafSlider({
         <ChevronsUp size={12} color={isDark ? "#a3a3a3" : "#003638"} />
       </Pressable>
 
-      <View style={{ flex: 1, minWidth: 0 }} onLayout={handleLayout}>
+      <View
+        style={{ flex: 1, minWidth: 0 }}
+        onLayout={handleLayout}
+        {...webPointerProps}
+      >
         {dragging && (
           <View
             pointerEvents="none"

@@ -1309,3 +1309,22 @@ Saved in `phase19/`:
 - `npm run typecheck`: passed.
 - `npm run build:web`: passed.
 - Attempted `npx expo start --web --port 8086` and `npx expo start --web --port 8086 --localhost`, but Expo failed to boot in this environment with `AggregateError` before a live tablet smoke pass could run.
+
+## 2026-05-09 — GoTo Overlay Shape + Desktop Slider Mouse Input
+
+### Scope decisions
+1. Kept `GoToNavigator` as a phone sheet, but changed desktop/tablet presentation to a rounded dialog so the surface no longer ends with sharp bottom corners.
+2. Added explicit web mouse support to the page rail instead of relying only on native momentum scroll events.
+
+### Implemented in this step
+- `components/mushaf/GoToNavigator.tsx`:
+  - Switched from `ResponsiveSheet` to `ResponsiveOverlay` with `phonePresentation="sheet"` and `desktopPresentation="dialog"`.
+  - Limited the drag handle to non-web sheet presentation.
+- `components/mushaf/MushafSlider.tsx`:
+  - Added web pointer drag handling that previews pages while dragging and commits on release.
+  - Added web wheel handling that moves the rail in fixed steps and commits after settle.
+  - Kept existing snap/commit behavior for touch/native scrolling.
+
+### Validation result
+- `npm run typecheck`: passed.
+- `npm run build:web`: passed.
