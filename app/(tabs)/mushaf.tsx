@@ -381,7 +381,7 @@ function MushafInner() {
     : 0;
   const tabletRailBottom = isTablet ? Math.max(insets.bottom, 16) : 0;
   const tabletRailHeight = isTablet ? 52 : 0;
-  const tabletRailSpacing = isTablet ? 18 : 0;
+  const tabletRailSpacing = isTablet ? 8 : 0;
   const floatingRailSurface = {
     backgroundColor: isDark ? "rgba(28,25,23,0.95)" : "rgba(255,248,241,0.95)",
     borderWidth: 1,
@@ -686,7 +686,7 @@ function MushafInner() {
               goToPageRef={goToPageRef}
               onScroll={onScrollHide}
               pagePaddingTop={isPhone ? 14 : 8}
-              pagePaddingBottom={isPhone ? 12 : isTablet ? 44 : 32}
+              pagePaddingBottom={isPhone ? 12 : isTablet ? 18 : 32}
               pageSidePadding={isPhone ? 22 : 16}
               centerVerticalOnPhone={isPhone}
               horizontalTopInset={isPhone && !chromeVisible && pageScroll === "horizontal" ? 52 : 0}
@@ -695,7 +695,7 @@ function MushafInner() {
                   ? isPhone
                     ? 12
                     : isTablet
-                      ? tabletRailHeight + tabletRailBottom + 12
+                      ? tabletRailHeight + tabletRailBottom + 6
                       : 18
                   : 0
               }

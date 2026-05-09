@@ -1292,3 +1292,20 @@ Saved in `phase19/`:
 - Playwright smoke:
   - `768x1024`: page mode showed the floating tablet rail with full inset width and preserved bottom reading space.
   - `1024x1366`: same full-width floating tablet rail treatment confirmed.
+
+## 2026-05-09 — Tablet Page Dead-Space Reduction
+
+### Scope decisions
+1. Keep the floating tablet rail unchanged.
+2. Reduce the redundant blank band under Quran text in tablet page mode by shrinking tablet-only page bottom padding and extra rail spacing.
+
+### Implemented in this step
+- `app/(tabs)/mushaf.tsx`:
+  - Reduced `tabletRailSpacing` from `18` to `8`.
+  - Reduced tablet `pagePaddingBottom` from `44` to `18`.
+  - Reduced tablet horizontal page bottom inset from `rail + 12` to `rail + 6`.
+
+### Validation result
+- `npm run typecheck`: passed.
+- `npm run build:web`: passed.
+- Attempted `npx expo start --web --port 8086` and `npx expo start --web --port 8086 --localhost`, but Expo failed to boot in this environment with `AggregateError` before a live tablet smoke pass could run.
