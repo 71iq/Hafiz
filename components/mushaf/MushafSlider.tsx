@@ -45,6 +45,7 @@ export function MushafSlider({
   const { isRTL, isDark } = useSettings();
   const s = useStrings();
   const listRef = useRef<FlatList<number>>(null);
+  const railHostRef = useRef<any>(null);
   const [viewportWidth, setViewportWidth] = useState(0);
   const [previewPage, setPreviewPage] = useState<number | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -250,63 +251,65 @@ export function MushafSlider({
     commitFromOffset(activeOffsetRef.current);
   }, [commitFromOffset]);
 
-  const handlePointerDown = useCallback((e: any) => {
+  useEffect(() => {
     if (Platform.OS !== "web") return;
-    beginPointerDrag(e.nativeEvent.pointerId ?? 0, e.nativeEvent.clientX ?? 0);
-  }, [beginPointerDrag]);
+    const host = railHostRef.current?.getNode?.() ?? railHostRef.current;
+    if (!host?.addEventListener) return;
 
-  const handlePointerMove = useCallback((e: any) => {
-    if (Platform.OS !== "web") return;
-    const state = pointerDragRef.current;
-    if (!state.active) return;
-    if (state.pointerId != null && e.nativeEvent.pointerId !== state.pointerId) return;
-    updatePointerDrag(e.nativeEvent.clientX ?? 0);
-  }, [updatePointerDrag]);
+    const onPointerDown = (event: PointerEvent) => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      beginPointerDrag(event.pointerId, event.clientX);
+    };
+    const onPointerMove = (event: PointerEvent) => {
+      const state = pointerDragRef.current;
+      if (!state.active || state.pointerId !== event.pointerId) return;
+      event.preventDefault();
+      updatePointerDrag(event.clientX);
+    };
+    const onPointerUp = (event: PointerEvent) => {
+      const state = pointerDragRef.current;
+      if (!state.active || state.pointerId !== event.pointerId) return;
+      event.preventDefault();
+      endPointerDrag();
+    };
+    const onWheel = (event: WheelEvent) => {
+      const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
+      if (!delta) return;
+      event.preventDefault();
+      if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
+      if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
+      userScrollingRef.current = true;
+      momentumRef.current = false;
+      setDragging(true);
+      const nextOffset = Math.max(0, Math.min(pageToOffset(1), activeOffsetRef.current + (delta > 0 ? WHEEL_STEP : -WHEEL_STEP)));
+      activeOffsetRef.current = nextOffset;
+      listRef.current?.scrollToOffset({ offset: nextOffset, animated: false });
+      updatePreviewFromOffset(nextOffset);
+      settleTimerRef.current = setTimeout(() => {
+        commitFromOffset(nextOffset);
+      }, 140);
+    };
 
-  const handlePointerUp = useCallback((e: any) => {
-    if (Platform.OS !== "web") return;
-    const state = pointerDragRef.current;
-    if (!state.active) return;
-    if (state.pointerId != null && e.nativeEvent.pointerId !== state.pointerId) return;
-    endPointerDrag();
-  }, [endPointerDrag]);
+    host.addEventListener("pointerdown", onPointerDown);
+    host.addEventListener("wheel", onWheel, { passive: false });
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointercancel", onPointerUp);
 
-  const handleWheel = useCallback((e: any) => {
-    if (Platform.OS !== "web") return;
-    const nativeEvent = e.nativeEvent;
-    const delta = Math.abs(nativeEvent.deltaX) > Math.abs(nativeEvent.deltaY)
-      ? nativeEvent.deltaX
-      : nativeEvent.deltaY;
-    if (!delta) return;
-    if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
-    if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
-    userScrollingRef.current = true;
-    momentumRef.current = false;
-    setDragging(true);
-    const nextOffset = Math.max(0, Math.min(pageToOffset(1), activeOffsetRef.current + (delta > 0 ? WHEEL_STEP : -WHEEL_STEP)));
-    activeOffsetRef.current = nextOffset;
-    listRef.current?.scrollToOffset({ offset: nextOffset, animated: false });
-    updatePreviewFromOffset(nextOffset);
-    settleTimerRef.current = setTimeout(() => {
-      commitFromOffset(nextOffset);
-    }, 140);
-  }, [commitFromOffset, pageToOffset, updatePreviewFromOffset]);
+    return () => {
+      host.removeEventListener("pointerdown", onPointerDown);
+      host.removeEventListener("wheel", onWheel);
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerUp);
+    };
+  }, [beginPointerDrag, commitFromOffset, endPointerDrag, pageToOffset, updatePointerDrag, updatePreviewFromOffset]);
 
   const livePage = previewPage ?? currentPage;
   const surahName = index?.pageByNumber.get(livePage)
     ? index.surahByNumber.get(index.pageByNumber.get(livePage)!.surah_start)?.name_arabic ?? null
     : null;
-  const webPointerProps =
-    Platform.OS === "web"
-      ? ({
-          onPointerDown: handlePointerDown,
-          onPointerMove: handlePointerMove,
-          onPointerUp: handlePointerUp,
-          onPointerCancel: handlePointerUp,
-          onPointerLeave: handlePointerUp,
-          onWheel: handleWheel,
-        } as any)
-      : undefined;
 
   const renderTick = useCallback(
     ({ item }: ListRenderItemInfo<number>) => {
@@ -371,9 +374,15 @@ export function MushafSlider({
       </Pressable>
 
       <View
-        style={{ flex: 1, minWidth: 0 }}
+        ref={railHostRef}
+        style={{
+          flex: 1,
+          minWidth: 0,
+          ...(Platform.OS === "web"
+            ? ({ cursor: dragging ? "grabbing" : "grab", touchAction: "none", userSelect: "none" } as any)
+            : null),
+        }}
         onLayout={handleLayout}
-        {...webPointerProps}
       >
         {dragging && (
           <View

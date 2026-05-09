@@ -302,14 +302,14 @@ export function GoToNavigator({
     <ResponsiveOverlay
       open={visible}
       onClose={onClose}
-      phonePresentation="sheet"
+      phonePresentation="dialog"
       desktopPresentation="dialog"
       maxWidth={520}
       maxHeight="88%"
       dismissOnBackdrop
       surfaceColor={isDark ? "#1C1917" : "#FFF8F1"}
     >
-      <OverlayHeader title={s.goToTitle} onClose={onClose} showHandle={Platform.OS !== "web"} isRTL={isRTL} />
+      <OverlayHeader title={s.goToTitle} onClose={onClose} isRTL={isRTL} />
 
       <View className="bg-surface dark:bg-surface-dark px-5 pt-4">
         <View

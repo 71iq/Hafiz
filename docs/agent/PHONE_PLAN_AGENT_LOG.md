@@ -1328,3 +1328,29 @@ Saved in `phase19/`:
 ### Validation result
 - `npm run typecheck`: passed.
 - `npm run build:web`: passed.
+
+## 2026-05-09 — GoTo Modal, Desktop Rail DOM Input, Tablet Page Padding
+
+### Scope decisions
+1. Make `GoToNavigator` a rounded modal at every width, including sub-768 tablet-like web widths, so it no longer appears as an inset sheet with flat bottom corners.
+2. Move desktop rail mouse support to DOM-level pointer and wheel listeners for React Native Web reliability.
+3. Remove per-page tablet bottom padding from vertical Mushaf pages; floating rail clearance remains owned by the outer page-mode container.
+
+### Implemented in this step
+- `components/mushaf/GoToNavigator.tsx`:
+  - Set both phone and desktop presentations to `dialog`.
+  - Removed the sheet drag handle for this overlay.
+- `components/mushaf/MushafSlider.tsx`:
+  - Added DOM `pointerdown`/`pointermove`/`pointerup` and `wheel` listeners on the rail host.
+  - Kept preview during interaction and commit after release/settle.
+- `app/(tabs)/mushaf.tsx`:
+  - Set tablet `pagePaddingBottom` to `0` so each page no longer carries a redundant blank band under Quran text.
+
+### Validation result
+- `npm run typecheck`: passed.
+- `npm run build:web`: passed.
+- `npx expo start --web --port 8087`: Metro served the live app.
+- Playwright smoke:
+  - `644x900`: GoTo panel opened as an inset modal with `28px` bottom corner radius.
+  - `768x1024`: tablet page mode showed shorter page boxes after removing per-page bottom padding.
+  - `1024x1366`: mouse wheel changed the page pill from `11` to `9`; mouse drag changed it from `9` to `19`.
