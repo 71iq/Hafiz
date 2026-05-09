@@ -9,10 +9,10 @@ import Animated, {
 } from "react-native-reanimated";
 import { FlashList, FlashListRef } from "@shopify/flash-list";
 import { useChrome, useHideChromeOnScroll } from "@/lib/ui/chrome";
-import { BookOpen, AlignJustify, Navigation, Eye, EyeOff, Search, BookMarked } from "lucide-react-native";
+import { BookOpen, AlignJustify, Eye, EyeOff, Search, BookMarked } from "lucide-react-native";
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
-import { useStrings, interpolate } from "@/lib/i18n/useStrings";
+import { useStrings } from "@/lib/i18n/useStrings";
 import { WordInteractionProvider } from "@/lib/word/context";
 import { SelectionProvider, useSelection } from "@/lib/selection/context";
 import { SurahHeader } from "@/components/mushaf/SurahHeader";
@@ -560,13 +560,6 @@ function MushafInner() {
                         <BookOpen size={16} color={isPageMode ? "#0d9488" : (isDark ? "#737373" : "#8B8178")} />
                       </Pressable>
                     </View>
-                    <Pressable
-                      onPress={() => setShowNavigator(true)}
-                      className="flex-row items-center rounded-full bg-surface-high dark:bg-surface-dark-high px-2.5 py-2"
-                      style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-                    >
-                      <Navigation size={13} color="#0d9488" />
-                    </Pressable>
                   </View>
                   <View className="flex-row items-center gap-1">
                     <Pressable
@@ -624,20 +617,6 @@ function MushafInner() {
                     <BookOpen size={16} color={isPageMode ? "#0d9488" : (isDark ? "#737373" : "#8B8178")} />
                   </Pressable>
                 </View>
-                <Pressable
-                  onPress={() => setShowNavigator(true)}
-                  className={`flex-row items-center rounded-full bg-surface-high dark:bg-surface-dark-high ${
-                    isNarrow ? "px-2 py-2" : "gap-1.5 px-3.5 py-2"
-                  }`}
-                  style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-                >
-                  <Navigation size={13} color="#0d9488" />
-                  {!isNarrow && (
-                    <Text className="text-charcoal dark:text-neutral-300" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}>
-                      {isPageMode ? interpolate(s.pageN, { n: currentPage }) : s.goTo}
-                    </Text>
-                  )}
-                </Pressable>
               </View>
               <View className={`flex-row items-center ${isNarrow ? "gap-1" : "gap-2.5"}`}>
                 <Pressable
