@@ -1249,3 +1249,24 @@ Saved in `phase19/`:
 - Static web smoke via `npx serve dist -l 8084`:
   - `360px`: rail height reduced to 38px, bottom nav to 55px, endpoint labels absent, drag/wheel settle navigated and updated the page pill.
   - `412px`: compact floating rail and bottom nav positions confirmed.
+
+## 2026-05-09 — Tablet Mushaf Page Rail Spacing
+
+### Scope decisions
+1. Kept phone behavior unchanged.
+2. For tablet widths (`768` through sub-desktop), the floating page rail remains available but is centered and width-constrained so it reads as a secondary control instead of a full-width footer.
+3. Tablet page content now explicitly reserves bottom reading space whenever the rail is visible, so Quran text does not sit underneath it.
+
+### Implemented in this step
+- `app/(tabs)/mushaf.tsx`:
+  - Added tablet width detection using the shared viewport contract.
+  - Centered the page rail to a max width of `360px` on tablet.
+  - Added tablet-only bottom spacing to page-mode containers and horizontal page insets.
+  - Increased tablet page bottom padding while the rail is visible.
+
+### Validation result
+- `npm run typecheck`: passed.
+- `npm run build:web`: passed.
+- Static web smoke via `npx serve dist -l 8084`:
+  - `768x1024`: rail centered at `360px` width with bottom inset; no full-width overlap on the reading surface.
+  - `1024x1366`: same centered tablet rail layout confirmed.

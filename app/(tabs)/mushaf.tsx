@@ -32,7 +32,7 @@ import { SearchCommand } from "@/components/SearchCommand";
 import { useWordInteraction } from "@/lib/word/context";
 import { consumePendingDeepLink, peekPendingDeepLink } from "@/lib/deep-link";
 import { toArabicNumber } from "@/lib/arabic";
-import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
+import { SIDEBAR_BREAKPOINT, VIEWPORT_BREAKPOINTS } from "@/lib/ui/viewport";
 
 /** Registers an ayah navigation callback inside WordInteractionProvider */
 function AyahNavigationRegistrar({
@@ -125,6 +125,7 @@ function MushafInner() {
   const { width: windowWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const isPhone = windowWidth < SIDEBAR_BREAKPOINT;
+  const isTablet = windowWidth >= SIDEBAR_BREAKPOINT && windowWidth < VIEWPORT_BREAKPOINTS.desktop;
   // Compact layout under ~480px — phones. Drops labels and tightens gaps.
   const isNarrow = windowWidth < 480;
   const { selection, toastMessage, dismissToast } = useSelection();
@@ -378,6 +379,11 @@ function MushafInner() {
   const mobileBottomNavOffset = isPhone
     ? Math.max(insets.bottom, 10) + mobileBottomNavHeight + mobileBottomNavGap
     : 0;
+  const tabletRailBottom = isTablet ? Math.max(insets.bottom, 16) : 0;
+  const tabletRailHeight = isTablet ? 52 : 0;
+  const tabletRailSpacing = isTablet ? 18 : 0;
+  const tabletRailWidth = isTablet ? Math.min(windowWidth - 64, 360) : 0;
+  const tabletRailSide = isTablet ? Math.max(24, (windowWidth - tabletRailWidth) / 2) : 0;
 
   useEffect(() => {
     currentPageRef.current = currentPage;
@@ -664,7 +670,7 @@ function MushafInner() {
             className="flex-1"
             style={{
               paddingTop: chromeVisible ? 0 : 10,
-              paddingBottom: isPhone ? 8 : 0,
+              paddingBottom: isPhone ? 8 : showBottomSlider && isTablet ? tabletRailHeight + tabletRailBottom + tabletRailSpacing : 0,
             }}
           >
             <PageMushaf
@@ -672,7 +678,7 @@ function MushafInner() {
               goToPageRef={goToPageRef}
               onScroll={onScrollHide}
               pagePaddingTop={isPhone ? 14 : 8}
-              pagePaddingBottom={isPhone ? 12 : 32}
+              pagePaddingBottom={isPhone ? 12 : isTablet ? 44 : 32}
               pageSidePadding={isPhone ? 22 : 16}
               centerVerticalOnPhone={isPhone}
               horizontalTopInset={isPhone && !chromeVisible && pageScroll === "horizontal" ? 52 : 0}
@@ -680,7 +686,9 @@ function MushafInner() {
                 pageScroll === "horizontal"
                   ? isPhone
                     ? 12
-                    : 18
+                    : isTablet
+                      ? tabletRailHeight + tabletRailBottom + 12
+                      : 18
                   : 0
               }
               highlightedWord={highlightedWord}
@@ -795,13 +803,13 @@ function MushafInner() {
             style={[
               {
                 position: Platform.OS === "web" && isPhone ? "fixed" as any : "absolute",
-                left: isPhone ? 12 : 0,
-                right: isPhone ? 12 : 0,
-                bottom: mobileBottomNavOffset,
+                left: isPhone ? 12 : isTablet ? tabletRailSide : 0,
+                right: isPhone ? 12 : isTablet ? tabletRailSide : 0,
+                bottom: isPhone ? mobileBottomNavOffset : isTablet ? tabletRailBottom : 0,
                 zIndex: 70,
-                borderRadius: isPhone ? 22 : 0,
+                borderRadius: isPhone || isTablet ? 22 : 0,
                 overflow: "hidden",
-                ...(Platform.OS === "web" && isPhone
+                ...(Platform.OS === "web" && (isPhone || isTablet)
                   ? ({ backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)" } as any)
                   : null),
               },
