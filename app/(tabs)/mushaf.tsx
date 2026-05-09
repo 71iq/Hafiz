@@ -382,8 +382,16 @@ function MushafInner() {
   const tabletRailBottom = isTablet ? Math.max(insets.bottom, 16) : 0;
   const tabletRailHeight = isTablet ? 52 : 0;
   const tabletRailSpacing = isTablet ? 18 : 0;
-  const tabletRailWidth = isTablet ? Math.min(windowWidth - 64, 360) : 0;
-  const tabletRailSide = isTablet ? Math.max(24, (windowWidth - tabletRailWidth) / 2) : 0;
+  const floatingRailSurface = {
+    backgroundColor: isDark ? "rgba(28,25,23,0.95)" : "rgba(255,248,241,0.95)",
+    borderWidth: 1,
+    borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.72)",
+    shadowColor: "#000",
+    shadowOpacity: isDark ? 0.24 : 0.12,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 10,
+  } as const;
 
   useEffect(() => {
     currentPageRef.current = currentPage;
@@ -802,9 +810,9 @@ function MushafInner() {
             pointerEvents={chromeVisible ? "auto" : "none"}
             style={[
               {
-                position: Platform.OS === "web" && isPhone ? "fixed" as any : "absolute",
-                left: isPhone ? 12 : isTablet ? tabletRailSide : 0,
-                right: isPhone ? 12 : isTablet ? tabletRailSide : 0,
+                position: Platform.OS === "web" && (isPhone || isTablet) ? "fixed" as any : "absolute",
+                left: isPhone || isTablet ? 12 : 0,
+                right: isPhone || isTablet ? 12 : 0,
                 bottom: isPhone ? mobileBottomNavOffset : isTablet ? tabletRailBottom : 0,
                 zIndex: 70,
                 borderRadius: isPhone || isTablet ? 22 : 0,
@@ -813,9 +821,9 @@ function MushafInner() {
                   ? ({ backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)" } as any)
                   : null),
               },
+              floatingRailSurface,
               sliderAnimStyle,
             ]}
-            className="bg-surface/95 dark:bg-surface-dark/95"
           >
             <MushafSlider
               currentPage={currentPage}

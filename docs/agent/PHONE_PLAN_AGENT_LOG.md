@@ -1270,3 +1270,25 @@ Saved in `phase19/`:
 - Static web smoke via `npx serve dist -l 8084`:
   - `768x1024`: rail centered at `360px` width with bottom inset; no full-width overlap on the reading surface.
   - `1024x1366`: same centered tablet rail layout confirmed.
+
+## 2026-05-09 — Tablet Mushaf Rail Width + Surface Restore
+
+### Scope decisions
+1. Reverted the tablet width clamp for the floating page rail.
+2. Kept the rail floating on tablet, but made it span the iPad viewport with the same inset treatment as phone.
+3. Explicitly painted the rail surface so the control remains readable over Mushaf content.
+
+### Implemented in this step
+- `app/(tabs)/mushaf.tsx`:
+  - Removed the tablet-only `360px` width clamp and side offset math.
+  - Kept the tablet rail fixed on web with `12px` inset edges across the viewport.
+  - Added explicit glass surface styling for the rail with background, border, and shadow.
+  - Preserved existing tablet bottom reading clearance while the rail is visible.
+
+### Validation result
+- `npm run typecheck`: passed.
+- `npm run build:web`: passed.
+- `npx expo start --web --port 8085`: Metro served the live app.
+- Playwright smoke:
+  - `768x1024`: page mode showed the floating tablet rail with full inset width and preserved bottom reading space.
+  - `1024x1366`: same full-width floating tablet rail treatment confirmed.
