@@ -29,6 +29,7 @@ type ResponsiveOverlayProps = {
   dismissOnEscape?: boolean;
   maxWidth?: number;
   maxHeight?: OverlayMaxHeight;
+  surfaceColor?: string;
   children: React.ReactNode;
 };
 
@@ -105,6 +106,7 @@ export function ResponsiveOverlay({
   dismissOnEscape = dismissOnBackdrop,
   maxWidth,
   maxHeight,
+  surfaceColor,
   children,
 }: ResponsiveOverlayProps) {
   const { width, height } = useWindowDimensions();
@@ -161,6 +163,7 @@ export function ResponsiveOverlay({
       width: contentWidth,
       maxWidth: activePresentation === "sheet" ? "100%" : contentWidth,
       maxHeight: computedMaxHeight,
+      ...(surfaceColor ? { backgroundColor: surfaceColor } : null),
       borderTopLeftRadius: activePresentation === "sheet" ? 28 : 28,
       borderTopRightRadius: activePresentation === "sheet" ? 28 : 28,
       borderBottomLeftRadius: activePresentation === "sheet" ? 0 : 28,
@@ -180,7 +183,7 @@ export function ResponsiveOverlay({
             ],
       opacity: animation,
     }),
-    [activePresentation, animation, computedMaxHeight, contentWidth]
+    [activePresentation, animation, computedMaxHeight, contentWidth, surfaceColor]
   );
 
   const overlayAlignment =

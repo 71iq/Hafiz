@@ -5,9 +5,11 @@ import { BookOpenText, Bookmark, MessageCircle, Play, Share2 } from "lucide-reac
 import { ReflectionsSection } from "@/components/reflections/ReflectionsSection";
 import { QiraatTab } from "@/components/mushaf/word-tabs/QiraatTab";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
+import { isQpcFontLoaded, loadQpcFont, qpcFontName } from "@/lib/fonts/loader";
 import { useDatabase } from "@/lib/database/provider";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { formatForCopy } from "@/lib/selection/format";
+import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import {
   addBookmark as dbAddBookmark,
   fetchSurahName,
@@ -24,6 +26,10 @@ type TargetAyah = {
 
 type AyahRow = {
   text_uthmani: string;
+  text_qcf2: string;
+  v2_page: number;
+  surah_name_arabic: string;
+  surah_name_english: string;
 };
 
 type TabKey = "translation" | "tafsir" | "qiraat" | "reflections";
@@ -47,6 +53,7 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
   } = useSettings();
   const { isBookmarked, showToast, refreshBookmarks } = useSelection();
   const [ayahRow, setAyahRow] = useState<AyahRow | null>(null);
+  const [fontVisible, setFontVisible] = useState(false);
   const [translationText, setTranslationText] = useState<string | null>(null);
   const [tafseerText, setTafseerText] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
@@ -57,12 +64,20 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
   const translationIsRtl = langInfo?.direction === "rtl";
   const bookmarked = target ? isBookmarked(target.surah, target.ayah) : false;
   const iconColor = isDark ? "#a3a3a3" : "#8B8178";
-  const isPhone = width < 768;
+  const isPhone = width < SIDEBAR_BREAKPOINT;
   const maxOverlayHeight = Math.min(height - (isPhone ? 12 : 48), isPhone ? height * 0.94 : 720);
+  const surfaceColor = isDark ? "#0A0A0A" : "#FFF8F1";
+  const qcf2Tokens = ayahRow?.text_qcf2.split(" ").filter(Boolean) ?? [];
+  const qcf2FontFamily = ayahRow ? qpcFontName(ayahRow.v2_page) : undefined;
+  const title = ayahRow
+    ? (uiLanguage === "ar" ? ayahRow.surah_name_arabic : ayahRow.surah_name_english)
+    : `${target?.surah ?? ""}:${target?.ayah ?? ""}`;
+  const subtitle = target ? `${target.surah}:${target.ayah}` : undefined;
 
   useEffect(() => {
     setActiveTab(initialTab);
     setAyahRow(null);
+    setFontVisible(false);
     setTranslationText(null);
     setTafseerText(null);
   }, [target?.surah, target?.ayah, initialTab]);
@@ -77,7 +92,10 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
     if (!target) return;
     let cancelled = false;
     db.getFirstAsync<AyahRow>(
-      "SELECT text_uthmani FROM quran_text WHERE surah = ? AND ayah = ?",
+      `SELECT q.text_uthmani, q.text_qcf2, q.v2_page, s.name_arabic AS surah_name_arabic, s.name_english AS surah_name_english
+       FROM quran_text q
+       JOIN surahs s ON s.number = q.surah
+       WHERE q.surah = ? AND q.ayah = ?`,
       [target.surah, target.ayah]
     ).then((row) => {
       if (!cancelled) setAyahRow(row ?? null);
@@ -86,6 +104,21 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
       cancelled = true;
     };
   }, [db, target]);
+
+  useEffect(() => {
+    if (!ayahRow) return;
+    if (isQpcFontLoaded(ayahRow.v2_page)) {
+      setFontVisible(true);
+      return;
+    }
+    let cancelled = false;
+    loadQpcFont(ayahRow.v2_page).then(() => {
+      if (!cancelled) requestAnimationFrame(() => setFontVisible(true));
+    }).catch(console.warn);
+    return () => {
+      cancelled = true;
+    };
+  }, [ayahRow]);
 
   useEffect(() => {
     if (!target || !showTranslation) return;
@@ -170,12 +203,20 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
   ];
 
   return (
-    <ResponsiveSheet open={open} onClose={onClose} maxWidth={1080} maxHeight={maxOverlayHeight}>
+    <ResponsiveSheet
+      open={open}
+      onClose={onClose}
+      maxWidth={1080}
+      maxHeight={maxOverlayHeight}
+      surfaceColor={surfaceColor}
+    >
       <OverlayHeader
+        title={title}
+        subtitle={subtitle}
         isRTL={isRTL}
         onClose={onClose}
         showHandle={isPhone}
-        leading={
+        actions={
           <View className={isRTL ? "flex-row-reverse items-center gap-1.5" : "flex-row items-center gap-1.5"}>
             <Pressable
               disabled
@@ -202,7 +243,58 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
       />
 
       <OverlayBody contentContainerStyle={{ padding: 20 }}>
-        <View className={isRTL ? "flex-row-reverse flex-wrap gap-2" : "flex-row flex-wrap gap-2"}>
+        <View className="min-h-[104px] justify-center rounded-3xl bg-surface-low dark:bg-surface-dark-low px-4 py-4">
+          {!fontVisible ? (
+            <Text
+              className="text-warm-500 dark:text-neutral-400"
+              style={{
+                fontFamily: "Manrope_500Medium",
+                fontSize: 13,
+                textAlign: isRTL ? "right" : "left",
+                writingDirection: isRTL ? "rtl" : "ltr",
+              }}
+            >
+              {s.loading}
+            </Text>
+          ) : null}
+          <View
+            className="items-end"
+            style={{
+              opacity: fontVisible ? 1 : 0,
+              direction: "ltr",
+            }}
+          >
+            <View
+              className="self-end"
+              style={{
+                direction: "ltr",
+                flexDirection: "row-reverse",
+                flexWrap: "wrap",
+                justifyContent: "flex-start",
+                alignItems: "center",
+                gap: 2,
+                maxWidth: "100%",
+              }}
+            >
+              {qcf2Tokens.map((glyph, index) => (
+                <Text
+                  key={`${target.surah}-${target.ayah}-${index}`}
+                  className="text-charcoal dark:text-neutral-100"
+                  style={{
+                    fontFamily: qcf2FontFamily,
+                    fontSize: isPhone ? 30 : 36,
+                    lineHeight: isPhone ? 58 : 66,
+                    paddingHorizontal: 2,
+                  }}
+                >
+                  {glyph}
+                </Text>
+              ))}
+            </View>
+          </View>
+        </View>
+
+        <View className={isRTL ? "mt-4 flex-row-reverse flex-wrap gap-2" : "mt-4 flex-row flex-wrap gap-2"}>
           {tabs.map((tab) => (
             <TabButton
               key={tab.key}

@@ -29,7 +29,12 @@ export function ConfirmDialog({
   onConfirm,
 }: Props) {
   return (
-    <ResponsiveModal open={visible} onClose={onCancel} maxWidth={420}>
+    <ResponsiveModal
+      open={visible}
+      onClose={onCancel}
+      maxWidth={420}
+      surfaceColor={isDark ? "#0A0A0A" : "#FFF8F1"}
+    >
       <OverlayHeader
         title={title}
         isRTL={isRTL}
