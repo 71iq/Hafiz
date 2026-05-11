@@ -1354,3 +1354,26 @@ Saved in `phase19/`:
   - `644x900`: GoTo panel opened as an inset modal with `28px` bottom corner radius.
   - `768x1024`: tablet page mode showed shorter page boxes after removing per-page bottom padding.
   - `1024x1366`: mouse wheel changed the page pill from `11` to `9`; mouse drag changed it from `9` to `19`.
+
+## 2026-05-11 — GoTo/Page Rail Bug Fix
+
+### Scope decisions
+1. Fixed only the GoTo overlay and page rail issues reported after the navigation redesign.
+2. Made the page rail mapping language-invariant: page 1 remains visual right and page 604 visual left.
+3. Disabled page rail and bottom chrome pointer interaction while chrome is hidden.
+
+### Implemented in this step
+- `components/mushaf/MushafSlider.tsx`:
+  - Added explicit page/index/offset mapping helpers for the `604 ... 1` rail.
+  - Forced the rail direction to LTR independent of UI language.
+  - Corrected web pointer drag offset direction and kept wheel commit behavior on the same canonical mapping.
+  - Added an `interactive` prop to disable web listeners, scroll input, and expand presses when hidden.
+  - Localized page digits: Western digits in English UI, Arabic digits in Arabic UI.
+- `app/(tabs)/mushaf.tsx` and `components/ui/AppNavigation.tsx`:
+  - Added web style-level `pointerEvents` alongside React Native pointer events for hidden floating chrome.
+- `components/mushaf/GoToNavigator.tsx` and `components/ui/ResponsiveOverlay.tsx`:
+  - Restored phone sheet presentation, kept tablet/desktop dialog presentation, and added inline clipping to the shared overlay content surface.
+
+### Validation result
+- `npm run typecheck`: passed.
+- `npm run build:web`: passed.

@@ -119,7 +119,11 @@ function BottomBar(props: BottomTabBarProps) {
           zIndex: 80,
           backgroundColor: isDark ? BAR_BG_DARK : BAR_BG_LIGHT,
           ...Platform.select({
-            web: { backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)" } as any,
+            web: {
+              backdropFilter: "blur(14px)",
+              WebkitBackdropFilter: "blur(14px)",
+              pointerEvents: visible ? "auto" : "none",
+            } as any,
             default: {
               backgroundColor: isDark ? "rgba(28,25,23,0.95)" : "rgba(255,248,241,0.95)",
             },
@@ -302,7 +306,11 @@ function FloatingPanel(props: BottomTabBarProps & { isRTL?: boolean }) {
             zIndex: 55,
             ...sideStyle,
             ...Platform.select({
-              web: { backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)" } as any,
+              web: {
+                backdropFilter: "blur(14px)",
+                WebkitBackdropFilter: "blur(14px)",
+                pointerEvents: open ? "auto" : "none",
+              } as any,
               default: {},
             }),
           },

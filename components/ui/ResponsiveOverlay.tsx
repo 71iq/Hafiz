@@ -169,6 +169,7 @@ export function ResponsiveOverlay({
       borderTopRightRadius: activePresentation === "sheet" ? 28 : 28,
       borderBottomLeftRadius: activePresentation === "sheet" ? 0 : 28,
       borderBottomRightRadius: activePresentation === "sheet" ? 0 : 28,
+      overflow: "hidden",
       transform:
         activePresentation === "sheet"
           ? [

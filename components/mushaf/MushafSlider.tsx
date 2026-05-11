@@ -28,6 +28,7 @@ type Props = {
   /** Tap the expand chevron → opens GoToNavigator */
   onExpand: () => void;
   index: MushafIndex | null;
+  interactive?: boolean;
 };
 
 const TICK_WIDTH = 26;
@@ -41,6 +42,7 @@ export function MushafSlider({
   onPreview,
   onExpand,
   index,
+  interactive = true,
 }: Props) {
   const { isRTL, isDark } = useSettings();
   const s = useStrings();
@@ -73,18 +75,49 @@ export function MushafSlider({
 
   const centerPadding = Math.max(0, (viewportWidth - TICK_WIDTH) / 2);
 
-  const pageToOffset = useCallback(
-    (page: number) => (max - Math.max(1, Math.min(max, page))) * TICK_WIDTH,
+  const clampPage = useCallback(
+    (page: number) => Math.max(1, Math.min(max, page)),
     [max]
+  );
+
+  const clampOffset = useCallback(
+    (offsetX: number) => Math.max(0, Math.min((max - 1) * TICK_WIDTH, offsetX)),
+    [max]
+  );
+
+  const pageToIndex = useCallback(
+    (page: number) => max - clampPage(page),
+    [clampPage, max]
+  );
+
+  const indexToPage = useCallback(
+    (index: number) => clampPage(max - Math.max(0, Math.min(max - 1, index))),
+    [clampPage, max]
+  );
+
+  const pageToOffset = useCallback(
+    (page: number) => pageToIndex(page) * TICK_WIDTH,
+    [pageToIndex]
   );
 
   const offsetToPage = useCallback(
     (offsetX: number) => {
-      const index = Math.round(Math.max(0, offsetX) / TICK_WIDTH);
-      return Math.max(1, Math.min(max, max - index));
+      const index = Math.round(clampOffset(offsetX) / TICK_WIDTH);
+      return indexToPage(index);
     },
-    [max]
+    [clampOffset, indexToPage]
   );
+
+  const clearSettleTimers = useCallback(() => {
+    if (fallbackTimerRef.current) {
+      clearTimeout(fallbackTimerRef.current);
+      fallbackTimerRef.current = null;
+    }
+    if (settleTimerRef.current) {
+      clearTimeout(settleTimerRef.current);
+      settleTimerRef.current = null;
+    }
+  }, []);
 
   const scrollToPage = useCallback(
     (page: number, animated: boolean) => {
@@ -115,11 +148,26 @@ export function MushafSlider({
 
   useEffect(() => {
     return () => {
-      if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
-      if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
+      clearSettleTimers();
       if (programmaticTimerRef.current) clearTimeout(programmaticTimerRef.current);
     };
-  }, []);
+  }, [clearSettleTimers]);
+
+  useEffect(() => {
+    if (interactive) return;
+    clearSettleTimers();
+    pointerDragRef.current = {
+      active: false,
+      pointerId: null,
+      startX: 0,
+      startOffset: 0,
+      moved: false,
+    };
+    userScrollingRef.current = false;
+    momentumRef.current = false;
+    setDragging(false);
+    setPreviewPage(null);
+  }, [clearSettleTimers, interactive]);
 
   const updatePreviewFromOffset = useCallback(
     (offsetX: number) => {
@@ -158,6 +206,7 @@ export function MushafSlider({
 
   const handleScroll = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (!interactive) return;
       if (programmaticScrollRef.current) return;
       if (!userScrollingRef.current) {
         userScrollingRef.current = true;
@@ -171,48 +220,49 @@ export function MushafSlider({
         if (userScrollingRef.current && !momentumRef.current) commitFromOffset(offsetX);
       }, 180);
     },
-    [commitFromOffset, updatePreviewFromOffset]
+    [commitFromOffset, interactive, updatePreviewFromOffset]
   );
 
   const handleScrollBeginDrag = useCallback(() => {
-    if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
-    if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
+    if (!interactive) return;
+    clearSettleTimers();
     userScrollingRef.current = true;
     momentumRef.current = false;
     setDragging(true);
-  }, []);
+  }, [clearSettleTimers, interactive]);
 
   const handleMomentumScrollBegin = useCallback(() => {
+    if (!interactive) return;
     momentumRef.current = true;
     if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
-  }, []);
+  }, [interactive]);
 
   const handleScrollEndDrag = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (!interactive) return;
       const offsetX = e.nativeEvent.contentOffset.x;
       activeOffsetRef.current = offsetX;
-      if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
-      if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
+      clearSettleTimers();
       fallbackTimerRef.current = setTimeout(() => {
         if (!momentumRef.current) commitFromOffset(offsetX);
       }, 160);
     },
-    [commitFromOffset]
+    [clearSettleTimers, commitFromOffset, interactive]
   );
 
   const handleMomentumScrollEnd = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
-      if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
+      if (!interactive) return;
+      clearSettleTimers();
       activeOffsetRef.current = e.nativeEvent.contentOffset.x;
       commitFromOffset(e.nativeEvent.contentOffset.x);
     },
-    [commitFromOffset]
+    [clearSettleTimers, commitFromOffset, interactive]
   );
 
   const beginPointerDrag = useCallback((pointerId: number, clientX: number) => {
-    if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
-    if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
+    if (!interactive) return;
+    clearSettleTimers();
     pointerDragRef.current = {
       active: true,
       pointerId,
@@ -223,20 +273,20 @@ export function MushafSlider({
     userScrollingRef.current = true;
     momentumRef.current = false;
     setDragging(true);
-  }, []);
+  }, [clearSettleTimers, interactive]);
 
   const updatePointerDrag = useCallback(
     (clientX: number) => {
       const state = pointerDragRef.current;
       if (!state.active) return;
       const deltaX = clientX - state.startX;
-      const nextOffset = Math.max(0, Math.min(pageToOffset(1), state.startOffset + deltaX));
+      const nextOffset = clampOffset(state.startOffset - deltaX);
       if (Math.abs(deltaX) > 2) state.moved = true;
       activeOffsetRef.current = nextOffset;
       listRef.current?.scrollToOffset({ offset: nextOffset, animated: false });
       updatePreviewFromOffset(nextOffset);
     },
-    [pageToOffset, updatePreviewFromOffset]
+    [clampOffset, updatePreviewFromOffset]
   );
 
   const endPointerDrag = useCallback(() => {
@@ -252,7 +302,7 @@ export function MushafSlider({
   }, [commitFromOffset]);
 
   useEffect(() => {
-    if (Platform.OS !== "web") return;
+    if (Platform.OS !== "web" || !interactive) return;
     const host = railHostRef.current?.getNode?.() ?? railHostRef.current;
     if (!host?.addEventListener) return;
 
@@ -277,12 +327,11 @@ export function MushafSlider({
       const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
       if (!delta) return;
       event.preventDefault();
-      if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
-      if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
+      clearSettleTimers();
       userScrollingRef.current = true;
       momentumRef.current = false;
       setDragging(true);
-      const nextOffset = Math.max(0, Math.min(pageToOffset(1), activeOffsetRef.current + (delta > 0 ? WHEEL_STEP : -WHEEL_STEP)));
+      const nextOffset = clampOffset(activeOffsetRef.current + (delta > 0 ? WHEEL_STEP : -WHEEL_STEP));
       activeOffsetRef.current = nextOffset;
       listRef.current?.scrollToOffset({ offset: nextOffset, animated: false });
       updatePreviewFromOffset(nextOffset);
@@ -304,9 +353,10 @@ export function MushafSlider({
       window.removeEventListener("pointerup", onPointerUp);
       window.removeEventListener("pointercancel", onPointerUp);
     };
-  }, [beginPointerDrag, commitFromOffset, endPointerDrag, pageToOffset, updatePointerDrag, updatePreviewFromOffset]);
+  }, [beginPointerDrag, clearSettleTimers, clampOffset, commitFromOffset, endPointerDrag, interactive, updatePointerDrag, updatePreviewFromOffset]);
 
   const livePage = previewPage ?? currentPage;
+  const livePageLabel = isRTL ? toArabicNumber(livePage) : String(livePage);
   const surahName = index?.pageByNumber.get(livePage)
     ? index.surahByNumber.get(index.pageByNumber.get(livePage)!.surah_start)?.name_arabic ?? null
     : null;
@@ -338,7 +388,7 @@ export function MushafSlider({
 
   return (
     <View
-      pointerEvents="box-none"
+      pointerEvents={interactive ? "box-none" : "none"}
       style={{
         flexDirection: isRTL ? "row-reverse" : "row",
         alignItems: "center",
@@ -349,6 +399,7 @@ export function MushafSlider({
     >
       <Pressable
         onPress={onExpand}
+        disabled={!interactive}
         hitSlop={10}
         accessibilityLabel={s.goTo}
         style={({ pressed }) => ({
@@ -361,14 +412,14 @@ export function MushafSlider({
           alignItems: "center",
           justifyContent: "center",
           gap: 5,
-          transform: [{ scale: pressed ? 0.95 : 1 }],
+          transform: [{ scale: pressed && interactive ? 0.95 : 1 }],
         })}
       >
         <Text
           className="text-primary-accent dark:text-primary-bright"
           style={{ fontFamily: "Manrope_700Bold", fontSize: 12 }}
         >
-          {toArabicNumber(livePage)}
+          {livePageLabel}
         </Text>
         <ChevronsUp size={12} color={isDark ? "#a3a3a3" : "#003638"} />
       </Pressable>
@@ -378,8 +429,14 @@ export function MushafSlider({
         style={{
           flex: 1,
           minWidth: 0,
+          direction: "ltr",
           ...(Platform.OS === "web"
-            ? ({ cursor: dragging ? "grabbing" : "grab", touchAction: "none", userSelect: "none" } as any)
+            ? ({
+                cursor: interactive ? (dragging ? "grabbing" : "grab") : "default",
+                pointerEvents: interactive ? "auto" : "none",
+                touchAction: "none",
+                userSelect: "none",
+              } as any)
             : null),
         }}
         onLayout={handleLayout}
@@ -405,7 +462,7 @@ export function MushafSlider({
               style={{ color: "#fff", fontFamily: "Manrope_600SemiBold", fontSize: 11 }}
             >
               {surahName ? `${surahName} · ` : ""}
-              {`ص ${toArabicNumber(livePage)}`}
+              {`ص ${livePageLabel}`}
             </Text>
           </View>
         )}
@@ -422,6 +479,7 @@ export function MushafSlider({
             index,
           })}
           showsHorizontalScrollIndicator={false}
+          scrollEnabled={interactive}
           snapToInterval={TICK_WIDTH}
           decelerationRate="fast"
           disableIntervalMomentum
@@ -436,7 +494,7 @@ export function MushafSlider({
             paddingRight: centerPadding,
             paddingTop: 4,
           }}
-          style={{ height: 26 }}
+          style={{ height: 26, direction: "ltr" } as any}
           initialNumToRender={24}
           maxToRenderPerBatch={24}
           windowSize={9}

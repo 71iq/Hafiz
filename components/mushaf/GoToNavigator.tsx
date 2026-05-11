@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
-import { View, Text, Pressable, TextInput, Platform } from "react-native";
+import { View, Text, Pressable, TextInput, Platform, useWindowDimensions } from "react-native";
 import { X, Search } from "lucide-react-native";
 import { useDatabase } from "@/lib/database/provider";
 import { toArabicNumber } from "@/lib/arabic";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { useSettings } from "@/lib/settings/context";
 import { ResponsiveOverlay, OverlayHeader, OverlayBody } from "@/components/ui/ResponsiveOverlay";
+import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 
 type SurahRow = {
   number: number;
@@ -43,6 +44,8 @@ export function GoToNavigator({
   const db = useDatabase();
   const s = useStrings();
   const { isDark, isRTL } = useSettings();
+  const { width } = useWindowDimensions();
+  const isPhone = width < SIDEBAR_BREAKPOINT;
   const [surahs, setSurahs] = useState<SurahRow[]>([]);
   const [juzList, setJuzList] = useState<JuzInfo[]>([]);
   const [surahPageMap, setSurahPageMap] = useState<Map<number, number>>(new Map());
@@ -302,14 +305,14 @@ export function GoToNavigator({
     <ResponsiveOverlay
       open={visible}
       onClose={onClose}
-      phonePresentation="dialog"
+      phonePresentation="sheet"
       desktopPresentation="dialog"
       maxWidth={520}
       maxHeight="88%"
       dismissOnBackdrop
       surfaceColor={isDark ? "#1C1917" : "#FFF8F1"}
     >
-      <OverlayHeader title={s.goToTitle} onClose={onClose} isRTL={isRTL} />
+      <OverlayHeader title={s.goToTitle} onClose={onClose} showHandle={isPhone} isRTL={isRTL} />
 
       <View className="bg-surface dark:bg-surface-dark px-5 pt-4">
         <View

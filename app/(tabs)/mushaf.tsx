@@ -817,6 +817,7 @@ function MushafInner() {
                 zIndex: 70,
                 borderRadius: isPhone || isTablet ? 22 : 0,
                 overflow: "hidden",
+                ...(Platform.OS === "web" ? ({ pointerEvents: chromeVisible ? "auto" : "none" } as any) : null),
                 ...(Platform.OS === "web" && (isPhone || isTablet)
                   ? ({ backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)" } as any)
                   : null),
@@ -827,6 +828,7 @@ function MushafInner() {
           >
             <MushafSlider
               currentPage={currentPage}
+              interactive={chromeVisible}
               onCommit={(p) => {
                 if (isPageMode) goToPageRef.current?.(p);
                 else {
