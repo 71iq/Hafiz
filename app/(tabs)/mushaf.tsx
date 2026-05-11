@@ -168,6 +168,7 @@ function MushafInner() {
   const [showBookmarks, setShowBookmarks] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [bottomRailHeight, setBottomRailHeight] = useState(0);
   const [hideMode, setHideMode] = useState(false);
   const [mushafIndex, setMushafIndex] = useState<MushafIndex | null>(null);
   const [topAyah, setTopAyah] = useState<{ surah: number; ayah: number } | null>(null);
@@ -380,8 +381,11 @@ function MushafInner() {
     ? Math.max(insets.bottom, 10) + mobileBottomNavHeight + mobileBottomNavGap
     : 0;
   const tabletRailBottom = isTablet ? Math.max(insets.bottom, 16) : 0;
-  const tabletRailHeight = isTablet ? 52 : 0;
-  const tabletRailSpacing = isTablet ? 8 : 0;
+  const tabletRailFallbackHeight = 40;
+  const tabletRailClearance = isTablet
+    ? (bottomRailHeight || tabletRailFallbackHeight) + tabletRailBottom + 6
+    : 0;
+  const tabletScrollBottomInset = isTablet ? (chromeVisible ? tabletRailClearance : 8) : undefined;
   const floatingRailSurface = {
     backgroundColor: isDark ? "rgba(28,25,23,0.95)" : "rgba(255,248,241,0.95)",
     borderWidth: 1,
@@ -392,6 +396,15 @@ function MushafInner() {
     shadowOffset: { width: 0, height: 8 },
     elevation: 10,
   } as const;
+  const handleBottomRailLayout = useCallback(
+    (e: { nativeEvent: { layout: { height: number } } }) => {
+      const nextHeight = Math.ceil(e.nativeEvent.layout.height);
+      if (nextHeight > 0) {
+        setBottomRailHeight((current) => (current === nextHeight ? current : nextHeight));
+      }
+    },
+    []
+  );
 
   useEffect(() => {
     currentPageRef.current = currentPage;
@@ -678,7 +691,7 @@ function MushafInner() {
             className="flex-1"
             style={{
               paddingTop: chromeVisible ? 0 : 10,
-              paddingBottom: isPhone ? 8 : showBottomSlider && isTablet ? tabletRailHeight + tabletRailBottom + tabletRailSpacing : 0,
+              paddingBottom: isPhone ? 8 : 0,
             }}
           >
             <PageMushaf
@@ -687,6 +700,7 @@ function MushafInner() {
               onScroll={onScrollHide}
               pagePaddingTop={isPhone ? 14 : 8}
               pagePaddingBottom={isPhone ? 12 : isTablet ? 0 : 32}
+              scrollBottomInset={tabletScrollBottomInset}
               pageSidePadding={isPhone ? 22 : 16}
               centerVerticalOnPhone={isPhone}
               horizontalTopInset={isPhone && !chromeVisible && pageScroll === "horizontal" ? 52 : 0}
@@ -695,7 +709,7 @@ function MushafInner() {
                   ? isPhone
                     ? 12
                     : isTablet
-                      ? tabletRailHeight + tabletRailBottom + 6
+                      ? (chromeVisible ? tabletRailClearance : 0)
                       : 18
                   : 0
               }
@@ -807,6 +821,7 @@ function MushafInner() {
         {/* Bottom slider — fades with chrome */}
         {showBottomSlider && (
           <Animated.View
+            onLayout={handleBottomRailLayout}
             pointerEvents={chromeVisible ? "auto" : "none"}
             style={[
               {

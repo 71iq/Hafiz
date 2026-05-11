@@ -1377,3 +1377,25 @@ Saved in `phase19/`:
 ### Validation result
 - `npm run typecheck`: passed.
 - `npm run build:web`: passed.
+
+## 2026-05-11 — Mushaf Chrome Timing + Tablet Bottom Clearance
+
+### Scope decisions
+1. Keep chrome visible during active scroll input and hide only after a short idle delay.
+2. Preserve the hidden-chrome pointer disabling added in the previous GoTo/page rail fix.
+3. Remove tablet page-mode rail clearance from normal layout height and keep only content-level clearance for the floating rail.
+
+### Implemented in this step
+- `lib/ui/chrome.tsx`:
+  - Added a 260ms idle debounce before hiding chrome after downward scrolling.
+  - Cancels the pending hide on upward scroll, near-top scroll, and unmount.
+- `app/(tabs)/mushaf.tsx`:
+  - Removed tablet bottom padding from the page-mode wrapper.
+  - Measured the floating rail height and used it to compute tablet-only content clearance while chrome is visible.
+  - Dropped tablet horizontal bottom inset to zero while chrome is hidden.
+- `components/mushaf/PageMushaf.tsx`:
+  - Added `scrollBottomInset` so tablet clearance can be applied to scrollable content without changing phone defaults.
+
+### Validation result
+- `npm run typecheck`: passed.
+- `npm run build:web`: passed.

@@ -136,6 +136,7 @@ type Props = {
   centerVerticalOnPhone?: boolean;
   horizontalTopInset?: number;
   horizontalBottomInset?: number;
+  scrollBottomInset?: number;
   highlightedWord?: { surah: number; ayah: number; wordPos: number } | null;
 };
 
@@ -275,6 +276,7 @@ export function PageMushaf({
   centerVerticalOnPhone = false,
   horizontalTopInset = 0,
   horizontalBottomInset = 0,
+  scrollBottomInset,
   highlightedWord = null,
 }: Props) {
   const db = useDatabase();
@@ -285,6 +287,7 @@ export function PageMushaf({
   const [containerHeight, setContainerHeight] = useState(0);
   const pageWidth = containerWidth || width;
   const horizontal = pageScroll === "horizontal";
+  const verticalScrollBottomInset = scrollBottomInset ?? pagePaddingBottom + 24;
   const [pageData, setPageData] = useState<PageData[]>([]);
   const [surahMap, setSurahMap] = useState<Map<number, SurahRow>>(new Map());
   const [pageMetaMap, setPageMetaMap] = useState<Map<number, { surahName: string | null; juz: number | null }>>(new Map());
@@ -787,8 +790,8 @@ export function PageMushaf({
   }, [containerHeight, fontSize, horizontal, horizontalBottomInset, horizontalTopInset, lineHeight, windowHeight]);
 
   const extraData = useMemo(
-    () => ({ fontSize, pageWidth, horizontalTypography, highlightedWord }),
-    [fontSize, horizontalTypography, highlightedWord, pageWidth]
+    () => ({ fontSize, pageWidth, horizontalTypography, highlightedWord, verticalScrollBottomInset }),
+    [fontSize, horizontalTypography, highlightedWord, pageWidth, verticalScrollBottomInset]
   );
 
   const renderPage = useCallback(
@@ -952,7 +955,7 @@ export function PageMushaf({
           updateCellsBatchingPeriod={80}
           windowSize={3}
           removeClippedSubviews
-          contentContainerStyle={{ paddingBottom: pagePaddingBottom + 24 }}
+          contentContainerStyle={{ paddingBottom: verticalScrollBottomInset }}
         />
       )}
 
