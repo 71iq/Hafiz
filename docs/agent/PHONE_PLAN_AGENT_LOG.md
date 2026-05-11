@@ -1399,3 +1399,24 @@ Saved in `phase19/`:
 ### Validation result
 - `npm run typecheck`: passed.
 - `npm run build:web`: passed.
+
+## 2026-05-11 — Mushaf Reader-Style Chrome Inactivity
+
+### Scope decisions
+1. Removed Mushaf hide-on-scroll behavior in favor of stable reader-style inactivity hiding.
+2. Kept toolbar/page rail visuals unchanged and preserved hidden-chrome pointer disabling.
+3. Treated reader scroll, wheel, touch, pointer movement, page rail interaction, and word taps as activity.
+
+### Implemented in this step
+- `lib/ui/chrome.tsx`:
+  - Added a provider-level `markActivity` API and 2500ms inactivity timer.
+  - Added `useChromeInactivity()` to enable inactivity hiding while Mushaf is mounted.
+- `app/(tabs)/mushaf.tsx`:
+  - Replaced scroll-direction hiding with activity markers on reader scroll, wheel, touch, and pointer events.
+  - Passed activity markers into `PageMushaf` and `MushafSlider`.
+- `components/mushaf/PageMushaf.tsx`, `components/mushaf/MushafSlider.tsx`, and `components/mushaf/WordToken.tsx`:
+  - Reset inactivity on horizontal page gestures, page rail gestures, rail wheel/drag, expand pill taps, and Quran word taps.
+
+### Validation result
+- `npm run typecheck`: passed.
+- `npm run build:web`: passed.

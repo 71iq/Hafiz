@@ -4,66 +4,92 @@ import type { NativeScrollEvent, NativeSyntheticEvent } from "react-native";
 type ChromeContextType = {
   visible: boolean;
   setVisible: (v: boolean) => void;
+  markActivity: () => void;
+  setAutoHideEnabled: (enabled: boolean) => void;
 };
 
 const ChromeContext = createContext<ChromeContextType>({
   visible: true,
   setVisible: () => {},
+  markActivity: () => {},
+  setAutoHideEnabled: () => {},
 });
 
-const HIDE_IDLE_DELAY_MS = 260;
+const INACTIVITY_HIDE_DELAY_MS = 2500;
 
 export function useChrome() {
   return useContext(ChromeContext);
 }
 
-/** Provider for in-app chrome (top header + bottom tab bar) visibility.
- *  Screens that want hide-on-scroll call setVisible based on scroll direction. */
+/** Provider for in-app chrome (top header + bottom tab bar) visibility. */
 export function ChromeProvider({ children }: { children: React.ReactNode }) {
   const [visible, setVisible] = useState(true);
-  return (
-    <ChromeContext.Provider value={{ visible, setVisible }}>
-      {children}
-    </ChromeContext.Provider>
-  );
-}
-
-/** Scroll handler that flips chrome visibility based on vertical scroll direction.
- *  Shows when near the top, hides when scrolling down, shows when scrolling up. */
-export function useHideChromeOnScroll() {
-  const { setVisible } = useChrome();
-  const lastY = useRef(0);
+  const autoHideEnabledRef = useRef(false);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const clearPendingHide = useCallback(() => {
+  const clearInactivityTimer = useCallback(() => {
     if (hideTimerRef.current) {
       clearTimeout(hideTimerRef.current);
       hideTimerRef.current = null;
     }
   }, []);
 
-  useEffect(() => clearPendingHide, [clearPendingHide]);
+  const scheduleInactivityHide = useCallback(() => {
+    if (!autoHideEnabledRef.current) return;
+    clearInactivityTimer();
+    hideTimerRef.current = setTimeout(() => {
+      hideTimerRef.current = null;
+      if (autoHideEnabledRef.current) setVisible(false);
+    }, INACTIVITY_HIDE_DELAY_MS);
+  }, [clearInactivityTimer]);
 
-  return useCallback(
-    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const y = e.nativeEvent.contentOffset.y;
-      const dy = y - lastY.current;
-      if (y < 16) {
-        clearPendingHide();
+  const markActivity = useCallback(() => {
+    setVisible(true);
+    scheduleInactivityHide();
+  }, [scheduleInactivityHide]);
+
+  const setAutoHideEnabled = useCallback(
+    (enabled: boolean) => {
+      autoHideEnabledRef.current = enabled;
+      clearInactivityTimer();
+      if (enabled) {
         setVisible(true);
-      } else if (dy > 1) {
-        clearPendingHide();
-        setVisible(true);
-        hideTimerRef.current = setTimeout(() => {
-          hideTimerRef.current = null;
-          setVisible(false);
-        }, HIDE_IDLE_DELAY_MS);
-      } else if (dy < -1) {
-        clearPendingHide();
+        scheduleInactivityHide();
+      } else {
         setVisible(true);
       }
-      lastY.current = y;
     },
-    [clearPendingHide, setVisible]
+    [clearInactivityTimer, scheduleInactivityHide]
+  );
+
+  useEffect(() => clearInactivityTimer, [clearInactivityTimer]);
+
+  return (
+    <ChromeContext.Provider value={{ visible, setVisible, markActivity, setAutoHideEnabled }}>
+      {children}
+    </ChromeContext.Provider>
+  );
+}
+
+/** Enables reader-style inactivity hiding while the current screen is mounted. */
+export function useChromeInactivity() {
+  const { markActivity, setAutoHideEnabled } = useChrome();
+
+  useEffect(() => {
+    setAutoHideEnabled(true);
+    markActivity();
+    return () => setAutoHideEnabled(false);
+  }, [markActivity, setAutoHideEnabled]);
+
+  return markActivity;
+}
+
+export function useHideChromeOnScroll() {
+  const markActivity = useChromeInactivity();
+  return useCallback(
+    (_e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      markActivity();
+    },
+    [markActivity]
   );
 }

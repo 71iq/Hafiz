@@ -31,7 +31,7 @@ function WordTokenInner({
   highlightColor,
 }: Props) {
   const { tooltipWord, setTooltipWord, openDetail } = useWordInteraction();
-  const { visible: chromeVisible, setVisible: setChromeVisible } = useChrome();
+  const { markActivity } = useChrome();
   const tokenRef = useRef<View>(null);
   const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTouchInput = useMemo(() => {
@@ -63,6 +63,7 @@ function WordTokenInner({
 
   const handlePress = useCallback(() => {
     if (disabled) return;
+    markActivity();
     if (!isTouchInput) {
       // Mouse / desktop: single click → tooltip
       showTooltip();
@@ -79,18 +80,19 @@ function WordTokenInner({
     }
     tapTimerRef.current = setTimeout(() => {
       tapTimerRef.current = null;
-      setChromeVisible(!chromeVisible);
+      markActivity();
     }, DOUBLE_TAP_MS);
-  }, [disabled, isTouchInput, chromeVisible, setChromeVisible, showTooltip]);
+  }, [disabled, isTouchInput, markActivity, showTooltip]);
 
   const handleLongPress = useCallback(() => {
     if (disabled) return;
+    markActivity();
     if (tapTimerRef.current) {
       clearTimeout(tapTimerRef.current);
       tapTimerRef.current = null;
     }
     openDetail(wordRef);
-  }, [disabled, surah, ayah, wordPos, v2Page, openDetail]);
+  }, [disabled, surah, ayah, wordPos, v2Page, markActivity, openDetail]);
 
   // Web: right-click also opens the detail sheet (matches "long press" intent)
   const webContextMenu =

@@ -8,7 +8,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { FlashList, FlashListRef } from "@shopify/flash-list";
-import { useChrome, useHideChromeOnScroll } from "@/lib/ui/chrome";
+import { useChrome, useChromeInactivity } from "@/lib/ui/chrome";
 import { BookOpen, AlignJustify, Eye, EyeOff, Search, BookMarked } from "lucide-react-native";
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
@@ -131,7 +131,17 @@ function MushafInner() {
   const { selection, toastMessage, dismissToast } = useSelection();
   const { navigateToAyah } = useWordInteraction();
   const { visible: chromeVisible } = useChrome();
-  const onScrollHide = useHideChromeOnScroll();
+  const markMushafActivity = useChromeInactivity();
+  const readerActivityProps = Platform.OS === "web"
+    ? ({
+        onPointerDown: markMushafActivity,
+        onPointerMove: markMushafActivity,
+        onWheel: markMushafActivity,
+      } as Record<string, unknown>)
+    : ({
+        onTouchStart: markMushafActivity,
+        onTouchMove: markMushafActivity,
+      } as Record<string, unknown>);
 
   // Header slides/fades out AND collapses its height so the list fills the
   // freed vertical space. We measure the natural header height on first
@@ -555,6 +565,7 @@ function MushafInner() {
       <SafeAreaView
         className="flex-1 bg-surface dark:bg-surface-dark"
         edges={["top"]}
+        {...readerActivityProps}
       >
         {/* Header chrome — phone gets the new glass top bar, desktop keeps current layout. */}
         <Animated.View pointerEvents={chromeVisible ? "auto" : "none"} style={headerAnimStyle}>
@@ -697,7 +708,8 @@ function MushafInner() {
             <PageMushaf
               onPageChange={setCurrentPage}
               goToPageRef={goToPageRef}
-              onScroll={onScrollHide}
+              onScroll={markMushafActivity}
+              onUserActivity={markMushafActivity}
               pagePaddingTop={isPhone ? 14 : 8}
               pagePaddingBottom={isPhone ? 12 : isTablet ? 0 : 32}
               scrollBottomInset={tabletScrollBottomInset}
@@ -778,7 +790,7 @@ function MushafInner() {
             keyExtractor={keyExtractor}
             extraData={{ fontSize, hideMode, highlightedKey }}
             contentContainerStyle={{ paddingBottom: isPhone ? 24 : 56 }}
-            onScroll={onScrollHide}
+            onScroll={markMushafActivity}
             scrollEventThrottle={16}
             onViewableItemsChanged={onViewableItemsChanged}
             viewabilityConfig={viewabilityConfig}
@@ -844,6 +856,7 @@ function MushafInner() {
             <MushafSlider
               currentPage={currentPage}
               interactive={chromeVisible}
+              onUserActivity={markMushafActivity}
               onCommit={(p) => {
                 if (isPageMode) goToPageRef.current?.(p);
                 else {

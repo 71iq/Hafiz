@@ -29,6 +29,7 @@ type Props = {
   onExpand: () => void;
   index: MushafIndex | null;
   interactive?: boolean;
+  onUserActivity?: () => void;
 };
 
 const TICK_WIDTH = 26;
@@ -43,6 +44,7 @@ export function MushafSlider({
   onExpand,
   index,
   interactive = true,
+  onUserActivity,
 }: Props) {
   const { isRTL, isDark } = useSettings();
   const s = useStrings();
@@ -208,6 +210,7 @@ export function MushafSlider({
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
       if (!interactive) return;
       if (programmaticScrollRef.current) return;
+      onUserActivity?.();
       if (!userScrollingRef.current) {
         userScrollingRef.current = true;
         setDragging(true);
@@ -220,26 +223,29 @@ export function MushafSlider({
         if (userScrollingRef.current && !momentumRef.current) commitFromOffset(offsetX);
       }, 180);
     },
-    [commitFromOffset, interactive, updatePreviewFromOffset]
+    [commitFromOffset, interactive, onUserActivity, updatePreviewFromOffset]
   );
 
   const handleScrollBeginDrag = useCallback(() => {
     if (!interactive) return;
+    onUserActivity?.();
     clearSettleTimers();
     userScrollingRef.current = true;
     momentumRef.current = false;
     setDragging(true);
-  }, [clearSettleTimers, interactive]);
+  }, [clearSettleTimers, interactive, onUserActivity]);
 
   const handleMomentumScrollBegin = useCallback(() => {
     if (!interactive) return;
+    onUserActivity?.();
     momentumRef.current = true;
     if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
-  }, [interactive]);
+  }, [interactive, onUserActivity]);
 
   const handleScrollEndDrag = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
       if (!interactive) return;
+      onUserActivity?.();
       const offsetX = e.nativeEvent.contentOffset.x;
       activeOffsetRef.current = offsetX;
       clearSettleTimers();
@@ -247,21 +253,23 @@ export function MushafSlider({
         if (!momentumRef.current) commitFromOffset(offsetX);
       }, 160);
     },
-    [clearSettleTimers, commitFromOffset, interactive]
+    [clearSettleTimers, commitFromOffset, interactive, onUserActivity]
   );
 
   const handleMomentumScrollEnd = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
       if (!interactive) return;
+      onUserActivity?.();
       clearSettleTimers();
       activeOffsetRef.current = e.nativeEvent.contentOffset.x;
       commitFromOffset(e.nativeEvent.contentOffset.x);
     },
-    [clearSettleTimers, commitFromOffset, interactive]
+    [clearSettleTimers, commitFromOffset, interactive, onUserActivity]
   );
 
   const beginPointerDrag = useCallback((pointerId: number, clientX: number) => {
     if (!interactive) return;
+    onUserActivity?.();
     clearSettleTimers();
     pointerDragRef.current = {
       active: true,
@@ -273,12 +281,13 @@ export function MushafSlider({
     userScrollingRef.current = true;
     momentumRef.current = false;
     setDragging(true);
-  }, [clearSettleTimers, interactive]);
+  }, [clearSettleTimers, interactive, onUserActivity]);
 
   const updatePointerDrag = useCallback(
     (clientX: number) => {
       const state = pointerDragRef.current;
       if (!state.active) return;
+      onUserActivity?.();
       const deltaX = clientX - state.startX;
       const nextOffset = clampOffset(state.startOffset - deltaX);
       if (Math.abs(deltaX) > 2) state.moved = true;
@@ -286,11 +295,12 @@ export function MushafSlider({
       listRef.current?.scrollToOffset({ offset: nextOffset, animated: false });
       updatePreviewFromOffset(nextOffset);
     },
-    [clampOffset, updatePreviewFromOffset]
+    [clampOffset, onUserActivity, updatePreviewFromOffset]
   );
 
   const endPointerDrag = useCallback(() => {
     if (!pointerDragRef.current.active) return;
+    onUserActivity?.();
     pointerDragRef.current = {
       active: false,
       pointerId: null,
@@ -299,7 +309,7 @@ export function MushafSlider({
       moved: false,
     };
     commitFromOffset(activeOffsetRef.current);
-  }, [commitFromOffset]);
+  }, [commitFromOffset, onUserActivity]);
 
   useEffect(() => {
     if (Platform.OS !== "web" || !interactive) return;
@@ -327,6 +337,7 @@ export function MushafSlider({
       const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
       if (!delta) return;
       event.preventDefault();
+      onUserActivity?.();
       clearSettleTimers();
       userScrollingRef.current = true;
       momentumRef.current = false;
@@ -353,7 +364,7 @@ export function MushafSlider({
       window.removeEventListener("pointerup", onPointerUp);
       window.removeEventListener("pointercancel", onPointerUp);
     };
-  }, [beginPointerDrag, clearSettleTimers, clampOffset, commitFromOffset, endPointerDrag, interactive, updatePointerDrag, updatePreviewFromOffset]);
+  }, [beginPointerDrag, clearSettleTimers, clampOffset, commitFromOffset, endPointerDrag, interactive, onUserActivity, updatePointerDrag, updatePreviewFromOffset]);
 
   const livePage = previewPage ?? currentPage;
   const livePageLabel = isRTL ? toArabicNumber(livePage) : String(livePage);
@@ -398,7 +409,10 @@ export function MushafSlider({
       }}
     >
       <Pressable
-        onPress={onExpand}
+        onPress={() => {
+          onUserActivity?.();
+          onExpand();
+        }}
         disabled={!interactive}
         hitSlop={10}
         accessibilityLabel={s.goTo}
