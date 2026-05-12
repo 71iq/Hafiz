@@ -8,7 +8,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { FlashList, FlashListRef } from "@shopify/flash-list";
-import { useChrome, useChromeInactivity } from "@/lib/ui/chrome";
+import { useChrome } from "@/lib/ui/chrome";
 import { BookOpen, AlignJustify, Eye, EyeOff, Search, BookMarked } from "lucide-react-native";
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
@@ -130,17 +130,37 @@ function MushafInner() {
   const isNarrow = windowWidth < 480;
   const { selection, toastMessage, dismissToast } = useSelection();
   const { navigateToAyah } = useWordInteraction();
-  const { visible: chromeVisible } = useChrome();
-  const markMushafActivity = useChromeInactivity();
+  const { visible: chromeVisible, setVisible: setChromeVisible } = useChrome();
+  const lastScrollYRef = useRef(0);
+  const touchStartYRef = useRef<number | null>(null);
+  const touchMovedRef = useRef(false);
+
+  const handleScrollReveal = useCallback((e: any) => {
+    const y = e?.nativeEvent?.contentOffset?.y;
+    if (typeof y !== "number") return;
+    if (y < lastScrollYRef.current) setChromeVisible(true);
+    lastScrollYRef.current = y;
+  }, [setChromeVisible]);
+
   const readerActivityProps = Platform.OS === "web"
     ? ({
-        onPointerDown: markMushafActivity,
-        onPointerMove: markMushafActivity,
-        onWheel: markMushafActivity,
+        onPointerDown: () => setChromeVisible(true),
       } as Record<string, unknown>)
     : ({
-        onTouchStart: markMushafActivity,
-        onTouchMove: markMushafActivity,
+        onTouchStart: (e: any) => {
+          touchStartYRef.current = e?.nativeEvent?.touches?.[0]?.pageY ?? null;
+          touchMovedRef.current = false;
+        },
+        onTouchMove: (e: any) => {
+          const y = e?.nativeEvent?.touches?.[0]?.pageY;
+          if (touchStartYRef.current != null && typeof y === "number" && Math.abs(y - touchStartYRef.current) > 8) {
+            touchMovedRef.current = true;
+          }
+        },
+        onTouchEnd: () => {
+          if (!touchMovedRef.current) setChromeVisible(true);
+          touchStartYRef.current = null;
+        },
       } as Record<string, unknown>);
 
   // Header slides/fades out AND collapses its height so the list fills the
@@ -708,8 +728,8 @@ function MushafInner() {
             <PageMushaf
               onPageChange={setCurrentPage}
               goToPageRef={goToPageRef}
-              onScroll={markMushafActivity}
-              onUserActivity={markMushafActivity}
+              onScroll={handleScrollReveal}
+              onUserActivity={() => setChromeVisible(true)}
               pagePaddingTop={isPhone ? 14 : 8}
               pagePaddingBottom={isPhone ? 12 : isTablet ? 0 : 32}
               scrollBottomInset={tabletScrollBottomInset}
@@ -790,7 +810,7 @@ function MushafInner() {
             keyExtractor={keyExtractor}
             extraData={{ fontSize, hideMode, highlightedKey }}
             contentContainerStyle={{ paddingBottom: isPhone ? 24 : 56 }}
-            onScroll={markMushafActivity}
+            onScroll={handleScrollReveal}
             scrollEventThrottle={16}
             onViewableItemsChanged={onViewableItemsChanged}
             viewabilityConfig={viewabilityConfig}
@@ -856,7 +876,7 @@ function MushafInner() {
             <MushafSlider
               currentPage={currentPage}
               interactive={chromeVisible}
-              onUserActivity={markMushafActivity}
+              onUserActivity={() => setChromeVisible(true)}
               onCommit={(p) => {
                 if (isPageMode) goToPageRef.current?.(p);
                 else {
