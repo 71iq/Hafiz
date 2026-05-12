@@ -3,7 +3,7 @@ import { View, Text, Pressable, ScrollView, TextInput, ActivityIndicator, useWin
 import { Check } from "lucide-react-native";
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
-import { useStrings } from "@/lib/i18n/useStrings";
+import { interpolate, useStrings } from "@/lib/i18n/useStrings";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { createDeck, generateDeckId } from "@/lib/fsrs/queries";
@@ -177,8 +177,16 @@ export function CreateDeckSheet({ visible, onClose, onCreated }: Props) {
       <OverlayBody contentContainerClassName="px-5 pb-8">
         {scopeType === "surah" && (
           <View className="gap-2">
-            {surahs.map((s) => (
-              <SurahItem key={s.number} surah={s} selected={selectedSurahs.has(s.number)} onToggle={() => toggleSurah(s.number)} isDark={isDark} />
+            {surahs.map((surah) => (
+              <SurahItem
+                key={surah.number}
+                surah={surah}
+                selected={selectedSurahs.has(surah.number)}
+                onToggle={() => toggleSurah(surah.number)}
+                isDark={isDark}
+                isRTL={isRTL}
+                ayahCountLabel={interpolate("{{n}} {{label}}", { n: surah.ayah_count, label: s.ayahs })}
+              />
             ))}
           </View>
         )}
@@ -231,16 +239,20 @@ function SurahItem({
   selected,
   onToggle,
   isDark,
+  isRTL,
+  ayahCountLabel,
 }: {
   surah: SurahRow;
   selected: boolean;
   onToggle: () => void;
   isDark: boolean;
+  isRTL: boolean;
+  ayahCountLabel: string;
 }) {
   return (
     <Pressable
       onPress={onToggle}
-      className={`flex-row items-center p-4 rounded-2xl ${
+      className={`items-center p-4 rounded-2xl gap-3 ${isRTL ? "flex-row-reverse" : "flex-row"} ${
         selected
           ? "bg-primary-accent/10 dark:bg-primary-bright/15"
           : "bg-surface-low dark:bg-surface-dark-low"
@@ -248,7 +260,7 @@ function SurahItem({
       style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
     >
       <View
-        className={`w-8 h-8 rounded-full items-center justify-center mr-3 ${
+        className={`w-8 h-8 rounded-full items-center justify-center ${
           selected ? "bg-primary-accent" : "bg-surface-high dark:bg-surface-dark-high"
         }`}
       >
@@ -269,20 +281,25 @@ function SurahItem({
       <View className="flex-1">
         <Text
           className="text-charcoal dark:text-neutral-200"
-          style={{ fontFamily: "Manrope_500Medium", fontSize: 14 }}
+          style={{ fontFamily: "Manrope_500Medium", fontSize: 14, textAlign: isRTL ? "right" : "left" }}
         >
           {surah.name_english}
         </Text>
         <Text
           className="text-warm-400 dark:text-neutral-500"
-          style={{ fontFamily: "Manrope_400Regular", fontSize: 12 }}
+          style={{ fontFamily: "Manrope_400Regular", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
         >
-          {surah.ayah_count} ayahs
+          {ayahCountLabel}
         </Text>
       </View>
       <Text
         className="text-charcoal dark:text-neutral-300"
-        style={{ fontFamily: "Manrope_400Regular", fontSize: 16, writingDirection: "rtl" }}
+        style={{
+          fontFamily: "Manrope_400Regular",
+          fontSize: 16,
+          writingDirection: "rtl",
+          textAlign: isRTL ? "left" : "right",
+        }}
       >
         {surah.name_arabic}
       </Text>
