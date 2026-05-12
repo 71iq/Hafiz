@@ -1,8 +1,13 @@
-import { Modal, View, Text, Pressable, ScrollView } from "react-native";
-import { X, Check } from "lucide-react-native";
+import { View, Text, Pressable } from "react-native";
+import { Check, ChevronLeft, ChevronRight } from "lucide-react-native";
 import { TRANSLATION_LANGUAGES } from "@/lib/translations/languages";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
+import {
+  OverlayBody,
+  OverlayHeader,
+  ResponsiveSheet,
+} from "@/components/ui/ResponsiveOverlay";
 
 type Props = {
   visible: boolean;
@@ -20,101 +25,89 @@ export function TranslationLanguagePicker({ visible, onClose }: Props) {
   };
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent
-      onRequestClose={onClose}
+    <ResponsiveSheet
+      open={visible}
+      onClose={onClose}
+      dismissOnBackdrop
+      maxWidth={520}
+      maxHeight="80%"
     >
-      <View className="flex-1 justify-end">
-        {/* Backdrop */}
-        <Pressable
-          className="flex-1"
-          style={{ backgroundColor: "rgba(0,0,0,0.3)" }}
-          onPress={onClose}
-        />
+      <OverlayHeader
+        title={s.translationLanguagePickerTitle}
+        onClose={onClose}
+        showHandle
+        isRTL={isRTL}
+      />
 
-        {/* Sheet */}
-        <View
-          className="bg-surface dark:bg-surface-dark-low rounded-t-4xl"
-          style={{ maxHeight: "70%" }}
-        >
-          {/* Header */}
-          <View className={`items-center justify-between px-6 pt-3 pb-4 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
-            <Text
-              className="text-charcoal dark:text-neutral-100"
-              style={{ fontFamily: "NotoSerif_700Bold", fontSize: 20, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
-            >
-              {s.translationLanguagePickerTitle}
-            </Text>
-            <Pressable
-              onPress={onClose}
-              className="w-9 h-9 rounded-full bg-surface-high dark:bg-surface-dark-high items-center justify-center"
-              style={({ pressed }) => ({
-                transform: [{ scale: pressed ? 0.95 : 1 }],
-              })}
-            >
-              <X size={16} color={isDark ? "#a3a3a3" : "#6e5a47"} />
-            </Pressable>
-          </View>
+      <OverlayBody contentContainerClassName="px-5 pt-2 pb-6">
+        <View className="gap-1">
+          {TRANSLATION_LANGUAGES.map((lang) => {
+            const isSelected = lang.code === translationLanguage;
 
-          {/* Language list — no borders, use spacing */}
-          <ScrollView className="px-6 pb-8">
-            <View className="gap-1">
-              {TRANSLATION_LANGUAGES.map((lang) => {
-                const isSelected = lang.code === translationLanguage;
-                return (
-                  <Pressable
-                    key={lang.code}
-                    onPress={() => handleSelect(lang.code)}
-                    className={`items-center justify-between py-3.5 px-3 rounded-2xl ${isRTL ? "flex-row-reverse" : "flex-row"}`}
-                    style={({ pressed }) => ({
-                      backgroundColor: isSelected
-                        ? (isDark ? "rgba(45,212,191,0.08)" : "rgba(13,148,136,0.06)")
-                        : pressed
-                          ? (isDark ? "rgba(45,212,191,0.04)" : "rgba(13,148,136,0.03)")
-                          : "transparent",
-                    })}
+            return (
+              <Pressable
+                key={lang.code}
+                onPress={() => handleSelect(lang.code)}
+                className={`items-center justify-between gap-3 rounded-2xl px-3 py-3.5 ${
+                  isRTL ? "flex-row-reverse" : "flex-row"
+                }`}
+                style={({ pressed }) => ({
+                  backgroundColor: isSelected
+                    ? isDark
+                      ? "rgba(45,212,191,0.08)"
+                      : "rgba(13,148,136,0.06)"
+                    : pressed
+                      ? isDark
+                        ? "rgba(45,212,191,0.04)"
+                        : "rgba(13,148,136,0.03)"
+                      : "transparent",
+                })}
+              >
+                <View
+                  className={`flex-1 ${isRTL ? "items-end" : "items-start"}`}
+                >
+                  <Text
+                    className={
+                      isSelected
+                        ? "text-primary-accent dark:text-primary-bright"
+                        : "text-charcoal dark:text-neutral-300"
+                    }
+                    style={{
+                      fontFamily: isSelected
+                        ? "Manrope_600SemiBold"
+                        : "Manrope_500Medium",
+                      fontSize: 15,
+                      textAlign: isRTL ? "right" : "left",
+                      writingDirection: isRTL ? "rtl" : "ltr",
+                    }}
                   >
-                    <View className={`flex-1 ${isRTL ? "items-end" : "items-start"}`}>
-                      <Text
-                        className={
-                          isSelected
-                            ? "text-primary-accent dark:text-primary-bright"
-                            : "text-charcoal dark:text-neutral-300"
-                        }
-                        style={{
-                          fontFamily: isSelected ? "Manrope_600SemiBold" : "Manrope_500Medium",
-                          fontSize: 15,
-                          textAlign: isRTL ? "right" : "left",
-                        }}
-                      >
-                        {lang.nameEnglish}
-                      </Text>
-                      <Text
-                        className="text-warm-400 dark:text-neutral-500 mt-0.5"
-                        style={{
-                          fontFamily: "Manrope_400Regular",
-                          fontSize: 13,
-                          ...(isRTL || lang.direction === "rtl"
-                            ? { writingDirection: "rtl", textAlign: "right" }
-                            : {}),
-                        }}
-                      >
-                        {lang.nameNative}
-                      </Text>
-                    </View>
-                    {isSelected && (
-                      <Check size={20} color={isDark ? "#2dd4bf" : "#0d9488"} />
-                    )}
-                  </Pressable>
-                );
-              })}
-              <View className="h-8" />
-            </View>
-          </ScrollView>
+                    {lang.nameEnglish}
+                  </Text>
+                  <Text
+                    className="mt-0.5 text-warm-400 dark:text-neutral-500"
+                    style={{
+                      fontFamily: "Manrope_400Regular",
+                      fontSize: 13,
+                      textAlign: isRTL ? "right" : "left",
+                      writingDirection: isRTL ? "rtl" : "ltr",
+                    }}
+                  >
+                    {lang.nameNative}
+                  </Text>
+                </View>
+
+                {isSelected ? (
+                  <Check size={20} color={isDark ? "#2dd4bf" : "#0d9488"} />
+                ) : isRTL ? (
+                  <ChevronLeft size={18} color={isDark ? "#737373" : "#8B8178"} />
+                ) : (
+                  <ChevronRight size={18} color={isDark ? "#737373" : "#8B8178"} />
+                )}
+              </Pressable>
+            );
+          })}
         </View>
-      </View>
-    </Modal>
+      </OverlayBody>
+    </ResponsiveSheet>
   );
 }
