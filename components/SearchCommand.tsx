@@ -6,7 +6,6 @@ import {
   Pressable,
   FlatList,
   Keyboard,
-  Modal,
   Platform,
   useWindowDimensions,
 } from "react-native";
@@ -20,6 +19,7 @@ import { useStrings, interpolate } from "@/lib/i18n/useStrings";
 import { setPendingDeepLink } from "@/lib/deep-link";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { useWordInteraction } from "@/lib/word/context";
+import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 
 // ─── Arabic diacritics stripping ───
 const ARABIC_DIACRITICS_RE =
@@ -207,12 +207,13 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
 
   // Auto-focus input when opened
   useEffect(() => {
+    let focusTimer: ReturnType<typeof setTimeout> | null = null;
     if (visible) {
       // Dismiss any lingering Mushaf word tooltip/detail modal — otherwise
       // they float above the search modal.
       clearTooltip();
       closeDetail();
-      setTimeout(() => inputRef.current?.focus(), 100);
+      focusTimer = setTimeout(() => inputRef.current?.focus(), 120);
       loadHistory();
     } else {
       // Reset state when closed
@@ -222,6 +223,9 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
       setHasSearched(false);
       setExpandedLemmas(new Set());
     }
+    return () => {
+      if (focusTimer) clearTimeout(focusTimer);
+    };
   }, [visible, clearTooltip, closeDetail]);
 
   const loadHistory = useCallback(async () => {
@@ -395,15 +399,18 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
   }, []);
 
   const handleResultTap = useCallback((surah: number, ayah: number, wordPos?: number) => {
+    const target = { surah, ayah, wordPos };
     Keyboard.dismiss();
+    if (!onNavigateToAyah) {
+      setPendingDeepLink(target);
+    }
     onClose();
     setTimeout(() => {
       if (onNavigateToAyah) {
-        onNavigateToAyah(surah, ayah, wordPos);
-        return;
+        onNavigateToAyah(target.surah, target.ayah, target.wordPos);
+      } else {
+        router.navigate("/(tabs)/mushaf");
       }
-      setPendingDeepLink({ surah, ayah, wordPos });
-      router.navigate("/(tabs)/mushaf");
     }, 150);
   }, [onClose, onNavigateToAyah]);
 
@@ -454,44 +461,29 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
   const tealColor = "#0d9488";
   const mutedColor = isDark ? "#737373" : "#8B8178";
   const isPhone = width < SIDEBAR_BREAKPOINT;
-  const modalWidth = isPhone ? Math.max(280, Math.min(width - 12, 430)) : Math.min(width - 32, 900);
   const modalHeight = isPhone ? Math.min(height - 16, 900) : Math.min(height - 48, 760);
+  const surfaceColor = isDark ? "#1C1917" : "#FFF8F1";
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
+    <ResponsiveSheet
+      open={visible}
+      onClose={onClose}
+      dismissOnBackdrop
+      maxWidth={900}
+      maxHeight={modalHeight}
+      surfaceColor={surfaceColor}
     >
-      <View className={`flex-1 items-center ${isPhone ? "justify-end px-1 pb-1" : "justify-center px-4"}`} style={{ backgroundColor: "rgba(0,0,0,0.52)" }}>
-        <Pressable className="absolute inset-0" onPress={onClose} />
-        <View
-          className={`overflow-hidden bg-surface dark:bg-surface-dark ${isPhone ? "rounded-t-3xl" : "rounded-3xl"}`}
-          style={{ width: modalWidth, height: modalHeight }}
-          onStartShouldSetResponder={() => true}
-        >
-        {/* Editorial header */}
-        <View className="px-5 pt-3 pb-3">
-          <View className="items-center pb-2">
-            <View className="h-1 w-10 rounded-full bg-surface-high dark:bg-surface-dark-high" />
-          </View>
-          <Text
-            className="text-warm-400 dark:text-neutral-500 uppercase"
-            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, letterSpacing: 1.8 }}
-          >
-            {`${s.searchTextMode} / ${s.searchRootMode}`}
-          </Text>
-          <Text
-            className="text-charcoal dark:text-neutral-100 mt-1"
-            style={{ fontFamily: "NotoSerif_700Bold", fontSize: 26 }}
-          >
-            {s.searchPlaceholder}
-          </Text>
-        </View>
+      <View className="flex-1" style={{ height: modalHeight, maxHeight: modalHeight }}>
+        <OverlayHeader
+          title={s.searchPlaceholder}
+          subtitle={`${s.searchTextMode} / ${s.searchRootMode}`}
+          onClose={onClose}
+          showHandle={isPhone}
+          isRTL={isRTL}
+        />
 
         {/* Search bar */}
-        <View className="px-5 pb-3">
+        <View className="px-5 pt-4 pb-3">
           <View className="flex-row items-center bg-surface-low dark:bg-surface-dark-low rounded-full px-4 py-2.5">
             <Search size={18} color={mutedColor} />
             <TextInput
@@ -575,10 +567,11 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
         </View>
 
         {/* Content area */}
-        {searching ? (
-          <SearchResultsSkeleton isDark={isDark} className="flex-1" />
-        ) : !hasSearched && query.length === 0 ? (
-          <View className="flex-1 px-5">
+        <OverlayBody scrollEnabled={false} className="px-0">
+          {searching ? (
+            <SearchResultsSkeleton isDark={isDark} className="flex-1" />
+          ) : !hasSearched && query.length === 0 ? (
+            <View className="flex-1 px-5">
             {history.length > 0 && (
               <>
                 <View className="flex-row items-center justify-between py-3">
@@ -603,6 +596,8 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
                   data={history}
                   keyExtractor={(item) => String(item.id)}
                   keyboardShouldPersistTaps="handled"
+                  style={{ flex: 1 }}
+                  contentContainerStyle={{ paddingBottom: 24 }}
                   renderItem={({ item }) => (
                     <Pressable
                       onPress={() => handleHistoryTap(item)}
@@ -665,6 +660,7 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
               data={groupedTextResults}
               keyExtractor={(item) => `surah-${item.surah}`}
               keyboardShouldPersistTaps="handled"
+              style={{ flex: 1 }}
               contentContainerStyle={{ paddingBottom: 40 }}
               renderItem={({ item: group }) => (
                 <View className="mb-2">
@@ -778,6 +774,7 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
               data={rootResults}
               keyExtractor={(item) => item.lemma}
               keyboardShouldPersistTaps="handled"
+              style={{ flex: 1 }}
               contentContainerStyle={{ paddingBottom: 40 }}
               renderItem={({ item: group }) => {
                 const isExpanded = expandedLemmas.has(group.lemma);
@@ -873,9 +870,9 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
               }}
             />
           </View>
-        )}
-        </View>
+          )}
+        </OverlayBody>
       </View>
-    </Modal>
+    </ResponsiveSheet>
   );
 }

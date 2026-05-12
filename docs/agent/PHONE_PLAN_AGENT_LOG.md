@@ -1438,3 +1438,22 @@ Saved in `phase19/`:
 ### Validation result
 - `npm run typecheck`: passed.
 - `npm run build:web`: passed.
+
+## 2026-05-12 — Search Overlay Migration
+
+### Scope decisions
+1. Migrated only `SearchCommand` to the shared responsive overlay shell.
+2. Kept search query, history, text/root result grouping, and Home/Mushaf launch APIs unchanged.
+3. Preserved word-result navigation by setting pending deep links before route navigation and keeping Mushaf in-place callbacks intact.
+
+### Implemented in this step
+- `components/SearchCommand.tsx`:
+  - Replaced the raw `Modal` shell with `ResponsiveSheet`, `OverlayHeader`, and `OverlayBody`.
+  - Added explicit light/dark surface color and fixed internal overlay height for virtualized lists.
+  - Kept history, text result, and root result `FlatList` scrolling inside the overlay body.
+  - Cleared deferred focus timers on close and preserved word target navigation.
+
+### Validation result
+- `npm run typecheck`: passed.
+- `npm run build:web`: passed.
+- `npx expo start --web --port 8088`: Metro started and was stopped after confirming startup.
