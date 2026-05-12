@@ -14,8 +14,8 @@ export default function Root({ children }: { children: React.ReactNode }) {
         <meta name="description" content="Quran retention with spaced repetition" />
 
         {/* Favicon / tab icon */}
-        <link rel="icon" type="image/png" href="/logo.png" />
-        <link rel="shortcut icon" type="image/png" href="/logo.png" />
+        <link rel="icon" type="image/png" sizes="48x48" href="/favicon.png?v=2" />
+        <link rel="shortcut icon" type="image/png" href="/favicon.png?v=2" />
 
         {/* PWA / Add-to-Home */}
         <link rel="manifest" href="/manifest.webmanifest" />
@@ -23,7 +23,7 @@ export default function Root({ children }: { children: React.ReactNode }) {
         <meta name="application-name" content="Hafiz" />
 
         {/* iOS Add-to-Home */}
-        <link rel="apple-touch-icon" href="/logo.png" />
+        <link rel="apple-touch-icon" href="/icon.png?v=2" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-title" content="Hafiz" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
