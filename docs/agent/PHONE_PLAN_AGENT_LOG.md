@@ -1420,3 +1420,21 @@ Saved in `phase19/`:
 ### Validation result
 - `npm run typecheck`: passed.
 - `npm run build:web`: passed.
+
+## 2026-05-12 — Mushaf Chrome Hide Restore
+
+### Scope decisions
+1. Restore expected reader chrome hiding after the previous fixes made top and bottom chrome stay visible.
+2. Hide chrome on downward Mushaf scrolling and reveal it on upward scroll or near the top.
+3. On phone/tablet reader taps, toggle chrome visibility without changing toolbar/page rail visuals.
+
+### Implemented in this step
+- `app/(tabs)/mushaf.tsx`:
+  - Replaced reveal-only scroll handling with direction-aware chrome handling.
+  - Moved tap handling to reader content wrappers so toolbar button taps do not toggle chrome.
+- `components/mushaf/WordToken.tsx`:
+  - Restored touch word-tap chrome toggling while preserving double-tap tooltip behavior.
+
+### Validation result
+- `npm run typecheck`: passed.
+- `npm run build:web`: passed.

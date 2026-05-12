@@ -31,7 +31,7 @@ function WordTokenInner({
   highlightColor,
 }: Props) {
   const { tooltipWord, setTooltipWord, openDetail } = useWordInteraction();
-  const { markActivity } = useChrome();
+  const { visible: chromeVisible, setVisible: setChromeVisible, markActivity } = useChrome();
   const tokenRef = useRef<View>(null);
   const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTouchInput = useMemo(() => {
@@ -63,9 +63,9 @@ function WordTokenInner({
 
   const handlePress = useCallback(() => {
     if (disabled) return;
-    markActivity();
     if (!isTouchInput) {
       // Mouse / desktop: single click → tooltip
+      markActivity();
       showTooltip();
       return;
     }
@@ -73,6 +73,7 @@ function WordTokenInner({
     if (tapTimerRef.current) {
       clearTimeout(tapTimerRef.current);
       tapTimerRef.current = null;
+      setChromeVisible(true);
       // Second tap arrived in time → revert the pending chrome toggle (it
       // hadn't fired yet, since we cleared the timer) and show tooltip.
       showTooltip();
@@ -80,9 +81,9 @@ function WordTokenInner({
     }
     tapTimerRef.current = setTimeout(() => {
       tapTimerRef.current = null;
-      markActivity();
+      setChromeVisible(!chromeVisible);
     }, DOUBLE_TAP_MS);
-  }, [disabled, isTouchInput, markActivity, showTooltip]);
+  }, [chromeVisible, disabled, isTouchInput, markActivity, setChromeVisible, showTooltip]);
 
   const handleLongPress = useCallback(() => {
     if (disabled) return;

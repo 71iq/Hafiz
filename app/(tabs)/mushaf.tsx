@@ -135,16 +135,42 @@ function MushafInner() {
   const touchStartYRef = useRef<number | null>(null);
   const touchMovedRef = useRef(false);
 
-  const handleScrollReveal = useCallback((e: any) => {
+  const handleScrollChrome = useCallback((e: any) => {
     const y = e?.nativeEvent?.contentOffset?.y;
     if (typeof y !== "number") return;
-    if (y < lastScrollYRef.current) setChromeVisible(true);
+    const dy = y - lastScrollYRef.current;
+    if (y < 16 || dy < -4) {
+      setChromeVisible(true);
+    } else if (dy > 4) {
+      setChromeVisible(false);
+    }
     lastScrollYRef.current = y;
   }, [setChromeVisible]);
 
-  const readerActivityProps = Platform.OS === "web"
+  const toggleChromeFromReaderTap = useCallback(() => {
+    if (!isPhone && !isTablet) return;
+    setChromeVisible(!chromeVisible);
+  }, [chromeVisible, isPhone, isTablet, setChromeVisible]);
+
+  const readerTapProps = Platform.OS === "web"
     ? ({
-        onPointerDown: () => setChromeVisible(true),
+        onPointerDown: (e: any) => {
+          if (!isPhone && !isTablet) return;
+          touchStartYRef.current = e?.nativeEvent?.pageY ?? null;
+          touchMovedRef.current = false;
+        },
+        onPointerMove: (e: any) => {
+          if (!isPhone && !isTablet) return;
+          const y = e?.nativeEvent?.pageY;
+          if (touchStartYRef.current != null && typeof y === "number" && Math.abs(y - touchStartYRef.current) > 8) {
+            touchMovedRef.current = true;
+          }
+        },
+        onPointerUp: () => {
+          if (!isPhone && !isTablet) return;
+          if (!touchMovedRef.current) toggleChromeFromReaderTap();
+          touchStartYRef.current = null;
+        },
       } as Record<string, unknown>)
     : ({
         onTouchStart: (e: any) => {
@@ -158,7 +184,7 @@ function MushafInner() {
           }
         },
         onTouchEnd: () => {
-          if (!touchMovedRef.current) setChromeVisible(true);
+          if (!touchMovedRef.current) toggleChromeFromReaderTap();
           touchStartYRef.current = null;
         },
       } as Record<string, unknown>);
@@ -585,7 +611,6 @@ function MushafInner() {
       <SafeAreaView
         className="flex-1 bg-surface dark:bg-surface-dark"
         edges={["top"]}
-        {...readerActivityProps}
       >
         {/* Header chrome — phone gets the new glass top bar, desktop keeps current layout. */}
         <Animated.View pointerEvents={chromeVisible ? "auto" : "none"} style={headerAnimStyle}>
@@ -720,6 +745,7 @@ function MushafInner() {
         {isPageMode ? (
           <View
             className="flex-1"
+            {...readerTapProps}
             style={{
               paddingTop: chromeVisible ? 0 : 10,
               paddingBottom: isPhone ? 8 : 0,
@@ -728,7 +754,7 @@ function MushafInner() {
             <PageMushaf
               onPageChange={setCurrentPage}
               goToPageRef={goToPageRef}
-              onScroll={handleScrollReveal}
+              onScroll={handleScrollChrome}
               onUserActivity={() => setChromeVisible(true)}
               pagePaddingTop={isPhone ? 14 : 8}
               pagePaddingBottom={isPhone ? 12 : isTablet ? 0 : 32}
@@ -802,19 +828,21 @@ function MushafInner() {
             )}
           </View>
         ) : (
-          <FlashList
-            ref={flashListRef}
-            data={items}
-            renderItem={renderItem}
-            getItemType={getItemType}
-            keyExtractor={keyExtractor}
-            extraData={{ fontSize, hideMode, highlightedKey }}
-            contentContainerStyle={{ paddingBottom: isPhone ? 24 : 56 }}
-            onScroll={handleScrollReveal}
-            scrollEventThrottle={16}
-            onViewableItemsChanged={onViewableItemsChanged}
-            viewabilityConfig={viewabilityConfig}
-          />
+          <View className="flex-1" {...readerTapProps}>
+            <FlashList
+              ref={flashListRef}
+              data={items}
+              renderItem={renderItem}
+              getItemType={getItemType}
+              keyExtractor={keyExtractor}
+              extraData={{ fontSize, hideMode, highlightedKey }}
+              contentContainerStyle={{ paddingBottom: isPhone ? 24 : 56 }}
+              onScroll={handleScrollChrome}
+              scrollEventThrottle={16}
+              onViewableItemsChanged={onViewableItemsChanged}
+              viewabilityConfig={viewabilityConfig}
+            />
+          </View>
         )}
 
         {/* Go-to navigator modal */}
