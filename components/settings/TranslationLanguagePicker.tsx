@@ -18,6 +18,7 @@ export function TranslationLanguagePicker({ visible, onClose }: Props) {
   const { translationLanguage, setTranslationLanguage, isDark, isRTL } =
     useSettings();
   const s = useStrings();
+  const surfaceColor = isDark ? "#1C1917" : "#FFF8F1";
 
   const handleSelect = async (code: string) => {
     await setTranslationLanguage(code);
@@ -31,6 +32,7 @@ export function TranslationLanguagePicker({ visible, onClose }: Props) {
       dismissOnBackdrop
       maxWidth={520}
       maxHeight="80%"
+      surfaceColor={surfaceColor}
     >
       <OverlayHeader
         title={s.translationLanguagePickerTitle}
