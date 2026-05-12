@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef, useMemo, memo } from "react";
-import { View, Text, Pressable, Animated as RNAnimated, useWindowDimensions, Modal, ScrollView, TextInput } from "react-native";
+import { View, Text, Pressable, Animated as RNAnimated, useWindowDimensions, TextInput } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -33,7 +33,7 @@ import {
 import { formatForCopy } from "@/lib/selection/format";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { AyahDetailModal } from "./AyahDetailModal";
-import { X } from "lucide-react-native";
+import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 
 type DeckOption = {
   id: string;
@@ -416,74 +416,49 @@ function AyahBlockInner({
         onClose={() => setDetailOpen(false)}
         initialTab={detailTab}
       />
-      <Modal visible={deckPickerOpen} transparent animationType="fade" onRequestClose={() => setDeckPickerOpen(false)}>
-        <View className="flex-1 items-center justify-center px-4" style={{ backgroundColor: "rgba(0,0,0,0.55)" }}>
-          <Pressable className="absolute inset-0" onPress={() => setDeckPickerOpen(false)} />
-          <View className="w-full max-w-[560px] rounded-3xl bg-surface dark:bg-surface-dark p-5">
-            <View className={isRTL ? "flex-row-reverse items-center justify-between" : "flex-row items-center justify-between"}>
-              <Text className="text-charcoal dark:text-neutral-100" style={{ fontFamily: "NotoSerif_700Bold", fontSize: 22 }}>
-                {s.reviewSelectDeck ?? s.flashcardsDecks}
+      <ResponsiveSheet open={deckPickerOpen} onClose={() => setDeckPickerOpen(false)} maxWidth={560} maxHeight={640}>
+        <OverlayHeader
+          title={s.reviewSelectDeck ?? s.flashcardsDecks}
+          onClose={() => setDeckPickerOpen(false)}
+          isRTL={isRTL}
+          showHandle={isPhone}
+        />
+        <OverlayBody contentContainerClassName="px-5 pb-5 pt-4">
+          <View className="rounded-2xl bg-surface-low dark:bg-surface-dark-low p-3">
+            <TextInput
+              value={newDeckName}
+              onChangeText={setNewDeckName}
+              placeholder={s.reviewNewDeckName}
+              placeholderTextColor={isDark ? "#525252" : "#b9a085"}
+              className="rounded-xl bg-surface dark:bg-surface-dark px-3 py-2 text-charcoal dark:text-neutral-100"
+              style={{ fontFamily: "Manrope_500Medium", fontSize: 14, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
+            />
+            <Pressable
+              onPress={handleCreateDeckAndAdd}
+              disabled={reviewBusy || newDeckName.trim().length === 0}
+              className="mt-3 rounded-2xl bg-primary-soft px-4 py-3"
+              style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }], opacity: reviewBusy || newDeckName.trim().length === 0 ? 0.55 : 1 })}
+            >
+              <Text className="text-gold" style={{ fontFamily: "Manrope_700Bold", fontSize: 14, textAlign: isRTL ? "right" : "left" }}>
+                {s.reviewCreateAndSelectDeck}
               </Text>
-              <Pressable onPress={() => setDeckPickerOpen(false)} className="h-9 w-9 items-center justify-center rounded-full bg-surface-low dark:bg-surface-dark-low">
-                <X size={16} color={isDark ? "#a3a3a3" : "#6e5a47"} />
-              </Pressable>
-            </View>
-            <View className="mt-4 rounded-2xl bg-surface-low dark:bg-surface-dark-low p-3">
-              <TextInput
-                value={newDeckName}
-                onChangeText={setNewDeckName}
-                placeholder={s.reviewNewDeckName}
-                placeholderTextColor={isDark ? "#525252" : "#b9a085"}
-                className="rounded-xl bg-surface dark:bg-surface-dark px-3 py-2 text-charcoal dark:text-neutral-100"
-                style={{
-                  fontFamily: "Manrope_500Medium",
-                  fontSize: 14,
-                  textAlign: isRTL ? "right" : "left",
-                  writingDirection: isRTL ? "rtl" : "ltr",
-                }}
-              />
-              <Pressable
-                onPress={handleCreateDeckAndAdd}
-                disabled={reviewBusy || newDeckName.trim().length === 0}
-                className="mt-3 rounded-2xl bg-primary-soft px-4 py-3"
-                style={({ pressed }) => ({
-                  transform: [{ scale: pressed ? 0.98 : 1 }],
-                  opacity: reviewBusy || newDeckName.trim().length === 0 ? 0.55 : 1,
-                })}
-              >
-                <Text className="text-gold" style={{ fontFamily: "Manrope_700Bold", fontSize: 14, textAlign: isRTL ? "right" : "left" }}>
-                  {s.reviewCreateAndSelectDeck}
-                </Text>
-              </Pressable>
-            </View>
-            <ScrollView style={{ maxHeight: 280, marginTop: 10 }}>
-              {deckLoading ? (
-                <Text className="text-warm-500 dark:text-neutral-400" style={{ fontFamily: "Manrope_500Medium", fontSize: 13 }}>
-                  {s.loading}
-                </Text>
-              ) : deckOptions.length === 0 ? (
-                <Text className="text-warm-500 dark:text-neutral-400" style={{ fontFamily: "Manrope_500Medium", fontSize: 13 }}>
-                  {s.flashcardsNoDecks}
-                </Text>
-              ) : (
-                deckOptions.map((deck) => (
-                  <Pressable
-                    key={deck.id}
-                    onPress={() => handleAddToExistingDeck(deck.id)}
-                    disabled={reviewBusy}
-                    className="mb-2 rounded-2xl bg-surface-low dark:bg-surface-dark-low px-4 py-3"
-                    style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.99 : 1 }], opacity: reviewBusy ? 0.7 : 1 })}
-                  >
-                    <Text className="text-charcoal dark:text-neutral-100" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}>
-                      {formatDeckLabel(deck)}
-                    </Text>
-                  </Pressable>
-                ))
-              )}
-            </ScrollView>
+            </Pressable>
           </View>
-        </View>
-      </Modal>
+          <View className="mt-3">
+            {deckLoading ? (
+              <Text className="text-warm-500 dark:text-neutral-400" style={{ fontFamily: "Manrope_500Medium", fontSize: 13 }}>{s.loading}</Text>
+            ) : deckOptions.length === 0 ? (
+              <Text className="text-warm-500 dark:text-neutral-400" style={{ fontFamily: "Manrope_500Medium", fontSize: 13 }}>{s.flashcardsNoDecks}</Text>
+            ) : (
+              deckOptions.map((deck) => (
+                <Pressable key={deck.id} onPress={() => handleAddToExistingDeck(deck.id)} disabled={reviewBusy} className="mb-2 rounded-2xl bg-surface-low dark:bg-surface-dark-low px-4 py-3" style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.99 : 1 }], opacity: reviewBusy ? 0.7 : 1 })}>
+                  <Text className="text-charcoal dark:text-neutral-100" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}>{formatDeckLabel(deck)}</Text>
+                </Pressable>
+              ))
+            )}
+          </View>
+        </OverlayBody>
+      </ResponsiveSheet>
     </View>
   );
 }

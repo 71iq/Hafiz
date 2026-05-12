@@ -1,22 +1,15 @@
 import React, { useState, useEffect, useCallback } from "react";
-import {
-  View,
-  Text,
-  Modal,
-  Pressable,
-  ScrollView,
-  TextInput,
-  ActivityIndicator,
-} from "react-native";
-import { X, Check } from "lucide-react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { View, Text, Pressable, ScrollView, TextInput, ActivityIndicator, useWindowDimensions } from "react-native";
+import { Check } from "lucide-react-native";
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { createDeck, generateDeckId, resolveScope } from "@/lib/fsrs/queries";
+import { createDeck, generateDeckId } from "@/lib/fsrs/queries";
 import type { DeckScope } from "@/lib/fsrs/types";
+import { OverlayBody, OverlayFooter, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
+import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 
 type ScopeType = "surah" | "juz" | "hizb" | "custom";
 
@@ -30,7 +23,9 @@ type SurahRow = { number: number; name_arabic: string; name_english: string; aya
 
 export function CreateDeckSheet({ visible, onClose, onCreated }: Props) {
   const db = useDatabase();
-  const { isDark } = useSettings();
+  const { isDark, isRTL } = useSettings();
+  const { width } = useWindowDimensions();
+  const isPhone = width < SIDEBAR_BREAKPOINT;
   const s = useStrings();
   const [scopeType, setScopeType] = useState<ScopeType>("surah");
   const [selectedSurahs, setSelectedSurahs] = useState<Set<number>>(new Set());
@@ -127,174 +122,98 @@ export function CreateDeckSheet({ visible, onClose, onCreated }: Props) {
   ];
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
-      <SafeAreaView
-        className="flex-1 bg-surface dark:bg-surface-dark"
-        edges={["top"]}
-      >
-        {/* Header */}
-        <View className="flex-row items-center justify-between px-6 py-4">
-          <Text
-            className="text-charcoal dark:text-neutral-100"
-            style={{ fontFamily: "NotoSerif_700Bold", fontSize: 22 }}
-          >
-            {s.flashcardsCreateDeckTitle}
-          </Text>
-          <Pressable onPress={onClose} className="w-10 h-10 rounded-full bg-surface-high dark:bg-surface-dark-high items-center justify-center">
-            <X size={18} color={isDark ? "#d4d4d4" : "#6e5a47"} />
-          </Pressable>
-        </View>
+    <ResponsiveSheet open={visible} onClose={onClose} maxWidth={760} maxHeight={720}>
+      <OverlayHeader
+        title={s.flashcardsCreateDeckTitle}
+        onClose={onClose}
+        isRTL={isRTL}
+        showHandle={isPhone}
+      />
 
-        {/* Scope type tabs */}
-        <View className="mb-4">
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{
-              gap: 8,
-              alignItems: "center",
-              paddingHorizontal: 24,
-              paddingVertical: 2,
-            }}
-            style={{ maxHeight: 52 }}
-          >
-            {SCOPE_TABS.map((tab) => (
-              <Pressable
-                key={tab.value}
-                onPress={() => setScopeType(tab.value)}
-                className={`h-11 rounded-full px-5 items-center justify-center ${
-                  scopeType === tab.value
-                    ? "bg-primary-accent"
-                    : "bg-surface-low dark:bg-surface-dark-low"
-                }`}
-                style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-              >
-                <Text
-                  numberOfLines={1}
-                  style={{
-                    fontFamily: scopeType === tab.value ? "Manrope_600SemiBold" : "Manrope_500Medium",
-                    fontSize: 13,
-                    color: scopeType === tab.value ? "#fff" : (isDark ? "#a3a3a3" : "#6e5a47"),
-                  }}
-                >
-                  {tab.label}
-                </Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* Content area */}
-        <ScrollView className="flex-1 px-6" contentContainerStyle={{ paddingBottom: 120 }}>
-          {scopeType === "surah" && (
-            <View className="gap-2">
-              {surahs.map((s) => (
-                <SurahItem
-                  key={s.number}
-                  surah={s}
-                  selected={selectedSurahs.has(s.number)}
-                  onToggle={() => toggleSurah(s.number)}
-                  isDark={isDark}
-                />
-              ))}
-            </View>
-          )}
-
-          {scopeType === "juz" && (
-            <View className="flex-row flex-wrap gap-3">
-              {Array.from({ length: 30 }, (_, i) => i + 1).map((n) => (
-                <NumberChip
-                  key={n}
-                  number={n}
-                  selected={selectedJuz.has(n)}
-                  onToggle={() => toggleJuz(n)}
-                  isDark={isDark}
-                />
-              ))}
-            </View>
-          )}
-
-          {scopeType === "hizb" && (
-            <View className="flex-row flex-wrap gap-3">
-              {Array.from({ length: 60 }, (_, i) => i + 1).map((n) => (
-                <NumberChip
-                  key={n}
-                  number={n}
-                  selected={selectedHizb.has(n)}
-                  onToggle={() => toggleHizb(n)}
-                  isDark={isDark}
-                />
-              ))}
-            </View>
-          )}
-
-          {scopeType === "custom" && (
-            <Card elevation="low" className="p-5">
-              <Text
-                className="text-charcoal dark:text-neutral-300 mb-3"
-                style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}
-              >
-                {s.flashcardsFrom}
-              </Text>
-              <View className="flex-row gap-3 mb-5">
-                <RangeInput
-                  label="Surah"
-                  value={customFrom.surah}
-                  onChangeText={(v) => setCustomFrom((p) => ({ ...p, surah: v }))}
-                  isDark={isDark}
-                />
-                <RangeInput
-                  label="Ayah"
-                  value={customFrom.ayah}
-                  onChangeText={(v) => setCustomFrom((p) => ({ ...p, ayah: v }))}
-                  isDark={isDark}
-                />
-              </View>
-              <Text
-                className="text-charcoal dark:text-neutral-300 mb-3"
-                style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}
-              >
-                {s.flashcardsTo}
-              </Text>
-              <View className="flex-row gap-3">
-                <RangeInput
-                  label="Surah"
-                  value={customTo.surah}
-                  onChangeText={(v) => setCustomTo((p) => ({ ...p, surah: v }))}
-                  isDark={isDark}
-                />
-                <RangeInput
-                  label="Ayah"
-                  value={customTo.ayah}
-                  onChangeText={(v) => setCustomTo((p) => ({ ...p, ayah: v }))}
-                  isDark={isDark}
-                />
-              </View>
-            </Card>
-          )}
-        </ScrollView>
-
-        {/* Bottom action */}
-        <View
-          className="px-6 pb-6 pt-4"
-          style={{ backgroundColor: isDark ? "rgba(10,10,10,0.95)" : "rgba(255,248,241,0.95)" }}
+      <View className="mb-4 mt-2">
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{
+            gap: 8,
+            alignItems: "center",
+            paddingHorizontal: 20,
+            paddingVertical: 2,
+            flexDirection: isRTL ? "row-reverse" : "row",
+          }}
+          style={{ maxHeight: 52 }}
         >
-          <Button
-            onPress={handleCreate}
-            disabled={!canCreate() || creating}
-            className="w-full"
-          >
-            {creating ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16, color: "#fff" }}>
-                {s.flashcardsCreate}
+          {SCOPE_TABS.map((tab) => (
+            <Pressable
+              key={tab.value}
+              onPress={() => setScopeType(tab.value)}
+              className={`h-11 rounded-full px-5 items-center justify-center ${
+                scopeType === tab.value ? "bg-primary-accent" : "bg-surface-low dark:bg-surface-dark-low"
+              }`}
+              style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+            >
+              <Text
+                numberOfLines={1}
+                style={{
+                  fontFamily: scopeType === tab.value ? "Manrope_600SemiBold" : "Manrope_500Medium",
+                  fontSize: 13,
+                  color: scopeType === tab.value ? "#fff" : (isDark ? "#a3a3a3" : "#6e5a47"),
+                }}
+              >
+                {tab.label}
               </Text>
-            )}
-          </Button>
-        </View>
-      </SafeAreaView>
-    </Modal>
+            </Pressable>
+          ))}
+        </ScrollView>
+      </View>
+
+      <OverlayBody contentContainerClassName="px-5 pb-8">
+        {scopeType === "surah" && (
+          <View className="gap-2">
+            {surahs.map((s) => (
+              <SurahItem key={s.number} surah={s} selected={selectedSurahs.has(s.number)} onToggle={() => toggleSurah(s.number)} isDark={isDark} />
+            ))}
+          </View>
+        )}
+
+        {scopeType === "juz" && (
+          <View className="flex-row flex-wrap gap-3">
+            {Array.from({ length: 30 }, (_, i) => i + 1).map((n) => (
+              <NumberChip key={n} number={n} selected={selectedJuz.has(n)} onToggle={() => toggleJuz(n)} isDark={isDark} />
+            ))}
+          </View>
+        )}
+
+        {scopeType === "hizb" && (
+          <View className="flex-row flex-wrap gap-3">
+            {Array.from({ length: 60 }, (_, i) => i + 1).map((n) => (
+              <NumberChip key={n} number={n} selected={selectedHizb.has(n)} onToggle={() => toggleHizb(n)} isDark={isDark} />
+            ))}
+          </View>
+        )}
+
+        {scopeType === "custom" && (
+          <Card elevation="low" className="p-5">
+            <Text className="text-charcoal dark:text-neutral-300 mb-3" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>{s.flashcardsFrom}</Text>
+            <View className="flex-row gap-3 mb-5">
+              <RangeInput label="Surah" value={customFrom.surah} onChangeText={(v) => setCustomFrom((p) => ({ ...p, surah: v }))} isDark={isDark} />
+              <RangeInput label="Ayah" value={customFrom.ayah} onChangeText={(v) => setCustomFrom((p) => ({ ...p, ayah: v }))} isDark={isDark} />
+            </View>
+            <Text className="text-charcoal dark:text-neutral-300 mb-3" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>{s.flashcardsTo}</Text>
+            <View className="flex-row gap-3">
+              <RangeInput label="Surah" value={customTo.surah} onChangeText={(v) => setCustomTo((p) => ({ ...p, surah: v }))} isDark={isDark} />
+              <RangeInput label="Ayah" value={customTo.ayah} onChangeText={(v) => setCustomTo((p) => ({ ...p, ayah: v }))} isDark={isDark} />
+            </View>
+          </Card>
+        )}
+      </OverlayBody>
+
+      <OverlayFooter isRTL={isRTL}>
+        <Button onPress={handleCreate} disabled={!canCreate() || creating} className="w-full">
+          {creating ? <ActivityIndicator color="#fff" size="small" /> : <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16, color: "#fff" }}>{s.flashcardsCreate}</Text>}
+        </Button>
+      </OverlayFooter>
+    </ResponsiveSheet>
   );
 }
 
