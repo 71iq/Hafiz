@@ -35,6 +35,7 @@ export function CreateDeckSheet({ visible, onClose, onCreated }: Props) {
   const [customTo, setCustomTo] = useState({ surah: "1", ayah: "7" });
   const [surahs, setSurahs] = useState<SurahRow[]>([]);
   const [creating, setCreating] = useState(false);
+  const surfaceColor = isDark ? "#1C1917" : "#FFF8F1";
 
   useEffect(() => {
     if (!visible) return;
@@ -122,7 +123,13 @@ export function CreateDeckSheet({ visible, onClose, onCreated }: Props) {
   ];
 
   return (
-    <ResponsiveSheet open={visible} onClose={onClose} maxWidth={760} maxHeight={720}>
+    <ResponsiveSheet
+      open={visible}
+      onClose={onClose}
+      maxWidth={760}
+      maxHeight={720}
+      surfaceColor={surfaceColor}
+    >
       <OverlayHeader
         title={s.flashcardsCreateDeckTitle}
         onClose={onClose}
