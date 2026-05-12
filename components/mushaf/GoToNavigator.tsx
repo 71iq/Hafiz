@@ -44,8 +44,9 @@ export function GoToNavigator({
   const db = useDatabase();
   const s = useStrings();
   const { isDark, isRTL } = useSettings();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const isPhone = width < SIDEBAR_BREAKPOINT;
+  const overlayMaxHeight = isPhone ? "88%" : Math.min(Math.floor(height * 0.88), 820);
   const [surahs, setSurahs] = useState<SurahRow[]>([]);
   const [juzList, setJuzList] = useState<JuzInfo[]>([]);
   const [surahPageMap, setSurahPageMap] = useState<Map<number, number>>(new Map());
@@ -307,9 +308,10 @@ export function GoToNavigator({
       onClose={onClose}
       phonePresentation="sheet"
       desktopPresentation="dialog"
-      maxWidth={520}
-      maxHeight="88%"
+      maxWidth={560}
+      maxHeight={overlayMaxHeight}
       dismissOnBackdrop
+      dismissOnEscape
       surfaceColor={isDark ? "#1C1917" : "#FFF8F1"}
     >
       <OverlayHeader title={s.goToTitle} onClose={onClose} showHandle={isPhone} isRTL={isRTL} />
