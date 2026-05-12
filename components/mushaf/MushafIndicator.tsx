@@ -1,5 +1,7 @@
 import { View, Text } from "react-native";
 import { toArabicNumber } from "@/lib/arabic";
+import { useSettings } from "@/lib/settings/context";
+import { useStrings } from "@/lib/i18n/useStrings";
 
 type Props = {
   surahName: string | null;
@@ -12,12 +14,15 @@ type Props = {
  * dynamically as the user scrolls through ayahs/pages.
  */
 export function MushafIndicator({ surahName, juz }: Props) {
+  const { isRTL } = useSettings();
+  const s = useStrings();
   if (!surahName && !juz) return null;
+  const juzLabel = isRTL ? toArabicNumber(juz ?? 0) : String(juz ?? "");
   return (
     <View
       pointerEvents="none"
       className="flex-row items-center justify-between px-5 py-1.5 bg-surface/60 dark:bg-surface-dark/60"
-      style={{ direction: "rtl" }}
+      style={{ direction: isRTL ? "rtl" : "ltr" }}
     >
       <Text
         className="text-warm-500 dark:text-neutral-400"
@@ -27,7 +32,7 @@ export function MushafIndicator({ surahName, juz }: Props) {
         }}
         numberOfLines={1}
       >
-        {surahName ? `سورة ${surahName}` : ""}
+        {surahName ? `${s.tabSurah} ${surahName}` : ""}
       </Text>
       <Text
         className="text-warm-500 dark:text-neutral-400"
@@ -37,7 +42,7 @@ export function MushafIndicator({ surahName, juz }: Props) {
         }}
         numberOfLines={1}
       >
-        {juz ? `الجزء ${toArabicNumber(juz)}` : ""}
+        {juz ? `${s.tabJuz} ${juzLabel}` : ""}
       </Text>
     </View>
   );

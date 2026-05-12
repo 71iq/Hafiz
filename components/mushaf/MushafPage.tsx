@@ -84,7 +84,7 @@ type PageGlyph = {
 const BISMILLAH_QCF2 = "\uFC41 \uFC42 \uFC43 \uFC44";
 
 // Content width scales with font size — a standard Mushaf line fills this width
-const FONT_WIDTH_SCALE = 19;
+const FONT_WIDTH_SCALE = 17.5;
 const MARKER_DOUBLE_TAP_MS = 260;
 
 /**
@@ -319,6 +319,7 @@ function MushafPageInner({
         return null;
       }
       if (words.length === 0) return null;
+      const shouldStretchLine = !centered && words.length > 6;
 
       return (
         <View
@@ -326,10 +327,10 @@ function MushafPageInner({
           style={{
             direction: "ltr",
             flexDirection: "row-reverse",
-            justifyContent: centered ? "center" : "space-between",
+            justifyContent: shouldStretchLine ? "space-between" : "center",
             width: contentWidth,
             height: lineHeight,
-            gap: centered ? fontSize * 0.3 : undefined,
+            gap: shouldStretchLine ? undefined : fontSize * 0.28,
             alignItems: "center",
             paddingHorizontal: 2,
             overflow: "visible",

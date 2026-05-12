@@ -18,6 +18,8 @@ import { useSettings } from "@/lib/settings/context";
 import { useStrings, interpolate } from "@/lib/i18n/useStrings";
 import { MushafPage, type PageLineLayout } from "./MushafPage";
 import { AyahDetailModal } from "./AyahDetailModal";
+import { toArabicNumber } from "@/lib/arabic";
+import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 
 type PageRow = {
   page: number;
@@ -145,7 +147,7 @@ type Props = {
 const SEPARATOR_HEIGHT = 48; // py-4 (32) + text-xs line (16)
 const SURAH_HEADER_COMPACT_HEIGHT = 68; // mt-3(12) + card(48) + mb-2(8)
 const HORIZONTAL_PAGE_TOP_PADDING = 0;
-const HORIZONTAL_PAGE_BOTTOM_RESERVE = 56;
+const HORIZONTAL_PAGE_BOTTOM_RESERVE = 8;
 const MUSHAF_LINE_COUNT = 15;
 const HORIZONTAL_CANCEL_DURATION = 190;
 const HORIZONTAL_PAGE_TURN_MIN_DURATION = 240;
@@ -233,9 +235,9 @@ function PageSeparator({
   juz: number | null;
   isRTL: boolean;
 }) {
-  const pageLabel = isRTL ? String(page).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[Number(d)]) : String(page);
+  const pageLabel = isRTL ? toArabicNumber(page) : String(page);
   const surahLabel = surahName ? (isRTL ? `سورة ${surahName}` : `Surah ${surahName}`) : "";
-  const juzLabel = juz ? (isRTL ? `الجزء ${String(juz).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[Number(d)])}` : `Juz ${juz}`) : "";
+  const juzLabel = juz ? (isRTL ? `الجزء ${toArabicNumber(juz)}` : `Juz ${juz}`) : "";
   return (
     <View className="items-center justify-center px-3" style={{ height: SEPARATOR_HEIGHT }}>
       <View className="w-full flex-row items-center justify-between" style={{ direction: isRTL ? "rtl" : "ltr" }}>
@@ -282,7 +284,7 @@ export function PageMushaf({
   highlightedWord = null,
 }: Props) {
   const db = useDatabase();
-  const { fontSize, lineHeight, pageScroll, isRTL } = useSettings();
+  const { fontSize, lineHeight, pageScroll, isRTL, uiLanguage } = useSettings();
   const s = useStrings();
   const { width, height: windowHeight } = useWindowDimensions();
   const [containerWidth, setContainerWidth] = useState(0);
@@ -316,6 +318,8 @@ export function PageMushaf({
   const flatListRef = useRef<FlatList>(null);
   const [webDragging, setWebDragging] = useState(false);
   const [showPageIndicator, setShowPageIndicator] = useState(false);
+  const currentPageLabel = isRTL ? toArabicNumber(currentPage) : String(currentPage);
+  const totalPageLabel = isRTL ? toArabicNumber(604) : "604";
 
   const onContainerLayout = useCallback((e: LayoutChangeEvent) => {
     const nextWidth = Math.round(e.nativeEvent.layout.width);
@@ -363,7 +367,7 @@ export function PageMushaf({
 
         const meta = new Map<number, { surahName: string | null; juz: number | null }>();
         for (const p of pages) {
-          const surahName = isRTL
+          const surahName = uiLanguage === "ar"
             ? map.get(p.surah_start)?.name_arabic ?? null
             : map.get(p.surah_start)?.name_english ?? null;
           const juz = findJuzForPageAyah(juzRanges, p.surah_start, p.ayah_start);
@@ -410,7 +414,7 @@ export function PageMushaf({
     }
 
     loadData();
-  }, [db, isRTL, lineHeight, pagePaddingTop, pagePaddingBottom]);
+  }, [db, uiLanguage, lineHeight, pagePaddingTop, pagePaddingBottom]);
 
   // Rebuild layout offsets when lineHeight changes (font size adjustment)
   useEffect(() => {
@@ -787,17 +791,20 @@ export function PageMushaf({
     if (!horizontal || fitHeight <= 0) {
       return { fontSize, lineHeight };
     }
+    const compactHorizontal = width < SIDEBAR_BREAKPOINT;
+    const minLineHeight = compactHorizontal ? 30 : 42;
+    const minFontSize = compactHorizontal ? 16 : 20;
     const availableLineHeight = Math.floor(
       (fitHeight - HORIZONTAL_PAGE_BOTTOM_RESERVE - HORIZONTAL_PAGE_TOP_PADDING) /
         MUSHAF_LINE_COUNT
     );
-    const fittedLineHeight = Math.max(42, Math.min(lineHeight, availableLineHeight));
+    const fittedLineHeight = Math.max(minLineHeight, Math.min(lineHeight, availableLineHeight));
     const fittedFontSize = Math.min(fontSize, Math.floor(fontSize * (fittedLineHeight / lineHeight)));
     return {
-      fontSize: Math.max(20, fittedFontSize),
+      fontSize: Math.max(minFontSize, fittedFontSize),
       lineHeight: fittedLineHeight,
     };
-  }, [containerHeight, fontSize, horizontal, horizontalBottomInset, horizontalTopInset, lineHeight, windowHeight]);
+  }, [containerHeight, fontSize, horizontal, horizontalBottomInset, horizontalTopInset, lineHeight, width, windowHeight]);
 
   const extraData = useMemo(
     () => ({ fontSize, pageWidth, horizontalTypography, highlightedWord, verticalScrollBottomInset }),
@@ -975,7 +982,7 @@ export function PageMushaf({
         <View className="absolute bottom-3 left-0 right-0 items-center pointer-events-none">
           <View className="bg-warm-800/80 dark:bg-neutral-800/90 rounded-full px-4 py-1.5">
             <Text className="text-white text-xs font-semibold">
-              {interpolate(s.pageXOfY, { page: currentPage, total: 604 })}
+              {interpolate(s.pageXOfY, { page: currentPageLabel, total: totalPageLabel })}
             </Text>
           </View>
         </View>

@@ -120,7 +120,7 @@ export default function MushafScreen() {
 
 function MushafInner() {
   const db = useDatabase();
-  const { fontSize, lineHeight, viewMode, setViewMode, pageScroll, isDark, isRTL } = useSettings();
+  const { fontSize, lineHeight, viewMode, setViewMode, pageScroll, isDark, isRTL, uiLanguage } = useSettings();
   const s = useStrings();
   const { width: windowWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -436,12 +436,21 @@ function MushafInner() {
   const mobileBottomNavOffset = isPhone
     ? Math.max(insets.bottom, 10) + mobileBottomNavHeight + mobileBottomNavGap
     : 0;
-  const tabletRailBottom = isTablet ? Math.max(insets.bottom, 16) : 0;
-  const tabletRailFallbackHeight = 40;
-  const tabletRailClearance = isTablet
-    ? (bottomRailHeight || tabletRailFallbackHeight) + tabletRailBottom + 6
-    : 0;
-  const tabletScrollBottomInset = isTablet ? (chromeVisible ? tabletRailClearance : 8) : undefined;
+  const railBottomOffset = isPhone
+    ? mobileBottomNavOffset
+    : isTablet
+      ? Math.max(insets.bottom, 16)
+      : 0;
+  const pageRailFallbackHeight = 40;
+  const pageRailClearance = showBottomSlider && chromeVisible
+    ? (bottomRailHeight || pageRailFallbackHeight) + railBottomOffset + 8
+    : 8;
+  const pageScrollBottomInset =
+    showBottomSlider ? (pageScroll === "horizontal" ? pageRailClearance : 8) : undefined;
+  const pageModeViewportBottomMargin =
+    pageScroll === "vertical" && showBottomSlider && chromeVisible
+      ? pageRailClearance
+      : 0;
   const floatingRailSurface = {
     backgroundColor: isDark ? "rgba(28,25,23,0.95)" : "rgba(255,248,241,0.95)",
     borderWidth: 1,
@@ -583,7 +592,8 @@ function MushafInner() {
     const sm = mushafIndex.surahByNumber.get(topAyah.surah);
     const juz = findJuzForAyah(mushafIndex, topAyah.surah, topAyah.ayah);
     const hizb = findHizbForAyah(mushafIndex, topAyah.surah, topAyah.ayah);
-    return { name: sm?.name_arabic ?? null, juz, hizb };
+    const name = uiLanguage === "ar" ? sm?.name_arabic : sm?.name_english;
+    return { name: name ?? null, juz, hizb };
   })();
   if (loading && !isPageMode) {
     return (
@@ -751,28 +761,32 @@ function MushafInner() {
               paddingBottom: isPhone ? 8 : 0,
             }}
           >
-            <PageMushaf
-              onPageChange={setCurrentPage}
-              goToPageRef={goToPageRef}
-              onScroll={handleScrollChrome}
-              onUserActivity={() => setChromeVisible(true)}
-              pagePaddingTop={isPhone ? 14 : 8}
-              pagePaddingBottom={isPhone ? 12 : isTablet ? 0 : 32}
-              scrollBottomInset={tabletScrollBottomInset}
-              pageSidePadding={isPhone ? 22 : 16}
-              centerVerticalOnPhone={isPhone}
-              horizontalTopInset={isPhone && !chromeVisible && pageScroll === "horizontal" ? 52 : 0}
-              horizontalBottomInset={
-                pageScroll === "horizontal"
-                  ? isPhone
-                    ? 12
-                    : isTablet
-                      ? (chromeVisible ? tabletRailClearance : 0)
-                      : 18
-                  : 0
-              }
-              highlightedWord={highlightedWord}
-            />
+            <View
+              className="flex-1"
+              style={[
+                { overflow: "hidden" },
+                pageModeViewportBottomMargin ? { marginBottom: pageModeViewportBottomMargin } : null,
+              ]}
+            >
+              <PageMushaf
+                onPageChange={setCurrentPage}
+                goToPageRef={goToPageRef}
+                onScroll={handleScrollChrome}
+                onUserActivity={() => setChromeVisible(true)}
+                pagePaddingTop={isPhone ? 14 : 8}
+                pagePaddingBottom={isPhone ? 12 : isTablet ? 0 : 32}
+                scrollBottomInset={pageScrollBottomInset}
+                pageSidePadding={isPhone ? 22 : 16}
+                centerVerticalOnPhone={isPhone}
+                horizontalTopInset={isPhone && !chromeVisible && pageScroll === "horizontal" ? 52 : 0}
+                horizontalBottomInset={
+                  pageScroll === "horizontal"
+                    ? pageRailClearance
+                    : 0
+                }
+                highlightedWord={highlightedWord}
+              />
+            </View>
             {!chromeVisible && (
               <>
                 <View
@@ -888,7 +902,7 @@ function MushafInner() {
                 position: Platform.OS === "web" && (isPhone || isTablet) ? "fixed" as any : "absolute",
                 left: isPhone || isTablet ? 12 : 0,
                 right: isPhone || isTablet ? 12 : 0,
-                bottom: isPhone ? mobileBottomNavOffset : isTablet ? tabletRailBottom : 0,
+                bottom: railBottomOffset,
                 zIndex: 70,
                 borderRadius: isPhone || isTablet ? 22 : 0,
                 overflow: "hidden",

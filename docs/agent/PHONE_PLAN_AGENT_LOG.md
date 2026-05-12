@@ -1457,3 +1457,24 @@ Saved in `phase19/`:
 - `npm run typecheck`: passed.
 - `npm run build:web`: passed.
 - `npx expo start --web --port 8088`: Metro started and was stopped after confirming startup.
+
+## 2026-05-12 — Mushaf Reader UI Stabilization
+
+### Scope decisions
+1. Kept the pass limited to Mushaf reader surfaces and the top indicator; no overlay code was changed.
+2. Preserved the Mushaf page rail direction and interaction model while tightening typography, language labels, and bottom clearance.
+3. Used viewport clipping plus minimal rail-aware clearance so the floating page rail does not cover Quran text without restoring the redundant iPad footer gap.
+
+### Implemented in this step
+- `app/(tabs)/mushaf.tsx`:
+  - Localized top indicator names and shared page rail clearance across phone, tablet, and desktop page modes.
+  - Clipped the vertical page viewport above the floating rail while leaving horizontal page fitting inside `PageMushaf`.
+- `components/mushaf/AyahBlock.tsx` and `components/mushaf/SurahHeader.tsx`:
+  - Added QCF2 line-height breathing room and localized Surah header names/digits.
+- `components/mushaf/MushafPage.tsx`, `components/mushaf/PageMushaf.tsx`, `components/mushaf/MushafSlider.tsx`, and `components/mushaf/MushafIndicator.tsx`:
+  - Reduced sparse-line stretching, tightened horizontal page fitting, and localized page/Surah/Juz labels without changing RTL page direction.
+
+### Validation result
+- `npm run typecheck`: passed.
+- `npm run build:web`: passed.
+- `npx expo start --web --port 8088`: Metro started; Playwright smoke checked page-mode reader at 360, 412, 768, and 1024 widths.

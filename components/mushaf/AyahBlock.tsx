@@ -148,6 +148,7 @@ function AyahBlockInner({
   const fontFamily = qpcFontName(v2Page);
   const bookmarked = isBookmarked(surah, ayah);
   const highlightColor = getHighlightColor(surah, ayah);
+  const qcf2LineHeight = Math.ceil(lineHeight + Math.max(6, fontSize * 0.16));
 
   const handleBookmark = useCallback(async () => {
     try {
@@ -348,6 +349,7 @@ function AyahBlockInner({
               justifyContent: "flex-start",
               alignItems: "center",
               gap: 2,
+              rowGap: Math.max(4, fontSize * 0.12),
               maxWidth: "100%",
               ...(highlightColor && {
                 backgroundColor: highlightColor + "20",
@@ -363,7 +365,7 @@ function AyahBlockInner({
                 glyph={glyph}
                 fontFamily={fontFamily}
                 fontSize={fontSize}
-                lineHeight={lineHeight}
+                lineHeight={qcf2LineHeight}
                 surah={surah}
                 ayah={ayah}
                 wordPos={i + 1}
@@ -376,7 +378,7 @@ function AyahBlockInner({
             {wordTokens.marker && (
               <Text
                 className="text-charcoal dark:text-neutral-100"
-                style={{ fontFamily, fontSize, lineHeight, paddingHorizontal: 2 }}
+                style={{ fontFamily, fontSize, lineHeight: qcf2LineHeight, paddingHorizontal: 2 }}
               >
                 {wordTokens.marker}
               </Text>

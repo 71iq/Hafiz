@@ -6,6 +6,8 @@ import {
   isQpcFontLoaded,
 } from "@/lib/fonts/loader";
 import { useStrings } from "@/lib/i18n/useStrings";
+import { useSettings } from "@/lib/settings/context";
+import { toArabicNumber } from "@/lib/arabic";
 
 type Props = {
   surahNumber: number;
@@ -30,8 +32,14 @@ export function SurahHeader({
   compact,
 }: Props) {
   const s = useStrings();
+  const { uiLanguage } = useSettings();
   const showBismillah =
     !hideBismillah && surahNumber !== 9 && surahNumber !== 1;
+  const isArabicMode = uiLanguage === "ar";
+  const localizedSurahNumber = isArabicMode ? toArabicNumber(surahNumber) : String(surahNumber);
+  const localizedAyahCount = isArabicMode ? toArabicNumber(ayahCount) : String(ayahCount);
+  const displayName = isArabicMode ? nameArabic : nameEnglish;
+  const nameDirection = isArabicMode ? "rtl" : "ltr";
 
   const [bismFontReady, setBismFontReady] = useState(() =>
     isQpcFontLoaded(1)
@@ -59,18 +67,21 @@ export function SurahHeader({
       <View style={{ height: showBismillah ? 100 : 68 }} className="justify-center">
         <View className="flex-row items-center justify-center px-2">
           <OrnamentLine />
-          <View className="mx-3 min-w-[190px] max-w-[300px] rounded-2xl bg-surface-low dark:bg-surface-dark-low px-4 py-2">
+          <View
+            className="mx-3 min-w-[190px] max-w-[340px] rounded-2xl bg-surface-low dark:bg-surface-dark-low px-5 py-2"
+            style={{ flexShrink: 1 }}
+          >
             <Text
               className="text-primary dark:text-primary-bright text-center"
-              style={{ fontSize: 22, lineHeight: 32, writingDirection: "rtl", paddingHorizontal: 6 }}
+              style={{ fontSize: 22, lineHeight: 36, writingDirection: nameDirection, paddingHorizontal: 10 }}
             >
-              {nameArabic}
+              {displayName}
             </Text>
             <Text
               className="text-warm-500 dark:text-neutral-400 text-center"
               style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, lineHeight: 14 }}
             >
-              {surahNumber}. {nameEnglish} · {ayahCount} {s.ayahs}
+              {localizedSurahNumber} · {localizedAyahCount} {s.ayahs}
             </Text>
           </View>
           <OrnamentLine />
@@ -110,19 +121,19 @@ export function SurahHeader({
           className="text-primary dark:text-primary-bright text-center mb-1.5"
           style={{
             fontSize: 34,
-            lineHeight: 58,
-            writingDirection: "rtl",
-            paddingHorizontal: 8,
+            lineHeight: 64,
+            writingDirection: nameDirection,
+            paddingHorizontal: 14,
           }}
         >
-          {nameArabic}
+          {displayName}
         </Text>
 
         <Text
           className="text-warm-500 dark:text-neutral-400 text-center mb-4"
           style={{ fontFamily: "Manrope_500Medium", fontSize: 15 }}
         >
-          {surahNumber}. {nameEnglish}
+          {localizedSurahNumber}. {displayName}
         </Text>
 
         <View className="flex-row items-center gap-3">
@@ -139,7 +150,7 @@ export function SurahHeader({
             className="text-warm-500 dark:text-neutral-400"
             style={{ fontFamily: "Manrope_500Medium", fontSize: 12 }}
           >
-            {ayahCount} {s.ayahs}
+            {localizedAyahCount} {s.ayahs}
           </Text>
         </View>
       </View>

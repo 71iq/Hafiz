@@ -13,7 +13,7 @@ import {
 import { ChevronsUp } from "lucide-react-native";
 import { toArabicNumber } from "@/lib/arabic";
 import { useSettings } from "@/lib/settings/context";
-import { useStrings } from "@/lib/i18n/useStrings";
+import { useStrings, interpolate } from "@/lib/i18n/useStrings";
 import type { MushafIndex } from "@/lib/mushaf/position";
 
 type Props = {
@@ -46,7 +46,7 @@ export function MushafSlider({
   interactive = true,
   onUserActivity,
 }: Props) {
-  const { isRTL, isDark } = useSettings();
+  const { isRTL, isDark, uiLanguage } = useSettings();
   const s = useStrings();
   const listRef = useRef<FlatList<number>>(null);
   const railHostRef = useRef<any>(null);
@@ -369,8 +369,11 @@ export function MushafSlider({
   const livePage = previewPage ?? currentPage;
   const livePageLabel = isRTL ? toArabicNumber(livePage) : String(livePage);
   const surahName = index?.pageByNumber.get(livePage)
-    ? index.surahByNumber.get(index.pageByNumber.get(livePage)!.surah_start)?.name_arabic ?? null
+    ? uiLanguage === "ar"
+      ? index.surahByNumber.get(index.pageByNumber.get(livePage)!.surah_start)?.name_arabic ?? null
+      : index.surahByNumber.get(index.pageByNumber.get(livePage)!.surah_start)?.name_english ?? null
     : null;
+  const pageLabel = interpolate(s.pageN, { n: livePageLabel });
 
   const renderTick = useCallback(
     ({ item }: ListRenderItemInfo<number>) => {
@@ -476,7 +479,7 @@ export function MushafSlider({
               style={{ color: "#fff", fontFamily: "Manrope_600SemiBold", fontSize: 11 }}
             >
               {surahName ? `${surahName} · ` : ""}
-              {`ص ${livePageLabel}`}
+              {pageLabel}
             </Text>
           </View>
         )}
