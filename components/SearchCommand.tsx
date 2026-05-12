@@ -628,7 +628,7 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
               </>
             )}
             {history.length === 0 && (
-              <View className="flex-1 items-center justify-center">
+              <View className="flex-1 items-center justify-center" style={{ paddingBottom: 18 }}>
                 <Search size={40} color={isDark ? "#404040" : "#DFD9D1"} />
                 <Text
                   className="text-warm-300 dark:text-neutral-600 mt-4"
