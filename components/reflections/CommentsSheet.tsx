@@ -1,11 +1,12 @@
 import { useState, useCallback, useEffect } from "react";
-import { View, Text, TextInput, Pressable, ScrollView, ActivityIndicator, Modal } from "react-native";
+import { View, Text, TextInput, Pressable, ActivityIndicator } from "react-native";
 import { Send } from "lucide-react-native";
 import { useAuthStore } from "@/lib/auth/store";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { fetchComments, addComment } from "@/lib/reflections/api";
 import type { ReflectionComment } from "@/lib/reflections/types";
+import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 
 type Props = {
   reflectionId: string | null;
@@ -25,7 +26,7 @@ function timeAgo(dateStr: string, justNowLabel: string): string {
 }
 
 export function CommentsSheet({ reflectionId, onClose, onCommentAdded }: Props) {
-  const { isDark } = useSettings();
+  const { isDark, isRTL } = useSettings();
   const s = useStrings();
   const user = useAuthStore((s) => s.user);
   const [comments, setComments] = useState<ReflectionComment[]>([]);
@@ -60,32 +61,11 @@ export function CommentsSheet({ reflectionId, onClose, onCommentAdded }: Props) 
   const mutedColor = isDark ? "#737373" : "#A39B93";
 
   return (
-    <Modal visible={!!reflectionId} transparent animationType="fade" onRequestClose={onClose}>
-      <View className="flex-1 items-center justify-center px-4" style={{ backgroundColor: "rgba(0,0,0,0.55)" }}>
-        <Pressable className="absolute inset-0" onPress={onClose} />
-        <View className="w-full max-w-[760px] max-h-[88%] rounded-3xl bg-surface dark:bg-surface-dark p-5">
-        <View className="items-center">
-          <Text
-            style={{
-              fontFamily: "Manrope_600SemiBold",
-              fontSize: 10,
-              letterSpacing: 1.6,
-              textTransform: "uppercase",
-              color: mutedColor,
-            }}
-          >
-            {s.reflections}
-          </Text>
-          <Text
-            className="text-charcoal dark:text-neutral-100"
-            style={{ fontFamily: "NotoSerif_700Bold", fontSize: 24, marginTop: 6 }}
-          >
-            {s.reflectionComments}
-          </Text>
-        </View>
-      
+    <ResponsiveSheet open={!!reflectionId} onClose={onClose} maxWidth={760}>
+      <OverlayHeader title={s.reflectionComments} subtitle={s.reflections} onClose={onClose} showHandle isRTL={isRTL} />
+      <View className="flex-1 min-h-0 px-5 pt-4 pb-4 gap-3">
         <View
-          className="mb-3 rounded-2xl px-3 py-2"
+          className="rounded-2xl px-3 py-2"
           style={{ backgroundColor: isDark ? "#141414" : "#F7F3EC" }}
         >
           <Text
@@ -95,13 +75,15 @@ export function CommentsSheet({ reflectionId, onClose, onCommentAdded }: Props) 
               letterSpacing: 1,
               textTransform: "uppercase",
               color: mutedColor,
+              textAlign: isRTL ? "right" : "left",
+              writingDirection: isRTL ? "rtl" : "ltr",
             }}
           >
             {s.reflectionThreadLabel}
           </Text>
         </View>
 
-        <ScrollView style={{ maxHeight: 360, marginBottom: 12 }}>
+        <OverlayBody className="flex-1 min-h-0" contentContainerClassName="pb-2">
           {loading ? (
             <ActivityIndicator style={{ padding: 20 }} />
           ) : comments.length === 0 ? (
@@ -119,7 +101,7 @@ export function CommentsSheet({ reflectionId, onClose, onCommentAdded }: Props) 
           ) : (
             comments.map((c) => (
               <View key={c.id} className="mb-3">
-                <View className="flex-row items-center gap-2 mb-1">
+                <View className={`items-center gap-2 mb-1 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
                   <Text
                     className="text-charcoal dark:text-neutral-200"
                     style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
@@ -132,19 +114,24 @@ export function CommentsSheet({ reflectionId, onClose, onCommentAdded }: Props) 
                 </View>
                 <Text
                   className="text-charcoal dark:text-neutral-300"
-                  style={{ fontFamily: "Manrope_400Regular", fontSize: 13, lineHeight: 20 }}
+                  style={{
+                    fontFamily: "Manrope_400Regular",
+                    fontSize: 13,
+                    lineHeight: 20,
+                    textAlign: isRTL ? "right" : "left",
+                    writingDirection: isRTL ? "rtl" : "ltr",
+                  }}
                 >
                   {c.content}
                 </Text>
               </View>
             ))
           )}
-        </ScrollView>
+        </OverlayBody>
 
-        {/* Comment input */}
         {user && (
           <View
-            className="flex-row items-center gap-2 rounded-2xl border border-warm-200 bg-surface-low px-3.5 py-2.5 dark:border-neutral-700 dark:bg-surface-dark-low"
+            className={`items-center gap-2 rounded-2xl border border-warm-200 bg-surface-low px-3.5 py-2.5 dark:border-neutral-700 dark:bg-surface-dark-low ${isRTL ? "flex-row-reverse" : "flex-row"}`}
           >
             <TextInput
               value={text}
@@ -158,6 +145,8 @@ export function CommentsSheet({ reflectionId, onClose, onCommentAdded }: Props) 
                 fontFamily: "Manrope_400Regular",
                 fontSize: 14,
                 padding: 0,
+                textAlign: isRTL ? "right" : "left",
+                writingDirection: isRTL ? "rtl" : "ltr",
               }}
               returnKeyType="send"
               blurOnSubmit
@@ -180,8 +169,7 @@ export function CommentsSheet({ reflectionId, onClose, onCommentAdded }: Props) 
             </Pressable>
           </View>
         )}
-        </View>
       </View>
-    </Modal>
+    </ResponsiveSheet>
   );
 }
