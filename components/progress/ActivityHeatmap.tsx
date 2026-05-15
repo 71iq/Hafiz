@@ -13,6 +13,7 @@ type Props = {
 const BASE_CELL_SIZE = 13;
 const CELL_GAP = 3;
 const TOTAL_WEEKS = 13;
+const COMPACT_BREAKPOINT = 768;
 
 function getColor(count: number, isDark: boolean): string {
   if (count === 0) return isDark ? "#262626" : "#E8E1DA";
@@ -30,9 +31,9 @@ function getMonthLabel(date: Date, isArabic: boolean): string {
 
 function getDayLabel(dayIndex: number, isArabic: boolean): string | null {
   // Show Mon, Wed, Fri (indices 1, 3, 5 in 0=Sun grid)
-  if (dayIndex === 1) return isArabic ? "ن" : "Mon";
-  if (dayIndex === 3) return isArabic ? "ر" : "Wed";
-  if (dayIndex === 5) return isArabic ? "ج" : "Fri";
+  if (dayIndex === 1) return isArabic ? "الاثنين" : "Mon";
+  if (dayIndex === 3) return isArabic ? "الأربعاء" : "Wed";
+  if (dayIndex === 5) return isArabic ? "الجمعة" : "Fri";
   return null;
 }
 
@@ -47,9 +48,10 @@ export function ActivityHeatmap({ data, isDark, s, isRTL }: Props) {
   const [tooltip, setTooltip] = useState<{ date: string; count: number } | null>(null);
   const { width } = useWindowDimensions();
   const isArabic = !!isRTL;
-  const DAY_LABEL_WIDTH = 28;
-  const gridWidth = Math.max(260, width - 90 - DAY_LABEL_WIDTH);
-  const CELL_SIZE = Math.max(10, Math.min(BASE_CELL_SIZE, Math.floor((gridWidth - CELL_GAP * (TOTAL_WEEKS - 1)) / TOTAL_WEEKS)));
+  const DAY_LABEL_WIDTH = isArabic ? 58 : 28;
+  const availableWidth = Math.max(220, width - 96);
+  const maxHeatmapWidth = Math.max(150, availableWidth - DAY_LABEL_WIDTH);
+  const CELL_SIZE = Math.max(8, Math.min(BASE_CELL_SIZE, Math.floor((maxHeatmapWidth - CELL_GAP * (TOTAL_WEEKS - 1)) / TOTAL_WEEKS)));
 
   // Build date lookup
   const countMap = new Map<string, number>();
@@ -110,44 +112,47 @@ export function ActivityHeatmap({ data, isDark, s, isRTL }: Props) {
     return result;
   }, [monthLabels, CELL_SIZE]);
   const heatmapWidth = TOTAL_WEEKS * CELL_SIZE + (TOTAL_WEEKS - 1) * CELL_GAP;
+  const contentWidth = heatmapWidth + DAY_LABEL_WIDTH;
+  const contentAlign = width < COMPACT_BREAKPOINT ? "center" : isRTL ? "flex-end" : "flex-start";
 
   return (
-    <View style={{ direction: "ltr" }}>
-      {/* Month labels row */}
-      <View
-        style={{
-          width: heatmapWidth,
-          height: 14,
-          marginLeft: isRTL ? 0 : DAY_LABEL_WIDTH,
-          marginRight: isRTL ? DAY_LABEL_WIDTH : 0,
-          marginBottom: 4,
-          position: "relative",
-        }}
-      >
-        {spacedMonthLabels.map((m, i) => (
-          <Text
-            key={i}
-            style={{
-              fontFamily: "Manrope_500Medium",
-              fontSize: 10,
-              color: isDark ? "#737373" : "#8B8178",
-              position: "absolute",
-              left: m.left,
-              textAlign: isRTL ? "right" : "left",
-              writingDirection: isRTL ? "rtl" : "ltr",
-            }}
-          >
-            {m.label}
-          </Text>
-        ))}
-      </View>
+    <View style={{ direction: "ltr", alignItems: contentAlign, width: "100%" }}>
+      <View style={{ width: contentWidth }}>
+        {/* Month labels row */}
+        <View
+          style={{
+            width: heatmapWidth,
+            height: 14,
+            marginLeft: isRTL ? 0 : DAY_LABEL_WIDTH,
+            marginRight: isRTL ? DAY_LABEL_WIDTH : 0,
+            marginBottom: 4,
+            position: "relative",
+          }}
+        >
+          {spacedMonthLabels.map((m, i) => (
+            <Text
+              key={i}
+              style={{
+                fontFamily: "Manrope_500Medium",
+                fontSize: 10,
+                color: isDark ? "#737373" : "#8B8178",
+                position: "absolute",
+                left: m.left,
+                textAlign: isRTL ? "right" : "left",
+                writingDirection: isRTL ? "rtl" : "ltr",
+              }}
+            >
+              {m.label}
+            </Text>
+          ))}
+        </View>
 
-      <View style={{ height: 14 }} />
+        <View style={{ height: 14 }} />
 
-      {/* Grid */}
-      <View style={{ flexDirection: isRTL ? "row-reverse" : "row", width: "100%", direction: "ltr" }}>
+        {/* Grid */}
+        <View style={{ flexDirection: isRTL ? "row-reverse" : "row", width: contentWidth, direction: "ltr" }}>
           {/* Day labels */}
-          <View style={{ width: DAY_LABEL_WIDTH, justifyContent: "flex-start", alignItems: isRTL ? "flex-end" : "flex-start" }}>
+          <View style={{ width: DAY_LABEL_WIDTH, justifyContent: "flex-start", alignItems: isRTL ? "flex-start" : "flex-end" }}>
             {Array.from({ length: 7 }, (_, i) => {
               const label = getDayLabel(i, isArabic);
               return (
@@ -167,6 +172,7 @@ export function ActivityHeatmap({ data, isDark, s, isRTL }: Props) {
                         color: isDark ? "#525252" : "#b9a085",
                         textAlign: isRTL ? "right" : "left",
                         writingDirection: isRTL ? "rtl" : "ltr",
+                        width: DAY_LABEL_WIDTH,
                       }}
                     >
                       {label}
@@ -203,35 +209,45 @@ export function ActivityHeatmap({ data, isDark, s, isRTL }: Props) {
                 })}
               </View>
             ))}
-      </View>
-      </View>
-
-      {/* Tooltip */}
-      {tooltip && (
-        <View
-          className="rounded-xl px-3 py-2 mt-3"
-          style={{ backgroundColor: isDark ? "#1a1a1a" : "#F5EDE4", alignSelf: "center" }}
-        >
-          <Text style={{ fontFamily: "Manrope_500Medium", fontSize: 12, color: isDark ? "#d4d4d4" : "#6e5a47" }}>
-            {tooltip.count} {s.heatmapReviews} — {tooltip.date}
-          </Text>
+          </View>
         </View>
-      )}
 
-      {/* Legend */}
-      <View style={{ flexDirection: "row", alignItems: "center", marginTop: 12 }}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-          {[0, 1, 2, 3].map((l) => (
-            <View
-              key={l}
-              style={{
-                width: 10,
-                height: 10,
-                borderRadius: 2,
-                backgroundColor: getColor(l === 0 ? 0 : l === 1 ? 5 : l === 2 ? 18 : 28, isDark),
-              }}
-            />
-          ))}
+        {/* Tooltip */}
+        {tooltip && (
+          <View
+            className="rounded-xl px-3 py-2 mt-3"
+            style={{ backgroundColor: isDark ? "#1a1a1a" : "#F5EDE4", alignSelf: "center" }}
+          >
+            <Text style={{ fontFamily: "Manrope_500Medium", fontSize: 12, color: isDark ? "#d4d4d4" : "#6e5a47" }}>
+              {tooltip.count} {s.heatmapReviews} — {tooltip.date}
+            </Text>
+          </View>
+        )}
+
+        {/* Legend */}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            marginTop: 12,
+            marginLeft: isRTL ? 0 : DAY_LABEL_WIDTH,
+            marginRight: isRTL ? DAY_LABEL_WIDTH : 0,
+            width: heatmapWidth,
+          }}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            {[0, 1, 2, 3].map((l) => (
+              <View
+                key={l}
+                style={{
+                  width: 10,
+                  height: 10,
+                  borderRadius: 2,
+                  backgroundColor: getColor(l === 0 ? 0 : l === 1 ? 5 : l === 2 ? 18 : 28, isDark),
+                }}
+              />
+            ))}
+          </View>
         </View>
       </View>
     </View>
