@@ -1478,3 +1478,22 @@ Saved in `phase19/`:
 - `npm run typecheck`: passed.
 - `npm run build:web`: passed.
 - `npx expo start --web --port 8088`: Metro started; Playwright smoke checked page-mode reader at 360, 412, 768, and 1024 widths.
+
+## 2026-05-15 — Mushaf Chrome Gesture Visibility
+
+### Scope decisions
+1. Fixed only Mushaf chrome visibility behavior; no visual chrome or page rail design changes were made.
+2. Treated reader taps as two-axis gestures so horizontal page swipes do not look like taps.
+3. Kept hidden chrome non-interactive and limited chrome reveal to explicit reader tap or meaningful vertical scroll-up.
+
+### Implemented in this step
+- `app/(tabs)/mushaf.tsx`:
+  - Added a short tap visibility guard so layout scroll events after a tap do not immediately reverse the user's chrome action.
+  - Raised scroll thresholds and removed near-top auto-show behavior, so only meaningful upward vertical scroll reveals chrome and downward scroll hides it.
+  - Tracked both X and Y movement before accepting a reader tap.
+- `components/mushaf/PageMushaf.tsx`:
+  - Replaced horizontal page gesture activity reveals with a non-revealing gesture marker, preserving page swipe/wheel navigation without unhiding chrome.
+
+### Validation result
+- `npm run typecheck`: passed.
+- `npm run build:web`: passed with Expo/NPM cache paths redirected to `/tmp` for the workspace sandbox.

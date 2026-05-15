@@ -132,16 +132,22 @@ function MushafInner() {
   const { navigateToAyah } = useWordInteraction();
   const { visible: chromeVisible, setVisible: setChromeVisible } = useChrome();
   const lastScrollYRef = useRef(0);
-  const touchStartYRef = useRef<number | null>(null);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const touchMovedRef = useRef(false);
+  const tapRevealGuardUntilRef = useRef(0);
 
   const handleScrollChrome = useCallback((e: any) => {
     const y = e?.nativeEvent?.contentOffset?.y;
     if (typeof y !== "number") return;
     const dy = y - lastScrollYRef.current;
-    if (y < 16 || dy < -4) {
+    const now = Date.now();
+    if (now <= tapRevealGuardUntilRef.current) {
+      lastScrollYRef.current = y;
+      return;
+    }
+    if (dy < -8) {
       setChromeVisible(true);
-    } else if (dy > 4) {
+    } else if (dy > 8) {
       setChromeVisible(false);
     }
     lastScrollYRef.current = y;
@@ -149,43 +155,70 @@ function MushafInner() {
 
   const toggleChromeFromReaderTap = useCallback(() => {
     if (!isPhone && !isTablet) return;
-    setChromeVisible(!chromeVisible);
+    if (!chromeVisible) {
+      tapRevealGuardUntilRef.current = Date.now() + 450;
+      setChromeVisible(true);
+      return;
+    }
+    tapRevealGuardUntilRef.current = Date.now() + 450;
+    setChromeVisible(false);
   }, [chromeVisible, isPhone, isTablet, setChromeVisible]);
 
   const readerTapProps = Platform.OS === "web"
     ? ({
         onPointerDown: (e: any) => {
           if (!isPhone && !isTablet) return;
-          touchStartYRef.current = e?.nativeEvent?.pageY ?? null;
+          touchStartRef.current = {
+            x: e?.nativeEvent?.pageX ?? e?.nativeEvent?.clientX ?? 0,
+            y: e?.nativeEvent?.pageY ?? e?.nativeEvent?.clientY ?? 0,
+          };
           touchMovedRef.current = false;
         },
         onPointerMove: (e: any) => {
           if (!isPhone && !isTablet) return;
-          const y = e?.nativeEvent?.pageY;
-          if (touchStartYRef.current != null && typeof y === "number" && Math.abs(y - touchStartYRef.current) > 8) {
+          const start = touchStartRef.current;
+          if (!start) return;
+          const x = e?.nativeEvent?.pageX ?? e?.nativeEvent?.clientX;
+          const y = e?.nativeEvent?.pageY ?? e?.nativeEvent?.clientY;
+          if (
+            typeof x === "number" &&
+            typeof y === "number" &&
+            (Math.abs(x - start.x) > 8 || Math.abs(y - start.y) > 8)
+          ) {
             touchMovedRef.current = true;
           }
         },
         onPointerUp: () => {
           if (!isPhone && !isTablet) return;
           if (!touchMovedRef.current) toggleChromeFromReaderTap();
-          touchStartYRef.current = null;
+          touchStartRef.current = null;
         },
       } as Record<string, unknown>)
     : ({
         onTouchStart: (e: any) => {
-          touchStartYRef.current = e?.nativeEvent?.touches?.[0]?.pageY ?? null;
+          const touch = e?.nativeEvent?.touches?.[0];
+          touchStartRef.current = touch
+            ? { x: touch.pageX ?? 0, y: touch.pageY ?? 0 }
+            : null;
           touchMovedRef.current = false;
         },
         onTouchMove: (e: any) => {
-          const y = e?.nativeEvent?.touches?.[0]?.pageY;
-          if (touchStartYRef.current != null && typeof y === "number" && Math.abs(y - touchStartYRef.current) > 8) {
+          const start = touchStartRef.current;
+          const touch = e?.nativeEvent?.touches?.[0];
+          if (!start || !touch) return;
+          const x = touch.pageX;
+          const y = touch.pageY;
+          if (
+            typeof x === "number" &&
+            typeof y === "number" &&
+            (Math.abs(x - start.x) > 8 || Math.abs(y - start.y) > 8)
+          ) {
             touchMovedRef.current = true;
           }
         },
         onTouchEnd: () => {
           if (!touchMovedRef.current) toggleChromeFromReaderTap();
-          touchStartYRef.current = null;
+          touchStartRef.current = null;
         },
       } as Record<string, unknown>);
 
@@ -772,7 +805,9 @@ function MushafInner() {
                 onPageChange={setCurrentPage}
                 goToPageRef={goToPageRef}
                 onScroll={handleScrollChrome}
-                onUserActivity={() => setChromeVisible(true)}
+                onHorizontalGesture={() => {
+                  touchMovedRef.current = true;
+                }}
                 pagePaddingTop={isPhone ? 14 : 8}
                 pagePaddingBottom={isPhone ? 12 : isTablet ? 0 : 32}
                 scrollBottomInset={pageScrollBottomInset}

@@ -139,7 +139,7 @@ type Props = {
   horizontalTopInset?: number;
   horizontalBottomInset?: number;
   scrollBottomInset?: number;
-  onUserActivity?: () => void;
+  onHorizontalGesture?: () => void;
   highlightedWord?: { surah: number; ayah: number; wordPos: number } | null;
 };
 
@@ -280,7 +280,7 @@ export function PageMushaf({
   horizontalTopInset = 0,
   horizontalBottomInset = 0,
   scrollBottomInset,
-  onUserActivity,
+  onHorizontalGesture,
   highlightedWord = null,
 }: Props) {
   const db = useDatabase();
@@ -655,24 +655,21 @@ export function PageMushaf({
           Math.abs(gesture.dx) > Math.abs(gesture.dy) * HORIZONTAL_PAN_DIRECTION_RATIO,
         onPanResponderTerminationRequest: () => false,
         onPanResponderGrant: () => {
-          onUserActivity?.();
+          onHorizontalGesture?.();
           dragStartPageRef.current = currentPageRef.current;
           dragX.stopAnimation();
         },
         onPanResponderMove: (_event, gesture) => {
-          onUserActivity?.();
           setHorizontalDragFromDelta(gesture.dx);
         },
         onPanResponderRelease: (_event, gesture) => {
-          onUserActivity?.();
           finishHorizontalGesture(gesture.dx, gesture.vx);
         },
         onPanResponderTerminate: () => {
-          onUserActivity?.();
           resetHorizontalDrag();
         },
       }),
-    [dragX, finishHorizontalGesture, horizontal, onUserActivity, pageData.length, resetHorizontalDrag, setHorizontalDragFromDelta]
+    [dragX, finishHorizontalGesture, horizontal, onHorizontalGesture, pageData.length, resetHorizontalDrag, setHorizontalDragFromDelta]
   );
 
   const handleHorizontalPointerDown = useCallback(
@@ -686,7 +683,6 @@ export function PageMushaf({
       ) {
         return;
       }
-      onUserActivity?.();
       const x = nativeEvent.clientX ?? 0;
       const y = nativeEvent.clientY ?? 0;
       dragStartPageRef.current = currentPageRef.current;
@@ -702,7 +698,7 @@ export function PageMushaf({
       };
       setWebDragging(true);
     },
-    [dragX, onUserActivity]
+    [dragX]
   );
 
   useEffect(() => {
@@ -711,12 +707,12 @@ export function PageMushaf({
     const handlePointerMove = (event: PointerEvent) => {
       const state = webDragRef.current;
       if (!state.active) return;
-      onUserActivity?.();
       const dx = event.clientX - state.startX;
       const dy = event.clientY - state.startY;
       if (!state.claimed) {
         if (Math.abs(dx) <= 8 || Math.abs(dx) <= Math.abs(dy) * 1.2) return;
         state.claimed = true;
+        onHorizontalGesture?.();
       }
 
       event.preventDefault();
@@ -731,7 +727,6 @@ export function PageMushaf({
     const handlePointerEnd = (event: PointerEvent) => {
       const state = webDragRef.current;
       if (!state.active) return;
-      onUserActivity?.();
       state.active = false;
       setWebDragging(false);
       const dx = state.lastX - state.startX;
@@ -752,7 +747,7 @@ export function PageMushaf({
       document.removeEventListener("pointerup", handlePointerEnd);
       document.removeEventListener("pointercancel", handlePointerEnd);
     };
-  }, [finishHorizontalGesture, onUserActivity, resetHorizontalDrag, setHorizontalDragFromDelta, webDragging]);
+  }, [finishHorizontalGesture, onHorizontalGesture, resetHorizontalDrag, setHorizontalDragFromDelta, webDragging]);
 
   const handleHorizontalWheel = useCallback(
     (event: { nativeEvent?: { deltaX?: number; deltaY?: number; preventDefault?: () => void } }) => {
@@ -760,11 +755,11 @@ export function PageMushaf({
       if (Platform.OS !== "web" || !nativeEvent || wheelLockedRef.current || horizontalAnimatingRef.current) {
         return;
       }
-      onUserActivity?.();
       const deltaX = nativeEvent.deltaX ?? 0;
       const deltaY = nativeEvent.deltaY ?? 0;
       if (Math.abs(deltaX) < 36 || Math.abs(deltaX) < Math.abs(deltaY) * 1.25) return;
 
+      onHorizontalGesture?.();
       wheelLockedRef.current = true;
       const direction: 1 | -1 = deltaX > 0 ? -1 : 1;
       const startPage = currentPageRef.current;
@@ -778,7 +773,7 @@ export function PageMushaf({
         wheelLockedRef.current = false;
       }, 320);
     },
-    [animateHorizontalPageChange, onUserActivity, pageData.length, resetHorizontalDrag]
+    [animateHorizontalPageChange, onHorizontalGesture, pageData.length, resetHorizontalDrag]
   );
 
   const openAyahDetail = useCallback((surah: number, ayah: number) => {
