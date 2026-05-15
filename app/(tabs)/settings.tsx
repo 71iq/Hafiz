@@ -52,9 +52,10 @@ export default function SettingsScreen() {
   const { user, profile, isLoading: authLoading, signOut } = useAuthStore();
   const accountName = profile?.display_name || profile?.username || user?.email || s.authProfile;
   const accountHandle = profile?.username ? `@${profile.username}` : user?.email || "";
-  const fontSizeLocked = viewMode === "page" && pageScroll === "horizontal";
+  const fontSizeUsesFittedPageSize = viewMode === "page" && pageScroll === "horizontal";
   const fontSizeLevelLabel = isRTL ? toArabicNumber(fontSizeIndex + 1) : String(fontSizeIndex + 1);
   const fontSizeTotalLabel = isRTL ? toArabicNumber(FONT_SIZE_STEPS.length) : String(FONT_SIZE_STEPS.length);
+  const TranslationChevron = isRTL ? ChevronLeft : ChevronRight;
 
   useEffect(() => {
     db.getFirstAsync<{ value: string }>(
@@ -296,12 +297,12 @@ export default function SettingsScreen() {
           <View className="h-5" />
 
           <Text
-            className={`text-charcoal dark:text-neutral-200 ${fontSizeLocked ? "mb-1" : "mb-4"}`}
+            className={`text-charcoal dark:text-neutral-200 ${fontSizeUsesFittedPageSize ? "mb-1" : "mb-4"}`}
             style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15 }}
           >
             {s.fontSizeLabel}
           </Text>
-          {fontSizeLocked && (
+          {fontSizeUsesFittedPageSize && (
             <Text
               className="text-warm-400 dark:text-neutral-500 mb-4"
               style={{ fontFamily: "Manrope_500Medium", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
@@ -311,12 +312,12 @@ export default function SettingsScreen() {
           )}
 
           {/* Size control */}
-          <View className="flex-row items-center justify-between mb-5" style={{ opacity: fontSizeLocked ? 0.42 : 1 }}>
+          <View className="flex-row items-center justify-between mb-5">
             <Pressable
               onPress={() => setFontSizeIndex(fontSizeIndex - 1)}
-              disabled={fontSizeLocked || fontSizeIndex === 0}
+              disabled={fontSizeIndex === 0}
               className="w-10 h-10 rounded-full bg-surface-high dark:bg-surface-dark-high items-center justify-center"
-              style={{ opacity: fontSizeLocked || fontSizeIndex === 0 ? 0.3 : 1 }}
+              style={{ opacity: fontSizeIndex === 0 ? 0.3 : 1 }}
             >
               <Minus size={18} color={isDark ? "#d4d4d4" : "#6e5a47"} />
             </Pressable>
@@ -332,9 +333,9 @@ export default function SettingsScreen() {
 
             <Pressable
               onPress={() => setFontSizeIndex(fontSizeIndex + 1)}
-              disabled={fontSizeLocked || fontSizeIndex === FONT_SIZE_STEPS.length - 1}
+              disabled={fontSizeIndex === FONT_SIZE_STEPS.length - 1}
               className="w-10 h-10 rounded-full bg-surface-high dark:bg-surface-dark-high items-center justify-center"
-              style={{ opacity: fontSizeLocked || fontSizeIndex === FONT_SIZE_STEPS.length - 1 ? 0.3 : 1 }}
+              style={{ opacity: fontSizeIndex === FONT_SIZE_STEPS.length - 1 ? 0.3 : 1 }}
             >
               <Plus size={18} color={isDark ? "#d4d4d4" : "#6e5a47"} />
             </Pressable>
@@ -387,11 +388,11 @@ export default function SettingsScreen() {
             onPress={() => setPickerVisible(true)}
             className="items-center justify-between gap-3"
             style={{
-              direction: "ltr",
-              flexDirection: isRTL ? "row-reverse" : "row",
+              direction: isRTL ? "rtl" : "ltr",
+              flexDirection: "row",
             }}
           >
-            <View className={`flex-1 ${isRTL ? "items-end" : "items-start"}`}>
+            <View className="flex-1">
               <Text
                 className="text-charcoal dark:text-neutral-300"
                 style={{ fontFamily: "Manrope_500Medium", fontSize: 14, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
@@ -412,10 +413,8 @@ export default function SettingsScreen() {
             </View>
             {isTranslationLoading ? (
               <ActivityIndicator size="small" color="#0d9488" />
-            ) : isRTL ? (
-              <ChevronLeft size={18} color={isDark ? "#525252" : "#DFD9D1"} />
             ) : (
-              <ChevronRight size={18} color={isDark ? "#525252" : "#DFD9D1"} />
+              <TranslationChevron size={18} color={isDark ? "#525252" : "#DFD9D1"} />
             )}
           </Pressable>
 
@@ -561,8 +560,9 @@ export default function SettingsScreen() {
                 key={i}
                 className="gap-2"
                 style={{
-                  direction: "ltr",
-                  flexDirection: isRTL ? "row-reverse" : "row",
+                  alignItems: "flex-start",
+                  direction: isRTL ? "rtl" : "ltr",
+                  flexDirection: "row",
                 }}
               >
                 <Text
@@ -571,7 +571,7 @@ export default function SettingsScreen() {
                     fontFamily: "Manrope_400Regular",
                     fontSize: 12,
                     lineHeight: 18,
-                    textAlign: isRTL ? "right" : "left",
+                    textAlign: "center",
                     width: 10,
                   }}
                 >

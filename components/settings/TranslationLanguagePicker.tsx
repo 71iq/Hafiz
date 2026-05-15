@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { View, Text, Pressable } from "react-native";
 import { Check, ChevronLeft, ChevronRight } from "lucide-react-native";
 import { TRANSLATION_LANGUAGES } from "@/lib/translations/languages";
@@ -19,6 +20,8 @@ export function TranslationLanguagePicker({ visible, onClose }: Props) {
     useSettings();
   const s = useStrings();
   const surfaceColor = isDark ? "#1C1917" : "#FFF8F1";
+  const DisclosureChevron = isRTL ? ChevronLeft : ChevronRight;
+  const [pressedCode, setPressedCode] = useState<string | null>(null);
 
   const handleSelect = async (code: string) => {
     await setTranslationLanguage(code);
@@ -45,29 +48,30 @@ export function TranslationLanguagePicker({ visible, onClose }: Props) {
         <View className="gap-1">
           {TRANSLATION_LANGUAGES.map((lang) => {
             const isSelected = lang.code === translationLanguage;
+            const isPressed = pressedCode === lang.code;
 
             return (
               <Pressable
                 key={lang.code}
                 onPress={() => handleSelect(lang.code)}
+                onPressIn={() => setPressedCode(lang.code)}
+                onPressOut={() => setPressedCode(null)}
                 className="items-center justify-between gap-3 rounded-2xl px-3 py-3.5"
-                style={({ pressed }) => ({
-                  direction: "ltr",
-                  flexDirection: isRTL ? "row-reverse" : "row",
+                style={{
+                  direction: isRTL ? "rtl" : "ltr",
+                  flexDirection: "row",
                   backgroundColor: isSelected
                     ? isDark
                       ? "rgba(45,212,191,0.08)"
                       : "rgba(13,148,136,0.06)"
-                    : pressed
+                    : isPressed
                       ? isDark
                         ? "rgba(45,212,191,0.04)"
                         : "rgba(13,148,136,0.03)"
                       : "transparent",
-                })}
+                }}
               >
-                <View
-                  className={`flex-1 ${isRTL ? "items-end" : "items-start"}`}
-                >
+                <View className="flex-1">
                   <Text
                     className={
                       isSelected
@@ -100,10 +104,8 @@ export function TranslationLanguagePicker({ visible, onClose }: Props) {
 
                 {isSelected ? (
                   <Check size={20} color={isDark ? "#2dd4bf" : "#0d9488"} />
-                ) : isRTL ? (
-                  <ChevronLeft size={18} color={isDark ? "#737373" : "#8B8178"} />
                 ) : (
-                  <ChevronRight size={18} color={isDark ? "#737373" : "#8B8178"} />
+                  <DisclosureChevron size={18} color={isDark ? "#737373" : "#8B8178"} />
                 )}
               </Pressable>
             );
