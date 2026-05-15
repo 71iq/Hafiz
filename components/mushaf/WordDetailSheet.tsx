@@ -128,7 +128,7 @@ export function WordDetailSheet() {
   const surahLabel = isArabicMode ? "السورة" : "Surah";
   const ayahLabel = isArabicMode ? "الآية" : "Ayah";
   const wordLabel = isArabicMode ? "الكلمة" : "Word";
-  const showRootLemma = isArabicMode || activeTab !== "tajweed";
+  const showRootLemma = isArabicMode;
   return (
     <>
       <ResponsiveSheet
@@ -176,7 +176,7 @@ export function WordDetailSheet() {
                 className={`mt-1 text-warm-500 dark:text-neutral-400 ${isRTL ? "text-right" : "text-left"}`}
                 style={{ fontFamily: "Manrope_500Medium", fontSize: 13 }}
               >
-                {s.wordMeaningTranslation ?? "Translation"}: {headerMeta.translationEn}
+                {headerMeta.translationEn}
               </Text>
             )}
 

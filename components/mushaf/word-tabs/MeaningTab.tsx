@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
-import { View, Text, Pressable } from "react-native";
+import { ActivityIndicator, View, Text, Pressable } from "react-native";
 import { BookmarkPlus, Check } from "lucide-react-native";
 import { useDatabase } from "@/lib/database/provider";
 import {
   fetchWordTranslation,
-  fetchWordRoot,
   fetchWordMeaningAr,
   type WordMeaningArRow,
 } from "@/lib/word/queries";
@@ -22,32 +21,49 @@ type EnglishMeaning = {
   wordArabic: string | null;
   translationEn: string | null;
   transliteration: string | null;
-  root: string | null;
-  lemma: string | null;
 };
 
 export function MeaningTab({ surah, ayah, wordPos }: Props) {
   const db = useDatabase();
   const s = useStrings();
-  const { uiLanguage } = useSettings();
+  const { uiLanguage, isRTL } = useSettings();
   const isArabicMode = uiLanguage === "ar";
 
   const [enData, setEnData] = useState<EnglishMeaning | null>(null);
   const [arMeaning, setArMeaning] = useState<WordMeaningArRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [savedToVocab, setSavedToVocab] = useState(false);
+  const [savingToVocab, setSavingToVocab] = useState(false);
+  const [saveError, setSaveError] = useState(false);
 
   useEffect(() => {
-    isMeaningCardSaved(db, surah, ayah, wordPos).then(setSavedToVocab).catch(() => {});
+    let cancelled = false;
+    setSaveError(false);
+    setSavingToVocab(false);
+    isMeaningCardSaved(db, surah, ayah, wordPos)
+      .then((saved) => {
+        if (!cancelled) setSavedToVocab(saved);
+      })
+      .catch(() => {
+        if (!cancelled) setSavedToVocab(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [db, surah, ayah, wordPos]);
 
   const saveToVocab = async () => {
-    if (savedToVocab) return;
+    if (savedToVocab || savingToVocab) return;
+    setSavingToVocab(true);
+    setSaveError(false);
     try {
       await addMeaningCard(db, surah, ayah, wordPos);
       setSavedToVocab(true);
     } catch (e) {
       console.warn("[MeaningTab] saveToVocab failed:", e);
+      setSaveError(true);
+    } finally {
+      setSavingToVocab(false);
     }
   };
 
@@ -58,17 +74,12 @@ export function MeaningTab({ surah, ayah, wordPos }: Props) {
         .then(setArMeaning)
         .finally(() => setLoading(false));
     } else {
-      Promise.all([
-        fetchWordTranslation(db, surah, ayah, wordPos),
-        fetchWordRoot(db, surah, ayah, wordPos),
-      ])
-        .then(([wt, wr]) => {
+      fetchWordTranslation(db, surah, ayah, wordPos)
+        .then((wt) => {
           setEnData({
             wordArabic: wt?.word_arabic ?? null,
             translationEn: wt?.translation_en ?? null,
             transliteration: wt?.transliteration ?? null,
-            root: wr?.root ?? null,
-            lemma: wr?.lemma ?? null,
           });
         })
         .finally(() => setLoading(false));
@@ -113,7 +124,14 @@ export function MeaningTab({ surah, ayah, wordPos }: Props) {
         >
           {arMeaning.meaning}
         </Text>
-        <SaveToVocabButton saved={savedToVocab} onPress={saveToVocab} label={savedToVocab ? s.addedToVocab : s.addToVocab} />
+        <SaveToVocabButton
+          saved={savedToVocab}
+          saving={savingToVocab}
+          onPress={saveToVocab}
+          label={savedToVocab ? s.addedToVocab : savingToVocab ? s.addingToVocab : s.addToVocab}
+          isRTL={isRTL}
+        />
+        {saveError && <SaveErrorText isRTL={isRTL} label={s.addToVocabFailed} />}
       </View>
     );
   }
@@ -154,36 +172,64 @@ export function MeaningTab({ surah, ayah, wordPos }: Props) {
           {enData.translationEn}
         </Text>
       )}
-      <SaveToVocabButton saved={savedToVocab} onPress={saveToVocab} label={savedToVocab ? s.addedToVocab : s.addToVocab} />
+      <SaveToVocabButton
+        saved={savedToVocab}
+        saving={savingToVocab}
+        onPress={saveToVocab}
+        label={savedToVocab ? s.addedToVocab : savingToVocab ? s.addingToVocab : s.addToVocab}
+        isRTL={isRTL}
+      />
+      {saveError && <SaveErrorText isRTL={isRTL} label={s.addToVocabFailed} />}
     </View>
   );
 }
 
 function SaveToVocabButton({
   saved,
+  saving,
   onPress,
   label,
+  isRTL,
 }: {
   saved: boolean;
+  saving: boolean;
   onPress: () => void;
   label: string;
+  isRTL: boolean;
 }) {
   return (
     <Pressable
       onPress={onPress}
-      disabled={saved}
-      className={`mt-4 self-start flex-row items-center gap-2 rounded-full px-4 py-2 ${
+      disabled={saved || saving}
+      className={`mt-4 items-center gap-2 rounded-full px-4 py-2 ${isRTL ? "self-end flex-row-reverse" : "self-start flex-row"} ${
         saved ? "bg-primary-accent/10 dark:bg-primary-bright/10" : "bg-surface-high dark:bg-surface-dark-high"
       }`}
       style={({ pressed }) => ({
         transform: [{ scale: pressed ? 0.98 : 1 }],
-        opacity: saved ? 0.8 : 1,
+        opacity: saved ? 0.8 : saving ? 0.7 : 1,
       })}
     >
-      {saved ? <Check size={14} color="#0d9488" /> : <BookmarkPlus size={14} color="#0d9488" />}
+      {saving ? (
+        <ActivityIndicator size="small" color="#0d9488" />
+      ) : saved ? (
+        <Check size={14} color="#0d9488" />
+      ) : (
+        <BookmarkPlus size={14} color="#0d9488" />
+      )}
       <Text className="text-primary-accent dark:text-primary-bright" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}>
         {label}
       </Text>
     </Pressable>
+  );
+}
+
+function SaveErrorText({ isRTL, label }: { isRTL: boolean; label: string }) {
+  return (
+    <Text
+      className={`mt-2 text-xs text-red-600 dark:text-red-400 ${isRTL ? "self-end text-right" : "self-start text-left"}`}
+      style={{ fontFamily: "Manrope_500Medium" }}
+    >
+      {label}
+    </Text>
   );
 }

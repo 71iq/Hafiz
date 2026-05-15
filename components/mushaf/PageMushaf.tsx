@@ -562,14 +562,23 @@ export function PageMushaf({
         horizontalDragOffsetRef.current = 0;
         dragX.setValue(0);
       } else {
-        flatListRef.current?.scrollToIndex({
-          index: page - 1,
-          animated,
-        });
+        const index = page - 1;
+        const offset = layoutInfo?.offsets[index];
+        if (typeof offset === "number") {
+          flatListRef.current?.scrollToOffset({
+            offset,
+            animated,
+          });
+        } else {
+          flatListRef.current?.scrollToIndex({
+            index,
+            animated,
+          });
+        }
       }
       updateCurrentPage(page);
     },
-    [dragX, horizontal, pageData.length, updateCurrentPage]
+    [dragX, horizontal, layoutInfo, pageData.length, updateCurrentPage]
   );
 
   // Expose goToPage function to parent — instant jump via getItemLayout

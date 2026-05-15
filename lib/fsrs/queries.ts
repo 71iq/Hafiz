@@ -246,7 +246,27 @@ export async function addMeaningCard(
     ]
   );
 
-  return { created: (result.changes ?? 0) > 0 };
+  const created = (result.changes ?? 0) > 0;
+  if (created) {
+    enqueueSync(db, "study_cards", "INSERT", cardId, {
+      id: cardId,
+      deck_id: MEANINGS_DECK_ID,
+      due: emptyCard.due.toISOString(),
+      stability: emptyCard.stability,
+      difficulty: emptyCard.difficulty,
+      elapsed_days: emptyCard.elapsed_days,
+      scheduled_days: emptyCard.scheduled_days,
+      learning_steps: emptyCard.learning_steps,
+      reps: emptyCard.reps,
+      lapses: emptyCard.lapses,
+      state: emptyCard.state,
+      last_review: null,
+      created_at: now,
+      updated_at: now,
+    }).catch(console.warn);
+  }
+
+  return { created };
 }
 
 // ─── Query helpers ───────────────────────────────────────────

@@ -1638,3 +1638,26 @@ Saved in `phase19/`:
 - Production export smoke checked at large font level:
   - 768px viewport: vertical page line width expanded to 672px with no horizontal document overflow.
   - 1024px viewport: vertical page line width expanded to 928px with no horizontal document overflow.
+
+## 2026-05-15 — Word Detail Sheet Cleanup
+
+### Scope decisions
+1. Kept the shared WordDetailSheet overlay intact and changed only word-detail content behavior.
+2. Hid Arabic root/lemma metadata in English mode while preserving Arabic morphology details in Arabic mode.
+3. Fixed occurrence navigation by making vertical page-mode jumps use the computed FlatList offset directly.
+
+### Implemented in this step
+- `components/mushaf/WordDetailSheet.tsx`:
+  - Removed the redundant translation label before the English meaning.
+  - Limited header root/lemma pills to Arabic UI mode.
+- `components/mushaf/word-tabs/MeaningTab.tsx` and `components/mushaf/word-tabs/TasreefTab.tsx`:
+  - Removed unnecessary English root/lemma exposure.
+  - Added clear saving/saved/error states for adding word meanings to revision.
+- `components/mushaf/PageMushaf.tsx`:
+  - Vertical page jumps now use `scrollToOffset` from computed page offsets before updating page state.
+- `lib/fsrs/queries.ts`:
+  - New meaning-card inserts enqueue non-blocking study-card sync.
+
+### Validation result
+- `npm run typecheck`: passed.
+- `npm run build:web`: passed with Node heap and Expo/NPM cache paths redirected for the workspace sandbox.
