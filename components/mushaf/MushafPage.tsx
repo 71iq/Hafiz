@@ -83,8 +83,9 @@ type PageGlyph = {
 // QCF2 Basmallah: 4 word glyphs from page 1's font (Surah 1 Ayah 1 = the Basmallah)
 const BISMILLAH_QCF2 = "\uFC41 \uFC42 \uFC43 \uFC44";
 
-// Content width scales with font size — a standard Mushaf line fills this width
-const FONT_WIDTH_SCALE = 17.5;
+// Approximate QCF2 font-size to Mushaf-line width ratio, used by PageMushaf
+// to cap vertical page typography before a line can overflow the viewport.
+export const MUSHAF_LINE_WIDTH_SCALE = 17.5;
 const MARKER_DOUBLE_TAP_MS = 260;
 
 /**
@@ -218,7 +219,7 @@ function MushafPageInner({
   }, [onOpenAyahDetail]);
 
   const hasLineLayout = lineLayout && lineLayout.length > 0;
-  const contentWidth = Math.max(0, Math.min(fontSize * FONT_WIDTH_SCALE, width - sidePadding * 2 - 8));
+  const contentWidth = Math.max(0, width - sidePadding * 2);
   const fontFamily = qpcFontName(pageNumber);
 
   // Show loading indicator while font is not loaded at all
@@ -319,7 +320,7 @@ function MushafPageInner({
         return null;
       }
       if (words.length === 0) return null;
-      const shouldStretchLine = !centered && words.length > 6;
+      const shouldStretchLine = !centered && words.length > 1;
 
       return (
         <View

@@ -802,7 +802,7 @@ function MushafInner() {
                 pagePaddingTop={isPhone ? 14 : 8}
                 pagePaddingBottom={isPhone ? 12 : isTablet ? 0 : 32}
                 scrollBottomInset={pageScrollBottomInset}
-                pageSidePadding={isPhone ? 22 : 16}
+                pageSidePadding={isPhone ? 6 : 16}
                 centerVerticalOnPhone={isPhone}
                 horizontalTopInset={0}
                 horizontalBottomInset={0}

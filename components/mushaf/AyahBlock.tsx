@@ -338,7 +338,7 @@ function AyahBlockInner({
       ) : (
         <View
           className={isPhone ? "pt-8 pb-1" : "pt-6 pb-1"}
-          style={{ opacity: fontVisible ? 1 : 0, direction: "ltr", alignItems: "flex-end", paddingHorizontal: 3 }}
+          style={{ opacity: fontVisible ? 1 : 0, direction: "ltr", alignItems: "flex-end", paddingHorizontal: 3, alignSelf: "stretch", width: "100%" }}
         >
           <View
             className="self-end"
@@ -350,6 +350,7 @@ function AyahBlockInner({
               alignItems: "center",
               gap: 2,
               rowGap: Math.max(4, fontSize * 0.12),
+              width: "100%",
               maxWidth: "100%",
               ...(highlightColor && {
                 backgroundColor: highlightColor + "20",

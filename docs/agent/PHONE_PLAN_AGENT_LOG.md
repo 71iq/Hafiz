@@ -1538,3 +1538,27 @@ Saved in `phase19/`:
 ### Validation result
 - `npm run typecheck`: passed.
 - `npm run build:web`: passed with Node heap and Expo/NPM cache paths redirected for the workspace sandbox.
+
+## 2026-05-15 — Phone Page Typography Width
+
+### Scope decisions
+1. Fixed phone Mushaf page-view typography/layout without changing QCF2 data, word identity, or page direction logic.
+2. Kept horizontal swipe mode on fixed page-fit typography while allowing vertical page mode to cap oversized font settings before clipping.
+3. Left tablet/desktop gutters unchanged; only phone page gutters were reduced.
+
+### Implemented in this step
+- `app/(tabs)/mushaf.tsx`:
+  - Reduced phone page-view side padding from 22px to 6px.
+- `components/mushaf/MushafPage.tsx`:
+  - Page lines now use the available page width instead of a font-size-derived content width.
+  - Non-centered page lines justify across the page width when they have multiple tokens.
+- `components/mushaf/PageMushaf.tsx`:
+  - Added page-width typography fitting for vertical page mode so larger settings do not push QCF2 lines off-screen.
+  - Horizontal swipe still uses default page-fit typography and ignores user font-size changes.
+- `components/mushaf/AyahBlock.tsx`:
+  - Gave verse-mode QCF2 rows a stable full-width wrapping container.
+
+### Validation result
+- `npm run typecheck`: passed.
+- `npm run build:web`: passed with Node heap and Expo/NPM cache paths redirected for the workspace sandbox.
+- Production export smoke checked at 360px and 412px: page rows used 6px gutters, justified across available width, and `documentElement.scrollWidth` matched viewport width.
