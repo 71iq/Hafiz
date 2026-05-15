@@ -203,13 +203,12 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   signOut: async () => {
     set({ isLoading: true, error: null });
     try {
-      const { error } = await supabase.auth.signOut();
+      const { error } = await supabase.auth.signOut({ scope: "local" });
       if (error) throw error;
-      set({ session: null, user: null, profile: null });
     } catch (err: any) {
-      set({ error: err.message });
+      console.warn("[Auth] Sign out error:", err.message);
     } finally {
-      set({ isLoading: false });
+      set({ session: null, user: null, profile: null, isLoading: false, error: null });
     }
   },
 

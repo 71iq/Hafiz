@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
-import { View, Text, Pressable, ActivityIndicator, ScrollView, Alert } from "react-native";
+import { View, Text, Pressable, ActivityIndicator, ScrollView } from "react-native";
 import { Switch } from "@/components/ui/Switch";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ToggleGroup } from "@/components/ui/ToggleGroup";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Sun, Moon, Smartphone, Minus, Plus, ChevronRight, ChevronLeft, User, LogOut } from "lucide-react-native";
 import {
@@ -41,6 +42,7 @@ export default function SettingsScreen() {
   const s = useStrings();
   const router = useRouter();
   const [pickerVisible, setPickerVisible] = useState(false);
+  const [logoutDialogVisible, setLogoutDialogVisible] = useState(false);
   const currentLang = getLanguageByCode(translationLanguage);
   const [enabledModes, setEnabledModes] = useState<TestMode[]>(DEFAULT_ENABLED_MODES);
   const [wordModes, setWordModes] = useState<Array<"wordMeaningArabic" | "wordMeaningTranslation">>([
@@ -101,6 +103,11 @@ export default function SettingsScreen() {
     });
   }, [db]);
 
+  const handleLogout = useCallback(async () => {
+    setLogoutDialogVisible(false);
+    await signOut();
+  }, [signOut]);
+
   const THEME_OPTIONS: { value: ThemeMode; label: string; icon: typeof Sun }[] = [
     { value: "light", label: s.themeLight, icon: Sun },
     { value: "dark", label: s.themeDark, icon: Moon },
@@ -148,14 +155,10 @@ export default function SettingsScreen() {
                 </View>
               </View>
               <Pressable
-                onPress={() => {
-                  Alert.alert(s.authLogout, s.authLogoutConfirm, [
-                    { text: s.flashcardsCancel, style: "cancel" },
-                    { text: s.authLogout, style: "destructive", onPress: signOut },
-                  ]);
-                }}
+                onPress={() => setLogoutDialogVisible(true)}
+                disabled={authLoading}
                 className="flex-row items-center justify-center gap-2 py-3 rounded-full bg-surface dark:bg-surface-dark"
-                style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+                style={({ pressed }) => ({ opacity: authLoading ? 0.5 : pressed ? 0.7 : 1 })}
               >
                 <LogOut size={16} color={isDark ? "#ef4444" : "#dc2626"} />
                 <Text
@@ -194,6 +197,18 @@ export default function SettingsScreen() {
             </View>
           )}
         </Card>
+        <ConfirmDialog
+          visible={logoutDialogVisible}
+          title={s.authLogout}
+          message={s.authLogoutConfirm}
+          cancelLabel={s.flashcardsCancel}
+          confirmLabel={s.authLogout}
+          destructive
+          isDark={isDark}
+          isRTL={isRTL}
+          onCancel={() => setLogoutDialogVisible(false)}
+          onConfirm={handleLogout}
+        />
 
         {/* Language Section */}
         <SectionLabel>{s.sectionLanguage}</SectionLabel>
