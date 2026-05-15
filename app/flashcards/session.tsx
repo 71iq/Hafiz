@@ -29,7 +29,6 @@ import type { StudyCardRow, TestMode } from "@/lib/fsrs/types";
 import { DEFAULT_ENABLED_MODES, TEST_MODE_COLORS } from "@/lib/fsrs/types";
 import { fetchWordMeaningAr, fetchWordText, fetchWordTranslation } from "@/lib/word/queries";
 import { MEANINGS_DECK_ID } from "@/lib/fsrs/queries";
-import { emitReviewActivity } from "@/lib/fsrs/review-events";
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -373,7 +372,6 @@ function FlashcardSessionScreen() {
       now.toISOString()
     );
     setReviewedCount((count) => count + 1);
-    emitReviewActivity();
 
     // Compute and store leaderboard points
     const points = computeReviewPoints(

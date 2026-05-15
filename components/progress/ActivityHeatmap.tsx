@@ -80,23 +80,19 @@ export function ActivityHeatmap({ data, isDark, s, isRTL }: Props) {
     }
     weeks.push(week);
   }
+  const renderedWeeks = isRTL ? [...weeks].reverse() : weeks;
 
-  // Month labels: find first occurrence of each month in weeks
+  // Month labels: find first visual occurrence of each month.
   const monthLabels: { label: string; weekIndex: number }[] = [];
   let lastMonth = -1;
-  for (let w = 0; w < weeks.length; w++) {
-    // Use the first day of the week to determine month
-    const firstDay = weeks[w][0];
+  for (let w = 0; w < renderedWeeks.length; w++) {
+    const firstDay = renderedWeeks[w][0];
     const month = firstDay.date.getMonth();
     if (month !== lastMonth) {
       monthLabels.push({ label: getMonthLabel(firstDay.date, isArabic), weekIndex: w });
       lastMonth = month;
     }
   }
-
-  // Stats
-  const activeDays = data.filter((d) => d.count > 0).length;
-  const totalReviews = data.reduce((sum, d) => sum + d.count, 0);
 
   const spacedMonthLabels = useMemo(() => {
     const result: { label: string; left: number }[] = [];
@@ -155,7 +151,14 @@ export function ActivityHeatmap({ data, isDark, s, isRTL }: Props) {
             {Array.from({ length: 7 }, (_, i) => {
               const label = getDayLabel(i, isArabic);
               return (
-                <View key={i} style={{ height: CELL_SIZE + CELL_GAP, justifyContent: "center" }}>
+                <View
+                  key={i}
+                  style={{
+                    height: CELL_SIZE,
+                    marginBottom: i === 6 ? 0 : CELL_GAP,
+                    justifyContent: "center",
+                  }}
+                >
                   {label && (
                     <Text
                       style={{
@@ -176,7 +179,7 @@ export function ActivityHeatmap({ data, isDark, s, isRTL }: Props) {
 
           {/* Week columns */}
           <View style={{ flexDirection: "row", gap: CELL_GAP, width: heatmapWidth }}>
-            {weeks.map((week, wi) => (
+            {renderedWeeks.map((week, wi) => (
               <View key={wi} style={{ gap: CELL_GAP }}>
                 {week.map((day) => {
                   if (day.count === -1) {
@@ -215,8 +218,8 @@ export function ActivityHeatmap({ data, isDark, s, isRTL }: Props) {
         </View>
       )}
 
-      {/* Legend + summary */}
-      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>
+      {/* Legend */}
+      <View style={{ flexDirection: "row", alignItems: "center", marginTop: 12 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
           {[0, 1, 2, 3].map((l) => (
             <View
@@ -229,14 +232,6 @@ export function ActivityHeatmap({ data, isDark, s, isRTL }: Props) {
               }}
             />
           ))}
-        </View>
-        <View style={{ flexDirection: "row", justifyContent: "center", gap: 18 }}>
-        <Text style={{ fontFamily: "Manrope_500Medium", fontSize: 12, color: isDark ? "#737373" : "#8B8178" }}>
-          {activeDays} {s.heatmapActiveDays}
-        </Text>
-        <Text style={{ fontFamily: "Manrope_500Medium", fontSize: 12, color: isDark ? "#737373" : "#8B8178" }}>
-          {totalReviews} {s.heatmapTotalReviews}
-        </Text>
         </View>
       </View>
     </View>

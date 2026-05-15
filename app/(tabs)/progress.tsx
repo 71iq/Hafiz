@@ -11,7 +11,11 @@ import { useSettings } from "@/lib/settings/context";
 import { useDatabase } from "@/lib/database/provider";
 import { useAuthStore } from "@/lib/auth/store";
 import { isSupabaseConfigured } from "@/lib/supabase";
-import { getTotalCardCount, getStudyStreak } from "@/lib/fsrs/queries";
+import {
+  getMemorizedAyahCardCount,
+  getReviewStats,
+  getTotalAyahCardCount,
+} from "@/lib/fsrs/queries";
 import { subscribeReviewActivity } from "@/lib/fsrs/review-events";
 
 type HeatmapDay = { date: string; count: number };
@@ -22,13 +26,6 @@ type SurahProgress = {
   totalCards: number;
   memorized: number;
 };
-
-function formatDateKey(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
 
 export default function ProgressScreen() {
   const s = useStrings();
@@ -47,62 +44,24 @@ export default function ProgressScreen() {
     );
   }
 
-  const [totalCards, setTotalCards] = useState(0);
-  const [streak, setStreak] = useState(0);
+  const [totalAyahCards, setTotalAyahCards] = useState(0);
+  const [memorizedAyahCards, setMemorizedAyahCards] = useState(0);
   const [longestStreak, setLongestStreak] = useState(0);
-  const [totalSessions, setTotalSessions] = useState(0);
+  const [avgDailyReviews, setAvgDailyReviews] = useState(0);
   const [heatmapData, setHeatmapData] = useState<HeatmapDay[]>([]);
   const [surahProgress, setSurahProgress] = useState<SurahProgress[]>([]);
 
   const loadData = useCallback(async () => {
-    const [cards, currentStreak] = await Promise.all([
-      getTotalCardCount(db),
-      getStudyStreak(db),
+    const [cards, memorized, reviewStats] = await Promise.all([
+      getTotalAyahCardCount(db),
+      getMemorizedAyahCardCount(db),
+      getReviewStats(db),
     ]);
-    setTotalCards(cards);
-    setStreak(currentStreak);
-    const sessions = await db.getFirstAsync<{ count: number }>(
-      "SELECT COUNT(DISTINCT DATE(reviewed_at)) as count FROM study_log"
-    );
-    setTotalSessions(sessions?.count ?? 0);
-
-    // Compute longest streak from study_log
-    const rows = await db.getAllAsync<{ review_date: string }>(
-      "SELECT DISTINCT DATE(reviewed_at) as review_date FROM study_log ORDER BY review_date ASC"
-    );
-    let maxStreak = 0;
-    let runStreak = 0;
-    let prev: Date | null = null;
-    for (const row of rows) {
-      const d = new Date(row.review_date);
-      d.setHours(0, 0, 0, 0);
-      if (prev) {
-        const diff = (d.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24);
-        runStreak = diff === 1 ? runStreak + 1 : 1;
-      } else {
-        runStreak = 1;
-      }
-      if (runStreak > maxStreak) maxStreak = runStreak;
-      prev = d;
-    }
-    setLongestStreak(maxStreak);
-
-    // Heatmap: reviews per day for the last 90 days
-    const ninetyDaysAgo = new Date();
-    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-    const heatRows = await db.getAllAsync<{ reviewed_at: string }>(
-      `SELECT reviewed_at
-       FROM study_log
-       WHERE reviewed_at >= ?
-       ORDER BY reviewed_at`,
-      [ninetyDaysAgo.toISOString()]
-    );
-    const heatCounts = new Map<string, number>();
-    for (const row of heatRows) {
-      const key = formatDateKey(new Date(row.reviewed_at));
-      heatCounts.set(key, (heatCounts.get(key) ?? 0) + 1);
-    }
-    setHeatmapData([...heatCounts].map(([date, count]) => ({ date, count })));
+    setTotalAyahCards(cards);
+    setMemorizedAyahCards(memorized);
+    setLongestStreak(reviewStats.longestStreak);
+    setAvgDailyReviews(reviewStats.averageDailyReviews);
+    setHeatmapData(reviewStats.activity);
 
     // Surah progress: per-surah card counts with memorization state
     const surahRows = await db.getAllAsync<{
@@ -115,6 +74,7 @@ export default function ProgressScreen() {
          COUNT(*) as total,
          SUM(CASE WHEN sc.state = 2 THEN 1 ELSE 0 END) as memorized
        FROM study_cards sc
+       WHERE sc.id NOT LIKE 'word:%'
        GROUP BY surah
        ORDER BY surah`
     );
@@ -151,7 +111,7 @@ export default function ProgressScreen() {
   useEffect(() => subscribeReviewActivity(loadData), [loadData]);
 
   const formatStat = (val: number) => val > 0 ? val.toLocaleString() : "—";
-  const masteryPct = totalCards > 0 ? Math.round((totalCards > 0 ? (surahProgress.reduce((acc, item) => acc + item.memorized, 0) / totalCards) : 0) * 100) : 0;
+  const masteryPct = totalAyahCards > 0 ? Math.round((memorizedAyahCards / totalAyahCards) * 100) : 0;
 
   return (
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
@@ -222,7 +182,7 @@ export default function ProgressScreen() {
               className="text-charcoal dark:text-neutral-100"
               style={{ fontFamily: "NotoSerif_700Bold", fontSize: 26 }}
             >
-              {formatStat(totalCards)}
+              {formatStat(memorizedAyahCards)}
             </Text>
             <Text
               className="text-warm-400 dark:text-neutral-500 mt-1"
@@ -252,7 +212,7 @@ export default function ProgressScreen() {
               className="text-charcoal dark:text-neutral-100"
               style={{ fontFamily: "NotoSerif_700Bold", fontSize: 26 }}
             >
-              {formatStat(totalSessions)}
+              {formatStat(avgDailyReviews)}
             </Text>
             <Text
               className="text-warm-400 dark:text-neutral-500 mt-1"

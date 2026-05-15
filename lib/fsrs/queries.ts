@@ -2,6 +2,55 @@ import type { SQLiteDatabase } from "expo-sqlite";
 import { createEmptyCard } from "./scheduler";
 import type { DeckScope, StudyCardRow } from "./types";
 import { enqueueSync } from "@/lib/database/sync-queue";
+import { emitReviewActivity } from "./review-events";
+
+export type ReviewActivityDay = { date: string; count: number };
+
+type ReviewStats = {
+  activity: ReviewActivityDay[];
+  activeDays: number;
+  totalReviews: number;
+  averageDailyReviews: number;
+  longestStreak: number;
+};
+
+function formatLocalDateKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function dayIndexFromDateKey(dateKey: string): number {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return Math.floor(new Date(year, (month || 1) - 1, day || 1).getTime() / 86400000);
+}
+
+function buildLocalReviewCounts(rows: { reviewed_at: string }[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    const reviewedAt = new Date(row.reviewed_at);
+    if (Number.isNaN(reviewedAt.getTime())) continue;
+    const key = formatLocalDateKey(reviewedAt);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return counts;
+}
+
+function calculateLongestStreak(dateKeys: string[]): number {
+  let maxStreak = 0;
+  let runStreak = 0;
+  let prevIndex: number | null = null;
+
+  for (const dateKey of dateKeys) {
+    const dayIndex = dayIndexFromDateKey(dateKey);
+    runStreak = prevIndex !== null && dayIndex - prevIndex === 1 ? runStreak + 1 : 1;
+    maxStreak = Math.max(maxStreak, runStreak);
+    prevIndex = dayIndex;
+  }
+
+  return maxStreak;
+}
 
 // ─── Deck ID generation ──────────────────────────────────────
 
@@ -321,6 +370,22 @@ export async function getTotalCardCount(db: SQLiteDatabase, deckId?: string): Pr
   return row?.count ?? 0;
 }
 
+export async function getTotalAyahCardCount(db: SQLiteDatabase): Promise<number> {
+  const row = await db.getFirstAsync<{ count: number }>(
+    "SELECT COUNT(*) as count FROM study_cards WHERE id NOT LIKE 'word:%'",
+    []
+  );
+  return row?.count ?? 0;
+}
+
+export async function getMemorizedAyahCardCount(db: SQLiteDatabase): Promise<number> {
+  const row = await db.getFirstAsync<{ count: number }>(
+    "SELECT COUNT(*) as count FROM study_cards WHERE state = 2 AND id NOT LIKE 'word:%'",
+    []
+  );
+  return row?.count ?? 0;
+}
+
 export async function getNewCount(db: SQLiteDatabase, deckId?: string): Promise<number> {
   if (deckId) {
     const row = await db.getFirstAsync<{ count: number }>(
@@ -419,26 +484,23 @@ export async function insertStudyLog(
     scheduled_days: scheduledDays,
     reviewed_at: reviewedAt,
   }).catch(console.warn);
+
+  emitReviewActivity();
 }
 
 export async function getStudyStreak(db: SQLiteDatabase): Promise<number> {
-  // Count consecutive days with at least one review, ending today or yesterday
-  const rows = await db.getAllAsync<{ review_date: string }>(
-    `SELECT DISTINCT DATE(reviewed_at) as review_date FROM study_log ORDER BY review_date DESC LIMIT 365`
+  const rows = await db.getAllAsync<{ reviewed_at: string }>(
+    `SELECT reviewed_at FROM study_log ORDER BY reviewed_at DESC`
   );
   if (rows.length === 0) return 0;
 
-  const dateToDayIndex = (d: Date) => Math.floor(d.getTime() / 86400000);
-  const parseYmdToDayIndex = (ymd: string): number => {
-    const [y, m, d] = ymd.split("-").map(Number);
-    return dateToDayIndex(new Date(y, (m || 1) - 1, d || 1));
-  };
+  const reviewDates = [...buildLocalReviewCounts(rows).keys()].sort().reverse();
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const todayIdx = dateToDayIndex(today);
+  const todayIdx = dayIndexFromDateKey(formatLocalDateKey(today));
   const yesterdayIdx = todayIdx - 1;
-  const firstIdx = parseYmdToDayIndex(rows[0].review_date);
+  const firstIdx = dayIndexFromDateKey(reviewDates[0]);
 
   // Streak must start from today or yesterday
   if (firstIdx < yesterdayIdx) return 0;
@@ -446,8 +508,8 @@ export async function getStudyStreak(db: SQLiteDatabase): Promise<number> {
   let streak = 0;
   let expectedIdx = firstIdx;
 
-  for (const row of rows) {
-    const idx = parseYmdToDayIndex(row.review_date);
+  for (const dateKey of reviewDates) {
+    const idx = dayIndexFromDateKey(dateKey);
     if (idx === expectedIdx) {
       streak++;
       expectedIdx--;
@@ -456,6 +518,39 @@ export async function getStudyStreak(db: SQLiteDatabase): Promise<number> {
     }
   }
   return streak;
+}
+
+export async function getReviewStats(db: SQLiteDatabase, activityDays = 90): Promise<ReviewStats> {
+  const rows = await db.getAllAsync<{ reviewed_at: string }>(
+    "SELECT reviewed_at FROM study_log ORDER BY reviewed_at ASC"
+  );
+  const counts = buildLocalReviewCounts(rows);
+  const dateKeys = [...counts.keys()].sort();
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayIndex = dayIndexFromDateKey(formatLocalDateKey(today));
+  const start = new Date(today);
+  start.setDate(start.getDate() - Math.max(activityDays - 1, 0));
+  const startIndex = dayIndexFromDateKey(formatLocalDateKey(start));
+
+  const activity = dateKeys
+    .filter((dateKey) => {
+      const dayIndex = dayIndexFromDateKey(dateKey);
+      return dayIndex >= startIndex && dayIndex <= todayIndex;
+    })
+    .map((date) => ({ date, count: counts.get(date) ?? 0 }));
+
+  const totalReviews = [...counts.values()].reduce((sum, count) => sum + count, 0);
+  const activeDays = dateKeys.length;
+
+  return {
+    activity,
+    activeDays,
+    totalReviews,
+    averageDailyReviews: activeDays > 0 ? Math.round(totalReviews / activeDays) : 0,
+    longestStreak: calculateLongestStreak(dateKeys),
+  };
 }
 
 export async function getLastReviewDate(db: SQLiteDatabase): Promise<string | null> {
