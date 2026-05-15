@@ -168,6 +168,7 @@ const HORIZONTAL_FLICK_VELOCITY = 0.26;
 const HORIZONTAL_EASING = Easing.out(Easing.cubic);
 const PAGE_WIDTH_FIT_TOLERANCE = 12;
 const DESKTOP_PAGE_LINE_MAX_WIDTH = 680;
+const DESKTOP_PAGE_SAFE_GUTTER = 32;
 
 function fitTypographyToPageWidth(
   fontSize: number,
@@ -198,6 +199,18 @@ function computeLineWidth(
   if (availableWidth <= 0) return 0;
   if (fillAvailableWidth) return Math.max(0, Math.min(availableWidth, maxLineWidth));
   return Math.max(0, Math.min(fontSize * MUSHAF_LINE_WIDTH_SCALE, availableWidth, maxLineWidth));
+}
+
+function computeVerticalLineMaxWidth(
+  fontSize: number,
+  availableWidth: number,
+  compactPageWidth: boolean
+): number {
+  if (compactPageWidth) return availableWidth;
+  const naturalLineWidth = fontSize * MUSHAF_LINE_WIDTH_SCALE;
+  const safeViewportWidth = Math.max(0, availableWidth - DESKTOP_PAGE_SAFE_GUTTER * 2);
+  const expandedMaxWidth = Math.max(DESKTOP_PAGE_LINE_MAX_WIDTH, naturalLineWidth);
+  return Math.max(0, Math.min(expandedMaxWidth, safeViewportWidth));
 }
 
 function shouldWrapLine(fontSize: number, lineWidth: number): boolean {
@@ -346,7 +359,10 @@ export function PageMushaf({
   const pageAvailableWidth = Math.max(0, pageWidth - pageSidePadding * 2);
   const compactPageWidth = width < SIDEBAR_BREAKPOINT;
   const compactDefaultFontSize = FONT_SIZE_STEPS_MOBILE[DEFAULT_FONT_SIZE_INDEX];
-  const verticalLineMaxWidth = compactPageWidth ? pageAvailableWidth : DESKTOP_PAGE_LINE_MAX_WIDTH;
+  const verticalLineMaxWidth = useMemo(
+    () => computeVerticalLineMaxWidth(fontSize, pageAvailableWidth, compactPageWidth),
+    [compactPageWidth, fontSize, pageAvailableWidth]
+  );
   const verticalShouldFillAvailable = compactPageWidth && fontSize >= compactDefaultFontSize;
   const verticalLineWidth = useMemo(
     () => computeLineWidth(fontSize, pageAvailableWidth, verticalLineMaxWidth, verticalShouldFillAvailable),

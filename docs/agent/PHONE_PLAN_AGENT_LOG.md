@@ -1618,3 +1618,23 @@ Saved in `phase19/`:
 - `npm run build:web`: passed with Node heap and Expo/NPM cache paths redirected for the workspace sandbox.
 - `npx expo start --web --port 8099 --localhost`: printed `Starting Metro Bundler`, then exited with an Expo CLI `AggregateError` in this sandbox.
 - Production export smoke checked at 412px: reader tap hid chrome and a second tap showed it without immediate re-hide; first-launch import completed and the compact phone top chrome rendered.
+
+## 2026-05-15 — Tablet Desktop Page Width Expansion
+
+### Scope decisions
+1. Fixed only vertical Mushaf page-view line width behavior on tablet/desktop.
+2. Preserved phone width behavior and horizontal swipe page-fit behavior.
+3. Kept the existing default desktop/tablet line width for normal font sizes while allowing large font levels to expand closer to viewport edges before wrapping.
+
+### Implemented in this step
+- `components/mushaf/PageMushaf.tsx`:
+  - Replaced the fixed tablet/desktop `680px` max line width with a font-aware max width.
+  - Large vertical page fonts can now use the natural QCF2 line width up to the viewport minus safe gutters.
+  - Phone still uses its existing available-width rule, and horizontal page mode still uses fixed page-fit sizing.
+
+### Validation result
+- `npm run typecheck`: passed.
+- `npm run build:web`: passed with Node heap and Expo/NPM cache paths redirected for the workspace sandbox.
+- Production export smoke checked at large font level:
+  - 768px viewport: vertical page line width expanded to 672px with no horizontal document overflow.
+  - 1024px viewport: vertical page line width expanded to 928px with no horizontal document overflow.
