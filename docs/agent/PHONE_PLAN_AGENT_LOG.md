@@ -1562,3 +1562,33 @@ Saved in `phase19/`:
 - `npm run typecheck`: passed.
 - `npm run build:web`: passed with Node heap and Expo/NPM cache paths redirected for the workspace sandbox.
 - Production export smoke checked at 360px and 412px: page rows used 6px gutters, justified across available width, and `documentElement.scrollWidth` matched viewport width.
+
+## 2026-05-15 — Page Typography Regression Fix
+
+### Scope decisions
+1. Fixed the regression from full-viewport line justification by restoring natural Mushaf line widths.
+2. Kept phone horizontal swipe page mode fixed/page-fit and independent of the user font-size level.
+3. Replaced the font-size picker presentation with numeric levels 1-10 while preserving level 3 as the default.
+
+### Implemented in this step
+- `lib/settings/context.tsx`:
+  - Expanded Quran font-size scales to 10 levels with default index 2.
+- `components/mushaf/FontSizeControl.tsx` and `app/(tabs)/settings.tsx`:
+  - Replaced dot indicators with numeric `level/10` controls, localized for Arabic digits.
+- `components/mushaf/MushafPage.tsx`:
+  - Added explicit page line width, line slot height, and vertical wrapping controls.
+- `components/mushaf/PageMushaf.tsx`:
+  - Phone level 3 fills safe gutters; levels 1-2 use narrower natural line widths.
+  - Desktop/tablet page lines are centered and capped to a sane max width.
+  - Large vertical levels allocate taller wrapping line slots instead of clipping horizontally.
+  - Horizontal swipe continues to use fixed default page-fit typography.
+
+### Validation result
+- `npm run typecheck`: passed.
+- `npm run build:web`: passed with Node heap and Expo/NPM cache paths redirected for the workspace sandbox.
+- Production export smoke checked:
+  - 360px default vertical page rows: 348px wide with 6px gutters and no horizontal document overflow.
+  - 412px default vertical page rows: 400px wide with 6px gutters and no horizontal document overflow.
+  - 360px level 1 vertical rows: centered 245px natural width, no full-screen word spreading.
+  - 360px level 10 vertical rows: 348px wrapped line slots, no horizontal document overflow.
+  - 768px and 1024px vertical rows: centered 525px default line width, no full-screen word spreading.

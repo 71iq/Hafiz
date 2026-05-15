@@ -1,18 +1,22 @@
 import { View, Text, Pressable } from "react-native";
 import { Minus, Plus } from "lucide-react-native";
 import { useSettings, FONT_SIZE_STEPS } from "@/lib/settings/context";
+import { toArabicNumber } from "@/lib/arabic";
 
 type Props = {
   disabled?: boolean;
 };
 
 export function FontSizeControl({ disabled = false }: Props) {
-  const { fontSizeIndex, setFontSizeIndex, isDark } = useSettings();
+  const { fontSizeIndex, setFontSizeIndex, isDark, isRTL } = useSettings();
 
   const iconColor = isDark ? "#d4d4d4" : "#6e5a47";
   const disabledIconColor = isDark ? "#525252" : "#B8AEA3";
   const canDecrease = !disabled && fontSizeIndex > 0;
   const canIncrease = !disabled && fontSizeIndex < FONT_SIZE_STEPS.length - 1;
+  const level = fontSizeIndex + 1;
+  const levelLabel = isRTL ? toArabicNumber(level) : String(level);
+  const totalLabel = isRTL ? toArabicNumber(FONT_SIZE_STEPS.length) : String(FONT_SIZE_STEPS.length);
 
   return (
     <View className="flex-row items-center gap-2" style={{ opacity: disabled ? 0.42 : 1 }}>
@@ -32,20 +36,13 @@ export function FontSizeControl({ disabled = false }: Props) {
         <Minus size={12} color={disabled ? disabledIconColor : iconColor} />
       </Pressable>
 
-      {/* Step dots */}
-      <View className="flex-row items-center gap-1 px-1">
-        {FONT_SIZE_STEPS.map((_, i) => (
-          <View
-            key={i}
-            className={`rounded-full ${
-              i === fontSizeIndex
-                ? "w-2 h-2 bg-primary-accent"
-                : i < fontSizeIndex
-                  ? "w-1.5 h-1.5 bg-primary-accent/40"
-                  : "w-1.5 h-1.5 bg-surface-high dark:bg-surface-dark-high"
-            }`}
-          />
-        ))}
+      <View className="min-w-12 rounded-full bg-surface-high dark:bg-surface-dark-high px-2.5 py-1 items-center">
+        <Text
+          className="text-charcoal dark:text-neutral-100"
+          style={{ fontFamily: "Manrope_700Bold", fontSize: 11 }}
+        >
+          {levelLabel}/{totalLabel}
+        </Text>
       </View>
 
       <Pressable

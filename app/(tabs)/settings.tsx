@@ -25,6 +25,7 @@ import { useStrings } from "@/lib/i18n/useStrings";
 import { ALL_TEST_MODES, DEFAULT_ENABLED_MODES, type TestMode } from "@/lib/fsrs/types";
 import { useAuthStore } from "@/lib/auth/store";
 import { useRouter } from "expo-router";
+import { toArabicNumber } from "@/lib/arabic";
 
 export default function SettingsScreen() {
   const {
@@ -50,6 +51,8 @@ export default function SettingsScreen() {
   const accountName = profile?.display_name || profile?.username || user?.email || s.authProfile;
   const accountHandle = profile?.username ? `@${profile.username}` : user?.email || "";
   const fontSizeLocked = viewMode === "page" && pageScroll === "horizontal";
+  const fontSizeLevelLabel = isRTL ? toArabicNumber(fontSizeIndex + 1) : String(fontSizeIndex + 1);
+  const fontSizeTotalLabel = isRTL ? toArabicNumber(FONT_SIZE_STEPS.length) : String(FONT_SIZE_STEPS.length);
 
   useEffect(() => {
     db.getFirstAsync<{ value: string }>(
@@ -303,20 +306,13 @@ export default function SettingsScreen() {
               <Minus size={18} color={isDark ? "#d4d4d4" : "#6e5a47"} />
             </Pressable>
 
-            {/* Step indicators */}
-            <View className="flex-row items-center gap-2.5">
-              {FONT_SIZE_STEPS.map((_, i) => (
-                <View
-                  key={i}
-                  className={`rounded-full ${
-                    i === fontSizeIndex
-                      ? "w-3 h-3 bg-primary-accent"
-                      : i < fontSizeIndex
-                        ? "w-2.5 h-2.5 bg-primary-accent/40"
-                        : "w-2.5 h-2.5 bg-surface-high dark:bg-surface-dark-high"
-                  }`}
-                />
-              ))}
+            <View className="min-w-24 rounded-full bg-surface-high dark:bg-surface-dark-high px-5 py-2.5 items-center">
+              <Text
+                className="text-charcoal dark:text-neutral-100"
+                style={{ fontFamily: "Manrope_700Bold", fontSize: 15 }}
+              >
+                {fontSizeLevelLabel}/{fontSizeTotalLabel}
+              </Text>
             </View>
 
             <Pressable

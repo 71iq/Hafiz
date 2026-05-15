@@ -7,15 +7,15 @@ import { DEFAULT_LANGUAGE } from "@/lib/translations/languages";
 import { importTranslation } from "@/lib/translations/import";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 
-// Desktop / large-viewport scale. Also the canonical length (7 steps) used
+// Desktop / large-viewport scale. Also the canonical length (10 levels) used
 // by UI controls like the font size picker.
-export const FONT_SIZE_STEPS = [22, 26, 30, 34, 38, 42, 46] as const;
-export const FONT_SIZE_LINE_HEIGHTS = [48, 56, 64, 72, 80, 88, 96] as const;
+export const FONT_SIZE_STEPS = [22, 26, 30, 34, 38, 42, 46, 50, 54, 58] as const;
+export const FONT_SIZE_LINE_HEIGHTS = [48, 56, 64, 72, 80, 88, 96, 104, 112, 120] as const;
 
-// Mobile scale — roughly 65–70% of desktop at each step. Seven steps aligned
+// Mobile scale — roughly 65–70% of desktop at each step. Ten levels aligned
 // 1-to-1 with FONT_SIZE_STEPS so the saved fontSizeIndex is portable.
-export const FONT_SIZE_STEPS_MOBILE = [14, 17, 20, 23, 26, 29, 32] as const;
-export const FONT_SIZE_LINE_HEIGHTS_MOBILE = [32, 38, 44, 50, 56, 62, 68] as const;
+export const FONT_SIZE_STEPS_MOBILE = [14, 17, 20, 23, 26, 29, 32, 35, 38, 41] as const;
+export const FONT_SIZE_LINE_HEIGHTS_MOBILE = [32, 38, 44, 50, 56, 62, 68, 74, 80, 86] as const;
 
 export const DEFAULT_FONT_SIZE_INDEX = 2; // desktop 30px / mobile 20px (verse view)
 // Web viewports narrower than the shared sidebar breakpoint use the mobile

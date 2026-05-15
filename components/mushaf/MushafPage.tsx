@@ -65,6 +65,9 @@ type Props = {
   paddingTop?: number;
   paddingBottom?: number;
   sidePadding?: number;
+  lineWidth?: number;
+  lineSlotHeight?: number;
+  allowLineWrap?: boolean;
 };
 
 // Identity for a single visual word on the page
@@ -150,6 +153,9 @@ function MushafPageInner({
   paddingTop = 8,
   paddingBottom = 32,
   sidePadding = 16,
+  lineWidth,
+  lineSlotHeight,
+  allowLineWrap = false,
 }: Props) {
   const [fontVisible, setFontVisible] = useState(false);
   const [wordsLoaded, setWordsLoaded] = useState(!!pageWordsData);
@@ -219,7 +225,9 @@ function MushafPageInner({
   }, [onOpenAyahDetail]);
 
   const hasLineLayout = lineLayout && lineLayout.length > 0;
-  const contentWidth = Math.max(0, width - sidePadding * 2);
+  const maxContentWidth = Math.max(0, width - sidePadding * 2);
+  const contentWidth = Math.max(0, Math.min(lineWidth ?? fontSize * MUSHAF_LINE_WIDTH_SCALE, maxContentWidth));
+  const visualLineHeight = lineSlotHeight ?? lineHeight;
   const fontFamily = qpcFontName(pageNumber);
 
   // Show loading indicator while font is not loaded at all
@@ -279,7 +287,7 @@ function MushafPageInner({
       }
 
       if (line.line_type === "basmallah") {
-        const bismHeight = lineHeight * 0.85 + 8;
+        const bismHeight = visualLineHeight * 0.85 + 8;
         return (
           <View
             key={`line-${line.line_number}-bism`}
@@ -321,6 +329,7 @@ function MushafPageInner({
       }
       if (words.length === 0) return null;
       const shouldStretchLine = !centered && words.length > 1;
+      const lineHeightStyle = allowLineWrap ? visualLineHeight : lineHeight;
 
       return (
         <View
@@ -328,11 +337,15 @@ function MushafPageInner({
           style={{
             direction: "ltr",
             flexDirection: "row-reverse",
-            justifyContent: shouldStretchLine ? "space-between" : "center",
+            flexWrap: allowLineWrap ? "wrap" : "nowrap",
+            justifyContent: shouldStretchLine && !allowLineWrap ? "space-between" : "center",
             width: contentWidth,
-            height: lineHeight,
-            gap: shouldStretchLine ? undefined : fontSize * 0.28,
+            minHeight: lineHeightStyle,
+            height: lineHeightStyle,
+            gap: shouldStretchLine && !allowLineWrap ? undefined : fontSize * 0.28,
+            rowGap: allowLineWrap ? Math.max(2, fontSize * 0.12) : undefined,
             alignItems: "center",
+            alignContent: "center",
             paddingHorizontal: 2,
             overflow: "visible",
           }}
