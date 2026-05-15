@@ -463,6 +463,7 @@ function MushafInner() {
 
   const isPageMode = viewMode === "page";
   const showBottomSlider = isPageMode;
+  const pageFontSizeLocked = isPageMode && pageScroll === "horizontal";
   const mobileBottomNavHeight = 54;
   const mobileBottomNavGap = 6;
   const mobileBottomNavOffset = isPhone
@@ -765,7 +766,7 @@ function MushafInner() {
                 >
                   <Search size={16} color={isDark ? "#737373" : "#8B8178"} />
                 </Pressable>
-                {!isNarrow && <FontSizeControl />}
+                {!isNarrow && <FontSizeControl disabled={pageFontSizeLocked} />}
               </View>
             </View>
           )}

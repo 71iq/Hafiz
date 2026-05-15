@@ -17,7 +17,7 @@ export const FONT_SIZE_LINE_HEIGHTS = [48, 56, 64, 72, 80, 88, 96] as const;
 export const FONT_SIZE_STEPS_MOBILE = [14, 17, 20, 23, 26, 29, 32] as const;
 export const FONT_SIZE_LINE_HEIGHTS_MOBILE = [32, 38, 44, 50, 56, 62, 68] as const;
 
-const DEFAULT_FONT_SIZE_INDEX = 2; // desktop 30px / mobile 20px (verse view)
+export const DEFAULT_FONT_SIZE_INDEX = 2; // desktop 30px / mobile 20px (verse view)
 // Web viewports narrower than the shared sidebar breakpoint use the mobile
 // scale; native is always mobile.
 

@@ -1517,3 +1517,24 @@ Saved in `phase19/`:
 - `npm run typecheck`: passed.
 - `npm run build:web`: passed with Node heap and Expo/NPM cache paths redirected for the workspace sandbox.
 - `npx expo start --web --port 8088`: smoke checked page-view container behavior at 360, 412, 768, and 1024 widths.
+
+## 2026-05-15 — Horizontal Page Font Size Lock
+
+### Scope decisions
+1. Fixed only Mushaf font-size behavior in horizontal page swipe mode.
+2. Kept verse view and vertical page scroll mode tied to the saved Quran font-size setting.
+3. Treated horizontal page swipe mode as a fixed page-fit renderer so QCF2 page dimensions do not react to font-size changes.
+
+### Implemented in this step
+- `components/mushaf/PageMushaf.tsx`:
+  - Horizontal page typography now uses the default page-fit font-size index instead of the active user font-size setting.
+- `components/mushaf/FontSizeControl.tsx` and `app/(tabs)/mushaf.tsx`:
+  - Font-size controls are visually disabled and non-interactive when Mushaf is in horizontal page mode.
+- `app/(tabs)/settings.tsx` and `lib/i18n/strings.ts`:
+  - Settings font-size controls are disabled in horizontal page mode with bilingual helper text explaining the fixed page view.
+- `lib/settings/context.tsx`:
+  - Exported the default font-size index so page-fit sizing and persisted settings share one default.
+
+### Validation result
+- `npm run typecheck`: passed.
+- `npm run build:web`: passed with Node heap and Expo/NPM cache paths redirected for the workspace sandbox.

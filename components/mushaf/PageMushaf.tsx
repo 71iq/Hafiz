@@ -14,7 +14,14 @@ import {
   type NativeSyntheticEvent,
 } from "react-native";
 import { useDatabase } from "@/lib/database/provider";
-import { useSettings } from "@/lib/settings/context";
+import {
+  DEFAULT_FONT_SIZE_INDEX,
+  FONT_SIZE_LINE_HEIGHTS,
+  FONT_SIZE_LINE_HEIGHTS_MOBILE,
+  FONT_SIZE_STEPS,
+  FONT_SIZE_STEPS_MOBILE,
+  useSettings,
+} from "@/lib/settings/context";
 import { useStrings, interpolate } from "@/lib/i18n/useStrings";
 import { MushafPage, type PageLineLayout } from "./MushafPage";
 import { AyahDetailModal } from "./AyahDetailModal";
@@ -787,14 +794,23 @@ export function PageMushaf({
       return { fontSize, lineHeight };
     }
     const compactHorizontal = width < SIDEBAR_BREAKPOINT;
+    const baseFontSize = compactHorizontal
+      ? FONT_SIZE_STEPS_MOBILE[DEFAULT_FONT_SIZE_INDEX]
+      : FONT_SIZE_STEPS[DEFAULT_FONT_SIZE_INDEX];
+    const baseLineHeight = compactHorizontal
+      ? FONT_SIZE_LINE_HEIGHTS_MOBILE[DEFAULT_FONT_SIZE_INDEX]
+      : FONT_SIZE_LINE_HEIGHTS[DEFAULT_FONT_SIZE_INDEX];
     const minLineHeight = compactHorizontal ? 30 : 42;
     const minFontSize = compactHorizontal ? 16 : 20;
     const availableLineHeight = Math.floor(
       (fitHeight - HORIZONTAL_PAGE_BOTTOM_RESERVE - HORIZONTAL_PAGE_TOP_PADDING) /
         MUSHAF_LINE_COUNT
     );
-    const fittedLineHeight = Math.max(minLineHeight, Math.min(lineHeight, availableLineHeight));
-    const fittedFontSize = Math.min(fontSize, Math.floor(fontSize * (fittedLineHeight / lineHeight)));
+    const fittedLineHeight = Math.max(minLineHeight, Math.min(baseLineHeight, availableLineHeight));
+    const fittedFontSize = Math.min(
+      baseFontSize,
+      Math.floor(baseFontSize * (fittedLineHeight / baseLineHeight))
+    );
     return {
       fontSize: Math.max(minFontSize, fittedFontSize),
       lineHeight: fittedLineHeight,

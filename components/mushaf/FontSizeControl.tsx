@@ -2,14 +2,20 @@ import { View, Text, Pressable } from "react-native";
 import { Minus, Plus } from "lucide-react-native";
 import { useSettings, FONT_SIZE_STEPS } from "@/lib/settings/context";
 
-export function FontSizeControl() {
+type Props = {
+  disabled?: boolean;
+};
+
+export function FontSizeControl({ disabled = false }: Props) {
   const { fontSizeIndex, setFontSizeIndex, isDark } = useSettings();
 
   const iconColor = isDark ? "#d4d4d4" : "#6e5a47";
-  const mutedColor = isDark ? "#525252" : "#DFD9D1";
+  const disabledIconColor = isDark ? "#525252" : "#B8AEA3";
+  const canDecrease = !disabled && fontSizeIndex > 0;
+  const canIncrease = !disabled && fontSizeIndex < FONT_SIZE_STEPS.length - 1;
 
   return (
-    <View className="flex-row items-center gap-2">
+    <View className="flex-row items-center gap-2" style={{ opacity: disabled ? 0.42 : 1 }}>
       <Text
         className="text-warm-400 dark:text-neutral-500"
         style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10 }}
@@ -19,11 +25,11 @@ export function FontSizeControl() {
 
       <Pressable
         onPress={() => setFontSizeIndex(fontSizeIndex - 1)}
-        disabled={fontSizeIndex === 0}
+        disabled={!canDecrease}
         className="w-7 h-7 rounded-full bg-surface-high dark:bg-surface-dark-high items-center justify-center"
-        style={{ opacity: fontSizeIndex === 0 ? 0.3 : 1 }}
+        style={{ opacity: canDecrease ? 1 : 0.3 }}
       >
-        <Minus size={12} color={iconColor} />
+        <Minus size={12} color={disabled ? disabledIconColor : iconColor} />
       </Pressable>
 
       {/* Step dots */}
@@ -44,11 +50,11 @@ export function FontSizeControl() {
 
       <Pressable
         onPress={() => setFontSizeIndex(fontSizeIndex + 1)}
-        disabled={fontSizeIndex === FONT_SIZE_STEPS.length - 1}
+        disabled={!canIncrease}
         className="w-7 h-7 rounded-full bg-surface-high dark:bg-surface-dark-high items-center justify-center"
-        style={{ opacity: fontSizeIndex === FONT_SIZE_STEPS.length - 1 ? 0.3 : 1 }}
+        style={{ opacity: canIncrease ? 1 : 0.3 }}
       >
-        <Plus size={12} color={iconColor} />
+        <Plus size={12} color={disabled ? disabledIconColor : iconColor} />
       </Pressable>
 
       <Text
