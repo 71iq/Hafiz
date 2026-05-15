@@ -48,6 +48,8 @@ export default function ProgressScreen() {
   const [memorizedAyahCards, setMemorizedAyahCards] = useState(0);
   const [longestStreak, setLongestStreak] = useState(0);
   const [avgDailyReviews, setAvgDailyReviews] = useState(0);
+  const [activeReviewDays, setActiveReviewDays] = useState(0);
+  const [totalReviews, setTotalReviews] = useState(0);
   const [heatmapData, setHeatmapData] = useState<HeatmapDay[]>([]);
   const [surahProgress, setSurahProgress] = useState<SurahProgress[]>([]);
 
@@ -61,6 +63,8 @@ export default function ProgressScreen() {
     setMemorizedAyahCards(memorized);
     setLongestStreak(reviewStats.longestStreak);
     setAvgDailyReviews(reviewStats.averageDailyReviews);
+    setActiveReviewDays(reviewStats.activeDays);
+    setTotalReviews(reviewStats.totalReviews);
     setHeatmapData(reviewStats.activity);
 
     // Surah progress: per-surah card counts with memorization state
@@ -231,7 +235,14 @@ export default function ProgressScreen() {
           >
             {s.progressActivity}
           </Text>
-          <ActivityHeatmap data={heatmapData} isDark={isDark} s={s} isRTL={isRTL} />
+          <ActivityHeatmap
+            data={heatmapData}
+            isDark={isDark}
+            s={s}
+            isRTL={isRTL}
+            activeDays={activeReviewDays}
+            totalReviews={totalReviews}
+          />
         </Card>
 
         {/* Surah progress */}

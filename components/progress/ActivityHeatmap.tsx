@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { View, Text, Pressable, useWindowDimensions } from "react-native";
+import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 
 type DayData = { date: string; count: number };
 
@@ -8,12 +9,13 @@ type Props = {
   isDark: boolean;
   s: Record<string, string>;
   isRTL?: boolean;
+  activeDays?: number;
+  totalReviews?: number;
 };
 
 const BASE_CELL_SIZE = 13;
-const CELL_GAP = 3;
 const TOTAL_WEEKS = 13;
-const COMPACT_BREAKPOINT = 768;
+const SUMMARY_BREAKPOINT = 560;
 
 function getColor(count: number, isDark: boolean): string {
   if (count === 0) return isDark ? "#262626" : "#E8E1DA";
@@ -44,14 +46,21 @@ function formatDateKey(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-export function ActivityHeatmap({ data, isDark, s, isRTL }: Props) {
+export function ActivityHeatmap({ data, isDark, s, isRTL, activeDays, totalReviews }: Props) {
   const [tooltip, setTooltip] = useState<{ date: string; count: number } | null>(null);
   const { width } = useWindowDimensions();
   const isArabic = !!isRTL;
-  const DAY_LABEL_WIDTH = isArabic ? 58 : 28;
+  const showSummary = width >= SUMMARY_BREAKPOINT;
+  const isSidebarWidth = width >= SIDEBAR_BREAKPOINT;
+  const isDesktopWidth = width >= 1024;
+  const CELL_GAP = isDesktopWidth ? 5 : isSidebarWidth ? 4 : 3;
+  const maxCellSize = isDesktopWidth ? 24 : isSidebarWidth ? 18 : showSummary ? 15 : BASE_CELL_SIZE;
+  const DAY_LABEL_WIDTH = isArabic ? (showSummary ? 70 : 58) : (showSummary ? 34 : 28);
+  const reservedSummaryWidth = showSummary ? (isSidebarWidth ? 200 : 150) : 0;
+  const reservedSummaryGap = showSummary ? (isSidebarWidth ? 32 : 20) : 0;
   const availableWidth = Math.max(220, width - 96);
-  const maxHeatmapWidth = Math.max(150, availableWidth - DAY_LABEL_WIDTH);
-  const CELL_SIZE = Math.max(8, Math.min(BASE_CELL_SIZE, Math.floor((maxHeatmapWidth - CELL_GAP * (TOTAL_WEEKS - 1)) / TOTAL_WEEKS)));
+  const maxHeatmapWidth = Math.max(150, availableWidth - DAY_LABEL_WIDTH - reservedSummaryWidth - reservedSummaryGap);
+  const CELL_SIZE = Math.max(8, Math.min(maxCellSize, Math.floor((maxHeatmapWidth - CELL_GAP * (TOTAL_WEEKS - 1)) / TOTAL_WEEKS)));
 
   // Build date lookup
   const countMap = new Map<string, number>();
@@ -113,10 +122,25 @@ export function ActivityHeatmap({ data, isDark, s, isRTL }: Props) {
   }, [monthLabels, CELL_SIZE]);
   const heatmapWidth = TOTAL_WEEKS * CELL_SIZE + (TOTAL_WEEKS - 1) * CELL_GAP;
   const contentWidth = heatmapWidth + DAY_LABEL_WIDTH;
-  const contentAlign = width < COMPACT_BREAKPOINT ? "center" : isRTL ? "flex-end" : "flex-start";
+  const reviewActiveDays = activeDays ?? data.filter((d) => d.count > 0).length;
+  const reviewTotal = totalReviews ?? data.reduce((sum, d) => sum + d.count, 0);
+  const formatCount = (value: number) => value > 0 ? value.toLocaleString() : "—";
+  const summaryItems = [
+    { value: reviewActiveDays, label: s.heatmapActiveDays },
+    { value: reviewTotal, label: s.heatmapTotalReviews },
+  ];
 
   return (
-    <View style={{ direction: "ltr", alignItems: contentAlign, width: "100%" }}>
+    <View style={{ direction: "ltr", alignItems: showSummary ? "stretch" : "center", width: "100%" }}>
+      <View
+        style={{
+          flexDirection: showSummary ? (isRTL ? "row-reverse" : "row") : "column",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: showSummary ? reservedSummaryGap : 0,
+          width: "100%",
+        }}
+      >
       <View style={{ width: contentWidth }}>
         {/* Month labels row */}
         <View
@@ -249,6 +273,52 @@ export function ActivityHeatmap({ data, isDark, s, isRTL }: Props) {
             ))}
           </View>
         </View>
+      </View>
+      {showSummary && (
+        <View
+          style={{
+            flex: 1,
+            minWidth: reservedSummaryWidth,
+            justifyContent: "center",
+            flexDirection: isDesktopWidth ? (isRTL ? "row-reverse" : "row") : "column",
+            alignItems: isDesktopWidth ? "center" : "stretch",
+            gap: 18,
+            alignSelf: "stretch",
+          }}
+        >
+          {summaryItems.map((item) => (
+            <View
+              key={item.label}
+              style={{
+                flex: isDesktopWidth ? 1 : undefined,
+                alignItems: isDesktopWidth ? "center" : isRTL ? "flex-end" : "flex-start",
+              }}
+            >
+              <Text
+                className="text-charcoal dark:text-neutral-100"
+                style={{
+                  fontFamily: "NotoSerif_700Bold",
+                  fontSize: isSidebarWidth ? 24 : 20,
+                  writingDirection: isRTL ? "rtl" : "ltr",
+                }}
+              >
+                {formatCount(item.value)}
+              </Text>
+              <Text
+                className="text-warm-400 dark:text-neutral-500 mt-1"
+                style={{
+                  fontFamily: "Manrope_500Medium",
+                  fontSize: 11,
+                  textAlign: isRTL ? "right" : "left",
+                  writingDirection: isRTL ? "rtl" : "ltr",
+                }}
+              >
+                {item.label}
+              </Text>
+            </View>
+          ))}
+        </View>
+      )}
       </View>
     </View>
   );
