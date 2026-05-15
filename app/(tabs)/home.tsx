@@ -45,7 +45,7 @@ export default function HomeScreen() {
   const s = useStrings();
   const router = useRouter();
   const [decks, setDecks] = useState<DeckDisplay[]>([]);
-  const [vocabStats, setVocabStats] = useState<{ total: number; due: number }>({ total: 0, due: 0 });
+  const [vocabStats, setVocabStats] = useState<{ total: number }>({ total: 0 });
   const [authBannerDismissed, setAuthBannerDismissed] = useState(false);
   const user = useAuthStore((state) => state.user);
   const [totalDue, setTotalDue] = useState(0);
@@ -81,13 +81,19 @@ export default function HomeScreen() {
       deckDisplays.push({ ...d, cardCount, dueCount, newCount });
     }
     setDecks(deckDisplays);
-    setTotalDue(await getDueCount(db));
-    setTotalCards(await getTotalCardCount(db));
-    setStreak(await getStudyStreak(db));
-    setLastReview(await getLastReviewDate(db));
+    const [dashboardDue, cardTotal, studyStreak, latestReview, vocabTotal] = await Promise.all([
+      getDueCount(db),
+      getTotalCardCount(db),
+      getStudyStreak(db),
+      getLastReviewDate(db),
+      getTotalCardCount(db, MEANINGS_DECK_ID),
+    ]);
+    setTotalDue(dashboardDue);
+    setTotalCards(cardTotal);
+    setStreak(studyStreak);
+    setLastReview(latestReview);
     setVocabStats({
-      total: await getTotalCardCount(db, MEANINGS_DECK_ID),
-      due: await getDueCount(db, MEANINGS_DECK_ID),
+      total: vocabTotal,
     });
 
     try {
@@ -443,7 +449,7 @@ export default function HomeScreen() {
                   className="text-warm-500 dark:text-neutral-400"
                   style={{ fontFamily: "Manrope_500Medium", fontSize: 12 }}
                 >
-                  {vocabStats.due} {s.flashcardsDueToday?.toLowerCase?.() ?? "due"} · {vocabStats.total} {s.flashcardsTotalCards?.toLowerCase?.() ?? "cards"}
+                  {vocabStats.total} {s.flashcardsTotalCards?.toLowerCase?.() ?? "cards"}
                 </Text>
                 <Pressable
                   onPress={() => router.push({ pathname: "/flashcards/session", params: { deckId: MEANINGS_DECK_ID } })}
