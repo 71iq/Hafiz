@@ -782,7 +782,7 @@ export function PageMushaf({
 
   const horizontalTypography = useMemo(() => {
     const fitHeightRaw = containerHeight || Math.max(0, windowHeight - 120);
-    const fitHeight = Math.max(0, fitHeightRaw - horizontalTopInset - horizontalBottomInset);
+    const fitHeight = Math.max(0, fitHeightRaw);
     if (!horizontal || fitHeight <= 0) {
       return { fontSize, lineHeight };
     }
@@ -799,7 +799,7 @@ export function PageMushaf({
       fontSize: Math.max(minFontSize, fittedFontSize),
       lineHeight: fittedLineHeight,
     };
-  }, [containerHeight, fontSize, horizontal, horizontalBottomInset, horizontalTopInset, lineHeight, width, windowHeight]);
+  }, [containerHeight, fontSize, horizontal, lineHeight, width, windowHeight]);
 
   const extraData = useMemo(
     () => ({ fontSize, pageWidth, horizontalTypography, highlightedWord, verticalScrollBottomInset }),

@@ -1497,3 +1497,23 @@ Saved in `phase19/`:
 ### Validation result
 - `npm run typecheck`: passed.
 - `npm run build:web`: passed with Expo/NPM cache paths redirected to `/tmp` for the workspace sandbox.
+
+## 2026-05-15 — Mushaf Page Chrome Overlay Layout
+
+### Scope decisions
+1. Fixed only page-view chrome layout behavior; verse view keeps its existing normal header flow.
+2. Made page-view top chrome overlay the reader instead of consuming flex layout height.
+3. Removed chrome-visible rail/header measurements from `PageMushaf` sizing so QCF2 page fitting stays stable while chrome fades in or out.
+
+### Implemented in this step
+- `app/(tabs)/mushaf.tsx`:
+  - Positioned the top header as absolute/fixed overlay only in page mode.
+  - Removed page-mode viewport bottom margin and chrome-dependent horizontal insets.
+  - Kept the bottom page rail floating and left its visual styling unchanged.
+- `components/mushaf/PageMushaf.tsx`:
+  - Calculated horizontal page typography from the reader container height, not from chrome top/bottom inset props.
+
+### Validation result
+- `npm run typecheck`: passed.
+- `npm run build:web`: passed with Node heap and Expo/NPM cache paths redirected for the workspace sandbox.
+- `npx expo start --web --port 8088`: smoke checked page-view container behavior at 360, 412, 768, and 1024 widths.

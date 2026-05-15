@@ -257,7 +257,6 @@ function MushafInner() {
   const [showBookmarks, setShowBookmarks] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [bottomRailHeight, setBottomRailHeight] = useState(0);
   const [hideMode, setHideMode] = useState(false);
   const [mushafIndex, setMushafIndex] = useState<MushafIndex | null>(null);
   const [topAyah, setTopAyah] = useState<{ surah: number; ayah: number } | null>(null);
@@ -474,16 +473,7 @@ function MushafInner() {
     : isTablet
       ? Math.max(insets.bottom, 16)
       : 0;
-  const pageRailFallbackHeight = 40;
-  const pageRailClearance = showBottomSlider && chromeVisible
-    ? (bottomRailHeight || pageRailFallbackHeight) + railBottomOffset + 8
-    : 8;
-  const pageScrollBottomInset =
-    showBottomSlider ? (pageScroll === "horizontal" ? pageRailClearance : 8) : undefined;
-  const pageModeViewportBottomMargin =
-    pageScroll === "vertical" && showBottomSlider && chromeVisible
-      ? pageRailClearance
-      : 0;
+  const pageScrollBottomInset = showBottomSlider ? 8 : undefined;
   const floatingRailSurface = {
     backgroundColor: isDark ? "rgba(28,25,23,0.95)" : "rgba(255,248,241,0.95)",
     borderWidth: 1,
@@ -494,15 +484,15 @@ function MushafInner() {
     shadowOffset: { width: 0, height: 8 },
     elevation: 10,
   } as const;
-  const handleBottomRailLayout = useCallback(
-    (e: { nativeEvent: { layout: { height: number } } }) => {
-      const nextHeight = Math.ceil(e.nativeEvent.layout.height);
-      if (nextHeight > 0) {
-        setBottomRailHeight((current) => (current === nextHeight ? current : nextHeight));
-      }
-    },
-    []
-  );
+  const pageHeaderOverlayStyle = isPageMode
+    ? ({
+        position: Platform.OS === "web" && (isPhone || isTablet) ? ("fixed" as any) : "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 80,
+      } as const)
+    : null;
 
   useEffect(() => {
     currentPageRef.current = currentPage;
@@ -656,7 +646,10 @@ function MushafInner() {
         edges={["top"]}
       >
         {/* Header chrome — phone gets the new glass top bar, desktop keeps current layout. */}
-        <Animated.View pointerEvents={chromeVisible ? "auto" : "none"} style={headerAnimStyle}>
+        <Animated.View
+          pointerEvents={chromeVisible ? "auto" : "none"}
+          style={[pageHeaderOverlayStyle, headerAnimStyle]}
+        >
           {isPhone ? (
             <View onLayout={onHeaderLayout} className="px-3 pt-2 pb-2 bg-surface dark:bg-surface-dark">
               <View
@@ -790,16 +783,13 @@ function MushafInner() {
             className="flex-1"
             {...readerTapProps}
             style={{
-              paddingTop: chromeVisible ? 0 : 10,
+              paddingTop: 0,
               paddingBottom: isPhone ? 8 : 0,
             }}
           >
             <View
               className="flex-1"
-              style={[
-                { overflow: "hidden" },
-                pageModeViewportBottomMargin ? { marginBottom: pageModeViewportBottomMargin } : null,
-              ]}
+              style={{ overflow: "hidden" }}
             >
               <PageMushaf
                 onPageChange={setCurrentPage}
@@ -813,12 +803,8 @@ function MushafInner() {
                 scrollBottomInset={pageScrollBottomInset}
                 pageSidePadding={isPhone ? 22 : 16}
                 centerVerticalOnPhone={isPhone}
-                horizontalTopInset={isPhone && !chromeVisible && pageScroll === "horizontal" ? 52 : 0}
-                horizontalBottomInset={
-                  pageScroll === "horizontal"
-                    ? pageRailClearance
-                    : 0
-                }
+                horizontalTopInset={0}
+                horizontalBottomInset={0}
                 highlightedWord={highlightedWord}
               />
             </View>
@@ -930,7 +916,6 @@ function MushafInner() {
         {/* Bottom slider — fades with chrome */}
         {showBottomSlider && (
           <Animated.View
-            onLayout={handleBottomRailLayout}
             pointerEvents={chromeVisible ? "auto" : "none"}
             style={[
               {
