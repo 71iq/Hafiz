@@ -1592,3 +1592,29 @@ Saved in `phase19/`:
   - 360px level 1 vertical rows: centered 245px natural width, no full-screen word spreading.
   - 360px level 10 vertical rows: 348px wrapped line slots, no horizontal document overflow.
   - 768px and 1024px vertical rows: centered 525px default line width, no full-screen word spreading.
+
+## 2026-05-15 — Reader Chrome And RTL Polish
+
+### Scope decisions
+1. Fixed reader chrome tap behavior without changing the bottom rail mechanics or page direction.
+2. Reworked only the Mushaf top chrome visual weight, keeping the same controls and Hafiz glass styling.
+3. Treated the reported RTL issues as layout direction bugs caused by nested/manual reversal, not string changes.
+
+### Implemented in this step
+- `app/(tabs)/mushaf.tsx`:
+  - Reader taps now toggle chrome through one functional state update with a longer scroll guard.
+  - Phone/tablet top chrome is now two compact floating pill groups instead of a heavy full-width bar.
+- `components/mushaf/WordToken.tsx`:
+  - Touch word taps no longer independently toggle reader chrome, preventing double hide/show.
+- `components/mushaf/PageMushaf.tsx` and `components/mushaf/MushafPage.tsx`:
+  - Horizontal page mode preloads nearby QCF2 fonts and suppresses transient page-turn spinners.
+- `app/(tabs)/settings.tsx`, `components/settings/TranslationLanguagePicker.tsx`, and `components/progress/ActivityHeatmap.tsx`:
+  - Fixed RTL row direction for language rows, credits bullets, and heatmap labels.
+- `app/(tabs)/_layout.tsx`:
+  - Active tab icons keep the same outline shape; only the existing active color/pill state remains.
+
+### Validation result
+- `npm run typecheck`: passed.
+- `npm run build:web`: passed with Node heap and Expo/NPM cache paths redirected for the workspace sandbox.
+- `npx expo start --web --port 8099 --localhost`: printed `Starting Metro Bundler`, then exited with an Expo CLI `AggregateError` in this sandbox.
+- Production export smoke checked at 412px: reader tap hid chrome and a second tap showed it without immediate re-hide; first-launch import completed and the compact phone top chrome rendered.

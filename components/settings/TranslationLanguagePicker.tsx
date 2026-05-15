@@ -50,10 +50,10 @@ export function TranslationLanguagePicker({ visible, onClose }: Props) {
               <Pressable
                 key={lang.code}
                 onPress={() => handleSelect(lang.code)}
-                className={`items-center justify-between gap-3 rounded-2xl px-3 py-3.5 ${
-                  isRTL ? "flex-row-reverse" : "flex-row"
-                }`}
+                className="items-center justify-between gap-3 rounded-2xl px-3 py-3.5"
                 style={({ pressed }) => ({
+                  direction: "ltr",
+                  flexDirection: isRTL ? "row-reverse" : "row",
                   backgroundColor: isSelected
                     ? isDark
                       ? "rgba(45,212,191,0.08)"

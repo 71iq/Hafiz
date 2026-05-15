@@ -98,13 +98,11 @@ export function ActivityHeatmap({ data, isDark, s, isRTL }: Props) {
   const activeDays = data.filter((d) => d.count > 0).length;
   const totalReviews = data.reduce((sum, d) => sum + d.count, 0);
 
-  const displayWeeks = isRTL ? [...weeks].reverse() : weeks;
   const spacedMonthLabels = useMemo(() => {
     const result: { label: string; left: number }[] = [];
     const candidates = monthLabels
       .map((m) => {
-        const visualWeekIndex = isRTL ? TOTAL_WEEKS - 1 - m.weekIndex : m.weekIndex;
-        return { label: m.label, left: visualWeekIndex * (CELL_SIZE + CELL_GAP) };
+        return { label: m.label, left: m.weekIndex * (CELL_SIZE + CELL_GAP) };
       })
       .sort((a, b) => a.left - b.left);
     let lastLeft = -1000;
@@ -114,12 +112,22 @@ export function ActivityHeatmap({ data, isDark, s, isRTL }: Props) {
       lastLeft = candidate.left;
     }
     return result;
-  }, [monthLabels, CELL_SIZE, isRTL]);
+  }, [monthLabels, CELL_SIZE]);
+  const heatmapWidth = TOTAL_WEEKS * CELL_SIZE + (TOTAL_WEEKS - 1) * CELL_GAP;
 
   return (
-    <View>
+    <View style={{ direction: "ltr" }}>
       {/* Month labels row */}
-      <View style={{ flexDirection: "row", marginLeft: isRTL ? 0 : DAY_LABEL_WIDTH, marginRight: isRTL ? DAY_LABEL_WIDTH : 0, marginBottom: 4 }}>
+      <View
+        style={{
+          width: heatmapWidth,
+          height: 14,
+          marginLeft: isRTL ? 0 : DAY_LABEL_WIDTH,
+          marginRight: isRTL ? DAY_LABEL_WIDTH : 0,
+          marginBottom: 4,
+          position: "relative",
+        }}
+      >
         {spacedMonthLabels.map((m, i) => (
           <Text
             key={i}
@@ -129,6 +137,8 @@ export function ActivityHeatmap({ data, isDark, s, isRTL }: Props) {
               color: isDark ? "#737373" : "#8B8178",
               position: "absolute",
               left: m.left,
+              textAlign: isRTL ? "right" : "left",
+              writingDirection: isRTL ? "rtl" : "ltr",
             }}
           >
             {m.label}
@@ -139,15 +149,23 @@ export function ActivityHeatmap({ data, isDark, s, isRTL }: Props) {
       <View style={{ height: 14 }} />
 
       {/* Grid */}
-      <View style={{ flexDirection: isRTL ? "row-reverse" : "row", width: "100%" }}>
+      <View style={{ flexDirection: isRTL ? "row-reverse" : "row", width: "100%", direction: "ltr" }}>
           {/* Day labels */}
-          <View style={{ width: DAY_LABEL_WIDTH, justifyContent: "flex-start" }}>
+          <View style={{ width: DAY_LABEL_WIDTH, justifyContent: "flex-start", alignItems: isRTL ? "flex-end" : "flex-start" }}>
             {Array.from({ length: 7 }, (_, i) => {
               const label = getDayLabel(i, isArabic);
               return (
                 <View key={i} style={{ height: CELL_SIZE + CELL_GAP, justifyContent: "center" }}>
                   {label && (
-                    <Text style={{ fontFamily: "Manrope_500Medium", fontSize: 9, color: isDark ? "#525252" : "#b9a085" }}>
+                    <Text
+                      style={{
+                        fontFamily: "Manrope_500Medium",
+                        fontSize: 9,
+                        color: isDark ? "#525252" : "#b9a085",
+                        textAlign: isRTL ? "right" : "left",
+                        writingDirection: isRTL ? "rtl" : "ltr",
+                      }}
+                    >
                       {label}
                     </Text>
                   )}
@@ -157,8 +175,8 @@ export function ActivityHeatmap({ data, isDark, s, isRTL }: Props) {
           </View>
 
           {/* Week columns */}
-          <View style={{ flexDirection: "row", gap: CELL_GAP }}>
-            {displayWeeks.map((week, wi) => (
+          <View style={{ flexDirection: "row", gap: CELL_GAP, width: heatmapWidth }}>
+            {weeks.map((week, wi) => (
               <View key={wi} style={{ gap: CELL_GAP }}>
                 {week.map((day) => {
                   if (day.count === -1) {

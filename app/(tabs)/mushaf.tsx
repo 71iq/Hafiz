@@ -155,14 +155,9 @@ function MushafInner() {
 
   const toggleChromeFromReaderTap = useCallback(() => {
     if (!isPhone && !isTablet) return;
-    if (!chromeVisible) {
-      tapRevealGuardUntilRef.current = Date.now() + 450;
-      setChromeVisible(true);
-      return;
-    }
-    tapRevealGuardUntilRef.current = Date.now() + 450;
-    setChromeVisible(false);
-  }, [chromeVisible, isPhone, isTablet, setChromeVisible]);
+    tapRevealGuardUntilRef.current = Date.now() + 700;
+    setChromeVisible((visible) => !visible);
+  }, [isPhone, isTablet, setChromeVisible]);
 
   const readerTapProps = Platform.OS === "web"
     ? ({
@@ -651,61 +646,77 @@ function MushafInner() {
           pointerEvents={chromeVisible ? "auto" : "none"}
           style={[pageHeaderOverlayStyle, headerAnimStyle]}
         >
-          {isPhone ? (
-            <View onLayout={onHeaderLayout} className="px-3 pt-2 pb-2 bg-surface dark:bg-surface-dark">
+          {isPhone || isTablet ? (
+            <View onLayout={onHeaderLayout} className="px-3 pt-2 pb-1">
               <View
-                className="rounded-3xl border border-white/15 px-3 py-2"
                 style={{
-                  backgroundColor: isDark ? "rgba(28,25,23,0.82)" : "rgba(255,248,241,0.82)",
-                  ...(Platform.OS === "web"
-                    ? ({ backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" } as any)
-                    : null),
+                  direction: "ltr",
+                  flexDirection: isRTL ? "row-reverse" : "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 8,
                 }}
               >
-                <View className={`mt-2 flex-row items-center justify-between ${isRTL ? "flex-row-reverse" : ""}`}>
-                  <View className="flex-row items-center gap-1.5">
-                    <View className="flex-row bg-surface-high dark:bg-surface-dark-high rounded-full p-1">
-                      <Pressable
-                        onPress={() => setViewMode("verse")}
-                        className={`rounded-full px-2.5 py-1 ${!isPageMode ? "bg-surface-bright dark:bg-surface-dark-bright" : ""}`}
-                        style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-                      >
-                        <AlignJustify size={16} color={!isPageMode ? "#0d9488" : (isDark ? "#737373" : "#8B8178")} />
-                      </Pressable>
-                      <Pressable
-                        onPress={() => setViewMode("page")}
-                        className={`rounded-full px-2.5 py-1 ${isPageMode ? "bg-surface-bright dark:bg-surface-dark-bright" : ""}`}
-                        style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-                      >
-                        <BookOpen size={16} color={isPageMode ? "#0d9488" : (isDark ? "#737373" : "#8B8178")} />
-                      </Pressable>
-                    </View>
-                  </View>
-                  <View className="flex-row items-center gap-1">
+                <View
+                  className="rounded-full border border-white/15 p-1"
+                  style={{
+                    flexDirection: "row",
+                    backgroundColor: isDark ? "rgba(28,25,23,0.82)" : "rgba(255,248,241,0.82)",
+                    ...(Platform.OS === "web"
+                      ? ({ backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" } as any)
+                      : null),
+                  }}
+                >
+                  <Pressable
+                    onPress={() => setViewMode("verse")}
+                    className={`rounded-full px-2.5 py-1 ${!isPageMode ? "bg-surface-bright dark:bg-surface-dark-bright" : ""}`}
+                    style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+                  >
+                    <AlignJustify size={16} color={!isPageMode ? "#0d9488" : (isDark ? "#737373" : "#8B8178")} />
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setViewMode("page")}
+                    className={`rounded-full px-2.5 py-1 ${isPageMode ? "bg-surface-bright dark:bg-surface-dark-bright" : ""}`}
+                    style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+                  >
+                    <BookOpen size={16} color={isPageMode ? "#0d9488" : (isDark ? "#737373" : "#8B8178")} />
+                  </Pressable>
+                </View>
+
+                <View
+                  className="rounded-full border border-white/15 p-1"
+                  style={{
+                    flexDirection: "row",
+                    gap: 2,
+                    backgroundColor: isDark ? "rgba(28,25,23,0.82)" : "rgba(255,248,241,0.82)",
+                    ...(Platform.OS === "web"
+                      ? ({ backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" } as any)
+                      : null),
+                  }}
+                >
+                  <Pressable
+                    onPress={() => setShowBookmarks(true)}
+                    className="rounded-full px-2.5 py-2"
+                    style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+                  >
+                    <BookMarked size={16} color={isDark ? "#737373" : "#8B8178"} />
+                  </Pressable>
+                  {viewMode === "verse" && (
                     <Pressable
-                      onPress={() => setShowBookmarks(true)}
-                      className="rounded-full bg-surface-high dark:bg-surface-dark-high px-2.5 py-2"
+                      onPress={() => setHideMode((prev) => !prev)}
+                      className={`rounded-full px-2.5 py-2 ${hideMode ? "bg-primary-accent/15 dark:bg-primary-bright/15" : ""}`}
                       style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
                     >
-                      <BookMarked size={16} color={isDark ? "#737373" : "#8B8178"} />
+                      {hideMode ? <EyeOff size={16} color="#0d9488" /> : <Eye size={16} color={isDark ? "#737373" : "#8B8178"} />}
                     </Pressable>
-                    {viewMode === "verse" && (
-                      <Pressable
-                        onPress={() => setHideMode((prev) => !prev)}
-                        className={`rounded-full px-2.5 py-2 ${hideMode ? "bg-primary-accent/15 dark:bg-primary-bright/15" : "bg-surface-high dark:bg-surface-dark-high"}`}
-                        style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-                      >
-                        {hideMode ? <EyeOff size={16} color="#0d9488" /> : <Eye size={16} color={isDark ? "#737373" : "#8B8178"} />}
-                      </Pressable>
-                    )}
-                    <Pressable
-                      onPress={() => setShowSearch(true)}
-                      className="rounded-full bg-surface-high dark:bg-surface-dark-high px-2.5 py-2"
-                      style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-                    >
-                      <Search size={16} color={isDark ? "#737373" : "#8B8178"} />
-                    </Pressable>
-                  </View>
+                  )}
+                  <Pressable
+                    onPress={() => setShowSearch(true)}
+                    className="rounded-full px-2.5 py-2"
+                    style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+                  >
+                    <Search size={16} color={isDark ? "#737373" : "#8B8178"} />
+                  </Pressable>
                 </View>
               </View>
             </View>

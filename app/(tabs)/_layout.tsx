@@ -72,12 +72,12 @@ function TabsWithStrings() {
           name="home"
           options={{
             title: s.tabHome,
-            tabBarIcon: ({ focused, color, size }) => (
+            tabBarIcon: ({ color, size }) => (
               <Sparkles
                 size={size}
                 color={color}
-                fill={focused ? color : "none"}
-                strokeWidth={focused ? 1.5 : 2}
+                fill="none"
+                strokeWidth={2}
               />
             ),
           }}
@@ -86,12 +86,12 @@ function TabsWithStrings() {
           name="mushaf"
           options={{
             title: s.tabMushaf,
-            tabBarIcon: ({ focused, color, size }) => (
+            tabBarIcon: ({ color, size }) => (
               <BookOpen
                 size={size}
                 color={color}
-                fill={focused ? color : "none"}
-                strokeWidth={focused ? 1.5 : 2}
+                fill="none"
+                strokeWidth={2}
               />
             ),
           }}
@@ -100,12 +100,12 @@ function TabsWithStrings() {
           name="leaderboard"
           options={{
             title: s.tabLeaderboard,
-            tabBarIcon: ({ focused, color, size }) => (
+            tabBarIcon: ({ color, size }) => (
               <Trophy
                 size={size}
                 color={color}
-                fill={focused ? color : "none"}
-                strokeWidth={focused ? 1.5 : 2}
+                fill="none"
+                strokeWidth={2}
               />
             ),
           }}
@@ -114,12 +114,12 @@ function TabsWithStrings() {
           name="progress"
           options={{
             title: s.tabProgress,
-            tabBarIcon: ({ focused, color, size }) => (
+            tabBarIcon: ({ color, size }) => (
               <BarChart3
                 size={size}
                 color={color}
-                fill={focused ? color : "none"}
-                strokeWidth={focused ? 1.5 : 2}
+                fill="none"
+                strokeWidth={2}
               />
             ),
           }}
@@ -128,8 +128,8 @@ function TabsWithStrings() {
           name="settings"
           options={{
             title: s.tabSettings,
-            tabBarIcon: ({ focused, color, size }) => (
-              <Settings size={size} color={color} strokeWidth={focused ? 2.5 : 2} />
+            tabBarIcon: ({ color, size }) => (
+              <Settings size={size} color={color} strokeWidth={2} />
             ),
           }}
         />

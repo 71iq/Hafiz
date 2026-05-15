@@ -370,7 +370,11 @@ export default function SettingsScreen() {
           {/* Translation Language */}
           <Pressable
             onPress={() => setPickerVisible(true)}
-            className={`items-center justify-between gap-3 ${isRTL ? "flex-row-reverse" : "flex-row"}`}
+            className="items-center justify-between gap-3"
+            style={{
+              direction: "ltr",
+              flexDirection: isRTL ? "row-reverse" : "row",
+            }}
           >
             <View className={`flex-1 ${isRTL ? "items-end" : "items-start"}`}>
               <Text
@@ -384,7 +388,8 @@ export default function SettingsScreen() {
                 style={{
                   fontFamily: "Manrope_400Regular",
                   fontSize: 12,
-                  ...(isRTL ? { textAlign: "right" } : {}),
+                  textAlign: isRTL ? "right" : "left",
+                  writingDirection: isRTL ? "rtl" : "ltr",
                 }}
               >
                 {currentLang?.nameEnglish ?? "English"}
@@ -539,9 +544,22 @@ export default function SettingsScreen() {
             ].map((line, i) => (
               <View
                 key={i}
-                className={`gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`}
+                className="gap-2"
+                style={{
+                  direction: "ltr",
+                  flexDirection: isRTL ? "row-reverse" : "row",
+                }}
               >
-                <Text className="text-warm-500 dark:text-neutral-400" style={{ fontFamily: "Manrope_400Regular", fontSize: 12, lineHeight: 18 }}>
+                <Text
+                  className="text-warm-500 dark:text-neutral-400"
+                  style={{
+                    fontFamily: "Manrope_400Regular",
+                    fontSize: 12,
+                    lineHeight: 18,
+                    textAlign: isRTL ? "right" : "left",
+                    width: 10,
+                  }}
+                >
                   •
                 </Text>
                 <Text

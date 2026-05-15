@@ -1,15 +1,15 @@
-import { createContext, useContext, useState, useCallback } from "react";
+import { createContext, useContext, useState, useCallback, type Dispatch, type SetStateAction } from "react";
 
 type ChromeContextType = {
   visible: boolean;
-  setVisible: (v: boolean) => void;
+  setVisible: Dispatch<SetStateAction<boolean>>;
   markActivity: () => void;
   setAutoHideEnabled: (_enabled: boolean) => void;
 };
 
 const ChromeContext = createContext<ChromeContextType>({
   visible: true,
-  setVisible: () => {},
+  setVisible: (_value) => {},
   markActivity: () => {},
   setAutoHideEnabled: () => {},
 });

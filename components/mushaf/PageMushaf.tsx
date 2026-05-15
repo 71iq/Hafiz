@@ -27,6 +27,7 @@ import { MUSHAF_LINE_WIDTH_SCALE, MushafPage, type PageLineLayout } from "./Mush
 import { AyahDetailModal } from "./AyahDetailModal";
 import { toArabicNumber } from "@/lib/arabic";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
+import { loadQpcFont } from "@/lib/fonts/loader";
 
 type PageRow = {
   page: number;
@@ -563,6 +564,16 @@ export function PageMushaf({
   }, [goToPageRef, jumpToPage]);
 
   useEffect(() => {
+    if (!horizontal || pageData.length === 0) return;
+    const start = Math.max(1, currentPage - 2);
+    const end = Math.min(pageData.length, currentPage + 2);
+    for (let page = start; page <= end; page++) {
+      loadQpcFont(page).catch(console.warn);
+    }
+    loadQpcFont(1).catch(console.warn);
+  }, [currentPage, horizontal, pageData.length]);
+
+  useEffect(() => {
     if (Platform.OS !== "web") return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
@@ -1062,6 +1073,7 @@ export function PageMushaf({
                     lineWidth={horizontalLineWidth}
                     lineSlotHeight={horizontalTypography.lineHeight}
                     allowLineWrap={false}
+                    showLoadingIndicator={false}
                   />
                 </View>
               </View>

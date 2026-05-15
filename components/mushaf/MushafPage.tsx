@@ -68,6 +68,7 @@ type Props = {
   lineWidth?: number;
   lineSlotHeight?: number;
   allowLineWrap?: boolean;
+  showLoadingIndicator?: boolean;
 };
 
 // Identity for a single visual word on the page
@@ -156,6 +157,7 @@ function MushafPageInner({
   lineWidth,
   lineSlotHeight,
   allowLineWrap = false,
+  showLoadingIndicator = true,
 }: Props) {
   const [fontVisible, setFontVisible] = useState(false);
   const [wordsLoaded, setWordsLoaded] = useState(!!pageWordsData);
@@ -234,7 +236,7 @@ function MushafPageInner({
   if (!isQpcFontLoaded(pageNumber)) {
     return (
       <View style={{ width, minHeight: 200 }} className="items-center justify-center">
-        <ActivityIndicator size="small" color="#0d9488" />
+        {showLoadingIndicator && <ActivityIndicator size="small" color="#0d9488" />}
       </View>
     );
   }
