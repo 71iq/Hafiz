@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <g id="arms">
+    <path id="left-arm" d="M158 314 C137 318 126 340 136 358 C144 373 162 376 176 362 C187 350 187 329 177 320 C171 315 164 313 158 314 Z" fill="#D7B85B" stroke="#8E7631" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" opacity="0.98"/>
+    <path id="right-arm" d="M354 314 C375 318 386 340 376 358 C368 373 350 376 336 362 C325 350 325 329 335 320 C341 315 348 313 354 314 Z" fill="#D7B85B" stroke="#8E7631" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" opacity="0.98"/>
+    <path d="M154 339 C150 347 152 355 159 359" fill="none" stroke="#FFF2B3" stroke-width="2.4" stroke-opacity="0.42" stroke-linecap="round"/>
+    <path d="M358 339 C362 347 360 355 353 359" fill="none" stroke="#FFF2B3" stroke-width="2.4" stroke-opacity="0.42" stroke-linecap="round"/>
+  </g>
+</svg>

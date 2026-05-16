@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <g id="eyes">
+    <path id="left-brow" d="M210 273 C220 267 231 267 240 273" fill="none" stroke="#263C31" stroke-width="4" stroke-opacity="0.66" stroke-linecap="round"/>
+    <path id="right-brow" d="M272 273 C281 267 292 267 302 273" fill="none" stroke="#263C31" stroke-width="4" stroke-opacity="0.66" stroke-linecap="round"/>
+    <ellipse id="left-eye" cx="226" cy="297" rx="11.5" ry="14" fill="#263C31"/>
+    <ellipse id="right-eye" cx="286" cy="297" rx="11.5" ry="14" fill="#263C31"/>
+    <circle cx="222" cy="291" r="3.2" fill="#FFFFFF" opacity="0.86"/>
+    <circle cx="282" cy="291" r="3.2" fill="#FFFFFF" opacity="0.86"/>
+    <ellipse cx="226" cy="311" rx="8" ry="2.4" fill="#1E2F27" opacity="0.10"/>
+    <ellipse cx="286" cy="311" rx="8" ry="2.4" fill="#1E2F27" opacity="0.10"/>
+  </g>
+</svg>

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <g id="leaf">
+    <path id="stem" d="M255 64 C253 43 248 28 240 16" fill="none" stroke="#6F682F" stroke-width="7" stroke-opacity="0.88" stroke-linecap="round"/>
+    <path id="leaf-left" d="M249 53 C225 30 192 31 176 52 C204 72 229 70 249 53 Z" fill="#78944F" stroke="#2F4E35" stroke-width="4" stroke-opacity="0.62" stroke-linecap="round" stroke-linejoin="round"/>
+    <path id="leaf-right" d="M260 57 C291 31 329 36 345 62 C313 83 284 78 260 57 Z" fill="#78944F" stroke="#2F4E35" stroke-width="4" stroke-opacity="0.62" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M184 52 C207 51 228 52 247 54" fill="none" stroke="#E7E8B8" stroke-width="3" stroke-opacity="0.43" stroke-linecap="round"/>
+    <path d="M270 57 C294 57 318 59 340 63" fill="none" stroke="#E7E8B8" stroke-width="3" stroke-opacity="0.43" stroke-linecap="round"/>
+    <path d="M185 45 C209 35 231 39 246 52" fill="none" stroke="#F7F0C4" stroke-width="6" stroke-opacity="0.24" stroke-linecap="round"/>
+    <path d="M269 49 C296 39 322 42 340 60" fill="none" stroke="#F7F0C4" stroke-width="6" stroke-opacity="0.24" stroke-linecap="round"/>
+  </g>
+</svg>

@@ -1,0 +1,21 @@
+{
+  "name": "zayt_vector_kit_rive_safe",
+  "viewBox": "0 0 512 512",
+  "features_removed": [
+    "filters",
+    "masks",
+    "clipPaths",
+    "embedded images",
+    "gradients",
+    "defs",
+    "CSS classes/style"
+  ],
+  "parts": [
+    "zayt_arms_rive_safe.svg",
+    "zayt_body_rive_safe.svg",
+    "zayt_eyes_rive_safe.svg",
+    "zayt_glow_rive_safe.svg",
+    "zayt_leaf_rive_safe.svg",
+    "zayt_mouth_rive_safe.svg"
+  ]
+}
