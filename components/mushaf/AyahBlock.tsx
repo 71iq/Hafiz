@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef, useMemo, memo } from "react";
-import { View, Text, Pressable, Animated as RNAnimated, useWindowDimensions, TextInput } from "react-native";
+import { ActivityIndicator, View, Text, Pressable, Animated as RNAnimated, useWindowDimensions, TextInput } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -15,6 +15,7 @@ import { WordToken } from "./WordToken";
 import {
   BookOpenText,
   Bookmark,
+  Pause,
   Play,
   PlusCircle,
   Share2,
@@ -32,6 +33,7 @@ import {
 } from "@/lib/selection/queries";
 import { formatForCopy } from "@/lib/selection/format";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
+import { useAyahAudio } from "@/lib/audio/ayah-audio";
 import { AyahDetailModal } from "./AyahDetailModal";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 
@@ -72,6 +74,7 @@ function AyahBlockInner({
   const langInfo = getLanguageByCode(translationLanguage);
   const s = useStrings();
   const { isBookmarked, getHighlightColor, showToast, refreshBookmarks } = useSelection();
+  const { getAyahState, toggleAyah } = useAyahAudio();
   const reflectionsEnabled = isSupabaseConfigured();
   const { data: reflectionCount = 0 } = useQuery({
     queryKey: ["reflectionCount", surah, ayah],
@@ -178,6 +181,13 @@ function AyahBlockInner({
     }
   }, [db, surah, ayah, showToast, s.copied]);
 
+  const handleAudioPress = useCallback(async () => {
+    const result = await toggleAyah(surah, ayah);
+    if (!result.ok) {
+      showToast(s.audioUnavailable);
+    }
+  }, [ayah, showToast, s.audioUnavailable, surah, toggleAyah]);
+
   const formatDeckLabel = useCallback((deck: DeckOption): string => {
     if (deck.name?.trim()) return deck.name.trim();
     const { scope } = deck;
@@ -263,6 +273,8 @@ function AyahBlockInner({
   }, [reviewBusy, db, surah, ayah, showToast, s.reviewActionAdded, s.reviewActionAlreadyExists, s.reviewActionFailed]);
 
   const iconColor = isDark ? "#a3a3a3" : "#8B8178";
+  const audioState = getAyahState(surah, ayah);
+  const audioIconColor = audioState.active ? "#0d9488" : iconColor;
 
   return (
     <View
@@ -308,7 +320,20 @@ function AyahBlockInner({
               <View className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-gold" />
             )}
           </View>
-          <ActionIcon icon={<Play size={15} color={iconColor} />} onPress={() => {}} disabled />
+          <ActionIcon
+            icon={
+              audioState.loading ? (
+                <ActivityIndicator size="small" color={audioIconColor} />
+              ) : audioState.playing ? (
+                <Pause size={15} color={audioIconColor} />
+              ) : (
+                <Play size={15} color={audioIconColor} />
+              )
+            }
+            onPress={handleAudioPress}
+            disabled={audioState.loading}
+            accessibilityLabel={audioState.loading ? s.audioLoading : audioState.playing ? s.audioPause : s.audioPlay}
+          />
           <ActionIcon icon={<Share2 size={15} color={iconColor} />} onPress={handleShare} />
         </View>
 
@@ -468,11 +493,23 @@ function AyahBlockInner({
 
 export const AyahBlock = memo(AyahBlockInner);
 
-function ActionIcon({ icon, onPress, disabled = false }: { icon: React.ReactNode; onPress: () => void; disabled?: boolean }) {
+function ActionIcon({
+  icon,
+  onPress,
+  disabled = false,
+  accessibilityLabel,
+}: {
+  icon: React.ReactNode;
+  onPress: () => void;
+  disabled?: boolean;
+  accessibilityLabel?: string;
+}) {
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
       hitSlop={8}
       className="h-8 w-8 items-center justify-center rounded-full bg-surface-low dark:bg-surface-dark-low"
       style={{

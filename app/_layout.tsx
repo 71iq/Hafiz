@@ -5,9 +5,10 @@ import * as Font from "expo-font";
 import { Platform } from "react-native";
 import { useEffect, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { DatabaseProvider } from "@/lib/database/provider";
+import { DatabaseProvider, useDatabaseStatus } from "@/lib/database/provider";
 import { UI_FONTS, loadUiFontsWeb } from "@/lib/fonts/ui-fonts";
 import { useAuthStore } from "@/lib/auth/store";
+import { AyahAudioProvider } from "@/lib/audio/ayah-audio";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -55,6 +56,12 @@ function WebTelemetry() {
   );
 }
 
+function AudioProviderBoundary({ children }: { children: React.ReactNode }) {
+  const { db } = useDatabaseStatus();
+  if (!db) return <>{children}</>;
+  return <AyahAudioProvider>{children}</AyahAudioProvider>;
+}
+
 export default function RootLayout() {
   // On web we never block render on fonts — FontFace with display:swap
   // lets text paint instantly in a fallback and swap when ready. Native
@@ -84,37 +91,39 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <DatabaseProvider>
-        <StableDocumentTitle />
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="onboarding" options={{ animation: "fade" }} />
-          <Stack.Screen name="open" />
-          <Stack.Screen
-            name="flashcards/session"
-            options={{ animation: "slide_from_bottom" }}
-          />
-          <Stack.Screen
-            name="auth/login"
-            options={{ animation: "slide_from_bottom" }}
-          />
-          <Stack.Screen
-            name="auth/signup"
-            options={{ animation: "slide_from_bottom" }}
-          />
-          <Stack.Screen
-            name="auth/forgot-password"
-            options={{ animation: "slide_from_bottom" }}
-          />
-          <Stack.Screen
-            name="auth/reset-password"
-            options={{ animation: "slide_from_bottom" }}
-          />
-          <Stack.Screen
-            name="profile/[userId]"
-            options={{ animation: "slide_from_right" }}
-          />
-        </Stack>
-        <WebTelemetry />
+        <AudioProviderBoundary>
+          <StableDocumentTitle />
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="onboarding" options={{ animation: "fade" }} />
+            <Stack.Screen name="open" />
+            <Stack.Screen
+              name="flashcards/session"
+              options={{ animation: "slide_from_bottom" }}
+            />
+            <Stack.Screen
+              name="auth/login"
+              options={{ animation: "slide_from_bottom" }}
+            />
+            <Stack.Screen
+              name="auth/signup"
+              options={{ animation: "slide_from_bottom" }}
+            />
+            <Stack.Screen
+              name="auth/forgot-password"
+              options={{ animation: "slide_from_bottom" }}
+            />
+            <Stack.Screen
+              name="auth/reset-password"
+              options={{ animation: "slide_from_bottom" }}
+            />
+            <Stack.Screen
+              name="profile/[userId]"
+              options={{ animation: "slide_from_right" }}
+            />
+          </Stack>
+          <WebTelemetry />
+        </AudioProviderBoundary>
       </DatabaseProvider>
     </QueryClientProvider>
   );

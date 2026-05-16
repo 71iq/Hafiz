@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { Platform, Pressable, Text, View, useWindowDimensions } from "react-native";
+import { ActivityIndicator, Platform, Pressable, Text, View, useWindowDimensions } from "react-native";
 import * as Clipboard from "expo-clipboard";
-import { BookOpenText, Bookmark, MessageCircle, Play, Share2 } from "lucide-react-native";
+import { BookOpenText, Bookmark, MessageCircle, Pause, Play, Share2 } from "lucide-react-native";
 import { ReflectionsSection } from "@/components/reflections/ReflectionsSection";
 import { QiraatTab } from "@/components/mushaf/word-tabs/QiraatTab";
+import { HadithTab } from "@/components/mushaf/ayah-tabs/HadithTab";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { isQpcFontLoaded, loadQpcFont, qpcFontName } from "@/lib/fonts/loader";
+import { useAyahAudio } from "@/lib/audio/ayah-audio";
 import { useDatabase } from "@/lib/database/provider";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { formatForCopy } from "@/lib/selection/format";
@@ -32,7 +34,7 @@ type AyahRow = {
   surah_name_english: string;
 };
 
-type TabKey = "translation" | "tafsir" | "qiraat" | "reflections";
+type TabKey = "translation" | "tafsir" | "hadith" | "qiraat" | "reflections";
 
 type Props = {
   target: TargetAyah | null;
@@ -52,6 +54,7 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
     isDark,
   } = useSettings();
   const { isBookmarked, showToast, refreshBookmarks } = useSelection();
+  const { getAyahState, toggleAyah } = useAyahAudio();
   const [ayahRow, setAyahRow] = useState<AyahRow | null>(null);
   const [fontVisible, setFontVisible] = useState(false);
   const [translationText, setTranslationText] = useState<string | null>(null);
@@ -64,6 +67,10 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
   const translationIsRtl = langInfo?.direction === "rtl";
   const bookmarked = target ? isBookmarked(target.surah, target.ayah) : false;
   const iconColor = isDark ? "#a3a3a3" : "#8B8178";
+  const audioState = target
+    ? getAyahState(target.surah, target.ayah)
+    : { active: false, playing: false, loading: false };
+  const audioIconColor = audioState.active ? "#0d9488" : iconColor;
   const isPhone = width < SIDEBAR_BREAKPOINT;
   const maxOverlayHeight = Math.min(height - (isPhone ? 12 : 48), isPhone ? height * 0.94 : 720);
   const surfaceColor = isDark ? "#0A0A0A" : "#FFF8F1";
@@ -187,6 +194,14 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
     }
   }, [ayahRow, db, target, showToast, s.copied]);
 
+  const handleAudioPress = useCallback(async () => {
+    if (!target) return;
+    const result = await toggleAyah(target.surah, target.ayah);
+    if (!result.ok) {
+      showToast(s.audioUnavailable);
+    }
+  }, [target?.surah, target?.ayah, toggleAyah, showToast, s.audioUnavailable]);
+
   if (!target) return null;
 
   const tabs: Array<{ key: TabKey; label: string; icon: ReactNode }> = [
@@ -198,6 +213,7 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
         }]
       : []),
     { key: "tafsir", label: s.tafseer, icon: <BookOpenText size={15} color={activeTab === "tafsir" ? "#0d9488" : iconColor} /> },
+    { key: "hadith", label: s.ayahTabHadith, icon: <BookOpenText size={15} color={activeTab === "hadith" ? "#0d9488" : iconColor} /> },
     { key: "qiraat", label: s.wordTabQiraat, icon: <BookOpenText size={15} color={activeTab === "qiraat" ? "#0d9488" : iconColor} /> },
     { key: "reflections", label: s.reflections, icon: <MessageCircle size={15} color={activeTab === "reflections" ? "#0d9488" : iconColor} /> },
   ];
@@ -232,7 +248,20 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
               </Text>
               {bookmarked && <View className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-gold" />}
             </Pressable>
-            <ActionIcon icon={<Play size={15} color={iconColor} />} onPress={() => {}} disabled />
+            <ActionIcon
+              icon={
+                audioState.loading ? (
+                  <ActivityIndicator size="small" color={audioIconColor} />
+                ) : audioState.playing ? (
+                  <Pause size={15} color={audioIconColor} />
+                ) : (
+                  <Play size={15} color={audioIconColor} />
+                )
+              }
+              onPress={handleAudioPress}
+              disabled={audioState.loading}
+              accessibilityLabel={audioState.loading ? s.audioLoading : audioState.playing ? s.audioPause : s.audioPlay}
+            />
             <ActionIcon
               icon={<Bookmark size={15} color={bookmarked ? "#FDDC91" : iconColor} fill={bookmarked ? "#FDDC91" : "none"} />}
               onPress={handleBookmark}
@@ -335,6 +364,7 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
               {tafseerText ?? s.loading}
             </Text>
           )}
+          {activeTab === "hadith" && <HadithTab surah={target.surah} ayah={target.ayah} />}
           {activeTab === "qiraat" && <QiraatTab surah={target.surah} ayah={target.ayah} />}
           {activeTab === "reflections" && (
             <ReflectionsSection surah={target.surah} ayah={target.ayah} initiallyExpanded showHeader={false} />
@@ -349,15 +379,19 @@ function ActionIcon({
   icon,
   onPress,
   disabled = false,
+  accessibilityLabel,
 }: {
   icon: ReactNode;
   onPress: () => void;
   disabled?: boolean;
+  accessibilityLabel?: string;
 }) {
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
       hitSlop={8}
       className="h-8 w-8 items-center justify-center rounded-full bg-surface-low dark:bg-surface-dark-low"
       style={{

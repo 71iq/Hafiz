@@ -16,6 +16,7 @@
     "nativewind-env.d.ts"
   ],
   "exclude": [
-    "quran.com-frontend-next/**"
+    "quran.com-frontend-next/**",
+    "supabase/functions/**"
   ]
 }

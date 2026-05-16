@@ -194,6 +194,36 @@ export async function createSchema(db: SQLiteDatabase): Promise<void> {
       PRIMARY KEY (surah, ayah)
     );
 
+    -- Quran Foundation ayah audio metadata cache (online enrichment, not synced)
+    CREATE TABLE IF NOT EXISTS qf_ayah_audio_cache (
+      recitation_id INTEGER NOT NULL,
+      surah INTEGER NOT NULL,
+      ayah INTEGER NOT NULL,
+      verse_key TEXT NOT NULL,
+      url TEXT NOT NULL,
+      duration REAL,
+      format TEXT,
+      segments_json TEXT,
+      reciter_name TEXT,
+      recitation_style TEXT,
+      fetched_at TEXT NOT NULL,
+      PRIMARY KEY (recitation_id, surah, ayah)
+    );
+
+    -- Quran Foundation hadith-by-ayah cache (online enrichment, not synced)
+    CREATE TABLE IF NOT EXISTS qf_ayah_hadith_cache (
+      surah INTEGER NOT NULL,
+      ayah INTEGER NOT NULL,
+      language TEXT NOT NULL,
+      page INTEGER NOT NULL,
+      limit_count INTEGER NOT NULL,
+      direction TEXT NOT NULL,
+      has_more INTEGER NOT NULL DEFAULT 0,
+      payload_json TEXT NOT NULL,
+      fetched_at TEXT NOT NULL,
+      PRIMARY KEY (surah, ayah, language, page, limit_count)
+    );
+
     -- Vocabulary flashcards (saved word meanings)
     CREATE TABLE IF NOT EXISTS vocab_cards (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -294,6 +324,37 @@ export async function createSchema(db: SQLiteDatabase): Promise<void> {
       created_at TEXT NOT NULL
     );
 
+    -- Private ayah notes (synced owner-only)
+    CREATE TABLE IF NOT EXISTS private_notes (
+      id TEXT PRIMARY KEY,
+      surah INTEGER NOT NULL,
+      ayah_start INTEGER NOT NULL,
+      ayah_end INTEGER NOT NULL,
+      content TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      deleted_at TEXT
+    );
+
+    -- Achievement unlocks (public badge row syncs without private payload)
+    CREATE TABLE IF NOT EXISTS achievement_unlocks (
+      achievement_id TEXT PRIMARY KEY,
+      unlocked_at TEXT NOT NULL,
+      seen_at TEXT,
+      local_payload TEXT NOT NULL DEFAULT '{}',
+      public_payload TEXT NOT NULL DEFAULT '{}',
+      sync_status TEXT DEFAULT 'pending'
+    );
+
+    -- Achievement progress cache
+    CREATE TABLE IF NOT EXISTS achievement_progress (
+      achievement_id TEXT PRIMARY KEY,
+      current_value INTEGER NOT NULL DEFAULT 0,
+      target_value INTEGER NOT NULL DEFAULT 1,
+      updated_at TEXT NOT NULL,
+      payload TEXT NOT NULL DEFAULT '{}'
+    );
+
     -- Sync queue for offline-first sync
     CREATE TABLE IF NOT EXISTS sync_queue (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -324,6 +385,11 @@ export async function createSchema(db: SQLiteDatabase): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_word_roots_lemma ON word_roots(lemma);
     CREATE INDEX IF NOT EXISTS idx_word_meanings_ar_sa ON word_meanings_ar(surah, ayah);
     CREATE INDEX IF NOT EXISTS idx_word_irab_daas_sa ON word_irab_daas(surah, ayah);
+    CREATE INDEX IF NOT EXISTS idx_qf_audio_cache_sa ON qf_ayah_audio_cache(surah, ayah);
+    CREATE INDEX IF NOT EXISTS idx_qf_hadith_cache_sa ON qf_ayah_hadith_cache(surah, ayah, language);
+    CREATE INDEX IF NOT EXISTS idx_private_notes_ayah ON private_notes(surah, ayah_start, ayah_end);
+    CREATE INDEX IF NOT EXISTS idx_private_notes_updated ON private_notes(updated_at);
+    CREATE INDEX IF NOT EXISTS idx_achievement_unlocks_unlocked ON achievement_unlocks(unlocked_at);
   `);
 }
 
