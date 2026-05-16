@@ -1148,10 +1148,18 @@ async function ensureQfUserSyncSchema(db: SQLiteDatabase): Promise<void> {
   try { await db.execAsync("ALTER TABLE bookmarks ADD COLUMN qf_collections_count INTEGER NOT NULL DEFAULT 0"); } catch (_) {}
   await db.execAsync("UPDATE bookmarks SET updated_at = created_at WHERE updated_at IS NULL");
 
+  try { await db.execAsync("ALTER TABLE study_cards ADD COLUMN updated_at TEXT"); } catch (_) {}
+  await db.execAsync("UPDATE study_cards SET updated_at = created_at WHERE updated_at IS NULL");
+
+  try { await db.execAsync("ALTER TABLE private_notes ADD COLUMN updated_at TEXT"); } catch (_) {}
+  await db.execAsync("UPDATE private_notes SET updated_at = created_at WHERE updated_at IS NULL");
   try { await db.execAsync("ALTER TABLE private_notes ADD COLUMN qf_note_id TEXT"); } catch (_) {}
   try { await db.execAsync("ALTER TABLE private_notes ADD COLUMN qf_synced_at TEXT"); } catch (_) {}
   try { await db.execAsync("ALTER TABLE private_notes ADD COLUMN qf_sync_error TEXT"); } catch (_) {}
   try { await db.execAsync("ALTER TABLE private_notes ADD COLUMN qf_ranges_json TEXT"); } catch (_) {}
+
+  try { await db.execAsync("ALTER TABLE reflection_journey_entries ADD COLUMN updated_at TEXT"); } catch (_) {}
+  await db.execAsync("UPDATE reflection_journey_entries SET updated_at = created_at WHERE updated_at IS NULL");
 
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS qf_sync_queue (
