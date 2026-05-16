@@ -1,6 +1,6 @@
 import { Platform } from "react-native";
 import type { SQLiteDatabase } from "expo-sqlite";
-import { createSchema, createTextSearchIndex } from "./schema";
+import { createSchema, createTextSearchIndex, migrateUserSchema } from "./schema";
 import { normalizeArabicCore, normalizeArabicWord } from "@/lib/arabic";
 import {
   buildAyahCountIndex,
@@ -1191,6 +1191,7 @@ export async function initializeDatabase(
 ): Promise<void> {
   console.log("[Import] Creating schema...");
   await createSchema(db);
+  await migrateUserSchema(db);
   await ensureQfUserSyncSchema(db);
 
   const populated = await isPopulated(db);

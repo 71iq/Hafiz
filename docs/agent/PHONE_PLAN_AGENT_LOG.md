@@ -1684,3 +1684,22 @@ Saved in `phase19/`:
 - Static export smoke checked from `dist/` at 360px and 412px:
   - Activity and Surah Progress render before Achievements.
   - The achievement drawer is collapsed by default, expands to the full grid, and has no horizontal document overflow.
+
+## 2026-05-16 — Legacy User Schema Migration Fix
+
+### Scope decisions
+1. Fixed the startup crash reported as `no such column: updated_at`.
+2. Treated existing browser SQLite databases as the risk surface; fresh installs already had the current schema.
+3. Kept the migration additive and idempotent so user data is preserved.
+
+### Implemented in this step
+- `lib/database/schema.ts`:
+  - Added `migrateUserSchema()` to backfill missing timestamp/payload columns on legacy user tables before feature queries run.
+  - Moved indexes that depend on migrated columns into safe post-migration creation.
+- `lib/database/init.ts`:
+  - Runs the user-schema migration immediately after schema creation and before population checks or achievement backfill.
+
+### Validation result
+- `npm run typecheck`: passed.
+- `npm run build:web`: passed.
+- Static export smoke checked from `dist/`: app opened without the `updated_at` error.

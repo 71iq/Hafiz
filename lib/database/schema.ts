@@ -433,8 +433,6 @@ export async function createSchema(db: SQLiteDatabase): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_sync_queue_status ON sync_queue(table_name);
     CREATE INDEX IF NOT EXISTS idx_qf_sync_queue_status ON qf_sync_queue(status, id);
     CREATE INDEX IF NOT EXISTS idx_qf_sync_queue_local ON qf_sync_queue(entity_type, local_id);
-    CREATE INDEX IF NOT EXISTS idx_bookmarks_updated ON bookmarks(updated_at);
-    CREATE INDEX IF NOT EXISTS idx_bookmarks_qf_id ON bookmarks(qf_bookmark_id);
     CREATE INDEX IF NOT EXISTS idx_highlights_surah_ayah ON highlights(surah, ayah);
     CREATE INDEX IF NOT EXISTS idx_study_log_reviewed ON study_log(reviewed_at);
     CREATE INDEX IF NOT EXISTS idx_word_roots_lemma ON word_roots(lemma);
@@ -443,13 +441,81 @@ export async function createSchema(db: SQLiteDatabase): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_qf_audio_cache_sa ON qf_ayah_audio_cache(surah, ayah);
     CREATE INDEX IF NOT EXISTS idx_qf_hadith_cache_sa ON qf_ayah_hadith_cache(surah, ayah, language);
     CREATE INDEX IF NOT EXISTS idx_private_notes_ayah ON private_notes(surah, ayah_start, ayah_end);
-    CREATE INDEX IF NOT EXISTS idx_private_notes_updated ON private_notes(updated_at);
-    CREATE INDEX IF NOT EXISTS idx_private_notes_qf_id ON private_notes(qf_note_id);
     CREATE INDEX IF NOT EXISTS idx_reflection_journey_levels_order ON reflection_journey_levels(order_index);
-    CREATE INDEX IF NOT EXISTS idx_reflection_journey_entries_updated ON reflection_journey_entries(updated_at);
-    CREATE INDEX IF NOT EXISTS idx_reflection_journey_entries_completed ON reflection_journey_entries(completed_at);
     CREATE INDEX IF NOT EXISTS idx_achievement_unlocks_unlocked ON achievement_unlocks(unlocked_at);
   `);
+}
+
+export async function migrateUserSchema(db: SQLiteDatabase): Promise<void> {
+  const legacyDate = "1970-01-01T00:00:00.000Z";
+
+  await addColumnIfMissing(db, "study_cards", "created_at", `created_at TEXT NOT NULL DEFAULT '${legacyDate}'`);
+  await addColumnIfMissing(db, "study_cards", "updated_at", `updated_at TEXT NOT NULL DEFAULT '${legacyDate}'`);
+  await addColumnIfMissing(db, "private_notes", "created_at", `created_at TEXT NOT NULL DEFAULT '${legacyDate}'`);
+  await addColumnIfMissing(db, "private_notes", "updated_at", `updated_at TEXT NOT NULL DEFAULT '${legacyDate}'`);
+  await addColumnIfMissing(db, "private_notes", "deleted_at", "deleted_at TEXT");
+  await addColumnIfMissing(db, "reflection_journey_entries", "created_at", `created_at TEXT NOT NULL DEFAULT '${legacyDate}'`);
+  await addColumnIfMissing(db, "reflection_journey_entries", "updated_at", `updated_at TEXT NOT NULL DEFAULT '${legacyDate}'`);
+  await addColumnIfMissing(db, "reflection_journey_entries", "completed_at", "completed_at TEXT");
+  await addColumnIfMissing(db, "achievement_unlocks", "seen_at", "seen_at TEXT");
+  await addColumnIfMissing(db, "achievement_unlocks", "local_payload", "local_payload TEXT NOT NULL DEFAULT '{}'");
+  await addColumnIfMissing(db, "achievement_unlocks", "public_payload", "public_payload TEXT NOT NULL DEFAULT '{}'");
+  await addColumnIfMissing(db, "achievement_unlocks", "sync_status", "sync_status TEXT DEFAULT 'pending'");
+  await addColumnIfMissing(db, "achievement_progress", "updated_at", `updated_at TEXT NOT NULL DEFAULT '${legacyDate}'`);
+  await addColumnIfMissing(db, "achievement_progress", "payload", "payload TEXT NOT NULL DEFAULT '{}'");
+
+  await db.execAsync(`
+    UPDATE study_cards
+      SET created_at = COALESCE(NULLIF(created_at, ''), NULLIF(last_review, ''), NULLIF(due, ''), '${legacyDate}')
+      WHERE created_at IS NULL OR created_at = '';
+    UPDATE study_cards
+      SET updated_at = COALESCE(NULLIF(updated_at, ''), NULLIF(last_review, ''), NULLIF(due, ''), created_at, '${legacyDate}')
+      WHERE updated_at IS NULL OR updated_at = '';
+    UPDATE private_notes
+      SET updated_at = COALESCE(NULLIF(updated_at, ''), NULLIF(created_at, ''), '${legacyDate}')
+      WHERE updated_at IS NULL OR updated_at = '';
+    UPDATE reflection_journey_entries
+      SET updated_at = COALESCE(NULLIF(updated_at, ''), NULLIF(completed_at, ''), NULLIF(created_at, ''), '${legacyDate}')
+      WHERE updated_at IS NULL OR updated_at = '';
+    UPDATE achievement_progress
+      SET updated_at = COALESCE(NULLIF(updated_at, ''), '${legacyDate}')
+      WHERE updated_at IS NULL OR updated_at = '';
+  `);
+
+  await createUserMigrationIndexes(db);
+}
+
+async function addColumnIfMissing(
+  db: SQLiteDatabase,
+  table: string,
+  column: string,
+  definition: string
+): Promise<void> {
+  try {
+    await db.getFirstAsync(`SELECT ${column} FROM ${table} LIMIT 1`);
+  } catch (_) {
+    try {
+      await db.execAsync(`ALTER TABLE ${table} ADD COLUMN ${definition}`);
+    } catch (error) {
+      console.warn(`[Database] Legacy schema migration skipped ${table}.${column}:`, error);
+    }
+  }
+}
+
+async function createUserMigrationIndexes(db: SQLiteDatabase): Promise<void> {
+  const statements = [
+    "CREATE INDEX IF NOT EXISTS idx_private_notes_updated ON private_notes(updated_at)",
+    "CREATE INDEX IF NOT EXISTS idx_reflection_journey_entries_updated ON reflection_journey_entries(updated_at)",
+    "CREATE INDEX IF NOT EXISTS idx_reflection_journey_entries_completed ON reflection_journey_entries(completed_at)",
+  ];
+
+  for (const statement of statements) {
+    try {
+      await db.execAsync(statement);
+    } catch (error) {
+      console.warn("[Database] Legacy schema index migration skipped:", error);
+    }
+  }
 }
 
 /** Create text_search index — must run AFTER the text_search column migration */
