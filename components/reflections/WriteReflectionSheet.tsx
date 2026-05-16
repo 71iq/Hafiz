@@ -5,6 +5,8 @@ import { useAuthStore } from "@/lib/auth/store";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { createReflection } from "@/lib/reflections/api";
+import { useDatabase } from "@/lib/database/provider";
+import { recordAchievementEvent } from "@/lib/achievements/queries";
 import { useQueryClient } from "@tanstack/react-query";
 import { interpolate } from "@/lib/i18n/useStrings";
 import { router } from "expo-router";
@@ -32,6 +34,7 @@ export function WriteReflectionSheet({
   const { isDark, isRTL } = useSettings();
   const { width, height } = useWindowDimensions();
   const s = useStrings();
+  const db = useDatabase();
   const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
   const [content, setContent] = useState("");
@@ -50,7 +53,15 @@ export function WriteReflectionSheet({
     setSubmitting(true);
     setError(null);
     try {
-      await createReflection(user.id, surah, ayahStart, ayahEnd, content.trim());
+      const reflection = await createReflection(user.id, surah, ayahStart, ayahEnd, content.trim());
+      recordAchievementEvent(db, {
+        type: "public_reflection_created",
+        reflectionId: reflection.id,
+        surah,
+        ayahStart,
+        ayahEnd,
+        createdAt: reflection.created_at,
+      }).catch(console.warn);
       // Invalidate reflection queries for this ayah range
       for (let a = ayahStart; a <= ayahEnd; a++) {
         queryClient.invalidateQueries({ queryKey: ["reflections", surah, a] });
@@ -67,7 +78,7 @@ export function WriteReflectionSheet({
     } finally {
       setSubmitting(false);
     }
-  }, [user, isValid, surah, ayahStart, ayahEnd, content, queryClient, onClose, onSuccess]);
+  }, [user, isValid, surah, ayahStart, ayahEnd, content, queryClient, onClose, onSuccess, db]);
 
   const handleClose = useCallback(() => {
     setContent("");

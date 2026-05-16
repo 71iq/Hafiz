@@ -1,8 +1,7 @@
 import type { SQLiteDatabase } from "expo-sqlite";
 
 /**
- * Enqueue a sync operation. Called after every write to a syncable table
- * (study_cards, study_log, bookmarks, highlights).
+ * Enqueue a sync operation. Called after every write to a syncable table.
  */
 export async function enqueueSync(
   db: SQLiteDatabase,

@@ -3,6 +3,7 @@ import { createEmptyCard } from "./scheduler";
 import type { DeckScope, StudyCardRow } from "./types";
 import { enqueueSync } from "@/lib/database/sync-queue";
 import { emitReviewActivity } from "./review-events";
+import { recordAchievementEvent } from "@/lib/achievements/queries";
 
 export type ReviewActivityDay = { date: string; count: number };
 
@@ -192,6 +193,8 @@ export async function createDeck(
     }
   });
 
+  recordAchievementEvent(db, { type: "deck_created", deckId, createdAt: now }).catch(console.warn);
+
   return ayahs.length;
 }
 
@@ -312,6 +315,15 @@ export async function addMeaningCard(
       last_review: null,
       created_at: now,
       updated_at: now,
+    }).catch(console.warn);
+
+    recordAchievementEvent(db, {
+      type: "vocab_saved",
+      cardId,
+      surah,
+      ayah,
+      wordPos,
+      createdAt: now,
     }).catch(console.warn);
   }
 
@@ -484,6 +496,8 @@ export async function insertStudyLog(
     scheduled_days: scheduledDays,
     reviewed_at: reviewedAt,
   }).catch(console.warn);
+
+  recordAchievementEvent(db, { type: "review_logged", cardId, rating, reviewedAt }).catch(console.warn);
 
   emitReviewActivity();
 }

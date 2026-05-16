@@ -8,6 +8,7 @@ import {
   cleanSyncedEntries,
   type SyncQueueEntry,
 } from "./sync-queue";
+import { backfillAchievements, insertRemoteAchievementUnlock } from "@/lib/achievements/queries";
 
 export type SyncStatus = "idle" | "syncing" | "synced" | "error" | "offline";
 
@@ -79,6 +80,14 @@ export async function pullRemoteChanges(db: SQLiteDatabase): Promise<number> {
 
     // Pull highlights
     totalPulled += await pullTable(db, "highlights", user.id, lastPullAt, upsertHighlight);
+
+    // Pull private notes
+    totalPulled += await pullTable(db, "private_notes", user.id, lastPullAt, upsertPrivateNote);
+
+    // Pull public badge unlocks. Pulled badges are already seen locally.
+    totalPulled += await pullTable(db, "achievement_unlocks", user.id, lastPullAt, upsertAchievementUnlock);
+
+    await backfillAchievements(db, { notify: false });
 
     // Update last pull timestamp
     await db.runAsync(
@@ -157,6 +166,12 @@ async function pushUpsert(
     case "highlights":
       onConflict = "user_id,id";
       break;
+    case "private_notes":
+      onConflict = "user_id,id";
+      break;
+    case "achievement_unlocks":
+      onConflict = "user_id,achievement_id";
+      break;
     default:
       onConflict = "user_id,id";
   }
@@ -191,6 +206,12 @@ async function pushDelete(
     case "highlights":
       query = query.eq("id", parseInt(rowId, 10));
       break;
+    case "private_notes":
+      query = query.eq("id", rowId);
+      break;
+    case "achievement_unlocks":
+      query = query.eq("achievement_id", rowId);
+      break;
     default:
       query = query.eq("id", rowId);
   }
@@ -209,7 +230,12 @@ async function pullTable(
   upsertFn: (db: SQLiteDatabase, row: any) => Promise<void>
 ): Promise<number> {
   // For tables with updated_at, filter by it. Otherwise use created_at.
-  const timeCol = tableName === "study_cards" ? "updated_at" : "created_at";
+  const timeCol =
+    tableName === "study_cards" || tableName === "private_notes"
+      ? "updated_at"
+      : tableName === "achievement_unlocks"
+        ? "unlocked_at"
+        : "created_at";
 
   const { data, error } = await supabase
     .from(tableName)
@@ -292,4 +318,36 @@ async function upsertHighlight(db: SQLiteDatabase, row: any): Promise<void> {
     "INSERT INTO highlights (surah, ayah, word_start, word_end, color, created_at) VALUES (?, ?, ?, ?, ?, ?)",
     [row.surah, row.ayah, row.word_start, row.word_end, row.color, row.created_at]
   );
+}
+
+async function upsertPrivateNote(db: SQLiteDatabase, row: any): Promise<void> {
+  const local = await db.getFirstAsync<{ updated_at: string }>(
+    "SELECT updated_at FROM private_notes WHERE id = ?",
+    [row.id]
+  );
+  if (local && local.updated_at >= row.updated_at) return;
+
+  await db.runAsync(
+    `INSERT OR REPLACE INTO private_notes
+      (id, surah, ayah_start, ayah_end, content, created_at, updated_at, deleted_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      row.id,
+      row.surah,
+      row.ayah_start,
+      row.ayah_end,
+      row.content,
+      row.created_at,
+      row.updated_at,
+      row.deleted_at,
+    ]
+  );
+}
+
+async function upsertAchievementUnlock(db: SQLiteDatabase, row: any): Promise<void> {
+  await insertRemoteAchievementUnlock(db, {
+    achievement_id: row.achievement_id,
+    unlocked_at: row.unlocked_at,
+    public_payload: row.public_payload,
+  });
 }

@@ -9,6 +9,7 @@ import React, {
 import { Platform, Pressable, Text, View } from "react-native";
 import { openDatabaseAsync, type SQLiteDatabase } from "expo-sqlite";
 import { initializeDatabase, type ImportProgress } from "./init";
+import { backfillAchievements } from "@/lib/achievements/queries";
 
 type DatabaseContextType = {
   db: SQLiteDatabase | null;
@@ -201,6 +202,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
             setProgress(p);
           }
         });
+        await backfillAchievements(database, { notify: false });
 
         if (!cancelled && !ejectedFlag.current && currentDb === database) {
           setIsReady(true);
