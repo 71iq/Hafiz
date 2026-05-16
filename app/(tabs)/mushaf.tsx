@@ -86,6 +86,57 @@ type MushafItem =
       v2Page: number;
     };
 
+function ViewModeToggle({
+  isPageMode,
+  isDark,
+  isRTL,
+  label,
+  compact,
+  glass,
+  onPress,
+}: {
+  isPageMode: boolean;
+  isDark: boolean;
+  isRTL: boolean;
+  label: string;
+  compact: boolean;
+  glass: boolean;
+  onPress: () => void;
+}) {
+  const Icon = isPageMode ? BookOpen : AlignJustify;
+
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected: true }}
+      accessibilityLabel={label}
+      className={`rounded-full ${compact ? "px-3 py-2" : "px-3.5 py-2"} ${
+        glass ? "border border-white/15" : "bg-surface-high dark:bg-surface-dark-high"
+      }`}
+      style={({ pressed }) => ({
+        flexDirection: isRTL ? "row-reverse" : "row",
+        alignItems: "center",
+        gap: 7,
+        backgroundColor: glass ? (isDark ? "rgba(28,25,23,0.82)" : "rgba(255,248,241,0.82)") : undefined,
+        transform: [{ scale: pressed ? 0.98 : 1 }],
+        ...(glass && Platform.OS === "web"
+          ? ({ backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" } as any)
+          : null),
+      })}
+    >
+      <Icon size={16} color={isDark ? "#2dd4bf" : "#0d9488"} strokeWidth={2} />
+      <Text
+        className="text-primary-accent dark:text-primary-bright"
+        numberOfLines={1}
+        style={{ fontFamily: "Manrope_600SemiBold", fontSize: compact ? 12 : 13 }}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
 export default function MushafScreen() {
   return (
     <WordInteractionProvider>
@@ -104,7 +155,7 @@ function MushafInner() {
   const insets = useSafeAreaInsets();
   const isPhone = windowWidth < SIDEBAR_BREAKPOINT;
   const isTablet = windowWidth >= SIDEBAR_BREAKPOINT && windowWidth < VIEWPORT_BREAKPOINTS.desktop;
-  // Compact layout under ~480px — phones. Drops labels and tightens gaps.
+  // Compact layout under ~480px tightens phone chrome spacing.
   const isNarrow = windowWidth < 480;
   const { selection, toastMessage, dismissToast } = useSelection();
   const { navigateToAyah } = useWordInteraction();
@@ -454,6 +505,10 @@ function MushafInner() {
   );
 
   const isPageMode = viewMode === "page";
+  const viewModeLabel = isPageMode ? s.mushafViewPage : s.mushafViewVerse;
+  const toggleViewMode = useCallback(() => {
+    setViewMode(isPageMode ? "verse" : "page");
+  }, [isPageMode, setViewMode]);
   const showBottomSlider = isPageMode;
   const pageFontSizeLocked = isPageMode && pageScroll === "horizontal";
   const mobileBottomNavHeight = 54;
@@ -650,31 +705,15 @@ function MushafInner() {
                   gap: 8,
                 }}
               >
-                <View
-                  className="rounded-full border border-white/15 p-1"
-                  style={{
-                    flexDirection: "row",
-                    backgroundColor: isDark ? "rgba(28,25,23,0.82)" : "rgba(255,248,241,0.82)",
-                    ...(Platform.OS === "web"
-                      ? ({ backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" } as any)
-                      : null),
-                  }}
-                >
-                  <Pressable
-                    onPress={() => setViewMode("verse")}
-                    className={`rounded-full px-2.5 py-1 ${!isPageMode ? "bg-surface-bright dark:bg-surface-dark-bright" : ""}`}
-                    style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-                  >
-                    <AlignJustify size={16} color={!isPageMode ? "#0d9488" : (isDark ? "#737373" : "#8B8178")} />
-                  </Pressable>
-                  <Pressable
-                    onPress={() => setViewMode("page")}
-                    className={`rounded-full px-2.5 py-1 ${isPageMode ? "bg-surface-bright dark:bg-surface-dark-bright" : ""}`}
-                    style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-                  >
-                    <BookOpen size={16} color={isPageMode ? "#0d9488" : (isDark ? "#737373" : "#8B8178")} />
-                  </Pressable>
-                </View>
+                <ViewModeToggle
+                  isPageMode={isPageMode}
+                  isDark={isDark}
+                  isRTL={isRTL}
+                  label={viewModeLabel}
+                  compact
+                  glass
+                  onPress={toggleViewMode}
+                />
 
                 <View
                   className="rounded-full border border-white/15 p-1"
@@ -721,26 +760,15 @@ function MushafInner() {
               }`}
             >
               <View className={`flex-row items-center ${isNarrow ? "gap-1.5" : "gap-2.5"}`}>
-                <View className="flex-row bg-surface-high dark:bg-surface-dark-high rounded-full p-1">
-                  <Pressable
-                    onPress={() => setViewMode("verse")}
-                    className={`rounded-full ${isNarrow ? "px-2 py-1" : "px-3 py-1.5"} ${
-                      !isPageMode ? "bg-surface-bright dark:bg-surface-dark-bright" : ""
-                    }`}
-                    style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-                  >
-                    <AlignJustify size={16} color={!isPageMode ? "#0d9488" : (isDark ? "#737373" : "#8B8178")} />
-                  </Pressable>
-                  <Pressable
-                    onPress={() => setViewMode("page")}
-                    className={`rounded-full ${isNarrow ? "px-2 py-1" : "px-3 py-1.5"} ${
-                      isPageMode ? "bg-surface-bright dark:bg-surface-dark-bright" : ""
-                    }`}
-                    style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-                  >
-                    <BookOpen size={16} color={isPageMode ? "#0d9488" : (isDark ? "#737373" : "#8B8178")} />
-                  </Pressable>
-                </View>
+                <ViewModeToggle
+                  isPageMode={isPageMode}
+                  isDark={isDark}
+                  isRTL={isRTL}
+                  label={viewModeLabel}
+                  compact={isNarrow}
+                  glass={false}
+                  onPress={toggleViewMode}
+                />
               </View>
               <View className={`flex-row items-center ${isNarrow ? "gap-1" : "gap-2.5"}`}>
                 <Pressable
