@@ -54,15 +54,15 @@ export const PUBLIC_PAGE_CONTENT: Record<
   about: {
     en: {
       eyebrow: "About Hafiz",
-      title: "A Quran retention app for steady review",
+      title: "Memorize through reflection",
       description:
-        "Hafiz is an independent, founder-maintained Quran app focused on reading, reflection, and spaced repetition. It is currently in early public preview.",
+        "Hafiz is an independent, founder-maintained Quran app focused on reading, reflection, and steady memorization. It is currently in early public preview.",
       sections: [
         {
           title: "What Hafiz does",
           body: [
-            "Hafiz combines an offline-first Mushaf reader with review tools designed for long-term Quran retention.",
-            "The app uses local Quran datasets, QCF2 page fonts for Quran display, word-level study data, tafsir, translations, private notes, and FSRS-based review scheduling.",
+            "Hafiz helps you memorize through reflection: read the ayah carefully, study its words, write what it opens for you, then return to it with a calm review rhythm.",
+            "The app brings together QCF2 page fonts for Quran display, word-level study data, tafsir, translations, private notes, and review tools. Review scheduling uses FSRS as a supporting tool.",
           ],
         },
         {
@@ -110,15 +110,15 @@ export const PUBLIC_PAGE_CONTENT: Record<
     },
     ar: {
       eyebrow: "عن حافظ",
-      title: "تطبيق لمراجعة القرآن وتثبيت الحفظ",
+      title: "احفظ بالتدبر",
       description:
-        "حافظ تطبيق قرآني مستقل يشرف عليه مؤسسه، ويركز على القراءة والتدبر والمراجعة المتباعدة. التطبيق حاليًا في مرحلة معاينة عامة مبكرة.",
+        "حافظ تطبيق قرآني مستقل يشرف عليه مؤسسه، ويركز على القراءة والتدبر وتثبيت الحفظ بهدوء. التطبيق حاليًا في مرحلة معاينة عامة مبكرة.",
       sections: [
         {
           title: "ماذا يقدم حافظ",
           body: [
-            "يجمع حافظ بين مصحف يعمل دون اتصال وأدوات مراجعة تساعد على تثبيت حفظ القرآن على المدى الطويل.",
-            "يعتمد التطبيق على بيانات قرآنية محلية، وخطوط QCF2 لعرض المصحف، وبيانات دراسة الكلمات، والتفسير، والترجمات، والملاحظات الخاصة، وجدولة المراجعة بخوارزمية FSRS.",
+            "يساعدك حافظ على الحفظ بالتدبر: تقرأ الآية بتأن، وتدرس كلماتها، وتكتب ما يفتح الله لك فيها، ثم تعود إليها بإيقاع مراجعة هادئ.",
+            "يجمع التطبيق بين خطوط QCF2 لعرض المصحف، وبيانات دراسة الكلمات، والتفسير، والترجمات، والملاحظات الخاصة، وأدوات المراجعة. وتستخدم جدولة المراجعة FSRS كأداة مساعدة.",
           ],
         },
         {
@@ -170,14 +170,14 @@ export const PUBLIC_PAGE_CONTENT: Record<
       eyebrow: "Privacy Policy",
       title: "Privacy Policy",
       description:
-        "This policy explains what Hafiz stores locally, what optional online features may sync, and how to contact us about privacy requests.",
+        "This policy explains what Hafiz may store in the app, what optional online features may sync, and how to contact us about privacy requests.",
       lastUpdated: "Last updated: May 16, 2026",
       sections: [
         {
-          title: "Local-first data",
+          title: "App data",
           body: [
-            "Hafiz is designed to work offline. Quran reading data is bundled with the app, and reading features use local SQLite instead of depending on the network.",
-            "Your study cards, review history, bookmarks, highlights, private notes, and settings may be stored locally on your device.",
+            "Hafiz may store study cards, review history, bookmarks, highlights, private notes, and settings in your browser or app storage.",
+            "Quran reading, reflection, and review features may use app storage so your experience can continue smoothly between sessions.",
           ],
         },
         {
@@ -205,17 +205,10 @@ export const PUBLIC_PAGE_CONTENT: Record<
           ],
         },
         {
-          title: "Analytics and hosting",
-          body: [
-            "The web version may use Vercel Analytics and Vercel Speed Insights to understand page usage and performance. These tools help measure aggregate product and performance signals for the public web app.",
-          ],
-        },
-        {
           title: "What we do not do",
           bullets: [
             "We do not sell your personal data.",
-            "We do not require an account for offline Quran reading.",
-            "We do not use the network for core Quran reading data.",
+            "We do not require an account for Quran reading and reflection tools.",
           ],
         },
         {
@@ -224,6 +217,11 @@ export const PUBLIC_PAGE_CONTENT: Record<
             "For privacy questions, account data requests, or deletion requests, email privacy@hafizquran.app. For product issues and bugs, use GitHub Issues.",
           ],
           links: [
+            {
+              label: "Email privacy@hafizquran.app",
+              href: "mailto:privacy@hafizquran.app",
+              external: true,
+            },
             {
               label: "GitHub Issues",
               href: "https://github.com/71iq/Hafiz/issues",
@@ -241,14 +239,14 @@ export const PUBLIC_PAGE_CONTENT: Record<
       eyebrow: "سياسة الخصوصية",
       title: "سياسة الخصوصية",
       description:
-        "توضح هذه السياسة ما يخزنه حافظ محليًا، وما قد تتم مزامنته عند استخدام الميزات الاختيارية المتصلة، وكيفية التواصل بخصوص طلبات الخصوصية.",
+        "توضح هذه السياسة ما قد يخزنه حافظ داخل التطبيق، وما قد تتم مزامنته عند استخدام الميزات الاختيارية المتصلة، وكيفية التواصل بخصوص طلبات الخصوصية.",
       lastUpdated: "آخر تحديث: 16 مايو 2026",
       sections: [
         {
-          title: "البيانات المحلية أولًا",
+          title: "بيانات التطبيق",
           body: [
-            "صُمم حافظ ليعمل دون اتصال. بيانات قراءة القرآن مرفقة مع التطبيق، وميزات القراءة تعتمد على SQLite محليًا بدل الاعتماد على الشبكة.",
-            "قد تُحفظ بطاقات الدراسة، وسجل المراجعة، والإشارات المرجعية، والتمييزات، والملاحظات الخاصة، والإعدادات على جهازك.",
+            "قد يحفظ حافظ بطاقات الدراسة، وسجل المراجعة، والإشارات المرجعية، والتمييزات، والملاحظات الخاصة، والإعدادات في متصفحك أو مساحة تخزين التطبيق.",
+            "قد تستخدم ميزات قراءة القرآن والتدبر والمراجعة تخزين التطبيق حتى تبقى تجربتك مستمرة بسلاسة بين الجلسات.",
           ],
         },
         {
@@ -276,17 +274,10 @@ export const PUBLIC_PAGE_CONTENT: Record<
           ],
         },
         {
-          title: "التحليلات والاستضافة",
-          body: [
-            "قد يستخدم إصدار الويب Vercel Analytics وVercel Speed Insights لفهم استخدام الصفحات والأداء. تساعد هذه الأدوات في قياس مؤشرات إجمالية للمنتج والأداء في تطبيق الويب العام.",
-          ],
-        },
-        {
           title: "ما لا نفعله",
           bullets: [
             "لا نبيع بياناتك الشخصية.",
-            "لا نطلب حسابًا لقراءة القرآن دون اتصال.",
-            "لا نستخدم الشبكة لجلب بيانات قراءة القرآن الأساسية.",
+            "لا نطلب حسابًا لاستخدام أدوات قراءة القرآن والتدبر.",
           ],
         },
         {
@@ -295,6 +286,11 @@ export const PUBLIC_PAGE_CONTENT: Record<
             "لأسئلة الخصوصية أو طلبات بيانات الحساب أو الحذف، راسل privacy@hafizquran.app. لمشكلات المنتج والأخطاء، استخدم GitHub Issues.",
           ],
           links: [
+            {
+              label: "راسل privacy@hafizquran.app",
+              href: "mailto:privacy@hafizquran.app",
+              external: true,
+            },
             {
               label: "بلاغات GitHub",
               href: "https://github.com/71iq/Hafiz/issues",
@@ -326,7 +322,7 @@ export const PUBLIC_PAGE_CONTENT: Record<
         {
           title: "Educational and study tool",
           body: [
-            "Hafiz is a Quran reading, reflection, and retention tool. It is not a substitute for qualified teachers, scholars, or local religious guidance.",
+            "Hafiz is a Quran reading, reflection, and memorization tool. It is not a substitute for qualified teachers, scholars, or local religious guidance.",
           ],
         },
         {

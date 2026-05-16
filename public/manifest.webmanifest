@@ -1,7 +1,7 @@
 {
   "name": "Hafiz",
   "short_name": "Hafiz",
-  "description": "Offline-first Quran retention with Mushaf reading, word study, tafsir, and spaced repetition.",
+  "description": "Memorize through reflection with Mushaf reading, word study, tafsir, private notes, and review tools.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

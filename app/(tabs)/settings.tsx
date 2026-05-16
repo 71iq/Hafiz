@@ -692,8 +692,8 @@ export default function SettingsScreen() {
 
         {/* About & Public Links */}
         <SectionLabel>{s.settingsAboutSection}</SectionLabel>
-        <Card elevation="low" className="p-5 mb-8">
-          <View className="gap-2">
+        <Card elevation="low" className="p-2 mb-8">
+          <View className="gap-1">
             <SettingsLinkRow
               icon={Info}
               title={s.settingsAboutHafiz}
@@ -839,15 +839,16 @@ function SettingsLinkRow({
   return (
     <Pressable
       onPress={onPress}
-      className="items-center gap-3 rounded-2xl bg-surface dark:bg-surface-dark px-4 py-3"
+      className={`${isRTL ? "flex-row-reverse" : "flex-row"} items-center gap-3 rounded-2xl px-3 py-3`}
       style={({ pressed }) => ({
-        direction: isRTL ? "rtl" : "ltr",
-        flexDirection: isRTL ? "row-reverse" : "row",
-        opacity: pressed ? 0.72 : 1,
+        backgroundColor: pressed
+          ? isDark ? "#1A1A1A" : "#F0EBE3"
+          : "transparent",
+        opacity: pressed ? 0.86 : 1,
       })}
     >
-      <View className="h-10 w-10 items-center justify-center rounded-full bg-primary-accent/10 dark:bg-primary-bright/15">
-        <Icon size={18} color={iconColor} />
+      <View className="h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-accent/10 dark:bg-primary-bright/15">
+        <Icon size={17} color={iconColor} />
       </View>
       <View className="flex-1">
         <Text
@@ -855,6 +856,7 @@ function SettingsLinkRow({
           style={{
             fontFamily: "Manrope_600SemiBold",
             fontSize: 14,
+            lineHeight: 19,
             textAlign: isRTL ? "right" : "left",
             writingDirection: isRTL ? "rtl" : "ltr",
           }}
@@ -866,7 +868,7 @@ function SettingsLinkRow({
           style={{
             fontFamily: "Manrope_400Regular",
             fontSize: 12,
-            lineHeight: 17,
+            lineHeight: 16,
             textAlign: isRTL ? "right" : "left",
             writingDirection: isRTL ? "rtl" : "ltr",
           }}

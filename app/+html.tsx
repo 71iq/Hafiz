@@ -13,7 +13,7 @@ export default function Root({ children }: { children: React.ReactNode }) {
         <title>Hafiz</title>
         <meta
           name="description"
-          content="Hafiz is an offline-first Quran retention app with Mushaf reading, word study, tafsir, and spaced repetition."
+          content="Hafiz helps you memorize through reflection with Mushaf reading, word study, tafsir, private notes, and review tools."
         />
         <link rel="canonical" href="https://hafizquran.app" />
         <meta property="og:type" content="website" />
@@ -21,7 +21,7 @@ export default function Root({ children }: { children: React.ReactNode }) {
         <meta property="og:title" content="Hafiz" />
         <meta
           property="og:description"
-          content="Offline-first Quran retention with Mushaf reading, word study, tafsir, and spaced repetition."
+          content="Memorize through reflection with Mushaf reading, word study, tafsir, private notes, and review tools."
         />
         <meta property="og:url" content="https://hafizquran.app" />
         <meta property="og:image" content="https://hafizquran.app/icon.png?v=2" />
@@ -29,7 +29,7 @@ export default function Root({ children }: { children: React.ReactNode }) {
         <meta name="twitter:title" content="Hafiz" />
         <meta
           name="twitter:description"
-          content="Offline-first Quran retention with Mushaf reading, word study, tafsir, and spaced repetition."
+          content="Memorize through reflection with Mushaf reading, word study, tafsir, private notes, and review tools."
         />
         <meta name="twitter:image" content="https://hafizquran.app/icon.png?v=2" />
 

@@ -1,6 +1,6 @@
 # Hafiz
 
-Hafiz is an offline-first Quran retention app for iOS, Android, and web. It combines a Mushaf reader, word-level study tools, tafsir, translations, private notes, and FSRS-based spaced repetition.
+Hafiz is a Quran memorization app built around one motto: Memorize through reflection. It combines a Mushaf reader, reflection tools, word-level study, tafsir, translations, private notes, and steady review tools.
 
 Live preview: https://hafizquran.app
 
@@ -8,13 +8,12 @@ Hafiz is in early public preview. It is ready for a small group of people to vie
 
 ## Features
 
-- Offline Quran reading from bundled local SQLite data.
 - QCF2/KFGQPC V2 page fonts for Quran display.
 - Verse and page Mushaf views.
 - Word meanings, morphology, i'rab, tajweed, qira'at data, and occurrences where available.
-- Flashcard review powered by FSRS.
+- Review tools, including FSRS-based scheduling.
 - Optional account sync, reflections, leaderboard, and public profile features.
-- Bilingual English/Arabic UI with RTL support.
+- Bilingual English/Arabic UI.
 
 ## Public Pages
 

@@ -38,6 +38,19 @@ function isInternalHref(href: string) {
   return href.startsWith("/");
 }
 
+function getExternalWebLinkProps(href: string) {
+  if (Platform.OS !== "web" || isInternalHref(href)) return null;
+  return {
+    href,
+    hrefAttrs: href.startsWith("mailto:")
+      ? undefined
+      : {
+          target: "_blank",
+          rel: "noreferrer",
+        },
+  } as const;
+}
+
 export function PublicPage({ page }: { page: PublicPageKey }) {
   const router = useRouter();
   const { width } = useWindowDimensions();
@@ -270,25 +283,30 @@ export function PublicPage({ page }: { page: PublicPageKey }) {
                     className="mt-5 flex-wrap gap-3"
                     style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
                   >
-                    {section.links.map((link) => (
-                      <Pressable
-                        key={`${link.href}-${link.label}`}
-                        onPress={() => openLink(link)}
-                        className="min-h-10 flex-row items-center gap-2 rounded-full bg-surface-high dark:bg-surface-dark-high px-4"
-                        style={({ pressed }) => ({
-                          opacity: pressed ? 0.72 : 1,
-                          ...(Platform.OS === "web" ? ({ cursor: "pointer" } as any) : null),
-                        })}
-                      >
-                        <Text
-                          className="text-primary-accent dark:text-primary-bright"
-                          style={{ fontFamily: "Manrope_700Bold", fontSize: 13 }}
+                    {section.links.map((link) => {
+                      const webLinkProps = getExternalWebLinkProps(link.href);
+                      return (
+                        <Pressable
+                          key={`${link.href}-${link.label}`}
+                          {...(webLinkProps as any)}
+                          accessibilityRole="link"
+                          onPress={webLinkProps ? undefined : () => openLink(link)}
+                          className="min-h-10 flex-row items-center gap-2 rounded-full bg-surface-high dark:bg-surface-dark-high px-4"
+                          style={({ pressed }) => ({
+                            opacity: pressed ? 0.72 : 1,
+                            ...(Platform.OS === "web" ? ({ cursor: "pointer" } as any) : null),
+                          })}
                         >
-                          {link.label}
-                        </Text>
-                        {link.external && <ExternalLink size={14} color={accent} />}
-                      </Pressable>
-                    ))}
+                          <Text
+                            className="text-primary-accent dark:text-primary-bright"
+                            style={{ fontFamily: "Manrope_700Bold", fontSize: 13 }}
+                          >
+                            {link.label}
+                          </Text>
+                          {link.external && <ExternalLink size={14} color={accent} />}
+                        </Pressable>
+                      );
+                    })}
                   </View>
                 )}
               </View>
