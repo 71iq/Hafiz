@@ -112,24 +112,35 @@ function ViewModeToggle({
       accessibilityState={{ selected: true }}
       accessibilityLabel={label}
       className={`rounded-full ${compact ? "px-3 py-2" : "px-3.5 py-2"} ${
-        glass ? "border border-white/15" : "bg-surface-high dark:bg-surface-dark-high"
+        glass ? "" : "bg-surface-high dark:bg-surface-dark-high"
       }`}
-      style={({ pressed }) => ({
+      style={{
+        ...(Platform.OS === "web" ? ({ appearance: "none", outlineStyle: "none" } as any) : null),
         flexDirection: isRTL ? "row-reverse" : "row",
         alignItems: "center",
+        justifyContent: "center",
+        flexWrap: "nowrap",
         gap: 7,
+        minWidth: compact ? 112 : 126,
+        borderWidth: glass ? 1 : 0,
+        borderStyle: "solid",
+        borderColor: glass ? "rgba(255,255,255,0.15)" : "transparent",
         backgroundColor: glass ? (isDark ? "rgba(28,25,23,0.82)" : "rgba(255,248,241,0.82)") : undefined,
-        transform: [{ scale: pressed ? 0.98 : 1 }],
         ...(glass && Platform.OS === "web"
           ? ({ backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" } as any)
           : null),
-      })}
+      }}
     >
       <Icon size={16} color={isDark ? "#2dd4bf" : "#0d9488"} strokeWidth={2} />
       <Text
         className="text-primary-accent dark:text-primary-bright"
         numberOfLines={1}
-        style={{ fontFamily: "Manrope_600SemiBold", fontSize: compact ? 12 : 13 }}
+        style={{
+          flexShrink: 0,
+          fontFamily: "Manrope_600SemiBold",
+          fontSize: compact ? 12 : 13,
+          ...(Platform.OS === "web" ? ({ whiteSpace: "nowrap" } as any) : null),
+        }}
       >
         {label}
       </Text>
@@ -705,15 +716,19 @@ function MushafInner() {
                   gap: 8,
                 }}
               >
-                <ViewModeToggle
-                  isPageMode={isPageMode}
-                  isDark={isDark}
-                  isRTL={isRTL}
-                  label={viewModeLabel}
-                  compact
-                  glass
-                  onPress={toggleViewMode}
-                />
+                {isPhone ? (
+                  <ViewModeToggle
+                    isPageMode={isPageMode}
+                    isDark={isDark}
+                    isRTL={isRTL}
+                    label={viewModeLabel}
+                    compact
+                    glass
+                    onPress={toggleViewMode}
+                  />
+                ) : (
+                  <View />
+                )}
 
                 <View
                   className="rounded-full border border-white/15 p-1"
@@ -726,6 +741,17 @@ function MushafInner() {
                       : null),
                   }}
                 >
+                  {isTablet && (
+                    <ViewModeToggle
+                      isPageMode={isPageMode}
+                      isDark={isDark}
+                      isRTL={isRTL}
+                      label={viewModeLabel}
+                      compact
+                      glass={false}
+                      onPress={toggleViewMode}
+                    />
+                  )}
                   <Pressable
                     onPress={() => setShowBookmarks(true)}
                     className="rounded-full px-2.5 py-2"
@@ -759,7 +785,8 @@ function MushafInner() {
                 isNarrow ? "px-2 py-2" : "px-4 py-3"
               }`}
             >
-              <View className={`flex-row items-center ${isNarrow ? "gap-1.5" : "gap-2.5"}`}>
+              <View />
+              <View className={`flex-row items-center ${isNarrow ? "gap-1" : "gap-2.5"}`}>
                 <ViewModeToggle
                   isPageMode={isPageMode}
                   isDark={isDark}
@@ -769,8 +796,6 @@ function MushafInner() {
                   glass={false}
                   onPress={toggleViewMode}
                 />
-              </View>
-              <View className={`flex-row items-center ${isNarrow ? "gap-1" : "gap-2.5"}`}>
                 <Pressable
                   onPress={() => setShowBookmarks(true)}
                   className={`rounded-full bg-surface-high dark:bg-surface-dark-high ${isNarrow ? "px-2 py-2" : "px-3 py-2"}`}
