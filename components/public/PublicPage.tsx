@@ -106,7 +106,7 @@ export function PublicPage({ page }: { page: PublicPageKey }) {
           }}
         >
           <View
-            className="mb-10 items-center justify-between gap-3"
+            className="mb-6 items-center justify-between gap-3"
             style={{
               flexDirection: isRTL ? "row-reverse" : "row",
               flexWrap: "wrap",
@@ -157,6 +157,15 @@ export function PublicPage({ page }: { page: PublicPageKey }) {
               </Pressable>
             </View>
           </View>
+
+          <PublicPageTabs
+            activePage={page}
+            isDark={isDark}
+            isRTL={isRTL}
+            language={language}
+            onChange={(nextPage) => router.push(`/${nextPage}` as any)}
+            width={width}
+          />
 
           <View className="mb-12">
             <Text
@@ -210,14 +219,6 @@ export function PublicPage({ page }: { page: PublicPageKey }) {
                 {content.lastUpdated}
               </Text>
             )}
-            <PublicPageTabs
-              activePage={page}
-              isDark={isDark}
-              isRTL={isRTL}
-              language={language}
-              onChange={(nextPage) => router.push(`/${nextPage}` as any)}
-              width={width}
-            />
           </View>
 
           <View className="gap-4">
@@ -379,7 +380,7 @@ function PublicPageTabs({
 
   return (
     <View
-      className="mt-7 rounded-full bg-surface-low dark:bg-surface-dark-low p-1"
+      className="mb-10 rounded-full bg-surface-low dark:bg-surface-dark-low p-1"
       style={{
         alignSelf: isCompact ? "stretch" : isRTL ? "flex-end" : "flex-start",
         flexDirection: isRTL ? "row-reverse" : "row",
