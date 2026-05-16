@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { View, Text, Pressable, ScrollView, RefreshControl } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Trophy, Flame, Medal } from "lucide-react-native";
+import { Trophy, CalendarCheck2, Medal } from "lucide-react-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { useSettings } from "@/lib/settings/context";
@@ -294,7 +294,7 @@ function LeaderboardRow({
       <View className="items-end ml-2">
         <View className="flex-row items-center gap-1.5">
           {hasMedal && <Medal size={15} color={medalColor} />}
-          {isStreak && <Flame size={14} color={isDark ? "#f97316" : "#d97706"} />}
+          {isStreak && <CalendarCheck2 size={14} color={isDark ? "#2dd4bf" : "#0d9488"} />}
           <Text
             style={{ fontFamily: "NotoSerif_700Bold", fontSize: 20, color: scoreColor }}
           >

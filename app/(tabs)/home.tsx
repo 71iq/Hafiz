@@ -3,7 +3,7 @@ import { View, Text, ScrollView, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
-import { Plus, Trash2, Play, Layers, Flame, Search, LayoutGrid, Languages, UserPlus, X as XIcon } from "lucide-react-native";
+import { Plus, Trash2, Play, Layers, CalendarCheck2, Search, LayoutGrid, Languages, UserPlus, X as XIcon } from "lucide-react-native";
 import { useAuthStore } from "@/lib/auth/store";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useDatabase } from "@/lib/database/provider";
@@ -23,10 +23,10 @@ import {
   getTotalCardCount,
   getNewCount,
   deleteDeck,
-  getStudyStreak,
-  getLastReviewDate,
+  getWirdStatus,
   MEANINGS_DECK_ID,
 } from "@/lib/fsrs/queries";
+import type { WirdStatus } from "@/lib/fsrs/queries";
 import type { DeckScope } from "@/lib/fsrs/types";
 import { subscribeReviewActivity } from "@/lib/fsrs/review-events";
 import {
@@ -57,8 +57,13 @@ export default function HomeScreen() {
   const user = useAuthStore((state) => state.user);
   const [totalDue, setTotalDue] = useState(0);
   const [totalCards, setTotalCards] = useState(0);
-  const [streak, setStreak] = useState(0);
-  const [lastReview, setLastReview] = useState<string | null>(null);
+  const [wirdStatus, setWirdStatus] = useState<WirdStatus>({
+    currentDays: 0,
+    longestDays: 0,
+    maintainedToday: false,
+    lastReviewDate: null,
+    state: "empty",
+  });
   const [showCreate, setShowCreate] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -89,17 +94,15 @@ export default function HomeScreen() {
       deckDisplays.push({ ...d, cardCount, dueCount, newCount });
     }
     setDecks(deckDisplays);
-    const [dashboardDue, cardTotal, studyStreak, latestReview, vocabTotal] = await Promise.all([
+    const [dashboardDue, cardTotal, nextWirdStatus, vocabTotal] = await Promise.all([
       getDueCount(db),
       getTotalCardCount(db),
-      getStudyStreak(db),
-      getLastReviewDate(db),
+      getWirdStatus(db),
       getTotalCardCount(db, MEANINGS_DECK_ID),
     ]);
     setTotalDue(dashboardDue);
     setTotalCards(cardTotal);
-    setStreak(studyStreak);
-    setLastReview(latestReview);
+    setWirdStatus(nextWirdStatus);
     setVocabStats({
       total: vocabTotal,
     });
@@ -202,15 +205,10 @@ export default function HomeScreen() {
     }
   };
 
-  const formatLastReview = (): string => {
-    if (!lastReview) return s.flashcardsNever;
-    const d = new Date(lastReview);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const reviewDay = new Date(d);
-    reviewDay.setHours(0, 0, 0, 0);
-    if (reviewDay.getTime() === today.getTime()) return s.flashcardsToday;
-    return d.toLocaleDateString();
+  const getWirdMessage = (): string => {
+    if (wirdStatus.maintainedToday) return s.wirdMaintained;
+    if (wirdStatus.state === "open_today") return s.wirdOpenToday;
+    return s.wirdBeginToday;
   };
 
   return (
@@ -304,18 +302,26 @@ export default function HomeScreen() {
               </Text>
             </View>
           </View>
-          <View className="flex-row items-center justify-between mt-4 pt-4 border-t border-warm-200 dark:border-neutral-800">
-            <View className="flex-row items-center gap-1.5">
-              <Flame size={14} color={isDark ? "#2dd4bf" : "#0d9488"} />
+          <View className={`flex-row items-center justify-between mt-4 pt-4 border-t border-warm-200 dark:border-neutral-800 ${isRTL ? "flex-row-reverse" : ""}`}>
+            <View className={`flex-row items-center gap-1.5 ${isRTL ? "flex-row-reverse" : ""}`}>
+              <CalendarCheck2 size={14} color={isDark ? "#2dd4bf" : "#0d9488"} />
               <Text className="text-charcoal dark:text-neutral-100" style={{ fontFamily: "Manrope_700Bold", fontSize: 16 }}>
-                {streak}
+                {wirdStatus.currentDays.toLocaleString()}
               </Text>
               <Text className="text-warm-400 dark:text-neutral-500" style={{ fontFamily: "Manrope_500Medium", fontSize: 11 }}>
                 {s.homeStreak}
               </Text>
             </View>
-            <Text className="text-warm-500 dark:text-neutral-400" style={{ fontFamily: "Manrope_500Medium", fontSize: 12 }}>
-              {formatLastReview()}
+            <Text
+              className="text-warm-500 dark:text-neutral-400 flex-shrink"
+              style={{
+                fontFamily: "Manrope_500Medium",
+                fontSize: 12,
+                textAlign: isRTL ? "left" : "right",
+                writingDirection: isRTL ? "rtl" : "ltr",
+              }}
+            >
+              {getWirdMessage()}
             </Text>
           </View>
         </View>

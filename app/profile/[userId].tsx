@@ -97,7 +97,7 @@ export default function PublicProfileScreen() {
                 {profile.current_streak.toLocaleString()}
               </Text>
               <Text className="text-warm-400 dark:text-neutral-500 mt-1" style={{ fontFamily: "Manrope_500Medium", fontSize: 11 }}>
-                {s.leaderboardStreak}
+                {s.wirdCurrent}
               </Text>
             </Card>
             <Card elevation="low" className="flex-1 p-5">
@@ -105,7 +105,7 @@ export default function PublicProfileScreen() {
                 {profile.longest_streak.toLocaleString()}
               </Text>
               <Text className="text-warm-400 dark:text-neutral-500 mt-1" style={{ fontFamily: "Manrope_500Medium", fontSize: 11 }}>
-                {s.progressLongestStreak}
+                {s.wirdLongest}
               </Text>
             </Card>
           </View>

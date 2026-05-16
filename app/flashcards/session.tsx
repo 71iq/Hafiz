@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/Button";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { gradeCard, Rating, State, createEmptyCard } from "@/lib/fsrs/scheduler";
 import type { Card as FSRSCard, Grade } from "@/lib/fsrs/scheduler";
-import { getDueCards, updateCard, insertStudyLog, getStudyStreak } from "@/lib/fsrs/queries";
+import { getDueCards, updateCard, insertStudyLog, getStudyStreak, getWirdStatus } from "@/lib/fsrs/queries";
 import { computeUniqueFront } from "@/lib/fsrs/uniqueness";
 import { computeReviewPoints, addTodayPoints, getTodayScore } from "@/lib/fsrs/scoring";
 import { hapticMedium, hapticSuccess } from "@/lib/haptics";
@@ -59,6 +59,8 @@ type SessionSummary = {
   relearningCount: number;
   durationMs: number;
   nextReviewDate: string | null;
+  wirdDays: number;
+  wirdMaintainedToday: boolean;
 };
 
 type WordTestMode = "wordMeaningArabic" | "wordMeaningTranslation";
@@ -197,7 +199,7 @@ function FlashcardSessionScreen() {
         if (cancelled) return;
         if (dueRows.length === 0) {
           resetSessionProgress();
-          setSummary({ total: 0, newCount: 0, reviewCount: 0, relearningCount: 0, durationMs: 0, nextReviewDate: null });
+          setSummary({ total: 0, newCount: 0, reviewCount: 0, relearningCount: 0, durationMs: 0, nextReviewDate: null, wirdDays: 0, wirdMaintainedToday: false });
           setPhase("summary");
           return;
         }
@@ -296,7 +298,7 @@ function FlashcardSessionScreen() {
         if (cancelled) return;
         console.warn("[FlashcardSession] Failed to load session:", e);
         resetSessionProgress();
-        setSummary({ total: 0, newCount: 0, reviewCount: 0, relearningCount: 0, durationMs: 0, nextReviewDate: null });
+        setSummary({ total: 0, newCount: 0, reviewCount: 0, relearningCount: 0, durationMs: 0, nextReviewDate: null, wirdDays: 0, wirdMaintainedToday: false });
         setPhase("summary");
       }
     }
@@ -424,6 +426,7 @@ function FlashcardSessionScreen() {
         const nextRow = await db.getFirstAsync<{ due: string }>(
           "SELECT due FROM study_cards ORDER BY due ASC LIMIT 1"
         );
+        const wirdStatus = await getWirdStatus(db);
 
         setSummary({
           total: cards.length,
@@ -432,6 +435,8 @@ function FlashcardSessionScreen() {
           relearningCount,
           durationMs: Date.now() - sessionStartRef.current,
           nextReviewDate: nextRow?.due ?? null,
+          wirdDays: wirdStatus.currentDays,
+          wirdMaintainedToday: wirdStatus.maintainedToday,
         });
         setPhase("summary");
         hapticSuccess();
@@ -814,6 +819,12 @@ function SessionSummaryView({ summary, onDone, isDark, s }: { summary: SessionSu
 
       <View className="w-full max-w-sm gap-4">
         <SummaryRow label={s.flashcardsSummaryReviewed} value={String(summary.total)} />
+        {summary.total > 0 && (
+          <SummaryRow
+            label={summary.wirdMaintainedToday ? s.wirdMaintained : s.wirdConsistency}
+            value={interpolate(s.wirdDays, { n: summary.wirdDays.toLocaleString() })}
+          />
+        )}
         <View className="flex-row gap-3">
           <SummaryCard label={s.flashcardsSummaryNew} value={String(summary.newCount)} color="#3b82f6" />
           <SummaryCard label={s.flashcardsSummaryReview} value={String(summary.reviewCount)} color="#22c55e" />
