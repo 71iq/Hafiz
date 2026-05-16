@@ -116,7 +116,7 @@ function shuffle<T>(arr: T[]): T[] {
 
 function FlashcardSessionScreen() {
   const db = useDatabase();
-  const { isDark, fontSize, lineHeight, tafseerSource, dailyReviewLimit } = useSettings();
+  const { isDark, fontSize, lineHeight, tafseerSource, dailyReviewLimit, isLoaded: settingsLoaded } = useSettings();
   const s = useStrings();
   const router = useRouter();
   const { deckId } = useLocalSearchParams<{ deckId?: string }>();
@@ -131,13 +131,22 @@ function FlashcardSessionScreen() {
   const [enabledModes, setEnabledModes] = useState<TestMode[]>(DEFAULT_ENABLED_MODES);
   const [wordEnabledModes, setWordEnabledModes] = useState<WordTestMode[]>(DEFAULT_WORD_TEST_MODES);
   const [summary, setSummary] = useState<SessionSummary | null>(null);
-  const [reviewedCount, setReviewedCount] = useState(0);
   const sessionStartRef = useRef(Date.now());
   const streakRef = useRef(0);
   const sessionPointsRef = useRef(0);
+  const gradingInFlightRef = useRef(false);
   const flipAnim = useRef(new RNAnimated.Value(0)).current;
   const normalizedDeckId = Array.isArray(deckId) ? deckId[0] : deckId;
   const isMeaningsDeck = normalizedDeckId === MEANINGS_DECK_ID;
+
+  const resetSessionProgress = useCallback(() => {
+    gradingInFlightRef.current = false;
+    sessionPointsRef.current = 0;
+    setCards([]);
+    setCurrentIndex(0);
+    setCurrentSideIndex(0);
+    setRevealed(false);
+  }, []);
 
   // Load enabled test modes from settings
   useEffect(() => {
@@ -173,12 +182,21 @@ function FlashcardSessionScreen() {
 
   // Load due cards and pre-fetch all card data
   useEffect(() => {
+    if (!settingsLoaded) return;
+
+    let cancelled = false;
+
     async function load() {
+      resetSessionProgress();
+      setSummary(null);
+      setPhase("loading");
       try {
         // Pre-load streak for scoring
         streakRef.current = await getStudyStreak(db);
         const dueRows = await getDueCards(db, normalizedDeckId, dailyReviewLimit);
+        if (cancelled) return;
         if (dueRows.length === 0) {
+          resetSessionProgress();
           setSummary({ total: 0, newCount: 0, reviewCount: 0, relearningCount: 0, durationMs: 0, nextReviewDate: null });
           setPhase("summary");
           return;
@@ -186,6 +204,7 @@ function FlashcardSessionScreen() {
 
         const loaded: CardData[] = [];
         for (const row of dueRows) {
+          if (cancelled) return;
           const parts = row.id.split(":");
           const isWordCard = parts[0] === "word" && parts.length >= 4;
           const surah = parseInt(isWordCard ? parts[1] : parts[0]);
@@ -235,6 +254,7 @@ function FlashcardSessionScreen() {
             isWordCard && wordPos ? fetchWordText(db, surah, ayah, wordPos) : Promise.resolve(null),
             isWordCard && wordPos ? fetchWordTranslation(db, surah, ayah, wordPos) : Promise.resolve(null),
           ]);
+          if (cancelled) return;
 
           const wordMeaningAr = isWordCard && wordPos
             ? (wordMeaningArRow?.meaning ?? null)
@@ -263,23 +283,28 @@ function FlashcardSessionScreen() {
             nextAyahText: nextRow?.text_uthmani ?? null,
           });
         }
+        if (cancelled) return;
 
         shuffle(loaded);
         sessionStartRef.current = Date.now();
-        setReviewedCount(0);
         setCurrentIndex(0);
         setCurrentSideIndex(0);
         setRevealed(false);
         setCards(loaded);
         setPhase("front");
       } catch (e) {
+        if (cancelled) return;
         console.warn("[FlashcardSession] Failed to load session:", e);
+        resetSessionProgress();
         setSummary({ total: 0, newCount: 0, reviewCount: 0, relearningCount: 0, durationMs: 0, nextReviewDate: null });
         setPhase("summary");
       }
     }
     load();
-  }, [db, normalizedDeckId, tafseerSource, dailyReviewLimit]);
+    return () => {
+      cancelled = true;
+    };
+  }, [db, normalizedDeckId, tafseerSource, dailyReviewLimit, settingsLoaded, resetSessionProgress]);
 
   const currentCard = cards[currentIndex] ?? null;
   const activeModes = useMemo(() => {
@@ -325,98 +350,105 @@ function FlashcardSessionScreen() {
   };
 
   const handleGrade = async (rating: Grade) => {
-    if (!currentCard) return;
-    hapticMedium();
-    const now = new Date();
+    if (!currentCard || gradingInFlightRef.current) return;
+    gradingInFlightRef.current = true;
+    try {
+      hapticMedium();
+      const now = new Date();
 
-    const fsrsCard: FSRSCard = {
-      due: new Date(currentCard.card.due),
-      stability: currentCard.card.stability,
-      difficulty: currentCard.card.difficulty,
-      elapsed_days: currentCard.card.elapsed_days,
-      scheduled_days: currentCard.card.scheduled_days,
-      learning_steps: currentCard.card.learning_steps,
-      reps: currentCard.card.reps,
-      lapses: currentCard.card.lapses,
-      state: currentCard.card.state as State,
-    };
+      const fsrsCard: FSRSCard = {
+        due: new Date(currentCard.card.due),
+        stability: currentCard.card.stability,
+        difficulty: currentCard.card.difficulty,
+        elapsed_days: currentCard.card.elapsed_days,
+        scheduled_days: currentCard.card.scheduled_days,
+        learning_steps: currentCard.card.learning_steps,
+        reps: currentCard.card.reps,
+        lapses: currentCard.card.lapses,
+        state: currentCard.card.state as State,
+      };
 
-    const result = gradeCard(fsrsCard, now, rating);
+      const result = gradeCard(fsrsCard, now, rating);
 
-    const updatedRow: StudyCardRow = {
-      ...currentCard.card,
-      due: result.card.due.toISOString(),
-      stability: result.card.stability,
-      difficulty: result.card.difficulty,
-      elapsed_days: result.card.elapsed_days,
-      scheduled_days: result.card.scheduled_days,
-      learning_steps: result.card.learning_steps,
-      reps: result.card.reps,
-      lapses: result.card.lapses,
-      state: result.card.state,
-      last_review: now.toISOString(),
-      updated_at: now.toISOString(),
-    };
-    await updateCard(db, updatedRow);
+      const updatedRow: StudyCardRow = {
+        ...currentCard.card,
+        due: result.card.due.toISOString(),
+        stability: result.card.stability,
+        difficulty: result.card.difficulty,
+        elapsed_days: result.card.elapsed_days,
+        scheduled_days: result.card.scheduled_days,
+        learning_steps: result.card.learning_steps,
+        reps: result.card.reps,
+        lapses: result.card.lapses,
+        state: result.card.state,
+        last_review: now.toISOString(),
+        updated_at: now.toISOString(),
+      };
+      await updateCard(db, updatedRow);
 
-    await insertStudyLog(
-      db,
-      currentCard.card.id,
-      rating,
-      result.log.state,
-      result.log.due.toISOString(),
-      result.log.stability,
-      result.log.difficulty,
-      result.log.elapsed_days,
-      result.log.scheduled_days,
-      now.toISOString()
-    );
-    setReviewedCount((count) => count + 1);
-
-    // Compute and store leaderboard points
-    const points = computeReviewPoints(
-      rating,
-      streakRef.current,
-      currentCard.card.difficulty,
-      currentCard.card.stability
-    );
-    if (points > 0) {
-      sessionPointsRef.current += points;
-      addTodayPoints(db, points).catch(console.warn);
-    }
-
-    if (currentIndex < cards.length - 1) {
-      setCurrentIndex((i) => i + 1);
-      setCurrentSideIndex(0);
-      setRevealed(false);
-      setPhase("front");
-    } else {
-      const newCount = cards.filter((c) => c.card.state === State.New).length;
-      const relearningCount = cards.filter((c) => c.card.state === State.Relearning).length;
-      const reviewCount = cards.length - newCount - relearningCount;
-
-      const nextRow = await db.getFirstAsync<{ due: string }>(
-        "SELECT due FROM study_cards ORDER BY due ASC LIMIT 1"
+      await insertStudyLog(
+        db,
+        currentCard.card.id,
+        rating,
+        result.log.state,
+        result.log.due.toISOString(),
+        result.log.stability,
+        result.log.difficulty,
+        result.log.elapsed_days,
+        result.log.scheduled_days,
+        now.toISOString()
       );
 
-      setSummary({
-        total: cards.length,
-        newCount,
-        reviewCount,
-        relearningCount,
-        durationMs: Date.now() - sessionStartRef.current,
-        nextReviewDate: nextRow?.due ?? null,
-      });
-      setPhase("summary");
-      hapticSuccess();
+      // Compute and store leaderboard points
+      const points = computeReviewPoints(
+        rating,
+        streakRef.current,
+        currentCard.card.difficulty,
+        currentCard.card.stability
+      );
+      if (points > 0) {
+        sessionPointsRef.current += points;
+        addTodayPoints(db, points).catch(console.warn);
+      }
 
-      // Sync daily score and profile stats to Supabase (non-blocking)
-      syncDailyScore(db).catch(console.warn);
-      updateProfileStats(db).catch(console.warn);
+      if (currentIndex < cards.length - 1) {
+        setCurrentIndex((i) => i + 1);
+        setCurrentSideIndex(0);
+        setRevealed(false);
+        setPhase("front");
+      } else {
+        const newCount = cards.filter((c) => c.card.state === State.New).length;
+        const relearningCount = cards.filter((c) => c.card.state === State.Relearning).length;
+        const reviewCount = cards.length - newCount - relearningCount;
+
+        const nextRow = await db.getFirstAsync<{ due: string }>(
+          "SELECT due FROM study_cards ORDER BY due ASC LIMIT 1"
+        );
+
+        setSummary({
+          total: cards.length,
+          newCount,
+          reviewCount,
+          relearningCount,
+          durationMs: Date.now() - sessionStartRef.current,
+          nextReviewDate: nextRow?.due ?? null,
+        });
+        setPhase("summary");
+        hapticSuccess();
+
+        // Sync daily score and profile stats to Supabase (non-blocking)
+        syncDailyScore(db).catch(console.warn);
+        updateProfileStats(db).catch(console.warn);
+      }
+    } finally {
+      gradingInFlightRef.current = false;
     }
   };
 
   const handleEndSession = () => {
+    resetSessionProgress();
+    setSummary(null);
+    setPhase("loading");
     router.replace("/(tabs)/home");
   };
 
@@ -448,6 +480,9 @@ function FlashcardSessionScreen() {
 
   if (!currentCard) return null;
 
+  const sessionTotal = cards.length;
+  const currentProgress = Math.min(currentIndex + 1, sessionTotal);
+  const progressPercent = sessionTotal > 0 ? (currentProgress / sessionTotal) * 100 : 0;
   const translateY = flipAnim.interpolate({ inputRange: [0, 1], outputRange: [30, 0] });
   const opacity = flipAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
 
@@ -467,7 +502,7 @@ function FlashcardSessionScreen() {
           className="text-warm-500 dark:text-neutral-400"
           style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
         >
-          {Math.min(reviewedCount + 1, cards.length)} / {cards.length}
+          {currentProgress} / {sessionTotal}
         </Text>
 
         <CardStateBadge state={currentCard.card.state} s={s} />
@@ -475,7 +510,7 @@ function FlashcardSessionScreen() {
         <View className="mt-2 h-[2px] rounded-full bg-surface-high dark:bg-surface-dark-high overflow-hidden">
           <View
             className="h-full rounded-full bg-primary-accent dark:bg-primary-bright"
-            style={{ width: `${((reviewedCount + 1) / cards.length) * 100}%` }}
+            style={{ width: `${progressPercent}%` }}
           />
         </View>
       </View>
