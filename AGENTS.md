@@ -85,6 +85,14 @@ For web UI stabilization and verification rules, `docs/agent/WEB_UI_CONTRACT.md`
 - Push: groups by table, upserts. Pull: last-write-wins via `updated_at`.
 - `useSync` hook in tab layout: syncs on foreground + connectivity restore.
 
+### Quran Foundation APIs
+
+- **Content API (audio/hadith) is not QF User API.** Content API access uses backend client credentials with `scope=content` through `supabase/functions/qf-content`; never put `QF_CLIENT_SECRET` in Expo, web, or any client bundle.
+- **Required Content API deployment:** set Supabase secrets `QF_CLIENT_ID`, `QF_CLIENT_SECRET`, `QF_ENV=production|prelive`, and `QF_DEFAULT_RECITATION_ID=7`, then deploy `supabase functions deploy qf-content`. Missing secrets or an undeployed function will surface in the UI as unavailable audio/hadith.
+- **QF User API/OAuth is separate work.** Do not reuse Supabase auth callback routes or Supabase OAuth assumptions for QF OAuth. Add dedicated QF callback/logout handling and server-side token exchange/refresh before calling user-related QF endpoints.
+- **QF app registration URLs must be real and public before User API rollout:** `Client URL` can be the web app root, `Logo URL` can use `/logo.png`, but `/privacy`, `/terms`, and a dedicated QF OAuth callback route do not currently exist unless added in a later change.
+- **Privacy/terms constraint:** if QF User API stores or syncs user-related Quran activity, update Hafiz privacy/terms pages first to disclose what data is requested from QF, what is stored in Supabase/local SQLite, retention/deletion behavior, and how logout/revocation works.
+
 ### Community
 
 - Reflections: TanStack Query for Supabase CRUD, optimistic likes with rollback, paginated 5/page.

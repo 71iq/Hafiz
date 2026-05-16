@@ -59,6 +59,14 @@ The UI is a **hybrid of quran.com and wahy.net**. The reading experience, layout
 | **Auth** | Supabase Auth (email/password + OAuth providers) |
 | **Sync Strategy** | Offline-first: read/write to local SQLite immediately. Background sync pushes changes to Supabase when online. Conflict resolution: last-write-wins with timestamp. |
 
+#### Quran Foundation API Boundary
+
+- Quran Foundation Content APIs are optional online enrichment. Audio and hadith-by-ayah go through the Supabase Edge Function `qf-content` using backend client credentials with `scope=content`; `QF_CLIENT_SECRET` must never be shipped to Expo/native/web clients.
+- Content API availability requires deployed Supabase secrets: `QF_CLIENT_ID`, `QF_CLIENT_SECRET`, `QF_ENV=production|prelive`, and `QF_DEFAULT_RECITATION_ID=7`. If these are absent or the Edge Function is not deployed, UI must show bilingual unavailable states while local SQLite Quran reading continues.
+- Quran Foundation User API/OAuth is a separate integration from Supabase Auth and from the Content API. It needs dedicated OAuth callback/logout routes, server-side code exchange and refresh, and token storage tied to the signed-in Hafiz user before user-related QF endpoints are used.
+- QF app registration fields must point to real public URLs. Current app assets can satisfy `Client URL` with the web app root and `Logo URL` with `/logo.png`; `/privacy`, `/terms`, and a dedicated QF OAuth redirect URI must be added before enabling QF User API.
+- Before storing or syncing any QF user-related data, Hafiz privacy/terms pages must disclose requested QF scopes/data, local SQLite and Supabase storage behavior, retention/deletion, logout/revocation, and any third-party processing by Quran Foundation/Supabase.
+
 **Sync flow:**
 1. All reads come from local SQLite — never block on network.
 2. All writes go to local SQLite first, then queue for sync.
