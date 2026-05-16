@@ -163,7 +163,7 @@ export function PublicPage({ page }: { page: PublicPageKey }) {
             isDark={isDark}
             isRTL={isRTL}
             language={language}
-            onChange={(nextPage) => router.push(`/${nextPage}` as any)}
+            onChange={(nextPage) => router.replace(`/${nextPage}` as any)}
             width={width}
           />
 
