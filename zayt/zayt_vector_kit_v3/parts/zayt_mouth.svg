@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-labelledby="title desc">
+  <title id="title">Zayt mouth layer v2</title>
+  <desc id="desc">Separate mouth layer. Same 512 by 512 viewBox; stack with the master or other parts.</desc>
+
+  <defs>
+    <radialGradient id="bodyGold3D" cx="42%" cy="25%" r="75%">
+      <stop offset="0%" stop-color="#FFF9D8"/>
+      <stop offset="28%" stop-color="#F9E79E"/>
+      <stop offset="62%" stop-color="#E3C260"/>
+      <stop offset="86%" stop-color="#B9983E"/>
+      <stop offset="100%" stop-color="#7B692F"/>
+    </radialGradient>
+    <radialGradient id="bodyCenterLight" cx="47%" cy="37%" r="52%">
+      <stop offset="0%" stop-color="#FFFCEE" stop-opacity="0.86"/>
+      <stop offset="55%" stop-color="#FFF0B4" stop-opacity="0.23"/>
+      <stop offset="100%" stop-color="#FFF0B4" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="bodyEdgeWarmth" cx="52%" cy="70%" r="56%">
+      <stop offset="0%" stop-color="#F0CA67" stop-opacity="0"/>
+      <stop offset="68%" stop-color="#C49A3A" stop-opacity="0.20"/>
+      <stop offset="100%" stop-color="#5E4F23" stop-opacity="0.34"/>
+    </radialGradient>
+    <linearGradient id="edgeStroke" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#D9C372" stop-opacity="0.75"/>
+      <stop offset="50%" stop-color="#9C8234" stop-opacity="0.60"/>
+      <stop offset="100%" stop-color="#5B5028" stop-opacity="0.50"/>
+    </linearGradient>
+    <linearGradient id="oilHighlight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.90"/>
+      <stop offset="45%" stop-color="#FFF9DD" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#FFF9DD" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="cheekGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#EFAF79" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#EFAF79" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="leafGrad" x1="10%" y1="5%" x2="88%" y2="94%">
+      <stop offset="0%" stop-color="#D0D9A1"/>
+      <stop offset="46%" stop-color="#78944F"/>
+      <stop offset="100%" stop-color="#2E5136"/>
+    </linearGradient>
+    <linearGradient id="leafGloss" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F7F0C4" stop-opacity="0.62"/>
+      <stop offset="100%" stop-color="#F7F0C4" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="glowGrad" cx="50%" cy="54%" r="48%">
+      <stop offset="0%" stop-color="#FFE7A3" stop-opacity="0.52"/>
+      <stop offset="50%" stop-color="#FDDC91" stop-opacity="0.20"/>
+      <stop offset="100%" stop-color="#FDDC91" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="shadowGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#003638" stop-opacity="0.15"/>
+      <stop offset="75%" stop-color="#003638" stop-opacity="0.05"/>
+      <stop offset="100%" stop-color="#003638" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="armGrad" x1="8%" y1="0%" x2="92%" y2="100%">
+      <stop offset="0%" stop-color="#FFECA3"/>
+      <stop offset="60%" stop-color="#D7B85B"/>
+      <stop offset="100%" stop-color="#A48638"/>
+    </linearGradient>
+    <filter id="softBlur" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="12"/></filter>
+    <filter id="tinyBlur" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="2.5"/></filter>
+    <filter id="softDrop" x="-45%" y="-45%" width="190%" height="190%">
+      <feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="#003638" flood-opacity="0.08"/>
+    </filter>
+    <clipPath id="bodyClip">
+      <path d="M256 64 C281 101 315 143 342 198 C372 259 376 324 344 374 C318 415 288 440 256 440 C224 440 194 415 168 374 C136 324 140 259 170 198 C197 143 231 101 256 64 Z"/>
+    </clipPath>
+    <style>
+      .round{stroke-linecap:round;stroke-linejoin:round}
+      .face{fill:#263C31}
+      .face-stroke{stroke:#263C31;stroke-linecap:round;stroke-linejoin:round}
+      .warm-stroke{stroke:#6E5E2C;stroke-linecap:round;stroke-linejoin:round}
+      .leaf-stroke{stroke:#2D4E36;stroke-linecap:round;stroke-linejoin:round}
+      .soft-line{fill:none;stroke-linecap:round;stroke-linejoin:round}
+    </style>
+  </defs>
+
+  
+
+  <g id="mouth" data-layer="mouth">
+    <path id="mouth-smile" d="M238 333 C247 344 265 344 274 333" fill="none" class="warm-stroke" stroke-width="5.2" stroke-opacity="0.85"/>
+    <path id="mouth-soft-shadow" d="M242 340 C250 346 262 346 270 340" fill="none" stroke="#3E3216" stroke-width="2" stroke-opacity="0.12" class="round"/>
+  </g>
+
+</svg>

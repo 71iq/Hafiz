@@ -1,0 +1,26 @@
+{
+  "name": "Zayt Vector Kit v3",
+  "viewBox": "0 0 512 512",
+  "stack_order": [
+    "glow",
+    "arms",
+    "body",
+    "eyes",
+    "mouth",
+    "leaf"
+  ],
+  "parts": {
+    "glow": "parts/zayt_glow.svg",
+    "arms": "parts/zayt_arms.svg",
+    "body": "parts/zayt_body.svg",
+    "eyes": "parts/zayt_eyes.svg",
+    "mouth": "parts/zayt_mouth.svg",
+    "leaf": "parts/zayt_leaf.svg"
+  },
+  "notes": [
+    "v3 uses richer gradients, clipped highlights, blush, softer arms/feet, leaf gloss, and glow/shadow layers.",
+    "All exports share the same viewBox and can be stacked without repositioning.",
+    "Recommended animation pivots: leaf around (255,54), arms around (164,318)/(348,318), face around (256,302), body scale around (256,360), glow opacity around center.",
+    "Keep the mascot off Mushaf/Quran text surfaces; use it for Home, onboarding, flashcards, progress, and empty states."
+  ]
+}
