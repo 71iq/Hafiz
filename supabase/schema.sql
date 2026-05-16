@@ -271,6 +271,18 @@ CREATE TABLE IF NOT EXISTS private_notes (
   PRIMARY KEY (user_id, id)
 );
 
+-- ─── Reflection Journey Entries (synced from local SQLite) ──
+CREATE TABLE IF NOT EXISTS reflection_journey_entries (
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  level_id TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('draft', 'completed')),
+  response_text TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
+  completed_at TIMESTAMPTZ,
+  PRIMARY KEY (user_id, level_id)
+);
+
 -- ─── Achievement Unlocks (public badges) ────────────────────
 CREATE TABLE IF NOT EXISTS achievement_unlocks (
   user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
@@ -281,6 +293,7 @@ CREATE TABLE IF NOT EXISTS achievement_unlocks (
 );
 
 ALTER TABLE private_notes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reflection_journey_entries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE achievement_unlocks ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Users can read own private notes"
@@ -298,6 +311,23 @@ CREATE POLICY "Users can update own private notes"
 
 CREATE POLICY "Users can delete own private notes"
   ON private_notes FOR DELETE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can read own reflection journey entries"
+  ON reflection_journey_entries FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own reflection journey entries"
+  ON reflection_journey_entries FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own reflection journey entries"
+  ON reflection_journey_entries FOR UPDATE
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own reflection journey entries"
+  ON reflection_journey_entries FOR DELETE
   USING (auth.uid() = user_id);
 
 CREATE POLICY "Achievement unlocks are publicly readable"
@@ -369,5 +399,6 @@ CREATE INDEX IF NOT EXISTS idx_reflection_comments_reflection ON reflection_comm
 CREATE INDEX IF NOT EXISTS idx_reports_reflection ON reports(reflection_id);
 CREATE INDEX IF NOT EXISTS idx_private_notes_user_updated ON private_notes(user_id, updated_at);
 CREATE INDEX IF NOT EXISTS idx_private_notes_ayah ON private_notes(user_id, surah, ayah_start, ayah_end);
+CREATE INDEX IF NOT EXISTS idx_reflection_journey_entries_user_updated ON reflection_journey_entries(user_id, updated_at);
 CREATE INDEX IF NOT EXISTS idx_achievement_unlocks_user_unlocked ON achievement_unlocks(user_id, unlocked_at);
 CREATE INDEX IF NOT EXISTS idx_achievement_unlocks_public_unlocked ON achievement_unlocks(unlocked_at);

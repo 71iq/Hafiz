@@ -84,6 +84,9 @@ export async function pullRemoteChanges(db: SQLiteDatabase): Promise<number> {
     // Pull private notes
     totalPulled += await pullTable(db, "private_notes", user.id, lastPullAt, upsertPrivateNote);
 
+    // Pull Reflection Journey entries
+    totalPulled += await pullTable(db, "reflection_journey_entries", user.id, lastPullAt, upsertReflectionJourneyEntry);
+
     // Pull public badge unlocks. Pulled badges are already seen locally.
     totalPulled += await pullTable(db, "achievement_unlocks", user.id, lastPullAt, upsertAchievementUnlock);
 
@@ -169,6 +172,9 @@ async function pushUpsert(
     case "private_notes":
       onConflict = "user_id,id";
       break;
+    case "reflection_journey_entries":
+      onConflict = "user_id,level_id";
+      break;
     case "achievement_unlocks":
       onConflict = "user_id,achievement_id";
       break;
@@ -209,6 +215,9 @@ async function pushDelete(
     case "private_notes":
       query = query.eq("id", rowId);
       break;
+    case "reflection_journey_entries":
+      query = query.eq("level_id", rowId);
+      break;
     case "achievement_unlocks":
       query = query.eq("achievement_id", rowId);
       break;
@@ -231,7 +240,7 @@ async function pullTable(
 ): Promise<number> {
   // For tables with updated_at, filter by it. Otherwise use created_at.
   const timeCol =
-    tableName === "study_cards" || tableName === "private_notes"
+    tableName === "study_cards" || tableName === "private_notes" || tableName === "reflection_journey_entries"
       ? "updated_at"
       : tableName === "achievement_unlocks"
         ? "unlocked_at"
@@ -340,6 +349,28 @@ async function upsertPrivateNote(db: SQLiteDatabase, row: any): Promise<void> {
       row.created_at,
       row.updated_at,
       row.deleted_at,
+    ]
+  );
+}
+
+async function upsertReflectionJourneyEntry(db: SQLiteDatabase, row: any): Promise<void> {
+  const local = await db.getFirstAsync<{ updated_at: string }>(
+    "SELECT updated_at FROM reflection_journey_entries WHERE level_id = ?",
+    [row.level_id]
+  );
+  if (local && local.updated_at >= row.updated_at) return;
+
+  await db.runAsync(
+    `INSERT OR REPLACE INTO reflection_journey_entries
+      (level_id, status, response_text, created_at, updated_at, completed_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [
+      row.level_id,
+      row.status,
+      row.response_text,
+      row.created_at,
+      row.updated_at,
+      row.completed_at,
     ]
   );
 }

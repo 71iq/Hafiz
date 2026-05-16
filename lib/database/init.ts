@@ -2,6 +2,11 @@ import { Platform } from "react-native";
 import type { SQLiteDatabase } from "expo-sqlite";
 import { createSchema, createTextSearchIndex } from "./schema";
 import { normalizeArabicCore, normalizeArabicWord } from "@/lib/arabic";
+import {
+  buildAyahCountIndex,
+  computeReflectionJourneyFingerprint,
+  loadAndValidateReflectionJourneySeed,
+} from "@/lib/reflection-journey/schema";
 
 // ─── Platform-aware data loading ─────────────────────────────
 // On web: fetch from /data/ (static files served from public/)
@@ -13,6 +18,7 @@ const nativeRequires: Record<string, () => any> = Platform.OS !== "web"
   ? {
       "quran-data.json": () => require("../../assets/data/quran-data.json"),
       "quran-qcf2.json": () => require("../../assets/data/quran-qcf2.json"),
+      "reflection-journey.json": () => require("../../assets/data/reflection-journey.json"),
       "translation-sahih.json": () => require("../../assets/data/translation-sahih.json"),
       "page-map.json": () => require("../../assets/data/page-map.json"),
       "tajweed.json": () => require("../../assets/data/tajweed.json"),
@@ -218,7 +224,7 @@ type ProgressCallback = (progress: ImportProgress) => void;
 
 // Bump this whenever a new import step is added so the progress bar caps at
 // 100% and the step counter shows accurate "N / total" labels.
-const TOTAL_STEPS = 17;
+const TOTAL_STEPS = 18;
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, "").trim();
@@ -490,6 +496,21 @@ async function batchInsert(
       }
     });
   }
+}
+
+async function readSetting(db: SQLiteDatabase, key: string): Promise<string | null> {
+  const row = await db.getFirstAsync<{ value: string }>(
+    "SELECT value FROM user_settings WHERE key = ?",
+    [key]
+  );
+  return row?.value ?? null;
+}
+
+async function writeSetting(db: SQLiteDatabase, key: string, value: string): Promise<void> {
+  await db.runAsync(
+    "INSERT OR REPLACE INTO user_settings (key, value) VALUES (?, ?)",
+    [key, value]
+  );
 }
 
 // ─── Import functions ────────────────────────────────────────
@@ -965,6 +986,71 @@ async function importQiraatEncyclopedia(
   console.log(`[Import] qiraat_encyclopedia done: ${rows.length} rows`);
 }
 
+async function importReflectionJourneyLevels(
+  db: SQLiteDatabase,
+  onProgress: ProgressCallback
+): Promise<void> {
+  const [seedData, quranData, storedFingerprint, existingCountRow] = await Promise.all([
+    loadData("reflection-journey.json"),
+    loadData("quran-data.json"),
+    readSetting(db, "reflection_journey_content_fingerprint"),
+    db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM reflection_journey_levels"),
+  ]);
+
+  const ayahCountIndex = buildAyahCountIndex(quranData);
+  const parsed = loadAndValidateReflectionJourneySeed(seedData, ayahCountIndex);
+  const fingerprint = computeReflectionJourneyFingerprint(parsed);
+  const existingCount = existingCountRow?.count ?? 0;
+  const shouldReimport =
+    storedFingerprint !== fingerprint || existingCount !== parsed.levels.length;
+
+  onProgress({
+    step: "Reflection Journey",
+    current: 18,
+    total: TOTAL_STEPS,
+    detail: `${parsed.levels.length} levels`,
+  });
+
+  if (!shouldReimport) {
+    return;
+  }
+
+  await db.withTransactionAsync(async () => {
+    await db.runAsync("DELETE FROM reflection_journey_levels");
+
+    if (parsed.levels.length > 0) {
+      const stmt = await db.prepareAsync(
+        `INSERT INTO reflection_journey_levels
+          (id, slug, order_index, title_en, title_ar, summary_en, summary_ar, response_prompt_en, response_prompt_ar, estimated_minutes, content_json)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      );
+      try {
+        for (const level of parsed.levels) {
+          await stmt.executeAsync([
+            level.id,
+            level.slug,
+            level.order,
+            level.title.en,
+            level.title.ar,
+            level.summary?.en ?? null,
+            level.summary?.ar ?? null,
+            level.responsePrompt.en,
+            level.responsePrompt.ar,
+            level.estimatedMinutes ?? null,
+            JSON.stringify(level.blocks),
+          ]);
+        }
+      } finally {
+        await stmt.finalizeAsync();
+      }
+    }
+
+    await writeSetting(db, "reflection_journey_content_fingerprint", fingerprint);
+  });
+
+  console.log(`[Import] Reflection Journey done: ${parsed.levels.length} levels`);
+}
+
 async function runNewTabImports(
   db: SQLiteDatabase,
   onProgress: ProgressCallback
@@ -1049,6 +1135,7 @@ async function runNewTabImports(
   if ((await safeCount("qiraat_encyclopedia")) === 0) {
     await safeImport("qiraat_encyclopedia", () => importQiraatEncyclopedia(db, onProgress));
   }
+  await safeImport("reflection_journey_levels", () => importReflectionJourneyLevels(db, onProgress));
 }
 
 // ─── Main initialization ─────────────────────────────────────
@@ -1217,6 +1304,7 @@ export async function initializeDatabase(
   if (Platform.OS === "web") {
     void loadData("quran-data.json");
     void loadData("quran-qcf2.json");
+    void loadData("reflection-journey.json");
     void loadData("zilal.json");
     void loadData("translation-sahih.json");
     void loadData("page-map.json");

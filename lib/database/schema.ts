@@ -194,6 +194,21 @@ export async function createSchema(db: SQLiteDatabase): Promise<void> {
       PRIMARY KEY (surah, ayah)
     );
 
+    -- Reflection Journey curated levels (offline-first bundled content)
+    CREATE TABLE IF NOT EXISTS reflection_journey_levels (
+      id TEXT PRIMARY KEY,
+      slug TEXT UNIQUE NOT NULL,
+      order_index INTEGER UNIQUE NOT NULL,
+      title_en TEXT NOT NULL,
+      title_ar TEXT NOT NULL,
+      summary_en TEXT,
+      summary_ar TEXT,
+      response_prompt_en TEXT NOT NULL,
+      response_prompt_ar TEXT NOT NULL,
+      estimated_minutes INTEGER,
+      content_json TEXT NOT NULL
+    );
+
     -- Quran Foundation ayah audio metadata cache (online enrichment, not synced)
     CREATE TABLE IF NOT EXISTS qf_ayah_audio_cache (
       recitation_id INTEGER NOT NULL,
@@ -336,6 +351,16 @@ export async function createSchema(db: SQLiteDatabase): Promise<void> {
       deleted_at TEXT
     );
 
+    -- Reflection Journey owner-only progress and responses
+    CREATE TABLE IF NOT EXISTS reflection_journey_entries (
+      level_id TEXT PRIMARY KEY,
+      status TEXT NOT NULL CHECK (status IN ('draft', 'completed')),
+      response_text TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      completed_at TEXT
+    );
+
     -- Achievement unlocks (public badge row syncs without private payload)
     CREATE TABLE IF NOT EXISTS achievement_unlocks (
       achievement_id TEXT PRIMARY KEY,
@@ -389,6 +414,9 @@ export async function createSchema(db: SQLiteDatabase): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_qf_hadith_cache_sa ON qf_ayah_hadith_cache(surah, ayah, language);
     CREATE INDEX IF NOT EXISTS idx_private_notes_ayah ON private_notes(surah, ayah_start, ayah_end);
     CREATE INDEX IF NOT EXISTS idx_private_notes_updated ON private_notes(updated_at);
+    CREATE INDEX IF NOT EXISTS idx_reflection_journey_levels_order ON reflection_journey_levels(order_index);
+    CREATE INDEX IF NOT EXISTS idx_reflection_journey_entries_updated ON reflection_journey_entries(updated_at);
+    CREATE INDEX IF NOT EXISTS idx_reflection_journey_entries_completed ON reflection_journey_entries(completed_at);
     CREATE INDEX IF NOT EXISTS idx_achievement_unlocks_unlocked ON achievement_unlocks(unlocked_at);
   `);
 }

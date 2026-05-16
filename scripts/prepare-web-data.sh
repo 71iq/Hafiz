@@ -12,6 +12,7 @@ mkdir -p public/data/tafseer public/data/translations public/data/wbw public/dat
 # Core data files
 cp assets/data/quran-data.json public/data/
 cp assets/data/quran-qcf2.json public/data/
+cp assets/data/reflection-journey.json public/data/
 cp assets/data/translation-sahih.json public/data/
 cp assets/data/page-map.json public/data/
 cp assets/data/tajweed.json public/data/

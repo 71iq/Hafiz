@@ -8,6 +8,7 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
+    "validate:reflection-journey": "node --experimental-strip-types scripts/validate-reflection-journey.js",
     "build:web": "expo export --platform web",
     "prebuild:web": "bash scripts/prepare-web-data.sh",
     "postinstall": "node scripts/fix-rn-gradle-plugin.js"

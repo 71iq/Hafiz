@@ -3,7 +3,7 @@ import { View, Text, ScrollView, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
-import { Plus, Trash2, Play, Layers, CalendarCheck2, Search, LayoutGrid, Languages, UserPlus, X as XIcon } from "lucide-react-native";
+import { Plus, Trash2, Play, Layers, CalendarCheck2, Search, LayoutGrid, Languages, UserPlus, BookMarked, X as XIcon } from "lucide-react-native";
 import { useAuthStore } from "@/lib/auth/store";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useDatabase } from "@/lib/database/provider";
@@ -35,6 +35,8 @@ import {
   subscribeAchievementUnlocks,
 } from "@/lib/achievements/queries";
 import type { AchievementUnlock } from "@/lib/achievements/types";
+import { getReflectionJourneySummary } from "@/lib/reflection-journey/queries";
+import { localizeReflectionJourneyText } from "@/lib/reflection-journey/schema";
 
 type DeckDisplay = {
   id: string;
@@ -71,6 +73,11 @@ export default function HomeScreen() {
   const [surahNames, setSurahNames] = useState<Record<number, string>>({});
   const [resume, setResume] = useState<{ surah: number; ayah: number; page: number } | null>(null);
   const [latestUnlock, setLatestUnlock] = useState<AchievementUnlock | null>(null);
+  const [journeySummary, setJourneySummary] = useState<{ totalLevels: number; completedLevels: number; currentLevelTitle: string | null }>({
+    totalLevels: 0,
+    completedLevels: 0,
+    currentLevelTitle: null,
+  });
 
   const loadData = useCallback(async () => {
     // Load surah names for deck labels
@@ -94,11 +101,12 @@ export default function HomeScreen() {
       deckDisplays.push({ ...d, cardCount, dueCount, newCount });
     }
     setDecks(deckDisplays);
-    const [dashboardDue, cardTotal, nextWirdStatus, vocabTotal] = await Promise.all([
+    const [dashboardDue, cardTotal, nextWirdStatus, vocabTotal, reflectionJourneySummary] = await Promise.all([
       getDueCount(db),
       getTotalCardCount(db),
       getWirdStatus(db),
       getTotalCardCount(db, MEANINGS_DECK_ID),
+      getReflectionJourneySummary(db),
     ]);
     setTotalDue(dashboardDue);
     setTotalCards(cardTotal);
@@ -107,6 +115,13 @@ export default function HomeScreen() {
       total: vocabTotal,
     });
     getLatestUnseenUnlock(db).then(setLatestUnlock).catch(console.warn);
+    setJourneySummary({
+      totalLevels: reflectionJourneySummary.totalLevels,
+      completedLevels: reflectionJourneySummary.completedLevels,
+      currentLevelTitle: reflectionJourneySummary.currentLevelTitle
+        ? localizeReflectionJourneyText(reflectionJourneySummary.currentLevelTitle, uiLanguage)
+        : null,
+    });
 
     try {
       const row = await db.getFirstAsync<{ value: string }>(
@@ -377,6 +392,47 @@ export default function HomeScreen() {
               </Pressable>
             </View>
           </Card>
+        )}
+
+        {journeySummary.totalLevels > 0 && (
+          <Pressable
+            onPress={() => router.push("/reflection-journey")}
+            style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+            className="mb-6"
+          >
+            <Card elevation="low" className="p-5 rounded-4xl">
+              <View className={`items-start justify-between ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
+                <View className={`flex-1 ${isRTL ? "items-end" : "items-start"}`}>
+                  <Text
+                    className="text-warm-400 dark:text-neutral-500 uppercase"
+                    style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, letterSpacing: 1.6 }}
+                  >
+                    {interpolate(s.reflectionJourneyProgress, {
+                      completed: journeySummary.completedLevels,
+                      total: journeySummary.totalLevels,
+                    })}
+                  </Text>
+                  <Text
+                    className="text-charcoal dark:text-neutral-100 mt-1"
+                    style={{ fontFamily: "NotoSerif_700Bold", fontSize: 22, textAlign: isRTL ? "right" : "left" }}
+                  >
+                    {s.reflectionJourneyTitle}
+                  </Text>
+                  <Text
+                    className="text-warm-500 dark:text-neutral-400 mt-1"
+                    style={{ fontFamily: "Manrope_400Regular", fontSize: 13, lineHeight: 21, textAlign: isRTL ? "right" : "left" }}
+                  >
+                    {journeySummary.currentLevelTitle
+                      ? interpolate(s.reflectionJourneyCurrentLevel, { title: journeySummary.currentLevelTitle })
+                      : s.reflectionJourneySubtitle}
+                  </Text>
+                </View>
+                <View className="h-12 w-12 rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 items-center justify-center">
+                  <BookMarked size={18} color={isDark ? "#2dd4bf" : "#0d9488"} />
+                </View>
+              </View>
+            </Card>
+          </Pressable>
         )}
 
         {/* Start Review CTA */}
