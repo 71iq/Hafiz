@@ -12,14 +12,14 @@ export default function IndexRedirect() {
       "SELECT value FROM user_settings WHERE key = 'onboarding_completed'"
     ).then((row) => {
       if (row?.value === "true") {
-        router.replace("/(tabs)/mushaf");
+        router.replace("/(tabs)/home");
       } else {
         router.replace("/onboarding" as any);
       }
       setChecked(true);
     }).catch(() => {
       // If query fails, skip onboarding
-      router.replace("/(tabs)/mushaf");
+      router.replace("/(tabs)/home");
       setChecked(true);
     });
   }, [db]);
