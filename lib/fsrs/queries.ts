@@ -15,6 +15,14 @@ type ReviewStats = {
   longestStreak: number;
 };
 
+export type WirdStatus = {
+  currentDays: number;
+  longestDays: number;
+  maintainedToday: boolean;
+  lastReviewDate: string | null;
+  state: "empty" | "maintained_today" | "open_today" | "fresh_start";
+};
+
 function formatLocalDateKey(date: Date): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -51,6 +59,30 @@ function calculateLongestStreak(dateKeys: string[]): number {
   }
 
   return maxStreak;
+}
+
+function calculateCurrentStreak(dateKeysDesc: string[], todayIndex: number): number {
+  if (dateKeysDesc.length === 0) return 0;
+
+  const yesterdayIndex = todayIndex - 1;
+  const firstIndex = dayIndexFromDateKey(dateKeysDesc[0]);
+
+  if (firstIndex < yesterdayIndex) return 0;
+
+  let streak = 0;
+  let expectedIndex = firstIndex;
+
+  for (const dateKey of dateKeysDesc) {
+    const dayIndex = dayIndexFromDateKey(dateKey);
+    if (dayIndex === expectedIndex) {
+      streak++;
+      expectedIndex--;
+    } else {
+      break;
+    }
+  }
+
+  return streak;
 }
 
 // ─── Deck ID generation ──────────────────────────────────────
@@ -513,25 +545,51 @@ export async function getStudyStreak(db: SQLiteDatabase): Promise<number> {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const todayIdx = dayIndexFromDateKey(formatLocalDateKey(today));
-  const yesterdayIdx = todayIdx - 1;
-  const firstIdx = dayIndexFromDateKey(reviewDates[0]);
+  return calculateCurrentStreak(reviewDates, todayIdx);
+}
 
-  // Streak must start from today or yesterday
-  if (firstIdx < yesterdayIdx) return 0;
+export async function getWirdStatus(db: SQLiteDatabase): Promise<WirdStatus> {
+  const rows = await db.getAllAsync<{ reviewed_at: string }>(
+    `SELECT reviewed_at FROM study_log ORDER BY reviewed_at DESC`
+  );
+  const counts = buildLocalReviewCounts(rows);
+  const dateKeys = [...counts.keys()].sort();
 
-  let streak = 0;
-  let expectedIdx = firstIdx;
-
-  for (const dateKey of reviewDates) {
-    const idx = dayIndexFromDateKey(dateKey);
-    if (idx === expectedIdx) {
-      streak++;
-      expectedIdx--;
-    } else {
-      break;
-    }
+  if (dateKeys.length === 0) {
+    return {
+      currentDays: 0,
+      longestDays: 0,
+      maintainedToday: false,
+      lastReviewDate: null,
+      state: "empty",
+    };
   }
-  return streak;
+
+  const reviewDatesDesc = [...dateKeys].reverse();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayIndex = dayIndexFromDateKey(formatLocalDateKey(today));
+  const latestDateKey = reviewDatesDesc[0];
+  const latestIndex = dayIndexFromDateKey(latestDateKey);
+  const currentDays = calculateCurrentStreak(reviewDatesDesc, todayIndex);
+  const state: WirdStatus["state"] =
+    latestIndex === todayIndex
+      ? "maintained_today"
+      : latestIndex === todayIndex - 1
+        ? "open_today"
+        : "fresh_start";
+  const latestRow = rows.find((row) => {
+    const reviewedAt = new Date(row.reviewed_at);
+    return !Number.isNaN(reviewedAt.getTime()) && formatLocalDateKey(reviewedAt) === latestDateKey;
+  });
+
+  return {
+    currentDays,
+    longestDays: calculateLongestStreak(dateKeys),
+    maintainedToday: state === "maintained_today",
+    lastReviewDate: latestRow?.reviewed_at ?? latestDateKey,
+    state,
+  };
 }
 
 export async function getReviewStats(db: SQLiteDatabase, activityDays = 90): Promise<ReviewStats> {

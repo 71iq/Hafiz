@@ -349,7 +349,7 @@ The user enables specific "test modes" in Settings. Each enabled mode adds a ste
 #### 3.6.4 Study Session UI
 - Show progress bar: cards remaining in session.
 - Show card state indicators: new (blue), learning (orange), review (green), relearning (red).
-- Session summary at end: cards reviewed, retention rate, streak info.
+- Session summary at end: cards reviewed, retention rate, gentle wird consistency info.
 - Option to end session early.
 
 #### 3.6.5 Study Log (Local SQLite, synced to Supabase)
@@ -386,6 +386,16 @@ study_log (
 );
 ```
 
+#### 3.6.6 Gentle Wird Consistency
+- Hafiz presents review consistency as a gentle wird habit, not an addiction-style streak mechanic.
+- A day counts when at least one graded flashcard review is written to `study_log`.
+- Primary maintained-state copy:
+  - Arabic: `حافظت على وردك`
+  - English: `You kept your wird`
+- Missed days must never be framed as loss, failure, danger, or rupture.
+- If today has no completed review, use neutral copy such as `ورد اليوم مفتوح` / `Today's wird is open` or `ابدأ ورد اليوم` / `Begin today's wird`.
+- Stored sync fields remain `current_streak` and `longest_streak` for Supabase compatibility, but user-facing UI should prefer "wird" and "consistency" language.
+
 ### 3.7 Leaderboard (Online Only)
 
 #### 3.7.1 Scoring Algorithm
@@ -402,6 +412,8 @@ Where:
   retention_bonus = card_stability / 100                              // More mature cards worth more (capped)
 ```
 
+The streak multiplier is an internal scoring input only. Do not surface it with pressure-oriented copy; UI should frame this as consistency.
+
 **Anti-gaming measures:**
 - Maximum 200 reviews per day count toward leaderboard.
 - "Again" ratings give 0 points (no farming by intentionally failing).
@@ -411,7 +423,7 @@ Where:
 - **Daily:** Top reviewers today.
 - **Weekly:** Rolling 7-day totals.
 - **All-time:** Cumulative score.
-- **Streak:** Longest current streak.
+- **Consistency:** Current review consistency, softened in UI as wird consistency.
 
 #### 3.7.3 Data Model (Supabase)
 ```sql
@@ -610,7 +622,7 @@ Use Supabase Row Level Security (RLS) policies:
 6. Implement settings UI for enabling/disabling test modes.
 7. On grading: call `scheduler.next(card, now, rating)` and persist updated card state to `study_cards` table. Log the review to `study_log` table.
 8. Build session summary screen.
-9. Build a "Study" dashboard showing: due cards today, new cards available, current streak.
+9. Build a "Study" dashboard showing: due cards today, new cards available, current wird consistency.
 10. **Verify:** Create a deck from Surah Al-Fatiha. Review all 7 cards. Check that next review dates are computed correctly and stored in SQLite.
 
 ### Phase 6: Authentication & Sync
@@ -642,7 +654,7 @@ Use Supabase Row Level Security (RLS) policies:
 
 1. Implement scoring algorithm (§3.7.1) — compute points after each review.
 2. After sync: push `daily_scores` to Supabase.
-3. Build Leaderboard screen with 4 tabs: Daily, Weekly, All-time, Streak.
+3. Build Leaderboard screen with 4 tabs: Daily, Weekly, All-time, Consistency.
 4. Fetch and display ranked users (profile pic, name, score, rank).
 5. Highlight current user's position.
 6. **Verify:** Review cards → score increases. Check leaderboard shows correct rankings.
