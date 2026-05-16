@@ -8,7 +8,7 @@ import { setPendingDeepLink } from "@/lib/deep-link";
  *
  * Handles:
  *   hafiz://open?surah=2&ayah=255
- *   https://hafiz.app/open?surah=2&ayah=255
+ *   https://hafizquran.app/open?surah=2&ayah=255
  *
  * Parses surah/ayah, stores the target, and redirects to the Mushaf tab.
  */
