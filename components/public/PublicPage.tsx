@@ -21,6 +21,7 @@ import {
 } from "@/lib/public-pages/content";
 
 const UI_LANGUAGE_CACHE_KEY = "hafiz_ui_language";
+const PUBLIC_PAGE_TABS: PublicPageKey[] = ["about", "privacy", "terms"];
 
 function readInitialLanguage(): PublicPageLanguage {
   if (Platform.OS !== "web" || typeof window === "undefined") return "en";
@@ -106,7 +107,10 @@ export function PublicPage({ page }: { page: PublicPageKey }) {
         >
           <View
             className="mb-10 items-center justify-between gap-3"
-            style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
+            style={{
+              flexDirection: isRTL ? "row-reverse" : "row",
+              flexWrap: "wrap",
+            }}
           >
             <Pressable
               onPress={() => router.canGoBack() ? router.back() : router.replace("/" as any)}
@@ -125,22 +129,33 @@ export function PublicPage({ page }: { page: PublicPageKey }) {
               </Text>
             </Pressable>
 
-            <Pressable
-              onPress={() => setLanguage(language === "en" ? "ar" : "en")}
-              className="min-h-10 flex-row items-center gap-2 rounded-full bg-surface-low dark:bg-surface-dark-low px-4"
-              style={({ pressed }) => ({
-                opacity: pressed ? 0.72 : 1,
-                ...(Platform.OS === "web" ? ({ cursor: "pointer" } as any) : null),
-              })}
+            <View
+              className="items-center gap-2"
+              style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
             >
-              <Globe2 size={16} color={accent} />
-              <Text
-                className="text-primary-accent dark:text-primary-bright"
-                style={{ fontFamily: "Manrope_700Bold", fontSize: 13 }}
+              <PageAction
+                label={labels.home}
+                onPress={() => router.replace("/" as any)}
+                primary
+                compact
+              />
+              <Pressable
+                onPress={() => setLanguage(language === "en" ? "ar" : "en")}
+                className="min-h-10 flex-row items-center gap-2 rounded-full bg-surface-low dark:bg-surface-dark-low px-4"
+                style={({ pressed }) => ({
+                  opacity: pressed ? 0.72 : 1,
+                  ...(Platform.OS === "web" ? ({ cursor: "pointer" } as any) : null),
+                })}
               >
-                {labels.language}
-              </Text>
-            </Pressable>
+                <Globe2 size={16} color={accent} />
+                <Text
+                  className="text-primary-accent dark:text-primary-bright"
+                  style={{ fontFamily: "Manrope_700Bold", fontSize: 13 }}
+                >
+                  {labels.language}
+                </Text>
+              </Pressable>
+            </View>
           </View>
 
           <View className="mb-12">
@@ -195,23 +210,14 @@ export function PublicPage({ page }: { page: PublicPageKey }) {
                 {content.lastUpdated}
               </Text>
             )}
-            <View
-              className="mt-7 flex-wrap gap-3"
-              style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
-            >
-              <PageAction
-                label={labels.home}
-                onPress={() => router.replace("/" as any)}
-                primary
-              />
-              {content.actions.map((action) => (
-                <PageAction
-                  key={`${action.href}-${action.label}`}
-                  label={action.label}
-                  onPress={() => openLink(action)}
-                />
-              ))}
-            </View>
+            <PublicPageTabs
+              activePage={page}
+              isDark={isDark}
+              isRTL={isRTL}
+              language={language}
+              onChange={(nextPage) => router.push(`/${nextPage}` as any)}
+              width={width}
+            />
           </View>
 
           <View className="gap-4">
@@ -322,15 +328,17 @@ function PageAction({
   label,
   onPress,
   primary,
+  compact,
 }: {
   label: string;
   onPress: () => void;
   primary?: boolean;
+  compact?: boolean;
 }) {
   return (
     <Pressable
       onPress={onPress}
-      className={`min-h-11 rounded-full px-5 items-center justify-center ${
+      className={`${compact ? "min-h-10 px-4" : "min-h-11 px-5"} rounded-full items-center justify-center ${
         primary
           ? "bg-primary-accent"
           : "bg-surface-low dark:bg-surface-dark-low"
@@ -342,10 +350,82 @@ function PageAction({
     >
       <Text
         className={primary ? "text-white" : "text-charcoal dark:text-neutral-200"}
-        style={{ fontFamily: "Manrope_700Bold", fontSize: 14 }}
+        style={{ fontFamily: "Manrope_700Bold", fontSize: compact ? 13 : 14 }}
       >
         {label}
       </Text>
     </Pressable>
+  );
+}
+
+function PublicPageTabs({
+  activePage,
+  isDark,
+  isRTL,
+  language,
+  onChange,
+  width,
+}: {
+  activePage: PublicPageKey;
+  isDark: boolean;
+  isRTL: boolean;
+  language: PublicPageLanguage;
+  onChange: (page: PublicPageKey) => void;
+  width: number;
+}) {
+  const isCompact = width < 520;
+  const inactiveTextColor = isDark ? "#d4d4d4" : "#4D4540";
+  const activeTextColor = isDark ? "#f5f5f5" : "#1F2933";
+
+  return (
+    <View
+      className="mt-7 rounded-full bg-surface-low dark:bg-surface-dark-low p-1"
+      style={{
+        alignSelf: isCompact ? "stretch" : isRTL ? "flex-end" : "flex-start",
+        flexDirection: isRTL ? "row-reverse" : "row",
+      }}
+    >
+      {PUBLIC_PAGE_TABS.map((tab) => {
+        const selected = tab === activePage;
+        return (
+          <Pressable
+            key={tab}
+            {...(Platform.OS === "web"
+              ? ({
+                  "aria-current": selected ? "page" : undefined,
+                  "aria-selected": selected,
+                } as any)
+              : null)}
+            accessibilityRole="tab"
+            accessibilityState={{ selected }}
+            onPress={() => {
+              if (!selected) onChange(tab);
+            }}
+            className={`${isCompact ? "flex-1 px-2" : "px-5"} min-h-10 items-center justify-center rounded-full ${
+              selected ? "bg-white dark:bg-surface-dark-high" : ""
+            }`}
+            style={({ pressed }) => ({
+              opacity: pressed && !selected ? 0.72 : 1,
+              ...(Platform.OS === "web"
+                ? ({ cursor: selected ? "default" : "pointer" } as any)
+                : null),
+            })}
+          >
+            <Text
+              className="text-center"
+              numberOfLines={1}
+              style={{
+                color: selected ? activeTextColor : inactiveTextColor,
+                fontFamily: "Manrope_700Bold",
+                fontSize: isCompact ? 12 : 13,
+                writingDirection: isRTL ? "rtl" : "ltr",
+              }}
+            >
+              {PUBLIC_PAGE_CONTENT[tab][language].eyebrow}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
   );
 }
