@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
-import { View, Text, Pressable, ActivityIndicator, ScrollView } from "react-native";
+import { View, Text, Pressable, ActivityIndicator, ScrollView, Linking } from "react-native";
 import { Switch } from "@/components/ui/Switch";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ToggleGroup } from "@/components/ui/ToggleGroup";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Sun, Moon, Smartphone, Minus, Plus, ChevronRight, ChevronLeft, User, LogOut, BookOpen, RefreshCw, Unlink } from "lucide-react-native";
+import { Sun, Moon, Smartphone, Minus, Plus, ChevronRight, ChevronLeft, User, LogOut, BookOpen, RefreshCw, Unlink, Info, FileText, HeartHandshake, ExternalLink, type LucideIcon } from "lucide-react-native";
 import {
   useSettings,
   FONT_SIZE_STEPS,
@@ -177,6 +177,10 @@ export default function SettingsScreen() {
       setQfBusy(false);
     }
   }, [db, refreshQfStatus, s.qfSyncComplete, s.qfSyncFailed]);
+
+  const openIssueReporter = useCallback(() => {
+    Linking.openURL("https://github.com/71iq/Hafiz/issues").catch(console.warn);
+  }, []);
 
   const THEME_OPTIONS: { value: ThemeMode; label: string; icon: typeof Sun }[] = [
     { value: "light", label: s.themeLight, icon: Sun },
@@ -686,6 +690,54 @@ export default function SettingsScreen() {
           </View>
         </Card>
 
+        {/* About & Public Links */}
+        <SectionLabel>{s.settingsAboutSection}</SectionLabel>
+        <Card elevation="low" className="p-5 mb-8">
+          <View className="gap-2">
+            <SettingsLinkRow
+              icon={Info}
+              title={s.settingsAboutHafiz}
+              description={s.settingsAboutHafizDesc}
+              onPress={() => router.push("/about" as any)}
+              isDark={isDark}
+              isRTL={isRTL}
+            />
+            <SettingsLinkRow
+              icon={FileText}
+              title={s.settingsPrivacyPolicy}
+              description={s.settingsPrivacyPolicyDesc}
+              onPress={() => router.push("/privacy" as any)}
+              isDark={isDark}
+              isRTL={isRTL}
+            />
+            <SettingsLinkRow
+              icon={FileText}
+              title={s.settingsTermsService}
+              description={s.settingsTermsServiceDesc}
+              onPress={() => router.push("/terms" as any)}
+              isDark={isDark}
+              isRTL={isRTL}
+            />
+            <SettingsLinkRow
+              icon={ExternalLink}
+              title={s.settingsReportIssue}
+              description={s.settingsReportIssueDesc}
+              onPress={openIssueReporter}
+              isDark={isDark}
+              isRTL={isRTL}
+              external
+            />
+            <SettingsLinkRow
+              icon={HeartHandshake}
+              title={s.settingsBecomeDonor}
+              description={s.settingsBecomeDonorDesc}
+              onPress={() => router.push("/about" as any)}
+              isDark={isDark}
+              isRTL={isRTL}
+            />
+          </View>
+        </Card>
+
         {/* Credits & Sources */}
         <SectionLabel>{s.creditsSection}</SectionLabel>
         <Card elevation="low" className="p-5 mb-8">
@@ -760,6 +812,74 @@ function SectionLabel({ children }: { children: string }) {
     >
       {children}
     </Text>
+  );
+}
+
+function SettingsLinkRow({
+  icon: Icon,
+  title,
+  description,
+  onPress,
+  isDark,
+  isRTL,
+  external,
+}: {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  onPress: () => void;
+  isDark: boolean;
+  isRTL: boolean;
+  external?: boolean;
+}) {
+  const RowChevron = isRTL ? ChevronLeft : ChevronRight;
+  const iconColor = isDark ? "#2dd4bf" : "#0d9488";
+  const chevronColor = isDark ? "#525252" : "#DFD9D1";
+
+  return (
+    <Pressable
+      onPress={onPress}
+      className="items-center gap-3 rounded-2xl bg-surface dark:bg-surface-dark px-4 py-3"
+      style={({ pressed }) => ({
+        direction: isRTL ? "rtl" : "ltr",
+        flexDirection: isRTL ? "row-reverse" : "row",
+        opacity: pressed ? 0.72 : 1,
+      })}
+    >
+      <View className="h-10 w-10 items-center justify-center rounded-full bg-primary-accent/10 dark:bg-primary-bright/15">
+        <Icon size={18} color={iconColor} />
+      </View>
+      <View className="flex-1">
+        <Text
+          className="text-charcoal dark:text-neutral-100"
+          style={{
+            fontFamily: "Manrope_600SemiBold",
+            fontSize: 14,
+            textAlign: isRTL ? "right" : "left",
+            writingDirection: isRTL ? "rtl" : "ltr",
+          }}
+        >
+          {title}
+        </Text>
+        <Text
+          className="mt-0.5 text-warm-400 dark:text-neutral-500"
+          style={{
+            fontFamily: "Manrope_400Regular",
+            fontSize: 12,
+            lineHeight: 17,
+            textAlign: isRTL ? "right" : "left",
+            writingDirection: isRTL ? "rtl" : "ltr",
+          }}
+        >
+          {description}
+        </Text>
+      </View>
+      {external ? (
+        <ExternalLink size={16} color={chevronColor} />
+      ) : (
+        <RowChevron size={18} color={chevronColor} />
+      )}
+    </Pressable>
   );
 }
 

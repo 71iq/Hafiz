@@ -29,8 +29,14 @@ function StableDocumentTitle() {
   useEffect(() => {
     if (Platform.OS !== "web" || typeof document === "undefined") return;
 
+    const titles: Record<string, string> = {
+      "/about": "About Hafiz | Hafiz",
+      "/privacy": "Privacy Policy | Hafiz",
+      "/terms": "Terms of Service | Hafiz",
+    };
+
     const setTitle = () => {
-      document.title = "Hafiz";
+      document.title = titles[pathname] ?? "Hafiz";
     };
 
     setTitle();
@@ -95,6 +101,9 @@ export default function RootLayout() {
           <StableDocumentTitle />
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="about" />
+            <Stack.Screen name="privacy" />
+            <Stack.Screen name="terms" />
             <Stack.Screen name="onboarding" options={{ animation: "fade" }} />
             <Stack.Screen name="open" />
             <Stack.Screen

@@ -11,7 +11,27 @@ export default function Root({ children }: { children: React.ReactNode }) {
         <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />
 
         <title>Hafiz</title>
-        <meta name="description" content="Quran retention with spaced repetition" />
+        <meta
+          name="description"
+          content="Hafiz is an offline-first Quran retention app with Mushaf reading, word study, tafsir, and spaced repetition."
+        />
+        <link rel="canonical" href="https://hafizquran.app" />
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="Hafiz" />
+        <meta property="og:title" content="Hafiz" />
+        <meta
+          property="og:description"
+          content="Offline-first Quran retention with Mushaf reading, word study, tafsir, and spaced repetition."
+        />
+        <meta property="og:url" content="https://hafizquran.app" />
+        <meta property="og:image" content="https://hafizquran.app/icon.png?v=2" />
+        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:title" content="Hafiz" />
+        <meta
+          name="twitter:description"
+          content="Offline-first Quran retention with Mushaf reading, word study, tafsir, and spaced repetition."
+        />
+        <meta name="twitter:image" content="https://hafizquran.app/icon.png?v=2" />
 
         {/* Favicon / tab icon */}
         <link rel="icon" type="image/png" sizes="48x48" href="/favicon.png?v=2" />

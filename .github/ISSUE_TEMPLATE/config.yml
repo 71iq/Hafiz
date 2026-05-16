@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: General support
+    url: mailto:support@hafizquran.app
+    about: Use email for support or legal questions.
+  - name: Privacy requests
+    url: mailto:privacy@hafizquran.app
+    about: Use email for account data, deletion, or privacy questions.

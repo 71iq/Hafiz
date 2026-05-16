@@ -1,0 +1,47 @@
+name: Bug report
+description: Report something broken in Hafiz
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a Hafiz issue. Please include enough detail to reproduce it.
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Describe the bug and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open ...
+        2. Tap ...
+        3. See ...
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Web
+        - iOS
+        - Android
+        - Not sure
+    validations:
+      required: true
+  - type: input
+    id: url
+    attributes:
+      label: URL or screen
+      description: If this happened on web, paste the URL. Otherwise name the app screen.
+  - type: textarea
+    id: details
+    attributes:
+      label: Additional details
+      description: Screenshots, console errors, device/browser version, or anything else useful.

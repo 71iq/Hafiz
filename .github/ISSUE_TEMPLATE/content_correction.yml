@@ -1,0 +1,31 @@
+name: Content correction
+description: Report a Quran data, translation, tafsir, word-study, or attribution issue
+title: "[Content]: "
+labels: ["content"]
+body:
+  - type: textarea
+    id: location
+    attributes:
+      label: Where is the issue?
+      description: Include surah, ayah, word, page, screen, or dataset if known.
+      placeholder: "Example: 2:255, word 3, Mushaf word detail sheet"
+    validations:
+      required: true
+  - type: textarea
+    id: issue
+    attributes:
+      label: What should be corrected?
+      description: Explain the current content and the correction you believe is needed.
+    validations:
+      required: true
+  - type: textarea
+    id: source
+    attributes:
+      label: Source or reference
+      description: Provide a source, screenshot, or explanation for the correction.
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional notes

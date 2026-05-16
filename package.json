@@ -2,6 +2,16 @@
   "name": "hafiz",
   "main": "expo-router/entry",
   "version": "1.0.0",
+  "private": true,
+  "license": "MIT",
+  "homepage": "https://hafizquran.app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/71iq/Hafiz.git"
+  },
+  "bugs": {
+    "url": "https://github.com/71iq/Hafiz/issues"
+  },
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
@@ -64,6 +74,5 @@
     "@types/react": "~19.2.2",
     "sharp": "^0.34.5",
     "typescript": "~5.9.2"
-  },
-  "private": true
+  }
 }

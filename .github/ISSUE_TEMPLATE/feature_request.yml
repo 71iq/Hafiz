@@ -1,0 +1,40 @@
+name: Feature request
+description: Suggest an improvement for Hafiz
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: Explain the user need or workflow.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the behavior you would like to see.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Mushaf
+        - Flashcards
+        - Word study
+        - Tafsir or translations
+        - Reflections
+        - Progress or leaderboard
+        - Settings
+        - Web/public pages
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Add screenshots, examples, or references if useful.
