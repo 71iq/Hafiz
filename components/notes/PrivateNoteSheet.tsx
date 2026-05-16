@@ -6,6 +6,7 @@ import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { createPrivateNote, updatePrivateNote, type PrivateNote } from "@/lib/notes/queries";
+import { isQfSyncableNoteContent } from "@/lib/quran-foundation/user-types";
 
 type Props = {
   open: boolean;
@@ -38,7 +39,9 @@ export function PrivateNoteSheet({
   const isPhone = width < SIDEBAR_BREAKPOINT;
   const maxOverlayHeight = Math.min(height - (isPhone ? 12 : 48), isPhone ? height * 0.94 : 620);
   const mutedColor = isDark ? "#737373" : "#A39B93";
-  const isValid = content.trim().length > 0;
+  const trimmedLength = content.trim().length;
+  const hasLengthError = trimmedLength > 0 && !isQfSyncableNoteContent(content);
+  const isValid = isQfSyncableNoteContent(content);
 
   useEffect(() => {
     if (open) {
@@ -100,6 +103,14 @@ export function PrivateNoteSheet({
             writingDirection: isRTL ? "rtl" : "ltr",
           }}
         />
+        {hasLengthError && (
+          <Text
+            className="mt-2 text-warm-500 dark:text-neutral-400"
+            style={{ fontFamily: "Manrope_500Medium", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
+          >
+            {s.privateNoteLengthError}
+          </Text>
+        )}
         {error && (
           <Text
             className="mt-2 text-red-600 dark:text-red-400"

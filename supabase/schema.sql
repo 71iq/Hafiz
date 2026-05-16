@@ -68,6 +68,13 @@ CREATE TABLE IF NOT EXISTS bookmarks (
   surah INTEGER NOT NULL,
   ayah INTEGER NOT NULL,
   created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  deleted_at TIMESTAMPTZ,
+  qf_bookmark_id TEXT,
+  qf_synced_at TIMESTAMPTZ,
+  qf_sync_error TEXT,
+  qf_is_in_default_collection BOOLEAN NOT NULL DEFAULT false,
+  qf_collections_count INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (user_id, surah, ayah)
 );
 
@@ -268,7 +275,24 @@ CREATE TABLE IF NOT EXISTS private_notes (
   created_at TIMESTAMPTZ NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL,
   deleted_at TIMESTAMPTZ,
+  qf_note_id TEXT,
+  qf_synced_at TIMESTAMPTZ,
+  qf_sync_error TEXT,
+  qf_ranges_json JSONB,
   PRIMARY KEY (user_id, id)
+);
+
+CREATE TABLE IF NOT EXISTS qf_user_connections (
+  user_id UUID PRIMARY KEY REFERENCES profiles(id) ON DELETE CASCADE,
+  qf_subject TEXT,
+  access_token_ciphertext TEXT NOT NULL,
+  refresh_token_ciphertext TEXT,
+  expires_at TIMESTAMPTZ,
+  scope TEXT[] NOT NULL DEFAULT '{}',
+  env TEXT NOT NULL CHECK (env IN ('prelive', 'production')),
+  status TEXT NOT NULL CHECK (status IN ('connected', 'needs_reauth', 'disconnected')),
+  connected_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 -- ─── Reflection Journey Entries (synced from local SQLite) ──
@@ -293,6 +317,7 @@ CREATE TABLE IF NOT EXISTS achievement_unlocks (
 );
 
 ALTER TABLE private_notes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE qf_user_connections ENABLE ROW LEVEL SECURITY;
 ALTER TABLE reflection_journey_entries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE achievement_unlocks ENABLE ROW LEVEL SECURITY;
 
@@ -391,6 +416,8 @@ CREATE INDEX IF NOT EXISTS idx_study_cards_user_due ON study_cards(user_id, due)
 CREATE INDEX IF NOT EXISTS idx_study_log_user_reviewed ON study_log(user_id, reviewed_at);
 CREATE INDEX IF NOT EXISTS idx_daily_scores_user_date ON daily_scores(user_id, date);
 CREATE INDEX IF NOT EXISTS idx_bookmarks_user ON bookmarks(user_id);
+CREATE INDEX IF NOT EXISTS idx_bookmarks_user_updated ON bookmarks(user_id, updated_at);
+CREATE INDEX IF NOT EXISTS idx_bookmarks_qf_id ON bookmarks(user_id, qf_bookmark_id);
 CREATE INDEX IF NOT EXISTS idx_highlights_user ON highlights(user_id);
 CREATE INDEX IF NOT EXISTS idx_reflections_ayah ON reflections(surah, ayah_start, ayah_end);
 CREATE INDEX IF NOT EXISTS idx_reflections_user ON reflections(user_id);
@@ -399,6 +426,8 @@ CREATE INDEX IF NOT EXISTS idx_reflection_comments_reflection ON reflection_comm
 CREATE INDEX IF NOT EXISTS idx_reports_reflection ON reports(reflection_id);
 CREATE INDEX IF NOT EXISTS idx_private_notes_user_updated ON private_notes(user_id, updated_at);
 CREATE INDEX IF NOT EXISTS idx_private_notes_ayah ON private_notes(user_id, surah, ayah_start, ayah_end);
+CREATE INDEX IF NOT EXISTS idx_private_notes_qf_id ON private_notes(user_id, qf_note_id);
+CREATE INDEX IF NOT EXISTS idx_qf_user_connections_status ON qf_user_connections(status, env);
 CREATE INDEX IF NOT EXISTS idx_reflection_journey_entries_user_updated ON reflection_journey_entries(user_id, updated_at);
 CREATE INDEX IF NOT EXISTS idx_achievement_unlocks_user_unlocked ON achievement_unlocks(user_id, unlocked_at);
 CREATE INDEX IF NOT EXISTS idx_achievement_unlocks_public_unlocked ON achievement_unlocks(unlocked_at);

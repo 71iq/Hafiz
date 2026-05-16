@@ -303,6 +303,13 @@ export async function createSchema(db: SQLiteDatabase): Promise<void> {
       surah INTEGER NOT NULL,
       ayah INTEGER NOT NULL,
       created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      deleted_at TEXT,
+      qf_bookmark_id TEXT,
+      qf_synced_at TEXT,
+      qf_sync_error TEXT,
+      qf_is_in_default_collection INTEGER NOT NULL DEFAULT 0,
+      qf_collections_count INTEGER NOT NULL DEFAULT 0,
       PRIMARY KEY (surah, ayah)
     );
 
@@ -348,7 +355,11 @@ export async function createSchema(db: SQLiteDatabase): Promise<void> {
       content TEXT NOT NULL,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
-      deleted_at TEXT
+      deleted_at TEXT,
+      qf_note_id TEXT,
+      qf_synced_at TEXT,
+      qf_sync_error TEXT,
+      qf_ranges_json TEXT
     );
 
     -- Reflection Journey owner-only progress and responses
@@ -392,6 +403,21 @@ export async function createSchema(db: SQLiteDatabase): Promise<void> {
       synced_at TEXT
     );
 
+    -- Quran Foundation user API sync queue (separate from Supabase sync)
+    CREATE TABLE IF NOT EXISTS qf_sync_queue (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      entity_type TEXT NOT NULL CHECK (entity_type IN ('bookmark', 'private_note')),
+      operation TEXT NOT NULL CHECK (operation IN ('UPSERT', 'DELETE')),
+      local_id TEXT NOT NULL,
+      data TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      attempt_count INTEGER NOT NULL DEFAULT 0,
+      last_error TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      synced_at TEXT
+    );
+
     -- ============================================================
     -- INDEXES for performance
     -- ============================================================
@@ -405,6 +431,10 @@ export async function createSchema(db: SQLiteDatabase): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_study_cards_due ON study_cards(due);
     CREATE INDEX IF NOT EXISTS idx_study_log_card ON study_log(card_id);
     CREATE INDEX IF NOT EXISTS idx_sync_queue_status ON sync_queue(table_name);
+    CREATE INDEX IF NOT EXISTS idx_qf_sync_queue_status ON qf_sync_queue(status, id);
+    CREATE INDEX IF NOT EXISTS idx_qf_sync_queue_local ON qf_sync_queue(entity_type, local_id);
+    CREATE INDEX IF NOT EXISTS idx_bookmarks_updated ON bookmarks(updated_at);
+    CREATE INDEX IF NOT EXISTS idx_bookmarks_qf_id ON bookmarks(qf_bookmark_id);
     CREATE INDEX IF NOT EXISTS idx_highlights_surah_ayah ON highlights(surah, ayah);
     CREATE INDEX IF NOT EXISTS idx_study_log_reviewed ON study_log(reviewed_at);
     CREATE INDEX IF NOT EXISTS idx_word_roots_lemma ON word_roots(lemma);
@@ -414,6 +444,7 @@ export async function createSchema(db: SQLiteDatabase): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_qf_hadith_cache_sa ON qf_ayah_hadith_cache(surah, ayah, language);
     CREATE INDEX IF NOT EXISTS idx_private_notes_ayah ON private_notes(surah, ayah_start, ayah_end);
     CREATE INDEX IF NOT EXISTS idx_private_notes_updated ON private_notes(updated_at);
+    CREATE INDEX IF NOT EXISTS idx_private_notes_qf_id ON private_notes(qf_note_id);
     CREATE INDEX IF NOT EXISTS idx_reflection_journey_levels_order ON reflection_journey_levels(order_index);
     CREATE INDEX IF NOT EXISTS idx_reflection_journey_entries_updated ON reflection_journey_entries(updated_at);
     CREATE INDEX IF NOT EXISTS idx_reflection_journey_entries_completed ON reflection_journey_entries(completed_at);

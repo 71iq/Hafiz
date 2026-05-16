@@ -1,8 +1,12 @@
 import React from "react";
 import { View, Text, Pressable, Platform, Image, type ImageSourcePropType } from "react-native";
-import * as WebBrowser from "expo-web-browser";
-import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { BookOpen } from "lucide-react-native";
+import { isSupabaseConfigured } from "@/lib/supabase";
+import { startAppOAuth } from "@/lib/auth/oauth";
+import { useDatabase } from "@/lib/database/provider";
 import { useStrings } from "@/lib/i18n/useStrings";
+import { runInitialQfUserSync } from "@/lib/quran-foundation/user-sync";
+import { QF_OAUTH_PROVIDER } from "@/lib/quran-foundation/user-types";
 import { useSettings } from "@/lib/settings/context";
 
 // NOTE: OAuth providers (Google, Apple, Facebook) must be configured in the
@@ -18,45 +22,27 @@ const appleLogo = require("@/assets/images/auth/apple-icon.png");
 const appleDarkLogo = require("@/assets/images/auth/apple_dark-icon.png");
 const facebookLogo = require("@/assets/images/auth/facebook-icon-icon.png");
 
-async function signInWithProvider(provider: "google" | "apple" | "facebook") {
-  if (Platform.OS === "web") {
-    // On web, Supabase handles redirect-based OAuth natively
-    await supabase.auth.signInWithOAuth({
-      provider,
-      options: { redirectTo: window.location.origin },
-    });
-  } else {
-    // On native, use expo-web-browser to open the OAuth flow
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider,
-      options: { skipBrowserRedirect: true },
-    });
-    if (error) throw error;
-    if (data.url) {
-      const result = await WebBrowser.openAuthSessionAsync(data.url);
-      if (result.type === "success" && result.url) {
-        // Extract tokens from the callback URL
-        const url = new URL(result.url);
-        const params = new URLSearchParams(url.hash.slice(1)); // tokens are in hash fragment
-        const accessToken = params.get("access_token");
-        const refreshToken = params.get("refresh_token");
-        if (accessToken && refreshToken) {
-          await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
-        }
-      }
-    }
-  }
-}
-
 export function OAuthButtons({ onError }: Props) {
   const s = useStrings();
+  const db = useDatabase();
   const { isDark } = useSettings();
 
   if (!isSupabaseConfigured()) return null;
 
   const handlePress = async (provider: "google" | "apple" | "facebook") => {
     try {
-      await signInWithProvider(provider);
+      await startAppOAuth(provider);
+    } catch (err: any) {
+      onError?.(err.message);
+    }
+  };
+
+  const handleQfPress = async () => {
+    try {
+      const result = await startAppOAuth(QF_OAUTH_PROVIDER);
+      if (result.qfConnected || Platform.OS === "web") {
+        runInitialQfUserSync(db).catch(console.warn);
+      }
     } catch (err: any) {
       onError?.(err.message);
     }
@@ -106,6 +92,24 @@ export function OAuthButtons({ onError }: Props) {
           borderColor={buttonBorderColor}
         />
       </View>
+
+      <Pressable
+        onPress={handleQfPress}
+        className="mt-3 flex-row items-center justify-center gap-2 rounded-full border px-4 py-3"
+        style={({ pressed }) => ({
+          opacity: pressed ? 0.75 : 1,
+          backgroundColor: buttonBackground,
+          borderColor: buttonBorderColor,
+        })}
+      >
+        <BookOpen size={17} color={isDark ? "#2dd4bf" : "#0d9488"} />
+        <Text
+          className="text-charcoal dark:text-neutral-100"
+          style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}
+        >
+          {s.authContinueWithQuranFoundation}
+        </Text>
+      </Pressable>
     </View>
   );
 }

@@ -1,14 +1,28 @@
 import { create } from "zustand";
 import { Platform } from "react-native";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { startAppOAuth } from "@/lib/auth/oauth";
+import { connectQfFromSession } from "@/lib/quran-foundation/user";
+import { QF_OAUTH_PROVIDER } from "@/lib/quran-foundation/user-types";
 import type { AuthState, AuthActions, Profile } from "./types";
 
 type AuthStore = AuthState & AuthActions;
 
 function buildFallbackProfile(user: NonNullable<AuthState["user"]>): Profile {
   const metadata = user.user_metadata ?? {};
-  const emailName = user.email?.split("@")[0] || "user";
-  const username = String(metadata.username || emailName).replace(/[^a-zA-Z0-9_]/g, "_").slice(0, 20) || "user";
+  const emailName = user.email?.split("@")[0];
+  const providerName =
+    metadata.username ||
+    metadata.preferred_username ||
+    metadata.name ||
+    metadata.full_name ||
+    metadata.sub;
+  const suffix = user.id.replace(/-/g, "").slice(0, 8);
+  const baseName = emailName || providerName || `user_${suffix}`;
+  const sanitized = String(baseName).replace(/[^a-zA-Z0-9_]/g, "_").replace(/^_+|_+$/g, "") || "user";
+  const username = emailName
+    ? sanitized.slice(0, 20)
+    : `${sanitized.slice(0, Math.max(3, 19 - suffix.length))}_${suffix}`.slice(0, 20);
 
   return {
     id: user.id,
@@ -22,6 +36,11 @@ function buildFallbackProfile(user: NonNullable<AuthState["user"]>): Profile {
     last_review_date: null,
     created_at: user.created_at,
   };
+}
+
+function connectQfSessionIfAvailable(session: AuthState["session"]): void {
+  if (!(session as any)?.provider_token) return;
+  connectQfFromSession(session).catch(console.warn);
 }
 
 function buildProfileInsert(user: NonNullable<AuthState["user"]>) {
@@ -73,6 +92,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
       if (session) {
         set({ session, user: session.user });
+        connectQfSessionIfAvailable(session);
         get().ensureProfile();
       }
 
@@ -84,6 +104,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         });
 
         if (session?.user) {
+          connectQfSessionIfAvailable(session);
           get().ensureProfile();
         } else {
           set({ profile: null });
@@ -106,6 +127,38 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       if (error) throw error;
       set({ session: data.session, user: data.user });
       await get().ensureProfile();
+    } catch (err: any) {
+      set({ error: err.message });
+      throw err;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  signInWithQuranFoundation: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const result = await startAppOAuth(QF_OAUTH_PROVIDER);
+      if (result.session) {
+        set({ session: result.session, user: result.session.user });
+        await get().ensureProfile();
+      }
+    } catch (err: any) {
+      set({ error: err.message });
+      throw err;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  linkQuranFoundation: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const result = await startAppOAuth(QF_OAUTH_PROVIDER, "link");
+      if (result.session) {
+        set({ session: result.session, user: result.session.user });
+        await get().ensureProfile();
+      }
     } catch (err: any) {
       set({ error: err.message });
       throw err;

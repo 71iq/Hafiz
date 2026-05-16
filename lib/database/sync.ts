@@ -240,7 +240,7 @@ async function pullTable(
 ): Promise<number> {
   // For tables with updated_at, filter by it. Otherwise use created_at.
   const timeCol =
-    tableName === "study_cards" || tableName === "private_notes" || tableName === "reflection_journey_entries"
+    tableName === "study_cards" || tableName === "bookmarks" || tableName === "private_notes" || tableName === "reflection_journey_entries"
       ? "updated_at"
       : tableName === "achievement_unlocks"
         ? "unlocked_at"
@@ -309,9 +309,30 @@ async function upsertStudyLog(db: SQLiteDatabase, row: any): Promise<void> {
 }
 
 async function upsertBookmark(db: SQLiteDatabase, row: any): Promise<void> {
+  const remoteUpdatedAt = row.updated_at ?? row.created_at;
+  const local = await db.getFirstAsync<{ updated_at: string }>(
+    "SELECT updated_at FROM bookmarks WHERE surah = ? AND ayah = ?",
+    [row.surah, row.ayah]
+  );
+  if (local && local.updated_at >= remoteUpdatedAt) return;
+
   await db.runAsync(
-    "INSERT OR IGNORE INTO bookmarks (surah, ayah, created_at) VALUES (?, ?, ?)",
-    [row.surah, row.ayah, row.created_at]
+    `INSERT OR REPLACE INTO bookmarks
+      (surah, ayah, created_at, updated_at, deleted_at, qf_bookmark_id, qf_synced_at,
+       qf_sync_error, qf_is_in_default_collection, qf_collections_count)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      row.surah,
+      row.ayah,
+      row.created_at,
+      remoteUpdatedAt,
+      row.deleted_at ?? null,
+      row.qf_bookmark_id ?? null,
+      row.qf_synced_at ?? null,
+      row.qf_sync_error ?? null,
+      row.qf_is_in_default_collection ? 1 : 0,
+      row.qf_collections_count ?? 0,
+    ]
   );
 }
 
@@ -335,11 +356,18 @@ async function upsertPrivateNote(db: SQLiteDatabase, row: any): Promise<void> {
     [row.id]
   );
   if (local && local.updated_at >= row.updated_at) return;
+  const qfRangesJson =
+    typeof row.qf_ranges_json === "string"
+      ? row.qf_ranges_json
+      : row.qf_ranges_json
+        ? JSON.stringify(row.qf_ranges_json)
+        : null;
 
   await db.runAsync(
     `INSERT OR REPLACE INTO private_notes
-      (id, surah, ayah_start, ayah_end, content, created_at, updated_at, deleted_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      (id, surah, ayah_start, ayah_end, content, created_at, updated_at, deleted_at,
+       qf_note_id, qf_synced_at, qf_sync_error, qf_ranges_json)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       row.id,
       row.surah,
@@ -349,6 +377,10 @@ async function upsertPrivateNote(db: SQLiteDatabase, row: any): Promise<void> {
       row.created_at,
       row.updated_at,
       row.deleted_at,
+      row.qf_note_id ?? null,
+      row.qf_synced_at ?? null,
+      row.qf_sync_error ?? null,
+      qfRangesJson,
     ]
   );
 }

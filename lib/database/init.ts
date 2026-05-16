@@ -1138,6 +1138,43 @@ async function runNewTabImports(
   await safeImport("reflection_journey_levels", () => importReflectionJourneyLevels(db, onProgress));
 }
 
+async function ensureQfUserSyncSchema(db: SQLiteDatabase): Promise<void> {
+  try { await db.execAsync("ALTER TABLE bookmarks ADD COLUMN updated_at TEXT"); } catch (_) {}
+  try { await db.execAsync("ALTER TABLE bookmarks ADD COLUMN deleted_at TEXT"); } catch (_) {}
+  try { await db.execAsync("ALTER TABLE bookmarks ADD COLUMN qf_bookmark_id TEXT"); } catch (_) {}
+  try { await db.execAsync("ALTER TABLE bookmarks ADD COLUMN qf_synced_at TEXT"); } catch (_) {}
+  try { await db.execAsync("ALTER TABLE bookmarks ADD COLUMN qf_sync_error TEXT"); } catch (_) {}
+  try { await db.execAsync("ALTER TABLE bookmarks ADD COLUMN qf_is_in_default_collection INTEGER NOT NULL DEFAULT 0"); } catch (_) {}
+  try { await db.execAsync("ALTER TABLE bookmarks ADD COLUMN qf_collections_count INTEGER NOT NULL DEFAULT 0"); } catch (_) {}
+  await db.execAsync("UPDATE bookmarks SET updated_at = created_at WHERE updated_at IS NULL");
+
+  try { await db.execAsync("ALTER TABLE private_notes ADD COLUMN qf_note_id TEXT"); } catch (_) {}
+  try { await db.execAsync("ALTER TABLE private_notes ADD COLUMN qf_synced_at TEXT"); } catch (_) {}
+  try { await db.execAsync("ALTER TABLE private_notes ADD COLUMN qf_sync_error TEXT"); } catch (_) {}
+  try { await db.execAsync("ALTER TABLE private_notes ADD COLUMN qf_ranges_json TEXT"); } catch (_) {}
+
+  await db.execAsync(`
+    CREATE TABLE IF NOT EXISTS qf_sync_queue (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      entity_type TEXT NOT NULL CHECK (entity_type IN ('bookmark', 'private_note')),
+      operation TEXT NOT NULL CHECK (operation IN ('UPSERT', 'DELETE')),
+      local_id TEXT NOT NULL,
+      data TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      attempt_count INTEGER NOT NULL DEFAULT 0,
+      last_error TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      synced_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_qf_sync_queue_status ON qf_sync_queue(status, id);
+    CREATE INDEX IF NOT EXISTS idx_qf_sync_queue_local ON qf_sync_queue(entity_type, local_id);
+    CREATE INDEX IF NOT EXISTS idx_bookmarks_updated ON bookmarks(updated_at);
+    CREATE INDEX IF NOT EXISTS idx_bookmarks_qf_id ON bookmarks(qf_bookmark_id);
+    CREATE INDEX IF NOT EXISTS idx_private_notes_qf_id ON private_notes(qf_note_id);
+  `);
+}
+
 // ─── Main initialization ─────────────────────────────────────
 
 export async function initializeDatabase(
@@ -1146,6 +1183,7 @@ export async function initializeDatabase(
 ): Promise<void> {
   console.log("[Import] Creating schema...");
   await createSchema(db);
+  await ensureQfUserSyncSchema(db);
 
   const populated = await isPopulated(db);
   if (populated) {

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { ToggleGroup } from "@/components/ui/ToggleGroup";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Sun, Moon, Smartphone, Minus, Plus, ChevronRight, ChevronLeft, User, LogOut } from "lucide-react-native";
+import { Sun, Moon, Smartphone, Minus, Plus, ChevronRight, ChevronLeft, User, LogOut, BookOpen, RefreshCw, Unlink } from "lucide-react-native";
 import {
   useSettings,
   FONT_SIZE_STEPS,
@@ -25,6 +25,10 @@ import { TranslationLanguagePicker } from "@/components/settings/TranslationLang
 import { useStrings } from "@/lib/i18n/useStrings";
 import { ALL_TEST_MODES, DEFAULT_ENABLED_MODES, type TestMode } from "@/lib/fsrs/types";
 import { useAuthStore } from "@/lib/auth/store";
+import { isSupabaseConfigured } from "@/lib/supabase";
+import { disconnectQfUser, getQfConnectionStatus } from "@/lib/quran-foundation/user";
+import { fullQfUserSync, runInitialQfUserSync } from "@/lib/quran-foundation/user-sync";
+import type { QfConnectionStatus } from "@/lib/quran-foundation/user-types";
 import { useRouter } from "expo-router";
 import { toArabicNumber } from "@/lib/arabic";
 
@@ -41,15 +45,19 @@ export default function SettingsScreen() {
   const db = useDatabase();
   const s = useStrings();
   const router = useRouter();
+  const configured = isSupabaseConfigured();
   const [pickerVisible, setPickerVisible] = useState(false);
   const [logoutDialogVisible, setLogoutDialogVisible] = useState(false);
+  const [qfStatus, setQfStatus] = useState<QfConnectionStatus>("disconnected");
+  const [qfBusy, setQfBusy] = useState(false);
+  const [qfMessage, setQfMessage] = useState<string | null>(null);
   const currentLang = getLanguageByCode(translationLanguage);
   const [enabledModes, setEnabledModes] = useState<TestMode[]>(DEFAULT_ENABLED_MODES);
   const [wordModes, setWordModes] = useState<Array<"wordMeaningArabic" | "wordMeaningTranslation">>([
     "wordMeaningArabic",
     "wordMeaningTranslation",
   ]);
-  const { user, profile, isLoading: authLoading, signOut } = useAuthStore();
+  const { user, profile, isLoading: authLoading, signOut, linkQuranFoundation } = useAuthStore();
   const accountName = profile?.display_name || profile?.username || user?.email || s.authProfile;
   const accountHandle = profile?.username ? `@${profile.username}` : user?.email || "";
   const fontSizeUsesFittedPageSize = viewMode === "page" && pageScroll === "horizontal";
@@ -66,6 +74,23 @@ export default function SettingsScreen() {
       }
     });
   }, [db]);
+
+  const refreshQfStatus = useCallback(async () => {
+    if (!configured || !user) {
+      setQfStatus("disconnected");
+      return;
+    }
+    const status = await getQfConnectionStatus();
+    if (status.ok) {
+      setQfStatus(status.status);
+    } else {
+      setQfStatus(status.code === "needs_reauth" ? "needs_reauth" : "disconnected");
+    }
+  }, [configured, user]);
+
+  useEffect(() => {
+    refreshQfStatus().catch(console.warn);
+  }, [refreshQfStatus]);
 
   useEffect(() => {
     db.getFirstAsync<{ value: string }>(
@@ -108,6 +133,50 @@ export default function SettingsScreen() {
     setLogoutDialogVisible(false);
     await signOut();
   }, [signOut]);
+
+  const handleQfConnect = useCallback(async () => {
+    setQfBusy(true);
+    setQfMessage(null);
+    try {
+      await linkQuranFoundation();
+      await runInitialQfUserSync(db);
+      await refreshQfStatus();
+      setQfMessage(s.qfSyncComplete);
+    } catch (err: any) {
+      setQfMessage(err.message || s.qfSyncFailed);
+    } finally {
+      setQfBusy(false);
+    }
+  }, [db, linkQuranFoundation, refreshQfStatus, s.qfSyncComplete, s.qfSyncFailed]);
+
+  const handleQfDisconnect = useCallback(async () => {
+    setQfBusy(true);
+    setQfMessage(null);
+    try {
+      await disconnectQfUser();
+      await refreshQfStatus();
+      setQfStatus("disconnected");
+      setQfMessage(s.qfDisconnected);
+    } catch (err: any) {
+      setQfMessage(err.message || s.qfSyncFailed);
+    } finally {
+      setQfBusy(false);
+    }
+  }, [refreshQfStatus, s.qfDisconnected, s.qfSyncFailed]);
+
+  const handleQfManualSync = useCallback(async () => {
+    setQfBusy(true);
+    setQfMessage(null);
+    try {
+      await fullQfUserSync(db);
+      await refreshQfStatus();
+      setQfMessage(s.qfSyncComplete);
+    } catch (err: any) {
+      setQfMessage(err.message || s.qfSyncFailed);
+    } finally {
+      setQfBusy(false);
+    }
+  }, [db, refreshQfStatus, s.qfSyncComplete, s.qfSyncFailed]);
 
   const THEME_OPTIONS: { value: ThemeMode; label: string; icon: typeof Sun }[] = [
     { value: "light", label: s.themeLight, icon: Sun },
@@ -155,6 +224,78 @@ export default function SettingsScreen() {
                   )}
                 </View>
               </View>
+              {configured && (
+                <View className="mb-4 rounded-3xl bg-surface dark:bg-surface-dark p-4">
+                  <View className="flex-row items-center gap-3">
+                    <View className="h-10 w-10 items-center justify-center rounded-full bg-primary-accent/10 dark:bg-primary-bright/15">
+                      <BookOpen size={18} color={isDark ? "#2dd4bf" : "#0d9488"} />
+                    </View>
+                    <View className="flex-1">
+                      <Text
+                        className="text-charcoal dark:text-neutral-100"
+                        style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, textAlign: isRTL ? "right" : "left" }}
+                      >
+                        {s.qfConnectionTitle}
+                      </Text>
+                      <Text
+                        className="text-warm-400 dark:text-neutral-500 mt-0.5"
+                        style={{ fontFamily: "Manrope_400Regular", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
+                      >
+                        {qfStatus === "connected"
+                          ? s.qfConnected
+                          : qfStatus === "needs_reauth"
+                            ? s.qfNeedsReauth
+                            : s.qfDisconnected}
+                      </Text>
+                    </View>
+                  </View>
+                  {!!qfMessage && (
+                    <Text
+                      className="mt-3 text-warm-500 dark:text-neutral-400"
+                      style={{ fontFamily: "Manrope_500Medium", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
+                    >
+                      {qfMessage}
+                    </Text>
+                  )}
+                  <View className="mt-4 flex-row gap-2">
+                    {qfStatus === "connected" ? (
+                      <>
+                        <Pressable
+                          onPress={handleQfManualSync}
+                          disabled={qfBusy}
+                          className="flex-1 flex-row items-center justify-center gap-2 rounded-full bg-primary-accent px-3 py-2.5"
+                          style={({ pressed }) => ({ opacity: qfBusy ? 0.5 : pressed ? 0.8 : 1 })}
+                        >
+                          {qfBusy ? <ActivityIndicator size="small" color="#FFFFFF" /> : <RefreshCw size={15} color="#FFFFFF" />}
+                          <Text style={{ color: "#FFFFFF", fontFamily: "Manrope_600SemiBold", fontSize: 13 }}>
+                            {s.qfManualSync}
+                          </Text>
+                        </Pressable>
+                        <Pressable
+                          onPress={handleQfDisconnect}
+                          disabled={qfBusy}
+                          className="h-10 w-10 items-center justify-center rounded-full bg-surface-high dark:bg-surface-dark-high"
+                          style={({ pressed }) => ({ opacity: qfBusy ? 0.5 : pressed ? 0.8 : 1 })}
+                        >
+                          <Unlink size={16} color={isDark ? "#ef4444" : "#dc2626"} />
+                        </Pressable>
+                      </>
+                    ) : (
+                      <Pressable
+                        onPress={handleQfConnect}
+                        disabled={qfBusy}
+                        className="flex-1 flex-row items-center justify-center gap-2 rounded-full bg-primary-accent px-3 py-2.5"
+                        style={({ pressed }) => ({ opacity: qfBusy ? 0.5 : pressed ? 0.8 : 1 })}
+                      >
+                        {qfBusy ? <ActivityIndicator size="small" color="#FFFFFF" /> : <BookOpen size={15} color="#FFFFFF" />}
+                        <Text style={{ color: "#FFFFFF", fontFamily: "Manrope_600SemiBold", fontSize: 13 }}>
+                          {qfStatus === "needs_reauth" ? s.qfReconnect : s.qfConnect}
+                        </Text>
+                      </Pressable>
+                    )}
+                  </View>
+                </View>
+              )}
               <Pressable
                 onPress={() => setLogoutDialogVisible(true)}
                 disabled={authLoading}

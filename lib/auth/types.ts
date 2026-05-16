@@ -29,6 +29,8 @@ export type AuthState = {
 export type AuthActions = {
   initialize: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
+  signInWithQuranFoundation: () => Promise<void>;
+  linkQuranFoundation: () => Promise<void>;
   signUp: (
     email: string,
     password: string,

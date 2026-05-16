@@ -6,6 +6,7 @@ import { useAuthStore } from "@/lib/auth/store";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { fullSync, type SyncStatus } from "@/lib/database/sync";
 import { getPendingSyncCount } from "@/lib/database/sync-queue";
+import { fullQfUserSync, getPendingQfSyncCount } from "@/lib/quran-foundation/user-sync";
 
 /**
  * Hook that manages automatic background sync.
@@ -35,10 +36,11 @@ export function useSync() {
 
     try {
       const result = await fullSync(db);
+      await fullQfUserSync(db);
       setStatus("synced");
 
       // Update pending count
-      const remaining = await getPendingSyncCount(db);
+      const remaining = await getPendingSyncCount(db) + await getPendingQfSyncCount(db);
       setPendingCount(remaining);
 
       // Reset to idle after a brief display of "synced"
@@ -88,7 +90,9 @@ export function useSync() {
       setPendingCount(0);
       return;
     }
-    getPendingSyncCount(db).then(setPendingCount).catch(console.warn);
+    Promise.all([getPendingSyncCount(db), getPendingQfSyncCount(db)])
+      .then(([supabaseCount, qfCount]) => setPendingCount(supabaseCount + qfCount))
+      .catch(console.warn);
   }, [db, user, status]);
 
   return { status, pendingCount, triggerSync: doSync };
