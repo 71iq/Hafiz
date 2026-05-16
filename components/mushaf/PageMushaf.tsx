@@ -148,6 +148,7 @@ type Props = {
   horizontalBottomInset?: number;
   scrollBottomInset?: number;
   onHorizontalGesture?: () => void;
+  highlightedAyahKey?: string | null;
   highlightedWord?: { surah: number; ayah: number; wordPos: number } | null;
 };
 
@@ -345,6 +346,7 @@ export function PageMushaf({
   horizontalBottomInset = 0,
   scrollBottomInset,
   onHorizontalGesture,
+  highlightedAyahKey = null,
   highlightedWord = null,
 }: Props) {
   const db = useDatabase();
@@ -936,6 +938,7 @@ export function PageMushaf({
       verticalLineSlotHeight,
       horizontalTypography,
       horizontalLineWidth,
+      highlightedAyahKey,
       highlightedWord,
       verticalScrollBottomInset,
     }),
@@ -943,6 +946,7 @@ export function PageMushaf({
       fontSize,
       lineHeight,
       horizontalTypography,
+      highlightedAyahKey,
       highlightedWord,
       horizontalLineWidth,
       pageWidth,
@@ -972,6 +976,7 @@ export function PageMushaf({
             lineLayout={item.lineLayout}
             globalWordOffset={item.globalWordOffset}
             onOpenAyahDetail={openAyahDetail}
+            highlightedAyahKey={highlightedAyahKey}
             highlightedWord={highlightedWord}
             paddingTop={pagePaddingTop}
             paddingBottom={pagePaddingBottom}
@@ -1006,6 +1011,7 @@ export function PageMushaf({
       horizontal,
       containerHeight,
       isRTL,
+      highlightedAyahKey,
       highlightedWord,
       verticalLineSlotHeight,
       verticalLineWidth,
@@ -1091,6 +1097,7 @@ export function PageMushaf({
                     lineLayout={item.lineLayout}
                     globalWordOffset={item.globalWordOffset}
                     onOpenAyahDetail={openAyahDetail}
+                    highlightedAyahKey={highlightedAyahKey}
                     highlightedWord={highlightedWord}
                     paddingTop={HORIZONTAL_PAGE_TOP_PADDING}
                     paddingBottom={0}

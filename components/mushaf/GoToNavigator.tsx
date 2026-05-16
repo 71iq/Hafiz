@@ -224,7 +224,14 @@ export function GoToNavigator({
             </View>
             <Text
               className="text-charcoal dark:text-neutral-300"
-              style={{ fontSize: 20, lineHeight: 36, writingDirection: "rtl", paddingHorizontal: 6, textAlign: "right" }}
+              style={{
+                fontSize: 20,
+                lineHeight: 38,
+                writingDirection: "rtl",
+                paddingHorizontal: 10,
+                textAlign: "right",
+                overflow: "visible",
+              }}
             >
               {surah.name_arabic}
             </Text>
@@ -292,7 +299,14 @@ export function GoToNavigator({
             </View>
             <Text
               className="text-charcoal dark:text-neutral-300"
-              style={{ fontSize: 20, lineHeight: 36, writingDirection: "rtl", paddingHorizontal: 6, textAlign: "right" }}
+              style={{
+                fontSize: 20,
+                lineHeight: 38,
+                writingDirection: "rtl",
+                paddingHorizontal: 10,
+                textAlign: "right",
+                overflow: "visible",
+              }}
             >
               {juz.surahNameArabic}
             </Text>

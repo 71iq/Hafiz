@@ -667,7 +667,14 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
                   <View className="px-5 py-2 bg-surface-low dark:bg-surface-dark-low">
                     <Text
                       className="text-primary-accent dark:text-primary-bright"
-                      style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13, paddingRight: 4, writingDirection: "rtl" }}
+                      style={{
+                        fontFamily: "Manrope_600SemiBold",
+                        fontSize: 13,
+                        lineHeight: 22,
+                        paddingHorizontal: 6,
+                        writingDirection: "rtl",
+                        overflow: "visible",
+                      }}
                     >
                       {group.nameArabic} — {group.nameEnglish}
                       <Text className="text-warm-400 dark:text-neutral-500" style={{ fontSize: 11 }}>

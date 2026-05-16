@@ -34,44 +34,22 @@ import { consumePendingDeepLink, peekPendingDeepLink } from "@/lib/deep-link";
 import { toArabicNumber } from "@/lib/arabic";
 import { SIDEBAR_BREAKPOINT, VIEWPORT_BREAKPOINTS } from "@/lib/ui/viewport";
 
+type MushafTarget = { surah: number; ayah: number; wordPos?: number };
+
 /** Registers an ayah navigation callback inside WordInteractionProvider */
 function AyahNavigationRegistrar({
-  items,
-  flashListRef,
-  goToPageRef,
-  viewMode,
-  onHighlightTarget,
+  onNavigateToTarget,
 }: {
-  items: MushafItem[];
-  flashListRef: React.RefObject<FlashListRef<MushafItem> | null>;
-  goToPageRef: React.RefObject<((page: number) => void) | null>;
-  viewMode: string;
-  onHighlightTarget: (target: { surah: number; ayah: number; wordPos?: number }) => void;
+  onNavigateToTarget: (target: MushafTarget) => void;
 }) {
   const { setNavigateToAyah, closeDetail } = useWordInteraction();
 
   useEffect(() => {
     setNavigateToAyah((surah: number, ayah: number, wordPos?: number) => {
       closeDetail();
-      onHighlightTarget({ surah, ayah, wordPos });
-
-      if (viewMode === "verse") {
-        const idx = items.findIndex(
-          (item) => item.type === "ayah" && item.surah === surah && item.ayah === ayah
-        );
-        if (idx >= 0 && flashListRef.current) {
-          flashListRef.current.scrollToIndex({ index: idx, animated: true });
-        }
-      } else if (viewMode === "page") {
-        const ayahItem = items.find(
-          (item) => item.type === "ayah" && item.surah === surah && item.ayah === ayah
-        );
-        if (ayahItem && ayahItem.type === "ayah" && goToPageRef.current) {
-          goToPageRef.current(ayahItem.v2Page);
-        }
-      }
+      onNavigateToTarget({ surah, ayah, wordPos });
     });
-  }, [items, viewMode, flashListRef, goToPageRef, setNavigateToAyah, closeDetail, onHighlightTarget]);
+  }, [setNavigateToAyah, closeDetail, onNavigateToTarget]);
 
   return null;
 }
@@ -268,7 +246,7 @@ function MushafInner() {
   const [highlightedWord, setHighlightedWord] = useState<{ surah: number; ayah: number; wordPos: number } | null>(null);
   const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const highlightTarget = useCallback((target: { surah: number; ayah: number; wordPos?: number }) => {
+  const highlightTarget = useCallback((target: MushafTarget) => {
     if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
     setHighlightedKey(`${target.surah}:${target.ayah}`);
     setHighlightedWord(
@@ -351,6 +329,46 @@ function MushafInner() {
     loadQuran();
   }, [db]);
 
+  const scrollToTarget = useCallback(
+    async (target: MushafTarget, animated = true) => {
+      if (viewMode === "verse") {
+        const idx = items.findIndex(
+          (item) => item.type === "ayah" && item.surah === target.surah && item.ayah === target.ayah
+        );
+        if (idx >= 0 && flashListRef.current) {
+          await flashListRef.current.scrollToIndex({
+            index: idx,
+            animated,
+            viewPosition: 0.12,
+          });
+          setTopAyah({ surah: target.surah, ayah: target.ayah });
+        }
+        return;
+      }
+
+      const ayahItem = items.find(
+        (item) => item.type === "ayah" && item.surah === target.surah && item.ayah === target.ayah
+      );
+      if (ayahItem && ayahItem.type === "ayah" && goToPageRef.current) {
+        goToPageRef.current(ayahItem.v2Page);
+      }
+    },
+    [items, viewMode]
+  );
+
+  const navigateToTarget = useCallback(
+    (target: MushafTarget, animated = true) => {
+      void scrollToTarget(target, animated)
+        .catch((e) => {
+          console.warn("[Mushaf] target navigation failed:", e);
+        })
+        .finally(() => {
+          highlightTarget(target);
+        });
+    },
+    [highlightTarget, scrollToTarget]
+  );
+
   // Consume pending deep link on tab focus (supports both hafiz:// links and search navigation)
   useFocusEffect(
     useCallback(() => {
@@ -358,29 +376,8 @@ function MushafInner() {
       const target = consumePendingDeepLink();
       if (!target) return;
 
-      highlightTarget(target);
-
-      // Scroll to the target ayah
-      if (viewMode === "verse") {
-        const idx = items.findIndex(
-          (item) => item.type === "ayah" && item.surah === target.surah && item.ayah === target.ayah
-        );
-        if (idx >= 0) {
-          setTimeout(() => {
-            flashListRef.current?.scrollToIndex({ index: idx, animated: true });
-          }, 100);
-        }
-      } else if (viewMode === "page") {
-        const ayahItem = items.find(
-          (item) => item.type === "ayah" && item.surah === target.surah && item.ayah === target.ayah
-        );
-        if (ayahItem && ayahItem.type === "ayah" && goToPageRef.current) {
-          setTimeout(() => {
-            goToPageRef.current?.(ayahItem.v2Page);
-          }, 100);
-        }
-      }
-    }, [loading, items, viewMode, highlightTarget])
+      setTimeout(() => navigateToTarget(target), 100);
+    }, [loading, items, navigateToTarget])
   );
 
   const renderItem = useCallback(
@@ -631,11 +628,7 @@ function MushafInner() {
   return (
     <>
       <AyahNavigationRegistrar
-        items={items}
-        flashListRef={flashListRef}
-        goToPageRef={goToPageRef}
-        viewMode={viewMode}
-        onHighlightTarget={highlightTarget}
+        onNavigateToTarget={navigateToTarget}
       />
       <SafeAreaView
         className="flex-1 bg-surface dark:bg-surface-dark"
@@ -817,6 +810,7 @@ function MushafInner() {
                 centerVerticalOnPhone={isPhone}
                 horizontalTopInset={0}
                 horizontalBottomInset={0}
+                highlightedAyahKey={highlightedKey}
                 highlightedWord={highlightedWord}
               />
             </View>
@@ -882,7 +876,7 @@ function MushafInner() {
               renderItem={renderItem}
               getItemType={getItemType}
               keyExtractor={keyExtractor}
-              extraData={{ fontSize, hideMode, highlightedKey }}
+              extraData={{ fontSize, hideMode, highlightedKey, highlightedWord }}
               contentContainerStyle={{ paddingBottom: isPhone ? 24 : 56 }}
               onScroll={handleScrollChrome}
               scrollEventThrottle={16}

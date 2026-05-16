@@ -61,6 +61,7 @@ type Props = {
   lineLayout?: PageLineLayout[];
   globalWordOffset?: number;
   onOpenAyahDetail?: (surah: number, ayah: number) => void;
+  highlightedAyahKey?: string | null;
   highlightedWord?: { surah: number; ayah: number; wordPos: number } | null;
   paddingTop?: number;
   paddingBottom?: number;
@@ -150,6 +151,7 @@ function MushafPageInner({
   lineLayout,
   globalWordOffset,
   onOpenAyahDetail,
+  highlightedAyahKey,
   highlightedWord,
   paddingTop = 8,
   paddingBottom = 32,
@@ -355,11 +357,16 @@ function MushafPageInner({
           {words.map((w, i) => {
             const identity = pageGlyphs[lineStartIndex + i]?.identity;
             if (identity && !identity.isMarker) {
-              const hlColor =
+              const isTargetWord =
                 highlightedWord &&
                 highlightedWord.surah === identity.surah &&
                 highlightedWord.ayah === identity.ayah &&
-                highlightedWord.wordPos === identity.wordPos
+                highlightedWord.wordPos === identity.wordPos;
+              const isTargetAyah =
+                !highlightedWord &&
+                highlightedAyahKey === `${identity.surah}:${identity.ayah}`;
+              const hlColor =
+                isTargetWord || isTargetAyah
                   ? "#0d9488"
                   : getHighlightColor(identity.surah, identity.ayah);
               return (
@@ -379,6 +386,9 @@ function MushafPageInner({
             }
             // Ayah end marker — opens ayah details modal
             if (identity && identity.isMarker) {
+              const isTargetAyah =
+                !highlightedWord &&
+                highlightedAyahKey === `${identity.surah}:${identity.ayah}`;
               return (
                 <Pressable
                   key={`w-${line.line_number}-${i}`}
@@ -393,7 +403,16 @@ function MushafPageInner({
                 >
                   <Text
                     className="text-charcoal dark:text-neutral-100"
-                    style={{ fontFamily, fontSize, lineHeight, paddingHorizontal: 2 }}
+                    style={{
+                      fontFamily,
+                      fontSize,
+                      lineHeight,
+                      paddingHorizontal: 2,
+                      ...(isTargetAyah && {
+                        backgroundColor: "rgba(13, 148, 136, 0.125)",
+                        borderRadius: 6,
+                      }),
+                    }}
                   >
                     {w}
                   </Text>
