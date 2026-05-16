@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { View, Text, ScrollView, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useRouter, type Href } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import { Plus, Trash2, Play, Layers, CalendarCheck2, Search, LayoutGrid, Languages, UserPlus, BookMarked, X as XIcon } from "lucide-react-native";
 import { useAuthStore } from "@/lib/auth/store";
@@ -79,6 +79,14 @@ export default function HomeScreen() {
     currentLevelTitle: null,
   });
 
+  const loadLatestUnlock = useCallback(async () => {
+    try {
+      setLatestUnlock(await getLatestUnseenUnlock(db));
+    } catch (e) {
+      console.warn(e);
+    }
+  }, [db]);
+
   const loadData = useCallback(async () => {
     // Load surah names for deck labels
     const surahRows = await db.getAllAsync<{ number: number; name_arabic: string; name_english: string }>(
@@ -114,7 +122,7 @@ export default function HomeScreen() {
     setVocabStats({
       total: vocabTotal,
     });
-    getLatestUnseenUnlock(db).then(setLatestUnlock).catch(console.warn);
+    loadLatestUnlock();
     setJourneySummary({
       totalLevels: reflectionJourneySummary.totalLevels,
       completedLevels: reflectionJourneySummary.completedLevels,
@@ -158,7 +166,7 @@ export default function HomeScreen() {
     } catch {
       setResume(null);
     }
-  }, [db, uiLanguage]);
+  }, [db, loadLatestUnlock, uiLanguage]);
 
   useFocusEffect(
     useCallback(() => {
@@ -174,8 +182,8 @@ export default function HomeScreen() {
     if (!latestUnlock) return;
     const achievementId = latestUnlock.achievementId;
     setLatestUnlock(null);
-    markAchievementSeen(db, achievementId).catch(console.warn);
-  }, [db, latestUnlock]);
+    markAchievementSeen(db, achievementId).then(loadLatestUnlock).catch(console.warn);
+  }, [db, latestUnlock, loadLatestUnlock]);
 
   const confirmDeleteDeck = async () => {
     if (!deckToDelete) return;
@@ -396,7 +404,7 @@ export default function HomeScreen() {
 
         {journeySummary.totalLevels > 0 && (
           <Pressable
-            onPress={() => router.push("/reflection-journey")}
+            onPress={() => router.push("/reflection-journey" as Href)}
             style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
             className="mb-6"
           >
