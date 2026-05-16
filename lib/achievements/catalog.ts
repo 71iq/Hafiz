@@ -34,8 +34,8 @@ const juzAchievements: AchievementDefinition[] = Array.from({ length: 30 }, (_, 
   const id = `juz_${String(juz).padStart(2, "0")}_completed`;
   return {
     id,
-    titleKey: `achievement.${id}.title`,
-    descriptionKey: `achievement.${id}.description`,
+    titleKey: "achievement.juz_completed.title",
+    descriptionKey: "achievement.juz_completed.description",
     category: "completion",
     icon: "layers",
     rarity: juz <= 3 ? "rare" : "epic",

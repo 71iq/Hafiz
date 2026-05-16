@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { View, Text, Pressable, Platform } from "react-native";
-import { Copy, BookMarked, Highlighter, PenLine, Trash2 } from "lucide-react-native";
+import { Copy, BookMarked, Highlighter, PenLine, StickyNote, Trash2 } from "lucide-react-native";
 import * as Clipboard from "expo-clipboard";
 import { Sheet, SheetContent } from "@/components/ui/Sheet";
 import { useSelection } from "@/lib/selection/context";
@@ -11,6 +11,7 @@ import { fetchUthmaniRange, fetchSurahName } from "@/lib/selection/queries";
 import { formatForCopy } from "@/lib/selection/format";
 import { HIGHLIGHT_COLORS } from "@/lib/selection/types";
 import { WriteReflectionSheet } from "@/components/reflections/WriteReflectionSheet";
+import { PrivateNoteSheet } from "@/components/notes/PrivateNoteSheet";
 
 export function SelectionActionBar() {
   const db = useDatabase();
@@ -28,6 +29,7 @@ export function SelectionActionBar() {
   } = useSelection();
   const [showColors, setShowColors] = useState(false);
   const [showWriteReflection, setShowWriteReflection] = useState(false);
+  const [showPrivateNote, setShowPrivateNote] = useState(false);
 
   const isOpen = selection !== null;
   const currentHighlight = selection ? getHighlightColor(selection.start.surah, selection.start.ayah) : undefined;
@@ -59,6 +61,10 @@ export function SelectionActionBar() {
 
   const handleReflect = useCallback(() => {
     setShowWriteReflection(true);
+  }, []);
+
+  const handleNote = useCallback(() => {
+    setShowPrivateNote(true);
   }, []);
 
   const handleHighlightColor = useCallback(
@@ -119,6 +125,12 @@ export function SelectionActionBar() {
             icon={<PenLine size={20} color={iconColor} />}
             label={s.addReflection}
             onPress={handleReflect}
+            isDark={isDark}
+          />
+          <ActionButton
+            icon={<StickyNote size={20} color={iconColor} />}
+            label={s.privateNoteAction}
+            onPress={handleNote}
             isDark={isDark}
           />
           <ActionButton
@@ -191,6 +203,20 @@ export function SelectionActionBar() {
         ayahEnd={selection.end.ayah}
         ayahPreview={`${selection.start.surah}:${selection.start.ayah}${selection.start.ayah !== selection.end.ayah ? `-${selection.end.ayah}` : ""}`}
         onSuccess={() => showToast(s.reflectionPosted)}
+      />
+    )}
+    {selection && (
+      <PrivateNoteSheet
+        open={showPrivateNote}
+        onClose={() => {
+          setShowPrivateNote(false);
+          handleClose();
+        }}
+        surah={selection.start.surah}
+        ayahStart={selection.start.ayah}
+        ayahEnd={selection.end.ayah}
+        ayahPreview={`${selection.start.surah}:${selection.start.ayah}${selection.start.ayah !== selection.end.ayah ? `-${selection.end.ayah}` : ""}`}
+        onSaved={() => showToast(s.privateNoteSaved)}
       />
     )}
     </>

@@ -1,14 +1,15 @@
 import { useMemo } from "react";
-import { View, Text, Pressable } from "react-native";
+import { ScrollView, View, Text, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ChevronLeft, ChevronRight, UserRound } from "lucide-react-native";
 import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { PublicBadgesGrid } from "@/components/achievements/PublicBadgesGrid";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
-import { fetchPublicProfile } from "@/lib/leaderboard/api";
+import { fetchPublicAchievementUnlocks, fetchPublicProfile } from "@/lib/leaderboard/api";
 
 export default function PublicProfileScreen() {
   const { isDark, isRTL } = useSettings();
@@ -21,6 +22,12 @@ export default function PublicProfileScreen() {
   const { data: profile, isLoading } = useQuery({
     queryKey: ["publicProfile", profileId],
     queryFn: () => fetchPublicProfile(profileId),
+    enabled: profileId.length > 0,
+    staleTime: 1000 * 60 * 2,
+  });
+  const { data: badges = [] } = useQuery({
+    queryKey: ["publicAchievementUnlocks", profileId],
+    queryFn: () => fetchPublicAchievementUnlocks(profileId),
     enabled: profileId.length > 0,
     staleTime: 1000 * 60 * 2,
   });
@@ -83,7 +90,7 @@ export default function PublicProfileScreen() {
           />
         </View>
       ) : (
-        <View className="px-6">
+        <ScrollView className="flex-1 px-6" contentContainerStyle={{ paddingBottom: 80 }}>
           <View className="flex-row gap-3 mb-3">
             <Card elevation="low" className="flex-1 p-5">
               <Text className="text-charcoal dark:text-neutral-100" style={{ fontFamily: "NotoSerif_700Bold", fontSize: 26 }}>
@@ -121,7 +128,17 @@ export default function PublicProfileScreen() {
               </Text>
             </Card>
           </View>
-        </View>
+
+          <Card elevation="low" className="mt-3 p-5">
+            <Text
+              className="mb-3 text-charcoal dark:text-neutral-100"
+              style={{ fontFamily: "Manrope_700Bold", fontSize: 16, textAlign: isRTL ? "right" : "left" }}
+            >
+              {s.publicBadges}
+            </Text>
+            <PublicBadgesGrid unlocks={badges} />
+          </Card>
+        </ScrollView>
       )}
     </SafeAreaView>
   );

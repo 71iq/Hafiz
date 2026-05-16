@@ -5,6 +5,8 @@ import { useFocusEffect } from "@react-navigation/native";
 import { Card } from "@/components/ui/Card";
 import { ActivityHeatmap } from "@/components/progress/ActivityHeatmap";
 import { SurahProgressList } from "@/components/progress/SurahProgressList";
+import { AchievementBadge } from "@/components/achievements/AchievementBadge";
+import { AchievementGrid } from "@/components/achievements/AchievementGrid";
 import { AuthGate } from "@/components/ui/AuthGate";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { useSettings } from "@/lib/settings/context";
@@ -17,6 +19,8 @@ import {
   getTotalAyahCardCount,
 } from "@/lib/fsrs/queries";
 import { subscribeReviewActivity } from "@/lib/fsrs/review-events";
+import { getAchievementDashboard, type AchievementDashboard } from "@/lib/achievements/queries";
+import { getAchievementDefinition } from "@/lib/achievements/catalog";
 
 type HeatmapDay = { date: string; count: number };
 type SurahProgress = {
@@ -52,12 +56,14 @@ export default function ProgressScreen() {
   const [totalReviews, setTotalReviews] = useState(0);
   const [heatmapData, setHeatmapData] = useState<HeatmapDay[]>([]);
   const [surahProgress, setSurahProgress] = useState<SurahProgress[]>([]);
+  const [achievementDashboard, setAchievementDashboard] = useState<AchievementDashboard | null>(null);
 
   const loadData = useCallback(async () => {
-    const [cards, memorized, reviewStats] = await Promise.all([
+    const [cards, memorized, reviewStats, achievements] = await Promise.all([
       getTotalAyahCardCount(db),
       getMemorizedAyahCardCount(db),
       getReviewStats(db),
+      getAchievementDashboard(db),
     ]);
     setTotalAyahCards(cards);
     setMemorizedAyahCards(memorized);
@@ -66,6 +72,7 @@ export default function ProgressScreen() {
     setActiveReviewDays(reviewStats.activeDays);
     setTotalReviews(reviewStats.totalReviews);
     setHeatmapData(reviewStats.activity);
+    setAchievementDashboard(achievements);
 
     // Surah progress: per-surah card counts with memorization state
     const surahRows = await db.getAllAsync<{
@@ -226,6 +233,61 @@ export default function ProgressScreen() {
             </Text>
           </Card>
         </View>
+
+        {/* Achievements */}
+        {achievementDashboard && (
+          <Card elevation="low" className="p-6 mb-6">
+            <View className={`mb-4 flex-row items-start justify-between gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
+              <View className={isRTL ? "items-end" : "items-start"}>
+                <Text
+                  className="text-charcoal dark:text-neutral-200"
+                  style={{ fontFamily: "Manrope_700Bold", fontSize: 16, textAlign: isRTL ? "right" : "left" }}
+                >
+                  {s.achievementsTitle}
+                </Text>
+                <Text
+                  className="mt-1 text-warm-400 dark:text-neutral-500"
+                  style={{ fontFamily: "Manrope_500Medium", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
+                >
+                  {`${achievementDashboard.unlockedCount} / ${achievementDashboard.totalCount}`}
+                </Text>
+              </View>
+            </View>
+
+            {achievementDashboard.recentUnlocks.length > 0 && (
+              <View className="mb-5">
+                <Text
+                  className="mb-2 text-warm-500 dark:text-neutral-400"
+                  style={{ fontFamily: "Manrope_700Bold", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
+                >
+                  {s.achievementRecentUnlocks}
+                </Text>
+                <View className={`flex-row flex-wrap gap-2 ${isRTL ? "flex-row-reverse" : ""}`}>
+                  {achievementDashboard.recentUnlocks.map((unlock) => {
+                    const definition = getAchievementDefinition(unlock.achievementId);
+                    if (!definition) return null;
+                    return (
+                      <AchievementBadge
+                        key={unlock.achievementId}
+                        compact
+                        item={{
+                          ...definition,
+                          unlockedAt: unlock.unlockedAt,
+                          seenAt: unlock.seenAt,
+                          localPayload: unlock.localPayload,
+                          publicPayload: unlock.publicPayload,
+                          progress: { achievementId: definition.id, currentValue: definition.target, targetValue: definition.target },
+                        }}
+                      />
+                    );
+                  })}
+                </View>
+              </View>
+            )}
+
+            <AchievementGrid items={achievementDashboard.items} />
+          </Card>
+        )}
 
         {/* Activity heatmap */}
         <Card elevation="low" className="p-6 mb-6">

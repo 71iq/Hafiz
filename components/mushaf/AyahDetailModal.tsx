@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { ActivityIndicator, Platform, Pressable, Text, View, useWindowDimensions } from "react-native";
 import * as Clipboard from "expo-clipboard";
-import { BookOpenText, Bookmark, MessageCircle, Pause, Play, Share2 } from "lucide-react-native";
+import { BookOpenText, Bookmark, MessageCircle, NotebookPen, Pause, Play, Share2 } from "lucide-react-native";
 import { ReflectionsSection } from "@/components/reflections/ReflectionsSection";
 import { QiraatTab } from "@/components/mushaf/word-tabs/QiraatTab";
 import { HadithTab } from "@/components/mushaf/ayah-tabs/HadithTab";
+import { PrivateNotesSection } from "@/components/notes/PrivateNotesSection";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { isQpcFontLoaded, loadQpcFont, qpcFontName } from "@/lib/fonts/loader";
 import { useAyahAudio } from "@/lib/audio/ayah-audio";
@@ -34,7 +35,7 @@ type AyahRow = {
   surah_name_english: string;
 };
 
-type TabKey = "translation" | "tafsir" | "hadith" | "qiraat" | "reflections";
+type TabKey = "translation" | "tafsir" | "hadith" | "qiraat" | "notes" | "reflections";
 
 type Props = {
   target: TargetAyah | null;
@@ -215,6 +216,7 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
     { key: "tafsir", label: s.tafseer, icon: <BookOpenText size={15} color={activeTab === "tafsir" ? "#0d9488" : iconColor} /> },
     { key: "hadith", label: s.ayahTabHadith, icon: <BookOpenText size={15} color={activeTab === "hadith" ? "#0d9488" : iconColor} /> },
     { key: "qiraat", label: s.wordTabQiraat, icon: <BookOpenText size={15} color={activeTab === "qiraat" ? "#0d9488" : iconColor} /> },
+    { key: "notes", label: s.privateNotes, icon: <NotebookPen size={15} color={activeTab === "notes" ? "#0d9488" : iconColor} /> },
     { key: "reflections", label: s.reflections, icon: <MessageCircle size={15} color={activeTab === "reflections" ? "#0d9488" : iconColor} /> },
   ];
 
@@ -366,6 +368,7 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
           )}
           {activeTab === "hadith" && <HadithTab surah={target.surah} ayah={target.ayah} />}
           {activeTab === "qiraat" && <QiraatTab surah={target.surah} ayah={target.ayah} />}
+          {activeTab === "notes" && <PrivateNotesSection surah={target.surah} ayah={target.ayah} />}
           {activeTab === "reflections" && (
             <ReflectionsSection surah={target.surah} ayah={target.ayah} initiallyExpanded showHeader={false} />
           )}

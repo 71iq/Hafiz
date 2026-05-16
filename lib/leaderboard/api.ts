@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import type { AchievementUnlock } from "@/lib/achievements/types";
 
 export type LeaderboardEntry = {
   user_id: string;
@@ -201,4 +202,35 @@ export async function fetchPublicProfile(userId: string): Promise<PublicProfile 
 
   if (error) throw error;
   return (data as PublicProfile | null) ?? null;
+}
+
+export async function fetchPublicAchievementUnlocks(userId: string): Promise<AchievementUnlock[]> {
+  if (!isSupabaseConfigured() || !userId) return [];
+
+  const { data, error } = await supabase
+    .from("achievement_unlocks")
+    .select("achievement_id, unlocked_at, public_payload")
+    .eq("user_id", userId)
+    .order("unlocked_at", { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []).map((row: any) => ({
+    achievementId: row.achievement_id,
+    unlockedAt: row.unlocked_at,
+    seenAt: row.unlocked_at,
+    localPayload: {},
+    publicPayload: parsePayload(row.public_payload),
+  }));
+}
+
+function parsePayload(value: unknown): Record<string, unknown> {
+  if (!value) return {};
+  if (typeof value === "object" && !Array.isArray(value)) return value as Record<string, unknown>;
+  if (typeof value !== "string") return {};
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
 }

@@ -16,6 +16,7 @@ import { CreateDeckSheet } from "@/components/flashcards/CreateDeckSheet";
 import { SearchCommand } from "@/components/SearchCommand";
 import { Toast } from "@/components/ui/Toast";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { AchievementUnlockToast } from "@/components/achievements/AchievementUnlockToast";
 import {
   getDecks,
   getDueCount,
@@ -28,6 +29,12 @@ import {
 } from "@/lib/fsrs/queries";
 import type { DeckScope } from "@/lib/fsrs/types";
 import { subscribeReviewActivity } from "@/lib/fsrs/review-events";
+import {
+  getLatestUnseenUnlock,
+  markAchievementSeen,
+  subscribeAchievementUnlocks,
+} from "@/lib/achievements/queries";
+import type { AchievementUnlock } from "@/lib/achievements/types";
 
 type DeckDisplay = {
   id: string;
@@ -58,6 +65,7 @@ export default function HomeScreen() {
   const [deckToDelete, setDeckToDelete] = useState<string | null>(null);
   const [surahNames, setSurahNames] = useState<Record<number, string>>({});
   const [resume, setResume] = useState<{ surah: number; ayah: number; page: number } | null>(null);
+  const [latestUnlock, setLatestUnlock] = useState<AchievementUnlock | null>(null);
 
   const loadData = useCallback(async () => {
     // Load surah names for deck labels
@@ -95,6 +103,7 @@ export default function HomeScreen() {
     setVocabStats({
       total: vocabTotal,
     });
+    getLatestUnseenUnlock(db).then(setLatestUnlock).catch(console.warn);
 
     try {
       const row = await db.getFirstAsync<{ value: string }>(
@@ -140,6 +149,15 @@ export default function HomeScreen() {
   );
 
   useEffect(() => subscribeReviewActivity(loadData), [loadData]);
+
+  useEffect(() => subscribeAchievementUnlocks((unlock) => setLatestUnlock(unlock)), []);
+
+  const dismissLatestUnlock = useCallback(() => {
+    if (!latestUnlock) return;
+    const achievementId = latestUnlock.achievementId;
+    setLatestUnlock(null);
+    markAchievementSeen(db, achievementId).catch(console.warn);
+  }, [db, latestUnlock]);
 
   const confirmDeleteDeck = async () => {
     if (!deckToDelete) return;
@@ -257,6 +275,10 @@ export default function HomeScreen() {
               </View>
             </Card>
           </Pressable>
+        )}
+
+        {latestUnlock && (
+          <AchievementUnlockToast unlock={latestUnlock} onDismiss={dismissLatestUnlock} />
         )}
 
         {/* Today focus */}
