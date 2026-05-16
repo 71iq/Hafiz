@@ -1,7 +1,8 @@
 import { useState, useCallback, useEffect } from "react";
-import { View, Text, ScrollView } from "react-native";
+import { View, Text, ScrollView, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
+import { ChevronDown, ChevronUp, Trophy } from "lucide-react-native";
 import { Card } from "@/components/ui/Card";
 import { ActivityHeatmap } from "@/components/progress/ActivityHeatmap";
 import { SurahProgressList } from "@/components/progress/SurahProgressList";
@@ -57,6 +58,7 @@ export default function ProgressScreen() {
   const [heatmapData, setHeatmapData] = useState<HeatmapDay[]>([]);
   const [surahProgress, setSurahProgress] = useState<SurahProgress[]>([]);
   const [achievementDashboard, setAchievementDashboard] = useState<AchievementDashboard | null>(null);
+  const [achievementsExpanded, setAchievementsExpanded] = useState(false);
 
   const loadData = useCallback(async () => {
     const [cards, memorized, reviewStats, achievements] = await Promise.all([
@@ -123,6 +125,22 @@ export default function ProgressScreen() {
 
   const formatStat = (val: number) => val > 0 ? val.toLocaleString() : "—";
   const masteryPct = totalAyahCards > 0 ? Math.round((memorizedAyahCards / totalAyahCards) * 100) : 0;
+  const recentAchievementItems: AchievementDashboard["items"] = [];
+  if (achievementDashboard) {
+    for (const unlock of achievementDashboard.recentUnlocks) {
+      const definition = getAchievementDefinition(unlock.achievementId);
+      if (!definition) continue;
+      recentAchievementItems.push({
+        ...definition,
+        unlockedAt: unlock.unlockedAt,
+        seenAt: unlock.seenAt,
+        localPayload: unlock.localPayload,
+        publicPayload: unlock.publicPayload,
+        progress: { achievementId: definition.id, currentValue: definition.target, targetValue: definition.target },
+      });
+      if (recentAchievementItems.length === 3) break;
+    }
+  }
 
   return (
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
@@ -234,61 +252,6 @@ export default function ProgressScreen() {
           </Card>
         </View>
 
-        {/* Achievements */}
-        {achievementDashboard && (
-          <Card elevation="low" className="p-6 mb-6">
-            <View className={`mb-4 flex-row items-start justify-between gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
-              <View className={isRTL ? "items-end" : "items-start"}>
-                <Text
-                  className="text-charcoal dark:text-neutral-200"
-                  style={{ fontFamily: "Manrope_700Bold", fontSize: 16, textAlign: isRTL ? "right" : "left" }}
-                >
-                  {s.achievementsTitle}
-                </Text>
-                <Text
-                  className="mt-1 text-warm-400 dark:text-neutral-500"
-                  style={{ fontFamily: "Manrope_500Medium", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
-                >
-                  {`${achievementDashboard.unlockedCount} / ${achievementDashboard.totalCount}`}
-                </Text>
-              </View>
-            </View>
-
-            {achievementDashboard.recentUnlocks.length > 0 && (
-              <View className="mb-5">
-                <Text
-                  className="mb-2 text-warm-500 dark:text-neutral-400"
-                  style={{ fontFamily: "Manrope_700Bold", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
-                >
-                  {s.achievementRecentUnlocks}
-                </Text>
-                <View className={`flex-row flex-wrap gap-2 ${isRTL ? "flex-row-reverse" : ""}`}>
-                  {achievementDashboard.recentUnlocks.map((unlock) => {
-                    const definition = getAchievementDefinition(unlock.achievementId);
-                    if (!definition) return null;
-                    return (
-                      <AchievementBadge
-                        key={unlock.achievementId}
-                        compact
-                        item={{
-                          ...definition,
-                          unlockedAt: unlock.unlockedAt,
-                          seenAt: unlock.seenAt,
-                          localPayload: unlock.localPayload,
-                          publicPayload: unlock.publicPayload,
-                          progress: { achievementId: definition.id, currentValue: definition.target, targetValue: definition.target },
-                        }}
-                      />
-                    );
-                  })}
-                </View>
-              </View>
-            )}
-
-            <AchievementGrid items={achievementDashboard.items} />
-          </Card>
-        )}
-
         {/* Activity heatmap */}
         <Card elevation="low" className="p-6 mb-6">
           <Text
@@ -315,6 +278,86 @@ export default function ProgressScreen() {
           {s.progressSurahProgress}
         </Text>
         <SurahProgressList data={surahProgress} isDark={isDark} s={s} />
+
+        {/* Achievements */}
+        {achievementDashboard && (
+          <Card elevation="low" className="p-5 mt-6 mb-6">
+            <View className={`flex-row items-center justify-between gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
+              <View className={`min-w-0 flex-1 flex-row items-center gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
+                <View
+                  className="h-11 w-11 items-center justify-center rounded-full"
+                  style={{ backgroundColor: isDark ? "rgba(45,212,191,0.12)" : "rgba(13,148,136,0.10)" }}
+                >
+                  <Trophy size={20} color={isDark ? "#2dd4bf" : "#0d9488"} />
+                </View>
+                <View className={`min-w-0 flex-1 ${isRTL ? "items-end" : "items-start"}`}>
+                  <Text
+                    className="text-charcoal dark:text-neutral-200"
+                    style={{ fontFamily: "Manrope_700Bold", fontSize: 16, textAlign: isRTL ? "right" : "left" }}
+                  >
+                    {s.achievementsTitle}
+                  </Text>
+                  <Text
+                    className="mt-1 text-warm-400 dark:text-neutral-500"
+                    style={{ fontFamily: "Manrope_500Medium", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
+                  >
+                    {`${achievementDashboard.unlockedCount} / ${achievementDashboard.totalCount}`}
+                  </Text>
+                </View>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={achievementsExpanded ? s.achievementsHideAll : s.achievementsViewAll}
+                onPress={() => setAchievementsExpanded((expanded) => !expanded)}
+                className="rounded-full px-3 py-2"
+                style={({ pressed }) => ({
+                  backgroundColor: isDark ? "rgba(45,212,191,0.12)" : "rgba(13,148,136,0.10)",
+                  opacity: pressed ? 0.72 : 1,
+                })}
+              >
+                <View className={`flex-row items-center gap-1.5 ${isRTL ? "flex-row-reverse" : ""}`}>
+                  <Text
+                    className="text-primary dark:text-primary-bright"
+                    style={{ fontFamily: "Manrope_700Bold", fontSize: 12 }}
+                  >
+                    {achievementsExpanded ? s.achievementsHideAll : s.achievementsViewAll}
+                  </Text>
+                  {achievementsExpanded ? (
+                    <ChevronUp size={15} color={isDark ? "#2dd4bf" : "#0d9488"} />
+                  ) : (
+                    <ChevronDown size={15} color={isDark ? "#2dd4bf" : "#0d9488"} />
+                  )}
+                </View>
+              </Pressable>
+            </View>
+
+            {recentAchievementItems.length > 0 && (
+              <View className="mt-4">
+                <Text
+                  className="mb-2 text-warm-500 dark:text-neutral-400"
+                  style={{ fontFamily: "Manrope_700Bold", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
+                >
+                  {s.achievementRecentUnlocks}
+                </Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ gap: 8, flexDirection: isRTL ? "row-reverse" : "row", paddingHorizontal: 1 }}
+                >
+                  {recentAchievementItems.map((item) => (
+                    <AchievementBadge key={item.id} compact item={item} />
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+
+            {achievementsExpanded && (
+              <View className="mt-5">
+                <AchievementGrid items={achievementDashboard.items} />
+              </View>
+            )}
+          </Card>
+        )}
       </ScrollView>
     </SafeAreaView>
   );

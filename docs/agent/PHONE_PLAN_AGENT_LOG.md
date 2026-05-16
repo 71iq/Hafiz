@@ -1661,3 +1661,26 @@ Saved in `phase19/`:
 ### Validation result
 - `npm run typecheck`: passed.
 - `npm run build:web`: passed with Node heap and Expo/NPM cache paths redirected for the workspace sandbox.
+
+## 2026-05-16 — Progress Page Achievement Drawer
+
+### Scope decisions
+1. Fixed only Progress page information order and achievement density.
+2. Treated memorization activity and surah progress as the primary page content, with achievements available as secondary detail.
+3. Kept all achievement data real/local and preserved the full grid behind an explicit expand control.
+
+### Implemented in this step
+- `app/(tabs)/progress.tsx`:
+  - Moved Memorization Activity and Surah Progress above achievements.
+  - Replaced the always-expanded achievement dashboard with a compact drawer showing the unlocked count and up to three recent unlocks.
+  - Added an expand/collapse button for the full achievement grid.
+- `lib/i18n/strings.ts`:
+  - Added bilingual labels for the achievement drawer control.
+
+### Validation result
+- `npm run typecheck`: passed after installing dependencies with `npm ci` because the worktree had no `node_modules`.
+- `npm run build:web`: passed.
+- `npx expo start --web --port 8098 --localhost`: failed with the existing Expo CLI `AggregateError` before serving.
+- Static export smoke checked from `dist/` at 360px and 412px:
+  - Activity and Surah Progress render before Achievements.
+  - The achievement drawer is collapsed by default, expands to the full grid, and has no horizontal document overflow.
