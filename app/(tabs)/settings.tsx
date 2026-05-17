@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { ToggleGroup } from "@/components/ui/ToggleGroup";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Sun, Moon, Smartphone, Minus, Plus, ChevronRight, ChevronLeft, User, LogOut, BookOpen, RefreshCw, Unlink, Info, FileText, HeartHandshake, ExternalLink, type LucideIcon } from "lucide-react-native";
+import { Sun, Moon, Smartphone, Minus, Plus, ChevronRight, ChevronLeft, User, LogOut, BookOpen, RefreshCw, Unlink, Info, FileText, HeartHandshake, ExternalLink, Sparkles, type LucideIcon } from "lucide-react-native";
 import {
   useSettings,
   FONT_SIZE_STEPS,
@@ -32,6 +32,7 @@ import { fullQfUserSync, runInitialQfUserSync } from "@/lib/quran-foundation/use
 import type { QfConnectionStatus } from "@/lib/quran-foundation/user-types";
 import { useRouter } from "expo-router";
 import { toArabicNumber } from "@/lib/arabic";
+import { ZaytPreviewModal } from "@/components/zayt/ZaytPreviewModal";
 
 export default function SettingsScreen() {
   const {
@@ -49,6 +50,7 @@ export default function SettingsScreen() {
   const configured = isSupabaseConfigured();
   const qfAuthEnabled = isQfUserAuthEnabled();
   const [pickerVisible, setPickerVisible] = useState(false);
+  const [zaytPreviewVisible, setZaytPreviewVisible] = useState(false);
   const [logoutDialogVisible, setLogoutDialogVisible] = useState(false);
   const [qfStatus, setQfStatus] = useState<QfConnectionStatus>("disconnected");
   const [qfBusy, setQfBusy] = useState(false);
@@ -692,6 +694,19 @@ export default function SettingsScreen() {
           </View>
         </Card>
 
+        {/* Developer Tools */}
+        <SectionLabel>{s.sectionDeveloperTools}</SectionLabel>
+        <Card elevation="low" className="p-2 mb-8">
+          <SettingsLinkRow
+            icon={Sparkles}
+            title={s.settingsZaytPreview}
+            description={s.settingsZaytPreviewDesc}
+            onPress={() => setZaytPreviewVisible(true)}
+            isDark={isDark}
+            isRTL={isRTL}
+          />
+        </Card>
+
         {/* About & Public Links */}
         <SectionLabel>{s.settingsAboutSection}</SectionLabel>
         <Card elevation="low" className="p-2 mb-8">
@@ -794,6 +809,10 @@ export default function SettingsScreen() {
           onClose={() => setPickerVisible(false)}
         />
       </ScrollView>
+      <ZaytPreviewModal
+        visible={zaytPreviewVisible}
+        onClose={() => setZaytPreviewVisible(false)}
+      />
     </SafeAreaView>
   );
 }
