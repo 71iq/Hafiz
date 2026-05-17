@@ -269,9 +269,64 @@ export async function addAyahToDeck(
 }
 
 export const MEANINGS_DECK_ID = "meanings";
+export const MUTASHABIHAT_DECK_ID = "mutashabihat";
+export const MUTASHABIHAT_DECK_NAME = "Mutashabihat";
 
 export function meaningCardId(surah: number, ayah: number, wordPos: number): string {
   return `word:${surah}:${ayah}:${wordPos}`;
+}
+
+export function mutashabihatCardId(surah: number, ayah: number): string {
+  return `${MUTASHABIHAT_DECK_ID}:${surah}:${ayah}`;
+}
+
+async function ensureMutashabihatDeck(db: SQLiteDatabase, now: string): Promise<boolean> {
+  const existing = await db.getFirstAsync<{ value: string }>(
+    "SELECT value FROM user_settings WHERE key = ?",
+    [`deck_${MUTASHABIHAT_DECK_ID}`]
+  );
+
+  const metadata = {
+    id: MUTASHABIHAT_DECK_ID,
+    name: MUTASHABIHAT_DECK_NAME,
+    scope: { type: "custom", surahStart: 1, ayahStart: 1, surahEnd: 1, ayahEnd: 1 },
+    createdAt: now,
+  };
+
+  if (!existing) {
+    await db.runAsync(
+      "INSERT INTO user_settings (key, value) VALUES (?, ?)",
+      [`deck_${MUTASHABIHAT_DECK_ID}`, JSON.stringify(metadata)]
+    );
+    return true;
+  }
+
+  try {
+    const current = JSON.parse(existing.value);
+    if (current?.name !== MUTASHABIHAT_DECK_NAME) {
+      await db.runAsync(
+        "UPDATE user_settings SET value = ? WHERE key = ?",
+        [
+          JSON.stringify({
+            ...metadata,
+            ...current,
+            id: MUTASHABIHAT_DECK_ID,
+            name: MUTASHABIHAT_DECK_NAME,
+            scope: current?.scope ?? metadata.scope,
+            createdAt: current?.createdAt ?? now,
+          }),
+          `deck_${MUTASHABIHAT_DECK_ID}`,
+        ]
+      );
+    }
+  } catch {
+    await db.runAsync(
+      "UPDATE user_settings SET value = ? WHERE key = ?",
+      [JSON.stringify(metadata), `deck_${MUTASHABIHAT_DECK_ID}`]
+    );
+  }
+
+  return false;
 }
 
 export async function isMeaningCardSaved(
@@ -357,6 +412,76 @@ export async function addMeaningCard(
       wordPos,
       createdAt: now,
     }).catch(console.warn);
+  }
+
+  return { created };
+}
+
+export async function isMutashabihatCardSaved(
+  db: SQLiteDatabase,
+  surah: number,
+  ayah: number
+): Promise<boolean> {
+  const row = await db.getFirstAsync<{ c: number }>(
+    "SELECT COUNT(*) as c FROM study_cards WHERE id = ? AND deck_id = ?",
+    [mutashabihatCardId(surah, ayah), MUTASHABIHAT_DECK_ID]
+  );
+  return (row?.c ?? 0) > 0;
+}
+
+export async function addMutashabihatCard(
+  db: SQLiteDatabase,
+  surah: number,
+  ayah: number
+): Promise<{ created: boolean }> {
+  const now = new Date().toISOString();
+  const emptyCard = createEmptyCard();
+  const cardId = mutashabihatCardId(surah, ayah);
+  const deckCreated = await ensureMutashabihatDeck(db, now);
+
+  const result = await db.runAsync(
+    `INSERT OR IGNORE INTO study_cards (id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days, learning_steps, reps, lapses, state, last_review, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      cardId,
+      MUTASHABIHAT_DECK_ID,
+      emptyCard.due.toISOString(),
+      emptyCard.stability,
+      emptyCard.difficulty,
+      emptyCard.elapsed_days,
+      emptyCard.scheduled_days,
+      emptyCard.learning_steps,
+      emptyCard.reps,
+      emptyCard.lapses,
+      emptyCard.state,
+      null,
+      now,
+      now,
+    ]
+  );
+
+  const created = (result.changes ?? 0) > 0;
+  if (created) {
+    enqueueSync(db, "study_cards", "INSERT", cardId, {
+      id: cardId,
+      deck_id: MUTASHABIHAT_DECK_ID,
+      due: emptyCard.due.toISOString(),
+      stability: emptyCard.stability,
+      difficulty: emptyCard.difficulty,
+      elapsed_days: emptyCard.elapsed_days,
+      scheduled_days: emptyCard.scheduled_days,
+      learning_steps: emptyCard.learning_steps,
+      reps: emptyCard.reps,
+      lapses: emptyCard.lapses,
+      state: emptyCard.state,
+      last_review: null,
+      created_at: now,
+      updated_at: now,
+    }).catch(console.warn);
+  }
+
+  if (deckCreated) {
+    recordAchievementEvent(db, { type: "deck_created", deckId: MUTASHABIHAT_DECK_ID, createdAt: now }).catch(console.warn);
   }
 
   return { created };

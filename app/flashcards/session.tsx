@@ -19,7 +19,14 @@ import { Button } from "@/components/ui/Button";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { gradeCard, Rating, State, createEmptyCard } from "@/lib/fsrs/scheduler";
 import type { Card as FSRSCard, Grade } from "@/lib/fsrs/scheduler";
-import { getDueCards, updateCard, insertStudyLog, getStudyStreak, getWirdStatus } from "@/lib/fsrs/queries";
+import {
+  getDueCards,
+  updateCard,
+  insertStudyLog,
+  getStudyStreak,
+  getWirdStatus,
+  MUTASHABIHAT_DECK_ID,
+} from "@/lib/fsrs/queries";
 import { computeUniqueFront } from "@/lib/fsrs/uniqueness";
 import { computeReviewPoints, addTodayPoints, getTodayScore } from "@/lib/fsrs/scoring";
 import { hapticMedium, hapticSuccess } from "@/lib/haptics";
@@ -28,7 +35,6 @@ import { syncDailyScore, updateProfileStats } from "@/lib/fsrs/leaderboard-sync"
 import type { StudyCardRow, TestMode } from "@/lib/fsrs/types";
 import { DEFAULT_ENABLED_MODES, TEST_MODE_COLORS } from "@/lib/fsrs/types";
 import { fetchWordMeaningAr, fetchWordText, fetchWordTranslation } from "@/lib/word/queries";
-import { MEANINGS_DECK_ID } from "@/lib/fsrs/queries";
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -139,8 +145,6 @@ function FlashcardSessionScreen() {
   const gradingInFlightRef = useRef(false);
   const flipAnim = useRef(new RNAnimated.Value(0)).current;
   const normalizedDeckId = Array.isArray(deckId) ? deckId[0] : deckId;
-  const isMeaningsDeck = normalizedDeckId === MEANINGS_DECK_ID;
-
   const resetSessionProgress = useCallback(() => {
     gradingInFlightRef.current = false;
     sessionPointsRef.current = 0;
@@ -209,9 +213,11 @@ function FlashcardSessionScreen() {
           if (cancelled) return;
           const parts = row.id.split(":");
           const isWordCard = parts[0] === "word" && parts.length >= 4;
-          const surah = parseInt(isWordCard ? parts[1] : parts[0]);
-          const ayah = parseInt(isWordCard ? parts[2] : parts[1]);
+          const isMutashabihatCard = parts[0] === MUTASHABIHAT_DECK_ID && parts.length >= 3;
+          const surah = parseInt(isWordCard || isMutashabihatCard ? parts[1] : parts[0], 10);
+          const ayah = parseInt(isWordCard ? parts[2] : isMutashabihatCard ? parts[2] : parts[1], 10);
           const wordPos = isWordCard ? parseInt(parts[3]) : undefined;
+          if (!Number.isFinite(surah) || !Number.isFinite(ayah)) continue;
 
           const [
             ayahRow,

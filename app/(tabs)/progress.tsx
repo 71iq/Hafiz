@@ -19,6 +19,7 @@ import {
   getMemorizedAyahCardCount,
   getReviewStats,
   getTotalAyahCardCount,
+  MUTASHABIHAT_DECK_ID,
 } from "@/lib/fsrs/queries";
 import { subscribeReviewActivity } from "@/lib/fsrs/review-events";
 import { getAchievementDashboard, type AchievementDashboard } from "@/lib/achievements/queries";
@@ -85,14 +86,25 @@ export default function ProgressScreen() {
       total: number;
       memorized: number;
     }>(
-      `SELECT
-         CAST(SUBSTR(sc.id, 1, INSTR(sc.id, ':') - 1) AS INTEGER) as surah,
+      `WITH ayah_cards AS (
+         SELECT
+           CASE
+             WHEN sc.deck_id = ? AND sc.id LIKE ? THEN SUBSTR(sc.id, LENGTH(?) + 2)
+             ELSE sc.id
+           END as ayah_key,
+           sc.state
+         FROM study_cards sc
+         WHERE sc.id NOT LIKE 'word:%'
+       )
+       SELECT
+         CAST(SUBSTR(ayah_key, 1, INSTR(ayah_key, ':') - 1) AS INTEGER) as surah,
          COUNT(*) as total,
-         SUM(CASE WHEN sc.state = 2 THEN 1 ELSE 0 END) as memorized
-       FROM study_cards sc
-       WHERE sc.id NOT LIKE 'word:%'
+         SUM(CASE WHEN state = 2 THEN 1 ELSE 0 END) as memorized
+       FROM ayah_cards
+       WHERE INSTR(ayah_key, ':') > 1
        GROUP BY surah
-       ORDER BY surah`
+       ORDER BY surah`,
+      [MUTASHABIHAT_DECK_ID, `${MUTASHABIHAT_DECK_ID}:%`, MUTASHABIHAT_DECK_ID]
     );
 
     if (surahRows.length > 0) {
