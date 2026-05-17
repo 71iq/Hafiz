@@ -401,9 +401,9 @@ function serviceClient(config: Config) {
 }
 
 async function readConfig(): Promise<{ ok: true; value: Config } | { ok: false; message: string }> {
-  const clientId = Deno.env.get("QF_CLIENT_ID")?.trim();
-  const clientSecret = Deno.env.get("QF_CLIENT_SECRET")?.trim();
-  const env = Deno.env.get("QF_ENV")?.trim();
+  const clientId = Deno.env.get("QF_USER_CLIENT_ID")?.trim() ?? Deno.env.get("QF_CLIENT_ID")?.trim();
+  const clientSecret = Deno.env.get("QF_USER_CLIENT_SECRET")?.trim() ?? Deno.env.get("QF_CLIENT_SECRET")?.trim();
+  const env = Deno.env.get("QF_USER_ENV")?.trim() ?? Deno.env.get("QF_ENV")?.trim();
   const supabaseUrl = Deno.env.get("SUPABASE_URL")?.trim();
   const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")?.trim();
   const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")?.trim();

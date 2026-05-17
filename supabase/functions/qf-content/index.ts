@@ -206,9 +206,9 @@ type Config = {
 };
 
 function readConfig(action: Action, recitationIdInput: unknown): { ok: true; value: Config } | { ok: false; message: string } {
-  const clientId = Deno.env.get("QF_CLIENT_ID")?.trim();
-  const clientSecret = Deno.env.get("QF_CLIENT_SECRET")?.trim();
-  const envInput = Deno.env.get("QF_ENV")?.trim();
+  const clientId = Deno.env.get("QF_CONTENT_CLIENT_ID")?.trim() ?? Deno.env.get("QF_CLIENT_ID")?.trim();
+  const clientSecret = Deno.env.get("QF_CONTENT_CLIENT_SECRET")?.trim() ?? Deno.env.get("QF_CLIENT_SECRET")?.trim();
+  const envInput = Deno.env.get("QF_CONTENT_ENV")?.trim() ?? Deno.env.get("QF_ENV")?.trim();
   if (!clientId || !clientSecret || !envInput) {
     return { ok: false, message: "Quran Foundation credentials are not configured." };
   }

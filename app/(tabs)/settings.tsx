@@ -26,6 +26,7 @@ import { useStrings } from "@/lib/i18n/useStrings";
 import { ALL_TEST_MODES, DEFAULT_ENABLED_MODES, type TestMode } from "@/lib/fsrs/types";
 import { useAuthStore } from "@/lib/auth/store";
 import { isSupabaseConfigured } from "@/lib/supabase";
+import { isQfUserAuthEnabled } from "@/lib/quran-foundation/config";
 import { disconnectQfUser, getQfConnectionStatus } from "@/lib/quran-foundation/user";
 import { fullQfUserSync, runInitialQfUserSync } from "@/lib/quran-foundation/user-sync";
 import type { QfConnectionStatus } from "@/lib/quran-foundation/user-types";
@@ -46,6 +47,7 @@ export default function SettingsScreen() {
   const s = useStrings();
   const router = useRouter();
   const configured = isSupabaseConfigured();
+  const qfAuthEnabled = isQfUserAuthEnabled();
   const [pickerVisible, setPickerVisible] = useState(false);
   const [logoutDialogVisible, setLogoutDialogVisible] = useState(false);
   const [qfStatus, setQfStatus] = useState<QfConnectionStatus>("disconnected");
@@ -76,7 +78,7 @@ export default function SettingsScreen() {
   }, [db]);
 
   const refreshQfStatus = useCallback(async () => {
-    if (!configured || !user) {
+    if (!configured || !user || !qfAuthEnabled) {
       setQfStatus("disconnected");
       return;
     }
@@ -86,7 +88,7 @@ export default function SettingsScreen() {
     } else {
       setQfStatus(status.code === "needs_reauth" ? "needs_reauth" : "disconnected");
     }
-  }, [configured, user]);
+  }, [configured, qfAuthEnabled, user]);
 
   useEffect(() => {
     refreshQfStatus().catch(console.warn);
@@ -228,7 +230,7 @@ export default function SettingsScreen() {
                   )}
                 </View>
               </View>
-              {configured && (
+              {configured && qfAuthEnabled && (
                 <View className="mb-4 rounded-3xl bg-surface dark:bg-surface-dark p-4">
                   <View className="flex-row items-center gap-3">
                     <View className="h-10 w-10 items-center justify-center rounded-full bg-primary-accent/10 dark:bg-primary-bright/15">
