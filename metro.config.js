@@ -3,7 +3,7 @@ const { withNativeWind } = require("nativewind/metro");
 
 const config = getDefaultConfig(__dirname);
 
-// Add sqlite extension for the MASAQ and WBW databases
-config.resolver.assetExts.push("db", "wasm");
+// Add app data and animation extensions for bundled assets.
+config.resolver.assetExts.push("db", "wasm", "riv");
 
 module.exports = withNativeWind(config, { input: "./global.css" });

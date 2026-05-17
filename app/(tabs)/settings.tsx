@@ -7,7 +7,7 @@ import { ToggleGroup } from "@/components/ui/ToggleGroup";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { ScreenScrollView, useScreenContentLayout } from "@/components/ui/ScreenContent";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Sun, Moon, Smartphone, Minus, Plus, ChevronRight, ChevronLeft, User, LogOut, BookOpen, RefreshCw, Unlink, Info, FileText, HeartHandshake, ExternalLink, type LucideIcon } from "lucide-react-native";
+import { Sun, Moon, Smartphone, Minus, Plus, ChevronRight, ChevronLeft, User, LogOut, BookOpen, RefreshCw, Unlink, Info, FileText, HeartHandshake, ExternalLink, Sparkles, type LucideIcon } from "lucide-react-native";
 import {
   useSettings,
   FONT_SIZE_STEPS,
@@ -27,12 +27,14 @@ import { useStrings } from "@/lib/i18n/useStrings";
 import { ALL_TEST_MODES, DEFAULT_ENABLED_MODES, type TestMode } from "@/lib/fsrs/types";
 import { useAuthStore } from "@/lib/auth/store";
 import { isSupabaseConfigured } from "@/lib/supabase";
+import { isQfUserAuthEnabled } from "@/lib/quran-foundation/config";
 import { disconnectQfUser, getQfConnectionStatus } from "@/lib/quran-foundation/user";
 import { fullQfUserSync, runInitialQfUserSync } from "@/lib/quran-foundation/user-sync";
 import type { QfConnectionStatus } from "@/lib/quran-foundation/user-types";
 import { useRouter } from "expo-router";
 import { toArabicNumber } from "@/lib/arabic";
 import { SETTINGS_CONTENT_MAX_WIDTH } from "@/lib/ui/viewport";
+import { ZaytPreviewModal } from "@/components/zayt/ZaytPreviewModal";
 
 export default function SettingsScreen() {
   const {
@@ -48,7 +50,9 @@ export default function SettingsScreen() {
   const s = useStrings();
   const router = useRouter();
   const configured = isSupabaseConfigured();
+  const qfAuthEnabled = isQfUserAuthEnabled();
   const [pickerVisible, setPickerVisible] = useState(false);
+  const [zaytPreviewVisible, setZaytPreviewVisible] = useState(false);
   const [logoutDialogVisible, setLogoutDialogVisible] = useState(false);
   const [qfStatus, setQfStatus] = useState<QfConnectionStatus>("disconnected");
   const [qfBusy, setQfBusy] = useState(false);
@@ -86,7 +90,7 @@ export default function SettingsScreen() {
   }, [db]);
 
   const refreshQfStatus = useCallback(async () => {
-    if (!configured || !user) {
+    if (!configured || !user || !qfAuthEnabled) {
       setQfStatus("disconnected");
       return;
     }
@@ -96,7 +100,7 @@ export default function SettingsScreen() {
     } else {
       setQfStatus(status.code === "needs_reauth" ? "needs_reauth" : "disconnected");
     }
-  }, [configured, user]);
+  }, [configured, qfAuthEnabled, user]);
 
   useEffect(() => {
     refreshQfStatus().catch(console.warn);
@@ -237,7 +241,7 @@ export default function SettingsScreen() {
                   )}
                 </View>
               </View>
-              {configured && (
+              {configured && qfAuthEnabled && (
                 <View className="mb-4 rounded-3xl bg-surface dark:bg-surface-dark p-4">
                   <View className="flex-row items-center gap-3">
                     <View className="h-10 w-10 items-center justify-center rounded-full bg-primary-accent/10 dark:bg-primary-bright/15">
@@ -681,6 +685,19 @@ export default function SettingsScreen() {
           </View>
         </Card>
 
+        {/* Developer Tools */}
+        <SectionLabel>{s.sectionDeveloperTools}</SectionLabel>
+        <Card elevation="low" className="p-2 mb-8">
+          <SettingsLinkRow
+            icon={Sparkles}
+            title={s.settingsZaytPreview}
+            description={s.settingsZaytPreviewDesc}
+            onPress={() => setZaytPreviewVisible(true)}
+            isDark={isDark}
+            isRTL={isRTL}
+          />
+        </Card>
+
         {/* About & Public Links */}
         <SectionLabel>{s.settingsAboutSection}</SectionLabel>
         <Card elevation="low" className="p-2 mb-8">
@@ -783,6 +800,10 @@ export default function SettingsScreen() {
           onClose={() => setPickerVisible(false)}
         />
       </ScreenScrollView>
+      <ZaytPreviewModal
+        visible={zaytPreviewVisible}
+        onClose={() => setZaytPreviewVisible(false)}
+      />
     </SafeAreaView>
   );
 }

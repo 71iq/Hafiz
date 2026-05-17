@@ -5,6 +5,7 @@ import { isSupabaseConfigured } from "@/lib/supabase";
 import { startAppOAuth } from "@/lib/auth/oauth";
 import { useDatabase } from "@/lib/database/provider";
 import { useStrings } from "@/lib/i18n/useStrings";
+import { isQfUserAuthEnabled } from "@/lib/quran-foundation/config";
 import { runInitialQfUserSync } from "@/lib/quran-foundation/user-sync";
 import { QF_OAUTH_PROVIDER } from "@/lib/quran-foundation/user-types";
 import { useSettings } from "@/lib/settings/context";
@@ -52,6 +53,7 @@ export function OAuthButtons({ onError }: Props) {
   const appleSource = (isDark ? appleDarkLogo : appleLogo) as ImageSourcePropType;
   const buttonBorderColor = isDark ? "#333" : "#E0E0E0";
   const buttonBackground = isDark ? "#1a1a1a" : "#FFFFFF";
+  const qfAuthEnabled = isQfUserAuthEnabled();
 
   return (
     <View>
@@ -93,23 +95,25 @@ export function OAuthButtons({ onError }: Props) {
         />
       </View>
 
-      <Pressable
-        onPress={handleQfPress}
-        className="mt-3 flex-row items-center justify-center gap-2 rounded-full border px-4 py-3"
-        style={({ pressed }) => ({
-          opacity: pressed ? 0.75 : 1,
-          backgroundColor: buttonBackground,
-          borderColor: buttonBorderColor,
-        })}
-      >
-        <BookOpen size={17} color={isDark ? "#2dd4bf" : "#0d9488"} />
-        <Text
-          className="text-charcoal dark:text-neutral-100"
-          style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}
+      {qfAuthEnabled && (
+        <Pressable
+          onPress={handleQfPress}
+          className="mt-3 flex-row items-center justify-center gap-2 rounded-full border px-4 py-3"
+          style={({ pressed }) => ({
+            opacity: pressed ? 0.75 : 1,
+            backgroundColor: buttonBackground,
+            borderColor: buttonBorderColor,
+          })}
         >
-          {s.authContinueWithQuranFoundation}
-        </Text>
-      </Pressable>
+          <BookOpen size={17} color={isDark ? "#2dd4bf" : "#0d9488"} />
+          <Text
+            className="text-charcoal dark:text-neutral-100"
+            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}
+          >
+            {s.authContinueWithQuranFoundation}
+          </Text>
+        </Pressable>
+      )}
     </View>
   );
 }
