@@ -4,6 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
 import { ChevronDown, ChevronUp, Trophy } from "lucide-react-native";
 import { Card } from "@/components/ui/Card";
+import { ScreenScrollView, useScreenContentLayout } from "@/components/ui/ScreenContent";
 import { ActivityHeatmap } from "@/components/progress/ActivityHeatmap";
 import { SurahProgressList } from "@/components/progress/SurahProgressList";
 import { AchievementBadge } from "@/components/achievements/AchievementBadge";
@@ -22,6 +23,7 @@ import {
 import { subscribeReviewActivity } from "@/lib/fsrs/review-events";
 import { getAchievementDashboard, type AchievementDashboard } from "@/lib/achievements/queries";
 import { getAchievementDefinition } from "@/lib/achievements/catalog";
+import { DESKTOP_CONTENT_MAX_WIDTH } from "@/lib/ui/viewport";
 
 type HeatmapDay = { date: string; count: number };
 type SurahProgress = {
@@ -37,6 +39,7 @@ export default function ProgressScreen() {
   const { isDark, isRTL } = useSettings();
   const db = useDatabase();
   const user = useAuthStore((state) => state.user);
+  const { isLaptop } = useScreenContentLayout({ maxWidth: DESKTOP_CONTENT_MAX_WIDTH });
 
   if (isSupabaseConfigured() && !user) {
     return (
@@ -125,6 +128,12 @@ export default function ProgressScreen() {
 
   const formatStat = (val: number) => val > 0 ? val.toLocaleString() : "—";
   const masteryPct = totalAyahCards > 0 ? Math.round((memorizedAyahCards / totalAyahCards) * 100) : 0;
+  const statItems = [
+    { value: `${masteryPct}%`, label: s.progressRetention },
+    { value: formatStat(memorizedAyahCards), label: s.progressTotalMemorized },
+    { value: formatStat(longestStreak), label: s.progressLongestStreak },
+    { value: formatStat(avgDailyReviews), label: s.progressAvgDaily },
+  ];
   const recentAchievementItems: AchievementDashboard["items"] = [];
   if (achievementDashboard) {
     for (const unlock of achievementDashboard.recentUnlocks) {
@@ -144,112 +153,71 @@ export default function ProgressScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
-      <ScrollView className="flex-1 px-6" contentContainerStyle={{ paddingBottom: 100 }}>
+      <ScreenScrollView maxWidth={DESKTOP_CONTENT_MAX_WIDTH} contentContainerStyle={{ paddingBottom: 100 }}>
         {/* Header */}
         <View className="pt-8 pb-5">
           <Text
             className="text-charcoal dark:text-neutral-100"
-            style={{ fontFamily: "NotoSerif_700Bold", fontSize: 28 }}
+            style={{ fontFamily: "NotoSerif_700Bold", fontSize: isLaptop ? 32 : 28 }}
           >
             {s.progressTitle}
           </Text>
         </View>
 
         {/* Daily reminder card */}
-        <Card elevation="low" className="p-6 mb-6 bg-primary-soft dark:bg-primary-soft">
+        <Card elevation="low" className="mb-6 bg-primary-soft dark:bg-primary-soft px-6 py-7">
           <Text
             className="text-gold mb-2"
             style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16, letterSpacing: 0.5 }}
           >
             {s.progressDailyReminder}
           </Text>
-          <Text
-            className="text-neutral-200"
-            style={{
-              fontFamily: "Manrope_400Regular",
-              fontSize: 16,
-              lineHeight: 26,
-              writingDirection: "rtl",
-              textAlign: "center",
-            }}
-          >
-            {s.progressHadith}
-          </Text>
-          {!isRTL && (
+          <View style={{ alignSelf: "center", maxWidth: isLaptop ? 720 : "100%", width: "100%" }}>
             <Text
-              className="text-neutral-200 mt-2"
+              className="text-neutral-200"
               style={{
                 fontFamily: "Manrope_400Regular",
-                fontSize: 14,
-                lineHeight: 22,
+                fontSize: isLaptop ? 22 : 16,
+                lineHeight: isLaptop ? 38 : 26,
+                writingDirection: "rtl",
                 textAlign: "center",
               }}
             >
-              {s.progressHadithTranslation}
+              {s.progressHadith}
             </Text>
-          )}
+            {!isRTL && (
+              <Text
+                className="text-neutral-200 mt-2"
+                style={{
+                  fontFamily: "Manrope_400Regular",
+                  fontSize: isLaptop ? 15 : 14,
+                  lineHeight: isLaptop ? 24 : 22,
+                  textAlign: "center",
+                }}
+              >
+                {s.progressHadithTranslation}
+              </Text>
+            )}
+          </View>
         </Card>
 
         {/* Stats grid — real data */}
-        <View className="flex-row gap-3 mb-3">
-          <Card elevation="low" className="flex-1 p-5">
-            <Text
-              className="text-charcoal dark:text-neutral-100"
-              style={{ fontFamily: "NotoSerif_700Bold", fontSize: 26 }}
-            >
-              {masteryPct}%
-            </Text>
-            <Text
-              className="text-warm-400 dark:text-neutral-500 mt-1"
-              style={{ fontFamily: "Manrope_500Medium", fontSize: 11 }}
-            >
-              {s.progressRetention}
-            </Text>
-          </Card>
-          <Card elevation="low" className="flex-1 p-5">
-            <Text
-              className="text-charcoal dark:text-neutral-100"
-              style={{ fontFamily: "NotoSerif_700Bold", fontSize: 26 }}
-            >
-              {formatStat(memorizedAyahCards)}
-            </Text>
-            <Text
-              className="text-warm-400 dark:text-neutral-500 mt-1"
-              style={{ fontFamily: "Manrope_500Medium", fontSize: 11 }}
-            >
-              {s.progressTotalMemorized}
-            </Text>
-          </Card>
-        </View>
-        <View className="flex-row gap-3 mb-6">
-          <Card elevation="low" className="flex-1 p-5">
-            <Text
-              className="text-charcoal dark:text-neutral-100"
-              style={{ fontFamily: "NotoSerif_700Bold", fontSize: 26 }}
-            >
-              {formatStat(longestStreak)}
-            </Text>
-            <Text
-              className="text-warm-400 dark:text-neutral-500 mt-1"
-              style={{ fontFamily: "Manrope_500Medium", fontSize: 11 }}
-            >
-              {s.progressLongestStreak}
-            </Text>
-          </Card>
-          <Card elevation="low" className="flex-1 p-5">
-            <Text
-              className="text-charcoal dark:text-neutral-100"
-              style={{ fontFamily: "NotoSerif_700Bold", fontSize: 26 }}
-            >
-              {formatStat(avgDailyReviews)}
-            </Text>
-            <Text
-              className="text-warm-400 dark:text-neutral-500 mt-1"
-              style={{ fontFamily: "Manrope_500Medium", fontSize: 11 }}
-            >
-              {s.progressAvgDaily}
-            </Text>
-          </Card>
+        <View
+          className="mb-6 gap-3"
+          style={{
+            flexDirection: "row",
+            flexWrap: "wrap",
+          }}
+        >
+          {statItems.map((item) => (
+            <ProgressStatCard
+              key={item.label}
+              value={item.value}
+              label={item.label}
+              isLaptop={isLaptop}
+              isRTL={isRTL}
+            />
+          ))}
         </View>
 
         {/* Activity heatmap */}
@@ -277,7 +245,7 @@ export default function ProgressScreen() {
         >
           {s.progressSurahProgress}
         </Text>
-        <SurahProgressList data={surahProgress} isDark={isDark} s={s} />
+        <SurahProgressList data={surahProgress} isDark={isDark} isRTL={isRTL} isCompact={isLaptop} s={s} />
 
         {/* Achievements */}
         {achievementDashboard && (
@@ -358,7 +326,54 @@ export default function ProgressScreen() {
             )}
           </Card>
         )}
-      </ScrollView>
+      </ScreenScrollView>
     </SafeAreaView>
+  );
+}
+
+function ProgressStatCard({
+  value,
+  label,
+  isLaptop,
+  isRTL,
+}: {
+  value: string;
+  label: string;
+  isLaptop: boolean;
+  isRTL: boolean;
+}) {
+  return (
+    <Card
+      elevation="low"
+      className="p-5"
+      style={{
+        width: isLaptop ? undefined : "48%",
+        flex: isLaptop ? 1 : undefined,
+        minWidth: isLaptop ? 0 : undefined,
+      }}
+    >
+      <Text
+        className="text-charcoal dark:text-neutral-100"
+        style={{
+          fontFamily: "NotoSerif_700Bold",
+          fontSize: 26,
+          textAlign: isRTL ? "right" : "left",
+          writingDirection: isRTL ? "rtl" : "ltr",
+        }}
+      >
+        {value}
+      </Text>
+      <Text
+        className="text-warm-400 dark:text-neutral-500 mt-1"
+        style={{
+          fontFamily: "Manrope_500Medium",
+          fontSize: 11,
+          textAlign: isRTL ? "right" : "left",
+          writingDirection: isRTL ? "rtl" : "ltr",
+        }}
+      >
+        {label}
+      </Text>
+    </Card>
   );
 }

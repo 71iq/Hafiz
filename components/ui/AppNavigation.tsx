@@ -18,7 +18,11 @@ import Animated, {
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useColorScheme } from "nativewind";
 import { useChrome } from "@/lib/ui/chrome";
-import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
+import {
+  PERSISTENT_SIDEBAR_BREAKPOINT,
+  PERSISTENT_SIDEBAR_WIDTH,
+  SIDEBAR_BREAKPOINT,
+} from "@/lib/ui/viewport";
 import { PanelLeftOpen, PanelRightOpen } from "lucide-react-native";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -186,7 +190,7 @@ function SidebarItem({
       }}
       accessibilityRole="button"
       accessibilityState={isFocused ? { selected: true } : {}}
-      className={`${isRTL ? "flex-row-reverse" : "flex-row"} items-center gap-3 rounded-2xl px-4 py-3 ${isFocused ? "bg-primary" : ""}`}
+      className={`${isRTL ? "flex-row-reverse" : "flex-row"} items-center gap-3 rounded-2xl px-4 py-3 ${isFocused ? "bg-primary-soft" : ""}`}
       style={({ pressed }) => ({
         transform: [{ scale: pressed ? 0.96 : 1 }],
       })}
@@ -368,12 +372,77 @@ function FloatingPanel(props: BottomTabBarProps & { isRTL?: boolean }) {
   );
 }
 
+function PersistentSidebar(props: BottomTabBarProps & { isRTL?: boolean }) {
+  const { state, descriptors, navigation, isRTL } = props;
+  const insets = useSafeAreaInsets();
+  const visibleRoutes = getVisibleRoutes(state, descriptors);
+  const sideStyle = isRTL ? { right: 16 } : { left: 16 };
+
+  return (
+    <View
+      style={{
+        position: Platform.OS === "web" ? ("fixed" as any) : "absolute",
+        top: Math.max(insets.top + 16, 16),
+        bottom: Math.max(insets.bottom + 16, 16),
+        width: PERSISTENT_SIDEBAR_WIDTH,
+        zIndex: 70,
+        ...sideStyle,
+      }}
+      pointerEvents="box-none"
+    >
+      <View className="h-full rounded-4xl bg-primary dark:bg-primary px-4 py-5">
+        <View className="px-3 pb-7">
+          <Text
+            className="text-gold"
+            style={{ fontFamily: "NotoSerif_700Bold", fontSize: 24 }}
+          >
+            Hafiz
+          </Text>
+          <Text
+            className="mt-0.5 text-gold/70"
+            style={{ fontFamily: "Manrope_400Regular", fontSize: 11 }}
+          >
+            The Digital Sanctuary
+          </Text>
+        </View>
+
+        <View className="gap-1">
+          {visibleRoutes.map((route) => {
+            const descriptor = descriptors[route.key];
+            const isFocused = state.index === state.routes.indexOf(route);
+            const onPress = () => {
+              const event = navigation.emit({ type: "tabPress", target: route.key, canPreventDefault: true });
+              if (!isFocused && !event.defaultPrevented) navigation.navigate(route.name, route.params);
+            };
+
+            return (
+              <SidebarItem
+                key={route.key}
+                route={route}
+                descriptor={descriptor}
+                isFocused={isFocused}
+                onPress={onPress}
+                isDark
+                isRTL={isRTL}
+              />
+            );
+          })}
+        </View>
+      </View>
+    </View>
+  );
+}
+
 // ─── Responsive wrapper ─────────────────────────────────────
 
 export function AppNavigation(props: BottomTabBarProps & { isRTL?: boolean }) {
   const { width } = useWindowDimensions();
+  const hasPersistentSidebar = width >= PERSISTENT_SIDEBAR_BREAKPOINT;
   const isWide = width >= SIDEBAR_BREAKPOINT;
 
+  if (hasPersistentSidebar) {
+    return <PersistentSidebar {...props} />;
+  }
   if (isWide) {
     return <FloatingPanel {...props} />;
   }

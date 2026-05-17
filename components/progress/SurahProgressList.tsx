@@ -17,10 +17,12 @@ type SurahProgress = {
 type Props = {
   data: SurahProgress[];
   isDark: boolean;
+  isRTL?: boolean;
+  isCompact?: boolean;
   s: Record<string, string>;
 };
 
-export function SurahProgressList({ data, isDark, s }: Props) {
+export function SurahProgressList({ data, isDark, isRTL, isCompact, s }: Props) {
   const router = useRouter();
 
   if (data.length === 0) {
@@ -42,18 +44,35 @@ export function SurahProgressList({ data, isDark, s }: Props) {
   };
 
   return (
-    <View style={{ gap: 8 }}>
+    <View
+      style={{
+        flexDirection: isCompact ? (isRTL ? "row-reverse" : "row") : "column",
+        flexWrap: isCompact ? "wrap" : "nowrap",
+        gap: 8,
+      }}
+    >
       {data.map((item) => {
         const pct = item.totalCards > 0 ? (item.memorized / item.totalCards) * 100 : 0;
         return (
           <Pressable
             key={item.surah}
             onPress={() => handlePress(item.surah)}
-            style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+            style={({ pressed }) => ({
+              transform: [{ scale: pressed ? 0.98 : 1 }],
+              width: isCompact ? "48%" : "100%",
+            })}
           >
             <Card elevation="low" className="p-4">
-              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1 }}>
+              <View
+                style={{
+                  flexDirection: isRTL ? "row-reverse" : "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: 8,
+                  gap: 10,
+                }}
+              >
+                <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 8, flex: 1 }}>
                   <View
                     style={{
                       width: 30,
@@ -68,22 +87,40 @@ export function SurahProgressList({ data, isDark, s }: Props) {
                       {item.surah}
                     </Text>
                   </View>
-                  <View style={{ flex: 1 }}>
+                  <View style={{ flex: 1, alignItems: isRTL ? "flex-end" : "flex-start" }}>
                     <Text
-                      style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, color: isDark ? "#e5e5e5" : "#2D2D2D", writingDirection: "rtl" }}
+                      style={{
+                        fontFamily: "Manrope_600SemiBold",
+                        fontSize: 14,
+                        color: isDark ? "#e5e5e5" : "#2D2D2D",
+                        writingDirection: "rtl",
+                        textAlign: "right",
+                      }}
                       numberOfLines={1}
                     >
                       {item.nameArabic}
                     </Text>
                     <Text
-                      style={{ fontFamily: "Manrope_400Regular", fontSize: 11, color: isDark ? "#737373" : "#8B8178" }}
+                      style={{
+                        fontFamily: "Manrope_400Regular",
+                        fontSize: 11,
+                        color: isDark ? "#737373" : "#8B8178",
+                        textAlign: isRTL ? "right" : "left",
+                      }}
                       numberOfLines={1}
                     >
                       {item.nameEnglish}
                     </Text>
                   </View>
                 </View>
-                <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13, color: isDark ? "#a3a3a3" : "#6e5a47" }}>
+                <Text
+                  style={{
+                    fontFamily: "Manrope_600SemiBold",
+                    fontSize: 13,
+                    color: isDark ? "#a3a3a3" : "#6e5a47",
+                    writingDirection: "ltr",
+                  }}
+                >
                   {item.memorized}/{item.totalCards}
                 </Text>
               </View>

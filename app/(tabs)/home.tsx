@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from "react";
-import { View, Text, ScrollView, Pressable } from "react-native";
+import { View, Text, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, type Href } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
@@ -12,6 +12,7 @@ import { useStrings } from "@/lib/i18n/useStrings";
 import { interpolate } from "@/lib/i18n/useStrings";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { ScreenScrollView, useScreenContentLayout } from "@/components/ui/ScreenContent";
 import { CreateDeckSheet } from "@/components/flashcards/CreateDeckSheet";
 import { SearchCommand } from "@/components/SearchCommand";
 import { Toast } from "@/components/ui/Toast";
@@ -37,6 +38,7 @@ import {
 import type { AchievementUnlock } from "@/lib/achievements/types";
 import { getReflectionJourneySummary } from "@/lib/reflection-journey/queries";
 import { localizeReflectionJourneyText } from "@/lib/reflection-journey/schema";
+import { DESKTOP_CONTENT_MAX_WIDTH } from "@/lib/ui/viewport";
 
 type DeckDisplay = {
   id: string;
@@ -53,6 +55,7 @@ export default function HomeScreen() {
   const { isDark, dailyReviewLimit, isRTL, uiLanguage } = useSettings();
   const s = useStrings();
   const router = useRouter();
+  const { isLaptop } = useScreenContentLayout({ maxWidth: DESKTOP_CONTENT_MAX_WIDTH });
   const [decks, setDecks] = useState<DeckDisplay[]>([]);
   const [vocabStats, setVocabStats] = useState<{ total: number }>({ total: 0 });
   const [authBannerDismissed, setAuthBannerDismissed] = useState(false);
@@ -236,7 +239,7 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
-      <ScrollView className="flex-1 px-6" contentContainerStyle={{ paddingBottom: 100 }}>
+      <ScreenScrollView maxWidth={DESKTOP_CONTENT_MAX_WIDTH} contentContainerStyle={{ paddingBottom: 100 }}>
         {/* Header */}
         <View className="pt-8 pb-4">
           <View className={`flex-row items-start justify-between ${isRTL ? "flex-row-reverse" : ""}`}>
@@ -249,13 +252,13 @@ export default function HomeScreen() {
               </Text>
               <Text
                 className="text-charcoal dark:text-neutral-100 mt-1"
-                style={{ fontFamily: "NotoSerif_700Bold", fontSize: 28 }}
+                style={{ fontFamily: "NotoSerif_700Bold", fontSize: isLaptop ? 32 : 28 }}
               >
                 {s.homeTitle}
               </Text>
               <Text
                 className="text-charcoal dark:text-neutral-100"
-                style={{ fontFamily: "NotoSerif_700Bold", fontSize: 28, marginTop: -4 }}
+                style={{ fontFamily: "NotoSerif_700Bold", fontSize: isLaptop ? 32 : 28, marginTop: -4 }}
               >
                 {user ? (user.email?.split("@")[0] ?? "Hafiz") : "Hafiz"}
               </Text>
@@ -325,7 +328,7 @@ export default function HomeScreen() {
               </Text>
             </View>
           </View>
-          <View className={`flex-row items-center justify-between mt-4 pt-4 border-t border-warm-200 dark:border-neutral-800 ${isRTL ? "flex-row-reverse" : ""}`}>
+          <View className={`flex-row items-center justify-between mt-4 rounded-3xl bg-surface-low dark:bg-surface-dark-low px-4 py-3 ${isRTL ? "flex-row-reverse" : ""}`}>
             <View className={`flex-row items-center gap-1.5 ${isRTL ? "flex-row-reverse" : ""}`}>
               <CalendarCheck2 size={14} color={isDark ? "#2dd4bf" : "#0d9488"} />
               <Text className="text-charcoal dark:text-neutral-100" style={{ fontFamily: "Manrope_700Bold", fontSize: 16 }}>
@@ -494,18 +497,25 @@ export default function HomeScreen() {
             />
           </Card>
         ) : (
-          <View className="gap-3">
+          <View
+            className="gap-3"
+            style={{
+              flexDirection: isLaptop ? (isRTL ? "row-reverse" : "row") : "column",
+              flexWrap: isLaptop ? "wrap" : "nowrap",
+            }}
+          >
             {decks.map((deck) => (
-              <DeckCard
-                key={deck.id}
-                deck={deck}
-                getDeckLabel={getDeckLabel}
-                onStartReview={() => handleStartReview(deck.id)}
-                onDelete={() => setDeckToDelete(deck.id)}
-                isDark={isDark}
-                isRTL={isRTL}
-                s={s}
-              />
+              <View key={deck.id} style={{ width: isLaptop ? "48%" : "100%" }}>
+                <DeckCard
+                  deck={deck}
+                  getDeckLabel={getDeckLabel}
+                  onStartReview={() => handleStartReview(deck.id)}
+                  onDelete={() => setDeckToDelete(deck.id)}
+                  isDark={isDark}
+                  isRTL={isRTL}
+                  s={s}
+                />
+              </View>
             ))}
           </View>
         )}
@@ -556,7 +566,7 @@ export default function HomeScreen() {
             </Card>
           </View>
         )}
-      </ScrollView>
+      </ScreenScrollView>
 
       <SearchCommand visible={showSearch} onClose={() => setShowSearch(false)} />
 

@@ -32,7 +32,13 @@ import { SearchCommand } from "@/components/SearchCommand";
 import { useWordInteraction } from "@/lib/word/context";
 import { consumePendingDeepLink, peekPendingDeepLink } from "@/lib/deep-link";
 import { toArabicNumber } from "@/lib/arabic";
-import { SIDEBAR_BREAKPOINT, VIEWPORT_BREAKPOINTS } from "@/lib/ui/viewport";
+import {
+  DESKTOP_CONTENT_GUTTER,
+  PERSISTENT_SIDEBAR_BREAKPOINT,
+  PERSISTENT_SIDEBAR_WIDTH,
+  SIDEBAR_BREAKPOINT,
+  VIEWPORT_BREAKPOINTS,
+} from "@/lib/ui/viewport";
 
 type MushafTarget = { surah: number; ayah: number; wordPos?: number };
 
@@ -166,6 +172,8 @@ function MushafInner() {
   const insets = useSafeAreaInsets();
   const isPhone = windowWidth < SIDEBAR_BREAKPOINT;
   const isTablet = windowWidth >= SIDEBAR_BREAKPOINT && windowWidth < VIEWPORT_BREAKPOINTS.desktop;
+  const hasPersistentSidebar = windowWidth >= PERSISTENT_SIDEBAR_BREAKPOINT;
+  const persistentSidebarInset = hasPersistentSidebar ? PERSISTENT_SIDEBAR_WIDTH + DESKTOP_CONTENT_GUTTER : 0;
   // Compact layout under ~480px tightens phone chrome spacing.
   const isNarrow = windowWidth < 480;
   const { selection, toastMessage, dismissToast } = useSelection();
@@ -547,8 +555,8 @@ function MushafInner() {
     ? ({
         position: Platform.OS === "web" && (isPhone || isTablet) ? ("fixed" as any) : "absolute",
         top: 0,
-        left: 0,
-        right: 0,
+        left: hasPersistentSidebar && !isRTL ? persistentSidebarInset : 0,
+        right: hasPersistentSidebar && isRTL ? persistentSidebarInset : 0,
         zIndex: 80,
       } as const)
     : null;
@@ -699,6 +707,10 @@ function MushafInner() {
       <SafeAreaView
         className="flex-1 bg-surface dark:bg-surface-dark"
         edges={["top"]}
+        style={{
+          paddingLeft: hasPersistentSidebar && !isRTL ? persistentSidebarInset : 0,
+          paddingRight: hasPersistentSidebar && isRTL ? persistentSidebarInset : 0,
+        }}
       >
         {/* Header chrome — phone gets the new glass top bar, desktop keeps current layout. */}
         <Animated.View
@@ -979,8 +991,12 @@ function MushafInner() {
             style={[
               {
                 position: Platform.OS === "web" && (isPhone || isTablet) ? "fixed" as any : "absolute",
-                left: isPhone || isTablet ? 12 : 0,
-                right: isPhone || isTablet ? 12 : 0,
+                left: hasPersistentSidebar && !isRTL
+                  ? persistentSidebarInset + 12
+                  : isPhone || isTablet ? 12 : 0,
+                right: hasPersistentSidebar && isRTL
+                  ? persistentSidebarInset + 12
+                  : isPhone || isTablet ? 12 : 0,
                 bottom: railBottomOffset,
                 zIndex: 70,
                 borderRadius: isPhone || isTablet ? 22 : 0,

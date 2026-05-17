@@ -48,9 +48,11 @@ function formatDateKey(date: Date): string {
 
 export function ActivityHeatmap({ data, isDark, s, isRTL, activeDays, totalReviews }: Props) {
   const [tooltip, setTooltip] = useState<{ date: string; count: number } | null>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
   const { width } = useWindowDimensions();
   const isArabic = !!isRTL;
-  const showSummary = width >= SUMMARY_BREAKPOINT;
+  const layoutWidth = containerWidth || width;
+  const showSummary = layoutWidth >= SUMMARY_BREAKPOINT;
   const isSidebarWidth = width >= SIDEBAR_BREAKPOINT;
   const isDesktopWidth = width >= 1024;
   const CELL_GAP = isDesktopWidth ? 5 : isSidebarWidth ? 4 : 3;
@@ -58,7 +60,7 @@ export function ActivityHeatmap({ data, isDark, s, isRTL, activeDays, totalRevie
   const DAY_LABEL_WIDTH = isArabic ? (showSummary ? 70 : 58) : (showSummary ? 34 : 28);
   const reservedSummaryWidth = showSummary ? (isSidebarWidth ? 200 : 150) : 0;
   const reservedSummaryGap = showSummary ? (isSidebarWidth ? 32 : 20) : 0;
-  const availableWidth = Math.max(220, width - 96);
+  const availableWidth = Math.max(220, layoutWidth);
   const maxHeatmapWidth = Math.max(150, availableWidth - DAY_LABEL_WIDTH - reservedSummaryWidth - reservedSummaryGap);
   const CELL_SIZE = Math.max(8, Math.min(maxCellSize, Math.floor((maxHeatmapWidth - CELL_GAP * (TOTAL_WEEKS - 1)) / TOTAL_WEEKS)));
 
@@ -131,7 +133,13 @@ export function ActivityHeatmap({ data, isDark, s, isRTL, activeDays, totalRevie
   ];
 
   return (
-    <View style={{ direction: "ltr", alignItems: showSummary ? "stretch" : "center", width: "100%" }}>
+    <View
+      onLayout={(event) => {
+        const nextWidth = Math.floor(event.nativeEvent.layout.width);
+        setContainerWidth((current) => current === nextWidth ? current : nextWidth);
+      }}
+      style={{ direction: "ltr", alignItems: showSummary ? "stretch" : "center", width: "100%" }}
+    >
       <View
         style={{
           flexDirection: showSummary ? (isRTL ? "row-reverse" : "row") : "column",

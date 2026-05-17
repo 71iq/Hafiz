@@ -13,6 +13,7 @@ import { syncDailyScore, updateProfileStats } from "@/lib/fsrs/leaderboard-sync"
 import { LeaderboardSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { AuthGate } from "@/components/ui/AuthGate";
+import { useScreenContentLayout } from "@/components/ui/ScreenContent";
 import {
   fetchDailyLeaderboard,
   fetchWeeklyLeaderboard,
@@ -20,6 +21,7 @@ import {
   fetchStreakLeaderboard,
   type LeaderboardEntry,
 } from "@/lib/leaderboard/api";
+import { LEADERBOARD_CONTENT_MAX_WIDTH } from "@/lib/ui/viewport";
 
 type Tab = "daily" | "weekly" | "alltime" | "streak";
 
@@ -28,6 +30,7 @@ export default function LeaderboardScreen() {
   const db = useDatabase();
   const s = useStrings();
   const router = useRouter();
+  const { contentContainerStyle, railStyle, isLaptop } = useScreenContentLayout({ maxWidth: LEADERBOARD_CONTENT_MAX_WIDTH });
   const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<Tab>("daily");
@@ -100,22 +103,30 @@ export default function LeaderboardScreen() {
 
   const scoreUnit = activeTab === "streak" ? s.leaderboardDays : s.leaderboardPoints;
   const activeTabLabel = tabs.find((tab) => tab.key === activeTab)?.label ?? "";
+  const featuredEntries = isLaptop ? entries.slice(0, 3) : [];
+  const rowEntries = isLaptop ? entries.slice(3) : entries;
 
   return (
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
-      <View className="px-6 pt-4">
-        <Text
-          className="text-primary dark:text-gold-light"
-          style={{ fontFamily: "NotoSerif_700Bold", fontSize: 32, lineHeight: 36 }}
-        >
-          {s.leaderboardTitle}
-        </Text>
+      <View style={[contentContainerStyle, { paddingTop: 16 }]}>
+        <View style={railStyle}>
+          <Text
+            className="text-primary dark:text-gold-light"
+            style={{ fontFamily: "NotoSerif_700Bold", fontSize: isLaptop ? 34 : 32, lineHeight: 38 }}
+          >
+            {s.leaderboardTitle}
+          </Text>
+        </View>
       </View>
 
       <View
-        className="mx-6 mt-5 mb-5 flex-row rounded-full p-1.5"
-        style={{ backgroundColor: isDark ? "#161616" : "#EFE8DE" }}
+        className="mt-5 mb-5"
+        style={contentContainerStyle}
       >
+        <View
+          className="flex-row rounded-full p-1.5"
+          style={[railStyle, { backgroundColor: isDark ? "#161616" : "#EFE8DE" }]}
+        >
         {tabs.map((tab) => {
           const isActive = activeTab === tab.key;
           return (
@@ -141,36 +152,62 @@ export default function LeaderboardScreen() {
             </Pressable>
           );
         })}
+        </View>
       </View>
 
       {/* Content */}
       {!configured ? (
-        <View className="flex-1 items-center justify-center">
-          <EmptyState
-            icon={Trophy}
-            title={s.authGateLeaderboardTitle}
-            subtitle={s.leaderboardNotConfigured}
-            isDark={isDark}
-          />
+        <View className="flex-1 justify-center" style={contentContainerStyle}>
+          <View style={railStyle}>
+            <EmptyState
+              icon={Trophy}
+              title={s.authGateLeaderboardTitle}
+              subtitle={s.leaderboardNotConfigured}
+              isDark={isDark}
+            />
+          </View>
         </View>
       ) : isLoading ? (
-        <LeaderboardSkeleton isDark={isDark} className="flex-1" />
+        <View className="flex-1" style={contentContainerStyle}>
+          <View style={railStyle}>
+            <LeaderboardSkeleton isDark={isDark} className="flex-1" />
+          </View>
+        </View>
       ) : entries.length === 0 ? (
-        <View className="flex-1 items-center justify-center">
-          <EmptyState
-            icon={Trophy}
-            title={s.leaderboardEmpty}
-            subtitle={s.emptyLeaderboardSubtitle}
-            isDark={isDark}
-          />
+        <View className="flex-1 justify-center" style={contentContainerStyle}>
+          <View style={railStyle}>
+            <EmptyState
+              icon={Trophy}
+              title={s.leaderboardEmpty}
+              subtitle={s.emptyLeaderboardSubtitle}
+              isDark={isDark}
+            />
+          </View>
         </View>
       ) : (
         <ScrollView
-          className="flex-1 px-6"
+          className="flex-1"
+          contentContainerStyle={[contentContainerStyle, { paddingBottom: 40 }]}
           refreshControl={
             <RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} />
           }
         >
+          <View style={railStyle}>
+          {featuredEntries.length > 0 && (
+            <View className="mb-6 flex-row justify-center gap-4">
+              {featuredEntries.map((entry) => (
+                <LeaderboardPodiumCard
+                  key={entry.user_id}
+                  entry={entry}
+                  isCurrentUser={entry.user_id === user?.id}
+                  isDark={isDark}
+                  unit={scoreUnit}
+                  s={s}
+                  onPress={() => router.push(`/profile/${entry.user_id}` as any)}
+                />
+              ))}
+            </View>
+          )}
           <View className="mb-3 flex-row items-end justify-between">
             <Text
               style={{
@@ -187,7 +224,7 @@ export default function LeaderboardScreen() {
               {`${entries.length} ${s.leaderboardPlayers}`}
             </Text>
           </View>
-          {entries.map((entry) => (
+          {rowEntries.map((entry) => (
             <LeaderboardRow
               key={entry.user_id}
               entry={entry}
@@ -199,10 +236,74 @@ export default function LeaderboardScreen() {
               onPress={() => router.push(`/profile/${entry.user_id}` as any)}
             />
           ))}
-          <View style={{ height: 40 }} />
+          </View>
         </ScrollView>
       )}
     </SafeAreaView>
+  );
+}
+
+function LeaderboardPodiumCard({
+  entry,
+  isCurrentUser,
+  isDark,
+  unit,
+  s,
+  onPress,
+}: {
+  entry: LeaderboardEntry;
+  isCurrentUser: boolean;
+  isDark: boolean;
+  unit: string;
+  s: any;
+  onPress: () => void;
+}) {
+  const displayName = entry.display_name || entry.username;
+  const rankColor = entry.rank === 1 ? "#F5C24B" : entry.rank === 2 ? "#B7BECF" : "#C49A62";
+  return (
+    <Pressable
+      onPress={onPress}
+      className="flex-1 items-center rounded-4xl bg-surface-low dark:bg-surface-dark-low px-4 py-5"
+      style={({ pressed }) => ({
+        opacity: pressed ? 0.82 : 1,
+        transform: [{ scale: pressed ? 0.98 : 1 }],
+      })}
+    >
+      <View className="mb-3 h-8 min-w-8 items-center justify-center rounded-full px-2" style={{ backgroundColor: rankColor }}>
+        <Text style={{ color: "#4A4034", fontFamily: "Manrope_700Bold", fontSize: 12 }}>
+          {entry.rank}
+        </Text>
+      </View>
+      <View
+        className="h-14 w-14 items-center justify-center rounded-full"
+        style={{ backgroundColor: isDark ? "#003638" : "#00595B" }}
+      >
+        <Text style={{ color: "#FDDC91", fontFamily: "Manrope_700Bold", fontSize: 18 }}>
+          {displayName.charAt(0).toUpperCase()}
+        </Text>
+      </View>
+      <Text
+        className="mt-3 text-charcoal dark:text-neutral-100"
+        style={{ fontFamily: "Manrope_700Bold", fontSize: 15, textAlign: "center" }}
+        numberOfLines={1}
+      >
+        {displayName}
+      </Text>
+      {isCurrentUser && (
+        <Text
+          className="mt-1 text-primary-accent dark:text-primary-bright"
+          style={{ fontFamily: "Manrope_700Bold", fontSize: 10 }}
+        >
+          {s.leaderboardYou}
+        </Text>
+      )}
+      <Text className="mt-1 text-charcoal dark:text-neutral-100" style={{ fontFamily: "NotoSerif_700Bold", fontSize: 24 }}>
+        {entry.score.toLocaleString()}
+      </Text>
+      <Text style={{ color: isDark ? "#737373" : "#A39B93", fontFamily: "Manrope_500Medium", fontSize: 10 }}>
+        {unit}
+      </Text>
+    </Pressable>
   );
 }
 

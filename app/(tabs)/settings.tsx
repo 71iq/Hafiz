@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
-import { View, Text, Pressable, ActivityIndicator, ScrollView, Linking } from "react-native";
+import { View, Text, Pressable, ActivityIndicator, Linking } from "react-native";
 import { Switch } from "@/components/ui/Switch";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ToggleGroup } from "@/components/ui/ToggleGroup";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { ScreenScrollView, useScreenContentLayout } from "@/components/ui/ScreenContent";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Sun, Moon, Smartphone, Minus, Plus, ChevronRight, ChevronLeft, User, LogOut, BookOpen, RefreshCw, Unlink, Info, FileText, HeartHandshake, ExternalLink, type LucideIcon } from "lucide-react-native";
 import {
@@ -31,6 +32,7 @@ import { fullQfUserSync, runInitialQfUserSync } from "@/lib/quran-foundation/use
 import type { QfConnectionStatus } from "@/lib/quran-foundation/user-types";
 import { useRouter } from "expo-router";
 import { toArabicNumber } from "@/lib/arabic";
+import { SETTINGS_CONTENT_MAX_WIDTH } from "@/lib/ui/viewport";
 
 export default function SettingsScreen() {
   const {
@@ -64,6 +66,14 @@ export default function SettingsScreen() {
   const fontSizeLevelLabel = isRTL ? toArabicNumber(fontSizeIndex + 1) : String(fontSizeIndex + 1);
   const fontSizeTotalLabel = isRTL ? toArabicNumber(FONT_SIZE_STEPS.length) : String(FONT_SIZE_STEPS.length);
   const TranslationChevron = isRTL ? ChevronLeft : ChevronRight;
+  const { isLaptop } = useScreenContentLayout({ maxWidth: SETTINGS_CONTENT_MAX_WIDTH });
+  const modeLabels: Record<TestMode, string> = {
+    nextAyah: s.flashcardsModeNextAyah,
+    previousAyah: s.flashcardsModePreviousAyah,
+    translation: s.flashcardsModeTranslation,
+    tafseer: s.flashcardsModeTafseer,
+    surahName: s.flashcardsModeSurahName,
+  };
 
   useEffect(() => {
     db.getFirstAsync<{ value: string }>(
@@ -190,17 +200,16 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
-      {/* Header */}
-      <View className="px-6 pt-8 pb-4">
-        <Text
-          className="text-charcoal dark:text-neutral-100"
-          style={{ fontFamily: "NotoSerif_700Bold", fontSize: 28 }}
-        >
-          {s.settingsTitle}
-        </Text>
-      </View>
-
-      <ScrollView className="flex-1 px-6" contentContainerStyle={{ paddingBottom: 48 }}>
+      <ScreenScrollView maxWidth={SETTINGS_CONTENT_MAX_WIDTH} contentContainerStyle={{ paddingBottom: 48 }}>
+        {/* Header */}
+        <View className="pt-8 pb-4">
+          <Text
+            className="text-charcoal dark:text-neutral-100"
+            style={{ fontFamily: "NotoSerif_700Bold", fontSize: isLaptop ? 32 : 28 }}
+          >
+            {s.settingsTitle}
+          </Text>
+        </View>
 
         {/* Account Section */}
         <SectionLabel>{s.authAccount}</SectionLabel>
@@ -457,33 +466,27 @@ export default function SettingsScreen() {
           )}
 
           {/* Size control */}
-          <View className="flex-row items-center justify-between mb-5">
-            <Pressable
-              onPress={() => setFontSizeIndex(fontSizeIndex - 1)}
-              disabled={fontSizeIndex === 0}
-              className="w-10 h-10 rounded-full bg-surface-high dark:bg-surface-dark-high items-center justify-center"
-              style={{ opacity: fontSizeIndex === 0 ? 0.3 : 1 }}
-            >
-              <Minus size={18} color={isDark ? "#d4d4d4" : "#6e5a47"} />
-            </Pressable>
-
-            <View className="min-w-24 rounded-full bg-surface-high dark:bg-surface-dark-high px-5 py-2.5 items-center">
+          <View
+            className={isLaptop ? "mb-5 items-start justify-between gap-4" : "mb-5 gap-4"}
+            style={{ flexDirection: isLaptop ? (isRTL ? "row-reverse" : "row") : "column" }}
+          >
+            <View className="flex-1">
               <Text
-                className="text-charcoal dark:text-neutral-100"
-                style={{ fontFamily: "Manrope_700Bold", fontSize: 15 }}
+                className="text-warm-400 dark:text-neutral-500"
+                style={{ fontFamily: "Manrope_500Medium", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
               >
-                {fontSizeLevelLabel}/{fontSizeTotalLabel}
+                {`${fontSizeLevelLabel}/${fontSizeTotalLabel}`}
               </Text>
             </View>
-
-            <Pressable
-              onPress={() => setFontSizeIndex(fontSizeIndex + 1)}
-              disabled={fontSizeIndex === FONT_SIZE_STEPS.length - 1}
-              className="w-10 h-10 rounded-full bg-surface-high dark:bg-surface-dark-high items-center justify-center"
-              style={{ opacity: fontSizeIndex === FONT_SIZE_STEPS.length - 1 ? 0.3 : 1 }}
-            >
-              <Plus size={18} color={isDark ? "#d4d4d4" : "#6e5a47"} />
-            </Pressable>
+            <SettingsStepper
+              value={`${fontSizeLevelLabel}/${fontSizeTotalLabel}`}
+              onDecrement={() => setFontSizeIndex(fontSizeIndex - 1)}
+              onIncrement={() => setFontSizeIndex(fontSizeIndex + 1)}
+              decrementDisabled={fontSizeIndex === 0}
+              incrementDisabled={fontSizeIndex === FONT_SIZE_STEPS.length - 1}
+              isDark={isDark}
+              isRTL={isRTL}
+            />
           </View>
 
           {/* Preview */}
@@ -597,96 +600,84 @@ export default function SettingsScreen() {
         {/* Flashcard Test Modes */}
         <SectionLabel>{s.flashcardsTestModes}</SectionLabel>
         <Card elevation="low" className="p-5 mb-8">
-          <View className="gap-3">
-            {ALL_TEST_MODES.map((mode) => {
-              const modeLabels: Record<TestMode, string> = {
-                nextAyah: s.flashcardsModeNextAyah,
-                previousAyah: s.flashcardsModePreviousAyah,
-                translation: s.flashcardsModeTranslation,
-                tafseer: s.flashcardsModeTafseer,
-                surahName: s.flashcardsModeSurahName,
-              };
-              return (
-                <View key={mode} className="flex-row items-center justify-between">
-                  <Text
-                    className="text-charcoal dark:text-neutral-300 flex-1"
-                    style={{ fontFamily: "Manrope_500Medium", fontSize: 14 }}
-                  >
-                    {modeLabels[mode]}
-                  </Text>
-                  <Switch
-                    value={enabledModes.includes(mode)}
-                    onValueChange={() => toggleTestMode(mode)}
-                  />
-                </View>
-              );
-            })}
+          <View
+            className="gap-3"
+            style={{
+              flexDirection: isLaptop ? (isRTL ? "row-reverse" : "row") : "column",
+              flexWrap: isLaptop ? "wrap" : "nowrap",
+            }}
+          >
+            {ALL_TEST_MODES.map((mode) => (
+              <SettingsSwitchRow
+                key={mode}
+                label={modeLabels[mode]}
+                value={enabledModes.includes(mode)}
+                onValueChange={() => toggleTestMode(mode)}
+                isDark={isDark}
+                isRTL={isRTL}
+                compact={isLaptop}
+              />
+            ))}
           </View>
-          <View className="h-px my-4 bg-surface-high dark:bg-surface-dark-high" />
           <Text
-            className="text-warm-400 dark:text-neutral-500 mb-3"
+            className="text-warm-400 dark:text-neutral-500 mb-3 mt-5"
             style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
           >
             {s.wordFlashcardsTestModes}
           </Text>
-          <View className="gap-3">
+          <View
+            className="gap-3"
+            style={{
+              flexDirection: isLaptop ? (isRTL ? "row-reverse" : "row") : "column",
+              flexWrap: isLaptop ? "wrap" : "nowrap",
+            }}
+          >
             {[
               { key: "wordMeaningArabic" as const, label: s.flashcardsModeWordMeaningArabic },
               { key: "wordMeaningTranslation" as const, label: s.flashcardsModeWordMeaningTranslation },
             ].map((mode) => (
-              <View key={mode.key} className="flex-row items-center justify-between">
-                <Text
-                  className="text-charcoal dark:text-neutral-300 flex-1"
-                  style={{ fontFamily: "Manrope_500Medium", fontSize: 14 }}
-                >
-                  {mode.label}
-                </Text>
-                <Switch
-                  value={wordModes.includes(mode.key)}
-                  onValueChange={() => toggleWordMode(mode.key)}
-                />
-              </View>
+              <SettingsSwitchRow
+                key={mode.key}
+                label={mode.label}
+                value={wordModes.includes(mode.key)}
+                onValueChange={() => toggleWordMode(mode.key)}
+                isDark={isDark}
+                isRTL={isRTL}
+                compact={isLaptop}
+              />
             ))}
           </View>
         </Card>
 
         {/* Daily Review Limit */}
         <Card elevation="low" className="p-5 mb-8">
-          <Text
-            className="text-charcoal dark:text-neutral-200 mb-1"
-            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15 }}
+          <View
+            className={isLaptop ? "items-center justify-between gap-4" : "gap-4"}
+            style={{ flexDirection: isLaptop ? (isRTL ? "row-reverse" : "row") : "column" }}
           >
-            {s.flashcardsDailyLimit}
-          </Text>
-          <Text
-            className="text-warm-400 dark:text-neutral-500 mb-4"
-            style={{ fontFamily: "Manrope_400Regular", fontSize: 12 }}
-          >
-            {s.flashcardsDailyLimitDesc}
-          </Text>
-          <View className="flex-row items-center justify-between">
-            <Pressable
-              onPress={() => setDailyReviewLimit(dailyReviewLimit - DAILY_REVIEW_LIMIT_STEP)}
-              disabled={dailyReviewLimit <= MIN_DAILY_REVIEW_LIMIT}
-              className="w-10 h-10 rounded-full bg-surface-high dark:bg-surface-dark-high items-center justify-center"
-              style={{ opacity: dailyReviewLimit <= MIN_DAILY_REVIEW_LIMIT ? 0.3 : 1 }}
-            >
-              <Minus size={18} color={isDark ? "#d4d4d4" : "#6e5a47"} />
-            </Pressable>
-            <Text
-              className="text-charcoal dark:text-neutral-100"
-              style={{ fontFamily: "Manrope_700Bold", fontSize: 22 }}
-            >
-              {dailyReviewLimit}
-            </Text>
-            <Pressable
-              onPress={() => setDailyReviewLimit(dailyReviewLimit + DAILY_REVIEW_LIMIT_STEP)}
-              disabled={dailyReviewLimit >= MAX_DAILY_REVIEW_LIMIT}
-              className="w-10 h-10 rounded-full bg-surface-high dark:bg-surface-dark-high items-center justify-center"
-              style={{ opacity: dailyReviewLimit >= MAX_DAILY_REVIEW_LIMIT ? 0.3 : 1 }}
-            >
-              <Plus size={18} color={isDark ? "#d4d4d4" : "#6e5a47"} />
-            </Pressable>
+            <View className="flex-1">
+              <Text
+                className="text-charcoal dark:text-neutral-200 mb-1"
+                style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15, textAlign: isRTL ? "right" : "left" }}
+              >
+                {s.flashcardsDailyLimit}
+              </Text>
+              <Text
+                className="text-warm-400 dark:text-neutral-500"
+                style={{ fontFamily: "Manrope_400Regular", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
+              >
+                {s.flashcardsDailyLimitDesc}
+              </Text>
+            </View>
+            <SettingsStepper
+              value={isRTL ? toArabicNumber(dailyReviewLimit) : String(dailyReviewLimit)}
+              onDecrement={() => setDailyReviewLimit(dailyReviewLimit - DAILY_REVIEW_LIMIT_STEP)}
+              onIncrement={() => setDailyReviewLimit(dailyReviewLimit + DAILY_REVIEW_LIMIT_STEP)}
+              decrementDisabled={dailyReviewLimit <= MIN_DAILY_REVIEW_LIMIT}
+              incrementDisabled={dailyReviewLimit >= MAX_DAILY_REVIEW_LIMIT}
+              isDark={isDark}
+              isRTL={isRTL}
+            />
           </View>
         </Card>
 
@@ -791,8 +782,106 @@ export default function SettingsScreen() {
           visible={pickerVisible}
           onClose={() => setPickerVisible(false)}
         />
-      </ScrollView>
+      </ScreenScrollView>
     </SafeAreaView>
+  );
+}
+
+function SettingsStepper({
+  value,
+  onDecrement,
+  onIncrement,
+  decrementDisabled,
+  incrementDisabled,
+  isDark,
+  isRTL,
+}: {
+  value: string;
+  onDecrement: () => void;
+  onIncrement: () => void;
+  decrementDisabled: boolean;
+  incrementDisabled: boolean;
+  isDark: boolean;
+  isRTL: boolean;
+}) {
+  const iconColor = isDark ? "#d4d4d4" : "#6e5a47";
+  return (
+    <View
+      className="self-start rounded-full bg-surface-high dark:bg-surface-dark-high p-1"
+      style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
+    >
+      <Pressable
+        onPress={onDecrement}
+        disabled={decrementDisabled}
+        className="h-9 w-9 items-center justify-center rounded-full"
+        style={({ pressed }) => ({
+          opacity: decrementDisabled ? 0.35 : pressed ? 0.68 : 1,
+          transform: [{ scale: pressed && !decrementDisabled ? 0.96 : 1 }],
+        })}
+      >
+        <Minus size={17} color={iconColor} />
+      </Pressable>
+      <View className="min-w-16 items-center justify-center px-3">
+        <Text
+          className="text-charcoal dark:text-neutral-100"
+          style={{ fontFamily: "Manrope_700Bold", fontSize: 14 }}
+        >
+          {value}
+        </Text>
+      </View>
+      <Pressable
+        onPress={onIncrement}
+        disabled={incrementDisabled}
+        className="h-9 w-9 items-center justify-center rounded-full"
+        style={({ pressed }) => ({
+          opacity: incrementDisabled ? 0.35 : pressed ? 0.68 : 1,
+          transform: [{ scale: pressed && !incrementDisabled ? 0.96 : 1 }],
+        })}
+      >
+        <Plus size={17} color={iconColor} />
+      </Pressable>
+    </View>
+  );
+}
+
+function SettingsSwitchRow({
+  label,
+  value,
+  onValueChange,
+  isDark,
+  isRTL,
+  compact,
+}: {
+  label: string;
+  value: boolean;
+  onValueChange: () => void;
+  isDark: boolean;
+  isRTL: boolean;
+  compact: boolean;
+}) {
+  return (
+    <View
+      className="items-center gap-3 rounded-2xl bg-surface dark:bg-surface-dark px-3 py-2.5"
+      style={{
+        flexDirection: isRTL ? "row-reverse" : "row",
+        width: compact ? "48%" : "100%",
+      }}
+    >
+      <Text
+        className="text-charcoal dark:text-neutral-300"
+        style={{
+          color: isDark ? "#d4d4d4" : "#2D2D2D",
+          flexShrink: 1,
+          fontFamily: "Manrope_500Medium",
+          fontSize: 14,
+          textAlign: isRTL ? "right" : "left",
+          writingDirection: isRTL ? "rtl" : "ltr",
+        }}
+      >
+        {label}
+      </Text>
+      <Switch value={value} onValueChange={onValueChange} />
+    </View>
   );
 }
 
