@@ -15,6 +15,21 @@ Hafiz is in early public preview. It is ready for a small group of people to vie
 - Optional account sync, reflections, leaderboard, and public profile features.
 - Bilingual English/Arabic UI.
 
+## Planned Features
+
+Hafiz is still in early public preview. Planned work includes:
+
+- More detail around daily wird, streaks, achievement milestones, and progress history.
+- MP3 support and hadiths connected to individual ayahs.
+- More functionality for private notes and reflection workflows.
+- Reading utilities such as auto-scroll in vertical mode.
+- Memorization utilities such as hiding and automatically revealing ayahs in page mode.
+- Mutashabehat review support, either through a shared deck users can access or a user-built deck populated from the "add for review" ayah flow.
+- Reflection Journey and a Reflection Feed, with the two experiences connected where useful.
+- An interactive character to make guidance and encouragement feel more present.
+- Broader tests and UI polish across screen sizes, themes, languages, and reading/review modes.
+- A tested, high-quality Android application.
+
 ## Public Pages
 
 - About: https://hafizquran.app/about
