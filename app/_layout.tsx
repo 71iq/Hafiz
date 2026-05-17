@@ -32,6 +32,7 @@ function StableDocumentTitle() {
     const titles: Record<string, string> = {
       "/about": "About Hafiz | Hafiz",
       "/privacy": "Privacy Policy | Hafiz",
+      "/profile": "Profile | Hafiz",
       "/terms": "Terms of Service | Hafiz",
     };
 
@@ -125,6 +126,10 @@ export default function RootLayout() {
             <Stack.Screen
               name="auth/reset-password"
               options={{ animation: "slide_from_bottom" }}
+            />
+            <Stack.Screen
+              name="profile/index"
+              options={{ animation: "slide_from_right" }}
             />
             <Stack.Screen
               name="profile/[userId]"

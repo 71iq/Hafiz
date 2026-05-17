@@ -1,17 +1,40 @@
 import { useMemo } from "react";
-import { ScrollView, View, Text, Pressable } from "react-native";
+import { I18nManager, Platform, ScrollView, View, Text, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ChevronLeft, ChevronRight, UserRound } from "lucide-react-native";
 import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { LoadingScreen } from "@/components/LoadingScreen";
 import { PublicBadgesGrid } from "@/components/achievements/PublicBadgesGrid";
-import { useSettings } from "@/lib/settings/context";
+import { useDatabaseStatus } from "@/lib/database/provider";
+import { SettingsProvider, useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
+import { strings } from "@/lib/i18n/strings";
 import { fetchPublicAchievementUnlocks, fetchPublicProfile } from "@/lib/leaderboard/api";
 
+const UI_LANGUAGE_CACHE_KEY = "hafiz_ui_language";
+
 export default function PublicProfileScreen() {
+  const { isReady, progress, error } = useDatabaseStatus();
+
+  if (error) {
+    return <RouteDatabaseError message={error} />;
+  }
+
+  if (!isReady) {
+    return <LoadingScreen progress={progress} />;
+  }
+
+  return (
+    <SettingsProvider>
+      <PublicProfileContent />
+    </SettingsProvider>
+  );
+}
+
+function PublicProfileContent() {
   const { isDark, isRTL } = useSettings();
   const s = useStrings();
   const router = useRouter();
@@ -142,4 +165,28 @@ export default function PublicProfileScreen() {
       )}
     </SafeAreaView>
   );
+}
+
+function RouteDatabaseError({ message }: { message: string }) {
+  const uiLanguage = getStartupLanguage();
+  const s = strings[uiLanguage];
+
+  return (
+    <View className="flex-1 items-center justify-center bg-surface px-6 dark:bg-surface-dark">
+      <Text className="mb-2 text-red-600" style={{ fontFamily: "Manrope_700Bold", fontSize: 18 }}>
+        {s.databaseError}
+      </Text>
+      <Text className="text-center text-red-500" style={{ fontFamily: "Manrope_400Regular", fontSize: 14 }}>
+        {message}
+      </Text>
+    </View>
+  );
+}
+
+function getStartupLanguage(): "en" | "ar" {
+  if (Platform.OS === "web" && typeof window !== "undefined") {
+    const cached = window.localStorage.getItem(UI_LANGUAGE_CACHE_KEY);
+    if (cached === "en" || cached === "ar") return cached;
+  }
+  return I18nManager.isRTL ? "ar" : "en";
 }

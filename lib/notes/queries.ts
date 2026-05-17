@@ -24,6 +24,11 @@ export type PrivateNote = {
   qfRangesJson: string | null;
 };
 
+export type PrivateNoteSearchResult = PrivateNote & {
+  surahNameArabic: string;
+  surahNameEnglish: string;
+};
+
 export type CreatePrivateNoteInput = {
   surah: number;
   ayahStart: number;
@@ -44,6 +49,11 @@ type PrivateNoteRow = {
   qf_synced_at: string | null;
   qf_sync_error: string | null;
   qf_ranges_json: string | null;
+};
+
+type PrivateNoteSearchRow = PrivateNoteRow & {
+  name_arabic: string;
+  name_english: string;
 };
 
 export async function createPrivateNote(
@@ -136,6 +146,59 @@ export async function listPrivateNotesForAyah(
     [surah, ayah, ayah]
   );
   return rows.map(rowToNote);
+}
+
+export async function searchPrivateNotes(
+  db: SQLiteDatabase,
+  query: string
+): Promise<PrivateNoteSearchResult[]> {
+  const trimmed = query.trim();
+  const params: Array<string | number> = [];
+  const conditions: string[] = ["n.deleted_at IS NULL"];
+
+  if (trimmed.length > 0) {
+    const like = `%${trimmed}%`;
+    const searchConditions = [
+      "n.content LIKE ?",
+      "LOWER(s.name_english) LIKE LOWER(?)",
+      "s.name_arabic LIKE ?",
+      "CAST(n.surah AS TEXT) LIKE ?",
+      "CAST(n.ayah_start AS TEXT) LIKE ?",
+      "CAST(n.ayah_end AS TEXT) LIKE ?",
+    ];
+    params.push(like, like, like, like, like, like);
+
+    const ayahRef = trimmed.match(/^(\d{1,3})\s*[:.,/\-\s]\s*(\d{1,3})$/);
+    if (ayahRef) {
+      searchConditions.push("(n.surah = ? AND n.ayah_start <= ? AND n.ayah_end >= ?)");
+      params.push(Number(ayahRef[1]), Number(ayahRef[2]), Number(ayahRef[2]));
+    }
+
+    const numeric = trimmed.match(/^\d{1,3}$/);
+    if (numeric) {
+      const value = Number(numeric[1]);
+      searchConditions.push("(n.surah = ? OR (n.ayah_start <= ? AND n.ayah_end >= ?))");
+      params.push(value, value, value);
+    }
+
+    conditions.push(`(${searchConditions.join(" OR ")})`);
+  }
+
+  const rows = await db.getAllAsync<PrivateNoteSearchRow>(
+    `SELECT n.*, s.name_arabic, s.name_english
+     FROM private_notes n
+     JOIN surahs s ON s.number = n.surah
+     WHERE ${conditions.join(" AND ")}
+     ORDER BY n.updated_at DESC
+     LIMIT 250`,
+    params
+  );
+
+  return rows.map((row) => ({
+    ...rowToNote(row),
+    surahNameArabic: row.name_arabic,
+    surahNameEnglish: row.name_english,
+  }));
 }
 
 function rowToNote(row: PrivateNoteRow): PrivateNote {

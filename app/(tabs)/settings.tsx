@@ -241,6 +241,16 @@ export default function SettingsScreen() {
                   )}
                 </View>
               </View>
+              <View className="mb-4">
+                <SettingsLinkRow
+                  icon={User}
+                  title={s.settingsProfile}
+                  description={s.settingsProfileDesc}
+                  onPress={() => router.push("/profile" as any)}
+                  isDark={isDark}
+                  isRTL={isRTL}
+                />
+              </View>
               {configured && qfAuthEnabled && (
                 <View className="mb-4 rounded-3xl bg-surface dark:bg-surface-dark p-4">
                   <View className="flex-row items-center gap-3">
@@ -330,6 +340,14 @@ export default function SettingsScreen() {
             </View>
           ) : (
             <View className="gap-2">
+              <SettingsLinkRow
+                icon={User}
+                title={s.settingsProfile}
+                description={s.settingsProfileDesc}
+                onPress={() => router.push("/profile" as any)}
+                isDark={isDark}
+                isRTL={isRTL}
+              />
               <Button
                 onPress={() => router.push("/auth/login")}
                 disabled={authLoading}
