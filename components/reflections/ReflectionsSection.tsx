@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
 import { View, Text, Pressable } from "react-native";
 import { ChevronDown, ChevronUp, PenLine, MessageSquare } from "lucide-react-native";
-import { router } from "expo-router";
+import { router, type Href } from "expo-router";
 import { ReflectionsSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -184,7 +184,7 @@ export function ReflectionsSection({ surah, ayah, initiallyExpanded = false, sho
           )}
 
           <Pressable
-            onPress={() => router.push("/(tabs)/reflection-feed")}
+            onPress={() => router.push("/reflection-feed" as Href)}
             className="items-center py-2.5"
             style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
           >
