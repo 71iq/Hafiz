@@ -28,6 +28,10 @@ export const DAILY_REVIEW_LIMIT_STEP = 10;
 export const FOCUS_SCROLL_SPEED_MIN = 0.5;
 export const FOCUS_SCROLL_SPEED_MAX = 2.5;
 export const FOCUS_SCROLL_SPEED_DEFAULT = 1;
+export const DEFAULT_HIFZ_AUTO_DELAY_MS = 500;
+export const MIN_HIFZ_AUTO_DELAY_MS = 250;
+export const MAX_HIFZ_AUTO_DELAY_MS = 5000;
+export const HIFZ_AUTO_DELAY_STEP_MS = 250;
 
 export type ThemeMode = "light" | "dark" | "system";
 export type ViewMode = "verse" | "page";
@@ -62,6 +66,10 @@ type SettingsContextType = {
   setDailyReviewLimit: (limit: number) => void;
   focusScrollSpeed: number;
   setFocusScrollSpeed: (speed: number) => void;
+  hifzAutoDelayMs: number;
+  setHifzAutoDelayMs: (delayMs: number) => void;
+  hifzAutoAdvancePage: boolean;
+  setHifzAutoAdvancePage: (enabled: boolean) => void;
   isRTL: boolean;
   isDark: boolean;
   isLoaded: boolean;
@@ -93,6 +101,10 @@ const SettingsContext = createContext<SettingsContextType>({
   setDailyReviewLimit: () => {},
   focusScrollSpeed: FOCUS_SCROLL_SPEED_DEFAULT,
   setFocusScrollSpeed: () => {},
+  hifzAutoDelayMs: DEFAULT_HIFZ_AUTO_DELAY_MS,
+  setHifzAutoDelayMs: () => {},
+  hifzAutoAdvancePage: false,
+  setHifzAutoAdvancePage: () => {},
   isRTL: false,
   isDark: false,
   isLoaded: false,
@@ -149,6 +161,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [uiLanguage, setUiLanguageState] = useState<UILanguage>(readCachedUiLanguage);
   const [dailyReviewLimit, setDailyReviewLimitState] = useState(DEFAULT_DAILY_REVIEW_LIMIT);
   const [focusScrollSpeed, setFocusScrollSpeedState] = useState(FOCUS_SCROLL_SPEED_DEFAULT);
+  const [hifzAutoDelayMs, setHifzAutoDelayMsState] = useState(DEFAULT_HIFZ_AUTO_DELAY_MS);
+  const [hifzAutoAdvancePage, setHifzAutoAdvancePageState] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
 
   // Load settings from SQLite on mount
@@ -214,6 +228,17 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
             );
           }
         }
+
+        const savedHifzDelay = await readSetting(db, "hifz_auto_delay_ms");
+        if (savedHifzDelay !== null) {
+          const n = parseInt(savedHifzDelay, 10);
+          if (n >= MIN_HIFZ_AUTO_DELAY_MS && n <= MAX_HIFZ_AUTO_DELAY_MS) {
+            setHifzAutoDelayMsState(n);
+          }
+        }
+
+        const savedHifzAutoAdvance = await readSetting(db, "hifz_auto_advance_page");
+        if (savedHifzAutoAdvance === "true") setHifzAutoAdvancePageState(true);
 
         const savedLang = await readSetting(db, "translation_language");
         if (savedLang && savedLang !== DEFAULT_LANGUAGE) {
@@ -340,6 +365,23 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     [db]
   );
 
+  const setHifzAutoDelayMs = useCallback(
+    (delayMs: number) => {
+      const clamped = Math.max(MIN_HIFZ_AUTO_DELAY_MS, Math.min(MAX_HIFZ_AUTO_DELAY_MS, delayMs));
+      setHifzAutoDelayMsState(clamped);
+      writeSetting(db, "hifz_auto_delay_ms", String(clamped)).catch(console.warn);
+    },
+    [db]
+  );
+
+  const setHifzAutoAdvancePage = useCallback(
+    (enabled: boolean) => {
+      setHifzAutoAdvancePageState(enabled);
+      writeSetting(db, "hifz_auto_advance_page", String(enabled)).catch(console.warn);
+    },
+    [db]
+  );
+
   const setUiLanguage = useCallback(
     (lang: UILanguage) => {
       setUiLanguageState(lang);
@@ -380,6 +422,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         setDailyReviewLimit,
         focusScrollSpeed,
         setFocusScrollSpeed,
+        hifzAutoDelayMs,
+        setHifzAutoDelayMs,
+        hifzAutoAdvancePage,
+        setHifzAutoAdvancePage,
         isRTL,
         isDark,
         isLoaded,

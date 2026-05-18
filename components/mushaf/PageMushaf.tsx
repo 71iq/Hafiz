@@ -23,7 +23,7 @@ import {
   useSettings,
 } from "@/lib/settings/context";
 import { useStrings, interpolate } from "@/lib/i18n/useStrings";
-import { MUSHAF_LINE_WIDTH_SCALE, MushafPage, type PageLineLayout } from "./MushafPage";
+import { MUSHAF_LINE_WIDTH_SCALE, MushafPage, type HifzVisibility, type PageLineLayout } from "./MushafPage";
 import { AyahDetailModal } from "./AyahDetailModal";
 import { toArabicNumber } from "@/lib/arabic";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
@@ -155,6 +155,7 @@ type Props = {
   autoScrollSpeed?: number;
   onAutoScrollUserPause?: () => void;
   onAutoScrollEnd?: () => void;
+  hifzVisibility?: HifzVisibility | null;
 };
 
 // Fixed heights for getItemLayout calculation
@@ -359,6 +360,7 @@ export function PageMushaf({
   autoScrollSpeed = 1,
   onAutoScrollUserPause,
   onAutoScrollEnd,
+  hifzVisibility = null,
 }: Props) {
   const db = useDatabase();
   const { fontSize, lineHeight, pageScroll, isRTL, uiLanguage } = useSettings();
@@ -985,6 +987,7 @@ export function PageMushaf({
       highlightedAyahKey,
       highlightedWord,
       verticalScrollBottomInset,
+      hifzVisibility,
     }),
     [
       fontSize,
@@ -998,6 +1001,7 @@ export function PageMushaf({
       verticalLineWidth,
       verticalLineWrap,
       verticalScrollBottomInset,
+      hifzVisibility,
     ]
   );
 
@@ -1089,6 +1093,7 @@ export function PageMushaf({
             lineWidth={verticalLineWidth}
             lineSlotHeight={verticalLineSlotHeight}
             allowLineWrap={verticalLineWrap}
+            hifzVisibility={hifzVisibility}
           />
           {index < pageData.length - 1 && (
             <PageSeparator
@@ -1121,6 +1126,7 @@ export function PageMushaf({
       verticalLineSlotHeight,
       verticalLineWidth,
       verticalLineWrap,
+      hifzVisibility,
     ]
   );
 
@@ -1211,6 +1217,7 @@ export function PageMushaf({
                     lineSlotHeight={horizontalTypography.lineHeight}
                     allowLineWrap={false}
                     showLoadingIndicator={false}
+                    hifzVisibility={hifzVisibility}
                   />
                 </View>
               </View>

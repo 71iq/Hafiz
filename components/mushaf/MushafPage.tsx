@@ -51,6 +51,14 @@ export type PageLineLayout = {
   surah_number: number | null;
 };
 
+export type HifzVisibility = {
+  enabled: boolean;
+  page: number;
+  revealedAyahCount: number;
+  activeAyahKey: string | null;
+  activeVisibleWordCount: number;
+};
+
 type Props = {
   pageNumber: number;
   ayahs: AyahData[];
@@ -70,6 +78,7 @@ type Props = {
   lineSlotHeight?: number;
   allowLineWrap?: boolean;
   showLoadingIndicator?: boolean;
+  hifzVisibility?: HifzVisibility | null;
 };
 
 // Identity for a single visual word on the page
@@ -160,6 +169,7 @@ function MushafPageInner({
   lineSlotHeight,
   allowLineWrap = false,
   showLoadingIndicator = true,
+  hifzVisibility = null,
 }: Props) {
   const [fontVisible, setFontVisible] = useState(false);
   const [wordsLoaded, setWordsLoaded] = useState(!!pageWordsData);
@@ -197,6 +207,34 @@ function MushafPageInner({
   const pageGlyphs = useMemo(
     () => buildPageGlyphs(ayahs),
     [ayahs],
+  );
+
+  const ayahIndexByKey = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const token of pageGlyphs) {
+      const key = `${token.identity.surah}:${token.identity.ayah}`;
+      if (!map.has(key)) map.set(key, map.size);
+    }
+    return map;
+  }, [pageGlyphs]);
+
+  const isHifzWordHidden = useCallback(
+    (identity: WordIdentity) => {
+      if (!hifzVisibility?.enabled) return false;
+      if (hifzVisibility.page !== pageNumber) return true;
+      const key = `${identity.surah}:${identity.ayah}`;
+      const ayahIndex = ayahIndexByKey.get(key);
+      if (ayahIndex === undefined) return false;
+      if (ayahIndex < hifzVisibility.revealedAyahCount) return false;
+      if (
+        key === hifzVisibility.activeAyahKey &&
+        identity.wordPos <= hifzVisibility.activeVisibleWordCount
+      ) {
+        return false;
+      }
+      return true;
+    },
+    [ayahIndexByKey, hifzVisibility, pageNumber]
   );
 
   const handleMarkerPress = useCallback((surah: number, ayah: number) => {
@@ -381,6 +419,7 @@ function MushafPageInner({
                   wordPos={identity.wordPos}
                   v2Page={pageNumber}
                   highlightColor={hlColor}
+                  hidden={isHifzWordHidden(identity)}
                 />
               );
             }

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useFocusEffect, router } from "expo-router";
 import { View, Text, Pressable, ActivityIndicator, Platform, useWindowDimensions } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -23,7 +23,9 @@ import { GoToNavigator } from "@/components/mushaf/GoToNavigator";
 import { MushafIndicator } from "@/components/mushaf/MushafIndicator";
 import { MushafSlider } from "@/components/mushaf/MushafSlider";
 import { FocusModeControls } from "@/components/mushaf/FocusModeControls";
+import { HifzControls } from "@/components/mushaf/HifzControls";
 import { WordDetailSheet } from "@/components/mushaf/WordDetailSheet";
+import type { HifzVisibility } from "@/components/mushaf/MushafPage";
 import { loadMushafIndex, findJuzForAyah, findHizbForAyah, topmostAyahForPage, type MushafIndex } from "@/lib/mushaf/position";
 import { FloatingWordTooltip } from "@/components/mushaf/WordTooltip";
 import { SelectionActionBar } from "@/components/mushaf/SelectionActionBar";
@@ -42,6 +44,7 @@ import {
 } from "@/lib/ui/viewport";
 
 type MushafTarget = { surah: number; ayah: number; wordPos?: number };
+type HifzPageAyah = { key: string; wordCount: number };
 
 /** Registers an ayah navigation callback inside WordInteractionProvider */
 function AyahNavigationRegistrar({
@@ -173,6 +176,8 @@ function MushafInner() {
     viewMode,
     setViewMode,
     pageScroll,
+    hifzAutoDelayMs,
+    hifzAutoAdvancePage,
     focusScrollSpeed,
     setFocusScrollSpeed,
     isDark,
@@ -351,10 +356,25 @@ function MushafInner() {
   const [showBookmarks, setShowBookmarks] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [hideMode, setHideMode] = useState(false);
+  const [verseHideMode, setVerseHideMode] = useState(false);
+  const [hifzEnabled, setHifzEnabled] = useState(false);
+  const [hifzRevealedAyahCount, setHifzRevealedAyahCount] = useState(0);
+  const [hifzActiveAyahKey, setHifzActiveAyahKey] = useState<string | null>(null);
+  const [hifzActiveVisibleWordCount, setHifzActiveVisibleWordCount] = useState(0);
+  const [hifzAutoRunning, setHifzAutoRunning] = useState(false);
   const [mushafIndex, setMushafIndex] = useState<MushafIndex | null>(null);
   const [topAyah, setTopAyah] = useState<{ surah: number; ayah: number } | null>(null);
   const currentPageRef = useRef(1);
+  const hifzCurrentPageAyahsRef = useRef<HifzPageAyah[]>([]);
+  const hifzEnabledRef = useRef(false);
+  const hifzAutoAdvancePageRef = useRef(false);
+  const hifzAutoPageChangeRef = useRef(false);
+  const hifzAutoTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const hifzProgressRef = useRef({
+    revealedAyahCount: 0,
+    activeAyahKey: null as string | null,
+    activeVisibleWordCount: 0,
+  });
   const goToPageRef = useRef<((page: number) => void) | null>(null);
   const flashListRef = useRef<FlashListRef<MushafItem>>(null);
 
@@ -450,6 +470,154 @@ function MushafInner() {
     loadQuran();
   }, [db]);
 
+  const currentPageHifzAyahs = useMemo<HifzPageAyah[]>(
+    () =>
+      items
+        .filter((item): item is Extract<MushafItem, { type: "ayah" }> =>
+          item.type === "ayah" && item.v2Page === currentPage
+        )
+        .map((item) => ({
+          key: `${item.surah}:${item.ayah}`,
+          wordCount: Math.max(0, item.text.split(" ").filter(Boolean).length - 1),
+        })),
+    [currentPage, items]
+  );
+
+  const applyHifzProgress = useCallback(
+    (next: {
+      revealedAyahCount: number;
+      activeAyahKey: string | null;
+      activeVisibleWordCount: number;
+    }) => {
+      hifzProgressRef.current = next;
+      setHifzRevealedAyahCount(next.revealedAyahCount);
+      setHifzActiveAyahKey(next.activeAyahKey);
+      setHifzActiveVisibleWordCount(next.activeVisibleWordCount);
+    },
+    []
+  );
+
+  const resetHifzProgress = useCallback(() => {
+    applyHifzProgress({
+      revealedAyahCount: 0,
+      activeAyahKey: null,
+      activeVisibleWordCount: 0,
+    });
+  }, [applyHifzProgress]);
+
+  const clearHifzTimer = useCallback(() => {
+    if (hifzAutoTimerRef.current) {
+      clearInterval(hifzAutoTimerRef.current);
+      hifzAutoTimerRef.current = null;
+    }
+  }, []);
+
+  const stopHifzAuto = useCallback(() => {
+    clearHifzTimer();
+    setHifzAutoRunning(false);
+  }, [clearHifzTimer]);
+
+  const resetHifzForNavigation = useCallback(() => {
+    if (!hifzEnabledRef.current) return;
+    stopHifzAuto();
+    resetHifzProgress();
+  }, [resetHifzProgress, stopHifzAuto]);
+
+  const handleHifzPageComplete = useCallback(() => {
+    const page = currentPageRef.current;
+    if (hifzAutoAdvancePageRef.current && page < 604 && goToPageRef.current) {
+      hifzAutoPageChangeRef.current = true;
+      resetHifzProgress();
+      goToPageRef.current(page + 1);
+      return;
+    }
+    stopHifzAuto();
+  }, [resetHifzProgress, stopHifzAuto]);
+
+  const stepHifzAuto = useCallback(() => {
+    if (!hifzEnabledRef.current) {
+      stopHifzAuto();
+      return;
+    }
+    const pageAyahs = hifzCurrentPageAyahsRef.current;
+    if (pageAyahs.length === 0) return;
+
+    const progress = hifzProgressRef.current;
+    let activeAyahKey = progress.activeAyahKey;
+    let activeVisibleWordCount = progress.activeVisibleWordCount;
+    let activeIndex = activeAyahKey
+      ? pageAyahs.findIndex((ayah) => ayah.key === activeAyahKey)
+      : -1;
+
+    if (activeIndex < 0) {
+      if (progress.revealedAyahCount >= pageAyahs.length) {
+        handleHifzPageComplete();
+        return;
+      }
+      activeIndex = progress.revealedAyahCount;
+      activeAyahKey = pageAyahs[activeIndex]?.key ?? null;
+      activeVisibleWordCount = 0;
+    }
+
+    const activeAyah = pageAyahs[activeIndex];
+    if (!activeAyah || !activeAyahKey) {
+      handleHifzPageComplete();
+      return;
+    }
+
+    if (activeAyah.wordCount <= 0 || activeVisibleWordCount + 1 >= activeAyah.wordCount) {
+      const revealedAyahCount = Math.max(progress.revealedAyahCount, activeIndex + 1);
+      applyHifzProgress({
+        revealedAyahCount,
+        activeAyahKey: null,
+        activeVisibleWordCount: 0,
+      });
+      if (revealedAyahCount >= pageAyahs.length) {
+        if (!hifzAutoAdvancePageRef.current || currentPageRef.current >= 604) {
+          handleHifzPageComplete();
+        }
+      }
+      return;
+    }
+
+    applyHifzProgress({
+      revealedAyahCount: progress.revealedAyahCount,
+      activeAyahKey,
+      activeVisibleWordCount: activeVisibleWordCount + 1,
+    });
+  }, [applyHifzProgress, handleHifzPageComplete, stopHifzAuto]);
+
+  useEffect(() => {
+    hifzCurrentPageAyahsRef.current = currentPageHifzAyahs;
+  }, [currentPageHifzAyahs]);
+
+  useEffect(() => {
+    hifzEnabledRef.current = hifzEnabled;
+  }, [hifzEnabled]);
+
+  useEffect(() => {
+    hifzAutoAdvancePageRef.current = hifzAutoAdvancePage;
+  }, [hifzAutoAdvancePage]);
+
+  useEffect(() => {
+    hifzProgressRef.current = {
+      revealedAyahCount: hifzRevealedAyahCount,
+      activeAyahKey: hifzActiveAyahKey,
+      activeVisibleWordCount: hifzActiveVisibleWordCount,
+    };
+  }, [hifzActiveAyahKey, hifzActiveVisibleWordCount, hifzRevealedAyahCount]);
+
+  useEffect(() => {
+    clearHifzTimer();
+    if (!hifzAutoRunning) return;
+    hifzAutoTimerRef.current = setInterval(stepHifzAuto, hifzAutoDelayMs);
+    return clearHifzTimer;
+  }, [clearHifzTimer, hifzAutoDelayMs, hifzAutoRunning, stepHifzAuto]);
+
+  useEffect(() => () => {
+    clearHifzTimer();
+  }, [clearHifzTimer]);
+
   const scrollToTarget = useCallback(
     async (target: MushafTarget, animated = true) => {
       if (viewMode === "verse") {
@@ -480,6 +648,7 @@ function MushafInner() {
   const navigateToTarget = useCallback(
     (target: MushafTarget, animated = true) => {
       pauseFocusAutoScroll();
+      resetHifzForNavigation();
       void scrollToTarget(target, animated)
         .catch((e) => {
           console.warn("[Mushaf] target navigation failed:", e);
@@ -488,7 +657,7 @@ function MushafInner() {
           highlightTarget(target);
         });
     },
-    [highlightTarget, pauseFocusAutoScroll, scrollToTarget]
+    [highlightTarget, pauseFocusAutoScroll, resetHifzForNavigation, scrollToTarget]
   );
 
   // Consume pending deep link on tab focus (supports both hafiz:// links and search navigation)
@@ -523,7 +692,7 @@ function MushafInner() {
           v2Page={item.v2Page}
           fontSize={fontSize}
           lineHeight={lineHeight}
-          hideMode={hideMode}
+          hideMode={verseHideMode}
           highlighted={highlightedKey === `${item.surah}:${item.ayah}`}
           highlightedWordPos={
             highlightedWord?.surah === item.surah && highlightedWord?.ayah === item.ayah
@@ -533,7 +702,7 @@ function MushafInner() {
         />
       );
     },
-    [fontSize, lineHeight, hideMode, highlightedKey, highlightedWord]
+    [fontSize, lineHeight, verseHideMode, highlightedKey, highlightedWord]
   );
 
   const getItemType = useCallback((item: MushafItem) => item.type, []);
@@ -548,15 +717,17 @@ function MushafInner() {
 
   const handleGoToPage = useCallback(
     (page: number) => {
+      resetHifzForNavigation();
       if (viewMode === "page" && goToPageRef.current) {
         goToPageRef.current(page);
       }
     },
-    [viewMode]
+    [resetHifzForNavigation, viewMode]
   );
 
   const handleGoToSurahVerse = useCallback(
     (surahNumber: number) => {
+      resetHifzForNavigation();
       const index = surahHeaderIndices.get(surahNumber);
       if (index !== undefined && flashListRef.current) {
         flashListRef.current.scrollToIndex({
@@ -565,7 +736,7 @@ function MushafInner() {
         });
       }
     },
-    [surahHeaderIndices]
+    [resetHifzForNavigation, surahHeaderIndices]
   );
 
   const handleBookmarkNavigate = useCallback(
@@ -582,21 +753,100 @@ function MushafInner() {
 
   const handleOpenSearch = useCallback(() => {
     pauseFocusAutoScroll();
+    resetHifzForNavigation();
     setShowSearch(true);
-  }, [pauseFocusAutoScroll]);
+  }, [pauseFocusAutoScroll, resetHifzForNavigation]);
 
   const handleOpenNavigator = useCallback(() => {
     pauseFocusAutoScroll();
+    resetHifzForNavigation();
     setShowNavigator(true);
-  }, [pauseFocusAutoScroll]);
+  }, [pauseFocusAutoScroll, resetHifzForNavigation]);
 
   const isPageMode = viewMode === "page";
   const viewModeLabel = isPageMode ? s.mushafViewPage : s.mushafViewVerse;
   const toggleViewMode = useCallback(() => {
     setViewMode(isPageMode ? "verse" : "page");
   }, [isPageMode, setViewMode]);
-  const canUseFocusMode = isPageMode && pageScroll === "vertical";
-  const showBottomSlider = isPageMode && !focusModeActive;
+  const canUseFocusMode = isPageMode && pageScroll === "vertical" && !hifzEnabled;
+  const showHifzControls = isPageMode && hifzEnabled && !focusModeActive;
+  const showBottomSlider = isPageMode && !focusModeActive && !hifzEnabled;
+  const hifzVisibility = useMemo<HifzVisibility | null>(
+    () =>
+      showHifzControls
+        ? {
+            enabled: true,
+            page: currentPage,
+            revealedAyahCount: hifzRevealedAyahCount,
+            activeAyahKey: hifzActiveAyahKey,
+            activeVisibleWordCount: hifzActiveVisibleWordCount,
+          }
+        : null,
+    [
+      currentPage,
+      hifzActiveAyahKey,
+      hifzActiveVisibleWordCount,
+      hifzRevealedAyahCount,
+      showHifzControls,
+    ]
+  );
+  const canRevealNextHifzAyah =
+    showHifzControls &&
+    currentPageHifzAyahs.length > 0 &&
+    (hifzRevealedAyahCount < currentPageHifzAyahs.length || hifzActiveAyahKey !== null);
+  const canHidePreviousHifzAyah =
+    showHifzControls && (hifzRevealedAyahCount > 0 || hifzActiveAyahKey !== null);
+  const toggleHifzMode = useCallback(() => {
+    if (hifzEnabled) {
+      stopHifzAuto();
+      resetHifzProgress();
+      setHifzEnabled(false);
+      return;
+    }
+    resetHifzProgress();
+    setHifzEnabled(true);
+    setChromeVisible(true);
+  }, [hifzEnabled, resetHifzProgress, setChromeVisible, stopHifzAuto]);
+  const revealNextHifzAyah = useCallback(() => {
+    stopHifzAuto();
+    const activeIndex = hifzActiveAyahKey
+      ? currentPageHifzAyahs.findIndex((ayah) => ayah.key === hifzActiveAyahKey)
+      : -1;
+    applyHifzProgress({
+      revealedAyahCount: Math.min(
+        currentPageHifzAyahs.length,
+        activeIndex >= 0 ? activeIndex + 1 : hifzRevealedAyahCount + 1
+      ),
+      activeAyahKey: null,
+      activeVisibleWordCount: 0,
+    });
+  }, [
+    applyHifzProgress,
+    currentPageHifzAyahs,
+    hifzActiveAyahKey,
+    hifzRevealedAyahCount,
+    stopHifzAuto,
+  ]);
+  const hidePreviousHifzAyah = useCallback(() => {
+    stopHifzAuto();
+    if (hifzActiveAyahKey) {
+      applyHifzProgress({
+        revealedAyahCount: hifzRevealedAyahCount,
+        activeAyahKey: null,
+        activeVisibleWordCount: 0,
+      });
+      return;
+    }
+    applyHifzProgress({
+      revealedAyahCount: Math.max(0, hifzRevealedAyahCount - 1),
+      activeAyahKey: null,
+      activeVisibleWordCount: 0,
+    });
+  }, [applyHifzProgress, hifzActiveAyahKey, hifzRevealedAyahCount, stopHifzAuto]);
+  const startHifzAuto = useCallback(() => {
+    if (!hifzEnabled) setHifzEnabled(true);
+    setHifzAutoRunning(true);
+  }, [hifzEnabled]);
   const pageFontSizeLocked = isPageMode && pageScroll === "horizontal";
   const mobileBottomNavHeight = 54;
   const mobileBottomNavGap = 6;
@@ -608,7 +858,7 @@ function MushafInner() {
     : isTablet
       ? Math.max(insets.bottom, 16)
       : 0;
-  const pageScrollBottomInset = focusModeActive ? Math.max(insets.bottom, 12) + 96 : showBottomSlider ? 8 : undefined;
+  const pageScrollBottomInset = focusModeActive ? Math.max(insets.bottom, 12) + 96 : isPageMode ? 8 : undefined;
   const floatingRailSurface = {
     backgroundColor: isDark ? "rgba(28,25,23,0.95)" : "rgba(255,248,241,0.95)",
     borderWidth: 1,
@@ -631,6 +881,9 @@ function MushafInner() {
 
   const enterFocusMode = useCallback(() => {
     if (!canUseFocusMode) return;
+    resetHifzProgress();
+    stopHifzAuto();
+    setHifzEnabled(false);
     clearFocusControlsTimer();
     setFocusToastMessage(null);
     setFocusModeActive(true);
@@ -638,7 +891,7 @@ function MushafInner() {
     setFocusControlsVisible(true);
     setImmersive(true);
     setChromeVisible(false);
-  }, [canUseFocusMode, clearFocusControlsTimer, setChromeVisible, setImmersive]);
+  }, [canUseFocusMode, clearFocusControlsTimer, resetHifzProgress, setChromeVisible, setImmersive, stopHifzAuto]);
 
   const exitFocusMode = useCallback(() => {
     clearFocusControlsTimer();
@@ -725,6 +978,23 @@ function MushafInner() {
   useEffect(() => {
     currentPageRef.current = currentPage;
   }, [currentPage]);
+
+  useEffect(() => {
+    if (!hifzEnabled) return;
+    resetHifzProgress();
+    if (hifzAutoPageChangeRef.current) {
+      hifzAutoPageChangeRef.current = false;
+      return;
+    }
+    stopHifzAuto();
+  }, [currentPage, hifzEnabled, resetHifzProgress, stopHifzAuto]);
+
+  useEffect(() => {
+    if (isPageMode || !hifzEnabled) return;
+    stopHifzAuto();
+    resetHifzProgress();
+    setHifzEnabled(false);
+  }, [hifzEnabled, isPageMode, resetHifzProgress, stopHifzAuto]);
 
   // For page view, derive the topmost ayah from the visible page
   useEffect(() => {
@@ -941,13 +1211,22 @@ function MushafInner() {
                   >
                     <BookMarked size={16} color={isDark ? "#737373" : "#8B8178"} />
                   </Pressable>
-                  {viewMode === "verse" && (
+                  {viewMode === "verse" ? (
                     <Pressable
-                      onPress={() => setHideMode((prev) => !prev)}
-                      className={`rounded-full px-2.5 py-2 ${hideMode ? "bg-primary-accent/15 dark:bg-primary-bright/15" : ""}`}
+                      onPress={() => setVerseHideMode((prev) => !prev)}
+                      className={`rounded-full px-2.5 py-2 ${verseHideMode ? "bg-primary-accent/15 dark:bg-primary-bright/15" : ""}`}
                       style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
                     >
-                      {hideMode ? <EyeOff size={16} color="#0d9488" /> : <Eye size={16} color={isDark ? "#737373" : "#8B8178"} />}
+                      {verseHideMode ? <EyeOff size={16} color="#0d9488" /> : <Eye size={16} color={isDark ? "#737373" : "#8B8178"} />}
+                    </Pressable>
+                  ) : (
+                    <Pressable
+                      onPress={toggleHifzMode}
+                      accessibilityLabel={s.hifzMode}
+                      className={`rounded-full px-2.5 py-2 ${hifzEnabled ? "bg-primary-accent/15 dark:bg-primary-bright/15" : ""}`}
+                      style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+                    >
+                      {hifzEnabled ? <EyeOff size={16} color="#0d9488" /> : <Eye size={16} color={isDark ? "#737373" : "#8B8178"} />}
                     </Pressable>
                   )}
                   {canUseFocusMode && (
@@ -996,17 +1275,30 @@ function MushafInner() {
                 >
                   <BookMarked size={16} color={isDark ? "#737373" : "#8B8178"} />
                 </Pressable>
-                {viewMode === "verse" && (
+                {viewMode === "verse" ? (
                   <Pressable
-                    onPress={() => setHideMode((prev) => !prev)}
+                    onPress={() => setVerseHideMode((prev) => !prev)}
                     className={`rounded-full ${isNarrow ? "px-2 py-2" : "px-3 py-2"} ${
-                      hideMode
+                      verseHideMode
                         ? "bg-primary-accent/15 dark:bg-primary-bright/15"
                         : "bg-surface-high dark:bg-surface-dark-high"
                     }`}
                     style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
                   >
-                    {hideMode ? <EyeOff size={16} color="#0d9488" /> : <Eye size={16} color={isDark ? "#737373" : "#8B8178"} />}
+                    {verseHideMode ? <EyeOff size={16} color="#0d9488" /> : <Eye size={16} color={isDark ? "#737373" : "#8B8178"} />}
+                  </Pressable>
+                ) : (
+                  <Pressable
+                    onPress={toggleHifzMode}
+                    accessibilityLabel={s.hifzMode}
+                    className={`rounded-full ${isNarrow ? "px-2 py-2" : "px-3 py-2"} ${
+                      hifzEnabled
+                        ? "bg-primary-accent/15 dark:bg-primary-bright/15"
+                        : "bg-surface-high dark:bg-surface-dark-high"
+                    }`}
+                    style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+                  >
+                    {hifzEnabled ? <EyeOff size={16} color="#0d9488" /> : <Eye size={16} color={isDark ? "#737373" : "#8B8178"} />}
                   </Pressable>
                 )}
                 {canUseFocusMode && (
@@ -1074,6 +1366,7 @@ function MushafInner() {
                 autoScrollSpeed={focusScrollSpeed}
                 onAutoScrollUserPause={pauseFocusAutoScroll}
                 onAutoScrollEnd={handleFocusAutoScrollEnd}
+                hifzVisibility={hifzVisibility}
               />
             </View>
             <FocusModeControls
@@ -1146,7 +1439,7 @@ function MushafInner() {
               renderItem={renderItem}
               getItemType={getItemType}
               keyExtractor={keyExtractor}
-              extraData={{ fontSize, hideMode, highlightedKey, highlightedWord }}
+              extraData={{ fontSize, verseHideMode, highlightedKey, highlightedWord }}
               contentContainerStyle={{ paddingBottom: isPhone ? 24 : 56 }}
               onScroll={handleScrollChrome}
               scrollEventThrottle={16}
@@ -1189,8 +1482,8 @@ function MushafInner() {
         {/* Selection action bar */}
         <SelectionActionBar />
 
-        {/* Bottom slider — fades with chrome */}
-        {showBottomSlider && (
+        {/* Bottom page rail / Hifz controls — fades with chrome */}
+        {(showBottomSlider || showHifzControls) && (
           <Animated.View
             pointerEvents={chromeVisible ? "auto" : "none"}
             style={[
@@ -1215,28 +1508,40 @@ function MushafInner() {
               sliderAnimStyle,
             ]}
           >
-            <MushafSlider
-              currentPage={currentPage}
-              interactive={chromeVisible}
-              onUserActivity={() => setChromeVisible(true)}
-              onCommit={(p) => {
-                if (isPageMode) goToPageRef.current?.(p);
-                else {
-                  // Verse view: jump to the first ayah on that page
-                  const ayah = mushafIndex
-                    ? topmostAyahForPage(mushafIndex, p)
-                    : null;
-                  if (ayah) {
-                    const idx = items.findIndex(
-                      (it) => it.type === "ayah" && it.surah === ayah.surah && it.ayah === ayah.ayah
-                    );
-                    if (idx >= 0) flashListRef.current?.scrollToIndex({ index: idx, animated: true });
+            {showHifzControls ? (
+              <HifzControls
+                canRevealNext={canRevealNextHifzAyah}
+                canHidePrevious={canHidePreviousHifzAyah}
+                autoRunning={hifzAutoRunning}
+                onRevealNext={revealNextHifzAyah}
+                onHidePrevious={hidePreviousHifzAyah}
+                onStartAuto={startHifzAuto}
+                onStopAuto={stopHifzAuto}
+              />
+            ) : (
+              <MushafSlider
+                currentPage={currentPage}
+                interactive={chromeVisible}
+                onUserActivity={() => setChromeVisible(true)}
+                onCommit={(p) => {
+                  if (isPageMode) goToPageRef.current?.(p);
+                  else {
+                    // Verse view: jump to the first ayah on that page
+                    const ayah = mushafIndex
+                      ? topmostAyahForPage(mushafIndex, p)
+                      : null;
+                    if (ayah) {
+                      const idx = items.findIndex(
+                        (it) => it.type === "ayah" && it.surah === ayah.surah && it.ayah === ayah.ayah
+                      );
+                      if (idx >= 0) flashListRef.current?.scrollToIndex({ index: idx, animated: true });
+                    }
                   }
-                }
-              }}
-              onExpand={handleOpenNavigator}
-              index={mushafIndex}
-            />
+                }}
+                onExpand={handleOpenNavigator}
+                index={mushafIndex}
+              />
+            )}
           </Animated.View>
         )}
 

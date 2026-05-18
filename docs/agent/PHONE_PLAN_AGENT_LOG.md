@@ -1727,3 +1727,31 @@ Saved in `phase19/`:
 - `npm run typecheck`: passed.
 - `npm run build:web`: passed.
 - `npx expo start --web --port 8099 --localhost`: started successfully; `/mushaf` returned HTTP 200 after Metro bundled.
+
+## 2026-05-18 — Page Hifz Mode
+
+### Scope decisions
+1. Added Hifz mode only to Mushaf page view.
+2. Kept verse hide mode as the existing separate verse-only behavior.
+3. Persisted only Hifz auto settings; revealed page progress and auto-running state remain session-only.
+
+### Implemented in this step
+- `app/(tabs)/mushaf.tsx`:
+  - Added page-only Hifz state, page reset handling, and word-by-word auto reveal.
+  - Replaced the page slider with Hifz controls while Hifz mode is enabled.
+- `components/mushaf/HifzControls.tsx`:
+  - Added previous, clock, and next controls plus the auto-reveal settings sheet.
+- `components/mushaf/MushafPage.tsx`, `components/mushaf/PageMushaf.tsx`, and `components/mushaf/WordToken.tsx`:
+  - Passed Hifz visibility state into QCF2 word rendering.
+  - Hidden words keep their QCF2 width while ayah markers remain visible.
+- `lib/settings/context.tsx` and `lib/i18n/strings.ts`:
+  - Added persisted Hifz auto speed and auto-next-page settings with bilingual strings.
+- `docs/product/HAFIZ_SPEC.md`:
+  - Documented page-view Hifz mode.
+
+### Validation result
+- `npm run typecheck`: passed.
+- `npm run build:web`: passed.
+- `npx expo start --web --port 8098 --localhost`: launched successfully for browser smoke checks.
+- Web smoke checked at 360, 412, 768, 1024, and 1440 widths with no document overflow.
+- Verified Hifz page controls in EN/light and AR/dark: hidden words preserve QCF2 layout, markers remain visible, manual reveal/hide works, auto reveal advances words, and auto-next-page advances after page completion.

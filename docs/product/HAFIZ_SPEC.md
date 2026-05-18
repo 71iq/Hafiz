@@ -188,6 +188,7 @@ The Mushaf supports **two view modes** (togglable like quran.com):
 - Each page shows the surah header (decorated) if a new surah begins on that page.
 - Swipe left/right to navigate pages.
 - The feel should resemble a physical Mushaf.
+- **Hifz mode:** Page view can hide Quran words while keeping ayah markers, surah headers, and basmallah visible. Manual controls reveal the next full ayah or hide the last revealed ayah. Auto reveal exposes words one by one at a persisted speed and can optionally continue to the next page. Reveal progress is session-only; speed and auto-next-page settings persist.
 
 #### 3.1.2 Verse-by-Verse View (Scroll-Based)
 - Virtualized scrolling list of ayahs (use FlashList).

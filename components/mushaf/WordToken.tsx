@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import { Text, Pressable, Platform, View } from "react-native";
 import { useWordInteraction } from "@/lib/word/context";
 import { useChrome } from "@/lib/ui/chrome";
+import { useSettings } from "@/lib/settings/context";
 
 type Props = {
   glyph: string;
@@ -14,6 +15,7 @@ type Props = {
   v2Page: number;
   disabled?: boolean;
   highlightColor?: string;
+  hidden?: boolean;
 };
 
 const DOUBLE_TAP_MS = 260;
@@ -29,9 +31,11 @@ function WordTokenInner({
   v2Page,
   disabled = false,
   highlightColor,
+  hidden = false,
 }: Props) {
   const { tooltipWord, setTooltipWord, openDetail } = useWordInteraction();
   const { markActivity } = useChrome();
+  const { isDark } = useSettings();
   const tokenRef = useRef<View>(null);
   const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTouchInput = useMemo(() => {
@@ -62,7 +66,7 @@ function WordTokenInner({
   }, [surah, ayah, wordPos, v2Page, setTooltipWord]);
 
   const handlePress = useCallback(() => {
-    if (disabled) return;
+    if (disabled || hidden) return;
     if (!isTouchInput) {
       // Mouse / desktop: single click → tooltip
       markActivity();
@@ -80,21 +84,21 @@ function WordTokenInner({
       tapTimerRef.current = null;
       showTooltip();
     }, DOUBLE_TAP_MS);
-  }, [disabled, isTouchInput, markActivity, showTooltip]);
+  }, [disabled, hidden, isTouchInput, markActivity, showTooltip]);
 
   const handleLongPress = useCallback(() => {
-    if (disabled) return;
+    if (disabled || hidden) return;
     markActivity();
     if (tapTimerRef.current) {
       clearTimeout(tapTimerRef.current);
       tapTimerRef.current = null;
     }
     openDetail(wordRef);
-  }, [disabled, surah, ayah, wordPos, v2Page, markActivity, openDetail]);
+  }, [disabled, hidden, surah, ayah, wordPos, v2Page, markActivity, openDetail]);
 
   // Web: right-click also opens the detail sheet (matches "long press" intent)
   const webContextMenu =
-    Platform.OS === "web" && !disabled
+    Platform.OS === "web" && !disabled && !hidden
       ? {
           onContextMenu: (e: any) => {
             e?.preventDefault?.();
@@ -115,6 +119,7 @@ function WordTokenInner({
       onPress={handlePress}
       onLongPress={handleLongPress}
       delayLongPress={400}
+      disabled={disabled || hidden}
       style={{ paddingHorizontal: 1, overflow: "visible" }}
       {...webContextMenu}
     >
@@ -136,6 +141,12 @@ function WordTokenInner({
           ...(isTooltipSelected && !bgColor && {
             backgroundColor: "rgba(13, 148, 136, 0.08)",
             borderRadius: 6,
+          }),
+          ...(hidden && {
+            color: "transparent",
+            borderBottomWidth: Math.max(2, fontSize * 0.08),
+            borderBottomColor: isDark ? "#474747" : "#e8dac5",
+            paddingBottom: Math.max(1, fontSize * 0.04),
           }),
         }}
       >
