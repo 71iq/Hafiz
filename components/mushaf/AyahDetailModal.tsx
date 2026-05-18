@@ -199,9 +199,9 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
     if (!target) return;
     const result = await toggleAyah(target.surah, target.ayah);
     if (!result.ok) {
-      showToast(s.audioUnavailable);
+      showToast(result.code === "not_configured" ? s.qfContentMisconfigured : s.qfContentUnavailable);
     }
-  }, [target?.surah, target?.ayah, toggleAyah, showToast, s.audioUnavailable]);
+  }, [target?.surah, target?.ayah, toggleAyah, showToast, s.qfContentMisconfigured, s.qfContentUnavailable]);
 
   if (!target) return null;
 

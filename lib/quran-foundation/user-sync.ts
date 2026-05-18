@@ -14,6 +14,14 @@ import {
 
 type QfEntityType = "bookmark" | "private_note";
 type QfOperation = "UPSERT" | "DELETE";
+type QfSyncConnectionState = "connected" | "not_connected" | "needs_reauth" | "failed";
+
+export type QfSyncResult = {
+  status: "synced" | "not_connected" | "needs_reauth" | "failed";
+  pushed: number;
+  pulled: number;
+  message?: string;
+};
 
 type QfSyncQueueEntry = {
   id: number;
@@ -80,19 +88,21 @@ export async function getPendingQfSyncCount(db: SQLiteDatabase): Promise<number>
   return row?.count ?? 0;
 }
 
-export async function runInitialQfUserSync(db: SQLiteDatabase): Promise<{ pushed: number; pulled: number }> {
-  if (!(await hasConnectedQfUser())) return { pushed: 0, pulled: 0 };
+export async function runInitialQfUserSync(db: SQLiteDatabase): Promise<QfSyncResult> {
+  const connection = await getQfSyncConnectionState();
+  if (connection !== "connected") return { status: connection, pushed: 0, pulled: 0 };
 
   const firstPull = await pullQfRemoteChanges(db);
   await enqueueAllActiveLocalRows(db);
   await markInitialLocalEnqueueDone(db);
   const pushed = await pushQfSyncQueue(db);
   const secondPull = await pullQfRemoteChanges(db);
-  return { pushed, pulled: firstPull + secondPull };
+  return { status: "synced", pushed, pulled: firstPull + secondPull };
 }
 
-export async function fullQfUserSync(db: SQLiteDatabase): Promise<{ pushed: number; pulled: number }> {
-  if (!(await hasConnectedQfUser())) return { pushed: 0, pulled: 0 };
+export async function fullQfUserSync(db: SQLiteDatabase): Promise<QfSyncResult> {
+  const connection = await getQfSyncConnectionState();
+  if (connection !== "connected") return { status: connection, pushed: 0, pulled: 0 };
   if (await needsInitialLocalEnqueue(db)) {
     const firstPull = await pullQfRemoteChanges(db);
     await enqueueAllActiveLocalRows(db);
@@ -103,7 +113,7 @@ export async function fullQfUserSync(db: SQLiteDatabase): Promise<{ pushed: numb
       "INSERT OR REPLACE INTO user_settings (key, value) VALUES ('qf_last_sync_at', ?)",
       [new Date().toISOString()]
     );
-    return { pushed, pulled: firstPull + secondPull };
+    return { status: "synced", pushed, pulled: firstPull + secondPull };
   }
   const pushed = await pushQfSyncQueue(db);
   const pulled = await pullQfRemoteChanges(db);
@@ -111,7 +121,7 @@ export async function fullQfUserSync(db: SQLiteDatabase): Promise<{ pushed: numb
     "INSERT OR REPLACE INTO user_settings (key, value) VALUES ('qf_last_sync_at', ?)",
     [new Date().toISOString()]
   );
-  return { pushed, pulled };
+  return { status: "synced", pushed, pulled };
 }
 
 async function needsInitialLocalEnqueue(db: SQLiteDatabase): Promise<boolean> {
@@ -127,11 +137,13 @@ async function markInitialLocalEnqueueDone(db: SQLiteDatabase): Promise<void> {
   );
 }
 
-async function hasConnectedQfUser(): Promise<boolean> {
-  if (!isSupabaseConfigured()) return false;
-  if (!useAuthStore.getState().user) return false;
+async function getQfSyncConnectionState(): Promise<QfSyncConnectionState> {
+  if (!isSupabaseConfigured()) return "not_connected";
+  if (!useAuthStore.getState().user) return "not_connected";
   const status = await getQfConnectionStatus();
-  return status.ok && status.status === "connected";
+  if (!status.ok) return status.code === "needs_reauth" ? "needs_reauth" : "failed";
+  if (status.status === "needs_reauth") return "needs_reauth";
+  return status.status === "connected" ? "connected" : "not_connected";
 }
 
 async function enqueueAllActiveLocalRows(db: SQLiteDatabase): Promise<void> {

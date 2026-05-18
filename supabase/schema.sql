@@ -302,6 +302,17 @@ CREATE TABLE IF NOT EXISTS qf_user_connections (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS qf_oauth_states (
+  state TEXT PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  code_verifier_ciphertext TEXT NOT NULL,
+  redirect_uri TEXT NOT NULL,
+  return_to TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expires_at TIMESTAMPTZ NOT NULL,
+  consumed_at TIMESTAMPTZ
+);
+
 -- ─── Reflection Journey Entries (synced from local SQLite) ──
 CREATE TABLE IF NOT EXISTS reflection_journey_entries (
   user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
@@ -325,6 +336,7 @@ CREATE TABLE IF NOT EXISTS achievement_unlocks (
 
 ALTER TABLE private_notes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE qf_user_connections ENABLE ROW LEVEL SECURITY;
+ALTER TABLE qf_oauth_states ENABLE ROW LEVEL SECURITY;
 ALTER TABLE reflection_journey_entries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE achievement_unlocks ENABLE ROW LEVEL SECURITY;
 
@@ -439,6 +451,7 @@ CREATE INDEX IF NOT EXISTS idx_private_notes_user_updated ON private_notes(user_
 CREATE INDEX IF NOT EXISTS idx_private_notes_ayah ON private_notes(user_id, surah, ayah_start, ayah_end);
 CREATE INDEX IF NOT EXISTS idx_private_notes_qf_id ON private_notes(user_id, qf_note_id);
 CREATE INDEX IF NOT EXISTS idx_qf_user_connections_status ON qf_user_connections(status, env);
+CREATE INDEX IF NOT EXISTS idx_qf_oauth_states_user ON qf_oauth_states(user_id, expires_at);
 CREATE INDEX IF NOT EXISTS idx_reflection_journey_entries_user_updated ON reflection_journey_entries(user_id, updated_at);
 CREATE INDEX IF NOT EXISTS idx_achievement_unlocks_user_unlocked ON achievement_unlocks(user_id, unlocked_at);
 CREATE INDEX IF NOT EXISTS idx_achievement_unlocks_public_unlocked ON achievement_unlocks(unlocked_at);

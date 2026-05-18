@@ -27,3 +27,4 @@ assets/data/wbw/*.db
 expo-env.d.ts
 # @end expo-cli
 .vercel
+supabase/.temp/

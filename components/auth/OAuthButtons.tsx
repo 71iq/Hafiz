@@ -1,11 +1,11 @@
 import React from "react";
-import { View, Text, Pressable, Platform, Image, type ImageSourcePropType } from "react-native";
+import { View, Text, Pressable, Image, type ImageSourcePropType } from "react-native";
 import { BookOpen } from "lucide-react-native";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { startAppOAuth } from "@/lib/auth/oauth";
 import { useDatabase } from "@/lib/database/provider";
 import { useStrings } from "@/lib/i18n/useStrings";
-import { isQfUserAuthEnabled } from "@/lib/quran-foundation/config";
+import { isQfLoginEnabled } from "@/lib/quran-foundation/config";
 import { runInitialQfUserSync } from "@/lib/quran-foundation/user-sync";
 import { QF_OAUTH_PROVIDER } from "@/lib/quran-foundation/user-types";
 import { useSettings } from "@/lib/settings/context";
@@ -41,7 +41,7 @@ export function OAuthButtons({ onError }: Props) {
   const handleQfPress = async () => {
     try {
       const result = await startAppOAuth(QF_OAUTH_PROVIDER);
-      if (result.qfConnected || Platform.OS === "web") {
+      if (result.qfConnected) {
         runInitialQfUserSync(db).catch(console.warn);
       }
     } catch (err: any) {
@@ -53,7 +53,7 @@ export function OAuthButtons({ onError }: Props) {
   const appleSource = (isDark ? appleDarkLogo : appleLogo) as ImageSourcePropType;
   const buttonBorderColor = isDark ? "#333" : "#E0E0E0";
   const buttonBackground = isDark ? "#1a1a1a" : "#FFFFFF";
-  const qfAuthEnabled = isQfUserAuthEnabled();
+  const qfAuthEnabled = isQfLoginEnabled();
 
   return (
     <View>

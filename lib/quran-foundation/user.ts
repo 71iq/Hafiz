@@ -1,12 +1,14 @@
 import type { Session } from "@supabase/supabase-js";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import type {
+  QfBeginOAuthResponse,
   QfConnectionStatusResponse,
+  QfCompleteOAuthResponse,
   QfUserAction,
   QfUserError,
   QfUserResponse,
 } from "./user-types";
-import { QF_OAUTH_SCOPES } from "./user-types";
+import { QF_OAUTH_PROVIDER, QF_OAUTH_SCOPES } from "./user-types";
 
 export async function invokeQfUser(action: QfUserAction): Promise<QfUserResponse> {
   if (!isSupabaseConfigured()) {
@@ -70,6 +72,35 @@ export async function getQfConnectionStatus(): Promise<QfConnectionStatusRespons
   const response = await invokeQfUser({ action: "status" });
   if (response.ok && "status" in response) return response as QfConnectionStatusResponse;
   return response as QfUserError;
+}
+
+export async function beginQfOAuthConnection(
+  redirectUri: string,
+  returnTo?: string
+): Promise<QfBeginOAuthResponse | QfUserError> {
+  const response = await invokeQfUser({ action: "begin-oauth", redirectUri, returnTo });
+  if (response.ok && "authorizationUrl" in response) return response as QfBeginOAuthResponse;
+  return response as QfUserError;
+}
+
+export async function completeQfOAuthConnection(
+  code: string,
+  state: string,
+  redirectUri: string
+): Promise<QfCompleteOAuthResponse | QfUserError> {
+  const response = await invokeQfUser({ action: "complete-oauth", code, state, redirectUri });
+  if (response.ok && "status" in response && response.status === "connected") return response as QfCompleteOAuthResponse;
+  return response as QfUserError;
+}
+
+export async function getQfLinkedIdentityState(): Promise<{ linked: boolean }> {
+  if (!isSupabaseConfigured()) return { linked: false };
+  const getUserIdentities = (supabase.auth as any).getUserIdentities;
+  if (typeof getUserIdentities !== "function") return { linked: false };
+  const { data, error } = await getUserIdentities.call(supabase.auth);
+  if (error) return { linked: false };
+  const identities = Array.isArray(data?.identities) ? data.identities : [];
+  return { linked: identities.some((identity: any) => identity?.provider === QF_OAUTH_PROVIDER) };
 }
 
 export async function disconnectQfUser(): Promise<QfUserResponse> {

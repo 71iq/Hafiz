@@ -187,9 +187,9 @@ function AyahBlockInner({
   const handleAudioPress = useCallback(async () => {
     const result = await toggleAyah(surah, ayah);
     if (!result.ok) {
-      showToast(s.audioUnavailable);
+      showToast(result.code === "not_configured" ? s.qfContentMisconfigured : s.qfContentUnavailable);
     }
-  }, [ayah, showToast, s.audioUnavailable, surah, toggleAyah]);
+  }, [ayah, showToast, s.qfContentMisconfigured, s.qfContentUnavailable, surah, toggleAyah]);
 
   const handleAddToReview = useCallback(async () => {
     if (reviewBusy || savedToReview) return;

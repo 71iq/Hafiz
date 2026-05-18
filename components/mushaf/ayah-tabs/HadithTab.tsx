@@ -40,6 +40,12 @@ export function HadithTab({ surah, ayah }: Props) {
   const lastPage = orderedPages[orderedPages.length - 1];
   const hasMore = lastPage?.hasMore ?? false;
   const contentDirection = lastPage?.direction === "rtl" || language === "ar" ? "rtl" : "ltr";
+  const errorMessage =
+    error?.code === "not_configured"
+      ? s.qfContentMisconfigured
+      : error
+        ? s.qfContentUnavailable
+        : s.hadithOffline;
 
   const applyPage = useCallback((response: QfHadithResponse | CachedQfHadith) => {
     setPages((prev) => ({
@@ -139,7 +145,7 @@ export function HadithTab({ surah, ayah }: Props) {
             writingDirection: isRTL ? "rtl" : "ltr",
           }}
         >
-          {s.hadithOffline}
+        {errorMessage}
         </Text>
         <Pressable
           onPress={handleRetry}

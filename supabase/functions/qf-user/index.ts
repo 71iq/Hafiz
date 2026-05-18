@@ -16,6 +16,7 @@ type Config = {
   env: QfEnv;
   authBaseUrl: string;
   apiBaseUrl: string;
+  allowedRedirectUris: string[];
   supabaseUrl: string;
   supabaseAnonKey: string;
   supabaseServiceRoleKey: string;
@@ -28,6 +29,16 @@ type ConnectionRow = {
   refresh_token_ciphertext: string | null;
   expires_at: string | null;
   status: "connected" | "needs_reauth" | "disconnected";
+};
+
+type OAuthStateRow = {
+  state: string;
+  user_id: string;
+  code_verifier_ciphertext: string;
+  redirect_uri: string;
+  return_to: string | null;
+  expires_at: string;
+  consumed_at: string | null;
 };
 
 const AUTH_BASE_BY_ENV: Record<QfEnv, string> = {
@@ -69,6 +80,10 @@ Deno.serve(async (req) => {
 
   try {
     switch (body.action) {
+      case "begin-oauth":
+        return await handleBeginOAuth(config.value, userId.value, body);
+      case "complete-oauth":
+        return await handleCompleteOAuth(config.value, userId.value, body);
       case "connect":
         return await handleConnect(config.value, userId.value, body);
       case "status":
@@ -97,6 +112,7 @@ Deno.serve(async (req) => {
     if (message === "not_connected") return jsonError("not_connected", "Quran Foundation is not connected.");
     if (message === "needs_reauth") return jsonError("needs_reauth", "Reconnect Quran Foundation to continue syncing.");
     if (message === "rate_limited") return jsonError("rate_limited", "Quran Foundation rate limit reached.");
+    if (message === "oauth_not_configured") return jsonError("not_configured", "Quran Foundation OAuth is not configured.");
     console.warn("[qf-user] request failed", message);
     return jsonError("upstream", "Quran Foundation sync is temporarily unavailable.");
   }
@@ -107,35 +123,105 @@ async function handleConnect(config: Config, userId: string, body: Record<string
   if (!providerAccessToken) return jsonError("bad_request", "Quran Foundation access token is required.");
 
   const providerRefreshToken = stringOrUndefined(body.providerRefreshToken);
-  const expiresAt =
-    stringOrUndefined(body.expiresAt) ??
-    expiresAtFromJwt(providerAccessToken) ??
-    new Date(Date.now() + 50 * 60 * 1000).toISOString();
   const scopes = Array.isArray(body.scopes)
     ? body.scopes.filter((scope): scope is string => typeof scope === "string")
     : [];
+  const expiresAt = stringOrUndefined(body.expiresAt) ?? expiresAtFromJwt(providerAccessToken);
+  const connectedAt = await storeConnection(config, userId, {
+    accessToken: providerAccessToken,
+    refreshToken: providerRefreshToken,
+    expiresAt,
+    scopes,
+  });
 
+  return jsonSuccess({ ok: true, status: "connected", connectedAt });
+}
+
+async function handleBeginOAuth(config: Config, userId: string, body: Record<string, unknown>): Promise<Response> {
+  const redirectUri = stringOrUndefined(body.redirectUri);
+  if (!redirectUri) return jsonError("bad_request", "Quran Foundation redirect URI is required.");
+  if (!config.allowedRedirectUris.includes(redirectUri)) {
+    return jsonError("not_configured", "Quran Foundation redirect URI is not configured.");
+  }
+
+  const state = randomBase64Url(32);
+  const codeVerifier = randomBase64Url(32);
+  const codeChallenge = await pkceChallenge(codeVerifier);
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+  const returnTo = stringOrUndefined(body.returnTo) ?? null;
   const service = serviceClient(config);
-  const { error } = await service.from("qf_user_connections").upsert(
-    {
-      user_id: userId,
-      qf_subject: subjectFromJwt(providerAccessToken),
-      access_token_ciphertext: await encrypt(config.encryptionKey, providerAccessToken),
-      refresh_token_ciphertext: providerRefreshToken
-        ? await encrypt(config.encryptionKey, providerRefreshToken)
-        : null,
-      expires_at: expiresAt,
-      scope: scopes,
-      env: config.env,
-      status: "connected",
-      connected_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "user_id" }
-  );
+  const { error } = await service.from("qf_oauth_states").insert({
+    state,
+    user_id: userId,
+    code_verifier_ciphertext: await encrypt(config.encryptionKey, codeVerifier),
+    redirect_uri: redirectUri,
+    return_to: returnTo,
+    expires_at: expiresAt,
+  });
   if (error) throw error;
 
-  return jsonSuccess({ ok: true, status: "connected", connectedAt: new Date().toISOString() });
+  const authorizationUrl = new URL(`${config.authBaseUrl}/oauth2/authorize`);
+  authorizationUrl.searchParams.set("response_type", "code");
+  authorizationUrl.searchParams.set("client_id", config.clientId);
+  authorizationUrl.searchParams.set("redirect_uri", redirectUri);
+  authorizationUrl.searchParams.set("scope", "openid offline_access bookmark note");
+  authorizationUrl.searchParams.set("state", state);
+  authorizationUrl.searchParams.set("code_challenge", codeChallenge);
+  authorizationUrl.searchParams.set("code_challenge_method", "S256");
+
+  return jsonSuccess({ ok: true, authorizationUrl: authorizationUrl.toString(), expiresAt });
+}
+
+async function handleCompleteOAuth(config: Config, userId: string, body: Record<string, unknown>): Promise<Response> {
+  const code = stringOrUndefined(body.code);
+  const state = stringOrUndefined(body.state);
+  const redirectUri = stringOrUndefined(body.redirectUri);
+  if (!code || !state || !redirectUri) {
+    return jsonError("bad_request", "Quran Foundation callback is missing required parameters.");
+  }
+  if (!config.allowedRedirectUris.includes(redirectUri)) {
+    return jsonError("not_configured", "Quran Foundation redirect URI is not configured.");
+  }
+
+  const service = serviceClient(config);
+  const { data, error } = await service
+    .from("qf_oauth_states")
+    .select("state, user_id, code_verifier_ciphertext, redirect_uri, return_to, expires_at, consumed_at")
+    .eq("state", state)
+    .maybeSingle();
+  if (error) throw error;
+  const oauthState = data as OAuthStateRow | null;
+  if (!oauthState || oauthState.user_id !== userId || oauthState.redirect_uri !== redirectUri) {
+    return jsonError("bad_request", "Quran Foundation connection state is invalid.");
+  }
+  if (oauthState.consumed_at) {
+    return jsonError("bad_request", "Quran Foundation connection state was already used.");
+  }
+  if (Date.parse(oauthState.expires_at) <= Date.now()) {
+    return jsonError("bad_request", "Quran Foundation connection state expired.");
+  }
+
+  const token = await exchangeAuthorizationCode(
+    config,
+    code,
+    redirectUri,
+    await decrypt(config.encryptionKey, oauthState.code_verifier_ciphertext)
+  );
+  const connectedAt = await storeConnection(config, userId, {
+    accessToken: token.accessToken,
+    refreshToken: token.refreshToken,
+    expiresAt: new Date(Date.now() + token.expiresIn * 1000).toISOString(),
+    scopes: token.scope ? token.scope.split(/\s+/).filter(Boolean) : ["openid", "offline_access", "bookmark", "note"],
+    idToken: token.idToken,
+  });
+
+  const { error: stateError } = await service
+    .from("qf_oauth_states")
+    .update({ consumed_at: new Date().toISOString() })
+    .eq("state", state);
+  if (stateError) throw stateError;
+
+  return jsonSuccess({ ok: true, status: "connected", connectedAt });
 }
 
 async function handleStatus(config: Config, userId: string): Promise<Response> {
@@ -361,6 +447,85 @@ async function refreshAccessToken(
   return { accessToken: body.access_token, refreshToken: body.refresh_token, expiresIn: body.expires_in };
 }
 
+async function exchangeAuthorizationCode(
+  config: Config,
+  code: string,
+  redirectUri: string,
+  codeVerifier: string
+): Promise<{ accessToken: string; refreshToken?: string; expiresIn: number; scope?: string; idToken?: string }> {
+  const basicAuth = btoa(`${config.clientId}:${config.clientSecret}`);
+  const response = await fetch(`${config.authBaseUrl}/oauth2/token`, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${basicAuth}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({
+      grant_type: "authorization_code",
+      code,
+      redirect_uri: redirectUri,
+      code_verifier: codeVerifier,
+    }),
+  });
+  if (response.status === 429) throw new Error("rate_limited");
+  if (response.status === 401 || response.status === 403) {
+    throw new Error("oauth_not_configured");
+  }
+  if (!response.ok) throw new Error(`QF authorization code exchange failed: ${response.status}`);
+
+  const body = await response.json() as {
+    access_token?: string;
+    refresh_token?: string;
+    expires_in?: number;
+    scope?: string;
+    id_token?: string;
+  };
+  if (!body.access_token || typeof body.expires_in !== "number") {
+    throw new Error("QF authorization code response was invalid.");
+  }
+  return {
+    accessToken: body.access_token,
+    refreshToken: body.refresh_token,
+    expiresIn: body.expires_in,
+    scope: body.scope,
+    idToken: body.id_token,
+  };
+}
+
+async function storeConnection(
+  config: Config,
+  userId: string,
+  token: {
+    accessToken: string;
+    refreshToken?: string;
+    expiresAt?: string | null;
+    scopes: string[];
+    idToken?: string;
+  }
+): Promise<string> {
+  const connectedAt = new Date().toISOString();
+  const service = serviceClient(config);
+  const { error } = await service.from("qf_user_connections").upsert(
+    {
+      user_id: userId,
+      qf_subject: subjectFromJwt(token.accessToken) ?? (token.idToken ? subjectFromJwt(token.idToken) : null),
+      access_token_ciphertext: await encrypt(config.encryptionKey, token.accessToken),
+      refresh_token_ciphertext: token.refreshToken
+        ? await encrypt(config.encryptionKey, token.refreshToken)
+        : null,
+      expires_at: token.expiresAt ?? expiresAtFromJwt(token.accessToken) ?? new Date(Date.now() + 50 * 60 * 1000).toISOString(),
+      scope: token.scopes,
+      env: config.env,
+      status: "connected",
+      connected_at: connectedAt,
+      updated_at: connectedAt,
+    },
+    { onConflict: "user_id" }
+  );
+  if (error) throw error;
+  return connectedAt;
+}
+
 async function getConnection(config: Config, userId: string): Promise<ConnectionRow | null> {
   const service = serviceClient(config);
   const { data, error } = await service
@@ -408,6 +573,7 @@ async function readConfig(): Promise<{ ok: true; value: Config } | { ok: false; 
   const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")?.trim();
   const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")?.trim();
   const rawEncryptionKey = Deno.env.get("QF_TOKEN_ENCRYPTION_KEY")?.trim();
+  const allowedRedirectUris = parseCsvEnv(Deno.env.get("QF_USER_REDIRECT_URIS"));
   if (!clientId || !clientSecret || !env || !supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey || !rawEncryptionKey) {
     return { ok: false, message: "Quran Foundation user sync is not configured." };
   }
@@ -428,12 +594,20 @@ async function readConfig(): Promise<{ ok: true; value: Config } | { ok: false; 
       env,
       authBaseUrl: AUTH_BASE_BY_ENV[env],
       apiBaseUrl: API_BASE_BY_ENV[env],
+      allowedRedirectUris,
       supabaseUrl,
       supabaseAnonKey,
       supabaseServiceRoleKey,
       encryptionKey,
     },
   };
+}
+
+function parseCsvEnv(value: string | undefined): string[] {
+  return (value ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 async function importEncryptionKey(raw: string): Promise<CryptoKey> {
@@ -576,10 +750,24 @@ function stringOrUndefined(value: unknown): string | undefined {
   return typeof value === "string" && value.trim().length > 0 ? value : undefined;
 }
 
+function randomBase64Url(byteLength: number): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(byteLength));
+  return encodeBase64Url(bytes);
+}
+
+async function pkceChallenge(codeVerifier: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(codeVerifier));
+  return encodeBase64Url(new Uint8Array(digest));
+}
+
 function encodeBase64(bytes: Uint8Array): string {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
   return btoa(binary);
+}
+
+function encodeBase64Url(bytes: Uint8Array): string {
+  return encodeBase64(bytes).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
 
 function decodeBase64(value: string): Uint8Array {

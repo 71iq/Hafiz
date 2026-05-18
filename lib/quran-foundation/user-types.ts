@@ -13,7 +13,7 @@ export type QfUserErrorCode =
   | "rate_limited"
   | "upstream";
 
-export type QfConnectionStatus = "connected" | "needs_reauth" | "disconnected";
+export type QfConnectionStatus = "connected" | "needs_reauth" | "linked_no_sync" | "disconnected";
 
 export type QfUserError = {
   ok: false;
@@ -23,10 +23,22 @@ export type QfUserError = {
 
 export type QfConnectionStatusResponse = {
   ok: true;
-  status: QfConnectionStatus;
+  status: Exclude<QfConnectionStatus, "linked_no_sync">;
   env?: "prelive" | "production";
   connectedAt?: string | null;
   updatedAt?: string | null;
+};
+
+export type QfBeginOAuthResponse = {
+  ok: true;
+  authorizationUrl: string;
+  expiresAt: string;
+};
+
+export type QfCompleteOAuthResponse = {
+  ok: true;
+  status: "connected";
+  connectedAt: string;
 };
 
 export type QfBookmark = {
@@ -49,7 +61,8 @@ export type QfNote = {
 
 export type QfUserSuccess =
   | QfConnectionStatusResponse
-  | { ok: true; status: "connected"; connectedAt: string }
+  | QfBeginOAuthResponse
+  | QfCompleteOAuthResponse
   | { ok: true; status: "disconnected" }
   | { ok: true; bookmark: QfBookmark }
   | { ok: true; bookmarks: QfBookmark[]; nextCursor?: string | null }
@@ -60,6 +73,8 @@ export type QfUserSuccess =
 export type QfUserResponse = QfUserSuccess | QfUserError;
 
 export type QfUserAction =
+  | { action: "begin-oauth"; redirectUri: string; returnTo?: string }
+  | { action: "complete-oauth"; code: string; state: string; redirectUri: string }
   | { action: "connect"; providerAccessToken: string; providerRefreshToken?: string; expiresAt?: string; scopes?: string[] }
   | { action: "status" }
   | { action: "disconnect" }

@@ -27,11 +27,11 @@ import { useStrings } from "@/lib/i18n/useStrings";
 import { ALL_TEST_MODES, DEFAULT_ENABLED_MODES, type TestMode } from "@/lib/fsrs/types";
 import { useAuthStore } from "@/lib/auth/store";
 import { isSupabaseConfigured } from "@/lib/supabase";
-import { isQfUserAuthEnabled } from "@/lib/quran-foundation/config";
-import { disconnectQfUser, getQfConnectionStatus } from "@/lib/quran-foundation/user";
+import { isQfSyncEnabled } from "@/lib/quran-foundation/config";
+import { beginQfOAuthConnection, disconnectQfUser, getQfConnectionStatus, getQfLinkedIdentityState } from "@/lib/quran-foundation/user";
 import { fullQfUserSync, runInitialQfUserSync } from "@/lib/quran-foundation/user-sync";
 import type { QfConnectionStatus } from "@/lib/quran-foundation/user-types";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { toArabicNumber } from "@/lib/arabic";
 import { SETTINGS_CONTENT_MAX_WIDTH } from "@/lib/ui/viewport";
 import { ZaytPreviewModal } from "@/components/zayt/ZaytPreviewModal";
@@ -49,8 +49,9 @@ export default function SettingsScreen() {
   const db = useDatabase();
   const s = useStrings();
   const router = useRouter();
+  const params = useLocalSearchParams<{ qf?: string; qf_error?: string }>();
   const configured = isSupabaseConfigured();
-  const qfAuthEnabled = isQfUserAuthEnabled();
+  const qfSyncEnabled = isQfSyncEnabled();
   const [pickerVisible, setPickerVisible] = useState(false);
   const [zaytPreviewVisible, setZaytPreviewVisible] = useState(false);
   const [logoutDialogVisible, setLogoutDialogVisible] = useState(false);
@@ -63,7 +64,7 @@ export default function SettingsScreen() {
     "wordMeaningArabic",
     "wordMeaningTranslation",
   ]);
-  const { user, profile, isLoading: authLoading, signOut, linkQuranFoundation } = useAuthStore();
+  const { user, profile, isLoading: authLoading, signOut } = useAuthStore();
   const accountName = profile?.display_name || profile?.username || user?.email || s.authProfile;
   const accountHandle = profile?.username ? `@${profile.username}` : user?.email || "";
   const fontSizeUsesFittedPageSize = viewMode === "page" && pageScroll === "horizontal";
@@ -90,21 +91,68 @@ export default function SettingsScreen() {
   }, [db]);
 
   const refreshQfStatus = useCallback(async () => {
-    if (!configured || !user || !qfAuthEnabled) {
+    if (!configured || !user || !qfSyncEnabled) {
       setQfStatus("disconnected");
-      return;
+      return "disconnected" as QfConnectionStatus;
     }
     const status = await getQfConnectionStatus();
     if (status.ok) {
+      if (status.status === "disconnected") {
+        const linked = await getQfLinkedIdentityState();
+        const next = linked.linked ? "linked_no_sync" : "disconnected";
+        setQfStatus(next);
+        return next;
+      }
       setQfStatus(status.status);
+      return status.status;
     } else {
-      setQfStatus(status.code === "needs_reauth" ? "needs_reauth" : "disconnected");
+      const next = status.code === "needs_reauth" ? "needs_reauth" : "disconnected";
+      setQfStatus(next);
+      return next;
     }
-  }, [configured, qfAuthEnabled, user]);
+  }, [configured, qfSyncEnabled, user]);
 
   useEffect(() => {
     refreshQfStatus().catch(console.warn);
   }, [refreshQfStatus]);
+
+  useEffect(() => {
+    const qf = Array.isArray(params.qf) ? params.qf[0] : params.qf;
+    const qfError = Array.isArray(params.qf_error) ? params.qf_error[0] : params.qf_error;
+    if (!qf && !qfError) return;
+
+    let cancelled = false;
+    const finishCallback = async () => {
+      if (qfError) {
+        setQfMessage(safeDecode(qfError));
+        await refreshQfStatus();
+        clearQfSettingsQuery();
+        return;
+      }
+      if (qf === "connected") {
+        setQfBusy(true);
+        setQfMessage(null);
+        try {
+          const status = await refreshQfStatus();
+          if (status === "connected") {
+            const result = await runInitialQfUserSync(db);
+            setQfMessage(result.status === "synced" ? s.qfSyncComplete : s.qfFinishConnection);
+          } else {
+            setQfMessage(s.qfFinishConnection);
+          }
+        } catch (err: any) {
+          if (!cancelled) setQfMessage(err.message || s.qfSyncFailed);
+        } finally {
+          if (!cancelled) setQfBusy(false);
+          clearQfSettingsQuery();
+        }
+      }
+    };
+    finishCallback().catch(console.warn);
+    return () => {
+      cancelled = true;
+    };
+  }, [db, params.qf, params.qf_error, refreshQfStatus, s.qfFinishConnection, s.qfSyncComplete, s.qfSyncFailed]);
 
   useEffect(() => {
     db.getFirstAsync<{ value: string }>(
@@ -152,16 +200,16 @@ export default function SettingsScreen() {
     setQfBusy(true);
     setQfMessage(null);
     try {
-      await linkQuranFoundation();
-      await runInitialQfUserSync(db);
-      await refreshQfStatus();
-      setQfMessage(s.qfSyncComplete);
+      const response = await beginQfOAuthConnection("https://hafizquran.app/auth/qf-callback", "/settings");
+      if (!response.ok) throw new Error(response.message);
+      setQfMessage(s.qfConnectionStarted);
+      await openQfAuthorizationUrl(response.authorizationUrl);
     } catch (err: any) {
-      setQfMessage(err.message || s.qfSyncFailed);
+      setQfMessage(err.message || s.qfConnectionFailed);
     } finally {
       setQfBusy(false);
     }
-  }, [db, linkQuranFoundation, refreshQfStatus, s.qfSyncComplete, s.qfSyncFailed]);
+  }, [s.qfConnectionFailed, s.qfConnectionStarted]);
 
   const handleQfDisconnect = useCallback(async () => {
     setQfBusy(true);
@@ -182,15 +230,21 @@ export default function SettingsScreen() {
     setQfBusy(true);
     setQfMessage(null);
     try {
-      await fullQfUserSync(db);
+      const result = await fullQfUserSync(db);
       await refreshQfStatus();
-      setQfMessage(s.qfSyncComplete);
+      setQfMessage(
+        result.status === "synced"
+          ? s.qfSyncComplete
+          : result.status === "needs_reauth"
+            ? s.qfNeedsReauth
+            : s.qfFinishConnection
+      );
     } catch (err: any) {
       setQfMessage(err.message || s.qfSyncFailed);
     } finally {
       setQfBusy(false);
     }
-  }, [db, refreshQfStatus, s.qfSyncComplete, s.qfSyncFailed]);
+  }, [db, refreshQfStatus, s.qfFinishConnection, s.qfNeedsReauth, s.qfSyncComplete, s.qfSyncFailed]);
 
   const openIssueReporter = useCallback(() => {
     Linking.openURL("https://github.com/71iq/Hafiz/issues").catch(console.warn);
@@ -251,7 +305,7 @@ export default function SettingsScreen() {
                   isRTL={isRTL}
                 />
               </View>
-              {configured && qfAuthEnabled && (
+              {configured && qfSyncEnabled && (
                 <View className="mb-4 rounded-3xl bg-surface dark:bg-surface-dark p-4">
                   <View className="flex-row items-center gap-3">
                     <View className="h-10 w-10 items-center justify-center rounded-full bg-primary-accent/10 dark:bg-primary-bright/15">
@@ -272,7 +326,9 @@ export default function SettingsScreen() {
                           ? s.qfConnected
                           : qfStatus === "needs_reauth"
                             ? s.qfNeedsReauth
-                            : s.qfDisconnected}
+                            : qfStatus === "linked_no_sync"
+                              ? s.qfLinkedNoSync
+                              : s.qfDisconnected}
                       </Text>
                     </View>
                   </View>
@@ -316,7 +372,7 @@ export default function SettingsScreen() {
                       >
                         {qfBusy ? <ActivityIndicator size="small" color="#FFFFFF" /> : <BookOpen size={15} color="#FFFFFF" />}
                         <Text style={{ color: "#FFFFFF", fontFamily: "Manrope_600SemiBold", fontSize: 13 }}>
-                          {qfStatus === "needs_reauth" ? s.qfReconnect : s.qfConnect}
+                          {qfStatus === "needs_reauth" || qfStatus === "linked_no_sync" ? s.qfReconnect : s.qfConnect}
                         </Text>
                       </Pressable>
                     )}
@@ -941,6 +997,29 @@ function SectionLabel({ children }: { children: string }) {
       {children}
     </Text>
   );
+}
+
+function clearQfSettingsQuery() {
+  const history = (globalThis as any).history;
+  if (!history?.replaceState) return;
+  history.replaceState(history.state, "", "/settings");
+}
+
+function safeDecode(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch (_) {
+    return value;
+  }
+}
+
+async function openQfAuthorizationUrl(url: string): Promise<void> {
+  const location = (globalThis as any).location;
+  if (location?.assign) {
+    location.assign(url);
+    return;
+  }
+  await Linking.openURL(url);
 }
 
 function SettingsLinkRow({

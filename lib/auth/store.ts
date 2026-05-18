@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { Platform } from "react-native";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { startAppOAuth } from "@/lib/auth/oauth";
-import { isQfUserAuthEnabled } from "@/lib/quran-foundation/config";
+import { isQfLoginEnabled, isQfSyncEnabled } from "@/lib/quran-foundation/config";
 import { connectQfFromSession } from "@/lib/quran-foundation/user";
 import { QF_OAUTH_PROVIDER } from "@/lib/quran-foundation/user-types";
 import type { AuthState, AuthActions, Profile } from "./types";
@@ -40,7 +40,7 @@ function buildFallbackProfile(user: NonNullable<AuthState["user"]>): Profile {
 }
 
 function connectQfSessionIfAvailable(session: AuthState["session"]): void {
-  if (!isQfUserAuthEnabled()) return;
+  if (!isQfSyncEnabled()) return;
   if (!(session as any)?.provider_token) return;
   connectQfFromSession(session).catch(console.warn);
 }
@@ -138,7 +138,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   },
 
   signInWithQuranFoundation: async () => {
-    if (!isQfUserAuthEnabled()) throw new Error("Quran Foundation sign-in is not enabled.");
+    if (!isQfLoginEnabled()) throw new Error("Quran Foundation sign-in is not enabled.");
     set({ isLoading: true, error: null });
     try {
       const result = await startAppOAuth(QF_OAUTH_PROVIDER);
@@ -155,7 +155,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   },
 
   linkQuranFoundation: async () => {
-    if (!isQfUserAuthEnabled()) throw new Error("Quran Foundation sign-in is not enabled.");
+    if (!isQfLoginEnabled()) throw new Error("Quran Foundation sign-in is not enabled.");
     set({ isLoading: true, error: null });
     try {
       const result = await startAppOAuth(QF_OAUTH_PROVIDER, "link");

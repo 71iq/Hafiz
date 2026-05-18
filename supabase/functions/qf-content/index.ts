@@ -37,6 +37,18 @@ type HadithPayload = {
   direction?: string;
 };
 
+class QfContentFailure extends Error {
+  constructor(
+    readonly code: Exclude<ErrorCode, "bad_request">,
+    readonly action: Action,
+    readonly phase: "token" | "api",
+    readonly status?: number,
+    readonly pathGroup?: string
+  ) {
+    super(`QF content ${phase} failed`);
+  }
+}
+
 const AUTH_BASE_BY_ENV: Record<QfEnv, string> = {
   production: "https://oauth2.quran.foundation",
   prelive: "https://prelive-oauth2.quran.foundation",
@@ -106,7 +118,11 @@ Deno.serve(async (req) => {
     }
     return await handleHadith(config.value, parsedAyah.surah, parsedAyah.ayah, body);
   } catch (error) {
-    console.warn("[qf-content] upstream request failed", error instanceof Error ? error.message : String(error));
+    if (error instanceof QfContentFailure) {
+      logQfContentFailure(error);
+      return jsonError(error.code, contentErrorMessage(error.code));
+    }
+    console.warn("[qf-content] upstream failed action=unknown phase=api status=unknown");
     return jsonError("upstream", "Quran Foundation content is temporarily unavailable.");
   }
 });
@@ -116,7 +132,7 @@ async function handleAudio(config: Config, surah: number, ayah: number): Promise
   const path =
     `/content/api/v4/recitations/${config.recitationId}/by_ayah/${encodeURIComponent(verseKey)}` +
     "?fields=verse_key,url,format,segments,duration,id&page=1&per_page=1";
-  const upstream = await getQfJson(config, path);
+  const upstream = await getQfJson(config, path, "audio-ayah", "recitations");
   if (!upstream.ok) return upstream.response;
 
   const files = Array.isArray((upstream.data as { audio_files?: unknown }).audio_files)
@@ -178,7 +194,9 @@ async function handleHadith(
   });
   const upstream = await getQfJson(
     config,
-    `/content/api/v4/hadith_references/by_ayah/${encodeURIComponent(verseKey)}/hadiths?${params.toString()}`
+    `/content/api/v4/hadith_references/by_ayah/${encodeURIComponent(verseKey)}/hadiths?${params.toString()}`,
+    "hadith-ayah",
+    "hadith_references"
   );
   if (!upstream.ok) return upstream.response;
 
@@ -240,9 +258,11 @@ function readConfig(action: Action, recitationIdInput: unknown): { ok: true; val
 async function getQfJson(
   config: Config,
   path: string,
+  action: Action,
+  pathGroup: string,
   didRetry = false
 ): Promise<{ ok: true; data: unknown } | { ok: false; response: Response }> {
-  const token = await getAccessToken(config);
+  const token = await getAccessToken(config, action);
   const response = await fetch(`${config.apiBaseUrl}${path}`, {
     headers: {
       "x-auth-token": token,
@@ -252,34 +272,37 @@ async function getQfJson(
 
   if (response.status === 401 && !didRetry) {
     clearToken();
-    return getQfJson(config, path, true);
+    return getQfJson(config, path, action, pathGroup, true);
   }
 
   if (response.status === 429) {
+    logQfContentFailure(new QfContentFailure("rate_limited", action, "api", response.status, pathGroup));
     return { ok: false, response: jsonError("rate_limited", "Quran Foundation rate limit reached.") };
   }
 
   if (!response.ok) {
-    return { ok: false, response: jsonError("upstream", "Quran Foundation content is temporarily unavailable.") };
+    const code = response.status === 401 || response.status === 403 ? "not_configured" : "upstream";
+    logQfContentFailure(new QfContentFailure(code, action, "api", response.status, pathGroup));
+    return { ok: false, response: jsonError(code, contentErrorMessage(code)) };
   }
 
   return { ok: true, data: await response.json() };
 }
 
-async function getAccessToken(config: Config): Promise<string> {
+async function getAccessToken(config: Config, action: Action): Promise<string> {
   const now = Date.now();
   if (tokenCache.accessToken && now < tokenCache.expiresAt - 30_000) {
     return tokenCache.accessToken;
   }
   if (!tokenCache.inflight) {
-    tokenCache.inflight = fetchToken(config).finally(() => {
+    tokenCache.inflight = fetchToken(config, action).finally(() => {
       tokenCache.inflight = null;
     });
   }
   return tokenCache.inflight;
 }
 
-async function fetchToken(config: Config): Promise<string> {
+async function fetchToken(config: Config, action: Action): Promise<string> {
   const basicAuth = btoa(`${config.clientId}:${config.clientSecret}`);
   const response = await fetch(`${config.authBaseUrl}/oauth2/token`, {
     method: "POST",
@@ -294,15 +317,18 @@ async function fetchToken(config: Config): Promise<string> {
   });
 
   if (response.status === 429) {
-    throw new Error("QF token rate limited");
+    throw new QfContentFailure("rate_limited", action, "token", response.status);
+  }
+  if (response.status === 401 || response.status === 403) {
+    throw new QfContentFailure("not_configured", action, "token", response.status);
   }
   if (!response.ok) {
-    throw new Error(`QF token request failed: ${response.status}`);
+    throw new QfContentFailure("upstream", action, "token", response.status);
   }
 
   const token = await response.json() as { access_token?: string; expires_in?: number };
   if (!token.access_token || typeof token.expires_in !== "number") {
-    throw new Error("QF token response was invalid");
+    throw new QfContentFailure("upstream", action, "token");
   }
   tokenCache.accessToken = token.access_token;
   tokenCache.expiresAt = Date.now() + token.expires_in * 1000;
@@ -312,6 +338,18 @@ async function fetchToken(config: Config): Promise<string> {
 function clearToken() {
   tokenCache.accessToken = null;
   tokenCache.expiresAt = 0;
+}
+
+function logQfContentFailure(error: QfContentFailure) {
+  console.warn(
+    `[qf-content] upstream failed action=${error.action} phase=${error.phase} status=${error.status ?? "unknown"} path=${error.pathGroup ?? "token"}`
+  );
+}
+
+function contentErrorMessage(code: Exclude<ErrorCode, "bad_request">): string {
+  if (code === "not_configured") return "Quran Foundation content is not configured.";
+  if (code === "rate_limited") return "Quran Foundation rate limit reached.";
+  return "Quran Foundation content is temporarily unavailable.";
 }
 
 function parseAyah(
