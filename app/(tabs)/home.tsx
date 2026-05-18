@@ -76,6 +76,7 @@ export default function HomeScreen() {
   const [surahNames, setSurahNames] = useState<Record<number, string>>({});
   const [resume, setResume] = useState<{ surah: number; ayah: number; page: number } | null>(null);
   const [latestUnlock, setLatestUnlock] = useState<AchievementUnlock | null>(null);
+  const [dismissingUnlockId, setDismissingUnlockId] = useState<string | null>(null);
   const [journeySummary, setJourneySummary] = useState<{ totalLevels: number; completedLevels: number; currentLevelTitle: string | null }>({
     totalLevels: 0,
     completedLevels: 0,
@@ -182,11 +183,22 @@ export default function HomeScreen() {
   useEffect(() => subscribeAchievementUnlocks((unlock) => setLatestUnlock(unlock)), []);
 
   const dismissLatestUnlock = useCallback(() => {
-    if (!latestUnlock) return;
+    if (!latestUnlock || dismissingUnlockId === latestUnlock.achievementId) return;
     const achievementId = latestUnlock.achievementId;
-    setLatestUnlock(null);
-    markAchievementSeen(db, achievementId).then(loadLatestUnlock).catch(console.warn);
-  }, [db, latestUnlock, loadLatestUnlock]);
+    setDismissingUnlockId(achievementId);
+    markAchievementSeen(db, achievementId)
+      .then(() => getLatestUnseenUnlock(db))
+      .then((nextUnlock) => {
+        setLatestUnlock((current) => {
+          if (!current || current.achievementId === achievementId) return nextUnlock;
+          return current;
+        });
+      })
+      .catch(console.warn)
+      .finally(() => {
+        setDismissingUnlockId((current) => (current === achievementId ? null : current));
+      });
+  }, [db, dismissingUnlockId, latestUnlock]);
 
   const confirmDeleteDeck = async () => {
     if (!deckToDelete) return;
