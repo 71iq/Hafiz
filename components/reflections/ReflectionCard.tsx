@@ -12,6 +12,7 @@ type Props = {
   reflection: Reflection;
   onLikeToggled: (reflectionId: string, liked: boolean, delta: number) => void;
   onCommentsPress: (reflectionId: string) => void;
+  variant?: "compact" | "feed";
   showReference?: boolean;
   referenceLabel?: string;
   onReferencePress?: (reflection: Reflection) => void;
@@ -41,6 +42,7 @@ export function ReflectionCard({
   reflection,
   onLikeToggled,
   onCommentsPress,
+  variant = "compact",
   showReference = false,
   referenceLabel,
   onReferencePress,
@@ -100,27 +102,39 @@ export function ReflectionCard({
   const contentAlign = isRTL ? "right" : "left";
   const rowClassName = isRTL ? "flex-row-reverse" : "flex-row";
   const menuSide = isRTL ? { left: 12 } : { right: 12 };
+  const isFeed = variant === "feed";
 
   return (
     <View
-      className="rounded-3xl px-4 py-3.5 mb-2.5"
-      style={{ backgroundColor: isDark ? "#171717" : "#FAF8F5", position: "relative" }}
+      className={isFeed ? "mb-3 border px-4 py-4" : "mb-2.5 px-4 py-3.5"}
+      style={{
+        backgroundColor: isDark ? "#171717" : "#FAF8F5",
+        position: "relative",
+        borderRadius: isFeed ? 28 : 24,
+        borderColor: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,54,56,0.08)",
+        borderWidth: isFeed ? 1 : 0,
+        shadowColor: "#003638",
+        shadowOffset: { width: 0, height: isFeed ? 8 : 0 },
+        shadowOpacity: isFeed && !isDark ? 0.045 : 0,
+        shadowRadius: isFeed ? 22 : 0,
+        elevation: isFeed ? 1 : 0,
+      }}
     >
       <View className={`${rowClassName} items-center justify-between mb-2`}>
         <View className={`${rowClassName} items-center gap-2`}>
           <View
-            className="w-8 h-8 rounded-full items-center justify-center"
+            className={`${isFeed ? "h-10 w-10" : "h-8 w-8"} rounded-full items-center justify-center`}
             style={{ backgroundColor: isDark ? "#003638" : "#00595B" }}
           >
             <Text
-              style={{ fontFamily: "Manrope_700Bold", fontSize: 12, color: "#FDDC91" }}
+              style={{ fontFamily: "Manrope_700Bold", fontSize: isFeed ? 14 : 12, color: "#FDDC91" }}
             >
               {authorName.charAt(0).toUpperCase()}
             </Text>
           </View>
           <Text
             className="text-charcoal dark:text-neutral-200"
-            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13, textAlign: contentAlign }}
+            style={{ fontFamily: "Manrope_600SemiBold", fontSize: isFeed ? 14 : 13, textAlign: contentAlign }}
           >
             {authorName}
           </Text>
@@ -198,9 +212,9 @@ export function ReflectionCard({
         className="text-charcoal dark:text-neutral-200"
         style={{
           fontFamily: "Manrope_400Regular",
-          fontSize: 14,
-          lineHeight: 23,
-          marginBottom: 12,
+          fontSize: isFeed ? 15 : 14,
+          lineHeight: isFeed ? 25 : 23,
+          marginBottom: isFeed ? 14 : 12,
           textAlign: contentAlign,
           writingDirection: isRTL ? "rtl" : "ltr",
         }}
@@ -208,7 +222,10 @@ export function ReflectionCard({
         {reflection.content}
       </Text>
 
-      <View className={`${rowClassName} items-center gap-2`}>
+      <View
+        className={`${rowClassName} items-center gap-2`}
+        style={isFeed ? { borderTopWidth: 1, borderTopColor: isDark ? "#242424" : "#EEE7DE", paddingTop: 12 } : undefined}
+      >
         <Pressable
           onPress={handleLike}
           className={`${rowClassName} items-center gap-1 rounded-full px-2.5 py-1.5`}
@@ -222,7 +239,7 @@ export function ReflectionCard({
             color={heartColor}
             fill={liked ? "#ef4444" : "none"}
           />
-          {likesCount > 0 && (
+          {(isFeed || likesCount > 0) && (
             <Text style={{ fontFamily: "Manrope_500Medium", fontSize: 12, color: mutedColor }}>
               {likesCount}
             </Text>
@@ -238,7 +255,7 @@ export function ReflectionCard({
           })}
         >
           <MessageCircle size={15} color={mutedColor} />
-          {reflection.comments_count > 0 && (
+          {(isFeed || reflection.comments_count > 0) && (
             <Text style={{ fontFamily: "Manrope_500Medium", fontSize: 12, color: mutedColor }}>
               {reflection.comments_count}
             </Text>

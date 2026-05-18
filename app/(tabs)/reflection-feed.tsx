@@ -11,6 +11,7 @@ import { Toast } from "@/components/ui/Toast";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { ReflectionCard } from "@/components/reflections/ReflectionCard";
 import { CommentsSheet } from "@/components/reflections/CommentsSheet";
+import { useScreenContentLayout } from "@/components/ui/ScreenContent";
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -44,12 +45,16 @@ type FilterOptions = {
 };
 
 const defaultFilter: ReflectionFeedFilter = { type: "all" };
+const REFLECTION_FEED_MAX_WIDTH = 640;
 
 export default function ReflectionFeedScreen() {
   const db = useDatabase();
   const { isDark, isRTL, uiLanguage } = useSettings();
   const { width } = useWindowDimensions();
   const isPhone = width < SIDEBAR_BREAKPOINT;
+  const { contentContainerStyle, railStyle, isLaptop } = useScreenContentLayout({
+    maxWidth: REFLECTION_FEED_MAX_WIDTH,
+  });
   const s = useStrings();
   const user = useAuthStore((state) => state.user);
   const queryClient = useQueryClient();
@@ -193,6 +198,7 @@ export default function ReflectionFeedScreen() {
     ({ item }: { item: Reflection }) => (
       <ReflectionCard
         reflection={item}
+        variant="feed"
         showReference
         referenceLabel={formatReference(item)}
         onReferencePress={handleReferencePress}
@@ -208,7 +214,7 @@ export default function ReflectionFeedScreen() {
     <Pressable
       onPress={() => feedQuery.fetchNextPage()}
       disabled={feedQuery.isFetchingNextPage}
-      className="mx-6 mb-10 mt-2 items-center rounded-full bg-primary-accent py-3 dark:bg-primary-bright"
+      className="mb-10 mt-2 items-center rounded-full bg-primary-accent py-3 dark:bg-primary-bright"
       style={({ pressed }) => ({ opacity: pressed || feedQuery.isFetchingNextPage ? 0.65 : 1 })}
     >
       {feedQuery.isFetchingNextPage ? (
@@ -225,112 +231,132 @@ export default function ReflectionFeedScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
-      <View className="px-6 pt-4 pb-3">
-        <View className={isRTL ? "items-end" : "items-start"}>
-          <Text
-            className="text-primary dark:text-gold-light"
+      <View className="flex-1" style={contentContainerStyle}>
+        <View className="flex-1" style={railStyle}>
+          <View
+            className="mt-4 mb-4 border px-4 py-4"
             style={{
-              fontFamily: "NotoSerif_700Bold",
-              fontSize: 32,
-              lineHeight: 38,
-              textAlign: isRTL ? "right" : "left",
+              borderRadius: 28,
+              backgroundColor: isDark ? "#151515" : "#FAF8F4",
+              borderColor: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,54,56,0.08)",
+              shadowColor: "#003638",
+              shadowOffset: { width: 0, height: 10 },
+              shadowOpacity: isDark ? 0 : 0.06,
+              shadowRadius: 28,
+              elevation: 2,
             }}
           >
-            {s.reflectionFeedTitle}
-          </Text>
-          <Text
-            className="mt-1 text-warm-500 dark:text-neutral-400"
-            style={{
-              fontFamily: "Manrope_400Regular",
-              fontSize: 13,
-              lineHeight: 21,
-              textAlign: isRTL ? "right" : "left",
-              writingDirection: isRTL ? "rtl" : "ltr",
-            }}
-          >
-            {s.reflectionFeedSubtitle}
-          </Text>
-        </View>
+            <View className={`items-center gap-3 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
+              <View className="h-11 w-11 items-center justify-center rounded-full bg-primary-accent/10 dark:bg-primary-bright/10">
+                <MessageSquare size={20} color={isDark ? "#2dd4bf" : "#0d9488"} />
+              </View>
+              <View className={`flex-1 ${isRTL ? "items-end" : "items-start"}`}>
+                <Text
+                  className="text-primary dark:text-gold-light"
+                  style={{
+                    fontFamily: "NotoSerif_700Bold",
+                    fontSize: isLaptop ? 34 : 30,
+                    lineHeight: isLaptop ? 40 : 36,
+                    textAlign: isRTL ? "right" : "left",
+                  }}
+                >
+                  {s.reflectionFeedTitle}
+                </Text>
+                <Text
+                  className="mt-1 text-warm-500 dark:text-neutral-400"
+                  style={{
+                    fontFamily: "Manrope_400Regular",
+                    fontSize: 13,
+                    lineHeight: 21,
+                    textAlign: isRTL ? "right" : "left",
+                    writingDirection: isRTL ? "rtl" : "ltr",
+                  }}
+                >
+                  {s.reflectionFeedSubtitle}
+                </Text>
+              </View>
+            </View>
 
-        <View className={`mt-4 flex-wrap gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
-          <FilterButton label={s.reflectionFeedAll} active={filter.type === "all"} onPress={() => setFilter(defaultFilter)} />
-          <FilterButton label={s.reflectionFeedFilterSurah} active={filter.type === "surah"} onPress={() => setPickerMode("surah")} />
-          <FilterButton label={s.reflectionFeedFilterJuz} active={filter.type === "juz"} onPress={() => setPickerMode("juz")} />
-        </View>
+            <View className={`mt-4 flex-wrap gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
+              <FilterButton label={s.reflectionFeedAll} active={filter.type === "all"} onPress={() => setFilter(defaultFilter)} />
+              <FilterButton label={s.reflectionFeedFilterSurah} active={filter.type === "surah"} onPress={() => setPickerMode("surah")} />
+              <FilterButton label={s.reflectionFeedFilterJuz} active={filter.type === "juz"} onPress={() => setPickerMode("juz")} />
+            </View>
 
-        <View className={`mt-3 flex-wrap gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
-          {sortOptions.map((option) => (
-            <FilterButton
-              key={option.value}
-              label={option.label}
-              active={sort === option.value}
-              onPress={() => setSort(option.value)}
+            <View className={`mt-3 flex-wrap gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
+              {sortOptions.map((option) => (
+                <FilterButton
+                  key={option.value}
+                  label={option.label}
+                  active={sort === option.value}
+                  onPress={() => setSort(option.value)}
+                />
+              ))}
+            </View>
+
+            <View
+              className={`mt-4 items-center gap-2 rounded-2xl bg-surface-low px-3 py-2 dark:bg-surface-dark-low ${
+                isRTL ? "flex-row-reverse" : "flex-row"
+              }`}
+            >
+              <BookOpen size={15} color={isDark ? "#2dd4bf" : "#0d9488"} />
+              <Text
+                className="flex-1 text-warm-500 dark:text-neutral-400"
+                style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
+              >
+                {activeFilterLabel}
+              </Text>
+              <ChevronDown size={14} color={isDark ? "#737373" : "#A39B93"} />
+            </View>
+          </View>
+
+          {!configured ? (
+            <View className="flex-1 items-center justify-center">
+              <EmptyState
+                icon={MessageSquare}
+                title={s.reflections}
+                subtitle={s.reflectionFeedNotConfigured}
+                isDark={isDark}
+              />
+            </View>
+          ) : feedQuery.isLoading ? (
+            <ReflectionsSkeleton isDark={isDark} className="flex-1" />
+          ) : feedQuery.error ? (
+            <View className="flex-1 items-center justify-center">
+              <EmptyState
+                icon={MessageSquare}
+                title={s.reflectionFeedTitle}
+                subtitle={(feedQuery.error as Error).message}
+                actionLabel={s.reflectionFeedRetry}
+                onAction={() => feedQuery.refetch()}
+                isDark={isDark}
+              />
+            </View>
+          ) : reflections.length === 0 ? (
+            <View className="flex-1 items-center justify-center">
+              <EmptyState
+                icon={MessageSquare}
+                title={s.reflectionFeedEmptyTitle}
+                subtitle={s.reflectionFeedEmptySubtitle}
+                isDark={isDark}
+              />
+            </View>
+          ) : (
+            <FlashList
+              data={reflections}
+              keyExtractor={(item) => item.id}
+              renderItem={renderReflection}
+              contentContainerStyle={{
+                paddingBottom: isPhone ? 112 : 48,
+              }}
+              refreshControl={
+                <RefreshControl refreshing={feedQuery.isRefetching} onRefresh={() => feedQuery.refetch()} />
+              }
+              ListFooterComponent={listFooter}
             />
-          ))}
-        </View>
-
-        <View
-          className={`mt-3 items-center gap-2 rounded-2xl bg-surface-low px-3 py-2 dark:bg-surface-dark-low ${
-            isRTL ? "flex-row-reverse" : "flex-row"
-          }`}
-        >
-          <BookOpen size={15} color={isDark ? "#2dd4bf" : "#0d9488"} />
-          <Text
-            className="flex-1 text-warm-500 dark:text-neutral-400"
-            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
-          >
-            {activeFilterLabel}
-          </Text>
-          <ChevronDown size={14} color={isDark ? "#737373" : "#A39B93"} />
+          )}
         </View>
       </View>
-
-      {!configured ? (
-        <View className="flex-1 items-center justify-center px-6">
-          <EmptyState
-            icon={MessageSquare}
-            title={s.reflections}
-            subtitle={s.reflectionFeedNotConfigured}
-            isDark={isDark}
-          />
-        </View>
-      ) : feedQuery.isLoading ? (
-        <ReflectionsSkeleton isDark={isDark} className="flex-1 px-6" />
-      ) : feedQuery.error ? (
-        <View className="flex-1 items-center justify-center px-6">
-          <EmptyState
-            icon={MessageSquare}
-            title={s.reflectionFeedTitle}
-            subtitle={(feedQuery.error as Error).message}
-            actionLabel={s.reflectionFeedRetry}
-            onAction={() => feedQuery.refetch()}
-            isDark={isDark}
-          />
-        </View>
-      ) : reflections.length === 0 ? (
-        <View className="flex-1 items-center justify-center px-6">
-          <EmptyState
-            icon={MessageSquare}
-            title={s.reflectionFeedEmptyTitle}
-            subtitle={s.reflectionFeedEmptySubtitle}
-            isDark={isDark}
-          />
-        </View>
-      ) : (
-        <FlashList
-          data={reflections}
-          keyExtractor={(item) => item.id}
-          renderItem={renderReflection}
-          contentContainerStyle={{
-            paddingHorizontal: 24,
-            paddingBottom: isPhone ? 112 : 48,
-          }}
-          refreshControl={
-            <RefreshControl refreshing={feedQuery.isRefetching} onRefresh={() => feedQuery.refetch()} />
-          }
-          ListFooterComponent={listFooter}
-        />
-      )}
 
       <FilterPicker
         mode={pickerMode}
