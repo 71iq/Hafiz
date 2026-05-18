@@ -231,7 +231,7 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     icon: "sparkle",
     rarity: "rare",
     target: 1,
-    active: false,
+    active: true,
     payloadPolicy: publicSummary,
   },
 ];

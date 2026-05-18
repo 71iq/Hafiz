@@ -16,6 +16,7 @@ const CATEGORY_ORDER: AchievementCategory[] = [
   "notes",
   "reflections",
   "vocab",
+  "mutashabih",
 ];
 
 export function AchievementGrid({ items }: Props) {

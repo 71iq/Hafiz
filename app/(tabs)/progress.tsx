@@ -21,6 +21,7 @@ import {
   getTotalAyahCardCount,
   MUTASHABIHAT_DECK_ID,
 } from "@/lib/fsrs/queries";
+import { SMART_DECK_IDS } from "@/lib/fsrs/smart-decks";
 import { subscribeReviewActivity } from "@/lib/fsrs/review-events";
 import { getAchievementDashboard, type AchievementDashboard } from "@/lib/achievements/queries";
 import { getAchievementDefinition } from "@/lib/achievements/catalog";
@@ -95,6 +96,7 @@ export default function ProgressScreen() {
            sc.state
          FROM study_cards sc
          WHERE sc.id NOT LIKE 'word:%'
+           AND sc.deck_id NOT IN (?, ?, ?)
        )
        SELECT
          CAST(SUBSTR(ayah_key, 1, INSTR(ayah_key, ':') - 1) AS INTEGER) as surah,
@@ -104,7 +106,14 @@ export default function ProgressScreen() {
        WHERE INSTR(ayah_key, ':') > 1
        GROUP BY surah
        ORDER BY surah`,
-      [MUTASHABIHAT_DECK_ID, `${MUTASHABIHAT_DECK_ID}:%`, MUTASHABIHAT_DECK_ID]
+      [
+        MUTASHABIHAT_DECK_ID,
+        `${MUTASHABIHAT_DECK_ID}:%`,
+        MUTASHABIHAT_DECK_ID,
+        SMART_DECK_IDS.mutashabihat,
+        SMART_DECK_IDS.similarTails,
+        SMART_DECK_IDS.qiraat,
+      ]
     );
 
     if (surahRows.length > 0) {

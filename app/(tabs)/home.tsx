@@ -3,7 +3,7 @@ import { View, Text, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, type Href } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
-import { Plus, Trash2, Play, Layers, CalendarCheck2, Search, LayoutGrid, Languages, UserPlus, BookMarked, MessageSquare, X as XIcon } from "lucide-react-native";
+import { Plus, Trash2, Play, Layers, CalendarCheck2, Search, LayoutGrid, Languages, UserPlus, BookMarked, MessageSquare, X as XIcon, SlidersHorizontal, Sparkles, BookOpenText, ListEnd } from "lucide-react-native";
 import { useAuthStore } from "@/lib/auth/store";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useDatabase } from "@/lib/database/provider";
@@ -14,6 +14,7 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ScreenScrollView, useScreenContentLayout } from "@/components/ui/ScreenContent";
 import { CreateDeckSheet } from "@/components/flashcards/CreateDeckSheet";
+import { SmartDeckFilterSheet } from "@/components/flashcards/SmartDeckFilterSheet";
 import { SearchCommand } from "@/components/SearchCommand";
 import { Toast } from "@/components/ui/Toast";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -29,6 +30,13 @@ import {
 } from "@/lib/fsrs/queries";
 import type { WirdStatus } from "@/lib/fsrs/queries";
 import type { DeckScope } from "@/lib/fsrs/types";
+import {
+  getSmartDeckStats,
+  readSmartDeckFilter,
+  SMART_DECK_IDS,
+  type BuiltInDeckFilter,
+  type SmartDeckId,
+} from "@/lib/fsrs/smart-decks";
 import { subscribeReviewActivity } from "@/lib/fsrs/review-events";
 import {
   getLatestUnseenUnlock,
@@ -50,6 +58,17 @@ type DeckDisplay = {
   newCount: number;
 };
 
+type SmartDeckDisplay = {
+  id: SmartDeckId;
+  title: string;
+  subtitle: string;
+  icon: typeof Sparkles;
+  filter: BuiltInDeckFilter;
+  total: number;
+  dueCount: number;
+  newCount: number;
+};
+
 export default function HomeScreen() {
   const db = useDatabase();
   const { isDark, dailyReviewLimit, isRTL, uiLanguage } = useSettings();
@@ -57,6 +76,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const { isLaptop } = useScreenContentLayout({ maxWidth: DESKTOP_CONTENT_MAX_WIDTH });
   const [decks, setDecks] = useState<DeckDisplay[]>([]);
+  const [smartDecks, setSmartDecks] = useState<SmartDeckDisplay[]>([]);
   const [vocabStats, setVocabStats] = useState<{ total: number }>({ total: 0 });
   const [authBannerDismissed, setAuthBannerDismissed] = useState(false);
   const user = useAuthStore((state) => state.user);
@@ -73,6 +93,7 @@ export default function HomeScreen() {
   const [showSearch, setShowSearch] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [deckToDelete, setDeckToDelete] = useState<string | null>(null);
+  const [filterDeckId, setFilterDeckId] = useState<SmartDeckId | null>(null);
   const [surahNames, setSurahNames] = useState<Record<number, string>>({});
   const [resume, setResume] = useState<{ surah: number; ayah: number; page: number } | null>(null);
   const [latestUnlock, setLatestUnlock] = useState<AchievementUnlock | null>(null);
@@ -101,6 +122,44 @@ export default function HomeScreen() {
       nameMap[row.number] = uiLanguage === "ar" ? row.name_arabic : row.name_english;
     }
     setSurahNames(nameMap);
+
+    const smartDefinitions = [
+      {
+        id: SMART_DECK_IDS.mutashabihat,
+        title: s.smartDeckMutashabihatTitle,
+        subtitle: s.smartDeckMutashabihatSubtitle,
+        icon: Sparkles,
+      },
+      {
+        id: SMART_DECK_IDS.similarTails,
+        title: s.smartDeckSimilarTailsTitle,
+        subtitle: s.smartDeckSimilarTailsSubtitle,
+        icon: ListEnd,
+      },
+      {
+        id: SMART_DECK_IDS.qiraat,
+        title: s.smartDeckQiraatTitle,
+        subtitle: s.smartDeckQiraatSubtitle,
+        icon: BookOpenText,
+      },
+    ] as const;
+
+    const smartDisplays = await Promise.all(
+      smartDefinitions.map(async (definition) => {
+        const [stats, filter] = await Promise.all([
+          getSmartDeckStats(db, definition.id),
+          readSmartDeckFilter(db, definition.id),
+        ]);
+        return {
+          ...definition,
+          filter,
+          total: stats.total,
+          dueCount: stats.due,
+          newCount: stats.newCount,
+        };
+      })
+    );
+    setSmartDecks(smartDisplays);
 
     const rawDecks = (await getDecks(db)).filter((d) => d.id !== MEANINGS_DECK_ID);
     const deckDisplays: DeckDisplay[] = [];
@@ -170,7 +229,7 @@ export default function HomeScreen() {
     } catch {
       setResume(null);
     }
-  }, [db, loadLatestUnlock, uiLanguage]);
+  }, [db, loadLatestUnlock, s.smartDeckMutashabihatTitle, s.smartDeckMutashabihatSubtitle, s.smartDeckSimilarTailsTitle, s.smartDeckSimilarTailsSubtitle, s.smartDeckQiraatTitle, s.smartDeckQiraatSubtitle, uiLanguage]);
 
   useFocusEffect(
     useCallback(() => {
@@ -216,6 +275,20 @@ export default function HomeScreen() {
 
   const handleStartReview = (deckId?: string) => {
     router.push({ pathname: "/flashcards/session", params: deckId ? { deckId } : {} });
+  };
+
+  const getSmartFilterLabel = (filter: BuiltInDeckFilter): string => {
+    if (filter.type === "surah") {
+      if (filter.surahs.length === 1) {
+        const n = filter.surahs[0];
+        return `${s.flashcardsScopeBysurah}: ${surahNames[n] ?? n}`;
+      }
+      return `${s.flashcardsScopeBysurah}: ${filter.surahs.length}`;
+    }
+    if (filter.type === "juz") {
+      return `${s.flashcardsScopeByjuz}: ${filter.juzNumbers.join(", ")}`;
+    }
+    return s.smartDeckFilterAll;
   };
 
   const getDeckLabel = (deck: DeckDisplay): string => {
@@ -520,6 +593,30 @@ export default function HomeScreen() {
           </Pressable>
         )}
 
+        {/* Built-in smart decks */}
+        <View className="flex-row items-center justify-between mb-4">
+          <Text
+            className="text-charcoal dark:text-neutral-100"
+            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16 }}
+          >
+            {s.smartDecksSection}
+          </Text>
+        </View>
+        <View className="gap-3 mb-6">
+          {smartDecks.map((deck) => (
+            <SmartDeckCard
+              key={deck.id}
+              deck={deck}
+              filterLabel={getSmartFilterLabel(deck.filter)}
+              onStartReview={() => handleStartReview(deck.id)}
+              onConfigure={() => setFilterDeckId(deck.id)}
+              isDark={isDark}
+              isRTL={isRTL}
+              s={s}
+            />
+          ))}
+        </View>
+
         {/* Decks */}
         <View className="flex-row items-center justify-between mb-4">
           <Text
@@ -631,6 +728,13 @@ export default function HomeScreen() {
         }}
       />
 
+      <SmartDeckFilterSheet
+        visible={!!filterDeckId}
+        deckId={filterDeckId}
+        onClose={() => setFilterDeckId(null)}
+        onSaved={loadData}
+      />
+
       {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}
       <ConfirmDialog
         visible={!!deckToDelete}
@@ -724,5 +828,113 @@ function DeckCard({
         </Button>
       )}
     </Card>
+  );
+}
+
+function SmartDeckCard({
+  deck,
+  filterLabel,
+  onStartReview,
+  onConfigure,
+  isDark,
+  isRTL,
+  s,
+}: {
+  deck: SmartDeckDisplay;
+  filterLabel: string;
+  onStartReview: () => void;
+  onConfigure: () => void;
+  isDark: boolean;
+  isRTL: boolean;
+  s: any;
+}) {
+  const Icon = deck.icon;
+  const canStart = deck.total > 0;
+  return (
+    <Card elevation="low" className="p-5">
+      <View className={`mb-3 flex-row items-start justify-between ${isRTL ? "flex-row-reverse" : ""}`}>
+        <View className={`flex-1 flex-row items-center gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
+          <View className="w-10 h-10 rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 items-center justify-center">
+            <Icon size={18} color={isDark ? "#2dd4bf" : "#0d9488"} />
+          </View>
+          <View className={`flex-1 ${isRTL ? "items-end" : "items-start"}`}>
+            <Text
+              className="text-charcoal dark:text-neutral-200"
+              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15, textAlign: isRTL ? "right" : "left" }}
+              numberOfLines={1}
+            >
+              {deck.title}
+            </Text>
+            <Text
+              className="text-warm-400 dark:text-neutral-500 mt-0.5"
+              style={{ fontFamily: "Manrope_400Regular", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
+              numberOfLines={2}
+            >
+              {deck.subtitle}
+            </Text>
+          </View>
+        </View>
+        <Pressable
+          onPress={onConfigure}
+          className="w-9 h-9 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center"
+          style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.95 : 1 }] })}
+        >
+          <SlidersHorizontal size={15} color={isDark ? "#a3a3a3" : "#8B8178"} />
+        </Pressable>
+      </View>
+
+      <View className={`flex-row items-center justify-between mb-4 ${isRTL ? "flex-row-reverse" : ""}`}>
+        <StatPill label={s.flashcardsDueToday} value={String(deck.dueCount)} isDark={isDark} />
+        <StatPill label={s.flashcardsNewCards} value={String(deck.newCount)} isDark={isDark} />
+        <StatPill label={s.flashcardsTotalCards} value={String(deck.total)} isDark={isDark} />
+      </View>
+
+      <View className={`flex-row items-center justify-between ${isRTL ? "flex-row-reverse" : ""}`}>
+        <Text
+          className="text-warm-500 dark:text-neutral-400 flex-1"
+          style={{
+            fontFamily: "Manrope_500Medium",
+            fontSize: 12,
+            textAlign: isRTL ? "right" : "left",
+            writingDirection: isRTL ? "rtl" : "ltr",
+          }}
+          numberOfLines={1}
+        >
+          {filterLabel}
+        </Text>
+        <Pressable
+          onPress={canStart ? onStartReview : undefined}
+          className="rounded-full bg-primary-accent px-4 py-1.5"
+          style={({ pressed }) => ({
+            opacity: canStart ? 1 : 0.4,
+            transform: [{ scale: pressed && canStart ? 0.97 : 1 }],
+          })}
+        >
+          <Text className="text-white" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}>
+            {canStart ? s.flashcardsStartReview : s.smartDeckNoCards}
+          </Text>
+        </Pressable>
+      </View>
+    </Card>
+  );
+}
+
+function StatPill({ label, value, isDark }: { label: string; value: string; isDark: boolean }) {
+  return (
+    <View className="rounded-2xl bg-surface-low dark:bg-surface-dark-low px-3 py-2 min-w-[82px] items-center">
+      <Text
+        className="text-charcoal dark:text-neutral-100"
+        style={{ fontFamily: "Manrope_700Bold", fontSize: 15, fontVariant: ["tabular-nums"] }}
+      >
+        {value}
+      </Text>
+      <Text
+        className="text-warm-400 dark:text-neutral-500 mt-0.5"
+        style={{ fontFamily: "Manrope_500Medium", fontSize: 10, color: isDark ? "#737373" : "#8B8178" }}
+        numberOfLines={1}
+      >
+        {label}
+      </Text>
+    </View>
   );
 }

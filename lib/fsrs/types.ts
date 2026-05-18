@@ -18,7 +18,7 @@ export interface DeckInfo {
 }
 
 export interface StudyCardRow {
-  id: string; // "surah:ayah" e.g. "2:255"
+  id: string; // ayah "2:255", word "word:2:255:4", or built-in smart deck id
   deck_id: string;
   due: string;
   stability: number;

@@ -17,10 +17,9 @@ import { interpolate } from "@/lib/i18n/useStrings";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { LoadingScreen } from "@/components/LoadingScreen";
-import { gradeCard, Rating, State, createEmptyCard } from "@/lib/fsrs/scheduler";
+import { gradeCard, Rating, State } from "@/lib/fsrs/scheduler";
 import type { Card as FSRSCard, Grade } from "@/lib/fsrs/scheduler";
 import {
-  getDueCards,
   updateCard,
   insertStudyLog,
   getStudyStreak,
@@ -28,19 +27,31 @@ import {
   MUTASHABIHAT_DECK_ID,
 } from "@/lib/fsrs/queries";
 import { computeUniqueFront } from "@/lib/fsrs/uniqueness";
-import { computeReviewPoints, addTodayPoints, getTodayScore } from "@/lib/fsrs/scoring";
+import { computeReviewPoints, addTodayPoints } from "@/lib/fsrs/scoring";
 import { hapticMedium, hapticSuccess } from "@/lib/haptics";
 import { Skeleton, SkeletonText } from "@/components/ui/Skeleton";
 import { syncDailyScore, updateProfileStats } from "@/lib/fsrs/leaderboard-sync";
 import type { StudyCardRow, TestMode } from "@/lib/fsrs/types";
 import { DEFAULT_ENABLED_MODES, TEST_MODE_COLORS } from "@/lib/fsrs/types";
 import { fetchWordMeaningAr, fetchWordText, fetchWordTranslation } from "@/lib/word/queries";
+import { Qcf2AyahText } from "@/components/flashcards/Qcf2AyahText";
+import {
+  getDueCardsForReview,
+  getSmartCardContent,
+  isSmartDeckId,
+  materializeSmartDeckCards,
+  type SmartCardKind,
+  type SmartDeckRef,
+} from "@/lib/fsrs/smart-decks";
+import { parseQiraatText, type QiraatBlock } from "@/lib/qiraat/parse";
+import { recordAchievementEvent } from "@/lib/achievements/queries";
 
 // ─── Types ───────────────────────────────────────────────────
 
 type SessionPhase = "loading" | "front" | "side" | "grading" | "summary";
 
 type CardData = {
+  kind: "ayah" | "word" | SmartCardKind;
   card: StudyCardRow;
   surah: number;
   ayah: number;
@@ -51,11 +62,22 @@ type CardData = {
   wordMeaningEn?: string;
   surahName: string;
   textUthmani: string;
+  textQcf2?: string;
+  v2Page?: number;
   uniqueFront: { text: string; surahName: string; contextCount: number; needsExplicitLabel: boolean };
   translation: string;
   tafseer: string;
   prevAyahText: string | null;
+  prevAyahQcf2?: string | null;
+  prevV2Page?: number | null;
   nextAyahText: string | null;
+  nextAyahQcf2?: string | null;
+  nextV2Page?: number | null;
+  smartDeckTitle?: string;
+  smartCue?: string;
+  smartRefs?: SmartDeckRef[];
+  qiraatText?: string;
+  qiraatGroup?: string[];
 };
 
 type SessionSummary = {
@@ -70,11 +92,17 @@ type SessionSummary = {
 };
 
 type WordTestMode = "wordMeaningArabic" | "wordMeaningTranslation";
+type SmartTestMode = "smartRefs" | "qiraatReading";
+type ReviewMode = TestMode | WordTestMode | SmartTestMode;
 const ALL_WORD_TEST_MODES: WordTestMode[] = ["wordMeaningArabic", "wordMeaningTranslation"];
 const DEFAULT_WORD_TEST_MODES: WordTestMode[] = ["wordMeaningArabic", "wordMeaningTranslation"];
 const WORD_TEST_MODE_COLORS: Record<WordTestMode, string> = {
   wordMeaningArabic: "#0d9488",
   wordMeaningTranslation: "#3b82f6",
+};
+const SMART_TEST_MODE_COLORS: Record<SmartTestMode, string> = {
+  smartRefs: "#0d9488",
+  qiraatReading: "#8b5cf6",
 };
 
 // ─── Main Component ──────────────────────────────────────────
@@ -145,6 +173,7 @@ function FlashcardSessionScreen() {
   const gradingInFlightRef = useRef(false);
   const flipAnim = useRef(new RNAnimated.Value(0)).current;
   const normalizedDeckId = Array.isArray(deckId) ? deckId[0] : deckId;
+
   const resetSessionProgress = useCallback(() => {
     gradingInFlightRef.current = false;
     sessionPointsRef.current = 0;
@@ -199,7 +228,10 @@ function FlashcardSessionScreen() {
       try {
         // Pre-load streak for scoring
         streakRef.current = await getStudyStreak(db);
-        const dueRows = await getDueCards(db, normalizedDeckId, dailyReviewLimit);
+        if (isSmartDeckId(normalizedDeckId)) {
+          await materializeSmartDeckCards(db, normalizedDeckId, dailyReviewLimit);
+        }
+        const dueRows = await getDueCardsForReview(db, normalizedDeckId, dailyReviewLimit);
         if (cancelled) return;
         if (dueRows.length === 0) {
           resetSessionProgress();
@@ -211,6 +243,37 @@ function FlashcardSessionScreen() {
         const loaded: CardData[] = [];
         for (const row of dueRows) {
           if (cancelled) return;
+          const smartContent = await getSmartCardContent(db, row.id);
+          if (smartContent?.refs[0]) {
+            const firstRef = smartContent.refs[0];
+            loaded.push({
+              kind: smartContent.kind,
+              card: row,
+              surah: firstRef.surah,
+              ayah: firstRef.ayah,
+              surahName: firstRef.surahNameAr,
+              textUthmani: firstRef.textUthmani,
+              textQcf2: firstRef.textQcf2,
+              v2Page: firstRef.v2Page,
+              uniqueFront: {
+                text: smartContent.cue,
+                surahName: firstRef.surahNameAr,
+                contextCount: 0,
+                needsExplicitLabel: true,
+              },
+              translation: "",
+              tafseer: "",
+              prevAyahText: null,
+              nextAyahText: null,
+              smartDeckTitle: getSmartDeckTitleForKind(smartContent.kind, s),
+              smartCue: smartContent.cue,
+              smartRefs: smartContent.refs,
+              qiraatText: smartContent.qiraatText,
+              qiraatGroup: smartContent.qiraatGroup,
+            });
+            continue;
+          }
+
           const parts = row.id.split(":");
           const isWordCard = parts[0] === "word" && parts.length >= 4;
           const isMutashabihatCard = parts[0] === MUTASHABIHAT_DECK_ID && parts.length >= 3;
@@ -231,8 +294,8 @@ function FlashcardSessionScreen() {
             canonicalWordText,
             wordTranslation,
           ] = await Promise.all([
-            db.getFirstAsync<{ text_uthmani: string }>(
-              "SELECT text_uthmani FROM quran_text WHERE surah = ? AND ayah = ?",
+            db.getFirstAsync<{ text_uthmani: string; text_qcf2: string; v2_page: number }>(
+              "SELECT text_uthmani, text_qcf2, v2_page FROM quran_text WHERE surah = ? AND ayah = ?",
               [surah, ayah]
             ),
             db.getFirstAsync<{ name_arabic: string }>(
@@ -248,13 +311,13 @@ function FlashcardSessionScreen() {
               [surah, ayah, tafseerSource]
             ),
             ayah > 1
-              ? db.getFirstAsync<{ text_uthmani: string }>(
-                  "SELECT text_uthmani FROM quran_text WHERE surah = ? AND ayah = ?",
+              ? db.getFirstAsync<{ text_uthmani: string; text_qcf2: string; v2_page: number }>(
+                  "SELECT text_uthmani, text_qcf2, v2_page FROM quran_text WHERE surah = ? AND ayah = ?",
                   [surah, ayah - 1]
                 )
               : null,
-            db.getFirstAsync<{ text_uthmani: string }>(
-              "SELECT text_uthmani FROM quran_text WHERE surah = ? AND ayah = ?",
+            db.getFirstAsync<{ text_uthmani: string; text_qcf2: string; v2_page: number }>(
+              "SELECT text_uthmani, text_qcf2, v2_page FROM quran_text WHERE surah = ? AND ayah = ?",
               [surah, ayah + 1]
             ),
             computeUniqueFront(db, surah, ayah),
@@ -274,6 +337,7 @@ function FlashcardSessionScreen() {
           const frontText = isWordCard ? (wordText ?? uniqueFront.text) : uniqueFront.text;
 
           loaded.push({
+            kind: isWordCard ? "word" : "ayah",
             card: row,
             surah,
             ayah,
@@ -284,14 +348,26 @@ function FlashcardSessionScreen() {
             wordMeaningEn: wordMeaningEn ?? undefined,
             surahName: surahRow?.name_arabic ?? "",
             textUthmani: ayahRow?.text_uthmani ?? "",
+            textQcf2: ayahRow?.text_qcf2,
+            v2Page: ayahRow?.v2_page,
             uniqueFront: { ...uniqueFront, text: frontText },
             translation: translationRow?.text_en ?? "",
             tafseer: tafseerRow?.text ?? "",
             prevAyahText: prevRow?.text_uthmani ?? null,
+            prevAyahQcf2: prevRow?.text_qcf2 ?? null,
+            prevV2Page: prevRow?.v2_page ?? null,
             nextAyahText: nextRow?.text_uthmani ?? null,
+            nextAyahQcf2: nextRow?.text_qcf2 ?? null,
+            nextV2Page: nextRow?.v2_page ?? null,
           });
         }
         if (cancelled) return;
+        if (loaded.length === 0) {
+          resetSessionProgress();
+          setSummary({ total: 0, newCount: 0, reviewCount: 0, relearningCount: 0, durationMs: 0, nextReviewDate: null, wirdDays: 0, wirdMaintainedToday: false });
+          setPhase("summary");
+          return;
+        }
 
         shuffle(loaded);
         sessionStartRef.current = Date.now();
@@ -312,11 +388,27 @@ function FlashcardSessionScreen() {
     return () => {
       cancelled = true;
     };
-  }, [db, normalizedDeckId, tafseerSource, dailyReviewLimit, settingsLoaded, resetSessionProgress]);
+  }, [
+    db,
+    normalizedDeckId,
+    tafseerSource,
+    dailyReviewLimit,
+    settingsLoaded,
+    resetSessionProgress,
+    s.smartDeckMutashabihatTitle,
+    s.smartDeckSimilarTailsTitle,
+    s.smartDeckQiraatTitle,
+  ]);
 
   const currentCard = cards[currentIndex] ?? null;
-  const activeModes = useMemo(() => {
-    if (!currentCard) return [] as Array<TestMode | WordTestMode>;
+  const activeModes = useMemo<ReviewMode[]>(() => {
+    if (!currentCard) return [] as ReviewMode[];
+    if (currentCard.kind === "mutashabihat" || currentCard.kind === "similarTail") {
+      return ["smartRefs"];
+    }
+    if (currentCard.kind === "qiraat") {
+      return currentCard.qiraatText ? ["qiraatReading"] : [];
+    }
     if (currentCard.isWordCard) {
       return wordEnabledModes.filter((mode) => {
         if (mode === "wordMeaningArabic" && !currentCard.wordMeaningAr) return false;
@@ -406,6 +498,14 @@ function FlashcardSessionScreen() {
         result.log.scheduled_days,
         now.toISOString()
       );
+
+      if (currentCard.card.id.startsWith("mutashabihat:") || currentCard.card.id.startsWith("similar-tail:")) {
+        recordAchievementEvent(db, {
+          type: "mutashabih_pair_reviewed",
+          pairId: currentCard.card.id,
+          reviewedAt: now.toISOString(),
+        }).catch(console.warn);
+      }
 
       // Compute and store leaderboard points
       const points = computeReviewPoints(
@@ -530,7 +630,7 @@ function FlashcardSessionScreen() {
       {phase === "side" && activeModes.length > 0 && (
         <View className="flex-row flex-wrap gap-2 px-6 pb-3">
           {activeModes.map((mode, i) => {
-            const color = isWordTestMode(mode) ? WORD_TEST_MODE_COLORS[mode] : TEST_MODE_COLORS[mode];
+            const color = getModeColor(mode);
             const isActive = i === currentSideIndex;
             const isDone = i < currentSideIndex;
             return (
@@ -567,20 +667,33 @@ function FlashcardSessionScreen() {
           {/* Front of card */}
           {phase === "front" && (
             <Card elevation="low" className="p-6 mb-6 rounded-3xl bg-surface-low dark:bg-surface-dark-low">
+              {isSmartReviewCard(currentCard) ? (
+                <SmartCardFront card={currentCard} fontSize={fontSize} lineHeight={lineHeight} s={s} />
+              ) : (
+                <>
               {!currentCard.isWordCard && currentCard.uniqueFront.contextCount > 0 && (
                 <Text
                   className="text-warm-400 dark:text-neutral-500 text-center mb-3"
                   style={{ fontFamily: "Manrope_400Regular", fontSize: 11 }}
                 >
-                  ({currentCard.uniqueFront.contextCount} {currentCard.uniqueFront.contextCount === 1 ? "ayah" : "ayahs"} of context)
+                  {interpolate(s.flashcardsContextCount, {
+                    n: currentCard.uniqueFront.contextCount,
+                    label: currentCard.uniqueFront.contextCount === 1 ? s.flashcardsContextAyah : s.flashcardsContextAyahs,
+                  })}
                 </Text>
               )}
-              <Text
-                className="text-charcoal dark:text-neutral-100 text-center"
-                style={{ fontSize, lineHeight, writingDirection: "rtl" }}
-              >
-                {currentCard.uniqueFront.text}
-              </Text>
+              {!currentCard.isWordCard && currentCard.uniqueFront.contextCount === 0 && currentCard.textQcf2 && currentCard.v2Page ? (
+                <Qcf2AyahText textQcf2={currentCard.textQcf2} v2Page={currentCard.v2Page} fontSize={fontSize} lineHeight={lineHeight} />
+              ) : (
+                <Text
+                  className="text-charcoal dark:text-neutral-100 text-center"
+                  style={{ fontSize, lineHeight, writingDirection: "rtl" }}
+                >
+                  {currentCard.uniqueFront.text}
+                </Text>
+              )}
+                </>
+              )}
             </Card>
           )}
 
@@ -594,7 +707,7 @@ function FlashcardSessionScreen() {
               {revealed && (
                 <RNAnimated.View style={{ transform: [{ translateY }], opacity }}>
                   <Card elevation="mid" className="p-6 rounded-3xl bg-surface-bright dark:bg-surface-dark-mid">
-                    <TestModeAnswer mode={currentMode} card={currentCard} fontSize={fontSize} lineHeight={lineHeight} />
+                    <TestModeAnswer mode={currentMode} card={currentCard} fontSize={fontSize} lineHeight={lineHeight} s={s} />
                   </Card>
                 </RNAnimated.View>
               )}
@@ -604,12 +717,21 @@ function FlashcardSessionScreen() {
           {/* Grading phase */}
           {phase === "grading" && (
             <Card elevation="low" className="p-6 mb-4 rounded-3xl bg-surface-low dark:bg-surface-dark-low">
-              <Text
-                className="text-charcoal dark:text-neutral-100 text-center"
-                style={{ fontSize: fontSize * 0.8, lineHeight: lineHeight * 0.8, writingDirection: "rtl" }}
-              >
-                {currentCard.textUthmani}
-              </Text>
+              {currentCard.textQcf2 && currentCard.v2Page ? (
+                <Qcf2AyahText
+                  textQcf2={currentCard.textQcf2}
+                  v2Page={currentCard.v2Page}
+                  fontSize={fontSize * 0.8}
+                  lineHeight={lineHeight * 0.8}
+                />
+              ) : (
+                <Text
+                  className="text-charcoal dark:text-neutral-100 text-center"
+                  style={{ fontSize: fontSize * 0.8, lineHeight: lineHeight * 0.8, writingDirection: "rtl" }}
+                >
+                  {currentCard.textUthmani}
+                </Text>
+              )}
             </Card>
           )}
         </View>
@@ -663,12 +785,11 @@ function FlashcardSessionScreen() {
 function TestModePrompt({
   mode, card, fontSize, lineHeight, s,
 }: {
-  mode: TestMode | WordTestMode; card: CardData; fontSize: number; lineHeight: number; s: any;
+  mode: ReviewMode; card: CardData; fontSize: number; lineHeight: number; s: any;
 }) {
   const label = getModeName(mode, s);
-  const color = isWordTestMode(mode) ? WORD_TEST_MODE_COLORS[mode] : TEST_MODE_COLORS[mode];
+  const color = getModeColor(mode);
 
-  // Surah Name mode hides the surah context
   return (
     <View>
       <View className="flex-row items-center gap-2 mb-3">
@@ -678,30 +799,40 @@ function TestModePrompt({
           </Text>
         </View>
       </View>
-      <Text
-        className="text-charcoal dark:text-neutral-100 text-center"
-        style={{ fontSize, lineHeight, writingDirection: "rtl" }}
-      >
-        {card.textUthmani}
-      </Text>
+      {mode === "smartRefs" ? (
+        <SmartCueText card={card} fontSize={fontSize} lineHeight={lineHeight} s={s} />
+      ) : card.textQcf2 && card.v2Page ? (
+        <Qcf2AyahText textQcf2={card.textQcf2} v2Page={card.v2Page} fontSize={fontSize} lineHeight={lineHeight} />
+      ) : (
+        <Text
+          className="text-charcoal dark:text-neutral-100 text-center"
+          style={{ fontSize, lineHeight, writingDirection: "rtl" }}
+        >
+          {card.textUthmani}
+        </Text>
+      )}
     </View>
   );
 }
 
 function TestModeAnswer({
-  mode, card, fontSize, lineHeight,
+  mode, card, fontSize, lineHeight, s,
 }: {
-  mode: TestMode | WordTestMode; card: CardData; fontSize: number; lineHeight: number;
+  mode: ReviewMode; card: CardData; fontSize: number; lineHeight: number; s: any;
 }) {
   switch (mode) {
     case "nextAyah":
-      return (
+      return card.nextAyahQcf2 && card.nextV2Page ? (
+        <Qcf2AyahText textQcf2={card.nextAyahQcf2} v2Page={card.nextV2Page} fontSize={fontSize} lineHeight={lineHeight} />
+      ) : (
         <Text className="text-charcoal dark:text-neutral-100 text-center" style={{ fontSize, lineHeight, writingDirection: "rtl" }}>
           {card.nextAyahText ?? "—"}
         </Text>
       );
     case "previousAyah":
-      return (
+      return card.prevAyahQcf2 && card.prevV2Page ? (
+        <Qcf2AyahText textQcf2={card.prevAyahQcf2} v2Page={card.prevV2Page} fontSize={fontSize} lineHeight={lineHeight} />
+      ) : (
         <Text className="text-charcoal dark:text-neutral-100 text-center" style={{ fontSize, lineHeight, writingDirection: "rtl" }}>
           {card.prevAyahText ?? "—"}
         </Text>
@@ -744,9 +875,195 @@ function TestModeAnswer({
           {card.wordMeaningEn ?? "—"}
         </Text>
       );
+    case "smartRefs":
+      return <SmartRefsAnswer card={card} fontSize={fontSize * 0.82} lineHeight={lineHeight * 0.82} s={s} />;
+    case "qiraatReading":
+      return <QiraatAnswer card={card} s={s} />;
     default:
       return null;
   }
+}
+
+function SmartCardFront({
+  card,
+  fontSize,
+  lineHeight,
+  s,
+}: {
+  card: CardData;
+  fontSize: number;
+  lineHeight: number;
+  s: any;
+}) {
+  const prompt = getSmartPrompt(card, s);
+  return (
+    <View className="items-center">
+      <Text
+        className="text-primary-accent dark:text-primary-bright text-center mb-2"
+        style={{ fontFamily: "Manrope_700Bold", fontSize: 13 }}
+      >
+        {card.smartDeckTitle}
+      </Text>
+      <Text
+        className="text-warm-500 dark:text-neutral-400 text-center mb-5"
+        style={{ fontFamily: "Manrope_500Medium", fontSize: 13, lineHeight: 20 }}
+      >
+        {prompt}
+      </Text>
+      {card.kind === "qiraat" && card.textQcf2 && card.v2Page ? (
+        <Qcf2AyahText textQcf2={card.textQcf2} v2Page={card.v2Page} fontSize={fontSize} lineHeight={lineHeight} />
+      ) : (
+        <SmartCueText card={card} fontSize={fontSize} lineHeight={lineHeight} s={s} />
+      )}
+    </View>
+  );
+}
+
+function SmartCueText({
+  card,
+  fontSize,
+  lineHeight,
+  s,
+}: {
+  card: CardData;
+  fontSize: number;
+  lineHeight: number;
+  s: any;
+}) {
+  const cue = card.smartCue ?? card.uniqueFront.text;
+  return (
+    <View className="items-center">
+      {card.kind === "similarTail" && (
+        <Text
+          className="text-warm-400 dark:text-neutral-500 text-center mb-2"
+          style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11 }}
+        >
+          {s.smartDeckTailCue}
+        </Text>
+      )}
+      <Text
+        className="text-charcoal dark:text-neutral-100 text-center"
+        style={{ fontSize, lineHeight, writingDirection: "rtl" }}
+      >
+        {cue}
+      </Text>
+    </View>
+  );
+}
+
+function SmartRefsAnswer({
+  card,
+  fontSize,
+  lineHeight,
+  s,
+}: {
+  card: CardData;
+  fontSize: number;
+  lineHeight: number;
+  s: any;
+}) {
+  const refs = card.smartRefs ?? [];
+  const title = card.kind === "similarTail" ? s.smartDeckSimilarTailAnswerTitle : s.smartDeckMutashabihatAnswerTitle;
+  return (
+    <ScrollView style={{ maxHeight: 420 }} nestedScrollEnabled>
+      <Text
+        className="text-warm-400 dark:text-neutral-500 uppercase mb-3"
+        style={{ fontFamily: "Manrope_700Bold", fontSize: 11, letterSpacing: 1.1, textAlign: "right", writingDirection: "rtl" }}
+      >
+        {title}
+      </Text>
+      <View className="gap-3">
+        {refs.map((ref, index) => (
+          <View
+            key={`${ref.surah}:${ref.ayah}:${index}`}
+            className="rounded-2xl bg-surface-low dark:bg-surface-dark-low p-4"
+          >
+            <View className="flex-row-reverse items-center justify-between mb-3">
+              <Text
+                className="text-primary-accent dark:text-primary-bright"
+                style={{ fontFamily: "Manrope_700Bold", fontSize: 13, writingDirection: "rtl" }}
+              >
+                {ref.surah}:{ref.ayah}
+              </Text>
+              <Text
+                className="text-warm-500 dark:text-neutral-400 flex-1 mr-3"
+                style={{ fontFamily: "Manrope_500Medium", fontSize: 12, textAlign: "right", writingDirection: "rtl" }}
+                numberOfLines={1}
+              >
+                {ref.surahNameAr}
+              </Text>
+            </View>
+            <Qcf2AyahText textQcf2={ref.textQcf2} v2Page={ref.v2Page} fontSize={fontSize} lineHeight={lineHeight} />
+            {card.kind === "similarTail" && ref.tail5 && (
+              <Text
+                className="text-warm-500 dark:text-neutral-400 mt-3"
+                style={{ fontFamily: "Manrope_500Medium", fontSize: 12, lineHeight: 20, textAlign: "right", writingDirection: "rtl" }}
+              >
+                {s.smartDeckTailComparisonCue}: {ref.tail5}
+              </Text>
+            )}
+          </View>
+        ))}
+      </View>
+    </ScrollView>
+  );
+}
+
+function QiraatAnswer({ card, s }: { card: CardData; s: any }) {
+  const blocks = parseQiraatText(card.qiraatText ?? "");
+  if (blocks.length === 0) {
+    return (
+      <Text className="text-warm-500 dark:text-neutral-400 text-center" style={{ writingDirection: "rtl" }}>
+        {s.noQiraatData}
+      </Text>
+    );
+  }
+
+  const group = card.qiraatGroup ?? [];
+  const coversLabel = group.length > 1
+    ? `${s.qiraatCoversAyahs}: ${group.map(formatAyahKeyArabic).join("، ")}`
+    : null;
+
+  return (
+    <ScrollView style={{ maxHeight: 420 }} nestedScrollEnabled>
+      <Text
+        className="text-xs font-medium text-warm-400 dark:text-neutral-500 uppercase tracking-wider mb-3"
+        style={{ writingDirection: "rtl", textAlign: "right" }}
+      >
+        {s.qiraatHeader}
+      </Text>
+
+      {coversLabel && (
+        <View className="mb-3 px-3 py-2 rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 self-start">
+          <Text
+            className="text-xs text-primary-accent dark:text-primary-bright"
+            style={{ writingDirection: "rtl" }}
+          >
+            {coversLabel}
+          </Text>
+        </View>
+      )}
+
+      {blocks.map((block: QiraatBlock, i: number) => (
+        <View key={i} className="mb-4">
+          {block.heading && (
+            <Text
+              className="text-lg text-primary-accent dark:text-primary-bright mb-1.5"
+              style={{ writingDirection: "rtl", textAlign: "right", fontWeight: "700" }}
+            >
+              {block.heading}
+            </Text>
+          )}
+          <Text
+            className="text-base text-charcoal dark:text-neutral-200 leading-8"
+            style={{ writingDirection: "rtl", textAlign: "right" }}
+          >
+            {block.body}
+          </Text>
+        </View>
+      ))}
+    </ScrollView>
+  );
 }
 
 // ─── Grading ─────────────────────────────────────────────────
@@ -794,7 +1111,7 @@ function GradingButtons({ onGrade, isDark, s }: { onGrade: (rating: Grade) => vo
 function CardStateBadge({ state, s }: { state: number; s: any }) {
   const config: Record<number, { label: string; bg: string }> = {
     [State.New]: { label: s.flashcardsSummaryNew, bg: "#3b82f6" },
-    [State.Learning]: { label: "Learning", bg: "#f97316" },
+    [State.Learning]: { label: s.flashcardsSummaryLearning, bg: "#f97316" },
     [State.Review]: { label: s.flashcardsSummaryReview, bg: "#22c55e" },
     [State.Relearning]: { label: s.flashcardsSummaryRelearning, bg: "#ef4444" },
   };
@@ -868,8 +1185,8 @@ function SummaryCard({ label, value, color }: { label: string; value: string; co
 
 // ─── Helpers ─────────────────────────────────────────────────
 
-function getModeName(mode: TestMode | WordTestMode, s: any): string {
-  const map: Record<TestMode | WordTestMode, string> = {
+function getModeName(mode: ReviewMode, s: any): string {
+  const map: Record<ReviewMode, string> = {
     nextAyah: s.flashcardsModeNextAyah,
     previousAyah: s.flashcardsModePreviousAyah,
     translation: s.flashcardsModeTranslation,
@@ -877,10 +1194,48 @@ function getModeName(mode: TestMode | WordTestMode, s: any): string {
     surahName: s.flashcardsModeSurahName,
     wordMeaningArabic: s.flashcardsModeWordMeaningArabic,
     wordMeaningTranslation: s.flashcardsModeWordMeaningTranslation,
+    smartRefs: s.smartDeckMutashabihatAnswerTitle,
+    qiraatReading: s.smartDeckQiraatAnswerTitle,
   };
   return map[mode] ?? mode;
 }
 
-function isWordTestMode(mode: TestMode | WordTestMode): mode is WordTestMode {
+function getModeColor(mode: ReviewMode): string {
+  if (isWordTestMode(mode)) return WORD_TEST_MODE_COLORS[mode];
+  if (isSmartTestMode(mode)) return SMART_TEST_MODE_COLORS[mode];
+  return TEST_MODE_COLORS[mode];
+}
+
+function isWordTestMode(mode: ReviewMode): mode is WordTestMode {
   return mode === "wordMeaningArabic" || mode === "wordMeaningTranslation";
+}
+
+function isSmartTestMode(mode: ReviewMode): mode is SmartTestMode {
+  return mode === "smartRefs" || mode === "qiraatReading";
+}
+
+function isSmartReviewCard(card: CardData): boolean {
+  return card.kind === "mutashabihat" || card.kind === "similarTail" || card.kind === "qiraat";
+}
+
+function getSmartDeckTitleForKind(kind: SmartCardKind, s: any): string {
+  if (kind === "mutashabihat") return s.smartDeckMutashabihatTitle;
+  if (kind === "similarTail") return s.smartDeckSimilarTailsTitle;
+  return s.smartDeckQiraatTitle;
+}
+
+function getSmartPrompt(card: CardData, s: any): string {
+  if (card.kind === "similarTail") return s.smartDeckSimilarTailPrompt;
+  if (card.kind === "qiraat") return s.smartDeckQiraatPrompt;
+  return s.smartDeckMutashabihatPrompt;
+}
+
+function formatAyahKeyArabic(key: string): string {
+  const [surah, ayah] = key.split(":").map((part) => parseInt(part, 10));
+  if (!Number.isFinite(surah) || !Number.isFinite(ayah)) return key;
+  return `${toArabicNumeral(surah)}:${toArabicNumeral(ayah)}`;
+}
+
+function toArabicNumeral(n: number): string {
+  return String(n).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[parseInt(d, 10)]);
 }

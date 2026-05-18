@@ -31,6 +31,7 @@ const nativeRequires: Record<string, () => any> = Platform.OS !== "web"
       "tajweed-rules-ar.json": () => require("../../assets/data/tajweed-rules-ar.json"),
       "tajweed-rules-en.json": () => require("../../assets/data/tajweed-rules-en.json"),
       "al-qira-at-al-mawsoo-ah-al-qur-aniyyah.json": () => require("../../assets/data/al-qira-at-al-mawsoo-ah-al-qur-aniyyah.json"),
+      "mutashabihat/nourquran_hafiz.json": () => require("../../assets/data/mutashabihat/nourquran_hafiz.json"),
     }
   : {};
 
@@ -224,7 +225,7 @@ type ProgressCallback = (progress: ImportProgress) => void;
 
 // Bump this whenever a new import step is added so the progress bar caps at
 // 100% and the step counter shows accurate "N / total" labels.
-const TOTAL_STEPS = 18;
+const TOTAL_STEPS = 19;
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, "").trim();
@@ -986,6 +987,74 @@ async function importQiraatEncyclopedia(
   console.log(`[Import] qiraat_encyclopedia done: ${rows.length} rows`);
 }
 
+async function importMutashabihat(
+  db: SQLiteDatabase,
+  onProgress: ProgressCallback
+): Promise<void> {
+  const data = await loadData("mutashabihat/nourquran_hafiz.json");
+  if (!data || typeof data !== "object" || data.schema_version !== "1.0") {
+    throw new Error("Unsupported Nour Quran mutashabihat schema_version");
+  }
+
+  const similarGroups = Array.isArray(data.similar_groups) ? data.similar_groups : [];
+  const tailGroups = Array.isArray(data.tail_groups) ? data.tail_groups : [];
+  onProgress({
+    step: "Mutashabihat",
+    current: 18,
+    total: TOTAL_STEPS,
+    detail: `${similarGroups.length} similar + ${tailGroups.length} tails`,
+  });
+
+  const groupRows: any[][] = [];
+  const refRows: any[][] = [];
+  let sortOrder = 0;
+
+  const appendGroups = (groups: any[], kind: "similar" | "tail") => {
+    for (const group of groups) {
+      const refs = Array.isArray(group.refs) ? group.refs : [];
+      const validRefs = refs.filter((ref: any) => Number.isInteger(ref.surah) && Number.isInteger(ref.ayah));
+      if (validRefs.length < 2) continue;
+
+      const id = typeof group.id === "string" ? group.id : null;
+      const cue = kind === "similar" ? group.phrase : group.tail;
+      if (!id || typeof cue !== "string" || cue.trim().length === 0) continue;
+
+      groupRows.push([id, kind, cue.trim(), String(group.source ?? data.source?.name ?? "nourquran"), sortOrder++]);
+      validRefs.forEach((ref: any, index: number) => {
+        refRows.push([
+          id,
+          index,
+          ref.surah,
+          ref.ayah,
+          typeof ref.surah_name_ar === "string" ? ref.surah_name_ar : null,
+          typeof ref.tail_5 === "string" ? ref.tail_5 : null,
+        ]);
+      });
+    }
+  };
+
+  appendGroups(similarGroups, "similar");
+  appendGroups(tailGroups, "tail");
+
+  await db.withTransactionAsync(async () => {
+    await db.runAsync("DELETE FROM mutashabihat_refs");
+    await db.runAsync("DELETE FROM mutashabihat_groups");
+  });
+
+  await batchInsert(
+    db,
+    "INSERT OR REPLACE INTO mutashabihat_groups (id, kind, cue, source, sort_order) VALUES (?, ?, ?, ?, ?)",
+    groupRows
+  );
+  await batchInsert(
+    db,
+    "INSERT OR REPLACE INTO mutashabihat_refs (group_id, sort_order, surah, ayah, surah_name_ar, tail_5) VALUES (?, ?, ?, ?, ?, ?)",
+    refRows
+  );
+
+  console.log(`[Import] mutashabihat done: ${groupRows.length} groups + ${refRows.length} refs`);
+}
+
 async function importReflectionJourneyLevels(
   db: SQLiteDatabase,
   onProgress: ProgressCallback
@@ -1006,7 +1075,7 @@ async function importReflectionJourneyLevels(
 
   onProgress({
     step: "Reflection Journey",
-    current: 18,
+    current: 19,
     total: TOTAL_STEPS,
     detail: `${parsed.levels.length} levels`,
   });
@@ -1134,6 +1203,9 @@ async function runNewTabImports(
   }
   if ((await safeCount("qiraat_encyclopedia")) === 0) {
     await safeImport("qiraat_encyclopedia", () => importQiraatEncyclopedia(db, onProgress));
+  }
+  if ((await safeCount("mutashabihat_groups")) === 0 || (await safeCount("mutashabihat_refs")) === 0) {
+    await safeImport("mutashabihat", () => importMutashabihat(db, onProgress));
   }
   await safeImport("reflection_journey_levels", () => importReflectionJourneyLevels(db, onProgress));
 }
@@ -1364,6 +1436,7 @@ export async function initializeDatabase(
     void loadData("tajweed-rules-ar.json");
     void loadData("tajweed-rules-en.json");
     void loadData("al-qira-at-al-mawsoo-ah-al-qur-aniyyah.json");
+    void loadData("mutashabihat/nourquran_hafiz.json");
     for (let i = 1; i <= 114; i++) void loadTafseerFile(i);
   }
 

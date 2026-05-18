@@ -194,6 +194,25 @@ export async function createSchema(db: SQLiteDatabase): Promise<void> {
       PRIMARY KEY (surah, ayah)
     );
 
+    -- NourQuran mutashabihat and similar ayah tails
+    CREATE TABLE IF NOT EXISTS mutashabihat_groups (
+      id TEXT PRIMARY KEY,
+      kind TEXT NOT NULL CHECK (kind IN ('similar', 'tail')),
+      cue TEXT NOT NULL,
+      source TEXT NOT NULL,
+      sort_order INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS mutashabihat_refs (
+      group_id TEXT NOT NULL,
+      sort_order INTEGER NOT NULL,
+      surah INTEGER NOT NULL,
+      ayah INTEGER NOT NULL,
+      surah_name_ar TEXT,
+      tail_5 TEXT,
+      PRIMARY KEY (group_id, sort_order)
+    );
+
     -- Reflection Journey curated levels (offline-first bundled content)
     CREATE TABLE IF NOT EXISTS reflection_journey_levels (
       id TEXT PRIMARY KEY,
@@ -438,6 +457,9 @@ export async function createSchema(db: SQLiteDatabase): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_word_roots_lemma ON word_roots(lemma);
     CREATE INDEX IF NOT EXISTS idx_word_meanings_ar_sa ON word_meanings_ar(surah, ayah);
     CREATE INDEX IF NOT EXISTS idx_word_irab_daas_sa ON word_irab_daas(surah, ayah);
+    CREATE INDEX IF NOT EXISTS idx_mutashabihat_groups_kind ON mutashabihat_groups(kind);
+    CREATE INDEX IF NOT EXISTS idx_mutashabihat_refs_group ON mutashabihat_refs(group_id);
+    CREATE INDEX IF NOT EXISTS idx_mutashabihat_refs_surah_ayah ON mutashabihat_refs(surah, ayah);
     CREATE INDEX IF NOT EXISTS idx_qf_audio_cache_sa ON qf_ayah_audio_cache(surah, ayah);
     CREATE INDEX IF NOT EXISTS idx_qf_hadith_cache_sa ON qf_ayah_hadith_cache(surah, ayah, language);
     CREATE INDEX IF NOT EXISTS idx_private_notes_ayah ON private_notes(surah, ayah_start, ayah_end);

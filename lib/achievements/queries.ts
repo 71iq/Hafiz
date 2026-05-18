@@ -205,7 +205,12 @@ async function backfillReviewAchievements(db: SQLiteDatabase, notify: boolean): 
   }
 
   const firstAyah = await db.getFirstAsync<{ card_id: string; reviewed_at: string }>(
-    "SELECT card_id, reviewed_at FROM study_log WHERE card_id NOT LIKE 'word:%' ORDER BY reviewed_at ASC LIMIT 1"
+    `SELECT card_id, reviewed_at FROM study_log
+      WHERE card_id NOT LIKE 'word:%'
+        AND card_id NOT LIKE 'mutashabihat:%'
+        AND card_id NOT LIKE 'similar-tail:%'
+        AND card_id NOT LIKE 'qiraat:%'
+      ORDER BY reviewed_at ASC LIMIT 1`
   );
   if (firstAyah) {
     await upsertProgress(db, "first_ayah_reviewed", 1, 1, { cardId: firstAyah.card_id });

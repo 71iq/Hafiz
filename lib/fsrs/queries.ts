@@ -4,6 +4,13 @@ import type { DeckScope, StudyCardRow } from "./types";
 import { enqueueSync } from "@/lib/database/sync-queue";
 import { emitReviewActivity } from "./review-events";
 import { recordAchievementEvent } from "@/lib/achievements/queries";
+import {
+  getAllMatchingSmartCardIdSet,
+  getDueCardsForReview,
+  getSmartDeckStats,
+  isSmartDeckId,
+  SMART_DECK_IDS,
+} from "./smart-decks";
 
 export type ReviewActivityDay = { date: string; count: number };
 
@@ -22,6 +29,9 @@ export type WirdStatus = {
   lastReviewDate: string | null;
   state: "empty" | "maintained_today" | "open_today" | "fresh_start";
 };
+
+const SMART_CARD_SQL = `deck_id IN ('${SMART_DECK_IDS.mutashabihat}', '${SMART_DECK_IDS.similarTails}', '${SMART_DECK_IDS.qiraat}')`;
+const NON_SMART_CARD_SQL = `NOT ${SMART_CARD_SQL}`;
 
 function formatLocalDateKey(date: Date): string {
   const year = date.getFullYear();
@@ -494,22 +504,14 @@ export async function getDueCards(
   deckId?: string,
   limit?: number
 ): Promise<StudyCardRow[]> {
-  const now = new Date().toISOString();
-  const limitClause = limit ? ` LIMIT ${limit}` : "";
-  if (deckId) {
-    return db.getAllAsync<StudyCardRow>(
-      `SELECT * FROM study_cards WHERE deck_id = ? AND due <= ? ORDER BY due${limitClause}`,
-      [deckId, now]
-    );
-  }
-  return db.getAllAsync<StudyCardRow>(
-    `SELECT * FROM study_cards WHERE due <= ? ORDER BY due${limitClause}`,
-    [now]
-  );
+  return getDueCardsForReview(db, deckId, limit);
 }
 
 export async function getDueCount(db: SQLiteDatabase, deckId?: string): Promise<number> {
   const now = new Date().toISOString();
+  if (isSmartDeckId(deckId)) {
+    return (await getSmartDeckStats(db, deckId)).due;
+  }
   if (deckId) {
     const row = await db.getFirstAsync<{ count: number }>(
       "SELECT COUNT(*) as count FROM study_cards WHERE deck_id = ? AND due <= ?",
@@ -517,14 +519,20 @@ export async function getDueCount(db: SQLiteDatabase, deckId?: string): Promise<
     );
     return row?.count ?? 0;
   }
-  const row = await db.getFirstAsync<{ count: number }>(
-    "SELECT COUNT(*) as count FROM study_cards WHERE due <= ?",
-    [now]
-  );
-  return row?.count ?? 0;
+  const [nonSmartRow, smartRows] = await Promise.all([
+    db.getFirstAsync<{ count: number }>(
+      `SELECT COUNT(*) as count FROM study_cards WHERE due <= ? AND ${NON_SMART_CARD_SQL}`,
+      [now]
+    ),
+    getFilteredSmartMaterializedRows(db),
+  ]);
+  return (nonSmartRow?.count ?? 0) + smartRows.filter((row) => row.due <= now).length;
 }
 
 export async function getTotalCardCount(db: SQLiteDatabase, deckId?: string): Promise<number> {
+  if (isSmartDeckId(deckId)) {
+    return (await getSmartDeckStats(db, deckId)).total;
+  }
   if (deckId) {
     const row = await db.getFirstAsync<{ count: number }>(
       "SELECT COUNT(*) as count FROM study_cards WHERE deck_id = ?",
@@ -532,16 +540,28 @@ export async function getTotalCardCount(db: SQLiteDatabase, deckId?: string): Pr
     );
     return row?.count ?? 0;
   }
-  const row = await db.getFirstAsync<{ count: number }>(
-    "SELECT COUNT(*) as count FROM study_cards",
+  const [nonSmartRow, smartRows] = await Promise.all([
+    db.getFirstAsync<{ count: number }>(
+      `SELECT COUNT(*) as count FROM study_cards WHERE ${NON_SMART_CARD_SQL}`,
+      []
+    ),
+    getFilteredSmartMaterializedRows(db),
+  ]);
+  return (nonSmartRow?.count ?? 0) + smartRows.length;
+}
+
+async function getFilteredSmartMaterializedRows(db: SQLiteDatabase): Promise<StudyCardRow[]> {
+  const rows = await db.getAllAsync<StudyCardRow>(
+    `SELECT * FROM study_cards WHERE ${SMART_CARD_SQL}`,
     []
   );
-  return row?.count ?? 0;
+  const matchingSmartIds = await getAllMatchingSmartCardIdSet(db);
+  return rows.filter((row) => matchingSmartIds.has(row.id));
 }
 
 export async function getTotalAyahCardCount(db: SQLiteDatabase): Promise<number> {
   const row = await db.getFirstAsync<{ count: number }>(
-    "SELECT COUNT(*) as count FROM study_cards WHERE id NOT LIKE 'word:%'",
+    `SELECT COUNT(*) as count FROM study_cards WHERE id NOT LIKE 'word:%' AND ${NON_SMART_CARD_SQL}`,
     []
   );
   return row?.count ?? 0;
@@ -549,13 +569,16 @@ export async function getTotalAyahCardCount(db: SQLiteDatabase): Promise<number>
 
 export async function getMemorizedAyahCardCount(db: SQLiteDatabase): Promise<number> {
   const row = await db.getFirstAsync<{ count: number }>(
-    "SELECT COUNT(*) as count FROM study_cards WHERE state = 2 AND id NOT LIKE 'word:%'",
+    `SELECT COUNT(*) as count FROM study_cards WHERE state = 2 AND id NOT LIKE 'word:%' AND ${NON_SMART_CARD_SQL}`,
     []
   );
   return row?.count ?? 0;
 }
 
 export async function getNewCount(db: SQLiteDatabase, deckId?: string): Promise<number> {
+  if (isSmartDeckId(deckId)) {
+    return (await getSmartDeckStats(db, deckId)).newCount;
+  }
   if (deckId) {
     const row = await db.getFirstAsync<{ count: number }>(
       "SELECT COUNT(*) as count FROM study_cards WHERE deck_id = ? AND state = 0",
@@ -563,11 +586,14 @@ export async function getNewCount(db: SQLiteDatabase, deckId?: string): Promise<
     );
     return row?.count ?? 0;
   }
-  const row = await db.getFirstAsync<{ count: number }>(
-    "SELECT COUNT(*) as count FROM study_cards WHERE state = 0",
-    []
-  );
-  return row?.count ?? 0;
+  const [nonSmartRow, smartRows] = await Promise.all([
+    db.getFirstAsync<{ count: number }>(
+      `SELECT COUNT(*) as count FROM study_cards WHERE state = 0 AND ${NON_SMART_CARD_SQL}`,
+      []
+    ),
+    getFilteredSmartMaterializedRows(db),
+  ]);
+  return (nonSmartRow?.count ?? 0) + smartRows.filter((row) => row.state === 0).length;
 }
 
 export async function getDecks(db: SQLiteDatabase): Promise<{ id: string; name?: string; scope: DeckScope; createdAt: string }[]> {

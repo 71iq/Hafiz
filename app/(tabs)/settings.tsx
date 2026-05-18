@@ -828,6 +828,7 @@ export default function SettingsScreen() {
               s.creditWordMeanings,
               s.creditIrab,
               s.creditQiraat,
+              s.creditNourQuran,
               s.creditTajweedRules,
               s.creditTajweedDesc,
             ].map((line, i) => (
