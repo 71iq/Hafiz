@@ -12,6 +12,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import { X } from "lucide-react-native";
+import { useColorScheme } from "nativewind";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { cn } from "@/lib/utils";
@@ -57,6 +58,9 @@ type OverlayFooterProps = {
   isRTL?: boolean;
   className?: string;
 };
+
+const DEFAULT_OVERLAY_SURFACE_LIGHT = "#FFF8F1";
+const DEFAULT_OVERLAY_SURFACE_DARK = "#0A0A0A";
 
 let bodyScrollLockCount = 0;
 let restoreBodyOverflow = "";
@@ -111,10 +115,13 @@ export function ResponsiveOverlay({
   children,
 }: ResponsiveOverlayProps) {
   const { width, height } = useWindowDimensions();
+  const { colorScheme } = useColorScheme();
   const animation = useRef(new Animated.Value(0)).current;
   const overlayId = useRef(`overlay-${Math.random().toString(36).slice(2)}`).current;
   const isPhone = width < SIDEBAR_BREAKPOINT;
   const activePresentation = isPhone ? phonePresentation : desktopPresentation === "dialog" ? "dialog" : "panel";
+  const resolvedSurfaceColor =
+    surfaceColor ?? (colorScheme === "dark" ? DEFAULT_OVERLAY_SURFACE_DARK : DEFAULT_OVERLAY_SURFACE_LIGHT);
 
   useEffect(() => {
     if (!open) return;
@@ -164,7 +171,7 @@ export function ResponsiveOverlay({
       width: contentWidth,
       maxWidth: activePresentation === "sheet" ? "100%" : contentWidth,
       maxHeight: computedMaxHeight,
-      ...(surfaceColor ? { backgroundColor: surfaceColor } : null),
+      backgroundColor: resolvedSurfaceColor,
       borderTopLeftRadius: activePresentation === "sheet" ? 28 : 28,
       borderTopRightRadius: activePresentation === "sheet" ? 28 : 28,
       borderBottomLeftRadius: activePresentation === "sheet" ? 0 : 28,
@@ -185,7 +192,7 @@ export function ResponsiveOverlay({
             ],
       opacity: animation,
     }),
-    [activePresentation, animation, computedMaxHeight, contentWidth, surfaceColor]
+    [activePresentation, animation, computedMaxHeight, contentWidth, resolvedSurfaceColor]
   );
 
   const overlayAlignment =
