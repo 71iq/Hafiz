@@ -4,6 +4,8 @@ export type Reflection = {
   surah: number;
   ayah_start: number;
   ayah_end: number;
+  juz_start: number;
+  juz_end: number;
   content: string;
   likes_count: number;
   comments_count: number;
@@ -31,3 +33,10 @@ export type ReflectionComment = {
     display_name: string | null;
   };
 };
+
+export type ReflectionFeedSort = "newest" | "oldest" | "popular" | "less";
+
+export type ReflectionFeedFilter =
+  | { type: "all" }
+  | { type: "surah"; surah: number }
+  | { type: "juz"; juz: number };

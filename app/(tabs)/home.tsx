@@ -3,7 +3,7 @@ import { View, Text, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, type Href } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
-import { Plus, Trash2, Play, Layers, CalendarCheck2, Search, LayoutGrid, Languages, UserPlus, BookMarked, X as XIcon } from "lucide-react-native";
+import { Plus, Trash2, Play, Layers, CalendarCheck2, Search, LayoutGrid, Languages, UserPlus, BookMarked, MessageSquare, X as XIcon } from "lucide-react-native";
 import { useAuthStore } from "@/lib/auth/store";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useDatabase } from "@/lib/database/provider";
@@ -445,6 +445,46 @@ export default function HomeScreen() {
             </Card>
           </Pressable>
         )}
+
+        <Pressable
+          onPress={() => router.push("/reflection-feed" as Href)}
+          style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+          className="mb-6"
+        >
+          <Card elevation="low" className="p-5 rounded-4xl">
+            <View className={`items-start justify-between ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
+              <View className={`flex-1 ${isRTL ? "items-end" : "items-start"}`}>
+                <Text
+                  className="text-warm-400 dark:text-neutral-500 uppercase"
+                  style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, letterSpacing: 1.6 }}
+                >
+                  {s.reflections}
+                </Text>
+                <Text
+                  className="text-charcoal dark:text-neutral-100 mt-1"
+                  style={{ fontFamily: "NotoSerif_700Bold", fontSize: 22, textAlign: isRTL ? "right" : "left" }}
+                >
+                  {s.reflectionFeedTitle}
+                </Text>
+                <Text
+                  className="text-warm-500 dark:text-neutral-400 mt-1"
+                  style={{
+                    fontFamily: "Manrope_400Regular",
+                    fontSize: 13,
+                    lineHeight: 21,
+                    textAlign: isRTL ? "right" : "left",
+                    writingDirection: isRTL ? "rtl" : "ltr",
+                  }}
+                >
+                  {s.reflectionFeedSubtitle}
+                </Text>
+              </View>
+              <View className="h-12 w-12 rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 items-center justify-center">
+                <MessageSquare size={18} color={isDark ? "#2dd4bf" : "#0d9488"} />
+              </View>
+            </View>
+          </Card>
+        </Pressable>
 
         {/* Start Review CTA */}
         {totalDue > 0 && (

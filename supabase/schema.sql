@@ -174,12 +174,19 @@ CREATE TABLE IF NOT EXISTS reflections (
   surah INTEGER NOT NULL,
   ayah_start INTEGER NOT NULL,
   ayah_end INTEGER NOT NULL,
+  juz_start INTEGER NOT NULL,
+  juz_end INTEGER NOT NULL,
   content TEXT NOT NULL CHECK (length(content) BETWEEN 10 AND 5000),
   likes_count INTEGER DEFAULT 0,
   comments_count INTEGER DEFAULT 0,
   status TEXT DEFAULT 'active' CHECK (status IN ('active', 'hidden', 'deleted')),
   created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  CONSTRAINT reflections_juz_range_check CHECK (
+    juz_start BETWEEN 1 AND 30
+    AND juz_end BETWEEN 1 AND 30
+    AND juz_start <= juz_end
+  )
 );
 
 -- ─── Reflection Likes ──────────────────────────────────────
@@ -421,6 +428,10 @@ CREATE INDEX IF NOT EXISTS idx_bookmarks_qf_id ON bookmarks(user_id, qf_bookmark
 CREATE INDEX IF NOT EXISTS idx_highlights_user ON highlights(user_id);
 CREATE INDEX IF NOT EXISTS idx_reflections_ayah ON reflections(surah, ayah_start, ayah_end);
 CREATE INDEX IF NOT EXISTS idx_reflections_user ON reflections(user_id);
+CREATE INDEX IF NOT EXISTS idx_reflections_feed_created ON reflections(status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_reflections_feed_likes ON reflections(status, likes_count DESC, comments_count DESC, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_reflections_surah_feed ON reflections(status, surah, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_reflections_juz_feed ON reflections(status, juz_start, juz_end, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_reflection_likes_reflection ON reflection_likes(reflection_id);
 CREATE INDEX IF NOT EXISTS idx_reflection_comments_reflection ON reflection_comments(reflection_id);
 CREATE INDEX IF NOT EXISTS idx_reports_reflection ON reports(reflection_id);

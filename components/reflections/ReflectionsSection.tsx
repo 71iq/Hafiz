@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { View, Text, Pressable } from "react-native";
 import { ChevronDown, ChevronUp, PenLine, MessageSquare } from "lucide-react-native";
+import { router } from "expo-router";
 import { ReflectionsSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -161,6 +162,7 @@ export function ReflectionsSection({ surah, ayah, initiallyExpanded = false, sho
                 reflection={r}
                 onLikeToggled={handleLikeToggled}
                 onCommentsPress={setCommentsReflectionId}
+                onAuthRequired={() => router.push("/auth/login")}
               />
             ))
           )}
@@ -181,7 +183,19 @@ export function ReflectionsSection({ surah, ayah, initiallyExpanded = false, sho
             </Pressable>
           )}
 
-          {/* Write reflection button */}
+          <Pressable
+            onPress={() => router.push("/(tabs)/reflection-feed")}
+            className="items-center py-2.5"
+            style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+          >
+            <Text
+              className="text-warm-500 dark:text-neutral-400"
+              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
+            >
+              {s.reflectionFeedSeeAll}
+            </Text>
+          </Pressable>
+
           <Pressable
             onPress={() => setWriteOpen(true)}
             className="flex-row items-center justify-center gap-2 rounded-full py-3.5 mt-1"

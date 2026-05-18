@@ -1,7 +1,27 @@
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
-import type { Reflection, ReflectionComment } from "./types";
+import type { Reflection, ReflectionComment, ReflectionFeedFilter, ReflectionFeedSort } from "./types";
 
 const PAGE_SIZE = 5;
+const FEED_PAGE_SIZE = 10;
+
+async function attachUserLikes(reflections: Reflection[], userId?: string): Promise<Reflection[]> {
+  if (!userId || reflections.length === 0) return reflections;
+
+  const { data: likes } = await supabase
+    .from("reflection_likes")
+    .select("reflection_id")
+    .eq("user_id", userId)
+    .in(
+      "reflection_id",
+      reflections.map((r) => r.id)
+    );
+
+  const likedSet = new Set((likes ?? []).map((l) => l.reflection_id));
+  return reflections.map((reflection) => ({
+    ...reflection,
+    user_has_liked: likedSet.has(reflection.id),
+  }));
+}
 
 /** Fetch reflections for a specific ayah (or range that includes it) */
 export async function fetchReflections(
@@ -29,24 +49,72 @@ export async function fetchReflections(
 
   const reflections = (data ?? []) as Reflection[];
   const hasMore = reflections.length > PAGE_SIZE;
-  const trimmed = hasMore ? reflections.slice(0, PAGE_SIZE) : reflections;
+  const trimmed = await attachUserLikes(hasMore ? reflections.slice(0, PAGE_SIZE) : reflections, userId);
+  return { data: trimmed, hasMore };
+}
 
-  // Check if current user has liked each reflection
-  if (userId && trimmed.length > 0) {
-    const { data: likes } = await supabase
-      .from("reflection_likes")
-      .select("reflection_id")
-      .eq("user_id", userId)
-      .in(
-        "reflection_id",
-        trimmed.map((r) => r.id)
-      );
+/** Fetch the global reflection feed with optional Quran filters */
+export async function fetchReflectionFeed({
+  filter,
+  sort,
+  page,
+  userId,
+}: {
+  filter: ReflectionFeedFilter;
+  sort: ReflectionFeedSort;
+  page: number;
+  userId?: string;
+}): Promise<{ data: Reflection[]; hasMore: boolean }> {
+  if (!isSupabaseConfigured()) return { data: [], hasMore: false };
 
-    const likedSet = new Set((likes ?? []).map((l) => l.reflection_id));
-    for (const r of trimmed) {
-      r.user_has_liked = likedSet.has(r.id);
-    }
+  const from = page * FEED_PAGE_SIZE;
+  const to = from + FEED_PAGE_SIZE;
+
+  let query = supabase
+    .from("reflections")
+    .select("*, profiles:profiles!reflections_user_id_fkey(username, display_name)")
+    .eq("status", "active");
+
+  if (filter.type === "surah") {
+    query = query.eq("surah", filter.surah);
+  } else if (filter.type === "juz") {
+    query = query.lte("juz_start", filter.juz).gte("juz_end", filter.juz);
   }
+
+  switch (sort) {
+    case "oldest":
+      query = query
+        .order("created_at", { ascending: true })
+        .order("likes_count", { ascending: false })
+        .order("comments_count", { ascending: false });
+      break;
+    case "popular":
+      query = query
+        .order("likes_count", { ascending: false })
+        .order("comments_count", { ascending: false })
+        .order("created_at", { ascending: false });
+      break;
+    case "less":
+      query = query
+        .order("likes_count", { ascending: true })
+        .order("comments_count", { ascending: true })
+        .order("created_at", { ascending: false });
+      break;
+    case "newest":
+    default:
+      query = query
+        .order("created_at", { ascending: false })
+        .order("likes_count", { ascending: false })
+        .order("comments_count", { ascending: false });
+      break;
+  }
+
+  const { data, error } = await query.range(from, to);
+  if (error) throw error;
+
+  const reflections = (data ?? []) as Reflection[];
+  const hasMore = reflections.length > FEED_PAGE_SIZE;
+  const trimmed = await attachUserLikes(hasMore ? reflections.slice(0, FEED_PAGE_SIZE) : reflections, userId);
 
   return { data: trimmed, hasMore };
 }
@@ -76,6 +144,8 @@ export async function createReflection(
   surah: number,
   ayahStart: number,
   ayahEnd: number,
+  juzStart: number,
+  juzEnd: number,
   content: string
 ): Promise<Reflection> {
   const { data, error } = await supabase
@@ -85,6 +155,8 @@ export async function createReflection(
       surah,
       ayah_start: ayahStart,
       ayah_end: ayahEnd,
+      juz_start: juzStart,
+      juz_end: juzEnd,
       content,
     })
     .select("*, profiles:profiles!reflections_user_id_fkey(username, display_name)")

@@ -71,6 +71,10 @@ function TabsWithStrings() {
           name="reflection-journey"
           options={{ href: null }}
         />
+        <Tabs.Screen
+          name="reflection-feed"
+          options={{ href: null }}
+        />
         {/* Visible tabs: Home, Mushaf, Leaderboard, Progress, Settings */}
         <Tabs.Screen
           name="home"

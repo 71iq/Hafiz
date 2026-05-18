@@ -11,6 +11,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { interpolate } from "@/lib/i18n/useStrings";
 import { router } from "expo-router";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
+import { findJuzForAyah, loadMushafIndex } from "@/lib/mushaf/position";
 
 type Props = {
   open: boolean;
@@ -53,7 +54,18 @@ export function WriteReflectionSheet({
     setSubmitting(true);
     setError(null);
     try {
-      const reflection = await createReflection(user.id, surah, ayahStart, ayahEnd, content.trim());
+      const mushafIndex = await loadMushafIndex(db);
+      const juzStart = findJuzForAyah(mushafIndex, surah, ayahStart);
+      const juzEnd = findJuzForAyah(mushafIndex, surah, ayahEnd);
+      const reflection = await createReflection(
+        user.id,
+        surah,
+        ayahStart,
+        ayahEnd,
+        Math.min(juzStart, juzEnd),
+        Math.max(juzStart, juzEnd),
+        content.trim()
+      );
       recordAchievementEvent(db, {
         type: "public_reflection_created",
         reflectionId: reflection.id,
@@ -67,11 +79,12 @@ export function WriteReflectionSheet({
         queryClient.invalidateQueries({ queryKey: ["reflections", surah, a] });
         queryClient.invalidateQueries({ queryKey: ["reflectionCount", surah, a] });
       }
+      queryClient.invalidateQueries({ queryKey: ["reflectionFeed"] });
       setContent("");
       onClose();
       onSuccess?.();
     } catch (e: any) {
-      const message = e.code === "PGRST205" || e.message?.includes("schema cache")
+      const message = e.code === "PGRST205" || e.code === "PGRST204" || e.message?.includes("schema cache")
         ? s.reflectionSetupRequired
         : e.message || s.reflectionPostFailed;
       setError(message);
