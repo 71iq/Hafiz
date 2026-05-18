@@ -9,7 +9,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { FlashList, FlashListRef } from "@shopify/flash-list";
 import { useChrome } from "@/lib/ui/chrome";
-import { BookOpen, AlignJustify, Eye, EyeOff, Search, BookMarked } from "lucide-react-native";
+import { BookOpen, AlignJustify, Eye, EyeOff, Search, BookMarked, ScanLine } from "lucide-react-native";
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -22,6 +22,7 @@ import { PageMushaf } from "@/components/mushaf/PageMushaf";
 import { GoToNavigator } from "@/components/mushaf/GoToNavigator";
 import { MushafIndicator } from "@/components/mushaf/MushafIndicator";
 import { MushafSlider } from "@/components/mushaf/MushafSlider";
+import { FocusModeControls } from "@/components/mushaf/FocusModeControls";
 import { WordDetailSheet } from "@/components/mushaf/WordDetailSheet";
 import { loadMushafIndex, findJuzForAyah, findHizbForAyah, topmostAyahForPage, type MushafIndex } from "@/lib/mushaf/position";
 import { FloatingWordTooltip } from "@/components/mushaf/WordTooltip";
@@ -166,27 +167,73 @@ export default function MushafScreen() {
 
 function MushafInner() {
   const db = useDatabase();
-  const { fontSize, lineHeight, viewMode, setViewMode, pageScroll, isDark, isRTL, uiLanguage } = useSettings();
+  const {
+    fontSize,
+    lineHeight,
+    viewMode,
+    setViewMode,
+    pageScroll,
+    focusScrollSpeed,
+    setFocusScrollSpeed,
+    isDark,
+    isRTL,
+    uiLanguage,
+  } = useSettings();
   const s = useStrings();
   const { width: windowWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const isPhone = windowWidth < SIDEBAR_BREAKPOINT;
   const isTablet = windowWidth >= SIDEBAR_BREAKPOINT && windowWidth < VIEWPORT_BREAKPOINTS.desktop;
   const hasPersistentSidebar = windowWidth >= PERSISTENT_SIDEBAR_BREAKPOINT;
-  const persistentSidebarInset = hasPersistentSidebar ? PERSISTENT_SIDEBAR_WIDTH + DESKTOP_CONTENT_GUTTER : 0;
   // Compact layout under ~480px tightens phone chrome spacing.
   const isNarrow = windowWidth < 480;
   const { selection, toastMessage, dismissToast } = useSelection();
-  const { navigateToAyah } = useWordInteraction();
-  const { visible: chromeVisible, setVisible: setChromeVisible } = useChrome();
+  const { navigateToAyah, detailWord } = useWordInteraction();
+  const { visible: chromeVisible, setVisible: setChromeVisible, setImmersive } = useChrome();
   const lastScrollYRef = useRef(0);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const touchMovedRef = useRef(false);
   const tapRevealGuardUntilRef = useRef(0);
+  const [focusModeActive, setFocusModeActive] = useState(false);
+  const [focusModePlaying, setFocusModePlaying] = useState(false);
+  const [focusControlsVisible, setFocusControlsVisible] = useState(false);
+  const [focusToastMessage, setFocusToastMessage] = useState<string | null>(null);
+  const focusControlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const persistentSidebarInset = hasPersistentSidebar && !focusModeActive ? PERSISTENT_SIDEBAR_WIDTH + DESKTOP_CONTENT_GUTTER : 0;
+
+  const clearFocusControlsTimer = useCallback(() => {
+    if (focusControlsTimerRef.current) {
+      clearTimeout(focusControlsTimerRef.current);
+      focusControlsTimerRef.current = null;
+    }
+  }, []);
+
+  const revealFocusControls = useCallback(() => {
+    if (!focusModeActive) return;
+    clearFocusControlsTimer();
+    setFocusControlsVisible(true);
+    if (focusModePlaying) {
+      focusControlsTimerRef.current = setTimeout(() => {
+        setFocusControlsVisible(false);
+        focusControlsTimerRef.current = null;
+      }, 2500);
+    }
+  }, [clearFocusControlsTimer, focusModeActive, focusModePlaying]);
+
+  const pauseFocusAutoScroll = useCallback(() => {
+    if (!focusModeActive) return;
+    clearFocusControlsTimer();
+    setFocusModePlaying(false);
+    setFocusControlsVisible(true);
+  }, [clearFocusControlsTimer, focusModeActive]);
 
   const handleScrollChrome = useCallback((e: any) => {
     const y = e?.nativeEvent?.contentOffset?.y;
     if (typeof y !== "number") return;
+    if (focusModeActive) {
+      lastScrollYRef.current = y;
+      return;
+    }
     const dy = y - lastScrollYRef.current;
     const now = Date.now();
     if (now <= tapRevealGuardUntilRef.current) {
@@ -199,18 +246,22 @@ function MushafInner() {
       setChromeVisible(false);
     }
     lastScrollYRef.current = y;
-  }, [setChromeVisible]);
+  }, [focusModeActive, setChromeVisible]);
 
   const toggleChromeFromReaderTap = useCallback(() => {
+    if (focusModeActive) {
+      pauseFocusAutoScroll();
+      return;
+    }
     if (!isPhone && !isTablet) return;
     tapRevealGuardUntilRef.current = Date.now() + 700;
     setChromeVisible((visible) => !visible);
-  }, [isPhone, isTablet, setChromeVisible]);
+  }, [focusModeActive, isPhone, isTablet, pauseFocusAutoScroll, setChromeVisible]);
 
   const readerTapProps = Platform.OS === "web"
     ? ({
         onPointerDown: (e: any) => {
-          if (!isPhone && !isTablet) return;
+          if (!focusModeActive && !isPhone && !isTablet) return;
           touchStartRef.current = {
             x: e?.nativeEvent?.pageX ?? e?.nativeEvent?.clientX ?? 0,
             y: e?.nativeEvent?.pageY ?? e?.nativeEvent?.clientY ?? 0,
@@ -218,7 +269,7 @@ function MushafInner() {
           touchMovedRef.current = false;
         },
         onPointerMove: (e: any) => {
-          if (!isPhone && !isTablet) return;
+          if (!focusModeActive && !isPhone && !isTablet) return;
           const start = touchStartRef.current;
           if (!start) return;
           const x = e?.nativeEvent?.pageX ?? e?.nativeEvent?.clientX;
@@ -232,7 +283,7 @@ function MushafInner() {
           }
         },
         onPointerUp: () => {
-          if (!isPhone && !isTablet) return;
+          if (!focusModeActive && !isPhone && !isTablet) return;
           if (!touchMovedRef.current) toggleChromeFromReaderTap();
           touchStartRef.current = null;
         },
@@ -428,6 +479,7 @@ function MushafInner() {
 
   const navigateToTarget = useCallback(
     (target: MushafTarget, animated = true) => {
+      pauseFocusAutoScroll();
       void scrollToTarget(target, animated)
         .catch((e) => {
           console.warn("[Mushaf] target navigation failed:", e);
@@ -436,7 +488,7 @@ function MushafInner() {
           highlightTarget(target);
         });
     },
-    [highlightTarget, scrollToTarget]
+    [highlightTarget, pauseFocusAutoScroll, scrollToTarget]
   );
 
   // Consume pending deep link on tab focus (supports both hafiz:// links and search navigation)
@@ -523,12 +575,28 @@ function MushafInner() {
     [navigateToAyah]
   );
 
+  const handleOpenBookmarks = useCallback(() => {
+    pauseFocusAutoScroll();
+    setShowBookmarks(true);
+  }, [pauseFocusAutoScroll]);
+
+  const handleOpenSearch = useCallback(() => {
+    pauseFocusAutoScroll();
+    setShowSearch(true);
+  }, [pauseFocusAutoScroll]);
+
+  const handleOpenNavigator = useCallback(() => {
+    pauseFocusAutoScroll();
+    setShowNavigator(true);
+  }, [pauseFocusAutoScroll]);
+
   const isPageMode = viewMode === "page";
   const viewModeLabel = isPageMode ? s.mushafViewPage : s.mushafViewVerse;
   const toggleViewMode = useCallback(() => {
     setViewMode(isPageMode ? "verse" : "page");
   }, [isPageMode, setViewMode]);
-  const showBottomSlider = isPageMode;
+  const canUseFocusMode = isPageMode && pageScroll === "vertical";
+  const showBottomSlider = isPageMode && !focusModeActive;
   const pageFontSizeLocked = isPageMode && pageScroll === "horizontal";
   const mobileBottomNavHeight = 54;
   const mobileBottomNavGap = 6;
@@ -540,7 +608,7 @@ function MushafInner() {
     : isTablet
       ? Math.max(insets.bottom, 16)
       : 0;
-  const pageScrollBottomInset = showBottomSlider ? 8 : undefined;
+  const pageScrollBottomInset = focusModeActive ? Math.max(insets.bottom, 12) + 96 : showBottomSlider ? 8 : undefined;
   const floatingRailSurface = {
     backgroundColor: isDark ? "rgba(28,25,23,0.95)" : "rgba(255,248,241,0.95)",
     borderWidth: 1,
@@ -560,6 +628,99 @@ function MushafInner() {
         zIndex: 80,
       } as const)
     : null;
+
+  const enterFocusMode = useCallback(() => {
+    if (!canUseFocusMode) return;
+    clearFocusControlsTimer();
+    setFocusToastMessage(null);
+    setFocusModeActive(true);
+    setFocusModePlaying(true);
+    setFocusControlsVisible(true);
+    setImmersive(true);
+    setChromeVisible(false);
+  }, [canUseFocusMode, clearFocusControlsTimer, setChromeVisible, setImmersive]);
+
+  const exitFocusMode = useCallback(() => {
+    clearFocusControlsTimer();
+    setFocusModeActive(false);
+    setFocusModePlaying(false);
+    setFocusControlsVisible(false);
+    setFocusToastMessage(null);
+    setImmersive(false);
+    setChromeVisible(true);
+  }, [clearFocusControlsTimer, setChromeVisible, setImmersive]);
+
+  const handleFocusSpeedChange = useCallback(
+    (speed: number) => {
+      setFocusScrollSpeed(speed);
+      revealFocusControls();
+    },
+    [revealFocusControls, setFocusScrollSpeed]
+  );
+
+  const handleFocusPlayPause = useCallback(() => {
+    setFocusModePlaying((playing) => !playing);
+    setFocusControlsVisible(true);
+  }, []);
+
+  const handleFocusAutoScrollEnd = useCallback(() => {
+    clearFocusControlsTimer();
+    setFocusModePlaying(false);
+    setFocusControlsVisible(true);
+    setFocusToastMessage(s.focusEndReached);
+  }, [clearFocusControlsTimer, s.focusEndReached]);
+
+  useEffect(() => {
+    clearFocusControlsTimer();
+    if (!focusModeActive) {
+      setFocusControlsVisible(false);
+      return;
+    }
+    setFocusControlsVisible(true);
+    if (focusModePlaying) {
+      focusControlsTimerRef.current = setTimeout(() => {
+        setFocusControlsVisible(false);
+        focusControlsTimerRef.current = null;
+      }, 2500);
+    }
+    return clearFocusControlsTimer;
+  }, [clearFocusControlsTimer, focusModeActive, focusModePlaying]);
+
+  useEffect(() => {
+    setImmersive(focusModeActive);
+    if (focusModeActive) {
+      setChromeVisible(false);
+    }
+  }, [focusModeActive, setChromeVisible, setImmersive]);
+
+  useEffect(() => {
+    if (focusModeActive && !canUseFocusMode) {
+      exitFocusMode();
+    }
+  }, [canUseFocusMode, exitFocusMode, focusModeActive]);
+
+  useEffect(() => {
+    if (!focusModeActive) return;
+    if (showNavigator || showBookmarks || showSearch || selection || detailWord) {
+      pauseFocusAutoScroll();
+    }
+  }, [
+    detailWord,
+    focusModeActive,
+    pauseFocusAutoScroll,
+    selection,
+    showBookmarks,
+    showNavigator,
+    showSearch,
+  ]);
+
+  useEffect(() => {
+    return () => {
+      clearFocusControlsTimer();
+      setImmersive(false);
+      setChromeVisible(true);
+    };
+  }, [clearFocusControlsTimer, setChromeVisible, setImmersive]);
 
   useEffect(() => {
     currentPageRef.current = currentPage;
@@ -685,6 +846,15 @@ function MushafInner() {
     const name = uiLanguage === "ar" ? sm?.name_arabic : sm?.name_english;
     return { name: name ?? null, juz, hizb };
   })();
+  const activeToastMessage = toastMessage ?? focusToastMessage;
+  const dismissActiveToast = useCallback(() => {
+    if (toastMessage) {
+      dismissToast();
+      return;
+    }
+    setFocusToastMessage(null);
+  }, [dismissToast, toastMessage]);
+
   if (loading && !isPageMode) {
     return (
       <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark items-center justify-center">
@@ -765,7 +935,7 @@ function MushafInner() {
                     />
                   )}
                   <Pressable
-                    onPress={() => setShowBookmarks(true)}
+                    onPress={handleOpenBookmarks}
                     className="rounded-full px-2.5 py-2"
                     style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
                   >
@@ -780,8 +950,19 @@ function MushafInner() {
                       {hideMode ? <EyeOff size={16} color="#0d9488" /> : <Eye size={16} color={isDark ? "#737373" : "#8B8178"} />}
                     </Pressable>
                   )}
+                  {canUseFocusMode && (
+                    <Pressable
+                      onPress={enterFocusMode}
+                      accessibilityRole="button"
+                      accessibilityLabel={s.enterFocusMode}
+                      className="rounded-full px-2.5 py-2"
+                      style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+                    >
+                      <ScanLine size={16} color="#0d9488" />
+                    </Pressable>
+                  )}
                   <Pressable
-                    onPress={() => setShowSearch(true)}
+                    onPress={handleOpenSearch}
                     className="rounded-full px-2.5 py-2"
                     style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
                   >
@@ -809,7 +990,7 @@ function MushafInner() {
                   onPress={toggleViewMode}
                 />
                 <Pressable
-                  onPress={() => setShowBookmarks(true)}
+                  onPress={handleOpenBookmarks}
                   className={`rounded-full bg-surface-high dark:bg-surface-dark-high ${isNarrow ? "px-2 py-2" : "px-3 py-2"}`}
                   style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
                 >
@@ -828,8 +1009,19 @@ function MushafInner() {
                     {hideMode ? <EyeOff size={16} color="#0d9488" /> : <Eye size={16} color={isDark ? "#737373" : "#8B8178"} />}
                   </Pressable>
                 )}
+                {canUseFocusMode && (
+                  <Pressable
+                    onPress={enterFocusMode}
+                    accessibilityRole="button"
+                    accessibilityLabel={s.enterFocusMode}
+                    className={`rounded-full bg-surface-high dark:bg-surface-dark-high ${isNarrow ? "px-2 py-2" : "px-3 py-2"}`}
+                    style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+                  >
+                    <ScanLine size={16} color="#0d9488" />
+                  </Pressable>
+                )}
                 <Pressable
-                  onPress={() => setShowSearch(true)}
+                  onPress={handleOpenSearch}
                   className={`rounded-full bg-surface-high dark:bg-surface-dark-high ${isNarrow ? "px-2 py-2" : "px-3 py-2"}`}
                   style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
                 >
@@ -877,9 +1069,22 @@ function MushafInner() {
                 horizontalBottomInset={0}
                 highlightedAyahKey={highlightedKey}
                 highlightedWord={highlightedWord}
+                autoScrollActive={focusModeActive}
+                autoScrollPlaying={focusModePlaying}
+                autoScrollSpeed={focusScrollSpeed}
+                onAutoScrollUserPause={pauseFocusAutoScroll}
+                onAutoScrollEnd={handleFocusAutoScrollEnd}
               />
             </View>
-            {!chromeVisible && (
+            <FocusModeControls
+              playing={focusModePlaying}
+              speed={focusScrollSpeed}
+              onPlayPause={handleFocusPlayPause}
+              onSpeedChange={handleFocusSpeedChange}
+              onExit={exitFocusMode}
+              visible={focusModeActive && focusControlsVisible}
+            />
+            {!chromeVisible && !focusModeActive && (
               <>
                 <View
                   pointerEvents="none"
@@ -1029,14 +1234,14 @@ function MushafInner() {
                   }
                 }
               }}
-              onExpand={() => setShowNavigator(true)}
+              onExpand={handleOpenNavigator}
               index={mushafIndex}
             />
           </Animated.View>
         )}
 
         {/* Toast notifications */}
-        <Toast message={toastMessage} onDismiss={dismissToast} />
+        <Toast message={activeToastMessage} onDismiss={dismissActiveToast} />
       </SafeAreaView>
     </>
   );

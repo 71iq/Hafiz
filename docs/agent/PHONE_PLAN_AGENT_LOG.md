@@ -1703,3 +1703,27 @@ Saved in `phase19/`:
 - `npm run typecheck`: passed.
 - `npm run build:web`: passed.
 - Static export smoke checked from `dist/`: app opened without the `updated_at` error.
+
+## 2026-05-18 — Mushaf Focus Mode Auto-Scroll
+
+### Scope decisions
+1. Added Focus Mode only for Mushaf page view when page navigation is set to vertical scroll.
+2. Kept QCF2 page rendering, v2 page grouping, page rail direction, and word identity unchanged.
+3. Treated Focus Mode as an immersive reader state that hides app chrome and global visual overlays while keeping sync/offline logic running.
+
+### Implemented in this step
+- `app/(tabs)/mushaf.tsx`:
+  - Added the page-scroll-only Focus Mode button, focus state, auto-scroll play/pause behavior, mode cleanup, and end-of-Mushaf toast.
+  - Hid Mushaf chrome, bottom rail, tab bar/sidebar, sync indicator, and offline banner while focus mode is active.
+- `components/mushaf/PageMushaf.tsx`:
+  - Added vertical FlatList auto-scroll driven by `requestAnimationFrame`, based on 90 seconds per current page at `1.0x`.
+  - Pauses auto-scroll on user scroll/touch/wheel/ayah detail interaction and clamps at the scroll end.
+- `components/mushaf/FocusModeControls.tsx`:
+  - Added compact play/pause, speed slider, speed label, and exit controls with RTL-aware ordering.
+- `lib/settings/context.tsx`, `lib/ui/chrome.tsx`, `components/ui/AppNavigation.tsx`, `app/(tabs)/_layout.tsx`, and `lib/i18n/strings.ts`:
+  - Added persisted focus speed, immersive chrome state, global overlay suppression, and bilingual strings.
+
+### Validation result
+- `npm run typecheck`: passed.
+- `npm run build:web`: passed.
+- `npx expo start --web --port 8099 --localhost`: started successfully; `/mushaf` returned HTTP 200 after Metro bundled.

@@ -25,6 +25,9 @@ export const DEFAULT_DAILY_REVIEW_LIMIT = 50;
 export const MIN_DAILY_REVIEW_LIMIT = 10;
 export const MAX_DAILY_REVIEW_LIMIT = 200;
 export const DAILY_REVIEW_LIMIT_STEP = 10;
+export const FOCUS_SCROLL_SPEED_MIN = 0.5;
+export const FOCUS_SCROLL_SPEED_MAX = 2.5;
+export const FOCUS_SCROLL_SPEED_DEFAULT = 1;
 
 export type ThemeMode = "light" | "dark" | "system";
 export type ViewMode = "verse" | "page";
@@ -57,6 +60,8 @@ type SettingsContextType = {
   setUiLanguage: (lang: UILanguage) => void;
   dailyReviewLimit: number;
   setDailyReviewLimit: (limit: number) => void;
+  focusScrollSpeed: number;
+  setFocusScrollSpeed: (speed: number) => void;
   isRTL: boolean;
   isDark: boolean;
   isLoaded: boolean;
@@ -86,6 +91,8 @@ const SettingsContext = createContext<SettingsContextType>({
   setUiLanguage: () => {},
   dailyReviewLimit: DEFAULT_DAILY_REVIEW_LIMIT,
   setDailyReviewLimit: () => {},
+  focusScrollSpeed: FOCUS_SCROLL_SPEED_DEFAULT,
+  setFocusScrollSpeed: () => {},
   isRTL: false,
   isDark: false,
   isLoaded: false,
@@ -141,6 +148,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [tafseerSource, setTafseerSourceState] = useState<TafseerSource>("muyassar");
   const [uiLanguage, setUiLanguageState] = useState<UILanguage>(readCachedUiLanguage);
   const [dailyReviewLimit, setDailyReviewLimitState] = useState(DEFAULT_DAILY_REVIEW_LIMIT);
+  const [focusScrollSpeed, setFocusScrollSpeedState] = useState(FOCUS_SCROLL_SPEED_DEFAULT);
   const [isLoaded, setIsLoaded] = useState(false);
 
   // Load settings from SQLite on mount
@@ -194,6 +202,16 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           const n = parseInt(savedLimit, 10);
           if (n >= MIN_DAILY_REVIEW_LIMIT && n <= MAX_DAILY_REVIEW_LIMIT) {
             setDailyReviewLimitState(n);
+          }
+        }
+
+        const savedFocusSpeed = await readSetting(db, "focus_scroll_speed");
+        if (savedFocusSpeed !== null) {
+          const n = Number(savedFocusSpeed);
+          if (Number.isFinite(n)) {
+            setFocusScrollSpeedState(
+              Math.max(FOCUS_SCROLL_SPEED_MIN, Math.min(FOCUS_SCROLL_SPEED_MAX, n))
+            );
           }
         }
 
@@ -311,6 +329,17 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     [db]
   );
 
+  const setFocusScrollSpeed = useCallback(
+    (speed: number) => {
+      const value = Number.isFinite(speed) ? speed : FOCUS_SCROLL_SPEED_DEFAULT;
+      const clamped = Math.max(FOCUS_SCROLL_SPEED_MIN, Math.min(FOCUS_SCROLL_SPEED_MAX, value));
+      const rounded = Math.round(clamped * 100) / 100;
+      setFocusScrollSpeedState(rounded);
+      writeSetting(db, "focus_scroll_speed", String(rounded)).catch(console.warn);
+    },
+    [db]
+  );
+
   const setUiLanguage = useCallback(
     (lang: UILanguage) => {
       setUiLanguageState(lang);
@@ -349,6 +378,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         setUiLanguage,
         dailyReviewLimit,
         setDailyReviewLimit,
+        focusScrollSpeed,
+        setFocusScrollSpeed,
         isRTL,
         isDark,
         isLoaded,

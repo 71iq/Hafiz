@@ -97,12 +97,13 @@ function BottomBar(props: BottomTabBarProps) {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === "dark";
   const visibleRoutes = getVisibleRoutes(state, descriptors);
-  const { visible } = useChrome();
+  const { visible, immersive } = useChrome();
+  const chromeVisible = visible && !immersive;
 
   const hidden = useSharedValue(0);
   useEffect(() => {
-    hidden.value = withTiming(visible ? 0 : 1, { duration: 200 });
-  }, [visible, hidden]);
+    hidden.value = withTiming(chromeVisible ? 0 : 1, { duration: 200 });
+  }, [chromeVisible, hidden]);
   const barAnimStyle = useAnimatedStyle(() => {
     const slide = hidden.value * 120;
     return {
@@ -113,7 +114,7 @@ function BottomBar(props: BottomTabBarProps) {
 
   return (
     <Animated.View
-      pointerEvents={visible ? "auto" : "none"}
+      pointerEvents={chromeVisible ? "auto" : "none"}
       style={[
         styles.bottomContainer,
         {
@@ -126,7 +127,7 @@ function BottomBar(props: BottomTabBarProps) {
             web: {
               backdropFilter: "blur(14px)",
               WebkitBackdropFilter: "blur(14px)",
-              pointerEvents: visible ? "auto" : "none",
+              pointerEvents: chromeVisible ? "auto" : "none",
             } as any,
             default: {
               backgroundColor: isDark ? "rgba(28,25,23,0.95)" : "rgba(255,248,241,0.95)",
@@ -208,6 +209,7 @@ function FloatingPanel(props: BottomTabBarProps & { isRTL?: boolean }) {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === "dark";
   const visibleRoutes = getVisibleRoutes(state, descriptors);
+  const { immersive } = useChrome();
   const [open, setOpen] = useState(false);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const progress = useSharedValue(0);
@@ -219,6 +221,10 @@ function FloatingPanel(props: BottomTabBarProps & { isRTL?: boolean }) {
   useEffect(() => {
     progress.value = withTiming(open ? 1 : 0, { duration: 180 });
   }, [open, progress]);
+
+  useEffect(() => {
+    if (immersive) setOpen(false);
+  }, [immersive]);
 
   const cancelHide = useCallback(() => {
     if (hideTimerRef.current) {
@@ -258,6 +264,8 @@ function FloatingPanel(props: BottomTabBarProps & { isRTL?: boolean }) {
   const triggerTop = Math.max(insets.top + 132, Math.round(height * 0.45) - 22);
   const panelTop = Math.max(insets.top + 88, 96);
   const SidebarTriggerIcon = isRTL ? PanelRightOpen : PanelLeftOpen;
+
+  if (immersive) return null;
 
   return (
     <>
@@ -376,7 +384,10 @@ function PersistentSidebar(props: BottomTabBarProps & { isRTL?: boolean }) {
   const { state, descriptors, navigation, isRTL } = props;
   const insets = useSafeAreaInsets();
   const visibleRoutes = getVisibleRoutes(state, descriptors);
+  const { immersive } = useChrome();
   const sideStyle = isRTL ? { right: 16 } : { left: 16 };
+
+  if (immersive) return null;
 
   return (
     <View

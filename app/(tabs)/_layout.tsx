@@ -11,7 +11,7 @@ import { SyncIndicator } from "@/components/ui/SyncIndicator";
 import { OfflineBanner } from "@/components/ui/OfflineBanner";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ChromeProvider } from "@/lib/ui/chrome";
+import { ChromeProvider, useChrome } from "@/lib/ui/chrome";
 import { StatusBar } from "expo-status-bar";
 
 function SyncOverlay() {
@@ -38,13 +38,14 @@ function SyncOverlay() {
 
 function TabsWithStrings() {
   const { isDark, isRTL, uiLanguage } = useSettings();
+  const { immersive } = useChrome();
   const s = useStrings();
 
   return (
     <View style={{ flex: 1, direction: isRTL ? "rtl" : "ltr" }}>
       <StatusBar style={isDark ? "light" : "dark"} backgroundColor={isDark ? "#0A0A0A" : "#FFF8F1"} />
-      <SyncOverlay />
-      <OfflineBanner uiLanguage={uiLanguage} />
+      {!immersive && <SyncOverlay />}
+      {!immersive && <OfflineBanner uiLanguage={uiLanguage} />}
       <Tabs
         screenOptions={{
           headerShown: false,

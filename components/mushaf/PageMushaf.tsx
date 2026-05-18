@@ -150,6 +150,11 @@ type Props = {
   onHorizontalGesture?: () => void;
   highlightedAyahKey?: string | null;
   highlightedWord?: { surah: number; ayah: number; wordPos: number } | null;
+  autoScrollActive?: boolean;
+  autoScrollPlaying?: boolean;
+  autoScrollSpeed?: number;
+  onAutoScrollUserPause?: () => void;
+  onAutoScrollEnd?: () => void;
 };
 
 // Fixed heights for getItemLayout calculation
@@ -170,6 +175,7 @@ const HORIZONTAL_EASING = Easing.out(Easing.cubic);
 const PAGE_WIDTH_FIT_TOLERANCE = 12;
 const DESKTOP_PAGE_LINE_MAX_WIDTH = 680;
 const DESKTOP_PAGE_SAFE_GUTTER = 32;
+const FOCUS_BASE_SECONDS_PER_PAGE = 90;
 
 function fitTypographyToPageWidth(
   fontSize: number,
@@ -348,6 +354,11 @@ export function PageMushaf({
   onHorizontalGesture,
   highlightedAyahKey = null,
   highlightedWord = null,
+  autoScrollActive = false,
+  autoScrollPlaying = false,
+  autoScrollSpeed = 1,
+  onAutoScrollUserPause,
+  onAutoScrollEnd,
 }: Props) {
   const db = useDatabase();
   const { fontSize, lineHeight, pageScroll, isRTL, uiLanguage } = useSettings();
@@ -401,10 +412,29 @@ export function PageMushaf({
   });
   const dragX = useRef(new RNAnimated.Value(0)).current;
   const flatListRef = useRef<FlatList>(null);
+  const autoScrollFrameRef = useRef<number | null>(null);
+  const autoScrollLastTimeRef = useRef<number | null>(null);
+  const verticalOffsetRef = useRef(0);
+  const contentHeightRef = useRef(0);
+  const autoScrollEndedRef = useRef(false);
   const [webDragging, setWebDragging] = useState(false);
   const [showPageIndicator, setShowPageIndicator] = useState(false);
   const currentPageLabel = isRTL ? toArabicNumber(currentPage) : String(currentPage);
   const totalPageLabel = isRTL ? toArabicNumber(604) : "604";
+  const verticalAutoScrollEnabled = autoScrollActive && !horizontal;
+
+  const cancelAutoScrollFrame = useCallback(() => {
+    if (autoScrollFrameRef.current !== null) {
+      cancelAnimationFrame(autoScrollFrameRef.current);
+      autoScrollFrameRef.current = null;
+    }
+    autoScrollLastTimeRef.current = null;
+  }, []);
+
+  const pauseAutoScrollForUser = useCallback(() => {
+    if (!verticalAutoScrollEnabled || !autoScrollPlaying) return;
+    onAutoScrollUserPause?.();
+  }, [autoScrollPlaying, onAutoScrollUserPause, verticalAutoScrollEnabled]);
 
   const onContainerLayout = useCallback((e: LayoutChangeEvent) => {
     const nextWidth = Math.round(e.nativeEvent.layout.width);
@@ -616,12 +646,13 @@ export function PageMushaf({
       if (next === null) return;
 
       event.preventDefault();
+      pauseAutoScrollForUser();
       jumpToPage(Math.max(1, Math.min(pageData.length, next)), true);
     };
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [horizontal, jumpToPage, pageData.length]);
+  }, [horizontal, jumpToPage, pageData.length, pauseAutoScrollForUser]);
 
   const handleScrollToIndexFailed = useCallback(
     ({ index }: { index: number }) => {
@@ -648,6 +679,18 @@ export function PageMushaf({
     },
     [updateCurrentPage]
   );
+
+  const handleVerticalScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      verticalOffsetRef.current = event.nativeEvent.contentOffset.y;
+      onScroll?.(event);
+    },
+    [onScroll]
+  );
+
+  const handleContentSizeChange = useCallback((_width: number, height: number) => {
+    contentHeightRef.current = height;
+  }, []);
 
   const resetHorizontalDrag = useCallback(
     (duration = HORIZONTAL_CANCEL_DURATION) => {
@@ -881,8 +924,9 @@ export function PageMushaf({
   );
 
   const openAyahDetail = useCallback((surah: number, ayah: number) => {
+    pauseAutoScrollForUser();
     setDetailAyah({ surah, ayah });
-  }, []);
+  }, [pauseAutoScrollForUser]);
 
   const horizontalTypography = useMemo(() => {
     const fitHeightRaw = containerHeight || Math.max(0, windowHeight - 120);
@@ -956,6 +1000,67 @@ export function PageMushaf({
       verticalScrollBottomInset,
     ]
   );
+
+  useEffect(() => {
+    return () => {
+      cancelAutoScrollFrame();
+    };
+  }, [cancelAutoScrollFrame]);
+
+  useEffect(() => {
+    if (!verticalAutoScrollEnabled || !autoScrollPlaying || loading || !layoutInfo || containerHeight <= 0) {
+      cancelAutoScrollFrame();
+      autoScrollEndedRef.current = false;
+      return;
+    }
+
+    autoScrollEndedRef.current = false;
+
+    const tick = (now: number) => {
+      const maxOffset = Math.max(0, contentHeightRef.current - containerHeight);
+      if (maxOffset <= 0) {
+        autoScrollFrameRef.current = requestAnimationFrame(tick);
+        return;
+      }
+
+      const lastTime = autoScrollLastTimeRef.current ?? now;
+      const deltaSeconds = Math.max(0, Math.min(0.05, (now - lastTime) / 1000));
+      autoScrollLastTimeRef.current = now;
+
+      const pageIndex = Math.max(0, Math.min(pageData.length - 1, currentPageRef.current - 1));
+      const pageHeight = layoutInfo.heights[pageIndex] ?? verticalLineSlotHeight * MUSHAF_LINE_COUNT;
+      const pixelsPerSecond = (pageHeight / FOCUS_BASE_SECONDS_PER_PAGE) * Math.max(0.1, autoScrollSpeed);
+      const nextOffset = Math.min(maxOffset, verticalOffsetRef.current + pixelsPerSecond * deltaSeconds);
+
+      flatListRef.current?.scrollToOffset({ offset: nextOffset, animated: false });
+      verticalOffsetRef.current = nextOffset;
+
+      if (nextOffset >= maxOffset - 1) {
+        cancelAutoScrollFrame();
+        if (!autoScrollEndedRef.current) {
+          autoScrollEndedRef.current = true;
+          onAutoScrollEnd?.();
+        }
+        return;
+      }
+
+      autoScrollFrameRef.current = requestAnimationFrame(tick);
+    };
+
+    autoScrollFrameRef.current = requestAnimationFrame(tick);
+    return cancelAutoScrollFrame;
+  }, [
+    autoScrollPlaying,
+    autoScrollSpeed,
+    cancelAutoScrollFrame,
+    containerHeight,
+    layoutInfo,
+    loading,
+    onAutoScrollEnd,
+    pageData.length,
+    verticalAutoScrollEnabled,
+    verticalLineSlotHeight,
+  ]);
 
   const renderPage = useCallback(
     ({ item, index }: { item: PageData; index: number }) => {
@@ -1120,7 +1225,11 @@ export function PageMushaf({
           keyExtractor={keyExtractor}
           getItemLayout={getItemLayout}
           extraData={extraData}
-          onScroll={onScroll}
+          onScroll={handleVerticalScroll}
+          onContentSizeChange={handleContentSizeChange}
+          onScrollBeginDrag={pauseAutoScrollForUser}
+          onMomentumScrollBegin={pauseAutoScrollForUser}
+          onTouchStart={pauseAutoScrollForUser}
           onScrollToIndexFailed={handleScrollToIndexFailed}
           scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}
@@ -1132,6 +1241,7 @@ export function PageMushaf({
           windowSize={3}
           removeClippedSubviews
           contentContainerStyle={{ paddingBottom: verticalScrollBottomInset }}
+          {...(Platform.OS === "web" ? ({ onWheel: pauseAutoScrollForUser } as Record<string, unknown>) : {})}
         />
       )}
 
