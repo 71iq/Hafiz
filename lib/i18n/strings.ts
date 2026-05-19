@@ -2,6 +2,7 @@ export type UIStrings = { [key: string]: string };
 
 export const strings: Record<"en" | "ar", UIStrings> = {
   en: {
+    appName: "Hafiz",
     // Tabs
     tabHome: "Home",
     tabMushaf: "Mushaf",
@@ -624,6 +625,7 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     errorTryAgain: "Try Again",
   },
   ar: {
+    appName: "حافظ",
     tabHome: "الرئيسية",
     tabMushaf: "المصحف",
     tabProgress: "التقدم",

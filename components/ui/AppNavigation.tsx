@@ -18,6 +18,7 @@ import Animated, {
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useColorScheme } from "nativewind";
 import { useChrome } from "@/lib/ui/chrome";
+import { useStrings } from "@/lib/i18n/useStrings";
 import {
   PERSISTENT_SIDEBAR_BREAKPOINT,
   PERSISTENT_SIDEBAR_WIDTH,
@@ -191,13 +192,25 @@ function SidebarItem({
       }}
       accessibilityRole="button"
       accessibilityState={isFocused ? { selected: true } : {}}
-      className={`${isRTL ? "flex-row-reverse" : "flex-row"} items-center gap-3 rounded-2xl px-4 py-3 ${isFocused ? "bg-primary-soft" : ""}`}
+      className={`flex-row items-center gap-3 rounded-2xl px-4 py-3 ${isFocused ? "bg-primary-soft" : ""}`}
       style={({ pressed }) => ({
+        direction: isRTL ? "rtl" : "ltr",
         transform: [{ scale: pressed ? 0.96 : 1 }],
       })}
     >
       {options.tabBarIcon?.({ focused: isFocused, color: iconColor, size: 20 })}
-      <Text style={[styles.sidebarLabel, { color: iconColor }]}>{label}</Text>
+      <Text
+        style={[
+          styles.sidebarLabel,
+          {
+            color: iconColor,
+            textAlign: isRTL ? "right" : "left",
+            writingDirection: isRTL ? "rtl" : "ltr",
+          },
+        ]}
+      >
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -207,6 +220,7 @@ function FloatingPanel(props: BottomTabBarProps & { isRTL?: boolean }) {
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
   const { colorScheme } = useColorScheme();
+  const s = useStrings();
   const isDark = colorScheme === "dark";
   const visibleRoutes = getVisibleRoutes(state, descriptors);
   const { immersive } = useChrome();
@@ -336,18 +350,18 @@ function FloatingPanel(props: BottomTabBarProps & { isRTL?: boolean }) {
           onBlur={scheduleHidePanel}
           className="rounded-3xl bg-surface/95 dark:bg-surface-dark/95 px-4 py-5"
         >
-          <View className="px-3 pb-6">
+          <View className={`px-3 pb-6 ${isRTL ? "items-end" : "items-start"}`}>
             <Text
               className="text-primary dark:text-neutral-100"
-              style={{ fontFamily: "NotoSerif_700Bold", fontSize: 22 }}
+              style={{
+                fontFamily: isRTL ? undefined : "NotoSerif_700Bold",
+                fontSize: 22,
+                fontWeight: isRTL ? "700" : undefined,
+                textAlign: isRTL ? "right" : "left",
+                writingDirection: isRTL ? "rtl" : "ltr",
+              }}
             >
-              Hafiz
-            </Text>
-            <Text
-              className="mt-0.5 text-warm-400 dark:text-neutral-500"
-              style={{ fontFamily: "Manrope_400Regular", fontSize: 11 }}
-            >
-              The Digital Sanctuary
+              {s.appName}
             </Text>
           </View>
 
@@ -383,6 +397,7 @@ function FloatingPanel(props: BottomTabBarProps & { isRTL?: boolean }) {
 function PersistentSidebar(props: BottomTabBarProps & { isRTL?: boolean }) {
   const { state, descriptors, navigation, isRTL } = props;
   const insets = useSafeAreaInsets();
+  const s = useStrings();
   const visibleRoutes = getVisibleRoutes(state, descriptors);
   const { immersive } = useChrome();
   const sideStyle = isRTL ? { right: 16 } : { left: 16 };
@@ -402,18 +417,18 @@ function PersistentSidebar(props: BottomTabBarProps & { isRTL?: boolean }) {
       pointerEvents="box-none"
     >
       <View className="h-full rounded-4xl bg-primary dark:bg-primary px-4 py-5">
-        <View className="px-3 pb-7">
+        <View className={`px-3 pb-7 ${isRTL ? "items-end" : "items-start"}`}>
           <Text
             className="text-gold"
-            style={{ fontFamily: "NotoSerif_700Bold", fontSize: 24 }}
+            style={{
+              fontFamily: isRTL ? undefined : "NotoSerif_700Bold",
+              fontSize: 24,
+              fontWeight: isRTL ? "700" : undefined,
+              textAlign: isRTL ? "right" : "left",
+              writingDirection: isRTL ? "rtl" : "ltr",
+            }}
           >
-            Hafiz
-          </Text>
-          <Text
-            className="mt-0.5 text-gold/70"
-            style={{ fontFamily: "Manrope_400Regular", fontSize: 11 }}
-          >
-            The Digital Sanctuary
+            {s.appName}
           </Text>
         </View>
 
