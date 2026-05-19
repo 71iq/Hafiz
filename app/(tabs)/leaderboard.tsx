@@ -110,20 +110,9 @@ export default function LeaderboardScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
-      <View style={[contentContainerStyle, { paddingTop: 16 }]}>
-        <View style={railStyle}>
-          <Text
-            className="text-primary dark:text-gold-light"
-            style={{ fontFamily: "NotoSerif_700Bold", fontSize: isLaptop ? 34 : 32, lineHeight: 38 }}
-          >
-            {s.leaderboardTitle}
-          </Text>
-        </View>
-      </View>
-
       <View
-        className="mt-5 mb-5"
-        style={contentContainerStyle}
+        className="mb-5"
+        style={[contentContainerStyle, { paddingTop: 16 }]}
       >
         <View
           className="flex-row rounded-full p-1.5"
@@ -210,7 +199,7 @@ export default function LeaderboardScreen() {
               ))}
             </View>
           )}
-          <View className="mb-3 flex-row items-end justify-between">
+          <View className="mb-3 flex-row items-end justify-between" style={{ direction: "ltr" }}>
             <Text
               style={{
                 fontFamily: "Manrope_600SemiBold",
@@ -340,6 +329,7 @@ function LeaderboardRow({
       onPress={onPress}
       className="flex-row items-center px-4 py-3.5 mb-2.5 rounded-2xl"
       style={{
+        direction: "ltr",
         backgroundColor: isCurrentUser
           ? (isDark ? "rgba(45, 212, 191, 0.12)" : "rgba(13, 148, 136, 0.08)")
           : (isDark ? "#141414" : "#FAF8F5"),
@@ -369,7 +359,7 @@ function LeaderboardRow({
       </View>
 
       <View className="flex-1">
-        <View className="flex-row items-center gap-2">
+        <View className="flex-row items-center gap-2" style={{ direction: "ltr" }}>
           <Text
             className="text-charcoal dark:text-neutral-100"
             style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}
