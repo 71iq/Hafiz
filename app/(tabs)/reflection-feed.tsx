@@ -38,14 +38,14 @@ type JuzOption = {
   ranges: ReflectionJuzRange[];
 };
 
-type PickerMode = "surah" | "juz" | null;
+type FilterKind = "surah" | "juz";
+type PickerMode = "filter-kind" | "location" | "sort" | null;
 
 type FilterOptions = {
   surahs: SurahOption[];
   juz: JuzOption[];
 };
 
-const defaultFilter: ReflectionFeedFilter = { type: "all" };
 const REFLECTION_FEED_MAX_WIDTH = 640;
 
 export default function ReflectionFeedScreen() {
@@ -60,7 +60,9 @@ export default function ReflectionFeedScreen() {
   const user = useAuthStore((state) => state.user);
   const queryClient = useQueryClient();
   const configured = isSupabaseConfigured();
-  const [filter, setFilter] = useState<ReflectionFeedFilter>(defaultFilter);
+  const [filterKind, setFilterKind] = useState<FilterKind>("surah");
+  const [selectedSurah, setSelectedSurah] = useState(1);
+  const [selectedJuz, setSelectedJuz] = useState(1);
   const [sort, setSort] = useState<ReflectionFeedSort>("newest");
   const [pickerMode, setPickerMode] = useState<PickerMode>(null);
   const [commentsReflectionId, setCommentsReflectionId] = useState<string | null>(null);
@@ -124,9 +126,14 @@ export default function ReflectionFeedScreen() {
     staleTime: Infinity,
   });
 
+  const filter = useMemo<ReflectionFeedFilter>(
+    () => (filterKind === "surah" ? { type: "surah", surah: selectedSurah } : { type: "juz", juz: selectedJuz }),
+    [filterKind, selectedJuz, selectedSurah]
+  );
+
   const selectedJuzRanges = useMemo(
-    () => (filter.type === "juz" ? options.juz.find((juz) => juz.juz === filter.juz)?.ranges : undefined),
-    [filter, options.juz]
+    () => (filterKind === "juz" ? options.juz.find((juz) => juz.juz === selectedJuz)?.ranges : undefined),
+    [filterKind, options.juz, selectedJuz]
   );
 
   const feedQuery = useInfiniteQuery({
@@ -172,20 +179,15 @@ export default function ReflectionFeedScreen() {
   );
 
   const selectedSurahLabel = useMemo(() => {
-    if (filter.type === "surah") {
-      const surah = surahByNumber.get(filter.surah);
-      const name = uiLanguage === "ar" ? surah?.nameArabic : surah?.nameEnglish;
-      return name ? `${s.tabSurah} ${name}` : `${s.tabSurah} ${filter.surah}`;
-    }
-    return s.reflectionFeedFilterSurah;
-  }, [filter, s.reflectionFeedFilterSurah, s.tabSurah, surahByNumber, uiLanguage]);
+    const surah = surahByNumber.get(selectedSurah);
+    const name = uiLanguage === "ar" ? surah?.nameArabic : surah?.nameEnglish;
+    return name ?? `${s.tabSurah} ${uiLanguage === "ar" ? toArabicNumber(selectedSurah) : selectedSurah}`;
+  }, [s.tabSurah, selectedSurah, surahByNumber, uiLanguage]);
 
-  const selectedJuzLabel = useMemo(() => {
-    if (filter.type === "juz") {
-      return `${s.tabJuz} ${uiLanguage === "ar" ? toArabicNumber(filter.juz) : filter.juz}`;
-    }
-    return s.reflectionFeedFilterJuz;
-  }, [filter, s.reflectionFeedFilterJuz, s.tabJuz, uiLanguage]);
+  const selectedJuzLabel = useMemo(
+    () => `${s.tabJuz} ${uiLanguage === "ar" ? toArabicNumber(selectedJuz) : selectedJuz}`,
+    [s.tabJuz, selectedJuz, uiLanguage]
+  );
 
   const sortOptions: { value: ReflectionFeedSort; label: string }[] = [
     { value: "newest", label: s.reflectionFeedSortNewest },
@@ -193,6 +195,9 @@ export default function ReflectionFeedScreen() {
     { value: "popular", label: s.reflectionFeedSortPopular },
     { value: "less", label: s.reflectionFeedSortLessPopular },
   ];
+  const selectedSortLabel = `${s.reflectionFeedSortBy}: ${
+    sortOptions.find((option) => option.value === sort)?.label ?? s.reflectionFeedSortNewest
+  }`;
 
   const handleReferencePress = useCallback((reflection: Reflection) => {
     setPendingDeepLink({ surah: reflection.surah, ayah: reflection.ayah_start });
@@ -320,30 +325,31 @@ export default function ReflectionFeedScreen() {
               </View>
             </View>
 
-            <View className={`mt-4 gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
+            <View className={`mt-4 flex-wrap gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
               <FilterSelect
-                label={selectedSurahLabel}
-                active={filter.type === "surah"}
+                label={filterKind === "surah" ? s.reflectionFeedFilterSurah : s.reflectionFeedFilterJuz}
+                active
                 isRTL={isRTL}
-                onPress={() => setPickerMode("surah")}
+                minWidth={112}
+                flex={0.8}
+                onPress={() => setPickerMode("filter-kind")}
               />
               <FilterSelect
-                label={selectedJuzLabel}
-                active={filter.type === "juz"}
+                label={filterKind === "surah" ? selectedSurahLabel : selectedJuzLabel}
+                active
                 isRTL={isRTL}
-                onPress={() => setPickerMode("juz")}
+                minWidth={184}
+                flex={1.55}
+                onPress={() => setPickerMode("location")}
               />
-            </View>
-
-            <View className={`mt-3 flex-wrap gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
-              {sortOptions.map((option) => (
-                <FilterButton
-                  key={option.value}
-                  label={option.label}
-                  active={sort === option.value}
-                  onPress={() => setSort(option.value)}
-                />
-              ))}
+              <FilterSelect
+                label={selectedSortLabel}
+                active
+                isRTL={isRTL}
+                minWidth={152}
+                flex={1.15}
+                onPress={() => setPickerMode("sort")}
+              />
             </View>
 
           </View>
@@ -399,12 +405,30 @@ export default function ReflectionFeedScreen() {
       <FilterPicker
         mode={pickerMode}
         options={options}
-        filter={filter}
+        filterKind={filterKind}
+        selectedSurah={selectedSurah}
+        selectedJuz={selectedJuz}
+        sort={sort}
+        sortOptions={sortOptions}
         isDark={isDark}
         isRTL={isRTL}
         uiLanguage={uiLanguage}
-        onSelect={(nextFilter) => {
-          setFilter(nextFilter);
+        onSelectKind={(kind) => {
+          setFilterKind(kind);
+          setPickerMode(null);
+        }}
+        onSelectSurah={(surah) => {
+          setSelectedSurah(surah);
+          setFilterKind("surah");
+          setPickerMode(null);
+        }}
+        onSelectJuz={(juz) => {
+          setSelectedJuz(juz);
+          setFilterKind("juz");
+          setPickerMode(null);
+        }}
+        onSelectSort={(nextSort) => {
+          setSort(nextSort);
           setPickerMode(null);
         }}
         onClose={() => setPickerMode(null)}
@@ -425,11 +449,15 @@ function FilterSelect({
   label,
   active,
   isRTL,
+  minWidth,
+  flex,
   onPress,
 }: {
   label: string;
   active: boolean;
   isRTL: boolean;
+  minWidth: number;
+  flex: number;
   onPress: () => void;
 }) {
   const iconColor = active ? "#FFFFFF" : "#A77F5A";
@@ -437,10 +465,10 @@ function FilterSelect({
   return (
     <Pressable
       onPress={onPress}
-      className={`min-w-[132px] flex-1 items-center gap-2 rounded-full px-4 py-2.5 ${
+      className={`items-center gap-2 rounded-full px-4 py-2.5 ${
         isRTL ? "flex-row-reverse" : "flex-row"
       } ${active ? "bg-primary-accent dark:bg-primary-bright" : "bg-surface-low dark:bg-surface-dark-low"}`}
-      style={({ pressed }) => ({ opacity: pressed ? 0.75 : 1 })}
+      style={({ pressed }) => ({ opacity: pressed ? 0.75 : 1, minWidth, flex })}
     >
       <Text
         numberOfLines={1}
@@ -454,73 +482,93 @@ function FilterSelect({
   );
 }
 
-function FilterButton({
-  label,
-  active,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      className={`rounded-full px-3.5 py-2 ${active ? "bg-primary-accent dark:bg-primary-bright" : "bg-surface-low dark:bg-surface-dark-low"}`}
-      style={({ pressed }) => ({ opacity: pressed ? 0.75 : 1 })}
-    >
-      <Text
-        className={active ? "text-white" : "text-warm-500 dark:text-neutral-400"}
-        style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
-      >
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
 function FilterPicker({
   mode,
   options,
-  filter,
+  filterKind,
+  selectedSurah,
+  selectedJuz,
+  sort,
+  sortOptions,
   isDark,
   isRTL,
   uiLanguage,
-  onSelect,
+  onSelectKind,
+  onSelectSurah,
+  onSelectJuz,
+  onSelectSort,
   onClose,
 }: {
   mode: PickerMode;
   options: FilterOptions;
-  filter: ReflectionFeedFilter;
+  filterKind: FilterKind;
+  selectedSurah: number;
+  selectedJuz: number;
+  sort: ReflectionFeedSort;
+  sortOptions: { value: ReflectionFeedSort; label: string }[];
   isDark: boolean;
   isRTL: boolean;
   uiLanguage: "en" | "ar";
-  onSelect: (filter: ReflectionFeedFilter) => void;
+  onSelectKind: (kind: FilterKind) => void;
+  onSelectSurah: (surah: number) => void;
+  onSelectJuz: (juz: number) => void;
+  onSelectSort: (sort: ReflectionFeedSort) => void;
   onClose: () => void;
 }) {
   const s = useStrings();
   const { width, height } = useWindowDimensions();
   const isPhone = width < SIDEBAR_BREAKPOINT;
   const maxHeight = Math.min(height - (isPhone ? 16 : 48), 680);
-  const title = mode === "surah" ? s.reflectionFeedSelectSurah : s.reflectionFeedSelectJuz;
+  const title =
+    mode === "filter-kind"
+      ? s.reflectionFeedSelectFilterType
+      : mode === "sort"
+        ? s.reflectionFeedSortBy
+        : filterKind === "surah"
+          ? s.reflectionFeedSelectSurah
+          : s.reflectionFeedSelectJuz;
 
   return (
     <ResponsiveSheet open={mode !== null} onClose={onClose} maxWidth={560} maxHeight={maxHeight}>
       <OverlayHeader title={title} onClose={onClose} showHandle={isPhone} isRTL={isRTL} />
       <OverlayBody contentContainerClassName="px-5 pt-3 pb-6">
-        {mode === "surah" ? (
+        {mode === "filter-kind" ? (
           <>
             <PickerRow
-              active={filter.type === "all"}
+              active={filterKind === "surah"}
               isDark={isDark}
               isRTL={isRTL}
-              leading="*"
-              title={s.reflectionFeedAllSurahs}
-              subtitle={s.reflectionFeedAll}
-              onPress={() => onSelect(defaultFilter)}
+              leading=""
+              title={s.reflectionFeedFilterSurah}
+              onPress={() => onSelectKind("surah")}
             />
+            <PickerRow
+              active={filterKind === "juz"}
+              isDark={isDark}
+              isRTL={isRTL}
+              leading=""
+              title={s.reflectionFeedFilterJuz}
+              onPress={() => onSelectKind("juz")}
+            />
+          </>
+        ) : mode === "sort" ? (
+          <>
+            {sortOptions.map((option, index) => (
+              <PickerRow
+                key={option.value}
+                active={sort === option.value}
+                isDark={isDark}
+                isRTL={isRTL}
+                leading={uiLanguage === "ar" ? toArabicNumber(index + 1) : String(index + 1)}
+                title={option.label}
+                onPress={() => onSelectSort(option.value)}
+              />
+            ))}
+          </>
+        ) : filterKind === "surah" ? (
+          <>
             {options.surahs.map((surah) => {
-              const active = filter.type === "surah" && filter.surah === surah.number;
+              const active = selectedSurah === surah.number;
               return (
                 <PickerRow
                   key={surah.number}
@@ -530,24 +578,15 @@ function FilterPicker({
                   leading={uiLanguage === "ar" ? toArabicNumber(surah.number) : String(surah.number)}
                   title={uiLanguage === "ar" ? surah.nameArabic : surah.nameEnglish}
                   subtitle={uiLanguage === "ar" ? surah.nameEnglish : surah.nameArabic}
-                  onPress={() => onSelect({ type: "surah", surah: surah.number })}
+                  onPress={() => onSelectSurah(surah.number)}
                 />
               );
             })}
           </>
         ) : (
           <>
-            <PickerRow
-              active={filter.type === "all"}
-              isDark={isDark}
-              isRTL={isRTL}
-              leading="*"
-              title={s.reflectionFeedAllJuz}
-              subtitle={s.reflectionFeedAll}
-              onPress={() => onSelect(defaultFilter)}
-            />
             {options.juz.map((juz) => {
-              const active = filter.type === "juz" && filter.juz === juz.juz;
+              const active = selectedJuz === juz.juz;
               return (
                 <PickerRow
                   key={juz.juz}
@@ -557,7 +596,7 @@ function FilterPicker({
                   leading={uiLanguage === "ar" ? toArabicNumber(juz.juz) : String(juz.juz)}
                   title={`${s.tabJuz} ${uiLanguage === "ar" ? toArabicNumber(juz.juz) : juz.juz}`}
                   subtitle={`${uiLanguage === "ar" ? juz.surahNameArabic : juz.surahNameEnglish} ${juz.startSurah}:${juz.startAyah}`}
-                  onPress={() => onSelect({ type: "juz", juz: juz.juz })}
+                  onPress={() => onSelectJuz(juz.juz)}
                 />
               );
             })}
@@ -582,7 +621,7 @@ function PickerRow({
   isRTL: boolean;
   leading: string;
   title: string;
-  subtitle: string;
+  subtitle?: string;
   onPress: () => void;
 }) {
   return (
@@ -601,18 +640,20 @@ function PickerRow({
             : "transparent",
       })}
     >
-      <View
-        className={`h-10 w-10 items-center justify-center rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 ${
-          isRTL ? "ml-3" : "mr-3"
-        }`}
-      >
-        <Text
-          className="text-primary-accent dark:text-primary-bright"
-          style={{ fontFamily: "Manrope_700Bold", fontSize: 12 }}
+      {!!leading && (
+        <View
+          className={`h-10 w-10 items-center justify-center rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 ${
+            isRTL ? "ml-3" : "mr-3"
+          }`}
         >
-          {leading}
-        </Text>
-      </View>
+          <Text
+            className="text-primary-accent dark:text-primary-bright"
+            style={{ fontFamily: "Manrope_700Bold", fontSize: 12 }}
+          >
+            {leading}
+          </Text>
+        </View>
+      )}
       <View className="flex-1">
         <Text
           className="text-charcoal dark:text-neutral-100"
@@ -620,12 +661,14 @@ function PickerRow({
         >
           {title}
         </Text>
-        <Text
-          className="mt-0.5 text-warm-400 dark:text-neutral-500"
-          style={{ fontFamily: "Manrope_400Regular", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
-        >
-          {subtitle}
-        </Text>
+        {!!subtitle && (
+          <Text
+            className="mt-0.5 text-warm-400 dark:text-neutral-500"
+            style={{ fontFamily: "Manrope_400Regular", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
+          >
+            {subtitle}
+          </Text>
+        )}
       </View>
     </Pressable>
   );
