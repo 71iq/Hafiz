@@ -9,7 +9,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { FlashList, FlashListRef } from "@shopify/flash-list";
 import { useChrome } from "@/lib/ui/chrome";
-import { BookOpen, AlignJustify, Eye, EyeOff, Search, BookMarked, ScanLine } from "lucide-react-native";
+import { BookOpen, AlignJustify, Eye, EyeOff, Home, Search, BookMarked, ScanLine } from "lucide-react-native";
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -36,9 +36,6 @@ import { useWordInteraction } from "@/lib/word/context";
 import { consumePendingDeepLink, peekPendingDeepLink } from "@/lib/deep-link";
 import { toArabicNumber } from "@/lib/arabic";
 import {
-  DESKTOP_CONTENT_GUTTER,
-  PERSISTENT_SIDEBAR_BREAKPOINT,
-  PERSISTENT_SIDEBAR_WIDTH,
   SIDEBAR_BREAKPOINT,
   VIEWPORT_BREAKPOINTS,
 } from "@/lib/ui/viewport";
@@ -198,7 +195,6 @@ function MushafInner() {
   const insets = useSafeAreaInsets();
   const isPhone = windowWidth < SIDEBAR_BREAKPOINT;
   const isTablet = windowWidth >= SIDEBAR_BREAKPOINT && windowWidth < VIEWPORT_BREAKPOINTS.desktop;
-  const hasPersistentSidebar = windowWidth >= PERSISTENT_SIDEBAR_BREAKPOINT;
   // Compact layout under ~480px tightens phone chrome spacing.
   const isNarrow = windowWidth < 480;
   const { selection, toastMessage, dismissToast } = useSelection();
@@ -213,8 +209,6 @@ function MushafInner() {
   const [focusControlsVisible, setFocusControlsVisible] = useState(false);
   const [focusToastMessage, setFocusToastMessage] = useState<string | null>(null);
   const focusControlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const persistentSidebarInset = hasPersistentSidebar && !focusModeActive ? PERSISTENT_SIDEBAR_WIDTH + DESKTOP_CONTENT_GUTTER : 0;
-
   const clearFocusControlsTimer = useCallback(() => {
     if (focusControlsTimerRef.current) {
       clearTimeout(focusControlsTimerRef.current);
@@ -770,6 +764,11 @@ function MushafInner() {
     setShowNavigator(true);
   }, [pauseFocusAutoScroll, resetHifzForNavigation]);
 
+  const handleGoHome = useCallback(() => {
+    pauseFocusAutoScroll();
+    router.navigate("/(tabs)/home");
+  }, [pauseFocusAutoScroll]);
+
   const isPageMode = viewMode === "page";
   const viewModeLabel = isPageMode ? s.mushafViewPage : s.mushafViewVerse;
   const toggleViewMode = useCallback(() => {
@@ -880,8 +879,8 @@ function MushafInner() {
     ? ({
         position: Platform.OS === "web" && (isPhone || isTablet) ? ("fixed" as any) : "absolute",
         top: 0,
-        left: hasPersistentSidebar && !isRTL ? persistentSidebarInset : 0,
-        right: hasPersistentSidebar && isRTL ? persistentSidebarInset : 0,
+        left: 0,
+        right: 0,
         zIndex: 80,
       } as const)
     : null;
@@ -1154,10 +1153,6 @@ function MushafInner() {
       <SafeAreaView
         className="flex-1 bg-surface dark:bg-surface-dark"
         edges={["top"]}
-        style={{
-          paddingLeft: hasPersistentSidebar && !isRTL ? persistentSidebarInset : 0,
-          paddingRight: hasPersistentSidebar && isRTL ? persistentSidebarInset : 0,
-        }}
       >
         {/* Header chrome — phone gets the new glass top bar, desktop keeps current layout. */}
         <Animated.View
@@ -1211,6 +1206,15 @@ function MushafInner() {
                       onPress={toggleViewMode}
                     />
                   )}
+                  <Pressable
+                    onPress={handleGoHome}
+                    accessibilityRole="button"
+                    accessibilityLabel={s.tabHome}
+                    className="rounded-full px-2.5 py-2"
+                    style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+                  >
+                    <Home size={16} color={isDark ? "#737373" : "#8B8178"} />
+                  </Pressable>
                   <Pressable
                     onPress={handleOpenBookmarks}
                     className="rounded-full px-2.5 py-2"
@@ -1276,6 +1280,15 @@ function MushafInner() {
                   onPress={toggleViewMode}
                 />
                 <Pressable
+                  onPress={handleGoHome}
+                  accessibilityRole="button"
+                  accessibilityLabel={s.tabHome}
+                  className={`rounded-full bg-surface-high dark:bg-surface-dark-high ${isNarrow ? "px-2 py-2" : "px-3 py-2"}`}
+                  style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+                >
+                  <Home size={16} color={isDark ? "#737373" : "#8B8178"} />
+                </Pressable>
+                <Pressable
                   onPress={handleOpenBookmarks}
                   className={`rounded-full bg-surface-high dark:bg-surface-dark-high ${isNarrow ? "px-2 py-2" : "px-3 py-2"}`}
                   style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
@@ -1326,7 +1339,7 @@ function MushafInner() {
                 >
                   <Search size={16} color={isDark ? "#737373" : "#8B8178"} />
                 </Pressable>
-                {!isNarrow && <FontSizeControl disabled={pageFontSizeLocked} />}
+                {!isNarrow && !pageFontSizeLocked && <FontSizeControl />}
               </View>
             </View>
           )}
@@ -1496,12 +1509,8 @@ function MushafInner() {
             style={[
               {
                 position: Platform.OS === "web" && (isPhone || isTablet) ? "fixed" as any : "absolute",
-                left: hasPersistentSidebar && !isRTL
-                  ? persistentSidebarInset + 12
-                  : isPhone || isTablet ? 12 : 0,
-                right: hasPersistentSidebar && isRTL
-                  ? persistentSidebarInset + 12
-                  : isPhone || isTablet ? 12 : 0,
+                left: isPhone || isTablet ? 12 : 0,
+                right: isPhone || isTablet ? 12 : 0,
                 bottom: railBottomOffset,
                 zIndex: 70,
                 borderRadius: isPhone || isTablet ? 22 : 0,

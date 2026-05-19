@@ -743,6 +743,11 @@ export function AppNavigation(props: BottomTabBarProps & { isRTL?: boolean }) {
   const { width } = useWindowDimensions();
   const hasPersistentSidebar = width >= PERSISTENT_SIDEBAR_BREAKPOINT;
   const isWide = width >= SIDEBAR_BREAKPOINT;
+  const activeRouteName = props.state.routes[props.state.index]?.name;
+
+  if (activeRouteName === "mushaf" && isWide) {
+    return null;
+  }
 
   if (hasPersistentSidebar) {
     return <PersistentSidebar {...props} />;
