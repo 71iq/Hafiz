@@ -1,22 +1,15 @@
-import { useState } from "react";
 import type { ReactNode } from "react";
 import { Platform, Pressable, Text, View } from "react-native";
-import { Clock3, Minus, Plus } from "lucide-react-native";
-import { Switch } from "@/components/ui/Switch";
-import {
-  OverlayBody,
-  OverlayFooter,
-  OverlayHeader,
-  ResponsiveSheet,
-} from "@/components/ui/ResponsiveOverlay";
+import { Eye, EyeOff, Gauge, Minus, Pause, Play, Plus } from "lucide-react-native";
 import {
   HIFZ_AUTO_DELAY_STEP_MS,
   MAX_HIFZ_AUTO_DELAY_MS,
+  DEFAULT_HIFZ_AUTO_DELAY_MS,
   MIN_HIFZ_AUTO_DELAY_MS,
   useSettings,
 } from "@/lib/settings/context";
 import { toArabicNumber } from "@/lib/arabic";
-import { useStrings } from "@/lib/i18n/useStrings";
+import { useStrings, interpolate } from "@/lib/i18n/useStrings";
 
 type Props = {
   canRevealNext: boolean;
@@ -28,10 +21,13 @@ type Props = {
   onStopAuto: () => void;
 };
 
-function formatSeconds(ms: number, isRTL: boolean) {
-  const seconds = ms / 1000;
-  const label = Number.isInteger(seconds) ? String(seconds) : seconds.toFixed(2).replace(/0$/, "");
-  return isRTL ? toArabicNumber(Number(label)) : label;
+function formatSpeed(ms: number, isRTL: boolean, template: string) {
+  const speed = DEFAULT_HIFZ_AUTO_DELAY_MS / ms;
+  const rounded = speed >= 1 ? Math.round(speed * 10) / 10 : Math.round(speed * 100) / 100;
+  const label = Number.isInteger(rounded) ? String(rounded) : String(rounded).replace(/0$/, "");
+  return interpolate(template, {
+    speed: isRTL ? toArabicNumber(Number(label)) : label,
+  });
 }
 
 function RailButton({
@@ -63,7 +59,7 @@ function RailButton({
       disabled={disabled}
       accessibilityRole="button"
       accessibilityLabel={label}
-      className="h-11 min-w-16 items-center justify-center rounded-full px-4"
+      className="h-11 w-11 items-center justify-center rounded-full"
       style={({ pressed }) => ({
         backgroundColor,
         opacity: disabled ? 0.4 : 1,
@@ -91,153 +87,91 @@ export function HifzControls({
   const {
     hifzAutoDelayMs,
     setHifzAutoDelayMs,
-    hifzAutoAdvancePage,
-    setHifzAutoAdvancePage,
     isDark,
     isRTL,
   } = useSettings();
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const iconColor = isDark ? "#d4d4d4" : "#4b4037";
   const teal = isDark ? "#2dd4bf" : "#0d9488";
   const red = isDark ? "#fca5a5" : "#dc2626";
-  const speedLabel = formatSeconds(hifzAutoDelayMs, isRTL);
-  const canDecreaseSpeed = hifzAutoDelayMs > MIN_HIFZ_AUTO_DELAY_MS;
-  const canIncreaseSpeed = hifzAutoDelayMs < MAX_HIFZ_AUTO_DELAY_MS;
+  const speedLabel = formatSpeed(hifzAutoDelayMs, isRTL, s.focusSpeedValue);
+  const canDecreaseSpeed = hifzAutoDelayMs < MAX_HIFZ_AUTO_DELAY_MS;
+  const canIncreaseSpeed = hifzAutoDelayMs > MIN_HIFZ_AUTO_DELAY_MS;
+  const decreaseSpeed = () => setHifzAutoDelayMs(hifzAutoDelayMs + HIFZ_AUTO_DELAY_STEP_MS);
+  const increaseSpeed = () => setHifzAutoDelayMs(hifzAutoDelayMs - HIFZ_AUTO_DELAY_STEP_MS);
 
   return (
-    <>
+    <View
+      className="items-center justify-center gap-2 px-2 py-2"
+      style={{
+        flexDirection: isRTL ? "row-reverse" : "row",
+        backgroundColor: isDark ? "rgba(28,25,23,0.95)" : "rgba(255,248,241,0.95)",
+      }}
+    >
+      <RailButton
+        label={s.hifzHidePreviousAyah}
+        disabled={!canHidePrevious}
+        tone="negative"
+        onPress={onHidePrevious}
+      >
+        <EyeOff size={21} color={red} strokeWidth={2.1} />
+      </RailButton>
+
+      <RailButton
+        label={autoRunning ? s.hifzPauseAutoReveal : s.hifzContinueAutoReveal}
+        tone={autoRunning ? "active" : "neutral"}
+        onPress={autoRunning ? onStopAuto : onStartAuto}
+      >
+        {autoRunning
+          ? <Pause size={20} color={teal} strokeWidth={2.2} />
+          : <Play size={20} color={teal} strokeWidth={2.2} />}
+      </RailButton>
+
       <View
-        className="items-center justify-center gap-3 px-3 py-2"
+        className="h-11 items-center justify-center gap-1 rounded-full px-1.5"
+        accessibilityRole="adjustable"
+        accessibilityLabel={s.hifzSpeedSeconds}
         style={{
           flexDirection: isRTL ? "row-reverse" : "row",
-          backgroundColor: isDark ? "rgba(28,25,23,0.95)" : "rgba(255,248,241,0.95)",
+          backgroundColor: isDark ? "rgba(38,38,38,0.84)" : "rgba(255,248,241,0.84)",
         }}
       >
         <RailButton
-          label={s.hifzHidePreviousAyah}
-          disabled={!canHidePrevious}
-          tone="negative"
-          onPress={onHidePrevious}
+          label={s.hifzDecreaseSpeed}
+          disabled={!canDecreaseSpeed}
+          onPress={decreaseSpeed}
         >
-          <Minus size={21} color={red} strokeWidth={2.2} />
+          <Minus size={17} color={iconColor} strokeWidth={2.2} />
         </RailButton>
-        <RailButton
-          label={s.hifzAutoReveal}
-          tone={autoRunning ? "active" : "neutral"}
-          onPress={() => setSettingsOpen(true)}
+        <View
+          className="min-w-16 items-center justify-center gap-1 px-1"
+          style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
         >
-          <Clock3 size={21} color={autoRunning ? teal : iconColor} strokeWidth={2.1} />
-        </RailButton>
+          <Gauge size={17} color={iconColor} strokeWidth={2.1} />
+          <Text
+            className="text-charcoal dark:text-neutral-100"
+            style={{ fontFamily: "Manrope_700Bold", fontSize: 12, fontVariant: ["tabular-nums"] }}
+            numberOfLines={1}
+          >
+            {speedLabel}
+          </Text>
+        </View>
         <RailButton
-          label={s.hifzRevealNextAyah}
-          disabled={!canRevealNext}
-          tone="positive"
-          onPress={onRevealNext}
+          label={s.hifzIncreaseSpeed}
+          disabled={!canIncreaseSpeed}
+          onPress={increaseSpeed}
         >
-          <Plus size={23} color={teal} strokeWidth={2.2} />
+          <Plus size={17} color={iconColor} strokeWidth={2.2} />
         </RailButton>
       </View>
 
-      <ResponsiveSheet
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        maxWidth={560}
-        maxHeight={420}
+      <RailButton
+        label={s.hifzRevealNextAyah}
+        disabled={!canRevealNext}
+        tone="positive"
+        onPress={onRevealNext}
       >
-        <OverlayHeader
-          title={s.hifzAutoReveal}
-          onClose={() => setSettingsOpen(false)}
-          showHandle
-          isRTL={isRTL}
-        />
-        <OverlayBody scrollEnabled={false} className="px-5 py-5">
-          <View className="gap-5">
-            <View
-              className="items-center justify-between gap-4"
-              style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
-            >
-              <View className={isRTL ? "items-end" : "items-start"}>
-                <Text
-                  className="text-charcoal dark:text-neutral-100"
-                  style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15, textAlign: isRTL ? "right" : "left" }}
-                >
-                  {s.hifzSpeedSeconds}
-                </Text>
-                <Text
-                  className="mt-1 text-warm-500 dark:text-neutral-400"
-                  style={{ fontFamily: "Manrope_400Regular", fontSize: 13, textAlign: isRTL ? "right" : "left" }}
-                >
-                  {s.hifzTimeBetweenWords}
-                </Text>
-              </View>
-
-              <View
-                className="items-center gap-2"
-                style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
-              >
-                <RailButton
-                  label={s.hifzHidePreviousAyah}
-                  disabled={!canDecreaseSpeed}
-                  onPress={() => setHifzAutoDelayMs(hifzAutoDelayMs - HIFZ_AUTO_DELAY_STEP_MS)}
-                >
-                  <Minus size={18} color={iconColor} />
-                </RailButton>
-                <View className="min-w-16 items-center rounded-xl bg-surface-mid px-3 py-2 dark:bg-surface-dark-mid">
-                  <Text
-                    className="text-charcoal dark:text-neutral-100"
-                    style={{ fontFamily: "Manrope_700Bold", fontSize: 14, fontVariant: ["tabular-nums"] }}
-                  >
-                    {speedLabel}
-                  </Text>
-                </View>
-                <RailButton
-                  label={s.hifzRevealNextAyah}
-                  disabled={!canIncreaseSpeed}
-                  onPress={() => setHifzAutoDelayMs(hifzAutoDelayMs + HIFZ_AUTO_DELAY_STEP_MS)}
-                >
-                  <Plus size={18} color={iconColor} />
-                </RailButton>
-              </View>
-            </View>
-
-            <View
-              className="items-center justify-between gap-4"
-              style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
-            >
-              <Text
-                className="flex-1 text-charcoal dark:text-neutral-100"
-                style={{
-                  fontFamily: "Manrope_500Medium",
-                  fontSize: 15,
-                  textAlign: isRTL ? "right" : "left",
-                  writingDirection: isRTL ? "rtl" : "ltr",
-                }}
-              >
-                {s.hifzAutoNextPage}
-              </Text>
-              <Switch value={hifzAutoAdvancePage} onValueChange={setHifzAutoAdvancePage} />
-            </View>
-          </View>
-        </OverlayBody>
-        <OverlayFooter isRTL={isRTL}>
-          <Pressable
-            onPress={() => {
-              if (autoRunning) onStopAuto();
-              else onStartAuto();
-              setSettingsOpen(false);
-            }}
-            className="flex-1 items-center rounded-xl bg-primary-accent py-3 dark:bg-primary-bright"
-            style={({ pressed }) => ({ opacity: pressed ? 0.9 : 1 })}
-          >
-            <Text
-              className="text-white"
-              style={{ fontFamily: "Manrope_700Bold", fontSize: 15 }}
-            >
-              {autoRunning ? s.hifzStop : s.hifzStart}
-            </Text>
-          </Pressable>
-        </OverlayFooter>
-      </ResponsiveSheet>
-    </>
+        <Eye size={21} color={teal} strokeWidth={2.1} />
+      </RailButton>
+    </View>
   );
 }
