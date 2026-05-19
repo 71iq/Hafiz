@@ -11,6 +11,7 @@ type Props = {
   isRTL?: boolean;
   activeDays?: number;
   totalReviews?: number;
+  showSummaryStats?: boolean;
 };
 
 const BASE_CELL_SIZE = 13;
@@ -46,13 +47,13 @@ function formatDateKey(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-export function ActivityHeatmap({ data, isDark, s, isRTL, activeDays, totalReviews }: Props) {
+export function ActivityHeatmap({ data, isDark, s, isRTL, activeDays, totalReviews, showSummaryStats = true }: Props) {
   const [tooltip, setTooltip] = useState<{ date: string; count: number } | null>(null);
   const [containerWidth, setContainerWidth] = useState(0);
   const { width } = useWindowDimensions();
   const isArabic = !!isRTL;
   const layoutWidth = containerWidth || width;
-  const showSummary = layoutWidth >= SUMMARY_BREAKPOINT;
+  const showSummary = showSummaryStats && layoutWidth >= SUMMARY_BREAKPOINT;
   const isSidebarWidth = width >= SIDEBAR_BREAKPOINT;
   const isDesktopWidth = width >= 1024;
   const CELL_GAP = isDesktopWidth ? 5 : isSidebarWidth ? 4 : 3;

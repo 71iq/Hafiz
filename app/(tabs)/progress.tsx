@@ -223,41 +223,47 @@ export default function ProgressScreen() {
           </View>
         </Card>
 
-        {/* Stats grid — real data */}
-        <View
-          className="mb-6 gap-3"
-          style={{
-            flexDirection: "row",
-            flexWrap: "wrap",
-          }}
-        >
-          {statItems.map((item) => (
-            <ProgressStatCard
-              key={item.label}
-              value={item.value}
-              label={item.label}
+        {/* Activity and stats */}
+        <Card elevation="low" className="p-5 mb-6">
+          <View
+            className="gap-5"
+            style={{
+              flexDirection: isLaptop ? (isRTL ? "row-reverse" : "row") : "column",
+              alignItems: "stretch",
+            }}
+          >
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text
+                className="mb-4 text-charcoal dark:text-neutral-200"
+                style={{
+                  fontFamily: "Manrope_700Bold",
+                  fontSize: 16,
+                  textAlign: isRTL ? "right" : "left",
+                  writingDirection: isRTL ? "rtl" : "ltr",
+                }}
+              >
+                {s.progressActivity}
+              </Text>
+              <ActivityHeatmap
+                data={heatmapData}
+                isDark={isDark}
+                s={s}
+                isRTL={isRTL}
+                activeDays={activeReviewDays}
+                totalReviews={totalReviews}
+                showSummaryStats={false}
+              />
+            </View>
+            <CompactProgressStats
+              items={[
+                ...statItems,
+                { value: formatStat(activeReviewDays), label: s.heatmapActiveDays },
+                { value: formatStat(totalReviews), label: s.heatmapTotalReviews },
+              ]}
               isLaptop={isLaptop}
               isRTL={isRTL}
             />
-          ))}
-        </View>
-
-        {/* Activity heatmap */}
-        <Card elevation="low" className="p-6 mb-6">
-          <Text
-            className="text-charcoal dark:text-neutral-200 mb-4"
-            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16 }}
-          >
-            {s.progressActivity}
-          </Text>
-          <ActivityHeatmap
-            data={heatmapData}
-            isDark={isDark}
-            s={s}
-            isRTL={isRTL}
-            activeDays={activeReviewDays}
-            totalReviews={totalReviews}
-          />
+          </View>
         </Card>
 
         {/* Surah progress */}
@@ -370,34 +376,58 @@ export default function ProgressScreen() {
   );
 }
 
-function ProgressStatCard({
-  value,
-  label,
+function CompactProgressStats({
+  items,
   isLaptop,
   isRTL,
 }: {
-  value: string;
-  label: string;
+  items: { value: string; label: string }[];
   isLaptop: boolean;
   isRTL: boolean;
 }) {
   return (
-    <Card
-      elevation="low"
-      className="p-5"
+    <View
+      className="gap-2"
       style={{
-        width: isLaptop ? undefined : "48%",
-        flex: isLaptop ? 1 : undefined,
-        minWidth: isLaptop ? 0 : undefined,
+        width: isLaptop ? 330 : "100%",
+        flexDirection: isRTL ? "row-reverse" : "row",
+        flexWrap: "wrap",
+        alignContent: "flex-start",
+        justifyContent: isLaptop ? "flex-start" : isRTL ? "flex-start" : "space-between",
+        paddingTop: isLaptop ? 32 : 0,
+      }}
+    >
+      {items.map((item) => (
+        <CompactProgressStat key={item.label} value={item.value} label={item.label} isRTL={isRTL} />
+      ))}
+    </View>
+  );
+}
+
+function CompactProgressStat({
+  value,
+  label,
+  isRTL,
+}: {
+  value: string;
+  label: string;
+  isRTL: boolean;
+}) {
+  return (
+    <View
+      className="rounded-2xl bg-warm-100/80 px-3 py-2 dark:bg-neutral-900"
+      style={{
+        minWidth: 96,
       }}
     >
       <Text
         className="text-charcoal dark:text-neutral-100"
         style={{
           fontFamily: "NotoSerif_700Bold",
-          fontSize: 26,
+          fontSize: 18,
           textAlign: isRTL ? "right" : "left",
           writingDirection: isRTL ? "rtl" : "ltr",
+          fontVariant: ["tabular-nums"],
         }}
       >
         {value}
@@ -406,13 +436,13 @@ function ProgressStatCard({
         className="text-warm-400 dark:text-neutral-500 mt-1"
         style={{
           fontFamily: "Manrope_500Medium",
-          fontSize: 11,
+          fontSize: 10,
           textAlign: isRTL ? "right" : "left",
           writingDirection: isRTL ? "rtl" : "ltr",
         }}
       >
         {label}
       </Text>
-    </Card>
+    </View>
   );
 }
