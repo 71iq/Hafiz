@@ -4,7 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { FlashList } from "@shopify/flash-list";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
-import { BookOpen, ChevronDown, MessageSquare } from "lucide-react-native";
+import { ChevronDown, MessageSquare } from "lucide-react-native";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ReflectionsSkeleton } from "@/components/ui/Skeleton";
 import { Toast } from "@/components/ui/Toast";
@@ -136,17 +136,21 @@ export default function ReflectionFeedScreen() {
     return map;
   }, [options.surahs]);
 
-  const activeFilterLabel = useMemo(() => {
+  const selectedSurahLabel = useMemo(() => {
     if (filter.type === "surah") {
       const surah = surahByNumber.get(filter.surah);
       const name = uiLanguage === "ar" ? surah?.nameArabic : surah?.nameEnglish;
       return name ? `${s.tabSurah} ${name}` : `${s.tabSurah} ${filter.surah}`;
     }
+    return s.reflectionFeedFilterSurah;
+  }, [filter, s.reflectionFeedFilterSurah, s.tabSurah, surahByNumber, uiLanguage]);
+
+  const selectedJuzLabel = useMemo(() => {
     if (filter.type === "juz") {
       return `${s.tabJuz} ${uiLanguage === "ar" ? toArabicNumber(filter.juz) : filter.juz}`;
     }
-    return s.reflectionFeedAll;
-  }, [filter, s.reflectionFeedAll, s.tabJuz, s.tabSurah, surahByNumber, uiLanguage]);
+    return s.reflectionFeedFilterJuz;
+  }, [filter, s.reflectionFeedFilterJuz, s.tabJuz, uiLanguage]);
 
   const sortOptions: { value: ReflectionFeedSort; label: string }[] = [
     { value: "newest", label: s.reflectionFeedSortNewest },
@@ -277,10 +281,19 @@ export default function ReflectionFeedScreen() {
               </View>
             </View>
 
-            <View className={`mt-4 flex-wrap gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
-              <FilterButton label={s.reflectionFeedAll} active={filter.type === "all"} onPress={() => setFilter(defaultFilter)} />
-              <FilterButton label={s.reflectionFeedFilterSurah} active={filter.type === "surah"} onPress={() => setPickerMode("surah")} />
-              <FilterButton label={s.reflectionFeedFilterJuz} active={filter.type === "juz"} onPress={() => setPickerMode("juz")} />
+            <View className={`mt-4 gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
+              <FilterSelect
+                label={selectedSurahLabel}
+                active={filter.type === "surah"}
+                isRTL={isRTL}
+                onPress={() => setPickerMode("surah")}
+              />
+              <FilterSelect
+                label={selectedJuzLabel}
+                active={filter.type === "juz"}
+                isRTL={isRTL}
+                onPress={() => setPickerMode("juz")}
+              />
             </View>
 
             <View className={`mt-3 flex-wrap gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
@@ -294,20 +307,6 @@ export default function ReflectionFeedScreen() {
               ))}
             </View>
 
-            <View
-              className={`mt-4 items-center gap-2 rounded-2xl bg-surface-low px-3 py-2 dark:bg-surface-dark-low ${
-                isRTL ? "flex-row-reverse" : "flex-row"
-              }`}
-            >
-              <BookOpen size={15} color={isDark ? "#2dd4bf" : "#0d9488"} />
-              <Text
-                className="flex-1 text-warm-500 dark:text-neutral-400"
-                style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
-              >
-                {activeFilterLabel}
-              </Text>
-              <ChevronDown size={14} color={isDark ? "#737373" : "#A39B93"} />
-            </View>
           </View>
 
           {!configured ? (
@@ -383,6 +382,39 @@ export default function ReflectionFeedScreen() {
   );
 }
 
+function FilterSelect({
+  label,
+  active,
+  isRTL,
+  onPress,
+}: {
+  label: string;
+  active: boolean;
+  isRTL: boolean;
+  onPress: () => void;
+}) {
+  const iconColor = active ? "#FFFFFF" : "#A77F5A";
+
+  return (
+    <Pressable
+      onPress={onPress}
+      className={`min-w-[132px] flex-1 items-center gap-2 rounded-full px-4 py-2.5 ${
+        isRTL ? "flex-row-reverse" : "flex-row"
+      } ${active ? "bg-primary-accent dark:bg-primary-bright" : "bg-surface-low dark:bg-surface-dark-low"}`}
+      style={({ pressed }) => ({ opacity: pressed ? 0.75 : 1 })}
+    >
+      <Text
+        numberOfLines={1}
+        className={active ? "flex-1 text-white" : "flex-1 text-warm-500 dark:text-neutral-400"}
+        style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
+      >
+        {label}
+      </Text>
+      <ChevronDown size={14} color={iconColor} />
+    </Pressable>
+  );
+}
+
 function FilterButton({
   label,
   active,
@@ -437,8 +469,18 @@ function FilterPicker({
     <ResponsiveSheet open={mode !== null} onClose={onClose} maxWidth={560} maxHeight={maxHeight}>
       <OverlayHeader title={title} onClose={onClose} showHandle={isPhone} isRTL={isRTL} />
       <OverlayBody contentContainerClassName="px-5 pt-3 pb-6">
-        {mode === "surah"
-          ? options.surahs.map((surah) => {
+        {mode === "surah" ? (
+          <>
+            <PickerRow
+              active={filter.type === "all"}
+              isDark={isDark}
+              isRTL={isRTL}
+              leading="*"
+              title={s.reflectionFeedAllSurahs}
+              subtitle={s.reflectionFeedAll}
+              onPress={() => onSelect(defaultFilter)}
+            />
+            {options.surahs.map((surah) => {
               const active = filter.type === "surah" && filter.surah === surah.number;
               return (
                 <PickerRow
@@ -452,8 +494,20 @@ function FilterPicker({
                   onPress={() => onSelect({ type: "surah", surah: surah.number })}
                 />
               );
-            })
-          : options.juz.map((juz) => {
+            })}
+          </>
+        ) : (
+          <>
+            <PickerRow
+              active={filter.type === "all"}
+              isDark={isDark}
+              isRTL={isRTL}
+              leading="*"
+              title={s.reflectionFeedAllJuz}
+              subtitle={s.reflectionFeedAll}
+              onPress={() => onSelect(defaultFilter)}
+            />
+            {options.juz.map((juz) => {
               const active = filter.type === "juz" && filter.juz === juz.juz;
               return (
                 <PickerRow
@@ -468,6 +522,8 @@ function FilterPicker({
                 />
               );
             })}
+          </>
+        )}
       </OverlayBody>
     </ResponsiveSheet>
   );
