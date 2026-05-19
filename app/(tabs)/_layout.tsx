@@ -1,6 +1,6 @@
 import { View, Text } from "react-native";
 import { Tabs } from "expo-router";
-import { Sparkles, BookOpen, BarChart3, Settings, Trophy } from "lucide-react-native";
+import { Sparkles, BookOpen, BarChart3, Settings, Trophy, MessageSquare, BookMarked } from "lucide-react-native";
 import { useDatabaseStatus } from "@/lib/database/provider";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { SettingsProvider, useSettings } from "@/lib/settings/context";
@@ -70,11 +70,23 @@ function TabsWithStrings() {
         />
         <Tabs.Screen
           name="reflection-journey"
-          options={{ href: null }}
+          options={{
+            href: null,
+            title: s.reflectionJourneyTitle,
+            tabBarIcon: ({ color, size }) => (
+              <BookMarked size={size} color={color} fill="none" strokeWidth={2} />
+            ),
+          }}
         />
         <Tabs.Screen
           name="reflection-feed"
-          options={{ href: null }}
+          options={{
+            href: null,
+            title: s.reflectionFeedTitle,
+            tabBarIcon: ({ color, size }) => (
+              <MessageSquare size={size} color={color} fill="none" strokeWidth={2} />
+            ),
+          }}
         />
         {/* Visible tabs: Home, Mushaf, Leaderboard, Progress, Settings */}
         <Tabs.Screen

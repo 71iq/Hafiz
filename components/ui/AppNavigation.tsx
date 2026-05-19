@@ -2,12 +2,14 @@ import {
   View,
   Pressable,
   Text,
+  Image,
   Platform,
   StyleSheet,
   useWindowDimensions,
   type GestureResponderEvent,
 } from "react-native";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
+import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
   useAnimatedStyle,
@@ -19,6 +21,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useColorScheme } from "nativewind";
 import { useChrome } from "@/lib/ui/chrome";
 import { useStrings } from "@/lib/i18n/useStrings";
+import { useAuthStore } from "@/lib/auth/store";
 import {
   PERSISTENT_SIDEBAR_BREAKPOINT,
   PERSISTENT_SIDEBAR_WIDTH,
@@ -36,12 +39,34 @@ const INACTIVE_DARK = "rgba(232, 225, 218, 0.5)";
 const BAR_BG_LIGHT = "rgba(255, 248, 241, 0.80)";
 const BAR_BG_DARK = "rgba(28, 25, 23, 0.80)";
 const PANEL_WIDTH = 248;
+const SIDEBAR_PRIMARY_ROUTES = [
+  "home",
+  "mushaf",
+  "leaderboard",
+  "progress",
+  "reflection-feed",
+  "reflection-journey",
+] as const;
+const SIDEBAR_SETTINGS_ROUTE = "settings";
 
 function getVisibleRoutes(state: BottomTabBarProps["state"], descriptors: BottomTabBarProps["descriptors"]) {
   return state.routes.filter((route) => {
     const { options } = descriptors[route.key];
     const itemStyle = options.tabBarItemStyle as any;
     return !(itemStyle && itemStyle.display === "none");
+  });
+}
+
+function getSidebarRouteItems(
+  state: BottomTabBarProps["state"],
+  descriptors: BottomTabBarProps["descriptors"],
+  routeNames: readonly string[]
+) {
+  return routeNames.flatMap((name) => {
+    const route = state.routes.find((item) => item.name === name);
+    if (!route) return [];
+    const descriptor = descriptors[route.key];
+    return descriptor ? [{ route, descriptor }] : [];
   });
 }
 
@@ -215,14 +240,169 @@ function SidebarItem({
   );
 }
 
+function SidebarSeparator({
+  isDark,
+  isPersistent,
+}: {
+  isDark: boolean;
+  isPersistent?: boolean;
+}) {
+  return (
+    <View
+      className="mx-3 my-4"
+      style={{
+        height: 1,
+        backgroundColor: isPersistent
+          ? "rgba(253, 220, 145, 0.22)"
+          : isDark
+            ? "rgba(232, 225, 218, 0.12)"
+            : "rgba(45, 45, 45, 0.10)",
+      }}
+    />
+  );
+}
+
+function SidebarProfileCard({
+  isDark,
+  isRTL,
+  isPersistent,
+}: {
+  isDark: boolean;
+  isRTL?: boolean;
+  isPersistent?: boolean;
+}) {
+  const s = useStrings();
+  const { user, profile } = useAuthStore();
+  const displayName = profile?.display_name || profile?.username || user?.email?.split("@")[0] || s.authProfile;
+  const avatarUrl = profile?.avatar_url;
+  const initial = Array.from(displayName.trim())[0]?.toUpperCase() || "H";
+  const nameColor = isPersistent ? "#FDDC91" : isDark ? "#F5F5F4" : "#2D2D2D";
+  const avatarBg = isPersistent
+    ? "rgba(253, 220, 145, 0.14)"
+    : isDark
+      ? "rgba(45, 212, 191, 0.14)"
+      : "rgba(13, 148, 136, 0.12)";
+  const cardBg = isPersistent
+    ? "rgba(253, 220, 145, 0.08)"
+    : isDark
+      ? "rgba(255, 255, 255, 0.05)"
+      : "rgba(255, 255, 255, 0.62)";
+
+  return (
+    <Pressable
+      onPress={() => router.push("/profile" as any)}
+      accessibilityRole="button"
+      className="flex-row items-center gap-3 rounded-2xl px-3 py-3"
+      style={({ pressed }) => ({
+        backgroundColor: cardBg,
+        direction: isRTL ? "rtl" : "ltr",
+        opacity: pressed ? 0.76 : 1,
+      })}
+    >
+      {avatarUrl ? (
+        <Image source={{ uri: avatarUrl }} style={styles.sidebarAvatar} />
+      ) : (
+        <View style={[styles.sidebarAvatarFallback, { backgroundColor: avatarBg }]}>
+          <Text
+            style={{
+              color: nameColor,
+              fontFamily: "Manrope_700Bold",
+              fontSize: 13,
+            }}
+          >
+            {initial}
+          </Text>
+        </View>
+      )}
+      <Text
+        numberOfLines={1}
+        style={[
+          styles.sidebarProfileName,
+          {
+            color: nameColor,
+            textAlign: isRTL ? "right" : "left",
+            writingDirection: isRTL ? "rtl" : "ltr",
+          },
+        ]}
+      >
+        {displayName}
+      </Text>
+    </Pressable>
+  );
+}
+
+function SidebarContent({
+  state,
+  descriptors,
+  navigation,
+  isDark,
+  isRTL,
+  isPersistent,
+  onNavigate,
+}: BottomTabBarProps & {
+  isDark: boolean;
+  isRTL?: boolean;
+  isPersistent?: boolean;
+  onNavigate?: () => void;
+}) {
+  const s = useStrings();
+  const primaryItems = getSidebarRouteItems(state, descriptors, SIDEBAR_PRIMARY_ROUTES);
+  const [settingsItem] = getSidebarRouteItems(state, descriptors, [SIDEBAR_SETTINGS_ROUTE]);
+
+  const renderItem = ({ route, descriptor }: { route: any; descriptor: any }) => {
+    const isFocused = state.index === state.routes.indexOf(route);
+    const onPress = () => {
+      const event = navigation.emit({ type: "tabPress", target: route.key, canPreventDefault: true });
+      if (!isFocused && !event.defaultPrevented) navigation.navigate(route.name, route.params);
+      onNavigate?.();
+    };
+
+    return (
+      <SidebarItem
+        key={route.key}
+        route={route}
+        descriptor={descriptor}
+        isFocused={isFocused}
+        onPress={onPress}
+        isDark={isDark}
+        isRTL={isRTL}
+      />
+    );
+  };
+
+  return (
+    <>
+      <View className={`px-3 pb-7 ${isRTL ? "items-end" : "items-start"}`}>
+        <Text
+          className={isPersistent ? "text-gold" : "text-primary dark:text-neutral-100"}
+          style={{
+            fontFamily: isRTL ? undefined : "NotoSerif_700Bold",
+            fontSize: isPersistent ? 24 : 22,
+            fontWeight: isRTL ? "700" : undefined,
+            textAlign: isRTL ? "right" : "left",
+            writingDirection: isRTL ? "rtl" : "ltr",
+          }}
+        >
+          {s.appName}
+        </Text>
+      </View>
+
+      <View className="gap-1">{primaryItems.map(renderItem)}</View>
+      <SidebarSeparator isDark={isDark} isPersistent={isPersistent} />
+      {isPersistent && <View className="flex-1" />}
+      {settingsItem ? renderItem(settingsItem) : null}
+      <SidebarSeparator isDark={isDark} isPersistent={isPersistent} />
+      <SidebarProfileCard isDark={isDark} isRTL={isRTL} isPersistent={isPersistent} />
+    </>
+  );
+}
+
 function FloatingPanel(props: BottomTabBarProps & { isRTL?: boolean }) {
-  const { state, descriptors, navigation, isRTL } = props;
+  const { isRTL } = props;
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
   const { colorScheme } = useColorScheme();
-  const s = useStrings();
   const isDark = colorScheme === "dark";
-  const visibleRoutes = getVisibleRoutes(state, descriptors);
   const { immersive } = useChrome();
   const [open, setOpen] = useState(false);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -350,44 +530,7 @@ function FloatingPanel(props: BottomTabBarProps & { isRTL?: boolean }) {
           onBlur={scheduleHidePanel}
           className="rounded-3xl bg-surface/95 dark:bg-surface-dark/95 px-4 py-5"
         >
-          <View className={`px-3 pb-6 ${isRTL ? "items-end" : "items-start"}`}>
-            <Text
-              className="text-primary dark:text-neutral-100"
-              style={{
-                fontFamily: isRTL ? undefined : "NotoSerif_700Bold",
-                fontSize: 22,
-                fontWeight: isRTL ? "700" : undefined,
-                textAlign: isRTL ? "right" : "left",
-                writingDirection: isRTL ? "rtl" : "ltr",
-              }}
-            >
-              {s.appName}
-            </Text>
-          </View>
-
-          <View className="gap-1">
-            {visibleRoutes.map((route) => {
-              const descriptor = descriptors[route.key];
-              const isFocused = state.index === state.routes.indexOf(route);
-              const onPress = () => {
-                const event = navigation.emit({ type: "tabPress", target: route.key, canPreventDefault: true });
-                if (!isFocused && !event.defaultPrevented) navigation.navigate(route.name, route.params);
-                hidePanel();
-              };
-
-              return (
-                <SidebarItem
-                  key={route.key}
-                  route={route}
-                  descriptor={descriptor}
-                  isFocused={isFocused}
-                  onPress={onPress}
-                  isDark={isDark}
-                  isRTL={isRTL}
-                />
-              );
-            })}
-          </View>
+          <SidebarContent {...props} isDark={isDark} onNavigate={hidePanel} />
         </Pressable>
       </Animated.View>
     </>
@@ -395,10 +538,8 @@ function FloatingPanel(props: BottomTabBarProps & { isRTL?: boolean }) {
 }
 
 function PersistentSidebar(props: BottomTabBarProps & { isRTL?: boolean }) {
-  const { state, descriptors, navigation, isRTL } = props;
+  const { isRTL } = props;
   const insets = useSafeAreaInsets();
-  const s = useStrings();
-  const visibleRoutes = getVisibleRoutes(state, descriptors);
   const { immersive } = useChrome();
   const sideStyle = isRTL ? { right: 16 } : { left: 16 };
 
@@ -416,44 +557,8 @@ function PersistentSidebar(props: BottomTabBarProps & { isRTL?: boolean }) {
       }}
       pointerEvents="box-none"
     >
-      <View className="h-full rounded-4xl bg-primary dark:bg-primary px-4 py-5">
-        <View className={`px-3 pb-7 ${isRTL ? "items-end" : "items-start"}`}>
-          <Text
-            className="text-gold"
-            style={{
-              fontFamily: isRTL ? undefined : "NotoSerif_700Bold",
-              fontSize: 24,
-              fontWeight: isRTL ? "700" : undefined,
-              textAlign: isRTL ? "right" : "left",
-              writingDirection: isRTL ? "rtl" : "ltr",
-            }}
-          >
-            {s.appName}
-          </Text>
-        </View>
-
-        <View className="gap-1">
-          {visibleRoutes.map((route) => {
-            const descriptor = descriptors[route.key];
-            const isFocused = state.index === state.routes.indexOf(route);
-            const onPress = () => {
-              const event = navigation.emit({ type: "tabPress", target: route.key, canPreventDefault: true });
-              if (!isFocused && !event.defaultPrevented) navigation.navigate(route.name, route.params);
-            };
-
-            return (
-              <SidebarItem
-                key={route.key}
-                route={route}
-                descriptor={descriptor}
-                isFocused={isFocused}
-                onPress={onPress}
-                isDark
-                isRTL={isRTL}
-              />
-            );
-          })}
-        </View>
+      <View className="h-full flex rounded-4xl bg-primary dark:bg-primary px-4 py-5">
+        <SidebarContent {...props} isDark isPersistent />
       </View>
     </View>
   );
@@ -516,5 +621,22 @@ const styles = StyleSheet.create({
   sidebarLabel: {
     fontFamily: "Manrope_500Medium",
     fontSize: 14,
+  },
+  sidebarAvatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+  },
+  sidebarAvatarFallback: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sidebarProfileName: {
+    flex: 1,
+    fontFamily: "Manrope_600SemiBold",
+    fontSize: 13,
   },
 });
