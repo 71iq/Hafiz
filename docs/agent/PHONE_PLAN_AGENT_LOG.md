@@ -1755,3 +1755,19 @@ Saved in `phase19/`:
 - `npx expo start --web --port 8098 --localhost`: launched successfully for browser smoke checks.
 - Web smoke checked at 360, 412, 768, 1024, and 1440 widths with no document overflow.
 - Verified Hifz page controls in EN/light and AR/dark: hidden words preserve QCF2 layout, markers remain visible, manual reveal/hide works, auto reveal advances words, and auto-next-page advances after page completion.
+
+## 2026-05-19 — Progress Achievements Modal
+
+### Scope decisions
+1. Changed only the Progress page achievement "View all" interaction.
+2. Kept the compact achievements card and recent unlocks visible in-page.
+3. Moved the full achievement grid into the existing responsive modal overlay.
+
+### Implemented in this step
+- `app/(tabs)/progress.tsx`:
+  - Replaced the inline expanded achievement grid with a modal opened by "View all".
+  - Reused the existing achievement grid and responsive overlay components.
+
+### Validation result
+- `npm run typecheck`: passed.
+- `npm run build:web`: passed.

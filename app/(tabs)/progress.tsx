@@ -2,9 +2,10 @@ import { useState, useCallback, useEffect } from "react";
 import { View, Text, ScrollView, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
-import { ChevronDown, ChevronUp, Trophy } from "lucide-react-native";
+import { ChevronDown, Trophy } from "lucide-react-native";
 import { Card } from "@/components/ui/Card";
 import { ScreenScrollView, useScreenContentLayout } from "@/components/ui/ScreenContent";
+import { OverlayBody, OverlayHeader, ResponsiveModal } from "@/components/ui/ResponsiveOverlay";
 import { ActivityHeatmap } from "@/components/progress/ActivityHeatmap";
 import { SurahProgressList } from "@/components/progress/SurahProgressList";
 import { AchievementBadge } from "@/components/achievements/AchievementBadge";
@@ -63,7 +64,7 @@ export default function ProgressScreen() {
   const [heatmapData, setHeatmapData] = useState<HeatmapDay[]>([]);
   const [surahProgress, setSurahProgress] = useState<SurahProgress[]>([]);
   const [achievementDashboard, setAchievementDashboard] = useState<AchievementDashboard | null>(null);
-  const [achievementsExpanded, setAchievementsExpanded] = useState(false);
+  const [achievementsModalOpen, setAchievementsModalOpen] = useState(false);
 
   const loadData = useCallback(async () => {
     const [cards, memorized, reviewStats, achievements] = await Promise.all([
@@ -296,8 +297,8 @@ export default function ProgressScreen() {
               </View>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={achievementsExpanded ? s.achievementsHideAll : s.achievementsViewAll}
-                onPress={() => setAchievementsExpanded((expanded) => !expanded)}
+                accessibilityLabel={s.achievementsViewAll}
+                onPress={() => setAchievementsModalOpen(true)}
                 className="rounded-full px-3 py-2"
                 style={({ pressed }) => ({
                   backgroundColor: isDark ? "rgba(45,212,191,0.12)" : "rgba(13,148,136,0.10)",
@@ -309,13 +310,9 @@ export default function ProgressScreen() {
                     className="text-primary dark:text-primary-bright"
                     style={{ fontFamily: "Manrope_700Bold", fontSize: 12 }}
                   >
-                    {achievementsExpanded ? s.achievementsHideAll : s.achievementsViewAll}
+                    {s.achievementsViewAll}
                   </Text>
-                  {achievementsExpanded ? (
-                    <ChevronUp size={15} color={isDark ? "#2dd4bf" : "#0d9488"} />
-                  ) : (
-                    <ChevronDown size={15} color={isDark ? "#2dd4bf" : "#0d9488"} />
-                  )}
+                  <ChevronDown size={15} color={isDark ? "#2dd4bf" : "#0d9488"} />
                 </View>
               </Pressable>
             </View>
@@ -339,15 +336,36 @@ export default function ProgressScreen() {
                 </ScrollView>
               </View>
             )}
-
-            {achievementsExpanded && (
-              <View className="mt-5">
-                <AchievementGrid items={achievementDashboard.items} />
-              </View>
-            )}
           </Card>
         )}
       </ScreenScrollView>
+
+      {achievementDashboard && (
+        <ResponsiveModal
+          open={achievementsModalOpen}
+          onClose={() => setAchievementsModalOpen(false)}
+          maxWidth={760}
+          surfaceColor={isDark ? "#0A0A0A" : "#FFF8F1"}
+        >
+          <OverlayHeader
+            title={s.achievementsTitle}
+            subtitle={`${achievementDashboard.unlockedCount} / ${achievementDashboard.totalCount}`}
+            isRTL={isRTL}
+            onClose={() => setAchievementsModalOpen(false)}
+            leading={
+              <View
+                className="h-11 w-11 items-center justify-center rounded-full"
+                style={{ backgroundColor: isDark ? "rgba(45,212,191,0.12)" : "rgba(13,148,136,0.10)" }}
+              >
+                <Trophy size={20} color={isDark ? "#2dd4bf" : "#0d9488"} />
+              </View>
+            }
+          />
+          <OverlayBody contentContainerClassName="px-5 py-5">
+            <AchievementGrid items={achievementDashboard.items} />
+          </OverlayBody>
+        </ResponsiveModal>
+      )}
     </SafeAreaView>
   );
 }
