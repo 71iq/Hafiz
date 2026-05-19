@@ -1771,3 +1771,24 @@ Saved in `phase19/`:
 ### Validation result
 - `npm run typecheck`: passed.
 - `npm run build:web`: passed.
+
+## 2026-05-19 — Progress Surah Modal
+
+### Scope decisions
+1. Changed only the Progress page Surah Progress presentation.
+2. Kept Surah progress data local/offline and preserved tap-through navigation to Mushaf.
+3. Matched the achievements pattern by keeping a compact in-page preview and moving the full list into a modal.
+
+### Implemented in this step
+- `components/progress/SurahProgressList.tsx`:
+  - Added a one-row horizontal preview mode capped by `previewLimit`.
+  - Added an end-of-row "View All" button and kept the full-list rendering path for the modal.
+- `app/(tabs)/progress.tsx`:
+  - Shows up to 10 Surah progress cards in a horizontal swipe row.
+  - Opens a responsive modal containing all Surah progress rows.
+- `lib/i18n/strings.ts`:
+  - Added bilingual Surah Progress "View All" text.
+
+### Validation result
+- `npm run typecheck`: passed.
+- `npm run build:web`: passed.

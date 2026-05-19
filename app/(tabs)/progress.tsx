@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import { View, Text, ScrollView, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
-import { ChevronDown, Trophy } from "lucide-react-native";
+import { BookOpen, ChevronDown, Trophy } from "lucide-react-native";
 import { Card } from "@/components/ui/Card";
 import { ScreenScrollView, useScreenContentLayout } from "@/components/ui/ScreenContent";
 import { OverlayBody, OverlayHeader, ResponsiveModal } from "@/components/ui/ResponsiveOverlay";
@@ -64,6 +64,7 @@ export default function ProgressScreen() {
   const [heatmapData, setHeatmapData] = useState<HeatmapDay[]>([]);
   const [surahProgress, setSurahProgress] = useState<SurahProgress[]>([]);
   const [achievementDashboard, setAchievementDashboard] = useState<AchievementDashboard | null>(null);
+  const [surahProgressModalOpen, setSurahProgressModalOpen] = useState(false);
   const [achievementsModalOpen, setAchievementsModalOpen] = useState(false);
 
   const loadData = useCallback(async () => {
@@ -273,7 +274,14 @@ export default function ProgressScreen() {
         >
           {s.progressSurahProgress}
         </Text>
-        <SurahProgressList data={surahProgress} isDark={isDark} isRTL={isRTL} isCompact={isLaptop} s={s} />
+        <SurahProgressList
+          data={surahProgress}
+          isDark={isDark}
+          isRTL={isRTL}
+          previewLimit={10}
+          onViewAll={() => setSurahProgressModalOpen(true)}
+          s={s}
+        />
 
         {/* Achievements */}
         {achievementDashboard && (
@@ -372,6 +380,37 @@ export default function ProgressScreen() {
           </OverlayBody>
         </ResponsiveModal>
       )}
+
+      <ResponsiveModal
+        open={surahProgressModalOpen}
+        onClose={() => setSurahProgressModalOpen(false)}
+        maxWidth={760}
+        surfaceColor={isDark ? "#0A0A0A" : "#FFF8F1"}
+      >
+        <OverlayHeader
+          title={s.progressSurahProgress}
+          isRTL={isRTL}
+          onClose={() => setSurahProgressModalOpen(false)}
+          leading={
+            <View
+              className="h-11 w-11 items-center justify-center rounded-full"
+              style={{ backgroundColor: isDark ? "rgba(45,212,191,0.12)" : "rgba(13,148,136,0.10)" }}
+            >
+              <BookOpen size={20} color={isDark ? "#2dd4bf" : "#0d9488"} />
+            </View>
+          }
+        />
+        <OverlayBody contentContainerClassName="px-5 py-5">
+          <SurahProgressList
+            data={surahProgress}
+            isDark={isDark}
+            isRTL={isRTL}
+            isCompact={isLaptop}
+            onItemPress={() => setSurahProgressModalOpen(false)}
+            s={s}
+          />
+        </OverlayBody>
+      </ResponsiveModal>
     </SafeAreaView>
   );
 }
