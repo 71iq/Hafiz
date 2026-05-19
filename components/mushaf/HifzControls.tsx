@@ -2,7 +2,6 @@ import type { ReactNode } from "react";
 import { Platform, Pressable, Text, View } from "react-native";
 import { Eye, EyeOff, Gauge, Minus, Pause, Play, Plus } from "lucide-react-native";
 import {
-  HIFZ_AUTO_DELAY_STEP_MS,
   MAX_HIFZ_AUTO_DELAY_MS,
   DEFAULT_HIFZ_AUTO_DELAY_MS,
   MIN_HIFZ_AUTO_DELAY_MS,
@@ -21,6 +20,10 @@ type Props = {
   onStopAuto: () => void;
 };
 
+const HIFZ_AUTO_DELAY_OPTIONS_MS = [
+  5000, 4750, 4500, 4250, 4000, 3750, 3500, 3250, 3000, 2750, 2500, 2250, 2000, 1750, 1500, 1250, 1000, 750, 500, 333, 250,
+] as const;
+
 function formatSpeed(ms: number, isRTL: boolean, template: string) {
   const speed = DEFAULT_HIFZ_AUTO_DELAY_MS / ms;
   const rounded = speed >= 1 ? Math.round(speed * 10) / 10 : Math.round(speed * 100) / 100;
@@ -28,6 +31,14 @@ function formatSpeed(ms: number, isRTL: boolean, template: string) {
   return interpolate(template, {
     speed: isRTL ? toArabicNumber(Number(label)) : label,
   });
+}
+
+function getNextFasterDelay(ms: number) {
+  return HIFZ_AUTO_DELAY_OPTIONS_MS.find((option) => option < ms) ?? MIN_HIFZ_AUTO_DELAY_MS;
+}
+
+function getNextSlowerDelay(ms: number) {
+  return [...HIFZ_AUTO_DELAY_OPTIONS_MS].reverse().find((option) => option > ms) ?? MAX_HIFZ_AUTO_DELAY_MS;
 }
 
 function RailButton({
@@ -96,8 +107,8 @@ export function HifzControls({
   const speedLabel = formatSpeed(hifzAutoDelayMs, isRTL, s.focusSpeedValue);
   const canDecreaseSpeed = hifzAutoDelayMs < MAX_HIFZ_AUTO_DELAY_MS;
   const canIncreaseSpeed = hifzAutoDelayMs > MIN_HIFZ_AUTO_DELAY_MS;
-  const decreaseSpeed = () => setHifzAutoDelayMs(hifzAutoDelayMs + HIFZ_AUTO_DELAY_STEP_MS);
-  const increaseSpeed = () => setHifzAutoDelayMs(hifzAutoDelayMs - HIFZ_AUTO_DELAY_STEP_MS);
+  const decreaseSpeed = () => setHifzAutoDelayMs(getNextSlowerDelay(hifzAutoDelayMs));
+  const increaseSpeed = () => setHifzAutoDelayMs(getNextFasterDelay(hifzAutoDelayMs));
 
   return (
     <View
