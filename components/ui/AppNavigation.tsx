@@ -401,10 +401,10 @@ function SettingsSidebarContent({
   const headerColor = isPersistent ? ACTIVE_TEXT : isDark ? "#F5F5F4" : "#2D2D2D";
   const activeColor = isPersistent ? ACTIVE_TEXT : isDark ? "#2dd4bf" : "#0d9488";
   const inactiveColor = isPersistent
-    ? "rgba(253, 220, 145, 0.62)"
+    ? INACTIVE_DARK
     : isDark ? INACTIVE_DARK : INACTIVE_LIGHT;
   const activeBg = isPersistent
-    ? "rgba(253, 220, 145, 0.14)"
+    ? ACTIVE_BG
     : isDark ? "rgba(45, 212, 191, 0.14)" : "rgba(13, 148, 136, 0.10)";
 
   const goBackToHome = () => {
