@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { View, Text, Pressable } from "react-native";
+import { ActivityIndicator, View, Text, Pressable } from "react-native";
 import { ChevronDown, ChevronUp, PenLine, MessageSquare } from "lucide-react-native";
 import { router, type Href } from "expo-router";
 import { ReflectionsSkeleton } from "@/components/ui/Skeleton";
@@ -31,6 +31,7 @@ export function ReflectionsSection({ surah, ayah, initiallyExpanded = false, sho
   const [page, setPage] = useState(0);
   const [allReflections, setAllReflections] = useState<Reflection[]>([]);
   const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [commentsReflectionId, setCommentsReflectionId] = useState<string | null>(null);
   const [writeOpen, setWriteOpen] = useState(false);
 
@@ -48,7 +49,7 @@ export function ReflectionsSection({ surah, ayah, initiallyExpanded = false, sho
 
   // Fetch first page when expanded
   const { isLoading } = useQuery({
-    queryKey: ["reflections", surah, ayah, 0],
+    queryKey: ["reflections", surah, ayah, 0, user?.id],
     queryFn: async () => {
       const result = await fetchReflections(surah, ayah, 0, user?.id);
       setAllReflections(result.data);
@@ -61,7 +62,9 @@ export function ReflectionsSection({ surah, ayah, initiallyExpanded = false, sho
   });
 
   const handleLoadMore = useCallback(async () => {
+    if (loadingMore || !hasMore) return;
     const nextPage = page + 1;
+    setLoadingMore(true);
     try {
       const result = await fetchReflections(surah, ayah, nextPage, user?.id);
       setAllReflections((prev) => [...prev, ...result.data]);
@@ -69,8 +72,10 @@ export function ReflectionsSection({ surah, ayah, initiallyExpanded = false, sho
       setPage(nextPage);
     } catch (e) {
       console.warn("[Reflections] Load more failed:", e);
+    } finally {
+      setLoadingMore(false);
     }
-  }, [surah, ayah, page, user?.id]);
+  }, [surah, ayah, page, user?.id, hasMore, loadingMore]);
 
   const handleLikeToggled = useCallback(
     (reflectionId: string, liked: boolean, delta: number) => {
@@ -171,15 +176,20 @@ export function ReflectionsSection({ surah, ayah, initiallyExpanded = false, sho
           {hasMore && (
             <Pressable
               onPress={handleLoadMore}
+              disabled={loadingMore}
               className="items-center py-2.5"
-              style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+              style={({ pressed }) => ({ opacity: pressed || loadingMore ? 0.6 : 1 })}
             >
-              <Text
-                className="text-primary-accent dark:text-primary-bright"
-                style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
-              >
-                {s.reflectionLoadMore}
-              </Text>
+              {loadingMore ? (
+                <ActivityIndicator size="small" color={isDark ? "#5eead4" : "#003638"} />
+              ) : (
+                <Text
+                  className="text-primary-accent dark:text-primary-bright"
+                  style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
+                >
+                  {s.reflectionLoadMore}
+                </Text>
+              )}
             </Pressable>
           )}
 

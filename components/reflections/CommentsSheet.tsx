@@ -1,7 +1,8 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { View, Text, TextInput, Pressable, ActivityIndicator } from "react-native";
 import { Send } from "lucide-react-native";
 import { router } from "expo-router";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { useAuthStore } from "@/lib/auth/store";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -37,26 +38,44 @@ export function CommentsSheet({ reflectionId, onClose, onCommentAdded }: Props) 
   const { isDark, isRTL, uiLanguage } = useSettings();
   const s = useStrings();
   const user = useAuthStore((s) => s.user);
-  const [comments, setComments] = useState<ReflectionComment[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [localComments, setLocalComments] = useState<ReflectionComment[]>([]);
   const [text, setText] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  const commentsQuery = useInfiniteQuery({
+    queryKey: ["reflectionComments", reflectionId],
+    queryFn: ({ pageParam }) => fetchComments(reflectionId ?? "", pageParam),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => (lastPage.hasMore ? allPages.length : undefined),
+    enabled: !!reflectionId,
+    staleTime: 1000 * 60,
+  });
+
+  const loadedComments = useMemo(
+    () => commentsQuery.data?.pages.flatMap((page) => page.data) ?? [],
+    [commentsQuery.data]
+  );
+
+  const comments = useMemo(() => {
+    const loadedIds = new Set(loadedComments.map((comment) => comment.id));
+    return [...loadedComments, ...localComments.filter((comment) => !loadedIds.has(comment.id))];
+  }, [loadedComments, localComments]);
+
   useEffect(() => {
-    if (!reflectionId) return;
-    setLoading(true);
-    fetchComments(reflectionId)
-      .then(setComments)
-      .catch(console.warn)
-      .finally(() => setLoading(false));
+    setLocalComments([]);
+    setText("");
   }, [reflectionId]);
+
+  useEffect(() => {
+    if (commentsQuery.error) console.warn("[Comments] Failed to load:", commentsQuery.error);
+  }, [commentsQuery.error]);
 
   const handleSubmit = useCallback(async () => {
     if (!user || !reflectionId || !text.trim()) return;
     setSubmitting(true);
     try {
       const comment = await addComment(user.id, reflectionId, text.trim());
-      setComments((prev) => [...prev, comment]);
+      setLocalComments((prev) => [...prev, comment]);
       setText("");
       onCommentAdded(reflectionId);
     } catch (e) {
@@ -92,7 +111,7 @@ export function CommentsSheet({ reflectionId, onClose, onCommentAdded }: Props) 
         </View>
 
         <OverlayBody className="flex-1 min-h-0" contentContainerClassName="pb-2">
-          {loading ? (
+          {commentsQuery.isLoading ? (
             <ActivityIndicator style={{ padding: 20 }} />
           ) : comments.length === 0 ? (
             <Text
@@ -107,33 +126,55 @@ export function CommentsSheet({ reflectionId, onClose, onCommentAdded }: Props) 
               {s.reflectionNoComments}
             </Text>
           ) : (
-            comments.map((c) => (
-              <View key={c.id} className="mb-3">
-                <View className={`items-center gap-2 mb-1 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
+            <>
+              {comments.map((c) => (
+                <View key={c.id} className="mb-3">
+                  <View className={`items-center gap-2 mb-1 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
+                    <Text
+                      className="text-charcoal dark:text-neutral-200"
+                      style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
+                    >
+                      {c.profiles?.display_name || c.profiles?.username || s.genericAnonymous}
+                    </Text>
+                    <Text style={{ fontFamily: "Manrope_400Regular", fontSize: 10, color: mutedColor }}>
+                      {relativeTime(c.created_at, s.justNow, uiLanguage)}
+                    </Text>
+                  </View>
                   <Text
-                    className="text-charcoal dark:text-neutral-200"
-                    style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
+                    className="text-charcoal dark:text-neutral-300"
+                    style={{
+                      fontFamily: "Manrope_400Regular",
+                      fontSize: 13,
+                      lineHeight: 20,
+                      textAlign: isRTL ? "right" : "left",
+                      writingDirection: isRTL ? "rtl" : "ltr",
+                    }}
                   >
-                    {c.profiles?.display_name || c.profiles?.username || s.genericAnonymous}
-                  </Text>
-                  <Text style={{ fontFamily: "Manrope_400Regular", fontSize: 10, color: mutedColor }}>
-                    {relativeTime(c.created_at, s.justNow, uiLanguage)}
+                    {c.content}
                   </Text>
                 </View>
-                <Text
-                  className="text-charcoal dark:text-neutral-300"
-                  style={{
-                    fontFamily: "Manrope_400Regular",
-                    fontSize: 13,
-                    lineHeight: 20,
-                    textAlign: isRTL ? "right" : "left",
-                    writingDirection: isRTL ? "rtl" : "ltr",
-                  }}
+              ))}
+
+              {commentsQuery.hasNextPage && (
+                <Pressable
+                  onPress={() => commentsQuery.fetchNextPage()}
+                  disabled={commentsQuery.isFetchingNextPage}
+                  className="items-center py-3"
+                  style={({ pressed }) => ({ opacity: pressed || commentsQuery.isFetchingNextPage ? 0.6 : 1 })}
                 >
-                  {c.content}
-                </Text>
-              </View>
-            ))
+                  {commentsQuery.isFetchingNextPage ? (
+                    <ActivityIndicator size="small" color={isDark ? "#5eead4" : "#003638"} />
+                  ) : (
+                    <Text
+                      className="text-primary-accent dark:text-primary-bright"
+                      style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
+                    >
+                      {s.reflectionLoadMore}
+                    </Text>
+                  )}
+                </Pressable>
+              )}
+            </>
           )}
         </OverlayBody>
 

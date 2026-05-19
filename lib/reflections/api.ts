@@ -3,6 +3,17 @@ import type { Reflection, ReflectionComment, ReflectionFeedFilter, ReflectionFee
 
 const PAGE_SIZE = 5;
 const FEED_PAGE_SIZE = 10;
+const COMMENT_PAGE_SIZE = 20;
+
+function pageBounds(page: number, pageSize: number) {
+  const from = page * pageSize;
+  return { from, to: from + pageSize };
+}
+
+function pageResult<T>(rows: T[], pageSize: number): { data: T[]; hasMore: boolean } {
+  const hasMore = rows.length > pageSize;
+  return { data: hasMore ? rows.slice(0, pageSize) : rows, hasMore };
+}
 
 function isMissingJuzColumnsError(error: { code?: string; message?: string } | null): boolean {
   return !!(
@@ -42,8 +53,7 @@ export async function fetchReflections(
 ): Promise<{ data: Reflection[]; hasMore: boolean }> {
   if (!isSupabaseConfigured()) return { data: [], hasMore: false };
 
-  const from = page * PAGE_SIZE;
-  const to = from + PAGE_SIZE;
+  const { from, to } = pageBounds(page, PAGE_SIZE);
 
   const { data, error } = await supabase
     .from("reflections")
@@ -57,10 +67,9 @@ export async function fetchReflections(
 
   if (error) throw error;
 
-  const reflections = (data ?? []) as Reflection[];
-  const hasMore = reflections.length > PAGE_SIZE;
-  const trimmed = await attachUserLikes(hasMore ? reflections.slice(0, PAGE_SIZE) : reflections, userId);
-  return { data: trimmed, hasMore };
+  const resultPage = pageResult((data ?? []) as Reflection[], PAGE_SIZE);
+  const trimmed = await attachUserLikes(resultPage.data, userId);
+  return { data: trimmed, hasMore: resultPage.hasMore };
 }
 
 /** Fetch the global reflection feed with optional Quran filters */
@@ -79,8 +88,7 @@ export async function fetchReflectionFeed({
 }): Promise<{ data: Reflection[]; hasMore: boolean }> {
   if (!isSupabaseConfigured()) return { data: [], hasMore: false };
 
-  const from = page * FEED_PAGE_SIZE;
-  const to = from + FEED_PAGE_SIZE;
+  const { from, to } = pageBounds(page, FEED_PAGE_SIZE);
 
   let query = supabase
     .from("reflections")
@@ -128,11 +136,10 @@ export async function fetchReflectionFeed({
   const { data, error } = await query.range(from, to);
   if (error) throw error;
 
-  const reflections = (data ?? []) as Reflection[];
-  const hasMore = reflections.length > FEED_PAGE_SIZE;
-  const trimmed = await attachUserLikes(hasMore ? reflections.slice(0, FEED_PAGE_SIZE) : reflections, userId);
+  const pageResultData = pageResult((data ?? []) as Reflection[], FEED_PAGE_SIZE);
+  const trimmed = await attachUserLikes(pageResultData.data, userId);
 
-  return { data: trimmed, hasMore };
+  return { data: trimmed, hasMore: pageResultData.hasMore };
 }
 
 /** Get reflection count for an ayah */
@@ -219,16 +226,21 @@ export async function toggleLike(
 
 /** Fetch comments for a reflection */
 export async function fetchComments(
-  reflectionId: string
-): Promise<ReflectionComment[]> {
+  reflectionId: string,
+  page: number
+): Promise<{ data: ReflectionComment[]; hasMore: boolean }> {
+  if (!isSupabaseConfigured()) return { data: [], hasMore: false };
+
+  const { from, to } = pageBounds(page, COMMENT_PAGE_SIZE);
   const { data, error } = await supabase
     .from("reflection_comments")
     .select("*, profiles:profiles!reflection_comments_user_id_fkey(username, display_name)")
     .eq("reflection_id", reflectionId)
-    .order("created_at", { ascending: true });
+    .order("created_at", { ascending: true })
+    .range(from, to);
 
   if (error) throw error;
-  return (data ?? []) as ReflectionComment[];
+  return pageResult((data ?? []) as ReflectionComment[], COMMENT_PAGE_SIZE);
 }
 
 /** Add a comment to a reflection */
