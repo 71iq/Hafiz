@@ -59,6 +59,7 @@ function ReflectionJourneyInner() {
   const selectedLevel = levels.find((level) => level.id === selectedLevelId) ?? null;
   const selectedIndex = selectedLevel ? levels.findIndex((level) => level.id === selectedLevel.id) : -1;
   const nextLevel = selectedIndex >= 0 ? levels[selectedIndex + 1] ?? null : null;
+  const contentWidthStyle = { alignSelf: "center" as const, width: isWide ? ("60%" as const) : ("100%" as const) };
 
   const loadLevels = useCallback(
     async (preferredLevelId?: string | null) => {
@@ -143,20 +144,11 @@ function ReflectionJourneyInner() {
   if (levels.length === 0) {
     return (
       <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
-        <View className="flex-1 px-6">
-          <View className="pt-8 pb-4">
-            <Text
-              className="text-charcoal dark:text-neutral-100"
-              style={{ fontFamily: "NotoSerif_700Bold", fontSize: 28, textAlign: isRTL ? "right" : "left" }}
-            >
-              {s.reflectionJourneyTitle}
-            </Text>
-          </View>
-          <Card elevation="low" className="rounded-4xl">
+        <View className="flex-1 items-center px-6 pt-8" style={contentWidthStyle}>
+          <Card elevation="low" className="w-full rounded-4xl">
             <EmptyState
               icon={BookMarked}
               title={s.reflectionJourneyEmptyTitle}
-              subtitle={s.reflectionJourneyEmptySubtitle}
               isDark={isDark}
             />
           </Card>
@@ -167,86 +159,81 @@ function ReflectionJourneyInner() {
 
   return (
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
-      <ScrollView className="flex-1 px-6" contentContainerStyle={{ paddingBottom: 120 }}>
-        <View className="pt-8 pb-4">
-          <View className={`items-start justify-between ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
-            <View className={isRTL ? "items-end" : "items-start"}>
-              <Text
-                className="text-warm-400 dark:text-neutral-500 uppercase"
-                style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, letterSpacing: 1.8 }}
-              >
-                {currentCountLabel}
-              </Text>
-              <Text
-                className="text-charcoal dark:text-neutral-100 mt-1"
-                style={{ fontFamily: "NotoSerif_700Bold", fontSize: 28, textAlign: isRTL ? "right" : "left" }}
-              >
-                {s.reflectionJourneyTitle}
-              </Text>
-              <Text
-                className="text-warm-500 dark:text-neutral-400 mt-1"
-                style={{ fontFamily: "Manrope_400Regular", fontSize: 13, lineHeight: 21, textAlign: isRTL ? "right" : "left" }}
-              >
-                {s.reflectionJourneySubtitle}
-              </Text>
-            </View>
-            <Button variant="ghost" size="sm" onPress={() => router.push("/home")} className="mt-1">
-              <Text className="text-charcoal dark:text-neutral-200" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}>
-                {s.tabHome}
-              </Text>
-            </Button>
-          </View>
-        </View>
-
-        <View className={isWide ? `flex-row gap-4 ${isRTL ? "flex-row-reverse" : ""}` : "gap-4"}>
-          <Card
-            elevation="low"
-            className={isWide ? "rounded-4xl p-4 self-start" : "rounded-4xl p-4"}
-            style={isWide ? { width: 280 } : undefined}
-          >
-            <Text
-              className="text-charcoal dark:text-neutral-100 mb-3"
-              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15, textAlign: isRTL ? "right" : "left" }}
-            >
-              {s.reflectionJourneyLevels}
-            </Text>
-
-            {isWide ? (
-              <View className="gap-2">
-                {levels.map((level) => (
-                  <LevelPill
-                    key={level.id}
-                    level={level}
-                    selected={level.id === selectedLevelId}
-                    onPress={() => !level.isLocked && setSelectedLevelId(level.id)}
-                  />
-                ))}
+      <ScrollView className="flex-1 px-6" contentContainerStyle={{ alignItems: "center", paddingBottom: 120 }}>
+        <View style={contentWidthStyle}>
+          <View className="pt-8 pb-4">
+            <View className={`items-start justify-between ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
+              <View className={isRTL ? "items-end" : "items-start"}>
+                <Text
+                  className="text-warm-400 dark:text-neutral-500 uppercase"
+                  style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, letterSpacing: 1.8 }}
+                >
+                  {currentCountLabel}
+                </Text>
+                <Text
+                  className="text-warm-500 dark:text-neutral-400 mt-1"
+                  style={{ fontFamily: "Manrope_400Regular", fontSize: 13, lineHeight: 21, textAlign: isRTL ? "right" : "left" }}
+                >
+                  {s.reflectionJourneySubtitle}
+                </Text>
               </View>
-            ) : (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{
-                  gap: 8,
-                  flexDirection: isRTL ? "row-reverse" : "row",
-                }}
-              >
-                {levels.map((level) => (
-                  <LevelPill
-                    key={level.id}
-                    level={level}
-                    selected={level.id === selectedLevelId}
-                    onPress={() => !level.isLocked && setSelectedLevelId(level.id)}
-                  />
-                ))}
-              </ScrollView>
-            )}
-          </Card>
+              <Button variant="ghost" size="sm" onPress={() => router.push("/home")} className="mt-1">
+                <Text className="text-charcoal dark:text-neutral-200" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}>
+                  {s.tabHome}
+                </Text>
+              </Button>
+            </View>
+          </View>
 
-          <View className="flex-1 gap-4">
-            {selectedLevel ? (
-              <>
-                <Card elevation="low" className="rounded-4xl p-5">
+          <View className={isWide ? `flex-row gap-4 ${isRTL ? "flex-row-reverse" : ""}` : "gap-4"}>
+            <Card
+              elevation="low"
+              className={isWide ? "rounded-4xl p-4 self-start" : "rounded-4xl p-4"}
+              style={isWide ? { width: 280 } : undefined}
+            >
+              <Text
+                className="text-charcoal dark:text-neutral-100 mb-3"
+                style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15, textAlign: isRTL ? "right" : "left" }}
+              >
+                {s.reflectionJourneyLevels}
+              </Text>
+
+              {isWide ? (
+                <View className="gap-2">
+                  {levels.map((level) => (
+                    <LevelPill
+                      key={level.id}
+                      level={level}
+                      selected={level.id === selectedLevelId}
+                      onPress={() => !level.isLocked && setSelectedLevelId(level.id)}
+                    />
+                  ))}
+                </View>
+              ) : (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{
+                    gap: 8,
+                    flexDirection: isRTL ? "row-reverse" : "row",
+                  }}
+                >
+                  {levels.map((level) => (
+                    <LevelPill
+                      key={level.id}
+                      level={level}
+                      selected={level.id === selectedLevelId}
+                      onPress={() => !level.isLocked && setSelectedLevelId(level.id)}
+                    />
+                  ))}
+                </ScrollView>
+              )}
+            </Card>
+
+            <View className="flex-1 gap-4">
+              {selectedLevel ? (
+                <>
+                  <Card elevation="low" className="rounded-4xl p-5">
                   <View className={`items-start justify-between ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
                     <View className={`flex-1 ${isRTL ? "items-end" : "items-start"}`}>
                       <Text
@@ -412,6 +399,7 @@ function ReflectionJourneyInner() {
               </>
             ) : null}
           </View>
+        </View>
         </View>
       </ScrollView>
 

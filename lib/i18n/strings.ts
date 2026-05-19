@@ -241,7 +241,6 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     reflectionJourneyMaxChars: "Max {{n}} characters",
     reflectionJourneyRecitationPlaceholder: "Recitation guidance will be added here later.",
     reflectionJourneyEmptyTitle: "No journey levels yet",
-    reflectionJourneyEmptySubtitle: "Add curated levels to assets/data/reflection-journey.json to start this feature.",
     // Progress page
     progressTitle: "Progress",
     progressDailyReminder: "Daily Reminder",
@@ -1174,7 +1173,6 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     reflectionJourneyMaxChars: "الحد الأقصى {{n}} حرفًا",
     reflectionJourneyRecitationPlaceholder: "ستُضاف إرشادات التلاوة هنا لاحقًا.",
     reflectionJourneyEmptyTitle: "لا توجد مستويات بعد",
-    reflectionJourneyEmptySubtitle: "أضف مستويات منسقة إلى assets/data/reflection-journey.json لبدء هذه الميزة.",
     // Reflections
     reflections: "تأملات",
     reflectionCount: "{{n}} تأملات",
