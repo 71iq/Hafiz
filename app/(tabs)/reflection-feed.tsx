@@ -38,7 +38,7 @@ type JuzOption = {
   ranges: ReflectionJuzRange[];
 };
 
-type FilterKind = "surah" | "juz";
+type FilterKind = "none" | "surah" | "juz";
 type PickerMode = "filter-kind" | "location" | "sort" | null;
 
 type FilterOptions = {
@@ -60,9 +60,9 @@ export default function ReflectionFeedScreen() {
   const user = useAuthStore((state) => state.user);
   const queryClient = useQueryClient();
   const configured = isSupabaseConfigured();
-  const [filterKind, setFilterKind] = useState<FilterKind>("surah");
-  const [selectedSurah, setSelectedSurah] = useState(1);
-  const [selectedJuz, setSelectedJuz] = useState(1);
+  const [filterKind, setFilterKind] = useState<FilterKind>("none");
+  const [selectedSurah, setSelectedSurah] = useState<number | null>(null);
+  const [selectedJuz, setSelectedJuz] = useState<number | null>(null);
   const [sort, setSort] = useState<ReflectionFeedSort>("newest");
   const [pickerMode, setPickerMode] = useState<PickerMode>(null);
   const [commentsReflectionId, setCommentsReflectionId] = useState<string | null>(null);
@@ -127,12 +127,16 @@ export default function ReflectionFeedScreen() {
   });
 
   const filter = useMemo<ReflectionFeedFilter>(
-    () => (filterKind === "surah" ? { type: "surah", surah: selectedSurah } : { type: "juz", juz: selectedJuz }),
+    () => {
+      if (filterKind === "surah" && selectedSurah !== null) return { type: "surah", surah: selectedSurah };
+      if (filterKind === "juz" && selectedJuz !== null) return { type: "juz", juz: selectedJuz };
+      return { type: "all" };
+    },
     [filterKind, selectedJuz, selectedSurah]
   );
 
   const selectedJuzRanges = useMemo(
-    () => (filterKind === "juz" ? options.juz.find((juz) => juz.juz === selectedJuz)?.ranges : undefined),
+    () => (filterKind === "juz" && selectedJuz !== null ? options.juz.find((juz) => juz.juz === selectedJuz)?.ranges : undefined),
     [filterKind, options.juz, selectedJuz]
   );
 
@@ -179,15 +183,23 @@ export default function ReflectionFeedScreen() {
   );
 
   const selectedSurahLabel = useMemo(() => {
+    if (selectedSurah === null) return s.reflectionFeedFilterAll;
     const surah = surahByNumber.get(selectedSurah);
     const name = uiLanguage === "ar" ? surah?.nameArabic : surah?.nameEnglish;
     return name ?? `${s.tabSurah} ${uiLanguage === "ar" ? toArabicNumber(selectedSurah) : selectedSurah}`;
-  }, [s.tabSurah, selectedSurah, surahByNumber, uiLanguage]);
+  }, [s.reflectionFeedFilterAll, s.tabSurah, selectedSurah, surahByNumber, uiLanguage]);
 
   const selectedJuzLabel = useMemo(
-    () => `${s.tabJuz} ${uiLanguage === "ar" ? toArabicNumber(selectedJuz) : selectedJuz}`,
-    [s.tabJuz, selectedJuz, uiLanguage]
+    () => (selectedJuz === null ? s.reflectionFeedFilterAll : `${s.tabJuz} ${uiLanguage === "ar" ? toArabicNumber(selectedJuz) : selectedJuz}`),
+    [s.reflectionFeedFilterAll, s.tabJuz, selectedJuz, uiLanguage]
   );
+
+  const selectedFilterKindLabel =
+    filterKind === "surah"
+      ? s.reflectionFeedFilterSurah
+      : filterKind === "juz"
+        ? s.reflectionFeedFilterJuz
+        : s.reflectionFeedFilterNone;
 
   const sortOptions: { value: ReflectionFeedSort; label: string }[] = [
     { value: "newest", label: s.reflectionFeedSortNewest },
@@ -327,7 +339,7 @@ export default function ReflectionFeedScreen() {
 
             <View className={`mt-4 flex-wrap gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
               <FilterSelect
-                label={filterKind === "surah" ? s.reflectionFeedFilterSurah : s.reflectionFeedFilterJuz}
+                label={selectedFilterKindLabel}
                 active
                 isRTL={isRTL}
                 minWidth={112}
@@ -335,7 +347,7 @@ export default function ReflectionFeedScreen() {
                 onPress={() => setPickerMode("filter-kind")}
               />
               <FilterSelect
-                label={filterKind === "surah" ? selectedSurahLabel : selectedJuzLabel}
+                label={filterKind === "juz" ? selectedJuzLabel : filterKind === "surah" ? selectedSurahLabel : s.reflectionFeedFilterAll}
                 active
                 isRTL={isRTL}
                 minWidth={184}
@@ -415,15 +427,19 @@ export default function ReflectionFeedScreen() {
         uiLanguage={uiLanguage}
         onSelectKind={(kind) => {
           setFilterKind(kind);
+          setSelectedSurah(null);
+          setSelectedJuz(null);
           setPickerMode(null);
         }}
         onSelectSurah={(surah) => {
           setSelectedSurah(surah);
+          setSelectedJuz(null);
           setFilterKind("surah");
           setPickerMode(null);
         }}
         onSelectJuz={(juz) => {
           setSelectedJuz(juz);
+          setSelectedSurah(null);
           setFilterKind("juz");
           setPickerMode(null);
         }}
@@ -502,16 +518,16 @@ function FilterPicker({
   mode: PickerMode;
   options: FilterOptions;
   filterKind: FilterKind;
-  selectedSurah: number;
-  selectedJuz: number;
+  selectedSurah: number | null;
+  selectedJuz: number | null;
   sort: ReflectionFeedSort;
   sortOptions: { value: ReflectionFeedSort; label: string }[];
   isDark: boolean;
   isRTL: boolean;
   uiLanguage: "en" | "ar";
   onSelectKind: (kind: FilterKind) => void;
-  onSelectSurah: (surah: number) => void;
-  onSelectJuz: (juz: number) => void;
+  onSelectSurah: (surah: number | null) => void;
+  onSelectJuz: (juz: number | null) => void;
   onSelectSort: (sort: ReflectionFeedSort) => void;
   onClose: () => void;
 }) {
@@ -524,7 +540,9 @@ function FilterPicker({
       ? s.reflectionFeedSelectFilterType
       : mode === "sort"
         ? s.reflectionFeedSortBy
-        : filterKind === "surah"
+        : filterKind === "none"
+          ? s.reflectionFeedFilterAll
+          : filterKind === "surah"
           ? s.reflectionFeedSelectSurah
           : s.reflectionFeedSelectJuz;
 
@@ -534,6 +552,14 @@ function FilterPicker({
       <OverlayBody contentContainerClassName="px-5 pt-3 pb-6">
         {mode === "filter-kind" ? (
           <>
+            <PickerRow
+              active={filterKind === "none"}
+              isDark={isDark}
+              isRTL={isRTL}
+              leading=""
+              title={s.reflectionFeedFilterNone}
+              onPress={() => onSelectKind("none")}
+            />
             <PickerRow
               active={filterKind === "surah"}
               isDark={isDark}
@@ -565,8 +591,25 @@ function FilterPicker({
               />
             ))}
           </>
+        ) : filterKind === "none" ? (
+          <PickerRow
+            active
+            isDark={isDark}
+            isRTL={isRTL}
+            leading=""
+            title={s.reflectionFeedFilterAll}
+            onPress={onClose}
+          />
         ) : filterKind === "surah" ? (
           <>
+            <PickerRow
+              active={selectedSurah === null}
+              isDark={isDark}
+              isRTL={isRTL}
+              leading=""
+              title={s.reflectionFeedFilterAll}
+              onPress={() => onSelectSurah(null)}
+            />
             {options.surahs.map((surah) => {
               const active = selectedSurah === surah.number;
               return (
@@ -585,6 +628,14 @@ function FilterPicker({
           </>
         ) : (
           <>
+            <PickerRow
+              active={selectedJuz === null}
+              isDark={isDark}
+              isRTL={isRTL}
+              leading=""
+              title={s.reflectionFeedFilterAll}
+              onPress={() => onSelectJuz(null)}
+            />
             {options.juz.map((juz) => {
               const active = selectedJuz === juz.juz;
               return (
