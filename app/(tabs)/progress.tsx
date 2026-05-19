@@ -261,6 +261,7 @@ export default function ProgressScreen() {
                 { value: formatStat(activeReviewDays), label: s.heatmapActiveDays },
                 { value: formatStat(totalReviews), label: s.heatmapTotalReviews },
               ]}
+              isDark={isDark}
               isLaptop={isLaptop}
               isRTL={isRTL}
             />
@@ -417,27 +418,29 @@ export default function ProgressScreen() {
 
 function CompactProgressStats({
   items,
+  isDark,
   isLaptop,
   isRTL,
 }: {
   items: { value: string; label: string }[];
+  isDark: boolean;
   isLaptop: boolean;
   isRTL: boolean;
 }) {
   return (
     <View
-      className="gap-2"
+      className="gap-3"
       style={{
-        width: isLaptop ? 330 : "100%",
+        width: isLaptop ? 360 : "100%",
         flexDirection: isRTL ? "row-reverse" : "row",
         flexWrap: "wrap",
         alignContent: "flex-start",
-        justifyContent: isLaptop ? "flex-start" : isRTL ? "flex-start" : "space-between",
-        paddingTop: isLaptop ? 32 : 0,
+        justifyContent: "space-between",
+        paddingTop: isLaptop ? 34 : 0,
       }}
     >
       {items.map((item) => (
-        <CompactProgressStat key={item.label} value={item.value} label={item.label} isRTL={isRTL} />
+        <CompactProgressStat key={item.label} value={item.value} label={item.label} isDark={isDark} isLaptop={isLaptop} isRTL={isRTL} />
       ))}
     </View>
   );
@@ -446,19 +449,38 @@ function CompactProgressStats({
 function CompactProgressStat({
   value,
   label,
+  isDark,
+  isLaptop,
   isRTL,
 }: {
   value: string;
   label: string;
+  isDark: boolean;
+  isLaptop: boolean;
   isRTL: boolean;
 }) {
   return (
     <View
-      className="rounded-2xl bg-warm-100/80 px-3 py-2 dark:bg-neutral-900"
+      className="rounded-2xl px-4 py-3"
       style={{
-        minWidth: 96,
+        width: isLaptop ? 174 : "48%",
+        minHeight: 74,
+        justifyContent: "space-between",
+        backgroundColor: isDark ? "#141414" : "#FFF8F1",
+        borderColor: isDark ? "rgba(45, 212, 191, 0.16)" : "rgba(13, 148, 136, 0.16)",
+        borderWidth: 1,
       }}
     >
+      <View
+        style={{
+          alignSelf: isRTL ? "flex-end" : "flex-start",
+          width: 24,
+          height: 3,
+          borderRadius: 999,
+          backgroundColor: isDark ? "#2dd4bf" : "#0d9488",
+          opacity: 0.82,
+        }}
+      />
       <Text
         className="text-charcoal dark:text-neutral-100"
         style={{
@@ -476,6 +498,7 @@ function CompactProgressStat({
         style={{
           fontFamily: "Manrope_500Medium",
           fontSize: 10,
+          lineHeight: 13,
           textAlign: isRTL ? "right" : "left",
           writingDirection: isRTL ? "rtl" : "ltr",
         }}
