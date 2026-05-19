@@ -9,7 +9,7 @@ import {
   type GestureResponderEvent,
 } from "react-native";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
   useAnimatedStyle,
@@ -27,7 +27,20 @@ import {
   PERSISTENT_SIDEBAR_WIDTH,
   SIDEBAR_BREAKPOINT,
 } from "@/lib/ui/viewport";
-import { PanelLeftOpen, PanelRightOpen } from "lucide-react-native";
+import {
+  ArrowLeft,
+  ArrowRight,
+  BookOpen,
+  FileText,
+  Info,
+  PanelLeftOpen,
+  PanelRightOpen,
+  RefreshCw,
+  SlidersHorizontal,
+  Sparkles,
+  User,
+  type LucideIcon,
+} from "lucide-react-native";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -48,6 +61,34 @@ const SIDEBAR_PRIMARY_ROUTES = [
   "reflection-journey",
 ] as const;
 const SIDEBAR_SETTINGS_ROUTE = "settings";
+const SETTINGS_CATEGORY_IDS = [
+  "general",
+  "reading",
+  "content",
+  "review",
+  "account",
+  "about",
+  "advanced",
+] as const;
+
+type SettingsCategoryId = typeof SETTINGS_CATEGORY_IDS[number];
+
+const SETTINGS_CATEGORY_ICONS: Record<SettingsCategoryId, LucideIcon> = {
+  general: SlidersHorizontal,
+  reading: BookOpen,
+  content: FileText,
+  review: RefreshCw,
+  account: User,
+  about: Info,
+  advanced: Sparkles,
+};
+
+function parseSettingsCategory(value: string | string[] | undefined): SettingsCategoryId {
+  const rawValue = Array.isArray(value) ? value[0] : value;
+  return SETTINGS_CATEGORY_IDS.includes(rawValue as SettingsCategoryId)
+    ? rawValue as SettingsCategoryId
+    : "general";
+}
 
 function getVisibleRoutes(state: BottomTabBarProps["state"], descriptors: BottomTabBarProps["descriptors"]) {
   return state.routes.filter((route) => {
@@ -331,6 +372,122 @@ function SidebarProfileCard({
   );
 }
 
+function SettingsSidebarContent({
+  navigation,
+  isDark,
+  isRTL,
+  isPersistent,
+  onNavigate,
+}: {
+  navigation: BottomTabBarProps["navigation"];
+  isDark: boolean;
+  isRTL?: boolean;
+  isPersistent?: boolean;
+  onNavigate?: () => void;
+}) {
+  const s = useStrings();
+  const params = useLocalSearchParams<{ category?: string | string[] }>();
+  const activeCategory = parseSettingsCategory(params.category);
+  const BackIcon = isRTL ? ArrowRight : ArrowLeft;
+  const settingsCategories: Array<{ id: SettingsCategoryId; title: string; icon: LucideIcon }> = [
+    { id: "general", title: s.settingsCategoryGeneral, icon: SETTINGS_CATEGORY_ICONS.general },
+    { id: "reading", title: s.settingsCategoryReading, icon: SETTINGS_CATEGORY_ICONS.reading },
+    { id: "content", title: s.settingsCategoryContent, icon: SETTINGS_CATEGORY_ICONS.content },
+    { id: "review", title: s.settingsCategoryReview, icon: SETTINGS_CATEGORY_ICONS.review },
+    { id: "account", title: s.settingsCategoryAccount, icon: SETTINGS_CATEGORY_ICONS.account },
+    { id: "about", title: s.settingsCategoryAbout, icon: SETTINGS_CATEGORY_ICONS.about },
+    { id: "advanced", title: s.settingsCategoryAdvanced, icon: SETTINGS_CATEGORY_ICONS.advanced },
+  ];
+  const headerColor = isPersistent ? ACTIVE_TEXT : isDark ? "#F5F5F4" : "#2D2D2D";
+  const activeColor = isPersistent ? ACTIVE_TEXT : isDark ? "#2dd4bf" : "#0d9488";
+  const inactiveColor = isPersistent
+    ? "rgba(253, 220, 145, 0.62)"
+    : isDark ? INACTIVE_DARK : INACTIVE_LIGHT;
+  const activeBg = isPersistent
+    ? "rgba(253, 220, 145, 0.14)"
+    : isDark ? "rgba(45, 212, 191, 0.14)" : "rgba(13, 148, 136, 0.10)";
+
+  const goBackToHome = () => {
+    navigation.navigate("home");
+    onNavigate?.();
+  };
+
+  const selectCategory = (category: SettingsCategoryId) => {
+    router.setParams({ category });
+    onNavigate?.();
+  };
+
+  return (
+    <>
+      <Pressable
+        onPress={goBackToHome}
+        accessibilityRole="button"
+        className="mb-5 flex-row items-center gap-3 rounded-2xl px-3 py-3"
+        style={({ pressed }) => ({
+          backgroundColor: pressed
+            ? isPersistent ? "rgba(253, 220, 145, 0.12)" : isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(45, 45, 45, 0.06)"
+            : "transparent",
+          direction: isRTL ? "rtl" : "ltr",
+          opacity: pressed ? 0.78 : 1,
+        })}
+      >
+        <BackIcon size={18} color={headerColor} />
+        <Text
+          style={{
+            color: headerColor,
+            flex: 1,
+            fontFamily: "Manrope_700Bold",
+            fontSize: 16,
+            textAlign: isRTL ? "right" : "left",
+            writingDirection: isRTL ? "rtl" : "ltr",
+          }}
+        >
+          {s.tabSettings}
+        </Text>
+      </Pressable>
+
+      <View className="gap-1">
+        {settingsCategories.map((category) => {
+          const isActive = activeCategory === category.id;
+          const Icon = category.icon;
+          const iconColor = isActive ? activeColor : inactiveColor;
+
+          return (
+            <Pressable
+              key={category.id}
+              onPress={() => selectCategory(category.id)}
+              accessibilityRole="button"
+              accessibilityState={isActive ? { selected: true } : {}}
+              className="flex-row items-center gap-3 rounded-2xl px-4 py-3"
+              style={({ pressed }) => ({
+                backgroundColor: isActive ? activeBg : "transparent",
+                direction: isRTL ? "rtl" : "ltr",
+                opacity: pressed ? 0.78 : 1,
+                transform: [{ scale: pressed ? 0.96 : 1 }],
+              })}
+            >
+              <Icon size={20} color={iconColor} />
+              <Text
+                style={[
+                  styles.sidebarLabel,
+                  {
+                    color: iconColor,
+                    fontFamily: isActive ? "Manrope_700Bold" : "Manrope_500Medium",
+                    textAlign: isRTL ? "right" : "left",
+                    writingDirection: isRTL ? "rtl" : "ltr",
+                  },
+                ]}
+              >
+                {category.title}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </>
+  );
+}
+
 function SidebarContent({
   state,
   descriptors,
@@ -346,6 +503,8 @@ function SidebarContent({
   onNavigate?: () => void;
 }) {
   const s = useStrings();
+  const activeRoute = state.routes[state.index];
+  const isSettingsRoute = activeRoute?.name === SIDEBAR_SETTINGS_ROUTE;
   const primaryItems = getSidebarRouteItems(state, descriptors, SIDEBAR_PRIMARY_ROUTES);
   const [settingsItem] = getSidebarRouteItems(state, descriptors, [SIDEBAR_SETTINGS_ROUTE]);
 
@@ -353,7 +512,9 @@ function SidebarContent({
     const isFocused = state.index === state.routes.indexOf(route);
     const onPress = () => {
       const event = navigation.emit({ type: "tabPress", target: route.key, canPreventDefault: true });
-      if (!isFocused && !event.defaultPrevented) navigation.navigate(route.name, route.params);
+      if (!isFocused && !event.defaultPrevented) {
+        navigation.navigate(route.name, route.name === SIDEBAR_SETTINGS_ROUTE ? { category: "general" } : route.params);
+      }
       onNavigate?.();
     };
 
@@ -369,6 +530,18 @@ function SidebarContent({
       />
     );
   };
+
+  if (isSettingsRoute) {
+    return (
+      <SettingsSidebarContent
+        navigation={navigation}
+        isDark={isDark}
+        isRTL={isRTL}
+        isPersistent={isPersistent}
+        onNavigate={onNavigate}
+      />
+    );
+  }
 
   return (
     <>

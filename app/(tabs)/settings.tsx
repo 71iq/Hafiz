@@ -33,7 +33,7 @@ import { fullQfUserSync, runInitialQfUserSync } from "@/lib/quran-foundation/use
 import type { QfConnectionStatus } from "@/lib/quran-foundation/user-types";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { toArabicNumber } from "@/lib/arabic";
-import { DESKTOP_CONTENT_MAX_WIDTH, SETTINGS_CONTENT_MAX_WIDTH, SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
+import { SETTINGS_CONTENT_MAX_WIDTH, SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { ZaytPreviewModal } from "@/components/zayt/ZaytPreviewModal";
 
 type SettingsCategoryId = "general" | "reading" | "content" | "review" | "account" | "about" | "advanced";
@@ -57,13 +57,12 @@ export default function SettingsScreen() {
   const db = useDatabase();
   const s = useStrings();
   const router = useRouter();
-  const params = useLocalSearchParams<{ qf?: string; qf_error?: string }>();
+  const params = useLocalSearchParams<{ qf?: string; qf_error?: string; category?: string }>();
   const configured = isSupabaseConfigured();
   const qfSyncEnabled = isQfSyncEnabled();
   const [pickerVisible, setPickerVisible] = useState(false);
   const [zaytPreviewVisible, setZaytPreviewVisible] = useState(false);
   const [logoutDialogVisible, setLogoutDialogVisible] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<SettingsCategoryId>("general");
   const [mobileCategory, setMobileCategory] = useState<SettingsCategoryId | null>(null);
   const [qfStatus, setQfStatus] = useState<QfConnectionStatus>("disconnected");
   const [qfBusy, setQfBusy] = useState(false);
@@ -84,8 +83,9 @@ export default function SettingsScreen() {
   const TranslationChevron = isRTL ? ChevronLeft : ChevronRight;
   const { isLaptop } = useScreenContentLayout({ maxWidth: SETTINGS_CONTENT_MAX_WIDTH });
   const usesCategorySidebar = width >= SIDEBAR_BREAKPOINT;
-  const activeCategory = usesCategorySidebar ? selectedCategory : mobileCategory;
-  const settingsMaxWidth = usesCategorySidebar ? DESKTOP_CONTENT_MAX_WIDTH : SETTINGS_CONTENT_MAX_WIDTH;
+  const categoryParam = Array.isArray(params.category) ? params.category[0] : params.category;
+  const desktopCategory = parseSettingsCategory(categoryParam) ?? "general";
+  const activeCategory = usesCategorySidebar ? desktopCategory : mobileCategory;
   const modeLabels: Record<TestMode, string> = {
     nextAyah: s.flashcardsModeNextAyah,
     previousAyah: s.flashcardsModePreviousAyah,
@@ -281,12 +281,8 @@ export default function SettingsScreen() {
   ];
 
   const handleCategorySelect = useCallback((category: SettingsCategoryId) => {
-    if (usesCategorySidebar) {
-      setSelectedCategory(category);
-      return;
-    }
     setMobileCategory(category);
-  }, [usesCategorySidebar]);
+  }, []);
 
   const categoryPanels = (
     <>
@@ -890,7 +886,7 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
-      <ScreenScrollView maxWidth={settingsMaxWidth} contentContainerStyle={{ paddingBottom: 48 }}>
+      <ScreenScrollView maxWidth={SETTINGS_CONTENT_MAX_WIDTH} contentContainerStyle={{ paddingBottom: 48 }}>
         {/* Header */}
         <View className="pt-8 pb-4">
           <Text
@@ -902,24 +898,8 @@ export default function SettingsScreen() {
         </View>
 
         {usesCategorySidebar ? (
-          <View
-            className="gap-6 pb-8"
-            style={{
-              alignItems: "flex-start",
-              flexDirection: isRTL ? "row-reverse" : "row",
-            }}
-          >
-            <SettingsCategoryNav
-              categories={settingsCategories}
-              activeCategory={activeCategory}
-              isDark={isDark}
-              isRTL={isRTL}
-              sidebar
-              onSelect={handleCategorySelect}
-            />
-            <View className="flex-1">
-              {categoryPanels}
-            </View>
+          <View className="pb-8">
+            {categoryPanels}
           </View>
         ) : (
           <View className="pb-8">
@@ -962,29 +942,40 @@ export default function SettingsScreen() {
   );
 }
 
+function parseSettingsCategory(value: string | undefined): SettingsCategoryId | null {
+  switch (value) {
+    case "general":
+    case "reading":
+    case "content":
+    case "review":
+    case "account":
+    case "about":
+    case "advanced":
+      return value;
+    default:
+      return null;
+  }
+}
+
 function SettingsCategoryNav({
   categories,
   activeCategory,
   isDark,
   isRTL,
-  sidebar = false,
   onSelect,
 }: {
   categories: SettingsCategory[];
   activeCategory: SettingsCategoryId | null;
   isDark: boolean;
   isRTL: boolean;
-  sidebar?: boolean;
   onSelect: (category: SettingsCategoryId) => void;
 }) {
   const RowChevron = isRTL ? ChevronLeft : ChevronRight;
-  const sidebarWidth = 220;
 
   return (
     <Card
       elevation="low"
       className="p-2"
-      style={sidebar ? { width: sidebarWidth, flexShrink: 0 } : undefined}
     >
       <View className="gap-1">
         {categories.map((category) => {
@@ -1001,7 +992,7 @@ function SettingsCategoryNav({
             <Pressable
               key={category.id}
               onPress={() => onSelect(category.id)}
-              className={`w-full items-center gap-3 rounded-2xl px-3 ${sidebar ? "py-3" : "py-4"} ${
+              className={`w-full items-center gap-3 rounded-2xl px-3 py-4 ${
                 isActive
                   ? "bg-primary-accent/10 dark:bg-primary-bright/15"
                   : "bg-transparent"
