@@ -1102,7 +1102,7 @@ function SettingsSwitchRow({
 }) {
   return (
     <View
-      className="items-center gap-3 rounded-2xl bg-surface dark:bg-surface-dark px-3 py-2.5"
+      className="items-center justify-between rounded-2xl bg-surface dark:bg-surface-dark px-3 py-2.5"
       style={{
         flexDirection: isRTL ? "row-reverse" : "row",
         width: compact ? "48%" : "100%",
@@ -1112,6 +1112,7 @@ function SettingsSwitchRow({
         className="text-charcoal dark:text-neutral-300"
         style={{
           color: isDark ? "#d4d4d4" : "#2D2D2D",
+          flex: 1,
           flexShrink: 1,
           fontFamily: "Manrope_500Medium",
           fontSize: 14,
