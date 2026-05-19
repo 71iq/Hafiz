@@ -74,8 +74,14 @@ type CardData = {
   nextAyahQcf2?: string | null;
   nextV2Page?: number | null;
   smartDeckTitle?: string;
+  smartTargetRef?: SmartDeckRef;
   smartCue?: string;
   smartRefs?: SmartDeckRef[];
+  smartPromptQcf2?: string;
+  smartPromptUthmani?: string;
+  smartHiddenAnswerQcf2?: string;
+  smartHiddenAnswerUthmani?: string;
+  smartNeedsExplicitRefLabel?: boolean;
   qiraatText?: string;
   qiraatGroup?: string[];
 };
@@ -244,20 +250,20 @@ function FlashcardSessionScreen() {
         for (const row of dueRows) {
           if (cancelled) return;
           const smartContent = await getSmartCardContent(db, row.id);
-          if (smartContent?.refs[0]) {
-            const firstRef = smartContent.refs[0];
+          if (smartContent?.targetRef) {
+            const targetRef = smartContent.targetRef;
             loaded.push({
               kind: smartContent.kind,
               card: row,
-              surah: firstRef.surah,
-              ayah: firstRef.ayah,
-              surahName: firstRef.surahNameAr,
-              textUthmani: firstRef.textUthmani,
-              textQcf2: firstRef.textQcf2,
-              v2Page: firstRef.v2Page,
+              surah: targetRef.surah,
+              ayah: targetRef.ayah,
+              surahName: targetRef.surahNameAr,
+              textUthmani: targetRef.textUthmani,
+              textQcf2: targetRef.textQcf2,
+              v2Page: targetRef.v2Page,
               uniqueFront: {
-                text: smartContent.cue,
-                surahName: firstRef.surahNameAr,
+                text: smartContent.promptUthmani ?? smartContent.cue,
+                surahName: targetRef.surahNameAr,
                 contextCount: 0,
                 needsExplicitLabel: true,
               },
@@ -266,8 +272,14 @@ function FlashcardSessionScreen() {
               prevAyahText: null,
               nextAyahText: null,
               smartDeckTitle: getSmartDeckTitleForKind(smartContent.kind, s),
+              smartTargetRef: targetRef,
               smartCue: smartContent.cue,
               smartRefs: smartContent.refs,
+              smartPromptQcf2: smartContent.promptQcf2,
+              smartPromptUthmani: smartContent.promptUthmani,
+              smartHiddenAnswerQcf2: smartContent.hiddenAnswerQcf2,
+              smartHiddenAnswerUthmani: smartContent.hiddenAnswerUthmani,
+              smartNeedsExplicitRefLabel: smartContent.needsExplicitRefLabel,
               qiraatText: smartContent.qiraatText,
               qiraatGroup: smartContent.qiraatGroup,
             });
@@ -930,23 +942,27 @@ function SmartCueText({
   lineHeight: number;
   s: any;
 }) {
-  const cue = card.smartCue ?? card.uniqueFront.text;
+  const promptText = card.smartPromptUthmani ?? card.uniqueFront.text;
   return (
     <View className="items-center">
-      {card.kind === "similarTail" && (
+      {card.kind === "mutashabihat" && card.smartNeedsExplicitRefLabel && (
         <Text
-          className="text-warm-400 dark:text-neutral-500 text-center mb-2"
-          style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11 }}
+          className="text-warm-500 dark:text-neutral-400 text-center mb-3"
+          style={{ fontFamily: "Manrope_700Bold", fontSize: 12, writingDirection: "rtl" }}
         >
-          {s.smartDeckTailCue}
+          {card.surahName} {card.surah}:{card.ayah}
         </Text>
       )}
-      <Text
-        className="text-charcoal dark:text-neutral-100 text-center"
-        style={{ fontSize, lineHeight, writingDirection: "rtl" }}
-      >
-        {cue}
-      </Text>
+      {card.smartPromptQcf2 && card.v2Page ? (
+        <Qcf2AyahText textQcf2={card.smartPromptQcf2} v2Page={card.v2Page} fontSize={fontSize} lineHeight={lineHeight} />
+      ) : (
+        <Text
+          className="text-charcoal dark:text-neutral-100 text-center"
+          style={{ fontSize, lineHeight, writingDirection: "rtl" }}
+        >
+          {promptText}
+        </Text>
+      )}
     </View>
   );
 }
@@ -963,7 +979,11 @@ function SmartRefsAnswer({
   s: any;
 }) {
   const refs = card.smartRefs ?? [];
-  const title = card.kind === "similarTail" ? s.smartDeckSimilarTailAnswerTitle : s.smartDeckMutashabihatAnswerTitle;
+  const target = card.smartTargetRef ?? refs[0] ?? null;
+  const related = target
+    ? refs.filter((ref) => ref.groupId !== target.groupId || ref.sortOrder !== target.sortOrder)
+    : refs;
+  const title = card.kind === "similarTail" ? s.smartDeckCorrectTail : s.smartDeckTargetAyah;
   return (
     <ScrollView style={{ maxHeight: 420 }} nestedScrollEnabled>
       <Text
@@ -973,39 +993,82 @@ function SmartRefsAnswer({
         {title}
       </Text>
       <View className="gap-3">
-        {refs.map((ref, index) => (
-          <View
-            key={`${ref.surah}:${ref.ayah}:${index}`}
-            className="rounded-2xl bg-surface-low dark:bg-surface-dark-low p-4"
-          >
-            <View className="flex-row-reverse items-center justify-between mb-3">
-              <Text
-                className="text-primary-accent dark:text-primary-bright"
-                style={{ fontFamily: "Manrope_700Bold", fontSize: 13, writingDirection: "rtl" }}
-              >
-                {ref.surah}:{ref.ayah}
-              </Text>
-              <Text
-                className="text-warm-500 dark:text-neutral-400 flex-1 mr-3"
-                style={{ fontFamily: "Manrope_500Medium", fontSize: 12, textAlign: "right", writingDirection: "rtl" }}
-                numberOfLines={1}
-              >
-                {ref.surahNameAr}
-              </Text>
-            </View>
-            <Qcf2AyahText textQcf2={ref.textQcf2} v2Page={ref.v2Page} fontSize={fontSize} lineHeight={lineHeight} />
-            {card.kind === "similarTail" && ref.tail5 && (
-              <Text
-                className="text-warm-500 dark:text-neutral-400 mt-3"
-                style={{ fontFamily: "Manrope_500Medium", fontSize: 12, lineHeight: 20, textAlign: "right", writingDirection: "rtl" }}
-              >
-                {s.smartDeckTailComparisonCue}: {ref.tail5}
-              </Text>
-            )}
+        {card.kind === "similarTail" && card.smartHiddenAnswerQcf2 && target && (
+          <View className="rounded-2xl bg-primary-accent/10 dark:bg-primary-bright/10 p-4">
+            <Qcf2AyahText
+              textQcf2={card.smartHiddenAnswerQcf2}
+              v2Page={target.v2Page}
+              fontSize={fontSize * 1.08}
+              lineHeight={lineHeight * 1.08}
+              colorClassName="text-primary-accent dark:text-primary-bright"
+            />
           </View>
-        ))}
+        )}
+
+        {target && (
+          <SmartRefCard refData={target} fontSize={fontSize} lineHeight={lineHeight} />
+        )}
+
+        {card.kind === "mutashabihat" && card.smartCue && (
+          <Text
+            className="text-warm-500 dark:text-neutral-400"
+            style={{ fontFamily: "Manrope_500Medium", fontSize: 12, lineHeight: 20, textAlign: "right", writingDirection: "rtl" }}
+          >
+            {s.smartDeckComparisonCue}: {card.smartCue}
+          </Text>
+        )}
+
+        {related.length > 0 && (
+          <>
+            <Text
+              className="text-warm-400 dark:text-neutral-500 uppercase mt-2"
+              style={{ fontFamily: "Manrope_700Bold", fontSize: 11, letterSpacing: 1.1, textAlign: "right", writingDirection: "rtl" }}
+            >
+              {s.smartDeckRelatedAyahs}
+            </Text>
+            {related.map((ref, index) => (
+              <SmartRefCard
+                key={`${ref.groupId}:${ref.sortOrder}:${ref.surah}:${ref.ayah}:${index}`}
+                refData={ref}
+                fontSize={fontSize}
+                lineHeight={lineHeight}
+              />
+            ))}
+          </>
+        )}
       </View>
     </ScrollView>
+  );
+}
+
+function SmartRefCard({
+  refData,
+  fontSize,
+  lineHeight,
+}: {
+  refData: SmartDeckRef;
+  fontSize: number;
+  lineHeight: number;
+}) {
+  return (
+    <View className="rounded-2xl bg-surface-low dark:bg-surface-dark-low p-4">
+      <View className="flex-row-reverse items-center justify-between mb-3">
+        <Text
+          className="text-primary-accent dark:text-primary-bright"
+          style={{ fontFamily: "Manrope_700Bold", fontSize: 13, writingDirection: "rtl" }}
+        >
+          {refData.surah}:{refData.ayah}
+        </Text>
+        <Text
+          className="text-warm-500 dark:text-neutral-400 flex-1 mr-3"
+          style={{ fontFamily: "Manrope_500Medium", fontSize: 12, textAlign: "right", writingDirection: "rtl" }}
+          numberOfLines={1}
+        >
+          {refData.surahNameAr}
+        </Text>
+      </View>
+      <Qcf2AyahText textQcf2={refData.textQcf2} v2Page={refData.v2Page} fontSize={fontSize} lineHeight={lineHeight} />
+    </View>
   );
 }
 
@@ -1194,7 +1257,7 @@ function getModeName(mode: ReviewMode, s: any): string {
     surahName: s.flashcardsModeSurahName,
     wordMeaningArabic: s.flashcardsModeWordMeaningArabic,
     wordMeaningTranslation: s.flashcardsModeWordMeaningTranslation,
-    smartRefs: s.smartDeckMutashabihatAnswerTitle,
+    smartRefs: s.smartDeckTargetAyah,
     qiraatReading: s.smartDeckQiraatAnswerTitle,
   };
   return map[mode] ?? mode;
@@ -1225,9 +1288,9 @@ function getSmartDeckTitleForKind(kind: SmartCardKind, s: any): string {
 }
 
 function getSmartPrompt(card: CardData, s: any): string {
-  if (card.kind === "similarTail") return s.smartDeckSimilarTailPrompt;
+  if (card.kind === "similarTail") return s.smartDeckTailCompletePrompt;
   if (card.kind === "qiraat") return s.smartDeckQiraatPrompt;
-  return s.smartDeckMutashabihatPrompt;
+  return s.smartDeckMutashabihatPrefixPrompt;
 }
 
 function formatAyahKeyArabic(key: string): string {

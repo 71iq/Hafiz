@@ -19,12 +19,15 @@ export type BuiltInDeckFilter =
 export type SmartCardKind = "mutashabihat" | "similarTail" | "qiraat";
 
 export type SmartDeckRef = {
+  groupId: string | null;
+  sortOrder: number;
   surah: number;
   ayah: number;
   surahNameAr: string;
   surahNameEn: string;
   tail5: string | null;
   textUthmani: string;
+  textClean: string;
   textQcf2: string;
   v2Page: number;
 };
@@ -32,7 +35,14 @@ export type SmartDeckRef = {
 export type SmartCardContent = {
   kind: SmartCardKind;
   cue: string;
+  targetRef: SmartDeckRef;
   refs: SmartDeckRef[];
+  promptQcf2?: string;
+  promptUthmani?: string;
+  hiddenAnswerQcf2?: string;
+  hiddenAnswerUthmani?: string;
+  prefixWordCount?: number;
+  needsExplicitRefLabel?: boolean;
   qiraatText?: string;
   qiraatGroup?: string[];
 };
@@ -135,16 +145,28 @@ export async function getSmartDeckCandidateCardIds(
   const prefix = deckId === SMART_DECK_IDS.mutashabihat ? "mutashabihat:" : "similar-tail:";
   const params: any[] = [kind];
   const clause = buildFilterClause("r", activeFilter, params);
-  const rows = await db.getAllAsync<{ id: string; sort_order: number }>(
-    `SELECT DISTINCT g.id, g.sort_order
+  const rows = await db.getAllAsync<{
+    id: string;
+    group_sort_order: number;
+    ref_sort_order: number;
+    cue: string;
+    tail_5: string | null;
+    text_clean: string;
+    text_qcf2: string;
+  }>(
+    `SELECT g.id, g.sort_order AS group_sort_order, r.sort_order AS ref_sort_order,
+            g.cue, r.tail_5, qt.text_clean, qt.text_qcf2
        FROM mutashabihat_groups g
        JOIN mutashabihat_refs r ON r.group_id = g.id
+       JOIN quran_text qt ON qt.surah = r.surah AND qt.ayah = r.ayah
       WHERE g.kind = ?
         ${clause ? `AND ${clause}` : ""}
-      ORDER BY g.sort_order`,
+      ORDER BY g.sort_order, r.sort_order`,
     params
   );
-  return rows.map((row) => `${prefix}${row.id}`);
+  return rows
+    .filter((row) => kind !== "tail" || hasVisibleTailPrompt(row.cue, row.tail_5, row.text_clean, row.text_qcf2))
+    .map((row) => `${prefix}${row.id}:${row.ref_sort_order}`);
 }
 
 export async function getAllMatchingSmartCardIdSet(db: SQLiteDatabase): Promise<Set<string>> {
@@ -282,10 +304,14 @@ export async function getSmartCardContent(
   cardId: string
 ): Promise<SmartCardContent | null> {
   if (cardId.startsWith("mutashabihat:")) {
-    return getMutashabihatCardContent(db, cardId.slice("mutashabihat:".length), "mutashabihat");
+    const parsed = parseMutashabihatCardId(cardId, "mutashabihat:");
+    if (!parsed) return null;
+    return getMutashabihatCardContent(db, parsed.groupId, parsed.sortOrder, "mutashabihat");
   }
   if (cardId.startsWith("similar-tail:")) {
-    return getMutashabihatCardContent(db, cardId.slice("similar-tail:".length), "similarTail");
+    const parsed = parseMutashabihatCardId(cardId, "similar-tail:");
+    if (!parsed) return null;
+    return getMutashabihatCardContent(db, parsed.groupId, parsed.sortOrder, "similarTail");
   }
   if (cardId.startsWith("qiraat:")) {
     const [, surahRaw, ayahRaw] = cardId.split(":");
@@ -294,6 +320,7 @@ export async function getSmartCardContent(
     if (!Number.isFinite(surah) || !Number.isFinite(ayah)) return null;
     const row = await db.getFirstAsync<{
       text_uthmani: string;
+      text_clean: string;
       text_qcf2: string;
       v2_page: number;
       name_arabic: string;
@@ -301,7 +328,7 @@ export async function getSmartCardContent(
       qiraat_text: string;
       ayah_group: string | null;
     }>(
-      `SELECT qt.text_uthmani, qt.text_qcf2, qt.v2_page, s.name_arabic, s.name_english,
+      `SELECT qt.text_uthmani, qt.text_clean, qt.text_qcf2, qt.v2_page, s.name_arabic, s.name_english,
               qe.text AS qiraat_text, qe.ayah_group
          FROM qiraat_encyclopedia qe
          JOIN quran_text qt ON qt.surah = qe.surah AND qt.ayah = qe.ayah
@@ -310,19 +337,24 @@ export async function getSmartCardContent(
       [surah, ayah]
     );
     if (!row) return null;
+    const ref: SmartDeckRef = {
+      groupId: null,
+      sortOrder: 0,
+      surah,
+      ayah,
+      surahNameAr: row.name_arabic,
+      surahNameEn: row.name_english,
+      tail5: null,
+      textUthmani: row.text_uthmani,
+      textClean: row.text_clean,
+      textQcf2: row.text_qcf2,
+      v2Page: row.v2_page,
+    };
     return {
       kind: "qiraat",
       cue: `${surah}:${ayah}`,
-      refs: [{
-        surah,
-        ayah,
-        surahNameAr: row.name_arabic,
-        surahNameEn: row.name_english,
-        tail5: null,
-        textUthmani: row.text_uthmani,
-        textQcf2: row.text_qcf2,
-        v2Page: row.v2_page,
-      }],
+      targetRef: ref,
+      refs: [ref],
       qiraatText: row.qiraat_text,
       qiraatGroup: parseStringArray(row.ayah_group),
     };
@@ -333,22 +365,27 @@ export async function getSmartCardContent(
 async function getMutashabihatCardContent(
   db: SQLiteDatabase,
   groupId: string,
+  targetSortOrder: number,
   kind: "mutashabihat" | "similarTail"
 ): Promise<SmartCardContent | null> {
   const rows = await db.getAllAsync<{
     cue: string;
+    group_id: string;
+    ref_sort_order: number;
     ref_surah: number;
     ref_ayah: number;
     surah_name_ar: string | null;
     tail_5: string | null;
     text_uthmani: string;
+    text_clean: string;
     text_qcf2: string;
     v2_page: number;
     name_arabic: string;
     name_english: string;
   }>(
-    `SELECT g.cue, r.surah AS ref_surah, r.ayah AS ref_ayah, r.surah_name_ar, r.tail_5,
-            qt.text_uthmani, qt.text_qcf2, qt.v2_page, s.name_arabic, s.name_english
+    `SELECT g.cue, g.id AS group_id, r.sort_order AS ref_sort_order,
+            r.surah AS ref_surah, r.ayah AS ref_ayah, r.surah_name_ar, r.tail_5,
+            qt.text_uthmani, qt.text_clean, qt.text_qcf2, qt.v2_page, s.name_arabic, s.name_english
        FROM mutashabihat_groups g
        JOIN mutashabihat_refs r ON r.group_id = g.id
        JOIN quran_text qt ON qt.surah = r.surah AND qt.ayah = r.ayah
@@ -358,20 +395,179 @@ async function getMutashabihatCardContent(
     [groupId]
   );
   if (rows.length === 0) return null;
-  return {
-    kind,
-    cue: rows[0].cue,
-    refs: rows.map((row) => ({
+  const refs: SmartDeckRef[] = rows.map((row) => ({
+      groupId: row.group_id,
+      sortOrder: row.ref_sort_order,
       surah: row.ref_surah,
       ayah: row.ref_ayah,
       surahNameAr: row.surah_name_ar ?? row.name_arabic,
       surahNameEn: row.name_english,
       tail5: row.tail_5,
       textUthmani: row.text_uthmani,
+      textClean: row.text_clean,
       textQcf2: row.text_qcf2,
       v2Page: row.v2_page,
-    })),
+  }));
+  const targetRef = refs.find((ref) => ref.sortOrder === targetSortOrder);
+  if (!targetRef) return null;
+
+  if (kind === "similarTail") {
+    const prompt = buildTailPrompt(rows[0].cue, targetRef);
+    if (!prompt) return null;
+    return {
+      kind,
+      cue: rows[0].cue,
+      targetRef,
+      refs,
+      ...prompt,
+    };
+  }
+
+  return {
+    kind,
+    cue: rows[0].cue,
+    targetRef,
+    refs,
+    ...buildMutashabihatPrompt(targetRef, refs),
   };
+}
+
+function parseMutashabihatCardId(
+  cardId: string,
+  prefix: "mutashabihat:" | "similar-tail:"
+): { groupId: string; sortOrder: number } | null {
+  const body = cardId.slice(prefix.length);
+  const separator = body.lastIndexOf(":");
+  if (separator <= 0) return null;
+  const groupId = body.slice(0, separator);
+  const sortOrder = parseInt(body.slice(separator + 1), 10);
+  if (!groupId || !Number.isFinite(sortOrder)) return null;
+  return { groupId, sortOrder };
+}
+
+function hasVisibleTailPrompt(
+  cue: string,
+  tail5: string | null,
+  textClean: string,
+  textQcf2: string
+): boolean {
+  const wordCount = splitQuranWords(textClean).length || Math.max(0, splitQcf2Words(textQcf2).length - 1);
+  if (wordCount === 0) return false;
+  const hiddenCount = inferTailWordCount(cue, tail5, textClean);
+  return wordCount - hiddenCount > 0;
+}
+
+function buildTailPrompt(
+  cue: string,
+  targetRef: SmartDeckRef
+): Pick<SmartCardContent, "promptQcf2" | "promptUthmani" | "hiddenAnswerQcf2" | "hiddenAnswerUthmani" | "prefixWordCount"> | null {
+  const qcf2Tokens = splitQcf2Words(targetRef.textQcf2);
+  const uthmaniWords = splitQuranWords(targetRef.textUthmani);
+  const wordCount = splitQuranWords(targetRef.textClean).length || Math.max(0, qcf2Tokens.length - 1);
+  if (wordCount === 0) return null;
+
+  const hiddenCount = Math.min(inferTailWordCount(cue, targetRef.tail5, targetRef.textClean), wordCount);
+  const prefixWordCount = wordCount - hiddenCount;
+  if (prefixWordCount <= 0) return null;
+
+  return {
+    promptQcf2: qcf2Tokens.slice(0, prefixWordCount).join(" "),
+    promptUthmani: uthmaniWords.slice(0, prefixWordCount).join(" "),
+    hiddenAnswerQcf2: qcf2Tokens.slice(prefixWordCount).join(" "),
+    hiddenAnswerUthmani: uthmaniWords.slice(prefixWordCount).join(" "),
+    prefixWordCount,
+  };
+}
+
+function buildMutashabihatPrompt(
+  targetRef: SmartDeckRef,
+  refs: SmartDeckRef[]
+): Pick<SmartCardContent, "promptQcf2" | "promptUthmani" | "prefixWordCount" | "needsExplicitRefLabel"> {
+  const qcf2Tokens = splitQcf2Words(targetRef.textQcf2);
+  const uthmaniWords = splitQuranWords(targetRef.textUthmani);
+  const targetWords = normalizeArabicWords(targetRef.textClean);
+  const fallbackCount = qcf2Tokens.length || uthmaniWords.length || targetWords.length;
+  let prefixWordCount = fallbackCount;
+  let needsExplicitRefLabel = true;
+
+  if (targetWords.length > 0) {
+    const normalizedRefs = refs.map((ref) => ({
+      ref,
+      words: normalizeArabicWords(ref.textClean),
+    }));
+
+    for (let count = 1; count <= targetWords.length; count++) {
+      const targetPrefix = targetWords.slice(0, count).join(" ");
+      const matches = normalizedRefs.filter((item) => item.words.slice(0, count).join(" ") === targetPrefix);
+      if (matches.length === 1 && matches[0].ref.sortOrder === targetRef.sortOrder) {
+        prefixWordCount = count;
+        needsExplicitRefLabel = false;
+        break;
+      }
+    }
+  }
+
+  const safePrefixCount = Math.max(0, Math.min(prefixWordCount, qcf2Tokens.length || prefixWordCount));
+  return {
+    promptQcf2: qcf2Tokens.slice(0, safePrefixCount).join(" "),
+    promptUthmani: uthmaniWords.slice(0, safePrefixCount).join(" "),
+    prefixWordCount: safePrefixCount,
+    needsExplicitRefLabel,
+  };
+}
+
+function inferTailWordCount(cue: string, tail5: string | null, textClean: string): number {
+  const ayahWords = normalizeArabicWords(textClean);
+  if (ayahWords.length === 0) return 0;
+
+  const cueWords = normalizeArabicWords(cue);
+  const tail5Words = normalizeArabicWords(tail5 ?? "");
+  const cueMatch = suffixMatchCount(ayahWords, cueWords);
+  if (cueMatch > 0) return cueMatch;
+
+  const tail5Match = suffixMatchCount(ayahWords, tail5Words);
+  if (tail5Match > 0) return tail5Match;
+
+  const fallback = cueWords.length || tail5Words.length || 1;
+  return Math.min(fallback, ayahWords.length);
+}
+
+function suffixMatchCount(words: string[], suffix: string[]): number {
+  if (suffix.length === 0 || suffix.length > words.length) return 0;
+  const start = words.length - suffix.length;
+  for (let i = 0; i < suffix.length; i++) {
+    if (words[start + i] !== suffix[i]) return 0;
+  }
+  return suffix.length;
+}
+
+function splitQcf2Words(text: string): string[] {
+  return text.split(/\s+/).filter(Boolean);
+}
+
+function splitQuranWords(text: string): string[] {
+  return text
+    .replace(/[۞۩﴿﴾0-9٠-٩]/g, " ")
+    .split(/\s+/)
+    .map((word) => word.trim())
+    .filter(Boolean);
+}
+
+function normalizeArabicWords(text: string): string[] {
+  const normalized = text
+    .replace(/\(و\)/g, " ")
+    .replace(/لا(?=[\u0621-\u064A])/g, "لا ")
+    .replace(/[\u064B-\u065F\u0670\u06D6-\u06ED]/g, "")
+    .replace(/[ٱأإآ]/g, "ا")
+    .replace(/ى/g, "ي")
+    .replace(/ؤ/g, "و")
+    .replace(/ئ/g, "ي")
+    .replace(/ة/g, "ه")
+    .replace(/ـ/g, "")
+    .replace(/[^\u0621-\u064A\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return normalized ? normalized.split(" ") : [];
 }
 
 async function getSmartDeckDueRows(
