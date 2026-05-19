@@ -53,7 +53,7 @@ export default function ReflectionFeedScreen() {
   const { isDark, isRTL, uiLanguage } = useSettings();
   const { width } = useWindowDimensions();
   const isPhone = width < SIDEBAR_BREAKPOINT;
-  const { contentContainerStyle, railStyle, isLaptop } = useScreenContentLayout({
+  const { contentContainerStyle, railStyle } = useScreenContentLayout({
     maxWidth: REFLECTION_FEED_MAX_WIDTH,
   });
   const s = useStrings();
@@ -312,22 +312,11 @@ export default function ReflectionFeedScreen() {
               </View>
               <View className={`flex-1 ${isRTL ? "items-end" : "items-start"}`}>
                 <Text
-                  className="text-primary dark:text-gold-light"
-                  style={{
-                    fontFamily: "NotoSerif_700Bold",
-                    fontSize: isLaptop ? 34 : 30,
-                    lineHeight: isLaptop ? 40 : 36,
-                    textAlign: isRTL ? "right" : "left",
-                  }}
-                >
-                  {s.reflectionFeedTitle}
-                </Text>
-                <Text
-                  className="mt-1 text-warm-500 dark:text-neutral-400"
+                  className="text-warm-500 dark:text-neutral-400"
                   style={{
                     fontFamily: "Manrope_400Regular",
-                    fontSize: 13,
-                    lineHeight: 21,
+                    fontSize: 14,
+                    lineHeight: 22,
                     textAlign: isRTL ? "right" : "left",
                     writingDirection: isRTL ? "rtl" : "ltr",
                   }}

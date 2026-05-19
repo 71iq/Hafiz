@@ -177,18 +177,8 @@ export default function ProgressScreen() {
   return (
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
       <ScreenScrollView maxWidth={DESKTOP_CONTENT_MAX_WIDTH} contentContainerStyle={{ paddingBottom: 100 }}>
-        {/* Header */}
-        <View className="pt-8 pb-5">
-          <Text
-            className="text-charcoal dark:text-neutral-100"
-            style={{ fontFamily: "NotoSerif_700Bold", fontSize: isLaptop ? 32 : 28 }}
-          >
-            {s.progressTitle}
-          </Text>
-        </View>
-
         {/* Daily reminder card */}
-        <Card elevation="low" className="mb-6 bg-primary-soft dark:bg-primary-soft px-6 py-7">
+        <Card elevation="low" className="mt-8 mb-6 bg-primary-soft dark:bg-primary-soft px-6 py-7">
           <Text
             className="text-gold mb-2"
             style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16, letterSpacing: 0.5 }}
