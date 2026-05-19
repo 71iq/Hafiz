@@ -4,8 +4,8 @@ export type Reflection = {
   surah: number;
   ayah_start: number;
   ayah_end: number;
-  juz_start: number;
-  juz_end: number;
+  juz_start?: number | null;
+  juz_end?: number | null;
   content: string;
   likes_count: number;
   comments_count: number;
@@ -40,3 +40,10 @@ export type ReflectionFeedFilter =
   | { type: "all" }
   | { type: "surah"; surah: number }
   | { type: "juz"; juz: number };
+
+export type ReflectionJuzRange = {
+  juz: number;
+  surah: number;
+  ayah_start: number;
+  ayah_end: number;
+};

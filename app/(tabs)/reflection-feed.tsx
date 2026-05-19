@@ -16,7 +16,7 @@ import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { fetchReflectionFeed } from "@/lib/reflections/api";
-import type { Reflection, ReflectionFeedFilter, ReflectionFeedSort } from "@/lib/reflections/types";
+import type { Reflection, ReflectionFeedFilter, ReflectionFeedSort, ReflectionJuzRange } from "@/lib/reflections/types";
 import { useAuthStore } from "@/lib/auth/store";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { setPendingDeepLink } from "@/lib/deep-link";
@@ -35,6 +35,7 @@ type JuzOption = {
   startAyah: number;
   surahNameArabic: string;
   surahNameEnglish: string;
+  ranges: ReflectionJuzRange[];
 };
 
 type PickerMode = "surah" | "juz" | null;
@@ -69,7 +70,7 @@ export default function ReflectionFeedScreen() {
   const { data: options = { surahs: [], juz: [] } } = useQuery({
     queryKey: ["reflectionFeedOptions", uiLanguage],
     queryFn: async (): Promise<FilterOptions> => {
-      const [surahs, juzRows] = await Promise.all([
+      const [surahs, juzRows, juzRanges] = await Promise.all([
         db.getAllAsync<{ number: number; name_arabic: string; name_english: string }>(
           "SELECT number, name_arabic, name_english FROM surahs ORDER BY number"
         ),
@@ -93,7 +94,16 @@ export default function ReflectionFeedScreen() {
            JOIN surahs s ON s.number = CAST(j_start.sk / 10000 AS INTEGER)
            ORDER BY j_start.juz`
         ),
+        db.getAllAsync<ReflectionJuzRange>(
+          "SELECT juz, surah, ayah_start, ayah_end FROM juz_map ORDER BY juz, surah, ayah_start"
+        ),
       ]);
+      const rangesByJuz = new Map<number, ReflectionJuzRange[]>();
+      for (const range of juzRanges) {
+        const ranges = rangesByJuz.get(range.juz) ?? [];
+        ranges.push(range);
+        rangesByJuz.set(range.juz, ranges);
+      }
 
       return {
         surahs: surahs.map((row) => ({
@@ -107,15 +117,28 @@ export default function ReflectionFeedScreen() {
           startAyah: row.start_ayah,
           surahNameArabic: row.surah_name_arabic,
           surahNameEnglish: row.surah_name_english,
+          ranges: rangesByJuz.get(row.juz) ?? [],
         })),
       };
     },
     staleTime: Infinity,
   });
 
+  const selectedJuzRanges = useMemo(
+    () => (filter.type === "juz" ? options.juz.find((juz) => juz.juz === filter.juz)?.ranges : undefined),
+    [filter, options.juz]
+  );
+
   const feedQuery = useInfiniteQuery({
-    queryKey: ["reflectionFeed", filter, sort, user?.id],
-    queryFn: ({ pageParam }) => fetchReflectionFeed({ filter, sort, page: pageParam, userId: user?.id }),
+    queryKey: ["reflectionFeed", filter, sort, user?.id, selectedJuzRanges],
+    queryFn: ({ pageParam }) =>
+      fetchReflectionFeed({
+        filter,
+        sort,
+        page: pageParam,
+        userId: user?.id,
+        juzRanges: selectedJuzRanges,
+      }),
     initialPageParam: 0,
     getNextPageParam: (lastPage, allPages) => (lastPage.hasMore ? allPages.length : undefined),
     enabled: configured,
@@ -135,6 +158,18 @@ export default function ReflectionFeedScreen() {
     for (const surah of options.surahs) map.set(surah.number, surah);
     return map;
   }, [options.surahs]);
+
+  const findJuzForAyah = useCallback(
+    (surah: number, ayah: number): number | null => {
+      for (const juz of options.juz) {
+        for (const range of juz.ranges) {
+          if (range.surah === surah && ayah >= range.ayah_start && ayah <= range.ayah_end) return juz.juz;
+        }
+      }
+      return null;
+    },
+    [options.juz]
+  );
 
   const selectedSurahLabel = useMemo(() => {
     if (filter.type === "surah") {
@@ -184,18 +219,22 @@ export default function ReflectionFeedScreen() {
         reflection.ayah_start === reflection.ayah_end
           ? `${reflection.surah}:${reflection.ayah_start}`
           : `${reflection.surah}:${reflection.ayah_start}-${reflection.ayah_end}`;
+      const juzStart = Number.isFinite(reflection.juz_start)
+        ? reflection.juz_start
+        : findJuzForAyah(reflection.surah, reflection.ayah_start);
+      const juzEnd = Number.isFinite(reflection.juz_end)
+        ? reflection.juz_end
+        : findJuzForAyah(reflection.surah, reflection.ayah_end);
       const juzPart =
-        reflection.juz_start === reflection.juz_end
-          ? `${s.tabJuz} ${uiLanguage === "ar" ? toArabicNumber(reflection.juz_start) : reflection.juz_start}`
-          : `${s.tabJuz} ${
-              uiLanguage === "ar"
-                ? `${toArabicNumber(reflection.juz_start)}-${toArabicNumber(reflection.juz_end)}`
-                : `${reflection.juz_start}-${reflection.juz_end}`
-            }`;
+        juzStart && juzEnd
+          ? juzStart === juzEnd
+            ? `${s.tabJuz} ${uiLanguage === "ar" ? toArabicNumber(juzStart) : juzStart}`
+            : `${s.tabJuz} ${uiLanguage === "ar" ? `${toArabicNumber(juzStart)}-${toArabicNumber(juzEnd)}` : `${juzStart}-${juzEnd}`}`
+          : null;
 
-      return `${surahName ?? s.tabSurah} ${ayahPart} · ${juzPart}`;
+      return `${surahName ?? s.tabSurah} ${ayahPart}${juzPart ? ` · ${juzPart}` : ""}`;
     },
-    [s.tabJuz, s.tabSurah, surahByNumber, uiLanguage]
+    [findJuzForAyah, s.tabJuz, s.tabSurah, surahByNumber, uiLanguage]
   );
 
   const renderReflection = useCallback(

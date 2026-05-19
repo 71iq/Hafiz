@@ -1,8 +1,18 @@
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
-import type { Reflection, ReflectionComment, ReflectionFeedFilter, ReflectionFeedSort } from "./types";
+import type { Reflection, ReflectionComment, ReflectionFeedFilter, ReflectionFeedSort, ReflectionJuzRange } from "./types";
 
 const PAGE_SIZE = 5;
 const FEED_PAGE_SIZE = 10;
+
+function isMissingJuzColumnsError(error: { code?: string; message?: string } | null): boolean {
+  return !!(
+    error &&
+    (error.code === "PGRST204" ||
+      error.code === "PGRST205" ||
+      error.message?.includes("juz_start") ||
+      error.message?.includes("juz_end"))
+  );
+}
 
 async function attachUserLikes(reflections: Reflection[], userId?: string): Promise<Reflection[]> {
   if (!userId || reflections.length === 0) return reflections;
@@ -59,11 +69,13 @@ export async function fetchReflectionFeed({
   sort,
   page,
   userId,
+  juzRanges,
 }: {
   filter: ReflectionFeedFilter;
   sort: ReflectionFeedSort;
   page: number;
   userId?: string;
+  juzRanges?: ReflectionJuzRange[];
 }): Promise<{ data: Reflection[]; hasMore: boolean }> {
   if (!isSupabaseConfigured()) return { data: [], hasMore: false };
 
@@ -78,7 +90,11 @@ export async function fetchReflectionFeed({
   if (filter.type === "surah") {
     query = query.eq("surah", filter.surah);
   } else if (filter.type === "juz") {
-    query = query.lte("juz_start", filter.juz).gte("juz_end", filter.juz);
+    const filters = (juzRanges ?? [])
+      .filter((range) => range.juz === filter.juz)
+      .map((range) => `and(surah.eq.${range.surah},ayah_start.lte.${range.ayah_end},ayah_end.gte.${range.ayah_start})`);
+    if (filters.length === 0) return { data: [], hasMore: false };
+    query = query.or(filters.join(","));
   }
 
   switch (sort) {
@@ -148,19 +164,31 @@ export async function createReflection(
   juzEnd: number,
   content: string
 ): Promise<Reflection> {
+  const insertPayload = {
+    user_id: userId,
+    surah,
+    ayah_start: ayahStart,
+    ayah_end: ayahEnd,
+    juz_start: juzStart,
+    juz_end: juzEnd,
+    content,
+  };
   const { data, error } = await supabase
     .from("reflections")
-    .insert({
-      user_id: userId,
-      surah,
-      ayah_start: ayahStart,
-      ayah_end: ayahEnd,
-      juz_start: juzStart,
-      juz_end: juzEnd,
-      content,
-    })
+    .insert(insertPayload)
     .select("*, profiles:profiles!reflections_user_id_fkey(username, display_name)")
     .single();
+
+  if (isMissingJuzColumnsError(error)) {
+    const fallback = await supabase
+      .from("reflections")
+      .insert({ user_id: userId, surah, ayah_start: ayahStart, ayah_end: ayahEnd, content })
+      .select("*, profiles:profiles!reflections_user_id_fkey(username, display_name)")
+      .single();
+
+    if (fallback.error) throw fallback.error;
+    return { ...(fallback.data as Reflection), juz_start: juzStart, juz_end: juzEnd };
+  }
 
   if (error) throw error;
   return data as Reflection;
