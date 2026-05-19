@@ -103,7 +103,9 @@ export default function LeaderboardScreen() {
 
   const scoreUnit = activeTab === "streak" ? s.leaderboardDays : s.leaderboardPoints;
   const activeTabLabel = tabs.find((tab) => tab.key === activeTab)?.label ?? "";
-  const featuredEntries = isLaptop ? entries.slice(0, 3) : [];
+  const featuredEntries = isLaptop
+    ? [entries[1], entries[0], entries[2]].filter((entry): entry is LeaderboardEntry => Boolean(entry))
+    : [];
   const rowEntries = isLaptop ? entries.slice(3) : entries;
 
   return (
@@ -194,7 +196,7 @@ export default function LeaderboardScreen() {
         >
           <View style={railStyle}>
           {featuredEntries.length > 0 && (
-            <View className="mb-6 flex-row justify-center gap-4">
+            <View className="mb-6 justify-center gap-4" style={{ flexDirection: "row", direction: "ltr" }}>
               {featuredEntries.map((entry) => (
                 <LeaderboardPodiumCard
                   key={entry.user_id}
@@ -265,6 +267,7 @@ function LeaderboardPodiumCard({
       onPress={onPress}
       className="flex-1 items-center rounded-4xl bg-surface-low dark:bg-surface-dark-low px-4 py-5"
       style={({ pressed }) => ({
+        marginTop: entry.rank === 1 ? 0 : 18,
         opacity: pressed ? 0.82 : 1,
         transform: [{ scale: pressed ? 0.98 : 1 }],
       })}
