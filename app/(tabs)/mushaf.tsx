@@ -46,6 +46,15 @@ import {
 type MushafTarget = { surah: number; ayah: number; wordPos?: number };
 type HifzPageAyah = { key: string; wordCount: number };
 
+function isFromFocusModeControls(event: any) {
+  const target = event?.nativeEvent?.target;
+  return !!(
+    target &&
+    typeof target.closest === "function" &&
+    target.closest('[data-focus-mode-controls="true"]')
+  );
+}
+
 /** Registers an ayah navigation callback inside WordInteractionProvider */
 function AyahNavigationRegistrar({
   onNavigateToTarget,
@@ -267,6 +276,10 @@ function MushafInner() {
     ? ({
         onPointerDown: (e: any) => {
           if (!focusModeActive && !isPhone && !isTablet) return;
+          if (isFromFocusModeControls(e)) {
+            touchStartRef.current = null;
+            return;
+          }
           touchStartRef.current = {
             x: e?.nativeEvent?.pageX ?? e?.nativeEvent?.clientX ?? 0,
             y: e?.nativeEvent?.pageY ?? e?.nativeEvent?.clientY ?? 0,
@@ -275,6 +288,7 @@ function MushafInner() {
         },
         onPointerMove: (e: any) => {
           if (!focusModeActive && !isPhone && !isTablet) return;
+          if (isFromFocusModeControls(e)) return;
           const start = touchStartRef.current;
           if (!start) return;
           const x = e?.nativeEvent?.pageX ?? e?.nativeEvent?.clientX;
@@ -287,8 +301,12 @@ function MushafInner() {
             touchMovedRef.current = true;
           }
         },
-        onPointerUp: () => {
+        onPointerUp: (e: any) => {
           if (!focusModeActive && !isPhone && !isTablet) return;
+          if (isFromFocusModeControls(e)) {
+            touchStartRef.current = null;
+            return;
+          }
           if (!touchMovedRef.current) toggleChromeFromReaderTap();
           touchStartRef.current = null;
         },

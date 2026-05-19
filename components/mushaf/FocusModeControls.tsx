@@ -81,6 +81,9 @@ export function FocusModeControls({
       }}
     >
       <View
+        {...(Platform.OS === "web"
+          ? ({ "data-focus-mode-controls": "true" } as Record<string, unknown>)
+          : null)}
         className="rounded-full border border-white/15 px-3 py-2"
         style={{
           width: "100%",

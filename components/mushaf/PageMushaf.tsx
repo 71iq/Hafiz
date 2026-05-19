@@ -1021,7 +1021,11 @@ export function PageMushaf({
     autoScrollEndedRef.current = false;
 
     const tick = (now: number) => {
-      const maxOffset = Math.max(0, contentHeightRef.current - containerHeight);
+      const lastIndex = layoutInfo.heights.length - 1;
+      const layoutContentHeight = lastIndex >= 0
+        ? layoutInfo.offsets[lastIndex] + layoutInfo.heights[lastIndex] + verticalScrollBottomInset
+        : 0;
+      const maxOffset = Math.max(0, Math.max(contentHeightRef.current, layoutContentHeight) - containerHeight);
       if (maxOffset <= 0) {
         autoScrollFrameRef.current = requestAnimationFrame(tick);
         return;
@@ -1064,6 +1068,7 @@ export function PageMushaf({
     pageData.length,
     verticalAutoScrollEnabled,
     verticalLineSlotHeight,
+    verticalScrollBottomInset,
   ]);
 
   const renderPage = useCallback(
