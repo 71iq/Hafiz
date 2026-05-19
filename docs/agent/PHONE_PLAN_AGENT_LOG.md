@@ -1792,3 +1792,19 @@ Saved in `phase19/`:
 ### Validation result
 - `npm run typecheck`: passed.
 - `npm run build:web`: passed.
+
+## 2026-05-19 — Persistent Mushaf Target Highlight
+
+### Scope decisions
+1. Changed only the temporary target highlight behavior for Mushaf navigation/search targets.
+2. Preserved QCF2 rendering, local data reads, and existing saved highlight behavior.
+
+### Implemented in this step
+- `app/(tabs)/mushaf.tsx`:
+  - Removed the timeout that cleared target ayah/word highlights after navigation.
+- `components/mushaf/AyahBlock.tsx`:
+  - Kept the initial pulse but made the verse-view target overlay settle into a persistent visible highlight.
+
+### Validation result
+- `npm run typecheck`: passed.
+- `npm run build:web`: passed.

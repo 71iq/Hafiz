@@ -84,7 +84,7 @@ function AyahBlockInner({
   const [reviewBusy, setReviewBusy] = useState(false);
   const [savedToReview, setSavedToReview] = useState(false);
 
-  // Deep link pulse highlight
+  // Target highlight pulses once, then remains visible for navigated/search results.
   const pulseAnim = useRef(new RNAnimated.Value(0)).current;
   useEffect(() => {
     if (highlighted) {
@@ -234,7 +234,7 @@ function AyahBlockInner({
             backgroundColor: "#0d9488",
             opacity: pulseAnim.interpolate({
               inputRange: [0, 1],
-              outputRange: [0, 0.15],
+              outputRange: [0.08, 0.15],
             }),
           }}
         />

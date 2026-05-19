@@ -382,28 +382,17 @@ function MushafInner() {
     Map<number, number>
   >(new Map());
 
-  // Deep link highlight: "surah:ayah" key that triggers pulse animation
+  // Target highlight: "surah:ayah" key from deep links, search, and cross-screen navigation.
   const [highlightedKey, setHighlightedKey] = useState<string | null>(null);
   const [highlightedWord, setHighlightedWord] = useState<{ surah: number; ayah: number; wordPos: number } | null>(null);
-  const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const highlightTarget = useCallback((target: MushafTarget) => {
-    if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
     setHighlightedKey(`${target.surah}:${target.ayah}`);
     setHighlightedWord(
       typeof target.wordPos === "number"
         ? { surah: target.surah, ayah: target.ayah, wordPos: target.wordPos }
         : null
     );
-    highlightTimerRef.current = setTimeout(() => {
-      setHighlightedKey(null);
-      setHighlightedWord(null);
-      highlightTimerRef.current = null;
-    }, 2200);
-  }, []);
-
-  useEffect(() => () => {
-    if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
   }, []);
 
   // Load shared juz/surah/page index once for the indicator
