@@ -293,66 +293,31 @@ export default function ReflectionFeedScreen() {
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
       <View className="flex-1" style={contentContainerStyle}>
         <View className="flex-1" style={railStyle}>
-          <View
-            className="mt-4 mb-4 border px-4 py-4"
-            style={{
-              borderRadius: 28,
-              backgroundColor: isDark ? "#151515" : "#FAF8F4",
-              borderColor: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,54,56,0.08)",
-              shadowColor: "#003638",
-              shadowOffset: { width: 0, height: 10 },
-              shadowOpacity: isDark ? 0 : 0.06,
-              shadowRadius: 28,
-              elevation: 2,
-            }}
-          >
-            <View className={`items-center gap-3 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
-              <View className="h-11 w-11 items-center justify-center rounded-full bg-primary-accent/10 dark:bg-primary-bright/10">
-                <MessageSquare size={20} color={isDark ? "#2dd4bf" : "#0d9488"} />
-              </View>
-              <View className={`flex-1 ${isRTL ? "items-end" : "items-start"}`}>
-                <Text
-                  className="text-warm-500 dark:text-neutral-400"
-                  style={{
-                    fontFamily: "Manrope_400Regular",
-                    fontSize: 14,
-                    lineHeight: 22,
-                    textAlign: isRTL ? "right" : "left",
-                    writingDirection: isRTL ? "rtl" : "ltr",
-                  }}
-                >
-                  {s.reflectionFeedSubtitle}
-                </Text>
-              </View>
-            </View>
-
-            <View className={`mt-4 flex-wrap gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
-              <FilterSelect
-                label={selectedFilterKindLabel}
-                active
-                isRTL={isRTL}
-                minWidth={112}
-                flex={0.8}
-                onPress={() => setPickerMode("filter-kind")}
-              />
-              <FilterSelect
-                label={filterKind === "juz" ? selectedJuzLabel : filterKind === "surah" ? selectedSurahLabel : s.reflectionFeedFilterAll}
-                active
-                isRTL={isRTL}
-                minWidth={184}
-                flex={1.55}
-                onPress={() => setPickerMode("location")}
-              />
-              <FilterSelect
-                label={selectedSortLabel}
-                active
-                isRTL={isRTL}
-                minWidth={152}
-                flex={1.15}
-                onPress={() => setPickerMode("sort")}
-              />
-            </View>
-
+          <View className={`mt-4 mb-4 flex-wrap gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
+            <FilterSelect
+              label={selectedFilterKindLabel}
+              isDark={isDark}
+              isRTL={isRTL}
+              minWidth={112}
+              flex={0.8}
+              onPress={() => setPickerMode("filter-kind")}
+            />
+            <FilterSelect
+              label={filterKind === "juz" ? selectedJuzLabel : filterKind === "surah" ? selectedSurahLabel : s.reflectionFeedFilterAll}
+              isDark={isDark}
+              isRTL={isRTL}
+              minWidth={184}
+              flex={1.55}
+              onPress={() => setPickerMode("location")}
+            />
+            <FilterSelect
+              label={selectedSortLabel}
+              isDark={isDark}
+              isRTL={isRTL}
+              minWidth={152}
+              flex={1.15}
+              onPress={() => setPickerMode("sort")}
+            />
           </View>
 
           {!configured ? (
@@ -452,37 +417,48 @@ export default function ReflectionFeedScreen() {
 
 function FilterSelect({
   label,
-  active,
+  isDark,
   isRTL,
   minWidth,
   flex,
   onPress,
 }: {
   label: string;
-  active: boolean;
+  isDark: boolean;
   isRTL: boolean;
   minWidth: number;
   flex: number;
   onPress: () => void;
 }) {
-  const iconColor = active ? "#FFFFFF" : "#A77F5A";
+  const color = isDark ? "#2dd4bf" : "#0d9488";
 
   return (
     <Pressable
       onPress={onPress}
       className={`items-center gap-2 rounded-full px-4 py-2.5 ${
         isRTL ? "flex-row-reverse" : "flex-row"
-      } ${active ? "bg-primary-accent dark:bg-primary-bright" : "bg-surface-low dark:bg-surface-dark-low"}`}
-      style={({ pressed }) => ({ opacity: pressed ? 0.75 : 1, minWidth, flex })}
+      }`}
+      style={({ pressed }) => ({
+        opacity: pressed ? 0.75 : 1,
+        minWidth,
+        flex,
+        backgroundColor: pressed
+          ? isDark
+            ? "rgba(45, 212, 191, 0.12)"
+            : "rgba(13, 148, 136, 0.08)"
+          : "transparent",
+        borderColor: isDark ? "rgba(45, 212, 191, 0.32)" : "rgba(13, 148, 136, 0.28)",
+        borderWidth: 1,
+      })}
     >
       <Text
         numberOfLines={1}
-        className={active ? "flex-1 text-white" : "flex-1 text-warm-500 dark:text-neutral-400"}
-        style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
+        className="flex-1"
+        style={{ color, fontFamily: "Manrope_600SemiBold", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
       >
         {label}
       </Text>
-      <ChevronDown size={14} color={iconColor} />
+      <ChevronDown size={14} color={color} />
     </Pressable>
   );
 }
