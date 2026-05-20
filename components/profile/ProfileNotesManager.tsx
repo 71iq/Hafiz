@@ -24,6 +24,7 @@ export function ProfileNotesManager() {
   const [notes, setNotes] = useState<PrivateNoteSearchResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [reloadToken, setReloadToken] = useState(0);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [editingNote, setEditingNote] = useState<PrivateNoteSearchResult | null>(null);
   const [deletingNote, setDeletingNote] = useState<PrivateNoteSearchResult | null>(null);
 
@@ -75,9 +76,10 @@ export function ProfileNotesManager() {
   const subtitle = query.trim().length > 0 ? s.profileNotesNoResultsSubtitle : s.profileNotesEmptySubtitle;
   const mutedColor = isDark ? "#737373" : "#A39B93";
   const iconColor = isDark ? "#2dd4bf" : "#0d9488";
+  const isSearchExpanded = searchOpen || query.trim().length > 0;
 
   return (
-    <View className="gap-4">
+    <View className="gap-3">
       <View className={`items-start justify-between gap-3 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
         <View className="min-w-0 flex-1">
           <Text
@@ -104,39 +106,56 @@ export function ProfileNotesManager() {
             {s.profileNotesSubtitle}
           </Text>
         </View>
-        <View className="rounded-full bg-primary-accent/10 px-3 py-1.5 dark:bg-primary-bright/10">
-          <Text
-            className="text-primary-accent dark:text-primary-bright"
-            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
+        <View className={`items-center gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
+          <View className="rounded-full bg-primary-accent/10 px-3 py-1.5 dark:bg-primary-bright/10">
+            <Text
+              className="text-primary-accent dark:text-primary-bright"
+              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
+            >
+              {countLabel}
+            </Text>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={s.profileNotesSearchPlaceholder}
+            onPress={() => setSearchOpen(true)}
+            className="min-h-10 items-center rounded-full bg-surface-low px-3 dark:bg-surface-dark-low"
+            style={({ pressed }) => ({
+              opacity: pressed ? 0.72 : 1,
+              width: isSearchExpanded ? 168 : 42,
+              flexDirection: isRTL ? "row-reverse" : "row",
+              justifyContent: isSearchExpanded ? "flex-start" : "center",
+              gap: isSearchExpanded ? 8 : 0,
+            })}
           >
-            {countLabel}
-          </Text>
+            <Search size={17} color={mutedColor} />
+            {isSearchExpanded && (
+              <TextInput
+                value={query}
+                onChangeText={setQuery}
+                onFocus={() => setSearchOpen(true)}
+                onBlur={() => {
+                  if (query.trim().length === 0) setSearchOpen(false);
+                }}
+                placeholder={s.profileNotesSearchPlaceholder}
+                placeholderTextColor={mutedColor}
+                className="min-h-9 flex-1 text-charcoal dark:text-neutral-100"
+                style={{
+                  fontFamily: "Manrope_400Regular",
+                  fontSize: 14,
+                  textAlign: isRTL ? "right" : "left",
+                  writingDirection: isRTL ? "rtl" : "ltr",
+                }}
+                returnKeyType="search"
+                autoFocus
+              />
+            )}
+          </Pressable>
         </View>
       </View>
 
-      <View
-        className="items-center gap-2 rounded-2xl bg-surface-low px-3.5 py-2.5 dark:bg-surface-dark-low"
-        style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
-      >
-        <Search size={17} color={mutedColor} />
-        <TextInput
-          value={query}
-          onChangeText={setQuery}
-          placeholder={s.profileNotesSearchPlaceholder}
-          placeholderTextColor={mutedColor}
-          className="min-h-9 flex-1 text-charcoal dark:text-neutral-100"
-          style={{
-            fontFamily: "Manrope_400Regular",
-            fontSize: 14,
-            textAlign: isRTL ? "right" : "left",
-            writingDirection: isRTL ? "rtl" : "ltr",
-          }}
-          returnKeyType="search"
-        />
-      </View>
-
       {loading ? (
-        <View className="items-center justify-center py-10">
+        <View className="items-center justify-center py-8">
           <ActivityIndicator size="small" color={iconColor} />
         </View>
       ) : notes.length === 0 ? (
@@ -213,9 +232,9 @@ function NoteCard({
   const iconColor = isDark ? "#2dd4bf" : "#0d9488";
 
   return (
-    <View className="rounded-3xl bg-surface-low p-4 dark:bg-surface-dark-low">
+    <View className="rounded-2xl bg-surface-low p-3 dark:bg-surface-dark-low">
       <View className={`items-start gap-3 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
-        <View className="h-11 w-11 items-center justify-center rounded-full bg-primary-accent/10 dark:bg-primary-bright/10">
+        <View className="h-9 w-9 items-center justify-center rounded-full bg-primary-accent/10 dark:bg-primary-bright/10">
           <NotebookPen size={18} color={iconColor} />
         </View>
         <View className="min-w-0 flex-1">
@@ -246,8 +265,8 @@ function NoteCard({
           </View>
           <Text
             selectable
-            className="mt-2 text-charcoal dark:text-neutral-100"
-            numberOfLines={5}
+            className="mt-1.5 text-charcoal dark:text-neutral-100"
+            numberOfLines={4}
             style={{
               fontFamily: "Manrope_400Regular",
               fontSize: 14,
@@ -259,7 +278,7 @@ function NoteCard({
             {note.content}
           </Text>
           <Text
-            className="mt-3 text-warm-400 dark:text-neutral-500"
+            className="mt-2 text-warm-400 dark:text-neutral-500"
             style={{
               fontFamily: "Manrope_500Medium",
               fontSize: 11,
@@ -270,12 +289,11 @@ function NoteCard({
             {updatedLabel}
           </Text>
         </View>
-      </View>
-
-      <View className={`mt-4 gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
-        <NoteAction icon={BookOpen} label={s.profileNotesOpenAyah} color={iconColor} isRTL={isRTL} onPress={onOpenAyah} />
-        <NoteAction icon={Edit3} label={s.profileNotesEdit} color={mutedColor} isRTL={isRTL} onPress={onEdit} />
-        <NoteAction icon={Trash2} label={s.profileNotesDelete} color={isDark ? "#ef4444" : "#dc2626"} isRTL={isRTL} onPress={onDelete} />
+        <View className="items-center gap-1.5">
+          <NoteAction icon={BookOpen} label={s.profileNotesOpenAyah} color={iconColor} onPress={onOpenAyah} />
+          <NoteAction icon={Edit3} label={s.profileNotesEdit} color={mutedColor} onPress={onEdit} />
+          <NoteAction icon={Trash2} label={s.profileNotesDelete} color={isDark ? "#ef4444" : "#dc2626"} onPress={onDelete} />
+        </View>
       </View>
     </View>
   );
@@ -285,31 +303,22 @@ function NoteAction({
   icon: Icon,
   label,
   color,
-  isRTL,
   onPress,
 }: {
   icon: LucideIcon;
   label: string;
   color: string;
-  isRTL: boolean;
   onPress: () => void;
 }) {
   return (
     <Pressable
       onPress={onPress}
-      className="min-h-10 flex-1 items-center justify-center gap-1.5 rounded-full bg-surface-high px-3 py-2 dark:bg-surface-dark-high"
-      style={({ pressed }) => ({ opacity: pressed ? 0.72 : 1, flexDirection: isRTL ? "row-reverse" : "row" })}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      className="h-8 w-8 items-center justify-center rounded-full bg-surface-high dark:bg-surface-dark-high"
+      style={({ pressed }) => ({ opacity: pressed ? 0.72 : 1 })}
     >
       <Icon size={14} color={color} />
-      <Text
-        className="text-charcoal dark:text-neutral-200"
-        numberOfLines={1}
-        adjustsFontSizeToFit
-        minimumFontScale={0.82}
-        style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
-      >
-        {label}
-      </Text>
     </Pressable>
   );
 }
