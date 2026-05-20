@@ -1,12 +1,17 @@
+import { useCallback, useState } from "react";
 import { I18nManager, Platform, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { ChevronLeft, ChevronRight, UserRound } from "lucide-react-native";
+import { ChevronLeft, ChevronRight, LogOut, UserRound } from "lucide-react-native";
+import { useQuery } from "@tanstack/react-query";
+import { PublicBadgesGrid } from "@/components/achievements/PublicBadgesGrid";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { ProfileNotesManager } from "@/components/profile/ProfileNotesManager";
-import { useDatabaseStatus } from "@/lib/database/provider";
+import { getRecentUnlocks } from "@/lib/achievements/queries";
+import { useDatabase, useDatabaseStatus } from "@/lib/database/provider";
 import { SettingsProvider, useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { strings } from "@/lib/i18n/strings";
@@ -59,20 +64,32 @@ function getStartupLanguage(): "en" | "ar" {
 function ProfileScreenContent() {
   const router = useRouter();
   const s = useStrings();
+  const db = useDatabase();
   const { isDark, isRTL, uiLanguage } = useSettings();
   const { width } = useWindowDimensions();
-  const { user, profile, isLoading: authLoading } = useAuthStore();
+  const { user, profile, isLoading: authLoading, signOut } = useAuthStore();
+  const [logoutDialogVisible, setLogoutDialogVisible] = useState(false);
   const maxWidth = Math.min(width, 880);
   const ArrowIcon = isRTL ? ChevronRight : ChevronLeft;
   const accountName = profile?.display_name || profile?.username || user?.email || s.authProfile;
   const accountHandle = profile?.username ? `@${profile.username}` : user?.email || s.profileLocalOnly;
   const numberLocale = uiLanguage === "ar" ? "ar" : "en";
+  const { data: publicBadges = [] } = useQuery({
+    queryKey: ["currentUserPublicAchievementUnlocks", user?.id],
+    queryFn: () => getRecentUnlocks(db, 100),
+    enabled: !!user,
+    staleTime: 1000 * 60,
+  });
   const stats = [
     { label: s.wirdCurrent, value: profile?.current_streak ?? 0 },
     { label: s.wirdLongest, value: profile?.longest_streak ?? 0 },
     { label: s.flashcardsSummaryReviewed, value: profile?.cards_reviewed ?? 0 },
     { label: s.leaderboardPoints, value: profile?.total_score ?? 0 },
   ];
+  const handleLogout = useCallback(async () => {
+    setLogoutDialogVisible(false);
+    await signOut();
+  }, [signOut]);
 
   return (
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
@@ -168,29 +185,61 @@ function ProfileScreenContent() {
           )}
 
           {user && (
-            <View className="mt-5 flex-row flex-wrap gap-3">
-              {stats.map((stat) => (
-                <Card key={stat.label} elevation="low" className="min-w-[150px] flex-1 p-5">
-                  <Text
-                    className="text-charcoal dark:text-neutral-100"
-                    style={{ fontFamily: "NotoSerif_700Bold", fontSize: 26, textAlign: isRTL ? "right" : "left" }}
-                  >
-                    {stat.value.toLocaleString(numberLocale)}
-                  </Text>
-                  <Text
-                    className="mt-1 text-warm-400 dark:text-neutral-500"
-                    style={{
-                      fontFamily: "Manrope_500Medium",
-                      fontSize: 11,
-                      textAlign: isRTL ? "right" : "left",
-                      writingDirection: isRTL ? "rtl" : "ltr",
-                    }}
-                  >
-                    {stat.label}
-                  </Text>
-                </Card>
-              ))}
-            </View>
+            <>
+              <View className="mt-5 flex-row flex-wrap gap-3">
+                {stats.map((stat) => (
+                  <Card key={stat.label} elevation="low" className="min-w-[150px] flex-1 p-5">
+                    <Text
+                      className="text-charcoal dark:text-neutral-100"
+                      style={{ fontFamily: "NotoSerif_700Bold", fontSize: 26, textAlign: isRTL ? "right" : "left" }}
+                    >
+                      {stat.value.toLocaleString(numberLocale)}
+                    </Text>
+                    <Text
+                      className="mt-1 text-warm-400 dark:text-neutral-500"
+                      style={{
+                        fontFamily: "Manrope_500Medium",
+                        fontSize: 11,
+                        textAlign: isRTL ? "right" : "left",
+                        writingDirection: isRTL ? "rtl" : "ltr",
+                      }}
+                    >
+                      {stat.label}
+                    </Text>
+                  </Card>
+                ))}
+              </View>
+
+              <Card elevation="low" className="mt-5 p-5">
+                <Text
+                  className="mb-3 text-charcoal dark:text-neutral-100"
+                  style={{
+                    fontFamily: "Manrope_700Bold",
+                    fontSize: 16,
+                    textAlign: isRTL ? "right" : "left",
+                    writingDirection: isRTL ? "rtl" : "ltr",
+                  }}
+                >
+                  {s.publicBadges}
+                </Text>
+                <PublicBadgesGrid unlocks={publicBadges} />
+              </Card>
+
+              <Pressable
+                onPress={() => setLogoutDialogVisible(true)}
+                disabled={authLoading}
+                className="mt-5 flex-row items-center justify-center gap-2 rounded-full bg-surface-high py-3 dark:bg-surface-dark-high"
+                style={({ pressed }) => ({ opacity: authLoading ? 0.5 : pressed ? 0.7 : 1 })}
+              >
+                <LogOut size={16} color={isDark ? "#ef4444" : "#dc2626"} />
+                <Text
+                  className="text-red-600 dark:text-red-400"
+                  style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}
+                >
+                  {s.authLogout}
+                </Text>
+              </Pressable>
+            </>
           )}
 
           <Card elevation="surface" className="mt-5 p-5">
@@ -198,6 +247,18 @@ function ProfileScreenContent() {
           </Card>
         </View>
       </ScrollView>
+      <ConfirmDialog
+        visible={logoutDialogVisible}
+        title={s.authLogout}
+        message={s.authLogoutConfirm}
+        cancelLabel={s.flashcardsCancel}
+        confirmLabel={s.authLogout}
+        destructive
+        isDark={isDark}
+        isRTL={isRTL}
+        onCancel={() => setLogoutDialogVisible(false)}
+        onConfirm={handleLogout}
+      />
     </SafeAreaView>
   );
 }
