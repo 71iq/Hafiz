@@ -293,7 +293,14 @@ export default function ReflectionFeedScreen() {
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
       <View className="flex-1" style={contentContainerStyle}>
         <View className="flex-1" style={railStyle}>
-          <View className={`mt-4 mb-4 flex-wrap gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
+          <View
+            className="mt-4 mb-4 flex-wrap gap-2"
+            style={{
+              direction: isRTL ? "rtl" : "ltr",
+              flexDirection: "row",
+              justifyContent: "flex-start",
+            }}
+          >
             <FilterSelect
               label={selectedFilterKindLabel}
               isDark={isDark}
@@ -436,13 +443,13 @@ function FilterSelect({
   return (
     <Pressable
       onPress={onPress}
-      className={`items-center gap-2 rounded-full px-4 py-2.5 ${
-        isRTL ? "flex-row-reverse" : "flex-row"
-      }`}
+      className="items-center gap-2 rounded-full px-4 py-2.5"
       style={({ pressed }) => ({
         opacity: pressed ? 0.75 : 1,
         minWidth,
         flex,
+        direction: isRTL ? "rtl" : "ltr",
+        flexDirection: "row",
         backgroundColor: pressed
           ? isDark
             ? "rgba(45, 212, 191, 0.12)"
