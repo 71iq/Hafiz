@@ -939,8 +939,8 @@ function SectionLabel({ children }: { children: string }) {
       className="text-warm-400 dark:text-neutral-500 mb-3"
       style={{
         fontFamily: "Manrope_600SemiBold",
-        fontSize: 11,
-        letterSpacing: 1.2,
+        fontSize: 14,
+        letterSpacing: 0.6,
         textTransform: "uppercase",
         textAlign: isRTL ? "right" : "left",
         writingDirection: isRTL ? "rtl" : "ltr",

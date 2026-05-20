@@ -9,7 +9,7 @@ import {
   type GestureResponderEvent,
 } from "react-native";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useGlobalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
   useAnimatedStyle,
@@ -371,20 +371,22 @@ function SidebarProfileCard({
 
 function SettingsSidebarContent({
   navigation,
+  category,
   isDark,
   isRTL,
   isPersistent,
   onNavigate,
 }: {
   navigation: BottomTabBarProps["navigation"];
+  category?: string | string[];
   isDark: boolean;
   isRTL?: boolean;
   isPersistent?: boolean;
   onNavigate?: () => void;
 }) {
   const s = useStrings();
-  const params = useLocalSearchParams<{ category?: string | string[] }>();
-  const activeCategory = parseSettingsCategory(params.category);
+  const params = useGlobalSearchParams<{ category?: string | string[] }>();
+  const activeCategory = parseSettingsCategory(category ?? params.category);
   const BackIcon = isRTL ? ArrowRight : ArrowLeft;
   const settingsCategories: Array<{ id: SettingsCategoryId; title: string; icon: LucideIcon }> = [
     { id: "general", title: s.settingsCategoryGeneral, icon: SETTINGS_CATEGORY_ICONS.general },
@@ -409,7 +411,7 @@ function SettingsSidebarContent({
   };
 
   const selectCategory = (category: SettingsCategoryId) => {
-    router.setParams({ category });
+    navigation.navigate(SIDEBAR_SETTINGS_ROUTE, { category });
     onNavigate?.();
   };
 
@@ -531,6 +533,7 @@ function SidebarContent({
     return (
       <SettingsSidebarContent
         navigation={navigation}
+        category={(activeRoute.params as { category?: string | string[] } | undefined)?.category}
         isDark={isDark}
         isRTL={isRTL}
         isPersistent={isPersistent}
