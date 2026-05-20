@@ -179,12 +179,6 @@ export default function ProgressScreen() {
       <ScreenScrollView maxWidth={DESKTOP_CONTENT_MAX_WIDTH} contentContainerStyle={{ paddingBottom: 100 }}>
         {/* Daily reminder card */}
         <Card elevation="low" className="mt-8 mb-6 bg-primary-soft dark:bg-primary-soft px-6 py-7">
-          <Text
-            className="text-gold mb-2"
-            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16, letterSpacing: 0.5 }}
-          >
-            {s.progressDailyReminder}
-          </Text>
           <View style={{ alignSelf: "center", maxWidth: isLaptop ? 720 : "100%", width: "100%" }}>
             <Text
               className="text-neutral-200"
