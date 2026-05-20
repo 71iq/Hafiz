@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from "react";
-import { View, Text, Pressable } from "react-native";
+import { ScrollView, View, Text, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, type Href } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
@@ -608,15 +608,17 @@ export default function HomeScreen() {
             />
           </Card>
         ) : (
-          <View
-            className="gap-2"
-            style={{
-              flexDirection: isLaptop ? (isRTL ? "row-reverse" : "row") : "column",
-              flexWrap: isLaptop ? "wrap" : "nowrap",
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{
+              flexDirection: isRTL ? "row-reverse" : "row",
+              gap: 8,
+              paddingBottom: 4,
             }}
           >
             {decks.map((deck) => (
-              <View key={deck.id} style={{ width: isLaptop ? "48%" : "100%" }}>
+              <View key={deck.id} style={{ width: isLaptop ? 500 : 320 }}>
                 <DeckCard
                   deck={deck}
                   title={getDeckLabel(deck)}
@@ -630,7 +632,7 @@ export default function HomeScreen() {
                 />
               </View>
             ))}
-          </View>
+          </ScrollView>
         )}
 
         {vocabStats.total > 0 && (
