@@ -1808,3 +1808,23 @@ Saved in `phase19/`:
 ### Validation result
 - `npm run typecheck`: passed.
 - `npm run build:web`: passed.
+
+## 2026-05-20 — Home Compact Deck Rows
+
+### Scope decisions
+1. Changed only the Home route deck presentation and header density.
+2. Removed the large `Home`/username display block and the Reflection Feed widget from the Home route.
+3. Kept existing real FSRS deck data, smart deck filters, deck review settings, vocabulary review settings, auth banner, resume reading, and global due-review CTA behavior.
+
+### Implemented in this step
+- `app/(tabs)/home.tsx`:
+  - Replaced built-in smart deck cards with compact one-row clickable rows.
+  - Removed per-card `Start Review` buttons; the row starts review when cards exist.
+  - Kept smart deck filter/settings controls as a small sliders icon and folded the filter label into the weak subtitle line.
+  - Changed deck stats to label-free numbers: total in normal text, then separator, new in green, due in red.
+  - Applied the same compact row pattern to user decks and the vocabulary deck, preserving review-settings and delete controls where applicable.
+
+### Validation result
+- Remote file read verified the Home route no longer renders the Reflection Feed widget and now contains compact deck-row components.
+- `npm run typecheck`: passed after mirroring the remote `main` file set locally for validation.
+- `npm run build:web`: passed after mirroring the remote `main` file set locally for validation.
