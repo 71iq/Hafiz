@@ -431,6 +431,7 @@ function FilterSelect({
   onPress: () => void;
 }) {
   const color = isDark ? "#2dd4bf" : "#0d9488";
+  const textColor = isDark ? "#f5f5f5" : "#2f241c";
 
   return (
     <Pressable
@@ -454,7 +455,7 @@ function FilterSelect({
       <Text
         numberOfLines={1}
         className="flex-1"
-        style={{ color, fontFamily: "Manrope_600SemiBold", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
+        style={{ color: textColor, fontFamily: "Manrope_600SemiBold", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
       >
         {label}
       </Text>
