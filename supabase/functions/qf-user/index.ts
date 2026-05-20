@@ -35,6 +35,7 @@ type OAuthStateRow = {
   state: string;
   user_id: string;
   code_verifier_ciphertext: string;
+  nonce: string | null;
   redirect_uri: string;
   return_to: string | null;
   expires_at: string;
@@ -145,6 +146,7 @@ async function handleBeginOAuth(config: Config, userId: string, body: Record<str
   }
 
   const state = randomBase64Url(32);
+  const nonce = randomBase64Url(32);
   const codeVerifier = randomBase64Url(32);
   const codeChallenge = await pkceChallenge(codeVerifier);
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
@@ -154,18 +156,20 @@ async function handleBeginOAuth(config: Config, userId: string, body: Record<str
     state,
     user_id: userId,
     code_verifier_ciphertext: await encrypt(config.encryptionKey, codeVerifier),
+    nonce,
     redirect_uri: redirectUri,
     return_to: returnTo,
     expires_at: expiresAt,
   });
   if (error) throw error;
 
-  const authorizationUrl = new URL(`${config.authBaseUrl}/oauth2/authorize`);
+  const authorizationUrl = new URL(`${config.authBaseUrl}/oauth2/auth`);
   authorizationUrl.searchParams.set("response_type", "code");
   authorizationUrl.searchParams.set("client_id", config.clientId);
   authorizationUrl.searchParams.set("redirect_uri", redirectUri);
   authorizationUrl.searchParams.set("scope", "openid offline_access bookmark note");
   authorizationUrl.searchParams.set("state", state);
+  authorizationUrl.searchParams.set("nonce", nonce);
   authorizationUrl.searchParams.set("code_challenge", codeChallenge);
   authorizationUrl.searchParams.set("code_challenge_method", "S256");
 
@@ -186,7 +190,7 @@ async function handleCompleteOAuth(config: Config, userId: string, body: Record<
   const service = serviceClient(config);
   const { data, error } = await service
     .from("qf_oauth_states")
-    .select("state, user_id, code_verifier_ciphertext, redirect_uri, return_to, expires_at, consumed_at")
+    .select("state, user_id, code_verifier_ciphertext, nonce, redirect_uri, return_to, expires_at, consumed_at")
     .eq("state", state)
     .maybeSingle();
   if (error) throw error;
@@ -207,6 +211,9 @@ async function handleCompleteOAuth(config: Config, userId: string, body: Record<
     redirectUri,
     await decrypt(config.encryptionKey, oauthState.code_verifier_ciphertext)
   );
+  if (token.idToken && oauthState.nonce && jwtPayload(token.idToken)?.nonce !== oauthState.nonce) {
+    return jsonError("bad_request", "Quran Foundation ID token nonce is invalid.");
+  }
   const connectedAt = await storeConnection(config, userId, {
     accessToken: token.accessToken,
     refreshToken: token.refreshToken,
@@ -251,6 +258,8 @@ async function handleDisconnect(config: Config, userId: string): Promise<Respons
 
 async function handleListBookmarks(config: Config, userId: string, body: Record<string, unknown>): Promise<Response> {
   const params = new URLSearchParams();
+  params.set("mushafId", "1");
+  params.set("first", "20");
   const after = stringOrUndefined(body.after);
   if (after) params.set("after", after);
   const result = await qfJson(config, userId, `/v1/bookmarks${params.size ? `?${params.toString()}` : ""}`);
@@ -274,6 +283,7 @@ async function handleUpsertBookmark(config: Config, userId: string, body: Record
       key: surah,
       verseNumber: ayah,
       mushafId: positiveInt(bookmark?.mushafId) ?? 1,
+      mushaf: positiveInt(bookmark?.mushafId) ?? 1,
     },
   });
   const normalized = normalizeBookmark((result as any).data ?? (result as any).bookmark ?? result);
@@ -713,7 +723,17 @@ function extractArray(value: unknown, key: string): unknown[] {
 function nextCursor(value: unknown): string | null {
   const row = value as Record<string, unknown> | null;
   const data = row?.data as Record<string, unknown> | undefined;
-  const pagination = row?.pagination as Record<string, unknown> | undefined;
+  const pagination =
+    (row?.pagination as Record<string, unknown> | undefined) ??
+    (data?.pagination as Record<string, unknown> | undefined);
+  if (pagination?.hasNextPage === false) return null;
+  if (pagination?.hasNextPage === true) {
+    return (
+      stringOrUndefined(pagination.endCursor ?? pagination.end_cursor) ??
+      stringOrUndefined(pagination.nextCursor ?? pagination.next_cursor) ??
+      null
+    );
+  }
   return (
     stringOrUndefined(row?.nextCursor ?? row?.next_cursor ?? row?.cursor) ??
     stringOrUndefined(data?.nextCursor ?? data?.next_cursor ?? data?.cursor) ??
