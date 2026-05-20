@@ -70,6 +70,29 @@ export const DEFAULT_ENABLED_MODES: TestMode[] = [
   "surahName",
 ];
 
+export type WordTestMode = "wordMeaningArabic" | "wordMeaningTranslation";
+
+export const ALL_WORD_TEST_MODES: WordTestMode[] = [
+  "wordMeaningArabic",
+  "wordMeaningTranslation",
+];
+
+export const DEFAULT_WORD_TEST_MODES: WordTestMode[] = [
+  "wordMeaningArabic",
+  "wordMeaningTranslation",
+];
+
+export const DEFAULT_DECK_DAILY_REVIEW_LIMIT = 50;
+export const MIN_DECK_DAILY_REVIEW_LIMIT = 10;
+export const MAX_DECK_DAILY_REVIEW_LIMIT = 200;
+export const DECK_DAILY_REVIEW_LIMIT_STEP = 10;
+
+export type DeckReviewSettings = {
+  dailyReviewLimit: number;
+  testModes: TestMode[];
+  wordTestModes: WordTestMode[];
+};
+
 /** Color for each test mode tag */
 export const TEST_MODE_COLORS: Record<TestMode, string> = {
   nextAyah: "#3b82f6",       // blue

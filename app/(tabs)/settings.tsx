@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
 import { View, Text, Pressable, ActivityIndicator, Linking, useWindowDimensions } from "react-native";
-import { Switch } from "@/components/ui/Switch";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ToggleGroup } from "@/components/ui/ToggleGroup";
@@ -11,9 +10,6 @@ import { Sun, Moon, Smartphone, Minus, Plus, ChevronRight, ChevronLeft, User, Lo
 import {
   useSettings,
   FONT_SIZE_STEPS,
-  MIN_DAILY_REVIEW_LIMIT,
-  MAX_DAILY_REVIEW_LIMIT,
-  DAILY_REVIEW_LIMIT_STEP,
   type ThemeMode,
   type UILanguage,
   type TafseerSource,
@@ -24,7 +20,6 @@ import { useDatabase } from "@/lib/database/provider";
 import { getLanguageByCode } from "@/lib/translations/languages";
 import { TranslationLanguagePicker } from "@/components/settings/TranslationLanguagePicker";
 import { useStrings } from "@/lib/i18n/useStrings";
-import { ALL_TEST_MODES, DEFAULT_ENABLED_MODES, type TestMode } from "@/lib/fsrs/types";
 import { useAuthStore } from "@/lib/auth/store";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { isQfSyncEnabled } from "@/lib/quran-foundation/config";
@@ -36,7 +31,7 @@ import { toArabicNumber } from "@/lib/arabic";
 import { SETTINGS_CONTENT_MAX_WIDTH, SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { ZaytPreviewModal } from "@/components/zayt/ZaytPreviewModal";
 
-type SettingsCategoryId = "general" | "reading" | "content" | "review" | "account" | "about" | "advanced";
+type SettingsCategoryId = "general" | "reading" | "content" | "account" | "about" | "advanced";
 
 type SettingsCategory = {
   id: SettingsCategoryId;
@@ -50,7 +45,6 @@ export default function SettingsScreen() {
     translationLanguage, isTranslationLoading, isDark, isRTL,
     tafseerSource, setTafseerSource,
     uiLanguage, setUiLanguage,
-    dailyReviewLimit, setDailyReviewLimit,
     pageScroll, setPageScroll,
     viewMode, setViewMode,
   } = useSettings();
@@ -69,11 +63,6 @@ export default function SettingsScreen() {
   const [qfMessage, setQfMessage] = useState<string | null>(null);
   const { width } = useWindowDimensions();
   const currentLang = getLanguageByCode(translationLanguage);
-  const [enabledModes, setEnabledModes] = useState<TestMode[]>(DEFAULT_ENABLED_MODES);
-  const [wordModes, setWordModes] = useState<Array<"wordMeaningArabic" | "wordMeaningTranslation">>([
-    "wordMeaningArabic",
-    "wordMeaningTranslation",
-  ]);
   const { user, profile, isLoading: authLoading, signOut } = useAuthStore();
   const accountName = profile?.display_name || profile?.username || user?.email || s.authProfile;
   const accountHandle = profile?.username ? `@${profile.username}` : user?.email || "";
@@ -86,24 +75,6 @@ export default function SettingsScreen() {
   const categoryParam = Array.isArray(params.category) ? params.category[0] : params.category;
   const desktopCategory = parseSettingsCategory(categoryParam) ?? "general";
   const activeCategory = usesCategorySidebar ? desktopCategory : mobileCategory;
-  const modeLabels: Record<TestMode, string> = {
-    nextAyah: s.flashcardsModeNextAyah,
-    previousAyah: s.flashcardsModePreviousAyah,
-    translation: s.flashcardsModeTranslation,
-    tafseer: s.flashcardsModeTafseer,
-    surahName: s.flashcardsModeSurahName,
-  };
-
-  useEffect(() => {
-    db.getFirstAsync<{ value: string }>(
-      "SELECT value FROM user_settings WHERE key = 'flashcard_test_modes'"
-    ).then((row) => {
-      if (row?.value) {
-        try { setEnabledModes(JSON.parse(row.value)); } catch {}
-      }
-    });
-  }, [db]);
-
   const refreshQfStatus = useCallback(async () => {
     if (!configured || !user || !qfSyncEnabled) {
       setQfStatus("disconnected");
@@ -167,43 +138,6 @@ export default function SettingsScreen() {
       cancelled = true;
     };
   }, [db, params.qf, params.qf_error, refreshQfStatus, s.qfFinishConnection, s.qfSyncComplete, s.qfSyncFailed]);
-
-  useEffect(() => {
-    db.getFirstAsync<{ value: string }>(
-      "SELECT value FROM user_settings WHERE key = 'word_flashcard_test_modes'"
-    ).then((row) => {
-      if (!row?.value) return;
-      try {
-        const parsed = JSON.parse(row.value) as Array<"wordMeaningArabic" | "wordMeaningTranslation">;
-        const valid = parsed.filter((m) => m === "wordMeaningArabic" || m === "wordMeaningTranslation");
-        if (valid.length > 0) setWordModes(valid);
-      } catch {}
-    });
-  }, [db]);
-
-  const toggleTestMode = useCallback((mode: TestMode) => {
-    setEnabledModes((prev) => {
-      const next = prev.includes(mode) ? prev.filter((m) => m !== mode) : [...prev, mode];
-      if (next.length === 0) return prev; // Must have at least one mode
-      db.runAsync(
-        "INSERT OR REPLACE INTO user_settings (key, value) VALUES (?, ?)",
-        ["flashcard_test_modes", JSON.stringify(next)]
-      );
-      return next;
-    });
-  }, [db]);
-
-  const toggleWordMode = useCallback((mode: "wordMeaningArabic" | "wordMeaningTranslation") => {
-    setWordModes((prev) => {
-      const next = prev.includes(mode) ? prev.filter((m) => m !== mode) : [...prev, mode];
-      if (next.length === 0) return prev;
-      db.runAsync(
-        "INSERT OR REPLACE INTO user_settings (key, value) VALUES (?, ?)",
-        ["word_flashcard_test_modes", JSON.stringify(next)]
-      );
-      return next;
-    });
-  }, [db]);
 
   const handleLogout = useCallback(async () => {
     setLogoutDialogVisible(false);
@@ -274,7 +208,6 @@ export default function SettingsScreen() {
     { id: "general", title: s.settingsCategoryGeneral, icon: SlidersHorizontal },
     { id: "reading", title: s.settingsCategoryReading, icon: BookOpen },
     { id: "content", title: s.settingsCategoryContent, icon: FileText },
-    { id: "review", title: s.settingsCategoryReview, icon: RefreshCw },
     { id: "account", title: s.settingsCategoryAccount, icon: User },
     { id: "about", title: s.settingsCategoryAbout, icon: Info },
     { id: "advanced", title: s.settingsCategoryAdvanced, icon: Sparkles },
@@ -351,36 +284,6 @@ export default function SettingsScreen() {
             </View>
           </Card>
 
-          <Card elevation="low" className="p-5 mb-8">
-            <View
-              className={isLaptop ? "items-center justify-between gap-4" : "gap-4"}
-              style={{ flexDirection: isLaptop ? (isRTL ? "row-reverse" : "row") : "column" }}
-            >
-              <View className="flex-1">
-                <Text
-                  className="text-charcoal dark:text-neutral-200 mb-1"
-                  style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15, textAlign: isRTL ? "right" : "left" }}
-                >
-                  {s.flashcardsDailyLimit}
-                </Text>
-                <Text
-                  className="text-warm-400 dark:text-neutral-500"
-                  style={{ fontFamily: "Manrope_400Regular", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
-                >
-                  {s.flashcardsDailyLimitDesc}
-                </Text>
-              </View>
-              <SettingsStepper
-                value={isRTL ? toArabicNumber(dailyReviewLimit) : String(dailyReviewLimit)}
-                onDecrement={() => setDailyReviewLimit(dailyReviewLimit - DAILY_REVIEW_LIMIT_STEP)}
-                onIncrement={() => setDailyReviewLimit(dailyReviewLimit + DAILY_REVIEW_LIMIT_STEP)}
-                decrementDisabled={dailyReviewLimit <= MIN_DAILY_REVIEW_LIMIT}
-                incrementDisabled={dailyReviewLimit >= MAX_DAILY_REVIEW_LIMIT}
-                isDark={isDark}
-                isRTL={isRTL}
-              />
-            </View>
-          </Card>
         </>
       )}
 
@@ -541,61 +444,6 @@ export default function SettingsScreen() {
                 isDark={isDark}
                 isRTL={isRTL}
               />
-            </View>
-          </Card>
-        </>
-      )}
-
-      {activeCategory === "review" && (
-        <>
-          <SectionLabel>{s.flashcardsTestModes}</SectionLabel>
-          <Card elevation="low" className="p-5 mb-8">
-            <View
-              className="gap-3"
-              style={{
-                flexDirection: isLaptop ? (isRTL ? "row-reverse" : "row") : "column",
-                flexWrap: isLaptop ? "wrap" : "nowrap",
-              }}
-            >
-              {ALL_TEST_MODES.map((mode) => (
-                <SettingsSwitchRow
-                  key={mode}
-                  label={modeLabels[mode]}
-                  value={enabledModes.includes(mode)}
-                  onValueChange={() => toggleTestMode(mode)}
-                  isDark={isDark}
-                  isRTL={isRTL}
-                  compact={isLaptop}
-                />
-              ))}
-            </View>
-            <Text
-              className="text-warm-400 dark:text-neutral-500 mb-3 mt-5"
-              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
-            >
-              {s.wordFlashcardsTestModes}
-            </Text>
-            <View
-              className="gap-3"
-              style={{
-                flexDirection: isLaptop ? (isRTL ? "row-reverse" : "row") : "column",
-                flexWrap: isLaptop ? "wrap" : "nowrap",
-              }}
-            >
-              {[
-                { key: "wordMeaningArabic" as const, label: s.flashcardsModeWordMeaningArabic },
-                { key: "wordMeaningTranslation" as const, label: s.flashcardsModeWordMeaningTranslation },
-              ].map((mode) => (
-                <SettingsSwitchRow
-                  key={mode.key}
-                  label={mode.label}
-                  value={wordModes.includes(mode.key)}
-                  onValueChange={() => toggleWordMode(mode.key)}
-                  isDark={isDark}
-                  isRTL={isRTL}
-                  compact={isLaptop}
-                />
-              ))}
             </View>
           </Card>
         </>
@@ -947,7 +795,6 @@ function parseSettingsCategory(value: string | undefined): SettingsCategoryId | 
     case "general":
     case "reading":
     case "content":
-    case "review":
     case "account":
     case "about":
     case "advanced":
@@ -1081,48 +928,6 @@ function SettingsStepper({
       >
         <Plus size={17} color={iconColor} />
       </Pressable>
-    </View>
-  );
-}
-
-function SettingsSwitchRow({
-  label,
-  value,
-  onValueChange,
-  isDark,
-  isRTL,
-  compact,
-}: {
-  label: string;
-  value: boolean;
-  onValueChange: () => void;
-  isDark: boolean;
-  isRTL: boolean;
-  compact: boolean;
-}) {
-  return (
-    <View
-      className="items-center justify-between rounded-2xl bg-surface dark:bg-surface-dark px-3 py-2.5"
-      style={{
-        flexDirection: isRTL ? "row-reverse" : "row",
-        width: compact ? "48%" : "100%",
-      }}
-    >
-      <Text
-        className="text-charcoal dark:text-neutral-300"
-        style={{
-          color: isDark ? "#d4d4d4" : "#2D2D2D",
-          flex: 1,
-          flexShrink: 1,
-          fontFamily: "Manrope_500Medium",
-          fontSize: 14,
-          textAlign: isRTL ? "right" : "left",
-          writingDirection: isRTL ? "rtl" : "ltr",
-        }}
-      >
-        {label}
-      </Text>
-      <Switch value={value} onValueChange={onValueChange} />
     </View>
   );
 }

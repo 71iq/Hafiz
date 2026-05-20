@@ -330,7 +330,7 @@ Each ayah in the selected scope becomes one card in the deck.
 4. Always show the surah name subtly as secondary context regardless.
 
 #### 3.6.3 Multi-Sided Card Flow (The Carousel)
-The user enables specific "test modes" in Settings. Each enabled mode adds a step to the card flow.
+The user enables specific "test modes" per deck. Each enabled mode adds a step to the card flow for that deck.
 
 **Available test modes (user enables/disables each):**
 
@@ -461,7 +461,7 @@ daily_scores (
 ### 3.8 Settings
 
 - **Reading preferences:** Font size, theme (light/dark/auto), default Mushaf view mode (page/verse-by-verse), show/hide translation inline, show/hide tafseer inline.
-- **Flashcard preferences:** Enabled test modes (checkboxes), daily review limit, new cards per day.
+- **Flashcard deck preferences:** Per-deck enabled test modes and daily review limit.
 - **Notifications:** Daily review reminder (time picker).
 - **Account:** Login/logout, username, sync status.
 - **Data:** Export study data, clear local data.
@@ -628,7 +628,7 @@ Use Supabase Row Level Security (RLS) policies:
    - State machine: Front → Side 1 → Side 2 → ... → Grading.
    - Animate transitions between sides.
 5. Implement all test modes (§3.6.3): Next Ayah, Previous Ayah, Translation, Tafseer, First Letter, Surah Identification.
-6. Implement settings UI for enabling/disabling test modes.
+6. Implement per-deck settings UI for enabling/disabling test modes.
 7. On grading: call `scheduler.next(card, now, rating)` and persist updated card state to `study_cards` table. Log the review to `study_log` table.
 8. Build session summary screen.
 9. Build a "Study" dashboard showing: due cards today, new cards available, current wird consistency.

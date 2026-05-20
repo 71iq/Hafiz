@@ -25,14 +25,20 @@ import {
   getStudyStreak,
   getWirdStatus,
   MUTASHABIHAT_DECK_ID,
+  readDeckReviewSettings,
 } from "@/lib/fsrs/queries";
 import { computeUniqueFront } from "@/lib/fsrs/uniqueness";
 import { computeReviewPoints, addTodayPoints } from "@/lib/fsrs/scoring";
 import { hapticMedium, hapticSuccess } from "@/lib/haptics";
 import { Skeleton, SkeletonText } from "@/components/ui/Skeleton";
 import { syncDailyScore, updateProfileStats } from "@/lib/fsrs/leaderboard-sync";
-import type { StudyCardRow, TestMode } from "@/lib/fsrs/types";
-import { DEFAULT_ENABLED_MODES, TEST_MODE_COLORS } from "@/lib/fsrs/types";
+import type { StudyCardRow, TestMode, WordTestMode } from "@/lib/fsrs/types";
+import {
+  DEFAULT_DECK_DAILY_REVIEW_LIMIT,
+  DEFAULT_ENABLED_MODES,
+  DEFAULT_WORD_TEST_MODES,
+  TEST_MODE_COLORS,
+} from "@/lib/fsrs/types";
 import { fetchWordMeaningAr, fetchWordText, fetchWordTranslation } from "@/lib/word/queries";
 import { Qcf2AyahText } from "@/components/flashcards/Qcf2AyahText";
 import {
@@ -97,11 +103,8 @@ type SessionSummary = {
   wirdMaintainedToday: boolean;
 };
 
-type WordTestMode = "wordMeaningArabic" | "wordMeaningTranslation";
 type SmartTestMode = "smartRefs" | "qiraatReading";
 type ReviewMode = TestMode | WordTestMode | SmartTestMode;
-const ALL_WORD_TEST_MODES: WordTestMode[] = ["wordMeaningArabic", "wordMeaningTranslation"];
-const DEFAULT_WORD_TEST_MODES: WordTestMode[] = ["wordMeaningArabic", "wordMeaningTranslation"];
 const WORD_TEST_MODE_COLORS: Record<WordTestMode, string> = {
   wordMeaningArabic: "#0d9488",
   wordMeaningTranslation: "#3b82f6",
@@ -158,7 +161,7 @@ function shuffle<T>(arr: T[]): T[] {
 
 function FlashcardSessionScreen() {
   const db = useDatabase();
-  const { isDark, fontSize, lineHeight, tafseerSource, dailyReviewLimit, isLoaded: settingsLoaded } = useSettings();
+  const { isDark, fontSize, lineHeight, tafseerSource, isLoaded: settingsLoaded } = useSettings();
   const s = useStrings();
   const router = useRouter();
   const { deckId } = useLocalSearchParams<{ deckId?: string }>();
@@ -172,6 +175,8 @@ function FlashcardSessionScreen() {
   const [revealed, setRevealed] = useState(false);
   const [enabledModes, setEnabledModes] = useState<TestMode[]>(DEFAULT_ENABLED_MODES);
   const [wordEnabledModes, setWordEnabledModes] = useState<WordTestMode[]>(DEFAULT_WORD_TEST_MODES);
+  const [reviewLimit, setReviewLimit] = useState(DEFAULT_DECK_DAILY_REVIEW_LIMIT);
+  const [reviewSettingsLoaded, setReviewSettingsLoaded] = useState(false);
   const [summary, setSummary] = useState<SessionSummary | null>(null);
   const sessionStartRef = useRef(Date.now());
   const streakRef = useRef(0);
@@ -189,41 +194,31 @@ function FlashcardSessionScreen() {
     setRevealed(false);
   }, []);
 
-  // Load enabled test modes from settings
   useEffect(() => {
-    db.getFirstAsync<{ value: string }>(
-      "SELECT value FROM user_settings WHERE key = 'flashcard_test_modes'"
-    ).then((row) => {
-      if (row?.value) {
-        try {
-          const modes = JSON.parse(row.value) as TestMode[];
-          // Filter out removed modes (e.g. firstLetter, surahIdentification)
-          const valid = modes.filter((m) =>
-            ["nextAyah", "previousAyah", "translation", "tafseer", "surahName"].includes(m)
-          );
-          if (valid.length > 0) setEnabledModes(valid);
-        } catch {}
-      }
+    let cancelled = false;
+    setReviewSettingsLoaded(false);
+    readDeckReviewSettings(db, normalizedDeckId).then((settings) => {
+      if (cancelled) return;
+      setEnabledModes(settings.testModes);
+      setWordEnabledModes(settings.wordTestModes);
+      setReviewLimit(settings.dailyReviewLimit);
+      setReviewSettingsLoaded(true);
+    }).catch((err) => {
+      console.warn(err);
+      if (cancelled) return;
+      setEnabledModes(DEFAULT_ENABLED_MODES);
+      setWordEnabledModes(DEFAULT_WORD_TEST_MODES);
+      setReviewLimit(DEFAULT_DECK_DAILY_REVIEW_LIMIT);
+      setReviewSettingsLoaded(true);
     });
-  }, [db]);
-
-  useEffect(() => {
-    db.getFirstAsync<{ value: string }>(
-      "SELECT value FROM user_settings WHERE key = 'word_flashcard_test_modes'"
-    ).then((row) => {
-      if (row?.value) {
-        try {
-          const modes = JSON.parse(row.value) as WordTestMode[];
-          const valid = modes.filter((m) => ALL_WORD_TEST_MODES.includes(m));
-          if (valid.length > 0) setWordEnabledModes(valid);
-        } catch {}
-      }
-    });
-  }, [db]);
+    return () => {
+      cancelled = true;
+    };
+  }, [db, normalizedDeckId]);
 
   // Load due cards and pre-fetch all card data
   useEffect(() => {
-    if (!settingsLoaded) return;
+    if (!settingsLoaded || !reviewSettingsLoaded) return;
 
     let cancelled = false;
 
@@ -235,9 +230,9 @@ function FlashcardSessionScreen() {
         // Pre-load streak for scoring
         streakRef.current = await getStudyStreak(db);
         if (isSmartDeckId(normalizedDeckId)) {
-          await materializeSmartDeckCards(db, normalizedDeckId, dailyReviewLimit);
+          await materializeSmartDeckCards(db, normalizedDeckId, reviewLimit);
         }
-        const dueRows = await getDueCardsForReview(db, normalizedDeckId, dailyReviewLimit);
+        const dueRows = await getDueCardsForReview(db, normalizedDeckId, reviewLimit);
         if (cancelled) return;
         if (dueRows.length === 0) {
           resetSessionProgress();
@@ -404,7 +399,8 @@ function FlashcardSessionScreen() {
     db,
     normalizedDeckId,
     tafseerSource,
-    dailyReviewLimit,
+    reviewLimit,
+    reviewSettingsLoaded,
     settingsLoaded,
     resetSessionProgress,
     s.smartDeckMutashabihatTitle,

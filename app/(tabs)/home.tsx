@@ -14,6 +14,7 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ScreenScrollView, useScreenContentLayout } from "@/components/ui/ScreenContent";
 import { CreateDeckSheet } from "@/components/flashcards/CreateDeckSheet";
+import { DeckReviewSettingsSheet } from "@/components/flashcards/DeckReviewSettingsSheet";
 import { SmartDeckFilterSheet } from "@/components/flashcards/SmartDeckFilterSheet";
 import { SearchCommand } from "@/components/SearchCommand";
 import { Toast } from "@/components/ui/Toast";
@@ -69,6 +70,12 @@ type SmartDeckDisplay = {
   newCount: number;
 };
 
+type DeckReviewSettingsTarget = {
+  id: string;
+  title: string;
+  mode: "ayah" | "word";
+};
+
 export default function HomeScreen() {
   const db = useDatabase();
   const { isDark, dailyReviewLimit, isRTL, uiLanguage } = useSettings();
@@ -94,6 +101,7 @@ export default function HomeScreen() {
   const [toast, setToast] = useState<string | null>(null);
   const [deckToDelete, setDeckToDelete] = useState<string | null>(null);
   const [filterDeckId, setFilterDeckId] = useState<SmartDeckId | null>(null);
+  const [reviewSettingsTarget, setReviewSettingsTarget] = useState<DeckReviewSettingsTarget | null>(null);
   const [surahNames, setSurahNames] = useState<Record<number, string>>({});
   const [resume, setResume] = useState<{ surah: number; ayah: number; page: number } | null>(null);
   const [latestUnlock, setLatestUnlock] = useState<AchievementUnlock | null>(null);
@@ -659,6 +667,7 @@ export default function HomeScreen() {
                   deck={deck}
                   getDeckLabel={getDeckLabel}
                   onStartReview={() => handleStartReview(deck.id)}
+                  onConfigure={() => setReviewSettingsTarget({ id: deck.id, title: getDeckLabel(deck), mode: "ayah" })}
                   onDelete={() => setDeckToDelete(deck.id)}
                   isDark={isDark}
                   isRTL={isRTL}
@@ -673,32 +682,42 @@ export default function HomeScreen() {
         {vocabStats.total > 0 && (
           <View className="gap-3 mt-3">
             <Card elevation="low" className="p-5">
-              <View className="flex-row items-start justify-between mb-3">
-                <View className="flex-1 flex-row items-center gap-3">
+              <View className={`items-start justify-between mb-3 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
+                <View className={`flex-1 flex-row items-center gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
                   <View className="w-10 h-10 rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 items-center justify-center">
                     <Languages size={18} color="#0d9488" />
                   </View>
-                  <View className="flex-1">
+                  <View className={`flex-1 ${isRTL ? "items-end" : "items-start"}`}>
                     <Text
                       className="text-charcoal dark:text-neutral-200"
-                      style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15 }}
+                      style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15, textAlign: isRTL ? "right" : "left" }}
                       numberOfLines={1}
                     >
                       {s.vocabDeckTitle}
                     </Text>
                     <Text
                       className="text-warm-400 dark:text-neutral-500 mt-0.5"
-                      style={{ fontFamily: "Manrope_400Regular", fontSize: 12 }}
+                      style={{ fontFamily: "Manrope_400Regular", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
                     >
                       {s.vocabDeckSubtitle}
                     </Text>
                   </View>
                 </View>
+                <Pressable
+                  onPress={() => setReviewSettingsTarget({ id: MEANINGS_DECK_ID, title: s.vocabDeckTitle, mode: "word" })}
+                  accessibilityRole="button"
+                  accessibilityLabel={s.deckReviewSettingsTitle}
+                  className="w-9 h-9 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center"
+                  hitSlop={8}
+                  style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.95 : 1 }] })}
+                >
+                  <SlidersHorizontal size={15} color={isDark ? "#a3a3a3" : "#8B8178"} />
+                </Pressable>
               </View>
-              <View className="flex-row items-center justify-between">
+              <View className={`flex-row items-center justify-between ${isRTL ? "flex-row-reverse" : ""}`}>
                 <Text
                   className="text-warm-500 dark:text-neutral-400"
-                  style={{ fontFamily: "Manrope_500Medium", fontSize: 12 }}
+                  style={{ fontFamily: "Manrope_500Medium", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
                 >
                   {vocabStats.total} {s.flashcardsTotalCards?.toLowerCase?.() ?? "cards"}
                 </Text>
@@ -735,6 +754,18 @@ export default function HomeScreen() {
         onSaved={loadData}
       />
 
+      <DeckReviewSettingsSheet
+        visible={!!reviewSettingsTarget}
+        deckId={reviewSettingsTarget?.id ?? null}
+        deckTitle={reviewSettingsTarget?.title ?? ""}
+        mode={reviewSettingsTarget?.mode ?? "ayah"}
+        onClose={() => setReviewSettingsTarget(null)}
+        onSaved={() => {
+          setToast(s.deckReviewSettingsSaved);
+          loadData();
+        }}
+      />
+
       {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}
       <ConfirmDialog
         visible={!!deckToDelete}
@@ -756,6 +787,7 @@ function DeckCard({
   deck,
   getDeckLabel,
   onStartReview,
+  onConfigure,
   onDelete,
   isDark,
   isRTL,
@@ -764,6 +796,7 @@ function DeckCard({
   deck: DeckDisplay;
   getDeckLabel: (deck: DeckDisplay) => string;
   onStartReview: () => void;
+  onConfigure: () => void;
   onDelete: () => void;
   isDark: boolean;
   isRTL: boolean;
@@ -787,13 +820,24 @@ function DeckCard({
             {deck.cardCount} {s.flashcardsTotalCards?.toLowerCase?.() ?? "cards"}
           </Text>
         </View>
-        <Pressable
-          onPress={onDelete}
-          className="w-8 h-8 rounded-full items-center justify-center"
-          hitSlop={8}
-        >
-          <Trash2 size={15} color={isDark ? "#525252" : "#DFD9D1"} />
-        </Pressable>
+        <View className={`flex-row items-center gap-1 ${isRTL ? "flex-row-reverse" : ""}`}>
+          <Pressable
+            onPress={onConfigure}
+            accessibilityRole="button"
+            accessibilityLabel={s.deckReviewSettingsTitle}
+            className="w-8 h-8 rounded-full items-center justify-center"
+            hitSlop={8}
+          >
+            <SlidersHorizontal size={15} color={isDark ? "#a3a3a3" : "#8B8178"} />
+          </Pressable>
+          <Pressable
+            onPress={onDelete}
+            className="w-8 h-8 rounded-full items-center justify-center"
+            hitSlop={8}
+          >
+            <Trash2 size={15} color={isDark ? "#525252" : "#DFD9D1"} />
+          </Pressable>
+        </View>
       </View>
 
       <View className={`flex-row gap-3 ${isRTL ? "flex-row-reverse self-end" : ""}`}>

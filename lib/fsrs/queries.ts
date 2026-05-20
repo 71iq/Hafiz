@@ -1,6 +1,19 @@
 import type { SQLiteDatabase } from "expo-sqlite";
 import { createEmptyCard } from "./scheduler";
-import type { DeckScope, StudyCardRow } from "./types";
+import {
+  ALL_TEST_MODES,
+  ALL_WORD_TEST_MODES,
+  DEFAULT_DECK_DAILY_REVIEW_LIMIT,
+  DEFAULT_ENABLED_MODES,
+  DEFAULT_WORD_TEST_MODES,
+  MAX_DECK_DAILY_REVIEW_LIMIT,
+  MIN_DECK_DAILY_REVIEW_LIMIT,
+  type DeckReviewSettings,
+  type DeckScope,
+  type StudyCardRow,
+  type TestMode,
+  type WordTestMode,
+} from "./types";
 import { enqueueSync } from "@/lib/database/sync-queue";
 import { emitReviewActivity } from "./review-events";
 import { recordAchievementEvent } from "@/lib/achievements/queries";
@@ -281,6 +294,95 @@ export async function addAyahToDeck(
 export const MEANINGS_DECK_ID = "meanings";
 export const MUTASHABIHAT_DECK_ID = "mutashabihat";
 export const MUTASHABIHAT_DECK_NAME = "Mutashabihat";
+const DECK_REVIEW_SETTINGS_PREFIX = "review_settings_";
+
+function deckReviewSettingsKey(deckId: string): string {
+  return `${DECK_REVIEW_SETTINGS_PREFIX}${deckId}`;
+}
+
+function clampReviewLimit(value: unknown): number {
+  const n = typeof value === "number" ? value : parseInt(String(value ?? ""), 10);
+  if (!Number.isFinite(n)) return DEFAULT_DECK_DAILY_REVIEW_LIMIT;
+  return Math.max(MIN_DECK_DAILY_REVIEW_LIMIT, Math.min(MAX_DECK_DAILY_REVIEW_LIMIT, n));
+}
+
+function normalizeModeList<T extends string>(value: unknown, allowed: readonly T[], fallback: readonly T[]): T[] {
+  if (!Array.isArray(value)) return [...fallback];
+  const valid = value.filter((mode): mode is T => allowed.includes(mode as T));
+  return valid.length > 0 ? valid : [...fallback];
+}
+
+function normalizeDeckReviewSettings(value: unknown, fallback?: DeckReviewSettings): DeckReviewSettings {
+  const raw = value && typeof value === "object" ? value as Partial<DeckReviewSettings> : {};
+  return {
+    dailyReviewLimit: clampReviewLimit(raw.dailyReviewLimit ?? fallback?.dailyReviewLimit),
+    testModes: normalizeModeList<TestMode>(raw.testModes, ALL_TEST_MODES, fallback?.testModes ?? DEFAULT_ENABLED_MODES),
+    wordTestModes: normalizeModeList<WordTestMode>(
+      raw.wordTestModes,
+      ALL_WORD_TEST_MODES,
+      fallback?.wordTestModes ?? DEFAULT_WORD_TEST_MODES
+    ),
+  };
+}
+
+async function readLegacyReviewSettings(db: SQLiteDatabase): Promise<DeckReviewSettings> {
+  const [dailyLimitRow, testModesRow, wordModesRow] = await Promise.all([
+    db.getFirstAsync<{ value: string }>("SELECT value FROM user_settings WHERE key = 'daily_review_limit'"),
+    db.getFirstAsync<{ value: string }>("SELECT value FROM user_settings WHERE key = 'flashcard_test_modes'"),
+    db.getFirstAsync<{ value: string }>("SELECT value FROM user_settings WHERE key = 'word_flashcard_test_modes'"),
+  ]);
+  let testModes: TestMode[] = DEFAULT_ENABLED_MODES;
+  let wordTestModes: WordTestMode[] = DEFAULT_WORD_TEST_MODES;
+
+  if (testModesRow?.value) {
+    try {
+      testModes = normalizeModeList<TestMode>(JSON.parse(testModesRow.value), ALL_TEST_MODES, DEFAULT_ENABLED_MODES);
+    } catch {}
+  }
+  if (wordModesRow?.value) {
+    try {
+      wordTestModes = normalizeModeList<WordTestMode>(JSON.parse(wordModesRow.value), ALL_WORD_TEST_MODES, DEFAULT_WORD_TEST_MODES);
+    } catch {}
+  }
+
+  return {
+    dailyReviewLimit: clampReviewLimit(dailyLimitRow?.value),
+    testModes,
+    wordTestModes,
+  };
+}
+
+export async function readDeckReviewSettings(
+  db: SQLiteDatabase,
+  deckId: string | null | undefined
+): Promise<DeckReviewSettings> {
+  const fallback = await readLegacyReviewSettings(db);
+  if (!deckId) return fallback;
+
+  const row = await db.getFirstAsync<{ value: string }>(
+    "SELECT value FROM user_settings WHERE key = ?",
+    [deckReviewSettingsKey(deckId)]
+  );
+  if (!row?.value) return fallback;
+
+  try {
+    return normalizeDeckReviewSettings(JSON.parse(row.value), fallback);
+  } catch {
+    return fallback;
+  }
+}
+
+export async function writeDeckReviewSettings(
+  db: SQLiteDatabase,
+  deckId: string,
+  settings: DeckReviewSettings
+): Promise<void> {
+  const normalized = normalizeDeckReviewSettings(settings);
+  await db.runAsync(
+    "INSERT OR REPLACE INTO user_settings (key, value) VALUES (?, ?)",
+    [deckReviewSettingsKey(deckId), JSON.stringify(normalized)]
+  );
+}
 
 export function meaningCardId(surah: number, ayah: number, wordPos: number): string {
   return `word:${surah}:${ayah}:${wordPos}`;
@@ -614,6 +716,7 @@ export async function deleteDeck(db: SQLiteDatabase, deckId: string): Promise<vo
     await db.runAsync("DELETE FROM study_cards WHERE deck_id = ?", [deckId]);
     // Delete deck metadata
     await db.runAsync("DELETE FROM user_settings WHERE key = ?", [`deck_${deckId}`]);
+    await db.runAsync("DELETE FROM user_settings WHERE key = ?", [deckReviewSettingsKey(deckId)]);
   });
 }
 
