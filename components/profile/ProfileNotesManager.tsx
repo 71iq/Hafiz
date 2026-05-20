@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { router } from "expo-router";
 import { BookOpen, Edit3, NotebookPen, Search, Trash2, type LucideIcon } from "lucide-react-native";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -20,11 +20,9 @@ export function ProfileNotesManager() {
   const db = useDatabase();
   const s = useStrings();
   const { isDark, isRTL, uiLanguage } = useSettings();
-  const [query, setQuery] = useState("");
   const [notes, setNotes] = useState<PrivateNoteSearchResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [reloadToken, setReloadToken] = useState(0);
-  const [searchOpen, setSearchOpen] = useState(false);
   const [editingNote, setEditingNote] = useState<PrivateNoteSearchResult | null>(null);
   const [deletingNote, setDeletingNote] = useState<PrivateNoteSearchResult | null>(null);
 
@@ -36,7 +34,7 @@ export function ProfileNotesManager() {
     let cancelled = false;
     setLoading(true);
     const timer = setTimeout(() => {
-      searchPrivateNotes(db, query)
+      searchPrivateNotes(db, "")
         .then((rows) => {
           if (!cancelled) setNotes(rows);
         })
@@ -53,7 +51,7 @@ export function ProfileNotesManager() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [db, query, reloadToken]);
+  }, [db, reloadToken]);
 
   const countLabel = useMemo(
     () => interpolate(s.profileNotesCount, { n: isRTL ? toArabicNumber(notes.length) : notes.length }),
@@ -72,11 +70,10 @@ export function ProfileNotesManager() {
     router.push("/(tabs)/mushaf" as any);
   }, []);
 
-  const title = query.trim().length > 0 ? s.profileNotesNoResultsTitle : s.profileNotesEmptyTitle;
-  const subtitle = query.trim().length > 0 ? s.profileNotesNoResultsSubtitle : s.profileNotesEmptySubtitle;
+  const title = s.profileNotesEmptyTitle;
+  const subtitle = s.profileNotesEmptySubtitle;
   const mutedColor = isDark ? "#737373" : "#A39B93";
   const iconColor = isDark ? "#2dd4bf" : "#0d9488";
-  const isSearchExpanded = searchOpen || query.trim().length > 0;
 
   return (
     <View className="gap-3">
@@ -115,42 +112,13 @@ export function ProfileNotesManager() {
               {countLabel}
             </Text>
           </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={s.profileNotesSearchPlaceholder}
-            onPress={() => setSearchOpen(true)}
-            className="min-h-10 items-center rounded-full bg-surface-low px-3 dark:bg-surface-dark-low"
-            style={({ pressed }) => ({
-              opacity: pressed ? 0.72 : 1,
-              width: isSearchExpanded ? 168 : 42,
-              flexDirection: isRTL ? "row-reverse" : "row",
-              justifyContent: isSearchExpanded ? "flex-start" : "center",
-              gap: isSearchExpanded ? 8 : 0,
-            })}
+          <View
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+            className="h-10 w-10 items-center justify-center rounded-full bg-surface-low dark:bg-surface-dark-low"
           >
             <Search size={17} color={mutedColor} />
-            {isSearchExpanded && (
-              <TextInput
-                value={query}
-                onChangeText={setQuery}
-                onFocus={() => setSearchOpen(true)}
-                onBlur={() => {
-                  if (query.trim().length === 0) setSearchOpen(false);
-                }}
-                placeholder={s.profileNotesSearchPlaceholder}
-                placeholderTextColor={mutedColor}
-                className="min-h-9 flex-1 text-charcoal dark:text-neutral-100"
-                style={{
-                  fontFamily: "Manrope_400Regular",
-                  fontSize: 14,
-                  textAlign: isRTL ? "right" : "left",
-                  writingDirection: isRTL ? "rtl" : "ltr",
-                }}
-                returnKeyType="search"
-                autoFocus
-              />
-            )}
-          </Pressable>
+          </View>
         </View>
       </View>
 
@@ -238,30 +206,39 @@ function NoteCard({
           <NotebookPen size={18} color={iconColor} />
         </View>
         <View className="min-w-0 flex-1">
-          <View className={`items-center gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
-            <Text
-              className="text-primary-accent dark:text-primary-bright"
-              style={{
-                fontFamily: "Manrope_700Bold",
-                fontSize: 13,
-                textAlign: isRTL ? "right" : "left",
-                writingDirection: isRTL ? "rtl" : "ltr",
-              }}
-            >
-              {refLabel}
-            </Text>
-            <Text
-              className="min-w-0 flex-1 text-warm-500 dark:text-neutral-400"
-              numberOfLines={1}
-              style={{
-                fontFamily: "Manrope_500Medium",
-                fontSize: 12,
-                textAlign: isRTL ? "right" : "left",
-                writingDirection: isRTL ? "rtl" : "ltr",
-              }}
-            >
-              {surahName}
-            </Text>
+          <View className={`items-start justify-between gap-3 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
+            <View className="min-w-0 flex-1">
+              <View className={`items-center gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
+                <Text
+                  className="text-primary-accent dark:text-primary-bright"
+                  style={{
+                    fontFamily: "Manrope_700Bold",
+                    fontSize: 13,
+                    textAlign: isRTL ? "right" : "left",
+                    writingDirection: isRTL ? "rtl" : "ltr",
+                  }}
+                >
+                  {refLabel}
+                </Text>
+                <Text
+                  className="min-w-0 flex-1 text-warm-500 dark:text-neutral-400"
+                  numberOfLines={1}
+                  style={{
+                    fontFamily: "Manrope_500Medium",
+                    fontSize: 12,
+                    textAlign: isRTL ? "right" : "left",
+                    writingDirection: isRTL ? "rtl" : "ltr",
+                  }}
+                >
+                  {surahName}
+                </Text>
+              </View>
+            </View>
+            <View className={`shrink-0 items-center gap-1.5 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
+              <NoteAction icon={BookOpen} label={s.profileNotesOpenAyah} color={iconColor} onPress={onOpenAyah} />
+              <NoteAction icon={Edit3} label={s.profileNotesEdit} color={mutedColor} onPress={onEdit} />
+              <NoteAction icon={Trash2} label={s.profileNotesDelete} color={isDark ? "#ef4444" : "#dc2626"} onPress={onDelete} />
+            </View>
           </View>
           <Text
             selectable
@@ -288,11 +265,6 @@ function NoteCard({
           >
             {updatedLabel}
           </Text>
-        </View>
-        <View className="items-center gap-1.5">
-          <NoteAction icon={BookOpen} label={s.profileNotesOpenAyah} color={iconColor} onPress={onOpenAyah} />
-          <NoteAction icon={Edit3} label={s.profileNotesEdit} color={mutedColor} onPress={onEdit} />
-          <NoteAction icon={Trash2} label={s.profileNotesDelete} color={isDark ? "#ef4444" : "#dc2626"} onPress={onDelete} />
         </View>
       </View>
     </View>

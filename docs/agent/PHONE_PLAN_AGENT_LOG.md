@@ -1828,3 +1828,20 @@ Saved in `phase19/`:
 - Remote file read verified the Home route no longer renders the Reflection Feed widget and now contains compact deck-row components.
 - `npm run typecheck`: passed after mirroring the remote `main` file set locally for validation.
 - `npm run build:web`: passed after mirroring the remote `main` file set locally for validation.
+
+## 2026-05-20 — Profile Notes Header Polish
+
+### Scope decisions
+1. Changed only the profile private-notes section presentation.
+2. Removed the inline-expanding notes search input and kept the compact search glyph in the header.
+3. Kept private-note reads local SQLite-only and left QCF2 reader code untouched.
+
+### Implemented in this step
+- `components/profile/ProfileNotesManager.tsx`:
+  - Replaced the expanding search control with a fixed circular search glyph.
+  - Moved note open/edit/delete controls into one horizontal row.
+
+### Validation result
+- `npm run typecheck`: passed.
+- `npm run build:web`: passed.
+- `npx expo start --web --port 8097 --localhost`: launched successfully; `/profile` smoke checked at 898px and 412px with the fixed header glyph and no search input expansion.
