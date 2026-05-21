@@ -29,6 +29,7 @@ import type { HifzVisibility } from "@/components/mushaf/MushafPage";
 import { loadMushafIndex, findJuzForAyah, findHizbForAyah, topmostAyahForPage, type MushafIndex } from "@/lib/mushaf/position";
 import { FloatingWordTooltip } from "@/components/mushaf/WordTooltip";
 import { SelectionActionBar } from "@/components/mushaf/SelectionActionBar";
+import { WebSelectionMenu } from "@/components/mushaf/WebSelectionMenu";
 import { BookmarksSheet } from "@/components/mushaf/BookmarksSheet";
 import { Toast } from "@/components/ui/Toast";
 import { SearchCommand } from "@/components/SearchCommand";
@@ -1501,6 +1502,9 @@ function MushafInner() {
 
         {/* Selection action bar */}
         <SelectionActionBar />
+
+        {/* Web text-selection copy menu */}
+        <WebSelectionMenu />
 
         {/* Bottom page rail / Hifz controls — fades with chrome */}
         {(showBottomSlider || showHifzControls) && (

@@ -113,6 +113,19 @@ function WordTokenInner({
     bgColor = highlightColor + "20";
   }
 
+  const webSelectionProps =
+    Platform.OS === "web"
+      ? ({
+          dataSet: {
+            hafizQuranToken: "word",
+            hafizSurah: String(surah),
+            hafizAyah: String(ayah),
+            hafizWordPos: String(wordPos),
+            hafizQuranHidden: hidden ? "true" : "false",
+          },
+        } as any)
+      : {};
+
   return (
     <Pressable
       ref={tokenRef as any}
@@ -120,10 +133,16 @@ function WordTokenInner({
       onLongPress={handleLongPress}
       delayLongPress={400}
       disabled={disabled || hidden}
-      style={{ paddingHorizontal: 1, overflow: "visible" }}
+      style={{
+        paddingHorizontal: 1,
+        overflow: "visible",
+        ...(Platform.OS === "web" ? ({ userSelect: hidden ? "none" : "text" } as any) : null),
+      }}
       {...webContextMenu}
+      {...webSelectionProps}
     >
       <Text
+        selectable={Platform.OS === "web" && !hidden}
         className={
           isTooltipSelected
             ? "text-primary-accent dark:text-primary-bright"
@@ -148,6 +167,7 @@ function WordTokenInner({
             borderBottomColor: isDark ? "#474747" : "#e8dac5",
             paddingBottom: Math.max(1, fontSize * 0.04),
           }),
+          ...(Platform.OS === "web" ? ({ userSelect: hidden ? "none" : "text" } as any) : null),
         }}
       >
         {glyph}

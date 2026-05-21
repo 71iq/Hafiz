@@ -16,6 +16,26 @@ type BookmarkRow = {
   qf_collections_count: number | null;
 };
 
+export type QuranSelectionWordRef = {
+  surah: number;
+  ayah: number;
+  wordPos: number;
+};
+
+export type UthmaniSelectionRange = {
+  surah: number;
+  surahName: string;
+  ayahStart: number;
+  ayahEnd: number;
+};
+
+export type UthmaniSelectionText = {
+  text: string;
+  firstSurah: number;
+  firstAyah: number;
+  ranges: UthmaniSelectionRange[];
+};
+
 export async function fetchAllBookmarks(db: SQLiteDatabase): Promise<BookmarkEntry[]> {
   return db.getAllAsync<BookmarkEntry>(
     `SELECT surah, ayah, created_at as createdAt
@@ -117,6 +137,56 @@ export async function fetchUthmaniRange(
   return rows.map((r) => r.text_uthmani).join(" ");
 }
 
+export async function fetchUthmaniWordsForSelection(
+  db: SQLiteDatabase,
+  refs: QuranSelectionWordRef[],
+): Promise<UthmaniSelectionText | null> {
+  const grouped = new Map<string, QuranSelectionWordRef[]>();
+  const deduped = new Map<string, QuranSelectionWordRef>();
+  for (const ref of refs) {
+    deduped.set(`${ref.surah}:${ref.ayah}:${ref.wordPos}`, ref);
+  }
+
+  const orderedRefs = Array.from(deduped.values()).sort(compareSelectionRefs);
+  for (const ref of orderedRefs) {
+    const key = `${ref.surah}:${ref.ayah}`;
+    grouped.set(key, [...(grouped.get(key) ?? []), ref]);
+  }
+
+  const textParts: string[] = [];
+  const selectedAyahs: { surah: number; ayah: number; surahName: string }[] = [];
+
+  for (const ayahRefs of grouped.values()) {
+    const first = ayahRefs[0];
+    const row = await db.getFirstAsync<{ text_uthmani: string; name_arabic: string }>(
+      `SELECT qt.text_uthmani, s.name_arabic
+       FROM quran_text qt
+       JOIN surahs s ON s.number = qt.surah
+       WHERE qt.surah = ? AND qt.ayah = ?`,
+      [first.surah, first.ayah],
+    );
+    if (!row) continue;
+
+    const words = selectableUthmaniWords(row.text_uthmani, first.surah, first.ayah);
+    const selectedWords = ayahRefs
+      .map((ref) => words[ref.wordPos - 1])
+      .filter((word): word is string => !!word);
+
+    if (selectedWords.length === 0) continue;
+    textParts.push(selectedWords.join(" "));
+    selectedAyahs.push({ surah: first.surah, ayah: first.ayah, surahName: row.name_arabic });
+  }
+
+  if (textParts.length === 0 || selectedAyahs.length === 0) return null;
+
+  return {
+    text: textParts.join(" "),
+    firstSurah: selectedAyahs[0].surah,
+    firstAyah: selectedAyahs[0].ayah,
+    ranges: compactSelectedAyahs(selectedAyahs),
+  };
+}
+
 export async function fetchSurahName(
   db: SQLiteDatabase,
   surah: number,
@@ -126,6 +196,38 @@ export async function fetchSurahName(
     [surah]
   );
   return row?.name_arabic ?? "";
+}
+
+function selectableUthmaniWords(text: string, surah: number, ayah: number): string[] {
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  if (ayah === 1 && surah !== 1 && surah !== 9 && words.length > 4) {
+    return words.slice(4);
+  }
+  return words;
+}
+
+function compareSelectionRefs(a: QuranSelectionWordRef, b: QuranSelectionWordRef): number {
+  return a.surah - b.surah || a.ayah - b.ayah || a.wordPos - b.wordPos;
+}
+
+function compactSelectedAyahs(
+  ayahs: { surah: number; ayah: number; surahName: string }[],
+): UthmaniSelectionRange[] {
+  const ranges: UthmaniSelectionRange[] = [];
+  for (const item of ayahs) {
+    const last = ranges[ranges.length - 1];
+    if (last && last.surah === item.surah && last.ayahEnd + 1 === item.ayah) {
+      last.ayahEnd = item.ayah;
+    } else {
+      ranges.push({
+        surah: item.surah,
+        surahName: item.surahName,
+        ayahStart: item.ayah,
+        ayahEnd: item.ayah,
+      });
+    }
+  }
+  return ranges;
 }
 
 async function getBookmarkRow(
