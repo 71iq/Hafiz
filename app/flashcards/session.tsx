@@ -747,42 +747,44 @@ function FlashcardSessionScreen() {
 
       {/* Bottom action area */}
       <View
-        className="px-6 pb-6 pt-4"
+        className="px-6 pb-6 pt-4 items-center"
         style={{ backgroundColor: isDark ? "rgba(10,10,10,0.95)" : "rgba(255,248,241,0.95)" }}
       >
-        {phase === "front" && (
-          <Button onPress={() => { setPhase(activeModes.length > 0 ? "side" : "grading"); setCurrentSideIndex(0); setRevealed(false); }} className="w-full">
-            <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16, color: "#fff" }}>
-              {s.flashcardsReveal}
-            </Text>
-          </Button>
-        )}
-
-        {phase === "side" && !revealed && (
-          <Button onPress={handleReveal} className="w-full">
-            <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16, color: "#fff" }}>
-              {s.flashcardsReveal}
-            </Text>
-          </Button>
-        )}
-
-        {phase === "side" && revealed && !isLastSide && (
-          <Button onPress={handleNext} className="w-full">
-            <View className="flex-row items-center gap-2">
+        <View style={{ width: "100%", maxWidth }}>
+          {phase === "front" && (
+            <Button onPress={() => { setPhase(activeModes.length > 0 ? "side" : "grading"); setCurrentSideIndex(0); setRevealed(false); }} className="w-full">
               <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16, color: "#fff" }}>
-                {s.flashcardsNext}
+                {s.flashcardsReveal}
               </Text>
-              <ChevronRight size={18} color="#fff" />
-            </View>
-          </Button>
-        )}
+            </Button>
+          )}
 
-        {/* Grading: show directly after last side is revealed, or in grading phase */}
-        {((phase === "side" && revealed && isLastSide) || phase === "grading") && (
-          <>
-            <GradingButtons onGrade={handleGrade} isDark={isDark} s={s} />
-          </>
-        )}
+          {phase === "side" && !revealed && (
+            <Button onPress={handleReveal} className="w-full">
+              <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16, color: "#fff" }}>
+                {s.flashcardsReveal}
+              </Text>
+            </Button>
+          )}
+
+          {phase === "side" && revealed && !isLastSide && (
+            <Button onPress={handleNext} className="w-full">
+              <View className="flex-row items-center gap-2">
+                <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16, color: "#fff" }}>
+                  {s.flashcardsNext}
+                </Text>
+                <ChevronRight size={18} color="#fff" />
+              </View>
+            </Button>
+          )}
+
+          {/* Grading: show directly after last side is revealed, or in grading phase */}
+          {((phase === "side" && revealed && isLastSide) || phase === "grading") && (
+            <>
+              <GradingButtons onGrade={handleGrade} isDark={isDark} s={s} />
+            </>
+          )}
+        </View>
       </View>
     </SafeAreaView>
   );
