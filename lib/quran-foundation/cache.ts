@@ -106,6 +106,8 @@ export async function readCachedAyahHadiths(
     [surah, ayah, language, page, limit]
   );
   if (!row) return null;
+  const parsedHadiths = parseJson(row.payload_json);
+  const hadiths = Array.isArray(parsedHadiths) ? parsedHadiths : [];
   return {
     ok: true,
     verseKey: `${surah}:${ayah}`,
@@ -114,9 +116,9 @@ export async function readCachedAyahHadiths(
     page: row.page,
     limit: row.limit_count,
     hasMore: row.has_more === 1,
-    hadiths: parseJson(row.payload_json) ?? [],
+    hadiths,
     fetchedAt: row.fetched_at,
-    isStale: isStale(row.fetched_at),
+    isStale: isStale(row.fetched_at) || hadiths.length === 0,
   };
 }
 

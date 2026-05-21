@@ -245,15 +245,24 @@ async function handleHadith(
   if (!upstream.ok) return upstream.response;
 
   const payload = upstream.data as HadithPayload;
+  const qfHadiths = Array.isArray(payload.hadiths) ? payload.hadiths : [];
+  const resolvedPayload =
+    qfHadiths.length > 0
+      ? payload
+      : (await fetchQuranComHadiths(verseKey, language, page, limit).catch(() => null)) ?? payload;
+  const hadiths = Array.isArray((resolvedPayload as HadithPayload).hadiths)
+    ? ((resolvedPayload as HadithPayload).hadiths)
+    : [];
+
   return jsonSuccess({
     ok: true,
     verseKey,
     language,
-    direction: stringOrUndefined(payload.direction) ?? (language === "ar" ? "rtl" : "ltr"),
-    page: numberOrUndefined(payload.page) ?? page,
-    limit: numberOrUndefined(payload.limit) ?? limit,
-    hasMore: Boolean(payload.has_more ?? payload.hasMore),
-    hadiths: Array.isArray(payload.hadiths) ? payload.hadiths : [],
+    direction: stringOrUndefined((resolvedPayload as HadithPayload).direction) ?? (language === "ar" ? "rtl" : "ltr"),
+    page: numberOrUndefined((resolvedPayload as HadithPayload).page) ?? page,
+    limit: numberOrUndefined((resolvedPayload as HadithPayload).limit) ?? limit,
+    hasMore: Boolean((resolvedPayload as HadithPayload).has_more ?? (resolvedPayload as HadithPayload).hasMore),
+    hadiths: normalizeHadiths(hadiths, language),
     fetchedAt: new Date().toISOString(),
   });
 }
@@ -466,6 +475,91 @@ function normalizeReciter(value: unknown) {
     translatedLanguageName: stringOrUndefined(row.translated_name?.language_name),
     style: stringOrUndefined(row.style) ?? "",
   };
+}
+
+async function fetchQuranComHadiths(
+  verseKey: string,
+  language: "en" | "ar",
+  page: number,
+  limit: number
+): Promise<HadithPayload | null> {
+  const params = new URLSearchParams({
+    language,
+    page: String(page),
+    limit: String(limit),
+  });
+  const response = await fetch(
+    `https://quran.com/api/proxy/content/api/qdc/hadith_references/by_ayah/${encodeURIComponent(verseKey)}/hadiths?${params.toString()}`,
+    {
+      headers: {
+        accept: "application/json",
+        referer: `https://quran.com/${verseKey}/hadith`,
+      },
+    }
+  );
+  if (!response.ok) return null;
+  const payload = await response.json() as HadithPayload;
+  return Array.isArray(payload.hadiths) ? payload : null;
+}
+
+function normalizeHadiths(value: unknown[], language: "en" | "ar"): unknown[] {
+  return value.map((hadith) => {
+    if (!isRecord(hadith)) return hadith;
+    const texts = Array.isArray(hadith.hadith) ? hadith.hadith : [];
+    const languageTexts = texts.filter((text) => !isRecord(text) || text.lang === language);
+    return {
+      ...hadith,
+      hadith: (languageTexts.length > 0 ? languageTexts : texts).map(normalizeHadithText),
+    };
+  });
+}
+
+function normalizeHadithText(value: unknown): unknown {
+  if (!isRecord(value)) return value;
+  const body = stringOrUndefined(value.body);
+  return {
+    ...value,
+    ...(body ? { body: htmlToText(body) } : {}),
+  };
+}
+
+function htmlToText(value: string): string {
+  return decodeHtmlEntities(
+    value
+      .replace(/\r\n/g, "\n")
+      .replace(/<\s*br\s*\/?>/gi, "\n")
+      .replace(/<\/p>\s*<p[^>]*>/gi, "\n\n")
+      .replace(/<\/?p[^>]*>/gi, "\n")
+      .replace(/<[^>]+>/g, "")
+  )
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n[ \t]+/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
+function decodeHtmlEntities(value: string): string {
+  const named: Record<string, string> = {
+    amp: "&",
+    apos: "'",
+    gt: ">",
+    lt: "<",
+    nbsp: " ",
+    quot: '"',
+  };
+  return value
+    .replace(/&([a-z]+);/gi, (match, name: string) => named[name.toLowerCase()] ?? match)
+    .replace(/&#(\d+);/g, (match, code: string) => safeCodePoint(Number(code), match))
+    .replace(/&#x([0-9a-f]+);/gi, (match, code: string) => safeCodePoint(parseInt(code, 16), match));
+}
+
+function safeCodePoint(code: number, fallback: string): string {
+  return Number.isInteger(code) && code >= 0 && code <= 0x10ffff ? String.fromCodePoint(code) : fallback;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 function numberOrUndefined(value: unknown): number | undefined {
