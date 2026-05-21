@@ -37,6 +37,8 @@ import type { StudyCardRow, TestMode, WordTestMode } from "@/lib/fsrs/types";
 import type { DeckReviewSettings } from "@/lib/fsrs/types";
 import {
   DEFAULT_DECK_DAILY_REVIEW_LIMIT,
+  DEFAULT_DECK_LEARNING_STEPS,
+  DEFAULT_DECK_RELEARNING_STEPS,
   DEFAULT_ENABLED_MODES,
   DEFAULT_WORD_TEST_MODES,
   TEST_MODE_COLORS,
@@ -154,7 +156,7 @@ export default function FlashcardSessionScreenWrapper() {
 
 function FlashcardSessionScreen() {
   const db = useDatabase();
-  const { isDark, fontSize, lineHeight, tafseerSource, isLoaded: settingsLoaded } = useSettings();
+  const { isDark, isRTL, fontSize, lineHeight, tafseerSource, isLoaded: settingsLoaded } = useSettings();
   const s = useStrings();
   const router = useRouter();
   const { deckId } = useLocalSearchParams<{ deckId?: string }>();
@@ -422,6 +424,10 @@ function FlashcardSessionScreen() {
   ]);
 
   const currentCard = cards[currentIndex] ?? null;
+  const gradePreviews = useMemo(
+    () => currentCard ? getGradeSchedulePreviews(currentCard.card, reviewSettings, isRTL) : {},
+    [currentCard, reviewSettings, isRTL]
+  );
   const activeModes = useMemo<ReviewMode[]>(() => {
     if (!currentCard) return [] as ReviewMode[];
     if (currentCard.kind === "mutashabihat" || currentCard.kind === "similarTail") {
@@ -477,19 +483,7 @@ function FlashcardSessionScreen() {
       hapticMedium();
       const now = new Date();
 
-      const fsrsCard: FSRSCard = {
-        due: new Date(currentCard.card.due),
-        stability: currentCard.card.stability,
-        difficulty: currentCard.card.difficulty,
-        elapsed_days: currentCard.card.elapsed_days,
-        scheduled_days: currentCard.card.scheduled_days,
-        learning_steps: currentCard.card.learning_steps,
-        reps: currentCard.card.reps,
-        lapses: currentCard.card.lapses,
-        state: currentCard.card.state as State,
-      };
-
-      const result = gradeCard(fsrsCard, now, rating, reviewSettings ?? undefined);
+      const result = gradeCard(toFSRSCard(currentCard.card), now, rating, reviewSettings ?? undefined);
 
       const updatedRow: StudyCardRow = {
         ...currentCard.card,
@@ -794,7 +788,7 @@ function FlashcardSessionScreen() {
           {/* Grading: show directly after last side is revealed, or in grading phase */}
           {((phase === "side" && revealed && isLastSide) || phase === "grading") && (
             <>
-              <GradingButtons onGrade={handleGrade} isDark={isDark} s={s} />
+              <GradingButtons onGrade={handleGrade} previews={gradePreviews} isDark={isDark} s={s} />
             </>
           )}
         </View>
@@ -1149,7 +1143,17 @@ const GRADE_BUTTONS: { rating: Grade; bgLight: string; bgDark: string }[] = [
   { rating: Rating.Easy, bgLight: "#1d4ed8", bgDark: "#2563eb" },
 ];
 
-function GradingButtons({ onGrade, isDark, s }: { onGrade: (rating: Grade) => void; isDark: boolean; s: any }) {
+function GradingButtons({
+  onGrade,
+  previews,
+  isDark,
+  s,
+}: {
+  onGrade: (rating: Grade) => void;
+  previews: Record<number, string>;
+  isDark: boolean;
+  s: any;
+}) {
   const labels: Record<number, string> = {
     [Rating.Again]: s.flashcardsAgain,
     [Rating.Hard]: s.flashcardsHard,
@@ -1167,12 +1171,29 @@ function GradingButtons({ onGrade, isDark, s }: { onGrade: (rating: Grade) => vo
             className="flex-1 rounded-2xl items-center"
             style={{
               backgroundColor: isDark ? bgDark : bgLight,
-              paddingVertical: 14,
+              minHeight: 58,
+              paddingHorizontal: 6,
+              paddingVertical: 10,
             }}
           >
-            <Text style={{ fontFamily: "Manrope_700Bold", fontSize: 14, color: "#fff" }}>
+            <Text
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.82}
+              style={{ fontFamily: "Manrope_700Bold", fontSize: 14, color: "#fff" }}
+            >
               {labels[rating]}
             </Text>
+            {previews[rating] ? (
+              <Text
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.75}
+                style={{ color: "rgba(255,255,255,0.82)", fontFamily: "Manrope_600SemiBold", fontSize: 10, marginTop: 3 }}
+              >
+                {previews[rating]}
+              </Text>
+            ) : null}
           </Pressable>
         ))}
       </View>
@@ -1290,6 +1311,81 @@ function isSmartTestMode(mode: ReviewMode): mode is SmartTestMode {
 
 function isSmartReviewCard(card: CardData): boolean {
   return card.kind === "mutashabihat" || card.kind === "similarTail" || card.kind === "qiraat";
+}
+
+function toFSRSCard(row: StudyCardRow): FSRSCard {
+  return {
+    due: new Date(row.due),
+    stability: row.stability,
+    difficulty: row.difficulty,
+    elapsed_days: row.elapsed_days,
+    scheduled_days: row.scheduled_days,
+    learning_steps: row.learning_steps,
+    reps: row.reps,
+    lapses: row.lapses,
+    state: row.state as State,
+  };
+}
+
+function getGradeSchedulePreviews(
+  row: StudyCardRow,
+  settings: DeckReviewSettings | null,
+  isRTL: boolean
+): Record<number, string> {
+  const now = new Date();
+  const previews: Record<number, string> = {};
+
+  for (const { rating } of GRADE_BUTTONS) {
+    const result = gradeCard(toFSRSCard(row), now, rating, settings ?? undefined);
+    const stepLabel = getLearningStepPreview(result.card, settings, isRTL);
+    const returnLabel = formatReturnDelay(result.card.due, now, isRTL);
+    previews[rating] = stepLabel ? `${stepLabel} · ${returnLabel}` : returnLabel;
+  }
+
+  return previews;
+}
+
+function getLearningStepPreview(
+  nextCard: FSRSCard,
+  settings: DeckReviewSettings | null,
+  isRTL: boolean
+): string | null {
+  const steps = nextCard.state === State.Learning
+    ? (settings?.learningSteps ?? DEFAULT_DECK_LEARNING_STEPS)
+    : nextCard.state === State.Relearning
+      ? (settings?.relearningSteps ?? DEFAULT_DECK_RELEARNING_STEPS)
+      : null;
+
+  if (!steps?.length) return null;
+
+  const step = Math.min(Math.max(nextCard.learning_steps, 0), steps.length - 1) + 1;
+  return `${formatCompactNumber(step, isRTL)}/${formatCompactNumber(steps.length, isRTL)}`;
+}
+
+function formatReturnDelay(due: Date, now: Date, isRTL: boolean): string {
+  const minutes = Math.ceil(Math.max(0, due.getTime() - now.getTime()) / 60000);
+  const units = isRTL
+    ? { minute: "د", hour: "س", day: "ي", month: "ش", year: "سنة" }
+    : { minute: "m", hour: "h", day: "d", month: "mo", year: "y" };
+
+  if (minutes <= 1) return `<${formatCompactNumber(1, isRTL)}${units.minute}`;
+  if (minutes < 60) return `${formatCompactNumber(minutes, isRTL)}${units.minute}`;
+
+  const hours = Math.ceil(minutes / 60);
+  if (hours < 24) return `${formatCompactNumber(hours, isRTL)}${units.hour}`;
+
+  const days = Math.ceil(minutes / 1440);
+  if (days < 30) return `${formatCompactNumber(days, isRTL)}${units.day}`;
+
+  if (days < 365) {
+    return `${formatCompactNumber(Math.max(1, Math.round(days / 30)), isRTL)}${units.month}`;
+  }
+
+  return `>${formatCompactNumber(Math.max(1, Math.floor(days / 365)), isRTL)}${units.year}`;
+}
+
+function formatCompactNumber(value: number, isRTL: boolean): string {
+  return isRTL ? toArabicNumeral(value) : String(value);
 }
 
 function getSmartDeckTitleForKind(kind: SmartCardKind, s: any): string {
