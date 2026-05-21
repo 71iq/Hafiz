@@ -69,6 +69,9 @@ const AYAH_COUNTS = [
   3, 6, 3, 5, 4, 5, 6,
 ];
 
+const DEFAULT_RECITATION_ID = 6;
+const SUPPORTED_RECITATION_IDS = new Set([6, 7]);
+
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -236,7 +239,7 @@ function readConfig(action: Action, recitationIdInput: unknown): { ok: true; val
 
   const recitationId =
     action === "audio-ayah"
-      ? parsePositiveInt(recitationIdInput ?? Deno.env.get("QF_DEFAULT_RECITATION_ID") ?? 6)
+      ? normalizeRecitationId(recitationIdInput ?? Deno.env.get("QF_DEFAULT_RECITATION_ID") ?? DEFAULT_RECITATION_ID)
       : 7;
   if (recitationId === null) {
     return { ok: false, message: "Quran Foundation recitation is not configured." };
@@ -394,6 +397,12 @@ function parsePositiveInt(value: unknown): number | null {
   const n = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
   if (!Number.isInteger(n) || n < 1) return null;
   return n;
+}
+
+function normalizeRecitationId(value: unknown): number | null {
+  const recitationId = parsePositiveInt(value);
+  if (recitationId === null) return null;
+  return SUPPORTED_RECITATION_IDS.has(recitationId) ? recitationId : DEFAULT_RECITATION_ID;
 }
 
 function normalizeAudioUrl(url: string): string {
