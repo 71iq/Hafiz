@@ -126,7 +126,7 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     creditWordMeanings: "Word meanings: quran-words.com",
     creditIrab: "Iʿrab: al-Daʿas via qul.tarteel.ai",
     creditQiraat: "Qiraʾat: Qurʾanic Encyclopedia via qul.tarteel.ai",
-    creditNourQuran: "Mutashabihat and similar ayah tails: NourQuran.com (used with prior approval).",
+    creditNourQuran: "Mutashabihat and similar ayah tails: NourQuran.com.",
     creditTajweedRules: "Tajweed markings: cpfair/quran-tajweed (CC BY 4.0)",
     creditTajweedDesc: "Tajweed descriptions: adapted from educational sources",
     settingsAboutSection: "About Hafiz",
