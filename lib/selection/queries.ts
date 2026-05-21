@@ -20,6 +20,7 @@ export type QuranSelectionWordRef = {
   surah: number;
   ayah: number;
   wordPos: number;
+  literalText?: string;
 };
 
 export type UthmaniSelectionRange = {
@@ -169,7 +170,7 @@ export async function fetchUthmaniWordsForSelection(
 
     const words = selectableUthmaniWords(row.text_uthmani, first.surah, first.ayah);
     const selectedWords = ayahRefs
-      .map((ref) => words[ref.wordPos - 1])
+      .map((ref) => ref.literalText ?? words[ref.wordPos - 1])
       .filter((word): word is string => !!word);
 
     if (selectedWords.length === 0) continue;

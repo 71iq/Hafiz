@@ -96,6 +96,7 @@ type PageGlyph = {
 
 // QCF2 Basmallah: 4 word glyphs from page 1's font (Surah 1 Ayah 1 = the Basmallah)
 const BISMILLAH_QCF2 = "\uFC41 \uFC42 \uFC43 \uFC44";
+const BISMILLAH_UTHMANI = "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ";
 
 // Approximate QCF2 font-size to Mushaf-line width ratio, used by PageMushaf
 // to cap vertical page typography before a line can overflow the viewport.
@@ -330,6 +331,20 @@ function MushafPageInner({
 
       if (line.line_type === "basmallah") {
         const bismHeight = visualLineHeight * 0.85 + 8;
+        const bismillahSelectionProps =
+          Platform.OS === "web" && line.surah_number
+            ? ({
+                selectable: true,
+                dataSet: {
+                  hafizQuranToken: "word",
+                  hafizSurah: String(line.surah_number),
+                  hafizAyah: "1",
+                  hafizWordPos: "-1",
+                  hafizLiteralText: BISMILLAH_UTHMANI,
+                  hafizQuranHidden: "false",
+                },
+              } as any)
+            : {};
         return (
           <View
             key={`line-${line.line_number}-bism`}
@@ -337,11 +352,13 @@ function MushafPageInner({
             style={{ height: bismHeight, justifyContent: "center" }}
           >
             <Text
+              {...bismillahSelectionProps}
               className="text-charcoal dark:text-neutral-200 text-center"
               style={{
                 fontFamily: qpcFontName(1),
                 fontSize: fontSize * 0.85,
                 lineHeight: lineHeight * 0.85,
+                ...(Platform.OS === "web" ? ({ userSelect: "text" } as any) : null),
               }}
             >
               {BISMILLAH_QCF2}

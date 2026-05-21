@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { View, Text } from "react-native";
+import { Platform, View, Text } from "react-native";
 import {
   loadQpcFont,
   qpcFontName,
@@ -21,6 +21,7 @@ type Props = {
 
 /** QCF2 Bismillah from page 1 font (PUA codepoints) */
 const BISMILLAH_QCF2 = "\uFC41 \uFC42 \uFC43 \uFC44";
+const BISMILLAH_UTHMANI = "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ";
 
 export function SurahHeader({
   surahNumber,
@@ -44,6 +45,20 @@ export function SurahHeader({
   const [bismFontReady, setBismFontReady] = useState(() =>
     isQpcFontLoaded(1)
   );
+  const bismillahSelectionProps =
+    Platform.OS === "web" && showBismillah
+      ? ({
+          selectable: true,
+          dataSet: {
+            hafizQuranToken: "word",
+            hafizSurah: String(surahNumber),
+            hafizAyah: "1",
+            hafizWordPos: "-1",
+            hafizLiteralText: BISMILLAH_UTHMANI,
+            hafizQuranHidden: "false",
+          },
+        } as any)
+      : {};
 
   useEffect(() => {
     if (!showBismillah) return;
@@ -90,12 +105,14 @@ export function SurahHeader({
         {showBismillah && (
           <View className="items-center mt-2 mb-1">
             <Text
+              {...bismillahSelectionProps}
               className="text-charcoal dark:text-neutral-200 text-center"
               style={{
                 fontSize: 18,
                 lineHeight: 32,
                 fontFamily: qpcFontName(1),
                 opacity: bismFontReady ? 1 : 0,
+                ...(Platform.OS === "web" ? ({ userSelect: "text" } as any) : null),
               }}
             >
               {BISMILLAH_QCF2}
@@ -159,12 +176,14 @@ export function SurahHeader({
       {showBismillah && (
         <View className="items-center mt-6 mb-2">
           <Text
+            {...bismillahSelectionProps}
             className="text-charcoal dark:text-neutral-200 text-center"
             style={{
               fontSize: 24,
               lineHeight: 48,
               fontFamily: qpcFontName(1),
               opacity: bismFontReady ? 1 : 0,
+              ...(Platform.OS === "web" ? ({ userSelect: "text" } as any) : null),
             }}
           >
             {BISMILLAH_QCF2}

@@ -203,7 +203,8 @@ function readSelectedQuranWords(selection: Selection): QuranSelectionWordRef[] {
     const ayah = Number(node.dataset.hafizAyah);
     const wordPos = Number(node.dataset.hafizWordPos);
     if (!Number.isFinite(surah) || !Number.isFinite(ayah) || !Number.isFinite(wordPos)) continue;
-    refs.set(`${surah}:${ayah}:${wordPos}`, { surah, ayah, wordPos });
+    const literalText = node.dataset.hafizLiteralText;
+    refs.set(`${surah}:${ayah}:${wordPos}:${literalText ?? ""}`, { surah, ayah, wordPos, literalText });
   }
 
   return Array.from(refs.values()).sort(
