@@ -155,7 +155,7 @@ export default function HomeScreen() {
           readDeckReviewSettings(db, definition.id),
           readSmartDeckFilter(db, definition.id),
         ]);
-        const stats = await getDeckTodayStats(db, definition.id, settings.dailyReviewLimit);
+        const stats = await getDeckTodayStats(db, definition.id, settings);
         return {
           ...definition,
           filter,
@@ -171,7 +171,7 @@ export default function HomeScreen() {
     const deckDisplays: DeckDisplay[] = [];
     for (const d of rawDecks) {
       const settings = await readDeckReviewSettings(db, d.id);
-      const stats = await getDeckTodayStats(db, d.id, settings.dailyReviewLimit);
+      const stats = await getDeckTodayStats(db, d.id, settings);
       deckDisplays.push({ ...d, cardCount: stats.total, dueCount: stats.dueCount, newCount: stats.newCount });
     }
     setDecks(deckDisplays);
@@ -180,10 +180,10 @@ export default function HomeScreen() {
       readDeckReviewSettings(db, MEANINGS_DECK_ID),
     ]);
     const [dashboardDue, memorizedTotal, nextWirdStatus, vocabTodayStats, reflectionJourneySummary] = await Promise.all([
-      getTodayDueCount(db, undefined, dashboardSettings.dailyReviewLimit),
+      getTodayDueCount(db, undefined, dashboardSettings),
       getMemorizedAyahCardCount(db),
       getWirdStatus(db),
-      getDeckTodayStats(db, MEANINGS_DECK_ID, vocabSettings.dailyReviewLimit),
+      getDeckTodayStats(db, MEANINGS_DECK_ID, vocabSettings),
       getReflectionJourneySummary(db),
     ]);
     setTotalDue(dashboardDue);

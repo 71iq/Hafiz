@@ -1,4 +1,4 @@
-import type { State } from "ts-fsrs";
+import type { State, StepUnit } from "ts-fsrs";
 
 /** A deck is a logical grouping — we track it as metadata on cards */
 export type DeckScope =
@@ -86,9 +86,48 @@ export const DEFAULT_DECK_DAILY_REVIEW_LIMIT = 30;
 export const MIN_DECK_DAILY_REVIEW_LIMIT = 10;
 export const MAX_DECK_DAILY_REVIEW_LIMIT = 30;
 export const DECK_DAILY_REVIEW_LIMIT_STEP = 10;
+export const DEFAULT_DECK_NEW_CARD_LIMIT = 30;
+export const MIN_DECK_NEW_CARD_LIMIT = 0;
+export const MAX_DECK_NEW_CARD_LIMIT = 30;
+export const DECK_NEW_CARD_LIMIT_STEP = 5;
+export const DEFAULT_DECK_REQUEST_RETENTION = 0.95;
+export const MIN_DECK_REQUEST_RETENTION = 0.8;
+export const MAX_DECK_REQUEST_RETENTION = 0.99;
+export const DECK_REQUEST_RETENTION_STEP = 0.01;
+export const DEFAULT_DECK_MAXIMUM_INTERVAL = 365;
+export const MIN_DECK_MAXIMUM_INTERVAL = 30;
+export const MAX_DECK_MAXIMUM_INTERVAL = 3650;
+export const DECK_MAXIMUM_INTERVAL_STEP = 30;
+export const DEFAULT_DECK_ENABLE_FUZZ = true;
+export const DEFAULT_DECK_ENABLE_SHORT_TERM = true;
+export type SchedulerStep = StepUnit;
+
+export const DEFAULT_DECK_LEARNING_STEPS: SchedulerStep[] = ["1m", "10m"];
+export const DEFAULT_DECK_RELEARNING_STEPS: SchedulerStep[] = ["10m"];
+
+export type NewReviewOrder = "reviewsFirst" | "newFirst" | "mixed";
+export type ReviewSortOrder = "due" | "oldest" | "newest" | "random";
+export type NewCardSortOrder = "created" | "random";
+
+export const ALL_NEW_REVIEW_ORDERS: NewReviewOrder[] = ["reviewsFirst", "newFirst", "mixed"];
+export const ALL_REVIEW_SORT_ORDERS: ReviewSortOrder[] = ["due", "oldest", "newest", "random"];
+export const ALL_NEW_CARD_SORT_ORDERS: NewCardSortOrder[] = ["created", "random"];
+export const DEFAULT_NEW_REVIEW_ORDER: NewReviewOrder = "reviewsFirst";
+export const DEFAULT_REVIEW_SORT_ORDER: ReviewSortOrder = "due";
+export const DEFAULT_NEW_CARD_SORT_ORDER: NewCardSortOrder = "created";
 
 export type DeckReviewSettings = {
   dailyReviewLimit: number;
+  newCardsLimit: number;
+  requestRetention: number;
+  maximumInterval: number;
+  enableFuzz: boolean;
+  enableShortTerm: boolean;
+  learningSteps: SchedulerStep[];
+  relearningSteps: SchedulerStep[];
+  newReviewOrder: NewReviewOrder;
+  reviewSortOrder: ReviewSortOrder;
+  newCardSortOrder: NewCardSortOrder;
   testModes: TestMode[];
   wordTestModes: WordTestMode[];
 };

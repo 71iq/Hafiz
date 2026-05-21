@@ -1,15 +1,35 @@
 import type { SQLiteDatabase } from "expo-sqlite";
 import { createEmptyCard } from "./scheduler";
 import {
+  ALL_NEW_CARD_SORT_ORDERS,
+  ALL_NEW_REVIEW_ORDERS,
   ALL_TEST_MODES,
   ALL_WORD_TEST_MODES,
+  ALL_REVIEW_SORT_ORDERS,
+  DEFAULT_DECK_ENABLE_FUZZ,
+  DEFAULT_DECK_ENABLE_SHORT_TERM,
   DEFAULT_DECK_DAILY_REVIEW_LIMIT,
   DEFAULT_ENABLED_MODES,
+  DEFAULT_DECK_LEARNING_STEPS,
+  DEFAULT_DECK_MAXIMUM_INTERVAL,
+  DEFAULT_DECK_NEW_CARD_LIMIT,
+  DEFAULT_DECK_RELEARNING_STEPS,
+  DEFAULT_DECK_REQUEST_RETENTION,
   DEFAULT_WORD_TEST_MODES,
+  DEFAULT_NEW_CARD_SORT_ORDER,
+  DEFAULT_NEW_REVIEW_ORDER,
+  DEFAULT_REVIEW_SORT_ORDER,
+  MAX_DECK_MAXIMUM_INTERVAL,
   MAX_DECK_DAILY_REVIEW_LIMIT,
+  MAX_DECK_NEW_CARD_LIMIT,
+  MAX_DECK_REQUEST_RETENTION,
+  MIN_DECK_MAXIMUM_INTERVAL,
   MIN_DECK_DAILY_REVIEW_LIMIT,
+  MIN_DECK_NEW_CARD_LIMIT,
+  MIN_DECK_REQUEST_RETENTION,
   type DeckReviewSettings,
   type DeckScope,
+  type SchedulerStep,
   type StudyCardRow,
   type TestMode,
   type WordTestMode,
@@ -24,6 +44,7 @@ import {
   getSmartDeckTodayStats,
   isSmartDeckId,
   SMART_DECK_IDS,
+  type DueCardsForReviewOptions,
 } from "./smart-decks";
 
 export type ReviewActivityDay = { date: string; count: number };
@@ -315,6 +336,47 @@ function clampReviewLimit(value: unknown): number {
   return Math.max(MIN_DECK_DAILY_REVIEW_LIMIT, Math.min(MAX_DECK_DAILY_REVIEW_LIMIT, n));
 }
 
+function clampNewCardLimit(value: unknown): number {
+  const n = typeof value === "number" ? value : parseInt(String(value ?? ""), 10);
+  if (!Number.isFinite(n)) return DEFAULT_DECK_NEW_CARD_LIMIT;
+  return Math.max(MIN_DECK_NEW_CARD_LIMIT, Math.min(MAX_DECK_NEW_CARD_LIMIT, n));
+}
+
+function clampRetention(value: unknown): number {
+  const n = typeof value === "number" ? value : parseFloat(String(value ?? ""));
+  if (!Number.isFinite(n)) return DEFAULT_DECK_REQUEST_RETENTION;
+  return Math.max(MIN_DECK_REQUEST_RETENTION, Math.min(MAX_DECK_REQUEST_RETENTION, n));
+}
+
+function clampMaximumInterval(value: unknown): number {
+  const n = typeof value === "number" ? value : parseInt(String(value ?? ""), 10);
+  if (!Number.isFinite(n)) return DEFAULT_DECK_MAXIMUM_INTERVAL;
+  return Math.max(MIN_DECK_MAXIMUM_INTERVAL, Math.min(MAX_DECK_MAXIMUM_INTERVAL, n));
+}
+
+function normalizeBoolean(value: unknown, fallback: boolean): boolean {
+  return typeof value === "boolean" ? value : fallback;
+}
+
+const SCHEDULER_STEP_RE = /^\d+(?:\.\d+)?[mhd]$/;
+
+function isSchedulerStep(value: string): value is SchedulerStep {
+  return SCHEDULER_STEP_RE.test(value);
+}
+
+function normalizeStepList(value: unknown, fallback: readonly SchedulerStep[]): SchedulerStep[] {
+  if (!Array.isArray(value)) return [...fallback];
+  if (value.length === 0) return [];
+  const valid = value
+    .map((step) => String(step).trim())
+    .filter(isSchedulerStep);
+  return valid.length > 0 ? valid : [...fallback];
+}
+
+function normalizeEnum<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {
+  return typeof value === "string" && allowed.includes(value as T) ? value as T : fallback;
+}
+
 function normalizeModeList<T extends string>(value: unknown, allowed: readonly T[], fallback: readonly T[]): T[] {
   if (!Array.isArray(value)) return [...fallback];
   const valid = value.filter((mode): mode is T => allowed.includes(mode as T));
@@ -325,6 +387,16 @@ function normalizeDeckReviewSettings(value: unknown, fallback?: DeckReviewSettin
   const raw = value && typeof value === "object" ? value as Partial<DeckReviewSettings> : {};
   return {
     dailyReviewLimit: clampReviewLimit(raw.dailyReviewLimit ?? fallback?.dailyReviewLimit),
+    newCardsLimit: clampNewCardLimit(raw.newCardsLimit ?? fallback?.newCardsLimit),
+    requestRetention: clampRetention(raw.requestRetention ?? fallback?.requestRetention),
+    maximumInterval: clampMaximumInterval(raw.maximumInterval ?? fallback?.maximumInterval),
+    enableFuzz: normalizeBoolean(raw.enableFuzz, fallback?.enableFuzz ?? DEFAULT_DECK_ENABLE_FUZZ),
+    enableShortTerm: normalizeBoolean(raw.enableShortTerm, fallback?.enableShortTerm ?? DEFAULT_DECK_ENABLE_SHORT_TERM),
+    learningSteps: normalizeStepList(raw.learningSteps, fallback?.learningSteps ?? DEFAULT_DECK_LEARNING_STEPS),
+    relearningSteps: normalizeStepList(raw.relearningSteps, fallback?.relearningSteps ?? DEFAULT_DECK_RELEARNING_STEPS),
+    newReviewOrder: normalizeEnum(raw.newReviewOrder, ALL_NEW_REVIEW_ORDERS, fallback?.newReviewOrder ?? DEFAULT_NEW_REVIEW_ORDER),
+    reviewSortOrder: normalizeEnum(raw.reviewSortOrder, ALL_REVIEW_SORT_ORDERS, fallback?.reviewSortOrder ?? DEFAULT_REVIEW_SORT_ORDER),
+    newCardSortOrder: normalizeEnum(raw.newCardSortOrder, ALL_NEW_CARD_SORT_ORDERS, fallback?.newCardSortOrder ?? DEFAULT_NEW_CARD_SORT_ORDER),
     testModes: normalizeModeList<TestMode>(raw.testModes, ALL_TEST_MODES, fallback?.testModes ?? DEFAULT_ENABLED_MODES),
     wordTestModes: normalizeModeList<WordTestMode>(
       raw.wordTestModes,
@@ -356,6 +428,16 @@ async function readLegacyReviewSettings(db: SQLiteDatabase): Promise<DeckReviewS
 
   return {
     dailyReviewLimit: clampReviewLimit(dailyLimitRow?.value),
+    newCardsLimit: DEFAULT_DECK_NEW_CARD_LIMIT,
+    requestRetention: DEFAULT_DECK_REQUEST_RETENTION,
+    maximumInterval: DEFAULT_DECK_MAXIMUM_INTERVAL,
+    enableFuzz: DEFAULT_DECK_ENABLE_FUZZ,
+    enableShortTerm: DEFAULT_DECK_ENABLE_SHORT_TERM,
+    learningSteps: [...DEFAULT_DECK_LEARNING_STEPS],
+    relearningSteps: [...DEFAULT_DECK_RELEARNING_STEPS],
+    newReviewOrder: DEFAULT_NEW_REVIEW_ORDER,
+    reviewSortOrder: DEFAULT_REVIEW_SORT_ORDER,
+    newCardSortOrder: DEFAULT_NEW_CARD_SORT_ORDER,
     testModes,
     wordTestModes,
   };
@@ -384,7 +466,7 @@ export async function readDeckReviewSettings(
 export async function writeDeckReviewSettings(
   db: SQLiteDatabase,
   deckId: string,
-  settings: DeckReviewSettings
+  settings: Partial<DeckReviewSettings>
 ): Promise<void> {
   const normalized = normalizeDeckReviewSettings(settings);
   await db.runAsync(
@@ -618,6 +700,16 @@ export async function getDueCards(
   return getDueCardsForReview(db, deckId, limit);
 }
 
+function reviewQueueOptionsFromSettings(settings: DeckReviewSettings, limit: number): DueCardsForReviewOptions {
+  return {
+    limit,
+    newCardsLimit: settings.newCardsLimit,
+    newReviewOrder: settings.newReviewOrder,
+    reviewSortOrder: settings.reviewSortOrder,
+    newCardSortOrder: settings.newCardSortOrder,
+  };
+}
+
 export async function getTodayReviewedCount(db: SQLiteDatabase, deckId?: string): Promise<number> {
   const { start, end } = todayBounds();
   if (deckId) {
@@ -649,11 +741,14 @@ export async function getRemainingReviewLimit(
 export async function getTodayDueCount(
   db: SQLiteDatabase,
   deckId: string | undefined,
-  limit: number
+  settingsOrLimit: DeckReviewSettings | number
 ): Promise<number> {
-  const remaining = await getRemainingReviewLimit(db, deckId, limit);
+  const settings = typeof settingsOrLimit === "number"
+    ? normalizeDeckReviewSettings({ dailyReviewLimit: settingsOrLimit })
+    : normalizeDeckReviewSettings(settingsOrLimit);
+  const remaining = await getRemainingReviewLimit(db, deckId, settings.dailyReviewLimit);
   if (remaining <= 0) return 0;
-  return (await getDueCardsForReview(db, deckId, remaining)).length;
+  return (await getDueCardsForReview(db, deckId, reviewQueueOptionsFromSettings(settings, remaining))).length;
 }
 
 export async function getDueCount(db: SQLiteDatabase, deckId?: string): Promise<number> {
@@ -681,21 +776,24 @@ export async function getDueCount(db: SQLiteDatabase, deckId?: string): Promise<
 export async function getDeckTodayStats(
   db: SQLiteDatabase,
   deckId: string,
-  limit: number
+  settingsOrLimit: DeckReviewSettings | number
 ): Promise<{ total: number; dueCount: number; newCount: number }> {
-  const remaining = await getRemainingReviewLimit(db, deckId, limit);
+  const settings = typeof settingsOrLimit === "number"
+    ? normalizeDeckReviewSettings({ dailyReviewLimit: settingsOrLimit })
+    : normalizeDeckReviewSettings(settingsOrLimit);
+  const remaining = await getRemainingReviewLimit(db, deckId, settings.dailyReviewLimit);
   if (remaining <= 0) {
     return { total: await getTotalCardCount(db, deckId), dueCount: 0, newCount: 0 };
   }
 
   if (isSmartDeckId(deckId)) {
-    const stats = await getSmartDeckTodayStats(db, deckId, remaining);
+    const stats = await getSmartDeckTodayStats(db, deckId, reviewQueueOptionsFromSettings(settings, remaining));
     return { total: stats.total, dueCount: stats.due, newCount: stats.newCount };
   }
 
   const [total, rows] = await Promise.all([
     getTotalCardCount(db, deckId),
-    getDueCardsForReview(db, deckId, remaining),
+    getDueCardsForReview(db, deckId, reviewQueueOptionsFromSettings(settings, remaining)),
   ]);
   return {
     total,

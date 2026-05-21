@@ -1,22 +1,40 @@
 import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
-import { Check, Minus, Plus } from "lucide-react-native";
+import { Check } from "lucide-react-native";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { OverlayBody, OverlayFooter, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { useDatabase } from "@/lib/database/provider";
-import { toArabicNumber } from "@/lib/arabic";
 import { interpolate, useStrings } from "@/lib/i18n/useStrings";
 import { useSettings } from "@/lib/settings/context";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
+import { SchedulerOptionsPanel, formatStepText, parseStepText } from "@/components/flashcards/DeckReviewSettingsSheet";
 import {
-  DEFAULT_ENABLED_MODES,
-  DEFAULT_WORD_TEST_MODES,
-  DECK_DAILY_REVIEW_LIMIT_STEP,
+  DEFAULT_DECK_ENABLE_FUZZ,
+  DEFAULT_DECK_ENABLE_SHORT_TERM,
   DEFAULT_DECK_DAILY_REVIEW_LIMIT,
+  DEFAULT_DECK_LEARNING_STEPS,
+  DEFAULT_DECK_MAXIMUM_INTERVAL,
+  DEFAULT_DECK_NEW_CARD_LIMIT,
+  DEFAULT_DECK_RELEARNING_STEPS,
+  DEFAULT_DECK_REQUEST_RETENTION,
+  DEFAULT_ENABLED_MODES,
+  DEFAULT_NEW_CARD_SORT_ORDER,
+  DEFAULT_NEW_REVIEW_ORDER,
+  DEFAULT_REVIEW_SORT_ORDER,
+  DEFAULT_WORD_TEST_MODES,
+  MAX_DECK_MAXIMUM_INTERVAL,
   MAX_DECK_DAILY_REVIEW_LIMIT,
+  MAX_DECK_NEW_CARD_LIMIT,
+  MAX_DECK_REQUEST_RETENTION,
+  MIN_DECK_MAXIMUM_INTERVAL,
   MIN_DECK_DAILY_REVIEW_LIMIT,
+  MIN_DECK_NEW_CARD_LIMIT,
+  MIN_DECK_REQUEST_RETENTION,
   type DeckReviewSettings,
+  type NewCardSortOrder,
+  type NewReviewOrder,
+  type ReviewSortOrder,
 } from "@/lib/fsrs/types";
 import {
   readDeckReviewSettings,
@@ -54,6 +72,16 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
   const [selectedJuz, setSelectedJuz] = useState<Set<number>>(new Set());
   const [surahs, setSurahs] = useState<SurahRow[]>([]);
   const [dailyLimit, setDailyLimit] = useState(DEFAULT_DECK_DAILY_REVIEW_LIMIT);
+  const [newCardsLimit, setNewCardsLimit] = useState(DEFAULT_DECK_NEW_CARD_LIMIT);
+  const [requestRetention, setRequestRetention] = useState(DEFAULT_DECK_REQUEST_RETENTION);
+  const [maximumInterval, setMaximumInterval] = useState(DEFAULT_DECK_MAXIMUM_INTERVAL);
+  const [enableFuzz, setEnableFuzz] = useState(DEFAULT_DECK_ENABLE_FUZZ);
+  const [enableShortTerm, setEnableShortTerm] = useState(DEFAULT_DECK_ENABLE_SHORT_TERM);
+  const [learningStepsText, setLearningStepsText] = useState(formatStepText(DEFAULT_DECK_LEARNING_STEPS));
+  const [relearningStepsText, setRelearningStepsText] = useState(formatStepText(DEFAULT_DECK_RELEARNING_STEPS));
+  const [newReviewOrder, setNewReviewOrder] = useState<NewReviewOrder>(DEFAULT_NEW_REVIEW_ORDER);
+  const [reviewSortOrder, setReviewSortOrder] = useState<ReviewSortOrder>(DEFAULT_REVIEW_SORT_ORDER);
+  const [newCardSortOrder, setNewCardSortOrder] = useState<NewCardSortOrder>(DEFAULT_NEW_CARD_SORT_ORDER);
   const [reviewSettings, setReviewSettings] = useState<DeckReviewSettings | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -71,6 +99,16 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
       setSelectedSurahs(new Set(filter.type === "surah" ? filter.surahs : []));
       setSelectedJuz(new Set(filter.type === "juz" ? filter.juzNumbers : []));
       setDailyLimit(settings.dailyReviewLimit);
+      setNewCardsLimit(settings.newCardsLimit);
+      setRequestRetention(settings.requestRetention);
+      setMaximumInterval(settings.maximumInterval);
+      setEnableFuzz(settings.enableFuzz);
+      setEnableShortTerm(settings.enableShortTerm);
+      setLearningStepsText(formatStepText(settings.learningSteps));
+      setRelearningStepsText(formatStepText(settings.relearningSteps));
+      setNewReviewOrder(settings.newReviewOrder);
+      setReviewSortOrder(settings.reviewSortOrder);
+      setNewCardSortOrder(settings.newCardSortOrder);
       setReviewSettings(settings);
     }).catch(console.warn);
     return () => {
@@ -98,6 +136,19 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
     setDailyLimit(Math.max(MIN_DECK_DAILY_REVIEW_LIMIT, Math.min(MAX_DECK_DAILY_REVIEW_LIMIT, value)));
   }, []);
 
+  const setNextNewCardsLimit = useCallback((value: number) => {
+    setNewCardsLimit(Math.max(MIN_DECK_NEW_CARD_LIMIT, Math.min(MAX_DECK_NEW_CARD_LIMIT, value)));
+  }, []);
+
+  const setNextRetention = useCallback((value: number) => {
+    const clamped = Math.max(MIN_DECK_REQUEST_RETENTION, Math.min(MAX_DECK_REQUEST_RETENTION, value));
+    setRequestRetention(Number(clamped.toFixed(2)));
+  }, []);
+
+  const setNextMaximumInterval = useCallback((value: number) => {
+    setMaximumInterval(Math.max(MIN_DECK_MAXIMUM_INTERVAL, Math.min(MAX_DECK_MAXIMUM_INTERVAL, value)));
+  }, []);
+
   const handleSave = async () => {
     if (!deckId || saving) return;
     setSaving(true);
@@ -107,11 +158,22 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
       if (filterType === "juz") filter = { type: "juz", juzNumbers: [...selectedJuz] };
       await writeSmartDeckFilter(db, deckId, filter);
       await writeDeckReviewSettings(db, deckId, {
+        ...(reviewSettings ?? {}),
         dailyReviewLimit: dailyLimit,
+        newCardsLimit,
+        requestRetention,
+        maximumInterval,
+        enableFuzz,
+        enableShortTerm,
+        learningSteps: parseStepText(learningStepsText, DEFAULT_DECK_LEARNING_STEPS),
+        relearningSteps: parseStepText(relearningStepsText, DEFAULT_DECK_RELEARNING_STEPS),
+        newReviewOrder,
+        reviewSortOrder,
+        newCardSortOrder,
         testModes: reviewSettings?.testModes ?? DEFAULT_ENABLED_MODES,
         wordTestModes: reviewSettings?.wordTestModes ?? DEFAULT_WORD_TEST_MODES,
       });
-      await materializeSmartDeckCards(db, deckId, dailyLimit);
+      await materializeSmartDeckCards(db, deckId, dailyLimit, newCardsLimit);
       onSaved();
       onClose();
     } finally {
@@ -220,49 +282,33 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
         )}
 
         <View className="mt-6">
-          <Text
-            className="mb-3 text-warm-400 dark:text-neutral-500"
-            style={{
-              fontFamily: "Manrope_600SemiBold",
-              fontSize: 11,
-              letterSpacing: 1.2,
-              textAlign: isRTL ? "right" : "left",
-              textTransform: "uppercase",
-              writingDirection: isRTL ? "rtl" : "ltr",
-            }}
-          >
-            {s.deckReviewSettingsTitle}
-          </Text>
-          <Card elevation="low" className="p-5">
-            <View
-              className="items-center justify-between gap-4"
-              style={{ flexDirection: compact ? (isRTL ? "row-reverse" : "row") : "column" }}
-            >
-              <View className="flex-1">
-                <Text
-                  className="text-charcoal dark:text-neutral-200"
-                  style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15, textAlign: isRTL ? "right" : "left" }}
-                >
-                  {s.flashcardsDailyLimit}
-                </Text>
-                <Text
-                  className="mt-0.5 text-warm-400 dark:text-neutral-500"
-                  style={{ fontFamily: "Manrope_400Regular", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
-                >
-                  {s.flashcardsDailyLimitDesc}
-                </Text>
-              </View>
-              <ReviewLimitStepper
-                value={isRTL ? toArabicNumber(dailyLimit) : String(dailyLimit)}
-                onDecrement={() => setNextDailyLimit(dailyLimit - DECK_DAILY_REVIEW_LIMIT_STEP)}
-                onIncrement={() => setNextDailyLimit(dailyLimit + DECK_DAILY_REVIEW_LIMIT_STEP)}
-                decrementDisabled={dailyLimit <= MIN_DECK_DAILY_REVIEW_LIMIT}
-                incrementDisabled={dailyLimit >= MAX_DECK_DAILY_REVIEW_LIMIT}
-                isDark={isDark}
-                isRTL={isRTL}
-              />
-            </View>
-          </Card>
+          <SchedulerOptionsPanel
+            dailyLimit={dailyLimit}
+            newCardsLimit={newCardsLimit}
+            requestRetention={requestRetention}
+            maximumInterval={maximumInterval}
+            enableFuzz={enableFuzz}
+            enableShortTerm={enableShortTerm}
+            learningStepsText={learningStepsText}
+            relearningStepsText={relearningStepsText}
+            newReviewOrder={newReviewOrder}
+            reviewSortOrder={reviewSortOrder}
+            newCardSortOrder={newCardSortOrder}
+            onDailyLimitChange={setNextDailyLimit}
+            onNewCardsLimitChange={setNextNewCardsLimit}
+            onRequestRetentionChange={setNextRetention}
+            onMaximumIntervalChange={setNextMaximumInterval}
+            onEnableFuzzChange={setEnableFuzz}
+            onEnableShortTermChange={setEnableShortTerm}
+            onLearningStepsTextChange={setLearningStepsText}
+            onRelearningStepsTextChange={setRelearningStepsText}
+            onNewReviewOrderChange={setNewReviewOrder}
+            onReviewSortOrderChange={setReviewSortOrder}
+            onNewCardSortOrderChange={setNewCardSortOrder}
+            compact={compact}
+            isDark={isDark}
+            isRTL={isRTL}
+          />
         </View>
       </OverlayBody>
 
@@ -278,63 +324,6 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
         </Button>
       </OverlayFooter>
     </ResponsiveSheet>
-  );
-}
-
-function ReviewLimitStepper({
-  value,
-  onDecrement,
-  onIncrement,
-  decrementDisabled,
-  incrementDisabled,
-  isDark,
-  isRTL,
-}: {
-  value: string;
-  onDecrement: () => void;
-  onIncrement: () => void;
-  decrementDisabled: boolean;
-  incrementDisabled: boolean;
-  isDark: boolean;
-  isRTL: boolean;
-}) {
-  const iconColor = isDark ? "#d4d4d4" : "#6e5a47";
-  return (
-    <View
-      className="self-start rounded-full bg-surface-high p-1 dark:bg-surface-dark-high"
-      style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
-    >
-      <Pressable
-        onPress={onDecrement}
-        disabled={decrementDisabled}
-        className="h-9 w-9 items-center justify-center rounded-full"
-        style={({ pressed }) => ({
-          opacity: decrementDisabled ? 0.35 : pressed ? 0.68 : 1,
-          transform: [{ scale: pressed && !decrementDisabled ? 0.96 : 1 }],
-        })}
-      >
-        <Minus size={17} color={iconColor} />
-      </Pressable>
-      <View className="min-w-16 items-center justify-center px-3">
-        <Text
-          className="text-charcoal dark:text-neutral-100"
-          style={{ fontFamily: "Manrope_700Bold", fontSize: 14 }}
-        >
-          {value}
-        </Text>
-      </View>
-      <Pressable
-        onPress={onIncrement}
-        disabled={incrementDisabled}
-        className="h-9 w-9 items-center justify-center rounded-full"
-        style={({ pressed }) => ({
-          opacity: incrementDisabled ? 0.35 : pressed ? 0.68 : 1,
-          transform: [{ scale: pressed && !incrementDisabled ? 0.96 : 1 }],
-        })}
-      >
-        <Plus size={17} color={iconColor} />
-      </Pressable>
-    </View>
   );
 }
 

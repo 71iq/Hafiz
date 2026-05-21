@@ -1,7 +1,20 @@
 import type { SQLiteDatabase } from "expo-sqlite";
 import { enqueueSync } from "@/lib/database/sync-queue";
 import { createEmptyCard } from "./scheduler";
-import type { StudyCardRow } from "./types";
+import {
+  ALL_NEW_CARD_SORT_ORDERS,
+  ALL_NEW_REVIEW_ORDERS,
+  ALL_REVIEW_SORT_ORDERS,
+  DEFAULT_DECK_NEW_CARD_LIMIT,
+  DEFAULT_NEW_CARD_SORT_ORDER,
+  DEFAULT_NEW_REVIEW_ORDER,
+  DEFAULT_REVIEW_SORT_ORDER,
+  MAX_DECK_NEW_CARD_LIMIT,
+  type NewCardSortOrder,
+  type NewReviewOrder,
+  type ReviewSortOrder,
+  type StudyCardRow,
+} from "./types";
 
 export const SMART_DECK_IDS = {
   mutashabihat: "default-mutashabihat",
@@ -51,6 +64,14 @@ export type SmartDeckStats = {
   total: number;
   due: number;
   newCount: number;
+};
+
+export type DueCardsForReviewOptions = number | {
+  limit?: number;
+  newCardsLimit?: number;
+  newReviewOrder?: NewReviewOrder;
+  reviewSortOrder?: ReviewSortOrder;
+  newCardSortOrder?: NewCardSortOrder;
 };
 
 const SMART_DECK_ID_LIST: SmartDeckId[] = [
@@ -174,6 +195,78 @@ export async function getAllMatchingSmartCardIdSet(db: SQLiteDatabase): Promise<
   return new Set(ids.flat());
 }
 
+function normalizeEnum<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {
+  return typeof value === "string" && allowed.includes(value as T) ? value as T : fallback;
+}
+
+function normalizeDueOptions(options?: DueCardsForReviewOptions): Required<NonNullable<Exclude<DueCardsForReviewOptions, number>>> {
+  if (typeof options === "number") {
+    return {
+      limit: options,
+      newCardsLimit: DEFAULT_DECK_NEW_CARD_LIMIT,
+      newReviewOrder: DEFAULT_NEW_REVIEW_ORDER,
+      reviewSortOrder: DEFAULT_REVIEW_SORT_ORDER,
+      newCardSortOrder: DEFAULT_NEW_CARD_SORT_ORDER,
+    };
+  }
+  return {
+    limit: options?.limit ?? 0,
+    newCardsLimit: typeof options?.newCardsLimit === "number" && Number.isFinite(options.newCardsLimit)
+      ? Math.max(0, Math.min(MAX_DECK_NEW_CARD_LIMIT, options.newCardsLimit))
+      : DEFAULT_DECK_NEW_CARD_LIMIT,
+    newReviewOrder: normalizeEnum(options?.newReviewOrder, ALL_NEW_REVIEW_ORDERS, DEFAULT_NEW_REVIEW_ORDER),
+    reviewSortOrder: normalizeEnum(options?.reviewSortOrder, ALL_REVIEW_SORT_ORDERS, DEFAULT_REVIEW_SORT_ORDER),
+    newCardSortOrder: normalizeEnum(options?.newCardSortOrder, ALL_NEW_CARD_SORT_ORDERS, DEFAULT_NEW_CARD_SORT_ORDER),
+  };
+}
+
+function shuffleRows(rows: StudyCardRow[]): StudyCardRow[] {
+  const next = [...rows];
+  for (let i = next.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [next[i], next[j]] = [next[j], next[i]];
+  }
+  return next;
+}
+
+function sortReviewRows(rows: StudyCardRow[], sortOrder: ReviewSortOrder): StudyCardRow[] {
+  if (sortOrder === "random") return shuffleRows(rows);
+  return [...rows].sort((a, b) => {
+    if (sortOrder === "oldest") return (a.last_review ?? a.created_at).localeCompare(b.last_review ?? b.created_at);
+    if (sortOrder === "newest") return (b.last_review ?? b.created_at).localeCompare(a.last_review ?? a.created_at);
+    return a.due.localeCompare(b.due);
+  });
+}
+
+function sortNewRows(rows: StudyCardRow[], sortOrder: NewCardSortOrder): StudyCardRow[] {
+  if (sortOrder === "random") return shuffleRows(rows);
+  return [...rows].sort((a, b) => a.created_at.localeCompare(b.created_at));
+}
+
+function interleaveRows(first: StudyCardRow[], second: StudyCardRow[]): StudyCardRow[] {
+  const rows: StudyCardRow[] = [];
+  const max = Math.max(first.length, second.length);
+  for (let i = 0; i < max; i++) {
+    if (first[i]) rows.push(first[i]);
+    if (second[i]) rows.push(second[i]);
+  }
+  return rows;
+}
+
+function applyReviewQueueOptions(rows: StudyCardRow[], options?: DueCardsForReviewOptions): StudyCardRow[] {
+  const normalized = normalizeDueOptions(options);
+  const limit = normalized.limit > 0 ? normalized.limit : rows.length;
+  const reviews = sortReviewRows(rows.filter((row) => row.state !== 0), normalized.reviewSortOrder);
+  const newCards = sortNewRows(rows.filter((row) => row.state === 0), normalized.newCardSortOrder)
+    .slice(0, normalized.newCardsLimit);
+  const ordered = normalized.newReviewOrder === "newFirst"
+    ? [...newCards, ...reviews]
+    : normalized.newReviewOrder === "mixed"
+      ? interleaveRows(reviews, newCards)
+      : [...reviews, ...newCards];
+  return ordered.slice(0, limit);
+}
+
 export async function getSmartDeckStats(
   db: SQLiteDatabase,
   deckId: SmartDeckId
@@ -195,35 +288,54 @@ export async function getSmartDeckStats(
 export async function getSmartDeckTodayStats(
   db: SQLiteDatabase,
   deckId: SmartDeckId,
-  limit?: number
+  options?: DueCardsForReviewOptions
 ): Promise<SmartDeckStats> {
   const ids = await getSmartDeckCandidateCardIds(db, deckId);
   if (ids.length === 0) return { total: 0, due: 0, newCount: 0 };
 
   const now = new Date().toISOString();
+  const normalized = normalizeDueOptions(options);
   const rows = await getStudyCardsByIds(db, ids, deckId);
   const existing = new Set(rows.map((row) => row.id));
-  const missing = ids.filter((id) => !existing.has(id)).length;
-  const safeLimit = limit && limit > 0 ? limit : ids.length;
   const dueRows = rows
     .filter((row) => row.due <= now)
     .sort((a, b) => a.due.localeCompare(b.due));
-  const reviewCount = Math.min(dueRows.filter((row) => row.state !== 0).length, safeLimit);
-  const remaining = Math.max(0, safeLimit - reviewCount);
-  const materializedNewCount = Math.min(dueRows.filter((row) => row.state === 0).length, remaining);
-  const newCount = materializedNewCount + Math.min(missing, Math.max(0, remaining - materializedNewCount));
+  const missingRows = ids
+    .filter((id) => !existing.has(id))
+    .slice(0, normalized.newCardsLimit)
+    .map((id) => {
+      const emptyCard = createEmptyCard();
+      return {
+        id,
+        deck_id: deckId,
+        due: now,
+        stability: emptyCard.stability,
+        difficulty: emptyCard.difficulty,
+        elapsed_days: emptyCard.elapsed_days,
+        scheduled_days: emptyCard.scheduled_days,
+        learning_steps: emptyCard.learning_steps,
+        reps: emptyCard.reps,
+        lapses: emptyCard.lapses,
+        state: emptyCard.state,
+        last_review: null,
+        created_at: now,
+        updated_at: now,
+      };
+    });
+  const queuedRows = applyReviewQueueOptions([...dueRows, ...missingRows], options);
 
   return {
     total: ids.length,
-    due: reviewCount,
-    newCount,
+    due: queuedRows.filter((row) => row.state !== 0).length,
+    newCount: queuedRows.filter((row) => row.state === 0).length,
   };
 }
 
 export async function materializeSmartDeckCards(
   db: SQLiteDatabase,
   deckId: SmartDeckId,
-  limit?: number
+  limit?: number,
+  newCardsLimit = DEFAULT_DECK_NEW_CARD_LIMIT
 ): Promise<number> {
   const ids = await getSmartDeckCandidateCardIds(db, deckId);
   if (ids.length === 0) return 0;
@@ -231,9 +343,15 @@ export async function materializeSmartDeckCards(
   const nowIso = new Date().toISOString();
   const rows = await getStudyCardsByIds(db, ids, deckId);
   const existing = new Set(rows.map((row) => row.id));
-  const existingDueCount = rows.filter((row) => row.due <= nowIso).length;
   const targetDueCount = limit && limit > 0 ? Math.min(limit, ids.length) : ids.length;
-  const createCount = Math.max(0, targetDueCount - existingDueCount);
+  const safeNewCardsLimit = Number.isFinite(newCardsLimit)
+    ? Math.max(0, Math.min(MAX_DECK_NEW_CARD_LIMIT, newCardsLimit))
+    : DEFAULT_DECK_NEW_CARD_LIMIT;
+  const existingDueRows = rows.filter((row) => row.due <= nowIso);
+  const existingDueReviewCount = existingDueRows.filter((row) => row.state !== 0).length;
+  const existingDueNewCount = existingDueRows.length - existingDueReviewCount;
+  const targetDueNewCount = Math.min(safeNewCardsLimit, Math.max(0, targetDueCount - existingDueReviewCount));
+  const createCount = Math.max(0, targetDueNewCount - existingDueNewCount);
   if (createCount === 0) return 0;
 
   const missingIds = ids.filter((id) => !existing.has(id)).slice(0, createCount);
@@ -300,31 +418,30 @@ export async function materializeSmartDeckCards(
 export async function getDueCardsForReview(
   db: SQLiteDatabase,
   deckId?: string,
-  limit?: number
+  options?: DueCardsForReviewOptions
 ): Promise<StudyCardRow[]> {
   const now = new Date().toISOString();
-  const safeLimit = limit && limit > 0 ? limit : undefined;
 
   if (isSmartDeckId(deckId)) {
     const rows = await getSmartDeckDueRows(db, deckId, now);
-    return safeLimit ? rows.slice(0, safeLimit) : rows;
+    return applyReviewQueueOptions(rows, options);
   }
 
   if (deckId) {
-    const limitClause = safeLimit ? ` LIMIT ${safeLimit}` : "";
-    return db.getAllAsync<StudyCardRow>(
-      `SELECT * FROM study_cards WHERE deck_id = ? AND due <= ? ORDER BY due${limitClause}`,
+    const rows = await db.getAllAsync<StudyCardRow>(
+      "SELECT * FROM study_cards WHERE deck_id = ? AND due <= ?",
       [deckId, now]
     );
+    return applyReviewQueueOptions(rows, options);
   }
 
   const rows = await db.getAllAsync<StudyCardRow>(
-    "SELECT * FROM study_cards WHERE due <= ? ORDER BY due",
+    "SELECT * FROM study_cards WHERE due <= ?",
     [now]
   );
   const matchingSmartIds = await getAllMatchingSmartCardIdSet(db);
   const filtered = rows.filter((row) => !isSmartDeckId(row.deck_id) || matchingSmartIds.has(row.id));
-  return safeLimit ? filtered.slice(0, safeLimit) : filtered;
+  return applyReviewQueueOptions(filtered, options);
 }
 
 export async function getSmartCardContent(

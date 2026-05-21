@@ -34,6 +34,7 @@ import { hapticMedium, hapticSuccess } from "@/lib/haptics";
 import { Skeleton, SkeletonText } from "@/components/ui/Skeleton";
 import { syncDailyScore, updateProfileStats } from "@/lib/fsrs/leaderboard-sync";
 import type { StudyCardRow, TestMode, WordTestMode } from "@/lib/fsrs/types";
+import type { DeckReviewSettings } from "@/lib/fsrs/types";
 import {
   DEFAULT_DECK_DAILY_REVIEW_LIMIT,
   DEFAULT_ENABLED_MODES,
@@ -151,15 +152,6 @@ export default function FlashcardSessionScreenWrapper() {
   );
 }
 
-/** Fisher-Yates shuffle (in-place) */
-function shuffle<T>(arr: T[]): T[] {
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}
-
 function FlashcardSessionScreen() {
   const db = useDatabase();
   const { isDark, fontSize, lineHeight, tafseerSource, isLoaded: settingsLoaded } = useSettings();
@@ -177,6 +169,7 @@ function FlashcardSessionScreen() {
   const [enabledModes, setEnabledModes] = useState<TestMode[]>(DEFAULT_ENABLED_MODES);
   const [wordEnabledModes, setWordEnabledModes] = useState<WordTestMode[]>(DEFAULT_WORD_TEST_MODES);
   const [reviewLimit, setReviewLimit] = useState(DEFAULT_DECK_DAILY_REVIEW_LIMIT);
+  const [reviewSettings, setReviewSettings] = useState<DeckReviewSettings | null>(null);
   const [reviewSettingsLoaded, setReviewSettingsLoaded] = useState(false);
   const [summary, setSummary] = useState<SessionSummary | null>(null);
   const sessionStartRef = useRef(Date.now());
@@ -203,6 +196,7 @@ function FlashcardSessionScreen() {
       setEnabledModes(settings.testModes);
       setWordEnabledModes(settings.wordTestModes);
       setReviewLimit(settings.dailyReviewLimit);
+      setReviewSettings(settings);
       setReviewSettingsLoaded(true);
     }).catch((err) => {
       console.warn(err);
@@ -210,6 +204,7 @@ function FlashcardSessionScreen() {
       setEnabledModes(DEFAULT_ENABLED_MODES);
       setWordEnabledModes(DEFAULT_WORD_TEST_MODES);
       setReviewLimit(DEFAULT_DECK_DAILY_REVIEW_LIMIT);
+      setReviewSettings(null);
       setReviewSettingsLoaded(true);
     });
     return () => {
@@ -230,12 +225,26 @@ function FlashcardSessionScreen() {
       try {
         // Pre-load streak for scoring
         streakRef.current = await getStudyStreak(db);
-        const remainingReviewLimit = await getRemainingReviewLimit(db, normalizedDeckId, reviewLimit);
+        const activeReviewSettings = reviewSettings;
+        const remainingReviewLimit = await getRemainingReviewLimit(db, normalizedDeckId, activeReviewSettings?.dailyReviewLimit ?? reviewLimit);
         if (isSmartDeckId(normalizedDeckId) && remainingReviewLimit > 0) {
-          await materializeSmartDeckCards(db, normalizedDeckId, remainingReviewLimit);
+          await materializeSmartDeckCards(
+            db,
+            normalizedDeckId,
+            remainingReviewLimit,
+            activeReviewSettings?.newCardsLimit
+          );
         }
         const dueRows = remainingReviewLimit > 0
-          ? await getDueCardsForReview(db, normalizedDeckId, remainingReviewLimit)
+          ? await getDueCardsForReview(db, normalizedDeckId, activeReviewSettings
+              ? {
+                  limit: remainingReviewLimit,
+                  newCardsLimit: activeReviewSettings.newCardsLimit,
+                  newReviewOrder: activeReviewSettings.newReviewOrder,
+                  reviewSortOrder: activeReviewSettings.reviewSortOrder,
+                  newCardSortOrder: activeReviewSettings.newCardSortOrder,
+                }
+              : remainingReviewLimit)
           : [];
         if (cancelled) return;
         if (dueRows.length === 0) {
@@ -380,7 +389,6 @@ function FlashcardSessionScreen() {
           return;
         }
 
-        shuffle(loaded);
         sessionStartRef.current = Date.now();
         setCurrentIndex(0);
         setCurrentSideIndex(0);
@@ -404,6 +412,7 @@ function FlashcardSessionScreen() {
     normalizedDeckId,
     tafseerSource,
     reviewLimit,
+    reviewSettings,
     reviewSettingsLoaded,
     settingsLoaded,
     resetSessionProgress,
@@ -480,7 +489,7 @@ function FlashcardSessionScreen() {
         state: currentCard.card.state as State,
       };
 
-      const result = gradeCard(fsrsCard, now, rating);
+      const result = gradeCard(fsrsCard, now, rating, reviewSettings ?? undefined);
 
       const updatedRow: StudyCardRow = {
         ...currentCard.card,
