@@ -641,7 +641,10 @@ export default function HomeScreen() {
               style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.985 : 1 }] })}
             >
               <Card elevation="low" className="px-4 py-3 rounded-3xl">
-                <View className={`flex-row items-center gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
+                <View
+                  className="items-center gap-3"
+                  style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
+                >
                   <View className="w-10 h-10 rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 items-center justify-center">
                     <Languages size={18} color={isDark ? "#2dd4bf" : "#0d9488"} />
                   </View>
@@ -760,7 +763,10 @@ function DeckCard({
       })}
     >
       <Card elevation="low" className="px-4 py-3 rounded-3xl">
-        <View className={`flex-row items-center gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
+        <View
+          className="items-center gap-3"
+          style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
+        >
           <View className="w-10 h-10 rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 items-center justify-center">
             <Layers size={18} color={isDark ? "#2dd4bf" : "#0d9488"} />
           </View>
@@ -838,7 +844,10 @@ function SmartDeckCard({
       })}
     >
       <Card elevation="low" className="px-4 py-3 rounded-3xl">
-        <View className={`flex-row items-center gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
+        <View
+          className="items-center gap-3"
+          style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
+        >
           <View className="w-10 h-10 rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 items-center justify-center">
             <Icon size={18} color={isDark ? "#2dd4bf" : "#0d9488"} />
           </View>
