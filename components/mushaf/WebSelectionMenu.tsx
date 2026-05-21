@@ -16,12 +16,15 @@ type MenuState = {
   x: number;
   y: number;
   refs: QuranSelectionWordRef[];
+  refsKey: string;
+  copyText: string | null;
 };
 
-const TOKEN_SELECTOR = '[data-hafiz-quran-token="word"]';
+const TOKEN_SELECTOR = "[data-hafiz-quran-token]";
 const MENU_WIDTH = 118;
 const MENU_HEIGHT = 44;
 const VIEWPORT_GUTTER = 8;
+const SELECTION_STYLE_ID = "hafiz-quran-selection-style";
 
 export function WebSelectionMenu() {
   const db = useDatabase();
@@ -34,6 +37,48 @@ export function WebSelectionMenu() {
   useEffect(() => {
     latestMenuRef.current = menu;
   }, [menu]);
+
+  const buildCopyText = useCallback(
+    async (refs: QuranSelectionWordRef[]) => {
+      const selectionText = await fetchUthmaniWordsForSelection(db, refs);
+      return selectionText ? formatSelectionForCopy(selectionText) : null;
+    },
+    [db],
+  );
+
+  const copyRefsToClipboard = useCallback(
+    async (refs: QuranSelectionWordRef[]) => {
+      const copyText = await buildCopyText(refs);
+      if (!copyText) return false;
+      await Clipboard.setStringAsync(copyText);
+      window.getSelection()?.removeAllRanges();
+      setMenu(null);
+      showToast(s.copied);
+      return true;
+    },
+    [buildCopyText, s.copied, showToast],
+  );
+
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+    if (document.getElementById(SELECTION_STYLE_ID)) return;
+
+    const style = document.createElement("style");
+    style.id = SELECTION_STYLE_ID;
+    style.textContent = `
+      ${TOKEN_SELECTOR}::selection,
+      ${TOKEN_SELECTOR} *::selection {
+        background: rgba(13, 148, 136, 0.22);
+        color: inherit;
+      }
+      ${TOKEN_SELECTOR}::-moz-selection,
+      ${TOKEN_SELECTOR} *::-moz-selection {
+        background: rgba(13, 148, 136, 0.22);
+        color: inherit;
+      }
+    `;
+    document.head.appendChild(style);
+  }, []);
 
   const positionForSelection = useCallback((selection: Selection, fallback?: { x: number; y: number }) => {
     const range = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
@@ -56,16 +101,22 @@ export function WebSelectionMenu() {
         return false;
       }
 
-      const refs = readSelectedQuranWords(selection);
+      const refs = readSelectedQuranTokens(selection);
       if (refs.length === 0) {
         setMenu(null);
         return false;
       }
 
-      setMenu({ ...positionForSelection(selection, fallback), refs });
+      const refsKey = getRefsKey(refs);
+      setMenu({ ...positionForSelection(selection, fallback), refs, refsKey, copyText: null });
+      void buildCopyText(refs)
+        .then((copyText) => {
+          setMenu((current) => current?.refsKey === refsKey ? { ...current, copyText } : current);
+        })
+        .catch((e) => console.warn("[WebSelectionMenu] Failed to prepare selected text:", e));
       return true;
     },
-    [positionForSelection],
+    [buildCopyText, positionForSelection],
   );
 
   useEffect(() => {
@@ -97,11 +148,38 @@ export function WebSelectionMenu() {
       event.stopPropagation();
     };
 
+    const handleCopyEvent = (event: ClipboardEvent) => {
+      const selection = window.getSelection();
+      if (!selection || selection.isCollapsed || selection.rangeCount === 0) return;
+      const refs = readSelectedQuranTokens(selection);
+      if (refs.length === 0) return;
+
+      event.preventDefault();
+      const refsKey = getRefsKey(refs);
+      const cachedCopyText =
+        latestMenuRef.current?.refsKey === refsKey
+          ? latestMenuRef.current.copyText
+          : null;
+
+      if (cachedCopyText && event.clipboardData) {
+        event.clipboardData.setData("text/plain", cachedCopyText);
+        window.setTimeout(() => {
+          window.getSelection()?.removeAllRanges();
+          setMenu(null);
+          showToast(s.copied);
+        }, 0);
+        return;
+      }
+
+      void copyRefsToClipboard(refs);
+    };
+
     document.addEventListener("mouseup", handleMouseUp);
     document.addEventListener("keyup", handleKeyUp);
     document.addEventListener("scroll", handleScroll, true);
     document.addEventListener("pointerdown", handlePointerDown, true);
     document.addEventListener("contextmenu", handleContextMenu, true);
+    document.addEventListener("copy", handleCopyEvent);
 
     return () => {
       document.removeEventListener("mouseup", handleMouseUp);
@@ -109,22 +187,23 @@ export function WebSelectionMenu() {
       document.removeEventListener("scroll", handleScroll, true);
       document.removeEventListener("pointerdown", handlePointerDown, true);
       document.removeEventListener("contextmenu", handleContextMenu, true);
+      document.removeEventListener("copy", handleCopyEvent);
     };
-  }, [showForCurrentSelection]);
+  }, [copyRefsToClipboard, s.copied, showForCurrentSelection, showToast]);
 
   const handleCopy = useCallback(async () => {
     if (!menu) return;
     try {
-      const selectionText = await fetchUthmaniWordsForSelection(db, menu.refs);
-      if (!selectionText) return;
-      await Clipboard.setStringAsync(formatSelectionForCopy(selectionText));
+      const copyText = menu.copyText ?? await buildCopyText(menu.refs);
+      if (!copyText) return;
+      await Clipboard.setStringAsync(copyText);
       window.getSelection()?.removeAllRanges();
       setMenu(null);
       showToast(s.copied);
     } catch (e) {
       console.warn("[WebSelectionMenu] Failed to copy selected text:", e);
     }
-  }, [db, menu, s.copied, showToast]);
+  }, [buildCopyText, menu, s.copied, showToast]);
 
   if (Platform.OS !== "web" || !menu) return null;
 
@@ -186,7 +265,7 @@ export function WebSelectionMenu() {
   );
 }
 
-function readSelectedQuranWords(selection: Selection): QuranSelectionWordRef[] {
+function readSelectedQuranTokens(selection: Selection): QuranSelectionWordRef[] {
   const range = selection.getRangeAt(0);
   const nodes = Array.from(document.querySelectorAll<HTMLElement>(TOKEN_SELECTOR));
   const refs = new Map<string, QuranSelectionWordRef>();
@@ -204,12 +283,25 @@ function readSelectedQuranWords(selection: Selection): QuranSelectionWordRef[] {
     const wordPos = Number(node.dataset.hafizWordPos);
     if (!Number.isFinite(surah) || !Number.isFinite(ayah) || !Number.isFinite(wordPos)) continue;
     const literalText = node.dataset.hafizLiteralText;
-    refs.set(`${surah}:${ayah}:${wordPos}:${literalText ?? ""}`, { surah, ayah, wordPos, literalText });
+    const isMarker = node.dataset.hafizAyahMarker === "true";
+    refs.set(`${surah}:${ayah}:${wordPos}:${literalText ?? ""}:${isMarker}`, {
+      surah,
+      ayah,
+      wordPos,
+      literalText,
+      isMarker,
+    });
   }
 
   return Array.from(refs.values()).sort(
     (a, b) => a.surah - b.surah || a.ayah - b.ayah || a.wordPos - b.wordPos,
   );
+}
+
+function getRefsKey(refs: QuranSelectionWordRef[]): string {
+  return refs
+    .map((ref) => `${ref.surah}:${ref.ayah}:${ref.wordPos}:${ref.literalText ?? ""}:${ref.isMarker ? 1 : 0}`)
+    .join("|");
 }
 
 function formatSelectionForCopy(selection: UthmaniSelectionText): string {

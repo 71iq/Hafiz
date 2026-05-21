@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef, useMemo, memo } from "react";
-import { ActivityIndicator, View, Text, Pressable, Animated as RNAnimated, useWindowDimensions } from "react-native";
+import { ActivityIndicator, View, Text, Pressable, Animated as RNAnimated, Platform, useWindowDimensions } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -337,8 +337,27 @@ function AyahBlockInner({
             {/* Ayah end marker */}
             {wordTokens.marker && (
               <Text
+                {...(Platform.OS === "web"
+                  ? ({
+                      selectable: true,
+                      dataSet: {
+                        hafizQuranToken: "marker",
+                        hafizSurah: String(surah),
+                        hafizAyah: String(ayah),
+                        hafizWordPos: "0",
+                        hafizAyahMarker: "true",
+                        hafizQuranHidden: hideMode ? "true" : "false",
+                      },
+                    } as any)
+                  : {})}
                 className="text-charcoal dark:text-neutral-100"
-                style={{ fontFamily, fontSize, lineHeight: qcf2LineHeight, paddingHorizontal: 2 }}
+                style={{
+                  fontFamily,
+                  fontSize,
+                  lineHeight: qcf2LineHeight,
+                  paddingHorizontal: 2,
+                  ...(Platform.OS === "web" ? ({ userSelect: hideMode ? "none" : "text" } as any) : null),
+                }}
               >
                 {wordTokens.marker}
               </Text>

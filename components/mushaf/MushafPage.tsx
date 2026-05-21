@@ -451,19 +451,34 @@ function MushafPageInner({
                   onPress={() => handleMarkerPress(identity.surah, identity.ayah)}
                   onLongPress={() => handleMarkerLongPress(identity.surah, identity.ayah)}
                   delayLongPress={300}
+                  {...(Platform.OS === "web"
+                    ? ({
+                        dataSet: {
+                          hafizQuranToken: "marker",
+                          hafizSurah: String(identity.surah),
+                          hafizAyah: String(identity.ayah),
+                          hafizWordPos: "0",
+                          hafizAyahMarker: "true",
+                          hafizQuranHidden: "false",
+                        },
+                      } as any)
+                    : {})}
                   style={({ pressed }) => ({
                     transform: [{ scale: pressed ? 0.95 : 1 }],
                     // @ts-ignore
                     cursor: "pointer",
+                    ...(Platform.OS === "web" ? ({ userSelect: "text" } as any) : null),
                   })}
                 >
                   <Text
+                    selectable={Platform.OS === "web"}
                     className="text-charcoal dark:text-neutral-100"
                     style={{
                       fontFamily,
                       fontSize,
                       lineHeight,
                       paddingHorizontal: 2,
+                      ...(Platform.OS === "web" ? ({ userSelect: "text" } as any) : null),
                       ...(isTargetAyah && {
                         backgroundColor: "rgba(13, 148, 136, 0.125)",
                         borderRadius: 6,

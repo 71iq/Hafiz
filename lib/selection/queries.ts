@@ -21,6 +21,7 @@ export type QuranSelectionWordRef = {
   ayah: number;
   wordPos: number;
   literalText?: string;
+  isMarker?: boolean;
 };
 
 export type UthmaniSelectionRange = {
@@ -169,9 +170,13 @@ export async function fetchUthmaniWordsForSelection(
     if (!row) continue;
 
     const words = selectableUthmaniWords(row.text_uthmani, first.surah, first.ayah);
-    const selectedWords = ayahRefs
-      .map((ref) => ref.literalText ?? words[ref.wordPos - 1])
-      .filter((word): word is string => !!word);
+    const wordRefs = ayahRefs.filter((ref) => !ref.isMarker);
+    const markerOnly = wordRefs.length === 0 && ayahRefs.some((ref) => ref.isMarker);
+    const selectedWords = markerOnly
+      ? words
+      : wordRefs
+          .map((ref) => ref.literalText ?? words[ref.wordPos - 1])
+          .filter((word): word is string => !!word);
 
     if (selectedWords.length === 0) continue;
     textParts.push(selectedWords.join(" "));
