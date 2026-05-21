@@ -18,6 +18,7 @@ const nativeRequires: Record<string, () => any> = Platform.OS !== "web"
   ? {
       "quran-data.json": () => require("../../assets/data/quran-data.json"),
       "quran-qcf2.json": () => require("../../assets/data/quran-qcf2.json"),
+      "surah-info.json": () => require("../../assets/data/surah-info.json"),
       "reflection-journey.json": () => require("../../assets/data/reflection-journey.json"),
       "translation-sahih.json": () => require("../../assets/data/translation-sahih.json"),
       "page-map.json": () => require("../../assets/data/page-map.json"),
@@ -225,7 +226,7 @@ type ProgressCallback = (progress: ImportProgress) => void;
 
 // Bump this whenever a new import step is added so the progress bar caps at
 // 100% and the step counter shows accurate "N / total" labels.
-const TOTAL_STEPS = 19;
+const TOTAL_STEPS = 20;
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, "").trim();
@@ -534,6 +535,31 @@ async function importSurahs(
     rows
   );
   console.log(`[Import] Surahs done: ${surahs.length} rows`);
+}
+
+async function importSurahInfo(
+  db: SQLiteDatabase,
+  onProgress: ProgressCallback
+): Promise<void> {
+  const data = await loadData("surah-info.json");
+  if (!Array.isArray(data)) throw new Error("Invalid surah-info.json");
+  onProgress({ step: "Surah Information", current: 20, total: TOTAL_STEPS, detail: `${data.length} entries` });
+  console.log(`[Import] Importing ${data.length} surah_info rows...`);
+
+  const rows = data.map((entry: any) => [
+    entry.surah,
+    entry.language,
+    entry.summary,
+    JSON.stringify(Array.isArray(entry.sections) ? entry.sections : []),
+    entry.sourceName,
+    entry.sourceUrl ?? null,
+  ]);
+  await batchInsert(
+    db,
+    "INSERT OR REPLACE INTO surah_info (surah, language, summary, sections_json, source_name, source_url) VALUES (?, ?, ?, ?, ?, ?)",
+    rows
+  );
+  console.log(`[Import] Surah information done: ${rows.length} rows`);
 }
 
 async function importQuranText(
@@ -1407,6 +1433,12 @@ export async function initializeDatabase(
 
     // Import new tab datasets if their tables are empty (migration for existing installs).
     await runNewTabImports(db, onProgress);
+    const surahInfoCount = await db.getFirstAsync<{ count: number }>(
+      "SELECT COUNT(*) as count FROM surah_info"
+    );
+    if ((surahInfoCount?.count ?? 0) < 228) {
+      await importSurahInfo(db, onProgress);
+    }
 
     console.log("[Import] Database already populated, skipping import.");
     onProgress({ step: "Complete", current: TOTAL_STEPS, total: TOTAL_STEPS, detail: "Already imported" });
@@ -1423,6 +1455,7 @@ export async function initializeDatabase(
   if (Platform.OS === "web") {
     void loadData("quran-data.json");
     void loadData("quran-qcf2.json");
+    void loadData("surah-info.json");
     void loadData("reflection-journey.json");
     void loadData("zilal.json");
     void loadData("translation-sahih.json");
@@ -1453,6 +1486,7 @@ export async function initializeDatabase(
   await importTajweed(db, onProgress);
   await importPageLines(db, onProgress);
   await runNewTabImports(db, onProgress);
+  await importSurahInfo(db, onProgress);
 
   // Create tafseer source index (not in schema.ts to avoid error on old tables without source column)
   await db.execAsync("CREATE INDEX IF NOT EXISTS idx_tafseer_source ON tafseer(source)");
@@ -1471,6 +1505,7 @@ export async function getTableCounts(
 ): Promise<Record<string, number>> {
   const tables = [
     "surahs",
+    "surah_info",
     "quran_text",
     "juz_map",
     "hizb_map",

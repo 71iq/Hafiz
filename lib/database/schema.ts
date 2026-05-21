@@ -18,6 +18,17 @@ export async function createSchema(db: SQLiteDatabase): Promise<void> {
       revelation_type TEXT NOT NULL
     );
 
+    -- Narrative Surah introductions (offline static data)
+    CREATE TABLE IF NOT EXISTS surah_info (
+      surah INTEGER NOT NULL,
+      language TEXT NOT NULL CHECK (language IN ('en', 'ar')),
+      summary TEXT NOT NULL,
+      sections_json TEXT NOT NULL,
+      source_name TEXT NOT NULL,
+      source_url TEXT,
+      PRIMARY KEY (surah, language)
+    );
+
     -- Full Quran text (6,236 rows)
     CREATE TABLE IF NOT EXISTS quran_text (
       surah INTEGER NOT NULL,

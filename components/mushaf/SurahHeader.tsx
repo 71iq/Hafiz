@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Platform, View, Text } from "react-native";
+import { Platform, Pressable, View, Text } from "react-native";
+import { Info } from "lucide-react-native";
 import {
   loadQpcFont,
   qpcFontName,
@@ -8,6 +9,7 @@ import {
 import { useStrings } from "@/lib/i18n/useStrings";
 import { useSettings } from "@/lib/settings/context";
 import { toArabicNumber } from "@/lib/arabic";
+import { SurahInfoModal, type SurahInfoTarget } from "./SurahInfoModal";
 
 type Props = {
   surahNumber: number;
@@ -33,7 +35,7 @@ export function SurahHeader({
   compact,
 }: Props) {
   const s = useStrings();
-  const { uiLanguage } = useSettings();
+  const { uiLanguage, isDark } = useSettings();
   const showBismillah =
     !hideBismillah && surahNumber !== 9 && surahNumber !== 1;
   const isArabicMode = uiLanguage === "ar";
@@ -41,6 +43,12 @@ export function SurahHeader({
   const localizedAyahCount = isArabicMode ? toArabicNumber(ayahCount) : String(ayahCount);
   const displayName = isArabicMode ? nameArabic : nameEnglish;
   const nameDirection = isArabicMode ? "rtl" : "ltr";
+  const [infoOpen, setInfoOpen] = useState(false);
+  const infoTarget: SurahInfoTarget = {
+    surahNumber,
+    nameArabic,
+    nameEnglish,
+  };
 
   const [bismFontReady, setBismFontReady] = useState(() =>
     isQpcFontLoaded(1)
@@ -79,55 +87,73 @@ export function SurahHeader({
 
   if (compact) {
     return (
-      <View style={{ height: showBismillah ? 100 : 68 }} className="justify-center">
-        <View className="flex-row items-center justify-center px-2">
-          <OrnamentLine />
-          <View
-            className="mx-3 min-w-[190px] max-w-[340px] rounded-2xl bg-surface-low dark:bg-surface-dark-low px-5 py-2"
-            style={{ flexShrink: 1 }}
-          >
-            <Text
-              className="text-primary dark:text-primary-bright text-center"
-              style={{ fontSize: 22, lineHeight: 36, writingDirection: nameDirection, paddingHorizontal: 10 }}
+      <>
+        <View style={{ height: showBismillah ? 100 : 68 }} className="justify-center">
+          <View className="flex-row items-center justify-center px-2">
+            <OrnamentLine />
+            <View
+              className="mx-3 min-w-[190px] max-w-[340px] rounded-2xl bg-surface-low dark:bg-surface-dark-low px-5 py-2"
+              style={{ flexShrink: 1, position: "relative" }}
             >
-              {displayName}
-            </Text>
-            <Text
-              className="text-warm-500 dark:text-neutral-400 text-center"
-              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, lineHeight: 14 }}
-            >
-              {localizedSurahNumber} · {localizedAyahCount} {s.ayahs}
-            </Text>
+              <SurahInfoButton
+                compact
+                isDark={isDark}
+                isRTL={isArabicMode}
+                label={s.surahInfoOpen}
+                onPress={() => setInfoOpen(true)}
+              />
+              <Text
+                className="text-primary dark:text-primary-bright text-center"
+                style={{ fontSize: 22, lineHeight: 36, writingDirection: nameDirection, paddingHorizontal: 20 }}
+              >
+                {displayName}
+              </Text>
+              <Text
+                className="text-warm-500 dark:text-neutral-400 text-center"
+                style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, lineHeight: 14 }}
+              >
+                {localizedSurahNumber} · {localizedAyahCount} {s.ayahs}
+              </Text>
+            </View>
+            <OrnamentLine />
           </View>
-          <OrnamentLine />
-        </View>
 
-        {showBismillah && (
-          <View className="items-center mt-2 mb-1">
-            <Text
-              {...bismillahSelectionProps}
-              className="text-charcoal dark:text-neutral-200 text-center"
-              style={{
-                fontSize: 18,
-                lineHeight: 32,
-                fontFamily: qpcFontName(1),
-                opacity: bismFontReady ? 1 : 0,
-                ...(Platform.OS === "web" ? ({ userSelect: "text" } as any) : null),
-              }}
-            >
-              {BISMILLAH_QCF2}
-            </Text>
-          </View>
-        )}
-      </View>
+          {showBismillah && (
+            <View className="items-center mt-2 mb-1">
+              <Text
+                {...bismillahSelectionProps}
+                className="text-charcoal dark:text-neutral-200 text-center"
+                style={{
+                  fontSize: 18,
+                  lineHeight: 32,
+                  fontFamily: qpcFontName(1),
+                  opacity: bismFontReady ? 1 : 0,
+                  ...(Platform.OS === "web" ? ({ userSelect: "text" } as any) : null),
+                }}
+              >
+                {BISMILLAH_QCF2}
+              </Text>
+            </View>
+          )}
+        </View>
+        <SurahInfoModal target={infoOpen ? infoTarget : null} onClose={() => setInfoOpen(false)} />
+      </>
     );
   }
 
   return (
+    <>
     <View className="mt-10 mb-5 self-center" style={{ width: "100%", maxWidth: 840, paddingHorizontal: 20 }}>
       <View
         className="rounded-3xl bg-surface-low dark:bg-surface-dark-low px-7 py-6 items-center"
+        style={{ position: "relative" }}
       >
+        <SurahInfoButton
+          isDark={isDark}
+          isRTL={isArabicMode}
+          label={s.surahInfoOpen}
+          onPress={() => setInfoOpen(true)}
+        />
         <View className="mb-4 w-full flex-row items-center justify-center">
           <OrnamentLine />
           <View className="mx-4 h-2 w-2 rounded-sm bg-gold" style={{ transform: [{ rotate: "45deg" }] }} />
@@ -191,6 +217,47 @@ export function SurahHeader({
         </View>
       )}
     </View>
+    <SurahInfoModal target={infoOpen ? infoTarget : null} onClose={() => setInfoOpen(false)} />
+    </>
+  );
+}
+
+function SurahInfoButton({
+  compact,
+  isDark,
+  isRTL,
+  label,
+  onPress,
+}: {
+  compact?: boolean;
+  isDark: boolean;
+  isRTL: boolean;
+  label: string;
+  onPress: () => void;
+}) {
+  const sizeClass = compact ? "h-7 w-7" : "h-9 w-9";
+  const iconSize = compact ? 13 : 16;
+  const offset = compact ? 7 : 16;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      hitSlop={8}
+      onPress={onPress}
+      className={`${sizeClass} items-center justify-center rounded-full bg-primary-accent/10 dark:bg-primary-bright/10`}
+      style={({ pressed }) => [
+        {
+          position: "absolute",
+          top: offset,
+          opacity: pressed ? 0.72 : 1,
+          zIndex: 2,
+          cursor: Platform.OS === "web" ? "pointer" : undefined,
+        },
+        isRTL ? { left: offset } : { right: offset },
+      ]}
+    >
+      <Info size={iconSize} color={isDark ? "#2dd4bf" : "#0d9488"} />
+    </Pressable>
   );
 }
 
