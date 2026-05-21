@@ -7,6 +7,7 @@ type ErrorCode =
   | "not_authenticated"
   | "not_connected"
   | "needs_reauth"
+  | "forbidden"
   | "rate_limited"
   | "upstream";
 
@@ -41,6 +42,22 @@ type OAuthStateRow = {
   expires_at: string;
   consumed_at: string | null;
 };
+
+class QfUserApiError extends Error {
+  status: number;
+  method: string;
+  path: string;
+  upstreamType?: string;
+
+  constructor(status: number, method: string, path: string, message: string, upstreamType?: string) {
+    super(message);
+    this.name = "QfUserApiError";
+    this.status = status;
+    this.method = method;
+    this.path = path;
+    this.upstreamType = upstreamType;
+  }
+}
 
 const AUTH_BASE_BY_ENV: Record<QfEnv, string> = {
   production: "https://oauth2.quran.foundation",
@@ -114,6 +131,14 @@ Deno.serve(async (req) => {
     if (message === "needs_reauth") return jsonError("needs_reauth", "Reconnect Quran Foundation to continue syncing.");
     if (message === "rate_limited") return jsonError("rate_limited", "Quran Foundation rate limit reached.");
     if (message === "oauth_not_configured") return jsonError("not_configured", "Quran Foundation OAuth is not configured.");
+    if (error instanceof QfUserApiError) {
+      console.warn(
+        `[qf-user] upstream failed method=${error.method} path=${redactQfPath(error.path)} status=${error.status} type=${error.upstreamType ?? "unknown"} message=${error.message}`
+      );
+      if (error.status === 403) return jsonError("forbidden", "Quran Foundation did not authorize bookmark/note sync. Reconnect or verify the app scopes.");
+      if (error.status === 400 || error.status === 422) return jsonError("bad_request", publicQfMessage(error.message));
+      return jsonError("upstream", publicQfMessage(error.message));
+    }
     console.warn("[qf-user] request failed", message);
     return jsonError("upstream", "Quran Foundation sync is temporarily unavailable.");
   }
@@ -373,9 +398,10 @@ async function qfJson(
   options: { method?: string; body?: unknown } = {},
   didRetry = false
 ): Promise<unknown> {
+  const method = options.method ?? "GET";
   const token = await getAccessToken(config, userId, false);
   const response = await fetch(`${config.apiBaseUrl}${path}`, {
-    method: options.method ?? "GET",
+    method,
     headers: {
       "x-auth-token": token,
       "x-client-id": config.clientId,
@@ -390,7 +416,18 @@ async function qfJson(
   }
   if (response.status === 429) throw new Error("rate_limited");
   if (response.status === 204) return {};
-  if (!response.ok) throw new Error(`QF user API failed: ${response.status}`);
+  if (!response.ok) {
+    const upstream = await readQfError(response);
+    if (isInvalidTokenResponse(response.status, upstream.type, upstream.message)) {
+      if (!didRetry) {
+        await getAccessToken(config, userId, true);
+        return qfJson(config, userId, path, options, true);
+      }
+      await markNeedsReauth(config, userId);
+      throw new Error("needs_reauth");
+    }
+    throw new QfUserApiError(response.status, method, path, upstream.message, upstream.type);
+  }
   return response.json();
 }
 
@@ -782,6 +819,46 @@ function stringOrUndefined(value: unknown): string | undefined {
   return typeof value === "string" && value.trim().length > 0 ? value : undefined;
 }
 
+async function readQfError(response: Response): Promise<{ message: string; type?: string }> {
+  const fallback = `QF user API failed: ${response.status}`;
+  const text = await response.text().catch(() => "");
+  if (!text) return { message: fallback };
+  try {
+    const body = JSON.parse(text) as Record<string, unknown>;
+    return {
+      message: stringOrUndefined(body.message) ?? fallback,
+      type: stringOrUndefined(body.type),
+    };
+  } catch (_) {
+    return { message: text.slice(0, 180) || fallback };
+  }
+}
+
+function isInvalidTokenResponse(status: number, type?: string, message?: string): boolean {
+  const normalizedType = type?.toLowerCase();
+  const normalizedMessage = message?.toLowerCase() ?? "";
+  return (
+    status === 401 ||
+    normalizedType === "invalid_token" ||
+    normalizedMessage.includes("access token") && normalizedMessage.includes("invalid")
+  );
+}
+
+function publicQfMessage(message: string): string {
+  const cleaned = message.trim();
+  if (!cleaned || cleaned.startsWith("QF user API failed:")) {
+    return "Quran Foundation sync is temporarily unavailable.";
+  }
+  return `Quran Foundation sync failed: ${cleaned}`;
+}
+
+function redactQfPath(path: string): string {
+  return path
+    .split("?")[0]
+    .replace(/\/v1\/bookmarks\/[^/]+$/, "/v1/bookmarks/:id")
+    .replace(/\/v1\/notes\/[^/]+$/, "/v1/notes/:id");
+}
+
 function randomBase64Url(byteLength: number): string {
   const bytes = crypto.getRandomValues(new Uint8Array(byteLength));
   return encodeBase64Url(bytes);
@@ -825,6 +902,7 @@ function jsonError(code: ErrorCode, message: string): Response {
     not_authenticated: 401,
     not_connected: 409,
     needs_reauth: 401,
+    forbidden: 403,
     rate_limited: 429,
     upstream: 502,
   };

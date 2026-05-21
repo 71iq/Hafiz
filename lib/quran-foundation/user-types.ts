@@ -10,6 +10,7 @@ export type QfUserErrorCode =
   | "not_authenticated"
   | "not_connected"
   | "needs_reauth"
+  | "forbidden"
   | "rate_limited"
   | "upstream";
 
