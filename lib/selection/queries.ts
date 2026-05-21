@@ -2,6 +2,7 @@ import type { SQLiteDatabase } from "expo-sqlite";
 import type { BookmarkEntry, HighlightEntry } from "./types";
 import { enqueueSync } from "@/lib/database/sync-queue";
 import { enqueueQfSync } from "@/lib/quran-foundation/user-sync";
+import { toArabicNumber } from "@/lib/arabic";
 
 type BookmarkRow = {
   surah: number;
@@ -179,7 +180,7 @@ export async function fetchUthmaniWordsForSelection(
           .filter((word): word is string => !!word);
 
     if (selectedWords.length === 0) continue;
-    textParts.push(selectedWords.join(" "));
+    textParts.push(`${selectedWords.join(" ")} ${toArabicNumber(first.ayah)}`);
     selectedAyahs.push({ surah: first.surah, ayah: first.ayah, surahName: row.name_arabic });
   }
 
