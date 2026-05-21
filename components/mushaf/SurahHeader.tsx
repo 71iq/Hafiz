@@ -91,30 +91,39 @@ export function SurahHeader({
         <View style={{ height: showBismillah ? 100 : 68 }} className="justify-center">
           <View className="flex-row items-center justify-center px-2">
             <OrnamentLine />
-            <View
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={s.surahInfoOpen}
+              onPress={() => setInfoOpen(true)}
               className="mx-3 min-w-[190px] max-w-[340px] rounded-2xl bg-surface-low dark:bg-surface-dark-low px-5 py-2"
-              style={{ flexShrink: 1, position: "relative" }}
+              style={({ pressed }) => ({
+                cursor: Platform.OS === "web" ? "pointer" : undefined,
+                flexShrink: 1,
+                opacity: pressed ? 0.82 : 1,
+              })}
             >
-              <SurahInfoButton
-                compact
-                isDark={isDark}
-                isRTL={isArabicMode}
-                label={s.surahInfoOpen}
-                onPress={() => setInfoOpen(true)}
-              />
-              <Text
-                className="text-primary dark:text-primary-bright text-center"
-                style={{ fontSize: 22, lineHeight: 36, writingDirection: nameDirection, paddingHorizontal: 20 }}
+              <View
+                className="items-center justify-center gap-2"
+                style={{ flexDirection: isArabicMode ? "row-reverse" : "row" }}
               >
-                {displayName}
-              </Text>
+                <Text
+                  className="text-primary dark:text-primary-bright text-center"
+                  style={{ flexShrink: 1, fontSize: 22, lineHeight: 36, writingDirection: nameDirection }}
+                  numberOfLines={1}
+                >
+                  {displayName}
+                </Text>
+                <View className="h-6 w-6 items-center justify-center rounded-full bg-primary-accent/10 dark:bg-primary-bright/10">
+                  <Info size={12} color={isDark ? "#2dd4bf" : "#0d9488"} />
+                </View>
+              </View>
               <Text
                 className="text-warm-500 dark:text-neutral-400 text-center"
                 style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, lineHeight: 14 }}
               >
                 {localizedSurahNumber} · {localizedAyahCount} {s.ayahs}
               </Text>
-            </View>
+            </Pressable>
             <OrnamentLine />
           </View>
 
