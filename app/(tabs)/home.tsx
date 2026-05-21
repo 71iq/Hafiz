@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from "react";
-import { View, Text, Pressable } from "react-native";
+import { ScrollView, View, Text, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, type Href } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
@@ -10,7 +10,7 @@ import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { interpolate } from "@/lib/i18n/useStrings";
 import { Card } from "@/components/ui/Card";
-import { ScreenScrollView } from "@/components/ui/ScreenContent";
+import { ScreenScrollView, useScreenContentLayout } from "@/components/ui/ScreenContent";
 import { CreateDeckSheet } from "@/components/flashcards/CreateDeckSheet";
 import { DeckReviewSettingsSheet } from "@/components/flashcards/DeckReviewSettingsSheet";
 import { SmartDeckFilterSheet } from "@/components/flashcards/SmartDeckFilterSheet";
@@ -80,6 +80,7 @@ export default function HomeScreen() {
   const { isDark, isRTL, uiLanguage } = useSettings();
   const s = useStrings();
   const router = useRouter();
+  const { isLaptop } = useScreenContentLayout({ maxWidth: DESKTOP_CONTENT_MAX_WIDTH });
   const [decks, setDecks] = useState<DeckDisplay[]>([]);
   const [smartDecks, setSmartDecks] = useState<SmartDeckDisplay[]>([]);
   const [vocabStats, setVocabStats] = useState<{ total: number; dueCount: number; newCount: number }>({ total: 0, dueCount: 0, newCount: 0 });
@@ -569,7 +570,7 @@ export default function HomeScreen() {
           </Pressable>
         </View>
 
-        <View className="gap-2 mb-6">
+        <View className="gap-2 mb-3">
           {smartDecks.map((deck) => (
             <SmartDeckCard
               key={deck.id}
@@ -591,21 +592,53 @@ export default function HomeScreen() {
               s={s}
             />
           )}
-          {decks.map((deck) => (
-            <DeckCard
-              key={deck.id}
-              deck={deck}
-              title={getDeckLabel(deck)}
-              description={getDeckDescription(deck)}
-              onStartReview={() => handleStartReview(deck.id)}
-              onConfigure={() => setReviewSettingsTarget({ id: deck.id, title: getDeckLabel(deck), mode: "ayah" })}
-              onDelete={() => setDeckToDelete(deck.id)}
-              isDark={isDark}
-              isRTL={isRTL}
-              s={s}
-            />
-          ))}
         </View>
+
+        {decks.length > 0 && (
+          <>
+            <View className="mb-3 mt-1">
+              <View
+                className="items-center gap-2"
+                style={{ direction: isRTL ? "rtl" : "ltr", flexDirection: "row" }}
+              >
+                <View className="h-px flex-1 bg-warm-200 dark:bg-neutral-800" />
+                <Text
+                  className="text-warm-400 dark:text-neutral-500 uppercase"
+                  style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, letterSpacing: 1.4 }}
+                >
+                  {s.flashcardsUserMadeDecks}
+                </Text>
+                <View className="h-px flex-1 bg-warm-200 dark:bg-neutral-800" />
+              </View>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              className="mb-6"
+              contentContainerStyle={{
+                flexDirection: isRTL ? "row-reverse" : "row",
+                gap: 8,
+                paddingBottom: 4,
+              }}
+            >
+              {decks.map((deck) => (
+                <View key={deck.id} style={{ width: isLaptop ? 500 : 320 }}>
+                  <DeckCard
+                    deck={deck}
+                    title={getDeckLabel(deck)}
+                    description={getDeckDescription(deck)}
+                    onStartReview={() => handleStartReview(deck.id)}
+                    onConfigure={() => setReviewSettingsTarget({ id: deck.id, title: getDeckLabel(deck), mode: "ayah" })}
+                    onDelete={() => setDeckToDelete(deck.id)}
+                    isDark={isDark}
+                    isRTL={isRTL}
+                    s={s}
+                  />
+                </View>
+              ))}
+            </ScrollView>
+          </>
+        )}
       </ScreenScrollView>
 
       <SearchCommand visible={showSearch} onClose={() => setShowSearch(false)} />
