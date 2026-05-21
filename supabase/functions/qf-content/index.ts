@@ -1,4 +1,4 @@
-type Action = "audio-ayah" | "hadith-ayah";
+type Action = "audio-ayah" | "audio-reciter-lookup" | "hadith-ayah";
 type ErrorCode = "bad_request" | "not_configured" | "rate_limited" | "upstream";
 
 type QfEnv = "production" | "prelive";
@@ -37,6 +37,20 @@ type HadithPayload = {
   direction?: string;
 };
 
+type RecitationResource = {
+  id?: number;
+  reciter_name?: string;
+  style?: string;
+  translated_name?: {
+    name?: string;
+    language_name?: string;
+  };
+};
+
+type RecitationsPayload = {
+  recitations?: unknown[];
+};
+
 class QfContentFailure extends Error {
   constructor(
     readonly code: Exclude<ErrorCode, "bad_request">,
@@ -70,7 +84,6 @@ const AYAH_COUNTS = [
 ];
 
 const DEFAULT_RECITATION_ID = 6;
-const SUPPORTED_RECITATION_IDS = new Set([6, 7]);
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -101,13 +114,8 @@ Deno.serve(async (req) => {
   }
 
   const action = body.action;
-  if (action !== "audio-ayah" && action !== "hadith-ayah") {
+  if (action !== "audio-ayah" && action !== "audio-reciter-lookup" && action !== "hadith-ayah") {
     return jsonError("bad_request", "Unsupported Quran Foundation content action.");
-  }
-
-  const parsedAyah = parseAyah(body.surah, body.ayah);
-  if (!parsedAyah.ok) {
-    return jsonError("bad_request", parsedAyah.message);
   }
 
   const config = readConfig(action, body.recitationId);
@@ -116,6 +124,15 @@ Deno.serve(async (req) => {
   }
 
   try {
+    if (action === "audio-reciter-lookup") {
+      return await handleRecitations(config.value, body);
+    }
+
+    const parsedAyah = parseAyah(body.surah, body.ayah);
+    if (!parsedAyah.ok) {
+      return jsonError("bad_request", parsedAyah.message);
+    }
+
     if (action === "audio-ayah") {
       return await handleAudio(config.value, parsedAyah.surah, parsedAyah.ayah);
     }
@@ -166,6 +183,30 @@ async function handleAudio(config: Config, surah: number, ayah: number): Promise
         stringOrUndefined(audioFile.recitation?.recitation_style) ??
         stringOrUndefined(audioFile.recitation?.style),
     },
+    fetchedAt: new Date().toISOString(),
+  });
+}
+
+async function handleRecitations(config: Config, body: Record<string, unknown>): Promise<Response> {
+  const language = normalizeLanguage(body.language);
+  const params = new URLSearchParams({ language });
+  const upstream = await getQfJson(
+    config,
+    `/content/api/v4/resources/recitations?${params.toString()}`,
+    "audio-reciter-lookup",
+    "recitations"
+  );
+  if (!upstream.ok) return upstream.response;
+
+  const payload = upstream.data as RecitationsPayload;
+  const reciters = Array.isArray(payload.recitations)
+    ? payload.recitations.map(normalizeReciter).filter((reciter): reciter is NonNullable<ReturnType<typeof normalizeReciter>> => reciter !== null)
+    : [];
+
+  return jsonSuccess({
+    ok: true,
+    language,
+    reciters,
     fetchedAt: new Date().toISOString(),
   });
 }
@@ -239,7 +280,7 @@ function readConfig(action: Action, recitationIdInput: unknown): { ok: true; val
 
   const recitationId =
     action === "audio-ayah"
-      ? normalizeRecitationId(recitationIdInput ?? Deno.env.get("QF_DEFAULT_RECITATION_ID") ?? DEFAULT_RECITATION_ID)
+      ? parsePositiveInt(recitationIdInput ?? Deno.env.get("QF_DEFAULT_RECITATION_ID") ?? DEFAULT_RECITATION_ID)
       : 7;
   if (recitationId === null) {
     return { ok: false, message: "Quran Foundation recitation is not configured." };
@@ -399,15 +440,32 @@ function parsePositiveInt(value: unknown): number | null {
   return n;
 }
 
-function normalizeRecitationId(value: unknown): number | null {
-  const recitationId = parsePositiveInt(value);
-  if (recitationId === null) return null;
-  return SUPPORTED_RECITATION_IDS.has(recitationId) ? recitationId : DEFAULT_RECITATION_ID;
-}
-
 function normalizeAudioUrl(url: string): string {
   if (/^https?:\/\//i.test(url)) return url;
   return `https://verses.quran.foundation/${url.replace(/^\/+/, "")}`;
+}
+
+function normalizeLanguage(value: unknown): string {
+  if (typeof value !== "string") return "en";
+  const normalized = value.trim().toLowerCase();
+  return /^[a-z]{2,3}(-[a-z]{2})?$/.test(normalized) ? normalized : "en";
+}
+
+function normalizeReciter(value: unknown) {
+  if (!value || typeof value !== "object") return null;
+  const row = value as RecitationResource;
+  const id = numberOrUndefined(row.id);
+  if (!id || id < 1) return null;
+  const translatedName = stringOrUndefined(row.translated_name?.name);
+  const reciterName = stringOrUndefined(row.reciter_name) ?? translatedName;
+  if (!reciterName) return null;
+  return {
+    id,
+    reciterName,
+    translatedName,
+    translatedLanguageName: stringOrUndefined(row.translated_name?.language_name),
+    style: stringOrUndefined(row.style) ?? "",
+  };
 }
 
 function numberOrUndefined(value: unknown): number | undefined {

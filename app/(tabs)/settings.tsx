@@ -24,7 +24,8 @@ import { useStrings } from "@/lib/i18n/useStrings";
 import { useAuthStore } from "@/lib/auth/store";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { isQfSyncEnabled } from "@/lib/quran-foundation/config";
-import { RECITERS, formatReciterLabel, getReciterById } from "@/lib/quran-foundation/recitations";
+import { fetchQfReciters, type QfContentReciter } from "@/lib/quran-foundation/content";
+import { RECITERS, formatReciterLabel, getReciterById, type QfReciter } from "@/lib/quran-foundation/recitations";
 import { beginQfOAuthConnection, disconnectQfUser, getQfConnectionStatus, getQfLinkedIdentityState } from "@/lib/quran-foundation/user";
 import { fullQfUserSync, runInitialQfUserSync } from "@/lib/quran-foundation/user-sync";
 import type { QfConnectionStatus } from "@/lib/quran-foundation/user-types";
@@ -868,6 +869,38 @@ function ReciterPicker({
   const { isDark, isRTL, uiLanguage } = useSettings();
   const s = useStrings();
   const DisclosureChevron = isRTL ? ChevronLeft : ChevronRight;
+  const [reciters, setReciters] = useState<QfReciter[]>(RECITERS);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!visible) return;
+    let cancelled = false;
+    setLoading(true);
+    fetchQfReciters(uiLanguage)
+      .then((response) => {
+        if (cancelled) return;
+        if (response.ok && response.reciters.length > 0) {
+          setReciters(mergeReciters(response.reciters.map((reciter) => toSettingsReciter(reciter, uiLanguage)), RECITERS));
+        } else {
+          setReciters(RECITERS);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setReciters(RECITERS);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [uiLanguage, visible]);
+
+  const pickerReciters = reciters.some((reciter) => reciter.id === selectedId)
+    ? reciters
+    : [getReciterById(selectedId), ...reciters].filter(
+        (reciter, index, list) => list.findIndex((item) => item.id === reciter.id) === index
+      );
 
   const handleSelect = (id: number) => {
     onSelect(id);
@@ -891,8 +924,19 @@ function ReciterPicker({
         isRTL={isRTL}
       />
       <OverlayBody contentContainerClassName="px-5 pt-2 pb-6">
+        {loading && (
+          <View className={`mb-3 flex-row items-center gap-2 px-3 ${isRTL ? "flex-row-reverse" : ""}`}>
+            <ActivityIndicator size="small" color={isDark ? "#2dd4bf" : "#0d9488"} />
+            <Text
+              className="text-warm-500 dark:text-neutral-400"
+              style={{ fontFamily: "Manrope_500Medium", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
+            >
+              {s.recitationRecitersLoading}
+            </Text>
+          </View>
+        )}
         <View className="gap-1">
-          {RECITERS.map((reciter) => {
+          {pickerReciters.map((reciter) => {
             const selected = reciter.id === selectedId;
             return (
               <Pressable
@@ -950,6 +994,35 @@ function ReciterPicker({
       </OverlayBody>
     </ResponsiveSheet>
   );
+}
+
+function toSettingsReciter(reciter: QfContentReciter, language: "en" | "ar"): QfReciter {
+  const fallback = getReciterById(reciter.id);
+  const translatedName = reciter.translatedName?.trim();
+  const sourceName = reciter.reciterName.trim();
+  const style = reciter.style.trim();
+  return {
+    id: reciter.id,
+    nameEn: language === "en" ? translatedName || sourceName : fallback.nameEn,
+    nameAr: language === "ar" ? translatedName || sourceName : fallback.nameAr,
+    styleEn: language === "en" ? style || fallback.styleEn : fallback.styleEn,
+    styleAr: language === "ar" ? localizeRecitationStyle(style) || fallback.styleAr : fallback.styleAr,
+  };
+}
+
+function localizeRecitationStyle(style: string): string {
+  const normalized = style.trim().toLowerCase();
+  if (normalized === "murattal") return "مرتل";
+  if (normalized === "mujawwad") return "مجود";
+  if (normalized === "muallim") return "معلم";
+  return style;
+}
+
+function mergeReciters(primary: QfReciter[], fallback: QfReciter[]): QfReciter[] {
+  const byId = new Map<number, QfReciter>();
+  fallback.forEach((reciter) => byId.set(reciter.id, reciter));
+  primary.forEach((reciter) => byId.set(reciter.id, reciter));
+  return Array.from(byId.values()).sort((a, b) => a.id - b.id);
 }
 
 function SettingsCategoryNav({

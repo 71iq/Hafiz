@@ -62,7 +62,22 @@ export type QfHadithResponse = {
   fetchedAt: string;
 };
 
-export type QfContentResponse = QfAudioResponse | QfHadithResponse | QfContentError;
+export type QfContentReciter = {
+  id: number;
+  reciterName: string;
+  translatedName?: string;
+  translatedLanguageName?: string;
+  style: string;
+};
+
+export type QfRecitersResponse = {
+  ok: true;
+  language: string;
+  reciters: QfContentReciter[];
+  fetchedAt: string;
+};
+
+export type QfContentResponse = QfAudioResponse | QfHadithResponse | QfRecitersResponse | QfContentError;
 
 type AudioRequest = {
   action: "audio-ayah";
@@ -78,6 +93,11 @@ type HadithRequest = {
   language: "en" | "ar";
   page?: number;
   limit?: number;
+};
+
+type RecitersRequest = {
+  action: "audio-reciter-lookup";
+  language: "en" | "ar";
 };
 
 export const QF_DEFAULT_RECITATION_ID = parsePositiveInt(
@@ -114,8 +134,15 @@ export async function fetchQfAyahHadiths(
   });
 }
 
-async function invokeQfContent<T extends QfAudioResponse | QfHadithResponse>(
-  body: AudioRequest | HadithRequest
+export async function fetchQfReciters(language: "en" | "ar"): Promise<QfRecitersResponse | QfContentError> {
+  return invokeQfContent<QfRecitersResponse>({
+    action: "audio-reciter-lookup",
+    language,
+  });
+}
+
+async function invokeQfContent<T extends QfAudioResponse | QfHadithResponse | QfRecitersResponse>(
+  body: AudioRequest | HadithRequest | RecitersRequest
 ): Promise<T | QfContentError> {
   if (!isSupabaseConfigured()) {
     return {

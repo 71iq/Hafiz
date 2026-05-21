@@ -64,7 +64,7 @@ export type RangeAudioState = {
 };
 
 type LoadedAudio = QfAudioResponse & { isStale?: boolean };
-type PlaybackMode = "single" | "range" | "word";
+type PlaybackMode = "single" | "range";
 
 type RangeSession = {
   ayahs: AyahAudioTarget[];
@@ -81,7 +81,6 @@ type AyahAudioContextType = {
   getAyahState: (surah: number, ayah: number, recitationId?: number) => AyahAudioState;
   toggleAyah: (surah: number, ayah: number, recitationId?: number) => Promise<ToggleResult>;
   playRange: (options: PlayRangeOptions) => Promise<ToggleResult>;
-  playWord: (surah: number, ayah: number, wordPos: number, recitationId?: number) => Promise<ToggleResult>;
   rangeState: RangeAudioState;
   stop: () => void;
 };
@@ -110,7 +109,6 @@ export function AyahAudioProvider({ children }: { children: React.ReactNode }) {
   const playbackModeRef = useRef<PlaybackMode | null>(null);
   const rangeSessionRef = useRef<RangeSession | null>(null);
   const rangeDelayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const wordTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setAudioModeAsync({
@@ -135,12 +133,6 @@ export function AyahAudioProvider({ children }: { children: React.ReactNode }) {
     if (!rangeDelayTimerRef.current) return;
     clearTimeout(rangeDelayTimerRef.current);
     rangeDelayTimerRef.current = null;
-  }, []);
-
-  const clearWordTimer = useCallback(() => {
-    if (!wordTimerRef.current) return;
-    clearTimeout(wordTimerRef.current);
-    wordTimerRef.current = null;
   }, []);
 
   const clearRangeSession = useCallback(() => {
@@ -284,27 +276,24 @@ export function AyahAudioProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    clearWordTimer();
     playbackModeRef.current = null;
     setActiveAyah(null);
     setLoadingKey(null);
-  }, [advanceRange, clearWordTimer, status.didJustFinish]);
+  }, [advanceRange, status.didJustFinish]);
 
   const stop = useCallback(() => {
     clearRangeSession();
-    clearWordTimer();
     playbackModeRef.current = null;
     player.pause();
     setActiveAyah(null);
     setLoadingKey(null);
-  }, [clearRangeSession, clearWordTimer, player]);
+  }, [clearRangeSession, player]);
 
   useEffect(
     () => () => {
       clearRangeDelayTimer();
-      clearWordTimer();
     },
-    [clearRangeDelayTimer, clearWordTimer]
+    [clearRangeDelayTimer]
   );
 
   const getAyahState = useCallback(
@@ -326,7 +315,6 @@ export function AyahAudioProvider({ children }: { children: React.ReactNode }) {
   const toggleAyah = useCallback(
     async (surah: number, ayah: number, recitationId = QF_DEFAULT_RECITATION_ID): Promise<ToggleResult> => {
       clearRangeSession();
-      clearWordTimer();
       const key = makeKey(surah, ayah, recitationId);
       const isSameAyah =
         activeAyah?.surah === surah &&
@@ -355,7 +343,6 @@ export function AyahAudioProvider({ children }: { children: React.ReactNode }) {
     [
       activeAyah,
       clearRangeSession,
-      clearWordTimer,
       playAyahFromSource,
       player,
       status.didJustFinish,
@@ -374,7 +361,6 @@ export function AyahAudioProvider({ children }: { children: React.ReactNode }) {
     }: PlayRangeOptions): Promise<ToggleResult> => {
       if (ayahs.length === 0) return { ok: false, code: "bad_request" };
       clearRangeSession();
-      clearWordTimer();
       player.pause();
 
       rangeSessionRef.current = {
@@ -390,49 +376,7 @@ export function AyahAudioProvider({ children }: { children: React.ReactNode }) {
 
       return playCurrentRangeAyah();
     },
-    [clearRangeSession, clearWordTimer, playCurrentRangeAyah, player]
-  );
-
-  const playWord = useCallback(
-    async (surah: number, ayah: number, wordPos: number, recitationId = QF_DEFAULT_RECITATION_ID): Promise<ToggleResult> => {
-      clearRangeSession();
-      clearWordTimer();
-
-      const key = makeKey(surah, ayah, recitationId);
-      player.pause();
-      setActiveAyah({ surah, ayah, recitationId });
-      setLoadingKey(key);
-
-      const response = await loadAyahAudio(surah, ayah, recitationId);
-      if (!response.ok) {
-        setLoadingKey(null);
-        setActiveAyah(null);
-        return { ok: false, code: response.code };
-      }
-
-      const segment = findWordSegment(response.audio.segments, wordPos);
-      if (!segment) {
-        setLoadingKey(null);
-        setActiveAyah(null);
-        return { ok: false, code: "upstream" };
-      }
-
-      playbackModeRef.current = "word";
-      player.replace({ uri: response.audio.url });
-      await player.seekTo(segment.startMs / 1000).catch(console.warn);
-      player.play();
-      setLoadingKey(null);
-
-      wordTimerRef.current = setTimeout(() => {
-        player.pause();
-        playbackModeRef.current = null;
-        setActiveAyah(null);
-        setLoadingKey(null);
-      }, Math.max(250, segment.endMs - segment.startMs + 90));
-
-      return { ok: true };
-    },
-    [clearRangeSession, clearWordTimer, loadAyahAudio, player]
+    [clearRangeSession, playCurrentRangeAyah, player]
   );
 
   const rangeState = useMemo<RangeAudioState>(
@@ -448,11 +392,10 @@ export function AyahAudioProvider({ children }: { children: React.ReactNode }) {
       getAyahState,
       toggleAyah,
       playRange,
-      playWord,
       rangeState,
       stop,
     }),
-    [getAyahState, playRange, playWord, rangeState, stop, toggleAyah]
+    [getAyahState, playRange, rangeState, stop, toggleAyah]
   );
 
   return <AyahAudioContext.Provider value={value}>{children}</AyahAudioContext.Provider>;
@@ -478,63 +421,6 @@ function playUrl(player: AudioPlayer, url: string) {
 function clampPositiveInt(value: number, min: number, max: number): number {
   const next = Number.isFinite(value) ? Math.round(value) : min;
   return Math.max(min, Math.min(max, next));
-}
-
-function findWordSegment(segments: unknown, wordPos: number): { startMs: number; endMs: number } | null {
-  if (!Array.isArray(segments)) return null;
-  for (const segment of segments) {
-    const parsed = parseWordSegment(segment);
-    if (parsed?.wordPos === wordPos) return parsed;
-  }
-  const fallback = parseWordSegment(segments[wordPos - 1]);
-  return fallback ? { startMs: fallback.startMs, endMs: fallback.endMs } : null;
-}
-
-function parseWordSegment(segment: unknown): { wordPos: number; startMs: number; endMs: number } | null {
-  if (Array.isArray(segment)) {
-    const values = segment.map((value) => Number(value));
-    if (values.length >= 4 && values.every(Number.isFinite)) {
-      return normalizeSegment(values[1], values[2], values[3]);
-    }
-    if (values.length >= 3 && values.every(Number.isFinite)) {
-      return normalizeSegment(values[0], values[1], values[2]);
-    }
-    return null;
-  }
-
-  if (!segment || typeof segment !== "object") return null;
-  const row = segment as Record<string, unknown>;
-  const wordPos =
-    numberFromUnknown(row.word_position) ??
-    numberFromUnknown(row.wordPosition) ??
-    numberFromUnknown(row.word_number) ??
-    numberFromUnknown(row.wordNumber) ??
-    numberFromUnknown(row.position);
-  const start =
-    numberFromUnknown(row.timestamp_from) ??
-    numberFromUnknown(row.timestampFrom) ??
-    numberFromUnknown(row.start_ms) ??
-    numberFromUnknown(row.startMs) ??
-    numberFromUnknown(row.start);
-  const end =
-    numberFromUnknown(row.timestamp_to) ??
-    numberFromUnknown(row.timestampTo) ??
-    numberFromUnknown(row.end_ms) ??
-    numberFromUnknown(row.endMs) ??
-    numberFromUnknown(row.end);
-  if (wordPos == null || start == null || end == null) return null;
-  return normalizeSegment(wordPos, start, end);
-}
-
-function normalizeSegment(wordPos: number, startMs: number, endMs: number): { wordPos: number; startMs: number; endMs: number } | null {
-  if (!Number.isFinite(wordPos) || !Number.isFinite(startMs) || !Number.isFinite(endMs)) return null;
-  if (wordPos < 1 || endMs <= startMs) return null;
-  return { wordPos: Math.round(wordPos), startMs: Math.max(0, startMs), endMs };
-}
-
-function numberFromUnknown(value: unknown): number | null {
-  const n = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
-  return Number.isFinite(n) ? n : null;
 }
 
 function refreshAudioCache(db: SQLiteDatabase, surah: number, ayah: number, recitationId: number) {
