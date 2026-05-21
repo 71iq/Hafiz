@@ -59,6 +59,14 @@ function dayIndexFromDateKey(dateKey: string): number {
   return Math.floor(new Date(year, (month || 1) - 1, day || 1).getTime() / 86400000);
 }
 
+function todayBounds(): { start: string; end: string } {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 1);
+  return { start: start.toISOString(), end: end.toISOString() };
+}
+
 function buildLocalReviewCounts(rows: { reviewed_at: string }[]): Map<string, number> {
   const counts = new Map<string, number>();
   for (const row of rows) {
@@ -610,6 +618,44 @@ export async function getDueCards(
   return getDueCardsForReview(db, deckId, limit);
 }
 
+export async function getTodayReviewedCount(db: SQLiteDatabase, deckId?: string): Promise<number> {
+  const { start, end } = todayBounds();
+  if (deckId) {
+    const row = await db.getFirstAsync<{ count: number }>(
+      `SELECT COUNT(*) as count
+       FROM study_log sl
+       JOIN study_cards sc ON sc.id = sl.card_id
+       WHERE sc.deck_id = ? AND sl.reviewed_at >= ? AND sl.reviewed_at < ?`,
+      [deckId, start, end]
+    );
+    return row?.count ?? 0;
+  }
+
+  const row = await db.getFirstAsync<{ count: number }>(
+    "SELECT COUNT(*) as count FROM study_log WHERE reviewed_at >= ? AND reviewed_at < ?",
+    [start, end]
+  );
+  return row?.count ?? 0;
+}
+
+export async function getRemainingReviewLimit(
+  db: SQLiteDatabase,
+  deckId: string | undefined,
+  limit: number
+): Promise<number> {
+  return Math.max(0, clampReviewLimit(limit) - await getTodayReviewedCount(db, deckId));
+}
+
+export async function getTodayDueCount(
+  db: SQLiteDatabase,
+  deckId: string | undefined,
+  limit: number
+): Promise<number> {
+  const remaining = await getRemainingReviewLimit(db, deckId, limit);
+  if (remaining <= 0) return 0;
+  return (await getDueCardsForReview(db, deckId, remaining)).length;
+}
+
 export async function getDueCount(db: SQLiteDatabase, deckId?: string): Promise<number> {
   const now = new Date().toISOString();
   if (isSmartDeckId(deckId)) {
@@ -637,14 +683,19 @@ export async function getDeckTodayStats(
   deckId: string,
   limit: number
 ): Promise<{ total: number; dueCount: number; newCount: number }> {
+  const remaining = await getRemainingReviewLimit(db, deckId, limit);
+  if (remaining <= 0) {
+    return { total: await getTotalCardCount(db, deckId), dueCount: 0, newCount: 0 };
+  }
+
   if (isSmartDeckId(deckId)) {
-    const stats = await getSmartDeckTodayStats(db, deckId, limit);
+    const stats = await getSmartDeckTodayStats(db, deckId, remaining);
     return { total: stats.total, dueCount: stats.due, newCount: stats.newCount };
   }
 
   const [total, rows] = await Promise.all([
     getTotalCardCount(db, deckId),
-    getDueCardsForReview(db, deckId, limit),
+    getDueCardsForReview(db, deckId, remaining),
   ]);
   return {
     total,

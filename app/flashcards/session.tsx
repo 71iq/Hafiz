@@ -25,6 +25,7 @@ import {
   getStudyStreak,
   getWirdStatus,
   MUTASHABIHAT_DECK_ID,
+  getRemainingReviewLimit,
   readDeckReviewSettings,
 } from "@/lib/fsrs/queries";
 import { computeUniqueFront } from "@/lib/fsrs/uniqueness";
@@ -229,10 +230,13 @@ function FlashcardSessionScreen() {
       try {
         // Pre-load streak for scoring
         streakRef.current = await getStudyStreak(db);
-        if (isSmartDeckId(normalizedDeckId)) {
-          await materializeSmartDeckCards(db, normalizedDeckId, reviewLimit);
+        const remainingReviewLimit = await getRemainingReviewLimit(db, normalizedDeckId, reviewLimit);
+        if (isSmartDeckId(normalizedDeckId) && remainingReviewLimit > 0) {
+          await materializeSmartDeckCards(db, normalizedDeckId, remainingReviewLimit);
         }
-        const dueRows = await getDueCardsForReview(db, normalizedDeckId, reviewLimit);
+        const dueRows = remainingReviewLimit > 0
+          ? await getDueCardsForReview(db, normalizedDeckId, remainingReviewLimit)
+          : [];
         if (cancelled) return;
         if (dueRows.length === 0) {
           resetSessionProgress();
