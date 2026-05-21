@@ -643,7 +643,7 @@ export default function HomeScreen() {
               <Card elevation="low" className="px-4 py-3 rounded-3xl">
                 <View
                   className="items-center gap-3"
-                  style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
+                  style={{ direction: isRTL ? "rtl" : "ltr", flexDirection: "row" }}
                 >
                   <View className="w-10 h-10 rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 items-center justify-center">
                     <Languages size={18} color={isDark ? "#2dd4bf" : "#0d9488"} />
@@ -765,7 +765,7 @@ function DeckCard({
       <Card elevation="low" className="px-4 py-3 rounded-3xl">
         <View
           className="items-center gap-3"
-          style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
+          style={{ direction: isRTL ? "rtl" : "ltr", flexDirection: "row" }}
         >
           <View className="w-10 h-10 rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 items-center justify-center">
             <Layers size={18} color={isDark ? "#2dd4bf" : "#0d9488"} />
@@ -786,7 +786,10 @@ function DeckCard({
               {description}
             </Text>
           </View>
-          <View className={`flex-row items-center gap-1 ${isRTL ? "flex-row-reverse" : ""}`}>
+          <View
+            className="flex-row items-center gap-1"
+            style={{ direction: isRTL ? "rtl" : "ltr" }}
+          >
             <Pressable
               onPress={(event) => {
                 event.stopPropagation?.();
@@ -846,7 +849,7 @@ function SmartDeckCard({
       <Card elevation="low" className="px-4 py-3 rounded-3xl">
         <View
           className="items-center gap-3"
-          style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
+          style={{ direction: isRTL ? "rtl" : "ltr", flexDirection: "row" }}
         >
           <View className="w-10 h-10 rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 items-center justify-center">
             <Icon size={18} color={isDark ? "#2dd4bf" : "#0d9488"} />
