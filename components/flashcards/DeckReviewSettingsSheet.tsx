@@ -180,6 +180,50 @@ export function DeckReviewSettingsSheet({ visible, deckId, deckTitle, mode, onCl
     }
   };
 
+  const reviewModeSection = (
+    <SettingsSection
+      title={mode === "word" ? s.wordFlashcardsTestModes : s.flashcardsTestModes}
+      isRTL={isRTL}
+      variant={mode === "word" ? "quiet" : "default"}
+    >
+      <View
+        className="gap-3"
+        style={{
+          flexDirection: compact ? (isRTL ? "row-reverse" : "row") : "column",
+          flexWrap: compact ? "wrap" : "nowrap",
+        }}
+      >
+        {mode === "word" ? (
+          ALL_WORD_TEST_MODES.map((item) => (
+            <ReviewSwitchRow
+              key={item}
+              label={wordModeLabels[item]}
+              value={wordTestModes.includes(item)}
+              onValueChange={() => toggleWordMode(item)}
+              compact={compact}
+              isDark={isDark}
+              isRTL={isRTL}
+              quiet
+            />
+          ))
+        ) : (
+          ALL_TEST_MODES.map((item) => (
+            <ReviewSwitchRow
+              key={item}
+              label={testModeLabels[item]}
+              value={testModes.includes(item)}
+              onValueChange={() => toggleTestMode(item)}
+              compact={compact}
+              isDark={isDark}
+              isRTL={isRTL}
+              quiet={false}
+            />
+          ))
+        )}
+      </View>
+    </SettingsSection>
+  );
+
   return (
     <ResponsiveSheet
       open={visible}
@@ -232,52 +276,13 @@ export function DeckReviewSettingsSheet({ visible, deckId, deckTitle, mode, onCl
           onNewReviewOrderChange={setNewReviewOrder}
           onReviewSortOrderChange={setReviewSortOrder}
           onNewCardSortOrderChange={setNewCardSortOrder}
+          afterDailyLimits={mode === "word" ? reviewModeSection : null}
           compact={compact}
           isDark={isDark}
           isRTL={isRTL}
         />
 
-        <SettingsSection
-          title={mode === "word" ? s.wordFlashcardsTestModes : s.flashcardsTestModes}
-          isRTL={isRTL}
-          variant={mode === "word" ? "quiet" : "default"}
-        >
-          <View
-            className="gap-3"
-            style={{
-              flexDirection: compact ? (isRTL ? "row-reverse" : "row") : "column",
-              flexWrap: compact ? "wrap" : "nowrap",
-            }}
-          >
-            {mode === "word" ? (
-              ALL_WORD_TEST_MODES.map((item) => (
-                <ReviewSwitchRow
-                  key={item}
-                  label={wordModeLabels[item]}
-                  value={wordTestModes.includes(item)}
-                  onValueChange={() => toggleWordMode(item)}
-                  compact={compact}
-                  isDark={isDark}
-                  isRTL={isRTL}
-                  quiet={mode === "word"}
-                />
-              ))
-            ) : (
-              ALL_TEST_MODES.map((item) => (
-                <ReviewSwitchRow
-                  key={item}
-                  label={testModeLabels[item]}
-                  value={testModes.includes(item)}
-                  onValueChange={() => toggleTestMode(item)}
-                  compact={compact}
-                  isDark={isDark}
-                  isRTL={isRTL}
-                  quiet={false}
-                />
-              ))
-            )}
-          </View>
-        </SettingsSection>
+        {mode !== "word" ? reviewModeSection : null}
       </OverlayBody>
 
       <OverlayFooter isRTL={isRTL}>
@@ -337,6 +342,7 @@ type SchedulerOptionsPanelProps = {
   onNewReviewOrderChange: (value: NewReviewOrder) => void;
   onReviewSortOrderChange: (value: ReviewSortOrder) => void;
   onNewCardSortOrderChange: (value: NewCardSortOrder) => void;
+  afterDailyLimits?: ReactNode;
   compact: boolean;
   isDark: boolean;
   isRTL: boolean;
@@ -365,6 +371,7 @@ export function SchedulerOptionsPanel({
   onNewReviewOrderChange,
   onReviewSortOrderChange,
   onNewCardSortOrderChange,
+  afterDailyLimits,
   compact,
   isDark,
   isRTL,
@@ -426,6 +433,8 @@ export function SchedulerOptionsPanel({
           />
         </SettingsRow>
       </SettingsSection>
+
+      {afterDailyLimits}
 
       <SettingsSection title={s.flashcardsFsrsSection} isRTL={isRTL}>
         <SettingsRow
