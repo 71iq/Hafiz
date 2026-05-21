@@ -14,7 +14,6 @@ import {
   type QfHadith,
   type QfHadithResponse,
 } from "@/lib/quran-foundation/content";
-import { getVerifiedAyahHadithFallback } from "@/lib/quran-foundation/hadith-fallbacks";
 
 const HADITH_PAGE_SIZE = 4;
 
@@ -76,15 +75,10 @@ export function HadithTab({ surah, ayah }: Props) {
         return;
       }
 
-      const resolvedResponse =
-        response.hadiths.length > 0
-          ? response
-          : getVerifiedAyahHadithFallback(surah, ayah, language, page, HADITH_PAGE_SIZE) ?? response;
-
-      await writeCachedAyahHadiths(db, resolvedResponse, surah, ayah).catch((e) => {
+      await writeCachedAyahHadiths(db, response, surah, ayah).catch((e) => {
         console.warn("[HadithTab] Cache write failed:", e);
       });
-      applyPage(resolvedResponse);
+      applyPage(response);
     },
     [applyPage, ayah, db, language, surah]
   );
