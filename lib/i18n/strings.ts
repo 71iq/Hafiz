@@ -239,7 +239,7 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     reflectionJourneyMinChars: "Min {{n}} characters",
     reflectionJourneyMaxChars: "Max {{n}} characters",
     reflectionJourneyRecitationPlaceholder: "Recitation guidance will be added here later.",
-    reflectionJourneyEmptyTitle: "No journey levels yet",
+    reflectionJourneyEmptyTitle: "Coming soon",
     // Progress page
     progressTitle: "Progress",
     progressDailyReminder: "Daily Reminder",
@@ -1176,7 +1176,7 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     reflectionJourneyMinChars: "الحد الأدنى {{n}} أحرف",
     reflectionJourneyMaxChars: "الحد الأقصى {{n}} حرفًا",
     reflectionJourneyRecitationPlaceholder: "ستُضاف إرشادات التلاوة هنا لاحقًا.",
-    reflectionJourneyEmptyTitle: "لا توجد مستويات بعد",
+    reflectionJourneyEmptyTitle: "قريبًا",
     // Reflections
     reflections: "تأملات",
     reflectionCount: "{{n}} تأملات",
