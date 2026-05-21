@@ -49,6 +49,7 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
   const { width, height } = useWindowDimensions();
   const {
     translationLanguage,
+    recitationId,
     tafseerSource,
     uiLanguage,
     isRTL,
@@ -69,7 +70,7 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
   const bookmarked = target ? isBookmarked(target.surah, target.ayah) : false;
   const iconColor = isDark ? "#a3a3a3" : "#8B8178";
   const audioState = target
-    ? getAyahState(target.surah, target.ayah)
+    ? getAyahState(target.surah, target.ayah, recitationId)
     : { active: false, playing: false, loading: false };
   const audioIconColor = audioState.active ? "#0d9488" : iconColor;
   const isPhone = width < SIDEBAR_BREAKPOINT;
@@ -197,11 +198,11 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
 
   const handleAudioPress = useCallback(async () => {
     if (!target) return;
-    const result = await toggleAyah(target.surah, target.ayah);
+    const result = await toggleAyah(target.surah, target.ayah, recitationId);
     if (!result.ok) {
       showToast(result.code === "not_configured" ? s.qfContentMisconfigured : s.qfContentUnavailable);
     }
-  }, [target?.surah, target?.ayah, toggleAyah, showToast, s.qfContentMisconfigured, s.qfContentUnavailable]);
+  }, [target?.surah, target?.ayah, recitationId, toggleAyah, showToast, s.qfContentMisconfigured, s.qfContentUnavailable]);
 
   if (!target) return null;
 

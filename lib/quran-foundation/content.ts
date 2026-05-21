@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { DEFAULT_RECITATION_ID } from "@/lib/quran-foundation/recitations";
 
 export type QfContentErrorCode = "bad_request" | "not_configured" | "rate_limited" | "upstream";
 
@@ -81,7 +82,7 @@ type HadithRequest = {
 
 export const QF_DEFAULT_RECITATION_ID = parsePositiveInt(
   process.env.EXPO_PUBLIC_QF_DEFAULT_RECITATION_ID ?? process.env.QF_DEFAULT_RECITATION_ID
-) ?? 7;
+) ?? DEFAULT_RECITATION_ID;
 
 export async function fetchQfAyahAudio(
   surah: number,

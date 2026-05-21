@@ -1,10 +1,12 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
-import { View, Text, Pressable, ScrollView, useWindowDimensions } from "react-native";
-import { BookOpen } from "lucide-react-native";
+import { ActivityIndicator, View, Text, Pressable, ScrollView, useWindowDimensions } from "react-native";
+import { BookOpen, Volume2 } from "lucide-react-native";
 import { useWordInteraction } from "@/lib/word/context";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { useDatabase } from "@/lib/database/provider";
+import { useAyahAudio } from "@/lib/audio/ayah-audio";
+import { useSelection } from "@/lib/selection/context";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { MeaningTab } from "./word-tabs/MeaningTab";
@@ -28,13 +30,16 @@ type WordHeaderMeta = {
 
 export function WordDetailSheet() {
   const { detailWord, closeDetail } = useWordInteraction();
-  const { isDark, isRTL, uiLanguage } = useSettings();
+  const { recitationId, isDark, isRTL, uiLanguage } = useSettings();
   const { width, height } = useWindowDimensions();
   const s = useStrings();
   const db = useDatabase();
+  const { playWord } = useAyahAudio();
+  const { showToast } = useSelection();
 
   const [activeTab, setActiveTab] = useState<TabKey>("meaning");
   const [ayahModalOpen, setAyahModalOpen] = useState(false);
+  const [wordAudioLoading, setWordAudioLoading] = useState(false);
   const [headerMeta, setHeaderMeta] = useState<WordHeaderMeta>({
     wordText: null,
     root: null,
@@ -65,6 +70,7 @@ export function WordDetailSheet() {
     closeDetail();
     setActiveTab("meaning");
     setAyahModalOpen(false);
+    setWordAudioLoading(false);
   }, [closeDetail]);
 
   useEffect(() => {
@@ -129,6 +135,29 @@ export function WordDetailSheet() {
   const ayahLabel = isArabicMode ? "الآية" : "Ayah";
   const wordLabel = isArabicMode ? "الكلمة" : "Word";
   const showRootLemma = isArabicMode;
+  const handlePlayWord = useCallback(async () => {
+    if (wordAudioLoading) return;
+    setWordAudioLoading(true);
+    try {
+      const result = await playWord(surah, ayah, wordPos, recitationId);
+      if (!result.ok) {
+        showToast(result.code === "not_configured" ? s.qfContentMisconfigured : s.qfContentUnavailable);
+      }
+    } finally {
+      setWordAudioLoading(false);
+    }
+  }, [
+    ayah,
+    playWord,
+    recitationId,
+    showToast,
+    s.qfContentMisconfigured,
+    s.qfContentUnavailable,
+    surah,
+    wordAudioLoading,
+    wordPos,
+  ]);
+
   return (
     <>
       <ResponsiveSheet
@@ -158,6 +187,23 @@ export function WordDetailSheet() {
                 <Text className="text-charcoal dark:text-neutral-200" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}>
                   {s.viewFullAyah}
                 </Text>
+              </Pressable>
+              <Pressable
+                onPress={handlePlayWord}
+                disabled={wordAudioLoading}
+                accessibilityRole="button"
+                accessibilityLabel={wordAudioLoading ? s.audioLoading : s.wordAudioPlay}
+                className="h-8 w-8 items-center justify-center rounded-full bg-primary-accent/10 dark:bg-primary-bright/10"
+                style={({ pressed }) => ({
+                  opacity: wordAudioLoading ? 0.55 : 1,
+                  transform: [{ scale: pressed && !wordAudioLoading ? 0.96 : 1 }],
+                })}
+              >
+                {wordAudioLoading ? (
+                  <ActivityIndicator size="small" color={isDark ? "#2dd4bf" : "#0d9488"} />
+                ) : (
+                  <Volume2 size={15} color={isDark ? "#2dd4bf" : "#0d9488"} />
+                )}
               </Pressable>
             </View>
           }

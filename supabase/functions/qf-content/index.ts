@@ -236,7 +236,7 @@ function readConfig(action: Action, recitationIdInput: unknown): { ok: true; val
 
   const recitationId =
     action === "audio-ayah"
-      ? parsePositiveInt(recitationIdInput ?? Deno.env.get("QF_DEFAULT_RECITATION_ID") ?? 7)
+      ? parsePositiveInt(recitationIdInput ?? Deno.env.get("QF_DEFAULT_RECITATION_ID") ?? 6)
       : 7;
   if (recitationId === null) {
     return { ok: false, message: "Quran Foundation recitation is not configured." };

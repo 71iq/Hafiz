@@ -6,7 +6,7 @@ import { ToggleGroup } from "@/components/ui/ToggleGroup";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { ScreenScrollView, useScreenContentLayout } from "@/components/ui/ScreenContent";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Sun, Moon, Smartphone, Minus, Plus, ChevronRight, ChevronLeft, User, LogOut, BookOpen, RefreshCw, Unlink, Info, FileText, HeartHandshake, ExternalLink, Sparkles, SlidersHorizontal, type LucideIcon } from "lucide-react-native";
+import { Sun, Moon, Smartphone, Minus, Plus, Check, ChevronRight, ChevronLeft, User, LogOut, BookOpen, RefreshCw, Unlink, Info, FileText, HeartHandshake, ExternalLink, Sparkles, SlidersHorizontal, type LucideIcon } from "lucide-react-native";
 import {
   useSettings,
   FONT_SIZE_STEPS,
@@ -19,10 +19,12 @@ import {
 import { useDatabase } from "@/lib/database/provider";
 import { getLanguageByCode } from "@/lib/translations/languages";
 import { TranslationLanguagePicker } from "@/components/settings/TranslationLanguagePicker";
+import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { useAuthStore } from "@/lib/auth/store";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { isQfSyncEnabled } from "@/lib/quran-foundation/config";
+import { RECITERS, formatReciterLabel, getReciterById } from "@/lib/quran-foundation/recitations";
 import { beginQfOAuthConnection, disconnectQfUser, getQfConnectionStatus, getQfLinkedIdentityState } from "@/lib/quran-foundation/user";
 import { fullQfUserSync, runInitialQfUserSync } from "@/lib/quran-foundation/user-sync";
 import type { QfConnectionStatus } from "@/lib/quran-foundation/user-types";
@@ -44,6 +46,7 @@ export default function SettingsScreen() {
     theme, setTheme, fontSizeIndex, setFontSizeIndex, fontSize,
     translationLanguage, isTranslationLoading, isDark, isRTL,
     tafseerSource, setTafseerSource,
+    recitationId, setRecitationId,
     uiLanguage, setUiLanguage,
     pageScroll, setPageScroll,
     viewMode, setViewMode,
@@ -55,6 +58,7 @@ export default function SettingsScreen() {
   const configured = isSupabaseConfigured();
   const qfSyncEnabled = isQfSyncEnabled();
   const [pickerVisible, setPickerVisible] = useState(false);
+  const [reciterPickerVisible, setReciterPickerVisible] = useState(false);
   const [zaytPreviewVisible, setZaytPreviewVisible] = useState(false);
   const [logoutDialogVisible, setLogoutDialogVisible] = useState(false);
   const [mobileCategory, setMobileCategory] = useState<SettingsCategoryId | null>(null);
@@ -63,6 +67,7 @@ export default function SettingsScreen() {
   const [qfMessage, setQfMessage] = useState<string | null>(null);
   const { width } = useWindowDimensions();
   const currentLang = getLanguageByCode(translationLanguage);
+  const currentReciter = getReciterById(recitationId);
   const { user, profile, isLoading: authLoading, signOut } = useAuthStore();
   const accountName = profile?.display_name || profile?.username || user?.email || s.authProfile;
   const accountHandle = profile?.username ? `@${profile.username}` : user?.email || "";
@@ -445,6 +450,45 @@ export default function SettingsScreen() {
                 isRTL={isRTL}
               />
             </View>
+
+            <View className="h-5" />
+
+            <Text
+              className="text-charcoal dark:text-neutral-300 mb-3"
+              style={{ fontFamily: "Manrope_500Medium", fontSize: 14, textAlign: isRTL ? "right" : "left" }}
+            >
+              {s.recitationSettingsLabel}
+            </Text>
+            <Pressable
+              onPress={() => setReciterPickerVisible(true)}
+              className="items-center justify-between gap-3 rounded-3xl bg-surface dark:bg-surface-dark px-4 py-4"
+              style={{
+                direction: isRTL ? "rtl" : "ltr",
+                flexDirection: "row",
+              }}
+            >
+              <View className="min-w-0 flex-1">
+                <Text
+                  className="text-charcoal dark:text-neutral-200"
+                  style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
+                >
+                  {s.recitationFavoriteReciter}
+                </Text>
+                <Text
+                  className="mt-0.5 text-warm-400 dark:text-neutral-500"
+                  numberOfLines={2}
+                  style={{
+                    fontFamily: "Manrope_400Regular",
+                    fontSize: 12,
+                    textAlign: isRTL ? "right" : "left",
+                    writingDirection: isRTL ? "rtl" : "ltr",
+                  }}
+                >
+                  {formatReciterLabel(currentReciter, uiLanguage)}
+                </Text>
+              </View>
+              <TranslationChevron size={18} color={isDark ? "#525252" : "#DFD9D1"} />
+            </Pressable>
           </Card>
         </>
       )}
@@ -782,6 +826,12 @@ export default function SettingsScreen() {
         visible={pickerVisible}
         onClose={() => setPickerVisible(false)}
       />
+      <ReciterPicker
+        visible={reciterPickerVisible}
+        selectedId={recitationId}
+        onSelect={setRecitationId}
+        onClose={() => setReciterPickerVisible(false)}
+      />
       <ZaytPreviewModal
         visible={zaytPreviewVisible}
         onClose={() => setZaytPreviewVisible(false)}
@@ -802,6 +852,104 @@ function parseSettingsCategory(value: string | undefined): SettingsCategoryId | 
     default:
       return null;
   }
+}
+
+function ReciterPicker({
+  visible,
+  selectedId,
+  onSelect,
+  onClose,
+}: {
+  visible: boolean;
+  selectedId: number;
+  onSelect: (id: number) => void;
+  onClose: () => void;
+}) {
+  const { isDark, isRTL, uiLanguage } = useSettings();
+  const s = useStrings();
+  const DisclosureChevron = isRTL ? ChevronLeft : ChevronRight;
+
+  const handleSelect = (id: number) => {
+    onSelect(id);
+    onClose();
+  };
+
+  return (
+    <ResponsiveSheet
+      open={visible}
+      onClose={onClose}
+      dismissOnBackdrop
+      maxWidth={560}
+      maxHeight="82%"
+      surfaceColor={isDark ? "#1C1917" : "#FFF8F1"}
+    >
+      <OverlayHeader
+        title={s.recitationReciterPickerTitle}
+        subtitle={s.recitationReciterPickerSubtitle}
+        onClose={onClose}
+        showHandle
+        isRTL={isRTL}
+      />
+      <OverlayBody contentContainerClassName="px-5 pt-2 pb-6">
+        <View className="gap-1">
+          {RECITERS.map((reciter) => {
+            const selected = reciter.id === selectedId;
+            return (
+              <Pressable
+                key={reciter.id}
+                onPress={() => handleSelect(reciter.id)}
+                className="items-center justify-between gap-3 rounded-2xl px-3 py-3.5"
+                style={({ pressed }) => ({
+                  direction: isRTL ? "rtl" : "ltr",
+                  flexDirection: "row",
+                  backgroundColor: selected
+                    ? isDark
+                      ? "rgba(45,212,191,0.08)"
+                      : "rgba(13,148,136,0.06)"
+                    : pressed
+                      ? isDark
+                        ? "rgba(45,212,191,0.04)"
+                        : "rgba(13,148,136,0.03)"
+                      : "transparent",
+                })}
+              >
+                <View className="min-w-0 flex-1">
+                  <Text
+                    className={selected ? "text-primary-accent dark:text-primary-bright" : "text-charcoal dark:text-neutral-300"}
+                    style={{
+                      fontFamily: selected ? "Manrope_700Bold" : "Manrope_600SemiBold",
+                      fontSize: 15,
+                      textAlign: isRTL ? "right" : "left",
+                      writingDirection: isRTL ? "rtl" : "ltr",
+                    }}
+                  >
+                    {uiLanguage === "ar" ? reciter.nameAr : reciter.nameEn}
+                  </Text>
+                  <Text
+                    className="mt-0.5 text-warm-400 dark:text-neutral-500"
+                    style={{
+                      fontFamily: "Manrope_400Regular",
+                      fontSize: 13,
+                      textAlign: isRTL ? "right" : "left",
+                      writingDirection: isRTL ? "rtl" : "ltr",
+                    }}
+                  >
+                    {uiLanguage === "ar" ? reciter.styleAr : reciter.styleEn}
+                  </Text>
+                </View>
+
+                {selected ? (
+                  <Check size={20} color={isDark ? "#2dd4bf" : "#0d9488"} />
+                ) : (
+                  <DisclosureChevron size={18} color={isDark ? "#737373" : "#8B8178"} />
+                )}
+              </Pressable>
+            );
+          })}
+        </View>
+      </OverlayBody>
+    </ResponsiveSheet>
+  );
 }
 
 function SettingsCategoryNav({

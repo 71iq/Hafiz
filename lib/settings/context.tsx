@@ -6,6 +6,7 @@ import { useDatabase } from "@/lib/database/provider";
 import { DEFAULT_LANGUAGE } from "@/lib/translations/languages";
 import { importTranslation } from "@/lib/translations/import";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
+import { DEFAULT_RECITATION_ID, normalizeRecitationId } from "@/lib/quran-foundation/recitations";
 
 // Desktop / large-viewport scale. Also the canonical length (10 levels) used
 // by UI controls like the font size picker.
@@ -60,6 +61,8 @@ type SettingsContextType = {
   isTranslationLoading: boolean;
   tafseerSource: TafseerSource;
   setTafseerSource: (source: TafseerSource) => void;
+  recitationId: number;
+  setRecitationId: (id: number) => void;
   uiLanguage: UILanguage;
   setUiLanguage: (lang: UILanguage) => void;
   dailyReviewLimit: number;
@@ -95,6 +98,8 @@ const SettingsContext = createContext<SettingsContextType>({
   isTranslationLoading: false,
   tafseerSource: "muyassar",
   setTafseerSource: () => {},
+  recitationId: DEFAULT_RECITATION_ID,
+  setRecitationId: () => {},
   uiLanguage: "en",
   setUiLanguage: () => {},
   dailyReviewLimit: DEFAULT_DAILY_REVIEW_LIMIT,
@@ -158,6 +163,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [translationLanguage, setTranslationLanguageState] = useState(DEFAULT_LANGUAGE);
   const [isTranslationLoading, setIsTranslationLoading] = useState(false);
   const [tafseerSource, setTafseerSourceState] = useState<TafseerSource>("muyassar");
+  const [recitationId, setRecitationIdState] = useState(DEFAULT_RECITATION_ID);
   const [uiLanguage, setUiLanguageState] = useState<UILanguage>(readCachedUiLanguage);
   const [dailyReviewLimit, setDailyReviewLimitState] = useState(DEFAULT_DAILY_REVIEW_LIMIT);
   const [focusScrollSpeed, setFocusScrollSpeedState] = useState(FOCUS_SCROLL_SPEED_DEFAULT);
@@ -203,6 +209,11 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         const savedTafseerSource = await readSetting(db, "tafseer_source");
         if (savedTafseerSource === "muyassar" || savedTafseerSource === "zilal") {
           setTafseerSourceState(savedTafseerSource);
+        }
+
+        const savedRecitationId = await readSetting(db, "recitation_id");
+        if (savedRecitationId !== null) {
+          setRecitationIdState(normalizeRecitationId(savedRecitationId));
         }
 
         const savedUiLang = await readSetting(db, "ui_language");
@@ -345,6 +356,15 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     [db]
   );
 
+  const setRecitationId = useCallback(
+    (id: number) => {
+      const next = normalizeRecitationId(id);
+      setRecitationIdState(next);
+      writeSetting(db, "recitation_id", String(next)).catch(console.warn);
+    },
+    [db]
+  );
+
   const setDailyReviewLimit = useCallback(
     (limit: number) => {
       const clamped = Math.max(MIN_DAILY_REVIEW_LIMIT, Math.min(MAX_DAILY_REVIEW_LIMIT, limit));
@@ -416,6 +436,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         isTranslationLoading,
         tafseerSource,
         setTafseerSource,
+        recitationId,
+        setRecitationId,
         uiLanguage,
         setUiLanguage,
         dailyReviewLimit,

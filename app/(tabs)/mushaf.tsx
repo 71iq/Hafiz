@@ -9,7 +9,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { FlashList, FlashListRef } from "@shopify/flash-list";
 import { useChrome } from "@/lib/ui/chrome";
-import { BookOpen, AlignJustify, Eye, EyeOff, Home, Search, BookMarked, ScanLine } from "lucide-react-native";
+import { BookOpen, AlignJustify, Eye, EyeOff, Home, Search, BookMarked, ListMusic, ScanLine } from "lucide-react-native";
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -25,6 +25,7 @@ import { MushafSlider } from "@/components/mushaf/MushafSlider";
 import { FocusModeControls } from "@/components/mushaf/FocusModeControls";
 import { HifzControls } from "@/components/mushaf/HifzControls";
 import { WordDetailSheet } from "@/components/mushaf/WordDetailSheet";
+import { RecitationRangeSheet } from "@/components/mushaf/RecitationRangeSheet";
 import type { HifzVisibility } from "@/components/mushaf/MushafPage";
 import { loadMushafIndex, findJuzForAyah, findHizbForAyah, topmostAyahForPage, type MushafIndex } from "@/lib/mushaf/position";
 import { FloatingWordTooltip } from "@/components/mushaf/WordTooltip";
@@ -368,6 +369,7 @@ function MushafInner() {
   const [showNavigator, setShowNavigator] = useState(false);
   const [showBookmarks, setShowBookmarks] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
+  const [showRecitation, setShowRecitation] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [verseHideMode, setVerseHideMode] = useState(false);
   const [hifzEnabled, setHifzEnabled] = useState(false);
@@ -759,6 +761,11 @@ function MushafInner() {
     setShowSearch(true);
   }, [pauseFocusAutoScroll, resetHifzForNavigation]);
 
+  const handleOpenRecitation = useCallback(() => {
+    pauseFocusAutoScroll();
+    setShowRecitation(true);
+  }, [pauseFocusAutoScroll]);
+
   const handleOpenNavigator = useCallback(() => {
     pauseFocusAutoScroll();
     resetHifzForNavigation();
@@ -961,7 +968,7 @@ function MushafInner() {
 
   useEffect(() => {
     if (!focusModeActive) return;
-    if (showNavigator || showBookmarks || showSearch || selection || detailWord) {
+    if (showNavigator || showBookmarks || showSearch || showRecitation || selection || detailWord) {
       pauseFocusAutoScroll();
     }
   }, [
@@ -971,6 +978,7 @@ function MushafInner() {
     selection,
     showBookmarks,
     showNavigator,
+    showRecitation,
     showSearch,
   ]);
 
@@ -1077,7 +1085,7 @@ function MushafInner() {
   useEffect(() => {
     if (Platform.OS !== "web" || !isPageMode) return;
     const handler = (e: KeyboardEvent) => {
-      if (showNavigator || showSearch || showBookmarks) return;
+      if (showNavigator || showSearch || showBookmarks || showRecitation) return;
       const target = e.target as HTMLElement | null;
       const tag = target?.tagName?.toLowerCase();
       // Don't hijack typing inside inputs/textareas/contenteditable
@@ -1093,7 +1101,7 @@ function MushafInner() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [isPageMode, currentPage, showNavigator, showSearch, showBookmarks]);
+  }, [isPageMode, currentPage, showNavigator, showSearch, showBookmarks, showRecitation]);
 
   // Verse-view: track topmost visible ayah via FlashList viewable items
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 }).current;
@@ -1218,10 +1226,20 @@ function MushafInner() {
                   </Pressable>
                   <Pressable
                     onPress={handleOpenBookmarks}
+                    accessibilityRole="button"
                     className="rounded-full px-2.5 py-2"
                     style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
                   >
                     <BookMarked size={16} color={isDark ? "#737373" : "#8B8178"} />
+                  </Pressable>
+                  <Pressable
+                    onPress={handleOpenRecitation}
+                    accessibilityRole="button"
+                    accessibilityLabel={s.recitationToolbar}
+                    className={`rounded-full px-2.5 py-2 ${showRecitation ? "bg-primary-accent/15 dark:bg-primary-bright/15" : ""}`}
+                    style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+                  >
+                    <ListMusic size={16} color={showRecitation ? "#0d9488" : isDark ? "#737373" : "#8B8178"} />
                   </Pressable>
                   {viewMode === "verse" ? (
                     <Pressable
@@ -1291,10 +1309,24 @@ function MushafInner() {
                 </Pressable>
                 <Pressable
                   onPress={handleOpenBookmarks}
+                  accessibilityRole="button"
                   className={`rounded-full bg-surface-high dark:bg-surface-dark-high ${isNarrow ? "px-2 py-2" : "px-3 py-2"}`}
                   style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
                 >
                   <BookMarked size={16} color={isDark ? "#737373" : "#8B8178"} />
+                </Pressable>
+                <Pressable
+                  onPress={handleOpenRecitation}
+                  accessibilityRole="button"
+                  accessibilityLabel={s.recitationToolbar}
+                  className={`rounded-full ${isNarrow ? "px-2 py-2" : "px-3 py-2"} ${
+                    showRecitation
+                      ? "bg-primary-accent/15 dark:bg-primary-bright/15"
+                      : "bg-surface-high dark:bg-surface-dark-high"
+                  }`}
+                  style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+                >
+                  <ListMusic size={16} color={showRecitation ? "#0d9488" : isDark ? "#737373" : "#8B8178"} />
                 </Pressable>
                 {viewMode === "verse" ? (
                   <Pressable
@@ -1485,6 +1517,13 @@ function MushafInner() {
           visible={showBookmarks}
           onClose={() => setShowBookmarks(false)}
           onNavigate={handleBookmarkNavigate}
+        />
+
+        {/* Recitation range sheet */}
+        <RecitationRangeSheet
+          visible={showRecitation}
+          onClose={() => setShowRecitation(false)}
+          currentAyah={topAyah}
         />
 
         {/* Floating word tooltip (portal-based, web only) */}

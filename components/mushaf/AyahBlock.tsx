@@ -62,7 +62,7 @@ function AyahBlockInner({
   const { width } = useWindowDimensions();
   const isPhone = width < SIDEBAR_BREAKPOINT;
   const db = useDatabase();
-  const { translationLanguage, isRTL, isDark } = useSettings();
+  const { translationLanguage, recitationId, isRTL, isDark } = useSettings();
   const langInfo = getLanguageByCode(translationLanguage);
   const s = useStrings();
   const { isBookmarked, getHighlightColor, showToast, refreshBookmarks } = useSelection();
@@ -185,11 +185,11 @@ function AyahBlockInner({
   }, [db, surah, ayah, showToast, s.copied]);
 
   const handleAudioPress = useCallback(async () => {
-    const result = await toggleAyah(surah, ayah);
+    const result = await toggleAyah(surah, ayah, recitationId);
     if (!result.ok) {
       showToast(result.code === "not_configured" ? s.qfContentMisconfigured : s.qfContentUnavailable);
     }
-  }, [ayah, showToast, s.qfContentMisconfigured, s.qfContentUnavailable, surah, toggleAyah]);
+  }, [ayah, recitationId, showToast, s.qfContentMisconfigured, s.qfContentUnavailable, surah, toggleAyah]);
 
   const handleAddToReview = useCallback(async () => {
     if (reviewBusy || savedToReview) return;
@@ -207,7 +207,7 @@ function AyahBlockInner({
   }, [reviewBusy, savedToReview, db, surah, ayah, showToast, s.reviewActionAdded, s.reviewActionAlreadyExists, s.reviewActionFailed]);
 
   const iconColor = isDark ? "#a3a3a3" : "#8B8178";
-  const audioState = getAyahState(surah, ayah);
+  const audioState = getAyahState(surah, ayah, recitationId);
   const audioIconColor = audioState.active ? "#0d9488" : iconColor;
 
   return (
