@@ -238,6 +238,7 @@ function SurahInfoButton({
   const sizeClass = compact ? "h-7 w-7" : "h-9 w-9";
   const iconSize = compact ? 13 : 16;
   const offset = compact ? 7 : 16;
+  const compactSideOffset = 10;
   return (
     <Pressable
       accessibilityRole="button"
@@ -248,12 +249,15 @@ function SurahInfoButton({
       style={({ pressed }) => [
         {
           position: "absolute",
-          top: offset,
+          top: compact ? "50%" : offset,
+          marginTop: compact ? -14 : undefined,
           opacity: pressed ? 0.72 : 1,
           zIndex: 2,
           cursor: Platform.OS === "web" ? "pointer" : undefined,
         },
-        isRTL ? { left: offset } : { right: offset },
+        compact
+          ? isRTL ? { right: compactSideOffset } : { left: compactSideOffset }
+          : isRTL ? { left: offset } : { right: offset },
       ]}
     >
       <Info size={iconSize} color={isDark ? "#2dd4bf" : "#0d9488"} />

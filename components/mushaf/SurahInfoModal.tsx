@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Linking, Pressable, Text, View } from "react-native";
-import { ExternalLink } from "lucide-react-native";
+import { ActivityIndicator, Text, View } from "react-native";
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -157,35 +156,6 @@ export function SurahInfoModal({
               </View>
             ))}
 
-            <Pressable
-              disabled={!info.sourceUrl}
-              onPress={() => info.sourceUrl && Linking.openURL(info.sourceUrl).catch(console.warn)}
-              className={`mt-1 flex-row items-center gap-2 rounded-2xl bg-surface-low dark:bg-surface-dark-low px-4 py-3 ${isRTL ? "flex-row-reverse" : ""}`}
-              style={({ pressed }) => ({ opacity: pressed && info.sourceUrl ? 0.75 : 1 })}
-            >
-              <View className="min-w-0 flex-1">
-                <Text
-                  className="text-warm-500 dark:text-neutral-500"
-                  style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11, textAlign: isRTL ? "right" : "left" }}
-                >
-                  {s.surahInfoSource}
-                </Text>
-                <Text
-                  className="mt-0.5 text-charcoal dark:text-neutral-200"
-                  numberOfLines={2}
-                  style={{
-                    fontFamily: "Manrope_500Medium",
-                    fontSize: 13,
-                    lineHeight: 19,
-                    textAlign: isRTL ? "right" : "left",
-                    writingDirection: isRTL ? "rtl" : "ltr",
-                  }}
-                >
-                  {info.sourceName}
-                </Text>
-              </View>
-              {!!info.sourceUrl && <ExternalLink size={15} color={isDark ? "#a3a3a3" : "#8B8178"} />}
-            </Pressable>
           </View>
         )}
       </OverlayBody>

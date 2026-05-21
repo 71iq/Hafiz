@@ -732,6 +732,7 @@ export default function SettingsScreen() {
                 s.creditIrab,
                 s.creditQiraat,
                 s.creditNourQuran,
+                s.creditSurahInfo,
                 s.creditTajweedRules,
                 s.creditTajweedDesc,
               ].map((line, i) => (
