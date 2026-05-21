@@ -303,17 +303,9 @@ async function getAccessToken(config: Config, action: Action): Promise<string> {
 }
 
 async function fetchToken(config: Config, action: Action): Promise<string> {
-  const basicAuth = btoa(`${config.clientId}:${config.clientSecret}`);
-  const response = await fetch(`${config.authBaseUrl}/oauth2/token`, {
-    method: "POST",
-    headers: {
-      Authorization: `Basic ${basicAuth}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: new URLSearchParams({
-      grant_type: "client_credentials",
-      scope: "content",
-    }),
+  const response = await fetchTokenWithClientAuth(config, {
+    grant_type: "client_credentials",
+    scope: "content",
   });
 
   if (response.status === 429) {
@@ -333,6 +325,34 @@ async function fetchToken(config: Config, action: Action): Promise<string> {
   tokenCache.accessToken = token.access_token;
   tokenCache.expiresAt = Date.now() + token.expires_in * 1000;
   return token.access_token;
+}
+
+async function fetchTokenWithClientAuth(config: Config, params: Record<string, string>): Promise<Response> {
+  const basicAuth = btoa(`${config.clientId}:${config.clientSecret}`);
+  const basicResponse = await fetch(`${config.authBaseUrl}/oauth2/token`, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${basicAuth}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams(params),
+  });
+
+  if (![400, 401, 403].includes(basicResponse.status)) {
+    return basicResponse;
+  }
+
+  return fetch(`${config.authBaseUrl}/oauth2/token`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({
+      ...params,
+      client_id: config.clientId,
+      client_secret: config.clientSecret,
+    }),
+  });
 }
 
 function clearToken() {

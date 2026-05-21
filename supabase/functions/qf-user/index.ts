@@ -436,17 +436,9 @@ async function refreshAccessToken(
   config: Config,
   refreshToken: string
 ): Promise<{ accessToken: string; refreshToken?: string; expiresIn: number }> {
-  const basicAuth = btoa(`${config.clientId}:${config.clientSecret}`);
-  const response = await fetch(`${config.authBaseUrl}/oauth2/token`, {
-    method: "POST",
-    headers: {
-      Authorization: `Basic ${basicAuth}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: new URLSearchParams({
-      grant_type: "refresh_token",
-      refresh_token: refreshToken,
-    }),
+  const response = await fetchTokenWithClientAuth(config, {
+    grant_type: "refresh_token",
+    refresh_token: refreshToken,
   });
   if (response.status === 429) throw new Error("rate_limited");
   if (!response.ok) throw new Error(`QF refresh failed: ${response.status}`);
@@ -463,19 +455,11 @@ async function exchangeAuthorizationCode(
   redirectUri: string,
   codeVerifier: string
 ): Promise<{ accessToken: string; refreshToken?: string; expiresIn: number; scope?: string; idToken?: string }> {
-  const basicAuth = btoa(`${config.clientId}:${config.clientSecret}`);
-  const response = await fetch(`${config.authBaseUrl}/oauth2/token`, {
-    method: "POST",
-    headers: {
-      Authorization: `Basic ${basicAuth}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: new URLSearchParams({
-      grant_type: "authorization_code",
-      code,
-      redirect_uri: redirectUri,
-      code_verifier: codeVerifier,
-    }),
+  const response = await fetchTokenWithClientAuth(config, {
+    grant_type: "authorization_code",
+    code,
+    redirect_uri: redirectUri,
+    code_verifier: codeVerifier,
   });
   if (response.status === 429) throw new Error("rate_limited");
   if (response.status === 401 || response.status === 403) {
@@ -500,6 +484,34 @@ async function exchangeAuthorizationCode(
     scope: body.scope,
     idToken: body.id_token,
   };
+}
+
+async function fetchTokenWithClientAuth(config: Config, params: Record<string, string>): Promise<Response> {
+  const basicAuth = btoa(`${config.clientId}:${config.clientSecret}`);
+  const basicResponse = await fetch(`${config.authBaseUrl}/oauth2/token`, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${basicAuth}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams(params),
+  });
+
+  if (![400, 401, 403].includes(basicResponse.status)) {
+    return basicResponse;
+  }
+
+  return fetch(`${config.authBaseUrl}/oauth2/token`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({
+      ...params,
+      client_id: config.clientId,
+      client_secret: config.clientSecret,
+    }),
+  });
 }
 
 async function storeConnection(
