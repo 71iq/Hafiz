@@ -1,30 +1,38 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, Text, View, useWindowDimensions } from "react-native";
 import { router } from "expo-router";
 import { BookOpen, Edit3, NotebookPen, Search, Trash2, type LucideIcon } from "lucide-react-native";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PrivateNoteSheet } from "@/components/notes/PrivateNoteSheet";
+import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
 import { interpolate, useStrings } from "@/lib/i18n/useStrings";
 import { setPendingDeepLink } from "@/lib/deep-link";
 import { toArabicNumber } from "@/lib/arabic";
+import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import {
   deletePrivateNote,
   searchPrivateNotes,
   type PrivateNoteSearchResult,
 } from "@/lib/notes/queries";
 
+const PROFILE_NOTES_PREVIEW_LIMIT = 4;
+
 export function ProfileNotesManager() {
   const db = useDatabase();
   const s = useStrings();
   const { isDark, isRTL, uiLanguage } = useSettings();
+  const { width, height } = useWindowDimensions();
   const [notes, setNotes] = useState<PrivateNoteSearchResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [reloadToken, setReloadToken] = useState(0);
   const [editingNote, setEditingNote] = useState<PrivateNoteSearchResult | null>(null);
   const [deletingNote, setDeletingNote] = useState<PrivateNoteSearchResult | null>(null);
+  const [allNotesOpen, setAllNotesOpen] = useState(false);
+  const isPhone = width < SIDEBAR_BREAKPOINT;
+  const maxOverlayHeight = Math.min(height - (isPhone ? 12 : 48), isPhone ? height * 0.94 : 720);
 
   const refreshNotes = useCallback(() => {
     setReloadToken((token) => token + 1);
@@ -57,6 +65,8 @@ export function ProfileNotesManager() {
     () => interpolate(s.profileNotesCount, { n: isRTL ? toArabicNumber(notes.length) : notes.length }),
     [isRTL, notes.length, s.profileNotesCount]
   );
+  const previewNotes = useMemo(() => notes.slice(0, PROFILE_NOTES_PREVIEW_LIMIT), [notes]);
+  const hasMoreNotes = notes.length > previewNotes.length;
 
   const confirmDelete = useCallback(async () => {
     if (!deletingNote) return;
@@ -66,8 +76,19 @@ export function ProfileNotesManager() {
   }, [db, deletingNote, refreshNotes]);
 
   const openAyah = useCallback((note: PrivateNoteSearchResult) => {
+    setAllNotesOpen(false);
     setPendingDeepLink({ surah: note.surah, ayah: note.ayahStart });
     router.push("/(tabs)/mushaf" as any);
+  }, []);
+
+  const openEdit = useCallback((note: PrivateNoteSearchResult) => {
+    setAllNotesOpen(false);
+    setEditingNote(note);
+  }, []);
+
+  const openDelete = useCallback((note: PrivateNoteSearchResult) => {
+    setAllNotesOpen(false);
+    setDeletingNote(note);
   }, []);
 
   const title = s.profileNotesEmptyTitle;
@@ -130,6 +151,55 @@ export function ProfileNotesManager() {
         <EmptyState icon={NotebookPen} title={title} subtitle={subtitle} isDark={isDark} />
       ) : (
         <View className="gap-3">
+          {previewNotes.map((note) => (
+            <NoteCard
+              key={note.id}
+              note={note}
+              isDark={isDark}
+              isRTL={isRTL}
+              uiLanguage={uiLanguage}
+              onEdit={() => openEdit(note)}
+              onDelete={() => openDelete(note)}
+              onOpenAyah={() => openAyah(note)}
+            />
+          ))}
+          {hasMoreNotes && (
+            <Pressable
+              onPress={() => setAllNotesOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel={s.profileNotesViewAll}
+              className={`items-center justify-center gap-2 rounded-full bg-surface-high px-4 py-3 dark:bg-surface-dark-high ${
+                isRTL ? "flex-row-reverse" : "flex-row"
+              }`}
+              style={({ pressed }) => ({ opacity: pressed ? 0.76 : 1 })}
+            >
+              <NotebookPen size={15} color={iconColor} />
+              <Text
+                className="text-charcoal dark:text-neutral-100"
+                style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}
+              >
+                {s.profileNotesViewAll}
+              </Text>
+            </Pressable>
+          )}
+        </View>
+      )}
+
+      <ResponsiveSheet
+        open={allNotesOpen}
+        onClose={() => setAllNotesOpen(false)}
+        maxWidth={720}
+        maxHeight={maxOverlayHeight}
+        surfaceColor={isDark ? "#1a1a1a" : "#FFF8F1"}
+      >
+        <OverlayHeader
+          title={s.profileNotesTitle}
+          subtitle={countLabel}
+          onClose={() => setAllNotesOpen(false)}
+          showHandle={isPhone}
+          isRTL={isRTL}
+        />
+        <OverlayBody contentContainerClassName="gap-3 px-5 py-4">
           {notes.map((note) => (
             <NoteCard
               key={note.id}
@@ -137,13 +207,13 @@ export function ProfileNotesManager() {
               isDark={isDark}
               isRTL={isRTL}
               uiLanguage={uiLanguage}
-              onEdit={() => setEditingNote(note)}
-              onDelete={() => setDeletingNote(note)}
+              onEdit={() => openEdit(note)}
+              onDelete={() => openDelete(note)}
               onOpenAyah={() => openAyah(note)}
             />
           ))}
-        </View>
-      )}
+        </OverlayBody>
+      </ResponsiveSheet>
 
       <PrivateNoteSheet
         open={!!editingNote}

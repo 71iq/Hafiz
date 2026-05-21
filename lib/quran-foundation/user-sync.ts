@@ -473,6 +473,8 @@ async function tombstoneMissingRemoteBookmarks(
 async function mergeRemoteNote(db: SQLiteDatabase, remote: QfNote): Promise<boolean> {
   const parsedRange = remote.ranges.map(parseQfRange).find((range) => range !== null);
   if (!parsedRange) return false;
+  const remoteBody = remote.body.trim();
+  if (!remoteBody) return false;
 
   const localByQfId = await db.getFirstAsync<LocalPrivateNoteRow>(
     "SELECT * FROM private_notes WHERE qf_note_id = ?",
@@ -486,6 +488,18 @@ async function mergeRemoteNote(db: SQLiteDatabase, remote: QfNote): Promise<bool
       await attachQfNote(db, localByQfId.id, remote, remote.ranges, { enqueueSupabase: false });
       return false;
     }
+    const duplicateLocal = await findExactLocalNote(
+      db,
+      parsedRange.surah,
+      parsedRange.ayahStart,
+      parsedRange.ayahEnd,
+      remoteBody,
+      localByQfId.id
+    );
+    if (duplicateLocal) {
+      await tombstoneLocalQfDuplicate(db, localByQfId);
+      return true;
+    }
     await db.runAsync(
       `UPDATE private_notes
        SET surah = ?, ayah_start = ?, ayah_end = ?, content = ?, updated_at = ?,
@@ -496,7 +510,7 @@ async function mergeRemoteNote(db: SQLiteDatabase, remote: QfNote): Promise<bool
         parsedRange.surah,
         parsedRange.ayahStart,
         parsedRange.ayahEnd,
-        remote.body,
+        remoteBody,
         updatedAt,
         remote.id,
         new Date().toISOString(),
@@ -509,7 +523,7 @@ async function mergeRemoteNote(db: SQLiteDatabase, remote: QfNote): Promise<bool
       surah: parsedRange.surah,
       ayah_start: parsedRange.ayahStart,
       ayah_end: parsedRange.ayahEnd,
-      content: remote.body,
+      content: remoteBody,
       created_at: localByQfId.created_at,
       updated_at: updatedAt,
       deleted_at: null,
@@ -521,15 +535,9 @@ async function mergeRemoteNote(db: SQLiteDatabase, remote: QfNote): Promise<bool
     return true;
   }
 
-  const exactLocal = await db.getFirstAsync<LocalPrivateNoteRow>(
-    `SELECT * FROM private_notes
-     WHERE qf_note_id IS NULL AND deleted_at IS NULL AND surah = ? AND ayah_start = ?
-       AND ayah_end = ? AND content = ?
-     ORDER BY updated_at DESC
-     LIMIT 1`,
-    [parsedRange.surah, parsedRange.ayahStart, parsedRange.ayahEnd, remote.body]
-  );
+  const exactLocal = await findExactLocalNote(db, parsedRange.surah, parsedRange.ayahStart, parsedRange.ayahEnd, remoteBody);
   if (exactLocal) {
+    if (exactLocal.qf_note_id && exactLocal.qf_note_id !== remote.id) return false;
     await attachQfNote(db, exactLocal.id, remote, remote.ranges, { enqueueSupabase: true });
     return true;
   }
@@ -546,7 +554,7 @@ async function mergeRemoteNote(db: SQLiteDatabase, remote: QfNote): Promise<bool
       parsedRange.surah,
       parsedRange.ayahStart,
       parsedRange.ayahEnd,
-      remote.body,
+      remoteBody,
       createdAt,
       updatedAt,
       remote.id,
@@ -559,7 +567,7 @@ async function mergeRemoteNote(db: SQLiteDatabase, remote: QfNote): Promise<bool
     surah: parsedRange.surah,
     ayah_start: parsedRange.ayahStart,
     ayah_end: parsedRange.ayahEnd,
-    content: remote.body,
+    content: remoteBody,
     created_at: createdAt,
     updated_at: updatedAt,
     deleted_at: null,
@@ -587,6 +595,38 @@ async function attachQfNote(
   if (row) {
     enqueueSync(db, "private_notes", "UPDATE", localId, noteToPayload(row)).catch(console.warn);
   }
+}
+
+async function findExactLocalNote(
+  db: SQLiteDatabase,
+  surah: number,
+  ayahStart: number,
+  ayahEnd: number,
+  body: string,
+  excludeId?: string
+): Promise<LocalPrivateNoteRow | null> {
+  return db.getFirstAsync<LocalPrivateNoteRow>(
+    `SELECT * FROM private_notes
+     WHERE deleted_at IS NULL AND surah = ? AND ayah_start = ? AND ayah_end = ? AND content = ?
+       AND (? IS NULL OR id != ?)
+     ORDER BY qf_note_id IS NULL DESC, updated_at DESC
+     LIMIT 1`,
+    [surah, ayahStart, ayahEnd, body.trim(), excludeId ?? null, excludeId ?? null]
+  );
+}
+
+async function tombstoneLocalQfDuplicate(db: SQLiteDatabase, row: LocalPrivateNoteRow): Promise<void> {
+  if (row.deleted_at) return;
+  const now = new Date().toISOString();
+  await db.runAsync(
+    "UPDATE private_notes SET updated_at = ?, deleted_at = ?, qf_synced_at = ?, qf_sync_error = NULL WHERE id = ?",
+    [now, now, now, row.id]
+  );
+  enqueueSync(db, "private_notes", "UPDATE", row.id, {
+    ...noteToPayload({ ...row, updated_at: now, deleted_at: now }),
+    qf_synced_at: now,
+    qf_sync_error: null,
+  }).catch(console.warn);
 }
 
 async function tombstoneMissingRemoteNotes(

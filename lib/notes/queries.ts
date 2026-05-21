@@ -36,6 +36,13 @@ export type CreatePrivateNoteInput = {
   content: string;
 };
 
+export class DuplicatePrivateNoteError extends Error {
+  constructor() {
+    super("Duplicate private note");
+    this.name = "DuplicatePrivateNoteError";
+  }
+}
+
 type PrivateNoteRow = {
   id: string;
   surah: number;
@@ -64,6 +71,9 @@ export async function createPrivateNote(
   const id = createId();
   const content = input.content.trim();
   assertQfNoteContent(content);
+  if (await hasExactPrivateNote(db, input.surah, input.ayahStart, input.ayahEnd, content)) {
+    throw new DuplicatePrivateNoteError();
+  }
   const rangesJson = JSON.stringify([buildQfRange(input.surah, input.ayahStart, input.ayahEnd)]);
   await db.runAsync(
     `INSERT INTO private_notes
@@ -107,6 +117,14 @@ export async function updatePrivateNote(
   const now = new Date().toISOString();
   const trimmed = content.trim();
   assertQfNoteContent(trimmed);
+  const current = await db.getFirstAsync<PrivateNoteRow>(
+    "SELECT * FROM private_notes WHERE id = ? AND deleted_at IS NULL",
+    [id]
+  );
+  if (!current) return;
+  if (await hasExactPrivateNote(db, current.surah, current.ayah_start, current.ayah_end, trimmed, id)) {
+    throw new DuplicatePrivateNoteError();
+  }
   await db.runAsync(
     "UPDATE private_notes SET content = ?, updated_at = ?, qf_sync_error = NULL WHERE id = ? AND deleted_at IS NULL",
     [trimmed, now, id]
@@ -239,6 +257,28 @@ function assertQfNoteContent(content: string): void {
   if (!isQfSyncableNoteContent(content)) {
     throw new Error(`Private notes must be ${QF_NOTE_MIN_LENGTH}-${QF_NOTE_MAX_LENGTH} characters.`);
   }
+}
+
+export function isDuplicatePrivateNoteError(error: unknown): boolean {
+  return error instanceof DuplicatePrivateNoteError || (error as { name?: string } | null)?.name === "DuplicatePrivateNoteError";
+}
+
+async function hasExactPrivateNote(
+  db: SQLiteDatabase,
+  surah: number,
+  ayahStart: number,
+  ayahEnd: number,
+  content: string,
+  excludeId?: string
+): Promise<boolean> {
+  const row = await db.getFirstAsync<{ id: string }>(
+    `SELECT id FROM private_notes
+     WHERE deleted_at IS NULL AND surah = ? AND ayah_start = ? AND ayah_end = ? AND content = ?
+       AND (? IS NULL OR id != ?)
+     LIMIT 1`,
+    [surah, ayahStart, ayahEnd, content, excludeId ?? null, excludeId ?? null]
+  );
+  return Boolean(row);
 }
 
 function safeJson(value: string): unknown {

@@ -5,7 +5,7 @@ import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
-import { createPrivateNote, updatePrivateNote, type PrivateNote } from "@/lib/notes/queries";
+import { createPrivateNote, isDuplicatePrivateNoteError, updatePrivateNote, type PrivateNote } from "@/lib/notes/queries";
 import { isQfSyncableNoteContent } from "@/lib/quran-foundation/user-types";
 
 type Props = {
@@ -36,6 +36,7 @@ export function PrivateNoteSheet({
   const [content, setContent] = useState(note?.content ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(false);
+  const [duplicateError, setDuplicateError] = useState(false);
   const isPhone = width < SIDEBAR_BREAKPOINT;
   const maxOverlayHeight = Math.min(height - (isPhone ? 12 : 48), isPhone ? height * 0.94 : 620);
   const mutedColor = isDark ? "#737373" : "#A39B93";
@@ -47,13 +48,21 @@ export function PrivateNoteSheet({
     if (open) {
       setContent(note?.content ?? "");
       setError(false);
+      setDuplicateError(false);
     }
   }, [note?.content, open]);
+
+  const handleContentChange = useCallback((value: string) => {
+    setContent(value);
+    setError(false);
+    setDuplicateError(false);
+  }, []);
 
   const handleSave = useCallback(async () => {
     if (!isValid || saving) return;
     setSaving(true);
     setError(false);
+    setDuplicateError(false);
     try {
       if (note) {
         await updatePrivateNote(db, note.id, content);
@@ -64,7 +73,11 @@ export function PrivateNoteSheet({
       onClose();
     } catch (e) {
       console.warn("[PrivateNoteSheet] save failed:", e);
-      setError(true);
+      if (isDuplicatePrivateNoteError(e)) {
+        setDuplicateError(true);
+      } else {
+        setError(true);
+      }
     } finally {
       setSaving(false);
     }
@@ -88,7 +101,7 @@ export function PrivateNoteSheet({
       <OverlayBody contentContainerClassName="px-5 py-4">
         <TextInput
           value={content}
-          onChangeText={setContent}
+          onChangeText={handleContentChange}
           placeholder={s.privateNotePlaceholder}
           placeholderTextColor={mutedColor}
           multiline
@@ -109,6 +122,14 @@ export function PrivateNoteSheet({
             style={{ fontFamily: "Manrope_500Medium", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
           >
             {s.privateNoteLengthError}
+          </Text>
+        )}
+        {duplicateError && (
+          <Text
+            className="mt-2 text-warm-500 dark:text-neutral-400"
+            style={{ fontFamily: "Manrope_500Medium", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
+          >
+            {s.privateNoteDuplicate}
           </Text>
         )}
         {error && (
