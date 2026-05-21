@@ -717,6 +717,17 @@ function DeckCard({
             <Pressable
               onPress={(event) => {
                 event.stopPropagation?.();
+                onDelete();
+              }}
+              accessibilityRole="button"
+              className="w-8 h-8 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center"
+              hitSlop={8}
+            >
+              <Trash2 size={14} color={isDark ? "#a3a3a3" : "#8B8178"} />
+            </Pressable>
+            <Pressable
+              onPress={(event) => {
+                event.stopPropagation?.();
                 onConfigure();
               }}
               accessibilityRole="button"
@@ -725,16 +736,6 @@ function DeckCard({
               hitSlop={8}
             >
               <SlidersHorizontal size={14} color={isDark ? "#a3a3a3" : "#8B8178"} />
-            </Pressable>
-            <Pressable
-              onPress={(event) => {
-                event.stopPropagation?.();
-                onDelete();
-              }}
-              className="w-8 h-8 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center"
-              hitSlop={8}
-            >
-              <Trash2 size={14} color={isDark ? "#a3a3a3" : "#8B8178"} />
             </Pressable>
           </View>
           <DeckStats total={deck.cardCount} newCount={deck.newCount} dueCount={deck.dueCount} isDark={isDark} isRTL={isRTL} />
