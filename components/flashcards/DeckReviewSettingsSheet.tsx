@@ -237,7 +237,11 @@ export function DeckReviewSettingsSheet({ visible, deckId, deckTitle, mode, onCl
           isRTL={isRTL}
         />
 
-        <SettingsSection title={mode === "word" ? s.wordFlashcardsTestModes : s.flashcardsTestModes} isRTL={isRTL}>
+        <SettingsSection
+          title={mode === "word" ? s.wordFlashcardsTestModes : s.flashcardsTestModes}
+          isRTL={isRTL}
+          variant={mode === "word" ? "quiet" : "default"}
+        >
           <View
             className="gap-3"
             style={{
@@ -255,6 +259,7 @@ export function DeckReviewSettingsSheet({ visible, deckId, deckTitle, mode, onCl
                   compact={compact}
                   isDark={isDark}
                   isRTL={isRTL}
+                  quiet={mode === "word"}
                 />
               ))
             ) : (
@@ -267,6 +272,7 @@ export function DeckReviewSettingsSheet({ visible, deckId, deckTitle, mode, onCl
                   compact={compact}
                   isDark={isDark}
                   isRTL={isRTL}
+                  quiet={false}
                 />
               ))
             )}
@@ -495,7 +501,7 @@ export function SchedulerOptionsPanel({
         />
       </SettingsSection>
 
-      <SettingsSection title={s.flashcardsDisplayOrderSection} isRTL={isRTL}>
+      <SettingsSection title={s.flashcardsDisplayOrderSection} isRTL={isRTL} variant="quiet">
         <ChoiceRow
           title={s.flashcardsNewReviewOrder}
           options={ALL_NEW_REVIEW_ORDERS.map((value) => ({ value, label: newReviewOrderLabels[value] }))}
@@ -525,7 +531,18 @@ export function SchedulerOptionsPanel({
   );
 }
 
-function SettingsSection({ title, children, isRTL }: { title: string; children: ReactNode; isRTL: boolean }) {
+function SettingsSection({
+  title,
+  children,
+  isRTL,
+  variant = "default",
+}: {
+  title: string;
+  children: ReactNode;
+  isRTL: boolean;
+  variant?: "default" | "quiet";
+}) {
+  const quiet = variant === "quiet";
   return (
     <View className="mb-5">
       <Text
@@ -541,8 +558,11 @@ function SettingsSection({ title, children, isRTL }: { title: string; children: 
       >
         {title}
       </Text>
-      <Card elevation="low" className="p-5">
-        <View className="gap-1">{children}</View>
+      <Card
+        elevation={quiet ? "bright" : "low"}
+        className={quiet ? "rounded-3xl border border-warm-200 p-4 dark:border-neutral-800" : "p-5"}
+      >
+        <View className={quiet ? "gap-2" : "gap-1"}>{children}</View>
       </Card>
     </View>
   );
@@ -681,13 +701,18 @@ function ChoiceRow<T extends string>({
   isDark: boolean;
   isRTL: boolean;
 }) {
+  const selectedBg = isDark ? "rgba(45, 212, 191, 0.14)" : "#CCFBF1";
+  const selectedText = isDark ? "#5eead4" : "#0F766E";
+  const optionShellBg = isDark ? "#1C1917" : "#FFF8F1";
+  const optionShellBorder = isDark ? "#262626" : "#E8E1DA";
+
   return (
-    <View className="gap-2 py-2">
+    <View className="gap-2 py-2.5">
       <Text
         className="text-charcoal dark:text-neutral-200"
         style={{
           fontFamily: "Manrope_600SemiBold",
-          fontSize: 15,
+          fontSize: 14,
           textAlign: isRTL ? "right" : "left",
           writingDirection: isRTL ? "rtl" : "ltr",
         }}
@@ -695,8 +720,11 @@ function ChoiceRow<T extends string>({
         {title}
       </Text>
       <View
-        className="gap-2"
+        className="gap-1 rounded-2xl p-1"
         style={{
+          backgroundColor: optionShellBg,
+          borderColor: optionShellBorder,
+          borderWidth: 1,
           flexDirection: isRTL ? "row-reverse" : "row",
           flexWrap: "wrap",
           justifyContent: isRTL ? "flex-start" : "flex-start",
@@ -708,16 +736,20 @@ function ChoiceRow<T extends string>({
             <Pressable
               key={option.value}
               onPress={() => onChange(option.value)}
-              className="rounded-full px-4 py-2"
+              className="rounded-xl px-3.5 py-2"
               style={({ pressed }) => ({
-                backgroundColor: selected ? "#0D9488" : isDark ? "#292524" : "#F4E8DC",
+                backgroundColor: selected ? selectedBg : "transparent",
+                borderColor: selected ? selectedText : "transparent",
+                borderWidth: 1,
+                minHeight: 36,
+                justifyContent: "center",
                 opacity: pressed ? 0.72 : 1,
               })}
             >
               <Text
                 style={{
-                  color: selected ? "#fff" : isDark ? "#d4d4d4" : "#5f4e40",
-                  fontFamily: "Manrope_700Bold",
+                  color: selected ? selectedText : isDark ? "#d4d4d4" : "#5f4e40",
+                  fontFamily: selected ? "Manrope_700Bold" : "Manrope_600SemiBold",
                   fontSize: 12,
                   textAlign: "center",
                   writingDirection: isRTL ? "rtl" : "ltr",
@@ -797,6 +829,7 @@ function ReviewSwitchRow({
   compact,
   isDark,
   isRTL,
+  quiet,
 }: {
   label: string;
   value: boolean;
@@ -804,21 +837,31 @@ function ReviewSwitchRow({
   compact: boolean;
   isDark: boolean;
   isRTL: boolean;
+  quiet: boolean;
 }) {
+  const selectedBg = isDark ? "rgba(45, 212, 191, 0.14)" : "#CCFBF1";
+  const selectedText = isDark ? "#5eead4" : "#0F766E";
+  const restingBg = isDark ? "#1C1917" : "#FFF8F1";
+  const restingBorder = isDark ? "#262626" : "#E8E1DA";
+
   return (
     <View
-      className="items-center gap-3 rounded-2xl bg-surface px-3 py-2.5 dark:bg-surface-dark"
+      className="items-center gap-3 rounded-2xl px-3 py-2.5"
       style={{
+        backgroundColor: quiet ? (value ? selectedBg : restingBg) : isDark ? "#0A0A0A" : "#FFF8F1",
+        borderColor: quiet ? (value ? selectedText : restingBorder) : "transparent",
+        borderWidth: quiet ? 1 : 0,
         flexDirection: isRTL ? "row-reverse" : "row",
+        justifyContent: "space-between",
         width: compact ? "48%" : "100%",
       }}
     >
       <Text
         className="text-charcoal dark:text-neutral-300"
         style={{
-          color: isDark ? "#d4d4d4" : "#2D2D2D",
+          color: quiet && value ? selectedText : isDark ? "#d4d4d4" : "#2D2D2D",
           flexShrink: 1,
-          fontFamily: "Manrope_500Medium",
+          fontFamily: quiet && value ? "Manrope_600SemiBold" : "Manrope_500Medium",
           fontSize: 14,
           textAlign: isRTL ? "right" : "left",
           writingDirection: isRTL ? "rtl" : "ltr",
