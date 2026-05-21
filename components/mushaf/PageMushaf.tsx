@@ -369,6 +369,7 @@ export function PageMushaf({
   const [containerWidth, setContainerWidth] = useState(0);
   const [containerHeight, setContainerHeight] = useState(0);
   const pageWidth = containerWidth || width;
+  const effectiveContainerHeight = containerHeight > 0 ? containerHeight : Math.max(0, windowHeight);
   const horizontal = pageScroll === "horizontal";
   const verticalScrollBottomInset = scrollBottomInset ?? pagePaddingBottom + 24;
   const pageAvailableWidth = Math.max(0, pageWidth - pageSidePadding * 2);
@@ -984,6 +985,7 @@ export function PageMushaf({
       verticalLineSlotHeight,
       horizontalTypography,
       horizontalLineWidth,
+      effectiveContainerHeight,
       highlightedAyahKey,
       highlightedWord,
       verticalScrollBottomInset,
@@ -996,6 +998,7 @@ export function PageMushaf({
       highlightedAyahKey,
       highlightedWord,
       horizontalLineWidth,
+      effectiveContainerHeight,
       pageWidth,
       verticalLineSlotHeight,
       verticalLineWidth,
@@ -1012,7 +1015,7 @@ export function PageMushaf({
   }, [cancelAutoScrollFrame]);
 
   useEffect(() => {
-    if (!verticalAutoScrollEnabled || !autoScrollPlaying || loading || !layoutInfo || containerHeight <= 0) {
+    if (!verticalAutoScrollEnabled || !autoScrollPlaying || loading || !layoutInfo || effectiveContainerHeight <= 0) {
       cancelAutoScrollFrame();
       autoScrollEndedRef.current = false;
       return;
@@ -1025,7 +1028,7 @@ export function PageMushaf({
       const layoutContentHeight = lastIndex >= 0
         ? layoutInfo.offsets[lastIndex] + layoutInfo.heights[lastIndex] + verticalScrollBottomInset
         : 0;
-      const maxOffset = Math.max(0, Math.max(contentHeightRef.current, layoutContentHeight) - containerHeight);
+      const maxOffset = Math.max(0, Math.max(contentHeightRef.current, layoutContentHeight) - effectiveContainerHeight);
       if (maxOffset <= 0) {
         autoScrollFrameRef.current = requestAnimationFrame(tick);
         return;
@@ -1061,7 +1064,7 @@ export function PageMushaf({
     autoScrollPlaying,
     autoScrollSpeed,
     cancelAutoScrollFrame,
-    containerHeight,
+    effectiveContainerHeight,
     layoutInfo,
     loading,
     onAutoScrollEnd,
@@ -1073,9 +1076,9 @@ export function PageMushaf({
 
   const renderPage = useCallback(
     ({ item, index }: { item: PageData; index: number }) => {
-      const shouldCenter = centerVerticalOnPhone && !horizontal && containerHeight > 0;
+      const shouldCenter = centerVerticalOnPhone && !horizontal && effectiveContainerHeight > 0;
       const minPageHeight = shouldCenter
-        ? Math.max(0, containerHeight - (index < pageData.length - 1 ? SEPARATOR_HEIGHT : 0))
+        ? Math.max(0, effectiveContainerHeight - (index < pageData.length - 1 ? SEPARATOR_HEIGHT : 0))
         : undefined;
 
       return (
@@ -1124,7 +1127,7 @@ export function PageMushaf({
       pageSidePadding,
       centerVerticalOnPhone,
       horizontal,
-      containerHeight,
+      effectiveContainerHeight,
       isRTL,
       highlightedAyahKey,
       highlightedWord,
