@@ -365,33 +365,6 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {resume && (
-          <Pressable
-            onPress={() => router.push("/(tabs)/mushaf")}
-            style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-            className="mb-6"
-          >
-            <Card elevation="low" className="p-4 rounded-3xl">
-              <View className="flex-row items-center gap-3">
-                <View className="w-11 h-11 rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 items-center justify-center">
-                  <Play size={16} color={isDark ? "#2dd4bf" : "#0d9488"} />
-                </View>
-                <View className="flex-1">
-                  <Text className="text-warm-400 dark:text-neutral-500 uppercase" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, letterSpacing: 1.5 }}>
-                    {s.goTo}
-                  </Text>
-                  <Text className="text-charcoal dark:text-neutral-100" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15 }}>
-                    {`${s.flashcardsScopeBysurah} ${surahNames[resume.surah] ?? resume.surah} · ${resume.surah}:${resume.ayah}`}
-                  </Text>
-                  <Text className="text-warm-400 dark:text-neutral-500" style={{ fontFamily: "Manrope_500Medium", fontSize: 12 }}>
-                    {interpolate(s.pageN, { n: resume.page })}
-                  </Text>
-                </View>
-              </View>
-            </Card>
-          </Pressable>
-        )}
-
         {latestUnlock && (
           <AchievementUnlockToast unlock={latestUnlock} onDismiss={dismissLatestUnlock} />
         )}
@@ -441,6 +414,33 @@ export default function HomeScreen() {
             </Text>
           </View>
         </View>
+
+        {resume && (
+          <Pressable
+            onPress={() => router.push("/(tabs)/mushaf")}
+            style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+            className="mb-6"
+          >
+            <Card elevation="low" className="p-4 rounded-3xl">
+              <View className="flex-row items-center gap-3">
+                <View className="w-11 h-11 rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 items-center justify-center">
+                  <Play size={16} color={isDark ? "#2dd4bf" : "#0d9488"} />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-warm-400 dark:text-neutral-500 uppercase" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, letterSpacing: 1.5 }}>
+                    {s.goTo}
+                  </Text>
+                  <Text className="text-charcoal dark:text-neutral-100" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15 }}>
+                    {`${s.flashcardsScopeBysurah} ${surahNames[resume.surah] ?? resume.surah} · ${resume.surah}:${resume.ayah}`}
+                  </Text>
+                  <Text className="text-warm-400 dark:text-neutral-500" style={{ fontFamily: "Manrope_500Medium", fontSize: 12 }}>
+                    {interpolate(s.pageN, { n: resume.page })}
+                  </Text>
+                </View>
+              </View>
+            </Card>
+          </Pressable>
+        )}
 
         {!user && !authBannerDismissed && (
           <Card elevation="low" className="p-4 mb-6">
