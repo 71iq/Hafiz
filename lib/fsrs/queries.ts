@@ -21,6 +21,7 @@ import {
   getAllMatchingSmartCardIdSet,
   getDueCardsForReview,
   getSmartDeckStats,
+  getSmartDeckTodayStats,
   isSmartDeckId,
   SMART_DECK_IDS,
 } from "./smart-decks";
@@ -629,6 +630,27 @@ export async function getDueCount(db: SQLiteDatabase, deckId?: string): Promise<
     getFilteredSmartMaterializedRows(db),
   ]);
   return (nonSmartRow?.count ?? 0) + smartRows.filter((row) => row.due <= now).length;
+}
+
+export async function getDeckTodayStats(
+  db: SQLiteDatabase,
+  deckId: string,
+  limit: number
+): Promise<{ total: number; dueCount: number; newCount: number }> {
+  if (isSmartDeckId(deckId)) {
+    const stats = await getSmartDeckTodayStats(db, deckId, limit);
+    return { total: stats.total, dueCount: stats.due, newCount: stats.newCount };
+  }
+
+  const [total, rows] = await Promise.all([
+    getTotalCardCount(db, deckId),
+    getDueCardsForReview(db, deckId, limit),
+  ]);
+  return {
+    total,
+    dueCount: rows.filter((row) => row.state !== 0).length,
+    newCount: rows.filter((row) => row.state === 0).length,
+  };
 }
 
 export async function getTotalCardCount(db: SQLiteDatabase, deckId?: string): Promise<number> {

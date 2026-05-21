@@ -192,6 +192,34 @@ export async function getSmartDeckStats(
   };
 }
 
+export async function getSmartDeckTodayStats(
+  db: SQLiteDatabase,
+  deckId: SmartDeckId,
+  limit?: number
+): Promise<SmartDeckStats> {
+  const ids = await getSmartDeckCandidateCardIds(db, deckId);
+  if (ids.length === 0) return { total: 0, due: 0, newCount: 0 };
+
+  const now = new Date().toISOString();
+  const rows = await getStudyCardsByIds(db, ids, deckId);
+  const existing = new Set(rows.map((row) => row.id));
+  const missing = ids.filter((id) => !existing.has(id)).length;
+  const safeLimit = limit && limit > 0 ? limit : ids.length;
+  const dueRows = rows
+    .filter((row) => row.due <= now)
+    .sort((a, b) => a.due.localeCompare(b.due));
+  const reviewCount = Math.min(dueRows.filter((row) => row.state !== 0).length, safeLimit);
+  const remaining = Math.max(0, safeLimit - reviewCount);
+  const materializedNewCount = Math.min(dueRows.filter((row) => row.state === 0).length, remaining);
+  const newCount = materializedNewCount + Math.min(missing, Math.max(0, remaining - materializedNewCount));
+
+  return {
+    total: ids.length,
+    due: reviewCount,
+    newCount,
+  };
+}
+
 export async function materializeSmartDeckCards(
   db: SQLiteDatabase,
   deckId: SmartDeckId,

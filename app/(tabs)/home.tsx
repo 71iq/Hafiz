@@ -21,17 +21,17 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { AchievementUnlockToast } from "@/components/achievements/AchievementUnlockToast";
 import {
   getDecks,
+  getDeckTodayStats,
   getDueCount,
   getTotalCardCount,
-  getNewCount,
   deleteDeck,
   getWirdStatus,
+  readDeckReviewSettings,
   MEANINGS_DECK_ID,
 } from "@/lib/fsrs/queries";
 import type { WirdStatus } from "@/lib/fsrs/queries";
 import type { DeckScope } from "@/lib/fsrs/types";
 import {
-  getSmartDeckStats,
   readSmartDeckFilter,
   SMART_DECK_IDS,
   type BuiltInDeckFilter,
@@ -152,15 +152,16 @@ export default function HomeScreen() {
 
     const smartDisplays = await Promise.all(
       smartDefinitions.map(async (definition) => {
-        const [stats, filter] = await Promise.all([
-          getSmartDeckStats(db, definition.id),
+        const [settings, filter] = await Promise.all([
+          readDeckReviewSettings(db, definition.id),
           readSmartDeckFilter(db, definition.id),
         ]);
+        const stats = await getDeckTodayStats(db, definition.id, settings.dailyReviewLimit);
         return {
           ...definition,
           filter,
           total: stats.total,
-          dueCount: stats.due,
+          dueCount: stats.dueCount,
           newCount: stats.newCount,
         };
       })
@@ -170,12 +171,9 @@ export default function HomeScreen() {
     const rawDecks = (await getDecks(db)).filter((d) => d.id !== MEANINGS_DECK_ID);
     const deckDisplays: DeckDisplay[] = [];
     for (const d of rawDecks) {
-      const [cardCount, dueCount, newCount] = await Promise.all([
-        getTotalCardCount(db, d.id),
-        getDueCount(db, d.id),
-        getNewCount(db, d.id),
-      ]);
-      deckDisplays.push({ ...d, cardCount, dueCount, newCount });
+      const settings = await readDeckReviewSettings(db, d.id);
+      const stats = await getDeckTodayStats(db, d.id, settings.dailyReviewLimit);
+      deckDisplays.push({ ...d, cardCount: stats.total, dueCount: stats.dueCount, newCount: stats.newCount });
     }
     setDecks(deckDisplays);
     const [dashboardDue, cardTotal, nextWirdStatus, vocabTotal, reflectionJourneySummary] = await Promise.all([

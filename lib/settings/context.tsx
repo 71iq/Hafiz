@@ -21,9 +21,9 @@ export const DEFAULT_FONT_SIZE_INDEX = 2; // desktop 30px / mobile 20px (verse v
 // Web viewports narrower than the shared sidebar breakpoint use the mobile
 // scale; native is always mobile.
 
-export const DEFAULT_DAILY_REVIEW_LIMIT = 50;
+export const DEFAULT_DAILY_REVIEW_LIMIT = 30;
 export const MIN_DAILY_REVIEW_LIMIT = 10;
-export const MAX_DAILY_REVIEW_LIMIT = 200;
+export const MAX_DAILY_REVIEW_LIMIT = 30;
 export const DAILY_REVIEW_LIMIT_STEP = 10;
 export const FOCUS_SCROLL_SPEED_MIN = 0.5;
 export const FOCUS_SCROLL_SPEED_MAX = 2.5;
