@@ -544,7 +544,13 @@ function SidebarContent({
 
   return (
     <>
-      <View className={`px-3 pb-7 ${isRTL ? "items-end" : "items-start"}`}>
+      <View
+        className="px-3 pb-7"
+        style={{
+          alignItems: isRTL ? "flex-end" : "flex-start",
+          width: "100%",
+        }}
+      >
         <Text
           className={isPersistent ? "text-gold" : "text-primary dark:text-neutral-100"}
           style={{
