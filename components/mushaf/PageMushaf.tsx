@@ -23,7 +23,17 @@ import {
   useSettings,
 } from "@/lib/settings/context";
 import { useStrings, interpolate } from "@/lib/i18n/useStrings";
-import { MUSHAF_LINE_WIDTH_SCALE, MushafPage, type HifzVisibility, type PageLineLayout } from "./MushafPage";
+import {
+  MUSHAF_LINE_WIDTH_SCALE,
+  MushafPage,
+  flattenPageWords,
+  loadPageWordsData,
+  pageWordLineNumbers,
+  splitGlyphs,
+  type HifzVisibility,
+  type PageLineLayout,
+  type PageWordsData,
+} from "./MushafPage";
 import { AyahDetailModal } from "./AyahDetailModal";
 import { toArabicNumber } from "@/lib/arabic";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
@@ -80,6 +90,8 @@ type PageData = {
   ayahs: AyahData[];
   lineLayout?: PageLineLayout[];
   globalWordOffset?: number;
+  pageWordLineNumbers?: number[];
+  usePageWords?: boolean;
 };
 
 type WebDragState = {
@@ -101,7 +113,8 @@ function buildPageData(
   pages: PageRow[],
   ayahs: AyahRow[],
   lineLookup: Map<number, PageLineLayout[]>,
-  offsetLookup: Map<number, number>
+  offsetLookup: Map<number, number>,
+  pageWords: PageWordsData | null
 ): PageData[] {
   // Group ayahs by their QCF2 page assignment
   const ayahsByPage = new Map<number, AyahRow[]>();
@@ -129,6 +142,18 @@ function buildPageData(
     if (lines) {
       pd.lineLayout = lines;
       pd.globalWordOffset = offsetLookup.get(page.page) ?? 0;
+    }
+    const lineWords = pageWords?.[page.page - 1] ?? null;
+    if (lineWords) {
+      const canonicalGlyphs = pageAyahs.flatMap((ayah) => splitGlyphs(ayah.textQcf2));
+      const pageWordGlyphs = flattenPageWords(lineWords);
+      const usePageWords =
+        canonicalGlyphs.length === pageWordGlyphs.length &&
+        canonicalGlyphs.every((glyph, index) => glyph === pageWordGlyphs[index]);
+      if (usePageWords) {
+        pd.usePageWords = true;
+        pd.pageWordLineNumbers = pageWordLineNumbers(lineWords);
+      }
     }
     result.push(pd);
   }
@@ -242,13 +267,24 @@ function computePageItemHeight(
   h += pagePaddingTop + pagePaddingBottom;
 
   if (page.lineLayout && page.lineLayout.length > 0) {
-    for (const line of page.lineLayout) {
-      if (line.line_type === "surah_name") {
-        h += SURAH_HEADER_COMPACT_HEIGHT;
-      } else if (line.line_type === "basmallah") {
-        h += lineHeight * 0.85 + 8; // my-1 margins
-      } else {
-        h += lineHeight;
+    if (page.usePageWords && page.pageWordLineNumbers) {
+      for (const line of page.lineLayout) {
+        if (line.line_type === "surah_name") {
+          h += SURAH_HEADER_COMPACT_HEIGHT;
+        } else if (line.line_type === "basmallah") {
+          h += lineHeight * 0.85 + 8; // my-1 margins
+        }
+      }
+      h += page.pageWordLineNumbers.length * lineHeight;
+    } else {
+      for (const line of page.lineLayout) {
+        if (line.line_type === "surah_name") {
+          h += SURAH_HEADER_COMPACT_HEIGHT;
+        } else if (line.line_type === "basmallah") {
+          h += lineHeight * 0.85 + 8; // my-1 margins
+        } else {
+          h += lineHeight;
+        }
       }
     }
   } else {
@@ -256,6 +292,15 @@ function computePageItemHeight(
   }
 
   return h;
+}
+
+function getRenderedLineCount(page: PageData): number {
+  if (!page.lineLayout || page.lineLayout.length === 0) return MUSHAF_LINE_COUNT;
+  if (page.usePageWords && page.pageWordLineNumbers) {
+    const structuralLineCount = page.lineLayout.filter((line) => line.line_type !== "ayah").length;
+    return structuralLineCount + page.pageWordLineNumbers.length;
+  }
+  return page.lineLayout.length;
 }
 
 function buildLayoutOffsets(
@@ -459,7 +504,7 @@ export function PageMushaf({
   useEffect(() => {
     async function loadData() {
       try {
-        const [pages, ayahs, surahs, pageLines, juzRanges] = await Promise.all([
+        const [pages, ayahs, surahs, pageLines, juzRanges, pageWords] = await Promise.all([
           db.getAllAsync<PageRow>(
             "SELECT page, surah_start, ayah_start, surah_end, ayah_end FROM page_map ORDER BY page"
           ),
@@ -475,6 +520,10 @@ export function PageMushaf({
           db.getAllAsync<JuzRangeRow>(
             "SELECT juz, surah, ayah_start, ayah_end FROM juz_map ORDER BY juz, surah, ayah_start"
           ),
+          loadPageWordsData().catch((e) => {
+            console.warn("[PageMushaf] failed to load page words:", e);
+            return null;
+          }),
         ]);
 
         const map = new Map<number, SurahRow>();
@@ -521,7 +570,7 @@ export function PageMushaf({
           }
         }
 
-        const data = buildPageData(pages, ayahs, lineLookup, offsetLookup);
+        const data = buildPageData(pages, ayahs, lineLookup, offsetLookup, pageWords);
         setPageData(data);
         setLayoutInfo(buildLayoutOffsets(data, verticalLineSlotHeight, pagePaddingTop, pagePaddingBottom));
       } catch (err) {
@@ -931,6 +980,18 @@ export function PageMushaf({
     setDetailAyah({ surah, ayah });
   }, [pauseAutoScrollForUser]);
 
+  const horizontalRenderedLineCount = useMemo(() => {
+    if (!horizontal || pageData.length === 0) return MUSHAF_LINE_COUNT;
+    const start = Math.max(1, currentPage - 1);
+    const end = Math.min(pageData.length, currentPage + 1);
+    let lineCount = MUSHAF_LINE_COUNT;
+    for (let page = start; page <= end; page++) {
+      const data = pageData[page - 1];
+      if (data) lineCount = Math.max(lineCount, getRenderedLineCount(data));
+    }
+    return lineCount;
+  }, [currentPage, horizontal, pageData]);
+
   const horizontalTypography = useMemo(() => {
     const fitHeightRaw = containerHeight || Math.max(0, windowHeight - 120);
     const fitHeight = Math.max(0, fitHeightRaw);
@@ -948,7 +1009,7 @@ export function PageMushaf({
     const minFontSize = compactHorizontal ? 16 : 20;
     const availableLineHeight = Math.floor(
       (fitHeight - HORIZONTAL_PAGE_BOTTOM_RESERVE - HORIZONTAL_PAGE_TOP_PADDING) /
-        MUSHAF_LINE_COUNT
+        horizontalRenderedLineCount
     );
     const heightFittedLineHeight = Math.max(minLineHeight, Math.min(baseLineHeight, availableLineHeight));
     const heightFittedFontSize = Math.min(
@@ -964,7 +1025,7 @@ export function PageMushaf({
       fontSize: Math.max(minFontSize, widthFitted.fontSize),
       lineHeight: Math.max(minLineHeight, widthFitted.lineHeight),
     };
-  }, [containerHeight, fontSize, horizontal, lineHeight, pageAvailableWidth, width, windowHeight]);
+  }, [containerHeight, fontSize, horizontal, horizontalRenderedLineCount, lineHeight, pageAvailableWidth, width, windowHeight]);
   const horizontalLineWidth = useMemo(
     () => computeLineWidth(
       horizontalTypography.fontSize,

@@ -23,9 +23,24 @@ function pageWordGlyphs(page) {
     .flatMap((line) => splitGlyphs(lines[line]));
 }
 
-function pageLineRanges(page) {
+function pageWordLineNumbers(page) {
+  const lines = pageWords[page - 1] || {};
+  return Object.keys(lines)
+    .filter((line) => splitGlyphs(lines[line]).length > 0)
+    .map(Number)
+    .filter(Number.isFinite)
+    .sort((a, b) => a - b);
+}
+
+function pageLayoutLines(page) {
   return pageLines
-    .filter((line) => line.page_number === page && line.line_type === "ayah")
+    .filter((line) => line.page_number === page)
+    .sort((a, b) => a.line_number - b.line_number);
+}
+
+function pageLineRanges(page) {
+  return pageLayoutLines(page)
+    .filter((line) => line.line_type === "ayah")
     .map((line) => ({
       line: line.line_number,
       first: Number(line.first_word_id),
@@ -41,7 +56,19 @@ function renderedPageGlyphs(page) {
   const canonical = canonicalPageGlyphs(page);
   const fromPageWords = pageWordGlyphs(page);
   if (arraysEqual(canonical, fromPageWords)) {
-    return { glyphs: fromPageWords, source: "page-words" };
+    const lines = pageWords[page - 1] || {};
+    const wordLineNumbers = pageWordLineNumbers(page);
+    const glyphs = wordLineNumbers.flatMap((line) => splitGlyphs(lines[String(line)]));
+    const structuralLineNumbers = new Set(
+      pageLayoutLines(page)
+        .filter((line) => line.line_type !== "ayah")
+        .map((line) => line.line_number)
+    );
+    return {
+      glyphs,
+      source: "page-words",
+      overlapLines: wordLineNumbers.filter((line) => structuralLineNumbers.has(line)),
+    };
   }
 
   const ranges = pageLineRanges(page);
@@ -62,11 +89,15 @@ function renderedPageGlyphs(page) {
 
 const failures = [];
 const fallbackPages = [];
+const overlapPages = [];
 
 for (let page = 1; page <= 604; page++) {
   const canonical = canonicalPageGlyphs(page);
   const rendered = renderedPageGlyphs(page);
   if (rendered.source === "page-lines") fallbackPages.push(page);
+  if (rendered.overlapLines?.length > 0) {
+    overlapPages.push({ page, lines: rendered.overlapLines });
+  }
 
   if (!arraysEqual(canonical, rendered.glyphs)) {
     failures.push({
@@ -87,3 +118,4 @@ if (failures.length > 0) {
 
 console.log("[verify-mushaf-page-tokens] OK");
 console.log(`Verified 604 pages. Used page_lines fallback on ${fallbackPages.length} pages: ${fallbackPages.join(", ")}`);
+console.log(`Verified structural/text line overlaps on ${overlapPages.length} pages: ${overlapPages.map((entry) => entry.page).join(", ")}`);

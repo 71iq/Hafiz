@@ -5,18 +5,21 @@ import { WordToken } from "./WordToken";
 import { loadQpcFont, qpcFontName, isQpcFontLoaded } from "@/lib/fonts/loader";
 import { useSelection } from "@/lib/selection/context";
 
+export type PageWordsByLine = Record<string, string>;
+export type PageWordsData = PageWordsByLine[];
+
 // Authoritative per-page, per-line word mapping from quran.com
 // pageWordsData[pageIndex] = { "lineNumber": "word1 word2 ..." }
 // On native: require() (small enough at 400KB). On web: lazy-fetched.
-let pageWordsData: Record<string, string>[] | null =
+let pageWordsData: PageWordsData | null =
   Platform.OS !== "web"
     ? require("../../assets/data/layout/page-words.json")
     : null;
 
-let pageWordsPromise: Promise<Record<string, string>[]> | null = null;
+let pageWordsPromise: Promise<PageWordsData> | null = null;
 
-function getPageWords(): Record<string, string>[] | null {
-  if (pageWordsData) return pageWordsData;
+export function loadPageWordsData(): Promise<PageWordsData> {
+  if (pageWordsData) return Promise.resolve(pageWordsData);
   if (!pageWordsPromise) {
     pageWordsPromise = fetch("/data/layout/page-words.json")
       .then((r) => r.json())
@@ -25,7 +28,7 @@ function getPageWords(): Record<string, string>[] | null {
         return data;
       });
   }
-  return null;
+  return pageWordsPromise;
 }
 
 type AyahData = {
@@ -136,14 +139,22 @@ function buildPageGlyphs(ayahs: AyahData[]): PageGlyph[] {
   return glyphs;
 }
 
-function splitGlyphs(text: string | undefined): string[] {
+export function splitGlyphs(text: string | undefined): string[] {
   return text?.split(/\s+/).filter(Boolean) ?? [];
 }
 
-function flattenPageWords(lineWords: Record<string, string>): string[] {
+export function flattenPageWords(lineWords: PageWordsByLine): string[] {
   return Object.keys(lineWords)
     .sort((a, b) => Number(a) - Number(b))
     .flatMap((key) => splitGlyphs(lineWords[key]));
+}
+
+export function pageWordLineNumbers(lineWords: PageWordsByLine): number[] {
+  return Object.keys(lineWords)
+    .filter((key) => splitGlyphs(lineWords[key]).length > 0)
+    .map(Number)
+    .filter(Number.isFinite)
+    .sort((a, b) => a - b);
 }
 
 function glyphsMatchCanonical(pageWordGlyphs: string[], pageGlyphs: PageGlyph[]): boolean {
@@ -181,8 +192,9 @@ function MushafPageInner({
   // On web, trigger async load of page-words data
   useEffect(() => {
     if (pageWordsData) { setWordsLoaded(true); return; }
-    getPageWords(); // starts the fetch
-    pageWordsPromise?.then(() => setWordsLoaded(true));
+    loadPageWordsData()
+      .then(() => setWordsLoaded(true))
+      .catch(console.warn);
   }, []);
 
   useEffect(() => {
@@ -291,25 +303,7 @@ function MushafPageInner({
       .filter((line) => line.line_type === "ayah")
       .at(-1)?.line_number ?? null;
 
-    // 19 pages have a 1-line offset between page-lines and page-words: the
-    // "basmallah" slot in page-words actually holds the first ayah line's
-    // glyphs (see surah 22 page 332). Detect by checking if any basmallah
-    // line has non-empty page-words content; if so, shift ayah lookups by -1.
-    let lineKeyOffset = 0;
-    for (const l of lineLayout!) {
-      if (l.line_type === "basmallah") {
-        const k = String(l.line_number);
-        if (lineWords[k] && lineWords[k].trim().length > 0) {
-          lineKeyOffset = -1;
-          break;
-        }
-      }
-    }
-    let wordIndex = 0;
-
-    content = lineLayout.map((line) => {
-      const centered = line.is_centered === 1;
-
+    const renderStructuralLine = (line: PageLineLayout) => {
       if (line.line_type === "surah_name") {
         const surah = line.surah_number ? surahMap.get(line.surah_number) : null;
         if (surah) {
@@ -367,32 +361,23 @@ function MushafPageInner({
         );
       }
 
-      let lineStartIndex = wordIndex;
-      let words: string[];
-      if (usePageWords) {
-        words = splitGlyphs(lineWords[String(line.line_number + lineKeyOffset)]);
-        wordIndex += words.length;
-      } else if (
-        typeof line.first_word_id === "number" &&
-        typeof line.last_word_id === "number" &&
-        typeof globalWordOffset === "number"
-      ) {
-        lineStartIndex = Math.max(0, line.first_word_id - globalWordOffset - 1);
-        let lineEndIndex = Math.max(lineStartIndex, line.last_word_id - globalWordOffset);
-        if (line.line_number === lastAyahLineNumber && lineEndIndex < pageGlyphs.length) {
-          lineEndIndex = pageGlyphs.length;
-        }
-        words = pageGlyphs.slice(lineStartIndex, lineEndIndex).map((token) => token.glyph);
-      } else {
-        return null;
-      }
+      return null;
+    };
+
+    const renderQuranLine = (
+      key: string,
+      lineNumber: number,
+      words: string[],
+      lineStartIndex: number,
+      centered: boolean,
+    ) => {
       if (words.length === 0) return null;
       const shouldStretchLine = !centered && words.length > 1;
       const lineHeightStyle = allowLineWrap ? visualLineHeight : lineHeight;
 
       return (
         <View
-          key={`line-${line.line_number}`}
+          key={key}
           style={{
             direction: "ltr",
             flexDirection: "row-reverse",
@@ -426,7 +411,7 @@ function MushafPageInner({
                   : getHighlightColor(identity.surah, identity.ayah);
               return (
                 <WordToken
-                  key={`w-${line.line_number}-${i}`}
+                  key={`w-${lineNumber}-${i}`}
                   glyph={w}
                   fontFamily={fontFamily}
                   fontSize={fontSize}
@@ -447,7 +432,7 @@ function MushafPageInner({
                 highlightedAyahKey === `${identity.surah}:${identity.ayah}`;
               return (
                 <Pressable
-                  key={`w-${line.line_number}-${i}`}
+                  key={`w-${lineNumber}-${i}`}
                   onPress={() => handleMarkerPress(identity.surah, identity.ayah)}
                   onLongPress={() => handleMarkerLongPress(identity.surah, identity.ayah)}
                   delayLongPress={300}
@@ -493,7 +478,7 @@ function MushafPageInner({
             // No identity fallback
             return (
               <Text
-                key={`w-${line.line_number}-${i}`}
+                key={`w-${lineNumber}-${i}`}
                 className="text-charcoal dark:text-neutral-100"
                 style={{ fontFamily, fontSize, lineHeight, paddingHorizontal: 2 }}
               >
@@ -503,7 +488,71 @@ function MushafPageInner({
           })}
         </View>
       );
-    });
+    };
+
+    if (usePageWords) {
+      const structuralLinesByNumber = new Map<number, PageLineLayout[]>();
+      const ayahLineByNumber = new Map<number, PageLineLayout>();
+      for (const line of lineLayout!) {
+        if (line.line_type === "ayah") {
+          ayahLineByNumber.set(line.line_number, line);
+          continue;
+        }
+        const lines = structuralLinesByNumber.get(line.line_number) ?? [];
+        lines.push(line);
+        structuralLinesByNumber.set(line.line_number, lines);
+      }
+
+      let wordIndex = 0;
+      const rows = [];
+      const orderedLineNumbers = Array.from(new Set([
+        ...lineLayout!.map((line) => line.line_number),
+        ...pageWordLineNumbers(lineWords),
+      ])).sort((a, b) => a - b);
+
+      for (const lineNumber of orderedLineNumbers) {
+        for (const line of structuralLinesByNumber.get(lineNumber) ?? []) {
+          rows.push(renderStructuralLine(line));
+        }
+
+        const words = splitGlyphs(lineWords[String(lineNumber)]);
+        if (words.length === 0) continue;
+        const lineStartIndex = wordIndex;
+        wordIndex += words.length;
+        const centered = ayahLineByNumber.get(lineNumber)?.is_centered === 1;
+        rows.push(renderQuranLine(`line-${lineNumber}-quran`, lineNumber, words, lineStartIndex, centered));
+      }
+
+      content = rows;
+    } else {
+      content = lineLayout.map((line) => {
+        if (line.line_type !== "ayah") {
+          return renderStructuralLine(line);
+        }
+
+        if (
+          typeof line.first_word_id !== "number" ||
+          typeof line.last_word_id !== "number" ||
+          typeof globalWordOffset !== "number"
+        ) {
+          return null;
+        }
+
+        const lineStartIndex = Math.max(0, line.first_word_id - globalWordOffset - 1);
+        let lineEndIndex = Math.max(lineStartIndex, line.last_word_id - globalWordOffset);
+        if (line.line_number === lastAyahLineNumber && lineEndIndex < pageGlyphs.length) {
+          lineEndIndex = pageGlyphs.length;
+        }
+        const words = pageGlyphs.slice(lineStartIndex, lineEndIndex).map((token) => token.glyph);
+        return renderQuranLine(
+          `line-${line.line_number}`,
+          line.line_number,
+          words,
+          lineStartIndex,
+          line.is_centered === 1,
+        );
+      });
+    }
   } else {
     // Fallback: render ayahs as continuous text (shouldn't happen with layout data)
     content = (
