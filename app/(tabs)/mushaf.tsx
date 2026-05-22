@@ -45,6 +45,8 @@ import {
 type MushafTarget = { surah: number; ayah: number; wordPos?: number };
 type HifzPageAyah = { key: string; wordCount: number };
 
+const PAGE_RAIL_MAX_WIDTH = 760;
+
 function isFromFocusModeControls(event: any) {
   const target = event?.nativeEvent?.target;
   return !!(
@@ -1559,59 +1561,69 @@ function MushafInner() {
         {/* Bottom page rail / Hifz controls — fades with chrome */}
         {(showBottomSlider || showHifzControls) && (
           <Animated.View
-            pointerEvents={chromeVisible ? "auto" : "none"}
+            pointerEvents={chromeVisible ? "box-none" : "none"}
             style={[
               {
                 position: Platform.OS === "web" && (isPhone || isTablet) ? "fixed" as any : "absolute",
-                left: isPhone || isTablet ? 12 : 0,
-                right: isPhone || isTablet ? 12 : 0,
+                left: 0,
+                right: 0,
                 bottom: railBottomOffset,
                 zIndex: 70,
-                borderRadius: isPhone || isTablet ? 22 : 0,
-                overflow: "hidden",
-                ...(Platform.OS === "web" ? ({ pointerEvents: chromeVisible ? "auto" : "none" } as any) : null),
-                ...(Platform.OS === "web" && (isPhone || isTablet)
-                  ? ({ backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)" } as any)
-                  : null),
+                alignItems: "center",
+                paddingHorizontal: isPhone ? 12 : 16,
               },
-              floatingRailSurface,
               sliderAnimStyle,
             ]}
           >
-            {showHifzControls ? (
-              <HifzControls
-                canRevealNext={canRevealNextHifzAyah}
-                canHidePrevious={canHidePreviousHifzAyah}
-                autoRunning={hifzAutoRunning}
-                onRevealNext={revealNextHifzAyah}
-                onHidePrevious={hidePreviousHifzAyah}
-                onStartAuto={startHifzAuto}
-                onStopAuto={stopHifzAuto}
-              />
-            ) : (
-              <MushafSlider
-                currentPage={currentPage}
-                interactive={chromeVisible}
-                onUserActivity={() => setChromeVisible(true)}
-                onCommit={(p) => {
-                  if (isPageMode) goToPageRef.current?.(p);
-                  else {
-                    // Verse view: jump to the first ayah on that page
-                    const ayah = mushafIndex
-                      ? topmostAyahForPage(mushafIndex, p)
-                      : null;
-                    if (ayah) {
-                      const idx = items.findIndex(
-                        (it) => it.type === "ayah" && it.surah === ayah.surah && it.ayah === ayah.ayah
-                      );
-                      if (idx >= 0) flashListRef.current?.scrollToIndex({ index: idx, animated: true });
+            <View
+              style={[
+                {
+                  width: "100%",
+                  maxWidth: isPhone ? undefined : PAGE_RAIL_MAX_WIDTH,
+                  borderRadius: 22,
+                  overflow: "hidden",
+                  ...(Platform.OS === "web"
+                    ? ({ backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)" } as any)
+                    : null),
+                },
+                floatingRailSurface,
+              ]}
+            >
+              {showHifzControls ? (
+                <HifzControls
+                  canRevealNext={canRevealNextHifzAyah}
+                  canHidePrevious={canHidePreviousHifzAyah}
+                  autoRunning={hifzAutoRunning}
+                  onRevealNext={revealNextHifzAyah}
+                  onHidePrevious={hidePreviousHifzAyah}
+                  onStartAuto={startHifzAuto}
+                  onStopAuto={stopHifzAuto}
+                />
+              ) : (
+                <MushafSlider
+                  currentPage={currentPage}
+                  interactive={chromeVisible}
+                  onUserActivity={() => setChromeVisible(true)}
+                  onCommit={(p) => {
+                    if (isPageMode) goToPageRef.current?.(p);
+                    else {
+                      // Verse view: jump to the first ayah on that page
+                      const ayah = mushafIndex
+                        ? topmostAyahForPage(mushafIndex, p)
+                        : null;
+                      if (ayah) {
+                        const idx = items.findIndex(
+                          (it) => it.type === "ayah" && it.surah === ayah.surah && it.ayah === ayah.ayah
+                        );
+                        if (idx >= 0) flashListRef.current?.scrollToIndex({ index: idx, animated: true });
+                      }
                     }
-                  }
-                }}
-                onExpand={handleOpenNavigator}
-                index={mushafIndex}
-              />
-            )}
+                  }}
+                  onExpand={handleOpenNavigator}
+                  index={mushafIndex}
+                />
+              )}
+            </View>
           </Animated.View>
         )}
 
