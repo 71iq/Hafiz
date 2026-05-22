@@ -555,20 +555,13 @@ export default function HomeScreen() {
           </Pressable>
         )}
 
-        <View className="flex-row items-center justify-between mb-3">
+        <View className={`mb-3 ${isRTL ? "items-end" : "items-start"}`}>
           <Text
             className="text-charcoal dark:text-neutral-100"
-            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16 }}
+            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
           >
             {s.flashcardsDecks}
           </Text>
-          <Pressable
-            onPress={() => setShowCreate(true)}
-            className="w-10 h-10 rounded-full bg-primary-accent items-center justify-center"
-            style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.9 : 1 }] })}
-          >
-            <Plus size={20} color="#fff" />
-          </Pressable>
         </View>
 
         <View className="gap-2 mb-3">
@@ -595,51 +588,51 @@ export default function HomeScreen() {
           )}
         </View>
 
-        {decks.length > 0 && (
-          <>
-            <View className="mb-3 mt-1">
-              <View
-                className="items-center gap-2"
-                style={{ direction: isRTL ? "rtl" : "ltr", flexDirection: "row" }}
-              >
-                <View className="h-px flex-1 bg-warm-200 dark:bg-neutral-800" />
-                <Text
-                  className="text-warm-400 dark:text-neutral-500 uppercase"
-                  style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, letterSpacing: 1.4 }}
-                >
-                  {s.flashcardsUserMadeDecks}
-                </Text>
-                <View className="h-px flex-1 bg-warm-200 dark:bg-neutral-800" />
-              </View>
-            </View>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              className="mb-6"
-              contentContainerStyle={{
-                flexDirection: isRTL ? "row-reverse" : "row",
-                gap: 8,
-                paddingBottom: 4,
-              }}
+        <View className="mb-3 mt-1">
+          <View
+            className="items-center gap-2"
+            style={{ direction: isRTL ? "rtl" : "ltr", flexDirection: "row" }}
+          >
+            <View className="h-px flex-1 bg-warm-200 dark:bg-neutral-800" />
+            <Text
+              className="text-warm-400 dark:text-neutral-500 uppercase"
+              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, letterSpacing: 1.4 }}
             >
-              {decks.map((deck) => (
-                <View key={deck.id} style={{ width: isLaptop ? 500 : 320 }}>
-                  <DeckCard
-                    deck={deck}
-                    title={getDeckLabel(deck)}
-                    description={getDeckDescription(deck)}
-                    onStartReview={() => handleStartReview(deck.id)}
-                    onConfigure={() => setReviewSettingsTarget({ id: deck.id, title: getDeckLabel(deck), mode: "ayah" })}
-                    onDelete={() => setDeckToDelete(deck.id)}
-                    isDark={isDark}
-                    isRTL={isRTL}
-                    s={s}
-                  />
-                </View>
-              ))}
-            </ScrollView>
-          </>
-        )}
+              {s.flashcardsUserMadeDecks}
+            </Text>
+            <View className="h-px flex-1 bg-warm-200 dark:bg-neutral-800" />
+          </View>
+        </View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          className="mb-6"
+          contentContainerStyle={{
+            flexDirection: isRTL ? "row-reverse" : "row",
+            gap: 8,
+            paddingBottom: 4,
+          }}
+        >
+          {decks.map((deck) => (
+            <View key={deck.id} style={{ width: isLaptop ? 500 : 320 }}>
+              <DeckCard
+                deck={deck}
+                title={getDeckLabel(deck)}
+                description={getDeckDescription(deck)}
+                onStartReview={() => handleStartReview(deck.id)}
+                onConfigure={() => setReviewSettingsTarget({ id: deck.id, title: getDeckLabel(deck), mode: "ayah" })}
+                onDelete={() => setDeckToDelete(deck.id)}
+                isDark={isDark}
+                isRTL={isRTL}
+                s={s}
+              />
+            </View>
+          ))}
+          <AddDeckTile
+            onPress={() => setShowCreate(true)}
+            label={s.flashcardsCreateDeck}
+          />
+        </ScrollView>
       </ScreenScrollView>
 
       <SearchCommand visible={showSearch} onClose={() => setShowSearch(false)} />
@@ -686,6 +679,33 @@ export default function HomeScreen() {
         onConfirm={confirmDeleteDeck}
       />
     </SafeAreaView>
+  );
+}
+
+function AddDeckTile({
+  onPress,
+  label,
+}: {
+  onPress: () => void;
+  label: string;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={({ pressed }) => ({
+        width: 78,
+        height: 78,
+        transform: [{ scale: pressed ? 0.96 : 1 }],
+      })}
+    >
+      <Card elevation="low" className="h-full items-center justify-center rounded-3xl">
+        <View className="h-10 w-10 rounded-full bg-primary-accent items-center justify-center">
+          <Plus size={20} color="#fff" />
+        </View>
+      </Card>
+    </Pressable>
   );
 }
 
