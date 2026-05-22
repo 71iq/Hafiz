@@ -7,6 +7,8 @@ import { toggleLike, reportReflection } from "@/lib/reflections/api";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
 import type { Reflection } from "@/lib/reflections/types";
+import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
+import { PublicProfileOverlay } from "@/components/profile/PublicProfileOverlay";
 
 type Props = {
   reflection: Reflection;
@@ -55,6 +57,7 @@ export function ReflectionCard({
   const [likesCount, setLikesCount] = useState(reflection.likes_count);
   const [showMenu, setShowMenu] = useState(false);
   const [reported, setReported] = useState(false);
+  const [profileUserId, setProfileUserId] = useState<string | null>(null);
 
   const authorName =
     reflection.profiles?.display_name || reflection.profiles?.username || s.genericAnonymous;
@@ -105,6 +108,7 @@ export function ReflectionCard({
   const isFeed = variant === "feed";
 
   return (
+    <>
     <View
       className={isFeed ? "mb-3 border px-4 py-4" : "mb-2.5 px-4 py-3.5"}
       style={{
@@ -122,22 +126,25 @@ export function ReflectionCard({
     >
       <View className={`${rowClassName} items-center justify-between mb-2`}>
         <View className={`${rowClassName} items-center gap-2`}>
-          <View
-            className={`${isFeed ? "h-10 w-10" : "h-8 w-8"} rounded-full items-center justify-center`}
-            style={{ backgroundColor: isDark ? "#003638" : "#00595B" }}
+          <Pressable
+            onPress={() => setProfileUserId(reflection.user_id)}
+            accessibilityRole="button"
+            className={`${rowClassName} items-center gap-2`}
+            style={({ pressed }) => ({ opacity: pressed ? 0.72 : 1 })}
           >
+            <ProfileAvatar
+              avatarUrl={reflection.profiles?.avatar_url}
+              name={authorName}
+              size={isFeed ? 40 : 32}
+              isDark={isDark}
+            />
             <Text
-              style={{ fontFamily: "Manrope_700Bold", fontSize: isFeed ? 14 : 12, color: "#FDDC91" }}
+              className="text-charcoal dark:text-neutral-200"
+              style={{ fontFamily: "Manrope_600SemiBold", fontSize: isFeed ? 14 : 13, textAlign: contentAlign }}
             >
-              {authorName.charAt(0).toUpperCase()}
+              {authorName}
             </Text>
-          </View>
-          <Text
-            className="text-charcoal dark:text-neutral-200"
-            style={{ fontFamily: "Manrope_600SemiBold", fontSize: isFeed ? 14 : 13, textAlign: contentAlign }}
-          >
-            {authorName}
-          </Text>
+          </Pressable>
           <Text
             style={{ fontFamily: "Manrope_400Regular", fontSize: 11, color: mutedColor }}
           >
@@ -263,5 +270,7 @@ export function ReflectionCard({
         </Pressable>
       </View>
     </View>
+    <PublicProfileOverlay userId={profileUserId} onClose={() => setProfileUserId(null)} />
+    </>
   );
 }

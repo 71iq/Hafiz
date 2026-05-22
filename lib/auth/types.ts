@@ -43,5 +43,6 @@ export type AuthActions = {
   updatePassword: (password: string) => Promise<void>;
   ensureProfile: () => Promise<Profile | null>;
   fetchProfile: () => Promise<void>;
+  updateProfile: (updates: { displayName?: string | null; avatarUrl?: string | null }) => Promise<Profile>;
   clearError: () => void;
 };

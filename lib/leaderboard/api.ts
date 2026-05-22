@@ -5,6 +5,7 @@ export type LeaderboardEntry = {
   user_id: string;
   username: string;
   display_name: string | null;
+  avatar_url: string | null;
   score: number;
   rank: number;
 };
@@ -13,6 +14,7 @@ export type PublicProfile = {
   id: string;
   username: string;
   display_name: string | null;
+  avatar_url: string | null;
   total_score: number;
   current_streak: number;
   longest_streak: number;
@@ -27,7 +29,7 @@ export async function fetchDailyLeaderboard(): Promise<LeaderboardEntry[]> {
   const today = new Date().toISOString().split("T")[0];
   const { data, error } = await supabase
     .from("daily_scores")
-    .select("user_id, score, profiles:profiles!daily_scores_user_id_fkey(username, display_name)")
+    .select("user_id, score, profiles:profiles!daily_scores_user_id_fkey(username, display_name, avatar_url)")
     .eq("date", today)
     .order("score", { ascending: false })
     .limit(50);
@@ -37,6 +39,7 @@ export async function fetchDailyLeaderboard(): Promise<LeaderboardEntry[]> {
     user_id: row.user_id,
     username: row.profiles?.username ?? "unknown",
     display_name: row.profiles?.display_name ?? null,
+    avatar_url: row.profiles?.avatar_url ?? null,
     score: row.score,
     rank: i + 1,
   }));
@@ -53,14 +56,14 @@ export async function fetchWeeklyLeaderboard(): Promise<LeaderboardEntry[]> {
   // Fetch all daily_scores from last 7 days, aggregate in JS
   const { data, error } = await supabase
     .from("daily_scores")
-    .select("user_id, score, profiles:profiles!daily_scores_user_id_fkey(username, display_name)")
+    .select("user_id, score, profiles:profiles!daily_scores_user_id_fkey(username, display_name, avatar_url)")
     .gte("date", weekAgoStr)
     .order("score", { ascending: false });
 
   if (error) throw error;
 
   // Aggregate by user
-  const userMap = new Map<string, { username: string; display_name: string | null; score: number }>();
+  const userMap = new Map<string, { username: string; display_name: string | null; avatar_url: string | null; score: number }>();
   for (const row of data ?? []) {
     const existing = userMap.get(row.user_id);
     if (existing) {
@@ -69,6 +72,7 @@ export async function fetchWeeklyLeaderboard(): Promise<LeaderboardEntry[]> {
       userMap.set(row.user_id, {
         username: (row as any).profiles?.username ?? "unknown",
         display_name: (row as any).profiles?.display_name ?? null,
+        avatar_url: (row as any).profiles?.avatar_url ?? null,
         score: row.score,
       });
     }
@@ -81,6 +85,7 @@ export async function fetchWeeklyLeaderboard(): Promise<LeaderboardEntry[]> {
       user_id,
       username: info.username,
       display_name: info.display_name,
+      avatar_url: info.avatar_url,
       score: info.score,
       rank: i + 1,
     }));
@@ -92,12 +97,12 @@ export async function fetchAllTimeLeaderboard(): Promise<LeaderboardEntry[]> {
 
   const { data, error } = await supabase
     .from("daily_scores")
-    .select("user_id, score, profiles:profiles!daily_scores_user_id_fkey(username, display_name)")
+    .select("user_id, score, profiles:profiles!daily_scores_user_id_fkey(username, display_name, avatar_url)")
     .order("score", { ascending: false });
 
   if (error) throw error;
 
-  const userMap = new Map<string, { username: string; display_name: string | null; score: number }>();
+  const userMap = new Map<string, { username: string; display_name: string | null; avatar_url: string | null; score: number }>();
   for (const row of data ?? []) {
     const existing = userMap.get(row.user_id);
     if (existing) {
@@ -106,6 +111,7 @@ export async function fetchAllTimeLeaderboard(): Promise<LeaderboardEntry[]> {
       userMap.set(row.user_id, {
         username: (row as any).profiles?.username ?? "unknown",
         display_name: (row as any).profiles?.display_name ?? null,
+        avatar_url: (row as any).profiles?.avatar_url ?? null,
         score: row.score,
       });
     }
@@ -118,6 +124,7 @@ export async function fetchAllTimeLeaderboard(): Promise<LeaderboardEntry[]> {
       user_id,
       username: info.username,
       display_name: info.display_name,
+      avatar_url: info.avatar_url,
       score: info.score,
       rank: i + 1,
     }));
@@ -129,7 +136,7 @@ export async function fetchStreakLeaderboard(): Promise<LeaderboardEntry[]> {
 
   const { data, error } = await supabase
     .from("daily_scores")
-    .select("user_id, date, profiles:profiles!daily_scores_user_id_fkey(username, display_name)")
+    .select("user_id, date, profiles:profiles!daily_scores_user_id_fkey(username, display_name, avatar_url)")
     .order("date", { ascending: false });
 
   if (error) throw error;
@@ -143,7 +150,7 @@ export async function fetchStreakLeaderboard(): Promise<LeaderboardEntry[]> {
   const todayIdx = Math.floor(today.getTime() / 86400000);
   const yesterdayIdx = todayIdx - 1;
 
-  const byUser = new Map<string, { username: string; display_name: string | null; dates: Set<string> }>();
+  const byUser = new Map<string, { username: string; display_name: string | null; avatar_url: string | null; dates: Set<string> }>();
   for (const row of data ?? []) {
     const existing = byUser.get(row.user_id);
     if (existing) {
@@ -152,6 +159,7 @@ export async function fetchStreakLeaderboard(): Promise<LeaderboardEntry[]> {
       byUser.set(row.user_id, {
         username: (row as any).profiles?.username ?? "unknown",
         display_name: (row as any).profiles?.display_name ?? null,
+        avatar_url: (row as any).profiles?.avatar_url ?? null,
         dates: new Set([row.date]),
       });
     }
@@ -160,10 +168,10 @@ export async function fetchStreakLeaderboard(): Promise<LeaderboardEntry[]> {
   const ranked = Array.from(byUser.entries()).map(([user_id, info]) => {
     const indices = Array.from(info.dates).map(toDayIndex).sort((a, b) => b - a);
     if (indices.length === 0) {
-      return { user_id, username: info.username, display_name: info.display_name, score: 0 };
+      return { user_id, username: info.username, display_name: info.display_name, avatar_url: info.avatar_url, score: 0 };
     }
     if (indices[0] < yesterdayIdx) {
-      return { user_id, username: info.username, display_name: info.display_name, score: 0 };
+      return { user_id, username: info.username, display_name: info.display_name, avatar_url: info.avatar_url, score: 0 };
     }
     let streak = 0;
     let expected = indices[0];
@@ -175,7 +183,7 @@ export async function fetchStreakLeaderboard(): Promise<LeaderboardEntry[]> {
         break;
       }
     }
-    return { user_id, username: info.username, display_name: info.display_name, score: streak };
+    return { user_id, username: info.username, display_name: info.display_name, avatar_url: info.avatar_url, score: streak };
   });
 
   return ranked
@@ -185,6 +193,7 @@ export async function fetchStreakLeaderboard(): Promise<LeaderboardEntry[]> {
       user_id: row.user_id,
       username: row.username,
       display_name: row.display_name,
+      avatar_url: row.avatar_url,
       score: row.score,
       rank: i + 1,
     }));
@@ -196,7 +205,7 @@ export async function fetchPublicProfile(userId: string): Promise<PublicProfile 
 
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, username, display_name, total_score, current_streak, longest_streak, cards_reviewed, last_review_date")
+    .select("id, username, display_name, avatar_url, total_score, current_streak, longest_streak, cards_reviewed, last_review_date")
     .eq("id", userId)
     .maybeSingle();
 

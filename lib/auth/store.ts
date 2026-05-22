@@ -288,6 +288,36 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     }
   },
 
+  updateProfile: async ({ displayName, avatarUrl }) => {
+    const user = get().user;
+    if (!user) throw new Error("Not signed in");
+
+    set({ isLoading: true, error: null });
+    try {
+      await get().ensureProfile();
+      const patch: Record<string, string | null> = {};
+      if (displayName !== undefined) patch.display_name = displayName;
+      if (avatarUrl !== undefined) patch.avatar_url = avatarUrl;
+
+      const { data, error } = await supabase
+        .from("profiles")
+        .update(patch)
+        .eq("id", user.id)
+        .select("*")
+        .single();
+
+      if (error) throw error;
+      const profile = data as Profile;
+      set({ profile });
+      return profile;
+    } catch (err: any) {
+      set({ error: err.message });
+      throw err;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
   ensureProfile: async () => {
     const user = get().user;
     if (!user) return null;

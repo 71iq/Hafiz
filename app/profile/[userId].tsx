@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { PublicBadgesGrid } from "@/components/achievements/PublicBadgesGrid";
+import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { useDatabaseStatus } from "@/lib/database/provider";
 import { SettingsProvider, useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -79,9 +80,7 @@ function PublicProfileContent() {
         </View>
 
         <View className={`mt-4 flex-row items-center gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
-          <View className="h-12 w-12 items-center justify-center rounded-full bg-primary-accent/10 dark:bg-primary-bright/10">
-            <UserRound size={20} color={isDark ? "#2dd4bf" : "#0d9488"} />
-          </View>
+          <ProfileAvatar avatarUrl={profile?.avatar_url} name={displayName} size={48} isDark={isDark} />
           <View className="flex-1">
             <Text
               className="text-charcoal dark:text-neutral-100"

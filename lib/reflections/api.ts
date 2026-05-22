@@ -57,7 +57,7 @@ export async function fetchReflections(
 
   const { data, error } = await supabase
     .from("reflections")
-    .select("*, profiles:profiles!reflections_user_id_fkey(username, display_name)")
+    .select("*, profiles:profiles!reflections_user_id_fkey(username, display_name, avatar_url)")
     .eq("surah", surah)
     .lte("ayah_start", ayah)
     .gte("ayah_end", ayah)
@@ -92,7 +92,7 @@ export async function fetchReflectionFeed({
 
   let query = supabase
     .from("reflections")
-    .select("*, profiles:profiles!reflections_user_id_fkey(username, display_name)")
+    .select("*, profiles:profiles!reflections_user_id_fkey(username, display_name, avatar_url)")
     .eq("status", "active");
 
   if (filter.type === "surah") {
@@ -183,14 +183,14 @@ export async function createReflection(
   const { data, error } = await supabase
     .from("reflections")
     .insert(insertPayload)
-    .select("*, profiles:profiles!reflections_user_id_fkey(username, display_name)")
+    .select("*, profiles:profiles!reflections_user_id_fkey(username, display_name, avatar_url)")
     .single();
 
   if (isMissingJuzColumnsError(error)) {
     const fallback = await supabase
       .from("reflections")
       .insert({ user_id: userId, surah, ayah_start: ayahStart, ayah_end: ayahEnd, content })
-      .select("*, profiles:profiles!reflections_user_id_fkey(username, display_name)")
+      .select("*, profiles:profiles!reflections_user_id_fkey(username, display_name, avatar_url)")
       .single();
 
     if (fallback.error) throw fallback.error;
@@ -234,7 +234,7 @@ export async function fetchComments(
   const { from, to } = pageBounds(page, COMMENT_PAGE_SIZE);
   const { data, error } = await supabase
     .from("reflection_comments")
-    .select("*, profiles:profiles!reflection_comments_user_id_fkey(username, display_name)")
+    .select("*, profiles:profiles!reflection_comments_user_id_fkey(username, display_name, avatar_url)")
     .eq("reflection_id", reflectionId)
     .order("created_at", { ascending: true })
     .range(from, to);
@@ -252,7 +252,7 @@ export async function addComment(
   const { data, error } = await supabase
     .from("reflection_comments")
     .insert({ user_id: userId, reflection_id: reflectionId, content })
-    .select("*, profiles:profiles!reflection_comments_user_id_fkey(username, display_name)")
+    .select("*, profiles:profiles!reflection_comments_user_id_fkey(username, display_name, avatar_url)")
     .single();
 
   if (error) throw error;

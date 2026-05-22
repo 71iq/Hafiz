@@ -16,6 +16,7 @@ export type Reflection = {
   profiles?: {
     username: string;
     display_name: string | null;
+    avatar_url: string | null;
   };
   // Whether the current user has liked this reflection
   user_has_liked?: boolean;
@@ -31,6 +32,7 @@ export type ReflectionComment = {
   profiles?: {
     username: string;
     display_name: string | null;
+    avatar_url: string | null;
   };
 };
 

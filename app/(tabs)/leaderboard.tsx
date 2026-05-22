@@ -3,7 +3,6 @@ import { View, Text, Pressable, ScrollView, RefreshControl } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Trophy, CalendarCheck2, Medal } from "lucide-react-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "expo-router";
 import { useSettings } from "@/lib/settings/context";
 import { useDatabase } from "@/lib/database/provider";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -14,6 +13,8 @@ import { LeaderboardSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { AuthGate } from "@/components/ui/AuthGate";
 import { useScreenContentLayout } from "@/components/ui/ScreenContent";
+import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
+import { PublicProfileOverlay } from "@/components/profile/PublicProfileOverlay";
 import {
   fetchDailyLeaderboard,
   fetchWeeklyLeaderboard,
@@ -29,11 +30,11 @@ export default function LeaderboardScreen() {
   const { isDark } = useSettings();
   const db = useDatabase();
   const s = useStrings();
-  const router = useRouter();
   const { contentContainerStyle, railStyle, isLaptop } = useScreenContentLayout({ maxWidth: LEADERBOARD_CONTENT_MAX_WIDTH });
   const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<Tab>("daily");
+  const [profileUserId, setProfileUserId] = useState<string | null>(null);
 
   const configured = isSupabaseConfigured();
 
@@ -194,7 +195,7 @@ export default function LeaderboardScreen() {
                   isDark={isDark}
                   unit={scoreUnit}
                   s={s}
-                  onPress={() => router.push(`/profile/${entry.user_id}` as any)}
+                  onPress={() => setProfileUserId(entry.user_id)}
                 />
               ))}
             </View>
@@ -224,12 +225,13 @@ export default function LeaderboardScreen() {
               unit={scoreUnit}
               isStreak={activeTab === "streak"}
               s={s}
-              onPress={() => router.push(`/profile/${entry.user_id}` as any)}
+              onPress={() => setProfileUserId(entry.user_id)}
             />
           ))}
           </View>
         </ScrollView>
       )}
+      <PublicProfileOverlay userId={profileUserId} onClose={() => setProfileUserId(null)} />
     </SafeAreaView>
   );
 }
@@ -270,9 +272,7 @@ function LeaderboardPodiumCard({
         className="h-14 w-14 items-center justify-center rounded-full"
         style={{ backgroundColor: isDark ? "#003638" : "#00595B" }}
       >
-        <Text style={{ color: "#FDDC91", fontFamily: "Manrope_700Bold", fontSize: 18 }}>
-          {displayName.charAt(0).toUpperCase()}
-        </Text>
+        <ProfileAvatar avatarUrl={entry.avatar_url} name={displayName} size={56} isDark={isDark} />
       </View>
       <Text
         className="mt-3 text-charcoal dark:text-neutral-100"
@@ -341,21 +341,8 @@ function LeaderboardRow({
         </Text>
       </View>
 
-      <View
-        className="w-10 h-10 rounded-full items-center justify-center mx-3"
-        style={{
-          backgroundColor: isDark ? "#003638" : "#00595B",
-        }}
-      >
-        <Text
-          style={{
-            fontFamily: "Manrope_600SemiBold",
-            fontSize: 15,
-            color: "#FDDC91",
-          }}
-        >
-          {displayName.charAt(0).toUpperCase()}
-        </Text>
+      <View className="mx-3">
+        <ProfileAvatar avatarUrl={entry.avatar_url} name={displayName} size={40} isDark={isDark} />
       </View>
 
       <View className="flex-1">
