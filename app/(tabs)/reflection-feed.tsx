@@ -443,13 +443,14 @@ function FilterSelect({
   return (
     <Pressable
       onPress={onPress}
-      className="items-center gap-2 rounded-full px-4 py-2.5"
+      className={`${isRTL ? "flex-row-reverse" : "flex-row"} flex-nowrap items-center gap-1.5 rounded-full px-4 py-2.5`}
       style={({ pressed }) => ({
         opacity: pressed ? 0.75 : 1,
         minWidth,
         flex,
         direction: isRTL ? "rtl" : "ltr",
-        flexDirection: "row",
+        flexDirection: isRTL ? "row-reverse" : "row",
+        flexWrap: "nowrap",
         backgroundColor: pressed
           ? isDark
             ? "rgba(45, 212, 191, 0.12)"
@@ -461,12 +462,20 @@ function FilterSelect({
     >
       <Text
         numberOfLines={1}
-        className="flex-1"
-        style={{ color: textColor, fontFamily: "Manrope_600SemiBold", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
+        style={{
+          color: textColor,
+          flexShrink: 1,
+          fontFamily: "Manrope_600SemiBold",
+          fontSize: 12,
+          minWidth: 0,
+          textAlign: isRTL ? "right" : "left",
+        }}
       >
         {label}
       </Text>
-      <ChevronDown size={14} color={color} />
+      <View style={{ flexShrink: 0 }}>
+        <ChevronDown size={14} color={color} />
+      </View>
     </Pressable>
   );
 }
