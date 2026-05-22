@@ -723,7 +723,7 @@ function DeckCard({
       <Card elevation="low" className="px-4 py-3 rounded-3xl">
         <View
           className="items-center gap-3"
-          style={{ direction: isRTL ? "rtl" : "ltr", flexDirection: "row" }}
+          style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
         >
           <View className="w-10 h-10 rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 items-center justify-center">
             <Layers size={18} color={isDark ? "#2dd4bf" : "#0d9488"} />
@@ -731,14 +731,14 @@ function DeckCard({
           <View className={`flex-1 ${isRTL ? "items-end" : "items-start"}`} style={{ minWidth: 0 }}>
             <Text
               className="text-charcoal dark:text-neutral-200"
-              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, textAlign: isRTL ? "right" : "left" }}
+              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
               numberOfLines={1}
             >
               {title}
             </Text>
             <Text
               className="text-warm-400 dark:text-neutral-500 mt-0.5"
-              style={{ fontFamily: "Manrope_400Regular", fontSize: 11, textAlign: isRTL ? "right" : "left" }}
+              style={{ fontFamily: "Manrope_400Regular", fontSize: 11, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
               numberOfLines={1}
             >
               {description}
@@ -746,7 +746,7 @@ function DeckCard({
           </View>
           <View
             className="flex-row items-center gap-1"
-            style={{ direction: isRTL ? "rtl" : "ltr" }}
+            style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
           >
             <Pressable
               onPress={(event) => {
@@ -808,7 +808,7 @@ function SmartDeckCard({
       <Card elevation="low" className="px-4 py-3 rounded-3xl">
         <View
           className="items-center gap-3"
-          style={{ direction: isRTL ? "rtl" : "ltr", flexDirection: "row" }}
+          style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
         >
           <View className="w-10 h-10 rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 items-center justify-center">
             <Icon size={18} color={isDark ? "#2dd4bf" : "#0d9488"} />
@@ -816,14 +816,14 @@ function SmartDeckCard({
           <View className={`flex-1 ${isRTL ? "items-end" : "items-start"}`} style={{ minWidth: 0 }}>
             <Text
               className="text-charcoal dark:text-neutral-200"
-              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, textAlign: isRTL ? "right" : "left" }}
+              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
               numberOfLines={1}
             >
               {deck.title}
             </Text>
             <Text
               className="text-warm-400 dark:text-neutral-500 mt-0.5"
-              style={{ fontFamily: "Manrope_400Regular", fontSize: 11, textAlign: isRTL ? "right" : "left" }}
+              style={{ fontFamily: "Manrope_400Regular", fontSize: 11, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
               numberOfLines={1}
             >
               {deck.subtitle} · {filterLabel}
@@ -874,7 +874,7 @@ function VocabularyDeckCard({
       <Card elevation="low" className="px-4 py-3 rounded-3xl">
         <View
           className="items-center gap-3"
-          style={{ direction: isRTL ? "rtl" : "ltr", flexDirection: "row" }}
+          style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
         >
           <View className="w-10 h-10 rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 items-center justify-center">
             <Languages size={18} color={isDark ? "#2dd4bf" : "#0d9488"} />
@@ -882,14 +882,14 @@ function VocabularyDeckCard({
           <View className={`flex-1 ${isRTL ? "items-end" : "items-start"}`} style={{ minWidth: 0 }}>
             <Text
               className="text-charcoal dark:text-neutral-200"
-              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, textAlign: isRTL ? "right" : "left" }}
+              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
               numberOfLines={1}
             >
               {s.vocabDeckTitle}
             </Text>
             <Text
               className="text-warm-400 dark:text-neutral-500 mt-0.5"
-              style={{ fontFamily: "Manrope_400Regular", fontSize: 11, textAlign: isRTL ? "right" : "left" }}
+              style={{ fontFamily: "Manrope_400Regular", fontSize: 11, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
               numberOfLines={1}
             >
               {s.vocabDeckSubtitle}
@@ -930,7 +930,7 @@ function DeckStats({
   isRTL: boolean;
 }) {
   return (
-    <View className={`flex-row items-center gap-2 ${isRTL ? "flex-row-reverse" : ""}`}>
+    <View className={`flex-row items-center gap-2 ${isRTL ? "flex-row-reverse" : ""}`} style={{ direction: "ltr" }}>
       <Text
         className="text-charcoal dark:text-neutral-100 text-center min-w-[30px]"
         style={{ fontFamily: "Manrope_700Bold", fontSize: 14, fontVariant: ["tabular-nums"] }}
