@@ -331,7 +331,7 @@ export default function SettingsScreen() {
 
             <View
               className={isLaptop ? "mb-5 items-start justify-between gap-4" : "mb-5 gap-4"}
-              style={{ flexDirection: isLaptop ? (isRTL ? "row-reverse" : "row") : "column" }}
+              style={{ flexDirection: isLaptop ? (isRTL ? "row" : "row-reverse") : "column" }}
             >
               <View className="flex-1">
                 <Text
