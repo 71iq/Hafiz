@@ -22,6 +22,7 @@ import { useColorScheme } from "nativewind";
 import { useChrome } from "@/lib/ui/chrome";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { useAuthStore } from "@/lib/auth/store";
+import { PublicProfileOverlay } from "@/components/profile/PublicProfileOverlay";
 import {
   PERSISTENT_SIDEBAR_BREAKPOINT,
   PERSISTENT_SIDEBAR_WIDTH,
@@ -304,13 +305,16 @@ function SidebarProfileCard({
   isDark,
   isRTL,
   isPersistent,
+  opensOverlay,
 }: {
   isDark: boolean;
   isRTL?: boolean;
   isPersistent?: boolean;
+  opensOverlay?: boolean;
 }) {
   const s = useStrings();
   const { user, profile } = useAuthStore();
+  const [profileUserId, setProfileUserId] = useState<string | null>(null);
   const displayName = profile?.display_name || profile?.username || user?.email?.split("@")[0] || s.authProfile;
   const avatarUrl = profile?.avatar_url;
   const initial = Array.from(displayName.trim())[0]?.toUpperCase() || "H";
@@ -325,10 +329,18 @@ function SidebarProfileCard({
     : isDark
       ? "rgba(255, 255, 255, 0.05)"
       : "rgba(255, 255, 255, 0.62)";
+  const openProfile = () => {
+    if (opensOverlay && user?.id) {
+      setProfileUserId(user.id);
+      return;
+    }
+    router.push("/profile" as any);
+  };
 
   return (
+    <>
     <Pressable
-      onPress={() => router.push("/profile" as any)}
+      onPress={openProfile}
       accessibilityRole="button"
       className="flex-row items-center gap-3 rounded-2xl px-3 py-3"
       style={({ pressed }) => ({
@@ -366,6 +378,8 @@ function SidebarProfileCard({
         {displayName}
       </Text>
     </Pressable>
+    <PublicProfileOverlay userId={profileUserId} onClose={() => setProfileUserId(null)} />
+    </>
   );
 }
 
@@ -503,6 +517,7 @@ function SidebarContent({
   const s = useStrings();
   const activeRoute = state.routes[state.index];
   const isSettingsRoute = activeRoute?.name === SIDEBAR_SETTINGS_ROUTE;
+  const profileOpensOverlay = activeRoute?.name === "leaderboard";
   const primaryItems = getSidebarRouteItems(state, descriptors, SIDEBAR_PRIMARY_ROUTES);
   const [settingsItem] = getSidebarRouteItems(state, descriptors, [SIDEBAR_SETTINGS_ROUTE]);
 
@@ -570,7 +585,12 @@ function SidebarContent({
       {isPersistent && <View className="flex-1" />}
       {settingsItem ? renderItem(settingsItem) : null}
       <SidebarSeparator isDark={isDark} isPersistent={isPersistent} />
-      <SidebarProfileCard isDark={isDark} isRTL={isRTL} isPersistent={isPersistent} />
+      <SidebarProfileCard
+        isDark={isDark}
+        isRTL={isRTL}
+        isPersistent={isPersistent}
+        opensOverlay={profileOpensOverlay}
+      />
     </>
   );
 }
