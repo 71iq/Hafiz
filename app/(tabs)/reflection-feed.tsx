@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, RefreshControl, Text, View, useWindowDimensions } from "react-native";
+import { ActivityIndicator, Platform, Pressable, RefreshControl, Text, View, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { FlashList } from "@shopify/flash-list";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -40,6 +40,7 @@ type JuzOption = {
 
 type FilterKind = "none" | "surah" | "juz";
 type PickerMode = "filter-kind" | "location" | "sort" | null;
+type SelectOption = { value: string; label: string };
 
 type FilterOptions = {
   surahs: SurahOption[];
@@ -47,6 +48,8 @@ type FilterOptions = {
 };
 
 const REFLECTION_FEED_MAX_WIDTH = 640;
+const WebSelect = "select" as any;
+const WebOption = "option" as any;
 
 export default function ReflectionFeedScreen() {
   const db = useDatabase();
@@ -200,6 +203,11 @@ export default function ReflectionFeedScreen() {
       : filterKind === "juz"
         ? s.reflectionFeedFilterJuz
         : s.reflectionFeedFilterNone;
+  const filterKindOptions: SelectOption[] = [
+    { value: "none", label: s.reflectionFeedFilterNone },
+    { value: "surah", label: s.reflectionFeedFilterSurah },
+    { value: "juz", label: s.reflectionFeedFilterJuz },
+  ];
 
   const sortOptions: { value: ReflectionFeedSort; label: string }[] = [
     { value: "newest", label: s.reflectionFeedSortNewest },
@@ -210,6 +218,41 @@ export default function ReflectionFeedScreen() {
   const selectedSortLabel = `${s.reflectionFeedSortBy}: ${
     sortOptions.find((option) => option.value === sort)?.label ?? s.reflectionFeedSortNewest
   }`;
+  const sortSelectOptions: SelectOption[] = sortOptions.map((option) => ({
+    value: option.value,
+    label: `${s.reflectionFeedSortBy}: ${option.label}`,
+  }));
+  const locationOptions = useMemo<SelectOption[]>(() => {
+    if (filterKind === "surah") {
+      return [
+        { value: "all", label: s.reflectionFeedFilterAll },
+        ...options.surahs.map((surah) => ({
+          value: String(surah.number),
+          label: uiLanguage === "ar" ? surah.nameArabic : surah.nameEnglish,
+        })),
+      ];
+    }
+    if (filterKind === "juz") {
+      return [
+        { value: "all", label: s.reflectionFeedFilterAll },
+        ...options.juz.map((juz) => ({
+          value: String(juz.juz),
+          label: `${s.tabJuz} ${uiLanguage === "ar" ? toArabicNumber(juz.juz) : juz.juz}`,
+        })),
+      ];
+    }
+    return [{ value: "all", label: s.reflectionFeedFilterAll }];
+  }, [filterKind, options.juz, options.surahs, s.reflectionFeedFilterAll, s.tabJuz, uiLanguage]);
+  const locationValue =
+    filterKind === "surah"
+      ? selectedSurah === null
+        ? "all"
+        : String(selectedSurah)
+      : filterKind === "juz"
+        ? selectedJuz === null
+          ? "all"
+          : String(selectedJuz)
+        : "all";
 
   const handleReferencePress = useCallback((reflection: Reflection) => {
     setPendingDeepLink({ surah: reflection.surah, ayah: reflection.ayah_start });
@@ -227,6 +270,20 @@ export default function ReflectionFeedScreen() {
   const showAuthRequired = useCallback(() => {
     setToast(s.reflectionFeedAuthRequired);
   }, [s.reflectionFeedAuthRequired]);
+  const handleLocationSelect = useCallback(
+    (value: string) => {
+      if (filterKind === "surah") {
+        setSelectedSurah(value === "all" ? null : Number(value));
+        setSelectedJuz(null);
+        return;
+      }
+      if (filterKind === "juz") {
+        setSelectedJuz(value === "all" ? null : Number(value));
+        setSelectedSurah(null);
+      }
+    },
+    [filterKind]
+  );
 
   const formatReference = useCallback(
     (reflection: Reflection) => {
@@ -302,27 +359,44 @@ export default function ReflectionFeedScreen() {
             }}
           >
             <FilterSelect
+              accessibilityLabel={s.reflectionFeedSelectFilterType}
               label={selectedFilterKindLabel}
+              value={filterKind}
+              options={filterKindOptions}
               isDark={isDark}
               isRTL={isRTL}
               minWidth={112}
               flex={0.8}
+              onValueChange={(value) => {
+                const kind = value as FilterKind;
+                setFilterKind(kind);
+                setSelectedSurah(null);
+                setSelectedJuz(null);
+              }}
               onPress={() => setPickerMode("filter-kind")}
             />
             <FilterSelect
+              accessibilityLabel={filterKind === "juz" ? s.reflectionFeedSelectJuz : s.reflectionFeedSelectSurah}
               label={filterKind === "juz" ? selectedJuzLabel : filterKind === "surah" ? selectedSurahLabel : s.reflectionFeedFilterAll}
+              value={locationValue}
+              options={locationOptions}
               isDark={isDark}
               isRTL={isRTL}
               minWidth={184}
               flex={1.55}
+              onValueChange={handleLocationSelect}
               onPress={() => setPickerMode("location")}
             />
             <FilterSelect
+              accessibilityLabel={s.reflectionFeedSortBy}
               label={selectedSortLabel}
+              value={sort}
+              options={sortSelectOptions}
               isDark={isDark}
               isRTL={isRTL}
               minWidth={152}
               flex={1.15}
+              onValueChange={(value) => setSort(value as ReflectionFeedSort)}
               onPress={() => setPickerMode("sort")}
             />
           </View>
@@ -375,41 +449,43 @@ export default function ReflectionFeedScreen() {
         </View>
       </View>
 
-      <FilterPicker
-        mode={pickerMode}
-        options={options}
-        filterKind={filterKind}
-        selectedSurah={selectedSurah}
-        selectedJuz={selectedJuz}
-        sort={sort}
-        sortOptions={sortOptions}
-        isDark={isDark}
-        isRTL={isRTL}
-        uiLanguage={uiLanguage}
-        onSelectKind={(kind) => {
-          setFilterKind(kind);
-          setSelectedSurah(null);
-          setSelectedJuz(null);
-          setPickerMode(null);
-        }}
-        onSelectSurah={(surah) => {
-          setSelectedSurah(surah);
-          setSelectedJuz(null);
-          setFilterKind("surah");
-          setPickerMode(null);
-        }}
-        onSelectJuz={(juz) => {
-          setSelectedJuz(juz);
-          setSelectedSurah(null);
-          setFilterKind("juz");
-          setPickerMode(null);
-        }}
-        onSelectSort={(nextSort) => {
-          setSort(nextSort);
-          setPickerMode(null);
-        }}
-        onClose={() => setPickerMode(null)}
-      />
+      {Platform.OS !== "web" ? (
+        <FilterPicker
+          mode={pickerMode}
+          options={options}
+          filterKind={filterKind}
+          selectedSurah={selectedSurah}
+          selectedJuz={selectedJuz}
+          sort={sort}
+          sortOptions={sortOptions}
+          isDark={isDark}
+          isRTL={isRTL}
+          uiLanguage={uiLanguage}
+          onSelectKind={(kind) => {
+            setFilterKind(kind);
+            setSelectedSurah(null);
+            setSelectedJuz(null);
+            setPickerMode(null);
+          }}
+          onSelectSurah={(surah) => {
+            setSelectedSurah(surah);
+            setSelectedJuz(null);
+            setFilterKind("surah");
+            setPickerMode(null);
+          }}
+          onSelectJuz={(juz) => {
+            setSelectedJuz(juz);
+            setSelectedSurah(null);
+            setFilterKind("juz");
+            setPickerMode(null);
+          }}
+          onSelectSort={(nextSort) => {
+            setSort(nextSort);
+            setPickerMode(null);
+          }}
+          onClose={() => setPickerMode(null)}
+        />
+      ) : null}
 
       <CommentsSheet
         reflectionId={commentsReflectionId}
@@ -423,22 +499,86 @@ export default function ReflectionFeedScreen() {
 }
 
 function FilterSelect({
+  accessibilityLabel,
   label,
+  value,
+  options,
   isDark,
   isRTL,
   minWidth,
   flex,
+  onValueChange,
   onPress,
 }: {
+  accessibilityLabel: string;
   label: string;
+  value: string;
+  options: SelectOption[];
   isDark: boolean;
   isRTL: boolean;
   minWidth: number;
   flex: number;
+  onValueChange: (value: string) => void;
   onPress: () => void;
 }) {
   const color = isDark ? "#2dd4bf" : "#0d9488";
   const textColor = isDark ? "#f5f5f5" : "#2f241c";
+  const borderColor = isDark ? "rgba(45, 212, 191, 0.32)" : "rgba(13, 148, 136, 0.28)";
+
+  if (Platform.OS === "web") {
+    return (
+      <View style={{ minWidth, flex, position: "relative" }}>
+        <WebSelect
+          aria-label={accessibilityLabel}
+          value={value}
+          onChange={(event: any) => onValueChange(event.target.value)}
+          style={{
+            appearance: "none",
+            WebkitAppearance: "none",
+            MozAppearance: "none",
+            backgroundColor: "transparent",
+            borderColor,
+            borderRadius: 999,
+            borderStyle: "solid",
+            borderWidth: 1,
+            color: textColor,
+            cursor: "pointer",
+            direction: isRTL ? "rtl" : "ltr",
+            fontFamily: "Manrope_600SemiBold",
+            fontSize: 12,
+            height: 40,
+            lineHeight: "16px",
+            maxWidth: "100%",
+            outlineColor: color,
+            paddingBottom: 0,
+            paddingLeft: isRTL ? 34 : 16,
+            paddingRight: isRTL ? 16 : 34,
+            paddingTop: 0,
+            textAlign: isRTL ? "right" : "left",
+            width: "100%",
+          }}
+        >
+          {options.map((option) => (
+            <WebOption key={option.value} value={option.value}>
+              {option.label}
+            </WebOption>
+          ))}
+        </WebSelect>
+        <View
+          pointerEvents="none"
+          style={{
+            bottom: 0,
+            justifyContent: "center",
+            position: "absolute",
+            [isRTL ? "left" : "right"]: 12,
+            top: 0,
+          }}
+        >
+          <ChevronDown size={14} color={color} />
+        </View>
+      </View>
+    );
+  }
 
   return (
     <Pressable
