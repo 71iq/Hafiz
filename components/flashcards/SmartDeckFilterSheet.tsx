@@ -78,8 +78,8 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
   const [maximumInterval, setMaximumInterval] = useState(DEFAULT_DECK_MAXIMUM_INTERVAL);
   const [enableFuzz, setEnableFuzz] = useState(DEFAULT_DECK_ENABLE_FUZZ);
   const [enableShortTerm, setEnableShortTerm] = useState(DEFAULT_DECK_ENABLE_SHORT_TERM);
-  const [learningStepsText, setLearningStepsText] = useState(formatStepText(DEFAULT_DECK_LEARNING_STEPS));
-  const [relearningStepsText, setRelearningStepsText] = useState(formatStepText(DEFAULT_DECK_RELEARNING_STEPS));
+  const [learningStepsText, setLearningStepsText] = useState(() => formatStepText(DEFAULT_DECK_LEARNING_STEPS, isRTL));
+  const [relearningStepsText, setRelearningStepsText] = useState(() => formatStepText(DEFAULT_DECK_RELEARNING_STEPS, isRTL));
   const [newReviewOrder, setNewReviewOrder] = useState<NewReviewOrder>(DEFAULT_NEW_REVIEW_ORDER);
   const [reviewSortOrder, setReviewSortOrder] = useState<ReviewSortOrder>(DEFAULT_REVIEW_SORT_ORDER);
   const [newCardSortOrder, setNewCardSortOrder] = useState<NewCardSortOrder>(DEFAULT_NEW_CARD_SORT_ORDER);
@@ -106,8 +106,8 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
       setMaximumInterval(settings.maximumInterval);
       setEnableFuzz(settings.enableFuzz);
       setEnableShortTerm(settings.enableShortTerm);
-      setLearningStepsText(formatStepText(settings.learningSteps));
-      setRelearningStepsText(formatStepText(settings.relearningSteps));
+      setLearningStepsText(formatStepText(settings.learningSteps, isRTL));
+      setRelearningStepsText(formatStepText(settings.relearningSteps, isRTL));
       setNewReviewOrder(settings.newReviewOrder);
       setReviewSortOrder(settings.reviewSortOrder);
       setNewCardSortOrder(settings.newCardSortOrder);
@@ -116,7 +116,7 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
     return () => {
       cancelled = true;
     };
-  }, [db, visible, deckId]);
+  }, [db, visible, deckId, isRTL]);
 
   useEffect(() => {
     if (!visible) setActiveInfo(null);

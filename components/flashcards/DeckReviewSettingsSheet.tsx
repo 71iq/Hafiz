@@ -79,8 +79,8 @@ export function DeckReviewSettingsSheet({ visible, deckId, deckTitle, mode, onCl
   const [maximumInterval, setMaximumInterval] = useState(DEFAULT_DECK_MAXIMUM_INTERVAL);
   const [enableFuzz, setEnableFuzz] = useState(DEFAULT_DECK_ENABLE_FUZZ);
   const [enableShortTerm, setEnableShortTerm] = useState(DEFAULT_DECK_ENABLE_SHORT_TERM);
-  const [learningStepsText, setLearningStepsText] = useState(formatStepText(DEFAULT_DECK_LEARNING_STEPS));
-  const [relearningStepsText, setRelearningStepsText] = useState(formatStepText(DEFAULT_DECK_RELEARNING_STEPS));
+  const [learningStepsText, setLearningStepsText] = useState(() => formatStepText(DEFAULT_DECK_LEARNING_STEPS, isRTL));
+  const [relearningStepsText, setRelearningStepsText] = useState(() => formatStepText(DEFAULT_DECK_RELEARNING_STEPS, isRTL));
   const [newReviewOrder, setNewReviewOrder] = useState<NewReviewOrder>(DEFAULT_NEW_REVIEW_ORDER);
   const [reviewSortOrder, setReviewSortOrder] = useState<ReviewSortOrder>(DEFAULT_REVIEW_SORT_ORDER);
   const [newCardSortOrder, setNewCardSortOrder] = useState<NewCardSortOrder>(DEFAULT_NEW_CARD_SORT_ORDER);
@@ -123,8 +123,8 @@ export function DeckReviewSettingsSheet({ visible, deckId, deckTitle, mode, onCl
       setMaximumInterval(settings.maximumInterval);
       setEnableFuzz(settings.enableFuzz);
       setEnableShortTerm(settings.enableShortTerm);
-      setLearningStepsText(formatStepText(settings.learningSteps));
-      setRelearningStepsText(formatStepText(settings.relearningSteps));
+      setLearningStepsText(formatStepText(settings.learningSteps, isRTL));
+      setRelearningStepsText(formatStepText(settings.relearningSteps, isRTL));
       setNewReviewOrder(settings.newReviewOrder);
       setReviewSortOrder(settings.reviewSortOrder);
       setNewCardSortOrder(settings.newCardSortOrder);
@@ -134,7 +134,7 @@ export function DeckReviewSettingsSheet({ visible, deckId, deckTitle, mode, onCl
     return () => {
       cancelled = true;
     };
-  }, [db, deckId, visible]);
+  }, [db, deckId, isRTL, visible]);
 
   useEffect(() => {
     if (!visible) setActiveInfo(null);
@@ -359,23 +359,59 @@ export function DeckReviewSettingsSheet({ visible, deckId, deckTitle, mode, onCl
   );
 }
 
-const STEP_TEXT_RE = /^\d+(?:\.\d+)?[mhd]$/;
+const STEP_TEXT_RE = /^(\d+(?:\.\d+)?)([mhd])$/;
+const ARABIC_DIGITS = "٠١٢٣٤٥٦٧٨٩";
+const EASTERN_ARABIC_DIGITS = "۰۱۲۳۴۵۶۷۸۹";
 
-function isSchedulerStepText(value: string): value is SchedulerStep {
-  return STEP_TEXT_RE.test(value);
+function normalizeStepDigits(value: string) {
+  return value.replace(/[٠-٩۰-۹]/g, (digit) => {
+    const arabicIndex = ARABIC_DIGITS.indexOf(digit);
+    if (arabicIndex >= 0) return String(arabicIndex);
+    return String(EASTERN_ARABIC_DIGITS.indexOf(digit));
+  });
 }
 
-export function formatStepText(steps: readonly SchedulerStep[]): string {
-  return steps.join(", ");
+function formatArabicStep(step: SchedulerStep): string {
+  const match = step.match(STEP_TEXT_RE);
+  if (!match) return step;
+  const value = Number(match[1]);
+  const unit = match[2] === "m" ? (value === 1 ? "دقيقة" : "دقائق") : match[2] === "h" ? (value === 1 ? "ساعة" : "ساعات") : (value === 1 ? "يوم" : "أيام");
+  return `${toArabicNumber(value)} ${unit}`;
+}
+
+export function formatStepText(steps: readonly SchedulerStep[], isRTL = false): string {
+  if (!isRTL) return steps.join(", ");
+  return steps.map(formatArabicStep).join("، ");
+}
+
+function parseStepToken(value: string): SchedulerStep | null {
+  const normalized = normalizeStepDigits(value.trim().toLowerCase()).replace(/\s+/g, " ");
+  const canonical = normalized.match(/^(\d+(?:\.\d+)?)\s*([mhd])$/);
+  if (canonical) return `${canonical[1]}${canonical[2]}` as SchedulerStep;
+
+  const arabic = normalized.match(/^(\d+(?:\.\d+)?)\s*(دقيقة|دقائق|دق|ساعة|ساعات|ساعه|س|يوم|أيام|ايام)$/);
+  if (!arabic) return null;
+  const unit = arabic[2];
+  if (unit === "دقيقة" || unit === "دقائق" || unit === "دق") return `${arabic[1]}m` as SchedulerStep;
+  if (unit === "ساعة" || unit === "ساعات" || unit === "ساعه" || unit === "س") return `${arabic[1]}h` as SchedulerStep;
+  return `${arabic[1]}d` as SchedulerStep;
 }
 
 export function parseStepText(value: string, fallback: readonly SchedulerStep[]): SchedulerStep[] {
   if (value.trim().length === 0) return [];
-  const steps = value
-    .split(/[,\s]+/)
+  const commaSeparated = value
+    .split(/[,،]+/)
     .map((step) => step.trim())
-    .filter(isSchedulerStepText);
-  return steps.length > 0 ? steps : [...fallback];
+    .filter(Boolean)
+    .map(parseStepToken)
+    .filter((step): step is SchedulerStep => step !== null);
+  if (commaSeparated.length > 0) return commaSeparated;
+
+  const spaceSeparated = value
+    .split(/\s+/)
+    .map(parseStepToken)
+    .filter((step): step is SchedulerStep => step !== null);
+  return spaceSeparated.length > 0 ? spaceSeparated : [...fallback];
 }
 
 type SchedulerOptionsPanelProps = {
@@ -581,7 +617,7 @@ export function SchedulerOptionsPanel({
           onInfoPress={onInfoPress}
           value={learningStepsText}
           onChangeText={onLearningStepsTextChange}
-          placeholder={formatStepText(DEFAULT_DECK_LEARNING_STEPS)}
+          placeholder={formatStepText(DEFAULT_DECK_LEARNING_STEPS, isRTL)}
           compact={compact}
           isDark={isDark}
           isRTL={isRTL}
@@ -594,7 +630,7 @@ export function SchedulerOptionsPanel({
           onInfoPress={onInfoPress}
           value={relearningStepsText}
           onChangeText={onRelearningStepsTextChange}
-          placeholder={formatStepText(DEFAULT_DECK_RELEARNING_STEPS)}
+          placeholder={formatStepText(DEFAULT_DECK_RELEARNING_STEPS, isRTL)}
           compact={compact}
           isDark={isDark}
           isRTL={isRTL}
@@ -821,12 +857,12 @@ function StepInputRow({
         autoCorrect={false}
         className="rounded-2xl border border-warm-200 bg-surface-high px-4 py-2.5 text-charcoal dark:border-neutral-800 dark:bg-surface-dark-high dark:text-neutral-100"
         style={{
-          direction: "ltr",
+          direction: isRTL ? "rtl" : "ltr",
           fontFamily: "Manrope_600SemiBold",
           fontSize: 14,
           minWidth: compact ? 220 : 240,
-          textAlign: "left",
-          writingDirection: "ltr",
+          textAlign: isRTL ? "right" : "left",
+          writingDirection: isRTL ? "rtl" : "ltr",
         }}
       />
     </SettingsRow>
