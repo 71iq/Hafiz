@@ -3,6 +3,7 @@ import { Pressable, Text, type PressableProps, type PressableStateCallbackType, 
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 import { forwardRef } from "react";
+import { useUIDirection, type Direction } from "@/lib/ui/direction";
 
 const buttonVariants = cva(
   "flex-row items-center justify-center",
@@ -56,16 +57,18 @@ type ButtonProps = PressableProps &
     asChild?: boolean;
     label?: string;
     children?: React.ReactNode;
+    dir?: Direction;
   };
 
 export const Button = forwardRef<any, ButtonProps>(
-  ({ variant, size, asChild, label, children, className, disabled, style, ...props }, ref) => {
+  ({ variant, size, asChild, label, children, className, disabled, style, dir: explicitDir, ...props }, ref) => {
     const Component = asChild ? Slot : Pressable;
+    const dir = useUIDirection(explicitDir);
 
     return (
       <Component
         ref={ref}
-        className={cn(buttonVariants({ variant, size }), className)}
+        className={cn(buttonVariants({ variant, size }), dir === "rtl" && "flex-row-reverse", className)}
         disabled={disabled}
         style={(state: PressableStateCallbackType) => [
           {
@@ -77,7 +80,7 @@ export const Button = forwardRef<any, ButtonProps>(
         {...props}
       >
         {children ?? (
-          <Text className={cn(buttonTextVariants({ variant, size }))}>
+          <Text className={cn(buttonTextVariants({ variant, size }))} style={{ writingDirection: dir }}>
             {label}
           </Text>
         )}

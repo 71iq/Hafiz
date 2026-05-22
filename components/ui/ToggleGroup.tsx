@@ -1,11 +1,13 @@
 import { View, Pressable, Text, type ViewProps } from "react-native";
 import { cn } from "@/lib/utils";
 import { forwardRef } from "react";
+import { useUIDirection, type Direction } from "@/lib/ui/direction";
 
 type ToggleGroupProps<T extends string> = ViewProps & {
   value: T;
   onValueChange: (value: T) => void;
   items: { value: T; label: string; icon?: React.ReactNode }[];
+  dir?: Direction;
 };
 
 /**
@@ -16,13 +18,16 @@ export function ToggleGroup<T extends string>({
   value,
   onValueChange,
   items,
+  dir: explicitDir,
   className,
   ...props
 }: ToggleGroupProps<T>) {
+  const dir = useUIDirection(explicitDir);
   return (
     <View
       className={cn(
         "flex-row rounded-full bg-surface-high dark:bg-surface-dark-high p-1",
+        dir === "rtl" && "flex-row-reverse",
         className
       )}
       {...props}
@@ -45,12 +50,13 @@ export function ToggleGroup<T extends string>({
             <Text
               className={cn(
                 "font-manrope-semibold text-sm text-center",
-                active
-                  ? "text-primary-accent dark:text-primary-bright"
-                  : "text-warm-400 dark:text-neutral-500",
-                item.icon ? "ml-1.5" : ""
-              )}
-            >
+                  active
+                    ? "text-primary-accent dark:text-primary-bright"
+                    : "text-warm-400 dark:text-neutral-500",
+                  item.icon ? (dir === "rtl" ? "mr-1.5" : "ml-1.5") : ""
+                )}
+                style={{ writingDirection: dir }}
+              >
               {item.label}
             </Text>
           </Pressable>

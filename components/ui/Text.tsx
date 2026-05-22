@@ -2,6 +2,7 @@ import { Text as RNText, type TextProps } from "react-native";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 import { forwardRef } from "react";
+import { useUIDirection, textAlignForDirection, type Direction } from "@/lib/ui/direction";
 
 const textVariants = cva("text-charcoal dark:text-neutral-200", {
   variants: {
@@ -31,25 +32,35 @@ const textVariants = cva("text-charcoal dark:text-neutral-200", {
   },
 });
 
-type TypographyProps = TextProps & VariantProps<typeof textVariants>;
+type TypographyProps = TextProps &
+  VariantProps<typeof textVariants> & {
+    dir?: Direction;
+    align?: "start" | "center" | "end";
+  };
 
 export const Text = forwardRef<RNText, TypographyProps>(
-  ({ variant, className, ...props }, ref) => (
-    <RNText
-      ref={ref}
-      className={cn(textVariants({ variant }), className)}
-      {...props}
-    />
-  )
+  ({ variant, className, dir: explicitDir, align, style, ...props }, ref) => {
+    const dir = useUIDirection(explicitDir);
+    return (
+      <RNText
+        ref={ref}
+        className={cn(textVariants({ variant }), className)}
+        style={[{ textAlign: textAlignForDirection(dir, align), writingDirection: dir }, style]}
+        {...props}
+      />
+    );
+  }
 );
 
 Text.displayName = "Text";
 
 export const Typography = forwardRef<RNText, TypographyProps>(
-  ({ variant, className, ...props }, ref) => (
+  ({ variant, className, dir, align, ...props }, ref) => (
     <Text
       ref={ref}
       variant={variant}
+      dir={dir}
+      align={align}
       className={className}
       {...props}
     />

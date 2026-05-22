@@ -10,6 +10,10 @@ export {
 } from "./Card";
 export { Badge, badgeVariants, badgeTextVariants } from "./Badge";
 export { Text, Typography, textVariants } from "./Text";
+export { Icon } from "./Icon";
+export { Input } from "./Input";
+export { Field, Label, FieldMessage } from "./Field";
+export { FormTextField } from "./FormTextField";
 export { Progress } from "./Progress";
 export {
   ResponsiveOverlay,

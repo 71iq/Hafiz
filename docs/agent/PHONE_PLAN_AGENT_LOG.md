@@ -1845,3 +1845,19 @@ Saved in `phase19/`:
 - `npm run typecheck`: passed.
 - `npm run build:web`: passed.
 - `npx expo start --web --port 8097 --localhost`: launched successfully; `/profile` smoke checked at 898px and 412px with the fixed header glyph and no search input expansion.
+
+## 2026-05-23 — Hybrid RNR Foundation
+
+### Scope decisions
+1. Chose the Hafiz Hybrid path: adopt RNR conventions for primitives and forms without replacing Hafiz tokens, custom responsive overlays, or QCF2 rendering.
+2. Treated RTL as an explicit primitive-level responsibility, not something assumed from RNR.
+3. Kept QCF2/page rendering files untouched in this foundation phase.
+
+### Implemented in this step
+- Added RNR support setup for portal hosting, Tailwind animation support, and NativeWind `inlineRem`.
+- Added shared UI direction helpers and wired `SettingsProvider` into a direction provider.
+- Added initial shared `Icon`, `Input`, field, and RHF text-field primitives.
+- Extended existing text/button/badge/toggle/overlay primitives with direction-aware behavior.
+
+### Validation result
+- `npm run typecheck`: passed.

@@ -2,6 +2,7 @@ import { View, Text, type ViewProps } from "react-native";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 import { forwardRef } from "react";
+import { useUIDirection, type Direction } from "@/lib/ui/direction";
 
 const badgeVariants = cva(
   "flex-row items-center justify-center rounded-full px-3 py-1",
@@ -38,18 +39,26 @@ type BadgeProps = ViewProps &
   VariantProps<typeof badgeVariants> & {
     label?: string;
     children?: React.ReactNode;
+    dir?: Direction;
   };
 
 export const Badge = forwardRef<View, BadgeProps>(
-  ({ variant, label, children, className, ...props }, ref) => (
-    <View
-      ref={ref}
-      className={cn(badgeVariants({ variant }), className)}
-      {...props}
-    >
-      {children ?? <Text className={cn(badgeTextVariants({ variant }))}>{label}</Text>}
-    </View>
-  )
+  ({ variant, label, children, className, dir: explicitDir, ...props }, ref) => {
+    const dir = useUIDirection(explicitDir);
+    return (
+      <View
+        ref={ref}
+        className={cn(badgeVariants({ variant }), className)}
+        {...props}
+      >
+        {children ?? (
+          <Text className={cn(badgeTextVariants({ variant }))} style={{ writingDirection: dir }}>
+            {label}
+          </Text>
+        )}
+      </View>
+    );
+  }
 );
 
 Badge.displayName = "Badge";

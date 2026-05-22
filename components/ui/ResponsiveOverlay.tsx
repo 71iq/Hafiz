@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, type Ref } from "react";
+import { useEffect, useMemo, useRef, type Ref, type RefObject } from "react";
 import {
   Animated,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -15,6 +16,7 @@ import { X } from "lucide-react-native";
 import { useColorScheme } from "nativewind";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
+import { useUIDirection, type Direction } from "@/lib/ui/direction";
 import { cn } from "@/lib/utils";
 
 type OverlayPresentation = "sheet" | "dialog" | "fullscreen";
@@ -31,6 +33,10 @@ type ResponsiveOverlayProps = {
   maxWidth?: number;
   maxHeight?: OverlayMaxHeight;
   surfaceColor?: string;
+  dir?: Direction;
+  avoidKeyboard?: boolean;
+  initialFocusRef?: RefObject<{ focus?: () => void } | null>;
+  restoreFocusRef?: RefObject<{ focus?: () => void } | null>;
   children: React.ReactNode;
 };
 
@@ -41,6 +47,7 @@ type OverlayHeaderProps = {
   actions?: React.ReactNode;
   onClose?: () => void;
   showHandle?: boolean;
+  dir?: Direction;
   isRTL?: boolean;
 };
 
@@ -55,6 +62,7 @@ type OverlayBodyProps = {
 
 type OverlayFooterProps = {
   children: React.ReactNode;
+  dir?: Direction;
   isRTL?: boolean;
   className?: string;
 };
@@ -112,10 +120,15 @@ export function ResponsiveOverlay({
   maxWidth,
   maxHeight,
   surfaceColor,
+  dir: explicitDir,
+  avoidKeyboard = false,
+  initialFocusRef,
+  restoreFocusRef,
   children,
 }: ResponsiveOverlayProps) {
   const { width, height } = useWindowDimensions();
   const { colorScheme } = useColorScheme();
+  const dir = useUIDirection(explicitDir);
   const animation = useRef(new Animated.Value(0)).current;
   const overlayId = useRef(`overlay-${Math.random().toString(36).slice(2)}`).current;
   const isPhone = width < SIDEBAR_BREAKPOINT;
@@ -152,6 +165,23 @@ export function ResponsiveOverlay({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [dismissOnEscape, onClose, open, overlayId]);
+
+  useEffect(() => {
+    if (!open) return;
+    const activeElement = Platform.OS === "web" && typeof document !== "undefined" ? document.activeElement : null;
+    const focusTimer = requestAnimationFrame(() => initialFocusRef?.current?.focus?.());
+    return () => {
+      cancelAnimationFrame(focusTimer);
+      const restoreTarget = restoreFocusRef?.current;
+      if (restoreTarget?.focus) {
+        requestAnimationFrame(() => restoreTarget.focus?.());
+        return;
+      }
+      if (Platform.OS === "web" && activeElement instanceof HTMLElement) {
+        requestAnimationFrame(() => activeElement.focus());
+      }
+    };
+  }, [initialFocusRef, open, restoreFocusRef]);
 
   const computedMaxHeight = useMemo(() => {
     if (maxHeight != null) return maxHeight;
@@ -197,10 +227,15 @@ export function ResponsiveOverlay({
 
   const overlayAlignment =
     activePresentation === "sheet" ? "items-stretch justify-end" : "items-center justify-center";
+  const Container = avoidKeyboard ? KeyboardAvoidingView : View;
 
   return (
     <Modal visible={open} transparent animationType="none" statusBarTranslucent onRequestClose={onClose}>
-      <View className={cn("flex-1 px-0", overlayAlignment)} style={{ backgroundColor: "rgba(0,0,0,0.55)" }}>
+      <Container
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        className={cn("flex-1 px-0", overlayAlignment)}
+        style={{ backgroundColor: "rgba(0,0,0,0.55)", direction: dir }}
+      >
         <Pressable
           className="absolute inset-0"
           disabled={!dismissOnBackdrop}
@@ -211,11 +246,11 @@ export function ResponsiveOverlay({
             "overflow-hidden bg-surface dark:bg-surface-dark shadow-2xl",
             activePresentation === "sheet" ? "rounded-t-[28px]" : "rounded-[28px]"
           )}
-          style={contentStyle}
+          style={[contentStyle, { direction: dir }]}
         >
           {children}
         </Animated.View>
-      </View>
+      </Container>
     </Modal>
   );
 }
@@ -235,8 +270,11 @@ export function OverlayHeader({
   actions,
   onClose,
   showHandle = false,
-  isRTL = false,
+  dir: explicitDir,
+  isRTL: explicitIsRTL,
 }: OverlayHeaderProps) {
+  const dir = useUIDirection(explicitDir);
+  const isRTL = explicitIsRTL ?? dir === "rtl";
   const rowClassName = isRTL ? "flex-row-reverse" : "flex-row";
 
   return (
@@ -324,8 +362,10 @@ export function OverlayBody({
   );
 }
 
-export function OverlayFooter({ children, isRTL = false, className }: OverlayFooterProps) {
+export function OverlayFooter({ children, dir: explicitDir, isRTL: explicitIsRTL, className }: OverlayFooterProps) {
   const insets = useSafeAreaInsets();
+  const dir = useUIDirection(explicitDir);
+  const isRTL = explicitIsRTL ?? dir === "rtl";
   return (
     <View
       className={cn(

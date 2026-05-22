@@ -5,6 +5,7 @@ import * as Font from "expo-font";
 import { Platform } from "react-native";
 import { useEffect, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { PortalHost } from "@rn-primitives/portal";
 import { DatabaseProvider, useDatabaseStatus } from "@/lib/database/provider";
 import { UI_FONTS, loadUiFontsWeb } from "@/lib/fonts/ui-fonts";
 import { useAuthStore } from "@/lib/auth/store";
@@ -136,6 +137,7 @@ export default function RootLayout() {
               options={{ animation: "slide_from_right" }}
             />
           </Stack>
+          <PortalHost />
           <WebTelemetry />
         </AudioProviderBoundary>
       </DatabaseProvider>

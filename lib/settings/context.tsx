@@ -7,6 +7,7 @@ import { DEFAULT_LANGUAGE } from "@/lib/translations/languages";
 import { importTranslation } from "@/lib/translations/import";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { DEFAULT_RECITATION_ID, normalizeRecitationId } from "@/lib/quran-foundation/recitations";
+import { DirectionProvider } from "@/lib/ui/direction";
 
 // Desktop / large-viewport scale. Also the canonical length (10 levels) used
 // by UI controls like the font size picker.
@@ -453,7 +454,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         isLoaded,
       }}
     >
-      {children}
+      <DirectionProvider dir={isRTL ? "rtl" : "ltr"}>{children}</DirectionProvider>
     </SettingsContext.Provider>
   );
 }
