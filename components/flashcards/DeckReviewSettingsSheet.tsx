@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { ActivityIndicator, Pressable, Text, TextInput, View, useWindowDimensions } from "react-native";
-import { Minus, Plus } from "lucide-react-native";
+import { Info, Minus, Plus } from "lucide-react-native";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { OverlayBody, OverlayFooter, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
@@ -54,6 +54,7 @@ import { useSettings } from "@/lib/settings/context";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 
 type ReviewSettingsMode = "ayah" | "word";
+type SettingInfo = { title: string; body: string };
 
 type Props = {
   visible: boolean;
@@ -86,6 +87,7 @@ export function DeckReviewSettingsSheet({ visible, deckId, deckTitle, mode, onCl
   const [testModes, setTestModes] = useState<TestMode[]>(DEFAULT_ENABLED_MODES);
   const [wordTestModes, setWordTestModes] = useState<WordTestMode[]>(DEFAULT_WORD_TEST_MODES);
   const [saving, setSaving] = useState(false);
+  const [activeInfo, setActiveInfo] = useState<SettingInfo | null>(null);
 
   const testModeLabels: Record<TestMode, string> = {
     nextAyah: s.flashcardsModeNextAyah,
@@ -97,6 +99,17 @@ export function DeckReviewSettingsSheet({ visible, deckId, deckTitle, mode, onCl
   const wordModeLabels: Record<WordTestMode, string> = {
     wordMeaningArabic: s.flashcardsModeWordMeaningArabic,
     wordMeaningTranslation: s.flashcardsModeWordMeaningTranslation,
+  };
+  const testModeInfo: Record<TestMode, string> = {
+    nextAyah: s.flashcardsModeNextAyahInfo,
+    previousAyah: s.flashcardsModePreviousAyahInfo,
+    translation: s.flashcardsModeTranslationInfo,
+    tafseer: s.flashcardsModeTafseerInfo,
+    surahName: s.flashcardsModeSurahNameInfo,
+  };
+  const wordModeInfo: Record<WordTestMode, string> = {
+    wordMeaningArabic: s.flashcardsModeWordMeaningArabicInfo,
+    wordMeaningTranslation: s.flashcardsModeWordMeaningTranslationInfo,
   };
 
   useEffect(() => {
@@ -122,6 +135,14 @@ export function DeckReviewSettingsSheet({ visible, deckId, deckTitle, mode, onCl
       cancelled = true;
     };
   }, [db, deckId, visible]);
+
+  useEffect(() => {
+    if (!visible) setActiveInfo(null);
+  }, [visible]);
+
+  const openSettingInfo = useCallback((title: string, body: string) => {
+    setActiveInfo({ title, body });
+  }, []);
 
   const setNextDailyLimit = useCallback((value: number) => {
     setDailyLimit(Math.max(MIN_DECK_DAILY_REVIEW_LIMIT, Math.min(MAX_DECK_DAILY_REVIEW_LIMIT, value)));
@@ -200,6 +221,9 @@ export function DeckReviewSettingsSheet({ visible, deckId, deckTitle, mode, onCl
               label={wordModeLabels[item]}
               value={wordTestModes.includes(item)}
               onValueChange={() => toggleWordMode(item)}
+              info={wordModeInfo[item]}
+              infoAccessibilityLabel={s.deckReviewSettingsInfoButton}
+              onInfoPress={() => openSettingInfo(wordModeLabels[item], wordModeInfo[item])}
               compact={compact}
               isDark={isDark}
               isRTL={isRTL}
@@ -213,6 +237,9 @@ export function DeckReviewSettingsSheet({ visible, deckId, deckTitle, mode, onCl
               label={testModeLabels[item]}
               value={testModes.includes(item)}
               onValueChange={() => toggleTestMode(item)}
+              info={testModeInfo[item]}
+              infoAccessibilityLabel={s.deckReviewSettingsInfoButton}
+              onInfoPress={() => openSettingInfo(testModeLabels[item], testModeInfo[item])}
               compact={compact}
               isDark={isDark}
               isRTL={isRTL}
@@ -225,78 +252,110 @@ export function DeckReviewSettingsSheet({ visible, deckId, deckTitle, mode, onCl
   );
 
   return (
-    <ResponsiveSheet
-      open={visible}
-      onClose={onClose}
-      maxWidth={680}
-      maxHeight="92%"
-      surfaceColor={surfaceColor}
-    >
-      <OverlayHeader
-        title={s.deckReviewSettingsTitle}
+    <>
+      <ResponsiveSheet
+        open={visible}
         onClose={onClose}
-        isRTL={isRTL}
-        showHandle={isPhone}
-      />
-
-      <OverlayBody contentContainerClassName="px-5 pb-8">
-        <Text
-          className="mb-4 text-charcoal dark:text-neutral-100"
-          style={{
-            fontFamily: "Manrope_700Bold",
-            fontSize: 17,
-            textAlign: isRTL ? "right" : "left",
-            writingDirection: isRTL ? "rtl" : "ltr",
-          }}
-          numberOfLines={2}
-        >
-          {deckTitle}
-        </Text>
-
-        <SchedulerOptionsPanel
-          dailyLimit={dailyLimit}
-          newCardsLimit={newCardsLimit}
-          requestRetention={requestRetention}
-          maximumInterval={maximumInterval}
-          enableFuzz={enableFuzz}
-          enableShortTerm={enableShortTerm}
-          learningStepsText={learningStepsText}
-          relearningStepsText={relearningStepsText}
-          newReviewOrder={newReviewOrder}
-          reviewSortOrder={reviewSortOrder}
-          newCardSortOrder={newCardSortOrder}
-          onDailyLimitChange={setNextDailyLimit}
-          onNewCardsLimitChange={setNextNewCardsLimit}
-          onRequestRetentionChange={setNextRetention}
-          onMaximumIntervalChange={setNextMaximumInterval}
-          onEnableFuzzChange={setEnableFuzz}
-          onEnableShortTermChange={setEnableShortTerm}
-          onLearningStepsTextChange={setLearningStepsText}
-          onRelearningStepsTextChange={setRelearningStepsText}
-          onNewReviewOrderChange={setNewReviewOrder}
-          onReviewSortOrderChange={setReviewSortOrder}
-          onNewCardSortOrderChange={setNewCardSortOrder}
-          afterDailyLimits={mode === "word" ? reviewModeSection : null}
-          compact={compact}
-          isDark={isDark}
+        maxWidth={680}
+        maxHeight="92%"
+        surfaceColor={surfaceColor}
+      >
+        <OverlayHeader
+          title={s.deckReviewSettingsTitle}
+          onClose={onClose}
           isRTL={isRTL}
+          showHandle={isPhone}
         />
 
-        {mode !== "word" ? reviewModeSection : null}
-      </OverlayBody>
+        <OverlayBody contentContainerClassName="px-5 pb-8">
+          <Text
+            className="mb-4 text-charcoal dark:text-neutral-100"
+            style={{
+              fontFamily: "Manrope_700Bold",
+              fontSize: 17,
+              textAlign: isRTL ? "right" : "left",
+              writingDirection: isRTL ? "rtl" : "ltr",
+            }}
+            numberOfLines={2}
+          >
+            {deckTitle}
+          </Text>
 
-      <OverlayFooter isRTL={isRTL}>
-        <Button onPress={handleSave} disabled={saving || !deckId} className="w-full">
-          {saving ? (
-            <ActivityIndicator color="#fff" size="small" />
-          ) : (
-            <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16, color: "#fff" }}>
-              {s.deckReviewSettingsSave}
-            </Text>
-          )}
-        </Button>
-      </OverlayFooter>
-    </ResponsiveSheet>
+          <SchedulerOptionsPanel
+            dailyLimit={dailyLimit}
+            newCardsLimit={newCardsLimit}
+            requestRetention={requestRetention}
+            maximumInterval={maximumInterval}
+            enableFuzz={enableFuzz}
+            enableShortTerm={enableShortTerm}
+            learningStepsText={learningStepsText}
+            relearningStepsText={relearningStepsText}
+            newReviewOrder={newReviewOrder}
+            reviewSortOrder={reviewSortOrder}
+            newCardSortOrder={newCardSortOrder}
+            onDailyLimitChange={setNextDailyLimit}
+            onNewCardsLimitChange={setNextNewCardsLimit}
+            onRequestRetentionChange={setNextRetention}
+            onMaximumIntervalChange={setNextMaximumInterval}
+            onEnableFuzzChange={setEnableFuzz}
+            onEnableShortTermChange={setEnableShortTerm}
+            onLearningStepsTextChange={setLearningStepsText}
+            onRelearningStepsTextChange={setRelearningStepsText}
+            onNewReviewOrderChange={setNewReviewOrder}
+            onReviewSortOrderChange={setReviewSortOrder}
+            onNewCardSortOrderChange={setNewCardSortOrder}
+            onInfoPress={openSettingInfo}
+            afterDailyLimits={mode === "word" ? reviewModeSection : null}
+            compact={compact}
+            isDark={isDark}
+            isRTL={isRTL}
+          />
+
+          {mode !== "word" ? reviewModeSection : null}
+        </OverlayBody>
+
+        <OverlayFooter isRTL={isRTL}>
+          <Button onPress={handleSave} disabled={saving || !deckId} className="w-full">
+            {saving ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16, color: "#fff" }}>
+                {s.deckReviewSettingsSave}
+              </Text>
+            )}
+          </Button>
+        </OverlayFooter>
+      </ResponsiveSheet>
+
+      <ResponsiveSheet
+        open={visible && activeInfo !== null}
+        onClose={() => setActiveInfo(null)}
+        maxWidth={440}
+        maxHeight={isPhone ? "70%" : 360}
+        surfaceColor={surfaceColor}
+      >
+        <OverlayHeader
+          title={activeInfo?.title ?? ""}
+          onClose={() => setActiveInfo(null)}
+          isRTL={isRTL}
+          showHandle={isPhone}
+        />
+        <OverlayBody contentContainerClassName="px-5 py-5">
+          <Text
+            className="text-charcoal dark:text-neutral-200"
+            style={{
+              fontFamily: "Manrope_400Regular",
+              fontSize: 14,
+              lineHeight: 23,
+              textAlign: isRTL ? "right" : "left",
+              writingDirection: isRTL ? "rtl" : "ltr",
+            }}
+          >
+            {activeInfo?.body ?? ""}
+          </Text>
+        </OverlayBody>
+      </ResponsiveSheet>
+    </>
   );
 }
 
@@ -342,6 +401,7 @@ type SchedulerOptionsPanelProps = {
   onNewReviewOrderChange: (value: NewReviewOrder) => void;
   onReviewSortOrderChange: (value: ReviewSortOrder) => void;
   onNewCardSortOrderChange: (value: NewCardSortOrder) => void;
+  onInfoPress: (title: string, body: string) => void;
   afterDailyLimits?: ReactNode;
   compact: boolean;
   isDark: boolean;
@@ -371,6 +431,7 @@ export function SchedulerOptionsPanel({
   onNewReviewOrderChange,
   onReviewSortOrderChange,
   onNewCardSortOrderChange,
+  onInfoPress,
   afterDailyLimits,
   compact,
   isDark,
@@ -403,7 +464,11 @@ export function SchedulerOptionsPanel({
         <SettingsRow
           title={s.flashcardsDailyLimit}
           subtitle={s.flashcardsDailyLimitDesc}
+          info={s.flashcardsDailyLimitInfo}
+          infoAccessibilityLabel={s.deckReviewSettingsInfoButton}
+          onInfoPress={onInfoPress}
           compact={compact}
+          isDark={isDark}
           isRTL={isRTL}
         >
           <ReviewStepper
@@ -419,7 +484,11 @@ export function SchedulerOptionsPanel({
         <SettingsRow
           title={s.flashcardsNewLimit}
           subtitle={s.flashcardsNewLimitDesc}
+          info={s.flashcardsNewLimitInfo}
+          infoAccessibilityLabel={s.deckReviewSettingsInfoButton}
+          onInfoPress={onInfoPress}
           compact={compact}
+          isDark={isDark}
           isRTL={isRTL}
         >
           <ReviewStepper
@@ -440,7 +509,11 @@ export function SchedulerOptionsPanel({
         <SettingsRow
           title={s.flashcardsDesiredRetention}
           subtitle={s.flashcardsDesiredRetentionDesc}
+          info={s.flashcardsDesiredRetentionInfo}
+          infoAccessibilityLabel={s.deckReviewSettingsInfoButton}
+          onInfoPress={onInfoPress}
           compact={compact}
+          isDark={isDark}
           isRTL={isRTL}
         >
           <ReviewStepper
@@ -456,7 +529,11 @@ export function SchedulerOptionsPanel({
         <SettingsRow
           title={s.flashcardsMaximumInterval}
           subtitle={s.flashcardsMaximumIntervalDesc}
+          info={s.flashcardsMaximumIntervalInfo}
+          infoAccessibilityLabel={s.deckReviewSettingsInfoButton}
+          onInfoPress={onInfoPress}
           compact={compact}
+          isDark={isDark}
           isRTL={isRTL}
         >
           <ReviewStepper
@@ -472,17 +549,25 @@ export function SchedulerOptionsPanel({
         <SwitchSettingsRow
           title={s.flashcardsEnableFuzz}
           subtitle={s.flashcardsEnableFuzzDesc}
+          info={s.flashcardsEnableFuzzInfo}
+          infoAccessibilityLabel={s.deckReviewSettingsInfoButton}
+          onInfoPress={onInfoPress}
           value={enableFuzz}
           onValueChange={() => onEnableFuzzChange(!enableFuzz)}
           compact={compact}
+          isDark={isDark}
           isRTL={isRTL}
         />
         <SwitchSettingsRow
           title={s.flashcardsEnableShortTerm}
           subtitle={s.flashcardsEnableShortTermDesc}
+          info={s.flashcardsEnableShortTermInfo}
+          infoAccessibilityLabel={s.deckReviewSettingsInfoButton}
+          onInfoPress={onInfoPress}
           value={enableShortTerm}
           onValueChange={() => onEnableShortTermChange(!enableShortTerm)}
           compact={compact}
+          isDark={isDark}
           isRTL={isRTL}
         />
       </SettingsSection>
@@ -491,6 +576,9 @@ export function SchedulerOptionsPanel({
         <StepInputRow
           title={s.flashcardsLearningSteps}
           subtitle={s.flashcardsLearningStepsDesc}
+          info={s.flashcardsLearningStepsInfo}
+          infoAccessibilityLabel={s.deckReviewSettingsInfoButton}
+          onInfoPress={onInfoPress}
           value={learningStepsText}
           onChangeText={onLearningStepsTextChange}
           placeholder={formatStepText(DEFAULT_DECK_LEARNING_STEPS)}
@@ -501,6 +589,9 @@ export function SchedulerOptionsPanel({
         <StepInputRow
           title={s.flashcardsRelearningSteps}
           subtitle={s.flashcardsRelearningStepsDesc}
+          info={s.flashcardsRelearningStepsInfo}
+          infoAccessibilityLabel={s.deckReviewSettingsInfoButton}
+          onInfoPress={onInfoPress}
           value={relearningStepsText}
           onChangeText={onRelearningStepsTextChange}
           placeholder={formatStepText(DEFAULT_DECK_RELEARNING_STEPS)}
@@ -513,6 +604,9 @@ export function SchedulerOptionsPanel({
       <SettingsSection title={s.flashcardsDisplayOrderSection} isRTL={isRTL} variant="quiet">
         <ChoiceRow
           title={s.flashcardsNewReviewOrder}
+          info={s.flashcardsNewReviewOrderInfo}
+          infoAccessibilityLabel={s.deckReviewSettingsInfoButton}
+          onInfoPress={onInfoPress}
           options={ALL_NEW_REVIEW_ORDERS.map((value) => ({ value, label: newReviewOrderLabels[value] }))}
           value={newReviewOrder}
           onChange={onNewReviewOrderChange}
@@ -521,6 +615,9 @@ export function SchedulerOptionsPanel({
         />
         <ChoiceRow
           title={s.flashcardsReviewSortOrder}
+          info={s.flashcardsReviewSortOrderInfo}
+          infoAccessibilityLabel={s.deckReviewSettingsInfoButton}
+          onInfoPress={onInfoPress}
           options={ALL_REVIEW_SORT_ORDERS.map((value) => ({ value, label: reviewSortOrderLabels[value] }))}
           value={reviewSortOrder}
           onChange={onReviewSortOrderChange}
@@ -529,6 +626,9 @@ export function SchedulerOptionsPanel({
         />
         <ChoiceRow
           title={s.flashcardsNewCardSortOrder}
+          info={s.flashcardsNewCardSortOrderInfo}
+          infoAccessibilityLabel={s.deckReviewSettingsInfoButton}
+          onInfoPress={onInfoPress}
           options={ALL_NEW_CARD_SORT_ORDERS.map((value) => ({ value, label: newCardSortOrderLabels[value] }))}
           value={newCardSortOrder}
           onChange={onNewCardSortOrderChange}
@@ -580,14 +680,22 @@ function SettingsSection({
 function SettingsRow({
   title,
   subtitle,
+  info,
+  infoAccessibilityLabel,
+  onInfoPress,
   children,
   compact,
+  isDark,
   isRTL,
 }: {
   title: string;
   subtitle: string;
+  info?: string;
+  infoAccessibilityLabel?: string;
+  onInfoPress?: (title: string, body: string) => void;
   children: ReactNode;
   compact: boolean;
+  isDark: boolean;
   isRTL: boolean;
 }) {
   return (
@@ -600,17 +708,15 @@ function SettingsRow({
       }}
     >
       <View className="min-w-0 flex-1">
-        <Text
-          className="text-charcoal dark:text-neutral-200"
-          style={{
-            fontFamily: "Manrope_600SemiBold",
-            fontSize: 15,
-            textAlign: isRTL ? "right" : "left",
-            writingDirection: isRTL ? "rtl" : "ltr",
-          }}
-        >
-          {title}
-        </Text>
+        <SettingTitle
+          title={title}
+          info={info}
+          infoAccessibilityLabel={infoAccessibilityLabel}
+          onInfoPress={onInfoPress}
+          isDark={isDark}
+          isRTL={isRTL}
+          fontSize={15}
+        />
         <Text
           className="mt-0.5 text-warm-400 dark:text-neutral-500"
           style={{
@@ -634,20 +740,37 @@ function SettingsRow({
 function SwitchSettingsRow({
   title,
   subtitle,
+  info,
+  infoAccessibilityLabel,
+  onInfoPress,
   value,
   onValueChange,
   compact,
+  isDark,
   isRTL,
 }: {
   title: string;
   subtitle: string;
+  info?: string;
+  infoAccessibilityLabel?: string;
+  onInfoPress?: (title: string, body: string) => void;
   value: boolean;
   onValueChange: () => void;
   compact: boolean;
+  isDark: boolean;
   isRTL: boolean;
 }) {
   return (
-    <SettingsRow title={title} subtitle={subtitle} compact={compact} isRTL={isRTL}>
+    <SettingsRow
+      title={title}
+      subtitle={subtitle}
+      info={info}
+      infoAccessibilityLabel={infoAccessibilityLabel}
+      onInfoPress={onInfoPress}
+      compact={compact}
+      isDark={isDark}
+      isRTL={isRTL}
+    >
       <Switch value={value} onValueChange={onValueChange} />
     </SettingsRow>
   );
@@ -656,6 +779,9 @@ function SwitchSettingsRow({
 function StepInputRow({
   title,
   subtitle,
+  info,
+  infoAccessibilityLabel,
+  onInfoPress,
   value,
   onChangeText,
   placeholder,
@@ -665,6 +791,9 @@ function StepInputRow({
 }: {
   title: string;
   subtitle: string;
+  info?: string;
+  infoAccessibilityLabel?: string;
+  onInfoPress?: (title: string, body: string) => void;
   value: string;
   onChangeText: (value: string) => void;
   placeholder: string;
@@ -673,7 +802,16 @@ function StepInputRow({
   isRTL: boolean;
 }) {
   return (
-    <SettingsRow title={title} subtitle={subtitle} compact={compact} isRTL={isRTL}>
+    <SettingsRow
+      title={title}
+      subtitle={subtitle}
+      info={info}
+      infoAccessibilityLabel={infoAccessibilityLabel}
+      onInfoPress={onInfoPress}
+      compact={compact}
+      isDark={isDark}
+      isRTL={isRTL}
+    >
       <TextInput
         value={value}
         onChangeText={onChangeText}
@@ -697,6 +835,9 @@ function StepInputRow({
 
 function ChoiceRow<T extends string>({
   title,
+  info,
+  infoAccessibilityLabel,
+  onInfoPress,
   options,
   value,
   onChange,
@@ -704,6 +845,9 @@ function ChoiceRow<T extends string>({
   isRTL,
 }: {
   title: string;
+  info?: string;
+  infoAccessibilityLabel?: string;
+  onInfoPress?: (title: string, body: string) => void;
   options: { value: T; label: string }[];
   value: T;
   onChange: (value: T) => void;
@@ -717,17 +861,15 @@ function ChoiceRow<T extends string>({
 
   return (
     <View className="gap-2 py-2.5">
-      <Text
-        className="text-charcoal dark:text-neutral-200"
-        style={{
-          fontFamily: "Manrope_600SemiBold",
-          fontSize: 14,
-          textAlign: isRTL ? "right" : "left",
-          writingDirection: isRTL ? "rtl" : "ltr",
-        }}
-      >
-        {title}
-      </Text>
+      <SettingTitle
+        title={title}
+        info={info}
+        infoAccessibilityLabel={infoAccessibilityLabel}
+        onInfoPress={onInfoPress}
+        isDark={isDark}
+        isRTL={isRTL}
+        fontSize={14}
+      />
       <View
         className="gap-1 rounded-2xl p-1"
         style={{
@@ -835,6 +977,9 @@ function ReviewSwitchRow({
   label,
   value,
   onValueChange,
+  info,
+  infoAccessibilityLabel,
+  onInfoPress,
   compact,
   isDark,
   isRTL,
@@ -843,6 +988,9 @@ function ReviewSwitchRow({
   label: string;
   value: boolean;
   onValueChange: () => void;
+  info?: string;
+  infoAccessibilityLabel?: string;
+  onInfoPress?: () => void;
   compact: boolean;
   isDark: boolean;
   isRTL: boolean;
@@ -865,20 +1013,99 @@ function ReviewSwitchRow({
         width: compact ? "48%" : "100%",
       }}
     >
+      <View
+        className="min-w-0 flex-1 items-center gap-1.5"
+        style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
+      >
+        <Text
+          className="text-charcoal dark:text-neutral-300"
+          style={{
+            color: quiet && value ? selectedText : isDark ? "#d4d4d4" : "#2D2D2D",
+            flexShrink: 1,
+            fontFamily: quiet && value ? "Manrope_600SemiBold" : "Manrope_500Medium",
+            fontSize: 14,
+            textAlign: isRTL ? "right" : "left",
+            writingDirection: isRTL ? "rtl" : "ltr",
+          }}
+        >
+          {label}
+        </Text>
+        {info && onInfoPress ? (
+          <SettingInfoButton
+            accessibilityLabel={infoAccessibilityLabel ?? label}
+            isDark={isDark}
+            onPress={onInfoPress}
+          />
+        ) : null}
+      </View>
+      <Switch value={value} onValueChange={onValueChange} />
+    </View>
+  );
+}
+
+function SettingTitle({
+  title,
+  info,
+  infoAccessibilityLabel,
+  onInfoPress,
+  isDark,
+  isRTL,
+  fontSize,
+}: {
+  title: string;
+  info?: string;
+  infoAccessibilityLabel?: string;
+  onInfoPress?: (title: string, body: string) => void;
+  isDark: boolean;
+  isRTL: boolean;
+  fontSize: number;
+}) {
+  return (
+    <View
+      className="min-w-0 items-center gap-1.5"
+      style={{ flexDirection: isRTL ? "row-reverse" : "row", alignSelf: isRTL ? "flex-end" : "flex-start" }}
+    >
       <Text
-        className="text-charcoal dark:text-neutral-300"
+        className="text-charcoal dark:text-neutral-200"
         style={{
-          color: quiet && value ? selectedText : isDark ? "#d4d4d4" : "#2D2D2D",
           flexShrink: 1,
-          fontFamily: quiet && value ? "Manrope_600SemiBold" : "Manrope_500Medium",
-          fontSize: 14,
+          fontFamily: "Manrope_600SemiBold",
+          fontSize,
           textAlign: isRTL ? "right" : "left",
           writingDirection: isRTL ? "rtl" : "ltr",
         }}
       >
-        {label}
+        {title}
       </Text>
-      <Switch value={value} onValueChange={onValueChange} />
+      {info && onInfoPress ? (
+        <SettingInfoButton
+          accessibilityLabel={infoAccessibilityLabel ?? title}
+          isDark={isDark}
+          onPress={() => onInfoPress(title, info)}
+        />
+      ) : null}
     </View>
+  );
+}
+
+function SettingInfoButton({
+  accessibilityLabel,
+  isDark,
+  onPress,
+}: {
+  accessibilityLabel: string;
+  isDark: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole="button"
+      hitSlop={8}
+      onPress={onPress}
+      className="h-6 w-6 items-center justify-center rounded-full bg-primary-accent/10 dark:bg-primary-bright/10"
+    >
+      <Info size={14} color={isDark ? "#5eead4" : "#0d9488"} />
+    </Pressable>
   );
 }

@@ -57,6 +57,7 @@ type Props = {
 };
 
 type FilterType = BuiltInDeckFilter["type"];
+type SettingInfo = { title: string; body: string };
 type SurahRow = { number: number; name_arabic: string; name_english: string; ayah_count: number };
 
 export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Props) {
@@ -84,6 +85,7 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
   const [newCardSortOrder, setNewCardSortOrder] = useState<NewCardSortOrder>(DEFAULT_NEW_CARD_SORT_ORDER);
   const [reviewSettings, setReviewSettings] = useState<DeckReviewSettings | null>(null);
   const [saving, setSaving] = useState(false);
+  const [activeInfo, setActiveInfo] = useState<SettingInfo | null>(null);
 
   useEffect(() => {
     if (!visible || !deckId) return;
@@ -115,6 +117,14 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
       cancelled = true;
     };
   }, [db, visible, deckId]);
+
+  useEffect(() => {
+    if (!visible) setActiveInfo(null);
+  }, [visible]);
+
+  const openSettingInfo = useCallback((title: string, body: string) => {
+    setActiveInfo({ title, body });
+  }, []);
 
   const toggleSurah = useCallback((n: number) => {
     setSelectedSurahs((prev) => {
@@ -189,141 +199,173 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
   ];
 
   return (
-    <ResponsiveSheet
-      open={visible}
-      onClose={onClose}
-      maxWidth={760}
-      maxHeight={720}
-      surfaceColor={surfaceColor}
-    >
-      <OverlayHeader
-        title={title}
+    <>
+      <ResponsiveSheet
+        open={visible}
         onClose={onClose}
-        isRTL={isRTL}
-        showHandle={isPhone}
-      />
+        maxWidth={760}
+        maxHeight={720}
+        surfaceColor={surfaceColor}
+      >
+        <OverlayHeader
+          title={title}
+          onClose={onClose}
+          isRTL={isRTL}
+          showHandle={isPhone}
+        />
 
-      <View className="mb-4 mt-2">
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{
-            gap: 8,
-            alignItems: "center",
-            paddingHorizontal: 20,
-            paddingVertical: 2,
-            flexDirection: isRTL ? "row-reverse" : "row",
-          }}
-          style={{ maxHeight: 52 }}
-        >
-          {tabs.map((tab) => (
-            <Pressable
-              key={tab.value}
-              onPress={() => setFilterType(tab.value)}
-              className={`h-11 rounded-full px-5 items-center justify-center ${
-                filterType === tab.value ? "bg-primary-accent" : "bg-surface-low dark:bg-surface-dark-low"
-              }`}
-              style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-            >
+        <View className="mb-4 mt-2">
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{
+              gap: 8,
+              alignItems: "center",
+              paddingHorizontal: 20,
+              paddingVertical: 2,
+              flexDirection: isRTL ? "row-reverse" : "row",
+            }}
+            style={{ maxHeight: 52 }}
+          >
+            {tabs.map((tab) => (
+              <Pressable
+                key={tab.value}
+                onPress={() => setFilterType(tab.value)}
+                className={`h-11 rounded-full px-5 items-center justify-center ${
+                  filterType === tab.value ? "bg-primary-accent" : "bg-surface-low dark:bg-surface-dark-low"
+                }`}
+                style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+              >
+                <Text
+                  numberOfLines={1}
+                  style={{
+                    fontFamily: filterType === tab.value ? "Manrope_600SemiBold" : "Manrope_500Medium",
+                    fontSize: 13,
+                    color: filterType === tab.value ? "#fff" : (isDark ? "#a3a3a3" : "#6e5a47"),
+                  }}
+                >
+                  {tab.label}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+
+        <OverlayBody contentContainerClassName="px-5 pb-8">
+          {filterType === "all" && (
+            <Card elevation="low" className="p-5">
               <Text
-                numberOfLines={1}
+                className="text-charcoal dark:text-neutral-200"
                 style={{
-                  fontFamily: filterType === tab.value ? "Manrope_600SemiBold" : "Manrope_500Medium",
-                  fontSize: 13,
-                  color: filterType === tab.value ? "#fff" : (isDark ? "#a3a3a3" : "#6e5a47"),
+                  fontFamily: "Manrope_600SemiBold",
+                  fontSize: 15,
+                  textAlign: isRTL ? "right" : "left",
+                  writingDirection: isRTL ? "rtl" : "ltr",
                 }}
               >
-                {tab.label}
+                {s.smartDeckFilterAllDesc}
               </Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-      </View>
-
-      <OverlayBody contentContainerClassName="px-5 pb-8">
-        {filterType === "all" && (
-          <Card elevation="low" className="p-5">
-            <Text
-              className="text-charcoal dark:text-neutral-200"
-              style={{
-                fontFamily: "Manrope_600SemiBold",
-                fontSize: 15,
-                textAlign: isRTL ? "right" : "left",
-                writingDirection: isRTL ? "rtl" : "ltr",
-              }}
-            >
-              {s.smartDeckFilterAllDesc}
-            </Text>
-          </Card>
-        )}
-
-        {filterType === "surah" && (
-          <View className="gap-2">
-            {surahs.map((surah) => (
-              <SurahFilterItem
-                key={surah.number}
-                surah={surah}
-                selected={selectedSurahs.has(surah.number)}
-                onToggle={() => toggleSurah(surah.number)}
-                isDark={isDark}
-                isRTL={isRTL}
-                ayahCountLabel={interpolate("{{n}} {{label}}", { n: surah.ayah_count, label: s.ayahs })}
-              />
-            ))}
-          </View>
-        )}
-
-        {filterType === "juz" && (
-          <View className="flex-row flex-wrap gap-3">
-            {Array.from({ length: 30 }, (_, i) => i + 1).map((n) => (
-              <NumberChip key={n} number={n} selected={selectedJuz.has(n)} onToggle={() => toggleJuz(n)} isDark={isDark} />
-            ))}
-          </View>
-        )}
-
-        <View className="mt-6">
-          <SchedulerOptionsPanel
-            dailyLimit={dailyLimit}
-            newCardsLimit={newCardsLimit}
-            requestRetention={requestRetention}
-            maximumInterval={maximumInterval}
-            enableFuzz={enableFuzz}
-            enableShortTerm={enableShortTerm}
-            learningStepsText={learningStepsText}
-            relearningStepsText={relearningStepsText}
-            newReviewOrder={newReviewOrder}
-            reviewSortOrder={reviewSortOrder}
-            newCardSortOrder={newCardSortOrder}
-            onDailyLimitChange={setNextDailyLimit}
-            onNewCardsLimitChange={setNextNewCardsLimit}
-            onRequestRetentionChange={setNextRetention}
-            onMaximumIntervalChange={setNextMaximumInterval}
-            onEnableFuzzChange={setEnableFuzz}
-            onEnableShortTermChange={setEnableShortTerm}
-            onLearningStepsTextChange={setLearningStepsText}
-            onRelearningStepsTextChange={setRelearningStepsText}
-            onNewReviewOrderChange={setNewReviewOrder}
-            onReviewSortOrderChange={setReviewSortOrder}
-            onNewCardSortOrderChange={setNewCardSortOrder}
-            compact={compact}
-            isDark={isDark}
-            isRTL={isRTL}
-          />
-        </View>
-      </OverlayBody>
-
-      <OverlayFooter isRTL={isRTL}>
-        <Button onPress={handleSave} disabled={saving} className="w-full">
-          {saving ? (
-            <ActivityIndicator color="#fff" size="small" />
-          ) : (
-            <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16, color: "#fff" }}>
-              {s.smartDeckApplyFilter}
-            </Text>
+            </Card>
           )}
-        </Button>
-      </OverlayFooter>
-    </ResponsiveSheet>
+
+          {filterType === "surah" && (
+            <View className="gap-2">
+              {surahs.map((surah) => (
+                <SurahFilterItem
+                  key={surah.number}
+                  surah={surah}
+                  selected={selectedSurahs.has(surah.number)}
+                  onToggle={() => toggleSurah(surah.number)}
+                  isDark={isDark}
+                  isRTL={isRTL}
+                  ayahCountLabel={interpolate("{{n}} {{label}}", { n: surah.ayah_count, label: s.ayahs })}
+                />
+              ))}
+            </View>
+          )}
+
+          {filterType === "juz" && (
+            <View className="flex-row flex-wrap gap-3">
+              {Array.from({ length: 30 }, (_, i) => i + 1).map((n) => (
+                <NumberChip key={n} number={n} selected={selectedJuz.has(n)} onToggle={() => toggleJuz(n)} isDark={isDark} />
+              ))}
+            </View>
+          )}
+
+          <View className="mt-6">
+            <SchedulerOptionsPanel
+              dailyLimit={dailyLimit}
+              newCardsLimit={newCardsLimit}
+              requestRetention={requestRetention}
+              maximumInterval={maximumInterval}
+              enableFuzz={enableFuzz}
+              enableShortTerm={enableShortTerm}
+              learningStepsText={learningStepsText}
+              relearningStepsText={relearningStepsText}
+              newReviewOrder={newReviewOrder}
+              reviewSortOrder={reviewSortOrder}
+              newCardSortOrder={newCardSortOrder}
+              onDailyLimitChange={setNextDailyLimit}
+              onNewCardsLimitChange={setNextNewCardsLimit}
+              onRequestRetentionChange={setNextRetention}
+              onMaximumIntervalChange={setNextMaximumInterval}
+              onEnableFuzzChange={setEnableFuzz}
+              onEnableShortTermChange={setEnableShortTerm}
+              onLearningStepsTextChange={setLearningStepsText}
+              onRelearningStepsTextChange={setRelearningStepsText}
+              onNewReviewOrderChange={setNewReviewOrder}
+              onReviewSortOrderChange={setReviewSortOrder}
+              onNewCardSortOrderChange={setNewCardSortOrder}
+              onInfoPress={openSettingInfo}
+              compact={compact}
+              isDark={isDark}
+              isRTL={isRTL}
+            />
+          </View>
+        </OverlayBody>
+
+        <OverlayFooter isRTL={isRTL}>
+          <Button onPress={handleSave} disabled={saving} className="w-full">
+            {saving ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16, color: "#fff" }}>
+                {s.smartDeckApplyFilter}
+              </Text>
+            )}
+          </Button>
+        </OverlayFooter>
+      </ResponsiveSheet>
+
+      <ResponsiveSheet
+        open={visible && activeInfo !== null}
+        onClose={() => setActiveInfo(null)}
+        maxWidth={440}
+        maxHeight={isPhone ? "70%" : 360}
+        surfaceColor={surfaceColor}
+      >
+        <OverlayHeader
+          title={activeInfo?.title ?? ""}
+          onClose={() => setActiveInfo(null)}
+          isRTL={isRTL}
+          showHandle={isPhone}
+        />
+        <OverlayBody contentContainerClassName="px-5 py-5">
+          <Text
+            className="text-charcoal dark:text-neutral-200"
+            style={{
+              fontFamily: "Manrope_400Regular",
+              fontSize: 14,
+              lineHeight: 23,
+              textAlign: isRTL ? "right" : "left",
+              writingDirection: isRTL ? "rtl" : "ltr",
+            }}
+          >
+            {activeInfo?.body ?? ""}
+          </Text>
+        </OverlayBody>
+      </ResponsiveSheet>
+    </>
   );
 }
 
