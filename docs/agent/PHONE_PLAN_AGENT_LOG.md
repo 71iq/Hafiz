@@ -1876,3 +1876,13 @@ Saved in `phase19/`:
 
 ### Validation result
 - `npm run typecheck`: passed.
+
+## 2026-05-23 — Hybrid RNR Verification
+
+### Validation result
+- `npx @react-native-reusables/cli@latest doctor --cwd .`: improved; dependency, Metro, and root portal warnings are resolved. Remaining warnings are theme/CSS-variable hybrid exceptions plus the existing Expo Babel-shape false positive.
+- `npm run typecheck`: passed.
+- `npm run build:web`: passed.
+- `npx expo start --web --port 8096 --localhost`: started successfully.
+- Playwright smoke checked `/auth/login` at 412px: page rendered with 0 console errors. Warnings were pre-existing metadata/shadow deprecations.
+- Playwright smoke checked `/mushaf` with a single Hafiz tab after avoiding the existing OPFS multi-tab lock condition; route rendered/redirected without console errors.
