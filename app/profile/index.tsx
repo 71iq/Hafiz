@@ -1,7 +1,8 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { I18nManager, Platform, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
 import { ChevronLeft, ChevronRight, LogOut, UserRound } from "lucide-react-native";
 import { useQuery } from "@tanstack/react-query";
 import { PublicBadgesGrid } from "@/components/achievements/PublicBadgesGrid";
@@ -16,8 +17,19 @@ import { SettingsProvider, useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { strings } from "@/lib/i18n/strings";
 import { useAuthStore } from "@/lib/auth/store";
+import { getWirdStatus } from "@/lib/fsrs/queries";
+import { getTotalScore } from "@/lib/fsrs/scoring";
+import { subscribeReviewActivity } from "@/lib/fsrs/review-events";
+import { updateProfileStats } from "@/lib/fsrs/leaderboard-sync";
 
 const UI_LANGUAGE_CACHE_KEY = "hafiz_ui_language";
+
+type ProfileStatsSnapshot = {
+  currentStreak: number;
+  longestStreak: number;
+  cardsReviewed: number;
+  totalScore: number;
+};
 
 export default function ProfileScreen() {
   const { isReady, progress, error } = useDatabaseStatus();
@@ -69,6 +81,7 @@ function ProfileScreenContent() {
   const { width } = useWindowDimensions();
   const { user, profile, isLoading: authLoading, signOut } = useAuthStore();
   const [logoutDialogVisible, setLogoutDialogVisible] = useState(false);
+  const [localStats, setLocalStats] = useState<ProfileStatsSnapshot | null>(null);
   const maxWidth = Math.min(width, 880);
   const ArrowIcon = isRTL ? ChevronRight : ChevronLeft;
   const accountName = profile?.display_name || profile?.username || user?.email || s.authProfile;
@@ -80,11 +93,44 @@ function ProfileScreenContent() {
     enabled: !!user,
     staleTime: 1000 * 60,
   });
+  const loadLocalStats = useCallback(async () => {
+    const [wirdStatus, totalScore, cardsReviewedRow] = await Promise.all([
+      getWirdStatus(db),
+      getTotalScore(db),
+      db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM study_log"),
+    ]);
+    setLocalStats({
+      currentStreak: wirdStatus.currentDays,
+      longestStreak: wirdStatus.longestDays,
+      cardsReviewed: cardsReviewedRow?.count ?? 0,
+      totalScore,
+    });
+  }, [db]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!user) {
+        setLocalStats(null);
+        return;
+      }
+      loadLocalStats().catch(console.warn);
+      updateProfileStats(db).catch(console.warn);
+    }, [db, loadLocalStats, user])
+  );
+
+  useEffect(() => {
+    if (!user) return;
+    return subscribeReviewActivity(() => {
+      loadLocalStats().catch(console.warn);
+      updateProfileStats(db).catch(console.warn);
+    });
+  }, [db, loadLocalStats, user]);
+
   const stats = [
-    { label: s.wirdCurrent, value: profile?.current_streak ?? 0 },
-    { label: s.wirdLongest, value: profile?.longest_streak ?? 0 },
-    { label: s.flashcardsSummaryReviewed, value: profile?.cards_reviewed ?? 0 },
-    { label: s.leaderboardPoints, value: profile?.total_score ?? 0 },
+    { label: s.wirdCurrent, value: localStats?.currentStreak ?? profile?.current_streak ?? 0 },
+    { label: s.wirdLongest, value: localStats?.longestStreak ?? profile?.longest_streak ?? 0 },
+    { label: s.flashcardsSummaryReviewed, value: localStats?.cardsReviewed ?? profile?.cards_reviewed ?? 0 },
+    { label: s.leaderboardPoints, value: localStats?.totalScore ?? profile?.total_score ?? 0 },
   ];
   const handleLogout = useCallback(async () => {
     setLogoutDialogVisible(false);

@@ -2,12 +2,26 @@ import type { SQLiteDatabase } from "expo-sqlite";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { useAuthStore } from "@/lib/auth/store";
 import { getTodayScore, getTotalScore } from "./scoring";
-import { getStudyStreak, getLastReviewDate } from "./queries";
+import { getWirdStatus } from "./queries";
+
+type ProfileStatsPatch = {
+  total_score: number;
+  current_streak: number;
+  longest_streak: number;
+  cards_reviewed: number;
+  last_review_date: string | null;
+};
 
 async function ensureProfileRow() {
   const { user, ensureProfile } = useAuthStore.getState();
   if (!user) return null;
   return ensureProfile();
+}
+
+function patchCurrentProfile(stats: ProfileStatsPatch): void {
+  useAuthStore.setState((state) => ({
+    profile: state.profile ? { ...state.profile, ...stats } : state.profile,
+  }));
 }
 
 /** Sync today's daily score to Supabase */
@@ -43,11 +57,10 @@ export async function updateProfileStats(db: SQLiteDatabase): Promise<void> {
   if (!user) return;
   await ensureProfileRow();
 
-  const [totalScore, currentStreak, lastReviewDate, totalCards] = await Promise.all([
+  const [totalScore, wirdStatus, cardsReviewedRow] = await Promise.all([
     getTotalScore(db),
-    getStudyStreak(db),
-    getLastReviewDate(db),
-    db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM study_cards").then((r) => r?.count ?? 0),
+    getWirdStatus(db),
+    db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM study_log"),
   ]);
 
   // Fetch current profile to compute longest streak
@@ -57,19 +70,27 @@ export async function updateProfileStats(db: SQLiteDatabase): Promise<void> {
     .eq("id", user.id)
     .single();
 
-  const longestStreak = Math.max(currentStreak, profile?.longest_streak ?? 0);
-  const lastReviewDay = lastReviewDate ? lastReviewDate.split("T")[0] : null;
+  const longestStreak = Math.max(wirdStatus.longestDays, profile?.longest_streak ?? 0);
+  const lastReviewDay = wirdStatus.lastReviewDate ? wirdStatus.lastReviewDate.split("T")[0] : null;
+  const stats: ProfileStatsPatch = {
+    total_score: totalScore,
+    current_streak: wirdStatus.currentDays,
+    longest_streak: longestStreak,
+    cards_reviewed: cardsReviewedRow?.count ?? 0,
+    last_review_date: lastReviewDay,
+  };
 
-  const { error } = await supabase
+  patchCurrentProfile(stats);
+
+  const { data, error } = await supabase
     .from("profiles")
     .upsert({
       id: user.id,
-      total_score: totalScore,
-      current_streak: currentStreak,
-      longest_streak: longestStreak,
-      cards_reviewed: totalCards,
-      last_review_date: lastReviewDay,
-    });
+      ...stats,
+    })
+    .select("*")
+    .single();
 
   if (error) console.warn("[Leaderboard] Failed to update profile stats:", error.message);
+  else if (data) useAuthStore.setState({ profile: data });
 }
