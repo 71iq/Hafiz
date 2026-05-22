@@ -33,6 +33,7 @@
     "@react-navigation/native": "^7.1.28",
     "@rive-app/react-native": "^0.4.6",
     "@rive-app/react-webgl2": "^4.28.5",
+    "@rn-primitives/slot": "^1.4.0",
     "@shopify/flash-list": "2.0.2",
     "@supabase/supabase-js": "^2.99.3",
     "@tanstack/react-query": "^5.95.0",

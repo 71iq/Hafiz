@@ -33,7 +33,7 @@ const textVariants = cva("text-charcoal dark:text-neutral-200", {
 
 type TypographyProps = TextProps & VariantProps<typeof textVariants>;
 
-export const Typography = forwardRef<RNText, TypographyProps>(
+export const Text = forwardRef<RNText, TypographyProps>(
   ({ variant, className, ...props }, ref) => (
     <RNText
       ref={ref}
@@ -43,5 +43,17 @@ export const Typography = forwardRef<RNText, TypographyProps>(
   )
 );
 
+Text.displayName = "Text";
+
+export const Typography = forwardRef<RNText, TypographyProps>(
+  ({ variant, className, ...props }, ref) => (
+    <Text
+      ref={ref}
+      variant={variant}
+      className={className}
+      {...props}
+    />
+  )
+);
 Typography.displayName = "Typography";
 export { textVariants };

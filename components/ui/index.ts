@@ -1,7 +1,15 @@
-export { Button, buttonVariants } from "./Button";
-export { Card, CardHeader, CardContent, CardFooter, cardVariants } from "./Card";
-export { Badge, badgeVariants } from "./Badge";
-export { Typography, textVariants } from "./Text";
+export { Button, buttonVariants, buttonTextVariants } from "./Button";
+export {
+  Card,
+  CardHeader,
+  CardContent,
+  CardFooter,
+  CardTitle,
+  CardDescription,
+  cardVariants,
+} from "./Card";
+export { Badge, badgeVariants, badgeTextVariants } from "./Badge";
+export { Text, Typography, textVariants } from "./Text";
 export { Progress } from "./Progress";
 export {
   ResponsiveOverlay,

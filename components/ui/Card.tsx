@@ -1,4 +1,4 @@
-import { View, type ViewProps } from "react-native";
+import { Text as RNText, View, type TextProps, type ViewProps } from "react-native";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 import { forwardRef } from "react";
@@ -52,5 +52,27 @@ export const CardFooter = forwardRef<View, ViewProps>(
   )
 );
 CardFooter.displayName = "CardFooter";
+
+export const CardTitle = forwardRef<RNText, TextProps>(
+  ({ className, ...props }, ref) => (
+    <RNText
+      ref={ref}
+      className={cn("font-manrope-semibold text-lg text-charcoal dark:text-neutral-100", className)}
+      {...props}
+    />
+  )
+);
+CardTitle.displayName = "CardTitle";
+
+export const CardDescription = forwardRef<RNText, TextProps>(
+  ({ className, ...props }, ref) => (
+    <RNText
+      ref={ref}
+      className={cn("font-manrope text-sm leading-relaxed text-warm-500 dark:text-neutral-400", className)}
+      {...props}
+    />
+  )
+);
+CardDescription.displayName = "CardDescription";
 
 export { cardVariants };

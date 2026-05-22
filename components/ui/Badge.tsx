@@ -36,20 +36,21 @@ const badgeTextVariants = cva("font-manrope-medium text-xs", {
 
 type BadgeProps = ViewProps &
   VariantProps<typeof badgeVariants> & {
-    label: string;
+    label?: string;
+    children?: React.ReactNode;
   };
 
 export const Badge = forwardRef<View, BadgeProps>(
-  ({ variant, label, className, ...props }, ref) => (
+  ({ variant, label, children, className, ...props }, ref) => (
     <View
       ref={ref}
       className={cn(badgeVariants({ variant }), className)}
       {...props}
     >
-      <Text className={cn(badgeTextVariants({ variant }))}>{label}</Text>
+      {children ?? <Text className={cn(badgeTextVariants({ variant }))}>{label}</Text>}
     </View>
   )
 );
 
 Badge.displayName = "Badge";
-export { badgeVariants };
+export { badgeVariants, badgeTextVariants };

@@ -1,4 +1,5 @@
-import { Pressable, Text, type PressableProps, type ViewStyle } from "react-native";
+import { Slot } from "@rn-primitives/slot";
+import { Pressable, Text, type PressableProps, type PressableStateCallbackType, type ViewStyle } from "react-native";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 import { forwardRef } from "react";
@@ -28,7 +29,7 @@ const buttonVariants = cva(
   }
 );
 
-const textVariants = cva("font-manrope-semibold text-center", {
+const buttonTextVariants = cva("font-manrope-semibold text-center", {
   variants: {
     variant: {
       default: "text-white",
@@ -52,18 +53,21 @@ const textVariants = cva("font-manrope-semibold text-center", {
 
 type ButtonProps = PressableProps &
   VariantProps<typeof buttonVariants> & {
+    asChild?: boolean;
     label?: string;
     children?: React.ReactNode;
   };
 
 export const Button = forwardRef<any, ButtonProps>(
-  ({ variant, size, label, children, className, disabled, style, ...props }, ref) => {
+  ({ variant, size, asChild, label, children, className, disabled, style, ...props }, ref) => {
+    const Component = asChild ? Slot : Pressable;
+
     return (
-      <Pressable
+      <Component
         ref={ref}
         className={cn(buttonVariants({ variant, size }), className)}
         disabled={disabled}
-        style={(state) => [
+        style={(state: PressableStateCallbackType) => [
           {
             opacity: disabled ? 0.5 : 1,
             transform: [{ scale: state.pressed ? 0.98 : 1 }],
@@ -73,14 +77,14 @@ export const Button = forwardRef<any, ButtonProps>(
         {...props}
       >
         {children ?? (
-          <Text className={cn(textVariants({ variant, size }))}>
+          <Text className={cn(buttonTextVariants({ variant, size }))}>
             {label}
           </Text>
         )}
-      </Pressable>
+      </Component>
     );
   }
 );
 
 Button.displayName = "Button";
-export { buttonVariants, textVariants };
+export { buttonVariants, buttonTextVariants, buttonTextVariants as textVariants };
