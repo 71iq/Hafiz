@@ -410,6 +410,16 @@ function MushafInner() {
     );
   }, []);
 
+  const clearTargetHighlight = useCallback(() => {
+    if (!highlightedKey && !highlightedWord) return;
+    setHighlightedKey(null);
+    setHighlightedWord(null);
+  }, [highlightedKey, highlightedWord]);
+
+  const screenDismissHighlightProps = Platform.OS === "web"
+    ? ({ onPointerDown: clearTargetHighlight } as Record<string, unknown>)
+    : ({ onTouchStart: clearTargetHighlight } as Record<string, unknown>);
+
   // Load shared juz/surah/page index once for the indicator
   useEffect(() => {
     loadMushafIndex(db).then(setMushafIndex).catch((e) => {
@@ -1162,6 +1172,7 @@ function MushafInner() {
       <SafeAreaView
         className="flex-1 bg-surface dark:bg-surface-dark"
         edges={["top"]}
+        {...screenDismissHighlightProps}
       >
         {/* Header chrome — phone gets the new glass top bar, desktop keeps current layout. */}
         <Animated.View
