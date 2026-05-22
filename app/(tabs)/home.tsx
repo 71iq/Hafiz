@@ -81,6 +81,7 @@ export default function HomeScreen() {
   const s = useStrings();
   const router = useRouter();
   const { isLaptop } = useScreenContentLayout({ maxWidth: DESKTOP_CONTENT_MAX_WIDTH });
+  const mirroredRowStyle = isRTL ? ({ direction: "ltr" } as const) : undefined;
   const [decks, setDecks] = useState<DeckDisplay[]>([]);
   const [smartDecks, setSmartDecks] = useState<SmartDeckDisplay[]>([]);
   const [vocabStats, setVocabStats] = useState<{ total: number; dueCount: number; newCount: number }>({ total: 0, dueCount: 0, newCount: 0 });
@@ -352,7 +353,7 @@ export default function HomeScreen() {
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
       <ScreenScrollView maxWidth={DESKTOP_CONTENT_MAX_WIDTH} contentContainerStyle={{ paddingBottom: 100 }}>
         <View className="pt-6 pb-3">
-          <View className={`flex-row items-center justify-between ${isRTL ? "flex-row-reverse" : ""}`}>
+          <View className={`flex-row items-center justify-between ${isRTL ? "flex-row-reverse" : ""}`} style={mirroredRowStyle}>
             <Text
               className="text-warm-400 dark:text-neutral-500 uppercase"
               style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, letterSpacing: 1.8 }}
@@ -377,8 +378,8 @@ export default function HomeScreen() {
           <Text className="text-warm-400 dark:text-neutral-500 uppercase" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, letterSpacing: 1.8 }}>
             {s.flashcardsDueToday}
           </Text>
-          <View className={`flex-row items-end justify-between gap-3 mt-2 ${isRTL ? "flex-row-reverse" : ""}`}>
-            <View className={`flex-1 flex-row items-end gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
+          <View className={`flex-row items-end justify-between gap-3 mt-2 ${isRTL ? "flex-row-reverse" : ""}`} style={mirroredRowStyle}>
+            <View className={`flex-1 flex-row items-end gap-3 ${isRTL ? "flex-row-reverse" : ""}`} style={mirroredRowStyle}>
               <View className={isRTL ? "items-end" : "items-start"}>
                 <Text className="text-charcoal dark:text-neutral-100" style={{ fontFamily: "NotoSerif_700Bold", fontSize: 68, lineHeight: 68 }}>
                   {totalDue}
@@ -401,7 +402,7 @@ export default function HomeScreen() {
                 onPress={() => handleStartReview()}
                 className={`rounded-full bg-primary-accent px-4 py-3 flex-row items-center gap-2 ${isRTL ? "flex-row-reverse" : ""}`}
                 accessibilityRole="button"
-                style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.97 : 1 }] })}
+                style={({ pressed }) => ({ ...(mirroredRowStyle ?? {}), transform: [{ scale: pressed ? 0.97 : 1 }] })}
               >
                 <Play size={15} color="#fff" />
                 <Text className="text-white" style={{ fontFamily: "Manrope_700Bold", fontSize: 12 }} numberOfLines={1}>
@@ -410,8 +411,8 @@ export default function HomeScreen() {
               </Pressable>
             )}
           </View>
-          <View className={`flex-row items-center justify-between mt-4 rounded-3xl bg-surface-low dark:bg-surface-dark-low px-4 py-3 ${isRTL ? "flex-row-reverse" : ""}`}>
-            <View className={`flex-row items-center gap-1.5 ${isRTL ? "flex-row-reverse" : ""}`}>
+          <View className={`flex-row items-center justify-between mt-4 rounded-3xl bg-surface-low dark:bg-surface-dark-low px-4 py-3 ${isRTL ? "flex-row-reverse" : ""}`} style={mirroredRowStyle}>
+            <View className={`flex-row items-center gap-1.5 ${isRTL ? "flex-row-reverse" : ""}`} style={mirroredRowStyle}>
               <CalendarCheck2 size={14} color={isDark ? "#2dd4bf" : "#0d9488"} />
               <Text className="text-charcoal dark:text-neutral-100" style={{ fontFamily: "Manrope_700Bold", fontSize: 16 }}>
                 {wirdStatus.currentDays.toLocaleString()}
