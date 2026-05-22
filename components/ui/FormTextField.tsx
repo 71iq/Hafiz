@@ -1,3 +1,5 @@
+import { type Ref } from "react";
+import { TextInput } from "react-native";
 import { Controller, type Control, type FieldPath, type FieldValues } from "react-hook-form";
 import { Input, type InputProps } from "@/components/ui/Input";
 import { Field, FieldMessage, Label } from "@/components/ui/Field";
@@ -9,6 +11,7 @@ type FormTextFieldProps<TFieldValues extends FieldValues> = {
   label: string;
   error?: string;
   dir?: Direction;
+  inputRef?: Ref<TextInput>;
   inputProps?: Omit<InputProps, "value" | "onChangeText" | "onBlur" | "dir" | "invalid">;
 };
 
@@ -18,6 +21,7 @@ export function FormTextField<TFieldValues extends FieldValues>({
   label,
   error,
   dir,
+  inputRef,
   inputProps,
 }: FormTextFieldProps<TFieldValues>) {
   return (
@@ -28,6 +32,7 @@ export function FormTextField<TFieldValues extends FieldValues>({
         name={name}
         render={({ field: { onChange, onBlur, value } }) => (
           <Input
+            ref={inputRef}
             dir={dir}
             invalid={!!error}
             onBlur={onBlur}

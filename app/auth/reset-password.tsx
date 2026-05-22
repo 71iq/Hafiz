@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { useForm, Controller } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { ChevronLeft, ChevronRight } from "lucide-react-native";
@@ -20,6 +20,7 @@ import { useAuthStore } from "@/lib/auth/store";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { FormTextField } from "@/components/ui/FormTextField";
 
 const resetPasswordSchema = z
   .object({
@@ -149,68 +150,34 @@ export default function ResetPasswordScreen() {
               </View>
             )}
 
-            <Text
-              className="text-charcoal dark:text-neutral-300 mb-2"
-              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}
-            >
-              {s.authNewPassword}
-            </Text>
-            <Controller
+            <FormTextField
               control={control}
               name="password"
-              render={({ field: { onChange, onBlur, value } }) => (
-                <TextInput
-                  className="bg-surface dark:bg-surface-dark-high rounded-2xl px-4 py-3 text-charcoal dark:text-neutral-100 mb-1"
-                  style={{ fontFamily: "Manrope_400Regular", fontSize: 15 }}
-                  placeholder={s.authNewPassword}
-                  placeholderTextColor="#b9a085"
-                  secureTextEntry
-                  returnKeyType="next"
-                  onSubmitEditing={() => confirmPasswordRef.current?.focus()}
-                  blurOnSubmit={false}
-                  onBlur={onBlur}
-                  onChangeText={onChange}
-                  value={value}
-                />
-              )}
+              label={s.authNewPassword}
+              error={errors.password?.message}
+              inputProps={{
+                placeholder: s.authNewPassword,
+                secureTextEntry: true,
+                returnKeyType: "next",
+                onSubmitEditing: () => confirmPasswordRef.current?.focus(),
+                blurOnSubmit: false,
+              }}
             />
-            {errors.password && (
-              <Text className="text-red-500 text-xs mb-2" style={{ fontFamily: "Manrope_400Regular" }}>
-                {errors.password.message}
-              </Text>
-            )}
 
             <View className="h-3" />
-            <Text
-              className="text-charcoal dark:text-neutral-300 mb-2"
-              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}
-            >
-              {s.authConfirmPassword}
-            </Text>
-            <Controller
+            <FormTextField
               control={control}
               name="confirmPassword"
-              render={({ field: { onChange, onBlur, value } }) => (
-                <TextInput
-                  ref={confirmPasswordRef}
-                  className="bg-surface dark:bg-surface-dark-high rounded-2xl px-4 py-3 text-charcoal dark:text-neutral-100 mb-1"
-                  style={{ fontFamily: "Manrope_400Regular", fontSize: 15 }}
-                  placeholder={s.authConfirmPassword}
-                  placeholderTextColor="#b9a085"
-                  secureTextEntry
-                  returnKeyType="done"
-                  onSubmitEditing={handleSubmit(onSubmit)}
-                  onBlur={onBlur}
-                  onChangeText={onChange}
-                  value={value}
-                />
-              )}
+              label={s.authConfirmPassword}
+              error={errors.confirmPassword?.message}
+              inputRef={confirmPasswordRef}
+              inputProps={{
+                placeholder: s.authConfirmPassword,
+                secureTextEntry: true,
+                returnKeyType: "done",
+                onSubmitEditing: handleSubmit(onSubmit),
+              }}
             />
-            {errors.confirmPassword && (
-              <Text className="text-red-500 text-xs mb-2" style={{ fontFamily: "Manrope_400Regular" }}>
-                {errors.confirmPassword.message}
-              </Text>
-            )}
 
             <View className="h-5" />
             <Button onPress={handleSubmit(onSubmit)} disabled={isLoading || !ready}>

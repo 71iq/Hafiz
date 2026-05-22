@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { useForm, Controller } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useAuthStore } from "@/lib/auth/store";
@@ -20,6 +20,7 @@ import { isSupabaseConfigured } from "@/lib/supabase";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { FormTextField } from "@/components/ui/FormTextField";
 import { OAuthButtons } from "@/components/auth/OAuthButtons";
 import { ChevronLeft, ChevronRight, UserPlus } from "lucide-react-native";
 
@@ -154,101 +155,71 @@ export default function SignupScreen() {
               </View>
             )}
 
-            {/* Email */}
-            <FormField label={s.authEmail} error={errors.email?.message}>
-              <Controller
-                control={control}
-                name="email"
-                render={({ field: { onChange, onBlur, value } }) => (
-                  <TextInput
-                    className="bg-surface dark:bg-surface-dark-high rounded-2xl px-4 py-3 text-charcoal dark:text-neutral-100"
-                    style={{ fontFamily: "Manrope_400Regular", fontSize: 15 }}
-                    placeholder={s.authEmail}
-                    placeholderTextColor="#b9a085"
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    returnKeyType="next"
-                    onSubmitEditing={() => usernameRef.current?.focus()}
-                    blurOnSubmit={false}
-                    onBlur={onBlur}
-                    onChangeText={onChange}
-                    value={value}
-                  />
-                )}
-              />
-            </FormField>
+            <FormTextField
+              control={control}
+              name="email"
+              label={s.authEmail}
+              error={errors.email?.message}
+              inputProps={{
+                placeholder: s.authEmail,
+                keyboardType: "email-address",
+                autoCapitalize: "none",
+                autoCorrect: false,
+                returnKeyType: "next",
+                onSubmitEditing: () => usernameRef.current?.focus(),
+                blurOnSubmit: false,
+              }}
+            />
 
-            {/* Username */}
-            <FormField label={s.authUsername} error={errors.username?.message}>
-              <Controller
-                control={control}
-                name="username"
-                render={({ field: { onChange, onBlur, value } }) => (
-                  <TextInput
-                    ref={usernameRef}
-                    className="bg-surface dark:bg-surface-dark-high rounded-2xl px-4 py-3 text-charcoal dark:text-neutral-100"
-                    style={{ fontFamily: "Manrope_400Regular", fontSize: 15 }}
-                    placeholder={s.authUsername}
-                    placeholderTextColor="#b9a085"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    returnKeyType="next"
-                    onSubmitEditing={() => displayNameRef.current?.focus()}
-                    blurOnSubmit={false}
-                    onBlur={onBlur}
-                    onChangeText={onChange}
-                    value={value}
-                  />
-                )}
-              />
-            </FormField>
+            <View className="h-3" />
 
-            {/* Display Name */}
-            <FormField label={s.authDisplayName} error={errors.displayName?.message}>
-              <Controller
-                control={control}
-                name="displayName"
-                render={({ field: { onChange, onBlur, value } }) => (
-                  <TextInput
-                    ref={displayNameRef}
-                    className="bg-surface dark:bg-surface-dark-high rounded-2xl px-4 py-3 text-charcoal dark:text-neutral-100"
-                    style={{ fontFamily: "Manrope_400Regular", fontSize: 15 }}
-                    placeholder={s.authDisplayName}
-                    placeholderTextColor="#b9a085"
-                    returnKeyType="next"
-                    onSubmitEditing={() => passwordRef.current?.focus()}
-                    blurOnSubmit={false}
-                    onBlur={onBlur}
-                    onChangeText={onChange}
-                    value={value}
-                  />
-                )}
-              />
-            </FormField>
+            <FormTextField
+              control={control}
+              name="username"
+              label={s.authUsername}
+              error={errors.username?.message}
+              inputRef={usernameRef}
+              inputProps={{
+                placeholder: s.authUsername,
+                autoCapitalize: "none",
+                autoCorrect: false,
+                returnKeyType: "next",
+                onSubmitEditing: () => displayNameRef.current?.focus(),
+                blurOnSubmit: false,
+              }}
+            />
 
-            {/* Password */}
-            <FormField label={s.authPassword} error={errors.password?.message}>
-              <Controller
-                control={control}
-                name="password"
-                render={({ field: { onChange, onBlur, value } }) => (
-                  <TextInput
-                    ref={passwordRef}
-                    className="bg-surface dark:bg-surface-dark-high rounded-2xl px-4 py-3 text-charcoal dark:text-neutral-100"
-                    style={{ fontFamily: "Manrope_400Regular", fontSize: 15 }}
-                    placeholder={s.authPassword}
-                    placeholderTextColor="#b9a085"
-                    secureTextEntry
-                    returnKeyType="done"
-                    onSubmitEditing={handleSubmit(onSubmit)}
-                    onBlur={onBlur}
-                    onChangeText={onChange}
-                    value={value}
-                  />
-                )}
-              />
-            </FormField>
+            <View className="h-3" />
+
+            <FormTextField
+              control={control}
+              name="displayName"
+              label={s.authDisplayName}
+              error={errors.displayName?.message}
+              inputRef={displayNameRef}
+              inputProps={{
+                placeholder: s.authDisplayName,
+                returnKeyType: "next",
+                onSubmitEditing: () => passwordRef.current?.focus(),
+                blurOnSubmit: false,
+              }}
+            />
+
+            <View className="h-3" />
+
+            <FormTextField
+              control={control}
+              name="password"
+              label={s.authPassword}
+              error={errors.password?.message}
+              inputRef={passwordRef}
+              inputProps={{
+                placeholder: s.authPassword,
+                secureTextEntry: true,
+                returnKeyType: "done",
+                onSubmitEditing: handleSubmit(onSubmit),
+              }}
+            />
 
             <View className="h-2" />
 
@@ -330,32 +301,5 @@ export default function SignupScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
-  );
-}
-
-function FormField({
-  label,
-  error,
-  children,
-}: {
-  label: string;
-  error?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <View className="mb-3">
-      <Text
-        className="text-charcoal dark:text-neutral-300 mb-2"
-        style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}
-      >
-        {label}
-      </Text>
-      {children}
-      {error && (
-        <Text className="text-red-500 text-xs mt-1" style={{ fontFamily: "Manrope_400Regular" }}>
-          {error}
-        </Text>
-      )}
-    </View>
   );
 }

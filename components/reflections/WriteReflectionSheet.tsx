@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
-import { View, Text, TextInput, Pressable, ActivityIndicator, useWindowDimensions } from "react-native";
+import { View, Text, Pressable, ActivityIndicator, useWindowDimensions } from "react-native";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
+import { Input } from "@/components/ui/Input";
 import { useAuthStore } from "@/lib/auth/store";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -111,6 +112,8 @@ export function WriteReflectionSheet({
       maxWidth={560}
       maxHeight={maxOverlayHeight}
       surfaceColor={surfaceColor}
+      dir={isRTL ? "rtl" : "ltr"}
+      avoidKeyboard
     >
       <OverlayHeader
         title={s.addReflection}
@@ -167,22 +170,19 @@ export function WriteReflectionSheet({
               </View>
             )}
 
-            <TextInput
+            <Input
               value={content}
               onChangeText={setContent}
               placeholder={s.reflectionPlaceholder}
               placeholderTextColor={mutedColor}
               multiline
               maxLength={5000}
-              textAlignVertical="top"
-              className="rounded-3xl bg-surface-low dark:bg-surface-dark-low text-charcoal dark:text-neutral-100 px-4 py-3.5 mb-2"
+              dir={isRTL ? "rtl" : "ltr"}
+              className="mb-2 rounded-3xl bg-surface-low px-4 py-3.5 text-charcoal dark:bg-surface-dark-low dark:text-neutral-100"
               style={{
-                fontFamily: "Manrope_400Regular",
                 fontSize: 14,
-                lineHeight: 22,
                 minHeight: 132,
                 maxHeight: 220,
-                textAlign: isRTL ? "right" : "left",
               }}
             />
 

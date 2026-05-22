@@ -1861,3 +1861,18 @@ Saved in `phase19/`:
 
 ### Validation result
 - `npm run typecheck`: passed.
+
+## 2026-05-23 — Hybrid RNR Form Primitive Adoption
+
+### Scope decisions
+1. Migrated the highest-duplication form surfaces first instead of sweeping every raw input.
+2. Preserved existing auth validation, keyboard submit/focus behavior, Supabase guards, and bilingual strings.
+3. Preserved reflection/comment/private-note sheet behavior while moving text direction and placeholder styling into shared primitives.
+
+### Implemented in this step
+- Auth login, signup, forgot-password, and reset-password now use the shared RHF text-field primitive.
+- Private notes, write-reflection, and comments sheets now use the shared `Input` primitive.
+- Common sheet text inputs now pass explicit direction and keyboard avoidance through `ResponsiveSheet`.
+
+### Validation result
+- `npm run typecheck`: passed.

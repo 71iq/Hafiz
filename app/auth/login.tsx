@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { useForm, Controller } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useAuthStore } from "@/lib/auth/store";
@@ -19,6 +19,7 @@ import { isSupabaseConfigured } from "@/lib/supabase";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { FormTextField } from "@/components/ui/FormTextField";
 import { OAuthButtons } from "@/components/auth/OAuthButtons";
 import { ChevronLeft, ChevronRight, ShieldCheck } from "lucide-react-native";
 
@@ -119,73 +120,37 @@ export default function LoginScreen() {
               </View>
             )}
 
-            {/* Email */}
-            <Text
-              className="text-charcoal dark:text-neutral-300 mb-2"
-              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}
-            >
-              {s.authEmail}
-            </Text>
-            <Controller
+            <FormTextField
               control={control}
               name="email"
-              render={({ field: { onChange, onBlur, value } }) => (
-                <TextInput
-                  className="bg-surface dark:bg-surface-dark-high rounded-2xl px-4 py-3 text-charcoal dark:text-neutral-100 mb-1"
-                  style={{ fontFamily: "Manrope_400Regular", fontSize: 15 }}
-                  placeholder={s.authEmail}
-                  placeholderTextColor="#b9a085"
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  returnKeyType="next"
-                  onSubmitEditing={() => passwordRef.current?.focus()}
-                  blurOnSubmit={false}
-                  onBlur={onBlur}
-                  onChangeText={onChange}
-                  value={value}
-                />
-              )}
+              label={s.authEmail}
+              error={errors.email?.message}
+              inputProps={{
+                placeholder: s.authEmail,
+                keyboardType: "email-address",
+                autoCapitalize: "none",
+                autoCorrect: false,
+                returnKeyType: "next",
+                onSubmitEditing: () => passwordRef.current?.focus(),
+                blurOnSubmit: false,
+              }}
             />
-            {errors.email && (
-              <Text className="text-red-500 text-xs mb-2" style={{ fontFamily: "Manrope_400Regular" }}>
-                {errors.email.message}
-              </Text>
-            )}
 
             <View className="h-3" />
 
-            {/* Password */}
-            <Text
-              className="text-charcoal dark:text-neutral-300 mb-2"
-              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}
-            >
-              {s.authPassword}
-            </Text>
-            <Controller
+            <FormTextField
               control={control}
               name="password"
-              render={({ field: { onChange, onBlur, value } }) => (
-                <TextInput
-                  ref={passwordRef}
-                  className="bg-surface dark:bg-surface-dark-high rounded-2xl px-4 py-3 text-charcoal dark:text-neutral-100 mb-1"
-                  style={{ fontFamily: "Manrope_400Regular", fontSize: 15 }}
-                  placeholder={s.authPassword}
-                  placeholderTextColor="#b9a085"
-                  secureTextEntry
-                  returnKeyType="done"
-                  onSubmitEditing={handleSubmit(onSubmit)}
-                  onBlur={onBlur}
-                  onChangeText={onChange}
-                  value={value}
-                />
-              )}
+              label={s.authPassword}
+              error={errors.password?.message}
+              inputRef={passwordRef}
+              inputProps={{
+                placeholder: s.authPassword,
+                secureTextEntry: true,
+                returnKeyType: "done",
+                onSubmitEditing: handleSubmit(onSubmit),
+              }}
             />
-            {errors.password && (
-              <Text className="text-red-500 text-xs mb-2" style={{ fontFamily: "Manrope_400Regular" }}>
-                {errors.password.message}
-              </Text>
-            )}
 
             <Pressable
               onPress={() => router.push("/auth/forgot-password" as any)}

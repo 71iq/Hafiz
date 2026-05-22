@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, Text, TextInput, View, useWindowDimensions } from "react-native";
+import { ActivityIndicator, Pressable, Text, View, useWindowDimensions } from "react-native";
 import { OverlayBody, OverlayFooter, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
+import { Input } from "@/components/ui/Input";
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -90,6 +91,8 @@ export function PrivateNoteSheet({
       maxWidth={560}
       maxHeight={maxOverlayHeight}
       surfaceColor={isDark ? "#1a1a1a" : "#FFF8F1"}
+      dir={isRTL ? "rtl" : "ltr"}
+      avoidKeyboard
     >
       <OverlayHeader
         title={note ? s.privateNoteEdit : s.privateNoteTitle}
@@ -99,21 +102,17 @@ export function PrivateNoteSheet({
         isRTL={isRTL}
       />
       <OverlayBody contentContainerClassName="px-5 py-4">
-        <TextInput
+        <Input
           value={content}
           onChangeText={handleContentChange}
           placeholder={s.privateNotePlaceholder}
           placeholderTextColor={mutedColor}
           multiline
-          textAlignVertical="top"
-          className="rounded-3xl bg-surface-low dark:bg-surface-dark-low px-4 py-3.5 text-charcoal dark:text-neutral-100"
+          dir={isRTL ? "rtl" : "ltr"}
+          className="rounded-3xl bg-surface-low px-4 py-3.5 text-charcoal dark:bg-surface-dark-low dark:text-neutral-100"
           style={{
-            fontFamily: "Manrope_400Regular",
             fontSize: 14,
-            lineHeight: 22,
             minHeight: 156,
-            textAlign: isRTL ? "right" : "left",
-            writingDirection: isRTL ? "rtl" : "ltr",
           }}
         />
         {hasLengthError && (

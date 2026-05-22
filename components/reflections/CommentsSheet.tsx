@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { View, Text, TextInput, Pressable, ActivityIndicator } from "react-native";
+import { View, Text, Pressable, ActivityIndicator } from "react-native";
 import { Send } from "lucide-react-native";
 import { router } from "expo-router";
 import { useInfiniteQuery } from "@tanstack/react-query";
@@ -9,6 +9,7 @@ import { useStrings } from "@/lib/i18n/useStrings";
 import { fetchComments, addComment } from "@/lib/reflections/api";
 import type { ReflectionComment } from "@/lib/reflections/types";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
+import { Input } from "@/components/ui/Input";
 
 type Props = {
   reflectionId: string | null;
@@ -88,7 +89,7 @@ export function CommentsSheet({ reflectionId, onClose, onCommentAdded }: Props) 
   const mutedColor = isDark ? "#737373" : "#A39B93";
 
   return (
-    <ResponsiveSheet open={!!reflectionId} onClose={onClose} maxWidth={760}>
+    <ResponsiveSheet open={!!reflectionId} onClose={onClose} maxWidth={760} dir={isRTL ? "rtl" : "ltr"} avoidKeyboard>
       <OverlayHeader title={s.reflectionComments} subtitle={s.reflections} onClose={onClose} showHandle isRTL={isRTL} />
       <View className="flex-1 min-h-0 px-5 pt-4 pb-4 gap-3">
         <View
@@ -182,20 +183,18 @@ export function CommentsSheet({ reflectionId, onClose, onCommentAdded }: Props) 
           <View
             className={`items-center gap-2 rounded-2xl border border-warm-200 bg-surface-low px-3.5 py-2.5 dark:border-neutral-700 dark:bg-surface-dark-low ${isRTL ? "flex-row-reverse" : "flex-row"}`}
           >
-            <TextInput
+            <Input
               value={text}
               onChangeText={setText}
               placeholder={s.reflectionAddComment}
               placeholderTextColor={mutedColor}
               multiline={false}
               maxLength={2000}
-              className="flex-1 text-charcoal dark:text-neutral-100"
+              dir={isRTL ? "rtl" : "ltr"}
+              className="min-h-0 flex-1 bg-transparent px-0 py-0 text-charcoal dark:text-neutral-100"
               style={{
-                fontFamily: "Manrope_400Regular",
                 fontSize: 14,
                 padding: 0,
-                textAlign: isRTL ? "right" : "left",
-                writingDirection: isRTL ? "rtl" : "ltr",
               }}
               returnKeyType="send"
               blurOnSubmit

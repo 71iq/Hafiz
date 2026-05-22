@@ -2,7 +2,6 @@ import { useState } from "react";
 import {
   View,
   Text,
-  TextInput,
   Pressable,
   KeyboardAvoidingView,
   Platform,
@@ -11,7 +10,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { useForm, Controller } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { ChevronLeft, ChevronRight } from "lucide-react-native";
@@ -20,6 +19,7 @@ import { isSupabaseConfigured } from "@/lib/supabase";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { FormTextField } from "@/components/ui/FormTextField";
 
 const forgotPasswordSchema = z.object({
   email: z.string().trim().toLowerCase().email("Invalid email address"),
@@ -114,37 +114,20 @@ export default function ForgotPasswordScreen() {
               </View>
             )}
 
-            <Text
-              className="text-charcoal dark:text-neutral-300 mb-2"
-              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}
-            >
-              {s.authEmail}
-            </Text>
-            <Controller
+            <FormTextField
               control={control}
               name="email"
-              render={({ field: { onChange, onBlur, value } }) => (
-                <TextInput
-                  className="bg-surface dark:bg-surface-dark-high rounded-2xl px-4 py-3 text-charcoal dark:text-neutral-100 mb-1"
-                  style={{ fontFamily: "Manrope_400Regular", fontSize: 15 }}
-                  placeholder={s.authEmail}
-                  placeholderTextColor="#b9a085"
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  returnKeyType="done"
-                  onSubmitEditing={handleSubmit(onSubmit)}
-                  onBlur={onBlur}
-                  onChangeText={onChange}
-                  value={value}
-                />
-              )}
+              label={s.authEmail}
+              error={errors.email?.message}
+              inputProps={{
+                placeholder: s.authEmail,
+                keyboardType: "email-address",
+                autoCapitalize: "none",
+                autoCorrect: false,
+                returnKeyType: "done",
+                onSubmitEditing: handleSubmit(onSubmit),
+              }}
             />
-            {errors.email && (
-              <Text className="text-red-500 text-xs mb-4" style={{ fontFamily: "Manrope_400Regular" }}>
-                {errors.email.message}
-              </Text>
-            )}
 
             <View className="h-5" />
             <Button onPress={handleSubmit(onSubmit)} disabled={isLoading || !configured}>
