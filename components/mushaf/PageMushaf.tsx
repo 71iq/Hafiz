@@ -346,18 +346,20 @@ function PageSeparator({
   surahName,
   juz,
   isRTL,
+  width,
 }: {
   page: number;
   surahName: string | null;
   juz: number | null;
   isRTL: boolean;
+  width: number;
 }) {
   const pageLabel = isRTL ? toArabicNumber(page) : String(page);
   const surahLabel = surahName ? (isRTL ? `سورة ${surahName}` : `Surah ${surahName}`) : "";
   const juzLabel = juz ? (isRTL ? `الجزء ${toArabicNumber(juz)}` : `Juz ${juz}`) : "";
   return (
     <View className="items-center justify-center px-3" style={{ height: SEPARATOR_HEIGHT }}>
-      <View className="w-full flex-row items-center justify-between" style={{ direction: isRTL ? "rtl" : "ltr" }}>
+      <View className="flex-row items-center justify-between" style={{ direction: isRTL ? "rtl" : "ltr", width }}>
         <Text
           className="text-warm-500 dark:text-neutral-400"
           style={{ fontFamily: "Manrope_500Medium", fontSize: 12 }}
@@ -1170,6 +1172,7 @@ export function PageMushaf({
               surahName={pageMetaMap.get(item.page)?.surahName ?? null}
               juz={pageMetaMap.get(item.page)?.juz ?? null}
               isRTL={isRTL}
+              width={verticalLineWidth}
             />
           )}
         </View>
@@ -1186,6 +1189,7 @@ export function PageMushaf({
       pagePaddingTop,
       pagePaddingBottom,
       pageSidePadding,
+      verticalLineWidth,
       centerVerticalOnPhone,
       horizontal,
       effectiveContainerHeight,
@@ -1193,7 +1197,6 @@ export function PageMushaf({
       highlightedAyahKey,
       highlightedWord,
       verticalLineSlotHeight,
-      verticalLineWidth,
       verticalLineWrap,
       hifzVisibility,
     ]
