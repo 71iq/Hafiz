@@ -1045,7 +1045,7 @@ function SmartRefsAnswer({
           </Text>
         )}
 
-        {related.length > 0 && (
+        {card.kind !== "similarTail" && related.length > 0 && (
           <>
             <Text
               className="text-warm-400 dark:text-neutral-500 uppercase mt-2"
