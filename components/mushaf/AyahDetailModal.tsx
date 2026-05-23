@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { ActivityIndicator, Platform, Pressable, Text, View, useWindowDimensions } from "react-native";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { ActivityIndicator, Platform, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { BookOpenText, Bookmark, MessageCircle, NotebookPen, Pause, Play, Share2 } from "lucide-react-native";
 import { ReflectionsSection } from "@/components/reflections/ReflectionsSection";
@@ -20,6 +20,7 @@ import {
 } from "@/lib/selection/queries";
 import { useSelection } from "@/lib/selection/context";
 import { useSettings } from "@/lib/settings/context";
+import { AVAILABLE_TAFSIR_SOURCES, DEFAULT_TAFSIR_SOURCE, type TafsirSourceId } from "@/lib/tafsir/sources";
 import { DEFAULT_LANGUAGE, getLanguageByCode } from "@/lib/translations/languages";
 
 type TargetAyah = {
@@ -33,6 +34,11 @@ type AyahRow = {
   v2_page: number;
   surah_name_arabic: string;
   surah_name_english: string;
+};
+
+type TafsirRow = {
+  source: TafsirSourceId;
+  text: string;
 };
 
 type TabKey = "translation" | "tafsir" | "hadith" | "qiraat" | "notes" | "reflections";
@@ -50,7 +56,6 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
   const {
     translationLanguage,
     recitationId,
-    tafseerSource,
     uiLanguage,
     isRTL,
     isDark,
@@ -60,7 +65,8 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
   const [ayahRow, setAyahRow] = useState<AyahRow | null>(null);
   const [fontVisible, setFontVisible] = useState(false);
   const [translationText, setTranslationText] = useState<string | null>(null);
-  const [tafseerText, setTafseerText] = useState<string | null>(null);
+  const [tafsirRows, setTafsirRows] = useState<TafsirRow[] | null>(null);
+  const [selectedTafsirSource, setSelectedTafsirSource] = useState<TafsirSourceId>(DEFAULT_TAFSIR_SOURCE);
   const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
   const [bookmarkBusy, setBookmarkBusy] = useState(false);
   const [shareBusy, setShareBusy] = useState(false);
@@ -80,17 +86,24 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
   const surfaceColor = isDark ? "#0A0A0A" : "#FFF8F1";
   const qcf2Tokens = ayahRow?.text_qcf2.split(" ").filter(Boolean) ?? [];
   const qcf2FontFamily = ayahRow ? qpcFontName(ayahRow.v2_page) : undefined;
+  const selectedTafsir = tafsirRows?.find((row) => row.source === selectedTafsirSource) ?? tafsirRows?.[0] ?? null;
+  const selectedTafsirIsRtl = selectedTafsir?.source !== "jalalayn-en";
   const title = ayahRow
     ? (uiLanguage === "ar" ? ayahRow.surah_name_arabic : ayahRow.surah_name_english)
     : `${target?.surah ?? ""}:${target?.ayah ?? ""}`;
   const subtitle = target ? `${target.surah}:${target.ayah}` : undefined;
+  const tafsirSourceConfigs = useMemo(() => {
+    const rowsBySource = new Set((tafsirRows ?? []).map((row) => row.source));
+    return AVAILABLE_TAFSIR_SOURCES.filter((source) => rowsBySource.has(source.id));
+  }, [tafsirRows]);
 
   useEffect(() => {
     setActiveTab(initialTab);
     setAyahRow(null);
     setFontVisible(false);
     setTranslationText(null);
-    setTafseerText(null);
+    setTafsirRows(null);
+    setSelectedTafsirSource(DEFAULT_TAFSIR_SOURCE);
   }, [target?.surah, target?.ayah, initialTab]);
 
   useEffect(() => {
@@ -156,18 +169,29 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
 
   useEffect(() => {
     if (!target) return;
-    setTafseerText(null);
+    setTafsirRows(null);
     let cancelled = false;
-    db.getFirstAsync<{ text: string }>(
-      "SELECT text FROM tafseer WHERE surah = ? AND ayah = ? AND source = ?",
-      [target.surah, target.ayah, tafseerSource]
+    db.getAllAsync<{ source: string; text: string }>(
+      "SELECT source, text FROM tafseer WHERE surah = ? AND ayah = ?",
+      [target.surah, target.ayah]
     ).then((row) => {
-      if (!cancelled) setTafseerText(row?.text ?? "");
+      if (cancelled) return;
+      const rowsBySource = new Map(row.map((item) => [item.source, item.text]));
+      const orderedRows = AVAILABLE_TAFSIR_SOURCES.flatMap<TafsirRow>((source) => {
+        const text = rowsBySource.get(source.id)?.trim();
+        return text ? [{ source: source.id, text }] : [];
+      });
+      setTafsirRows(orderedRows);
+      setSelectedTafsirSource((currentSource) => (
+        orderedRows.some((item) => item.source === currentSource)
+          ? currentSource
+          : orderedRows[0]?.source ?? DEFAULT_TAFSIR_SOURCE
+      ));
     }).catch(console.warn);
     return () => {
       cancelled = true;
     };
-  }, [db, target, tafseerSource]);
+  }, [db, target]);
 
   const handleBookmark = useCallback(async () => {
     if (!target || bookmarkBusy) return;
@@ -375,18 +399,68 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
             </Text>
           )}
           {activeTab === "tafsir" && (
-            <Text
-              className="text-warm-700 dark:text-neutral-300"
-              style={{
-                fontFamily: "Manrope_400Regular",
-                fontSize: 15,
-                lineHeight: 26,
-                writingDirection: "rtl",
-                textAlign: "right",
-              }}
-            >
-              {tafseerText ?? s.loading}
-            </Text>
+            <View>
+              {tafsirRows === null ? (
+                <Text
+                  className="text-warm-700 dark:text-neutral-300"
+                  style={{
+                    fontFamily: "Manrope_400Regular",
+                    fontSize: 15,
+                    lineHeight: 26,
+                    writingDirection: isRTL ? "rtl" : "ltr",
+                    textAlign: isRTL ? "right" : "left",
+                  }}
+                >
+                  {s.loading}
+                </Text>
+              ) : tafsirRows.length === 0 ? (
+                <Text
+                  className="text-warm-700 dark:text-neutral-300"
+                  style={{
+                    fontFamily: "Manrope_400Regular",
+                    fontSize: 15,
+                    lineHeight: 26,
+                    writingDirection: isRTL ? "rtl" : "ltr",
+                    textAlign: isRTL ? "right" : "left",
+                  }}
+                >
+                  {s.noTafseerData}
+                </Text>
+              ) : (
+                <>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={{
+                      gap: 8,
+                      paddingBottom: 12,
+                      flexDirection: isRTL ? "row-reverse" : "row",
+                    }}
+                  >
+                    {tafsirSourceConfigs.map((source) => (
+                      <TafsirSourceButton
+                        key={source.id}
+                        label={s[source.labelKey] ?? source.id}
+                        active={selectedTafsirSource === source.id}
+                        onPress={() => setSelectedTafsirSource(source.id)}
+                      />
+                    ))}
+                  </ScrollView>
+                  <Text
+                    className="text-warm-700 dark:text-neutral-300"
+                    style={{
+                      fontFamily: "Manrope_400Regular",
+                      fontSize: 15,
+                      lineHeight: 26,
+                      writingDirection: selectedTafsirIsRtl ? "rtl" : "ltr",
+                      textAlign: selectedTafsirIsRtl ? "right" : "left",
+                    }}
+                  >
+                    {selectedTafsir?.text ?? s.noTafseerData}
+                  </Text>
+                </>
+              )}
+            </View>
           )}
           {activeTab === "hadith" && <HadithTab surah={target.surah} ayah={target.ayah} />}
           {activeTab === "qiraat" && <QiraatTab surah={target.surah} ayah={target.ayah} />}
@@ -451,6 +525,36 @@ function TabButton({
       style={{ cursor: Platform.OS === "web" ? "pointer" : undefined }}
     >
       {icon}
+      <Text
+        className={active ? "text-primary-accent dark:text-primary-bright" : "text-warm-500 dark:text-neutral-400"}
+        style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+function TafsirSourceButton({
+  label,
+  active,
+  onPress,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      className={`rounded-full px-3 py-2 ${
+        active
+          ? "bg-primary-accent/10 dark:bg-primary-bright/10"
+          : "bg-surface dark:bg-surface-dark"
+      }`}
+      style={{ cursor: Platform.OS === "web" ? "pointer" : undefined }}
+    >
       <Text
         className={active ? "text-primary-accent dark:text-primary-bright" : "text-warm-500 dark:text-neutral-400"}
         style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}

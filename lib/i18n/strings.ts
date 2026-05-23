@@ -227,6 +227,7 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     wordMeaningTranslation: "Translation",
     wordMeaningRoot: "Root",
     wordMeaningLemma: "Lemma",
+    noTafseerData: "No tafsir is available for this ayah",
     // Tafseer sources
     tafseerSourceLabel: "Tafsir Source",
     tafseerMuyassar: "Al-Muyassar",
@@ -1003,6 +1004,7 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     wordMeaningTranslation: "الترجمة",
     wordMeaningRoot: "الجذر",
     wordMeaningLemma: "الصيغة",
+    noTafseerData: "لا يوجد تفسير متاح لهذه الآية",
     tafseerSourceLabel: "مصدر التفسير",
     tafseerMuyassar: "التفسير الميسر",
     tafseerMuyassarDesc: "تفسير مختصر وميسر",
