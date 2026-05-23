@@ -30,9 +30,22 @@ export interface StudyCardRow {
   lapses: number;
   state: number; // State enum: 0=New, 1=Learning, 2=Review, 3=Relearning
   last_review: string | null;
+  suspended_at: string | null;
+  buried_until: string | null;
+  marked_at: string | null;
   created_at: string;
   updated_at: string;
 }
+
+export type DeckCardListItem = StudyCardRow & {
+  reference: string;
+  title: string;
+  subtitle: string;
+  preview: string;
+  searchText: string;
+  kind: "ayah" | "word" | "smart";
+  isVirtual: boolean;
+};
 
 export interface StudyLogRow {
   id: number;

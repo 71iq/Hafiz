@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import {
   View,
   Text,
+  TextInput,
   Pressable,
   ScrollView,
   Animated as RNAnimated,
@@ -9,7 +10,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { X, ChevronRight, Trophy } from "lucide-react-native";
+import { CalendarDays, ChevronRight, Clock3, EllipsisVertical, PauseCircle, RotateCcw, Star, Trash2, Trophy, X } from "lucide-react-native";
 import { useDatabase, useDatabaseStatus } from "@/lib/database/provider";
 import { SettingsProvider, useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -27,6 +28,13 @@ import {
   MUTASHABIHAT_DECK_ID,
   getRemainingReviewLimit,
   readDeckReviewSettings,
+  deleteStudyCard,
+  getNextEligibleReviewDate,
+  resetStudyCardProgress,
+  setStudyCardBuried,
+  setStudyCardDueDate,
+  setStudyCardMarked,
+  setStudyCardSuspended,
 } from "@/lib/fsrs/queries";
 import { computeUniqueFront } from "@/lib/fsrs/uniqueness";
 import { computeReviewPoints, addTodayPoints } from "@/lib/fsrs/scoring";
@@ -45,6 +53,8 @@ import {
 } from "@/lib/fsrs/types";
 import { fetchWordMeaningAr, fetchWordText, fetchWordTranslation } from "@/lib/word/queries";
 import { Qcf2AyahText } from "@/components/flashcards/Qcf2AyahText";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { OverlayBody, OverlayFooter, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import {
   getDueCardsForReview,
   getSmartCardContent,
@@ -179,19 +189,32 @@ function FlashcardSessionScreen() {
   const sessionStartRef = useRef(Date.now());
   const streakRef = useRef(0);
   const sessionPointsRef = useRef(0);
+  const reviewedCountsRef = useRef({ total: 0, newCount: 0, reviewCount: 0, relearningCount: 0 });
   const gradingInFlightRef = useRef(false);
   const flipAnim = useRef(new RNAnimated.Value(0)).current;
   const normalizedDeckId = Array.isArray(deckId) ? deckId[0] : deckId;
+  const [cardMenuOpen, setCardMenuOpen] = useState(false);
+  const [confirmCardAction, setConfirmCardAction] = useState<"delete" | "reset" | null>(null);
+  const [dueDateOpen, setDueDateOpen] = useState(false);
+  const [dueDateText, setDueDateText] = useState("");
+  const [dueDateError, setDueDateError] = useState<string | null>(null);
+  const [cardActionBusy, setCardActionBusy] = useState(false);
 
   const resetSessionProgress = useCallback(() => {
     gradingInFlightRef.current = false;
     setGradingBusy(false);
     setSessionError(null);
     sessionPointsRef.current = 0;
+    reviewedCountsRef.current = { total: 0, newCount: 0, reviewCount: 0, relearningCount: 0 };
     setCards([]);
     setCurrentIndex(0);
     setCurrentSideIndex(0);
     setRevealed(false);
+    setCardMenuOpen(false);
+    setConfirmCardAction(null);
+    setDueDateOpen(false);
+    setDueDateError(null);
+    setCardActionBusy(false);
   }, []);
 
   useEffect(() => {
@@ -488,6 +511,154 @@ function FlashcardSessionScreen() {
     animateFlip();
   };
 
+  const buildSummary = useCallback(async (): Promise<SessionSummary> => {
+    const [nextReviewDate, wirdStatus] = await Promise.all([
+      getNextEligibleReviewDate(db),
+      getWirdStatus(db),
+    ]);
+    const counts = reviewedCountsRef.current;
+    return {
+      total: counts.total,
+      newCount: counts.newCount,
+      reviewCount: counts.reviewCount,
+      relearningCount: counts.relearningCount,
+      durationMs: Date.now() - sessionStartRef.current,
+      nextReviewDate,
+      wirdDays: wirdStatus.currentDays,
+      wirdMaintainedToday: wirdStatus.maintainedToday,
+    };
+  }, [db]);
+
+  const finishSessionWithSummary = useCallback(async () => {
+    setSummary(await buildSummary());
+    setPhase("summary");
+    if (reviewedCountsRef.current.total > 0) {
+      syncDailyScore(db).catch(console.warn);
+      updateProfileStats(db).catch(console.warn);
+    }
+  }, [buildSummary, db]);
+
+  const advanceAfterRemovingCurrentCard = useCallback(async () => {
+    setSessionError(null);
+    setCurrentSideIndex(0);
+    setRevealed(false);
+    if (cards.length <= 1) {
+      setCards([]);
+      await finishSessionWithSummary();
+      return;
+    }
+    setCards((prev) => prev.filter((_, index) => index !== currentIndex));
+    setCurrentIndex((index) => Math.min(index, cards.length - 2));
+    setPhase("front");
+  }, [cards.length, currentIndex, finishSessionWithSummary]);
+
+  const updateCurrentCardRow = useCallback((updatedRow: StudyCardRow) => {
+    setCards((prev) => prev.map((item, index) => (
+      index === currentIndex ? { ...item, card: updatedRow } : item
+    )));
+  }, [currentIndex]);
+
+  const recordReviewedCard = useCallback((state: number) => {
+    const next = { ...reviewedCountsRef.current, total: reviewedCountsRef.current.total + 1 };
+    if (state === State.New) next.newCount += 1;
+    else if (state === State.Relearning) next.relearningCount += 1;
+    else next.reviewCount += 1;
+    reviewedCountsRef.current = next;
+  }, []);
+
+  const runCardAction = useCallback(async (action: () => Promise<void>) => {
+    if (cardActionBusy || !currentCard) return;
+    setCardActionBusy(true);
+    setSessionError(null);
+    try {
+      await action();
+    } catch (e) {
+      console.warn("[FlashcardSession] Card action failed:", e);
+      setSessionError(s.cardActionFailed);
+    } finally {
+      setCardActionBusy(false);
+    }
+  }, [cardActionBusy, currentCard, s.cardActionFailed]);
+
+  const handleSuspendCard = useCallback(() => {
+    if (!currentCard) return;
+    setCardMenuOpen(false);
+    runCardAction(async () => {
+      hapticMedium();
+      await setStudyCardSuspended(db, currentCard.card.deck_id, currentCard.card.id, true);
+      await advanceAfterRemovingCurrentCard();
+    });
+  }, [advanceAfterRemovingCurrentCard, currentCard, db, runCardAction]);
+
+  const handleBuryCard = useCallback(() => {
+    if (!currentCard) return;
+    setCardMenuOpen(false);
+    runCardAction(async () => {
+      hapticMedium();
+      await setStudyCardBuried(db, currentCard.card.deck_id, currentCard.card.id, true);
+      await advanceAfterRemovingCurrentCard();
+    });
+  }, [advanceAfterRemovingCurrentCard, currentCard, db, runCardAction]);
+
+  const handleToggleMarkCard = useCallback(() => {
+    if (!currentCard) return;
+    setCardMenuOpen(false);
+    runCardAction(async () => {
+      hapticMedium();
+      const updated = await setStudyCardMarked(
+        db,
+        currentCard.card.deck_id,
+        currentCard.card.id,
+        !currentCard.card.marked_at
+      );
+      updateCurrentCardRow(updated);
+    });
+  }, [currentCard, db, runCardAction, updateCurrentCardRow]);
+
+  const handleConfirmCardAction = useCallback(() => {
+    if (!currentCard || !confirmCardAction) return;
+    const action = confirmCardAction;
+    runCardAction(async () => {
+      hapticMedium();
+      if (action === "delete") {
+        await deleteStudyCard(db, currentCard.card.deck_id, currentCard.card.id);
+        setConfirmCardAction(null);
+        await advanceAfterRemovingCurrentCard();
+        return;
+      }
+      const updated = await resetStudyCardProgress(db, currentCard.card.deck_id, currentCard.card.id);
+      updateCurrentCardRow(updated);
+      setCurrentSideIndex(0);
+      setRevealed(false);
+      setPhase("front");
+      setConfirmCardAction(null);
+    });
+  }, [advanceAfterRemovingCurrentCard, confirmCardAction, currentCard, db, runCardAction, updateCurrentCardRow]);
+
+  const openDueDateSheet = useCallback(() => {
+    if (!currentCard) return;
+    setCardMenuOpen(false);
+    setDueDateText(formatLocalDateInput(new Date(currentCard.card.due)));
+    setDueDateError(null);
+    setDueDateOpen(true);
+  }, [currentCard]);
+
+  const handleSaveDueDate = useCallback(() => {
+    if (!currentCard) return;
+    const parsed = parseDueDateInput(dueDateText);
+    if (!parsed.ok) {
+      setDueDateError(parsed.reason === "past" ? s.cardDueDatePast : s.cardDueDateInvalid);
+      return;
+    }
+    runCardAction(async () => {
+      hapticMedium();
+      await setStudyCardDueDate(db, currentCard.card.deck_id, currentCard.card.id, parsed.date);
+      setDueDateOpen(false);
+      setDueDateError(null);
+      await advanceAfterRemovingCurrentCard();
+    });
+  }, [advanceAfterRemovingCurrentCard, currentCard, db, dueDateText, runCardAction, s.cardDueDateInvalid, s.cardDueDatePast]);
+
   const handleGrade = async (rating: Grade) => {
     if (!currentCard || gradingInFlightRef.current) return;
     gradingInFlightRef.current = true;
@@ -527,6 +698,7 @@ function FlashcardSessionScreen() {
         result.log.scheduled_days,
         now.toISOString()
       );
+      recordReviewedCard(currentCard.card.state);
 
       if (currentCard.card.id.startsWith("mutashabihat:") || currentCard.card.id.startsWith("similar-tail:")) {
         recordAchievementEvent(db, {
@@ -554,31 +726,9 @@ function FlashcardSessionScreen() {
         setRevealed(false);
         setPhase("front");
       } else {
-        const newCount = cards.filter((c) => c.card.state === State.New).length;
-        const relearningCount = cards.filter((c) => c.card.state === State.Relearning).length;
-        const reviewCount = cards.length - newCount - relearningCount;
-
-        const nextRow = await db.getFirstAsync<{ due: string }>(
-          "SELECT due FROM study_cards ORDER BY due ASC LIMIT 1"
-        );
-        const wirdStatus = await getWirdStatus(db);
-
-        setSummary({
-          total: cards.length,
-          newCount,
-          reviewCount,
-          relearningCount,
-          durationMs: Date.now() - sessionStartRef.current,
-          nextReviewDate: nextRow?.due ?? null,
-          wirdDays: wirdStatus.currentDays,
-          wirdMaintainedToday: wirdStatus.maintainedToday,
-        });
-        setPhase("summary");
+        await finishSessionWithSummary();
         hapticSuccess();
 
-        // Sync daily score and profile stats to Supabase (non-blocking)
-        syncDailyScore(db).catch(console.warn);
-        updateProfileStats(db).catch(console.warn);
       }
     } catch (e) {
       console.warn("[FlashcardSession] Failed to grade card:", e);
@@ -634,29 +784,48 @@ function FlashcardSessionScreen() {
   return (
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
       {/* Header */}
-      <View className="px-6 pt-3 pb-2">
-        <View className="flex-row items-center justify-between">
-        <Pressable
-          onPress={handleEndSession}
-          className="w-11 h-11 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center"
-        >
-          <X size={18} color={isDark ? "#d4d4d4" : "#6e5a47"} />
-        </Pressable>
-
-        <Text
-          className="text-warm-500 dark:text-neutral-400"
-          style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
-        >
-          {currentProgress} / {sessionTotal}
-        </Text>
-
-        <CardStateBadge state={currentCard.card.state} s={s} />
-        </View>
-        <View className="mt-2 h-[2px] rounded-full bg-surface-high dark:bg-surface-dark-high overflow-hidden">
+      <View className="px-6 pt-3 pb-2 items-center">
+        <View style={{ width: "100%", maxWidth }}>
           <View
-            className="h-full rounded-full bg-primary-accent dark:bg-primary-bright"
-            style={{ width: `${progressPercent}%` }}
-          />
+            className="items-center justify-between"
+            style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
+          >
+            <Pressable
+              onPress={handleEndSession}
+              className="w-11 h-11 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center"
+            >
+              <X size={18} color={isDark ? "#d4d4d4" : "#6e5a47"} />
+            </Pressable>
+
+            <Text
+              className="text-warm-500 dark:text-neutral-400"
+              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
+            >
+              {currentProgress} / {sessionTotal}
+            </Text>
+
+            <View
+              className="items-center gap-2"
+              style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
+            >
+              <CardStateBadge state={currentCard.card.state} s={s} />
+              <Pressable
+                onPress={() => setCardMenuOpen(true)}
+                className="w-11 h-11 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center"
+                accessibilityRole="button"
+                accessibilityLabel={s.cardActionsTitle}
+                disabled={cardActionBusy}
+              >
+                <EllipsisVertical size={18} color={isDark ? "#d4d4d4" : "#6e5a47"} />
+              </Pressable>
+            </View>
+          </View>
+          <View className="mt-2 h-[2px] rounded-full bg-surface-high dark:bg-surface-dark-high overflow-hidden">
+            <View
+              className="h-full rounded-full bg-primary-accent dark:bg-primary-bright"
+              style={{ width: `${progressPercent}%` }}
+            />
+          </View>
         </View>
       </View>
 
@@ -789,7 +958,270 @@ function FlashcardSessionScreen() {
           )}
         </View>
       </View>
+
+      <CardActionsSheet
+        visible={cardMenuOpen}
+        card={currentCard}
+        isDark={isDark}
+        isRTL={isRTL}
+        busy={cardActionBusy}
+        s={s}
+        onClose={() => setCardMenuOpen(false)}
+        onDelete={() => {
+          setCardMenuOpen(false);
+          setConfirmCardAction("delete");
+        }}
+        onSuspend={handleSuspendCard}
+        onBury={handleBuryCard}
+        onToggleMark={handleToggleMarkCard}
+        onReset={() => {
+          setCardMenuOpen(false);
+          setConfirmCardAction("reset");
+        }}
+        onSetDueDate={openDueDateSheet}
+      />
+      <DueDateSheet
+        visible={dueDateOpen}
+        value={dueDateText}
+        error={dueDateError}
+        busy={cardActionBusy}
+        isDark={isDark}
+        isRTL={isRTL}
+        s={s}
+        onChange={setDueDateText}
+        onClose={() => {
+          if (!cardActionBusy) setDueDateOpen(false);
+        }}
+        onSave={handleSaveDueDate}
+      />
+      <ConfirmDialog
+        visible={!!confirmCardAction}
+        title={confirmCardAction === "delete" ? s.cardDeleteTitle : s.cardResetTitle}
+        message={confirmCardAction === "delete" ? s.cardDeleteConfirm : s.cardResetConfirm}
+        cancelLabel={s.flashcardsCancel}
+        confirmLabel={confirmCardAction === "delete" ? s.flashcardsDelete : s.cardResetProgress}
+        destructive={confirmCardAction === "delete"}
+        confirmLoading={cardActionBusy}
+        isDark={isDark}
+        isRTL={isRTL}
+        onCancel={() => {
+          if (!cardActionBusy) setConfirmCardAction(null);
+        }}
+        onConfirm={handleConfirmCardAction}
+      />
     </SafeAreaView>
+  );
+}
+
+function CardActionsSheet({
+  visible,
+  card,
+  isDark,
+  isRTL,
+  busy,
+  s,
+  onClose,
+  onDelete,
+  onSuspend,
+  onBury,
+  onToggleMark,
+  onReset,
+  onSetDueDate,
+}: {
+  visible: boolean;
+  card: CardData | null;
+  isDark: boolean;
+  isRTL: boolean;
+  busy: boolean;
+  s: any;
+  onClose: () => void;
+  onDelete: () => void;
+  onSuspend: () => void;
+  onBury: () => void;
+  onToggleMark: () => void;
+  onReset: () => void;
+  onSetDueDate: () => void;
+}) {
+  const marked = !!card?.card.marked_at;
+  const mutedColor = isDark ? "#a3a3a3" : "#8B8178";
+  return (
+    <ResponsiveSheet
+      open={visible}
+      onClose={onClose}
+      maxWidth={420}
+      maxHeight="80%"
+      surfaceColor={isDark ? "#1C1917" : "#FFF8F1"}
+    >
+      <OverlayHeader title={s.cardActionsTitle} onClose={onClose} isRTL={isRTL} showHandle />
+      <OverlayBody scrollEnabled={false} contentContainerClassName="px-4 py-3">
+        <View className="gap-2">
+          <CardActionRow
+            icon={<Trash2 size={18} color={isDark ? "#f87171" : "#dc2626"} />}
+            label={s.cardDelete}
+            disabled={busy}
+            destructive
+            isRTL={isRTL}
+            onPress={onDelete}
+          />
+          <CardActionRow
+            icon={<PauseCircle size={18} color={mutedColor} />}
+            label={s.cardSuspend}
+            disabled={busy}
+            isRTL={isRTL}
+            onPress={onSuspend}
+          />
+          <CardActionRow
+            icon={<Clock3 size={18} color={isDark ? "#fbbf24" : "#d97706"} />}
+            label={s.cardBury}
+            disabled={busy}
+            isRTL={isRTL}
+            onPress={onBury}
+          />
+          <CardActionRow
+            icon={<Star size={18} color={isDark ? "#facc15" : "#ca8a04"} fill={marked ? (isDark ? "#facc15" : "#ca8a04") : "transparent"} />}
+            label={marked ? s.cardUnmark : s.cardMark}
+            disabled={busy}
+            isRTL={isRTL}
+            onPress={onToggleMark}
+          />
+          <CardActionRow
+            icon={<RotateCcw size={18} color={mutedColor} />}
+            label={s.cardResetProgress}
+            disabled={busy}
+            isRTL={isRTL}
+            onPress={onReset}
+          />
+          <CardActionRow
+            icon={<CalendarDays size={18} color={mutedColor} />}
+            label={s.cardSetDueDate}
+            disabled={busy}
+            isRTL={isRTL}
+            onPress={onSetDueDate}
+          />
+        </View>
+      </OverlayBody>
+    </ResponsiveSheet>
+  );
+}
+
+function CardActionRow({
+  icon,
+  label,
+  disabled,
+  destructive,
+  isRTL,
+  onPress,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  disabled: boolean;
+  destructive?: boolean;
+  isRTL: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      className="rounded-2xl bg-surface-low dark:bg-surface-dark-low px-4 py-3"
+      style={({ pressed }) => ({
+        opacity: disabled ? 0.5 : pressed ? 0.78 : 1,
+      })}
+    >
+      <View className="items-center gap-3" style={{ flexDirection: isRTL ? "row-reverse" : "row" }}>
+        <View className="h-9 w-9 items-center justify-center rounded-full bg-surface dark:bg-surface-dark-high">
+          {icon}
+        </View>
+        <Text
+          className={destructive ? "text-red-600 dark:text-red-400" : "text-charcoal dark:text-neutral-100"}
+          style={{
+            flex: 1,
+            fontFamily: "Manrope_600SemiBold",
+            fontSize: 14,
+            textAlign: isRTL ? "right" : "left",
+            writingDirection: isRTL ? "rtl" : "ltr",
+          }}
+        >
+          {label}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
+function DueDateSheet({
+  visible,
+  value,
+  error,
+  busy,
+  isDark,
+  isRTL,
+  s,
+  onChange,
+  onClose,
+  onSave,
+}: {
+  visible: boolean;
+  value: string;
+  error: string | null;
+  busy: boolean;
+  isDark: boolean;
+  isRTL: boolean;
+  s: any;
+  onChange: (value: string) => void;
+  onClose: () => void;
+  onSave: () => void;
+}) {
+  return (
+    <ResponsiveSheet
+      open={visible}
+      onClose={onClose}
+      maxWidth={420}
+      maxHeight={360}
+      surfaceColor={isDark ? "#1C1917" : "#FFF8F1"}
+      avoidKeyboard
+    >
+      <OverlayHeader title={s.cardSetDueDate} subtitle={s.cardDueDateHint} onClose={onClose} isRTL={isRTL} showHandle />
+      <OverlayBody scrollEnabled={false} contentContainerClassName="px-5 py-5">
+        <TextInput
+          value={value}
+          onChangeText={onChange}
+          placeholder={s.cardDueDatePlaceholder}
+          placeholderTextColor={isDark ? "#737373" : "#b9a085"}
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="numbers-and-punctuation"
+          className="min-h-12 rounded-2xl bg-surface-low dark:bg-surface-dark-low px-4 py-3 text-charcoal dark:text-neutral-100"
+          style={{
+            fontFamily: "Manrope_500Medium",
+            fontSize: 16,
+            textAlign: isRTL ? "right" : "left",
+            writingDirection: "ltr",
+          }}
+        />
+        {error ? (
+          <Text
+            className="mt-3 text-red-600 dark:text-red-400"
+            style={{ fontFamily: "Manrope_500Medium", fontSize: 13, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
+          >
+            {error}
+          </Text>
+        ) : null}
+      </OverlayBody>
+      <OverlayFooter isRTL={isRTL}>
+        <Button variant="outline" onPress={onClose} disabled={busy} className="flex-1">
+          <Text className="text-charcoal dark:text-neutral-200" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>
+            {s.flashcardsCancel}
+          </Text>
+        </Button>
+        <Button onPress={onSave} disabled={busy} className="flex-1">
+          <Text className="text-white" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>
+            {s.cardSaveDueDate}
+          </Text>
+        </Button>
+      </OverlayFooter>
+    </ResponsiveSheet>
   );
 }
 
@@ -1376,6 +1808,46 @@ function isSmartReviewCard(card: CardData): boolean {
   return card.kind === "mutashabihat" || card.kind === "similarTail" || card.kind === "qiraat";
 }
 
+function normalizeDateDigits(value: string): string {
+  const western = "0123456789";
+  const arabic = "٠١٢٣٤٥٦٧٨٩";
+  const eastern = "۰۱۲۳۴۵۶۷۸۹";
+  return value.replace(/[٠-٩۰-۹]/g, (digit) => {
+    const arabicIndex = arabic.indexOf(digit);
+    if (arabicIndex >= 0) return western[arabicIndex];
+    return western[eastern.indexOf(digit)];
+  });
+}
+
+function formatLocalDateInput(date: Date): string {
+  const safeDate = Number.isNaN(date.getTime()) ? new Date() : date;
+  const year = safeDate.getFullYear();
+  const month = String(safeDate.getMonth() + 1).padStart(2, "0");
+  const day = String(safeDate.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function parseDueDateInput(value: string): { ok: true; date: Date } | { ok: false; reason: "invalid" | "past" } {
+  const normalized = normalizeDateDigits(value.trim());
+  const match = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return { ok: false, reason: "invalid" };
+  const year = parseInt(match[1], 10);
+  const month = parseInt(match[2], 10);
+  const day = parseInt(match[3], 10);
+  const date = new Date(year, month - 1, day);
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return { ok: false, reason: "invalid" };
+  }
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (date < today) return { ok: false, reason: "past" };
+  return { ok: true, date };
+}
+
 function toFSRSCard(row: StudyCardRow): FSRSCard {
   return {
     due: new Date(row.due),
@@ -1387,6 +1859,7 @@ function toFSRSCard(row: StudyCardRow): FSRSCard {
     reps: row.reps,
     lapses: row.lapses,
     state: row.state as State,
+    last_review: row.last_review ? new Date(row.last_review) : undefined,
   };
 }
 

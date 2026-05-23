@@ -86,6 +86,11 @@ const SMART_DECK_ID_LIST: SmartDeckId[] = [
 const SMART_CARD_PREFIXES = ["mutashabihat:", "similar-tail:", "qiraat:"];
 const SQLITE_PARAM_BATCH = 800;
 const INSERT_BATCH = 500;
+const REVIEWABLE_CARD_SQL = "suspended_at IS NULL AND (buried_until IS NULL OR buried_until <= ?)";
+
+function isReviewableCard(row: StudyCardRow, nowIso: string): boolean {
+  return !row.suspended_at && (!row.buried_until || row.buried_until <= nowIso);
+}
 
 export function isSmartDeckId(deckId: string | undefined | null): deckId is SmartDeckId {
   return !!deckId && (SMART_DECK_ID_LIST as string[]).includes(deckId);
@@ -283,7 +288,7 @@ export async function getSmartDeckStats(
   const missing = ids.filter((id) => !existing.has(id)).length;
   return {
     total: ids.length,
-    due: rows.filter((row) => row.due <= now).length + missing,
+    due: rows.filter((row) => row.due <= now && isReviewableCard(row, now)).length + missing,
     newCount: rows.filter((row) => row.state === 0).length + missing,
   };
 }
@@ -301,7 +306,7 @@ export async function getSmartDeckTodayStats(
   const rows = await getStudyCardsByIds(db, ids, deckId);
   const existing = new Set(rows.map((row) => row.id));
   const dueRows = rows
-    .filter((row) => row.due <= now)
+    .filter((row) => row.due <= now && isReviewableCard(row, now))
     .sort((a, b) => a.due.localeCompare(b.due));
   const missingRows = ids
     .filter((id) => !existing.has(id))
@@ -321,6 +326,9 @@ export async function getSmartDeckTodayStats(
         lapses: emptyCard.lapses,
         state: emptyCard.state,
         last_review: null,
+        suspended_at: null,
+        buried_until: null,
+        marked_at: null,
         created_at: now,
         updated_at: now,
       };
@@ -350,7 +358,7 @@ export async function materializeSmartDeckCards(
   const safeNewCardsLimit = Number.isFinite(newCardsLimit)
     ? Math.max(0, Math.min(MAX_DECK_NEW_CARD_LIMIT, newCardsLimit))
     : DEFAULT_DECK_NEW_CARD_LIMIT;
-  const existingDueRows = rows.filter((row) => row.due <= nowIso);
+  const existingDueRows = rows.filter((row) => row.due <= nowIso && isReviewableCard(row, nowIso));
   const existingDueReviewCount = existingDueRows.filter((row) => row.state !== 0).length;
   const existingDueNewCount = existingDueRows.length - existingDueReviewCount;
   const targetDueNewCount = Math.min(safeNewCardsLimit, Math.max(0, targetDueCount - existingDueReviewCount));
@@ -375,6 +383,9 @@ export async function materializeSmartDeckCards(
     lapses: emptyCard.lapses,
     state: emptyCard.state,
     last_review: null,
+    suspended_at: null,
+    buried_until: null,
+    marked_at: null,
     created_at: nowIso,
     updated_at: nowIso,
   }));
@@ -382,7 +393,7 @@ export async function materializeSmartDeckCards(
   await db.withTransactionAsync(async () => {
     for (let i = 0; i < createdRows.length; i += INSERT_BATCH) {
       const batch = createdRows.slice(i, i + INSERT_BATCH);
-      const placeholders = batch.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").join(",");
+      const placeholders = batch.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").join(",");
       const params: any[] = [];
       for (const row of batch) {
         params.push(
@@ -398,13 +409,16 @@ export async function materializeSmartDeckCards(
           row.lapses,
           row.state,
           row.last_review,
+          row.suspended_at,
+          row.buried_until,
+          row.marked_at,
           row.created_at,
           row.updated_at
         );
       }
       await db.runAsync(
         `INSERT OR IGNORE INTO study_cards
-          (id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days, learning_steps, reps, lapses, state, last_review, created_at, updated_at)
+          (id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days, learning_steps, reps, lapses, state, last_review, suspended_at, buried_until, marked_at, created_at, updated_at)
          VALUES ${placeholders}`,
         params
       );
@@ -432,15 +446,15 @@ export async function getDueCardsForReview(
 
   if (deckId) {
     const rows = await db.getAllAsync<StudyCardRow>(
-      "SELECT * FROM study_cards WHERE deck_id = ? AND due <= ?",
-      [deckId, now]
+      `SELECT * FROM study_cards WHERE deck_id = ? AND due <= ? AND ${REVIEWABLE_CARD_SQL}`,
+      [deckId, now, now]
     );
     return applyReviewQueueOptions(rows, options);
   }
 
   const rows = await db.getAllAsync<StudyCardRow>(
-    "SELECT * FROM study_cards WHERE due <= ?",
-    [now]
+    `SELECT * FROM study_cards WHERE due <= ? AND ${REVIEWABLE_CARD_SQL}`,
+    [now, now]
   );
   const matchingSmartIds = await getAllMatchingSmartCardIdSet(db);
   const filtered = rows.filter((row) => !isSmartDeckId(row.deck_id) || matchingSmartIds.has(row.id));
@@ -807,9 +821,9 @@ async function getSmartDeckDueRows(
     const placeholders = chunk.map(() => "?").join(",");
     rows.push(...await db.getAllAsync<StudyCardRow>(
       `SELECT * FROM study_cards
-        WHERE deck_id = ? AND due <= ? AND id IN (${placeholders})
+        WHERE deck_id = ? AND due <= ? AND ${REVIEWABLE_CARD_SQL} AND id IN (${placeholders})
         ORDER BY due`,
-      [deckId, now, ...chunk]
+      [deckId, now, now, ...chunk]
     ));
   }
   return rows.sort((a, b) => a.due.localeCompare(b.due));

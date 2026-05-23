@@ -278,12 +278,14 @@ async function upsertStudyCard(db: SQLiteDatabase, row: any): Promise<void> {
   await db.runAsync(
     `INSERT OR REPLACE INTO study_cards
      (id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days,
-      learning_steps, reps, lapses, state, last_review, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      learning_steps, reps, lapses, state, last_review, suspended_at, buried_until,
+      marked_at, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       row.id, row.deck_id, row.due, row.stability, row.difficulty,
       row.elapsed_days, row.scheduled_days, row.learning_steps,
       row.reps, row.lapses, row.state, row.last_review,
+      row.suspended_at ?? null, row.buried_until ?? null, row.marked_at ?? null,
       row.created_at, row.updated_at,
     ]
   );

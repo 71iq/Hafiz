@@ -41,6 +41,9 @@ CREATE TABLE IF NOT EXISTS study_cards (
   lapses INTEGER NOT NULL DEFAULT 0,
   state INTEGER NOT NULL DEFAULT 0,
   last_review TIMESTAMPTZ,
+  suspended_at TIMESTAMPTZ,
+  buried_until TIMESTAMPTZ,
+  marked_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL,
   PRIMARY KEY (user_id, id)
@@ -511,6 +514,8 @@ CREATE TRIGGER trg_reflection_comments_count
 -- ============================================================
 
 CREATE INDEX IF NOT EXISTS idx_study_cards_user_due ON study_cards(user_id, due);
+CREATE INDEX IF NOT EXISTS idx_study_cards_user_buried ON study_cards(user_id, buried_until);
+CREATE INDEX IF NOT EXISTS idx_study_cards_user_marked ON study_cards(user_id, marked_at);
 CREATE INDEX IF NOT EXISTS idx_study_log_user_reviewed ON study_log(user_id, reviewed_at);
 CREATE INDEX IF NOT EXISTS idx_daily_scores_user_date ON daily_scores(user_id, date);
 CREATE INDEX IF NOT EXISTS idx_bookmarks_user ON bookmarks(user_id);

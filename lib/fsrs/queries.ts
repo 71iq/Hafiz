@@ -29,6 +29,7 @@ import {
   MIN_DECK_REQUEST_RETENTION,
   type DeckReviewSettings,
   type DeckScope,
+  type DeckCardListItem,
   type SchedulerStep,
   type StudyCardRow,
   type TestMode,
@@ -40,6 +41,8 @@ import { recordAchievementEvent } from "@/lib/achievements/queries";
 import {
   getAllMatchingSmartCardIdSet,
   getDueCardsForReview,
+  getSmartCardContent,
+  getSmartDeckCandidateCardIds,
   getSmartDeckStats,
   getSmartDeckTodayStats,
   isSmartDeckId,
@@ -67,6 +70,57 @@ export type WirdStatus = {
 
 const SMART_CARD_SQL = `deck_id IN ('${SMART_DECK_IDS.mutashabihat}', '${SMART_DECK_IDS.similarTails}', '${SMART_DECK_IDS.qiraat}')`;
 const NON_SMART_CARD_SQL = `NOT ${SMART_CARD_SQL}`;
+const REVIEWABLE_CARD_SQL = "suspended_at IS NULL AND (buried_until IS NULL OR buried_until <= ?)";
+
+function localStartOfTomorrow(): Date {
+  const tomorrow = new Date();
+  tomorrow.setHours(0, 0, 0, 0);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return tomorrow;
+}
+
+function dayDiffLocal(from: Date, to: Date): number {
+  const fromStart = new Date(from);
+  fromStart.setHours(0, 0, 0, 0);
+  const toStart = new Date(to);
+  toStart.setHours(0, 0, 0, 0);
+  return Math.max(0, Math.round((toStart.getTime() - fromStart.getTime()) / 86400000));
+}
+
+function cardToSyncData(card: StudyCardRow): Record<string, any> {
+  return {
+    id: card.id,
+    deck_id: card.deck_id,
+    due: card.due,
+    stability: card.stability,
+    difficulty: card.difficulty,
+    elapsed_days: card.elapsed_days,
+    scheduled_days: card.scheduled_days,
+    learning_steps: card.learning_steps,
+    reps: card.reps,
+    lapses: card.lapses,
+    state: card.state,
+    last_review: card.last_review,
+    suspended_at: card.suspended_at,
+    buried_until: card.buried_until,
+    marked_at: card.marked_at,
+    created_at: card.created_at,
+    updated_at: card.updated_at,
+  };
+}
+
+function rowWithDefaultStatus(row: StudyCardRow): StudyCardRow {
+  return {
+    ...row,
+    suspended_at: row.suspended_at ?? null,
+    buried_until: row.buried_until ?? null,
+    marked_at: row.marked_at ?? null,
+  };
+}
+
+function isReviewableCard(row: StudyCardRow, nowIso: string): boolean {
+  return !row.suspended_at && (!row.buried_until || row.buried_until <= nowIso);
+}
 
 function formatLocalDateKey(date: Date): string {
   const year = date.getFullYear();
@@ -603,6 +657,9 @@ export async function addMeaningCard(
       lapses: emptyCard.lapses,
       state: emptyCard.state,
       last_review: null,
+      suspended_at: null,
+      buried_until: null,
+      marked_at: null,
       created_at: now,
       updated_at: now,
     }).catch(console.warn);
@@ -678,6 +735,9 @@ export async function addMutashabihatCard(
       lapses: emptyCard.lapses,
       state: emptyCard.state,
       last_review: null,
+      suspended_at: null,
+      buried_until: null,
+      marked_at: null,
       created_at: now,
       updated_at: now,
     }).catch(console.warn);
@@ -758,19 +818,19 @@ export async function getDueCount(db: SQLiteDatabase, deckId?: string): Promise<
   }
   if (deckId) {
     const row = await db.getFirstAsync<{ count: number }>(
-      "SELECT COUNT(*) as count FROM study_cards WHERE deck_id = ? AND due <= ?",
-      [deckId, now]
+      `SELECT COUNT(*) as count FROM study_cards WHERE deck_id = ? AND due <= ? AND ${REVIEWABLE_CARD_SQL}`,
+      [deckId, now, now]
     );
     return row?.count ?? 0;
   }
   const [nonSmartRow, smartRows] = await Promise.all([
     db.getFirstAsync<{ count: number }>(
-      `SELECT COUNT(*) as count FROM study_cards WHERE due <= ? AND ${NON_SMART_CARD_SQL}`,
-      [now]
+      `SELECT COUNT(*) as count FROM study_cards WHERE due <= ? AND ${NON_SMART_CARD_SQL} AND ${REVIEWABLE_CARD_SQL}`,
+      [now, now]
     ),
     getFilteredSmartMaterializedRows(db),
   ]);
-  return (nonSmartRow?.count ?? 0) + smartRows.filter((row) => row.due <= now).length;
+  return (nonSmartRow?.count ?? 0) + smartRows.filter((row) => row.due <= now && isReviewableCard(row, now)).length;
 }
 
 export async function getDeckTodayStats(
@@ -829,7 +889,7 @@ async function getFilteredSmartMaterializedRows(db: SQLiteDatabase): Promise<Stu
     []
   );
   const matchingSmartIds = await getAllMatchingSmartCardIdSet(db);
-  return rows.filter((row) => matchingSmartIds.has(row.id));
+  return rows.map(rowWithDefaultStatus).filter((row) => matchingSmartIds.has(row.id));
 }
 
 export async function getTotalAyahCardCount(db: SQLiteDatabase): Promise<number> {
@@ -853,20 +913,22 @@ export async function getNewCount(db: SQLiteDatabase, deckId?: string): Promise<
     return (await getSmartDeckStats(db, deckId)).newCount;
   }
   if (deckId) {
+    const now = new Date().toISOString();
     const row = await db.getFirstAsync<{ count: number }>(
-      "SELECT COUNT(*) as count FROM study_cards WHERE deck_id = ? AND state = 0",
-      [deckId]
+      `SELECT COUNT(*) as count FROM study_cards WHERE deck_id = ? AND state = 0 AND ${REVIEWABLE_CARD_SQL}`,
+      [deckId, now]
     );
     return row?.count ?? 0;
   }
+  const now = new Date().toISOString();
   const [nonSmartRow, smartRows] = await Promise.all([
     db.getFirstAsync<{ count: number }>(
-      `SELECT COUNT(*) as count FROM study_cards WHERE state = 0 AND ${NON_SMART_CARD_SQL}`,
-      []
+      `SELECT COUNT(*) as count FROM study_cards WHERE state = 0 AND ${NON_SMART_CARD_SQL} AND ${REVIEWABLE_CARD_SQL}`,
+      [now]
     ),
     getFilteredSmartMaterializedRows(db),
   ]);
-  return (nonSmartRow?.count ?? 0) + smartRows.filter((row) => row.state === 0).length;
+  return (nonSmartRow?.count ?? 0) + smartRows.filter((row) => row.state === 0 && isReviewableCard(row, now)).length;
 }
 
 export async function getDecks(db: SQLiteDatabase): Promise<{ id: string; name?: string; scope: DeckScope; createdAt: string }[]> {
@@ -891,36 +953,418 @@ export async function deleteDeck(db: SQLiteDatabase, deckId: string): Promise<vo
   });
 }
 
+export async function ensureStudyCardRow(
+  db: SQLiteDatabase,
+  deckId: string,
+  cardId: string
+): Promise<StudyCardRow> {
+  const existing = await db.getFirstAsync<StudyCardRow>(
+    "SELECT * FROM study_cards WHERE id = ? AND deck_id = ?",
+    [cardId, deckId]
+  );
+  if (existing) return rowWithDefaultStatus(existing);
+
+  const now = new Date();
+  const nowIso = now.toISOString();
+  const emptyCard = createEmptyCard(now);
+  const row: StudyCardRow = {
+    id: cardId,
+    deck_id: deckId,
+    due: emptyCard.due.toISOString(),
+    stability: emptyCard.stability,
+    difficulty: emptyCard.difficulty,
+    elapsed_days: emptyCard.elapsed_days,
+    scheduled_days: emptyCard.scheduled_days,
+    learning_steps: emptyCard.learning_steps,
+    reps: emptyCard.reps,
+    lapses: emptyCard.lapses,
+    state: emptyCard.state,
+    last_review: null,
+    suspended_at: null,
+    buried_until: null,
+    marked_at: null,
+    created_at: nowIso,
+    updated_at: nowIso,
+  };
+
+  await db.runAsync(
+    `INSERT OR IGNORE INTO study_cards
+      (id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days, learning_steps,
+       reps, lapses, state, last_review, suspended_at, buried_until, marked_at, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      row.id,
+      row.deck_id,
+      row.due,
+      row.stability,
+      row.difficulty,
+      row.elapsed_days,
+      row.scheduled_days,
+      row.learning_steps,
+      row.reps,
+      row.lapses,
+      row.state,
+      row.last_review,
+      row.suspended_at,
+      row.buried_until,
+      row.marked_at,
+      row.created_at,
+      row.updated_at,
+    ]
+  );
+  enqueueSync(db, "study_cards", "INSERT", cardId, cardToSyncData(row)).catch(console.warn);
+  return row;
+}
+
+export async function deleteStudyCard(
+  db: SQLiteDatabase,
+  deckId: string,
+  cardId: string
+): Promise<void> {
+  const result = await db.runAsync(
+    "DELETE FROM study_cards WHERE id = ? AND deck_id = ?",
+    [cardId, deckId]
+  );
+  if ((result.changes ?? 0) > 0) {
+    enqueueSync(db, "study_cards", "DELETE", cardId, { id: cardId }).catch(console.warn);
+  }
+}
+
+export async function setStudyCardSuspended(
+  db: SQLiteDatabase,
+  deckId: string,
+  cardId: string,
+  suspended: boolean
+): Promise<StudyCardRow> {
+  const row = await ensureStudyCardRow(db, deckId, cardId);
+  const now = new Date().toISOString();
+  const updated = {
+    ...row,
+    suspended_at: suspended ? now : null,
+    buried_until: suspended ? null : row.buried_until,
+    updated_at: now,
+  };
+  await updateCard(db, updated);
+  return updated;
+}
+
+export async function setStudyCardBuried(
+  db: SQLiteDatabase,
+  deckId: string,
+  cardId: string,
+  buried: boolean
+): Promise<StudyCardRow> {
+  const row = await ensureStudyCardRow(db, deckId, cardId);
+  const now = new Date().toISOString();
+  const updated = {
+    ...row,
+    buried_until: buried ? localStartOfTomorrow().toISOString() : null,
+    updated_at: now,
+  };
+  await updateCard(db, updated);
+  return updated;
+}
+
+export async function setStudyCardMarked(
+  db: SQLiteDatabase,
+  deckId: string,
+  cardId: string,
+  marked: boolean
+): Promise<StudyCardRow> {
+  const row = await ensureStudyCardRow(db, deckId, cardId);
+  const now = new Date().toISOString();
+  const updated = {
+    ...row,
+    marked_at: marked ? now : null,
+    updated_at: now,
+  };
+  await updateCard(db, updated);
+  return updated;
+}
+
+export async function resetStudyCardProgress(
+  db: SQLiteDatabase,
+  deckId: string,
+  cardId: string
+): Promise<StudyCardRow> {
+  const row = await ensureStudyCardRow(db, deckId, cardId);
+  const now = new Date();
+  const emptyCard = createEmptyCard(now);
+  const updated = {
+    ...row,
+    due: emptyCard.due.toISOString(),
+    stability: emptyCard.stability,
+    difficulty: emptyCard.difficulty,
+    elapsed_days: emptyCard.elapsed_days,
+    scheduled_days: emptyCard.scheduled_days,
+    learning_steps: emptyCard.learning_steps,
+    reps: emptyCard.reps,
+    lapses: emptyCard.lapses,
+    state: emptyCard.state,
+    last_review: null,
+    updated_at: now.toISOString(),
+  };
+  await updateCard(db, updated);
+  return updated;
+}
+
+export async function setStudyCardDueDate(
+  db: SQLiteDatabase,
+  deckId: string,
+  cardId: string,
+  dueDate: Date
+): Promise<StudyCardRow> {
+  const row = await ensureStudyCardRow(db, deckId, cardId);
+  const now = new Date();
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(dueDate);
+  target.setHours(0, 0, 0, 0);
+  const scheduledDays = dayDiffLocal(today, target);
+  const due = scheduledDays === 0 ? now : target;
+  const updated = {
+    ...row,
+    due: due.toISOString(),
+    scheduled_days: scheduledDays,
+    suspended_at: null,
+    buried_until: null,
+    updated_at: now.toISOString(),
+  };
+  await updateCard(db, updated);
+  return updated;
+}
+
+export async function getNextEligibleReviewDate(db: SQLiteDatabase): Promise<string | null> {
+  const row = await db.getFirstAsync<{ next_at: string }>(
+    `SELECT CASE
+        WHEN buried_until IS NOT NULL AND buried_until > due THEN buried_until
+        ELSE due
+      END AS next_at
+       FROM study_cards
+      WHERE suspended_at IS NULL
+      ORDER BY next_at ASC
+      LIMIT 1`
+  );
+  return row?.next_at ?? null;
+}
+
+export async function getDeckCardsForList(
+  db: SQLiteDatabase,
+  deckId: string
+): Promise<DeckCardListItem[]> {
+  if (isSmartDeckId(deckId)) {
+    const [candidateIds, existingRows] = await Promise.all([
+      getSmartDeckCandidateCardIds(db, deckId),
+      db.getAllAsync<StudyCardRow>("SELECT * FROM study_cards WHERE deck_id = ?", [deckId]),
+    ]);
+    const rowById = new Map(existingRows.map((row) => [row.id, rowWithDefaultStatus(row)]));
+    const now = new Date();
+    const emptyCard = createEmptyCard(now);
+    const nowIso = now.toISOString();
+    const items: DeckCardListItem[] = [];
+    for (const id of candidateIds) {
+      const row = rowById.get(id) ?? {
+        id,
+        deck_id: deckId,
+        due: nowIso,
+        stability: emptyCard.stability,
+        difficulty: emptyCard.difficulty,
+        elapsed_days: emptyCard.elapsed_days,
+        scheduled_days: emptyCard.scheduled_days,
+        learning_steps: emptyCard.learning_steps,
+        reps: emptyCard.reps,
+        lapses: emptyCard.lapses,
+        state: emptyCard.state,
+        last_review: null,
+        suspended_at: null,
+        buried_until: null,
+        marked_at: null,
+        created_at: nowIso,
+        updated_at: nowIso,
+      };
+      items.push(await decorateDeckCardListItem(db, row, !rowById.has(id)));
+    }
+    return items;
+  }
+
+  const rows = await db.getAllAsync<StudyCardRow>(
+    "SELECT * FROM study_cards WHERE deck_id = ? ORDER BY created_at ASC, id ASC",
+    [deckId]
+  );
+  const items: DeckCardListItem[] = [];
+  for (const row of rows) {
+    items.push(await decorateDeckCardListItem(db, rowWithDefaultStatus(row), false));
+  }
+  return items;
+}
+
+async function decorateDeckCardListItem(
+  db: SQLiteDatabase,
+  row: StudyCardRow,
+  isVirtual: boolean
+): Promise<DeckCardListItem> {
+  const normalizedRow = rowWithDefaultStatus(row);
+  const smartContent = await getSmartCardContent(db, normalizedRow.id);
+  if (smartContent?.targetRef) {
+    const ref = smartContent.targetRef;
+    const reference = `${ref.surah}:${ref.ayah}`;
+    const title = `${reference} · ${ref.surahNameEn}`;
+    const preview = smartContent.promptUthmani ?? smartContent.cue ?? ref.textUthmani;
+    const searchText = [
+      normalizedRow.id,
+      reference,
+      ref.surahNameAr,
+      ref.surahNameEn,
+      ref.textUthmani,
+      ref.textClean,
+      smartContent.cue,
+      smartContent.promptUthmani,
+      smartContent.hiddenAnswerUthmani,
+      smartContent.qiraatText,
+      ...(smartContent.qiraatGroup ?? []),
+    ].filter(Boolean).join(" ");
+    return {
+      ...normalizedRow,
+      reference,
+      title,
+      subtitle: ref.surahNameAr,
+      preview,
+      searchText,
+      kind: "smart",
+      isVirtual,
+    };
+  }
+
+  const parsed = parseStudyCardId(normalizedRow.id);
+  if (!parsed) {
+    return {
+      ...normalizedRow,
+      reference: normalizedRow.id,
+      title: normalizedRow.id,
+      subtitle: normalizedRow.deck_id,
+      preview: "",
+      searchText: `${normalizedRow.id} ${normalizedRow.deck_id}`,
+      kind: "ayah",
+      isVirtual,
+    };
+  }
+
+  const [ayahRow, surahRow, translationRow] = await Promise.all([
+    db.getFirstAsync<{ text_uthmani: string; text_search: string | null }>(
+      "SELECT text_uthmani, text_search FROM quran_text WHERE surah = ? AND ayah = ?",
+      [parsed.surah, parsed.ayah]
+    ),
+    db.getFirstAsync<{ name_arabic: string; name_english: string }>(
+      "SELECT name_arabic, name_english FROM surahs WHERE number = ?",
+      [parsed.surah]
+    ),
+    db.getFirstAsync<{ text_en: string }>(
+      "SELECT text_en FROM translations WHERE surah = ? AND ayah = ?",
+      [parsed.surah, parsed.ayah]
+    ),
+  ]);
+
+  if (parsed.kind === "word" && parsed.wordPos) {
+    const [wordRow, wordMeaningRow, wordIrabRow] = await Promise.all([
+      db.getFirstAsync<{ word_arabic: string | null; translation_en: string | null }>(
+        "SELECT word_arabic, translation_en FROM word_translations WHERE surah = ? AND ayah = ? AND word_pos = ?",
+        [parsed.surah, parsed.ayah, parsed.wordPos]
+      ),
+      db.getFirstAsync<{ word: string | null; meaning: string | null }>(
+        "SELECT word, meaning FROM word_meanings_ar WHERE surah = ? AND ayah = ? AND word_pos = ?",
+        [parsed.surah, parsed.ayah, parsed.wordPos]
+      ),
+      db.getFirstAsync<{ arabic_word: string | null }>(
+        "SELECT arabic_word FROM word_irab WHERE surah = ? AND ayah = ? AND word_pos = ?",
+        [parsed.surah, parsed.ayah, parsed.wordPos]
+      ),
+    ]);
+    const reference = `${parsed.surah}:${parsed.ayah}:${parsed.wordPos}`;
+    const word = wordIrabRow?.arabic_word ?? wordMeaningRow?.word ?? wordRow?.word_arabic ?? reference;
+    const preview = wordMeaningRow?.meaning ?? wordRow?.translation_en ?? ayahRow?.text_uthmani ?? "";
+    const searchText = [
+      normalizedRow.id,
+      reference,
+      word,
+      preview,
+      wordRow?.translation_en,
+      wordMeaningRow?.meaning,
+      surahRow?.name_arabic,
+      surahRow?.name_english,
+      ayahRow?.text_uthmani,
+      ayahRow?.text_search,
+      translationRow?.text_en,
+    ].filter(Boolean).join(" ");
+    return {
+      ...normalizedRow,
+      reference,
+      title: word,
+      subtitle: `${surahRow?.name_english ?? parsed.surah} · ${parsed.surah}:${parsed.ayah}`,
+      preview,
+      searchText,
+      kind: "word",
+      isVirtual,
+    };
+  }
+
+  const reference = `${parsed.surah}:${parsed.ayah}`;
+  const preview = ayahRow?.text_uthmani ?? "";
+  const searchText = [
+    normalizedRow.id,
+    reference,
+    surahRow?.name_arabic,
+    surahRow?.name_english,
+    ayahRow?.text_uthmani,
+    ayahRow?.text_search,
+    translationRow?.text_en,
+  ].filter(Boolean).join(" ");
+  return {
+    ...normalizedRow,
+    reference,
+    title: reference,
+    subtitle: surahRow?.name_english ?? "",
+    preview,
+    searchText,
+    kind: "ayah",
+    isVirtual,
+  };
+}
+
+function parseStudyCardId(cardId: string): { kind: "ayah" | "word"; surah: number; ayah: number; wordPos?: number } | null {
+  const parts = cardId.split(":");
+  if (parts[0] === "word" && parts.length >= 4) {
+    const surah = parseInt(parts[1], 10);
+    const ayah = parseInt(parts[2], 10);
+    const wordPos = parseInt(parts[3], 10);
+    return Number.isFinite(surah) && Number.isFinite(ayah) && Number.isFinite(wordPos)
+      ? { kind: "word", surah, ayah, wordPos }
+      : null;
+  }
+  if (parts.length >= 2) {
+    const surah = parseInt(parts[0], 10);
+    const ayah = parseInt(parts[1], 10);
+    return Number.isFinite(surah) && Number.isFinite(ayah) ? { kind: "ayah", surah, ayah } : null;
+  }
+  return null;
+}
+
 export async function updateCard(db: SQLiteDatabase, card: StudyCardRow): Promise<void> {
   await db.runAsync(
     `UPDATE study_cards SET
       due = ?, stability = ?, difficulty = ?, elapsed_days = ?, scheduled_days = ?,
-      learning_steps = ?, reps = ?, lapses = ?, state = ?, last_review = ?, updated_at = ?
+      learning_steps = ?, reps = ?, lapses = ?, state = ?, last_review = ?,
+      suspended_at = ?, buried_until = ?, marked_at = ?, updated_at = ?
      WHERE id = ?`,
     [
       card.due, card.stability, card.difficulty, card.elapsed_days, card.scheduled_days,
-      card.learning_steps, card.reps, card.lapses, card.state, card.last_review, card.updated_at,
+      card.learning_steps, card.reps, card.lapses, card.state, card.last_review,
+      card.suspended_at, card.buried_until, card.marked_at, card.updated_at,
       card.id,
     ]
   );
 
   // Enqueue for sync
-  enqueueSync(db, "study_cards", "UPDATE", card.id, {
-    id: card.id,
-    deck_id: card.deck_id,
-    due: card.due,
-    stability: card.stability,
-    difficulty: card.difficulty,
-    elapsed_days: card.elapsed_days,
-    scheduled_days: card.scheduled_days,
-    learning_steps: card.learning_steps,
-    reps: card.reps,
-    lapses: card.lapses,
-    state: card.state,
-    last_review: card.last_review,
-    created_at: card.created_at,
-    updated_at: card.updated_at,
-  }).catch(console.warn);
+  enqueueSync(db, "study_cards", "UPDATE", card.id, cardToSyncData(card)).catch(console.warn);
 }
 
 export async function insertStudyLog(

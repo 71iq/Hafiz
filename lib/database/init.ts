@@ -2417,6 +2417,9 @@ async function ensureQfUserSyncSchema(db: SQLiteDatabase): Promise<void> {
   await db.execAsync("UPDATE bookmarks SET updated_at = created_at WHERE updated_at IS NULL");
 
   try { await db.execAsync("ALTER TABLE study_cards ADD COLUMN updated_at TEXT"); } catch (_) {}
+  try { await db.execAsync("ALTER TABLE study_cards ADD COLUMN suspended_at TEXT"); } catch (_) {}
+  try { await db.execAsync("ALTER TABLE study_cards ADD COLUMN buried_until TEXT"); } catch (_) {}
+  try { await db.execAsync("ALTER TABLE study_cards ADD COLUMN marked_at TEXT"); } catch (_) {}
   await db.execAsync("UPDATE study_cards SET updated_at = created_at WHERE updated_at IS NULL");
 
   try { await db.execAsync("ALTER TABLE private_notes ADD COLUMN updated_at TEXT"); } catch (_) {}

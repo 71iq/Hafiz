@@ -312,6 +312,9 @@ export async function createSchema(db: SQLiteDatabase): Promise<void> {
       lapses INTEGER NOT NULL DEFAULT 0,
       state INTEGER NOT NULL DEFAULT 0,
       last_review TEXT,
+      suspended_at TEXT,
+      buried_until TEXT,
+      marked_at TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -463,6 +466,8 @@ export async function createSchema(db: SQLiteDatabase): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_juz_map_juz ON juz_map(juz);
     CREATE INDEX IF NOT EXISTS idx_study_cards_deck ON study_cards(deck_id);
     CREATE INDEX IF NOT EXISTS idx_study_cards_due ON study_cards(due);
+    CREATE INDEX IF NOT EXISTS idx_study_cards_buried ON study_cards(buried_until);
+    CREATE INDEX IF NOT EXISTS idx_study_cards_marked ON study_cards(marked_at);
     CREATE INDEX IF NOT EXISTS idx_study_log_card ON study_log(card_id);
     CREATE INDEX IF NOT EXISTS idx_sync_queue_status ON sync_queue(table_name);
     CREATE INDEX IF NOT EXISTS idx_qf_sync_queue_status ON qf_sync_queue(status, id);
@@ -488,6 +493,9 @@ export async function migrateUserSchema(db: SQLiteDatabase): Promise<void> {
 
   await addColumnIfMissing(db, "study_cards", "created_at", `created_at TEXT NOT NULL DEFAULT '${legacyDate}'`);
   await addColumnIfMissing(db, "study_cards", "updated_at", `updated_at TEXT NOT NULL DEFAULT '${legacyDate}'`);
+  await addColumnIfMissing(db, "study_cards", "suspended_at", "suspended_at TEXT");
+  await addColumnIfMissing(db, "study_cards", "buried_until", "buried_until TEXT");
+  await addColumnIfMissing(db, "study_cards", "marked_at", "marked_at TEXT");
   await addColumnIfMissing(db, "private_notes", "created_at", `created_at TEXT NOT NULL DEFAULT '${legacyDate}'`);
   await addColumnIfMissing(db, "private_notes", "updated_at", `updated_at TEXT NOT NULL DEFAULT '${legacyDate}'`);
   await addColumnIfMissing(db, "private_notes", "deleted_at", "deleted_at TEXT");
