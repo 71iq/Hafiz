@@ -8,6 +8,7 @@ type Props = {
   fontSize: number;
   lineHeight: number;
   colorClassName?: string;
+  highlightWordPos?: number;
 };
 
 export function Qcf2AyahText({
@@ -16,6 +17,7 @@ export function Qcf2AyahText({
   fontSize,
   lineHeight,
   colorClassName = "text-charcoal dark:text-neutral-100",
+  highlightWordPos,
 }: Props) {
   const [visible, setVisible] = useState(() => isQpcFontLoaded(v2Page));
 
@@ -35,6 +37,7 @@ export function Qcf2AyahText({
 
   const tokens = textQcf2.split(" ").filter(Boolean);
   if (tokens.length === 0) return null;
+  const highlightIndex = typeof highlightWordPos === "number" ? highlightWordPos - 1 : -1;
 
   return (
     <View
@@ -48,20 +51,25 @@ export function Qcf2AyahText({
         opacity: visible ? 1 : 0,
       }}
     >
-      {tokens.map((token, index) => (
-        <Text
-          key={`${token}-${index}`}
-          className={colorClassName}
-          style={{
-            fontFamily: qpcFontName(v2Page),
-            fontSize,
-            lineHeight,
-            paddingHorizontal: 1,
-          }}
-        >
-          {token}
-        </Text>
-      ))}
+      {tokens.map((token, index) => {
+        const highlighted = index === highlightIndex;
+        return (
+          <Text
+            key={`${token}-${index}`}
+            className={highlighted ? "text-primary-accent dark:text-primary-bright" : colorClassName}
+            style={{
+              fontFamily: qpcFontName(v2Page),
+              fontSize,
+              lineHeight,
+              paddingHorizontal: highlighted ? 7 : 1,
+              borderRadius: highlighted ? 10 : 0,
+              backgroundColor: highlighted ? "rgba(13, 148, 136, 0.13)" : "transparent",
+            }}
+          >
+            {token}
+          </Text>
+        );
+      })}
     </View>
   );
 }
