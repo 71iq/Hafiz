@@ -27,7 +27,30 @@ type Props = {
   onChanged: () => void;
 };
 
-type Filter = "all" | "marked" | "suspended" | "buried";
+type Filter =
+  | "all"
+  | "due"
+  | "scheduled"
+  | "new"
+  | "learning"
+  | "review"
+  | "relearning"
+  | "marked"
+  | "suspended"
+  | "buried";
+
+const CARD_FILTERS: Filter[] = [
+  "all",
+  "due",
+  "scheduled",
+  "new",
+  "learning",
+  "review",
+  "relearning",
+  "marked",
+  "suspended",
+  "buried",
+];
 
 export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged }: Props) {
   const db = useDatabase();
@@ -77,10 +100,7 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
     const now = new Date().toISOString();
     const needle = query.trim().toLowerCase();
     return cards.filter((card) => {
-      const buried = !!card.buried_until && card.buried_until > now;
-      if (filter === "marked" && !card.marked_at) return false;
-      if (filter === "suspended" && !card.suspended_at) return false;
-      if (filter === "buried" && !buried) return false;
+      if (!matchesCardFilter(card, filter, now)) return false;
       if (!needle) return true;
       return card.searchText.toLowerCase().includes(needle);
     });
@@ -158,7 +178,7 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
             </View>
 
             <View className="flex-row flex-wrap gap-2" style={{ flexDirection: rowDirection }}>
-              {(["all", "marked", "suspended", "buried"] as Filter[]).map((value) => (
+              {CARD_FILTERS.map((value) => (
                 <Pressable
                   key={value}
                   onPress={() => setFilter(value)}
@@ -490,10 +510,31 @@ function DueDateEditor({
 }
 
 function getFilterLabel(filter: Filter, s: any): string {
+  if (filter === "due") return s.deckCardsFilterDue;
+  if (filter === "scheduled") return s.deckCardsFilterScheduled;
+  if (filter === "new") return s.deckCardsFilterNew;
+  if (filter === "learning") return s.deckCardsFilterLearning;
+  if (filter === "review") return s.deckCardsFilterReview;
+  if (filter === "relearning") return s.deckCardsFilterRelearning;
   if (filter === "marked") return s.deckCardsFilterMarked;
   if (filter === "suspended") return s.deckCardsFilterSuspended;
   if (filter === "buried") return s.deckCardsFilterBuried;
   return s.deckCardsFilterAll;
+}
+
+function matchesCardFilter(card: DeckCardListItem, filter: Filter, now: string): boolean {
+  const isBuried = !!card.buried_until && card.buried_until > now;
+  const isReviewable = !card.suspended_at && !isBuried;
+  if (filter === "due") return isReviewable && card.due <= now;
+  if (filter === "scheduled") return isReviewable && card.due > now;
+  if (filter === "new") return card.state === State.New;
+  if (filter === "learning") return card.state === State.Learning;
+  if (filter === "review") return card.state === State.Review;
+  if (filter === "relearning") return card.state === State.Relearning;
+  if (filter === "marked") return !!card.marked_at;
+  if (filter === "suspended") return !!card.suspended_at;
+  if (filter === "buried") return isBuried;
+  return true;
 }
 
 function formatShortDate(value: string): string {
