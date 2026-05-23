@@ -130,16 +130,18 @@ export function BookmarksSheet({ visible, onClose, onNavigate }: Props) {
                     width: 36,
                     height: 36,
                     borderRadius: 18,
-                    backgroundColor: isDark ? "rgba(253,220,145,0.12)" : "rgba(253,220,145,0.2)",
+                    backgroundColor: isDark ? "rgba(253,220,145,0.14)" : "#FFF0C2",
+                    borderColor: isDark ? "rgba(253,220,145,0.22)" : "rgba(154, 98, 0, 0.18)",
+                    borderWidth: 1,
                     alignItems: "center",
                     justifyContent: "center",
                   }}
                 >
                   <Text
                     style={{
-                      fontFamily: "Manrope_600SemiBold",
+                      fontFamily: "Manrope_700Bold",
                       fontSize: 11,
-                      color: "#FDDC91",
+                      color: isDark ? "#FDDC91" : "#9A6200",
                     }}
                   >
                     {b.surah}:{b.ayah}
