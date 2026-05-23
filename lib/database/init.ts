@@ -889,6 +889,12 @@ const nativeJalalaynEnRequires: Record<number, () => any> = Platform.OS !== "web
     }
   : {};
 
+const nativeAlBahrAlMadidRequires: Record<number, () => any> = Platform.OS !== "web"
+  ? Object.fromEntries(
+      Array.from({ length: 114 }, (_, i) => i + 1).map((n) => [n, () => alBahrAlMadidRequireStatic(n)])
+    )
+  : {};
+
 function tafseerRequireStatic(n: number): any {
   // Metro bundler requires static string literals for require() calls.
   // This function is only called on native, never on web.
@@ -1131,6 +1137,126 @@ function tahrirTanwirRequireStatic(n: number): any {
   }
 }
 
+function alBahrAlMadidRequireStatic(n: number): any {
+  switch (n) {
+    case 1: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/1.json");
+    case 2: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/2.json");
+    case 3: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/3.json");
+    case 4: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/4.json");
+    case 5: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/5.json");
+    case 6: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/6.json");
+    case 7: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/7.json");
+    case 8: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/8.json");
+    case 9: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/9.json");
+    case 10: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/10.json");
+    case 11: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/11.json");
+    case 12: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/12.json");
+    case 13: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/13.json");
+    case 14: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/14.json");
+    case 15: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/15.json");
+    case 16: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/16.json");
+    case 17: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/17.json");
+    case 18: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/18.json");
+    case 19: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/19.json");
+    case 20: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/20.json");
+    case 21: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/21.json");
+    case 22: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/22.json");
+    case 23: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/23.json");
+    case 24: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/24.json");
+    case 25: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/25.json");
+    case 26: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/26.json");
+    case 27: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/27.json");
+    case 28: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/28.json");
+    case 29: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/29.json");
+    case 30: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/30.json");
+    case 31: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/31.json");
+    case 32: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/32.json");
+    case 33: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/33.json");
+    case 34: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/34.json");
+    case 35: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/35.json");
+    case 36: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/36.json");
+    case 37: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/37.json");
+    case 38: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/38.json");
+    case 39: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/39.json");
+    case 40: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/40.json");
+    case 41: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/41.json");
+    case 42: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/42.json");
+    case 43: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/43.json");
+    case 44: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/44.json");
+    case 45: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/45.json");
+    case 46: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/46.json");
+    case 47: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/47.json");
+    case 48: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/48.json");
+    case 49: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/49.json");
+    case 50: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/50.json");
+    case 51: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/51.json");
+    case 52: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/52.json");
+    case 53: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/53.json");
+    case 54: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/54.json");
+    case 55: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/55.json");
+    case 56: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/56.json");
+    case 57: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/57.json");
+    case 58: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/58.json");
+    case 59: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/59.json");
+    case 60: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/60.json");
+    case 61: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/61.json");
+    case 62: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/62.json");
+    case 63: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/63.json");
+    case 64: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/64.json");
+    case 65: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/65.json");
+    case 66: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/66.json");
+    case 67: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/67.json");
+    case 68: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/68.json");
+    case 69: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/69.json");
+    case 70: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/70.json");
+    case 71: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/71.json");
+    case 72: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/72.json");
+    case 73: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/73.json");
+    case 74: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/74.json");
+    case 75: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/75.json");
+    case 76: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/76.json");
+    case 77: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/77.json");
+    case 78: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/78.json");
+    case 79: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/79.json");
+    case 80: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/80.json");
+    case 81: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/81.json");
+    case 82: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/82.json");
+    case 83: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/83.json");
+    case 84: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/84.json");
+    case 85: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/85.json");
+    case 86: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/86.json");
+    case 87: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/87.json");
+    case 88: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/88.json");
+    case 89: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/89.json");
+    case 90: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/90.json");
+    case 91: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/91.json");
+    case 92: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/92.json");
+    case 93: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/93.json");
+    case 94: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/94.json");
+    case 95: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/95.json");
+    case 96: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/96.json");
+    case 97: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/97.json");
+    case 98: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/98.json");
+    case 99: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/99.json");
+    case 100: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/100.json");
+    case 101: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/101.json");
+    case 102: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/102.json");
+    case 103: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/103.json");
+    case 104: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/104.json");
+    case 105: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/105.json");
+    case 106: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/106.json");
+    case 107: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/107.json");
+    case 108: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/108.json");
+    case 109: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/109.json");
+    case 110: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/110.json");
+    case 111: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/111.json");
+    case 112: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/112.json");
+    case 113: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/113.json");
+    case 114: return require("../../assets/data/tafsir-sources/al-bahr-al-madid/114.json");
+    default: return null;
+  }
+}
+
 // ─── Fetch cache ────────────────────────────────────────────
 // Many importers load the same JSON (quran-data.json is used 4x). Caching
 // the in-flight promise dedupes fetches AND lets us pre-warm loads in
@@ -1184,6 +1310,7 @@ function nativeTafsirSourceLoader(source: TafsirSourceId, surahNumber: number): 
   if (source === "alusi") return nativeAlusiRequires[surahNumber] ?? null;
   if (source === "nazam-durar") return nativeNazamDurarRequires[surahNumber] ?? null;
   if (source === "razi") return nativeRaziRequires[surahNumber] ?? null;
+  if (source === "al-bahr-al-madid") return nativeAlBahrAlMadidRequires[surahNumber] ?? null;
   if (source === "jalalayn") return nativeJalalaynRequires[surahNumber] ?? null;
   if (source === "jalalayn-en") return nativeJalalaynEnRequires[surahNumber] ?? null;
   return null;
