@@ -1,4 +1,4 @@
-export type TafsirSourceId = "muyassar" | "zilal" | "tahrir-tanwir" | "qurtubi";
+export type TafsirSourceId = "muyassar" | "zilal" | "tahrir-tanwir" | "qurtubi" | "kashshaf";
 
 type TafsirImportKind = "muyassar" | "zilal" | "surahRows";
 
@@ -42,6 +42,13 @@ export const TAFSIR_SOURCES: TafsirSourceConfig[] = [
     importKind: "surahRows",
     progressDetail: "Tafseer Al Qurtubi",
     expectedRows: 6234,
+  },
+  {
+    id: "kashshaf",
+    labelKey: "tafseerKashshaf",
+    descriptionKey: "tafseerKashshafDesc",
+    importKind: "surahRows",
+    progressDetail: "Al-Kashshaf Al-Zamakhshari",
   },
 ];
 

@@ -7,7 +7,7 @@ set -e
 
 echo "Preparing web data files..."
 
-mkdir -p public/data/tafseer public/data/tafsir-sources/tahrir-tanwir public/data/tafsir-sources/qurtubi public/data/translations public/data/wbw public/data/masaq public/data/layout public/data/mutashabihat
+mkdir -p public/data/tafseer public/data/tafsir-sources/tahrir-tanwir public/data/tafsir-sources/qurtubi public/data/tafsir-sources/kashshaf public/data/translations public/data/wbw public/data/masaq public/data/layout public/data/mutashabihat
 
 # Core data files
 cp assets/data/quran-data.json public/data/
@@ -35,6 +35,7 @@ cp assets/data/layout/page-words.json public/data/layout/
 cp assets/data/tafseer/*.json public/data/tafseer/
 cp assets/data/tafsir-sources/tahrir-tanwir/*.json public/data/tafsir-sources/tahrir-tanwir/
 cp assets/data/tafsir-sources/qurtubi/*.json public/data/tafsir-sources/qurtubi/
+cp assets/data/tafsir-sources/kashshaf/*.json public/data/tafsir-sources/kashshaf/
 
 # Translations (20 files)
 cp assets/data/translations/*.json public/data/translations/
