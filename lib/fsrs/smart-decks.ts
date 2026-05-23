@@ -43,6 +43,9 @@ export type SmartDeckRef = {
   textClean: string;
   textQcf2: string;
   v2Page: number;
+  preText?: string | null;
+  similarText?: string | null;
+  postText?: string | null;
 };
 
 export type SmartCardContent = {
@@ -527,9 +530,13 @@ async function getMutashabihatCardContent(
     v2_page: number;
     name_arabic: string;
     name_english: string;
+    pre_text: string | null;
+    similar_text: string | null;
+    post_text: string | null;
   }>(
     `SELECT g.cue, g.id AS group_id, r.sort_order AS ref_sort_order,
             r.surah AS ref_surah, r.ayah AS ref_ayah, r.surah_name_ar, r.tail_5,
+            r.pre_text, r.similar_text, r.post_text,
             qt.text_uthmani, qt.text_clean, qt.text_qcf2, qt.v2_page, s.name_arabic, s.name_english
        FROM mutashabihat_groups g
        JOIN mutashabihat_refs r ON r.group_id = g.id
@@ -552,6 +559,9 @@ async function getMutashabihatCardContent(
       textClean: row.text_clean,
       textQcf2: row.text_qcf2,
       v2Page: row.v2_page,
+      preText: row.pre_text,
+      similarText: row.similar_text,
+      postText: row.post_text,
   }));
   const targetRef = refs.find((ref) => ref.sortOrder === targetSortOrder);
   if (!targetRef) return null;
@@ -628,6 +638,9 @@ function buildMutashabihatPrompt(
   targetRef: SmartDeckRef,
   refs: SmartDeckRef[]
 ): Pick<SmartCardContent, "promptQcf2" | "promptUthmani" | "prefixWordCount" | "needsExplicitRefLabel"> {
+  const segmentedPrompt = buildSegmentedMutashabihatPrompt(targetRef, refs);
+  if (segmentedPrompt) return segmentedPrompt;
+
   const qcf2Tokens = splitQcf2Words(targetRef.textQcf2);
   const uthmaniWords = splitQuranWords(targetRef.textUthmani);
   const targetWords = normalizeArabicWords(targetRef.textClean);
@@ -659,6 +672,73 @@ function buildMutashabihatPrompt(
     prefixWordCount: safePrefixCount,
     needsExplicitRefLabel,
   };
+}
+
+function buildSegmentedMutashabihatPrompt(
+  targetRef: SmartDeckRef,
+  refs: SmartDeckRef[]
+): Pick<SmartCardContent, "promptQcf2" | "promptUthmani" | "prefixWordCount" | "needsExplicitRefLabel"> | null {
+  const similarWords = normalizeArabicWords(targetRef.similarText ?? "");
+  if (similarWords.length === 0) return null;
+
+  const targetWords = normalizeArabicWords(targetRef.textClean);
+  if (targetWords.length === 0) return null;
+
+  const promptWordCount = findSegmentPromptWordCount(targetWords, targetRef.preText ?? "", similarWords);
+  if (promptWordCount <= 0) return null;
+
+  const qcf2Tokens = splitQcf2Words(targetRef.textQcf2);
+  const uthmaniWords = splitQuranWords(targetRef.textUthmani);
+  const safePrefixCount = Math.max(0, Math.min(promptWordCount, targetWords.length, qcf2Tokens.length || promptWordCount));
+  if (safePrefixCount <= 0) return null;
+
+  const normalizedRefs = refs.map((ref) => ({
+    ref,
+    words: normalizeArabicWords(ref.textClean),
+  }));
+  const targetPrefix = targetWords.slice(0, safePrefixCount).join(" ");
+  const matches = normalizedRefs.filter((item) => item.words.slice(0, safePrefixCount).join(" ") === targetPrefix);
+  const needsExplicitRefLabel = !(matches.length === 1 && matches[0].ref.sortOrder === targetRef.sortOrder);
+
+  return {
+    promptQcf2: qcf2Tokens.slice(0, safePrefixCount).join(" "),
+    promptUthmani: uthmaniWords.slice(0, safePrefixCount).join(" "),
+    prefixWordCount: safePrefixCount,
+    needsExplicitRefLabel,
+  };
+}
+
+function findSegmentPromptWordCount(
+  targetWords: string[],
+  preText: string,
+  similarWords: string[]
+): number {
+  const preWords = normalizeArabicWords(preText);
+  if (preWords.length > 0) {
+    const combinedWords = [...preWords, ...similarWords];
+    const combinedStart = findSubsequenceStart(targetWords, combinedWords);
+    if (combinedStart >= 0) return combinedStart + combinedWords.length;
+  }
+
+  const similarStart = findSubsequenceStart(targetWords, similarWords);
+  if (similarStart >= 0) return similarStart + similarWords.length;
+
+  return 0;
+}
+
+function findSubsequenceStart(words: string[], needle: string[]): number {
+  if (needle.length === 0 || needle.length > words.length) return -1;
+  for (let start = 0; start <= words.length - needle.length; start++) {
+    let matched = true;
+    for (let i = 0; i < needle.length; i++) {
+      if (words[start + i] !== needle[i]) {
+        matched = false;
+        break;
+      }
+    }
+    if (matched) return start;
+  }
+  return -1;
 }
 
 function inferTailWordCount(cue: string, tail5: string | null, textClean: string): number {

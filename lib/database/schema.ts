@@ -221,6 +221,9 @@ export async function createSchema(db: SQLiteDatabase): Promise<void> {
       ayah INTEGER NOT NULL,
       surah_name_ar TEXT,
       tail_5 TEXT,
+      pre_text TEXT,
+      similar_text TEXT,
+      post_text TEXT,
       PRIMARY KEY (group_id, sort_order)
     );
 
@@ -496,6 +499,9 @@ export async function migrateUserSchema(db: SQLiteDatabase): Promise<void> {
   await addColumnIfMissing(db, "achievement_unlocks", "sync_status", "sync_status TEXT DEFAULT 'pending'");
   await addColumnIfMissing(db, "achievement_progress", "updated_at", `updated_at TEXT NOT NULL DEFAULT '${legacyDate}'`);
   await addColumnIfMissing(db, "achievement_progress", "payload", "payload TEXT NOT NULL DEFAULT '{}'");
+  await addColumnIfMissing(db, "mutashabihat_refs", "pre_text", "pre_text TEXT");
+  await addColumnIfMissing(db, "mutashabihat_refs", "similar_text", "similar_text TEXT");
+  await addColumnIfMissing(db, "mutashabihat_refs", "post_text", "post_text TEXT");
 
   await db.execAsync(`
     UPDATE study_cards

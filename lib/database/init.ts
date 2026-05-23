@@ -1054,6 +1054,9 @@ async function importMutashabihat(
           ref.ayah,
           typeof ref.surah_name_ar === "string" ? ref.surah_name_ar : null,
           typeof ref.tail_5 === "string" ? ref.tail_5 : null,
+          kind === "similar" && typeof ref.pre_text === "string" ? ref.pre_text : null,
+          kind === "similar" && typeof ref.similar_text === "string" ? ref.similar_text : null,
+          kind === "similar" && typeof ref.post_text === "string" ? ref.post_text : null,
         ]);
       });
     }
@@ -1074,7 +1077,7 @@ async function importMutashabihat(
   );
   await batchInsert(
     db,
-    "INSERT OR REPLACE INTO mutashabihat_refs (group_id, sort_order, surah, ayah, surah_name_ar, tail_5) VALUES (?, ?, ?, ?, ?, ?)",
+    "INSERT OR REPLACE INTO mutashabihat_refs (group_id, sort_order, surah, ayah, surah_name_ar, tail_5, pre_text, similar_text, post_text) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
     refRows
   );
 
@@ -1230,7 +1233,18 @@ async function runNewTabImports(
   if ((await safeCount("qiraat_encyclopedia")) === 0) {
     await safeImport("qiraat_encyclopedia", () => importQiraatEncyclopedia(db, onProgress));
   }
-  if ((await safeCount("mutashabihat_groups")) === 0 || (await safeCount("mutashabihat_refs")) === 0) {
+  const missingMutashabihatSegments = await db.getFirstAsync<{ c: number }>(
+    `SELECT COUNT(*) as c
+       FROM mutashabihat_refs r
+       JOIN mutashabihat_groups g ON g.id = r.group_id
+      WHERE g.kind = 'similar'
+        AND TRIM(COALESCE(r.similar_text, '')) = ''`
+  ).catch(() => ({ c: 0 }));
+  if (
+    (await safeCount("mutashabihat_groups")) === 0 ||
+    (await safeCount("mutashabihat_refs")) === 0 ||
+    (missingMutashabihatSegments?.c ?? 0) > 0
+  ) {
     await safeImport("mutashabihat", () => importMutashabihat(db, onProgress));
   }
   await safeImport("reflection_journey_levels", () => importReflectionJourneyLevels(db, onProgress));
