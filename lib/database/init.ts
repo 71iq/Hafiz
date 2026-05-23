@@ -7,6 +7,11 @@ import {
   computeReflectionJourneyFingerprint,
   loadAndValidateReflectionJourneySeed,
 } from "@/lib/reflection-journey/schema";
+import {
+  SURAH_ROW_TAFSIR_SOURCES,
+  type TafsirSourceConfig,
+  type TafsirSourceId,
+} from "@/lib/tafsir/sources";
 
 // ─── Platform-aware data loading ─────────────────────────────
 // On web: fetch from /data/ (static files served from public/)
@@ -42,6 +47,12 @@ const nativeTafseerRequires: Record<number, () => any> = Platform.OS !== "web"
         // Metro needs static string literals — we use a switch
         return tafseerRequireStatic(n);
       }])
+    )
+  : {};
+
+const nativeTahrirTanwirRequires: Record<number, () => any> = Platform.OS !== "web"
+  ? Object.fromEntries(
+      Array.from({ length: 114 }, (_, i) => i + 1).map((n) => [n, () => tahrirTanwirRequireStatic(n)])
     )
   : {};
 
@@ -167,6 +178,126 @@ function tafseerRequireStatic(n: number): any {
   }
 }
 
+function tahrirTanwirRequireStatic(n: number): any {
+  switch (n) {
+    case 1: return require("../../assets/data/tafsir-sources/tahrir-tanwir/1.json");
+    case 2: return require("../../assets/data/tafsir-sources/tahrir-tanwir/2.json");
+    case 3: return require("../../assets/data/tafsir-sources/tahrir-tanwir/3.json");
+    case 4: return require("../../assets/data/tafsir-sources/tahrir-tanwir/4.json");
+    case 5: return require("../../assets/data/tafsir-sources/tahrir-tanwir/5.json");
+    case 6: return require("../../assets/data/tafsir-sources/tahrir-tanwir/6.json");
+    case 7: return require("../../assets/data/tafsir-sources/tahrir-tanwir/7.json");
+    case 8: return require("../../assets/data/tafsir-sources/tahrir-tanwir/8.json");
+    case 9: return require("../../assets/data/tafsir-sources/tahrir-tanwir/9.json");
+    case 10: return require("../../assets/data/tafsir-sources/tahrir-tanwir/10.json");
+    case 11: return require("../../assets/data/tafsir-sources/tahrir-tanwir/11.json");
+    case 12: return require("../../assets/data/tafsir-sources/tahrir-tanwir/12.json");
+    case 13: return require("../../assets/data/tafsir-sources/tahrir-tanwir/13.json");
+    case 14: return require("../../assets/data/tafsir-sources/tahrir-tanwir/14.json");
+    case 15: return require("../../assets/data/tafsir-sources/tahrir-tanwir/15.json");
+    case 16: return require("../../assets/data/tafsir-sources/tahrir-tanwir/16.json");
+    case 17: return require("../../assets/data/tafsir-sources/tahrir-tanwir/17.json");
+    case 18: return require("../../assets/data/tafsir-sources/tahrir-tanwir/18.json");
+    case 19: return require("../../assets/data/tafsir-sources/tahrir-tanwir/19.json");
+    case 20: return require("../../assets/data/tafsir-sources/tahrir-tanwir/20.json");
+    case 21: return require("../../assets/data/tafsir-sources/tahrir-tanwir/21.json");
+    case 22: return require("../../assets/data/tafsir-sources/tahrir-tanwir/22.json");
+    case 23: return require("../../assets/data/tafsir-sources/tahrir-tanwir/23.json");
+    case 24: return require("../../assets/data/tafsir-sources/tahrir-tanwir/24.json");
+    case 25: return require("../../assets/data/tafsir-sources/tahrir-tanwir/25.json");
+    case 26: return require("../../assets/data/tafsir-sources/tahrir-tanwir/26.json");
+    case 27: return require("../../assets/data/tafsir-sources/tahrir-tanwir/27.json");
+    case 28: return require("../../assets/data/tafsir-sources/tahrir-tanwir/28.json");
+    case 29: return require("../../assets/data/tafsir-sources/tahrir-tanwir/29.json");
+    case 30: return require("../../assets/data/tafsir-sources/tahrir-tanwir/30.json");
+    case 31: return require("../../assets/data/tafsir-sources/tahrir-tanwir/31.json");
+    case 32: return require("../../assets/data/tafsir-sources/tahrir-tanwir/32.json");
+    case 33: return require("../../assets/data/tafsir-sources/tahrir-tanwir/33.json");
+    case 34: return require("../../assets/data/tafsir-sources/tahrir-tanwir/34.json");
+    case 35: return require("../../assets/data/tafsir-sources/tahrir-tanwir/35.json");
+    case 36: return require("../../assets/data/tafsir-sources/tahrir-tanwir/36.json");
+    case 37: return require("../../assets/data/tafsir-sources/tahrir-tanwir/37.json");
+    case 38: return require("../../assets/data/tafsir-sources/tahrir-tanwir/38.json");
+    case 39: return require("../../assets/data/tafsir-sources/tahrir-tanwir/39.json");
+    case 40: return require("../../assets/data/tafsir-sources/tahrir-tanwir/40.json");
+    case 41: return require("../../assets/data/tafsir-sources/tahrir-tanwir/41.json");
+    case 42: return require("../../assets/data/tafsir-sources/tahrir-tanwir/42.json");
+    case 43: return require("../../assets/data/tafsir-sources/tahrir-tanwir/43.json");
+    case 44: return require("../../assets/data/tafsir-sources/tahrir-tanwir/44.json");
+    case 45: return require("../../assets/data/tafsir-sources/tahrir-tanwir/45.json");
+    case 46: return require("../../assets/data/tafsir-sources/tahrir-tanwir/46.json");
+    case 47: return require("../../assets/data/tafsir-sources/tahrir-tanwir/47.json");
+    case 48: return require("../../assets/data/tafsir-sources/tahrir-tanwir/48.json");
+    case 49: return require("../../assets/data/tafsir-sources/tahrir-tanwir/49.json");
+    case 50: return require("../../assets/data/tafsir-sources/tahrir-tanwir/50.json");
+    case 51: return require("../../assets/data/tafsir-sources/tahrir-tanwir/51.json");
+    case 52: return require("../../assets/data/tafsir-sources/tahrir-tanwir/52.json");
+    case 53: return require("../../assets/data/tafsir-sources/tahrir-tanwir/53.json");
+    case 54: return require("../../assets/data/tafsir-sources/tahrir-tanwir/54.json");
+    case 55: return require("../../assets/data/tafsir-sources/tahrir-tanwir/55.json");
+    case 56: return require("../../assets/data/tafsir-sources/tahrir-tanwir/56.json");
+    case 57: return require("../../assets/data/tafsir-sources/tahrir-tanwir/57.json");
+    case 58: return require("../../assets/data/tafsir-sources/tahrir-tanwir/58.json");
+    case 59: return require("../../assets/data/tafsir-sources/tahrir-tanwir/59.json");
+    case 60: return require("../../assets/data/tafsir-sources/tahrir-tanwir/60.json");
+    case 61: return require("../../assets/data/tafsir-sources/tahrir-tanwir/61.json");
+    case 62: return require("../../assets/data/tafsir-sources/tahrir-tanwir/62.json");
+    case 63: return require("../../assets/data/tafsir-sources/tahrir-tanwir/63.json");
+    case 64: return require("../../assets/data/tafsir-sources/tahrir-tanwir/64.json");
+    case 65: return require("../../assets/data/tafsir-sources/tahrir-tanwir/65.json");
+    case 66: return require("../../assets/data/tafsir-sources/tahrir-tanwir/66.json");
+    case 67: return require("../../assets/data/tafsir-sources/tahrir-tanwir/67.json");
+    case 68: return require("../../assets/data/tafsir-sources/tahrir-tanwir/68.json");
+    case 69: return require("../../assets/data/tafsir-sources/tahrir-tanwir/69.json");
+    case 70: return require("../../assets/data/tafsir-sources/tahrir-tanwir/70.json");
+    case 71: return require("../../assets/data/tafsir-sources/tahrir-tanwir/71.json");
+    case 72: return require("../../assets/data/tafsir-sources/tahrir-tanwir/72.json");
+    case 73: return require("../../assets/data/tafsir-sources/tahrir-tanwir/73.json");
+    case 74: return require("../../assets/data/tafsir-sources/tahrir-tanwir/74.json");
+    case 75: return require("../../assets/data/tafsir-sources/tahrir-tanwir/75.json");
+    case 76: return require("../../assets/data/tafsir-sources/tahrir-tanwir/76.json");
+    case 77: return require("../../assets/data/tafsir-sources/tahrir-tanwir/77.json");
+    case 78: return require("../../assets/data/tafsir-sources/tahrir-tanwir/78.json");
+    case 79: return require("../../assets/data/tafsir-sources/tahrir-tanwir/79.json");
+    case 80: return require("../../assets/data/tafsir-sources/tahrir-tanwir/80.json");
+    case 81: return require("../../assets/data/tafsir-sources/tahrir-tanwir/81.json");
+    case 82: return require("../../assets/data/tafsir-sources/tahrir-tanwir/82.json");
+    case 83: return require("../../assets/data/tafsir-sources/tahrir-tanwir/83.json");
+    case 84: return require("../../assets/data/tafsir-sources/tahrir-tanwir/84.json");
+    case 85: return require("../../assets/data/tafsir-sources/tahrir-tanwir/85.json");
+    case 86: return require("../../assets/data/tafsir-sources/tahrir-tanwir/86.json");
+    case 87: return require("../../assets/data/tafsir-sources/tahrir-tanwir/87.json");
+    case 88: return require("../../assets/data/tafsir-sources/tahrir-tanwir/88.json");
+    case 89: return require("../../assets/data/tafsir-sources/tahrir-tanwir/89.json");
+    case 90: return require("../../assets/data/tafsir-sources/tahrir-tanwir/90.json");
+    case 91: return require("../../assets/data/tafsir-sources/tahrir-tanwir/91.json");
+    case 92: return require("../../assets/data/tafsir-sources/tahrir-tanwir/92.json");
+    case 93: return require("../../assets/data/tafsir-sources/tahrir-tanwir/93.json");
+    case 94: return require("../../assets/data/tafsir-sources/tahrir-tanwir/94.json");
+    case 95: return require("../../assets/data/tafsir-sources/tahrir-tanwir/95.json");
+    case 96: return require("../../assets/data/tafsir-sources/tahrir-tanwir/96.json");
+    case 97: return require("../../assets/data/tafsir-sources/tahrir-tanwir/97.json");
+    case 98: return require("../../assets/data/tafsir-sources/tahrir-tanwir/98.json");
+    case 99: return require("../../assets/data/tafsir-sources/tahrir-tanwir/99.json");
+    case 100: return require("../../assets/data/tafsir-sources/tahrir-tanwir/100.json");
+    case 101: return require("../../assets/data/tafsir-sources/tahrir-tanwir/101.json");
+    case 102: return require("../../assets/data/tafsir-sources/tahrir-tanwir/102.json");
+    case 103: return require("../../assets/data/tafsir-sources/tahrir-tanwir/103.json");
+    case 104: return require("../../assets/data/tafsir-sources/tahrir-tanwir/104.json");
+    case 105: return require("../../assets/data/tafsir-sources/tahrir-tanwir/105.json");
+    case 106: return require("../../assets/data/tafsir-sources/tahrir-tanwir/106.json");
+    case 107: return require("../../assets/data/tafsir-sources/tahrir-tanwir/107.json");
+    case 108: return require("../../assets/data/tafsir-sources/tahrir-tanwir/108.json");
+    case 109: return require("../../assets/data/tafsir-sources/tahrir-tanwir/109.json");
+    case 110: return require("../../assets/data/tafsir-sources/tahrir-tanwir/110.json");
+    case 111: return require("../../assets/data/tafsir-sources/tahrir-tanwir/111.json");
+    case 112: return require("../../assets/data/tafsir-sources/tahrir-tanwir/112.json");
+    case 113: return require("../../assets/data/tafsir-sources/tahrir-tanwir/113.json");
+    case 114: return require("../../assets/data/tafsir-sources/tahrir-tanwir/114.json");
+    default: return null;
+  }
+}
+
 // ─── Fetch cache ────────────────────────────────────────────
 // Many importers load the same JSON (quran-data.json is used 4x). Caching
 // the in-flight promise dedupes fetches AND lets us pre-warm loads in
@@ -213,6 +344,20 @@ function loadTafseerFile(surahNumber: number): Promise<any> {
   return p;
 }
 
+function nativeTafsirSourceLoader(source: TafsirSourceId, surahNumber: number): (() => any) | null {
+  if (source === "tahrir-tanwir") return nativeTahrirTanwirRequires[surahNumber] ?? null;
+  return null;
+}
+
+async function doLoadTafsirSourceFile(source: TafsirSourceId, surahNumber: number): Promise<any> {
+  if (Platform.OS === "web") {
+    const resp = await fetch(`/data/tafsir-sources/${source}/${surahNumber}.json`);
+    return resp.json();
+  }
+  const loader = nativeTafsirSourceLoader(source, surahNumber);
+  return loader ? loader() : null;
+}
+
 // ─── Types & helpers ─────────────────────────────────────────
 
 export type ImportProgress = {
@@ -226,7 +371,7 @@ type ProgressCallback = (progress: ImportProgress) => void;
 
 // Bump this whenever a new import step is added so the progress bar caps at
 // 100% and the step counter shows accurate "N / total" labels.
-const TOTAL_STEPS = 20;
+const TOTAL_STEPS = 21;
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, "").trim();
@@ -543,7 +688,7 @@ async function importSurahInfo(
 ): Promise<void> {
   const data = await loadData("surah-info.json");
   if (!Array.isArray(data)) throw new Error("Invalid surah-info.json");
-  onProgress({ step: "Surah Information", current: 20, total: TOTAL_STEPS, detail: `${data.length} entries` });
+  onProgress({ step: "Surah Information", current: 21, total: TOTAL_STEPS, detail: `${data.length} entries` });
   console.log(`[Import] Importing ${data.length} surah_info rows...`);
 
   const rows = data.map((entry: any) => [
@@ -703,11 +848,53 @@ async function importZilal(
   console.log(`[Import] Tafseer (zilal) done: ${allRows.length} rows`);
 }
 
+async function importSurahRowTafsirSource(
+  db: SQLiteDatabase,
+  source: TafsirSourceConfig,
+  onProgress: ProgressCallback
+): Promise<void> {
+  onProgress({ step: "Tafseer", current: 7, total: TOTAL_STEPS, detail: source.progressDetail });
+  console.log(`[Import] Importing tafseer (${source.id}) from 114 surah files...`);
+
+  let inserted = 0;
+  for (let surahNumber = 1; surahNumber <= 114; surahNumber++) {
+    const data = await doLoadTafsirSourceFile(source.id, surahNumber);
+    if (!Array.isArray(data)) continue;
+    const rows: any[][] = [];
+    for (const row of data) {
+      const surah = Array.isArray(row) ? row[0] : row?.surah;
+      const ayah = Array.isArray(row) ? row[1] : row?.ayah;
+      const text = Array.isArray(row) ? row[2] : row?.text;
+      if (!Number.isInteger(surah) || !Number.isInteger(ayah)) continue;
+      const cleanText = stripHtml(String(text ?? ""));
+      if (cleanText.length === 0) continue;
+      rows.push([surah, ayah, source.id, cleanText]);
+    }
+    await batchInsert(
+      db,
+      "INSERT OR REPLACE INTO tafseer (surah, ayah, source, text) VALUES (?, ?, ?, ?)",
+      rows
+    );
+    inserted += rows.length;
+  }
+
+  console.log(`[Import] Tafseer (${source.id}) done: ${inserted} rows`);
+}
+
+async function importConfiguredTafsirSources(
+  db: SQLiteDatabase,
+  onProgress: ProgressCallback
+): Promise<void> {
+  for (const source of SURAH_ROW_TAFSIR_SOURCES) {
+    await importSurahRowTafsirSource(db, source, onProgress);
+  }
+}
+
 async function importTranslations(
   db: SQLiteDatabase,
   onProgress: ProgressCallback
 ): Promise<void> {
-  onProgress({ step: "Translations", current: 7, total: TOTAL_STEPS, detail: "Sahih International" });
+  onProgress({ step: "Translations", current: 8, total: TOTAL_STEPS, detail: "Sahih International" });
   console.log(`[Import] Importing translations...`);
 
   const translationData = await loadData("translation-sahih.json");
@@ -732,7 +919,7 @@ async function importPageMap(
   onProgress: ProgressCallback
 ): Promise<void> {
   const pageMapData = await loadData("page-map.json");
-  onProgress({ step: "Page Map", current: 8, total: TOTAL_STEPS, detail: "604 pages" });
+  onProgress({ step: "Page Map", current: 9, total: TOTAL_STEPS, detail: "604 pages" });
   console.log(`[Import] Importing ${pageMapData.length} page_map rows...`);
 
   const rows = pageMapData.map((p: any) => [
@@ -755,7 +942,7 @@ async function importWordTranslations(
   onProgress: ProgressCallback
 ): Promise<void> {
   const wbwData = await loadData("wbw/wbw.json");
-  onProgress({ step: "Word-by-Word", current: 9, total: TOTAL_STEPS, detail: `${wbwData.length} words` });
+  onProgress({ step: "Word-by-Word", current: 10, total: TOTAL_STEPS, detail: `${wbwData.length} words` });
   console.log(`[Import] Importing ${wbwData.length} word_translations rows...`);
 
   const rows = wbwData.map((w: any) => [
@@ -779,7 +966,7 @@ async function importWordIrab(
   onProgress: ProgressCallback
 ): Promise<void> {
   const masaqData = await loadData("masaq/masaq-aggregated.json");
-  onProgress({ step: "Grammar (إعراب)", current: 10, total: TOTAL_STEPS, detail: `${masaqData.length} words` });
+  onProgress({ step: "Grammar (إعراب)", current: 11, total: TOTAL_STEPS, detail: `${masaqData.length} words` });
   console.log(`[Import] Importing ${masaqData.length} word_irab rows...`);
 
   const rows = masaqData.map((m: any) => [
@@ -806,7 +993,7 @@ async function importPageLines(
   onProgress: ProgressCallback
 ): Promise<void> {
   const pageLinesData = await loadData("layout/page-lines.json");
-  onProgress({ step: "Page Layout", current: 12, total: TOTAL_STEPS, detail: `${pageLinesData.length} lines` });
+  onProgress({ step: "Page Layout", current: 13, total: TOTAL_STEPS, detail: `${pageLinesData.length} lines` });
   console.log(`[Import] Importing ${pageLinesData.length} page_lines rows...`);
 
   const rows = pageLinesData.map((l: any) => [
@@ -831,7 +1018,7 @@ async function importTajweed(
   onProgress: ProgressCallback
 ): Promise<void> {
   const tajweedData = await loadData("tajweed.json");
-  onProgress({ step: "Tajweed Rules", current: 11, total: TOTAL_STEPS, detail: `${tajweedData.length} ayahs` });
+  onProgress({ step: "Tajweed Rules", current: 12, total: TOTAL_STEPS, detail: `${tajweedData.length} ayahs` });
   console.log(`[Import] Importing tajweed rules...`);
 
   const allRows: any[][] = [];
@@ -859,7 +1046,7 @@ async function importWordMeaningsAr(
 ): Promise<void> {
   const data = await loadData("wbw-arabic-meanings.json");
   if (!Array.isArray(data)) return;
-  onProgress({ step: "Arabic Meanings", current: 13, total: TOTAL_STEPS, detail: `${data.length} words` });
+  onProgress({ step: "Arabic Meanings", current: 14, total: TOTAL_STEPS, detail: `${data.length} words` });
   console.log(`[Import] Importing ${data.length} word_meanings_ar rows with canonical word mapping...`);
 
   const canonicalByAyah = await loadCanonicalWordsByAyah(db);
@@ -884,7 +1071,7 @@ async function importWordIrabDaas(
 ): Promise<void> {
   const data = await loadData("irab-per-word.json");
   if (!Array.isArray(data)) return;
-  onProgress({ step: "Da'as Iʿrab", current: 14, total: TOTAL_STEPS, detail: `${data.length} words` });
+  onProgress({ step: "Da'as Iʿrab", current: 15, total: TOTAL_STEPS, detail: `${data.length} words` });
   console.log(`[Import] Importing ${data.length} word_irab_daas rows (expanding ayah_group)...`);
 
   const canonicalByAyah = await loadCanonicalWordsByAyah(db);
@@ -913,7 +1100,7 @@ async function importTajweedRulesAr(
   const data = await loadData("tajweed-rules-ar.json");
   if (!data || typeof data !== "object") return;
   const keys = Object.keys(data).filter((k) => !k.startsWith("_"));
-  onProgress({ step: "Tajweed (AR)", current: 15, total: TOTAL_STEPS, detail: `${keys.length} rules` });
+  onProgress({ step: "Tajweed (AR)", current: 16, total: TOTAL_STEPS, detail: `${keys.length} rules` });
   console.log(`[Import] Importing ${keys.length} tajweed_rules_ar rows...`);
 
   const rows = keys.map((key) => {
@@ -935,7 +1122,7 @@ async function importTajweedRulesEn(
   const data = await loadData("tajweed-rules-en.json");
   if (!data || typeof data !== "object") return;
   const keys = Object.keys(data).filter((k) => !k.startsWith("_"));
-  onProgress({ step: "Tajweed (EN)", current: 16, total: TOTAL_STEPS, detail: `${keys.length} rules` });
+  onProgress({ step: "Tajweed (EN)", current: 17, total: TOTAL_STEPS, detail: `${keys.length} rules` });
   console.log(`[Import] Importing ${keys.length} tajweed_rules_en rows...`);
 
   const rows = keys.map((key) => {
@@ -956,7 +1143,7 @@ async function importQiraatEncyclopedia(
 ): Promise<void> {
   const data = await loadData("al-qira-at-al-mawsoo-ah-al-qur-aniyyah.json");
   if (!data || typeof data !== "object") return;
-  onProgress({ step: "Qiraʾat", current: 17, total: TOTAL_STEPS, detail: "…" });
+  onProgress({ step: "Qiraʾat", current: 18, total: TOTAL_STEPS, detail: "…" });
   console.log(`[Import] Building qiraat_encyclopedia rows...`);
 
   // Two pass: first collect object entries (with text). Second pass: resolve string refs.
@@ -1026,7 +1213,7 @@ async function importMutashabihat(
   const tailGroups = Array.isArray(data.tail_groups) ? data.tail_groups : [];
   onProgress({
     step: "Mutashabihat",
-    current: 18,
+    current: 19,
     total: TOTAL_STEPS,
     detail: `${similarGroups.length} similar + ${tailGroups.length} tails`,
   });
@@ -1104,7 +1291,7 @@ async function importReflectionJourneyLevels(
 
   onProgress({
     step: "Reflection Journey",
-    current: 19,
+    current: 20,
     total: TOTAL_STEPS,
     detail: `${parsed.levels.length} levels`,
   });
@@ -1397,6 +1584,18 @@ export async function initializeDatabase(
       await importZilal(db, onProgress);
     }
 
+    for (const source of SURAH_ROW_TAFSIR_SOURCES) {
+      const sourceCount = await db.getFirstAsync<{ count: number }>(
+        "SELECT COUNT(*) as count FROM tafseer WHERE source = ?",
+        [source.id]
+      );
+      if ((sourceCount?.count ?? 0) < 6236) {
+        console.log(`[Import] Importing ${source.id} tafseer...`);
+        await db.runAsync("DELETE FROM tafseer WHERE source = ?", [source.id]);
+        await importSurahRowTafsirSource(db, source, onProgress);
+      }
+    }
+
     // Add text_search column for diacritics-stripped search (Phase 4 migration)
     try { await db.execAsync("ALTER TABLE quran_text ADD COLUMN text_search TEXT NOT NULL DEFAULT ''"); } catch (_) {}
     const searchCheck = await db.getFirstAsync<{ text_search: string }>(
@@ -1493,6 +1692,7 @@ export async function initializeDatabase(
   await importWordRoots(db, onProgress);
   await importTafseer(db, onProgress);
   await importZilal(db, onProgress);
+  await importConfiguredTafsirSources(db, onProgress);
   await importTranslations(db, onProgress);
   await importPageMap(db, onProgress);
   await importWordTranslations(db, onProgress);

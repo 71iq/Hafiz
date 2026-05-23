@@ -8,6 +8,11 @@ import { importTranslation } from "@/lib/translations/import";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { DEFAULT_RECITATION_ID, normalizeRecitationId } from "@/lib/quran-foundation/recitations";
 import { DirectionProvider } from "@/lib/ui/direction";
+import {
+  DEFAULT_TAFSIR_SOURCE,
+  isTafsirSourceId,
+  type TafsirSourceId,
+} from "@/lib/tafsir/sources";
 
 // Desktop / large-viewport scale. Also the canonical length (10 levels) used
 // by UI controls like the font size picker.
@@ -39,7 +44,7 @@ export type ThemeMode = "light" | "dark" | "system";
 export type ViewMode = "verse" | "page";
 export type PageScroll = "vertical" | "horizontal";
 export type UILanguage = "en" | "ar";
-export type TafseerSource = "muyassar" | "zilal";
+export type TafseerSource = TafsirSourceId;
 const UI_LANGUAGE_CACHE_KEY = "hafiz_ui_language";
 
 type SettingsContextType = {
@@ -97,7 +102,7 @@ const SettingsContext = createContext<SettingsContextType>({
   translationLanguage: DEFAULT_LANGUAGE,
   setTranslationLanguage: async () => {},
   isTranslationLoading: false,
-  tafseerSource: "muyassar",
+  tafseerSource: DEFAULT_TAFSIR_SOURCE,
   setTafseerSource: () => {},
   recitationId: DEFAULT_RECITATION_ID,
   setRecitationId: () => {},
@@ -163,7 +168,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [showTafseer, setShowTafseerState] = useState(false);
   const [translationLanguage, setTranslationLanguageState] = useState(DEFAULT_LANGUAGE);
   const [isTranslationLoading, setIsTranslationLoading] = useState(false);
-  const [tafseerSource, setTafseerSourceState] = useState<TafseerSource>("muyassar");
+  const [tafseerSource, setTafseerSourceState] = useState<TafseerSource>(DEFAULT_TAFSIR_SOURCE);
   const [recitationId, setRecitationIdState] = useState(DEFAULT_RECITATION_ID);
   const [uiLanguage, setUiLanguageState] = useState<UILanguage>(readCachedUiLanguage);
   const [dailyReviewLimit, setDailyReviewLimitState] = useState(DEFAULT_DAILY_REVIEW_LIMIT);
@@ -208,7 +213,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         if (savedShowTafseer === "true") setShowTafseerState(true);
 
         const savedTafseerSource = await readSetting(db, "tafseer_source");
-        if (savedTafseerSource === "muyassar" || savedTafseerSource === "zilal") {
+        if (isTafsirSourceId(savedTafseerSource)) {
           setTafseerSourceState(savedTafseerSource);
         }
 

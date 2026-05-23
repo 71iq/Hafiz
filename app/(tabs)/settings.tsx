@@ -12,12 +12,12 @@ import {
   FONT_SIZE_STEPS,
   type ThemeMode,
   type UILanguage,
-  type TafseerSource,
   type PageScroll,
   type ViewMode,
 } from "@/lib/settings/context";
 import { useDatabase } from "@/lib/database/provider";
 import { getLanguageByCode } from "@/lib/translations/languages";
+import { TAFSIR_SOURCES } from "@/lib/tafsir/sources";
 import { TranslationLanguagePicker } from "@/components/settings/TranslationLanguagePicker";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -432,24 +432,18 @@ export default function SettingsScreen() {
               {s.tafseerSourceLabel}
             </Text>
             <View className="gap-2">
-              <TafseerSourceOption
-                value="muyassar"
-                title={s.tafseerMuyassar}
-                description={s.tafseerMuyassarDesc}
-                isActive={tafseerSource === "muyassar"}
-                onPress={() => setTafseerSource("muyassar")}
-                isDark={isDark}
-                isRTL={isRTL}
-              />
-              <TafseerSourceOption
-                value="zilal"
-                title={s.tafseerZilal}
-                description={s.tafseerZilalDesc}
-                isActive={tafseerSource === "zilal"}
-                onPress={() => setTafseerSource("zilal")}
-                isDark={isDark}
-                isRTL={isRTL}
-              />
+              {TAFSIR_SOURCES.map((source) => (
+                <TafseerSourceOption
+                  key={source.id}
+                  value={source.id}
+                  title={s[source.labelKey] ?? source.id}
+                  description={s[source.descriptionKey] ?? ""}
+                  isActive={tafseerSource === source.id}
+                  onPress={() => setTafseerSource(source.id)}
+                  isDark={isDark}
+                  isRTL={isRTL}
+                />
+              ))}
             </View>
 
             <View className="h-5" />
@@ -731,6 +725,7 @@ export default function SettingsScreen() {
                 s.creditWordMeanings,
                 s.creditIrab,
                 s.creditQiraat,
+                s.creditTahrirTanwir,
                 s.creditNourQuran,
                 s.creditSurahInfo,
                 s.creditTajweedRules,

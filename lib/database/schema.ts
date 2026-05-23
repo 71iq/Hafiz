@@ -77,7 +77,7 @@ export async function createSchema(db: SQLiteDatabase): Promise<void> {
       ayah_end INTEGER NOT NULL
     );
 
-    -- Tafseer (multi-source: muyassar, zilal)
+    -- Tafseer (multi-source)
     CREATE TABLE IF NOT EXISTS tafseer (
       surah INTEGER NOT NULL,
       ayah INTEGER NOT NULL,
