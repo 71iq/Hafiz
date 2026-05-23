@@ -704,10 +704,10 @@ function SettingsSection({
         {title}
       </Text>
       <Card
-        elevation={quiet ? "bright" : "low"}
-        className={quiet ? "rounded-3xl border border-warm-200 p-4 dark:border-neutral-800" : "p-5"}
+        elevation={quiet ? "surface" : "low"}
+        className={quiet ? "rounded-3xl bg-transparent p-0 dark:bg-transparent" : "p-5"}
       >
-        <View className={quiet ? "gap-2" : "gap-1"}>{children}</View>
+        <View className={quiet ? "gap-2.5" : "gap-1"}>{children}</View>
       </Card>
     </View>
   );
@@ -890,31 +890,43 @@ function ChoiceRow<T extends string>({
   isDark: boolean;
   isRTL: boolean;
 }) {
-  const selectedBg = isDark ? "rgba(45, 212, 191, 0.14)" : "#CCFBF1";
-  const selectedText = isDark ? "#5eead4" : "#0F766E";
-  const optionShellBg = isDark ? "#1C1917" : "#FFF8F1";
-  const optionShellBorder = isDark ? "#262626" : "#E8E1DA";
+  const rowBg = isDark ? "#141414" : "#FAF8F5";
+  const rowBorder = isDark ? "rgba(255,255,255,0.06)" : "rgba(45,45,45,0.06)";
+  const selectedBg = isDark ? "rgba(45, 212, 191, 0.18)" : "#DFF8F3";
+  const selectedText = isDark ? "#5eead4" : "#007D78";
+  const idleText = isDark ? "#d4d4d4" : "#5f4e40";
 
   return (
-    <View className="gap-2 py-2.5">
-      <SettingTitle
-        title={title}
-        info={info}
-        infoAccessibilityLabel={infoAccessibilityLabel}
-        onInfoPress={onInfoPress}
-        isDark={isDark}
-        isRTL={isRTL}
-        fontSize={14}
-      />
+    <View
+      className="gap-3 rounded-3xl px-4 py-3.5"
+      style={{
+        alignItems: "center",
+        backgroundColor: rowBg,
+        borderColor: rowBorder,
+        borderWidth: 1,
+        flexDirection: isRTL ? "row-reverse" : "row",
+        flexWrap: "wrap",
+        justifyContent: "space-between",
+      }}
+    >
+      <View style={{ flexGrow: 1, flexShrink: 1, minWidth: 150 }}>
+        <SettingTitle
+          title={title}
+          info={info}
+          infoAccessibilityLabel={infoAccessibilityLabel}
+          onInfoPress={onInfoPress}
+          isDark={isDark}
+          isRTL={isRTL}
+          fontSize={14}
+        />
+      </View>
       <View
-        className="gap-1 rounded-2xl p-1"
+        className="gap-2"
         style={{
-          backgroundColor: optionShellBg,
-          borderColor: optionShellBorder,
-          borderWidth: 1,
           flexDirection: isRTL ? "row-reverse" : "row",
           flexWrap: "wrap",
-          justifyContent: isRTL ? "flex-start" : "flex-start",
+          flexShrink: 1,
+          justifyContent: isRTL ? "flex-start" : "flex-end",
         }}
       >
         {options.map((option) => {
@@ -923,19 +935,19 @@ function ChoiceRow<T extends string>({
             <Pressable
               key={option.value}
               onPress={() => onChange(option.value)}
-              className="rounded-xl px-3.5 py-2"
+              className="rounded-full px-3.5 py-2"
               style={({ pressed }) => ({
                 backgroundColor: selected ? selectedBg : "transparent",
-                borderColor: selected ? selectedText : "transparent",
+                borderColor: selected ? "transparent" : isDark ? "rgba(255,255,255,0.08)" : "rgba(95,78,64,0.12)",
                 borderWidth: 1,
-                minHeight: 36,
+                minHeight: 34,
                 justifyContent: "center",
                 opacity: pressed ? 0.72 : 1,
               })}
             >
               <Text
                 style={{
-                  color: selected ? selectedText : isDark ? "#d4d4d4" : "#5f4e40",
+                  color: selected ? selectedText : idleText,
                   fontFamily: selected ? "Manrope_700Bold" : "Manrope_600SemiBold",
                   fontSize: 12,
                   textAlign: "center",
