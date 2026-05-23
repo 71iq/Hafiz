@@ -56,6 +56,125 @@ const nativeTahrirTanwirRequires: Record<number, () => any> = Platform.OS !== "w
     )
   : {};
 
+const nativeQurtubiRequires: Record<number, () => any> = Platform.OS !== "web"
+  ? {
+      1: () => require("../../assets/data/tafsir-sources/qurtubi/1.json"),
+      2: () => require("../../assets/data/tafsir-sources/qurtubi/2.json"),
+      3: () => require("../../assets/data/tafsir-sources/qurtubi/3.json"),
+      4: () => require("../../assets/data/tafsir-sources/qurtubi/4.json"),
+      5: () => require("../../assets/data/tafsir-sources/qurtubi/5.json"),
+      6: () => require("../../assets/data/tafsir-sources/qurtubi/6.json"),
+      7: () => require("../../assets/data/tafsir-sources/qurtubi/7.json"),
+      8: () => require("../../assets/data/tafsir-sources/qurtubi/8.json"),
+      9: () => require("../../assets/data/tafsir-sources/qurtubi/9.json"),
+      10: () => require("../../assets/data/tafsir-sources/qurtubi/10.json"),
+      11: () => require("../../assets/data/tafsir-sources/qurtubi/11.json"),
+      12: () => require("../../assets/data/tafsir-sources/qurtubi/12.json"),
+      13: () => require("../../assets/data/tafsir-sources/qurtubi/13.json"),
+      14: () => require("../../assets/data/tafsir-sources/qurtubi/14.json"),
+      15: () => require("../../assets/data/tafsir-sources/qurtubi/15.json"),
+      16: () => require("../../assets/data/tafsir-sources/qurtubi/16.json"),
+      17: () => require("../../assets/data/tafsir-sources/qurtubi/17.json"),
+      18: () => require("../../assets/data/tafsir-sources/qurtubi/18.json"),
+      19: () => require("../../assets/data/tafsir-sources/qurtubi/19.json"),
+      20: () => require("../../assets/data/tafsir-sources/qurtubi/20.json"),
+      21: () => require("../../assets/data/tafsir-sources/qurtubi/21.json"),
+      22: () => require("../../assets/data/tafsir-sources/qurtubi/22.json"),
+      23: () => require("../../assets/data/tafsir-sources/qurtubi/23.json"),
+      24: () => require("../../assets/data/tafsir-sources/qurtubi/24.json"),
+      25: () => require("../../assets/data/tafsir-sources/qurtubi/25.json"),
+      26: () => require("../../assets/data/tafsir-sources/qurtubi/26.json"),
+      27: () => require("../../assets/data/tafsir-sources/qurtubi/27.json"),
+      28: () => require("../../assets/data/tafsir-sources/qurtubi/28.json"),
+      29: () => require("../../assets/data/tafsir-sources/qurtubi/29.json"),
+      30: () => require("../../assets/data/tafsir-sources/qurtubi/30.json"),
+      31: () => require("../../assets/data/tafsir-sources/qurtubi/31.json"),
+      32: () => require("../../assets/data/tafsir-sources/qurtubi/32.json"),
+      33: () => require("../../assets/data/tafsir-sources/qurtubi/33.json"),
+      34: () => require("../../assets/data/tafsir-sources/qurtubi/34.json"),
+      35: () => require("../../assets/data/tafsir-sources/qurtubi/35.json"),
+      36: () => require("../../assets/data/tafsir-sources/qurtubi/36.json"),
+      37: () => require("../../assets/data/tafsir-sources/qurtubi/37.json"),
+      38: () => require("../../assets/data/tafsir-sources/qurtubi/38.json"),
+      39: () => require("../../assets/data/tafsir-sources/qurtubi/39.json"),
+      40: () => require("../../assets/data/tafsir-sources/qurtubi/40.json"),
+      41: () => require("../../assets/data/tafsir-sources/qurtubi/41.json"),
+      42: () => require("../../assets/data/tafsir-sources/qurtubi/42.json"),
+      43: () => require("../../assets/data/tafsir-sources/qurtubi/43.json"),
+      44: () => require("../../assets/data/tafsir-sources/qurtubi/44.json"),
+      45: () => require("../../assets/data/tafsir-sources/qurtubi/45.json"),
+      46: () => require("../../assets/data/tafsir-sources/qurtubi/46.json"),
+      47: () => require("../../assets/data/tafsir-sources/qurtubi/47.json"),
+      48: () => require("../../assets/data/tafsir-sources/qurtubi/48.json"),
+      49: () => require("../../assets/data/tafsir-sources/qurtubi/49.json"),
+      50: () => require("../../assets/data/tafsir-sources/qurtubi/50.json"),
+      51: () => require("../../assets/data/tafsir-sources/qurtubi/51.json"),
+      52: () => require("../../assets/data/tafsir-sources/qurtubi/52.json"),
+      53: () => require("../../assets/data/tafsir-sources/qurtubi/53.json"),
+      54: () => require("../../assets/data/tafsir-sources/qurtubi/54.json"),
+      55: () => require("../../assets/data/tafsir-sources/qurtubi/55.json"),
+      56: () => require("../../assets/data/tafsir-sources/qurtubi/56.json"),
+      57: () => require("../../assets/data/tafsir-sources/qurtubi/57.json"),
+      58: () => require("../../assets/data/tafsir-sources/qurtubi/58.json"),
+      59: () => require("../../assets/data/tafsir-sources/qurtubi/59.json"),
+      60: () => require("../../assets/data/tafsir-sources/qurtubi/60.json"),
+      61: () => require("../../assets/data/tafsir-sources/qurtubi/61.json"),
+      62: () => require("../../assets/data/tafsir-sources/qurtubi/62.json"),
+      63: () => require("../../assets/data/tafsir-sources/qurtubi/63.json"),
+      64: () => require("../../assets/data/tafsir-sources/qurtubi/64.json"),
+      65: () => require("../../assets/data/tafsir-sources/qurtubi/65.json"),
+      66: () => require("../../assets/data/tafsir-sources/qurtubi/66.json"),
+      67: () => require("../../assets/data/tafsir-sources/qurtubi/67.json"),
+      68: () => require("../../assets/data/tafsir-sources/qurtubi/68.json"),
+      69: () => require("../../assets/data/tafsir-sources/qurtubi/69.json"),
+      70: () => require("../../assets/data/tafsir-sources/qurtubi/70.json"),
+      71: () => require("../../assets/data/tafsir-sources/qurtubi/71.json"),
+      72: () => require("../../assets/data/tafsir-sources/qurtubi/72.json"),
+      73: () => require("../../assets/data/tafsir-sources/qurtubi/73.json"),
+      74: () => require("../../assets/data/tafsir-sources/qurtubi/74.json"),
+      75: () => require("../../assets/data/tafsir-sources/qurtubi/75.json"),
+      76: () => require("../../assets/data/tafsir-sources/qurtubi/76.json"),
+      77: () => require("../../assets/data/tafsir-sources/qurtubi/77.json"),
+      78: () => require("../../assets/data/tafsir-sources/qurtubi/78.json"),
+      79: () => require("../../assets/data/tafsir-sources/qurtubi/79.json"),
+      80: () => require("../../assets/data/tafsir-sources/qurtubi/80.json"),
+      81: () => require("../../assets/data/tafsir-sources/qurtubi/81.json"),
+      82: () => require("../../assets/data/tafsir-sources/qurtubi/82.json"),
+      83: () => require("../../assets/data/tafsir-sources/qurtubi/83.json"),
+      84: () => require("../../assets/data/tafsir-sources/qurtubi/84.json"),
+      85: () => require("../../assets/data/tafsir-sources/qurtubi/85.json"),
+      86: () => require("../../assets/data/tafsir-sources/qurtubi/86.json"),
+      87: () => require("../../assets/data/tafsir-sources/qurtubi/87.json"),
+      88: () => require("../../assets/data/tafsir-sources/qurtubi/88.json"),
+      89: () => require("../../assets/data/tafsir-sources/qurtubi/89.json"),
+      90: () => require("../../assets/data/tafsir-sources/qurtubi/90.json"),
+      91: () => require("../../assets/data/tafsir-sources/qurtubi/91.json"),
+      92: () => require("../../assets/data/tafsir-sources/qurtubi/92.json"),
+      93: () => require("../../assets/data/tafsir-sources/qurtubi/93.json"),
+      94: () => require("../../assets/data/tafsir-sources/qurtubi/94.json"),
+      95: () => require("../../assets/data/tafsir-sources/qurtubi/95.json"),
+      96: () => require("../../assets/data/tafsir-sources/qurtubi/96.json"),
+      97: () => require("../../assets/data/tafsir-sources/qurtubi/97.json"),
+      98: () => require("../../assets/data/tafsir-sources/qurtubi/98.json"),
+      99: () => require("../../assets/data/tafsir-sources/qurtubi/99.json"),
+      100: () => require("../../assets/data/tafsir-sources/qurtubi/100.json"),
+      101: () => require("../../assets/data/tafsir-sources/qurtubi/101.json"),
+      102: () => require("../../assets/data/tafsir-sources/qurtubi/102.json"),
+      103: () => require("../../assets/data/tafsir-sources/qurtubi/103.json"),
+      104: () => require("../../assets/data/tafsir-sources/qurtubi/104.json"),
+      105: () => require("../../assets/data/tafsir-sources/qurtubi/105.json"),
+      106: () => require("../../assets/data/tafsir-sources/qurtubi/106.json"),
+      107: () => require("../../assets/data/tafsir-sources/qurtubi/107.json"),
+      108: () => require("../../assets/data/tafsir-sources/qurtubi/108.json"),
+      109: () => require("../../assets/data/tafsir-sources/qurtubi/109.json"),
+      110: () => require("../../assets/data/tafsir-sources/qurtubi/110.json"),
+      111: () => require("../../assets/data/tafsir-sources/qurtubi/111.json"),
+      112: () => require("../../assets/data/tafsir-sources/qurtubi/112.json"),
+      113: () => require("../../assets/data/tafsir-sources/qurtubi/113.json"),
+      114: () => require("../../assets/data/tafsir-sources/qurtubi/114.json"),
+    }
+  : {};
+
 function tafseerRequireStatic(n: number): any {
   // Metro bundler requires static string literals for require() calls.
   // This function is only called on native, never on web.
@@ -346,6 +465,7 @@ function loadTafseerFile(surahNumber: number): Promise<any> {
 
 function nativeTafsirSourceLoader(source: TafsirSourceId, surahNumber: number): (() => any) | null {
   if (source === "tahrir-tanwir") return nativeTahrirTanwirRequires[surahNumber] ?? null;
+  if (source === "qurtubi") return nativeQurtubiRequires[surahNumber] ?? null;
   return null;
 }
 
@@ -1589,7 +1709,7 @@ export async function initializeDatabase(
         "SELECT COUNT(*) as count FROM tafseer WHERE source = ?",
         [source.id]
       );
-      if ((sourceCount?.count ?? 0) < 6236) {
+      if ((sourceCount?.count ?? 0) < (source.expectedRows ?? 6236)) {
         console.log(`[Import] Importing ${source.id} tafseer...`);
         await db.runAsync("DELETE FROM tafseer WHERE source = ?", [source.id]);
         await importSurahRowTafsirSource(db, source, onProgress);

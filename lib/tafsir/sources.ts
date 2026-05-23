@@ -1,4 +1,4 @@
-export type TafsirSourceId = "muyassar" | "zilal" | "tahrir-tanwir";
+export type TafsirSourceId = "muyassar" | "zilal" | "tahrir-tanwir" | "qurtubi";
 
 type TafsirImportKind = "muyassar" | "zilal" | "surahRows";
 
@@ -8,6 +8,7 @@ export type TafsirSourceConfig = {
   descriptionKey: string;
   importKind: TafsirImportKind;
   progressDetail: string;
+  expectedRows?: number;
 };
 
 export const DEFAULT_TAFSIR_SOURCE: TafsirSourceId = "muyassar";
@@ -33,6 +34,14 @@ export const TAFSIR_SOURCES: TafsirSourceConfig[] = [
     descriptionKey: "tafseerTahrirTanwirDesc",
     importKind: "surahRows",
     progressDetail: "Al-Tahrir wa al-Tanwir",
+  },
+  {
+    id: "qurtubi",
+    labelKey: "tafseerQurtubi",
+    descriptionKey: "tafseerQurtubiDesc",
+    importKind: "surahRows",
+    progressDetail: "Tafseer Al Qurtubi",
+    expectedRows: 6234,
   },
 ];
 
