@@ -6,6 +6,7 @@ import { Platform } from "react-native";
 
 const nativeTranslationRequires: Record<string, () => any> = Platform.OS !== "web"
   ? {
+      "en-bridges": () => require("../../assets/data/translations/en-bridges.json"),
       id: () => require("../../assets/data/translations/id.json"),
       bn: () => require("../../assets/data/translations/bn.json"),
       ur: () => require("../../assets/data/translations/ur.json"),
@@ -42,6 +43,7 @@ export async function loadTranslation(langCode: string): Promise<any> {
 
 // Backwards-compatible sync export for code that checks langCode membership
 export const translationRequires: Record<string, true> = {
+  "en-bridges": true,
   id: true, bn: true, ur: true, fa: true, hi: true, tr: true, ha: true,
   fr: true, ps: true, sd: true, ru: true, ku: true, uz: true, sw: true,
   om: true, am: true, so: true, az: true, kk: true, ber: true,

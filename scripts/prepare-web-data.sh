@@ -43,7 +43,7 @@ cp assets/data/tafsir-sources/al-bahr-al-madid/*.json public/data/tafsir-sources
 cp assets/data/tafsir-sources/jalalayn/*.json public/data/tafsir-sources/jalalayn/
 cp assets/data/tafsir-sources/jalalayn-en/*.json public/data/tafsir-sources/jalalayn-en/
 
-# Translations (20 files)
+# Translations
 cp assets/data/translations/*.json public/data/translations/
 
 echo "Done. Web data files copied to public/data/"

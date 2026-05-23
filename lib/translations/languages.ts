@@ -9,6 +9,7 @@ export const DEFAULT_LANGUAGE = "en";
 
 export const TRANSLATION_LANGUAGES: TranslationLanguage[] = [
   { code: "en", nameEnglish: "English", nameNative: "English", direction: "ltr" },
+  { code: "en-bridges", nameEnglish: "English (Bridges)", nameNative: "English (Bridges)", direction: "ltr" },
   { code: "id", nameEnglish: "Indonesian", nameNative: "Bahasa Indonesia", direction: "ltr" },
   { code: "bn", nameEnglish: "Bengali", nameNative: "বাংলা", direction: "ltr" },
   { code: "ur", nameEnglish: "Urdu", nameNative: "اردو", direction: "rtl" },
