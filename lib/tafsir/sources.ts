@@ -4,7 +4,8 @@ export type TafsirSourceId =
   | "tahrir-tanwir"
   | "qurtubi"
   | "kashshaf"
-  | "alusi";
+  | "alusi"
+  | "nazam-durar";
 
 type TafsirImportKind = "muyassar" | "zilal" | "surahRows";
 
@@ -62,6 +63,13 @@ export const TAFSIR_SOURCES: TafsirSourceConfig[] = [
     descriptionKey: "tafseerAlusiDesc",
     importKind: "surahRows",
     progressDetail: "Tafsir Al-Alusi",
+  },
+  {
+    id: "nazam-durar",
+    labelKey: "tafseerNazamDurar",
+    descriptionKey: "tafseerNazamDurarDesc",
+    importKind: "surahRows",
+    progressDetail: "Nazam Al-Durar Al-Biqa'i",
   },
 ];
 
