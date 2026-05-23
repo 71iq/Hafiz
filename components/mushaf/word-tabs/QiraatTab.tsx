@@ -70,7 +70,6 @@ export function QiraatTab({ surah, ayah }: Props) {
   if (!text || blocks.length === 0) {
     return (
       <View className="py-10 items-center px-4">
-        <Text className="text-3xl mb-4">{"📖"}</Text>
         <Text
           className="text-base text-warm-500 dark:text-neutral-400 text-center"
           style={{ writingDirection: "rtl" }}
