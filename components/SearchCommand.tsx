@@ -168,6 +168,7 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
   const [rootResults, setRootResults] = useState<LemmaGroup[]>([]);
   const [searching, setSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [expandedLemmas, setExpandedLemmas] = useState<Set<string>>(new Set());
 
@@ -221,6 +222,7 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
       setTextResults([]);
       setRootResults([]);
       setHasSearched(false);
+      setSearchError(null);
       setExpandedLemmas(new Set());
     }
     return () => {
@@ -271,11 +273,13 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
         setTextResults([]);
         setRootResults([]);
         setHasSearched(false);
+        setSearchError(null);
         return;
       }
 
       setSearching(true);
       setHasSearched(true);
+      setSearchError(null);
 
       try {
         if (searchMode === "text") {
@@ -361,11 +365,14 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
         saveToHistory(term.trim(), searchMode);
       } catch (err) {
         console.error("[Search] Error:", err);
+        setTextResults([]);
+        setRootResults([]);
+        setSearchError(s.searchFailed);
       } finally {
         setSearching(false);
       }
     },
-    [db, saveToHistory, loadRootIndex]
+    [db, saveToHistory, loadRootIndex, s.searchFailed]
   );
 
   const handleQueryChange = useCallback(
@@ -395,6 +402,7 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
     setTextResults([]);
     setRootResults([]);
     setHasSearched(false);
+    setSearchError(null);
     inputRef.current?.focus();
   }, []);
 
@@ -570,6 +578,16 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
         <OverlayBody scrollEnabled={false} className="px-0">
           {searching ? (
             <SearchResultsSkeleton isDark={isDark} className="flex-1" />
+          ) : searchError ? (
+            <View className="flex-1 items-center justify-center">
+              <EmptyState
+                icon={Search}
+                title={searchError}
+                actionLabel={s.errorTryAgain}
+                onAction={() => performSearch(query, mode)}
+                isDark={isDark}
+              />
+            </View>
           ) : !hasSearched && query.length === 0 ? (
             <View className="flex-1 px-5">
             {history.length > 0 && (

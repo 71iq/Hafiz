@@ -28,6 +28,8 @@ export function ProfileNotesManager() {
   const [notes, setNotes] = useState<PrivateNoteSearchResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [reloadToken, setReloadToken] = useState(0);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [editingNote, setEditingNote] = useState<PrivateNoteSearchResult | null>(null);
   const [deletingNote, setDeletingNote] = useState<PrivateNoteSearchResult | null>(null);
   const [allNotesOpen, setAllNotesOpen] = useState(false);
@@ -35,6 +37,7 @@ export function ProfileNotesManager() {
   const maxOverlayHeight = Math.min(height - (isPhone ? 12 : 48), isPhone ? height * 0.94 : 720);
 
   const refreshNotes = useCallback(() => {
+    setError(null);
     setReloadToken((token) => token + 1);
   }, []);
 
@@ -44,11 +47,17 @@ export function ProfileNotesManager() {
     const timer = setTimeout(() => {
       searchPrivateNotes(db, "")
         .then((rows) => {
-          if (!cancelled) setNotes(rows);
+          if (!cancelled) {
+            setNotes(rows);
+            setError(null);
+          }
         })
         .catch((e) => {
           console.warn("[ProfileNotesManager] notes search failed:", e);
-          if (!cancelled) setNotes([]);
+          if (!cancelled) {
+            setNotes([]);
+            setError(s.genericActionFailed);
+          }
         })
         .finally(() => {
           if (!cancelled) setLoading(false);
@@ -59,7 +68,7 @@ export function ProfileNotesManager() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [db, reloadToken]);
+  }, [db, reloadToken, s.genericActionFailed]);
 
   const countLabel = useMemo(
     () => interpolate(s.profileNotesCount, { n: isRTL ? toArabicNumber(notes.length) : notes.length }),
@@ -69,11 +78,20 @@ export function ProfileNotesManager() {
   const hasMoreNotes = notes.length > previewNotes.length;
 
   const confirmDelete = useCallback(async () => {
-    if (!deletingNote) return;
-    await deletePrivateNote(db, deletingNote.id);
-    setDeletingNote(null);
-    refreshNotes();
-  }, [db, deletingNote, refreshNotes]);
+    if (!deletingNote || deleteBusy) return;
+    setDeleteBusy(true);
+    setError(null);
+    try {
+      await deletePrivateNote(db, deletingNote.id);
+      setDeletingNote(null);
+      refreshNotes();
+    } catch (e) {
+      console.warn("[ProfileNotesManager] note delete failed:", e);
+      setError(s.privateNoteDeleteFailed);
+    } finally {
+      setDeleteBusy(false);
+    }
+  }, [db, deleteBusy, deletingNote, refreshNotes, s.privateNoteDeleteFailed]);
 
   const openAyah = useCallback((note: PrivateNoteSearchResult) => {
     setAllNotesOpen(false);
@@ -142,6 +160,20 @@ export function ProfileNotesManager() {
           </View>
         </View>
       </View>
+
+      {error ? (
+        <Text
+          className="text-red-600 dark:text-red-400"
+          style={{
+            fontFamily: "Manrope_500Medium",
+            fontSize: 13,
+            textAlign: isRTL ? "right" : "left",
+            writingDirection: isRTL ? "rtl" : "ltr",
+          }}
+        >
+          {error}
+        </Text>
+      ) : null}
 
       {loading ? (
         <View className="items-center justify-center py-8">
@@ -233,7 +265,10 @@ export function ProfileNotesManager() {
         destructive
         isDark={isDark}
         isRTL={isRTL}
-        onCancel={() => setDeletingNote(null)}
+        confirmLoading={deleteBusy}
+        onCancel={() => {
+          if (!deleteBusy) setDeletingNote(null);
+        }}
         onConfirm={confirmDelete}
       />
     </View>

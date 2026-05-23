@@ -52,11 +52,13 @@ export function GoToNavigator({
   const [surahPageMap, setSurahPageMap] = useState<Map<number, number>>(new Map());
   const [searchText, setSearchText] = useState("");
   const [tab, setTab] = useState<TabKey>("surah");
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!visible) return;
     setSearchText("");
     setTab("surah");
+    setLoadError(null);
 
     async function load() {
       try {
@@ -113,10 +115,11 @@ export function GoToNavigator({
         );
       } catch (err) {
         console.error("[GoToNavigator] Failed to load data:", err);
+        setLoadError(s.goToLoadFailed);
       }
     }
     load();
-  }, [db, visible]);
+  }, [db, visible, s.goToLoadFailed]);
 
   const handleSearchChange = useCallback((text: string) => {
     setSearchText(text);
@@ -393,7 +396,19 @@ export function GoToNavigator({
         contentContainerClassName="bg-surface dark:bg-surface-dark pb-6"
       >
         <View className="bg-surface dark:bg-surface-dark">
-          {tab === "surah" ? renderSurahList() : renderJuzList()}
+          {loadError ? (
+            <Text
+              className="py-8 text-center text-red-600 dark:text-red-400"
+              style={{
+                fontFamily: "Manrope_500Medium",
+                fontSize: 13,
+                textAlign: isRTL ? "right" : "left",
+                writingDirection: isRTL ? "rtl" : "ltr",
+              }}
+            >
+              {loadError}
+            </Text>
+          ) : tab === "surah" ? renderSurahList() : renderJuzList()}
         </View>
       </OverlayBody>
     </ResponsiveOverlay>

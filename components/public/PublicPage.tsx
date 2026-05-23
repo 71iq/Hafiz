@@ -57,6 +57,7 @@ export function PublicPage({ page }: { page: PublicPageKey }) {
   const { width } = useWindowDimensions();
   const { colorScheme } = useColorScheme();
   const [language, setLanguage] = useState<PublicPageLanguage>(readInitialLanguage);
+  const [linkError, setLinkError] = useState<string | null>(null);
   const content = PUBLIC_PAGE_CONTENT[page][language];
   const labels = PUBLIC_PAGE_LABELS[language];
   const isRTL = language === "ar";
@@ -80,11 +81,15 @@ export function PublicPage({ page }: { page: PublicPageKey }) {
   const orderedSections = useMemo(() => content.sections, [content.sections]);
 
   const openLink = (link: PublicPageLink) => {
+    setLinkError(null);
     if (isInternalHref(link.href) && !link.external) {
       router.push(link.href as any);
       return;
     }
-    Linking.openURL(link.href).catch(console.warn);
+    Linking.openURL(link.href).catch((e) => {
+      console.warn("[PublicPage] Failed to open link:", e);
+      setLinkError(labels.linkFailed);
+    });
   };
 
   return (
@@ -166,6 +171,20 @@ export function PublicPage({ page }: { page: PublicPageKey }) {
             onChange={(nextPage) => router.replace(`/${nextPage}` as any)}
             width={width}
           />
+
+          {linkError && (
+            <Text
+              className="mb-4 rounded-2xl bg-red-500/10 px-4 py-3 text-red-600 dark:text-red-400"
+              style={{
+                fontFamily: "Manrope_500Medium",
+                fontSize: 13,
+                textAlign: isRTL ? "right" : "left",
+                writingDirection: isRTL ? "rtl" : "ltr",
+              }}
+            >
+              {linkError}
+            </Text>
+          )}
 
           <View className="mb-12">
             <Text

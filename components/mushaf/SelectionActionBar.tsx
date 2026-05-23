@@ -30,6 +30,7 @@ export function SelectionActionBar() {
   const [showColors, setShowColors] = useState(false);
   const [showWriteReflection, setShowWriteReflection] = useState(false);
   const [showPrivateNote, setShowPrivateNote] = useState(false);
+  const [actionBusy, setActionBusy] = useState(false);
 
   const isOpen = selection !== null;
   const currentHighlight = selection ? getHighlightColor(selection.start.surah, selection.start.ayah) : undefined;
@@ -51,13 +52,22 @@ export function SelectionActionBar() {
   }, [db, selection]);
 
   const handleCopy = useCallback(async () => {
-    const meta = await getTextAndMeta();
-    if (!meta) return;
-    const formatted = formatForCopy(meta.text, meta.surahName, meta.surah, meta.ayah, meta.ayah);
-    await Clipboard.setStringAsync(formatted);
-    showToast(s.copied);
-    handleClose();
-  }, [getTextAndMeta, showToast, s.copied, handleClose]);
+    if (actionBusy) return;
+    setActionBusy(true);
+    try {
+      const meta = await getTextAndMeta();
+      if (!meta) return;
+      const formatted = formatForCopy(meta.text, meta.surahName, meta.surah, meta.ayah, meta.ayah);
+      await Clipboard.setStringAsync(formatted);
+      showToast(s.copied);
+      handleClose();
+    } catch (e) {
+      console.warn("[SelectionActionBar] Failed to copy selection:", e);
+      showToast(s.copyFailed);
+    } finally {
+      setActionBusy(false);
+    }
+  }, [actionBusy, getTextAndMeta, showToast, s.copied, s.copyFailed, handleClose]);
 
   const handleReflect = useCallback(() => {
     setShowWriteReflection(true);
@@ -69,27 +79,54 @@ export function SelectionActionBar() {
 
   const handleHighlightColor = useCallback(
     async (color: string) => {
-      await addHighlightForSelection(color);
-      showToast(s.highlightAdded);
-      setShowColors(false);
-      handleClose();
+      if (actionBusy) return;
+      setActionBusy(true);
+      try {
+        await addHighlightForSelection(color);
+        showToast(s.highlightAdded);
+        setShowColors(false);
+        handleClose();
+      } catch (e) {
+        console.warn("[SelectionActionBar] Failed to highlight selection:", e);
+        showToast(s.highlightActionFailed);
+      } finally {
+        setActionBusy(false);
+      }
     },
-    [addHighlightForSelection, showToast, s.highlightAdded, handleClose]
+    [actionBusy, addHighlightForSelection, showToast, s.highlightAdded, s.highlightActionFailed, handleClose]
   );
 
   const handleRemoveHighlight = useCallback(async () => {
-    await removeHighlightForSelection();
-    showToast(s.highlightRemoved);
-    setShowColors(false);
-    handleClose();
-  }, [removeHighlightForSelection, showToast, s.highlightRemoved, handleClose]);
+    if (actionBusy) return;
+    setActionBusy(true);
+    try {
+      await removeHighlightForSelection();
+      showToast(s.highlightRemoved);
+      setShowColors(false);
+      handleClose();
+    } catch (e) {
+      console.warn("[SelectionActionBar] Failed to remove highlight:", e);
+      showToast(s.highlightActionFailed);
+    } finally {
+      setActionBusy(false);
+    }
+  }, [actionBusy, removeHighlightForSelection, showToast, s.highlightRemoved, s.highlightActionFailed, handleClose]);
 
   const handleBookmark = useCallback(async () => {
-    const result = await toggleBookmarkForSelection();
-    if (result === "added") showToast(s.bookmarkAdded);
-    else if (result === "removed") showToast(s.bookmarkRemoved);
-    handleClose();
-  }, [toggleBookmarkForSelection, showToast, s.bookmarkAdded, s.bookmarkRemoved, handleClose]);
+    if (actionBusy) return;
+    setActionBusy(true);
+    try {
+      const result = await toggleBookmarkForSelection();
+      if (result === "added") showToast(s.bookmarkAdded);
+      else if (result === "removed") showToast(s.bookmarkRemoved);
+      handleClose();
+    } catch (e) {
+      console.warn("[SelectionActionBar] Failed to toggle bookmark:", e);
+      showToast(s.bookmarkActionFailed);
+    } finally {
+      setActionBusy(false);
+    }
+  }, [actionBusy, toggleBookmarkForSelection, showToast, s.bookmarkAdded, s.bookmarkRemoved, s.bookmarkActionFailed, handleClose]);
 
   const iconColor = isDark ? "#e5e5e5" : "#2D2D2D";
   const mutedColor = isDark ? "#737373" : "#A39B93";
@@ -120,18 +157,21 @@ export function SelectionActionBar() {
             label={s.copy}
             onPress={handleCopy}
             isDark={isDark}
+            disabled={actionBusy}
           />
           <ActionButton
             icon={<PenLine size={20} color={iconColor} />}
             label={s.addReflection}
             onPress={handleReflect}
             isDark={isDark}
+            disabled={actionBusy}
           />
           <ActionButton
             icon={<StickyNote size={20} color={iconColor} />}
             label={s.privateNoteAction}
             onPress={handleNote}
             isDark={isDark}
+            disabled={actionBusy}
           />
           <ActionButton
             icon={<Highlighter size={20} color={currentHighlight ?? iconColor} />}
@@ -139,12 +179,14 @@ export function SelectionActionBar() {
             onPress={() => setShowColors((v) => !v)}
             isDark={isDark}
             active={showColors}
+            disabled={actionBusy}
           />
           <ActionButton
             icon={<BookMarked size={20} color={currentlyBookmarked ? "#FDDC91" : iconColor} />}
             label={currentlyBookmarked ? s.removeBookmark : s.bookmark}
             onPress={handleBookmark}
             isDark={isDark}
+            disabled={actionBusy}
           />
         </View>
 
@@ -155,12 +197,14 @@ export function SelectionActionBar() {
               <Pressable
                 key={color}
                 onPress={() => handleHighlightColor(color)}
+                disabled={actionBusy}
                 style={({ pressed }) => ({
                   width: 36,
                   height: 36,
                   borderRadius: 18,
                   backgroundColor: color,
-                  transform: [{ scale: pressed ? 0.9 : 1 }],
+                  opacity: actionBusy ? 0.45 : 1,
+                  transform: [{ scale: pressed && !actionBusy ? 0.9 : 1 }],
                   ...(currentHighlight === color && {
                     borderWidth: 3,
                     borderColor: isDark ? "#fff" : "#2D2D2D",
@@ -172,6 +216,7 @@ export function SelectionActionBar() {
             {currentHighlight && (
               <Pressable
                 onPress={handleRemoveHighlight}
+                disabled={actionBusy}
                 style={({ pressed }) => ({
                   width: 36,
                   height: 36,
@@ -179,7 +224,8 @@ export function SelectionActionBar() {
                   backgroundColor: isDark ? "#262626" : "#F0EAE2",
                   alignItems: "center",
                   justifyContent: "center",
-                  transform: [{ scale: pressed ? 0.9 : 1 }],
+                  opacity: actionBusy ? 0.45 : 1,
+                  transform: [{ scale: pressed && !actionBusy ? 0.9 : 1 }],
                 })}
               >
                 <Trash2 size={16} color={mutedColor} />
@@ -229,23 +275,26 @@ function ActionButton({
   onPress,
   isDark,
   active,
+  disabled = false,
 }: {
   icon: React.ReactNode;
   label: string;
   onPress: () => void;
   isDark: boolean;
   active?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <Pressable
       onPress={onPress}
+      disabled={disabled}
       style={({ pressed }) => ({
         alignItems: "center",
         gap: 6,
         paddingHorizontal: 12,
         paddingVertical: 8,
         borderRadius: 16,
-        opacity: pressed ? 0.7 : 1,
+        opacity: disabled ? 0.45 : pressed ? 0.7 : 1,
         backgroundColor: active
           ? (isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)")
           : "transparent",

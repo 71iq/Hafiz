@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ToggleGroup } from "@/components/ui/ToggleGroup";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { Toast } from "@/components/ui/Toast";
 import { ScreenScrollView, useScreenContentLayout } from "@/components/ui/ScreenContent";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Sun, Moon, Smartphone, Minus, Plus, Check, ChevronRight, ChevronLeft, User, LogOut, BookOpen, RefreshCw, Unlink, Info, FileText, HeartHandshake, ExternalLink, Sparkles, SlidersHorizontal, type LucideIcon } from "lucide-react-native";
@@ -66,6 +67,7 @@ export default function SettingsScreen() {
   const [qfStatus, setQfStatus] = useState<QfConnectionStatus>("disconnected");
   const [qfBusy, setQfBusy] = useState(false);
   const [qfMessage, setQfMessage] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   const { width } = useWindowDimensions();
   const currentLang = getLanguageByCode(translationLanguage);
   const currentReciter = getReciterById(recitationId);
@@ -146,8 +148,8 @@ export default function SettingsScreen() {
   }, [db, params.qf, params.qf_error, refreshQfStatus, s.qfFinishConnection, s.qfSyncComplete, s.qfSyncFailed]);
 
   const handleLogout = useCallback(async () => {
-    setLogoutDialogVisible(false);
     await signOut();
+    setLogoutDialogVisible(false);
   }, [signOut]);
 
   const handleQfConnect = useCallback(async () => {
@@ -201,8 +203,11 @@ export default function SettingsScreen() {
   }, [db, refreshQfStatus, s.qfFinishConnection, s.qfNeedsReauth, s.qfSyncComplete, s.qfSyncFailed]);
 
   const openIssueReporter = useCallback(() => {
-    Linking.openURL("https://github.com/71iq/Hafiz/issues").catch(console.warn);
-  }, []);
+    Linking.openURL("https://github.com/71iq/Hafiz/issues").catch((e) => {
+      console.warn("[Settings] Failed to open issue reporter:", e);
+      setToast(s.externalLinkFailed);
+    });
+  }, [s.externalLinkFailed]);
 
   const THEME_OPTIONS: { value: ThemeMode; label: string; icon: typeof Sun }[] = [
     { value: "light", label: s.themeLight, icon: Sun },
@@ -823,11 +828,15 @@ export default function SettingsScreen() {
         cancelLabel={s.flashcardsCancel}
         confirmLabel={s.authLogout}
         destructive
+        confirmLoading={authLoading}
         isDark={isDark}
         isRTL={isRTL}
-        onCancel={() => setLogoutDialogVisible(false)}
+        onCancel={() => {
+          if (!authLoading) setLogoutDialogVisible(false);
+        }}
         onConfirm={handleLogout}
       />
+      {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}
       <TranslationLanguagePicker
         visible={pickerVisible}
         onClose={() => setPickerVisible(false)}

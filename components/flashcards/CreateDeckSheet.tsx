@@ -35,6 +35,7 @@ export function CreateDeckSheet({ visible, onClose, onCreated }: Props) {
   const [customTo, setCustomTo] = useState({ surah: "1", ayah: "7" });
   const [surahs, setSurahs] = useState<SurahRow[]>([]);
   const [creating, setCreating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const surfaceColor = isDark ? "#1C1917" : "#FFF8F1";
 
   useEffect(() => {
@@ -45,6 +46,7 @@ export function CreateDeckSheet({ visible, onClose, onCreated }: Props) {
   }, [visible, db]);
 
   const toggleSurah = useCallback((n: number) => {
+    setError(null);
     setSelectedSurahs((prev) => {
       const next = new Set(prev);
       if (next.has(n)) next.delete(n); else next.add(n);
@@ -53,6 +55,7 @@ export function CreateDeckSheet({ visible, onClose, onCreated }: Props) {
   }, []);
 
   const toggleJuz = useCallback((n: number) => {
+    setError(null);
     setSelectedJuz((prev) => {
       const next = new Set(prev);
       if (next.has(n)) next.delete(n); else next.add(n);
@@ -61,6 +64,7 @@ export function CreateDeckSheet({ visible, onClose, onCreated }: Props) {
   }, []);
 
   const toggleHizb = useCallback((n: number) => {
+    setError(null);
     setSelectedHizb((prev) => {
       const next = new Set(prev);
       if (next.has(n)) next.delete(n); else next.add(n);
@@ -68,17 +72,38 @@ export function CreateDeckSheet({ visible, onClose, onCreated }: Props) {
     });
   }, []);
 
+  const getCustomScope = (): DeckScope | null => {
+    const surahStart = parseInt(customFrom.surah, 10);
+    const ayahStart = parseInt(customFrom.ayah, 10);
+    const surahEnd = parseInt(customTo.surah, 10);
+    const ayahEnd = parseInt(customTo.ayah, 10);
+    if (![surahStart, ayahStart, surahEnd, ayahEnd].every(Number.isFinite)) return null;
+    const startSurah = surahs.find((row) => row.number === surahStart);
+    const endSurah = surahs.find((row) => row.number === surahEnd);
+    if (!startSurah || !endSurah) return null;
+    if (ayahStart < 1 || ayahStart > startSurah.ayah_count) return null;
+    if (ayahEnd < 1 || ayahEnd > endSurah.ayah_count) return null;
+    if (surahEnd < surahStart) return null;
+    if (surahEnd === surahStart && ayahEnd < ayahStart) return null;
+    return { type: "custom", surahStart, ayahStart, surahEnd, ayahEnd };
+  };
+
   const canCreate = () => {
     switch (scopeType) {
       case "surah": return selectedSurahs.size > 0;
       case "juz": return selectedJuz.size > 0;
       case "hizb": return selectedHizb.size > 0;
-      case "custom": return true;
+      case "custom": return getCustomScope() !== null;
     }
   };
 
   const handleCreate = async () => {
     if (creating) return;
+    setError(null);
+    if (!canCreate()) {
+      setError(scopeType === "custom" ? s.deckRangeInvalid : s.deckSelectionRequired);
+      return;
+    }
     setCreating(true);
     try {
       let scope: DeckScope;
@@ -93,13 +118,7 @@ export function CreateDeckSheet({ visible, onClose, onCreated }: Props) {
           scope = { type: "hizb", hizbNumbers: [...selectedHizb] };
           break;
         case "custom":
-          scope = {
-            type: "custom",
-            surahStart: parseInt(customFrom.surah) || 1,
-            ayahStart: parseInt(customFrom.ayah) || 1,
-            surahEnd: parseInt(customTo.surah) || 1,
-            ayahEnd: parseInt(customTo.ayah) || 7,
-          };
+          scope = getCustomScope()!;
           break;
       }
       const deckId = generateDeckId(scope);
@@ -110,6 +129,9 @@ export function CreateDeckSheet({ visible, onClose, onCreated }: Props) {
       setSelectedJuz(new Set());
       setSelectedHizb(new Set());
       onClose();
+    } catch (e) {
+      console.warn("[CreateDeckSheet] Failed to create deck:", e);
+      setError(s.deckCreateFailed);
     } finally {
       setCreating(false);
     }
@@ -153,7 +175,10 @@ export function CreateDeckSheet({ visible, onClose, onCreated }: Props) {
           {SCOPE_TABS.map((tab) => (
             <Pressable
               key={tab.value}
-              onPress={() => setScopeType(tab.value)}
+              onPress={() => {
+                setError(null);
+                setScopeType(tab.value);
+              }}
               className={`h-11 rounded-full px-5 items-center justify-center ${
                 scopeType === tab.value ? "bg-primary-accent" : "bg-surface-low dark:bg-surface-dark-low"
               }`}
@@ -211,22 +236,32 @@ export function CreateDeckSheet({ visible, onClose, onCreated }: Props) {
           <Card elevation="low" className="p-5">
             <Text className="text-charcoal dark:text-neutral-300 mb-3" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>{s.flashcardsFrom}</Text>
             <View className="flex-row gap-3 mb-5">
-              <RangeInput label="Surah" value={customFrom.surah} onChangeText={(v) => setCustomFrom((p) => ({ ...p, surah: v }))} isDark={isDark} />
-              <RangeInput label="Ayah" value={customFrom.ayah} onChangeText={(v) => setCustomFrom((p) => ({ ...p, ayah: v }))} isDark={isDark} />
+              <RangeInput label={s.tabSurah} value={customFrom.surah} onChangeText={(v) => { setError(null); setCustomFrom((p) => ({ ...p, surah: v })); }} isDark={isDark} />
+              <RangeInput label={s.reflectionAyahLabel} value={customFrom.ayah} onChangeText={(v) => { setError(null); setCustomFrom((p) => ({ ...p, ayah: v })); }} isDark={isDark} />
             </View>
             <Text className="text-charcoal dark:text-neutral-300 mb-3" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>{s.flashcardsTo}</Text>
             <View className="flex-row gap-3">
-              <RangeInput label="Surah" value={customTo.surah} onChangeText={(v) => setCustomTo((p) => ({ ...p, surah: v }))} isDark={isDark} />
-              <RangeInput label="Ayah" value={customTo.ayah} onChangeText={(v) => setCustomTo((p) => ({ ...p, ayah: v }))} isDark={isDark} />
+              <RangeInput label={s.tabSurah} value={customTo.surah} onChangeText={(v) => { setError(null); setCustomTo((p) => ({ ...p, surah: v })); }} isDark={isDark} />
+              <RangeInput label={s.reflectionAyahLabel} value={customTo.ayah} onChangeText={(v) => { setError(null); setCustomTo((p) => ({ ...p, ayah: v })); }} isDark={isDark} />
             </View>
           </Card>
         )}
       </OverlayBody>
 
       <OverlayFooter isRTL={isRTL}>
-        <Button onPress={handleCreate} disabled={!canCreate() || creating} className="w-full">
-          {creating ? <ActivityIndicator color="#fff" size="small" /> : <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16, color: "#fff" }}>{s.flashcardsCreate}</Text>}
-        </Button>
+        <View className="w-full gap-3">
+          {error && (
+            <Text
+              className="text-red-600 dark:text-red-400"
+              style={{ fontFamily: "Manrope_500Medium", fontSize: 13, textAlign: isRTL ? "right" : "left" }}
+            >
+              {error}
+            </Text>
+          )}
+          <Button onPress={handleCreate} disabled={!canCreate() || creating} className="w-full">
+            {creating ? <ActivityIndicator color="#fff" size="small" /> : <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16, color: "#fff" }}>{s.flashcardsCreate}</Text>}
+          </Button>
+        </View>
       </OverlayFooter>
     </ResponsiveSheet>
   );

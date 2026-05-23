@@ -86,6 +86,7 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
   const [reviewSettings, setReviewSettings] = useState<DeckReviewSettings | null>(null);
   const [saving, setSaving] = useState(false);
   const [activeInfo, setActiveInfo] = useState<SettingInfo | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!visible || !deckId) return;
@@ -96,6 +97,7 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
       readDeckReviewSettings(db, deckId),
     ]).then(([rows, filter, settings]) => {
       if (cancelled) return;
+      setError(null);
       setSurahs(rows);
       setFilterType(filter.type);
       setSelectedSurahs(new Set(filter.type === "surah" ? filter.surahs : []));
@@ -112,7 +114,10 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
       setReviewSortOrder(settings.reviewSortOrder);
       setNewCardSortOrder(settings.newCardSortOrder);
       setReviewSettings(settings);
-    }).catch(console.warn);
+    }).catch((e) => {
+      console.warn("[SmartDeckFilterSheet] Failed to load filter:", e);
+      if (!cancelled) setError(s.genericActionFailed);
+    });
     return () => {
       cancelled = true;
     };
@@ -127,6 +132,7 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
   }, []);
 
   const toggleSurah = useCallback((n: number) => {
+    setError(null);
     setSelectedSurahs((prev) => {
       const next = new Set(prev);
       if (next.has(n)) next.delete(n); else next.add(n);
@@ -135,6 +141,7 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
   }, []);
 
   const toggleJuz = useCallback((n: number) => {
+    setError(null);
     setSelectedJuz((prev) => {
       const next = new Set(prev);
       if (next.has(n)) next.delete(n); else next.add(n);
@@ -143,24 +150,40 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
   }, []);
 
   const setNextDailyLimit = useCallback((value: number) => {
+    setError(null);
     setDailyLimit(Math.max(MIN_DECK_DAILY_REVIEW_LIMIT, Math.min(MAX_DECK_DAILY_REVIEW_LIMIT, value)));
   }, []);
 
   const setNextNewCardsLimit = useCallback((value: number) => {
+    setError(null);
     setNewCardsLimit(Math.max(MIN_DECK_NEW_CARD_LIMIT, Math.min(MAX_DECK_NEW_CARD_LIMIT, value)));
   }, []);
 
   const setNextRetention = useCallback((value: number) => {
+    setError(null);
     const clamped = Math.max(MIN_DECK_REQUEST_RETENTION, Math.min(MAX_DECK_REQUEST_RETENTION, value));
     setRequestRetention(Number(clamped.toFixed(2)));
   }, []);
 
   const setNextMaximumInterval = useCallback((value: number) => {
+    setError(null);
     setMaximumInterval(Math.max(MIN_DECK_MAXIMUM_INTERVAL, Math.min(MAX_DECK_MAXIMUM_INTERVAL, value)));
   }, []);
 
+  const canSave = () => {
+    if (!deckId) return false;
+    if (filterType === "surah") return selectedSurahs.size > 0;
+    if (filterType === "juz") return selectedJuz.size > 0;
+    return true;
+  };
+
   const handleSave = async () => {
     if (!deckId || saving) return;
+    setError(null);
+    if (!canSave()) {
+      setError(s.deckSelectionRequired);
+      return;
+    }
     setSaving(true);
     try {
       let filter: BuiltInDeckFilter = { type: "all" };
@@ -186,6 +209,9 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
       await materializeSmartDeckCards(db, deckId, dailyLimit, newCardsLimit);
       onSaved();
       onClose();
+    } catch (e) {
+      console.warn("[SmartDeckFilterSheet] Failed to save filter:", e);
+      setError(s.deckFilterSaveFailed);
     } finally {
       setSaving(false);
     }
@@ -230,7 +256,10 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
             {tabs.map((tab) => (
               <Pressable
                 key={tab.value}
-                onPress={() => setFilterType(tab.value)}
+                onPress={() => {
+                  setError(null);
+                  setFilterType(tab.value);
+                }}
                 className={`h-11 rounded-full px-5 items-center justify-center ${
                   filterType === tab.value ? "bg-primary-accent" : "bg-surface-low dark:bg-surface-dark-low"
                 }`}
@@ -325,15 +354,25 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
         </OverlayBody>
 
         <OverlayFooter isRTL={isRTL}>
-          <Button onPress={handleSave} disabled={saving} className="w-full">
-            {saving ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16, color: "#fff" }}>
-                {s.smartDeckApplyFilter}
+          <View className="w-full gap-3">
+            {error && (
+              <Text
+                className="text-red-600 dark:text-red-400"
+                style={{ fontFamily: "Manrope_500Medium", fontSize: 13, textAlign: isRTL ? "right" : "left" }}
+              >
+                {error}
               </Text>
             )}
-          </Button>
+            <Button onPress={handleSave} disabled={saving || !canSave()} className="w-full">
+              {saving ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16, color: "#fff" }}>
+                  {s.smartDeckApplyFilter}
+                </Text>
+              )}
+            </Button>
+          </View>
         </OverlayFooter>
       </ResponsiveSheet>
 

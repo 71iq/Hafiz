@@ -33,6 +33,7 @@ export function BookmarksSheet({ visible, onClose, onNavigate }: Props) {
   const s = useStrings();
   const { bookmarksList, showToast, refreshBookmarks } = useSelection();
   const [enriched, setEnriched] = useState<BookmarkWithName[]>([]);
+  const [removingKey, setRemovingKey] = useState<string | null>(null);
   const isPhone = width < SIDEBAR_BREAKPOINT;
   const maxOverlayHeight = Math.min(height - (isPhone ? 12 : 48), isPhone ? height * 0.94 : 640);
   const surfaceColor = isDark ? "#1a1a1a" : "#FFF8F1";
@@ -62,11 +63,21 @@ export function BookmarksSheet({ visible, onClose, onNavigate }: Props) {
 
   const handleRemove = useCallback(
     async (surah: number, ayah: number) => {
-      await removeBookmark(db, surah, ayah);
-      await refreshBookmarks();
-      showToast(s.bookmarkRemoved);
+      const key = `${surah}:${ayah}`;
+      if (removingKey) return;
+      setRemovingKey(key);
+      try {
+        await removeBookmark(db, surah, ayah);
+        await refreshBookmarks();
+        showToast(s.bookmarkRemoved);
+      } catch (e) {
+        console.warn("[BookmarksSheet] Failed to remove bookmark:", e);
+        showToast(s.bookmarkActionFailed);
+      } finally {
+        setRemovingKey(null);
+      }
     },
-    [db, refreshBookmarks, showToast, s.bookmarkRemoved]
+    [db, refreshBookmarks, removingKey, showToast, s.bookmarkRemoved, s.bookmarkActionFailed]
   );
 
   const handleTap = useCallback(
@@ -171,10 +182,14 @@ export function BookmarksSheet({ visible, onClose, onNavigate }: Props) {
                 </View>
               </View>
               <Pressable
-                onPress={() => handleRemove(b.surah, b.ayah)}
+                onPress={(event) => {
+                  event.stopPropagation?.();
+                  handleRemove(b.surah, b.ayah);
+                }}
+                disabled={removingKey === `${b.surah}:${b.ayah}`}
                 style={({ pressed }) => ({
                   padding: 8,
-                  opacity: pressed ? 0.5 : 1,
+                  opacity: removingKey === `${b.surah}:${b.ayah}` ? 0.45 : pressed ? 0.5 : 1,
                 })}
                 hitSlop={8}
               >

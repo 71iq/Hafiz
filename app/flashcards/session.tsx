@@ -174,6 +174,8 @@ function FlashcardSessionScreen() {
   const [reviewSettings, setReviewSettings] = useState<DeckReviewSettings | null>(null);
   const [reviewSettingsLoaded, setReviewSettingsLoaded] = useState(false);
   const [summary, setSummary] = useState<SessionSummary | null>(null);
+  const [sessionError, setSessionError] = useState<string | null>(null);
+  const [gradingBusy, setGradingBusy] = useState(false);
   const sessionStartRef = useRef(Date.now());
   const streakRef = useRef(0);
   const sessionPointsRef = useRef(0);
@@ -183,6 +185,8 @@ function FlashcardSessionScreen() {
 
   const resetSessionProgress = useCallback(() => {
     gradingInFlightRef.current = false;
+    setGradingBusy(false);
+    setSessionError(null);
     sessionPointsRef.current = 0;
     setCards([]);
     setCurrentIndex(0);
@@ -401,6 +405,7 @@ function FlashcardSessionScreen() {
         if (cancelled) return;
         console.warn("[FlashcardSession] Failed to load session:", e);
         resetSessionProgress();
+        setSessionError(s.genericActionFailed);
         setSummary({ total: 0, newCount: 0, reviewCount: 0, relearningCount: 0, durationMs: 0, nextReviewDate: null, wirdDays: 0, wirdMaintainedToday: false });
         setPhase("summary");
       }
@@ -421,6 +426,7 @@ function FlashcardSessionScreen() {
     s.smartDeckMutashabihatTitle,
     s.smartDeckSimilarTailsTitle,
     s.smartDeckQiraatTitle,
+    s.genericActionFailed,
   ]);
 
   const currentCard = cards[currentIndex] ?? null;
@@ -485,6 +491,8 @@ function FlashcardSessionScreen() {
   const handleGrade = async (rating: Grade) => {
     if (!currentCard || gradingInFlightRef.current) return;
     gradingInFlightRef.current = true;
+    setGradingBusy(true);
+    setSessionError(null);
     try {
       hapticMedium();
       const now = new Date();
@@ -572,8 +580,12 @@ function FlashcardSessionScreen() {
         syncDailyScore(db).catch(console.warn);
         updateProfileStats(db).catch(console.warn);
       }
+    } catch (e) {
+      console.warn("[FlashcardSession] Failed to grade card:", e);
+      setSessionError(s.flashcardsReviewSaveFailed);
     } finally {
       gradingInFlightRef.current = false;
+      setGradingBusy(false);
     }
   };
 
@@ -605,7 +617,7 @@ function FlashcardSessionScreen() {
   if (phase === "summary") {
     return (
       <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
-        <SessionSummaryView summary={summary!} onDone={handleEndSession} isDark={isDark} s={s} />
+        <SessionSummaryView summary={summary!} onDone={handleEndSession} isDark={isDark} s={s} error={sessionError} />
       </SafeAreaView>
     );
   }
@@ -788,7 +800,15 @@ function FlashcardSessionScreen() {
           {/* Grading: show directly after last side is revealed, or in grading phase */}
           {((phase === "side" && revealed && isLastSide) || phase === "grading") && (
             <>
-              <GradingButtons onGrade={handleGrade} previews={gradePreviews} isDark={isDark} s={s} />
+              {sessionError && (
+                <Text
+                  className="mb-3 text-red-600 dark:text-red-400"
+                  style={{ fontFamily: "Manrope_500Medium", fontSize: 13, textAlign: "center" }}
+                >
+                  {sessionError}
+                </Text>
+              )}
+              <GradingButtons onGrade={handleGrade} previews={gradePreviews} isDark={isDark} s={s} disabled={gradingBusy} />
             </>
           )}
         </View>
@@ -1170,11 +1190,13 @@ function GradingButtons({
   previews,
   isDark,
   s,
+  disabled = false,
 }: {
   onGrade: (rating: Grade) => void;
   previews: Record<number, string>;
   isDark: boolean;
   s: any;
+  disabled?: boolean;
 }) {
   const labels: Record<number, string> = {
     [Rating.Again]: s.flashcardsAgain,
@@ -1190,13 +1212,15 @@ function GradingButtons({
           <Pressable
             key={rating}
             onPress={() => onGrade(rating)}
+            disabled={disabled}
             className="flex-1 rounded-2xl items-center"
-            style={{
+            style={({ pressed }) => ({
               backgroundColor: isDark ? bgDark : bgLight,
               minHeight: 58,
+              opacity: disabled ? 0.55 : pressed ? 0.88 : 1,
               paddingHorizontal: 6,
               paddingVertical: 10,
-            }}
+            })}
           >
             <Text
               numberOfLines={1}
@@ -1243,12 +1267,20 @@ function CardStateBadge({ state, s }: { state: number; s: any }) {
 
 // ─── Session Summary ─────────────────────────────────────────
 
-function SessionSummaryView({ summary, onDone, isDark, s }: { summary: SessionSummary; onDone: () => void; isDark: boolean; s: any }) {
+function SessionSummaryView({ summary, onDone, isDark, s, error }: { summary: SessionSummary; onDone: () => void; isDark: boolean; s: any; error?: string | null }) {
   const durationMin = Math.max(1, Math.round(summary.durationMs / 60000));
   const nextReview = summary.nextReviewDate ? new Date(summary.nextReviewDate).toLocaleDateString() : "—";
 
   return (
     <ScrollView className="flex-1 px-6" contentContainerStyle={{ alignItems: "center", paddingTop: 60, paddingBottom: 100 }}>
+      {error && (
+        <Text
+          className="mb-4 text-center text-red-600 dark:text-red-400"
+          style={{ fontFamily: "Manrope_500Medium", fontSize: 13 }}
+        >
+          {error}
+        </Text>
+      )}
       <View className="w-20 h-20 rounded-full items-center justify-center mb-6" style={{ backgroundColor: isDark ? "#1B4D4F" : "#f0fdfa" }}>
         <Trophy size={36} color={isDark ? "#FDDC91" : "#0d9488"} />
       </View>

@@ -31,6 +31,7 @@ export const PUBLIC_PAGE_LABELS: Record<
     language: string;
     back: string;
     external: string;
+    linkFailed: string;
   }
 > = {
   en: {
@@ -38,12 +39,14 @@ export const PUBLIC_PAGE_LABELS: Record<
     language: "العربية",
     back: "Back",
     external: "External link",
+    linkFailed: "Could not open link",
   },
   ar: {
     home: "افتح حافظ",
     language: "English",
     back: "رجوع",
     external: "رابط خارجي",
+    linkFailed: "تعذر فتح الرابط",
   },
 };
 

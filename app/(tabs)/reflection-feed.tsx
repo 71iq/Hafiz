@@ -417,7 +417,7 @@ export default function ReflectionFeedScreen() {
               <EmptyState
                 icon={MessageSquare}
                 title={s.reflectionFeedTitle}
-                subtitle={(feedQuery.error as Error).message}
+                subtitle={s.reflectionLoadFailed}
                 actionLabel={s.reflectionFeedRetry}
                 onAction={() => feedQuery.refetch()}
                 isDark={isDark}

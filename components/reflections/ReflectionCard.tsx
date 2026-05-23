@@ -57,6 +57,9 @@ export function ReflectionCard({
   const [likesCount, setLikesCount] = useState(reflection.likes_count);
   const [showMenu, setShowMenu] = useState(false);
   const [reported, setReported] = useState(false);
+  const [likeBusy, setLikeBusy] = useState(false);
+  const [reportBusy, setReportBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [profileUserId, setProfileUserId] = useState<string | null>(null);
 
   const authorName =
@@ -65,13 +68,18 @@ export function ReflectionCard({
   useEffect(() => {
     setLiked(reflection.user_has_liked ?? false);
     setLikesCount(reflection.likes_count);
+    setReported(false);
+    setError(null);
   }, [reflection.id, reflection.likes_count, reflection.user_has_liked]);
 
   const handleLike = useCallback(async () => {
+    if (likeBusy) return;
     if (!user) {
       onAuthRequired?.();
       return;
     }
+    setLikeBusy(true);
+    setError(null);
     hapticLight();
     const wasLiked = liked;
     // Optimistic update
@@ -86,19 +94,26 @@ export function ReflectionCard({
       setLiked(wasLiked);
       setLikesCount((c) => c + (wasLiked ? 1 : -1));
       onLikeToggled(reflection.id, wasLiked, wasLiked ? 1 : -1);
+      setError(s.reflectionLikeFailed);
+    } finally {
+      setLikeBusy(false);
     }
-  }, [user, liked, reflection.id, onLikeToggled, onAuthRequired]);
+  }, [likeBusy, user, liked, reflection.id, onLikeToggled, onAuthRequired, s.reflectionLikeFailed]);
 
   const handleReport = useCallback(async () => {
-    if (!user) return;
+    if (!user || reportBusy) return;
     setShowMenu(false);
+    setReportBusy(true);
+    setError(null);
     try {
       await reportReflection(user.id, reflection.id);
       setReported(true);
     } catch {
-      // silently fail
+      setError(s.reflectionReportFailed);
+    } finally {
+      setReportBusy(false);
     }
-  }, [user, reflection.id]);
+  }, [user, reportBusy, reflection.id, s.reflectionReportFailed]);
 
   const mutedColor = isDark ? "#737373" : "#A39B93";
   const heartColor = liked ? "#ef4444" : mutedColor;
@@ -182,9 +197,9 @@ export function ReflectionCard({
         >
           <Pressable
             onPress={handleReport}
-            disabled={reported}
+            disabled={reported || reportBusy}
             className={`${rowClassName} items-center gap-2 px-3 py-2`}
-            style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+            style={({ pressed }) => ({ opacity: pressed || reported || reportBusy ? 0.6 : 1 })}
           >
             <Flag size={14} color={reported ? mutedColor : "#ef4444"} />
             <Text
@@ -235,9 +250,10 @@ export function ReflectionCard({
       >
         <Pressable
           onPress={handleLike}
+          disabled={likeBusy}
           className={`${rowClassName} items-center gap-1 rounded-full px-2.5 py-1.5`}
           style={({ pressed }) => ({
-            opacity: pressed ? 0.6 : 1,
+            opacity: pressed || likeBusy ? 0.6 : 1,
             backgroundColor: isDark ? "#202020" : "#F0EAE2",
           })}
         >
@@ -269,6 +285,20 @@ export function ReflectionCard({
           )}
         </Pressable>
       </View>
+
+      {error ? (
+        <Text
+          className="mt-2 text-red-600 dark:text-red-400"
+          style={{
+            fontFamily: "Manrope_500Medium",
+            fontSize: 12,
+            textAlign: contentAlign,
+            writingDirection: isRTL ? "rtl" : "ltr",
+          }}
+        >
+          {error}
+        </Text>
+      ) : null}
     </View>
     <PublicProfileOverlay userId={profileUserId} onClose={() => setProfileUserId(null)} />
     </>

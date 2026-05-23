@@ -23,11 +23,19 @@ export function PrivateNotesSection({ surah, ayah }: Props) {
   const [notes, setNotes] = useState<PrivateNote[]>([]);
   const [editingNote, setEditingNote] = useState<PrivateNote | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [deletingNoteId, setDeletingNoteId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const loadNotes = useCallback(async () => {
-    const rows = await listPrivateNotesForAyah(db, surah, ayah);
-    setNotes(rows);
-  }, [ayah, db, surah]);
+    try {
+      setError(null);
+      const rows = await listPrivateNotesForAyah(db, surah, ayah);
+      setNotes(rows);
+    } catch (e) {
+      console.warn("[PrivateNotesSection] Failed to load notes:", e);
+      setError(s.genericActionFailed);
+    }
+  }, [ayah, db, surah, s.genericActionFailed]);
 
   useEffect(() => {
     loadNotes().catch(console.warn);
@@ -35,10 +43,20 @@ export function PrivateNotesSection({ surah, ayah }: Props) {
 
   const handleDelete = useCallback(
     async (note: PrivateNote) => {
-      await deletePrivateNote(db, note.id);
-      await loadNotes();
+      if (deletingNoteId) return;
+      setDeletingNoteId(note.id);
+      setError(null);
+      try {
+        await deletePrivateNote(db, note.id);
+        await loadNotes();
+      } catch (e) {
+        console.warn("[PrivateNotesSection] Failed to delete note:", e);
+        setError(s.privateNoteDeleteFailed);
+      } finally {
+        setDeletingNoteId(null);
+      }
     },
-    [db, loadNotes]
+    [db, deletingNoteId, loadNotes, s.privateNoteDeleteFailed]
   );
 
   const openCreate = useCallback(() => {
@@ -72,6 +90,15 @@ export function PrivateNotesSection({ surah, ayah }: Props) {
           </Text>
         </Pressable>
       </View>
+
+      {error && (
+        <Text
+          className="mb-3 text-red-600 dark:text-red-400"
+          style={{ fontFamily: "Manrope_500Medium", fontSize: 13, textAlign: isRTL ? "right" : "left" }}
+        >
+          {error}
+        </Text>
+      )}
 
       {notes.length === 0 ? (
         <Text
@@ -111,7 +138,16 @@ export function PrivateNotesSection({ surah, ayah }: Props) {
                     {new Date(note.updatedAt).toLocaleDateString()}
                   </Text>
                 </View>
-                <Pressable onPress={() => handleDelete(note)} hitSlop={8} className="h-8 w-8 items-center justify-center rounded-full">
+                <Pressable
+                  onPress={(event) => {
+                    event.stopPropagation?.();
+                    handleDelete(note);
+                  }}
+                  disabled={deletingNoteId === note.id}
+                  hitSlop={8}
+                  className="h-8 w-8 items-center justify-center rounded-full"
+                  style={{ opacity: deletingNoteId === note.id ? 0.45 : 1 }}
+                >
                   <Trash2 size={14} color={mutedColor} />
                 </Pressable>
               </View>

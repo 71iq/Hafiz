@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { View, Text, Pressable, ScrollView } from "react-native";
+import { ActivityIndicator, View, Text, Pressable, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { ArrowLeft, ArrowRight, Trash2, X } from "lucide-react-native";
@@ -22,9 +22,12 @@ export default function VocabSessionScreen() {
   const [idx, setIdx] = useState(0);
   const [revealed, setRevealed] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const all = await listVocabCards(db);
       const now = new Date();
@@ -32,10 +35,13 @@ export default function VocabSessionScreen() {
       setCards(due.length > 0 ? due : all);
       setIdx(0);
       setRevealed(false);
+    } catch (e) {
+      console.warn("[VocabSession] Failed to load cards:", e);
+      setError(s.genericActionFailed);
     } finally {
       setLoading(false);
     }
-  }, [db]);
+  }, [db, s.genericActionFailed]);
 
   useEffect(() => {
     load();
@@ -44,7 +50,10 @@ export default function VocabSessionScreen() {
   const grade = useCallback(
     async (rating: number) => {
       const c = cards[idx];
-      if (!c) return;
+      if (!c || busy) return;
+      setBusy(true);
+      setError(null);
+      try {
       const cardObj = {
         due: c.due ? new Date(c.due) : new Date(),
         stability: c.stability,
@@ -80,17 +89,32 @@ export default function VocabSessionScreen() {
       );
       setRevealed(false);
       setIdx((i) => i + 1);
+      } catch (e) {
+        console.warn("[VocabSession] Failed to grade card:", e);
+        setError(s.flashcardsReviewSaveFailed);
+      } finally {
+        setBusy(false);
+      }
     },
-    [cards, idx, db]
+    [busy, cards, idx, db, s.flashcardsReviewSaveFailed]
   );
 
   const remove = useCallback(async () => {
     const c = cards[idx];
-    if (!c) return;
-    await deleteVocabCard(db, c.id);
-    setCards((prev) => prev.filter((x) => x.id !== c.id));
-    setRevealed(false);
-  }, [cards, idx, db]);
+    if (!c || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await deleteVocabCard(db, c.id);
+      setCards((prev) => prev.filter((x) => x.id !== c.id));
+      setRevealed(false);
+    } catch (e) {
+      console.warn("[VocabSession] Failed to delete card:", e);
+      setError(s.flashcardsDeleteFailed);
+    } finally {
+      setBusy(false);
+    }
+  }, [busy, cards, idx, db, s.flashcardsDeleteFailed]);
 
   const finished = !loading && (cards.length === 0 || idx >= cards.length);
   const card = cards[idx];
@@ -187,7 +211,9 @@ export default function VocabSessionScreen() {
               ) : (
                 <Pressable
                   onPress={() => setRevealed(true)}
+                  disabled={busy}
                   className="rounded-full bg-primary-accent px-5 py-2.5 mt-5"
+                  style={({ pressed }) => ({ opacity: busy ? 0.55 : pressed ? 0.8 : 1 })}
                 >
                   <Text className="text-white" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>
                     {s.flashcardsReveal}
@@ -195,6 +221,15 @@ export default function VocabSessionScreen() {
                 </Pressable>
               )}
             </View>
+
+            {error && (
+              <Text
+                className="text-red-600 dark:text-red-400 text-center"
+                style={{ fontFamily: "Manrope_500Medium", fontSize: 13 }}
+              >
+                {error}
+              </Text>
+            )}
 
             {revealed && (
               <View className="flex-row gap-2">
@@ -207,15 +242,20 @@ export default function VocabSessionScreen() {
                   <Pressable
                     key={b.r}
                     onPress={() => grade(b.r as number)}
+                    disabled={busy}
                     className="flex-1 rounded-full py-2.5 items-center"
                     style={({ pressed }) => ({
                       backgroundColor: b.color,
-                      opacity: pressed ? 0.9 : 1,
+                      opacity: busy ? 0.55 : pressed ? 0.9 : 1,
                     })}
                   >
-                    <Text className="text-white" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}>
-                      {b.label}
-                    </Text>
+                    {busy ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Text className="text-white" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}>
+                        {b.label}
+                      </Text>
+                    )}
                   </Pressable>
                 ))}
               </View>
@@ -223,8 +263,9 @@ export default function VocabSessionScreen() {
 
             <Pressable
               onPress={remove}
+              disabled={busy}
               className="self-center mt-3 flex-row items-center gap-1.5"
-              style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+              style={({ pressed }) => ({ opacity: busy ? 0.45 : pressed ? 0.6 : 1 })}
             >
               <Trash2 size={14} color={isDark ? "#737373" : "#8B8178"} />
               <Text className="text-warm-400 dark:text-neutral-500" style={{ fontFamily: "Manrope_500Medium", fontSize: 12 }}>

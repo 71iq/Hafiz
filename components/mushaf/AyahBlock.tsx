@@ -82,6 +82,8 @@ function AyahBlockInner({
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailTab, setDetailTab] = useState<"translation" | "tafsir" | "reflections">("translation");
   const [reviewBusy, setReviewBusy] = useState(false);
+  const [bookmarkBusy, setBookmarkBusy] = useState(false);
+  const [shareBusy, setShareBusy] = useState(false);
   const [savedToReview, setSavedToReview] = useState(false);
 
   // Target highlight pulses once, then remains visible for navigated/search results.
@@ -157,6 +159,8 @@ function AyahBlockInner({
   const qcf2LineHeight = Math.ceil(lineHeight + Math.max(6, fontSize * 0.16));
 
   const handleBookmark = useCallback(async () => {
+    if (bookmarkBusy) return;
+    setBookmarkBusy(true);
     try {
       if (bookmarked) {
         await dbRemoveBookmark(db, surah, ayah);
@@ -168,10 +172,15 @@ function AyahBlockInner({
       await refreshBookmarks();
     } catch (e) {
       console.warn("[AyahBlock] Failed to toggle bookmark:", e);
+      showToast(s.bookmarkActionFailed);
+    } finally {
+      setBookmarkBusy(false);
     }
-  }, [bookmarked, db, surah, ayah, showToast, s.bookmarkAdded, s.bookmarkRemoved, refreshBookmarks]);
+  }, [bookmarkBusy, bookmarked, db, surah, ayah, showToast, s.bookmarkAdded, s.bookmarkRemoved, s.bookmarkActionFailed, refreshBookmarks]);
 
   const handleShare = useCallback(async () => {
+    if (shareBusy) return;
+    setShareBusy(true);
     try {
       const [text, surahName] = await Promise.all([
         fetchUthmaniRange(db, surah, ayah, ayah),
@@ -181,8 +190,11 @@ function AyahBlockInner({
       showToast(s.copied);
     } catch (e) {
       console.warn("[AyahBlock] Failed to copy share text:", e);
+      showToast(s.copyFailed);
+    } finally {
+      setShareBusy(false);
     }
-  }, [db, surah, ayah, showToast, s.copied]);
+  }, [shareBusy, db, surah, ayah, showToast, s.copied, s.copyFailed]);
 
   const handleAudioPress = useCallback(async () => {
     const result = await toggleAyah(surah, ayah, recitationId);
@@ -268,13 +280,24 @@ function AyahBlockInner({
             disabled={audioState.loading}
             accessibilityLabel={audioState.loading ? s.audioLoading : audioState.playing ? s.audioPause : s.audioPlay}
           />
-          <ActionIcon icon={<Share2 size={15} color={iconColor} />} onPress={handleShare} />
+          <ActionIcon
+            icon={shareBusy ? <ActivityIndicator size="small" color={iconColor} /> : <Share2 size={15} color={iconColor} />}
+            onPress={handleShare}
+            disabled={shareBusy}
+          />
         </View>
 
         <View className={isRTL ? "flex-row-reverse items-center gap-1.5" : "flex-row items-center gap-1.5"}>
           <ActionIcon
-            icon={<Bookmark size={15} color={bookmarked ? "#FDDC91" : iconColor} fill={bookmarked ? "#FDDC91" : "none"} />}
+            icon={
+              bookmarkBusy ? (
+                <ActivityIndicator size="small" color={iconColor} />
+              ) : (
+                <Bookmark size={15} color={bookmarked ? "#FDDC91" : iconColor} fill={bookmarked ? "#FDDC91" : "none"} />
+              )
+            }
             onPress={handleBookmark}
+            disabled={bookmarkBusy}
           />
         </View>
       </View>

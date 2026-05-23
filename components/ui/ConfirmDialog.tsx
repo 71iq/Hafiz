@@ -1,4 +1,4 @@
-import { Text, View } from "react-native";
+import { ActivityIndicator, Text, View } from "react-native";
 import { AlertTriangle } from "lucide-react-native";
 import { Button } from "@/components/ui/Button";
 import { OverlayBody, OverlayFooter, OverlayHeader, ResponsiveModal } from "@/components/ui/ResponsiveOverlay";
@@ -10,6 +10,8 @@ type Props = {
   cancelLabel: string;
   confirmLabel: string;
   destructive?: boolean;
+  confirmLoading?: boolean;
+  confirmDisabled?: boolean;
   isDark: boolean;
   isRTL?: boolean;
   onCancel: () => void;
@@ -23,22 +25,25 @@ export function ConfirmDialog({
   cancelLabel,
   confirmLabel,
   destructive,
+  confirmLoading = false,
+  confirmDisabled = false,
   isDark,
   isRTL,
   onCancel,
   onConfirm,
 }: Props) {
+  const handleClose = confirmLoading ? () => {} : onCancel;
   return (
     <ResponsiveModal
       open={visible}
-      onClose={onCancel}
+      onClose={handleClose}
       maxWidth={420}
       surfaceColor={isDark ? "#0A0A0A" : "#FFF8F1"}
     >
       <OverlayHeader
         title={title}
         isRTL={isRTL}
-        onClose={onCancel}
+        onClose={handleClose}
         leading={
           <View className="h-11 w-11 items-center justify-center rounded-full bg-red-500/10">
             <AlertTriangle size={20} color={isDark ? "#f87171" : "#dc2626"} />
@@ -62,15 +67,24 @@ export function ConfirmDialog({
         </View>
       </OverlayBody>
       <OverlayFooter isRTL={isRTL}>
-        <Button variant="outline" onPress={onCancel} className="flex-1">
+        <Button variant="outline" onPress={onCancel} disabled={confirmLoading} className="flex-1">
           <Text className="text-charcoal dark:text-neutral-200" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>
             {cancelLabel}
           </Text>
         </Button>
-        <Button variant={destructive ? "destructive" : "default"} onPress={onConfirm} className="flex-1">
-          <Text className="text-white" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>
-            {confirmLabel}
-          </Text>
+        <Button
+          variant={destructive ? "destructive" : "default"}
+          onPress={onConfirm}
+          disabled={confirmLoading || confirmDisabled}
+          className="flex-1"
+        >
+          {confirmLoading ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <Text className="text-white" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>
+              {confirmLabel}
+            </Text>
+          )}
         </Button>
       </OverlayFooter>
     </ResponsiveModal>

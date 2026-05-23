@@ -336,16 +336,23 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const setTranslationLanguage = useCallback(
     async (code: string) => {
       if (code === translationLanguage) return;
-      setTranslationLanguageState(code);
-      writeSetting(db, "translation_language", code).catch(console.warn);
-
+      if (code === DEFAULT_LANGUAGE) {
+        setTranslationLanguageState(code);
+        await writeSetting(db, "translation_language", code);
+        return;
+      }
       if (code !== DEFAULT_LANGUAGE) {
         setIsTranslationLoading(true);
         try {
           await importTranslation(db, code);
           await writeSetting(db, "translation_active_lang", code);
+          setTranslationLanguageState(code);
+          await writeSetting(db, "translation_language", code);
         } catch (e) {
           console.warn("[Settings] Failed to import translation:", e);
+          setTranslationLanguageState(DEFAULT_LANGUAGE);
+          writeSetting(db, "translation_language", DEFAULT_LANGUAGE).catch(console.warn);
+          throw e;
         } finally {
           setIsTranslationLoading(false);
         }

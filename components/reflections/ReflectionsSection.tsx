@@ -32,6 +32,7 @@ export function ReflectionsSection({ surah, ayah, initiallyExpanded = false, sho
   const [allReflections, setAllReflections] = useState<Reflection[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [commentsReflectionId, setCommentsReflectionId] = useState<string | null>(null);
   const [writeOpen, setWriteOpen] = useState(false);
 
@@ -48,10 +49,11 @@ export function ReflectionsSection({ surah, ayah, initiallyExpanded = false, sho
   });
 
   // Fetch first page when expanded
-  const { isLoading } = useQuery({
+  const { isLoading, error: reflectionsError, refetch: refetchReflections } = useQuery({
     queryKey: ["reflections", surah, ayah, 0, user?.id],
     queryFn: async () => {
       const result = await fetchReflections(surah, ayah, 0, user?.id);
+      setError(null);
       setAllReflections(result.data);
       setHasMore(result.hasMore);
       setPage(0);
@@ -65,6 +67,7 @@ export function ReflectionsSection({ surah, ayah, initiallyExpanded = false, sho
     if (loadingMore || !hasMore) return;
     const nextPage = page + 1;
     setLoadingMore(true);
+    setError(null);
     try {
       const result = await fetchReflections(surah, ayah, nextPage, user?.id);
       setAllReflections((prev) => [...prev, ...result.data]);
@@ -72,6 +75,7 @@ export function ReflectionsSection({ surah, ayah, initiallyExpanded = false, sho
       setPage(nextPage);
     } catch (e) {
       console.warn("[Reflections] Load more failed:", e);
+      setError(s.reflectionLoadFailed);
     } finally {
       setLoadingMore(false);
     }
@@ -153,6 +157,14 @@ export function ReflectionsSection({ surah, ayah, initiallyExpanded = false, sho
         <View className="pb-3 pt-3">
           {isLoading ? (
             <ReflectionsSkeleton isDark={isDark} />
+          ) : reflectionsError ? (
+            <EmptyState
+              icon={MessageSquare}
+              title={s.reflectionLoadFailed}
+              actionLabel={s.errorTryAgain}
+              onAction={() => refetchReflections()}
+              isDark={isDark}
+            />
           ) : allReflections.length === 0 ? (
             <EmptyState
               icon={MessageSquare}
@@ -191,6 +203,14 @@ export function ReflectionsSection({ surah, ayah, initiallyExpanded = false, sho
                 </Text>
               )}
             </Pressable>
+          )}
+          {error && (
+            <Text
+              className="py-2 text-center text-red-600 dark:text-red-400"
+              style={{ fontFamily: "Manrope_500Medium", fontSize: 12 }}
+            >
+              {error}
+            </Text>
           )}
 
           <Pressable

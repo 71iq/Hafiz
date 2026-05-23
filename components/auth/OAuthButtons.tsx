@@ -1,5 +1,5 @@
-import React from "react";
-import { View, Text, Pressable, Image, type ImageSourcePropType } from "react-native";
+import React, { useState } from "react";
+import { ActivityIndicator, View, Text, Pressable, Image, type ImageSourcePropType } from "react-native";
 import { BookOpen } from "lucide-react-native";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { startAppOAuth } from "@/lib/auth/oauth";
@@ -27,18 +27,25 @@ export function OAuthButtons({ onError }: Props) {
   const s = useStrings();
   const db = useDatabase();
   const { isDark } = useSettings();
+  const [busyProvider, setBusyProvider] = useState<"google" | "apple" | "facebook" | "qf" | null>(null);
 
   if (!isSupabaseConfigured()) return null;
 
   const handlePress = async (provider: "google" | "apple" | "facebook") => {
+    if (busyProvider) return;
+    setBusyProvider(provider);
     try {
       await startAppOAuth(provider);
     } catch (err: any) {
       onError?.(err.message);
+    } finally {
+      setBusyProvider(null);
     }
   };
 
   const handleQfPress = async () => {
+    if (busyProvider) return;
+    setBusyProvider("qf");
     try {
       const result = await startAppOAuth(QF_OAUTH_PROVIDER);
       if (result.qfConnected) {
@@ -46,6 +53,8 @@ export function OAuthButtons({ onError }: Props) {
       }
     } catch (err: any) {
       onError?.(err.message);
+    } finally {
+      setBusyProvider(null);
     }
   };
 
@@ -80,32 +89,43 @@ export function OAuthButtons({ onError }: Props) {
           source={googleLogo}
           backgroundColor={buttonBackground}
           borderColor={buttonBorderColor}
+          disabled={!!busyProvider}
+          loading={busyProvider === "google"}
         />
         <OAuthIconButton
           onPress={() => handlePress("apple")}
           source={appleSource}
           backgroundColor={buttonBackground}
           borderColor={buttonBorderColor}
+          disabled={!!busyProvider}
+          loading={busyProvider === "apple"}
         />
         <OAuthIconButton
           onPress={() => handlePress("facebook")}
           source={facebookLogo}
           backgroundColor={buttonBackground}
           borderColor={buttonBorderColor}
+          disabled={!!busyProvider}
+          loading={busyProvider === "facebook"}
         />
       </View>
 
       {qfAuthEnabled && (
         <Pressable
           onPress={handleQfPress}
+          disabled={!!busyProvider}
           className="mt-3 flex-row items-center justify-center gap-2 rounded-full border px-4 py-3"
           style={({ pressed }) => ({
-            opacity: pressed ? 0.75 : 1,
+            opacity: busyProvider ? 0.55 : pressed ? 0.75 : 1,
             backgroundColor: buttonBackground,
             borderColor: buttonBorderColor,
           })}
         >
-          <BookOpen size={17} color={isDark ? "#2dd4bf" : "#0d9488"} />
+          {busyProvider === "qf" ? (
+            <ActivityIndicator size="small" color={isDark ? "#2dd4bf" : "#0d9488"} />
+          ) : (
+            <BookOpen size={17} color={isDark ? "#2dd4bf" : "#0d9488"} />
+          )}
           <Text
             className="text-charcoal dark:text-neutral-100"
             style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}
@@ -123,15 +143,20 @@ function OAuthIconButton({
   source,
   backgroundColor,
   borderColor,
+  disabled = false,
+  loading = false,
 }: {
   onPress: () => void;
   source: ImageSourcePropType;
   backgroundColor: string;
   borderColor: string;
+  disabled?: boolean;
+  loading?: boolean;
 }) {
   return (
     <Pressable
       onPress={onPress}
+      disabled={disabled}
       style={({ pressed }) => ({
         width: 50,
         height: 50,
@@ -141,10 +166,15 @@ function OAuthIconButton({
         borderColor,
         alignItems: "center",
         justifyContent: "center",
-        transform: [{ scale: pressed ? 0.95 : 1 }],
+        opacity: disabled && !loading ? 0.55 : 1,
+        transform: [{ scale: pressed && !disabled ? 0.95 : 1 }],
       })}
     >
-      <Image source={source} style={{ width: 32, height: 32 }} resizeMode="contain" />
+      {loading ? (
+        <ActivityIndicator size="small" color="#0d9488" />
+      ) : (
+        <Image source={source} style={{ width: 32, height: 32 }} resizeMode="contain" />
+      )}
     </Pressable>
   );
 }

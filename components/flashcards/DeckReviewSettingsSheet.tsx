@@ -88,6 +88,7 @@ export function DeckReviewSettingsSheet({ visible, deckId, deckTitle, mode, onCl
   const [wordTestModes, setWordTestModes] = useState<WordTestMode[]>(DEFAULT_WORD_TEST_MODES);
   const [saving, setSaving] = useState(false);
   const [activeInfo, setActiveInfo] = useState<SettingInfo | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const testModeLabels: Record<TestMode, string> = {
     nextAyah: s.flashcardsModeNextAyah,
@@ -117,6 +118,7 @@ export function DeckReviewSettingsSheet({ visible, deckId, deckTitle, mode, onCl
     let cancelled = false;
     readDeckReviewSettings(db, deckId).then((settings) => {
       if (cancelled) return;
+      setError(null);
       setDailyLimit(settings.dailyReviewLimit);
       setNewCardsLimit(settings.newCardsLimit);
       setRequestRetention(settings.requestRetention);
@@ -130,7 +132,10 @@ export function DeckReviewSettingsSheet({ visible, deckId, deckTitle, mode, onCl
       setNewCardSortOrder(settings.newCardSortOrder);
       setTestModes(settings.testModes);
       setWordTestModes(settings.wordTestModes);
-    }).catch(console.warn);
+    }).catch((e) => {
+      console.warn("[DeckReviewSettingsSheet] Failed to load settings:", e);
+      if (!cancelled) setError(s.genericActionFailed);
+    });
     return () => {
       cancelled = true;
     };
@@ -145,23 +150,28 @@ export function DeckReviewSettingsSheet({ visible, deckId, deckTitle, mode, onCl
   }, []);
 
   const setNextDailyLimit = useCallback((value: number) => {
+    setError(null);
     setDailyLimit(Math.max(MIN_DECK_DAILY_REVIEW_LIMIT, Math.min(MAX_DECK_DAILY_REVIEW_LIMIT, value)));
   }, []);
 
   const setNextNewCardsLimit = useCallback((value: number) => {
+    setError(null);
     setNewCardsLimit(Math.max(MIN_DECK_NEW_CARD_LIMIT, Math.min(MAX_DECK_NEW_CARD_LIMIT, value)));
   }, []);
 
   const setNextRetention = useCallback((value: number) => {
+    setError(null);
     const clamped = Math.max(MIN_DECK_REQUEST_RETENTION, Math.min(MAX_DECK_REQUEST_RETENTION, value));
     setRequestRetention(Number(clamped.toFixed(2)));
   }, []);
 
   const setNextMaximumInterval = useCallback((value: number) => {
+    setError(null);
     setMaximumInterval(Math.max(MIN_DECK_MAXIMUM_INTERVAL, Math.min(MAX_DECK_MAXIMUM_INTERVAL, value)));
   }, []);
 
   const toggleTestMode = useCallback((value: TestMode) => {
+    setError(null);
     setTestModes((prev) => {
       const next = prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value];
       return next.length > 0 ? next : prev;
@@ -169,6 +179,7 @@ export function DeckReviewSettingsSheet({ visible, deckId, deckTitle, mode, onCl
   }, []);
 
   const toggleWordMode = useCallback((value: WordTestMode) => {
+    setError(null);
     setWordTestModes((prev) => {
       const next = prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value];
       return next.length > 0 ? next : prev;
@@ -177,6 +188,7 @@ export function DeckReviewSettingsSheet({ visible, deckId, deckTitle, mode, onCl
 
   const handleSave = async () => {
     if (!deckId || saving) return;
+    setError(null);
     setSaving(true);
     try {
       await writeDeckReviewSettings(db, deckId, {
@@ -196,6 +208,9 @@ export function DeckReviewSettingsSheet({ visible, deckId, deckTitle, mode, onCl
       });
       onSaved();
       onClose();
+    } catch (e) {
+      console.warn("[DeckReviewSettingsSheet] Failed to save settings:", e);
+      setError(s.deckSettingsSaveFailed);
     } finally {
       setSaving(false);
     }
@@ -315,15 +330,25 @@ export function DeckReviewSettingsSheet({ visible, deckId, deckTitle, mode, onCl
         </OverlayBody>
 
         <OverlayFooter isRTL={isRTL}>
-          <Button onPress={handleSave} disabled={saving || !deckId} className="w-full">
-            {saving ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16, color: "#fff" }}>
-                {s.deckReviewSettingsSave}
+          <View className="w-full gap-3">
+            {error && (
+              <Text
+                className="text-red-600 dark:text-red-400"
+                style={{ fontFamily: "Manrope_500Medium", fontSize: 13, textAlign: isRTL ? "right" : "left" }}
+              >
+                {error}
               </Text>
             )}
-          </Button>
+            <Button onPress={handleSave} disabled={saving || !deckId} className="w-full">
+              {saving ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16, color: "#fff" }}>
+                  {s.deckReviewSettingsSave}
+                </Text>
+              )}
+            </Button>
+          </View>
         </OverlayFooter>
       </ResponsiveSheet>
 

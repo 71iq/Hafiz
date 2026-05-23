@@ -32,6 +32,7 @@ export function WebSelectionMenu() {
   const { isDark, isRTL } = useSettings();
   const { showToast } = useSelection();
   const [menu, setMenu] = useState<MenuState | null>(null);
+  const [copyBusy, setCopyBusy] = useState(false);
   const latestMenuRef = useRef<MenuState | null>(null);
 
   useEffect(() => {
@@ -171,7 +172,10 @@ export function WebSelectionMenu() {
         return;
       }
 
-      void copyRefsToClipboard(refs);
+      void copyRefsToClipboard(refs).catch((e) => {
+        console.warn("[WebSelectionMenu] Failed to copy selected text:", e);
+        showToast(s.copyFailed);
+      });
     };
 
     document.addEventListener("mouseup", handleMouseUp);
@@ -189,10 +193,11 @@ export function WebSelectionMenu() {
       document.removeEventListener("contextmenu", handleContextMenu, true);
       document.removeEventListener("copy", handleCopyEvent);
     };
-  }, [copyRefsToClipboard, s.copied, showForCurrentSelection, showToast]);
+  }, [copyRefsToClipboard, s.copied, s.copyFailed, showForCurrentSelection, showToast]);
 
   const handleCopy = useCallback(async () => {
-    if (!menu) return;
+    if (!menu || copyBusy) return;
+    setCopyBusy(true);
     try {
       const copyText = menu.copyText ?? await buildCopyText(menu.refs);
       if (!copyText) return;
@@ -202,8 +207,11 @@ export function WebSelectionMenu() {
       showToast(s.copied);
     } catch (e) {
       console.warn("[WebSelectionMenu] Failed to copy selected text:", e);
+      showToast(s.copyFailed);
+    } finally {
+      setCopyBusy(false);
     }
-  }, [buildCopyText, menu, s.copied, showToast]);
+  }, [buildCopyText, copyBusy, menu, s.copied, s.copyFailed, showToast]);
 
   if (Platform.OS !== "web" || !menu) return null;
 
@@ -229,6 +237,7 @@ export function WebSelectionMenu() {
         accessibilityRole="button"
         accessibilityLabel={s.copy}
         onPress={handleCopy}
+        disabled={copyBusy}
         style={({ pressed }) => ({
           position: "fixed" as any,
           left: menu.x,
@@ -243,7 +252,7 @@ export function WebSelectionMenu() {
           justifyContent: "center",
           flexDirection: isRTL ? "row-reverse" : "row",
           gap: 8,
-          opacity: pressed ? 0.78 : 1,
+          opacity: copyBusy ? 0.55 : pressed ? 0.78 : 1,
           boxShadow: "0 14px 32px rgba(0, 0, 0, 0.18)",
           userSelect: "none",
         } as any)}

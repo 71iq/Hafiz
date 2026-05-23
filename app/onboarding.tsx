@@ -47,6 +47,8 @@ function OnboardingInner() {
 
   // Screen 3 state
   const [creating, setCreating] = useState(false);
+  const [completing, setCompleting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [createdDeckId, setCreatedDeckId] = useState<string | null>(null);
 
   // Load surahs
@@ -81,15 +83,26 @@ function OnboardingInner() {
   );
 
   const completeOnboarding = useCallback(async () => {
-    await db.runAsync(
-      "INSERT OR REPLACE INTO user_settings (key, value) VALUES ('onboarding_completed', 'true')"
-    );
-    router.replace("/(tabs)/home");
-  }, [db, router]);
+    if (completing) return;
+    setCompleting(true);
+    setError(null);
+    try {
+      await db.runAsync(
+        "INSERT OR REPLACE INTO user_settings (key, value) VALUES ('onboarding_completed', 'true')"
+      );
+      router.replace("/(tabs)/home");
+    } catch (e) {
+      console.warn("[Onboarding] Failed to complete onboarding:", e);
+      setError(s.onboardingSaveFailed);
+    } finally {
+      setCompleting(false);
+    }
+  }, [completing, db, router, s.onboardingSaveFailed]);
 
   const handleCreateDeck = useCallback(async () => {
     if (selectedSurahs.size === 0) return;
     setCreating(true);
+    setError(null);
     try {
       const scope: DeckScope = {
         type: "surah",
@@ -98,20 +111,30 @@ function OnboardingInner() {
       const deckId = generateDeckId(scope);
       await createDeck(db, deckId, scope);
       setCreatedDeckId(deckId);
-      setCreating(false);
     } catch (err) {
       console.error("[Onboarding] Failed to create deck:", err);
+      setError(s.deckCreateFailed);
+    } finally {
       setCreating(false);
     }
-  }, [db, selectedSurahs]);
+  }, [db, selectedSurahs, s.deckCreateFailed]);
 
   const handleStartReview = useCallback(async () => {
-    if (!createdDeckId) return;
-    await db.runAsync(
-      "INSERT OR REPLACE INTO user_settings (key, value) VALUES ('onboarding_completed', 'true')"
-    );
-    router.replace({ pathname: "/flashcards/session", params: { deckId: createdDeckId } });
-  }, [createdDeckId, db, router]);
+    if (!createdDeckId || completing) return;
+    setCompleting(true);
+    setError(null);
+    try {
+      await db.runAsync(
+        "INSERT OR REPLACE INTO user_settings (key, value) VALUES ('onboarding_completed', 'true')"
+      );
+      router.replace({ pathname: "/flashcards/session", params: { deckId: createdDeckId } });
+    } catch (e) {
+      console.warn("[Onboarding] Failed to start review:", e);
+      setError(s.onboardingSaveFailed);
+    } finally {
+      setCompleting(false);
+    }
+  }, [completing, createdDeckId, db, router, s.onboardingSaveFailed]);
 
   const toggleSurah = useCallback((n: number) => {
     setSelectedSurahs((prev) => {
@@ -363,10 +386,23 @@ function OnboardingInner() {
           backgroundColor: bgColor,
         }}
       >
+        {error && (
+          <Text
+            style={{
+              color: "#dc2626",
+              fontFamily: "Manrope_500Medium",
+              fontSize: 13,
+              marginBottom: 12,
+              textAlign: "center",
+            }}
+          >
+            {error}
+          </Text>
+        )}
         {/* Continue button */}
         <Pressable
           onPress={() => animateTo(2)}
-          disabled={selectedSurahs.size === 0}
+          disabled={selectedSurahs.size === 0 || completing}
           style={(state) => ({
             backgroundColor: accentColor,
             paddingHorizontal: 48,
@@ -374,8 +410,8 @@ function OnboardingInner() {
             borderRadius: 26,
             justifyContent: "center",
             alignItems: "center",
-            opacity: selectedSurahs.size === 0 ? 0.4 : 1,
-            transform: [{ scale: state.pressed && selectedSurahs.size > 0 ? 0.98 : 1 }],
+            opacity: selectedSurahs.size === 0 || completing ? 0.4 : 1,
+            transform: [{ scale: state.pressed && selectedSurahs.size > 0 && !completing ? 0.98 : 1 }],
             width: "100%",
           })}
         >
@@ -395,9 +431,11 @@ function OnboardingInner() {
         {/* Skip button */}
         <Pressable
           onPress={completeOnboarding}
+          disabled={completing}
           style={(state) => ({
             marginTop: 16,
             alignItems: "center",
+            opacity: completing ? 0.5 : 1,
             transform: [{ scale: state.pressed ? 0.98 : 1 }],
           })}
         >
@@ -508,11 +546,24 @@ function OnboardingInner() {
 
       {/* Bottom actions */}
       <View style={{ paddingBottom: 40, alignItems: "center" }}>
+        {error && (
+          <Text
+            style={{
+              color: "#dc2626",
+              fontFamily: "Manrope_500Medium",
+              fontSize: 13,
+              marginBottom: 12,
+              textAlign: "center",
+            }}
+          >
+            {error}
+          </Text>
+        )}
         {!createdDeckId ? (
           <>
             <Pressable
               onPress={handleCreateDeck}
-              disabled={creating}
+              disabled={creating || completing}
               style={(state) => ({
                 backgroundColor: accentColor,
                 paddingHorizontal: 48,
@@ -522,8 +573,8 @@ function OnboardingInner() {
                 alignItems: "center",
                 flexDirection: "row",
                 gap: 8,
-                opacity: creating ? 0.7 : 1,
-                transform: [{ scale: state.pressed && !creating ? 0.98 : 1 }],
+                opacity: creating || completing ? 0.7 : 1,
+                transform: [{ scale: state.pressed && !creating && !completing ? 0.98 : 1 }],
                 width: "100%",
               })}
             >
@@ -543,11 +594,12 @@ function OnboardingInner() {
 
             <Pressable
               onPress={completeOnboarding}
-              disabled={creating}
+              disabled={creating || completing}
               style={(state) => ({
                 marginTop: 16,
                 alignItems: "center",
-                transform: [{ scale: state.pressed ? 0.98 : 1 }],
+                opacity: creating || completing ? 0.5 : 1,
+                transform: [{ scale: state.pressed && !creating && !completing ? 0.98 : 1 }],
               })}
             >
               <Text
@@ -565,6 +617,7 @@ function OnboardingInner() {
           <>
             <Pressable
               onPress={handleStartReview}
+              disabled={completing}
               style={(state) => ({
                 backgroundColor: accentColor,
                 paddingHorizontal: 48,
@@ -572,10 +625,14 @@ function OnboardingInner() {
                 borderRadius: 26,
                 justifyContent: "center",
                 alignItems: "center",
-                transform: [{ scale: state.pressed ? 0.98 : 1 }],
+                flexDirection: "row",
+                gap: 8,
+                opacity: completing ? 0.7 : 1,
+                transform: [{ scale: state.pressed && !completing ? 0.98 : 1 }],
                 width: "100%",
               })}
             >
+              {completing ? <ActivityIndicator size="small" color="#FFFFFF" /> : null}
               <Text
                 style={{
                   fontFamily: "Manrope_600SemiBold",
@@ -589,10 +646,12 @@ function OnboardingInner() {
 
             <Pressable
               onPress={completeOnboarding}
+              disabled={completing}
               style={(state) => ({
                 marginTop: 16,
                 alignItems: "center",
-                transform: [{ scale: state.pressed ? 0.98 : 1 }],
+                opacity: completing ? 0.5 : 1,
+                transform: [{ scale: state.pressed && !completing ? 0.98 : 1 }],
               })}
             >
               <Text

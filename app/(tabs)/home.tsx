@@ -100,6 +100,7 @@ export default function HomeScreen() {
   const [showSearch, setShowSearch] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [deckToDelete, setDeckToDelete] = useState<string | null>(null);
+  const [deletingDeckId, setDeletingDeckId] = useState<string | null>(null);
   const [filterDeckId, setFilterDeckId] = useState<SmartDeckId | null>(null);
   const [reviewSettingsTarget, setReviewSettingsTarget] = useState<DeckReviewSettingsTarget | null>(null);
   const [surahNames, setSurahNames] = useState<Record<number, string>>({});
@@ -267,16 +268,19 @@ export default function HomeScreen() {
   }, [db, dismissingUnlockId, latestUnlock]);
 
   const confirmDeleteDeck = async () => {
-    if (!deckToDelete) return;
+    if (!deckToDelete || deletingDeckId) return;
     const deckId = deckToDelete;
-    setDeckToDelete(null);
+    setDeletingDeckId(deckId);
     try {
       await deleteDeck(db, deckId);
       setDecks((prev) => prev.filter((d) => d.id !== deckId));
       await loadData();
+      setDeckToDelete(null);
     } catch (e) {
       console.warn("[Home] Failed to delete deck:", e);
-      setToast(s.reviewActionFailed);
+      setToast(s.deckDeleteFailed);
+    } finally {
+      setDeletingDeckId(null);
     }
   };
 
@@ -673,9 +677,12 @@ export default function HomeScreen() {
         cancelLabel={s.flashcardsCancel}
         confirmLabel={s.flashcardsDelete}
         destructive
+        confirmLoading={!!deletingDeckId}
         isDark={isDark}
         isRTL={isRTL}
-        onCancel={() => setDeckToDelete(null)}
+        onCancel={() => {
+          if (!deletingDeckId) setDeckToDelete(null);
+        }}
         onConfirm={confirmDeleteDeck}
       />
     </SafeAreaView>

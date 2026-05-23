@@ -62,6 +62,8 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
   const [translationText, setTranslationText] = useState<string | null>(null);
   const [tafseerText, setTafseerText] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
+  const [bookmarkBusy, setBookmarkBusy] = useState(false);
+  const [shareBusy, setShareBusy] = useState(false);
 
   const open = target !== null;
   const showTranslation = open && uiLanguage !== "ar";
@@ -168,7 +170,8 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
   }, [db, target, tafseerSource]);
 
   const handleBookmark = useCallback(async () => {
-    if (!target) return;
+    if (!target || bookmarkBusy) return;
+    setBookmarkBusy(true);
     try {
       if (bookmarked) {
         await dbRemoveBookmark(db, target.surah, target.ayah);
@@ -180,11 +183,15 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
       await refreshBookmarks();
     } catch (e) {
       console.warn("[AyahDetailModal] Failed to toggle bookmark:", e);
+      showToast(s.bookmarkActionFailed);
+    } finally {
+      setBookmarkBusy(false);
     }
-  }, [bookmarked, db, target, showToast, s.bookmarkAdded, s.bookmarkRemoved, refreshBookmarks]);
+  }, [bookmarkBusy, bookmarked, db, target, showToast, s.bookmarkAdded, s.bookmarkRemoved, s.bookmarkActionFailed, refreshBookmarks]);
 
   const handleShare = useCallback(async () => {
-    if (!target || !ayahRow) return;
+    if (!target || !ayahRow || shareBusy) return;
+    setShareBusy(true);
     try {
       const surahName = await fetchSurahName(db, target.surah);
       await Clipboard.setStringAsync(
@@ -193,8 +200,11 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
       showToast(s.copied);
     } catch (e) {
       console.warn("[AyahDetailModal] Failed to copy share text:", e);
+      showToast(s.copyFailed);
+    } finally {
+      setShareBusy(false);
     }
-  }, [ayahRow, db, target, showToast, s.copied]);
+  }, [ayahRow, shareBusy, db, target, showToast, s.copied, s.copyFailed]);
 
   const handleAudioPress = useCallback(async () => {
     if (!target) return;
@@ -266,10 +276,21 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
               accessibilityLabel={audioState.loading ? s.audioLoading : audioState.playing ? s.audioPause : s.audioPlay}
             />
             <ActionIcon
-              icon={<Bookmark size={15} color={bookmarked ? "#FDDC91" : iconColor} fill={bookmarked ? "#FDDC91" : "none"} />}
+              icon={
+                bookmarkBusy ? (
+                  <ActivityIndicator size="small" color={iconColor} />
+                ) : (
+                  <Bookmark size={15} color={bookmarked ? "#FDDC91" : iconColor} fill={bookmarked ? "#FDDC91" : "none"} />
+                )
+              }
               onPress={handleBookmark}
+              disabled={bookmarkBusy}
             />
-            <ActionIcon icon={<Share2 size={15} color={iconColor} />} onPress={handleShare} />
+            <ActionIcon
+              icon={shareBusy ? <ActivityIndicator size="small" color={iconColor} /> : <Share2 size={15} color={iconColor} />}
+              onPress={handleShare}
+              disabled={shareBusy}
+            />
           </View>
         }
       />

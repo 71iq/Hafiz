@@ -84,7 +84,7 @@ export default function LeaderboardScreen() {
     });
   }, [configured, queryClient, syncLeaderboard, user]);
 
-  const { data: entries = [], isLoading, refetch, isRefetching } = useQuery({
+  const { data: entries = [], isLoading, error: leaderboardError, refetch, isRefetching } = useQuery({
     queryKey: ["leaderboard", activeTab],
     queryFn: async () => {
       await syncLeaderboard();
@@ -163,6 +163,18 @@ export default function LeaderboardScreen() {
         <View className="flex-1" style={contentContainerStyle}>
           <View style={railStyle}>
             <LeaderboardSkeleton isDark={isDark} className="flex-1" />
+          </View>
+        </View>
+      ) : leaderboardError ? (
+        <View className="flex-1 justify-center" style={contentContainerStyle}>
+          <View style={railStyle}>
+            <EmptyState
+              icon={Trophy}
+              title={s.leaderboardLoadFailed}
+              actionLabel={s.errorTryAgain}
+              onAction={() => refetch()}
+              isDark={isDark}
+            />
           </View>
         </View>
       ) : entries.length === 0 ? (

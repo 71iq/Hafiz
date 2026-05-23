@@ -44,6 +44,7 @@ export function CommentsSheet({ reflectionId, onClose, onCommentAdded }: Props) 
   const [localComments, setLocalComments] = useState<ReflectionComment[]>([]);
   const [text, setText] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [profileUserId, setProfileUserId] = useState<string | null>(null);
 
   const commentsQuery = useInfiniteQuery({
@@ -68,15 +69,20 @@ export function CommentsSheet({ reflectionId, onClose, onCommentAdded }: Props) 
   useEffect(() => {
     setLocalComments([]);
     setText("");
+    setError(null);
   }, [reflectionId]);
 
   useEffect(() => {
-    if (commentsQuery.error) console.warn("[Comments] Failed to load:", commentsQuery.error);
-  }, [commentsQuery.error]);
+    if (commentsQuery.error) {
+      console.warn("[Comments] Failed to load:", commentsQuery.error);
+      setError(s.commentLoadFailed);
+    }
+  }, [commentsQuery.error, s.commentLoadFailed]);
 
   const handleSubmit = useCallback(async () => {
     if (!user || !reflectionId || !text.trim()) return;
     setSubmitting(true);
+    setError(null);
     try {
       const comment = await addComment(user.id, reflectionId, text.trim());
       setLocalComments((prev) => [...prev, comment]);
@@ -84,10 +90,21 @@ export function CommentsSheet({ reflectionId, onClose, onCommentAdded }: Props) 
       onCommentAdded(reflectionId);
     } catch (e) {
       console.warn("[Comments] Failed to add:", e);
+      setError(s.commentPostFailed);
     } finally {
       setSubmitting(false);
     }
-  }, [user, reflectionId, text, onCommentAdded]);
+  }, [user, reflectionId, text, onCommentAdded, s.commentPostFailed]);
+
+  const handleLoadMore = useCallback(async () => {
+    setError(null);
+    try {
+      await commentsQuery.fetchNextPage();
+    } catch (e) {
+      console.warn("[Comments] Failed to load more:", e);
+      setError(s.commentLoadFailed);
+    }
+  }, [commentsQuery, s.commentLoadFailed]);
 
   const mutedColor = isDark ? "#737373" : "#A39B93";
 
@@ -114,6 +131,20 @@ export function CommentsSheet({ reflectionId, onClose, onCommentAdded }: Props) 
             {s.reflectionThreadLabel}
           </Text>
         </View>
+
+        {error ? (
+          <Text
+            className="text-red-600 dark:text-red-400"
+            style={{
+              fontFamily: "Manrope_500Medium",
+              fontSize: 12,
+              textAlign: isRTL ? "right" : "left",
+              writingDirection: isRTL ? "rtl" : "ltr",
+            }}
+          >
+            {error}
+          </Text>
+        ) : null}
 
         <OverlayBody className="flex-1 min-h-0" contentContainerClassName="pb-2">
           {commentsQuery.isLoading ? (
@@ -175,7 +206,7 @@ export function CommentsSheet({ reflectionId, onClose, onCommentAdded }: Props) 
 
               {commentsQuery.hasNextPage && (
                 <Pressable
-                  onPress={() => commentsQuery.fetchNextPage()}
+                  onPress={handleLoadMore}
                   disabled={commentsQuery.isFetchingNextPage}
                   className="items-center py-3"
                   style={({ pressed }) => ({ opacity: pressed || commentsQuery.isFetchingNextPage ? 0.6 : 1 })}
@@ -202,7 +233,10 @@ export function CommentsSheet({ reflectionId, onClose, onCommentAdded }: Props) 
           >
             <Input
               value={text}
-              onChangeText={setText}
+              onChangeText={(next) => {
+                setText(next);
+                if (error) setError(null);
+              }}
               placeholder={s.reflectionAddComment}
               placeholderTextColor={mutedColor}
               multiline={false}
