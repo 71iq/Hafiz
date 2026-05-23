@@ -270,6 +270,12 @@ function MushafInner() {
     setChromeVisible((visible) => !visible);
   }, [focusModeActive, isPhone, isTablet, pauseFocusAutoScroll, setChromeVisible]);
 
+  const keepChromeVisibleDuringFontChange = useCallback(() => {
+    if (focusModeActive) return;
+    tapRevealGuardUntilRef.current = Date.now() + 1200;
+    setChromeVisible(true);
+  }, [focusModeActive, setChromeVisible]);
+
   const readerTapProps = Platform.OS === "web"
     ? ({
         onPointerDown: (e: any) => {
@@ -1385,7 +1391,9 @@ function MushafInner() {
                 >
                   <Search size={16} color={isDark ? "#737373" : "#8B8178"} />
                 </Pressable>
-                {!isNarrow && !pageFontSizeLocked && <FontSizeControl />}
+                {!isNarrow && !pageFontSizeLocked && (
+                  <FontSizeControl onChangeStart={keepChromeVisibleDuringFontChange} />
+                )}
               </View>
             </View>
           )}

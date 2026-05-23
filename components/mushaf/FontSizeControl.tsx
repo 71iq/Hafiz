@@ -5,9 +5,10 @@ import { toArabicNumber } from "@/lib/arabic";
 
 type Props = {
   disabled?: boolean;
+  onChangeStart?: () => void;
 };
 
-export function FontSizeControl({ disabled = false }: Props) {
+export function FontSizeControl({ disabled = false, onChangeStart }: Props) {
   const { fontSizeIndex, setFontSizeIndex, isDark, isRTL } = useSettings();
 
   const iconColor = isDark ? "#d4d4d4" : "#6e5a47";
@@ -17,6 +18,14 @@ export function FontSizeControl({ disabled = false }: Props) {
   const level = fontSizeIndex + 1;
   const levelLabel = isRTL ? toArabicNumber(level) : String(level);
   const totalLabel = isRTL ? toArabicNumber(FONT_SIZE_STEPS.length) : String(FONT_SIZE_STEPS.length);
+  const decreaseFontSize = () => {
+    onChangeStart?.();
+    setFontSizeIndex(fontSizeIndex - 1);
+  };
+  const increaseFontSize = () => {
+    onChangeStart?.();
+    setFontSizeIndex(fontSizeIndex + 1);
+  };
 
   return (
     <View className="flex-row items-center gap-2" style={{ opacity: disabled ? 0.42 : 1 }}>
@@ -28,7 +37,7 @@ export function FontSizeControl({ disabled = false }: Props) {
       </Text>
 
       <Pressable
-        onPress={() => setFontSizeIndex(fontSizeIndex - 1)}
+        onPress={decreaseFontSize}
         disabled={!canDecrease}
         className="w-7 h-7 rounded-full bg-surface-high dark:bg-surface-dark-high items-center justify-center"
         style={{ opacity: canDecrease ? 1 : 0.3 }}
@@ -46,7 +55,7 @@ export function FontSizeControl({ disabled = false }: Props) {
       </View>
 
       <Pressable
-        onPress={() => setFontSizeIndex(fontSizeIndex + 1)}
+        onPress={increaseFontSize}
         disabled={!canIncrease}
         className="w-7 h-7 rounded-full bg-surface-high dark:bg-surface-dark-high items-center justify-center"
         style={{ opacity: canIncrease ? 1 : 0.3 }}
