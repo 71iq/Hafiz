@@ -696,7 +696,7 @@ function AddDeckTile({
       accessibilityLabel={label}
       style={({ pressed }) => ({
         width: 78,
-        height: 78,
+        height: 64,
         transform: [{ scale: pressed ? 0.96 : 1 }],
       })}
     >
