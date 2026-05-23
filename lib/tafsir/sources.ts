@@ -6,7 +6,8 @@ export type TafsirSourceId =
   | "kashshaf"
   | "alusi"
   | "nazam-durar"
-  | "razi";
+  | "razi"
+  | "jalalayn-en";
 
 type TafsirImportKind = "muyassar" | "zilal" | "surahRows";
 
@@ -78,6 +79,13 @@ export const TAFSIR_SOURCES: TafsirSourceConfig[] = [
     descriptionKey: "tafseerRaziDesc",
     importKind: "surahRows",
     progressDetail: "Tafsir Al-Razi",
+  },
+  {
+    id: "jalalayn-en",
+    labelKey: "tafseerJalalaynEn",
+    descriptionKey: "tafseerJalalaynEnDesc",
+    importKind: "surahRows",
+    progressDetail: "Tafsir Al Jalalayn - English",
   },
 ];
 
