@@ -186,7 +186,7 @@ export default function LeaderboardScreen() {
         >
           <View style={railStyle}>
           {featuredEntries.length > 0 && (
-            <View className="mb-6 justify-center gap-4" style={{ flexDirection: "row", direction: "ltr" }}>
+            <View className="mb-7 justify-center gap-5" style={{ flexDirection: "row", direction: "ltr" }}>
               {featuredEntries.map((entry) => (
                 <LeaderboardPodiumCard
                   key={entry.user_id}
@@ -252,25 +252,43 @@ function LeaderboardPodiumCard({
   onPress: () => void;
 }) {
   const displayName = entry.display_name || entry.username;
+  const isFirst = entry.rank === 1;
   const rankColor = entry.rank === 1 ? "#F5C24B" : entry.rank === 2 ? "#B7BECF" : "#C49A62";
+  const cardBg = isDark
+    ? isFirst ? "#172B28" : "#141414"
+    : isFirst ? "#FFF3D8" : "#FAF8F5";
+  const scoreBg = isDark
+    ? isFirst ? "rgba(245, 194, 75, 0.13)" : "rgba(253, 220, 145, 0.08)"
+    : isFirst ? "rgba(245, 194, 75, 0.20)" : "rgba(0, 54, 56, 0.05)";
+  const scoreColor = isDark
+    ? isFirst ? "#FDDC91" : "#F5F5F4"
+    : isFirst ? "#2D2419" : "#1D1D1B";
   return (
     <Pressable
       onPress={onPress}
-      className="flex-1 items-center rounded-4xl bg-surface-low dark:bg-surface-dark-low px-4 py-5"
+      className="flex-1 items-center overflow-hidden rounded-4xl px-4 py-5"
       style={({ pressed }) => ({
+        backgroundColor: cardBg,
+        borderColor: isFirst ? rankColor : "transparent",
+        borderWidth: isFirst ? 1 : 0,
         marginTop: entry.rank === 1 ? 0 : 18,
         opacity: pressed ? 0.82 : 1,
         transform: [{ scale: pressed ? 0.98 : 1 }],
       })}
     >
-      <View className="mb-3 h-8 min-w-8 items-center justify-center rounded-full px-2" style={{ backgroundColor: rankColor }}>
+      <View style={{ position: "absolute", left: 0, right: 0, top: 0, height: 5, backgroundColor: rankColor }} />
+      <View
+        className={`mb-3 h-9 min-w-9 items-center justify-center rounded-full px-2 ${isFirst ? "flex-row gap-1" : ""}`}
+        style={{ backgroundColor: rankColor }}
+      >
+        {isFirst && <Trophy size={13} color="#4A4034" />}
         <Text style={{ color: "#4A4034", fontFamily: "Manrope_700Bold", fontSize: 12 }}>
           {entry.rank}
         </Text>
       </View>
       <View
-        className="h-14 w-14 items-center justify-center rounded-full"
-        style={{ backgroundColor: isDark ? "#003638" : "#00595B" }}
+        className="h-16 w-16 items-center justify-center rounded-full"
+        style={{ backgroundColor: isDark ? "rgba(45, 212, 191, 0.12)" : "rgba(0, 89, 91, 0.10)" }}
       >
         <ProfileAvatar avatarUrl={entry.avatar_url} name={displayName} size={56} isDark={isDark} />
       </View>
@@ -289,12 +307,30 @@ function LeaderboardPodiumCard({
           {s.leaderboardYou}
         </Text>
       )}
-      <Text className="mt-1 text-charcoal dark:text-neutral-100" style={{ fontFamily: "NotoSerif_700Bold", fontSize: 24 }}>
-        {entry.score.toLocaleString()}
-      </Text>
-      <Text style={{ color: isDark ? "#737373" : "#A39B93", fontFamily: "Manrope_500Medium", fontSize: 10 }}>
-        {unit}
-      </Text>
+      <View className="mt-3 min-w-[118px] items-center rounded-3xl px-4 py-2.5" style={{ backgroundColor: scoreBg }}>
+        <Text
+          className="text-charcoal dark:text-neutral-100"
+          style={{
+            color: scoreColor,
+            fontFamily: "NotoSerif_700Bold",
+            fontSize: isFirst ? 34 : 30,
+            lineHeight: isFirst ? 40 : 36,
+          }}
+        >
+          {entry.score.toLocaleString()}
+        </Text>
+        <Text
+          style={{
+            color: isDark ? "#BFB6A8" : "#8B8178",
+            fontFamily: "Manrope_700Bold",
+            fontSize: 9,
+            letterSpacing: 1.1,
+            textTransform: "uppercase",
+          }}
+        >
+          {unit}
+        </Text>
+      </View>
     </Pressable>
   );
 }
@@ -323,19 +359,30 @@ function LeaderboardRow({
   const hasMedal = entry.rank <= 3;
   const rankColor = hasMedal ? (isDark ? "#F5EBD7" : "#4A4034") : mutedColor;
   const scoreColor = isDark ? "#F3F2EF" : "#1D1D1B";
+  const rowBg = isCurrentUser
+    ? (isDark ? "rgba(45, 212, 191, 0.12)" : "rgba(13, 148, 136, 0.08)")
+    : (isDark ? "#141414" : "#FAF8F5");
+  const scoreBg = isDark ? "rgba(255,255,255,0.05)" : "rgba(0,54,56,0.045)";
+  const rankBg = hasMedal
+    ? entry.rank === 1
+      ? "rgba(245, 194, 75, 0.16)"
+      : entry.rank === 2
+        ? "rgba(183, 190, 207, 0.18)"
+        : "rgba(196, 154, 98, 0.18)"
+    : isDark ? "rgba(255,255,255,0.05)" : "rgba(45,45,45,0.04)";
 
   return (
     <Pressable
       onPress={onPress}
-      className="flex-row items-center px-4 py-3.5 mb-2.5 rounded-2xl"
+      className="mb-2.5 flex-row items-center rounded-3xl px-4 py-3.5"
       style={{
         direction: "ltr",
-        backgroundColor: isCurrentUser
-          ? (isDark ? "rgba(45, 212, 191, 0.12)" : "rgba(13, 148, 136, 0.08)")
-          : (isDark ? "#141414" : "#FAF8F5"),
+        backgroundColor: rowBg,
+        borderColor: isCurrentUser ? (isDark ? "rgba(45, 212, 191, 0.22)" : "rgba(13, 148, 136, 0.18)") : "transparent",
+        borderWidth: isCurrentUser ? 1 : 0,
       }}
     >
-      <View className="w-8 items-center">
+      <View className="h-9 w-9 items-center justify-center rounded-full" style={{ backgroundColor: rankBg }}>
         <Text style={{ fontFamily: "NotoSerif_700Bold", fontSize: 16, color: rankColor }}>
           {entry.rank}
         </Text>
@@ -372,12 +419,12 @@ function LeaderboardRow({
         </Text>
       </View>
 
-      <View className="items-end ml-2">
+      <View className="ml-2 min-w-[112px] items-end rounded-2xl px-3 py-2" style={{ backgroundColor: scoreBg }}>
         <View className="flex-row items-center gap-1.5">
           {hasMedal && <Medal size={15} color={medalColor} />}
           {isStreak && <CalendarCheck2 size={14} color={isDark ? "#2dd4bf" : "#0d9488"} />}
           <Text
-            style={{ fontFamily: "NotoSerif_700Bold", fontSize: 20, color: scoreColor }}
+            style={{ fontFamily: "NotoSerif_700Bold", fontSize: 24, lineHeight: 30, color: scoreColor }}
           >
             {entry.score.toLocaleString()}
           </Text>
