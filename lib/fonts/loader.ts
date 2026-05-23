@@ -33,7 +33,6 @@ async function loadFontWeb(name: string, asset: any): Promise<void> {
   const fontFace = new FontFace(name, `url("${uri}")`, { display: "swap" });
   (document.fonts as any).add(fontFace);
   await fontFace.load();
-  await document.fonts.ready;
 }
 
 /** Load the QPC V2 font for a specific page. No-op if already loaded.

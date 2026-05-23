@@ -18,7 +18,7 @@ import {
 } from "@/lib/settings/context";
 import { useDatabase } from "@/lib/database/provider";
 import { getLanguageByCode } from "@/lib/translations/languages";
-import { TAFSIR_SOURCES } from "@/lib/tafsir/sources";
+import { AVAILABLE_TAFSIR_SOURCES } from "@/lib/tafsir/sources";
 import { TranslationLanguagePicker } from "@/components/settings/TranslationLanguagePicker";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -437,7 +437,7 @@ export default function SettingsScreen() {
               {s.tafseerSourceLabel}
             </Text>
             <View className="gap-2">
-              {TAFSIR_SOURCES.map((source) => (
+              {AVAILABLE_TAFSIR_SOURCES.map((source) => (
                 <TafseerSourceOption
                   key={source.id}
                   value={source.id}

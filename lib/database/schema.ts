@@ -458,6 +458,7 @@ export async function createSchema(db: SQLiteDatabase): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_quran_text_surah ON quran_text(surah);
     CREATE INDEX IF NOT EXISTS idx_word_roots_root ON word_roots(root);
     CREATE INDEX IF NOT EXISTS idx_word_roots_surah_ayah ON word_roots(surah, ayah);
+    CREATE INDEX IF NOT EXISTS idx_word_roots_surah_ayah_pos ON word_roots(surah, ayah, word_pos);
     CREATE INDEX IF NOT EXISTS idx_tajweed_surah_ayah ON tajweed_rules(surah, ayah);
     CREATE INDEX IF NOT EXISTS idx_juz_map_juz ON juz_map(juz);
     CREATE INDEX IF NOT EXISTS idx_study_cards_deck ON study_cards(deck_id);

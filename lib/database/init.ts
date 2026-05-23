@@ -2401,7 +2401,9 @@ async function runNewTabImports(
   ) {
     await safeImport("mutashabihat", () => importMutashabihat(db, onProgress));
   }
-  await safeImport("reflection_journey_levels", () => importReflectionJourneyLevels(db, onProgress));
+  if (Platform.OS !== "web") {
+    await safeImport("reflection_journey_levels", () => importReflectionJourneyLevels(db, onProgress));
+  }
 }
 
 async function ensureQfUserSyncSchema(db: SQLiteDatabase): Promise<void> {
@@ -2551,15 +2553,17 @@ export async function initializeDatabase(
       await importZilal(db, onProgress);
     }
 
-    for (const source of SURAH_ROW_TAFSIR_SOURCES) {
-      const sourceCount = await db.getFirstAsync<{ count: number }>(
-        "SELECT COUNT(*) as count FROM tafseer WHERE source = ?",
-        [source.id]
-      );
-      if ((sourceCount?.count ?? 0) < (source.expectedRows ?? 6236)) {
-        console.log(`[Import] Importing ${source.id} tafseer...`);
-        await db.runAsync("DELETE FROM tafseer WHERE source = ?", [source.id]);
-        await importSurahRowTafsirSource(db, source, onProgress);
+    if (Platform.OS !== "web") {
+      for (const source of SURAH_ROW_TAFSIR_SOURCES) {
+        const sourceCount = await db.getFirstAsync<{ count: number }>(
+          "SELECT COUNT(*) as count FROM tafseer WHERE source = ?",
+          [source.id]
+        );
+        if ((sourceCount?.count ?? 0) < (source.expectedRows ?? 6236)) {
+          console.log(`[Import] Importing ${source.id} tafseer...`);
+          await db.runAsync("DELETE FROM tafseer WHERE source = ?", [source.id]);
+          await importSurahRowTafsirSource(db, source, onProgress);
+        }
       }
     }
 
@@ -2659,7 +2663,9 @@ export async function initializeDatabase(
   await importWordRoots(db, onProgress);
   await importTafseer(db, onProgress);
   await importZilal(db, onProgress);
-  await importConfiguredTafsirSources(db, onProgress);
+  if (Platform.OS !== "web") {
+    await importConfiguredTafsirSources(db, onProgress);
+  }
   await importTranslations(db, onProgress);
   await importPageMap(db, onProgress);
   await importWordTranslations(db, onProgress);

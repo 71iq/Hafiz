@@ -440,6 +440,8 @@ export function PageMushaf({
   );
   const [pageData, setPageData] = useState<PageData[]>([]);
   const [surahMap, setSurahMap] = useState<Map<number, SurahRow>>(new Map());
+  const [pageRows, setPageRows] = useState<PageRow[]>([]);
+  const [juzRangeRows, setJuzRangeRows] = useState<JuzRangeRow[]>([]);
   const [pageMetaMap, setPageMetaMap] = useState<Map<number, { surahName: string | null; juz: number | null }>>(new Map());
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
@@ -533,16 +535,8 @@ export function PageMushaf({
           map.set(s.number, s);
         }
         setSurahMap(map);
-
-        const meta = new Map<number, { surahName: string | null; juz: number | null }>();
-        for (const p of pages) {
-          const surahName = uiLanguage === "ar"
-            ? map.get(p.surah_start)?.name_arabic ?? null
-            : map.get(p.surah_start)?.name_english ?? null;
-          const juz = findJuzForPageAyah(juzRanges, p.surah_start, p.ayah_start);
-          meta.set(p.page, { surahName, juz });
-        }
-        setPageMetaMap(meta);
+        setPageRows(pages);
+        setJuzRangeRows(juzRanges);
 
         // Group page lines by page number and compute globalWordOffset per page
         const lineLookup = new Map<number, PageLineLayout[]>();
@@ -583,7 +577,20 @@ export function PageMushaf({
     }
 
     loadData();
-  }, [db, uiLanguage, pagePaddingTop, pagePaddingBottom]);
+  }, [db]);
+
+  useEffect(() => {
+    if (pageRows.length === 0 || surahMap.size === 0) return;
+    const meta = new Map<number, { surahName: string | null; juz: number | null }>();
+    for (const p of pageRows) {
+      const surahName = uiLanguage === "ar"
+        ? surahMap.get(p.surah_start)?.name_arabic ?? null
+        : surahMap.get(p.surah_start)?.name_english ?? null;
+      const juz = findJuzForPageAyah(juzRangeRows, p.surah_start, p.ayah_start);
+      meta.set(p.page, { surahName, juz });
+    }
+    setPageMetaMap(meta);
+  }, [juzRangeRows, pageRows, surahMap, uiLanguage]);
 
   // Rebuild layout offsets when lineHeight changes (font size adjustment)
   useEffect(() => {
@@ -1155,6 +1162,8 @@ export function PageMushaf({
             width={pageWidth}
             lineLayout={item.lineLayout}
             globalWordOffset={item.globalWordOffset}
+            usePageWords={item.usePageWords}
+            pageWordLineNumbers={item.pageWordLineNumbers}
             onOpenAyahDetail={openAyahDetail}
             highlightedAyahKey={highlightedAyahKey}
             highlightedWord={highlightedWord}
@@ -1279,6 +1288,8 @@ export function PageMushaf({
                     width={pageWidth}
                     lineLayout={item.lineLayout}
                     globalWordOffset={item.globalWordOffset}
+                    usePageWords={item.usePageWords}
+                    pageWordLineNumbers={item.pageWordLineNumbers}
                     onOpenAyahDetail={openAyahDetail}
                     highlightedAyahKey={highlightedAyahKey}
                     highlightedWord={highlightedWord}

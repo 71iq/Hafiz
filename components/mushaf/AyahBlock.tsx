@@ -36,6 +36,8 @@ import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { useAyahAudio } from "@/lib/audio/ayah-audio";
 import { AyahDetailModal } from "./AyahDetailModal";
 
+const mutashabihatSavedCache = new Map<string, boolean>();
+
 type Props = {
   surah: number;
   ayah: number;
@@ -130,9 +132,17 @@ function AyahBlockInner({
 
   useEffect(() => {
     let cancelled = false;
+    const cacheKey = `${surah}:${ayah}`;
+    const cached = mutashabihatSavedCache.get(cacheKey);
+    if (cached !== undefined) {
+      setSavedToReview(cached);
+      setReviewBusy(false);
+      return;
+    }
     setReviewBusy(false);
     isMutashabihatCardSaved(db, surah, ayah)
       .then((saved) => {
+        mutashabihatSavedCache.set(cacheKey, saved);
         if (!cancelled) setSavedToReview(saved);
       })
       .catch(() => {
@@ -208,6 +218,7 @@ function AyahBlockInner({
     setReviewBusy(true);
     try {
       const result = await addMutashabihatCard(db, surah, ayah);
+      mutashabihatSavedCache.set(`${surah}:${ayah}`, true);
       setSavedToReview(true);
       showToast(result.created ? s.reviewActionAdded : (s.reviewActionAlreadyExists ?? s.reviewActionAdded));
     } catch (e) {

@@ -10,7 +10,7 @@ import { DEFAULT_RECITATION_ID, normalizeRecitationId } from "@/lib/quran-founda
 import { DirectionProvider } from "@/lib/ui/direction";
 import {
   DEFAULT_TAFSIR_SOURCE,
-  isTafsirSourceId,
+  isAvailableTafsirSourceId,
   type TafsirSourceId,
 } from "@/lib/tafsir/sources";
 
@@ -145,6 +145,20 @@ async function readSetting(db: SQLiteDatabase, key: string): Promise<string | nu
   return row?.value ?? null;
 }
 
+async function readSettings(db: SQLiteDatabase, keys: string[]): Promise<Record<string, string | null>> {
+  if (keys.length === 0) return {};
+  const placeholders = keys.map(() => "?").join(", ");
+  const rows = await db.getAllAsync<{ key: string; value: string }>(
+    `SELECT key, value FROM user_settings WHERE key IN (${placeholders})`,
+    keys
+  );
+  const values = Object.fromEntries(keys.map((key) => [key, null])) as Record<string, string | null>;
+  for (const row of rows) {
+    values[row.key] = row.value;
+  }
+  return values;
+}
+
 async function writeSetting(db: SQLiteDatabase, key: string, value: string): Promise<void> {
   await db.runAsync(
     "INSERT OR REPLACE INTO user_settings (key, value) VALUES (?, ?)",
@@ -181,7 +195,25 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     async function load() {
       try {
-        const savedFontSize = await readSetting(db, "font_size_index");
+        const saved = await readSettings(db, [
+          "font_size_index",
+          "theme",
+          "view_mode",
+          "page_scroll",
+          "show_translation",
+          "show_tafseer",
+          "tafseer_source",
+          "recitation_id",
+          "ui_language",
+          "daily_review_limit",
+          "focus_scroll_speed",
+          "hifz_auto_delay_ms",
+          "hifz_auto_advance_page",
+          "translation_language",
+          "translation_active_lang",
+        ]);
+
+        const savedFontSize = saved.font_size_index;
         if (savedFontSize !== null) {
           const idx = parseInt(savedFontSize, 10);
           if (idx >= 0 && idx < FONT_SIZE_STEPS.length) {
@@ -189,46 +221,46 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
-        const savedTheme = await readSetting(db, "theme");
+        const savedTheme = saved.theme;
         if (savedTheme === "light" || savedTheme === "dark" || savedTheme === "system") {
           setThemeState(savedTheme);
           // Defer to avoid NativeWind observable firing before components mount
           requestAnimationFrame(() => setColorScheme(savedTheme));
         }
 
-        const savedViewMode = await readSetting(db, "view_mode");
+        const savedViewMode = saved.view_mode;
         if (savedViewMode === "verse" || savedViewMode === "page") {
           setViewModeState(savedViewMode);
         }
 
-        const savedPageScroll = await readSetting(db, "page_scroll");
+        const savedPageScroll = saved.page_scroll;
         if (savedPageScroll === "vertical" || savedPageScroll === "horizontal") {
           setPageScrollState(savedPageScroll);
         }
 
-        const savedShowTranslation = await readSetting(db, "show_translation");
+        const savedShowTranslation = saved.show_translation;
         if (savedShowTranslation === "true") setShowTranslationState(true);
 
-        const savedShowTafseer = await readSetting(db, "show_tafseer");
+        const savedShowTafseer = saved.show_tafseer;
         if (savedShowTafseer === "true") setShowTafseerState(true);
 
-        const savedTafseerSource = await readSetting(db, "tafseer_source");
-        if (isTafsirSourceId(savedTafseerSource)) {
+        const savedTafseerSource = saved.tafseer_source;
+        if (isAvailableTafsirSourceId(savedTafseerSource)) {
           setTafseerSourceState(savedTafseerSource);
         }
 
-        const savedRecitationId = await readSetting(db, "recitation_id");
+        const savedRecitationId = saved.recitation_id;
         if (savedRecitationId !== null) {
           setRecitationIdState(normalizeRecitationId(savedRecitationId));
         }
 
-        const savedUiLang = await readSetting(db, "ui_language");
+        const savedUiLang = saved.ui_language;
         if (savedUiLang === "en" || savedUiLang === "ar") {
           setUiLanguageState(savedUiLang);
           cacheUiLanguage(savedUiLang);
         }
 
-        const savedLimit = await readSetting(db, "daily_review_limit");
+        const savedLimit = saved.daily_review_limit;
         if (savedLimit !== null) {
           const n = parseInt(savedLimit, 10);
           if (n >= MIN_DAILY_REVIEW_LIMIT && n <= MAX_DAILY_REVIEW_LIMIT) {
@@ -236,7 +268,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
-        const savedFocusSpeed = await readSetting(db, "focus_scroll_speed");
+        const savedFocusSpeed = saved.focus_scroll_speed;
         if (savedFocusSpeed !== null) {
           const n = Number(savedFocusSpeed);
           if (Number.isFinite(n)) {
@@ -246,7 +278,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
-        const savedHifzDelay = await readSetting(db, "hifz_auto_delay_ms");
+        const savedHifzDelay = saved.hifz_auto_delay_ms;
         if (savedHifzDelay !== null) {
           const n = parseInt(savedHifzDelay, 10);
           if (n >= MIN_HIFZ_AUTO_DELAY_MS && n <= MAX_HIFZ_AUTO_DELAY_MS) {
@@ -254,14 +286,14 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
-        const savedHifzAutoAdvance = await readSetting(db, "hifz_auto_advance_page");
+        const savedHifzAutoAdvance = saved.hifz_auto_advance_page;
         if (savedHifzAutoAdvance === "true") setHifzAutoAdvancePageState(true);
 
-        const savedLang = await readSetting(db, "translation_language");
+        const savedLang = saved.translation_language;
         if (savedLang && savedLang !== DEFAULT_LANGUAGE) {
           setTranslationLanguageState(savedLang);
           // Re-import if translation_active has wrong language or is empty
-          const activeLang = await readSetting(db, "translation_active_lang");
+          const activeLang = saved.translation_active_lang;
           if (activeLang !== savedLang) {
             setIsTranslationLoading(true);
             try {

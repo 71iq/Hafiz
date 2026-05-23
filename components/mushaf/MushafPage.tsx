@@ -71,6 +71,8 @@ type Props = {
   width: number;
   lineLayout?: PageLineLayout[];
   globalWordOffset?: number;
+  usePageWords?: boolean;
+  pageWordLineNumbers?: number[];
   onOpenAyahDetail?: (surah: number, ayah: number) => void;
   highlightedAyahKey?: string | null;
   highlightedWord?: { surah: number; ayah: number; wordPos: number } | null;
@@ -171,6 +173,8 @@ function MushafPageInner({
   width,
   lineLayout,
   globalWordOffset,
+  usePageWords: pageUsesPageWords,
+  pageWordLineNumbers: precomputedPageWordLineNumbers,
   onOpenAyahDetail,
   highlightedAyahKey,
   highlightedWord,
@@ -297,8 +301,20 @@ function MushafPageInner({
   let content;
   if (hasLineLayout) {
     const lineWords = (pageWordsData ?? [])[pageNumber - 1] ?? {};
-    const pageWordGlyphs = wordsLoaded ? flattenPageWords(lineWords) : [];
-    const usePageWords = glyphsMatchCanonical(pageWordGlyphs, pageGlyphs);
+    let usePageWords = false;
+    let orderedPageWordLineNumbers: number[] = [];
+    if (wordsLoaded) {
+      if (pageUsesPageWords && precomputedPageWordLineNumbers) {
+        usePageWords = true;
+        orderedPageWordLineNumbers = precomputedPageWordLineNumbers;
+      } else {
+        const pageWordGlyphs = flattenPageWords(lineWords);
+        usePageWords = glyphsMatchCanonical(pageWordGlyphs, pageGlyphs);
+        if (usePageWords) {
+          orderedPageWordLineNumbers = pageWordLineNumbers(lineWords);
+        }
+      }
+    }
     const lastAyahLineNumber = lineLayout!
       .filter((line) => line.line_type === "ayah")
       .at(-1)?.line_number ?? null;
@@ -507,7 +523,7 @@ function MushafPageInner({
       const rows = [];
       const orderedLineNumbers = Array.from(new Set([
         ...lineLayout!.map((line) => line.line_number),
-        ...pageWordLineNumbers(lineWords),
+        ...orderedPageWordLineNumbers,
       ])).sort((a, b) => a - b);
 
       for (const lineNumber of orderedLineNumbers) {

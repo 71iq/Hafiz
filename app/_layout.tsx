@@ -52,6 +52,12 @@ function StableDocumentTitle() {
 
 function WebTelemetry() {
   if (Platform.OS !== "web") return null;
+  if (
+    typeof window !== "undefined" &&
+    /^(localhost|127\.0\.0\.1|0\.0\.0\.0)$/.test(window.location.hostname)
+  ) {
+    return null;
+  }
 
   const { Analytics } = require("@vercel/analytics/react");
   const { SpeedInsights } = require("@vercel/speed-insights/react");

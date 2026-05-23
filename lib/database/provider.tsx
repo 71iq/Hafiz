@@ -7,7 +7,11 @@ import React, {
   useState,
 } from "react";
 import { Platform, Pressable, Text, View } from "react-native";
-import { openDatabaseAsync, type SQLiteDatabase } from "expo-sqlite";
+import {
+  importDatabaseFromAssetAsync,
+  openDatabaseAsync,
+  type SQLiteDatabase,
+} from "expo-sqlite";
 import { initializeDatabase, type ImportProgress } from "./init";
 import { backfillAchievements } from "@/lib/achievements/queries";
 
@@ -27,9 +31,11 @@ const DatabaseContext = createContext<DatabaseContextType>({
 
 const CHANNEL_NAME = "hafiz-db-lock";
 const LOCK_NAME = "hafiz-db-exclusive";
+const DATABASE_NAME = "hafiz.db";
 const OPEN_MAX_ATTEMPTS = 5;
 const OPEN_RETRY_DELAY_MS = 400;
 const POST_CLOSE_SETTLE_MS = 200;
+const quranDbAsset = require("../../assets/data/quran.db");
 
 type ClaimMessage = { type: "claim"; tabId: string };
 
@@ -126,7 +132,10 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
       for (let attempt = 0; attempt < OPEN_MAX_ATTEMPTS; attempt++) {
         if (cancelled || ejectedFlag.current) throw new Error("aborted");
         try {
-          return await openDatabaseAsync("hafiz.db");
+          await importDatabaseFromAssetAsync(DATABASE_NAME, {
+            assetId: quranDbAsset,
+          });
+          return await openDatabaseAsync(DATABASE_NAME);
         } catch (err) {
           lastErr = err;
           if (!isOpfsLockError(err) || attempt === OPEN_MAX_ATTEMPTS - 1) {

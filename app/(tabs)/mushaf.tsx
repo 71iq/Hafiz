@@ -387,6 +387,8 @@ function MushafInner() {
   const [hifzAutoRunning, setHifzAutoRunning] = useState(false);
   const [mushafIndex, setMushafIndex] = useState<MushafIndex | null>(null);
   const [topAyah, setTopAyah] = useState<{ surah: number; ayah: number } | null>(null);
+  const [pageModeHifzAyahs, setPageModeHifzAyahs] = useState<HifzPageAyah[]>([]);
+  const isPageMode = viewMode === "page";
   const currentPageRef = useRef(1);
   const hifzCurrentPageAyahsRef = useRef<HifzPageAyah[]>([]);
   const hifzEnabledRef = useRef(false);
@@ -436,8 +438,19 @@ function MushafInner() {
   }, [db]);
 
   useEffect(() => {
+    if (viewMode === "page") {
+      setLoading(false);
+      return;
+    }
+    if (items.length > 0) {
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
     async function loadQuran() {
       try {
+        setLoading(true);
         const surahs = await db.getAllAsync<SurahRow>(
           "SELECT number, name_arabic, name_english, ayah_count, revelation_type FROM surahs ORDER BY number"
         );
@@ -480,19 +493,24 @@ function MushafInner() {
           });
         }
 
-        setItems(flatItems);
-        setSurahHeaderIndices(headerIndices);
+        if (!cancelled) {
+          setItems(flatItems);
+          setSurahHeaderIndices(headerIndices);
+        }
       } catch (err) {
         console.error("[Mushaf] Failed to load Quran data:", err);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
 
     loadQuran();
-  }, [db]);
+    return () => {
+      cancelled = true;
+    };
+  }, [db, items.length, viewMode]);
 
-  const currentPageHifzAyahs = useMemo<HifzPageAyah[]>(
+  const verseModeHifzAyahs = useMemo<HifzPageAyah[]>(
     () =>
       items
         .filter((item): item is Extract<MushafItem, { type: "ayah" }> =>
@@ -504,6 +522,37 @@ function MushafInner() {
         })),
     [currentPage, items]
   );
+  const currentPageHifzAyahs = isPageMode ? pageModeHifzAyahs : verseModeHifzAyahs;
+
+  useEffect(() => {
+    if (!isPageMode) {
+      setPageModeHifzAyahs([]);
+      return;
+    }
+    let cancelled = false;
+    db.getAllAsync<{ surah: number; ayah: number; text_qcf2: string }>(
+      "SELECT surah, ayah, text_qcf2 FROM quran_text WHERE v2_page = ? ORDER BY surah, ayah",
+      [currentPage]
+    )
+      .then((rows) => {
+        if (cancelled) return;
+        setPageModeHifzAyahs(
+          rows.map((row) => ({
+            key: `${row.surah}:${row.ayah}`,
+            wordCount: Math.max(0, row.text_qcf2.split(" ").filter(Boolean).length - 1),
+          }))
+        );
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          console.warn("[Mushaf] failed to load page hifz ayahs:", e);
+          setPageModeHifzAyahs([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentPage, db, isPageMode]);
 
   const applyHifzProgress = useCallback(
     (next: {
@@ -660,11 +709,19 @@ function MushafInner() {
       const ayahItem = items.find(
         (item) => item.type === "ayah" && item.surah === target.surah && item.ayah === target.ayah
       );
-      if (ayahItem && ayahItem.type === "ayah" && goToPageRef.current) {
-        goToPageRef.current(ayahItem.v2Page);
+      let page = ayahItem?.type === "ayah" ? ayahItem.v2Page : null;
+      if (!page) {
+        const row = await db.getFirstAsync<{ v2_page: number }>(
+          "SELECT v2_page FROM quran_text WHERE surah = ? AND ayah = ?",
+          [target.surah, target.ayah]
+        );
+        page = row?.v2_page ?? null;
+      }
+      if (page && goToPageRef.current) {
+        goToPageRef.current(page);
       }
     },
-    [items, viewMode]
+    [db, items, viewMode]
   );
 
   const navigateToTarget = useCallback(
@@ -685,12 +742,12 @@ function MushafInner() {
   // Consume pending deep link on tab focus (supports both hafiz:// links and search navigation)
   useFocusEffect(
     useCallback(() => {
-      if (loading || items.length === 0) return;
+      if (loading || (!isPageMode && items.length === 0)) return;
       const target = consumePendingDeepLink();
       if (!target) return;
 
       setTimeout(() => navigateToTarget(target), 100);
-    }, [loading, items, navigateToTarget])
+    }, [isPageMode, loading, items.length, navigateToTarget])
   );
 
   const renderItem = useCallback(
@@ -795,7 +852,6 @@ function MushafInner() {
     router.navigate("/(tabs)/home");
   }, [pauseFocusAutoScroll]);
 
-  const isPageMode = viewMode === "page";
   const viewModeLabel = isPageMode ? s.mushafViewPage : s.mushafViewVerse;
   const toggleViewMode = useCallback(() => {
     setViewMode(isPageMode ? "verse" : "page");
@@ -1067,7 +1123,7 @@ function MushafInner() {
   const restoredOnceRef = useRef(false);
   useEffect(() => {
     if (restoredOnceRef.current) return;
-    if (loading || items.length === 0 || !mushafIndex) return;
+    if (loading || !mushafIndex || (!isPageMode && items.length === 0)) return;
     restoredOnceRef.current = true;
     (async () => {
       try {
