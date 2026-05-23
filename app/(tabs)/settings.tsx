@@ -730,6 +730,7 @@ export default function SettingsScreen() {
                 s.creditKashshaf,
                 s.creditAlusi,
                 s.creditNazamDurar,
+                s.creditRazi,
                 s.creditNourQuran,
                 s.creditSurahInfo,
                 s.creditTajweedRules,
