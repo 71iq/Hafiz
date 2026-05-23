@@ -1,4 +1,10 @@
-export type TafsirSourceId = "muyassar" | "zilal" | "tahrir-tanwir" | "qurtubi" | "kashshaf";
+export type TafsirSourceId =
+  | "muyassar"
+  | "zilal"
+  | "tahrir-tanwir"
+  | "qurtubi"
+  | "kashshaf"
+  | "alusi";
 
 type TafsirImportKind = "muyassar" | "zilal" | "surahRows";
 
@@ -49,6 +55,13 @@ export const TAFSIR_SOURCES: TafsirSourceConfig[] = [
     descriptionKey: "tafseerKashshafDesc",
     importKind: "surahRows",
     progressDetail: "Al-Kashshaf Al-Zamakhshari",
+  },
+  {
+    id: "alusi",
+    labelKey: "tafseerAlusi",
+    descriptionKey: "tafseerAlusiDesc",
+    importKind: "surahRows",
+    progressDetail: "Tafsir Al-Alusi",
   },
 ];
 
