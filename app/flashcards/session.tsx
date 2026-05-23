@@ -643,34 +643,36 @@ function FlashcardSessionScreen() {
 
       {/* Mode tags row */}
       {phase === "side" && activeModes.length > 0 && (
-        <View className="flex-row flex-wrap gap-2 px-6 pb-3">
-          {activeModes.map((mode, i) => {
-            const color = getModeColor(mode);
-            const isActive = i === currentSideIndex;
-            const isDone = i < currentSideIndex;
-            return (
-              <View
-                key={mode}
-                className="px-3 py-1.5 rounded-full"
-                style={{
-                  backgroundColor: isActive ? color : "transparent",
-                  borderWidth: 1.5,
-                  borderColor: color,
-                  opacity: isDone ? 0.4 : 1,
-                }}
-              >
-                <Text
+        <View className="items-center px-6 pb-3">
+          <View className="flex-row flex-wrap gap-2" style={{ width: "100%", maxWidth }}>
+            {activeModes.map((mode, i) => {
+              const color = getModeColor(mode);
+              const isActive = i === currentSideIndex;
+              const isDone = i < currentSideIndex;
+              return (
+                <View
+                  key={mode}
+                  className="px-3 py-1.5 rounded-full"
                   style={{
-                    fontFamily: isActive ? "Manrope_600SemiBold" : "Manrope_500Medium",
-                    fontSize: 11,
-                    color: isActive ? "#fff" : color,
+                    backgroundColor: isActive ? color : "transparent",
+                    borderWidth: 1.5,
+                    borderColor: color,
+                    opacity: isDone ? 0.4 : 1,
                   }}
                 >
-                  {getModeName(mode, s)}
-                </Text>
-              </View>
-            );
-          })}
+                  <Text
+                    style={{
+                      fontFamily: isActive ? "Manrope_600SemiBold" : "Manrope_500Medium",
+                      fontSize: 11,
+                      color: isActive ? "#fff" : color,
+                    }}
+                  >
+                    {getModeName(mode, s)}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
         </View>
       )}
 
