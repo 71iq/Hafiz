@@ -852,34 +852,10 @@ function TestModePrompt({
 }: {
   mode: ReviewMode; card: CardData; fontSize: number; lineHeight: number; s: any;
 }) {
-  const label = getModeName(mode, s);
-  const color = getModeColor(mode);
   const wordMode = isWordTestMode(mode);
-  const targetWordQcf2 =
-    wordMode && card.wordPos && card.textQcf2
-      ? card.textQcf2.split(" ").filter(Boolean)[card.wordPos - 1]
-      : null;
 
   return (
     <View>
-      <View className="flex-row items-center gap-2 mb-3">
-        <View className="px-2.5 py-1 rounded-full" style={{ backgroundColor: color }}>
-          <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, color: "#fff" }}>
-            {label}
-          </Text>
-        </View>
-      </View>
-      {wordMode && targetWordQcf2 && card.v2Page && (
-        <View className="items-center mb-4">
-          <Qcf2AyahText
-            textQcf2={targetWordQcf2}
-            v2Page={card.v2Page}
-            fontSize={fontSize * 1.18}
-            lineHeight={lineHeight * 1.18}
-            colorClassName="text-primary-accent dark:text-primary-bright"
-          />
-        </View>
-      )}
       {mode === "smartRefs" ? (
         <SmartCueText card={card} fontSize={fontSize} lineHeight={lineHeight} s={s} />
       ) : card.textQcf2 && card.v2Page ? (
