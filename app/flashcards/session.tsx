@@ -629,6 +629,7 @@ function FlashcardSessionScreen() {
   const progressPercent = sessionTotal > 0 ? (currentProgress / sessionTotal) * 100 : 0;
   const translateY = flipAnim.interpolate({ inputRange: [0, 1], outputRange: [30, 0] });
   const opacity = flipAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
+  const showModeTags = (phase === "front" || phase === "side") && activeModes.length > 0;
 
   return (
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
@@ -659,39 +660,14 @@ function FlashcardSessionScreen() {
         </View>
       </View>
 
-      {/* Mode tags row */}
-      {phase === "side" && activeModes.length > 0 && (
-        <View className="items-center px-6 pb-3">
-          <View className="flex-row flex-wrap gap-2" style={{ width: "100%", maxWidth }}>
-            {activeModes.map((mode, i) => {
-              const color = getModeColor(mode);
-              const isActive = i === currentSideIndex;
-              const isDone = i < currentSideIndex;
-              return (
-                <View
-                  key={mode}
-                  className="px-3 py-1.5 rounded-full"
-                  style={{
-                    backgroundColor: isActive ? color : "transparent",
-                    borderWidth: 1.5,
-                    borderColor: color,
-                    opacity: isDone ? 0.4 : 1,
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontFamily: isActive ? "Manrope_600SemiBold" : "Manrope_500Medium",
-                      fontSize: 11,
-                      color: isActive ? "#fff" : color,
-                    }}
-                  >
-                    {getModeName(mode, s)}
-                  </Text>
-                </View>
-              );
-            })}
-          </View>
-        </View>
+      {showModeTags && (
+        <ModeTagsRow
+          activeModes={activeModes}
+          currentSideIndex={currentSideIndex}
+          maxWidth={maxWidth}
+          isRTL={isRTL}
+          s={s}
+        />
       )}
 
       <ScrollView
@@ -818,6 +794,58 @@ function FlashcardSessionScreen() {
 }
 
 // ─── Test Mode Components ────────────────────────────────────
+
+function ModeTagsRow({
+  activeModes,
+  currentSideIndex,
+  maxWidth,
+  isRTL,
+  s,
+}: {
+  activeModes: ReviewMode[];
+  currentSideIndex: number;
+  maxWidth: number;
+  isRTL: boolean;
+  s: any;
+}) {
+  return (
+    <View className="items-center px-6 pb-3">
+      <View
+        className="flex-row flex-wrap gap-2"
+        style={{ width: "100%", maxWidth, flexDirection: isRTL ? "row-reverse" : "row" }}
+      >
+        {activeModes.map((mode, i) => {
+          const color = getModeColor(mode);
+          const isActive = i === currentSideIndex;
+          const isDone = i < currentSideIndex;
+          return (
+            <View
+              key={mode}
+              className="px-3 py-1.5 rounded-full"
+              style={{
+                backgroundColor: isActive ? color : "transparent",
+                borderWidth: 1.5,
+                borderColor: color,
+                opacity: isDone ? 0.4 : 1,
+              }}
+            >
+              <Text
+                style={{
+                  fontFamily: isActive ? "Manrope_600SemiBold" : "Manrope_500Medium",
+                  fontSize: 11,
+                  color: isActive ? "#fff" : color,
+                  writingDirection: isRTL ? "rtl" : "ltr",
+                }}
+              >
+                {getModeName(mode, s)}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
 
 function TestModePrompt({
   mode, card, fontSize, lineHeight, s,
@@ -1208,40 +1236,45 @@ function GradingButtons({
   return (
     <View className="gap-3">
       <View className="flex-row gap-3">
-        {GRADE_BUTTONS.map(({ rating, bgLight, bgDark }) => (
-          <Pressable
-            key={rating}
-            onPress={() => onGrade(rating)}
-            disabled={disabled}
-            className="flex-1 rounded-2xl items-center"
-            style={({ pressed }) => ({
-              backgroundColor: isDark ? bgDark : bgLight,
-              minHeight: 58,
-              opacity: disabled ? 0.55 : pressed ? 0.88 : 1,
-              paddingHorizontal: 6,
-              paddingVertical: 10,
-            })}
-          >
-            <Text
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.82}
-              style={{ fontFamily: "Manrope_700Bold", fontSize: 14, color: "#fff" }}
+        {GRADE_BUTTONS.map(({ rating, bgLight, bgDark }) => {
+          const backgroundColor = isDark ? bgDark : bgLight;
+          return (
+            <Pressable
+              key={rating}
+              onPress={() => onGrade(rating)}
+              disabled={disabled}
+              className="flex-1 rounded-2xl overflow-hidden"
+              style={({ pressed }) => ({
+                opacity: disabled ? 0.55 : pressed ? 0.88 : 1,
+                transform: [{ scale: pressed ? 0.98 : 1 }],
+              })}
             >
-              {labels[rating]}
-            </Text>
-            {previews[rating] ? (
-              <Text
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.75}
-                style={{ color: "rgba(255,255,255,0.82)", fontFamily: "Manrope_600SemiBold", fontSize: 10, marginTop: 3 }}
+              <View
+                className="items-center justify-center px-1.5 py-2.5"
+                style={{ backgroundColor, minHeight: 58 }}
               >
-                {previews[rating]}
-              </Text>
-            ) : null}
-          </Pressable>
-        ))}
+                <Text
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.82}
+                  style={{ fontFamily: "Manrope_700Bold", fontSize: 14, color: "#fff" }}
+                >
+                  {labels[rating]}
+                </Text>
+                {previews[rating] ? (
+                  <Text
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.75}
+                    style={{ color: "rgba(255,255,255,0.82)", fontFamily: "Manrope_600SemiBold", fontSize: 10, marginTop: 3 }}
+                  >
+                    {previews[rating]}
+                  </Text>
+                ) : null}
+              </View>
+            </Pressable>
+          );
+        })}
       </View>
     </View>
   );
