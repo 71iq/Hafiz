@@ -3,6 +3,7 @@ import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { useAuthStore } from "@/lib/auth/store";
 import { getTodayScore, getTotalScore } from "./scoring";
 import { getWirdStatus } from "./queries";
+import { getLocalSurahProgress } from "@/lib/profile/progress";
 
 type ProfileStatsPatch = {
   total_score: number;
@@ -93,4 +94,40 @@ export async function updateProfileStats(db: SQLiteDatabase): Promise<void> {
 
   if (error) console.warn("[Leaderboard] Failed to update profile stats:", error.message);
   else if (data) useAuthStore.setState({ profile: data });
+
+  try {
+    const surahProgress = await getLocalSurahProgress(db);
+    if (surahProgress.length > 0) {
+      const now = new Date().toISOString();
+      const { error: progressError } = await supabase
+        .from("public_surah_progress")
+        .upsert(
+          surahProgress.map((row) => ({
+            user_id: user.id,
+            surah: row.surah,
+            total_cards: row.totalCards,
+            memorized_cards: row.memorized,
+            updated_at: now,
+          })),
+          { onConflict: "user_id,surah" }
+        );
+      if (progressError) throw progressError;
+
+      const activeSurahs = `(${surahProgress.map((row) => row.surah).join(",")})`;
+      const { error: staleDeleteError } = await supabase
+        .from("public_surah_progress")
+        .delete()
+        .eq("user_id", user.id)
+        .not("surah", "in", activeSurahs);
+      if (staleDeleteError) throw staleDeleteError;
+    } else {
+      const { error: deleteError } = await supabase
+        .from("public_surah_progress")
+        .delete()
+        .eq("user_id", user.id);
+      if (deleteError) throw deleteError;
+    }
+  } catch (progressError: any) {
+    console.warn("[Leaderboard] Failed to update public surah progress:", progressError.message);
+  }
 }

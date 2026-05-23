@@ -136,11 +136,11 @@ export default function RootLayout() {
             />
             <Stack.Screen
               name="profile/index"
-              options={{ animation: "slide_from_right" }}
+              options={{ animation: "fade", presentation: "transparentModal" }}
             />
             <Stack.Screen
               name="profile/[userId]"
-              options={{ animation: "slide_from_right" }}
+              options={{ animation: "fade", presentation: "transparentModal" }}
             />
           </Stack>
           <PortalHost />

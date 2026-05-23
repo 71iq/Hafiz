@@ -335,11 +335,22 @@ CREATE TABLE IF NOT EXISTS achievement_unlocks (
   PRIMARY KEY (user_id, achievement_id)
 );
 
+CREATE TABLE IF NOT EXISTS public_surah_progress (
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  surah INTEGER NOT NULL CHECK (surah BETWEEN 1 AND 114),
+  total_cards INTEGER NOT NULL DEFAULT 0 CHECK (total_cards >= 0),
+  memorized_cards INTEGER NOT NULL DEFAULT 0 CHECK (memorized_cards >= 0),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, surah),
+  CHECK (memorized_cards <= total_cards)
+);
+
 ALTER TABLE private_notes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE qf_user_connections ENABLE ROW LEVEL SECURITY;
 ALTER TABLE qf_oauth_states ENABLE ROW LEVEL SECURITY;
 ALTER TABLE reflection_journey_entries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE achievement_unlocks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public_surah_progress ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Users can read own private notes"
   ON private_notes FOR SELECT
@@ -391,6 +402,26 @@ CREATE POLICY "Users can update own achievement unlocks"
 CREATE POLICY "Users can delete own achievement unlocks"
   ON achievement_unlocks FOR DELETE
   USING (auth.uid() = user_id);
+
+CREATE POLICY "Public surah progress is publicly readable"
+  ON public_surah_progress FOR SELECT
+  USING (true);
+
+CREATE POLICY "Users can insert own public surah progress"
+  ON public_surah_progress FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own public surah progress"
+  ON public_surah_progress FOR UPDATE
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own public surah progress"
+  ON public_surah_progress FOR DELETE
+  USING (auth.uid() = user_id);
+
+GRANT SELECT ON public_surah_progress TO anon, authenticated;
+GRANT INSERT, UPDATE, DELETE ON public_surah_progress TO authenticated;
 
 -- ─── Storage: profile avatars ────────────────────────────────
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
@@ -503,3 +534,4 @@ CREATE INDEX IF NOT EXISTS idx_qf_oauth_states_user ON qf_oauth_states(user_id, 
 CREATE INDEX IF NOT EXISTS idx_reflection_journey_entries_user_updated ON reflection_journey_entries(user_id, updated_at);
 CREATE INDEX IF NOT EXISTS idx_achievement_unlocks_user_unlocked ON achievement_unlocks(user_id, unlocked_at);
 CREATE INDEX IF NOT EXISTS idx_achievement_unlocks_public_unlocked ON achievement_unlocks(unlocked_at);
+CREATE INDEX IF NOT EXISTS idx_public_surah_progress_user_updated ON public_surah_progress(user_id, updated_at DESC);

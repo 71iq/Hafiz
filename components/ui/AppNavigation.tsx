@@ -2,7 +2,6 @@ import {
   View,
   Pressable,
   Text,
-  Image,
   Platform,
   StyleSheet,
   useWindowDimensions,
@@ -22,7 +21,7 @@ import { useColorScheme } from "nativewind";
 import { useChrome } from "@/lib/ui/chrome";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { useAuthStore } from "@/lib/auth/store";
-import { PublicProfileOverlay } from "@/components/profile/PublicProfileOverlay";
+import { ProfileIdentity } from "@/components/profile/ProfileIdentity";
 import {
   PERSISTENT_SIDEBAR_BREAKPOINT,
   PERSISTENT_SIDEBAR_WIDTH,
@@ -305,40 +304,26 @@ function SidebarProfileCard({
   isDark,
   isRTL,
   isPersistent,
-  opensOverlay,
 }: {
   isDark: boolean;
   isRTL?: boolean;
   isPersistent?: boolean;
-  opensOverlay?: boolean;
 }) {
   const s = useStrings();
   const { user, profile } = useAuthStore();
-  const [profileUserId, setProfileUserId] = useState<string | null>(null);
   const displayName = profile?.display_name || profile?.username || user?.email?.split("@")[0] || s.authProfile;
-  const avatarUrl = profile?.avatar_url;
-  const initial = Array.from(displayName.trim())[0]?.toUpperCase() || "H";
   const nameColor = isPersistent ? "#FDDC91" : isDark ? "#F5F5F4" : "#2D2D2D";
-  const avatarBg = isPersistent
-    ? "rgba(253, 220, 145, 0.14)"
-    : isDark
-      ? "rgba(45, 212, 191, 0.14)"
-      : "rgba(13, 148, 136, 0.12)";
+  const handleColor = isPersistent ? "rgba(253, 220, 145, 0.68)" : isDark ? "#A3A3A3" : "#8A7764";
   const cardBg = isPersistent
     ? "rgba(253, 220, 145, 0.08)"
     : isDark
       ? "rgba(255, 255, 255, 0.05)"
       : "rgba(255, 255, 255, 0.62)";
   const openProfile = () => {
-    if (opensOverlay && user?.id) {
-      setProfileUserId(user.id);
-      return;
-    }
     router.push("/profile" as any);
   };
 
   return (
-    <>
     <Pressable
       onPress={openProfile}
       accessibilityRole="button"
@@ -349,37 +334,19 @@ function SidebarProfileCard({
         opacity: pressed ? 0.76 : 1,
       })}
     >
-      {avatarUrl ? (
-        <Image source={{ uri: avatarUrl }} style={styles.sidebarAvatar} />
-      ) : (
-        <View style={[styles.sidebarAvatarFallback, { backgroundColor: avatarBg }]}>
-          <Text
-            style={{
-              color: nameColor,
-              fontFamily: "Manrope_700Bold",
-              fontSize: 13,
-            }}
-          >
-            {initial}
-          </Text>
-        </View>
-      )}
-      <Text
-        numberOfLines={1}
-        style={[
-          styles.sidebarProfileName,
-          {
-            color: nameColor,
-            textAlign: isRTL ? "right" : "left",
-            writingDirection: isRTL ? "rtl" : "ltr",
-          },
-        ]}
-      >
-        {displayName}
-      </Text>
+      <ProfileIdentity
+        displayName={displayName}
+        username={profile?.username}
+        avatarUrl={profile?.avatar_url}
+        isDark={isDark}
+        isRTL={isRTL}
+        avatarSize={34}
+        nameSize={13}
+        handleSize={10}
+        nameColor={nameColor}
+        handleColor={handleColor}
+      />
     </Pressable>
-    <PublicProfileOverlay userId={profileUserId} onClose={() => setProfileUserId(null)} />
-    </>
   );
 }
 
@@ -517,7 +484,6 @@ function SidebarContent({
   const s = useStrings();
   const activeRoute = state.routes[state.index];
   const isSettingsRoute = activeRoute?.name === SIDEBAR_SETTINGS_ROUTE;
-  const profileOpensOverlay = activeRoute?.name === "leaderboard";
   const primaryItems = getSidebarRouteItems(state, descriptors, SIDEBAR_PRIMARY_ROUTES);
   const [settingsItem] = getSidebarRouteItems(state, descriptors, [SIDEBAR_SETTINGS_ROUTE]);
 
@@ -589,7 +555,6 @@ function SidebarContent({
         isDark={isDark}
         isRTL={isRTL}
         isPersistent={isPersistent}
-        opensOverlay={profileOpensOverlay}
       />
     </>
   );
@@ -824,22 +789,5 @@ const styles = StyleSheet.create({
   sidebarLabel: {
     fontFamily: "Manrope_500Medium",
     fontSize: 14,
-  },
-  sidebarAvatar: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-  },
-  sidebarAvatarFallback: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  sidebarProfileName: {
-    flex: 1,
-    fontFamily: "Manrope_600SemiBold",
-    fontSize: 13,
   },
 });

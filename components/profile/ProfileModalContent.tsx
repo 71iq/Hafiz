@@ -1,0 +1,659 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, Pressable, Text, View, useWindowDimensions } from "react-native";
+import { useRouter } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
+import * as ImagePicker from "expo-image-picker";
+import { Camera, LogOut, Pencil, Save, Trash2, UserRound, type LucideIcon } from "lucide-react-native";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { PublicBadgesGrid } from "@/components/achievements/PublicBadgesGrid";
+import { ActivityHeatmap } from "@/components/progress/ActivityHeatmap";
+import { SurahProgressList } from "@/components/progress/SurahProgressList";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Input } from "@/components/ui/Input";
+import { OverlayBody, OverlayHeader, ResponsiveModal, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
+import { getRecentUnlocks } from "@/lib/achievements/queries";
+import { useAuthStore } from "@/lib/auth/store";
+import { useDatabase } from "@/lib/database/provider";
+import { getWirdStatus, getReviewStats } from "@/lib/fsrs/queries";
+import { updateProfileStats } from "@/lib/fsrs/leaderboard-sync";
+import { getTotalScore } from "@/lib/fsrs/scoring";
+import { subscribeReviewActivity } from "@/lib/fsrs/review-events";
+import { useStrings } from "@/lib/i18n/useStrings";
+import {
+  fetchPublicAchievementUnlocks,
+  fetchPublicProfile,
+  fetchPublicReviewActivity,
+  fetchPublicSurahProgress,
+  type PublicProfile,
+} from "@/lib/leaderboard/api";
+import { uploadProfileAvatar } from "@/lib/profile/avatar";
+import { attachSurahNames, getLocalSurahProgress, type ProfileSurahProgress } from "@/lib/profile/progress";
+import { useSettings } from "@/lib/settings/context";
+import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
+import { ProfileAvatar } from "./ProfileAvatar";
+import { ProfileIdentity } from "./ProfileIdentity";
+import { ProfileNotesManager } from "./ProfileNotesManager";
+import { ProfileStatCard } from "./ProfileStatCard";
+
+type ProfileModalContentProps = {
+  userId?: string;
+};
+
+type ProfileStatsSnapshot = {
+  currentStreak: number;
+  longestStreak: number;
+  cardsReviewed: number;
+  totalScore: number;
+};
+
+type ReviewSnapshot = {
+  activity: { date: string; count: number }[];
+  activeDays: number;
+  totalReviews: number;
+};
+
+type ProfileTab = "overview" | "notes";
+
+export function ProfileModalContent({ userId }: ProfileModalContentProps) {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const db = useDatabase();
+  const s = useStrings();
+  const { isDark, isRTL, uiLanguage } = useSettings();
+  const { width, height } = useWindowDimensions();
+  const { user, profile, isLoading: authLoading, signOut, updateProfile } = useAuthStore();
+  const [activeTab, setActiveTab] = useState<ProfileTab>("overview");
+  const [localStats, setLocalStats] = useState<ProfileStatsSnapshot | null>(null);
+  const [localReview, setLocalReview] = useState<ReviewSnapshot>({ activity: [], activeDays: 0, totalReviews: 0 });
+  const [localSurahProgress, setLocalSurahProgress] = useState<ProfileSurahProgress[]>([]);
+  const [editOpen, setEditOpen] = useState(false);
+  const [logoutDialogVisible, setLogoutDialogVisible] = useState(false);
+  const [displayNameDraft, setDisplayNameDraft] = useState("");
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [profileStatus, setProfileStatus] = useState<"saved" | "saveFailed" | "photoFailed" | "permissionDenied" | null>(null);
+
+  const requestedUserId = userId || user?.id || "";
+  const isOwnProfile = !!user && (!userId || userId === user.id);
+  const isSignedOutOwnProfile = !user && !userId;
+  const numberLocale = uiLanguage === "ar" ? "ar" : "en";
+  const isPhone = width < SIDEBAR_BREAKPOINT;
+  const maxOverlayHeight = Math.min(height - (isPhone ? 12 : 48), isPhone ? height * 0.94 : 760);
+
+  const publicProfileQuery = useQuery({
+    queryKey: ["publicProfile", requestedUserId],
+    queryFn: () => fetchPublicProfile(requestedUserId),
+    enabled: !!requestedUserId && !isOwnProfile && !isSignedOutOwnProfile,
+    staleTime: 1000 * 60 * 2,
+  });
+
+  const publicBadgesQuery = useQuery({
+    queryKey: ["publicAchievementUnlocks", requestedUserId],
+    queryFn: () => fetchPublicAchievementUnlocks(requestedUserId),
+    enabled: !!requestedUserId && !isOwnProfile,
+    staleTime: 1000 * 60 * 2,
+  });
+
+  const ownBadgesQuery = useQuery({
+    queryKey: ["currentUserPublicAchievementUnlocks", user?.id],
+    queryFn: () => getRecentUnlocks(db, 100),
+    enabled: isOwnProfile,
+    staleTime: 1000 * 60,
+  });
+
+  const publicActivityQuery = useQuery({
+    queryKey: ["publicReviewActivity", requestedUserId],
+    queryFn: () => fetchPublicReviewActivity(requestedUserId),
+    enabled: !!requestedUserId && !isOwnProfile,
+    staleTime: 1000 * 60 * 2,
+  });
+
+  const publicSurahProgressQuery = useQuery({
+    queryKey: ["publicSurahProgress", requestedUserId],
+    queryFn: async () => attachSurahNames(db, await fetchPublicSurahProgress(requestedUserId)),
+    enabled: !!requestedUserId && !isOwnProfile,
+    staleTime: 1000 * 60 * 2,
+  });
+
+  const close = useCallback(() => {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.replace("/(tabs)/home" as any);
+  }, [router]);
+
+  const publicProfile = publicProfileQuery.data ?? null;
+  const visibleProfile: PublicProfile | null = isOwnProfile
+    ? profile
+      ? {
+          id: profile.id,
+          username: profile.username,
+          display_name: profile.display_name,
+          avatar_url: profile.avatar_url,
+          total_score: profile.total_score,
+          current_streak: profile.current_streak,
+          longest_streak: profile.longest_streak,
+          cards_reviewed: profile.cards_reviewed,
+          last_review_date: profile.last_review_date,
+        }
+      : null
+    : publicProfile;
+  const displayName =
+    visibleProfile?.display_name ||
+    visibleProfile?.username ||
+    (isSignedOutOwnProfile ? s.authProfile : s.genericAnonymous);
+  const username = visibleProfile?.username ?? null;
+  const avatarUrl = visibleProfile?.avatar_url ?? null;
+  const currentDisplayName = profile?.display_name ?? "";
+  const displayNameValue = displayNameDraft.trim();
+  const displayNameDirty = displayNameValue !== currentDisplayName;
+  const stats = [
+    { label: s.wirdCurrent, value: isOwnProfile ? localStats?.currentStreak ?? profile?.current_streak ?? 0 : visibleProfile?.current_streak ?? 0 },
+    { label: s.wirdLongest, value: isOwnProfile ? localStats?.longestStreak ?? profile?.longest_streak ?? 0 : visibleProfile?.longest_streak ?? 0 },
+    { label: s.flashcardsSummaryReviewed, value: isOwnProfile ? localStats?.cardsReviewed ?? profile?.cards_reviewed ?? 0 : visibleProfile?.cards_reviewed ?? 0 },
+    { label: s.leaderboardPoints, value: isOwnProfile ? localStats?.totalScore ?? profile?.total_score ?? 0 : visibleProfile?.total_score ?? 0 },
+  ];
+  const review = isOwnProfile
+    ? localReview
+    : publicActivityQuery.data ?? { activity: [], activeDays: 0, totalReviews: 0 };
+  const surahProgress = isOwnProfile ? localSurahProgress : publicSurahProgressQuery.data ?? [];
+  const publicBadges = isOwnProfile ? ownBadgesQuery.data ?? [] : publicBadgesQuery.data ?? [];
+  const loadingPublic = !isOwnProfile && !isSignedOutOwnProfile && publicProfileQuery.isLoading;
+  const statusMessage =
+    profileStatus === "saved"
+      ? s.profileSaved
+      : profileStatus === "permissionDenied"
+        ? s.profilePhotoPermissionDenied
+        : profileStatus === "photoFailed"
+          ? s.profilePhotoFailed
+          : profileStatus === "saveFailed"
+            ? s.profileSaveFailed
+            : "";
+
+  useEffect(() => {
+    setDisplayNameDraft(profile?.display_name ?? "");
+  }, [profile?.display_name, user?.id]);
+
+  const loadLocalOverview = useCallback(async () => {
+    if (!user) return;
+    const [wirdStatus, totalScore, cardsReviewedRow, reviewStats, surahs] = await Promise.all([
+      getWirdStatus(db),
+      getTotalScore(db),
+      db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM study_log"),
+      getReviewStats(db),
+      getLocalSurahProgress(db),
+    ]);
+    setLocalStats({
+      currentStreak: wirdStatus.currentDays,
+      longestStreak: wirdStatus.longestDays,
+      cardsReviewed: cardsReviewedRow?.count ?? 0,
+      totalScore,
+    });
+    setLocalReview({
+      activity: reviewStats.activity,
+      activeDays: reviewStats.activeDays,
+      totalReviews: reviewStats.totalReviews,
+    });
+    setLocalSurahProgress(surahs);
+  }, [db, user]);
+
+  const invalidateProfileSurfaces = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ["publicProfile"] });
+    queryClient.invalidateQueries({ queryKey: ["reflectionFeed"] });
+    queryClient.invalidateQueries({ queryKey: ["reflections"] });
+    queryClient.invalidateQueries({ queryKey: ["reflectionComments"] });
+    queryClient.invalidateQueries({ queryKey: ["leaderboard"] });
+  }, [queryClient]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!isOwnProfile) return;
+      loadLocalOverview().catch(console.warn);
+      updateProfileStats(db).catch(console.warn);
+    }, [db, isOwnProfile, loadLocalOverview])
+  );
+
+  useEffect(() => {
+    if (!isOwnProfile) return;
+    return subscribeReviewActivity(() => {
+      loadLocalOverview().catch(console.warn);
+      updateProfileStats(db).catch(console.warn);
+      queryClient.invalidateQueries({ queryKey: ["publicReviewActivity", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["publicSurahProgress", user?.id] });
+    });
+  }, [db, isOwnProfile, loadLocalOverview, queryClient, user?.id]);
+
+  const handleLogout = useCallback(async () => {
+    setLogoutDialogVisible(false);
+    await signOut();
+    close();
+  }, [close, signOut]);
+
+  const handleSaveProfile = useCallback(async () => {
+    if (!user || !displayNameDirty) return;
+    setProfileSaving(true);
+    setProfileStatus(null);
+    try {
+      const updated = await updateProfile({ displayName: displayNameValue.length > 0 ? displayNameValue : null });
+      queryClient.setQueryData(["publicProfile", user.id], updated);
+      invalidateProfileSurfaces();
+      setProfileStatus("saved");
+    } catch (e) {
+      console.warn("[Profile] Failed to update profile:", e);
+      setProfileStatus("saveFailed");
+    } finally {
+      setProfileSaving(false);
+    }
+  }, [displayNameDirty, displayNameValue, invalidateProfileSurfaces, queryClient, updateProfile, user]);
+
+  const handlePickAvatar = useCallback(async () => {
+    if (!user) return;
+    setProfileStatus(null);
+
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      setProfileStatus("permissionDenied");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.82,
+    });
+    const asset = result.canceled ? null : result.assets[0];
+    if (!asset) return;
+
+    setAvatarUploading(true);
+    try {
+      const nextAvatarUrl = await uploadProfileAvatar(user.id, asset);
+      const updated = await updateProfile({ avatarUrl: nextAvatarUrl });
+      queryClient.setQueryData(["publicProfile", user.id], updated);
+      invalidateProfileSurfaces();
+      setProfileStatus("saved");
+    } catch (e) {
+      console.warn("[Profile] Failed to update avatar:", e);
+      setProfileStatus("photoFailed");
+    } finally {
+      setAvatarUploading(false);
+    }
+  }, [invalidateProfileSurfaces, queryClient, updateProfile, user]);
+
+  const handleRemoveAvatar = useCallback(async () => {
+    if (!user || !profile?.avatar_url) return;
+    setAvatarUploading(true);
+    setProfileStatus(null);
+    try {
+      const updated = await updateProfile({ avatarUrl: null });
+      queryClient.setQueryData(["publicProfile", user.id], updated);
+      invalidateProfileSurfaces();
+      setProfileStatus("saved");
+    } catch (e) {
+      console.warn("[Profile] Failed to remove avatar:", e);
+      setProfileStatus("photoFailed");
+    } finally {
+      setAvatarUploading(false);
+    }
+  }, [invalidateProfileSurfaces, profile?.avatar_url, queryClient, updateProfile, user]);
+
+  const tabs = useMemo(
+    () => isOwnProfile ? [
+      { key: "overview" as const, label: s.profileOverviewTab },
+      { key: "notes" as const, label: s.profileNotesTab },
+    ] : [],
+    [isOwnProfile, s.profileNotesTab, s.profileOverviewTab]
+  );
+
+  const headerActions = isOwnProfile && user ? (
+    <View className={`items-center gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
+      <HeaderAction icon={Pencil} label={s.profileEditAction} color={isDark ? "#2dd4bf" : "#0d9488"} onPress={() => setEditOpen(true)} />
+      <HeaderAction icon={LogOut} label={s.profileLogoutAction} color={isDark ? "#ef4444" : "#dc2626"} onPress={() => setLogoutDialogVisible(true)} />
+    </View>
+  ) : null;
+
+  return (
+    <>
+      <ResponsiveSheet
+        open
+        onClose={close}
+        maxWidth={880}
+        maxHeight={maxOverlayHeight}
+        surfaceColor={isDark ? "#0A0A0A" : "#FFF8F1"}
+        dir={isRTL ? "rtl" : "ltr"}
+      >
+        <OverlayHeader
+          title={displayName}
+          subtitle={username ? `@${username}` : undefined}
+          leading={
+            visibleProfile ? (
+              <ProfileAvatar avatarUrl={avatarUrl} name={displayName} size={48} isDark={isDark} />
+            ) : (
+              <View className="h-12 w-12 items-center justify-center rounded-full bg-primary-accent/10 dark:bg-primary-bright/10">
+                <UserRound size={22} color={isDark ? "#2dd4bf" : "#0d9488"} />
+              </View>
+            )
+          }
+          actions={headerActions}
+          onClose={close}
+          showHandle={isPhone}
+          isRTL={isRTL}
+        />
+
+        <OverlayBody contentContainerClassName="px-5 py-5">
+          {isSignedOutOwnProfile ? (
+            <SignedOutProfile isDark={isDark} isRTL={isRTL} onClose={close} />
+          ) : loadingPublic ? (
+            <View className="items-center justify-center py-12">
+              <ActivityIndicator color={isDark ? "#5eead4" : "#003638"} />
+            </View>
+          ) : !visibleProfile ? (
+            <EmptyState icon={UserRound} title={s.authProfile} subtitle={s.errorSubtitle} isDark={isDark} />
+          ) : (
+            <View className="gap-5">
+              {tabs.length > 0 ? (
+                <View className={`rounded-full bg-surface-high p-1 dark:bg-surface-dark-high ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
+                  {tabs.map((tab) => {
+                    const active = activeTab === tab.key;
+                    return (
+                      <Pressable
+                        key={tab.key}
+                        onPress={() => setActiveTab(tab.key)}
+                        className="h-10 flex-1 items-center justify-center rounded-full"
+                        style={{
+                          backgroundColor: active ? (isDark ? "#1B4D4F" : "#003638") : "transparent",
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color: active ? "#FDDC91" : isDark ? "#a3a3a3" : "#6e5a47",
+                            fontFamily: active ? "Manrope_700Bold" : "Manrope_500Medium",
+                            fontSize: 13,
+                          }}
+                        >
+                          {tab.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ) : null}
+
+              {activeTab === "notes" && isOwnProfile ? (
+                <ProfileNotesManager />
+              ) : (
+                <ProfileOverview
+                  displayName={displayName}
+                  username={username}
+                  avatarUrl={avatarUrl}
+                  stats={stats}
+                  review={review}
+                  surahProgress={surahProgress}
+                  publicBadges={publicBadges}
+                  numberLocale={numberLocale}
+                  isOwnProfile={isOwnProfile}
+                  isDark={isDark}
+                  isRTL={isRTL}
+                />
+              )}
+            </View>
+          )}
+        </OverlayBody>
+      </ResponsiveSheet>
+
+      <ResponsiveModal
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        maxWidth={520}
+        surfaceColor={isDark ? "#0A0A0A" : "#FFF8F1"}
+        dir={isRTL ? "rtl" : "ltr"}
+        avoidKeyboard
+      >
+        <OverlayHeader title={s.profileEditTitle} subtitle={s.profileEditSubtitle} onClose={() => setEditOpen(false)} isRTL={isRTL} />
+        <OverlayBody contentContainerClassName="gap-4 px-5 py-5">
+          <View className={`items-center gap-3 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
+            <ProfileAvatar avatarUrl={profile?.avatar_url} name={displayName} size={58} isDark={isDark} />
+            <View className="min-w-0 flex-1">
+              <Text
+                className="text-warm-500 dark:text-neutral-400"
+                style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
+              >
+                {s.authDisplayName}
+              </Text>
+              <Input
+                value={displayNameDraft}
+                onChangeText={(value) => {
+                  setDisplayNameDraft(value);
+                  setProfileStatus(null);
+                }}
+                placeholder={s.profileDisplayNamePlaceholder}
+                maxLength={60}
+                dir={isRTL ? "rtl" : "ltr"}
+                className="mt-2"
+              />
+            </View>
+          </View>
+          <View className={`gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
+            <Button
+              variant="outline"
+              className="flex-1 gap-2 bg-surface-high dark:bg-surface-dark-high"
+              onPress={handlePickAvatar}
+              disabled={avatarUploading || authLoading}
+            >
+              {avatarUploading ? (
+                <ActivityIndicator size="small" color={isDark ? "#5eead4" : "#003638"} />
+              ) : (
+                <Camera size={16} color={isDark ? "#5eead4" : "#003638"} />
+              )}
+              <Text className="text-charcoal dark:text-neutral-200" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>
+                {s.profileChangePhoto}
+              </Text>
+            </Button>
+            {profile?.avatar_url ? (
+              <Button
+                variant="outline"
+                size="icon"
+                className="bg-surface-high dark:bg-surface-dark-high"
+                onPress={handleRemoveAvatar}
+                disabled={avatarUploading || authLoading}
+              >
+                <Trash2 size={16} color={isDark ? "#fca5a5" : "#dc2626"} />
+              </Button>
+            ) : null}
+          </View>
+          <Button className="gap-2" onPress={handleSaveProfile} disabled={!displayNameDirty || profileSaving || authLoading}>
+            {profileSaving ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Save size={16} color="#FFFFFF" />}
+            <Text className="text-white" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>
+              {s.profileSave}
+            </Text>
+          </Button>
+          {statusMessage ? (
+            <Text
+              className={profileStatus === "saved" ? "text-primary-accent dark:text-primary-bright" : "text-red-600 dark:text-red-400"}
+              style={{
+                fontFamily: "Manrope_500Medium",
+                fontSize: 12,
+                textAlign: isRTL ? "right" : "left",
+                writingDirection: isRTL ? "rtl" : "ltr",
+              }}
+            >
+              {statusMessage}
+            </Text>
+          ) : null}
+        </OverlayBody>
+      </ResponsiveModal>
+
+      <ConfirmDialog
+        visible={logoutDialogVisible}
+        title={s.authLogout}
+        message={s.authLogoutConfirm}
+        cancelLabel={s.flashcardsCancel}
+        confirmLabel={s.authLogout}
+        destructive
+        isDark={isDark}
+        isRTL={isRTL}
+        onCancel={() => setLogoutDialogVisible(false)}
+        onConfirm={handleLogout}
+      />
+    </>
+  );
+}
+
+function ProfileOverview({
+  displayName,
+  username,
+  avatarUrl,
+  stats,
+  review,
+  surahProgress,
+  publicBadges,
+  numberLocale,
+  isOwnProfile,
+  isDark,
+  isRTL,
+}: {
+  displayName: string;
+  username: string | null;
+  avatarUrl: string | null;
+  stats: { label: string; value: number }[];
+  review: ReviewSnapshot;
+  surahProgress: ProfileSurahProgress[];
+  publicBadges: any[];
+  numberLocale: string;
+  isOwnProfile: boolean;
+  isDark: boolean;
+  isRTL: boolean;
+}) {
+  const s = useStrings();
+
+  return (
+    <View className="gap-5">
+      <View className={`flex-row flex-wrap gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
+        {stats.map((stat) => (
+          <ProfileStatCard
+            key={stat.label}
+            value={stat.value.toLocaleString(numberLocale)}
+            label={stat.label}
+            isDark={isDark}
+            isRTL={isRTL}
+            valueSize={23}
+            style={{ width: "48%" }}
+          />
+        ))}
+      </View>
+
+      <Card elevation="low" className="p-5">
+        <View className="mb-4">
+          <ProfileIdentity
+            displayName={displayName}
+            username={username}
+            avatarUrl={avatarUrl}
+            isDark={isDark}
+            isRTL={isRTL}
+            avatarSize={38}
+            nameSize={14}
+            handleSize={11}
+          />
+        </View>
+        <Text
+          className="mb-4 text-charcoal dark:text-neutral-100"
+          style={{ fontFamily: "Manrope_700Bold", fontSize: 16, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
+        >
+          {s.progressActivity}
+        </Text>
+        <ActivityHeatmap
+          data={review.activity}
+          isDark={isDark}
+          s={s}
+          isRTL={isRTL}
+          activeDays={review.activeDays}
+          totalReviews={review.totalReviews}
+        />
+      </Card>
+
+      <View>
+        <Text
+          className="mb-3 text-charcoal dark:text-neutral-100"
+          style={{ fontFamily: "Manrope_700Bold", fontSize: 16, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
+        >
+          {s.progressSurahProgress}
+        </Text>
+        <SurahProgressList data={surahProgress} isDark={isDark} isRTL={isRTL} previewLimit={8} readOnly={!isOwnProfile} s={s} />
+      </View>
+
+      <Card elevation="low" className="p-5">
+        <Text
+          className="mb-3 text-charcoal dark:text-neutral-100"
+          style={{ fontFamily: "Manrope_700Bold", fontSize: 16, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
+        >
+          {s.publicBadges}
+        </Text>
+        <PublicBadgesGrid unlocks={publicBadges} />
+      </Card>
+    </View>
+  );
+}
+
+function SignedOutProfile({ isDark, isRTL, onClose }: { isDark: boolean; isRTL: boolean; onClose: () => void }) {
+  const router = useRouter();
+  const s = useStrings();
+  return (
+    <View className="gap-4">
+      <EmptyState icon={UserRound} title={s.profileSignedOutTitle} subtitle={s.profileSignedOutSubtitle} isDark={isDark} />
+      <View className="gap-2">
+        <Button
+          onPress={() => {
+            onClose();
+            router.push("/auth/login" as any);
+          }}
+        >
+          <Text className="text-white" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15 }}>
+            {s.authLogin}
+          </Text>
+        </Button>
+        <Button
+          variant="outline"
+          onPress={() => {
+            onClose();
+            router.push("/auth/signup" as any);
+          }}
+        >
+          <Text
+            className="text-charcoal dark:text-neutral-200"
+            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15, textAlign: isRTL ? "right" : "left" }}
+          >
+            {s.authSignup}
+          </Text>
+        </Button>
+      </View>
+    </View>
+  );
+}
+
+function HeaderAction({
+  icon: Icon,
+  label,
+  color,
+  onPress,
+}: {
+  icon: LucideIcon;
+  label: string;
+  color: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      className="h-9 w-9 items-center justify-center rounded-full bg-surface-low dark:bg-surface-dark-low"
+      style={({ pressed }) => ({ opacity: pressed ? 0.72 : 1 })}
+    >
+      <Icon size={17} color={color} />
+    </Pressable>
+  );
+}

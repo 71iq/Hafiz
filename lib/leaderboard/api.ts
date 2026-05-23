@@ -22,6 +22,14 @@ export type PublicProfile = {
   last_review_date: string | null;
 };
 
+export type PublicReviewActivityDay = { date: string; count: number };
+
+export type PublicSurahProgressRow = {
+  surah: number;
+  totalCards: number;
+  memorized: number;
+};
+
 /** Daily leaderboard: top scorers today */
 export async function fetchDailyLeaderboard(): Promise<LeaderboardEntry[]> {
   if (!isSupabaseConfigured()) return [];
@@ -229,6 +237,55 @@ export async function fetchPublicAchievementUnlocks(userId: string): Promise<Ach
     seenAt: row.unlocked_at,
     localPayload: {},
     publicPayload: parsePayload(row.public_payload),
+  }));
+}
+
+export async function fetchPublicReviewActivity(userId: string, days = 90): Promise<{
+  activity: PublicReviewActivityDay[];
+  activeDays: number;
+  totalReviews: number;
+}> {
+  if (!isSupabaseConfigured() || !userId) return { activity: [], activeDays: 0, totalReviews: 0 };
+
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() - Math.max(days - 1, 0));
+  const startDate = start.toISOString().split("T")[0];
+
+  const { data, error } = await supabase
+    .from("daily_scores")
+    .select("date, reviews_count")
+    .eq("user_id", userId)
+    .gte("date", startDate)
+    .order("date", { ascending: true });
+
+  if (error) throw error;
+
+  const activity = (data ?? []).map((row: any) => ({
+    date: row.date,
+    count: row.reviews_count ?? 0,
+  }));
+  return {
+    activity,
+    activeDays: activity.filter((day) => day.count > 0).length,
+    totalReviews: activity.reduce((sum, day) => sum + day.count, 0),
+  };
+}
+
+export async function fetchPublicSurahProgress(userId: string): Promise<PublicSurahProgressRow[]> {
+  if (!isSupabaseConfigured() || !userId) return [];
+
+  const { data, error } = await supabase
+    .from("public_surah_progress")
+    .select("surah, total_cards, memorized_cards")
+    .eq("user_id", userId)
+    .order("surah", { ascending: true });
+
+  if (error) throw error;
+  return (data ?? []).map((row: any) => ({
+    surah: row.surah,
+    totalCards: row.total_cards ?? 0,
+    memorized: row.memorized_cards ?? 0,
   }));
 }
 

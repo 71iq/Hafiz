@@ -22,6 +22,7 @@ type Props = {
   previewLimit?: number;
   onItemPress?: () => void;
   onViewAll?: () => void;
+  readOnly?: boolean;
   s: Record<string, string>;
 };
 
@@ -33,6 +34,7 @@ export function SurahProgressList({
   previewLimit,
   onItemPress,
   onViewAll,
+  readOnly = false,
   s,
 }: Props) {
   const router = useRouter();
@@ -60,15 +62,7 @@ export function SurahProgressList({
 
   const renderItem = (item: SurahProgress, cardWidth?: number) => {
     const pct = item.totalCards > 0 ? (item.memorized / item.totalCards) * 100 : 0;
-    return (
-      <Pressable
-        key={item.surah}
-        onPress={() => handlePress(item.surah)}
-        style={({ pressed }) => ({
-          transform: [{ scale: pressed ? 0.98 : 1 }],
-          width: cardWidth ?? (isCompact ? "48%" : "100%"),
-        })}
-      >
+    const content = (
         <Card elevation="low" className="p-4">
           <View
             style={{
@@ -152,6 +146,26 @@ export function SurahProgressList({
             )}
           </View>
         </Card>
+    );
+
+    if (readOnly) {
+      return (
+        <View key={item.surah} style={{ width: cardWidth ?? (isCompact ? "48%" : "100%") }}>
+          {content}
+        </View>
+      );
+    }
+
+    return (
+      <Pressable
+        key={item.surah}
+        onPress={() => handlePress(item.surah)}
+        style={({ pressed }) => ({
+          transform: [{ scale: pressed ? 0.98 : 1 }],
+          width: cardWidth ?? (isCompact ? "48%" : "100%"),
+        })}
+      >
+        {content}
       </Pressable>
     );
   };

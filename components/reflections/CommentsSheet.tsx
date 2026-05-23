@@ -10,8 +10,7 @@ import { fetchComments, addComment } from "@/lib/reflections/api";
 import type { ReflectionComment } from "@/lib/reflections/types";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { Input } from "@/components/ui/Input";
-import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
-import { PublicProfileOverlay } from "@/components/profile/PublicProfileOverlay";
+import { ProfileIdentity } from "@/components/profile/ProfileIdentity";
 
 type Props = {
   reflectionId: string | null;
@@ -45,7 +44,6 @@ export function CommentsSheet({ reflectionId, onClose, onCommentAdded }: Props) 
   const [text, setText] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [profileUserId, setProfileUserId] = useState<string | null>(null);
 
   const commentsQuery = useInfiniteQuery({
     queryKey: ["reflectionComments", reflectionId],
@@ -107,6 +105,12 @@ export function CommentsSheet({ reflectionId, onClose, onCommentAdded }: Props) 
   }, [commentsQuery, s.commentLoadFailed]);
 
   const mutedColor = isDark ? "#737373" : "#A39B93";
+  const openProfile = useCallback(
+    (commentUserId: string) => {
+      router.push(commentUserId === user?.id ? "/profile" as any : `/profile/${commentUserId}` as any);
+    },
+    [user?.id]
+  );
 
   return (
     <>
@@ -167,23 +171,21 @@ export function CommentsSheet({ reflectionId, onClose, onCommentAdded }: Props) 
                 <View key={c.id} className="mb-3">
                   <View className={`items-center gap-2 mb-1 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
                     <Pressable
-                      onPress={() => setProfileUserId(c.user_id)}
+                      onPress={() => openProfile(c.user_id)}
                       accessibilityRole="button"
-                      className={`items-center gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`}
+                      className="min-w-0"
                       style={({ pressed }) => ({ opacity: pressed ? 0.72 : 1 })}
                     >
-                      <ProfileAvatar
+                      <ProfileIdentity
+                        displayName={c.profiles?.display_name || c.profiles?.username || s.genericAnonymous}
+                        username={c.profiles?.username}
                         avatarUrl={c.profiles?.avatar_url}
-                        name={c.profiles?.display_name || c.profiles?.username || s.genericAnonymous}
-                        size={26}
                         isDark={isDark}
+                        isRTL={isRTL}
+                        avatarSize={26}
+                        nameSize={12}
+                        handleSize={10}
                       />
-                      <Text
-                        className="text-charcoal dark:text-neutral-200"
-                        style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
-                      >
-                        {c.profiles?.display_name || c.profiles?.username || s.genericAnonymous}
-                      </Text>
                     </Pressable>
                     <Text style={{ fontFamily: "Manrope_400Regular", fontSize: 10, color: mutedColor }}>
                       {relativeTime(c.created_at, s.justNow, uiLanguage)}
@@ -297,7 +299,6 @@ export function CommentsSheet({ reflectionId, onClose, onCommentAdded }: Props) 
         )}
       </View>
     </ResponsiveSheet>
-    <PublicProfileOverlay userId={profileUserId} onClose={() => setProfileUserId(null)} />
     </>
   );
 }

@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { View, Text, Pressable, ScrollView, RefreshControl } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { router } from "expo-router";
 import { Trophy, CalendarCheck2, Medal } from "lucide-react-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSettings } from "@/lib/settings/context";
@@ -13,8 +14,7 @@ import { LeaderboardSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { AuthGate } from "@/components/ui/AuthGate";
 import { useScreenContentLayout } from "@/components/ui/ScreenContent";
-import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
-import { PublicProfileOverlay } from "@/components/profile/PublicProfileOverlay";
+import { ProfileIdentity } from "@/components/profile/ProfileIdentity";
 import {
   fetchDailyLeaderboard,
   fetchWeeklyLeaderboard,
@@ -34,7 +34,6 @@ export default function LeaderboardScreen() {
   const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<Tab>("daily");
-  const [profileUserId, setProfileUserId] = useState<string | null>(null);
 
   const configured = isSupabaseConfigured();
 
@@ -108,6 +107,12 @@ export default function LeaderboardScreen() {
     ? [entries[1], entries[0], entries[2]].filter((entry): entry is LeaderboardEntry => Boolean(entry))
     : [];
   const rowEntries = isLaptop ? entries.slice(3) : entries;
+  const openProfile = useCallback(
+    (userId: string) => {
+      router.push(userId === user?.id ? "/profile" as any : `/profile/${userId}` as any);
+    },
+    [user?.id]
+  );
 
   return (
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
@@ -207,7 +212,7 @@ export default function LeaderboardScreen() {
                   isDark={isDark}
                   unit={scoreUnit}
                   s={s}
-                  onPress={() => setProfileUserId(entry.user_id)}
+                  onPress={() => openProfile(entry.user_id)}
                 />
               ))}
             </View>
@@ -237,13 +242,12 @@ export default function LeaderboardScreen() {
               unit={scoreUnit}
               isStreak={activeTab === "streak"}
               s={s}
-              onPress={() => setProfileUserId(entry.user_id)}
+              onPress={() => openProfile(entry.user_id)}
             />
           ))}
           </View>
         </ScrollView>
       )}
-      <PublicProfileOverlay userId={profileUserId} onClose={() => setProfileUserId(null)} />
     </SafeAreaView>
   );
 }
@@ -298,19 +302,16 @@ function LeaderboardPodiumCard({
           {entry.rank}
         </Text>
       </View>
-      <View
-        className="h-16 w-16 items-center justify-center rounded-full"
-        style={{ backgroundColor: isDark ? "rgba(45, 212, 191, 0.12)" : "rgba(0, 89, 91, 0.10)" }}
-      >
-        <ProfileAvatar avatarUrl={entry.avatar_url} name={displayName} size={56} isDark={isDark} />
-      </View>
-      <Text
-        className="mt-3 text-charcoal dark:text-neutral-100"
-        style={{ fontFamily: "Manrope_700Bold", fontSize: 15, textAlign: "center" }}
-        numberOfLines={1}
-      >
-        {displayName}
-      </Text>
+      <ProfileIdentity
+        displayName={displayName}
+        username={entry.username}
+        avatarUrl={entry.avatar_url}
+        isDark={isDark}
+        avatarSize={56}
+        nameSize={15}
+        handleSize={10}
+        centered
+      />
       {isCurrentUser && (
         <Text
           className="mt-1 text-primary-accent dark:text-primary-bright"
@@ -400,19 +401,19 @@ function LeaderboardRow({
         </Text>
       </View>
 
-      <View className="mx-3">
-        <ProfileAvatar avatarUrl={entry.avatar_url} name={displayName} size={40} isDark={isDark} />
-      </View>
-
-      <View className="flex-1">
+      <View className="mx-3 min-w-0 flex-1">
         <View className="flex-row items-center gap-2" style={{ direction: "ltr" }}>
-          <Text
-            className="text-charcoal dark:text-neutral-100"
-            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}
-            numberOfLines={1}
-          >
-            {displayName}
-          </Text>
+          <View className="min-w-0 flex-1">
+            <ProfileIdentity
+              displayName={displayName}
+              username={entry.username}
+              avatarUrl={entry.avatar_url}
+              isDark={isDark}
+              avatarSize={40}
+              nameSize={14}
+              handleSize={11}
+            />
+          </View>
           {isCurrentUser && (
             <View className="px-2 py-0.5 rounded-full bg-primary-accent/10 dark:bg-primary-bright/10">
               <Text
@@ -424,11 +425,6 @@ function LeaderboardRow({
             </View>
           )}
         </View>
-        <Text
-          style={{ fontFamily: "Manrope_400Regular", fontSize: 11, color: mutedColor }}
-        >
-          @{entry.username}
-        </Text>
       </View>
 
       <View className="ml-2 min-w-[112px] items-end rounded-2xl px-3 py-2" style={{ backgroundColor: scoreBg }}>

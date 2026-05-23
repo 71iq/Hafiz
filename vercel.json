@@ -2,5 +2,8 @@
   "buildCommand": "bash scripts/vercel-build.sh",
   "outputDirectory": "dist",
   "cleanUrls": true,
-  "trailingSlash": false
+  "trailingSlash": false,
+  "rewrites": [
+    { "source": "/profile/:userId", "destination": "/profile/[userId]" }
+  ]
 }

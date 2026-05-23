@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { View, Text, Pressable } from "react-native";
+import { router } from "expo-router";
 import { Heart, MessageCircle, MoreHorizontal, Flag } from "lucide-react-native";
 import { useAuthStore } from "@/lib/auth/store";
 import { hapticLight } from "@/lib/haptics";
@@ -7,8 +8,7 @@ import { toggleLike, reportReflection } from "@/lib/reflections/api";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
 import type { Reflection } from "@/lib/reflections/types";
-import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
-import { PublicProfileOverlay } from "@/components/profile/PublicProfileOverlay";
+import { ProfileIdentity } from "@/components/profile/ProfileIdentity";
 
 type Props = {
   reflection: Reflection;
@@ -60,7 +60,6 @@ export function ReflectionCard({
   const [likeBusy, setLikeBusy] = useState(false);
   const [reportBusy, setReportBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [profileUserId, setProfileUserId] = useState<string | null>(null);
 
   const authorName =
     reflection.profiles?.display_name || reflection.profiles?.username || s.genericAnonymous;
@@ -121,6 +120,9 @@ export function ReflectionCard({
   const rowClassName = isRTL ? "flex-row-reverse" : "flex-row";
   const menuSide = isRTL ? { left: 12 } : { right: 12 };
   const isFeed = variant === "feed";
+  const openProfile = useCallback(() => {
+    router.push(reflection.user_id === user?.id ? "/profile" as any : `/profile/${reflection.user_id}` as any);
+  }, [reflection.user_id, user?.id]);
 
   return (
     <>
@@ -142,23 +144,21 @@ export function ReflectionCard({
       <View className={`${rowClassName} items-center justify-between mb-2`}>
         <View className={`${rowClassName} items-center gap-2`}>
           <Pressable
-            onPress={() => setProfileUserId(reflection.user_id)}
+            onPress={openProfile}
             accessibilityRole="button"
-            className={`${rowClassName} items-center gap-2`}
+            className="min-w-0"
             style={({ pressed }) => ({ opacity: pressed ? 0.72 : 1 })}
           >
-            <ProfileAvatar
+            <ProfileIdentity
+              displayName={authorName}
+              username={reflection.profiles?.username}
               avatarUrl={reflection.profiles?.avatar_url}
-              name={authorName}
-              size={isFeed ? 40 : 32}
               isDark={isDark}
+              isRTL={isRTL}
+              avatarSize={isFeed ? 40 : 32}
+              nameSize={isFeed ? 14 : 13}
+              handleSize={10}
             />
-            <Text
-              className="text-charcoal dark:text-neutral-200"
-              style={{ fontFamily: "Manrope_600SemiBold", fontSize: isFeed ? 14 : 13, textAlign: contentAlign }}
-            >
-              {authorName}
-            </Text>
           </Pressable>
           <Text
             style={{ fontFamily: "Manrope_400Regular", fontSize: 11, color: mutedColor }}
@@ -300,7 +300,6 @@ export function ReflectionCard({
         </Text>
       ) : null}
     </View>
-    <PublicProfileOverlay userId={profileUserId} onClose={() => setProfileUserId(null)} />
     </>
   );
 }
