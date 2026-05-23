@@ -8,6 +8,7 @@ import { useStrings } from "@/lib/i18n/useStrings";
 import { useSettings } from "@/lib/settings/context";
 import { UserRound } from "lucide-react-native";
 import { ProfileAvatar } from "./ProfileAvatar";
+import { ProfileStatCard } from "./ProfileStatCard";
 
 type PublicProfileOverlayProps = {
   userId: string | null;
@@ -63,26 +64,17 @@ export function PublicProfileOverlay({ userId, onClose }: PublicProfileOverlayPr
           <EmptyState icon={UserRound} title={s.authProfile} subtitle={s.errorSubtitle} isDark={isDark} />
         ) : (
           <View>
-            <View className="flex-row flex-wrap gap-3">
+            <View className={`flex-row flex-wrap gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
               {stats.map((stat) => (
-                <View
+                <ProfileStatCard
                   key={stat.label}
-                  className="min-w-[128px] flex-1 rounded-2xl px-4 py-3.5"
-                  style={{ backgroundColor: isDark ? "#141414" : "#F7F3EC" }}
-                >
-                  <Text
-                    className="text-charcoal dark:text-neutral-100"
-                    style={{ fontFamily: "NotoSerif_700Bold", fontSize: 23, textAlign, writingDirection }}
-                  >
-                    {stat.value.toLocaleString(numberLocale)}
-                  </Text>
-                  <Text
-                    className="mt-1 text-warm-400 dark:text-neutral-500"
-                    style={{ fontFamily: "Manrope_500Medium", fontSize: 11, textAlign, writingDirection }}
-                  >
-                    {stat.label}
-                  </Text>
-                </View>
+                  value={stat.value.toLocaleString(numberLocale)}
+                  label={stat.label}
+                  isDark={isDark}
+                  isRTL={isRTL}
+                  valueSize={23}
+                  style={{ width: "48%" }}
+                />
               ))}
             </View>
             <Text

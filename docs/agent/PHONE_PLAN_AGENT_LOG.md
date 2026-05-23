@@ -1886,3 +1886,24 @@ Saved in `phase19/`:
 - `npx expo start --web --port 8096 --localhost`: started successfully.
 - Playwright smoke checked `/auth/login` at 412px: page rendered with 0 console errors. Warnings were pre-existing metadata/shadow deprecations.
 - Playwright smoke checked `/mushaf` with a single Hafiz tab after avoiding the existing OPFS multi-tab lock condition; route rendered/redirected without console errors.
+
+## 2026-05-23 — Profile Stat Widgets Aligned
+
+### Scope decision
+- Aligned profile/public-profile stat widgets with the progress-page compact stat card treatment: warm card surface, subtle teal border, top accent rule, tabular serif metric, and small warm label.
+- Kept the existing profile page layout behavior: own profile can remain four-up on wide rails and wrap on phone; public profile and leaderboard overlay use two-column wrapped cards to avoid cramped labels.
+
+### Impacted files
+- `components/profile/ProfileStatCard.tsx`
+- `app/profile/index.tsx`
+- `app/profile/[userId].tsx`
+- `components/profile/PublicProfileOverlay.tsx`
+
+### Next step
+- Follow-up visual QA with an authenticated browser state to inspect the private/public stat cards with live profile data.
+
+### Validation result
+- `npm run typecheck`: passed.
+- `npm run build:web`: passed.
+- `npx expo start --web --port 8097 --localhost`: launched, but browser navigation to `/profile` hit the existing web bundler OOM path; retrying with `NODE_OPTIONS=--max-old-space-size=8192` also reached heap limit.
+- Static export fallback served from `dist` rendered `/profile` at 1009px and 412px with real local data bootstrap and the signed-out profile surface. Auth-gated stat cards were not visually reachable in this isolated browser state.

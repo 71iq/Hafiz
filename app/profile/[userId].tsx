@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { PublicBadgesGrid } from "@/components/achievements/PublicBadgesGrid";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
+import { ProfileStatCard } from "@/components/profile/ProfileStatCard";
 import { useDatabaseStatus } from "@/lib/database/provider";
 import { SettingsProvider, useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -37,7 +38,7 @@ export default function PublicProfileScreen() {
 }
 
 function PublicProfileContent() {
-  const { isDark, isRTL } = useSettings();
+  const { isDark, isRTL, uiLanguage } = useSettings();
   const s = useStrings();
   const router = useRouter();
   const { width } = useWindowDimensions();
@@ -65,6 +66,15 @@ function PublicProfileContent() {
   const pagePaddingHorizontal = isDesktop ? 32 : 24;
   const textAlign = isRTL ? "right" : "left";
   const writingDirection = isRTL ? "rtl" : "ltr";
+  const numberLocale = uiLanguage === "ar" ? "ar" : "en";
+  const stats = profile
+    ? [
+        { label: s.wirdCurrent, value: profile.current_streak },
+        { label: s.wirdLongest, value: profile.longest_streak },
+        { label: s.flashcardsSummaryReviewed, value: profile.cards_reviewed },
+        { label: s.leaderboardPoints, value: profile.total_score },
+      ]
+    : [];
 
   return (
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
@@ -128,42 +138,18 @@ function PublicProfileContent() {
           contentContainerStyle={{ alignItems: "center", paddingHorizontal: pagePaddingHorizontal, paddingBottom: 80 }}
         >
           <View style={contentRailStyle}>
-          <View className={`flex-row gap-3 mb-3 ${isRTL ? "flex-row-reverse" : ""}`}>
-            <Card elevation="low" className="flex-1 p-5">
-              <Text className="text-charcoal dark:text-neutral-100" style={{ fontFamily: "NotoSerif_700Bold", fontSize: 26, textAlign }}>
-                {profile.current_streak.toLocaleString()}
-              </Text>
-              <Text className="text-warm-400 dark:text-neutral-500 mt-1" style={{ fontFamily: "Manrope_500Medium", fontSize: 11, textAlign, writingDirection }}>
-                {s.wirdCurrent}
-              </Text>
-            </Card>
-            <Card elevation="low" className="flex-1 p-5">
-              <Text className="text-charcoal dark:text-neutral-100" style={{ fontFamily: "NotoSerif_700Bold", fontSize: 26, textAlign }}>
-                {profile.longest_streak.toLocaleString()}
-              </Text>
-              <Text className="text-warm-400 dark:text-neutral-500 mt-1" style={{ fontFamily: "Manrope_500Medium", fontSize: 11, textAlign, writingDirection }}>
-                {s.wirdLongest}
-              </Text>
-            </Card>
-          </View>
-
-          <View className={`flex-row gap-3 mb-3 ${isRTL ? "flex-row-reverse" : ""}`}>
-            <Card elevation="low" className="flex-1 p-5">
-              <Text className="text-charcoal dark:text-neutral-100" style={{ fontFamily: "NotoSerif_700Bold", fontSize: 26, textAlign }}>
-                {profile.cards_reviewed.toLocaleString()}
-              </Text>
-              <Text className="text-warm-400 dark:text-neutral-500 mt-1" style={{ fontFamily: "Manrope_500Medium", fontSize: 11, textAlign, writingDirection }}>
-                {s.flashcardsSummaryReviewed}
-              </Text>
-            </Card>
-            <Card elevation="low" className="flex-1 p-5">
-              <Text className="text-charcoal dark:text-neutral-100" style={{ fontFamily: "NotoSerif_700Bold", fontSize: 26, textAlign }}>
-                {profile.total_score.toLocaleString()}
-              </Text>
-              <Text className="text-warm-400 dark:text-neutral-500 mt-1" style={{ fontFamily: "Manrope_500Medium", fontSize: 11, textAlign, writingDirection }}>
-                {s.leaderboardPoints}
-              </Text>
-            </Card>
+          <View className={`mb-3 flex-row flex-wrap gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
+            {stats.map((stat) => (
+              <ProfileStatCard
+                key={stat.label}
+                value={stat.value.toLocaleString(numberLocale)}
+                label={stat.label}
+                isDark={isDark}
+                isRTL={isRTL}
+                valueSize={24}
+                style={{ width: "48%" }}
+              />
+            ))}
           </View>
 
           <Card elevation="low" className="mt-3 p-5">

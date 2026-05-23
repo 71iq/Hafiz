@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/Input";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { ProfileNotesManager } from "@/components/profile/ProfileNotesManager";
+import { ProfileStatCard } from "@/components/profile/ProfileStatCard";
 import { getRecentUnlocks } from "@/lib/achievements/queries";
 import { useDatabase, useDatabaseStatus } from "@/lib/database/provider";
 import { SettingsProvider, useSettings } from "@/lib/settings/context";
@@ -448,27 +449,17 @@ function ProfileScreenContent() {
                 </View>
               </Card>
 
-              <View className="mt-5 flex-row flex-wrap gap-3">
+              <View className={`mt-5 flex-row flex-wrap gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
                 {stats.map((stat) => (
-                  <Card key={stat.label} elevation="low" className="min-w-[150px] flex-1 p-5">
-                    <Text
-                      className="text-charcoal dark:text-neutral-100"
-                      style={{ fontFamily: "NotoSerif_700Bold", fontSize: 26, textAlign: isRTL ? "right" : "left" }}
-                    >
-                      {stat.value.toLocaleString(numberLocale)}
-                    </Text>
-                    <Text
-                      className="mt-1 text-warm-400 dark:text-neutral-500"
-                      style={{
-                        fontFamily: "Manrope_500Medium",
-                        fontSize: 11,
-                        textAlign: isRTL ? "right" : "left",
-                        writingDirection: isRTL ? "rtl" : "ltr",
-                      }}
-                    >
-                      {stat.label}
-                    </Text>
-                  </Card>
+                  <ProfileStatCard
+                    key={stat.label}
+                    className="min-w-[150px] flex-1"
+                    value={stat.value.toLocaleString(numberLocale)}
+                    label={stat.label}
+                    isDark={isDark}
+                    isRTL={isRTL}
+                    valueSize={24}
+                  />
                 ))}
               </View>
 
