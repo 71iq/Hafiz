@@ -72,8 +72,9 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
   const [editOpen, setEditOpen] = useState(false);
   const [logoutDialogVisible, setLogoutDialogVisible] = useState(false);
   const [displayNameDraft, setDisplayNameDraft] = useState("");
+  const [avatarDraft, setAvatarDraft] = useState<ImagePicker.ImagePickerAsset | null>(null);
+  const [avatarRemovalDraft, setAvatarRemovalDraft] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
-  const [avatarUploading, setAvatarUploading] = useState(false);
   const [profileStatus, setProfileStatus] = useState<"saved" | "saveFailed" | "photoFailed" | "permissionDenied" | null>(null);
 
   const requestedUserId = userId || user?.id || "";
@@ -151,6 +152,15 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
   const currentDisplayName = profile?.display_name ?? "";
   const displayNameValue = displayNameDraft.trim();
   const displayNameDirty = displayNameValue !== currentDisplayName;
+  const avatarPreviewUrl = avatarRemovalDraft ? null : avatarDraft?.uri ?? profile?.avatar_url ?? null;
+  const avatarDirty = !!avatarDraft || avatarRemovalDraft;
+  const profileDirty = displayNameDirty || avatarDirty;
+  const saveProfileDisabled = !profileDirty || profileSaving || authLoading;
+  const saveProfileIconColor = saveProfileDisabled && !profileSaving ? (isDark ? "#737373" : "#8A7764") : "#FFFFFF";
+  const saveProfileTextColor = saveProfileDisabled && !profileSaving ? (isDark ? "#737373" : "#8A7764") : "#FFFFFF";
+  const saveProfileBackgroundColor = saveProfileDisabled && !profileSaving
+    ? isDark ? "#262626" : "#E6DED5"
+    : isDark ? "#0f766e" : "#0d9488";
   const stats = [
     { label: s.wirdCurrent, value: isOwnProfile ? localStats?.currentStreak ?? profile?.current_streak ?? 0 : visibleProfile?.current_streak ?? 0 },
     { label: s.wirdLongest, value: isOwnProfile ? localStats?.longestStreak ?? profile?.longest_streak ?? 0 : visibleProfile?.longest_streak ?? 0 },
@@ -177,6 +187,11 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
   useEffect(() => {
     setDisplayNameDraft(profile?.display_name ?? "");
   }, [profile?.display_name, user?.id]);
+
+  useEffect(() => {
+    setAvatarDraft(null);
+    setAvatarRemovalDraft(false);
+  }, [user?.id]);
 
   const loadLocalOverview = useCallback(async () => {
     if (!user) return;
@@ -234,21 +249,27 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
   }, [close, signOut]);
 
   const handleSaveProfile = useCallback(async () => {
-    if (!user || !displayNameDirty) return;
+    if (!user || !profileDirty) return;
     setProfileSaving(true);
     setProfileStatus(null);
     try {
-      const updated = await updateProfile({ displayName: displayNameValue.length > 0 ? displayNameValue : null });
+      const nextAvatarUrl = avatarDraft ? await uploadProfileAvatar(user.id, avatarDraft) : avatarRemovalDraft ? null : undefined;
+      const updated = await updateProfile({
+        displayName: displayNameDirty ? (displayNameValue.length > 0 ? displayNameValue : null) : undefined,
+        avatarUrl: avatarDirty ? nextAvatarUrl : undefined,
+      });
+      setAvatarDraft(null);
+      setAvatarRemovalDraft(false);
       queryClient.setQueryData(["publicProfile", user.id], updated);
       invalidateProfileSurfaces();
       setProfileStatus("saved");
     } catch (e) {
       console.warn("[Profile] Failed to update profile:", e);
-      setProfileStatus("saveFailed");
+      setProfileStatus(avatarDirty ? "photoFailed" : "saveFailed");
     } finally {
       setProfileSaving(false);
     }
-  }, [displayNameDirty, displayNameValue, invalidateProfileSurfaces, queryClient, updateProfile, user]);
+  }, [avatarDirty, avatarDraft, avatarRemovalDraft, displayNameDirty, displayNameValue, invalidateProfileSurfaces, profileDirty, queryClient, updateProfile, user]);
 
   const handlePickAvatar = useCallback(async () => {
     if (!user) return;
@@ -269,37 +290,16 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
     const asset = result.canceled ? null : result.assets[0];
     if (!asset) return;
 
-    setAvatarUploading(true);
-    try {
-      const nextAvatarUrl = await uploadProfileAvatar(user.id, asset);
-      const updated = await updateProfile({ avatarUrl: nextAvatarUrl });
-      queryClient.setQueryData(["publicProfile", user.id], updated);
-      invalidateProfileSurfaces();
-      setProfileStatus("saved");
-    } catch (e) {
-      console.warn("[Profile] Failed to update avatar:", e);
-      setProfileStatus("photoFailed");
-    } finally {
-      setAvatarUploading(false);
-    }
-  }, [invalidateProfileSurfaces, queryClient, updateProfile, user]);
+    setAvatarDraft(asset);
+    setAvatarRemovalDraft(false);
+  }, [user]);
 
   const handleRemoveAvatar = useCallback(async () => {
-    if (!user || !profile?.avatar_url) return;
-    setAvatarUploading(true);
+    if (!user || (!profile?.avatar_url && !avatarDraft)) return;
     setProfileStatus(null);
-    try {
-      const updated = await updateProfile({ avatarUrl: null });
-      queryClient.setQueryData(["publicProfile", user.id], updated);
-      invalidateProfileSurfaces();
-      setProfileStatus("saved");
-    } catch (e) {
-      console.warn("[Profile] Failed to remove avatar:", e);
-      setProfileStatus("photoFailed");
-    } finally {
-      setAvatarUploading(false);
-    }
-  }, [invalidateProfileSurfaces, profile?.avatar_url, queryClient, updateProfile, user]);
+    setAvatarDraft(null);
+    setAvatarRemovalDraft(!!profile?.avatar_url);
+  }, [avatarDraft, profile?.avatar_url, user]);
 
   const tabs = useMemo(
     () => isOwnProfile ? [
@@ -416,7 +416,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
         <OverlayHeader title={s.profileEditTitle} subtitle={s.profileEditSubtitle} onClose={() => setEditOpen(false)} isRTL={isRTL} />
         <OverlayBody contentContainerClassName="gap-4 px-5 py-5">
           <View className={`items-center gap-3 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
-            <ProfileAvatar avatarUrl={profile?.avatar_url} name={displayName} size={58} isDark={isDark} />
+            <ProfileAvatar avatarUrl={avatarPreviewUrl} name={displayName} size={58} isDark={isDark} />
             <View className="min-w-0 flex-1">
               <Text
                 className="text-warm-500 dark:text-neutral-400"
@@ -433,7 +433,8 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
                 placeholder={s.profileDisplayNamePlaceholder}
                 maxLength={60}
                 dir={isRTL ? "rtl" : "ltr"}
-                className="mt-2"
+                className="mt-1 min-h-8 bg-transparent px-2 py-0"
+                style={{ height: 32, lineHeight: 20 }}
               />
             </View>
           </View>
@@ -442,32 +443,33 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
               variant="outline"
               className="flex-1 gap-2 bg-surface-high dark:bg-surface-dark-high"
               onPress={handlePickAvatar}
-              disabled={avatarUploading || authLoading}
+              disabled={profileSaving || authLoading}
             >
-              {avatarUploading ? (
-                <ActivityIndicator size="small" color={isDark ? "#5eead4" : "#003638"} />
-              ) : (
-                <Camera size={16} color={isDark ? "#5eead4" : "#003638"} />
-              )}
+              <Camera size={16} color={isDark ? "#5eead4" : "#003638"} />
               <Text className="text-charcoal dark:text-neutral-200" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>
                 {s.profileChangePhoto}
               </Text>
             </Button>
-            {profile?.avatar_url ? (
+            {avatarPreviewUrl ? (
               <Button
                 variant="outline"
                 size="icon"
                 className="bg-surface-high dark:bg-surface-dark-high"
                 onPress={handleRemoveAvatar}
-                disabled={avatarUploading || authLoading}
+                disabled={profileSaving || authLoading}
               >
                 <Trash2 size={16} color={isDark ? "#fca5a5" : "#dc2626"} />
               </Button>
             ) : null}
           </View>
-          <Button className="gap-2" onPress={handleSaveProfile} disabled={!displayNameDirty || profileSaving || authLoading}>
-            {profileSaving ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Save size={16} color="#FFFFFF" />}
-            <Text className="text-white" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>
+          <Button
+            className="gap-2"
+            onPress={handleSaveProfile}
+            disabled={saveProfileDisabled}
+            style={{ backgroundColor: saveProfileBackgroundColor, opacity: saveProfileDisabled && !profileSaving ? 1 : undefined }}
+          >
+            {profileSaving ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Save size={16} color={saveProfileIconColor} />}
+            <Text style={{ color: saveProfileTextColor, fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>
               {s.profileSave}
             </Text>
           </Button>

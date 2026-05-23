@@ -325,9 +325,22 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     const fallback = buildFallbackProfile(user);
 
     try {
+      const { data: existingProfile, error: existingError } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (existingError) throw existingError;
+      if (existingProfile) {
+        const profile = existingProfile as Profile;
+        set({ profile });
+        return profile;
+      }
+
       const { data, error } = await supabase
         .from("profiles")
-        .upsert(buildProfileInsert(user), { onConflict: "id", ignoreDuplicates: true })
+        .insert(buildProfileInsert(user))
         .select("*")
         .single();
 
