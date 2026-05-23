@@ -731,6 +731,7 @@ export default function SettingsScreen() {
                 s.creditAlusi,
                 s.creditNazamDurar,
                 s.creditRazi,
+                s.creditJalalayn,
                 s.creditJalalaynEn,
                 s.creditNourQuran,
                 s.creditSurahInfo,
