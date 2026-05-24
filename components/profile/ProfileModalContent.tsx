@@ -34,7 +34,6 @@ import { attachSurahNames, getLocalSurahProgress, type ProfileSurahProgress } fr
 import { useSettings } from "@/lib/settings/context";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { ProfileAvatar } from "./ProfileAvatar";
-import { ProfileIdentity } from "./ProfileIdentity";
 import { ProfileNotesManager } from "./ProfileNotesManager";
 import { ProfileStatCard } from "./ProfileStatCard";
 
@@ -331,7 +330,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
           subtitle={username ? `@${username}` : undefined}
           leading={
             visibleProfile ? (
-              <ProfileAvatar avatarUrl={avatarUrl} name={displayName} size={48} isDark={isDark} />
+              <ProfileAvatar avatarUrl={avatarUrl} name={displayName} size={56} isDark={isDark} />
             ) : (
               <View className="h-12 w-12 items-center justify-center rounded-full bg-primary-accent/10 dark:bg-primary-bright/10">
                 <UserRound size={22} color={isDark ? "#2dd4bf" : "#0d9488"} />
@@ -387,9 +386,6 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
                 <ProfileNotesManager />
               ) : (
                 <ProfileOverview
-                  displayName={displayName}
-                  username={username}
-                  avatarUrl={avatarUrl}
                   stats={stats}
                   review={review}
                   surahProgress={surahProgress}
@@ -506,9 +502,6 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
 }
 
 function ProfileOverview({
-  displayName,
-  username,
-  avatarUrl,
   stats,
   review,
   surahProgress,
@@ -518,9 +511,6 @@ function ProfileOverview({
   isDark,
   isRTL,
 }: {
-  displayName: string;
-  username: string | null;
-  avatarUrl: string | null;
   stats: { label: string; value: number }[];
   review: ReviewSnapshot;
   surahProgress: ProfileSurahProgress[];
@@ -531,50 +521,49 @@ function ProfileOverview({
   isRTL: boolean;
 }) {
   const s = useStrings();
+  const { width } = useWindowDimensions();
+  const isWideActivity = width >= SIDEBAR_BREAKPOINT;
+  const activityStats = [
+    ...stats,
+    { label: s.heatmapActiveDays, value: review.activeDays },
+    { label: s.heatmapTotalReviews, value: review.totalReviews },
+  ];
 
   return (
     <View className="gap-5">
-      <View className={`flex-row flex-wrap gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
-        {stats.map((stat) => (
-          <ProfileStatCard
-            key={stat.label}
-            value={stat.value.toLocaleString(numberLocale)}
-            label={stat.label}
-            isDark={isDark}
-            isRTL={isRTL}
-            valueSize={23}
-            style={{ width: "48%" }}
-          />
-        ))}
-      </View>
-
       <Card elevation="low" className="p-5">
-        <View className="mb-4">
-          <ProfileIdentity
-            displayName={displayName}
-            username={username}
-            avatarUrl={avatarUrl}
-            isDark={isDark}
-            isRTL={isRTL}
-            avatarSize={38}
-            nameSize={14}
-            handleSize={11}
-          />
-        </View>
         <Text
           className="mb-4 text-charcoal dark:text-neutral-100"
           style={{ fontFamily: "Manrope_700Bold", fontSize: 16, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
         >
           {s.progressActivity}
         </Text>
-        <ActivityHeatmap
-          data={review.activity}
-          isDark={isDark}
-          s={s}
-          isRTL={isRTL}
-          activeDays={review.activeDays}
-          totalReviews={review.totalReviews}
-        />
+        <View
+          className="gap-5"
+          style={{
+            flexDirection: isWideActivity ? (isRTL ? "row-reverse" : "row") : "column",
+            alignItems: "stretch",
+          }}
+        >
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <ActivityHeatmap
+              data={review.activity}
+              isDark={isDark}
+              s={s}
+              isRTL={isRTL}
+              activeDays={review.activeDays}
+              totalReviews={review.totalReviews}
+              showSummaryStats={false}
+            />
+          </View>
+          <ProfileActivityStats
+            items={activityStats}
+            numberLocale={numberLocale}
+            isDark={isDark}
+            isWide={isWideActivity}
+            isRTL={isRTL}
+          />
+        </View>
       </Card>
 
       <View>
@@ -596,6 +585,45 @@ function ProfileOverview({
         </Text>
         <PublicBadgesGrid unlocks={publicBadges} />
       </Card>
+    </View>
+  );
+}
+
+function ProfileActivityStats({
+  items,
+  numberLocale,
+  isDark,
+  isWide,
+  isRTL,
+}: {
+  items: { label: string; value: number }[];
+  numberLocale: string;
+  isDark: boolean;
+  isWide: boolean;
+  isRTL: boolean;
+}) {
+  return (
+    <View
+      className="gap-3"
+      style={{
+        width: isWide ? 360 : "100%",
+        flexDirection: isRTL ? "row-reverse" : "row",
+        flexWrap: "wrap",
+        alignContent: "flex-start",
+        justifyContent: "space-between",
+      }}
+    >
+      {items.map((item) => (
+        <ProfileStatCard
+          key={item.label}
+          value={item.value.toLocaleString(numberLocale)}
+          label={item.label}
+          isDark={isDark}
+          isRTL={isRTL}
+          valueSize={18}
+          style={{ width: isWide ? 174 : "48%" }}
+        />
+      ))}
     </View>
   );
 }
