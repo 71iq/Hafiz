@@ -170,7 +170,7 @@ export default function FlashcardSessionScreenWrapper() {
 
 function FlashcardSessionScreen() {
   const db = useDatabase();
-  const { isDark, isRTL, fontSize, lineHeight, tafseerSource, isLoaded: settingsLoaded } = useSettings();
+  const { isDark, isRTL, fontSize, lineHeight, tafseerSource, themeSurface, isLoaded: settingsLoaded } = useSettings();
   const s = useStrings();
   const router = useRouter();
   const { deckId } = useLocalSearchParams<{ deckId?: string }>();
@@ -931,7 +931,7 @@ function FlashcardSessionScreen() {
       {/* Bottom action area */}
       <View
         className="px-6 pb-6 pt-4 items-center"
-        style={{ backgroundColor: isDark ? "rgba(10,10,10,0.95)" : "rgba(255,248,241,0.95)" }}
+        style={{ backgroundColor: withOpacity(themeSurface, 0.95) }}
       >
         <View style={{ width: "100%", maxWidth }}>
           {phase === "front" && (
@@ -1022,6 +1022,16 @@ function FlashcardSessionScreen() {
       />
     </SafeAreaView>
   );
+}
+
+function withOpacity(hexColor: string, opacity: number): string {
+  const match = /^#([0-9a-f]{6})$/i.exec(hexColor);
+  if (!match) return hexColor;
+  const value = match[1];
+  const r = parseInt(value.slice(0, 2), 16);
+  const g = parseInt(value.slice(2, 4), 16);
+  const b = parseInt(value.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${opacity})`;
 }
 
 function CardActionsSheet({
