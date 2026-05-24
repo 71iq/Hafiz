@@ -716,22 +716,21 @@ function AddDeckTile({
   label: string;
 }) {
   return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      style={({ pressed }) => ({
-        width: 78,
-        height: 64,
-        transform: [{ scale: pressed ? 0.96 : 1 }],
-      })}
-    >
+    <View style={{ width: 78, height: 64 }}>
       <Card elevation="low" className="h-full items-center justify-center rounded-3xl">
-        <View className="h-10 w-10 rounded-full bg-primary-accent items-center justify-center">
+        <Pressable
+          onPress={onPress}
+          accessibilityRole="button"
+          accessibilityLabel={label}
+          className="h-10 w-10 rounded-full bg-primary-accent items-center justify-center"
+          style={({ pressed }) => ({
+            transform: [{ scale: pressed ? 0.96 : 1 }],
+          })}
+        >
           <Plus size={20} color="#fff" />
-        </View>
+        </Pressable>
       </Card>
-    </Pressable>
+    </View>
   );
 }
 
