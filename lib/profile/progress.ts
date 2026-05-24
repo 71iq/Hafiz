@@ -22,7 +22,8 @@ export async function getLocalSurahProgress(db: SQLiteDatabase): Promise<Profile
            WHEN sc.deck_id = ? AND sc.id LIKE ? THEN SUBSTR(sc.id, LENGTH(?) + 2)
            ELSE sc.id
          END as ayah_key,
-         sc.state
+         sc.reps,
+         sc.last_review
        FROM study_cards sc
        WHERE sc.id NOT LIKE 'word:%'
          AND sc.deck_id NOT IN (?, ?, ?)
@@ -30,7 +31,7 @@ export async function getLocalSurahProgress(db: SQLiteDatabase): Promise<Profile
      SELECT
        CAST(SUBSTR(ayah_key, 1, INSTR(ayah_key, ':') - 1) AS INTEGER) as surah,
        COUNT(*) as total,
-       SUM(CASE WHEN state = 2 THEN 1 ELSE 0 END) as memorized
+       SUM(CASE WHEN reps > 0 OR last_review IS NOT NULL THEN 1 ELSE 0 END) as memorized
      FROM ayah_cards
      WHERE INSTR(ayah_key, ':') > 1
      GROUP BY surah
