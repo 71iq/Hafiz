@@ -158,7 +158,6 @@ export async function fetchStreakLeaderboard(): Promise<LeaderboardEntry[]> {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const todayIdx = Math.floor(today.getTime() / 86400000);
-  const yesterdayIdx = todayIdx - 1;
 
   const byUser = new Map<string, { username: string; display_name: string | null; avatar_url: string | null; dates: Set<string> }>();
   for (const row of data ?? []) {
@@ -180,7 +179,7 @@ export async function fetchStreakLeaderboard(): Promise<LeaderboardEntry[]> {
     if (indices.length === 0) {
       return { user_id, username: info.username, display_name: info.display_name, avatar_url: info.avatar_url, score: 0 };
     }
-    if (indices[0] < yesterdayIdx) {
+    if (indices[0] !== todayIdx) {
       return { user_id, username: info.username, display_name: info.display_name, avatar_url: info.avatar_url, score: 0 };
     }
     let streak = 0;
@@ -227,11 +226,11 @@ export async function fetchPublicProfile(userId: string): Promise<PublicProfile 
       .maybeSingle();
 
     if (fallback.error) throw fallback.error;
-    return fallback.data ? ({ ...fallback.data, bio: null, country: null } as PublicProfile) : null;
+    return fallback.data ? normalizePublicProfileStreak({ ...fallback.data, bio: null, country: null } as PublicProfile) : null;
   }
 
   if (error) throw error;
-  return (data as PublicProfile | null) ?? null;
+  return data ? normalizePublicProfileStreak(data as PublicProfile) : null;
 }
 
 export async function fetchPublicAchievementUnlocks(userId: string): Promise<AchievementUnlock[]> {
@@ -300,6 +299,15 @@ export async function fetchPublicSurahProgress(userId: string): Promise<PublicSu
     totalCards: row.total_cards ?? 0,
     memorized: row.memorized_cards ?? 0,
   }));
+}
+
+function normalizePublicProfileStreak(profile: PublicProfile): PublicProfile {
+  const lastReviewDate = profile.last_review_date?.slice(0, 10) ?? null;
+  const today = new Date().toISOString().slice(0, 10);
+  return {
+    ...profile,
+    current_streak: lastReviewDate === today ? profile.current_streak ?? 0 : 0,
+  };
 }
 
 function parsePayload(value: unknown): Record<string, unknown> {

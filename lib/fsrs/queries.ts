@@ -171,10 +171,9 @@ function calculateLongestStreak(dateKeys: string[]): number {
 function calculateCurrentStreak(dateKeysDesc: string[], todayIndex: number): number {
   if (dateKeysDesc.length === 0) return 0;
 
-  const yesterdayIndex = todayIndex - 1;
   const firstIndex = dayIndexFromDateKey(dateKeysDesc[0]);
 
-  if (firstIndex < yesterdayIndex) return 0;
+  if (firstIndex !== todayIndex) return 0;
 
   let streak = 0;
   let expectedIndex = firstIndex;
