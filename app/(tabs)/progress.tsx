@@ -2,7 +2,8 @@ import { useState, useCallback, useEffect } from "react";
 import { View, Text, ScrollView, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
-import { BookOpen, ChevronDown, Trophy } from "lucide-react-native";
+import type { SQLiteDatabase } from "expo-sqlite";
+import { BarChart3, BookOpen, ChevronDown, Trophy } from "lucide-react-native";
 import { Card } from "@/components/ui/Card";
 import { ScreenScrollView, useScreenContentLayout } from "@/components/ui/ScreenContent";
 import { OverlayBody, OverlayHeader, ResponsiveModal } from "@/components/ui/ResponsiveOverlay";
@@ -17,10 +18,15 @@ import { useDatabase } from "@/lib/database/provider";
 import { useAuthStore } from "@/lib/auth/store";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import {
+  getDueCount,
   getMemorizedAyahCardCount,
+  getNewCount,
   getReviewStats,
   getTotalAyahCardCount,
+  getTotalCardCount,
+  MEANINGS_DECK_ID,
 } from "@/lib/fsrs/queries";
+import { getSmartDeckStats, SMART_DECK_IDS, type SmartDeckId } from "@/lib/fsrs/smart-decks";
 import { subscribeReviewActivity } from "@/lib/fsrs/review-events";
 import { getAchievementDashboard, type AchievementDashboard } from "@/lib/achievements/queries";
 import { getAchievementDefinition } from "@/lib/achievements/catalog";
@@ -28,6 +34,20 @@ import { DESKTOP_CONTENT_MAX_WIDTH } from "@/lib/ui/viewport";
 import { getLocalSurahProgress, type ProfileSurahProgress } from "@/lib/profile/progress";
 
 type HeatmapDay = { date: string; count: number };
+
+type DefaultDeckProgressKey = "mutashabihat" | "similarTails" | "qiraat" | "vocabulary";
+
+type DefaultDeckProgressItem = {
+  key: DefaultDeckProgressKey;
+  deckId: string;
+  isSmartDeck: boolean;
+  total: number;
+  newCount: number;
+  startedCount: number;
+  dueCount: number;
+  color: string;
+};
+
 export default function ProgressScreen() {
   const s = useStrings();
   const { isDark, isRTL } = useSettings();
@@ -54,16 +74,18 @@ export default function ProgressScreen() {
   const [totalReviews, setTotalReviews] = useState(0);
   const [heatmapData, setHeatmapData] = useState<HeatmapDay[]>([]);
   const [surahProgress, setSurahProgress] = useState<ProfileSurahProgress[]>([]);
+  const [defaultDeckProgress, setDefaultDeckProgress] = useState<DefaultDeckProgressItem[]>([]);
   const [achievementDashboard, setAchievementDashboard] = useState<AchievementDashboard | null>(null);
   const [surahProgressModalOpen, setSurahProgressModalOpen] = useState(false);
   const [achievementsModalOpen, setAchievementsModalOpen] = useState(false);
 
   const loadData = useCallback(async () => {
-    const [cards, memorized, reviewStats, achievements] = await Promise.all([
+    const [cards, memorized, reviewStats, achievements, defaultDecks] = await Promise.all([
       getTotalAyahCardCount(db),
       getMemorizedAyahCardCount(db),
       getReviewStats(db),
       getAchievementDashboard(db),
+      getDefaultDeckProgress(db),
     ]);
     setTotalAyahCards(cards);
     setMemorizedAyahCards(memorized);
@@ -72,6 +94,7 @@ export default function ProgressScreen() {
     setActiveReviewDays(reviewStats.activeDays);
     setTotalReviews(reviewStats.totalReviews);
     setHeatmapData(reviewStats.activity);
+    setDefaultDeckProgress(defaultDecks);
     setAchievementDashboard(achievements);
 
     setSurahProgress(await getLocalSurahProgress(db));
@@ -187,6 +210,13 @@ export default function ProgressScreen() {
             />
           </View>
         </Card>
+
+        <DefaultDeckProgressChart
+          items={defaultDeckProgress}
+          isDark={isDark}
+          isRTL={isRTL}
+          s={s}
+        />
 
         {/* Surah progress */}
         <Text
@@ -333,6 +363,226 @@ export default function ProgressScreen() {
         </OverlayBody>
       </ResponsiveModal>
     </SafeAreaView>
+  );
+}
+
+async function getDefaultDeckProgress(db: SQLiteDatabase): Promise<DefaultDeckProgressItem[]> {
+  const decks: Pick<DefaultDeckProgressItem, "key" | "deckId" | "isSmartDeck" | "color">[] = [
+    { key: "mutashabihat", deckId: SMART_DECK_IDS.mutashabihat, isSmartDeck: true, color: "#0d9488" },
+    { key: "similarTails", deckId: SMART_DECK_IDS.similarTails, isSmartDeck: true, color: "#ca8a04" },
+    { key: "qiraat", deckId: SMART_DECK_IDS.qiraat, isSmartDeck: true, color: "#2563eb" },
+    { key: "vocabulary", deckId: MEANINGS_DECK_ID, isSmartDeck: false, color: "#be123c" },
+  ];
+
+  return Promise.all(decks.map(async (deck) => {
+    if (deck.isSmartDeck) {
+      const stats = await getSmartDeckStats(db, deck.deckId as SmartDeckId);
+      const newCount = Math.max(0, Math.min(stats.total, stats.newCount));
+      return {
+        ...deck,
+        total: stats.total,
+        newCount,
+        startedCount: Math.max(0, stats.total - newCount),
+        dueCount: Math.max(0, Math.min(stats.total, stats.due)),
+      };
+    }
+
+    const [total, rawNewCount, rawDueCount] = await Promise.all([
+      getTotalCardCount(db, deck.deckId),
+      getNewCount(db, deck.deckId),
+      getDueCount(db, deck.deckId),
+    ]);
+    const newCount = Math.max(0, Math.min(total, rawNewCount));
+    return {
+      ...deck,
+      total,
+      newCount,
+      startedCount: Math.max(0, total - newCount),
+      dueCount: Math.max(0, Math.min(total, rawDueCount)),
+    };
+  }));
+}
+
+function DefaultDeckProgressChart({
+  items,
+  isDark,
+  isRTL,
+  s,
+}: {
+  items: DefaultDeckProgressItem[];
+  isDark: boolean;
+  isRTL: boolean;
+  s: any;
+}) {
+  const titles: Record<DefaultDeckProgressKey, string> = {
+    mutashabihat: s.smartDeckMutashabihatTitle,
+    similarTails: s.smartDeckSimilarTailsTitle,
+    qiraat: s.smartDeckQiraatTitle,
+    vocabulary: s["achievementCategory.vocab"] ?? s.vocabDeckTitle,
+  };
+  const totalCards = items.reduce((sum, item) => sum + item.total, 0);
+
+  return (
+    <Card elevation="low" className="p-5 mb-6">
+      <View className={`flex-row items-center gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
+        <View
+          className="h-11 w-11 items-center justify-center rounded-full"
+          style={{ backgroundColor: isDark ? "rgba(45,212,191,0.12)" : "rgba(13,148,136,0.10)" }}
+        >
+          <BarChart3 size={20} color={isDark ? "#2dd4bf" : "#0d9488"} />
+        </View>
+        <View className={`min-w-0 flex-1 ${isRTL ? "items-end" : "items-start"}`}>
+          <Text
+            className="text-charcoal dark:text-neutral-200"
+            style={{ fontFamily: "Manrope_700Bold", fontSize: 16, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
+          >
+            {s.progressDefaultDecks}
+          </Text>
+          <Text
+            className="mt-1 text-warm-400 dark:text-neutral-500"
+            style={{ fontFamily: "Manrope_500Medium", fontSize: 12, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
+          >
+            {`${s.flashcardsTotalCards}: ${totalCards.toLocaleString()}`}
+          </Text>
+        </View>
+      </View>
+      <View className={`mt-4 flex-row items-center gap-3 ${isRTL ? "flex-row-reverse" : ""}`} style={{ flexWrap: "wrap" }}>
+        <DeckLegendDot label={s.progressDeckStarted} color={isDark ? "#2dd4bf" : "#0d9488"} isRTL={isRTL} />
+        <DeckLegendDot label={s.flashcardsNewCards} color={isDark ? "#525252" : "#E5DDD4"} isRTL={isRTL} />
+      </View>
+
+      {totalCards > 0 ? (
+        <View className="mt-5 gap-4">
+          {items.map((item) => (
+            <DefaultDeckProgressRow
+              key={item.key}
+              title={titles[item.key]}
+              item={item}
+              isDark={isDark}
+              isRTL={isRTL}
+              s={s}
+            />
+          ))}
+        </View>
+      ) : (
+        <Text
+          className="mt-5 text-warm-500 dark:text-neutral-400"
+          style={{ fontFamily: "Manrope_500Medium", fontSize: 13, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
+        >
+          {s.progressDefaultDecksEmpty}
+        </Text>
+      )}
+    </Card>
+  );
+}
+
+function DefaultDeckProgressRow({
+  title,
+  item,
+  isDark,
+  isRTL,
+  s,
+}: {
+  title: string;
+  item: DefaultDeckProgressItem;
+  isDark: boolean;
+  isRTL: boolean;
+  s: any;
+}) {
+  const startedPct = item.total > 0 ? Math.round((item.startedCount / item.total) * 100) : 0;
+  const barWidth = `${startedPct}%` as `${number}%`;
+  return (
+    <View>
+      <View className={`mb-2 flex-row items-center justify-between gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
+        <Text
+          className="min-w-0 flex-1 text-charcoal dark:text-neutral-200"
+          style={{ fontFamily: "Manrope_700Bold", fontSize: 13, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
+          numberOfLines={1}
+        >
+          {title}
+        </Text>
+        <Text
+          className="text-warm-500 dark:text-neutral-400"
+          style={{ fontFamily: "Manrope_700Bold", fontSize: 12, fontVariant: ["tabular-nums"] }}
+        >
+          {`${item.startedCount.toLocaleString()} / ${item.total.toLocaleString()}`}
+        </Text>
+      </View>
+      <View
+        className="h-3 overflow-hidden rounded-full"
+        style={{
+          backgroundColor: isDark ? "#262626" : "#E9E1D8",
+        }}
+      >
+        <View
+          className="h-full rounded-full"
+          style={{
+            width: barWidth,
+            alignSelf: isRTL ? "flex-end" : "flex-start",
+            backgroundColor: item.color,
+          }}
+        />
+      </View>
+      <View className={`mt-2 flex-row flex-wrap gap-2 ${isRTL ? "flex-row-reverse" : ""}`}>
+        <DeckMetric label={s.progressDeckStarted} value={item.startedCount} isDark={isDark} isRTL={isRTL} />
+        <DeckMetric label={s.flashcardsNewCards} value={item.newCount} isDark={isDark} isRTL={isRTL} />
+        <DeckMetric label={s.deckCardsFilterDue} value={item.dueCount} isDark={isDark} isRTL={isRTL} />
+      </View>
+    </View>
+  );
+}
+
+function DeckMetric({
+  label,
+  value,
+  isDark,
+  isRTL,
+}: {
+  label: string;
+  value: number;
+  isDark: boolean;
+  isRTL: boolean;
+}) {
+  return (
+    <View
+      className={`flex-row items-center gap-1.5 rounded-full px-2.5 py-1 ${isRTL ? "flex-row-reverse" : ""}`}
+      style={{ backgroundColor: isDark ? "#171717" : "#F5EEE7" }}
+    >
+      <Text
+        className="text-charcoal dark:text-neutral-200"
+        style={{ fontFamily: "Manrope_700Bold", fontSize: 11, fontVariant: ["tabular-nums"] }}
+      >
+        {value.toLocaleString()}
+      </Text>
+      <Text
+        className="text-warm-500 dark:text-neutral-500"
+        style={{ fontFamily: "Manrope_500Medium", fontSize: 10, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+function DeckLegendDot({
+  label,
+  color,
+  isRTL,
+}: {
+  label: string;
+  color: string;
+  isRTL: boolean;
+}) {
+  return (
+    <View className={`flex-row items-center gap-1.5 ${isRTL ? "flex-row-reverse" : ""}`}>
+      <View className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
+      <Text
+        className="text-warm-500 dark:text-neutral-500"
+        style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
+      >
+        {label}
+      </Text>
+    </View>
   );
 }
 
