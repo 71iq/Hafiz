@@ -274,8 +274,16 @@ function LeaderboardPodiumCard({
     ? isFirst ? "#172B28" : "#141414"
     : isFirst ? "#FFF3D8" : "#FAF8F5";
   const scoreBg = isDark
-    ? isFirst ? "rgba(245, 194, 75, 0.13)" : "rgba(253, 220, 145, 0.08)"
-    : isFirst ? "rgba(245, 194, 75, 0.20)" : "rgba(0, 54, 56, 0.05)";
+    ? entry.rank === 1
+      ? "rgba(245, 194, 75, 0.13)"
+      : entry.rank === 2
+        ? "rgba(183, 190, 207, 0.14)"
+        : "rgba(196, 154, 98, 0.15)"
+    : entry.rank === 1
+      ? "rgba(245, 194, 75, 0.20)"
+      : entry.rank === 2
+        ? "rgba(183, 190, 207, 0.24)"
+        : "rgba(196, 154, 98, 0.24)";
   const scoreColor = isDark
     ? isFirst ? "#FDDC91" : "#F5F5F4"
     : isFirst ? "#2D2419" : "#1D1D1B";
