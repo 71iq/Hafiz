@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 import { useRouter } from "expo-router";
-import { useFocusEffect } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
 import { Camera, Check, ChevronDown, MapPin, Pencil, Save, Search, Trash2, UserRound, X, type LucideIcon } from "lucide-react-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -275,11 +274,12 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
   const saveProfileBackgroundColor = saveProfileDisabled && !profileSaving
     ? isDark ? "#262626" : "#E6DED5"
     : isDark ? "#0f766e" : "#0d9488";
+  const ownStats = localStats ?? { currentStreak: 0, longestStreak: 0, cardsReviewed: 0, totalScore: 0 };
   const stats = [
-    { label: s.wirdCurrent, value: isOwnProfile ? localStats?.currentStreak ?? profile?.current_streak ?? 0 : visibleProfile?.current_streak ?? 0 },
-    { label: s.wirdLongest, value: isOwnProfile ? localStats?.longestStreak ?? profile?.longest_streak ?? 0 : visibleProfile?.longest_streak ?? 0 },
-    { label: s.flashcardsSummaryReviewed, value: isOwnProfile ? localStats?.cardsReviewed ?? profile?.cards_reviewed ?? 0 : visibleProfile?.cards_reviewed ?? 0 },
-    { label: s.leaderboardPoints, value: isOwnProfile ? localStats?.totalScore ?? profile?.total_score ?? 0 : visibleProfile?.total_score ?? 0 },
+    { label: s.wirdCurrent, value: isOwnProfile ? ownStats.currentStreak : visibleProfile?.current_streak ?? 0 },
+    { label: s.wirdLongest, value: isOwnProfile ? ownStats.longestStreak : visibleProfile?.longest_streak ?? 0 },
+    { label: s.flashcardsSummaryReviewed, value: isOwnProfile ? ownStats.cardsReviewed : visibleProfile?.cards_reviewed ?? 0 },
+    { label: s.leaderboardPoints, value: isOwnProfile ? ownStats.totalScore : visibleProfile?.total_score ?? 0 },
   ];
   const review = isOwnProfile
     ? localReview
@@ -311,13 +311,11 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
 
   const loadLocalOverview = useCallback(async () => {
     if (!user) return;
-    const [wirdStatus, totalScore, cardsReviewedRow, reviewStats, defaultDecks, surahs] = await Promise.all([
+    const [wirdStatus, totalScore, cardsReviewedRow, reviewStats] = await Promise.all([
       getWirdStatus(db),
       getTotalScore(db),
       db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM study_log"),
       getReviewStats(db),
-      getDefaultDeckProgress(db),
-      getLocalSurahProgress(db),
     ]);
     setLocalStats({
       currentStreak: wirdStatus.currentDays,
@@ -330,6 +328,17 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
       activeDays: reviewStats.activeDays,
       totalReviews: reviewStats.totalReviews,
     });
+
+    const [defaultDecks, surahs] = await Promise.all([
+      getDefaultDeckProgress(db).catch((error) => {
+        console.warn("[Profile] Failed to load default deck progress:", error);
+        return [];
+      }),
+      getLocalSurahProgress(db).catch((error) => {
+        console.warn("[Profile] Failed to load surah progress:", error);
+        return [];
+      }),
+    ]);
     setDefaultDeckProgress(defaultDecks);
     setLocalSurahProgress(surahs);
   }, [db, user]);
@@ -342,13 +351,11 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
     queryClient.invalidateQueries({ queryKey: ["leaderboard"] });
   }, [queryClient]);
 
-  useFocusEffect(
-    useCallback(() => {
-      if (!isOwnProfile) return;
-      loadLocalOverview().catch(console.warn);
-      updateProfileStats(db).catch(console.warn);
-    }, [db, isOwnProfile, loadLocalOverview])
-  );
+  useEffect(() => {
+    if (!isOwnProfile) return;
+    loadLocalOverview().catch(console.warn);
+    updateProfileStats(db).catch(console.warn);
+  }, [db, isOwnProfile, loadLocalOverview]);
 
   useEffect(() => {
     if (!isOwnProfile) return;
