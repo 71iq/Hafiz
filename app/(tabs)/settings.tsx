@@ -34,6 +34,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { toArabicNumber } from "@/lib/arabic";
 import { SETTINGS_CONTENT_MAX_WIDTH, SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { ZaytPreviewModal } from "@/components/zayt/ZaytPreviewModal";
+import { ProfileIdentity } from "@/components/profile/ProfileIdentity";
 
 type SettingsCategoryId = "general" | "reading" | "content" | "account" | "about" | "advanced";
 
@@ -72,8 +73,7 @@ export default function SettingsScreen() {
   const currentLang = getLanguageByCode(translationLanguage);
   const currentReciter = getReciterById(recitationId);
   const { user, profile, isLoading: authLoading, signOut } = useAuthStore();
-  const accountName = profile?.display_name || profile?.username || user?.email || s.authProfile;
-  const accountHandle = profile?.username ? `@${profile.username}` : user?.email || "";
+  const accountName = profile?.display_name || profile?.username || user?.email?.split("@")[0] || s.authProfile;
   const fontSizeUsesFittedPageSize = viewMode === "page" && pageScroll === "horizontal";
   const fontSizeLevelLabel = isRTL ? toArabicNumber(fontSizeIndex + 1) : String(fontSizeIndex + 1);
   const fontSizeTotalLabel = isRTL ? toArabicNumber(FONT_SIZE_STEPS.length) : String(FONT_SIZE_STEPS.length);
@@ -499,37 +499,25 @@ export default function SettingsScreen() {
           <Card elevation="low" className="p-5 mb-8">
             {user ? (
               <View>
-                <View className="flex-row items-center gap-3 mb-4">
-                  <View className="w-12 h-12 rounded-full bg-primary-accent/10 dark:bg-primary-bright/15 items-center justify-center">
-                    <User size={22} color={isDark ? "#2dd4bf" : "#0d9488"} />
-                  </View>
-                  <View className="flex-1">
-                    <Text
-                      className="text-charcoal dark:text-neutral-100"
-                      style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16 }}
-                    >
-                      {accountName}
-                    </Text>
-                    {!!accountHandle && (
-                      <Text
-                        className="text-warm-400 dark:text-neutral-500"
-                        style={{ fontFamily: "Manrope_400Regular", fontSize: 13 }}
-                      >
-                        {accountHandle}
-                      </Text>
-                    )}
-                  </View>
-                </View>
-                <View className="mb-4">
-                  <SettingsLinkRow
-                    icon={User}
-                    title={s.settingsProfile}
-                    description={s.settingsProfileDesc}
-                    onPress={() => router.push("/profile" as any)}
+                <Pressable
+                  onPress={() => router.push("/profile" as any)}
+                  accessibilityRole="button"
+                  accessibilityLabel={s.settingsProfile}
+                  className={`mb-4 items-center gap-3 rounded-3xl bg-surface dark:bg-surface-dark p-4 ${isRTL ? "flex-row-reverse" : "flex-row"}`}
+                  style={({ pressed }) => ({ opacity: pressed ? 0.74 : 1 })}
+                >
+                  <ProfileIdentity
+                    displayName={accountName}
+                    username={profile?.username}
+                    avatarUrl={profile?.avatar_url}
                     isDark={isDark}
                     isRTL={isRTL}
+                    avatarSize={52}
+                    nameSize={16}
+                    handleSize={12}
                   />
-                </View>
+                  <TranslationChevron size={18} color={isDark ? "#525252" : "#DFD9D1"} />
+                </Pressable>
                 {configured && qfSyncEnabled && (
                   <View className="mb-4 rounded-3xl bg-surface dark:bg-surface-dark p-4">
                     <View className="flex-row items-center gap-3">

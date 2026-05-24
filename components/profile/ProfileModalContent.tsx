@@ -3,14 +3,13 @@ import { ActivityIndicator, Pressable, Text, View, useWindowDimensions } from "r
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
-import { Camera, LogOut, Pencil, Save, Trash2, UserRound, type LucideIcon } from "lucide-react-native";
+import { Camera, Pencil, Save, Trash2, UserRound, type LucideIcon } from "lucide-react-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { PublicBadgesGrid } from "@/components/achievements/PublicBadgesGrid";
 import { ActivityHeatmap } from "@/components/progress/ActivityHeatmap";
 import { SurahProgressList } from "@/components/progress/SurahProgressList";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Input } from "@/components/ui/Input";
 import { OverlayBody, OverlayHeader, ResponsiveModal, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
@@ -65,13 +64,12 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
   const s = useStrings();
   const { isDark, isRTL, uiLanguage } = useSettings();
   const { width, height } = useWindowDimensions();
-  const { user, profile, isLoading: authLoading, signOut, updateProfile } = useAuthStore();
+  const { user, profile, isLoading: authLoading, updateProfile } = useAuthStore();
   const [activeTab, setActiveTab] = useState<ProfileTab>("overview");
   const [localStats, setLocalStats] = useState<ProfileStatsSnapshot | null>(null);
   const [localReview, setLocalReview] = useState<ReviewSnapshot>({ activity: [], activeDays: 0, totalReviews: 0 });
   const [localSurahProgress, setLocalSurahProgress] = useState<ProfileSurahProgress[]>([]);
   const [editOpen, setEditOpen] = useState(false);
-  const [logoutDialogVisible, setLogoutDialogVisible] = useState(false);
   const [displayNameDraft, setDisplayNameDraft] = useState("");
   const [bioDraft, setBioDraft] = useState("");
   const [avatarDraft, setAvatarDraft] = useState<ImagePicker.ImagePickerAsset | null>(null);
@@ -251,12 +249,6 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
     });
   }, [db, isOwnProfile, loadLocalOverview, queryClient, user?.id]);
 
-  const handleLogout = useCallback(async () => {
-    setLogoutDialogVisible(false);
-    await signOut();
-    close();
-  }, [close, signOut]);
-
   const handleSaveProfile = useCallback(async () => {
     if (!user || !profileDirty) return;
     setProfileSaving(true);
@@ -322,7 +314,6 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
   const headerActions = isOwnProfile && user ? (
     <View className={`items-center gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
       <HeaderAction icon={Pencil} label={s.profileEditAction} color={isDark ? "#2dd4bf" : "#0d9488"} onPress={() => setEditOpen(true)} />
-      <HeaderAction icon={LogOut} label={s.profileLogoutAction} color={isDark ? "#ef4444" : "#dc2626"} onPress={() => setLogoutDialogVisible(true)} />
     </View>
   ) : null;
 
@@ -526,18 +517,6 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
         </OverlayBody>
       </ResponsiveModal>
 
-      <ConfirmDialog
-        visible={logoutDialogVisible}
-        title={s.authLogout}
-        message={s.authLogoutConfirm}
-        cancelLabel={s.flashcardsCancel}
-        confirmLabel={s.authLogout}
-        destructive
-        isDark={isDark}
-        isRTL={isRTL}
-        onCancel={() => setLogoutDialogVisible(false)}
-        onConfirm={handleLogout}
-      />
     </>
   );
 }
