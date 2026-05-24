@@ -126,8 +126,8 @@ export const ALL_NEW_REVIEW_ORDERS: NewReviewOrder[] = ["reviewsFirst", "newFirs
 export const ALL_REVIEW_SORT_ORDERS: ReviewSortOrder[] = ["due", "oldest", "newest", "random"];
 export const ALL_NEW_CARD_SORT_ORDERS: NewCardSortOrder[] = ["created", "random"];
 export const DEFAULT_NEW_REVIEW_ORDER: NewReviewOrder = "mixed";
-export const DEFAULT_REVIEW_SORT_ORDER: ReviewSortOrder = "due";
-export const DEFAULT_NEW_CARD_SORT_ORDER: NewCardSortOrder = "created";
+export const DEFAULT_REVIEW_SORT_ORDER: ReviewSortOrder = "random";
+export const DEFAULT_NEW_CARD_SORT_ORDER: NewCardSortOrder = "random";
 
 export type DeckReviewSettings = {
   dailyReviewLimit: number;
