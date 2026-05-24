@@ -235,6 +235,10 @@ export default function ReflectionFeedScreen() {
     [queryClient]
   );
 
+  const openPostModal = useCallback((reflectionId: string) => {
+    setCommentsReflectionId(reflectionId);
+  }, []);
+
   const showAuthRequired = useCallback(() => {
     setToast(s.reflectionFeedAuthRequired);
   }, [s.reflectionFeedAuthRequired]);
@@ -273,12 +277,18 @@ export default function ReflectionFeedScreen() {
         showReference
         referenceLabel={formatReference(item)}
         onReferencePress={handleReferencePress}
-        onCommentsPress={setCommentsReflectionId}
+        onCommentsPress={openPostModal}
+        onPress={openPostModal}
         onLikeToggled={() => {}}
         onAuthRequired={showAuthRequired}
       />
     ),
-    [formatReference, handleReferencePress, showAuthRequired]
+    [formatReference, handleReferencePress, openPostModal, showAuthRequired]
+  );
+
+  const commentsReflection = useMemo(
+    () => reflections.find((reflection) => reflection.id === commentsReflectionId) ?? null,
+    [commentsReflectionId, reflections]
   );
 
   const listFooter = configured && feedQuery.hasNextPage ? (
@@ -441,6 +451,12 @@ export default function ReflectionFeedScreen() {
 
       <CommentsSheet
         reflectionId={commentsReflectionId}
+        reflection={commentsReflection}
+        showReference
+        referenceLabel={commentsReflection ? formatReference(commentsReflection) : undefined}
+        onReferencePress={handleReferencePress}
+        onLikeToggled={() => {}}
+        onAuthRequired={showAuthRequired}
         onClose={() => setCommentsReflectionId(null)}
         onCommentAdded={handleCommentAdded}
       />

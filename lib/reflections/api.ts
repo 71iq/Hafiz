@@ -1,5 +1,12 @@
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
-import type { Reflection, ReflectionComment, ReflectionFeedFilter, ReflectionFeedSort, ReflectionJuzRange } from "./types";
+import type {
+  Reflection,
+  ReflectionComment,
+  ReflectionCommentSort,
+  ReflectionFeedFilter,
+  ReflectionFeedSort,
+  ReflectionJuzRange,
+} from "./types";
 
 const PAGE_SIZE = 5;
 const FEED_PAGE_SIZE = 10;
@@ -23,6 +30,15 @@ function isMissingJuzColumnsError(error: { code?: string; message?: string } | n
       error.code === "PGRST205" ||
       error.message?.includes("juz_start") ||
       error.message?.includes("juz_end"))
+  );
+}
+
+function isMissingColumnError(error: { code?: string; message?: string } | null, column: string): boolean {
+  return !!(
+    error &&
+    (error.code === "PGRST204" ||
+      error.code === "PGRST205" ||
+      error.message?.includes(column))
   );
 }
 
@@ -243,17 +259,34 @@ export async function toggleLike(
 /** Fetch comments for a reflection */
 export async function fetchComments(
   reflectionId: string,
-  page: number
+  page: number,
+  sort: ReflectionCommentSort = "oldest"
 ): Promise<{ data: ReflectionComment[]; hasMore: boolean }> {
   if (!isSupabaseConfigured()) return { data: [], hasMore: false };
 
   const { from, to } = pageBounds(page, COMMENT_PAGE_SIZE);
-  const { data, error } = await supabase
-    .from("reflection_comments")
-    .select("*, profiles:profiles!reflection_comments_user_id_fkey(username, display_name, avatar_url)")
-    .eq("reflection_id", reflectionId)
-    .order("created_at", { ascending: true })
-    .range(from, to);
+  const buildQuery = () =>
+    supabase
+      .from("reflection_comments")
+      .select("*, profiles:profiles!reflection_comments_user_id_fkey(username, display_name, avatar_url)")
+      .eq("reflection_id", reflectionId);
+
+  const applySort = (query: ReturnType<typeof buildQuery>, nextSort: ReflectionCommentSort, usePopularity: boolean) => {
+    if (nextSort === "newest") return query.order("created_at", { ascending: false });
+    if (nextSort === "popular" && usePopularity) {
+      return query.order("likes_count", { ascending: false }).order("created_at", { ascending: false });
+    }
+    if (nextSort === "popular") return query.order("created_at", { ascending: false });
+    return query.order("created_at", { ascending: true });
+  };
+
+  const { data, error } = await applySort(buildQuery(), sort, true).range(from, to);
+
+  if (error && sort === "popular" && isMissingColumnError(error, "likes_count")) {
+    const fallback = await applySort(buildQuery(), sort, false).range(from, to);
+    if (fallback.error) throw fallback.error;
+    return pageResult((fallback.data ?? []) as ReflectionComment[], COMMENT_PAGE_SIZE);
+  }
 
   if (error) throw error;
   return pageResult((data ?? []) as ReflectionComment[], COMMENT_PAGE_SIZE);

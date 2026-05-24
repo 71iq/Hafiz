@@ -14,6 +14,7 @@ type Props = {
   reflection: Reflection;
   onLikeToggled: (reflectionId: string, liked: boolean, delta: number) => void;
   onCommentsPress: (reflectionId: string) => void;
+  onPress?: (reflectionId: string) => void;
   variant?: "compact" | "feed";
   showReference?: boolean;
   referenceLabel?: string;
@@ -44,6 +45,7 @@ export function ReflectionCard({
   reflection,
   onLikeToggled,
   onCommentsPress,
+  onPress,
   variant = "compact",
   showReference = false,
   referenceLabel,
@@ -123,6 +125,21 @@ export function ReflectionCard({
   const openProfile = useCallback(() => {
     router.push(reflection.user_id === user?.id ? "/profile" as any : `/profile/${reflection.user_id}` as any);
   }, [reflection.user_id, user?.id]);
+  const contentText = (
+    <Text
+      className="text-charcoal dark:text-neutral-200"
+      style={{
+        fontFamily: "Manrope_400Regular",
+        fontSize: isFeed ? 15 : 14,
+        lineHeight: isFeed ? 25 : 23,
+        marginBottom: isFeed ? 14 : 12,
+        textAlign: contentAlign,
+        writingDirection: isRTL ? "rtl" : "ltr",
+      }}
+    >
+      {reflection.content}
+    </Text>
+  );
 
   return (
     <>
@@ -230,19 +247,17 @@ export function ReflectionCard({
         </Pressable>
       ) : null}
 
-      <Text
-        className="text-charcoal dark:text-neutral-200"
-        style={{
-          fontFamily: "Manrope_400Regular",
-          fontSize: isFeed ? 15 : 14,
-          lineHeight: isFeed ? 25 : 23,
-          marginBottom: isFeed ? 14 : 12,
-          textAlign: contentAlign,
-          writingDirection: isRTL ? "rtl" : "ltr",
-        }}
-      >
-        {reflection.content}
-      </Text>
+      {onPress ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => onPress(reflection.id)}
+          style={({ pressed }) => ({ opacity: pressed ? 0.72 : 1 })}
+        >
+          {contentText}
+        </Pressable>
+      ) : (
+        contentText
+      )}
 
       <View
         className={`${rowClassName} items-center gap-2`}

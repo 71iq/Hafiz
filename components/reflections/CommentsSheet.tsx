@@ -1,19 +1,26 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { View, Text, Pressable, ActivityIndicator } from "react-native";
-import { Send } from "lucide-react-native";
+import { ChevronDown, Send } from "lucide-react-native";
 import { router } from "expo-router";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useAuthStore } from "@/lib/auth/store";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { fetchComments, addComment } from "@/lib/reflections/api";
-import type { ReflectionComment } from "@/lib/reflections/types";
+import type { Reflection, ReflectionComment, ReflectionCommentSort } from "@/lib/reflections/types";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { Input } from "@/components/ui/Input";
 import { ProfileIdentity } from "@/components/profile/ProfileIdentity";
+import { ReflectionCard } from "./ReflectionCard";
 
 type Props = {
   reflectionId: string | null;
+  reflection?: Reflection | null;
+  referenceLabel?: string;
+  showReference?: boolean;
+  onReferencePress?: (reflection: Reflection) => void;
+  onLikeToggled?: (reflectionId: string, liked: boolean, delta: number) => void;
+  onAuthRequired?: () => void;
   onClose: () => void;
   onCommentAdded: (reflectionId: string) => void;
 };
@@ -36,18 +43,53 @@ function relativeTime(dateStr: string, justNowLabel: string, locale: string): st
   return new Date(dateStr).toLocaleDateString(locale);
 }
 
-export function CommentsSheet({ reflectionId, onClose, onCommentAdded }: Props) {
+function sortComments(comments: ReflectionComment[], sort: ReflectionCommentSort): ReflectionComment[] {
+  const sorted = [...comments];
+  const createdAt = (comment: ReflectionComment) => new Date(comment.created_at).getTime();
+  if (sort === "newest") return sorted.sort((a, b) => createdAt(b) - createdAt(a));
+  if (sort === "popular") {
+    return sorted.sort((a, b) => {
+      const likesDelta = (b.likes_count ?? 0) - (a.likes_count ?? 0);
+      return likesDelta !== 0 ? likesDelta : createdAt(b) - createdAt(a);
+    });
+  }
+  return sorted.sort((a, b) => createdAt(a) - createdAt(b));
+}
+
+export function CommentsSheet({
+  reflectionId,
+  reflection,
+  referenceLabel,
+  showReference = false,
+  onReferencePress,
+  onLikeToggled,
+  onAuthRequired,
+  onClose,
+  onCommentAdded,
+}: Props) {
   const { isDark, isRTL, uiLanguage } = useSettings();
   const s = useStrings();
   const user = useAuthStore((s) => s.user);
   const [localComments, setLocalComments] = useState<ReflectionComment[]>([]);
+  const [sort, setSort] = useState<ReflectionCommentSort>("oldest");
+  const [sortOpen, setSortOpen] = useState(false);
   const [text, setText] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const sortOptions = useMemo<{ value: ReflectionCommentSort; label: string }[]>(
+    () => [
+      { value: "popular", label: s.commentSortPopular },
+      { value: "oldest", label: s.commentSortOldest },
+      { value: "newest", label: s.commentSortNewest },
+    ],
+    [s.commentSortNewest, s.commentSortOldest, s.commentSortPopular]
+  );
+  const selectedSortLabel = sortOptions.find((option) => option.value === sort)?.label ?? s.commentSortOldest;
+
   const commentsQuery = useInfiniteQuery({
-    queryKey: ["reflectionComments", reflectionId],
-    queryFn: ({ pageParam }) => fetchComments(reflectionId ?? "", pageParam),
+    queryKey: ["reflectionComments", reflectionId, sort],
+    queryFn: ({ pageParam }) => fetchComments(reflectionId ?? "", pageParam, sort),
     initialPageParam: 0,
     getNextPageParam: (lastPage, allPages) => (lastPage.hasMore ? allPages.length : undefined),
     enabled: !!reflectionId,
@@ -61,13 +103,14 @@ export function CommentsSheet({ reflectionId, onClose, onCommentAdded }: Props) 
 
   const comments = useMemo(() => {
     const loadedIds = new Set(loadedComments.map((comment) => comment.id));
-    return [...loadedComments, ...localComments.filter((comment) => !loadedIds.has(comment.id))];
-  }, [loadedComments, localComments]);
+    return sortComments([...loadedComments, ...localComments.filter((comment) => !loadedIds.has(comment.id))], sort);
+  }, [loadedComments, localComments, sort]);
 
   useEffect(() => {
     setLocalComments([]);
     setText("");
     setError(null);
+    setSortOpen(false);
   }, [reflectionId]);
 
   useEffect(() => {
@@ -115,42 +158,108 @@ export function CommentsSheet({ reflectionId, onClose, onCommentAdded }: Props) 
   return (
     <>
     <ResponsiveSheet open={!!reflectionId} onClose={onClose} maxWidth={760} dir={isRTL ? "rtl" : "ltr"} avoidKeyboard>
-      <OverlayHeader title={s.reflectionComments} subtitle={s.reflections} onClose={onClose} showHandle isRTL={isRTL} />
-      <View className="flex-1 min-h-0 px-5 pt-4 pb-4 gap-3">
-        <View
-          className="rounded-2xl px-3 py-2"
-          style={{ backgroundColor: isDark ? "#141414" : "#F7F3EC" }}
-        >
-          <Text
-            style={{
-              fontFamily: "Manrope_600SemiBold",
-              fontSize: 10,
-              letterSpacing: 1,
-              textTransform: "uppercase",
-              color: mutedColor,
-              textAlign: isRTL ? "right" : "left",
-              writingDirection: isRTL ? "rtl" : "ltr",
-            }}
-          >
-            {s.reflectionThreadLabel}
-          </Text>
-        </View>
+      <OverlayHeader title={reflection ? s.reflectionPostTitle : s.reflectionComments} subtitle={s.reflections} onClose={onClose} showHandle isRTL={isRTL} />
+      <View className="flex-1 min-h-0">
+        <OverlayBody className="flex-1 min-h-0" contentContainerClassName="px-5 pt-4 pb-3">
+          {reflection ? (
+            <ReflectionCard
+              reflection={reflection}
+              variant="feed"
+              showReference={showReference}
+              referenceLabel={referenceLabel}
+              onReferencePress={onReferencePress}
+              onCommentsPress={() => {}}
+              onLikeToggled={onLikeToggled ?? (() => {})}
+              onAuthRequired={onAuthRequired}
+            />
+          ) : null}
 
-        {error ? (
-          <Text
-            className="text-red-600 dark:text-red-400"
-            style={{
-              fontFamily: "Manrope_500Medium",
-              fontSize: 12,
-              textAlign: isRTL ? "right" : "left",
-              writingDirection: isRTL ? "rtl" : "ltr",
-            }}
-          >
-            {error}
-          </Text>
-        ) : null}
+          <View className="mb-3">
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={s.commentSortBy}
+              onPress={() => setSortOpen((open) => !open)}
+              className={`items-center justify-between gap-2 rounded-full px-3.5 py-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`}
+              style={({ pressed }) => ({
+                backgroundColor: isDark ? "#141414" : "#F8FAFC",
+                borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,54,56,0.08)",
+                borderWidth: 1,
+                opacity: pressed ? 0.72 : 1,
+              })}
+            >
+              <Text
+                className="text-charcoal dark:text-neutral-200"
+                style={{
+                  fontFamily: "Manrope_600SemiBold",
+                  fontSize: 12,
+                  textAlign: isRTL ? "right" : "left",
+                  writingDirection: isRTL ? "rtl" : "ltr",
+                }}
+              >
+                {`${s.commentSortBy}: ${selectedSortLabel}`}
+              </Text>
+              <ChevronDown size={15} color={mutedColor} />
+            </Pressable>
+            {sortOpen ? (
+              <View
+                className="mt-2 overflow-hidden rounded-2xl"
+                style={{
+                  backgroundColor: isDark ? "#141414" : "#FFFFFF",
+                  borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,54,56,0.08)",
+                  borderWidth: 1,
+                }}
+              >
+                {sortOptions.map((option, index) => {
+                  const active = option.value === sort;
+                  return (
+                    <Pressable
+                      key={option.value}
+                      onPress={() => {
+                        setSort(option.value);
+                        setSortOpen(false);
+                      }}
+                      className="px-4 py-3"
+                      style={({ pressed }) => ({
+                        backgroundColor: active
+                          ? isDark ? "rgba(45,212,191,0.12)" : "rgba(13,148,136,0.08)"
+                          : "transparent",
+                        borderTopWidth: index === 0 ? 0 : 1,
+                        borderTopColor: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,54,56,0.06)",
+                        opacity: pressed ? 0.72 : 1,
+                      })}
+                    >
+                      <Text
+                        className={active ? "text-primary-accent dark:text-primary-bright" : "text-charcoal dark:text-neutral-200"}
+                        style={{
+                          fontFamily: active ? "Manrope_700Bold" : "Manrope_500Medium",
+                          fontSize: 13,
+                          textAlign: isRTL ? "right" : "left",
+                          writingDirection: isRTL ? "rtl" : "ltr",
+                        }}
+                      >
+                        {option.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : null}
+          </View>
 
-        <OverlayBody className="flex-1 min-h-0" contentContainerClassName="pb-2">
+          {error ? (
+            <Text
+              className="mb-3 text-red-600 dark:text-red-400"
+              style={{
+                fontFamily: "Manrope_500Medium",
+                fontSize: 12,
+                textAlign: isRTL ? "right" : "left",
+                writingDirection: isRTL ? "rtl" : "ltr",
+              }}
+            >
+              {error}
+            </Text>
+          ) : null}
+
           {commentsQuery.isLoading ? (
             <ActivityIndicator style={{ padding: 20 }} />
           ) : comments.length === 0 ? (
@@ -231,7 +340,7 @@ export function CommentsSheet({ reflectionId, onClose, onCommentAdded }: Props) 
 
         {user ? (
           <View
-            className={`items-center gap-2 rounded-2xl border border-warm-200 bg-surface-low px-3.5 py-2.5 dark:border-neutral-700 dark:bg-surface-dark-low ${isRTL ? "flex-row-reverse" : "flex-row"}`}
+            className={`mx-5 mb-4 items-center gap-2 rounded-2xl border border-warm-200 bg-surface-low px-3.5 py-2.5 dark:border-neutral-700 dark:bg-surface-dark-low ${isRTL ? "flex-row-reverse" : "flex-row"}`}
           >
             <Input
               value={text}
@@ -270,7 +379,7 @@ export function CommentsSheet({ reflectionId, onClose, onCommentAdded }: Props) 
             </Pressable>
           </View>
         ) : (
-          <View className="rounded-2xl bg-surface-low dark:bg-surface-dark-low px-4 py-3">
+          <View className="mx-5 mb-4 rounded-2xl bg-surface-low dark:bg-surface-dark-low px-4 py-3">
             <Text
               className="text-warm-500 dark:text-neutral-400"
               style={{
