@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, Text, View, useWindowDimensions } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
-import { Camera, MapPin, Pencil, Save, Trash2, UserRound, type LucideIcon } from "lucide-react-native";
+import { Camera, Check, ChevronDown, MapPin, Pencil, Save, Search, Trash2, UserRound, X, type LucideIcon } from "lucide-react-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { PublicBadgesGrid } from "@/components/achievements/PublicBadgesGrid";
 import { ActivityHeatmap } from "@/components/progress/ActivityHeatmap";
@@ -31,7 +31,9 @@ import {
 import { uploadProfileAvatar } from "@/lib/profile/avatar";
 import { attachSurahNames, getLocalSurahProgress, type ProfileSurahProgress } from "@/lib/profile/progress";
 import { useSettings } from "@/lib/settings/context";
+import type { UILanguage } from "@/lib/settings/context";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
+import { cn } from "@/lib/utils";
 import { ProfileAvatar } from "./ProfileAvatar";
 import { ProfileNotesManager } from "./ProfileNotesManager";
 import { ProfileStatCard } from "./ProfileStatCard";
@@ -57,6 +59,93 @@ type ProfileTab = "overview" | "notes";
 
 const PROFILE_BIO_MAX_LENGTH = 280;
 const PROFILE_COUNTRY_MAX_LENGTH = 80;
+
+const COUNTRY_REGION_CODES = [
+  "AF", "AX", "AL", "DZ", "AS", "AD", "AO", "AI", "AQ", "AG", "AR", "AM", "AW", "AU", "AT", "AZ", "BS", "BH",
+  "BD", "BB", "BY", "BE", "BZ", "BJ", "BM", "BT", "BO", "BQ", "BA", "BW", "BV", "BR", "IO", "BN", "BG", "BF",
+  "BI", "KH", "CM", "CA", "CV", "KY", "CF", "TD", "CL", "CN", "CX", "CC", "CO", "KM", "CG", "CD", "CK", "CR",
+  "CI", "HR", "CU", "CW", "CY", "CZ", "DK", "DJ", "DM", "DO", "EC", "EG", "SV", "GQ", "ER", "EE", "SZ", "ET",
+  "FK", "FO", "FJ", "FI", "FR", "GF", "PF", "TF", "GA", "GM", "GE", "DE", "GH", "GI", "GR", "GL", "GD", "GP",
+  "GU", "GT", "GG", "GN", "GW", "GY", "HT", "HM", "VA", "HN", "HK", "HU", "IS", "IN", "ID", "IR", "IQ", "IE",
+  "IM", "IL", "IT", "JM", "JP", "JE", "JO", "KZ", "KE", "KI", "KP", "KR", "KW", "KG", "LA", "LV", "LB", "LS",
+  "LR", "LY", "LI", "LT", "LU", "MO", "MG", "MW", "MY", "MV", "ML", "MT", "MH", "MQ", "MR", "MU", "YT", "MX",
+  "FM", "MD", "MC", "MN", "ME", "MS", "MA", "MZ", "MM", "NA", "NR", "NP", "NL", "NC", "NZ", "NI", "NE", "NG",
+  "NU", "NF", "MK", "MP", "NO", "OM", "PK", "PW", "PS", "PA", "PG", "PY", "PE", "PH", "PN", "PL", "PT", "PR",
+  "QA", "RE", "RO", "RU", "RW", "BL", "SH", "KN", "LC", "MF", "PM", "VC", "WS", "SM", "ST", "SA", "SN", "RS",
+  "SC", "SL", "SG", "SX", "SK", "SI", "SB", "SO", "ZA", "GS", "SS", "ES", "LK", "SD", "SR", "SJ", "SE", "CH",
+  "SY", "TW", "TJ", "TZ", "TH", "TL", "TG", "TK", "TO", "TT", "TN", "TR", "TM", "TC", "TV", "UG", "UA", "AE",
+  "GB", "US", "UM", "UY", "UZ", "VU", "VE", "VN", "VG", "VI", "WF", "EH", "YE", "ZM", "ZW", "XK",
+] as const;
+
+type CountryOption = {
+  code: string;
+  label: string;
+  storageName: string;
+  searchText: string;
+};
+
+type RegionDisplayNames = {
+  of: (code: string) => string | undefined;
+};
+
+type RegionDisplayNamesConstructor = new (
+  locales: string[],
+  options: { type: "region" }
+) => RegionDisplayNames;
+
+const regionDisplayNamesCache: Partial<Record<UILanguage, RegionDisplayNames | null>> = {};
+
+function getRegionDisplayNames(language: UILanguage): RegionDisplayNames | null {
+  if (language in regionDisplayNamesCache) return regionDisplayNamesCache[language] ?? null;
+  try {
+    const DisplayNames = (Intl as typeof Intl & { DisplayNames?: RegionDisplayNamesConstructor }).DisplayNames;
+    regionDisplayNamesCache[language] = DisplayNames ? new DisplayNames([language], { type: "region" }) : null;
+  } catch {
+    regionDisplayNamesCache[language] = null;
+  }
+  return regionDisplayNamesCache[language] ?? null;
+}
+
+function getCountryRegionName(code: string, language: UILanguage): string {
+  return getRegionDisplayNames(language)?.of(code) ?? code;
+}
+
+function normalizeCountrySearch(value: string): string {
+  return value.trim().toLocaleLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+}
+
+function buildCountryOptions(language: UILanguage): CountryOption[] {
+  const locale = language === "ar" ? "ar" : "en";
+  return COUNTRY_REGION_CODES.map((code) => {
+    const storageName = getCountryRegionName(code, "en");
+    const label = getCountryRegionName(code, language);
+    const arabicName = getCountryRegionName(code, "ar");
+    return {
+      code,
+      label,
+      storageName,
+      searchText: normalizeCountrySearch(`${code} ${storageName} ${label} ${arabicName}`),
+    };
+  }).sort((a, b) => a.label.localeCompare(b.label, locale));
+}
+
+function findCountryOptionByValue(value: string, options: CountryOption[]): CountryOption | null {
+  const needle = normalizeCountrySearch(value);
+  if (!needle) return null;
+  return options.find((option) => {
+    return (
+      normalizeCountrySearch(option.code) === needle ||
+      normalizeCountrySearch(option.storageName) === needle ||
+      normalizeCountrySearch(option.label) === needle ||
+      normalizeCountrySearch(getCountryRegionName(option.code, "ar")) === needle
+    );
+  }) ?? null;
+}
+
+function getLocalizedCountryValue(value: string, language: UILanguage): string {
+  const options = buildCountryOptions(language);
+  return findCountryOptionByValue(value, options)?.label ?? value;
+}
 
 export function ProfileModalContent({ userId }: ProfileModalContentProps) {
   const router = useRouter();
@@ -155,6 +244,10 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
   const avatarUrl = visibleProfile?.avatar_url ?? null;
   const bio = visibleProfile?.bio?.trim() ?? "";
   const country = visibleProfile?.country?.trim() ?? "";
+  const localizedCountry = useMemo(
+    () => country ? getLocalizedCountryValue(country, uiLanguage) : "",
+    [country, uiLanguage]
+  );
   const currentDisplayName = profile?.display_name?.trim() ?? "";
   const displayNameValue = displayNameDraft.trim();
   const displayNameDirty = displayNameValue !== currentDisplayName;
@@ -398,7 +491,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
               ) : (
                 <ProfileOverview
                   bio={bio}
-                  country={country}
+                  country={localizedCountry}
                   stats={stats}
                   review={review}
                   surahProgress={surahProgress}
@@ -507,16 +600,20 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
             >
               {s.profileCountryTitle}
             </Text>
-            <Input
+            <CountryCommandSelect
               value={countryDraft}
-              onChangeText={(value) => {
+              onChange={(value) => {
                 setCountryDraft(value);
                 setProfileStatus(null);
               }}
               placeholder={s.profileCountryPlaceholder}
-              maxLength={PROFILE_COUNTRY_MAX_LENGTH}
-              dir={isRTL ? "rtl" : "ltr"}
-              className="bg-surface-high dark:bg-surface-dark-high"
+              searchPlaceholder={s.profileCountrySearchPlaceholder}
+              emptyLabel={s.profileCountryNoResults}
+              clearLabel={s.profileCountryClear}
+              language={uiLanguage}
+              isDark={isDark}
+              isRTL={isRTL}
+              disabled={profileSaving || authLoading}
             />
           </View>
           <Button
@@ -547,6 +644,170 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
       </ResponsiveModal>
 
     </>
+  );
+}
+
+function CountryCommandSelect({
+  value,
+  onChange,
+  placeholder,
+  searchPlaceholder,
+  emptyLabel,
+  clearLabel,
+  language,
+  isDark,
+  isRTL,
+  disabled,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  searchPlaceholder: string;
+  emptyLabel: string;
+  clearLabel: string;
+  language: UILanguage;
+  isDark: boolean;
+  isRTL: boolean;
+  disabled: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const options = useMemo(() => buildCountryOptions(language), [language]);
+  const selectedOption = useMemo(() => findCountryOptionByValue(value, options), [options, value]);
+  const selectedLabel = selectedOption?.label ?? value.trim();
+  const queryText = normalizeCountrySearch(query);
+  const filteredOptions = useMemo(
+    () => queryText ? options.filter((option) => option.searchText.includes(queryText)) : options,
+    [options, queryText]
+  );
+  const iconColor = isDark ? "#a3a3a3" : "#8A7764";
+  const activeColor = isDark ? "#5eead4" : "#0d9488";
+
+  useEffect(() => {
+    if (!open) setQuery("");
+  }, [open]);
+
+  return (
+    <View className="relative">
+      <Pressable
+        onPress={() => {
+          if (!disabled) setOpen((current) => !current);
+        }}
+        disabled={disabled}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open, disabled }}
+        className={cn(
+          "min-h-11 rounded-2xl bg-surface-high px-4 py-3 dark:bg-surface-dark-high",
+          disabled && "opacity-50"
+        )}
+      >
+        <View className={`items-center gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
+          <Text
+            className={selectedLabel ? "text-charcoal dark:text-neutral-100" : "text-warm-500 dark:text-neutral-500"}
+            numberOfLines={1}
+            style={{
+              flex: 1,
+              fontFamily: "Manrope_400Regular",
+              fontSize: 15,
+              textAlign: isRTL ? "right" : "left",
+              writingDirection: isRTL ? "rtl" : "ltr",
+            }}
+          >
+            {selectedLabel || placeholder}
+          </Text>
+          {selectedLabel ? (
+            <Pressable
+              onPress={(event) => {
+                event.stopPropagation();
+                onChange("");
+                setOpen(false);
+              }}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={clearLabel}
+              className="h-6 w-6 items-center justify-center rounded-full bg-surface-low dark:bg-surface-dark-low"
+            >
+              <X size={14} color={iconColor} />
+            </Pressable>
+          ) : null}
+          <ChevronDown size={17} color={iconColor} />
+        </View>
+      </Pressable>
+
+      {open ? (
+        <View className="mt-2 overflow-hidden rounded-2xl border border-warm-200 bg-surface-high dark:border-neutral-800 dark:bg-surface-dark-high">
+          <View className="border-b border-warm-200 px-3 py-2 dark:border-neutral-800">
+            <Input
+              value={query}
+              onChangeText={setQuery}
+              placeholder={searchPlaceholder}
+              maxLength={PROFILE_COUNTRY_MAX_LENGTH}
+              dir={isRTL ? "rtl" : "ltr"}
+              startIcon={<Search size={16} color={iconColor} />}
+              className="min-h-9 bg-transparent px-0 py-0"
+              containerClassName="bg-surface-low dark:bg-surface-dark-low"
+              style={{ height: 36, lineHeight: 20 }}
+            />
+          </View>
+          <ScrollView
+            nestedScrollEnabled
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            style={{ maxHeight: 260 }}
+            contentContainerClassName="py-1"
+          >
+            {filteredOptions.length > 0 ? (
+              filteredOptions.map((option) => {
+                const selected = selectedOption?.code === option.code;
+                return (
+                  <Pressable
+                    key={option.code}
+                    onPress={() => {
+                      onChange(option.storageName);
+                      setOpen(false);
+                    }}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    className={cn(
+                      "mx-1 min-h-11 rounded-xl px-3 py-2",
+                      selected ? "bg-primary-accent/10 dark:bg-primary-bright/15" : "bg-transparent"
+                    )}
+                  >
+                    <View className={`items-center gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
+                      <Text
+                        className="min-w-0 flex-1 text-charcoal dark:text-neutral-100"
+                        numberOfLines={1}
+                        style={{
+                          fontFamily: selected ? "Manrope_700Bold" : "Manrope_500Medium",
+                          fontSize: 14,
+                          textAlign: isRTL ? "right" : "left",
+                          writingDirection: isRTL ? "rtl" : "ltr",
+                        }}
+                      >
+                        {option.label}
+                      </Text>
+                      {selected ? <Check size={16} color={activeColor} /> : null}
+                    </View>
+                  </Pressable>
+                );
+              })
+            ) : (
+              <Text
+                className="px-4 py-6 text-warm-500 dark:text-neutral-500"
+                style={{
+                  fontFamily: "Manrope_500Medium",
+                  fontSize: 13,
+                  textAlign: "center",
+                  writingDirection: isRTL ? "rtl" : "ltr",
+                }}
+              >
+                {emptyLabel}
+              </Text>
+            )}
+          </ScrollView>
+        </View>
+      ) : null}
+    </View>
   );
 }
 
