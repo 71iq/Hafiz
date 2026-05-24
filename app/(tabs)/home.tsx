@@ -3,7 +3,7 @@ import { ScrollView, View, Text, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, type Href } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
-import { Plus, Trash2, Play, Layers, CalendarCheck2, Search, Languages, UserPlus, BookMarked, X as XIcon, SlidersHorizontal, Sparkles, BookOpenText, ListEnd, List } from "lucide-react-native";
+import { Plus, Trash2, Play, Layers, CalendarCheck2, Search, Languages, UserPlus, BookMarked, X as XIcon, Settings2, Sparkles, BookOpenText, ListEnd, List } from "lucide-react-native";
 import { useAuthStore } from "@/lib/auth/store";
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
@@ -829,7 +829,7 @@ function DeckCard({
               className="w-8 h-8 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center"
               hitSlop={8}
             >
-              <SlidersHorizontal size={14} color={isDark ? "#a3a3a3" : "#8B8178"} />
+              <Settings2 size={14} color={isDark ? "#a3a3a3" : "#8B8178"} />
             </Pressable>
           </View>
           <DeckStats total={deck.cardCount} newCount={deck.newCount} dueCount={deck.dueCount} isDark={isDark} isRTL={isRTL} />
@@ -917,7 +917,7 @@ function SmartDeckCard({
               className="w-8 h-8 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center"
               hitSlop={8}
             >
-              <SlidersHorizontal size={14} color={isDark ? "#a3a3a3" : "#8B8178"} />
+              <Settings2 size={14} color={isDark ? "#a3a3a3" : "#8B8178"} />
             </Pressable>
           </View>
           <DeckStats total={deck.total} newCount={deck.newCount} dueCount={deck.dueCount} isDark={isDark} isRTL={isRTL} />
@@ -1004,7 +1004,7 @@ function VocabularyDeckCard({
               className="w-8 h-8 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center"
               hitSlop={8}
             >
-              <SlidersHorizontal size={14} color={isDark ? "#a3a3a3" : "#8B8178"} />
+              <Settings2 size={14} color={isDark ? "#a3a3a3" : "#8B8178"} />
             </Pressable>
           </View>
           <DeckStats total={stats.total} newCount={stats.newCount} dueCount={stats.dueCount} isDark={isDark} isRTL={isRTL} />
