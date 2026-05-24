@@ -1,6 +1,12 @@
 import type { SQLiteDatabase } from "expo-sqlite";
-import { MUTASHABIHAT_DECK_ID } from "@/lib/fsrs/queries";
-import { SMART_DECK_IDS } from "@/lib/fsrs/smart-decks";
+import {
+  getDueCount,
+  getNewCount,
+  getTotalCardCount,
+  MEANINGS_DECK_ID,
+  MUTASHABIHAT_DECK_ID,
+} from "@/lib/fsrs/queries";
+import { getSmartDeckStats, SMART_DECK_IDS, type SmartDeckId } from "@/lib/fsrs/smart-decks";
 
 export type ProfileSurahProgress = {
   surah: number;
@@ -9,6 +15,57 @@ export type ProfileSurahProgress = {
   totalCards: number;
   memorized: number;
 };
+
+export type DefaultDeckProgressKey = "mutashabihat" | "similarTails" | "qiraat" | "reasonsOfRevelation" | "vocabulary";
+
+export type DefaultDeckProgressItem = {
+  key: DefaultDeckProgressKey;
+  deckId: string;
+  isSmartDeck: boolean;
+  total: number;
+  newCount: number;
+  startedCount: number;
+  dueCount: number;
+  color: string;
+};
+
+export async function getDefaultDeckProgress(db: SQLiteDatabase): Promise<DefaultDeckProgressItem[]> {
+  const decks: Pick<DefaultDeckProgressItem, "key" | "deckId" | "isSmartDeck" | "color">[] = [
+    { key: "mutashabihat", deckId: SMART_DECK_IDS.mutashabihat, isSmartDeck: true, color: "#0d9488" },
+    { key: "similarTails", deckId: SMART_DECK_IDS.similarTails, isSmartDeck: true, color: "#ca8a04" },
+    { key: "qiraat", deckId: SMART_DECK_IDS.qiraat, isSmartDeck: true, color: "#2563eb" },
+    { key: "reasonsOfRevelation", deckId: SMART_DECK_IDS.reasonsOfRevelation, isSmartDeck: true, color: "#d97706" },
+    { key: "vocabulary", deckId: MEANINGS_DECK_ID, isSmartDeck: false, color: "#be123c" },
+  ];
+
+  return Promise.all(decks.map(async (deck) => {
+    if (deck.isSmartDeck) {
+      const stats = await getSmartDeckStats(db, deck.deckId as SmartDeckId, { type: "all" });
+      const newCount = Math.max(0, Math.min(stats.total, stats.newCount));
+      return {
+        ...deck,
+        total: stats.total,
+        newCount,
+        startedCount: Math.max(0, stats.total - newCount),
+        dueCount: Math.max(0, Math.min(stats.total, stats.due)),
+      };
+    }
+
+    const [total, rawNewCount, rawDueCount] = await Promise.all([
+      getTotalCardCount(db, deck.deckId),
+      getNewCount(db, deck.deckId),
+      getDueCount(db, deck.deckId),
+    ]);
+    const newCount = Math.max(0, Math.min(total, rawNewCount));
+    return {
+      ...deck,
+      total,
+      newCount,
+      startedCount: Math.max(0, total - newCount),
+      dueCount: Math.max(0, Math.min(total, rawDueCount)),
+    };
+  }));
+}
 
 export async function getLocalSurahProgress(db: SQLiteDatabase): Promise<ProfileSurahProgress[]> {
   const surahRows = await db.getAllAsync<{

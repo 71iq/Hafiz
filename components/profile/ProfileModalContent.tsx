@@ -7,6 +7,7 @@ import { Camera, Check, ChevronDown, MapPin, Pencil, Save, Search, Trash2, UserR
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { PublicBadgesGrid } from "@/components/achievements/PublicBadgesGrid";
 import { ActivityHeatmap } from "@/components/progress/ActivityHeatmap";
+import { DefaultDeckProgressChart } from "@/components/progress/DefaultDeckProgressChart";
 import { SurahProgressList } from "@/components/progress/SurahProgressList";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -29,7 +30,13 @@ import {
   type PublicProfile,
 } from "@/lib/leaderboard/api";
 import { uploadProfileAvatar } from "@/lib/profile/avatar";
-import { attachSurahNames, getLocalSurahProgress, type ProfileSurahProgress } from "@/lib/profile/progress";
+import {
+  attachSurahNames,
+  getDefaultDeckProgress,
+  getLocalSurahProgress,
+  type DefaultDeckProgressItem,
+  type ProfileSurahProgress,
+} from "@/lib/profile/progress";
 import { useSettings } from "@/lib/settings/context";
 import type { UILanguage } from "@/lib/settings/context";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
@@ -158,6 +165,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
   const [activeTab, setActiveTab] = useState<ProfileTab>("overview");
   const [localStats, setLocalStats] = useState<ProfileStatsSnapshot | null>(null);
   const [localReview, setLocalReview] = useState<ReviewSnapshot>({ activity: [], activeDays: 0, totalReviews: 0 });
+  const [defaultDeckProgress, setDefaultDeckProgress] = useState<DefaultDeckProgressItem[]>([]);
   const [localSurahProgress, setLocalSurahProgress] = useState<ProfileSurahProgress[]>([]);
   const [editOpen, setEditOpen] = useState(false);
   const [displayNameDraft, setDisplayNameDraft] = useState("");
@@ -303,11 +311,12 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
 
   const loadLocalOverview = useCallback(async () => {
     if (!user) return;
-    const [wirdStatus, totalScore, cardsReviewedRow, reviewStats, surahs] = await Promise.all([
+    const [wirdStatus, totalScore, cardsReviewedRow, reviewStats, defaultDecks, surahs] = await Promise.all([
       getWirdStatus(db),
       getTotalScore(db),
       db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM study_log"),
       getReviewStats(db),
+      getDefaultDeckProgress(db),
       getLocalSurahProgress(db),
     ]);
     setLocalStats({
@@ -321,6 +330,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
       activeDays: reviewStats.activeDays,
       totalReviews: reviewStats.totalReviews,
     });
+    setDefaultDeckProgress(defaultDecks);
     setLocalSurahProgress(surahs);
   }, [db, user]);
 
@@ -494,6 +504,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
                   country={localizedCountry}
                   stats={stats}
                   review={review}
+                  defaultDeckProgress={defaultDeckProgress}
                   surahProgress={surahProgress}
                   publicBadges={publicBadges}
                   numberLocale={numberLocale}
@@ -816,6 +827,7 @@ function ProfileOverview({
   country,
   stats,
   review,
+  defaultDeckProgress,
   surahProgress,
   publicBadges,
   numberLocale,
@@ -827,6 +839,7 @@ function ProfileOverview({
   country: string;
   stats: { label: string; value: number }[];
   review: ReviewSnapshot;
+  defaultDeckProgress: DefaultDeckProgressItem[];
   surahProgress: ProfileSurahProgress[];
   publicBadges: any[];
   numberLocale: string;
@@ -922,6 +935,16 @@ function ProfileOverview({
           />
         </View>
       </Card>
+
+      {isOwnProfile ? (
+        <DefaultDeckProgressChart
+          items={defaultDeckProgress}
+          isDark={isDark}
+          isRTL={isRTL}
+          s={s}
+          className="p-5"
+        />
+      ) : null}
 
       <View>
         <Text
