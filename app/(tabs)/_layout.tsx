@@ -37,13 +37,13 @@ function SyncOverlay() {
 }
 
 function TabsWithStrings() {
-  const { isDark, isRTL, uiLanguage } = useSettings();
+  const { isDark, isRTL, uiLanguage, themeSurface } = useSettings();
   const { immersive } = useChrome();
   const s = useStrings();
 
   return (
     <View style={{ flex: 1, direction: isRTL ? "rtl" : "ltr" }}>
-      <StatusBar style={isDark ? "light" : "dark"} backgroundColor={isDark ? "#0A0A0A" : "#FFF8F1"} />
+      <StatusBar style={isDark ? "light" : "dark"} backgroundColor={themeSurface} />
       {!immersive && <SyncOverlay />}
       {!immersive && <OfflineBanner uiLanguage={uiLanguage} />}
       <Tabs

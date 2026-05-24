@@ -1,3 +1,5 @@
+const colorVar = (name, fallback) => `rgb(var(${name}, ${fallback}) / <alpha-value>)`;
+
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: [
@@ -21,21 +23,21 @@ module.exports = {
       colors: {
         // === Surface hierarchy (DESIGN.md "The Digital Sanctuary") ===
         surface: {
-          DEFAULT: "#FFF8F1", // base layer
-          low: "#F9F3EB", // grouped content
-          mid: "#F0EBE3", // elevated content
-          high: "#E8E1DA", // interactive cards
-          dim: "#DFD9D1", // receded backgrounds
-          bright: "#FFFFFF", // most elevated
+          DEFAULT: colorVar("--color-surface", "255 248 241"), // base layer
+          low: colorVar("--color-surface-low", "249 243 235"), // grouped content
+          mid: colorVar("--color-surface-mid", "240 235 227"), // elevated content
+          high: colorVar("--color-surface-high", "232 225 218"), // interactive cards
+          dim: colorVar("--color-surface-dim", "223 217 209"), // receded backgrounds
+          bright: colorVar("--color-surface-bright", "255 255 255"), // most elevated
         },
         // Dark mode surfaces
         "surface-dark": {
-          DEFAULT: "#0A0A0A", // base
-          low: "#141414", // grouped
-          mid: "#1A1A1A", // elevated
-          high: "#262626", // interactive
-          dim: "#0F0F0F", // receded
-          bright: "#2D2D2D", // most elevated
+          DEFAULT: colorVar("--color-surface-dark", "10 10 10"), // base
+          low: colorVar("--color-surface-dark-low", "20 20 20"), // grouped
+          mid: colorVar("--color-surface-dark-mid", "26 26 26"), // elevated
+          high: colorVar("--color-surface-dark-high", "38 38 38"), // interactive
+          dim: colorVar("--color-surface-dark-dim", "15 15 15"), // receded
+          bright: colorVar("--color-surface-dark-bright", "45 45 45"), // most elevated
         },
         // === Primary (deep teal) ===
         primary: {

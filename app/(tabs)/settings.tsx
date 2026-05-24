@@ -7,10 +7,11 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Toast } from "@/components/ui/Toast";
 import { ScreenScrollView, useScreenContentLayout } from "@/components/ui/ScreenContent";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Sun, Moon, Smartphone, Minus, Plus, Check, ChevronRight, ChevronLeft, User, LogOut, BookOpen, RefreshCw, Unlink, Info, FileText, HeartHandshake, ExternalLink, Sparkles, SlidersHorizontal, type LucideIcon } from "lucide-react-native";
+import { Sun, Moon, Smartphone, Clock3, Circle, Minus, Plus, Check, ChevronRight, ChevronLeft, User, LogOut, BookOpen, RefreshCw, Unlink, Info, FileText, HeartHandshake, ExternalLink, Sparkles, SlidersHorizontal, type LucideIcon } from "lucide-react-native";
 import {
   useSettings,
   FONT_SIZE_STEPS,
+  type ThemePalette,
   type ThemeMode,
   type UILanguage,
   type PageScroll,
@@ -32,7 +33,12 @@ import { fullQfUserSync, runInitialQfUserSync } from "@/lib/quran-foundation/use
 import type { QfConnectionStatus } from "@/lib/quran-foundation/user-types";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { toArabicNumber } from "@/lib/arabic";
-import { SETTINGS_CONTENT_MAX_WIDTH, SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
+import {
+  DESKTOP_CONTENT_GUTTER,
+  PERSISTENT_SIDEBAR_WIDTH,
+  SETTINGS_CONTENT_MAX_WIDTH,
+  SIDEBAR_BREAKPOINT,
+} from "@/lib/ui/viewport";
 import { ZaytPreviewModal } from "@/components/zayt/ZaytPreviewModal";
 import { ProfileIdentity } from "@/components/profile/ProfileIdentity";
 
@@ -44,9 +50,28 @@ type SettingsCategory = {
   icon: LucideIcon;
 };
 
+function shiftThemeTime(time: string, deltaMinutes: number) {
+  const [hours, minutes] = time.split(":").map((part) => Number(part));
+  const total = (hours * 60 + minutes + deltaMinutes + 24 * 60) % (24 * 60);
+  const nextHours = Math.floor(total / 60);
+  const nextMinutes = total % 60;
+  return `${String(nextHours).padStart(2, "0")}:${String(nextMinutes).padStart(2, "0")}`;
+}
+
+function getThemeTimeParts(time: string) {
+  const [hours, minutes] = time.split(":").map((part) => Number(part));
+  return { hours, minutes };
+}
+
+function formatThemeTimePart(value: number, isRTL: boolean) {
+  const text = String(value).padStart(2, "0");
+  return isRTL ? text.replace(/\d/g, (digit) => toArabicNumber(Number(digit))) : text;
+}
+
 export default function SettingsScreen() {
   const {
     theme, setTheme, fontSizeIndex, setFontSizeIndex, fontSize,
+    scheduledTheme, setScheduledTheme, scheduledSwitchTime, setScheduledSwitchTime,
     translationLanguage, isTranslationLoading, isDark, isRTL,
     tafseerSource, setTafseerSource,
     recitationId, setRecitationId,
@@ -79,6 +104,15 @@ export default function SettingsScreen() {
   const fontSizeTotalLabel = isRTL ? toArabicNumber(FONT_SIZE_STEPS.length) : String(FONT_SIZE_STEPS.length);
   const TranslationChevron = isRTL ? ChevronLeft : ChevronRight;
   const { isLaptop } = useScreenContentLayout({ maxWidth: SETTINGS_CONTENT_MAX_WIDTH });
+  const settingsRailWidth = Math.min(
+    SETTINGS_CONTENT_MAX_WIDTH,
+    Math.max(0, width - (isLaptop ? PERSISTENT_SIDEBAR_WIDTH + DESKTOP_CONTENT_GUTTER * 2 : 48))
+  );
+  const appearanceCardInnerWidth = Math.max(0, settingsRailWidth - 40);
+  const themeCardWidth = Math.floor(
+    (appearanceCardInnerWidth - (isLaptop ? 24 : 12)) / (isLaptop ? 3 : 2)
+  );
+  const scheduledThemeCardWidth = Math.floor((Math.max(0, appearanceCardInnerWidth - 32) - 10) / 2);
   const usesCategorySidebar = width >= SIDEBAR_BREAKPOINT;
   const categoryParam = Array.isArray(params.category) ? params.category[0] : params.category;
   const desktopCategory = parseSettingsCategory(categoryParam) ?? "general";
@@ -209,11 +243,21 @@ export default function SettingsScreen() {
     });
   }, [s.externalLinkFailed]);
 
-  const THEME_OPTIONS: { value: ThemeMode; label: string; icon: typeof Sun }[] = [
-    { value: "light", label: s.themeLight, icon: Sun },
+  const THEME_OPTIONS: { value: ThemeMode; label: string; icon: LucideIcon }[] = [
     { value: "dark", label: s.themeDark, icon: Moon },
-    { value: "system", label: s.themeAuto, icon: Smartphone },
+    { value: "beige", label: s.themeBeige, icon: Sun },
+    { value: "white", label: s.themeWhite, icon: Circle },
+    { value: "amoled", label: s.themeAmoled, icon: Moon },
+    { value: "system", label: s.themeSystem, icon: Smartphone },
+    { value: "scheduled", label: s.themeScheduled, icon: Clock3 },
   ];
+  const SCHEDULED_THEME_OPTIONS: { value: ThemePalette; label: string; icon: LucideIcon }[] = [
+    { value: "dark", label: s.themeDark, icon: Moon },
+    { value: "beige", label: s.themeBeige, icon: Sun },
+    { value: "white", label: s.themeWhite, icon: Circle },
+    { value: "amoled", label: s.themeAmoled, icon: Moon },
+  ];
+  const scheduledTimeParts = getThemeTimeParts(scheduledSwitchTime);
 
   const settingsCategories: SettingsCategory[] = [
     { id: "general", title: s.settingsCategoryGeneral, icon: SlidersHorizontal },
@@ -258,41 +302,164 @@ export default function SettingsScreen() {
             >
               {s.themeLabel}
             </Text>
-            <View className="flex-row gap-3">
+            <View
+              style={{
+                flexDirection: isRTL ? "row-reverse" : "row",
+                flexWrap: "wrap",
+                gap: 12,
+              }}
+            >
               {THEME_OPTIONS.map((option) => {
                 const isActive = theme === option.value;
                 const IconComponent = option.icon;
                 return (
-                  <Pressable
-                    key={option.value}
-                    onPress={() => setTheme(option.value)}
-                    className={`flex-1 items-center py-4 rounded-2xl ${
-                      isActive
-                        ? "bg-primary-accent/10 dark:bg-primary-bright/15"
-                        : "bg-surface-high dark:bg-surface-dark-high"
-                    }`}
-                    style={({ pressed }) => ({
-                      transform: [{ scale: pressed ? 0.98 : 1 }],
-                    })}
-                  >
-                    <IconComponent
-                      size={20}
-                      color={isActive ? (isDark ? "#2dd4bf" : "#0d9488") : (isDark ? "#737373" : "#b9a085")}
-                    />
-                    <Text
-                      className={`text-sm mt-2 ${
+                  <View key={option.value} style={{ width: themeCardWidth, minHeight: 96 }}>
+                    <Pressable
+                      onPress={() => setTheme(option.value)}
+                      className={`flex-1 items-center justify-center rounded-2xl px-3 py-4 ${
                         isActive
-                          ? "text-primary-accent dark:text-primary-bright"
-                          : "text-warm-400 dark:text-neutral-500"
+                          ? "bg-primary-accent/10 dark:bg-primary-bright/15"
+                          : "bg-surface-high dark:bg-surface-dark-high"
                       }`}
-                      style={{ fontFamily: isActive ? "Manrope_600SemiBold" : "Manrope_500Medium" }}
+                      style={({ pressed }) => ({
+                        transform: [{ scale: pressed ? 0.98 : 1 }],
+                      })}
                     >
-                      {option.label}
-                    </Text>
-                  </Pressable>
+                      <IconComponent
+                        size={20}
+                        color={isActive ? (isDark ? "#2dd4bf" : "#0d9488") : (isDark ? "#737373" : "#b9a085")}
+                      />
+                      <Text
+                        className={`text-sm mt-2 ${
+                          isActive
+                            ? "text-primary-accent dark:text-primary-bright"
+                            : "text-warm-400 dark:text-neutral-500"
+                        }`}
+                        numberOfLines={2}
+                        style={{
+                          fontFamily: isActive ? "Manrope_600SemiBold" : "Manrope_500Medium",
+                          minHeight: 36,
+                          textAlign: "center",
+                          writingDirection: isRTL ? "rtl" : "ltr",
+                        }}
+                      >
+                        {option.label}
+                      </Text>
+                    </Pressable>
+                  </View>
                 );
               })}
             </View>
+
+            {theme === "scheduled" && (
+              <View className="mt-5 rounded-3xl bg-surface-high/60 p-4 dark:bg-surface-dark-high/60">
+                <Text
+                  className="mb-3 text-charcoal dark:text-neutral-200"
+                  style={{
+                    fontFamily: "Manrope_600SemiBold",
+                    fontSize: 14,
+                    textAlign: isRTL ? "right" : "left",
+                    writingDirection: isRTL ? "rtl" : "ltr",
+                  }}
+                >
+                  {s.themeScheduleTarget}
+                </Text>
+                <View
+                  style={{
+                    flexDirection: isRTL ? "row-reverse" : "row",
+                    flexWrap: "wrap",
+                    gap: 10,
+                  }}
+                >
+                  {SCHEDULED_THEME_OPTIONS.map((option) => {
+                    const isActive = scheduledTheme === option.value;
+                    const IconComponent = option.icon;
+                    return (
+                      <View key={option.value} style={{ width: scheduledThemeCardWidth, minHeight: 76 }}>
+                        <Pressable
+                          onPress={() => setScheduledTheme(option.value)}
+                          className={`flex-1 items-center justify-center rounded-2xl px-3 py-3 ${
+                            isActive
+                              ? "bg-primary-accent/10 dark:bg-primary-bright/15"
+                              : "bg-surface dark:bg-surface-dark"
+                          }`}
+                          style={({ pressed }) => ({
+                            transform: [{ scale: pressed ? 0.98 : 1 }],
+                          })}
+                        >
+                          <IconComponent
+                            size={18}
+                            color={isActive ? (isDark ? "#2dd4bf" : "#0d9488") : (isDark ? "#737373" : "#b9a085")}
+                          />
+                          <Text
+                            className={`mt-1.5 text-xs ${
+                              isActive
+                                ? "text-primary-accent dark:text-primary-bright"
+                                : "text-warm-400 dark:text-neutral-500"
+                            }`}
+                            numberOfLines={2}
+                            style={{
+                              fontFamily: isActive ? "Manrope_600SemiBold" : "Manrope_500Medium",
+                              minHeight: 32,
+                              textAlign: "center",
+                              writingDirection: isRTL ? "rtl" : "ltr",
+                            }}
+                          >
+                            {option.label}
+                          </Text>
+                        </Pressable>
+                      </View>
+                    );
+                  })}
+                </View>
+
+                <View
+                  className="mt-5 items-center justify-between gap-4"
+                  style={{ flexDirection: isLaptop ? (isRTL ? "row-reverse" : "row") : "column" }}
+                >
+                  <Text
+                    className="text-charcoal dark:text-neutral-200"
+                    style={{
+                      fontFamily: "Manrope_600SemiBold",
+                      fontSize: 14,
+                      textAlign: isRTL ? "right" : "left",
+                      writingDirection: isRTL ? "rtl" : "ltr",
+                    }}
+                  >
+                    {s.themeScheduleTime}
+                  </Text>
+                  <View
+                    className="items-center gap-2"
+                    style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
+                  >
+                    <SettingsStepper
+                      value={formatThemeTimePart(scheduledTimeParts.hours, isRTL)}
+                      onDecrement={() => setScheduledSwitchTime(shiftThemeTime(scheduledSwitchTime, -60))}
+                      onIncrement={() => setScheduledSwitchTime(shiftThemeTime(scheduledSwitchTime, 60))}
+                      decrementDisabled={false}
+                      incrementDisabled={false}
+                      isDark={isDark}
+                      isRTL={isRTL}
+                    />
+                    <Text
+                      className="text-charcoal dark:text-neutral-100"
+                      style={{ fontFamily: "Manrope_700Bold", fontSize: 18 }}
+                    >
+                      :
+                    </Text>
+                    <SettingsStepper
+                      value={formatThemeTimePart(scheduledTimeParts.minutes, isRTL)}
+                      onDecrement={() => setScheduledSwitchTime(shiftThemeTime(scheduledSwitchTime, -1))}
+                      onIncrement={() => setScheduledSwitchTime(shiftThemeTime(scheduledSwitchTime, 1))}
+                      decrementDisabled={false}
+                      incrementDisabled={false}
+                      isDark={isDark}
+                      isRTL={isRTL}
+                    />
+                  </View>
+                </View>
+              </View>
+            )}
           </Card>
 
         </>

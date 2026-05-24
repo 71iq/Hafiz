@@ -32,7 +32,7 @@ type SurahRow = {
 
 function OnboardingInner() {
   const db = useDatabase();
-  const { isDark } = useSettings();
+  const { isDark, themeSurface } = useSettings();
   const s = useStrings();
   const router = useRouter();
   const { width: screenWidth } = useWindowDimensions();
@@ -150,7 +150,7 @@ function OnboardingInner() {
   const teal = "#0d9488";
   const tealDark = "#2dd4bf";
   const accentColor = isDark ? tealDark : teal;
-  const bgColor = isDark ? "#0A0A0A" : "#FFF8F1";
+  const bgColor = themeSurface;
   const cardBg = isDark ? "#1A1A1A" : "#FFFFFF";
   const textPrimary = isDark ? "#F5F5F5" : "#2D2D2D";
   const textMuted = isDark ? "#A3A3A3" : "#8a7058";

@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
-import { Platform, useWindowDimensions } from "react-native";
-import { useColorScheme as useNativeWindColorScheme } from "nativewind";
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from "react";
+import { Platform, useColorScheme as useSystemColorScheme, useWindowDimensions, View } from "react-native";
+import { useColorScheme as useNativeWindColorScheme, vars } from "nativewind";
 import type { SQLiteDatabase } from "expo-sqlite";
 import { useDatabase } from "@/lib/database/provider";
 import { DEFAULT_LANGUAGE } from "@/lib/translations/languages";
@@ -40,7 +40,8 @@ export const MIN_HIFZ_AUTO_DELAY_MS = 250;
 export const MAX_HIFZ_AUTO_DELAY_MS = 5000;
 export const HIFZ_AUTO_DELAY_STEP_MS = 250;
 
-export type ThemeMode = "light" | "dark" | "system";
+export type ThemePalette = "beige" | "dark" | "white" | "amoled";
+export type ThemeMode = ThemePalette | "system" | "scheduled";
 export type ViewMode = "verse" | "page";
 export type PageScroll = "vertical" | "horizontal";
 export type UILanguage = "en" | "ar";
@@ -54,6 +55,12 @@ type SettingsContextType = {
   setFontSizeIndex: (index: number) => void;
   theme: ThemeMode;
   setTheme: (theme: ThemeMode) => void;
+  effectiveTheme: ThemePalette;
+  scheduledTheme: ThemePalette;
+  setScheduledTheme: (theme: ThemePalette) => void;
+  scheduledSwitchTime: string;
+  setScheduledSwitchTime: (time: string) => void;
+  themeSurface: string;
   viewMode: ViewMode;
   setViewMode: (mode: ViewMode) => void;
   pageScroll: PageScroll;
@@ -91,6 +98,12 @@ const SettingsContext = createContext<SettingsContextType>({
   setFontSizeIndex: () => {},
   theme: "system",
   setTheme: () => {},
+  effectiveTheme: "beige",
+  scheduledTheme: "dark",
+  setScheduledTheme: () => {},
+  scheduledSwitchTime: "21:00",
+  setScheduledSwitchTime: () => {},
+  themeSurface: "#FFF8F1",
   viewMode: "verse",
   setViewMode: () => {},
   pageScroll: "vertical",
@@ -120,6 +133,120 @@ const SettingsContext = createContext<SettingsContextType>({
   isDark: false,
   isLoaded: false,
 });
+
+const DEFAULT_SCHEDULED_THEME: ThemePalette = "dark";
+const DEFAULT_SCHEDULED_SWITCH_TIME = "21:00";
+
+const THEME_PALETTES: Record<
+  ThemePalette,
+  {
+    surface: string;
+    variables: Record<`--${string}`, string>;
+  }
+> = {
+  beige: {
+    surface: "#FFF8F1",
+    variables: {
+      "--color-surface": "255 248 241",
+      "--color-surface-low": "249 243 235",
+      "--color-surface-mid": "240 235 227",
+      "--color-surface-high": "232 225 218",
+      "--color-surface-dim": "223 217 209",
+      "--color-surface-bright": "255 255 255",
+      "--color-surface-dark": "255 248 241",
+      "--color-surface-dark-low": "249 243 235",
+      "--color-surface-dark-mid": "240 235 227",
+      "--color-surface-dark-high": "232 225 218",
+      "--color-surface-dark-dim": "223 217 209",
+      "--color-surface-dark-bright": "255 255 255",
+    },
+  },
+  white: {
+    surface: "#FFFFFF",
+    variables: {
+      "--color-surface": "255 255 255",
+      "--color-surface-low": "248 250 252",
+      "--color-surface-mid": "244 244 245",
+      "--color-surface-high": "229 231 235",
+      "--color-surface-dim": "209 213 219",
+      "--color-surface-bright": "255 255 255",
+      "--color-surface-dark": "255 255 255",
+      "--color-surface-dark-low": "248 250 252",
+      "--color-surface-dark-mid": "244 244 245",
+      "--color-surface-dark-high": "229 231 235",
+      "--color-surface-dark-dim": "209 213 219",
+      "--color-surface-dark-bright": "255 255 255",
+    },
+  },
+  dark: {
+    surface: "#0A0A0A",
+    variables: {
+      "--color-surface": "10 10 10",
+      "--color-surface-low": "20 20 20",
+      "--color-surface-mid": "26 26 26",
+      "--color-surface-high": "38 38 38",
+      "--color-surface-dim": "15 15 15",
+      "--color-surface-bright": "45 45 45",
+      "--color-surface-dark": "10 10 10",
+      "--color-surface-dark-low": "20 20 20",
+      "--color-surface-dark-mid": "26 26 26",
+      "--color-surface-dark-high": "38 38 38",
+      "--color-surface-dark-dim": "15 15 15",
+      "--color-surface-dark-bright": "45 45 45",
+    },
+  },
+  amoled: {
+    surface: "#000000",
+    variables: {
+      "--color-surface": "0 0 0",
+      "--color-surface-low": "3 3 3",
+      "--color-surface-mid": "8 8 8",
+      "--color-surface-high": "15 15 15",
+      "--color-surface-dim": "0 0 0",
+      "--color-surface-bright": "24 24 24",
+      "--color-surface-dark": "0 0 0",
+      "--color-surface-dark-low": "3 3 3",
+      "--color-surface-dark-mid": "8 8 8",
+      "--color-surface-dark-high": "15 15 15",
+      "--color-surface-dark-dim": "0 0 0",
+      "--color-surface-dark-bright": "24 24 24",
+    },
+  },
+};
+
+function isThemePalette(value: string | null | undefined): value is ThemePalette {
+  return value === "beige" || value === "dark" || value === "white" || value === "amoled";
+}
+
+function normalizeThemeMode(value: string | null | undefined): ThemeMode | null {
+  if (value === "light") return "beige";
+  if (isThemePalette(value) || value === "system" || value === "scheduled") return value;
+  return null;
+}
+
+function normalizeThemeTime(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const match = /^(\d{1,2}):(\d{2})$/.exec(value);
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+function getCurrentMinuteOfDay() {
+  const now = new Date();
+  return now.getHours() * 60 + now.getMinutes();
+}
+
+function getThemeTimeMinuteOfDay(time: string) {
+  const [hours, minutes] = time.split(":").map((part) => Number(part));
+  return hours * 60 + minutes;
+}
+
+function isThemeScheduleActive(time: string, currentMinute: number) {
+  return currentMinute >= getThemeTimeMinuteOfDay(time);
+}
 
 function readCachedUiLanguage(): UILanguage {
   if (Platform.OS !== "web" || typeof window === "undefined") return "en";
@@ -168,13 +295,17 @@ async function writeSetting(db: SQLiteDatabase, key: string, value: string): Pro
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const db = useDatabase();
-  const { colorScheme: nwScheme, setColorScheme } = useNativeWindColorScheme();
+  const { setColorScheme } = useNativeWindColorScheme();
+  const systemScheme = useSystemColorScheme();
   const { width } = useWindowDimensions();
   const isCompact = Platform.OS !== "web" || width < SIDEBAR_BREAKPOINT;
   const activeSteps = isCompact ? FONT_SIZE_STEPS_MOBILE : FONT_SIZE_STEPS;
   const activeLineHeights = isCompact ? FONT_SIZE_LINE_HEIGHTS_MOBILE : FONT_SIZE_LINE_HEIGHTS;
   const [fontSizeIndex, setFontSizeIndexState] = useState(DEFAULT_FONT_SIZE_INDEX);
   const [theme, setThemeState] = useState<ThemeMode>("system");
+  const [scheduledTheme, setScheduledThemeState] = useState<ThemePalette>(DEFAULT_SCHEDULED_THEME);
+  const [scheduledSwitchTime, setScheduledSwitchTimeState] = useState(DEFAULT_SCHEDULED_SWITCH_TIME);
+  const [nowMinute, setNowMinute] = useState(getCurrentMinuteOfDay);
   const [viewMode, setViewModeState] = useState<ViewMode>("verse");
   const effectiveFontIndex = fontSizeIndex;
   const [pageScroll, setPageScrollState] = useState<PageScroll>("vertical");
@@ -198,6 +329,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         const saved = await readSettings(db, [
           "font_size_index",
           "theme",
+          "scheduled_theme",
+          "scheduled_switch_time",
           "view_mode",
           "page_scroll",
           "show_translation",
@@ -222,11 +355,14 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         }
 
         const savedTheme = saved.theme;
-        if (savedTheme === "light" || savedTheme === "dark" || savedTheme === "system") {
-          setThemeState(savedTheme);
-          // Defer to avoid NativeWind observable firing before components mount
-          requestAnimationFrame(() => setColorScheme(savedTheme));
-        }
+        const normalizedTheme = normalizeThemeMode(savedTheme);
+        if (normalizedTheme) setThemeState(normalizedTheme);
+
+        const savedScheduledTheme = saved.scheduled_theme;
+        if (isThemePalette(savedScheduledTheme)) setScheduledThemeState(savedScheduledTheme);
+
+        const normalizedScheduledTime = normalizeThemeTime(saved.scheduled_switch_time);
+        if (normalizedScheduledTime) setScheduledSwitchTimeState(normalizedScheduledTime);
 
         const savedViewMode = saved.view_mode;
         if (savedViewMode === "verse" || savedViewMode === "page") {
@@ -315,6 +451,28 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     load();
   }, [db]);
 
+  useEffect(() => {
+    const intervalId = setInterval(() => setNowMinute(getCurrentMinuteOfDay()), 30_000);
+    return () => clearInterval(intervalId);
+  }, []);
+
+  const systemTheme = systemScheme === "dark" ? "dark" : "beige";
+  const scheduleActive = theme === "scheduled" && isThemeScheduleActive(scheduledSwitchTime, nowMinute);
+  const effectiveTheme: ThemePalette =
+    theme === "system" ? systemTheme : theme === "scheduled" ? (scheduleActive ? scheduledTheme : systemTheme) : theme;
+  const isDark = effectiveTheme === "dark" || effectiveTheme === "amoled";
+  const themeSurface = THEME_PALETTES[effectiveTheme].surface;
+  const themeVars = useMemo(() => vars(THEME_PALETTES[effectiveTheme].variables), [effectiveTheme]);
+  const nativeWindScheme = theme === "system" || (theme === "scheduled" && !scheduleActive)
+    ? "system"
+    : isDark
+      ? "dark"
+      : "light";
+
+  useEffect(() => {
+    requestAnimationFrame(() => setColorScheme(nativeWindScheme));
+  }, [nativeWindScheme, setColorScheme]);
+
   const setFontSizeIndex = useCallback(
     (index: number) => {
       if (index < 0 || index >= FONT_SIZE_STEPS.length) return;
@@ -327,8 +485,26 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const setTheme = useCallback(
     (newTheme: ThemeMode) => {
       setThemeState(newTheme);
-      requestAnimationFrame(() => setColorScheme(newTheme));
       writeSetting(db, "theme", newTheme).catch(console.warn);
+    },
+    [db]
+  );
+
+  const setScheduledTheme = useCallback(
+    (newTheme: ThemePalette) => {
+      setScheduledThemeState(newTheme);
+      writeSetting(db, "scheduled_theme", newTheme).catch(console.warn);
+    },
+    [db]
+  );
+
+  const setScheduledSwitchTime = useCallback(
+    (time: string) => {
+      const normalized = normalizeThemeTime(time);
+      if (!normalized) return;
+      setScheduledSwitchTimeState(normalized);
+      setNowMinute(getCurrentMinuteOfDay());
+      writeSetting(db, "scheduled_switch_time", normalized).catch(console.warn);
     },
     [db]
   );
@@ -456,7 +632,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     [db]
   );
 
-  const isDark = nwScheme === "dark";
   const isRTL = uiLanguage === "ar";
 
   return (
@@ -468,6 +643,12 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         setFontSizeIndex,
         theme,
         setTheme,
+        effectiveTheme,
+        scheduledTheme,
+        setScheduledTheme,
+        scheduledSwitchTime,
+        setScheduledSwitchTime,
+        themeSurface,
         viewMode,
         setViewMode,
         pageScroll,
@@ -498,7 +679,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         isLoaded,
       }}
     >
-      <DirectionProvider dir={isRTL ? "rtl" : "ltr"}>{children}</DirectionProvider>
+      <View className="flex-1" style={themeVars}>
+        <DirectionProvider dir={isRTL ? "rtl" : "ltr"}>{children}</DirectionProvider>
+      </View>
     </SettingsContext.Provider>
   );
 }
