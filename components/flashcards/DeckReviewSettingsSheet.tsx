@@ -915,7 +915,7 @@ function ChoiceRow<T extends string>({
   isDark: boolean;
   isRTL: boolean;
 }) {
-  const rowBg = isDark ? "#141414" : "#FAF8F5";
+  const rowBg = isDark ? "#141414" : "#F9F3EB";
   const rowBorder = isDark ? "rgba(255,255,255,0.06)" : "rgba(45,45,45,0.06)";
   const selectedBg = isDark ? "rgba(45, 212, 191, 0.18)" : "#DFF8F3";
   const selectedText = isDark ? "#5eead4" : "#007D78";
