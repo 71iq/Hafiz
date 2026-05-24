@@ -373,10 +373,10 @@ export default function HomeScreen() {
             </Text>
             <Pressable
               onPress={() => setShowSearch(true)}
-              className="w-10 h-10 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center"
+              className="w-10 h-10 items-center justify-center"
               style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
             >
-              <Search size={16} color={isDark ? "#a3a3a3" : "#8B8178"} />
+              <Search size={22} color={isDark ? "#d4d4d4" : "#5C554E"} />
             </Pressable>
           </View>
         </View>
