@@ -17,6 +17,7 @@ Bundled Quran text, fonts, translations, tafsir, tajweed, morphology, layout dat
 - MASAQ morphology and i'rab data: CC BY 3.0.
 - Tajweed data: sourced from `cpfair/quran-tajweed`, CC BY 4.0.
 - Tajweed rule descriptions: adapted from educational tajweed references and bundled in `assets/data/tajweed-rules-en.json` and `assets/data/tajweed-rules-ar.json`.
+- Reasons of revelation data: sourced from `mostafaahmed97/asbab-al-nuzul-dataset`, MIT License.
 
 ## Attribution Principle
 

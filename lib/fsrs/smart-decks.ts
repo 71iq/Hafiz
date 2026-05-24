@@ -20,6 +20,7 @@ export const SMART_DECK_IDS = {
   mutashabihat: "default-mutashabihat",
   similarTails: "default-similar-tails",
   qiraat: "default-qiraat",
+  reasonsOfRevelation: "default-reasons-of-revelation",
 } as const;
 
 export type SmartDeckId = (typeof SMART_DECK_IDS)[keyof typeof SMART_DECK_IDS];
@@ -29,7 +30,7 @@ export type BuiltInDeckFilter =
   | { type: "surah"; surahs: number[] }
   | { type: "juz"; juzNumbers: number[] };
 
-export type SmartCardKind = "mutashabihat" | "similarTail" | "qiraat";
+export type SmartCardKind = "mutashabihat" | "similarTail" | "qiraat" | "asbab";
 
 export type SmartDeckRef = {
   groupId: string | null;
@@ -61,6 +62,9 @@ export type SmartCardContent = {
   needsExplicitRefLabel?: boolean;
   qiraatText?: string;
   qiraatGroup?: string[];
+  asbabOccasions?: string[];
+  asbabGroup?: string[];
+  asbabSource?: string;
 };
 
 export type SmartDeckStats = {
@@ -81,9 +85,10 @@ const SMART_DECK_ID_LIST: SmartDeckId[] = [
   SMART_DECK_IDS.mutashabihat,
   SMART_DECK_IDS.similarTails,
   SMART_DECK_IDS.qiraat,
+  SMART_DECK_IDS.reasonsOfRevelation,
 ];
 
-const SMART_CARD_PREFIXES = ["mutashabihat:", "similar-tail:", "qiraat:"];
+const SMART_CARD_PREFIXES = ["mutashabihat:", "similar-tail:", "qiraat:", "asbab:"];
 const SQLITE_PARAM_BATCH = 800;
 const INSERT_BATCH = 500;
 const REVIEWABLE_CARD_SQL = "suspended_at IS NULL AND (buried_until IS NULL OR buried_until <= ?)";
@@ -156,6 +161,19 @@ export async function getSmartDeckCandidateCardIds(
   filter?: BuiltInDeckFilter
 ): Promise<string[]> {
   const activeFilter = filter ?? await readSmartDeckFilter(db, deckId);
+  if (deckId === SMART_DECK_IDS.reasonsOfRevelation) {
+    const params: any[] = [];
+    const clause = buildFilterClause("an", activeFilter, params);
+    const rows = await db.getAllAsync<{ surah: number; ayah: number }>(
+      `SELECT an.surah, an.ayah
+         FROM asbab_al_nuzul an
+        WHERE TRIM(COALESCE(an.occasions_json, '')) != ''
+          ${clause ? `AND ${clause}` : ""}
+        ORDER BY an.surah, an.ayah`,
+      params
+    );
+    return rows.map((row) => `asbab:${row.surah}:${row.ayah}`);
+  }
   if (deckId === SMART_DECK_IDS.qiraat) {
     const params: any[] = [];
     const clause = buildFilterClause("qe", activeFilter, params);
@@ -519,6 +537,56 @@ export async function getSmartCardContent(
       refs: [ref],
       qiraatText: row.qiraat_text,
       qiraatGroup: parseStringArray(row.ayah_group),
+    };
+  }
+  if (cardId.startsWith("asbab:")) {
+    const [, surahRaw, ayahRaw] = cardId.split(":");
+    const surah = parseInt(surahRaw, 10);
+    const ayah = parseInt(ayahRaw, 10);
+    if (!Number.isFinite(surah) || !Number.isFinite(ayah)) return null;
+    const row = await db.getFirstAsync<{
+      text_uthmani: string;
+      text_clean: string;
+      text_qcf2: string;
+      v2_page: number;
+      name_arabic: string;
+      name_english: string;
+      occasions_json: string;
+      ayah_group: string | null;
+      source: string | null;
+    }>(
+      `SELECT qt.text_uthmani, qt.text_clean, qt.text_qcf2, qt.v2_page, s.name_arabic, s.name_english,
+              an.occasions_json, an.ayah_group, an.source
+         FROM asbab_al_nuzul an
+         JOIN quran_text qt ON qt.surah = an.surah AND qt.ayah = an.ayah
+         JOIN surahs s ON s.number = an.surah
+        WHERE an.surah = ? AND an.ayah = ? AND TRIM(COALESCE(an.occasions_json, '')) != ''`,
+      [surah, ayah]
+    );
+    if (!row) return null;
+    const occasions = parseStringArray(row.occasions_json).filter((text) => text.trim().length > 0);
+    if (occasions.length === 0) return null;
+    const ref: SmartDeckRef = {
+      groupId: null,
+      sortOrder: 0,
+      surah,
+      ayah,
+      surahNameAr: row.name_arabic,
+      surahNameEn: row.name_english,
+      tail5: null,
+      textUthmani: row.text_uthmani,
+      textClean: row.text_clean,
+      textQcf2: row.text_qcf2,
+      v2Page: row.v2_page,
+    };
+    return {
+      kind: "asbab",
+      cue: `${surah}:${ayah}`,
+      targetRef: ref,
+      refs: [ref],
+      asbabOccasions: occasions,
+      asbabGroup: parseStringArray(row.ayah_group),
+      asbabSource: row.source ?? undefined,
     };
   }
   return null;

@@ -885,6 +885,7 @@ export default function SettingsScreen() {
                 s.creditWordMeanings,
                 s.creditIrab,
                 s.creditQiraat,
+                s.creditAsbab,
                 s.creditTahrirTanwir,
                 s.creditQurtubi,
                 s.creditKashshaf,

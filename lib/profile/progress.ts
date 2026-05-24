@@ -42,6 +42,7 @@ export async function getLocalSurahProgress(db: SQLiteDatabase): Promise<Profile
       SMART_DECK_IDS.mutashabihat,
       SMART_DECK_IDS.similarTails,
       SMART_DECK_IDS.qiraat,
+      SMART_DECK_IDS.reasonsOfRevelation,
     ]
   );
 

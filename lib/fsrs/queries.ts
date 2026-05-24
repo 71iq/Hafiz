@@ -68,7 +68,7 @@ export type WirdStatus = {
   state: "empty" | "maintained_today" | "open_today" | "fresh_start";
 };
 
-const SMART_CARD_SQL = `deck_id IN ('${SMART_DECK_IDS.mutashabihat}', '${SMART_DECK_IDS.similarTails}', '${SMART_DECK_IDS.qiraat}')`;
+const SMART_CARD_SQL = `deck_id IN (${Object.values(SMART_DECK_IDS).map((id) => `'${id}'`).join(", ")})`;
 const NON_SMART_CARD_SQL = `NOT ${SMART_CARD_SQL}`;
 const REVIEWABLE_CARD_SQL = "suspended_at IS NULL AND (buried_until IS NULL OR buried_until <= ?)";
 
@@ -1209,7 +1209,7 @@ async function decorateDeckCardListItem(
     const ref = smartContent.targetRef;
     const reference = `${ref.surah}:${ref.ayah}`;
     const title = `${reference} · ${ref.surahNameEn}`;
-    const preview = smartContent.promptUthmani ?? smartContent.cue ?? ref.textUthmani;
+    const preview = smartContent.promptUthmani ?? smartContent.asbabOccasions?.[0] ?? smartContent.cue ?? ref.textUthmani;
     const searchText = [
       normalizedRow.id,
       reference,
@@ -1222,6 +1222,8 @@ async function decorateDeckCardListItem(
       smartContent.hiddenAnswerUthmani,
       smartContent.qiraatText,
       ...(smartContent.qiraatGroup ?? []),
+      ...(smartContent.asbabOccasions ?? []),
+      ...(smartContent.asbabGroup ?? []),
     ].filter(Boolean).join(" ");
     return {
       ...normalizedRow,

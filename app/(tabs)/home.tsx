@@ -157,6 +157,12 @@ export default function HomeScreen() {
         subtitle: s.smartDeckQiraatSubtitle,
         icon: BookOpenText,
       },
+      {
+        id: SMART_DECK_IDS.reasonsOfRevelation,
+        title: s.smartDeckReasonsTitle,
+        subtitle: s.smartDeckReasonsSubtitle,
+        icon: BookMarked,
+      },
     ] as const;
 
     const smartDisplays = await Promise.all(
@@ -244,7 +250,7 @@ export default function HomeScreen() {
     } catch {
       setResume(null);
     }
-  }, [db, loadLatestUnlock, s.smartDeckMutashabihatTitle, s.smartDeckMutashabihatSubtitle, s.smartDeckSimilarTailsTitle, s.smartDeckSimilarTailsSubtitle, s.smartDeckQiraatTitle, s.smartDeckQiraatSubtitle, uiLanguage]);
+  }, [db, loadLatestUnlock, s.smartDeckMutashabihatTitle, s.smartDeckMutashabihatSubtitle, s.smartDeckSimilarTailsTitle, s.smartDeckSimilarTailsSubtitle, s.smartDeckQiraatTitle, s.smartDeckQiraatSubtitle, s.smartDeckReasonsTitle, s.smartDeckReasonsSubtitle, uiLanguage]);
 
   useFocusEffect(
     useCallback(() => {

@@ -37,6 +37,7 @@ const nativeRequires: Record<string, () => any> = Platform.OS !== "web"
       "tajweed-rules-ar.json": () => require("../../assets/data/tajweed-rules-ar.json"),
       "tajweed-rules-en.json": () => require("../../assets/data/tajweed-rules-en.json"),
       "al-qira-at-al-mawsoo-ah-al-qur-aniyyah.json": () => require("../../assets/data/al-qira-at-al-mawsoo-ah-al-qur-aniyyah.json"),
+      "asbab-al-nuzul.json": () => require("../../assets/data/asbab-al-nuzul.json"),
       "mutashabihat/nourquran_hafiz.json": () => require("../../assets/data/mutashabihat/nourquran_hafiz.json"),
     }
   : {};
@@ -1338,7 +1339,7 @@ type ProgressCallback = (progress: ImportProgress) => void;
 
 // Bump this whenever a new import step is added so the progress bar caps at
 // 100% and the step counter shows accurate "N / total" labels.
-const TOTAL_STEPS = 21;
+const TOTAL_STEPS = 22;
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, "").trim();
@@ -1655,7 +1656,7 @@ async function importSurahInfo(
 ): Promise<void> {
   const data = await loadData("surah-info.json");
   if (!Array.isArray(data)) throw new Error("Invalid surah-info.json");
-  onProgress({ step: "Surah Information", current: 21, total: TOTAL_STEPS, detail: `${data.length} entries` });
+  onProgress({ step: "Surah Information", current: 22, total: TOTAL_STEPS, detail: `${data.length} entries` });
   console.log(`[Import] Importing ${data.length} surah_info rows...`);
 
   const rows = data.map((entry: any) => [
@@ -2167,6 +2168,45 @@ async function importQiraatEncyclopedia(
   console.log(`[Import] qiraat_encyclopedia done: ${rows.length} rows`);
 }
 
+async function importAsbabAlNuzul(
+  db: SQLiteDatabase,
+  onProgress: ProgressCallback
+): Promise<void> {
+  const data = await loadData("asbab-al-nuzul.json");
+  if (!data || typeof data !== "object" || data.schema_version !== "1.0") {
+    throw new Error("Unsupported asbab_al_nuzul schema_version");
+  }
+  const source = typeof data.source?.repository === "string"
+    ? data.source.repository
+    : "asbab-al-nuzul-dataset";
+  const rows = (Array.isArray(data.rows) ? data.rows : [])
+    .map((row: any) => {
+      const surah = Number(row.surah);
+      const ayah = Number(row.ayah);
+      const occasions = Array.isArray(row.occasions)
+        ? row.occasions.map((text: unknown) => stripHtml(String(text ?? "")).trim()).filter(Boolean)
+        : [];
+      const ayahGroup = Array.isArray(row.ayah_group) ? row.ayah_group.map(String) : [`${surah}:${ayah}`];
+      if (!Number.isInteger(surah) || !Number.isInteger(ayah) || occasions.length === 0) return null;
+      return [surah, ayah, JSON.stringify(occasions), JSON.stringify(ayahGroup), source];
+    })
+    .filter(Boolean) as any[][];
+
+  onProgress({
+    step: "Asbab al-Nuzul",
+    current: 19,
+    total: TOTAL_STEPS,
+    detail: `${rows.length} ayahs`,
+  });
+
+  await batchInsert(
+    db,
+    "INSERT OR REPLACE INTO asbab_al_nuzul (surah, ayah, occasions_json, ayah_group, source) VALUES (?, ?, ?, ?, ?)",
+    rows
+  );
+  console.log(`[Import] asbab_al_nuzul done: ${rows.length} rows`);
+}
+
 async function importMutashabihat(
   db: SQLiteDatabase,
   onProgress: ProgressCallback
@@ -2180,7 +2220,7 @@ async function importMutashabihat(
   const tailGroups = Array.isArray(data.tail_groups) ? data.tail_groups : [];
   onProgress({
     step: "Mutashabihat",
-    current: 19,
+    current: 20,
     total: TOTAL_STEPS,
     detail: `${similarGroups.length} similar + ${tailGroups.length} tails`,
   });
@@ -2258,7 +2298,7 @@ async function importReflectionJourneyLevels(
 
   onProgress({
     step: "Reflection Journey",
-    current: 20,
+    current: 21,
     total: TOTAL_STEPS,
     detail: `${parsed.levels.length} levels`,
   });
@@ -2386,6 +2426,9 @@ async function runNewTabImports(
   }
   if ((await safeCount("qiraat_encyclopedia")) === 0) {
     await safeImport("qiraat_encyclopedia", () => importQiraatEncyclopedia(db, onProgress));
+  }
+  if ((await safeCount("asbab_al_nuzul")) === 0) {
+    await safeImport("asbab_al_nuzul", () => importAsbabAlNuzul(db, onProgress));
   }
   const missingMutashabihatSegments = await db.getFirstAsync<{ c: number }>(
     `SELECT COUNT(*) as c
@@ -2656,6 +2699,7 @@ export async function initializeDatabase(
     void loadData("tajweed-rules-ar.json");
     void loadData("tajweed-rules-en.json");
     void loadData("al-qira-at-al-mawsoo-ah-al-qur-aniyyah.json");
+    void loadData("asbab-al-nuzul.json");
     void loadData("mutashabihat/nourquran_hafiz.json");
     for (let i = 1; i <= 114; i++) void loadTafseerFile(i);
   }
@@ -2706,6 +2750,7 @@ export async function getTableCounts(
     "word_translations",
     "word_irab",
     "tajweed_rules",
+    "asbab_al_nuzul",
     "page_lines",
   ];
 

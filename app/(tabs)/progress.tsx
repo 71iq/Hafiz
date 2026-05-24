@@ -35,7 +35,7 @@ import { getLocalSurahProgress, type ProfileSurahProgress } from "@/lib/profile/
 
 type HeatmapDay = { date: string; count: number };
 
-type DefaultDeckProgressKey = "mutashabihat" | "similarTails" | "qiraat" | "vocabulary";
+type DefaultDeckProgressKey = "mutashabihat" | "similarTails" | "qiraat" | "reasonsOfRevelation" | "vocabulary";
 
 type DefaultDeckProgressItem = {
   key: DefaultDeckProgressKey;
@@ -371,6 +371,7 @@ async function getDefaultDeckProgress(db: SQLiteDatabase): Promise<DefaultDeckPr
     { key: "mutashabihat", deckId: SMART_DECK_IDS.mutashabihat, isSmartDeck: true, color: "#0d9488" },
     { key: "similarTails", deckId: SMART_DECK_IDS.similarTails, isSmartDeck: true, color: "#ca8a04" },
     { key: "qiraat", deckId: SMART_DECK_IDS.qiraat, isSmartDeck: true, color: "#2563eb" },
+    { key: "reasonsOfRevelation", deckId: SMART_DECK_IDS.reasonsOfRevelation, isSmartDeck: true, color: "#d97706" },
     { key: "vocabulary", deckId: MEANINGS_DECK_ID, isSmartDeck: false, color: "#be123c" },
   ];
 
@@ -418,6 +419,7 @@ function DefaultDeckProgressChart({
     mutashabihat: s.smartDeckMutashabihatTitle,
     similarTails: s.smartDeckSimilarTailsTitle,
     qiraat: s.smartDeckQiraatTitle,
+    reasonsOfRevelation: s.smartDeckReasonsTitle,
     vocabulary: s["achievementCategory.vocab"] ?? s.vocabDeckTitle,
   };
   const totalCards = items.reduce((sum, item) => sum + item.total, 0);

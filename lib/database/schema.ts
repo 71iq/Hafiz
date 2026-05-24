@@ -205,6 +205,16 @@ export async function createSchema(db: SQLiteDatabase): Promise<void> {
       PRIMARY KEY (surah, ayah)
     );
 
+    -- Reasons of revelation per ayah
+    CREATE TABLE IF NOT EXISTS asbab_al_nuzul (
+      surah INTEGER NOT NULL,
+      ayah INTEGER NOT NULL,
+      occasions_json TEXT NOT NULL,
+      ayah_group TEXT NOT NULL DEFAULT '[]',
+      source TEXT NOT NULL DEFAULT 'asbab-al-nuzul-dataset',
+      PRIMARY KEY (surah, ayah)
+    );
+
     -- NourQuran mutashabihat and similar ayah tails
     CREATE TABLE IF NOT EXISTS mutashabihat_groups (
       id TEXT PRIMARY KEY,
@@ -475,6 +485,7 @@ export async function createSchema(db: SQLiteDatabase): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_word_roots_lemma ON word_roots(lemma);
     CREATE INDEX IF NOT EXISTS idx_word_meanings_ar_sa ON word_meanings_ar(surah, ayah);
     CREATE INDEX IF NOT EXISTS idx_word_irab_daas_sa ON word_irab_daas(surah, ayah);
+    CREATE INDEX IF NOT EXISTS idx_asbab_al_nuzul_sa ON asbab_al_nuzul(surah, ayah);
     CREATE INDEX IF NOT EXISTS idx_mutashabihat_groups_kind ON mutashabihat_groups(kind);
     CREATE INDEX IF NOT EXISTS idx_mutashabihat_refs_group ON mutashabihat_refs(group_id);
     CREATE INDEX IF NOT EXISTS idx_mutashabihat_refs_surah_ayah ON mutashabihat_refs(surah, ayah);

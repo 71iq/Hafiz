@@ -104,6 +104,9 @@ type CardData = {
   smartNeedsExplicitRefLabel?: boolean;
   qiraatText?: string;
   qiraatGroup?: string[];
+  asbabOccasions?: string[];
+  asbabGroup?: string[];
+  asbabSource?: string;
 };
 
 type SessionSummary = {
@@ -117,7 +120,7 @@ type SessionSummary = {
   wirdMaintainedToday: boolean;
 };
 
-type SmartTestMode = "smartRefs" | "qiraatReading";
+type SmartTestMode = "smartRefs" | "qiraatReading" | "asbabReading";
 type ReviewMode = TestMode | WordTestMode | SmartTestMode;
 const WORD_TEST_MODE_COLORS: Record<WordTestMode, string> = {
   wordMeaningArabic: "#0d9488",
@@ -126,6 +129,7 @@ const WORD_TEST_MODE_COLORS: Record<WordTestMode, string> = {
 const SMART_TEST_MODE_COLORS: Record<SmartTestMode, string> = {
   smartRefs: "#0d9488",
   qiraatReading: "#8b5cf6",
+  asbabReading: "#d97706",
 };
 
 // ─── Main Component ──────────────────────────────────────────
@@ -319,6 +323,9 @@ function FlashcardSessionScreen() {
               smartNeedsExplicitRefLabel: smartContent.needsExplicitRefLabel,
               qiraatText: smartContent.qiraatText,
               qiraatGroup: smartContent.qiraatGroup,
+              asbabOccasions: smartContent.asbabOccasions,
+              asbabGroup: smartContent.asbabGroup,
+              asbabSource: smartContent.asbabSource,
             });
             continue;
           }
@@ -449,6 +456,7 @@ function FlashcardSessionScreen() {
     s.smartDeckMutashabihatTitle,
     s.smartDeckSimilarTailsTitle,
     s.smartDeckQiraatTitle,
+    s.smartDeckReasonsTitle,
     s.genericActionFailed,
   ]);
 
@@ -464,6 +472,9 @@ function FlashcardSessionScreen() {
     }
     if (currentCard.kind === "qiraat") {
       return currentCard.qiraatText ? ["qiraatReading"] : [];
+    }
+    if (currentCard.kind === "asbab") {
+      return currentCard.asbabOccasions?.length ? ["asbabReading"] : [];
     }
     if (currentCard.isWordCard) {
       return wordEnabledModes.filter((mode) => {
@@ -1374,6 +1385,8 @@ function TestModeAnswer({
       return <SmartRefsAnswer card={card} fontSize={fontSize * 0.82} lineHeight={lineHeight * 0.82} s={s} />;
     case "qiraatReading":
       return <QiraatAnswer card={card} s={s} />;
+    case "asbabReading":
+      return <AsbabAnswer card={card} s={s} />;
     default:
       return null;
   }
@@ -1405,7 +1418,7 @@ function SmartCardFront({
       >
         {prompt}
       </Text>
-      {card.kind === "qiraat" && card.textQcf2 && card.v2Page ? (
+      {(card.kind === "qiraat" || card.kind === "asbab") && card.textQcf2 && card.v2Page ? (
         <Qcf2AyahText textQcf2={card.textQcf2} v2Page={card.v2Page} fontSize={fontSize} lineHeight={lineHeight} />
       ) : (
         <SmartCueText card={card} fontSize={fontSize} lineHeight={lineHeight} s={s} />
@@ -1612,6 +1625,65 @@ function QiraatAnswer({ card, s }: { card: CardData; s: any }) {
   );
 }
 
+function AsbabAnswer({ card, s }: { card: CardData; s: any }) {
+  const occasions = card.asbabOccasions ?? [];
+  if (occasions.length === 0) {
+    return (
+      <Text className="text-warm-500 dark:text-neutral-400 text-center" style={{ writingDirection: "rtl" }}>
+        {s.noAsbabData}
+      </Text>
+    );
+  }
+
+  const group = card.asbabGroup ?? [];
+  const coversLabel = group.length > 1
+    ? `${s.asbabCoversAyahs}: ${group.map(formatAyahKeyArabic).join("، ")}`
+    : null;
+
+  return (
+    <ScrollView style={{ maxHeight: 420 }} nestedScrollEnabled>
+      <Text
+        className="text-xs font-medium text-warm-400 dark:text-neutral-500 uppercase tracking-wider mb-3"
+        style={{ writingDirection: "rtl", textAlign: "right" }}
+      >
+        {s.asbabHeader}
+      </Text>
+
+      {coversLabel && (
+        <View className="mb-3 px-3 py-2 rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 self-start">
+          <Text
+            className="text-xs text-primary-accent dark:text-primary-bright"
+            style={{ writingDirection: "rtl" }}
+          >
+            {coversLabel}
+          </Text>
+        </View>
+      )}
+
+      <View className="gap-3">
+        {occasions.map((occasion, index) => (
+          <View key={`${card.surah}:${card.ayah}:${index}`} className="rounded-2xl bg-surface-low dark:bg-surface-dark-low p-4">
+            {occasions.length > 1 && (
+              <Text
+                className="mb-2 text-primary-accent dark:text-primary-bright"
+                style={{ fontFamily: "Manrope_700Bold", fontSize: 12, textAlign: "right", writingDirection: "rtl" }}
+              >
+                {`${s.smartDeckReasonLabel} ${index + 1}`}
+              </Text>
+            )}
+            <Text
+              className="text-base text-charcoal dark:text-neutral-200 leading-8"
+              style={{ writingDirection: "rtl", textAlign: "right" }}
+            >
+              {occasion}
+            </Text>
+          </View>
+        ))}
+      </View>
+    </ScrollView>
+  );
+}
+
 // ─── Grading ─────────────────────────────────────────────────
 
 const GRADE_BUTTONS: { rating: Grade; bgLight: string; bgDark: string }[] = [
@@ -1786,6 +1858,7 @@ function getModeName(mode: ReviewMode, s: any): string {
     wordMeaningTranslation: s.flashcardsModeWordMeaningTranslation,
     smartRefs: s.smartDeckTargetAyah,
     qiraatReading: s.smartDeckQiraatAnswerTitle,
+    asbabReading: s.smartDeckReasonsAnswerTitle,
   };
   return map[mode] ?? mode;
 }
@@ -1801,11 +1874,11 @@ function isWordTestMode(mode: ReviewMode): mode is WordTestMode {
 }
 
 function isSmartTestMode(mode: ReviewMode): mode is SmartTestMode {
-  return mode === "smartRefs" || mode === "qiraatReading";
+  return mode === "smartRefs" || mode === "qiraatReading" || mode === "asbabReading";
 }
 
 function isSmartReviewCard(card: CardData): boolean {
-  return card.kind === "mutashabihat" || card.kind === "similarTail" || card.kind === "qiraat";
+  return card.kind === "mutashabihat" || card.kind === "similarTail" || card.kind === "qiraat" || card.kind === "asbab";
 }
 
 function normalizeDateDigits(value: string): string {
@@ -1927,12 +2000,14 @@ function formatCompactNumber(value: number, isRTL: boolean): string {
 function getSmartDeckTitleForKind(kind: SmartCardKind, s: any): string {
   if (kind === "mutashabihat") return s.smartDeckMutashabihatTitle;
   if (kind === "similarTail") return s.smartDeckSimilarTailsTitle;
-  return s.smartDeckQiraatTitle;
+  if (kind === "qiraat") return s.smartDeckQiraatTitle;
+  return s.smartDeckReasonsTitle;
 }
 
 function getSmartPrompt(card: CardData, s: any): string {
   if (card.kind === "similarTail") return s.smartDeckTailCompletePrompt;
   if (card.kind === "qiraat") return s.smartDeckQiraatPrompt;
+  if (card.kind === "asbab") return s.smartDeckReasonsPrompt;
   return s.smartDeckMutashabihatPrefixPrompt;
 }
 

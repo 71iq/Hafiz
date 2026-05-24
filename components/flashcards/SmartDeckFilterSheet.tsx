@@ -411,7 +411,8 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
 function getSmartDeckTitle(deckId: SmartDeckId, s: any): string {
   if (deckId === SMART_DECK_IDS.mutashabihat) return s.smartDeckMutashabihatTitle;
   if (deckId === SMART_DECK_IDS.similarTails) return s.smartDeckSimilarTailsTitle;
-  return s.smartDeckQiraatTitle;
+  if (deckId === SMART_DECK_IDS.qiraat) return s.smartDeckQiraatTitle;
+  return s.smartDeckReasonsTitle;
 }
 
 function SurahFilterItem({

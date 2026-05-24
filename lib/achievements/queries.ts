@@ -210,6 +210,7 @@ async function backfillReviewAchievements(db: SQLiteDatabase, notify: boolean): 
         AND card_id NOT LIKE 'mutashabihat:%'
         AND card_id NOT LIKE 'similar-tail:%'
         AND card_id NOT LIKE 'qiraat:%'
+        AND card_id NOT LIKE 'asbab:%'
       ORDER BY reviewed_at ASC LIMIT 1`
   );
   if (firstAyah) {
