@@ -250,21 +250,48 @@ const startupThemeScript = `
       var parts = time.split(":");
       return Number(parts[0]) * 60 + Number(parts[1]);
     };
+    var sortRules = function (rules) {
+      return rules.slice().sort(function (a, b) { return minuteOfDay(a.time) - minuteOfDay(b.time); });
+    };
+    var readScheduleRules = function () {
+      try {
+        var parsed = JSON.parse(window.localStorage.getItem("hafiz_scheduled_rules") || "null");
+        if (Array.isArray(parsed)) {
+          var rules = parsed.map(function (rule, index) {
+            var theme = isPalette(rule && rule.theme) ? rule.theme : null;
+            var time = normalizeTime(rule && rule.time);
+            if (!theme || !time) return null;
+            return { id: typeof rule.id === "string" && rule.id ? rule.id : "rule-" + index, theme: theme, time: time };
+          }).filter(Boolean);
+          if (rules.length > 0) return sortRules(rules);
+        }
+      } catch (error) {}
+
+      var legacyTheme = window.localStorage.getItem("hafiz_scheduled_theme");
+      legacyTheme = isPalette(legacyTheme) ? legacyTheme : "dark";
+      var legacyTime = normalizeTime(window.localStorage.getItem("hafiz_scheduled_switch_time")) || "21:00";
+      return [{ id: "default", theme: legacyTheme, time: legacyTime }];
+    };
+    var resolveScheduledTheme = function (rules, currentMinute, systemTheme) {
+      if (rules.length === 1) return currentMinute >= minuteOfDay(rules[0].time) ? rules[0].theme : systemTheme;
+      var activeRule = rules[rules.length - 1];
+      for (var i = 0; i < rules.length; i += 1) {
+        if (minuteOfDay(rules[i].time) <= currentMinute) activeRule = rules[i];
+        else break;
+      }
+      return activeRule.theme;
+    };
     var now = new Date();
     var currentMinute = now.getHours() * 60 + now.getMinutes();
     var systemTheme =
       window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "beige";
     var theme = normalizeTheme(window.localStorage.getItem("hafiz_theme")) || "system";
-    var scheduledTheme = window.localStorage.getItem("hafiz_scheduled_theme");
-    scheduledTheme = isPalette(scheduledTheme) ? scheduledTheme : "dark";
-    var scheduledTime = normalizeTime(window.localStorage.getItem("hafiz_scheduled_switch_time")) || "21:00";
+    var scheduledRules = readScheduleRules();
     var effectiveTheme =
       theme === "system"
         ? systemTheme
         : theme === "scheduled"
-          ? currentMinute >= minuteOfDay(scheduledTime)
-            ? scheduledTheme
-            : systemTheme
+          ? resolveScheduledTheme(scheduledRules, currentMinute, systemTheme)
           : theme;
     var palette = palettes[effectiveTheme] || palettes.beige;
     var root = document.documentElement;

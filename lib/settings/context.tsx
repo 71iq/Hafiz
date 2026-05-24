@@ -42,6 +42,7 @@ export const HIFZ_AUTO_DELAY_STEP_MS = 250;
 
 export type ThemePalette = "beige" | "dark" | "white" | "amoled";
 export type ThemeMode = ThemePalette | "system" | "scheduled";
+export type ThemeScheduleRule = { id: string; theme: ThemePalette; time: string };
 export type ViewMode = "verse" | "page";
 export type PageScroll = "vertical" | "horizontal";
 export type UILanguage = "en" | "ar";
@@ -50,6 +51,7 @@ const UI_LANGUAGE_CACHE_KEY = "hafiz_ui_language";
 const THEME_CACHE_KEY = "hafiz_theme";
 const SCHEDULED_THEME_CACHE_KEY = "hafiz_scheduled_theme";
 const SCHEDULED_SWITCH_TIME_CACHE_KEY = "hafiz_scheduled_switch_time";
+const SCHEDULED_RULES_CACHE_KEY = "hafiz_scheduled_rules";
 
 type SettingsContextType = {
   fontSizeIndex: number;
@@ -63,6 +65,8 @@ type SettingsContextType = {
   setScheduledTheme: (theme: ThemePalette) => void;
   scheduledSwitchTime: string;
   setScheduledSwitchTime: (time: string) => void;
+  scheduledRules: ThemeScheduleRule[];
+  setScheduledRules: (rules: ThemeScheduleRule[]) => void;
   themeSurface: string;
   viewMode: ViewMode;
   setViewMode: (mode: ViewMode) => void;
@@ -106,6 +110,8 @@ const SettingsContext = createContext<SettingsContextType>({
   setScheduledTheme: () => {},
   scheduledSwitchTime: "21:00",
   setScheduledSwitchTime: () => {},
+  scheduledRules: [],
+  setScheduledRules: () => {},
   themeSurface: "#FFF8F1",
   viewMode: "verse",
   setViewMode: () => {},
@@ -139,6 +145,9 @@ const SettingsContext = createContext<SettingsContextType>({
 
 const DEFAULT_SCHEDULED_THEME: ThemePalette = "dark";
 const DEFAULT_SCHEDULED_SWITCH_TIME = "21:00";
+const DEFAULT_SCHEDULED_RULES: ThemeScheduleRule[] = [
+  { id: "default", theme: DEFAULT_SCHEDULED_THEME, time: DEFAULT_SCHEDULED_SWITCH_TIME },
+];
 
 const THEME_PALETTES: Record<
   ThemePalette,
@@ -237,6 +246,45 @@ function normalizeThemeTime(value: string | null | undefined): string | null {
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
+function normalizeThemeScheduleRules(value: string | null | undefined): ThemeScheduleRule[] | null {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value);
+    if (!Array.isArray(parsed)) return null;
+    const rules = parsed.flatMap((rule, index): ThemeScheduleRule[] => {
+      const theme = isThemePalette(rule?.theme) ? rule.theme : null;
+      const time = normalizeThemeTime(rule?.time);
+      if (!theme || !time) return [];
+      return [{
+        id: typeof rule?.id === "string" && rule.id.trim() ? rule.id : `rule-${index}`,
+        theme,
+        time,
+      }];
+    });
+    return rules.length > 0 ? sortThemeScheduleRules(rules) : null;
+  } catch {
+    return null;
+  }
+}
+
+function sortThemeScheduleRules(rules: ThemeScheduleRule[]): ThemeScheduleRule[] {
+  return [...rules].sort((a, b) => getThemeTimeMinuteOfDay(a.time) - getThemeTimeMinuteOfDay(b.time));
+}
+
+function normalizeThemeScheduleRulesList(rules: ThemeScheduleRule[]): ThemeScheduleRule[] {
+  const normalized = rules.flatMap((rule, index): ThemeScheduleRule[] => {
+    const theme = isThemePalette(rule.theme) ? rule.theme : null;
+    const time = normalizeThemeTime(rule.time);
+    if (!theme || !time) return [];
+    return [{
+      id: rule.id.trim() || `rule-${index}`,
+      theme,
+      time,
+    }];
+  });
+  return sortThemeScheduleRules(normalized.length > 0 ? normalized : DEFAULT_SCHEDULED_RULES);
+}
+
 function getCurrentMinuteOfDay() {
   const now = new Date();
   return now.getHours() * 60 + now.getMinutes();
@@ -249,6 +297,25 @@ function getThemeTimeMinuteOfDay(time: string) {
 
 function isThemeScheduleActive(time: string, currentMinute: number) {
   return currentMinute >= getThemeTimeMinuteOfDay(time);
+}
+
+function resolveScheduledTheme(rules: ThemeScheduleRule[], currentMinute: number, systemTheme: ThemePalette): ThemePalette {
+  const normalized = normalizeThemeScheduleRulesList(rules);
+  if (normalized.length === 1) {
+    return isThemeScheduleActive(normalized[0].time, currentMinute) ? normalized[0].theme : systemTheme;
+  }
+
+  let activeRule = normalized[normalized.length - 1];
+  for (const rule of normalized) {
+    if (getThemeTimeMinuteOfDay(rule.time) <= currentMinute) activeRule = rule;
+    else break;
+  }
+  return activeRule.theme;
+}
+
+function scheduledUsesSystemFallback(rules: ThemeScheduleRule[], currentMinute: number): boolean {
+  const normalized = normalizeThemeScheduleRulesList(rules);
+  return normalized.length === 1 && !isThemeScheduleActive(normalized[0].time, currentMinute);
 }
 
 function readCachedUiLanguage(): UILanguage {
@@ -297,6 +364,22 @@ function cacheScheduledSwitchTime(time: string) {
   }
 }
 
+function readCachedScheduledRules(): ThemeScheduleRule[] {
+  if (Platform.OS !== "web" || typeof window === "undefined") return DEFAULT_SCHEDULED_RULES;
+  return normalizeThemeScheduleRules(window.localStorage.getItem(SCHEDULED_RULES_CACHE_KEY)) ??
+    [{
+      id: "default",
+      theme: readCachedScheduledTheme(),
+      time: readCachedScheduledSwitchTime(),
+    }];
+}
+
+function cacheScheduledRules(rules: ThemeScheduleRule[]) {
+  if (Platform.OS === "web" && typeof window !== "undefined") {
+    window.localStorage.setItem(SCHEDULED_RULES_CACHE_KEY, JSON.stringify(normalizeThemeScheduleRulesList(rules)));
+  }
+}
+
 export function useSettings() {
   return useContext(SettingsContext);
 }
@@ -342,6 +425,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<ThemeMode>(readCachedThemeMode);
   const [scheduledTheme, setScheduledThemeState] = useState<ThemePalette>(readCachedScheduledTheme);
   const [scheduledSwitchTime, setScheduledSwitchTimeState] = useState(readCachedScheduledSwitchTime);
+  const [scheduledRules, setScheduledRulesState] = useState<ThemeScheduleRule[]>(readCachedScheduledRules);
   const [nowMinute, setNowMinute] = useState(getCurrentMinuteOfDay);
   const [viewMode, setViewModeState] = useState<ViewMode>("verse");
   const effectiveFontIndex = fontSizeIndex;
@@ -366,6 +450,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         const saved = await readSettings(db, [
           "font_size_index",
           "theme",
+          "scheduled_rules",
           "scheduled_theme",
           "scheduled_switch_time",
           "view_mode",
@@ -408,6 +493,20 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         if (normalizedScheduledTime) {
           setScheduledSwitchTimeState(normalizedScheduledTime);
           cacheScheduledSwitchTime(normalizedScheduledTime);
+        }
+
+        const savedScheduledRules = normalizeThemeScheduleRules(saved.scheduled_rules);
+        if (savedScheduledRules) {
+          setScheduledRulesState(savedScheduledRules);
+          cacheScheduledRules(savedScheduledRules);
+        } else if (isThemePalette(savedScheduledTheme) || normalizedScheduledTime) {
+          const fallbackRules = normalizeThemeScheduleRulesList([{
+            id: "default",
+            theme: isThemePalette(savedScheduledTheme) ? savedScheduledTheme : DEFAULT_SCHEDULED_THEME,
+            time: normalizedScheduledTime ?? DEFAULT_SCHEDULED_SWITCH_TIME,
+          }]);
+          setScheduledRulesState(fallbackRules);
+          cacheScheduledRules(fallbackRules);
         }
 
         const savedViewMode = saved.view_mode;
@@ -503,9 +602,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const systemTheme = systemScheme === "dark" ? "dark" : "beige";
-  const scheduleActive = theme === "scheduled" && isThemeScheduleActive(scheduledSwitchTime, nowMinute);
   const effectiveTheme: ThemePalette =
-    theme === "system" ? systemTheme : theme === "scheduled" ? (scheduleActive ? scheduledTheme : systemTheme) : theme;
+    theme === "system" ? systemTheme : theme === "scheduled" ? resolveScheduledTheme(scheduledRules, nowMinute, systemTheme) : theme;
   const isDark = effectiveTheme === "dark" || effectiveTheme === "amoled";
   const themeSurface = THEME_PALETTES[effectiveTheme].surface;
   const themeVars = useMemo(
@@ -515,7 +613,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         : vars(THEME_PALETTES[effectiveTheme].variables),
     [effectiveTheme]
   );
-  const nativeWindScheme = theme === "system" || (theme === "scheduled" && !scheduleActive)
+  const nativeWindScheme = theme === "system" || (theme === "scheduled" && scheduledUsesSystemFallback(scheduledRules, nowMinute))
     ? "system"
     : isDark
       ? "dark"
@@ -545,21 +643,59 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
   const setScheduledTheme = useCallback(
     (newTheme: ThemePalette) => {
-      setScheduledThemeState(newTheme);
-      cacheScheduledTheme(newTheme);
-      writeSetting(db, "scheduled_theme", newTheme).catch(console.warn);
+      const nextRules = normalizeThemeScheduleRulesList([
+        { ...(scheduledRules[0] ?? DEFAULT_SCHEDULED_RULES[0]), theme: newTheme },
+        ...scheduledRules.slice(1),
+      ]);
+      setScheduledRulesState(nextRules);
+      setScheduledThemeState(nextRules[0].theme);
+      setScheduledSwitchTimeState(nextRules[0].time);
+      cacheScheduledRules(nextRules);
+      cacheScheduledTheme(nextRules[0].theme);
+      cacheScheduledSwitchTime(nextRules[0].time);
+      setNowMinute(getCurrentMinuteOfDay());
+      writeSetting(db, "scheduled_rules", JSON.stringify(nextRules)).catch(console.warn);
+      writeSetting(db, "scheduled_theme", nextRules[0].theme).catch(console.warn);
+      writeSetting(db, "scheduled_switch_time", nextRules[0].time).catch(console.warn);
     },
-    [db]
+    [db, scheduledRules]
   );
 
   const setScheduledSwitchTime = useCallback(
     (time: string) => {
       const normalized = normalizeThemeTime(time);
       if (!normalized) return;
-      setScheduledSwitchTimeState(normalized);
-      cacheScheduledSwitchTime(normalized);
+      const nextRules = normalizeThemeScheduleRulesList([
+        { ...(scheduledRules[0] ?? DEFAULT_SCHEDULED_RULES[0]), time: normalized },
+        ...scheduledRules.slice(1),
+      ]);
+      setScheduledRulesState(nextRules);
+      setScheduledThemeState(nextRules[0].theme);
+      setScheduledSwitchTimeState(nextRules[0].time);
+      cacheScheduledRules(nextRules);
+      cacheScheduledTheme(nextRules[0].theme);
+      cacheScheduledSwitchTime(nextRules[0].time);
       setNowMinute(getCurrentMinuteOfDay());
-      writeSetting(db, "scheduled_switch_time", normalized).catch(console.warn);
+      writeSetting(db, "scheduled_rules", JSON.stringify(nextRules)).catch(console.warn);
+      writeSetting(db, "scheduled_theme", nextRules[0].theme).catch(console.warn);
+      writeSetting(db, "scheduled_switch_time", nextRules[0].time).catch(console.warn);
+    },
+    [db, scheduledRules]
+  );
+
+  const setScheduledRules = useCallback(
+    (rules: ThemeScheduleRule[]) => {
+      const nextRules = normalizeThemeScheduleRulesList(rules);
+      setScheduledRulesState(nextRules);
+      setScheduledThemeState(nextRules[0].theme);
+      setScheduledSwitchTimeState(nextRules[0].time);
+      cacheScheduledRules(nextRules);
+      cacheScheduledTheme(nextRules[0].theme);
+      cacheScheduledSwitchTime(nextRules[0].time);
+      setNowMinute(getCurrentMinuteOfDay());
+      writeSetting(db, "scheduled_rules", JSON.stringify(nextRules)).catch(console.warn);
+      writeSetting(db, "scheduled_theme", nextRules[0].theme).catch(console.warn);
+      writeSetting(db, "scheduled_switch_time", nextRules[0].time).catch(console.warn);
     },
     [db]
   );
@@ -703,6 +839,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         setScheduledTheme,
         scheduledSwitchTime,
         setScheduledSwitchTime,
+        scheduledRules,
+        setScheduledRules,
         themeSurface,
         viewMode,
         setViewMode,

@@ -7,11 +7,12 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Toast } from "@/components/ui/Toast";
 import { ScreenScrollView, useScreenContentLayout } from "@/components/ui/ScreenContent";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Sun, Moon, Smartphone, Clock3, Circle, Minus, Plus, Check, ChevronRight, ChevronLeft, User, LogOut, BookOpen, RefreshCw, Unlink, Info, FileText, HeartHandshake, ExternalLink, Sparkles, SlidersHorizontal, type LucideIcon } from "lucide-react-native";
+import { Sun, Moon, Smartphone, Clock3, Circle, Minus, Plus, X, Check, ChevronRight, ChevronLeft, User, LogOut, BookOpen, RefreshCw, Unlink, Info, FileText, HeartHandshake, ExternalLink, Sparkles, SlidersHorizontal, type LucideIcon } from "lucide-react-native";
 import {
   useSettings,
   FONT_SIZE_STEPS,
   type ThemePalette,
+  type ThemeScheduleRule,
   type ThemeMode,
   type UILanguage,
   type PageScroll,
@@ -71,7 +72,7 @@ function formatThemeTimePart(value: number, isRTL: boolean) {
 export default function SettingsScreen() {
   const {
     theme, setTheme, fontSizeIndex, setFontSizeIndex, fontSize,
-    scheduledTheme, setScheduledTheme, scheduledSwitchTime, setScheduledSwitchTime,
+    scheduledRules, setScheduledRules,
     translationLanguage, isTranslationLoading, isDark, isRTL,
     tafseerSource, setTafseerSource,
     recitationId, setRecitationId,
@@ -112,7 +113,11 @@ export default function SettingsScreen() {
   const themeCardWidth = Math.floor(
     (appearanceCardInnerWidth - (isLaptop ? 24 : 12)) / (isLaptop ? 3 : 2)
   );
-  const scheduledThemeCardWidth = Math.floor((Math.max(0, appearanceCardInnerWidth - 32) - 10) / 2);
+  const scheduledRuleThemeColumnCount = isLaptop && appearanceCardInnerWidth >= 560 ? 4 : 2;
+  const scheduledRuleThemeCardWidth = Math.max(
+    0,
+    Math.floor((Math.max(0, appearanceCardInnerWidth - 56) - 10 * (scheduledRuleThemeColumnCount - 1)) / scheduledRuleThemeColumnCount)
+  );
   const usesCategorySidebar = width >= SIDEBAR_BREAKPOINT;
   const categoryParam = Array.isArray(params.category) ? params.category[0] : params.category;
   const desktopCategory = parseSettingsCategory(categoryParam) ?? "general";
@@ -257,7 +262,33 @@ export default function SettingsScreen() {
     { value: "white", label: s.themeWhite, icon: Circle },
     { value: "amoled", label: s.themeAmoled, icon: Moon },
   ];
-  const scheduledTimeParts = getThemeTimeParts(scheduledSwitchTime);
+
+  const updateScheduledRule = useCallback(
+    (ruleId: string, patch: Partial<Pick<ThemeScheduleRule, "theme" | "time">>) => {
+      setScheduledRules(scheduledRules.map((rule) => rule.id === ruleId ? { ...rule, ...patch } : rule));
+    },
+    [scheduledRules, setScheduledRules]
+  );
+
+  const addScheduledRule = useCallback(() => {
+    const lastRule = scheduledRules[scheduledRules.length - 1] ?? { id: "default", theme: "dark" as ThemePalette, time: "21:00" };
+    setScheduledRules([
+      ...scheduledRules,
+      {
+        id: `rule-${Date.now()}`,
+        theme: lastRule.theme === "dark" || lastRule.theme === "amoled" ? "white" : "dark",
+        time: shiftThemeTime(lastRule.time, 60),
+      },
+    ]);
+  }, [scheduledRules, setScheduledRules]);
+
+  const removeScheduledRule = useCallback(
+    (ruleId: string) => {
+      if (scheduledRules.length <= 1) return;
+      setScheduledRules(scheduledRules.filter((rule) => rule.id !== ruleId));
+    },
+    [scheduledRules, setScheduledRules]
+  );
 
   const settingsCategories: SettingsCategory[] = [
     { id: "general", title: s.settingsCategoryGeneral, icon: SlidersHorizontal },
@@ -352,9 +383,9 @@ export default function SettingsScreen() {
             </View>
 
             {theme === "scheduled" && (
-              <View className="mt-5 rounded-3xl bg-surface-high/60 p-4 dark:bg-surface-dark-high/60">
+              <View className="mt-5 gap-3 rounded-3xl bg-surface-high/60 p-4 dark:bg-surface-dark-high/60">
                 <Text
-                  className="mb-3 text-charcoal dark:text-neutral-200"
+                  className="text-charcoal dark:text-neutral-200"
                   style={{
                     fontFamily: "Manrope_600SemiBold",
                     fontSize: 14,
@@ -362,102 +393,160 @@ export default function SettingsScreen() {
                     writingDirection: isRTL ? "rtl" : "ltr",
                   }}
                 >
-                  {s.themeScheduleTarget}
+                  {s.themeScheduleRules}
                 </Text>
-                <View
-                  style={{
-                    flexDirection: isRTL ? "row-reverse" : "row",
-                    flexWrap: "wrap",
-                    gap: 10,
-                  }}
-                >
-                  {SCHEDULED_THEME_OPTIONS.map((option) => {
-                    const isActive = scheduledTheme === option.value;
-                    const IconComponent = option.icon;
-                    return (
-                      <View key={option.value} style={{ width: scheduledThemeCardWidth, minHeight: 76 }}>
-                        <Pressable
-                          onPress={() => setScheduledTheme(option.value)}
-                          className={`flex-1 items-center justify-center rounded-2xl px-3 py-3 ${
-                            isActive
-                              ? "bg-primary-accent/10 dark:bg-primary-bright/15"
-                              : "bg-surface dark:bg-surface-dark"
-                          }`}
-                          style={({ pressed }) => ({
-                            transform: [{ scale: pressed ? 0.98 : 1 }],
-                          })}
+                {scheduledRules.map((rule) => {
+                  const timeParts = getThemeTimeParts(rule.time);
+                  return (
+                    <View key={rule.id} className="rounded-2xl bg-surface p-3 dark:bg-surface-dark">
+                      <View
+                        className="mb-3 items-center justify-between gap-3"
+                        style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
+                      >
+                        <Text
+                          className="text-charcoal dark:text-neutral-200"
+                          style={{
+                            fontFamily: "Manrope_600SemiBold",
+                            fontSize: 13,
+                            textAlign: isRTL ? "right" : "left",
+                            writingDirection: isRTL ? "rtl" : "ltr",
+                          }}
                         >
-                          <IconComponent
-                            size={18}
-                            color={isActive ? (isDark ? "#2dd4bf" : "#0d9488") : (isDark ? "#737373" : "#b9a085")}
+                          {s.themeScheduleTarget}
+                        </Text>
+                        {scheduledRules.length > 1 && (
+                          <Pressable
+                            accessibilityLabel={s.themeScheduleRemoveRule}
+                            onPress={() => removeScheduledRule(rule.id)}
+                            className="h-8 w-8 items-center justify-center rounded-full bg-surface-high dark:bg-surface-dark-high"
+                            style={({ pressed }) => ({
+                              opacity: pressed ? 0.68 : 1,
+                              transform: [{ scale: pressed ? 0.96 : 1 }],
+                            })}
+                          >
+                            <X size={15} color={isDark ? "#d4d4d4" : "#6e5a47"} />
+                          </Pressable>
+                        )}
+                      </View>
+                      <View
+                        style={{
+                          flexDirection: isRTL ? "row-reverse" : "row",
+                          flexWrap: "wrap",
+                          gap: 10,
+                        }}
+                      >
+                        {SCHEDULED_THEME_OPTIONS.map((option) => {
+                          const isActive = rule.theme === option.value;
+                          const IconComponent = option.icon;
+                          return (
+                            <View key={option.value} style={{ width: scheduledRuleThemeCardWidth, minHeight: 76 }}>
+                              <Pressable
+                                onPress={() => updateScheduledRule(rule.id, { theme: option.value })}
+                                className={`flex-1 items-center justify-center rounded-2xl px-3 py-3 ${
+                                  isActive
+                                    ? "bg-primary-accent/10 dark:bg-primary-bright/15"
+                                    : "bg-surface-high dark:bg-surface-dark-high"
+                                }`}
+                                style={({ pressed }) => ({
+                                  transform: [{ scale: pressed ? 0.98 : 1 }],
+                                })}
+                              >
+                                <IconComponent
+                                  size={18}
+                                  color={isActive ? (isDark ? "#2dd4bf" : "#0d9488") : (isDark ? "#737373" : "#b9a085")}
+                                />
+                                <Text
+                                  className={`mt-1.5 text-xs ${
+                                    isActive
+                                      ? "text-primary-accent dark:text-primary-bright"
+                                      : "text-warm-400 dark:text-neutral-500"
+                                  }`}
+                                  numberOfLines={2}
+                                  style={{
+                                    fontFamily: isActive ? "Manrope_600SemiBold" : "Manrope_500Medium",
+                                    minHeight: 32,
+                                    textAlign: "center",
+                                    writingDirection: isRTL ? "rtl" : "ltr",
+                                  }}
+                                >
+                                  {option.label}
+                                </Text>
+                              </Pressable>
+                            </View>
+                          );
+                        })}
+                      </View>
+
+                      <View
+                        className="mt-4 items-center justify-between gap-4"
+                        style={{ flexDirection: isLaptop ? (isRTL ? "row-reverse" : "row") : "column" }}
+                      >
+                        <Text
+                          className="text-charcoal dark:text-neutral-200"
+                          style={{
+                            alignSelf: isLaptop ? "auto" : isRTL ? "flex-end" : "flex-start",
+                            fontFamily: "Manrope_600SemiBold",
+                            fontSize: 13,
+                            textAlign: isRTL ? "right" : "left",
+                            writingDirection: isRTL ? "rtl" : "ltr",
+                          }}
+                        >
+                          {s.themeScheduleAt}
+                        </Text>
+                        <View
+                          className="items-center gap-2"
+                          style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
+                        >
+                          <SettingsStepper
+                            value={formatThemeTimePart(timeParts.hours, isRTL)}
+                            onDecrement={() => updateScheduledRule(rule.id, { time: shiftThemeTime(rule.time, -60) })}
+                            onIncrement={() => updateScheduledRule(rule.id, { time: shiftThemeTime(rule.time, 60) })}
+                            decrementDisabled={false}
+                            incrementDisabled={false}
+                            isDark={isDark}
+                            isRTL={isRTL}
                           />
                           <Text
-                            className={`mt-1.5 text-xs ${
-                              isActive
-                                ? "text-primary-accent dark:text-primary-bright"
-                                : "text-warm-400 dark:text-neutral-500"
-                            }`}
-                            numberOfLines={2}
-                            style={{
-                              fontFamily: isActive ? "Manrope_600SemiBold" : "Manrope_500Medium",
-                              minHeight: 32,
-                              textAlign: "center",
-                              writingDirection: isRTL ? "rtl" : "ltr",
-                            }}
+                            className="text-charcoal dark:text-neutral-100"
+                            style={{ fontFamily: "Manrope_700Bold", fontSize: 18 }}
                           >
-                            {option.label}
+                            :
                           </Text>
-                        </Pressable>
+                          <SettingsStepper
+                            value={formatThemeTimePart(timeParts.minutes, isRTL)}
+                            onDecrement={() => updateScheduledRule(rule.id, { time: shiftThemeTime(rule.time, -1) })}
+                            onIncrement={() => updateScheduledRule(rule.id, { time: shiftThemeTime(rule.time, 1) })}
+                            decrementDisabled={false}
+                            incrementDisabled={false}
+                            isDark={isDark}
+                            isRTL={isRTL}
+                          />
+                        </View>
                       </View>
-                    );
+                    </View>
+                  );
+                })}
+                <Pressable
+                  onPress={addScheduledRule}
+                  className="mt-1 items-center justify-center gap-2 rounded-2xl border border-primary-accent/25 bg-primary-accent/5 px-4 py-3 dark:border-primary-bright/25 dark:bg-primary-bright/10"
+                  style={({ pressed }) => ({
+                    flexDirection: isRTL ? "row-reverse" : "row",
+                    opacity: pressed ? 0.72 : 1,
+                    transform: [{ scale: pressed ? 0.98 : 1 }],
                   })}
-                </View>
-
-                <View
-                  className="mt-5 items-center justify-between gap-4"
-                  style={{ flexDirection: isLaptop ? (isRTL ? "row-reverse" : "row") : "column" }}
                 >
+                  <Plus size={17} color={isDark ? "#2dd4bf" : "#0d9488"} />
                   <Text
-                    className="text-charcoal dark:text-neutral-200"
+                    className="text-primary-accent dark:text-primary-bright"
                     style={{
-                      fontFamily: "Manrope_600SemiBold",
-                      fontSize: 14,
-                      textAlign: isRTL ? "right" : "left",
+                      fontFamily: "Manrope_700Bold",
+                      fontSize: 13,
                       writingDirection: isRTL ? "rtl" : "ltr",
                     }}
                   >
-                    {s.themeScheduleTime}
+                    {s.themeScheduleAddRule}
                   </Text>
-                  <View
-                    className="items-center gap-2"
-                    style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
-                  >
-                    <SettingsStepper
-                      value={formatThemeTimePart(scheduledTimeParts.hours, isRTL)}
-                      onDecrement={() => setScheduledSwitchTime(shiftThemeTime(scheduledSwitchTime, -60))}
-                      onIncrement={() => setScheduledSwitchTime(shiftThemeTime(scheduledSwitchTime, 60))}
-                      decrementDisabled={false}
-                      incrementDisabled={false}
-                      isDark={isDark}
-                      isRTL={isRTL}
-                    />
-                    <Text
-                      className="text-charcoal dark:text-neutral-100"
-                      style={{ fontFamily: "Manrope_700Bold", fontSize: 18 }}
-                    >
-                      :
-                    </Text>
-                    <SettingsStepper
-                      value={formatThemeTimePart(scheduledTimeParts.minutes, isRTL)}
-                      onDecrement={() => setScheduledSwitchTime(shiftThemeTime(scheduledSwitchTime, -1))}
-                      onIncrement={() => setScheduledSwitchTime(shiftThemeTime(scheduledSwitchTime, 1))}
-                      decrementDisabled={false}
-                      incrementDisabled={false}
-                      isDark={isDark}
-                      isRTL={isRTL}
-                    />
-                  </View>
-                </View>
+                </Pressable>
               </View>
             )}
           </Card>
