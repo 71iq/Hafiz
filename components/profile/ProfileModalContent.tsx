@@ -56,6 +56,8 @@ type ReviewSnapshot = {
 
 type ProfileTab = "overview" | "notes";
 
+const PROFILE_BIO_MAX_LENGTH = 280;
+
 export function ProfileModalContent({ userId }: ProfileModalContentProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -71,6 +73,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
   const [editOpen, setEditOpen] = useState(false);
   const [logoutDialogVisible, setLogoutDialogVisible] = useState(false);
   const [displayNameDraft, setDisplayNameDraft] = useState("");
+  const [bioDraft, setBioDraft] = useState("");
   const [avatarDraft, setAvatarDraft] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [avatarRemovalDraft, setAvatarRemovalDraft] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
@@ -134,6 +137,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
           username: profile.username,
           display_name: profile.display_name,
           avatar_url: profile.avatar_url,
+          bio: profile.bio,
           total_score: profile.total_score,
           current_streak: profile.current_streak,
           longest_streak: profile.longest_streak,
@@ -148,12 +152,17 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
     (isSignedOutOwnProfile ? s.authProfile : s.genericAnonymous);
   const username = visibleProfile?.username ?? null;
   const avatarUrl = visibleProfile?.avatar_url ?? null;
-  const currentDisplayName = profile?.display_name ?? "";
+  const bio = visibleProfile?.bio?.trim() ?? "";
+  const currentDisplayName = profile?.display_name?.trim() ?? "";
   const displayNameValue = displayNameDraft.trim();
   const displayNameDirty = displayNameValue !== currentDisplayName;
+  const currentBio = profile?.bio?.trim() ?? "";
+  const bioValue = bioDraft.trim();
+  const bioDirty = bioValue !== currentBio;
+  const bioCount = `${bioDraft.length.toLocaleString(numberLocale)} / ${PROFILE_BIO_MAX_LENGTH.toLocaleString(numberLocale)}`;
   const avatarPreviewUrl = avatarRemovalDraft ? null : avatarDraft?.uri ?? profile?.avatar_url ?? null;
   const avatarDirty = !!avatarDraft || avatarRemovalDraft;
-  const profileDirty = displayNameDirty || avatarDirty;
+  const profileDirty = displayNameDirty || bioDirty || avatarDirty;
   const saveProfileDisabled = !profileDirty || profileSaving || authLoading;
   const saveProfileIconColor = saveProfileDisabled && !profileSaving ? (isDark ? "#737373" : "#8A7764") : "#FFFFFF";
   const saveProfileTextColor = saveProfileDisabled && !profileSaving ? (isDark ? "#737373" : "#8A7764") : "#FFFFFF";
@@ -185,7 +194,8 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
 
   useEffect(() => {
     setDisplayNameDraft(profile?.display_name ?? "");
-  }, [profile?.display_name, user?.id]);
+    setBioDraft(profile?.bio ?? "");
+  }, [profile?.bio, profile?.display_name, user?.id]);
 
   useEffect(() => {
     setAvatarDraft(null);
@@ -255,6 +265,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
       const nextAvatarUrl = avatarDraft ? await uploadProfileAvatar(user.id, avatarDraft) : avatarRemovalDraft ? null : undefined;
       const updated = await updateProfile({
         displayName: displayNameDirty ? (displayNameValue.length > 0 ? displayNameValue : null) : undefined,
+        bio: bioDirty ? (bioValue.length > 0 ? bioValue : null) : undefined,
         avatarUrl: avatarDirty ? nextAvatarUrl : undefined,
       });
       setAvatarDraft(null);
@@ -268,7 +279,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
     } finally {
       setProfileSaving(false);
     }
-  }, [avatarDirty, avatarDraft, avatarRemovalDraft, displayNameDirty, displayNameValue, invalidateProfileSurfaces, profileDirty, queryClient, updateProfile, user]);
+  }, [avatarDirty, avatarDraft, avatarRemovalDraft, bioDirty, bioValue, displayNameDirty, displayNameValue, invalidateProfileSurfaces, profileDirty, queryClient, updateProfile, user]);
 
   const handlePickAvatar = useCallback(async () => {
     if (!user) return;
@@ -386,6 +397,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
                 <ProfileNotesManager />
               ) : (
                 <ProfileOverview
+                  bio={bio}
                   stats={stats}
                   review={review}
                   surahProgress={surahProgress}
@@ -458,6 +470,35 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
               </Button>
             ) : null}
           </View>
+          <View>
+            <View className={`mb-1 items-center justify-between gap-3 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
+              <Text
+                className="text-warm-500 dark:text-neutral-400"
+                style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
+              >
+                {s.profileBioTitle}
+              </Text>
+              <Text
+                className="text-warm-500 dark:text-neutral-500"
+                style={{ fontFamily: "Manrope_500Medium", fontSize: 11, textAlign: isRTL ? "left" : "right" }}
+              >
+                {bioCount}
+              </Text>
+            </View>
+            <Input
+              value={bioDraft}
+              onChangeText={(value) => {
+                setBioDraft(value);
+                setProfileStatus(null);
+              }}
+              placeholder={s.profileBioPlaceholder}
+              maxLength={PROFILE_BIO_MAX_LENGTH}
+              multiline
+              dir={isRTL ? "rtl" : "ltr"}
+              className="min-h-[104px] rounded-2xl bg-surface-high dark:bg-surface-dark-high"
+              style={{ lineHeight: 21 }}
+            />
+          </View>
           <Button
             className="gap-2"
             onPress={handleSaveProfile}
@@ -502,6 +543,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
 }
 
 function ProfileOverview({
+  bio,
   stats,
   review,
   surahProgress,
@@ -511,6 +553,7 @@ function ProfileOverview({
   isDark,
   isRTL,
 }: {
+  bio: string;
   stats: { label: string; value: number }[];
   review: ReviewSnapshot;
   surahProgress: ProfileSurahProgress[];
@@ -531,6 +574,24 @@ function ProfileOverview({
 
   return (
     <View className="gap-5">
+      {bio ? (
+        <Card elevation="low" className="p-5">
+          <Text
+            className="mb-2 text-charcoal dark:text-neutral-100"
+            style={{ fontFamily: "Manrope_700Bold", fontSize: 16, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
+          >
+            {s.profileBioTitle}
+          </Text>
+          <Text
+            selectable
+            className="text-warm-700 dark:text-neutral-300"
+            style={{ fontFamily: "Manrope_400Regular", fontSize: 14, lineHeight: 22, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
+          >
+            {bio}
+          </Text>
+        </Card>
+      ) : null}
+
       <Card elevation="low" className="p-5">
         <Text
           className="mb-4 text-charcoal dark:text-neutral-100"

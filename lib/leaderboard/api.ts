@@ -15,6 +15,7 @@ export type PublicProfile = {
   username: string;
   display_name: string | null;
   avatar_url: string | null;
+  bio: string | null;
   total_score: number;
   current_streak: number;
   longest_streak: number;
@@ -213,9 +214,20 @@ export async function fetchPublicProfile(userId: string): Promise<PublicProfile 
 
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, username, display_name, avatar_url, total_score, current_streak, longest_streak, cards_reviewed, last_review_date")
+    .select("id, username, display_name, avatar_url, bio, total_score, current_streak, longest_streak, cards_reviewed, last_review_date")
     .eq("id", userId)
     .maybeSingle();
+
+  if (error && isMissingBioColumnError(error)) {
+    const fallback = await supabase
+      .from("profiles")
+      .select("id, username, display_name, avatar_url, total_score, current_streak, longest_streak, cards_reviewed, last_review_date")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (fallback.error) throw fallback.error;
+    return fallback.data ? ({ ...fallback.data, bio: null } as PublicProfile) : null;
+  }
 
   if (error) throw error;
   return (data as PublicProfile | null) ?? null;
@@ -299,4 +311,9 @@ function parsePayload(value: unknown): Record<string, unknown> {
   } catch {
     return {};
   }
+}
+
+function isMissingBioColumnError(error: { code?: string; message?: string; details?: string } | null): boolean {
+  const message = `${error?.code ?? ""} ${error?.message ?? ""} ${error?.details ?? ""}`.toLowerCase();
+  return message.includes("bio") && (message.includes("column") || message.includes("schema") || message.includes("pgrst204"));
 }

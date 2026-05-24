@@ -5,6 +5,7 @@ export type Profile = {
   username: string;
   display_name: string | null;
   avatar_url: string | null;
+  bio: string | null;
   total_score: number;
   current_streak: number;
   longest_streak: number;
@@ -43,6 +44,6 @@ export type AuthActions = {
   updatePassword: (password: string) => Promise<void>;
   ensureProfile: () => Promise<Profile | null>;
   fetchProfile: () => Promise<void>;
-  updateProfile: (updates: { displayName?: string | null; avatarUrl?: string | null }) => Promise<Profile>;
+  updateProfile: (updates: { displayName?: string | null; avatarUrl?: string | null; bio?: string | null }) => Promise<Profile>;
   clearError: () => void;
 };

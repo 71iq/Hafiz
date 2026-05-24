@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   username TEXT UNIQUE NOT NULL CHECK (length(username) BETWEEN 3 AND 20),
   display_name TEXT,
   avatar_url TEXT,
+  bio TEXT CHECK (bio IS NULL OR char_length(bio) <= 280),
   total_score INTEGER DEFAULT 0,
   current_streak INTEGER DEFAULT 0,
   longest_streak INTEGER DEFAULT 0,
