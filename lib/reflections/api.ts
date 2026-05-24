@@ -4,6 +4,7 @@ import type { Reflection, ReflectionComment, ReflectionFeedFilter, ReflectionFee
 const PAGE_SIZE = 5;
 const FEED_PAGE_SIZE = 10;
 const COMMENT_PAGE_SIZE = 20;
+const MAX_SEARCH_LENGTH = 120;
 
 function pageBounds(page: number, pageSize: number) {
   const from = page * pageSize;
@@ -23,6 +24,14 @@ function isMissingJuzColumnsError(error: { code?: string; message?: string } | n
       error.message?.includes("juz_start") ||
       error.message?.includes("juz_end"))
   );
+}
+
+function normalizeSearchTerm(value?: string): string {
+  return (value ?? "").trim().replace(/\s+/g, " ").slice(0, MAX_SEARCH_LENGTH);
+}
+
+function escapeIlikePattern(value: string): string {
+  return value.replace(/[\\%_]/g, (match) => `\\${match}`);
 }
 
 async function attachUserLikes(reflections: Reflection[], userId?: string): Promise<Reflection[]> {
@@ -79,16 +88,19 @@ export async function fetchReflectionFeed({
   page,
   userId,
   juzRanges,
+  searchTerm,
 }: {
   filter: ReflectionFeedFilter;
   sort: ReflectionFeedSort;
   page: number;
   userId?: string;
   juzRanges?: ReflectionJuzRange[];
+  searchTerm?: string;
 }): Promise<{ data: Reflection[]; hasMore: boolean }> {
   if (!isSupabaseConfigured()) return { data: [], hasMore: false };
 
   const { from, to } = pageBounds(page, FEED_PAGE_SIZE);
+  const normalizedSearch = normalizeSearchTerm(searchTerm);
 
   let query = supabase
     .from("reflections")
@@ -103,6 +115,10 @@ export async function fetchReflectionFeed({
       .map((range) => `and(surah.eq.${range.surah},ayah_start.lte.${range.ayah_end},ayah_end.gte.${range.ayah_start})`);
     if (filters.length === 0) return { data: [], hasMore: false };
     query = query.or(filters.join(","));
+  }
+
+  if (normalizedSearch) {
+    query = query.ilike("content", `%${escapeIlikePattern(normalizedSearch)}%`);
   }
 
   switch (sort) {

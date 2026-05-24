@@ -1,10 +1,10 @@
-import { useCallback, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, RefreshControl, Text, View, useWindowDimensions } from "react-native";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, Pressable, RefreshControl, Text, TextInput, View, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { FlashList } from "@shopify/flash-list";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
-import { ChevronDown, MessageSquare } from "lucide-react-native";
+import { ChevronDown, MessageSquare, Search, X } from "lucide-react-native";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ReflectionsSkeleton } from "@/components/ui/Skeleton";
 import { Toast } from "@/components/ui/Toast";
@@ -64,10 +64,20 @@ export default function ReflectionFeedScreen() {
   const [selectedSurah, setSelectedSurah] = useState<number | null>(null);
   const [selectedJuz, setSelectedJuz] = useState<number | null>(null);
   const [sort, setSort] = useState<ReflectionFeedSort>("newest");
+  const [searchText, setSearchText] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [pickerMode, setPickerMode] = useState<PickerMode>(null);
   const [commentsReflectionId, setCommentsReflectionId] = useState<string | null>(null);
   const [commentDeltas, setCommentDeltas] = useState<Record<string, number>>({});
   const [toast, setToast] = useState<string | null>(null);
+  const normalizedSearchQuery = searchQuery.trim().replace(/\s+/g, " ").slice(0, 120);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchQuery(searchText);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [searchText]);
 
   const { data: options = { surahs: [], juz: [] } } = useQuery({
     queryKey: ["reflectionFeedOptions", uiLanguage],
@@ -141,7 +151,7 @@ export default function ReflectionFeedScreen() {
   );
 
   const feedQuery = useInfiniteQuery({
-    queryKey: ["reflectionFeed", filter, sort, user?.id, selectedJuzRanges],
+    queryKey: ["reflectionFeed", filter, sort, user?.id, selectedJuzRanges, normalizedSearchQuery],
     queryFn: ({ pageParam }) =>
       fetchReflectionFeed({
         filter,
@@ -149,6 +159,7 @@ export default function ReflectionFeedScreen() {
         page: pageParam,
         userId: user?.id,
         juzRanges: selectedJuzRanges,
+        searchTerm: normalizedSearchQuery,
       }),
     initialPageParam: 0,
     getNextPageParam: (lastPage, allPages) => (lastPage.hasMore ? allPages.length : undefined),
@@ -293,41 +304,55 @@ export default function ReflectionFeedScreen() {
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
       <View className="flex-1" style={contentContainerStyle}>
         <View className="flex-1" style={railStyle}>
-          <View
-            className="mt-4 mb-4 flex-wrap gap-2"
-            style={{
-              direction: isRTL ? "rtl" : "ltr",
-              flexDirection: "row",
-              justifyContent: "flex-start",
-            }}
-          >
-            <FilterSelect
-              accessibilityLabel={s.reflectionFeedSelectFilterType}
-              label={selectedFilterKindLabel}
+          <View className="mt-4 mb-4 gap-2" style={{ direction: isRTL ? "rtl" : "ltr" }}>
+            <ReflectionFeedSearch
+              value={searchText}
+              onChangeText={setSearchText}
+              onClear={() => {
+                setSearchText("");
+                setSearchQuery("");
+              }}
+              placeholder={s.reflectionFeedSearchPlaceholder}
+              clearLabel={s.reflectionFeedClearSearch}
               isDark={isDark}
               isRTL={isRTL}
-              minWidth={112}
-              flex={0.8}
-              onPress={() => setPickerMode("filter-kind")}
             />
-            <FilterSelect
-              accessibilityLabel={filterKind === "juz" ? s.reflectionFeedSelectJuz : s.reflectionFeedSelectSurah}
-              label={filterKind === "juz" ? selectedJuzLabel : filterKind === "surah" ? selectedSurahLabel : s.reflectionFeedFilterAll}
-              isDark={isDark}
-              isRTL={isRTL}
-              minWidth={184}
-              flex={1.55}
-              onPress={() => setPickerMode("location")}
-            />
-            <FilterSelect
-              accessibilityLabel={s.reflectionFeedSortBy}
-              label={selectedSortLabel}
-              isDark={isDark}
-              isRTL={isRTL}
-              minWidth={152}
-              flex={1.15}
-              onPress={() => setPickerMode("sort")}
-            />
+            <View
+              className="flex-wrap gap-2"
+              style={{
+                direction: isRTL ? "rtl" : "ltr",
+                flexDirection: "row",
+                justifyContent: "flex-start",
+              }}
+            >
+              <FilterSelect
+                accessibilityLabel={s.reflectionFeedSelectFilterType}
+                label={selectedFilterKindLabel}
+                isDark={isDark}
+                isRTL={isRTL}
+                minWidth={112}
+                flex={0.8}
+                onPress={() => setPickerMode("filter-kind")}
+              />
+              <FilterSelect
+                accessibilityLabel={filterKind === "juz" ? s.reflectionFeedSelectJuz : s.reflectionFeedSelectSurah}
+                label={filterKind === "juz" ? selectedJuzLabel : filterKind === "surah" ? selectedSurahLabel : s.reflectionFeedFilterAll}
+                isDark={isDark}
+                isRTL={isRTL}
+                minWidth={184}
+                flex={1.55}
+                onPress={() => setPickerMode("location")}
+              />
+              <FilterSelect
+                accessibilityLabel={s.reflectionFeedSortBy}
+                label={selectedSortLabel}
+                isDark={isDark}
+                isRTL={isRTL}
+                minWidth={152}
+                flex={1.15}
+                onPress={() => setPickerMode("sort")}
+              />
+            </View>
           </View>
 
           {!configured ? (
@@ -357,7 +382,7 @@ export default function ReflectionFeedScreen() {
               <EmptyState
                 icon={MessageSquare}
                 title={s.reflectionFeedEmptyTitle}
-                subtitle={s.reflectionFeedEmptySubtitle}
+                subtitle={normalizedSearchQuery ? s.reflectionFeedSearchEmptySubtitle : s.reflectionFeedEmptySubtitle}
                 isDark={isDark}
               />
             </View>
@@ -422,6 +447,64 @@ export default function ReflectionFeedScreen() {
 
       <Toast message={toast} onDismiss={() => setToast(null)} />
     </SafeAreaView>
+  );
+}
+
+function ReflectionFeedSearch({
+  value,
+  onChangeText,
+  onClear,
+  placeholder,
+  clearLabel,
+  isDark,
+  isRTL,
+}: {
+  value: string;
+  onChangeText: (value: string) => void;
+  onClear: () => void;
+  placeholder: string;
+  clearLabel: string;
+  isDark: boolean;
+  isRTL: boolean;
+}) {
+  const iconColor = isDark ? "#737373" : "#8B8178";
+
+  return (
+    <View
+      className="min-h-11 items-center gap-2 rounded-2xl bg-surface-low px-4 dark:bg-surface-dark-low"
+      style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
+    >
+      <Search size={17} color={iconColor} />
+      <TextInput
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor={isDark ? "#737373" : "#b9a085"}
+        returnKeyType="search"
+        className="min-h-11 flex-1 py-2 text-charcoal dark:text-neutral-100"
+        style={{
+          fontFamily: "Manrope_400Regular",
+          fontSize: 14,
+          textAlign: isRTL ? "right" : "left",
+          writingDirection: isRTL ? "rtl" : "ltr",
+        }}
+      />
+      {value.trim().length > 0 ? (
+        <Pressable
+          onPress={onClear}
+          accessibilityRole="button"
+          accessibilityLabel={clearLabel}
+          hitSlop={8}
+          className="h-8 w-8 items-center justify-center rounded-full"
+          style={({ pressed }) => ({
+            opacity: pressed ? 0.7 : 1,
+            backgroundColor: pressed ? (isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)") : "transparent",
+          })}
+        >
+          <X size={15} color={iconColor} />
+        </Pressable>
+      ) : null}
+    </View>
   );
 }
 
