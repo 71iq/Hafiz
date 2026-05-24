@@ -393,12 +393,11 @@ function CompactProgressStat({
 }) {
   return (
     <View
-      className="rounded-2xl px-4 py-3"
+      className="rounded-2xl bg-surface-bright px-4 py-3 dark:bg-surface-dark-low"
       style={{
         width: isLaptop ? 174 : "48%",
         minHeight: 74,
         justifyContent: "space-between",
-        backgroundColor: isDark ? "#141414" : "#FFF8F1",
         borderColor: isDark ? "rgba(45, 212, 191, 0.16)" : "rgba(13, 148, 136, 0.16)",
         borderWidth: 1,
       }}
@@ -426,7 +425,7 @@ function CompactProgressStat({
         {value}
       </Text>
       <Text
-        className="text-warm-400 dark:text-neutral-500 mt-1"
+        className="mt-1 text-neutral-500 dark:text-neutral-500"
         style={{
           fontFamily: "Manrope_500Medium",
           fontSize: 10,

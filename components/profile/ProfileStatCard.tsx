@@ -24,12 +24,11 @@ export function ProfileStatCard({
 
   return (
     <View
-      className={cn("rounded-2xl px-4 py-3", className)}
+      className={cn("rounded-2xl bg-surface-bright px-4 py-3 dark:bg-surface-dark-low", className)}
       style={[
         {
           minHeight: 74,
           justifyContent: "space-between",
-          backgroundColor: isDark ? "#141414" : "#FFF8F1",
           borderColor: isDark ? "rgba(45, 212, 191, 0.16)" : "rgba(13, 148, 136, 0.16)",
           borderWidth: 1,
         },
@@ -60,7 +59,7 @@ export function ProfileStatCard({
         {value}
       </Text>
       <Text
-        className="mt-1 text-warm-400 dark:text-neutral-500"
+        className="mt-1 text-neutral-500 dark:text-neutral-500"
         style={{
           fontFamily: "Manrope_500Medium",
           fontSize: 10,
