@@ -590,18 +590,7 @@ export default function SettingsScreen() {
               </Text>
             )}
 
-            <View
-              className={isLaptop ? "mb-5 items-start justify-between gap-4" : "mb-5 gap-4"}
-              style={{ flexDirection: isLaptop ? (isRTL ? "row" : "row-reverse") : "column" }}
-            >
-              <View className="flex-1">
-                <Text
-                  className="text-warm-400 dark:text-neutral-500"
-                  style={{ fontFamily: "Manrope_500Medium", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
-                >
-                  {`${fontSizeLevelLabel}/${fontSizeTotalLabel}`}
-                </Text>
-              </View>
+            <View className="mb-5" style={{ alignItems: isRTL ? "flex-end" : "flex-start" }}>
               <SettingsStepper
                 value={`${fontSizeLevelLabel}/${fontSizeTotalLabel}`}
                 onDecrement={() => setFontSizeIndex(fontSizeIndex - 1)}
