@@ -615,7 +615,7 @@ export default function HomeScreen() {
               className="text-warm-400 dark:text-neutral-500 uppercase"
               style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, letterSpacing: 1.4 }}
             >
-              {s.flashcardsUserMadeDecks}
+              {s.flashcardsRetentionDecks}
             </Text>
             <View className="h-px flex-1 bg-warm-200 dark:bg-neutral-800" />
           </View>
