@@ -48,6 +48,8 @@ export default function Root({ children }: { children: React.ReactNode }) {
         <meta name="apple-mobile-web-app-title" content="Hafiz" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
+        <script dangerouslySetInnerHTML={{ __html: startupThemeScript }} />
+
         {/* Allow the document body to overflow by 1px so mobile browsers
             register a scrollable page and collapse their URL bar. #root stays
             clipped to the dynamic viewport (100dvh) so internal lists keep
@@ -79,7 +81,7 @@ body {
   /* Anchor the visible content to the large viewport and add a sliver of
      extra height so window scroll is always possible. */
   min-height: calc(100dvh + 1px);
-  background-color: #fff;
+  background-color: rgb(var(--color-surface, 255 255 255));
   /* Prefer smooth momentum on iOS so the scroll-to-1px nudge doesn't feel
      sudden. */
   -webkit-overflow-scrolling: touch;
@@ -116,7 +118,6 @@ body {
   background: transparent;
 }
 @media (prefers-color-scheme: dark) {
-  body { background-color: #000; }
   * {
     scrollbar-color: rgba(45, 212, 191, 0.55) transparent;
   }
@@ -153,5 +154,124 @@ const urlBarHideScript = `
     window.addEventListener('load', run, { once: true });
   }
   window.addEventListener('orientationchange', function () { setTimeout(nudge, 200); });
+})();
+`;
+
+const startupThemeScript = `
+(function () {
+  try {
+    var palettes = {
+      beige: {
+        surface: "#FFF8F1",
+        variables: {
+          "--color-surface": "255 248 241",
+          "--color-surface-low": "249 243 235",
+          "--color-surface-mid": "240 235 227",
+          "--color-surface-high": "232 225 218",
+          "--color-surface-dim": "223 217 209",
+          "--color-surface-bright": "255 255 255",
+          "--color-surface-dark": "255 248 241",
+          "--color-surface-dark-low": "249 243 235",
+          "--color-surface-dark-mid": "240 235 227",
+          "--color-surface-dark-high": "232 225 218",
+          "--color-surface-dark-dim": "223 217 209",
+          "--color-surface-dark-bright": "255 255 255"
+        }
+      },
+      white: {
+        surface: "#FFFFFF",
+        variables: {
+          "--color-surface": "255 255 255",
+          "--color-surface-low": "248 250 252",
+          "--color-surface-mid": "244 244 245",
+          "--color-surface-high": "229 231 235",
+          "--color-surface-dim": "209 213 219",
+          "--color-surface-bright": "255 255 255",
+          "--color-surface-dark": "255 255 255",
+          "--color-surface-dark-low": "248 250 252",
+          "--color-surface-dark-mid": "244 244 245",
+          "--color-surface-dark-high": "229 231 235",
+          "--color-surface-dark-dim": "209 213 219",
+          "--color-surface-dark-bright": "255 255 255"
+        }
+      },
+      dark: {
+        surface: "#0A0A0A",
+        variables: {
+          "--color-surface": "10 10 10",
+          "--color-surface-low": "20 20 20",
+          "--color-surface-mid": "26 26 26",
+          "--color-surface-high": "38 38 38",
+          "--color-surface-dim": "15 15 15",
+          "--color-surface-bright": "45 45 45",
+          "--color-surface-dark": "10 10 10",
+          "--color-surface-dark-low": "20 20 20",
+          "--color-surface-dark-mid": "26 26 26",
+          "--color-surface-dark-high": "38 38 38",
+          "--color-surface-dark-dim": "15 15 15",
+          "--color-surface-dark-bright": "45 45 45"
+        }
+      },
+      amoled: {
+        surface: "#000000",
+        variables: {
+          "--color-surface": "0 0 0",
+          "--color-surface-low": "3 3 3",
+          "--color-surface-mid": "8 8 8",
+          "--color-surface-high": "15 15 15",
+          "--color-surface-dim": "0 0 0",
+          "--color-surface-bright": "24 24 24",
+          "--color-surface-dark": "0 0 0",
+          "--color-surface-dark-low": "3 3 3",
+          "--color-surface-dark-mid": "8 8 8",
+          "--color-surface-dark-high": "15 15 15",
+          "--color-surface-dark-dim": "0 0 0",
+          "--color-surface-dark-bright": "24 24 24"
+        }
+      }
+    };
+    var isPalette = function (value) {
+      return value === "beige" || value === "white" || value === "dark" || value === "amoled";
+    };
+    var normalizeTheme = function (value) {
+      if (value === "light") return "beige";
+      if (isPalette(value) || value === "system" || value === "scheduled") return value;
+      return null;
+    };
+    var normalizeTime = function (value) {
+      var match = /^(\\d{1,2}):(\\d{2})$/.exec(value || "");
+      if (!match) return null;
+      var hours = Number(match[1]);
+      var minutes = Number(match[2]);
+      if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+      return String(hours).padStart(2, "0") + ":" + String(minutes).padStart(2, "0");
+    };
+    var minuteOfDay = function (time) {
+      var parts = time.split(":");
+      return Number(parts[0]) * 60 + Number(parts[1]);
+    };
+    var now = new Date();
+    var currentMinute = now.getHours() * 60 + now.getMinutes();
+    var systemTheme =
+      window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "beige";
+    var theme = normalizeTheme(window.localStorage.getItem("hafiz_theme")) || "system";
+    var scheduledTheme = window.localStorage.getItem("hafiz_scheduled_theme");
+    scheduledTheme = isPalette(scheduledTheme) ? scheduledTheme : "dark";
+    var scheduledTime = normalizeTime(window.localStorage.getItem("hafiz_scheduled_switch_time")) || "21:00";
+    var effectiveTheme =
+      theme === "system"
+        ? systemTheme
+        : theme === "scheduled"
+          ? currentMinute >= minuteOfDay(scheduledTime)
+            ? scheduledTheme
+            : systemTheme
+          : theme;
+    var palette = palettes[effectiveTheme] || palettes.beige;
+    var root = document.documentElement;
+    Object.keys(palette.variables).forEach(function (name) {
+      root.style.setProperty(name, palette.variables[name]);
+    });
+    root.style.backgroundColor = palette.surface;
+  } catch (error) {}
 })();
 `;

@@ -47,6 +47,9 @@ export type PageScroll = "vertical" | "horizontal";
 export type UILanguage = "en" | "ar";
 export type TafseerSource = TafsirSourceId;
 const UI_LANGUAGE_CACHE_KEY = "hafiz_ui_language";
+const THEME_CACHE_KEY = "hafiz_theme";
+const SCHEDULED_THEME_CACHE_KEY = "hafiz_scheduled_theme";
+const SCHEDULED_SWITCH_TIME_CACHE_KEY = "hafiz_scheduled_switch_time";
 
 type SettingsContextType = {
   fontSizeIndex: number;
@@ -260,6 +263,40 @@ function cacheUiLanguage(lang: UILanguage) {
   }
 }
 
+function readCachedThemeMode(): ThemeMode {
+  if (Platform.OS !== "web" || typeof window === "undefined") return "system";
+  return normalizeThemeMode(window.localStorage.getItem(THEME_CACHE_KEY)) ?? "system";
+}
+
+function cacheThemeMode(theme: ThemeMode) {
+  if (Platform.OS === "web" && typeof window !== "undefined") {
+    window.localStorage.setItem(THEME_CACHE_KEY, theme);
+  }
+}
+
+function readCachedScheduledTheme(): ThemePalette {
+  if (Platform.OS !== "web" || typeof window === "undefined") return DEFAULT_SCHEDULED_THEME;
+  const cached = window.localStorage.getItem(SCHEDULED_THEME_CACHE_KEY);
+  return isThemePalette(cached) ? cached : DEFAULT_SCHEDULED_THEME;
+}
+
+function cacheScheduledTheme(theme: ThemePalette) {
+  if (Platform.OS === "web" && typeof window !== "undefined") {
+    window.localStorage.setItem(SCHEDULED_THEME_CACHE_KEY, theme);
+  }
+}
+
+function readCachedScheduledSwitchTime(): string {
+  if (Platform.OS !== "web" || typeof window === "undefined") return DEFAULT_SCHEDULED_SWITCH_TIME;
+  return normalizeThemeTime(window.localStorage.getItem(SCHEDULED_SWITCH_TIME_CACHE_KEY)) ?? DEFAULT_SCHEDULED_SWITCH_TIME;
+}
+
+function cacheScheduledSwitchTime(time: string) {
+  if (Platform.OS === "web" && typeof window !== "undefined") {
+    window.localStorage.setItem(SCHEDULED_SWITCH_TIME_CACHE_KEY, time);
+  }
+}
+
 export function useSettings() {
   return useContext(SettingsContext);
 }
@@ -302,9 +339,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const activeSteps = isCompact ? FONT_SIZE_STEPS_MOBILE : FONT_SIZE_STEPS;
   const activeLineHeights = isCompact ? FONT_SIZE_LINE_HEIGHTS_MOBILE : FONT_SIZE_LINE_HEIGHTS;
   const [fontSizeIndex, setFontSizeIndexState] = useState(DEFAULT_FONT_SIZE_INDEX);
-  const [theme, setThemeState] = useState<ThemeMode>("system");
-  const [scheduledTheme, setScheduledThemeState] = useState<ThemePalette>(DEFAULT_SCHEDULED_THEME);
-  const [scheduledSwitchTime, setScheduledSwitchTimeState] = useState(DEFAULT_SCHEDULED_SWITCH_TIME);
+  const [theme, setThemeState] = useState<ThemeMode>(readCachedThemeMode);
+  const [scheduledTheme, setScheduledThemeState] = useState<ThemePalette>(readCachedScheduledTheme);
+  const [scheduledSwitchTime, setScheduledSwitchTimeState] = useState(readCachedScheduledSwitchTime);
   const [nowMinute, setNowMinute] = useState(getCurrentMinuteOfDay);
   const [viewMode, setViewModeState] = useState<ViewMode>("verse");
   const effectiveFontIndex = fontSizeIndex;
@@ -356,13 +393,22 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
         const savedTheme = saved.theme;
         const normalizedTheme = normalizeThemeMode(savedTheme);
-        if (normalizedTheme) setThemeState(normalizedTheme);
+        if (normalizedTheme) {
+          setThemeState(normalizedTheme);
+          cacheThemeMode(normalizedTheme);
+        }
 
         const savedScheduledTheme = saved.scheduled_theme;
-        if (isThemePalette(savedScheduledTheme)) setScheduledThemeState(savedScheduledTheme);
+        if (isThemePalette(savedScheduledTheme)) {
+          setScheduledThemeState(savedScheduledTheme);
+          cacheScheduledTheme(savedScheduledTheme);
+        }
 
         const normalizedScheduledTime = normalizeThemeTime(saved.scheduled_switch_time);
-        if (normalizedScheduledTime) setScheduledSwitchTimeState(normalizedScheduledTime);
+        if (normalizedScheduledTime) {
+          setScheduledSwitchTimeState(normalizedScheduledTime);
+          cacheScheduledSwitchTime(normalizedScheduledTime);
+        }
 
         const savedViewMode = saved.view_mode;
         if (savedViewMode === "verse" || savedViewMode === "page") {
@@ -462,7 +508,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     theme === "system" ? systemTheme : theme === "scheduled" ? (scheduleActive ? scheduledTheme : systemTheme) : theme;
   const isDark = effectiveTheme === "dark" || effectiveTheme === "amoled";
   const themeSurface = THEME_PALETTES[effectiveTheme].surface;
-  const themeVars = useMemo(() => vars(THEME_PALETTES[effectiveTheme].variables), [effectiveTheme]);
+  const themeVars = useMemo(
+    () =>
+      Platform.OS === "web" && typeof window === "undefined"
+        ? undefined
+        : vars(THEME_PALETTES[effectiveTheme].variables),
+    [effectiveTheme]
+  );
   const nativeWindScheme = theme === "system" || (theme === "scheduled" && !scheduleActive)
     ? "system"
     : isDark
@@ -485,6 +537,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const setTheme = useCallback(
     (newTheme: ThemeMode) => {
       setThemeState(newTheme);
+      cacheThemeMode(newTheme);
       writeSetting(db, "theme", newTheme).catch(console.warn);
     },
     [db]
@@ -493,6 +546,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const setScheduledTheme = useCallback(
     (newTheme: ThemePalette) => {
       setScheduledThemeState(newTheme);
+      cacheScheduledTheme(newTheme);
       writeSetting(db, "scheduled_theme", newTheme).catch(console.warn);
     },
     [db]
@@ -503,6 +557,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       const normalized = normalizeThemeTime(time);
       if (!normalized) return;
       setScheduledSwitchTimeState(normalized);
+      cacheScheduledSwitchTime(normalized);
       setNowMinute(getCurrentMinuteOfDay());
       writeSetting(db, "scheduled_switch_time", normalized).catch(console.warn);
     },
