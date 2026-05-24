@@ -190,6 +190,7 @@ function MushafInner() {
     hifzAutoAdvancePage,
     focusScrollSpeed,
     setFocusScrollSpeed,
+    effectiveTheme,
     isDark,
     isRTL,
     uiLanguage,
@@ -947,8 +948,9 @@ function MushafInner() {
       ? Math.max(insets.bottom, 16)
       : 0;
   const pageScrollBottomInset = focusModeActive ? Math.max(insets.bottom, 12) + 96 : isPageMode ? 8 : undefined;
+  const lightRailBackground = effectiveTheme === "white" ? "rgba(255,255,255,0.95)" : "rgba(255,248,241,0.95)";
   const floatingRailSurface = {
-    backgroundColor: isDark ? "rgba(28,25,23,0.95)" : "rgba(255,248,241,0.95)",
+    backgroundColor: isDark ? "rgba(28,25,23,0.95)" : lightRailBackground,
     borderWidth: 1,
     borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.72)",
     shadowColor: "#000",
