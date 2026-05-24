@@ -386,17 +386,14 @@ export default function HomeScreen() {
         )}
 
         <View className="mb-6">
-          <Text className="text-warm-400 dark:text-neutral-500 uppercase" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, letterSpacing: 1.8 }}>
-            {s.flashcardsDueToday}
-          </Text>
-          <View className={`flex-row items-end justify-between gap-3 mt-2 ${isRTL ? "flex-row-reverse" : ""}`} style={mirroredRowStyle}>
+          <View className={`flex-row items-end justify-between gap-3 ${isRTL ? "flex-row-reverse" : ""}`} style={mirroredRowStyle}>
             <View className={`flex-1 flex-row items-end gap-3 ${isRTL ? "flex-row-reverse" : ""}`} style={mirroredRowStyle}>
               <View className={isRTL ? "items-end" : "items-start"}>
                 <Text className="text-charcoal dark:text-neutral-100" style={{ fontFamily: "NotoSerif_700Bold", fontSize: 68, lineHeight: 68 }}>
                   {totalDue}
                 </Text>
                 <Text className="text-warm-400 dark:text-neutral-500" style={{ fontFamily: "Manrope_500Medium", fontSize: 12, textAlign: isRTL ? "right" : "left" }}>
-                  {s.homeTodayReviews}
+                  {s.flashcardsDueToday}
                 </Text>
               </View>
               <View className={`pb-1 ${isRTL ? "items-end" : "items-start"}`}>
