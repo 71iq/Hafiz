@@ -377,7 +377,7 @@ async function getDefaultDeckProgress(db: SQLiteDatabase): Promise<DefaultDeckPr
 
   return Promise.all(decks.map(async (deck) => {
     if (deck.isSmartDeck) {
-      const stats = await getSmartDeckStats(db, deck.deckId as SmartDeckId);
+      const stats = await getSmartDeckStats(db, deck.deckId as SmartDeckId, { type: "all" });
       const newCount = Math.max(0, Math.min(stats.total, stats.newCount));
       return {
         ...deck,

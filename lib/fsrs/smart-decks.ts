@@ -295,9 +295,10 @@ function applyReviewQueueOptions(rows: StudyCardRow[], options?: DueCardsForRevi
 
 export async function getSmartDeckStats(
   db: SQLiteDatabase,
-  deckId: SmartDeckId
+  deckId: SmartDeckId,
+  filter?: BuiltInDeckFilter
 ): Promise<SmartDeckStats> {
-  const ids = await getSmartDeckCandidateCardIds(db, deckId);
+  const ids = await getSmartDeckCandidateCardIds(db, deckId, filter);
   if (ids.length === 0) return { total: 0, due: 0, newCount: 0 };
 
   const now = new Date().toISOString();

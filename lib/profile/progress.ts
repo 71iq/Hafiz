@@ -26,7 +26,7 @@ export async function getLocalSurahProgress(db: SQLiteDatabase): Promise<Profile
          sc.last_review
        FROM study_cards sc
        WHERE sc.id NOT LIKE 'word:%'
-         AND sc.deck_id NOT IN (?, ?, ?)
+         AND sc.deck_id NOT IN (?, ?, ?, ?)
      )
      SELECT
        CAST(SUBSTR(ayah_key, 1, INSTR(ayah_key, ':') - 1) AS INTEGER) as surah,
