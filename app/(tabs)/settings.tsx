@@ -20,7 +20,8 @@ import {
 } from "@/lib/settings/context";
 import { useDatabase } from "@/lib/database/provider";
 import { getLanguageByCode } from "@/lib/translations/languages";
-import { AVAILABLE_TAFSIR_SOURCES } from "@/lib/tafsir/sources";
+import { AVAILABLE_TAFSIR_SOURCES, type TafsirSourceId } from "@/lib/tafsir/sources";
+import { ensureTafsirSourceImported } from "@/lib/database/init";
 import { TranslationLanguagePicker } from "@/components/settings/TranslationLanguagePicker";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -94,6 +95,7 @@ export default function SettingsScreen() {
   const [qfStatus, setQfStatus] = useState<QfConnectionStatus>("disconnected");
   const [qfBusy, setQfBusy] = useState(false);
   const [qfMessage, setQfMessage] = useState<string | null>(null);
+  const [importingTafseerSource, setImportingTafseerSource] = useState<TafsirSourceId | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const { width } = useWindowDimensions();
   const currentLang = getLanguageByCode(translationLanguage);
@@ -302,6 +304,23 @@ export default function SettingsScreen() {
   const handleCategorySelect = useCallback((category: SettingsCategoryId) => {
     setMobileCategory(category);
   }, []);
+
+  const handleTafseerSourceSelect = useCallback(
+    async (sourceId: TafsirSourceId) => {
+      if (sourceId === tafseerSource || importingTafseerSource) return;
+      setImportingTafseerSource(sourceId);
+      try {
+        await ensureTafsirSourceImported(db, sourceId);
+        setTafseerSource(sourceId);
+      } catch (err) {
+        console.warn("[Settings] Failed to import tafsir source:", err);
+        setToast(s.tafseerSourceImportFailed);
+      } finally {
+        setImportingTafseerSource(null);
+      }
+    },
+    [db, importingTafseerSource, s.tafseerSourceImportFailed, setTafseerSource, tafseerSource]
+  );
 
   const categoryPanels = (
     <>
@@ -689,7 +708,9 @@ export default function SettingsScreen() {
                   title={s[source.labelKey] ?? source.id}
                   description={s[source.descriptionKey] ?? ""}
                   isActive={tafseerSource === source.id}
-                  onPress={() => setTafseerSource(source.id)}
+                  isLoading={importingTafseerSource === source.id}
+                  disabled={importingTafseerSource !== null}
+                  onPress={() => handleTafseerSourceSelect(source.id)}
                   isDark={isDark}
                   isRTL={isRTL}
                 />
@@ -1518,6 +1539,8 @@ function TafseerSourceOption({
   title,
   description,
   isActive,
+  isLoading,
+  disabled,
   onPress,
   isDark,
   isRTL,
@@ -1526,6 +1549,8 @@ function TafseerSourceOption({
   title: string;
   description: string;
   isActive: boolean;
+  isLoading?: boolean;
+  disabled?: boolean;
   onPress: () => void;
   isDark: boolean;
   isRTL: boolean;
@@ -1533,29 +1558,37 @@ function TafseerSourceOption({
   return (
     <Pressable
       onPress={onPress}
+      disabled={disabled}
       className={`p-4 rounded-2xl ${
         isActive
           ? "bg-primary-accent/10 dark:bg-primary-bright/15"
           : "bg-surface-high dark:bg-surface-dark-high"
       }`}
       style={({ pressed }) => ({
+        opacity: disabled && !isLoading ? 0.58 : 1,
         transform: [{ scale: pressed ? 0.98 : 1 }],
       })}
     >
-      <Text
-        className={isActive
-          ? "text-primary-accent dark:text-primary-bright"
-          : "text-charcoal dark:text-neutral-300"
-        }
-        style={{
-          fontFamily: isActive ? "Manrope_600SemiBold" : "Manrope_500Medium",
-          fontSize: 14,
-          writingDirection: isRTL ? "rtl" : "ltr",
-          textAlign: isRTL ? "right" : "left",
-        }}
+      <View
+        className="items-center gap-3"
+        style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
       >
-        {title}
-      </Text>
+        <Text
+          className={isActive
+            ? "flex-1 text-primary-accent dark:text-primary-bright"
+            : "flex-1 text-charcoal dark:text-neutral-300"
+          }
+          style={{
+            fontFamily: isActive ? "Manrope_600SemiBold" : "Manrope_500Medium",
+            fontSize: 14,
+            writingDirection: isRTL ? "rtl" : "ltr",
+            textAlign: isRTL ? "right" : "left",
+          }}
+        >
+          {title}
+        </Text>
+        {isLoading && <ActivityIndicator size="small" color={isDark ? "#2dd4bf" : "#0d9488"} />}
+      </View>
       <Text
         className="text-warm-400 dark:text-neutral-500 mt-0.5"
         style={{

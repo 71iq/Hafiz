@@ -8,6 +8,7 @@ import {
   loadAndValidateReflectionJourneySeed,
 } from "@/lib/reflection-journey/schema";
 import {
+  TAFSIR_SOURCES,
   SURAH_ROW_TAFSIR_SOURCES,
   type TafsirSourceConfig,
   type TafsirSourceId,
@@ -1319,8 +1320,17 @@ function nativeTafsirSourceLoader(source: TafsirSourceId, surahNumber: number): 
 
 async function doLoadTafsirSourceFile(source: TafsirSourceId, surahNumber: number): Promise<any> {
   if (Platform.OS === "web") {
-    const resp = await fetch(`/data/tafsir-sources/${source}/${surahNumber}.json`);
-    return resp.json();
+    const path = `/data/tafsir-sources/${source}/${surahNumber}.json`;
+    const DecompressionStreamCtor = (globalThis as any).DecompressionStream;
+    if (typeof DecompressionStreamCtor === "function") {
+      const compressedResp = await fetch(`${path}.gz`);
+      if (compressedResp.ok && compressedResp.body) {
+        const stream = compressedResp.body.pipeThrough(new DecompressionStreamCtor("gzip"));
+        return new Response(stream).json();
+      }
+    }
+    const resp = await fetch(path);
+    return resp.ok ? resp.json() : null;
   }
   const loader = nativeTafsirSourceLoader(source, surahNumber);
   return loader ? loader() : null;
@@ -1820,7 +1830,7 @@ async function importSurahRowTafsirSource(
   db: SQLiteDatabase,
   source: TafsirSourceConfig,
   onProgress: ProgressCallback
-): Promise<void> {
+): Promise<number> {
   onProgress({ step: "Tafseer", current: 7, total: TOTAL_STEPS, detail: source.progressDetail });
   console.log(`[Import] Importing tafseer (${source.id}) from 114 surah files...`);
 
@@ -1847,6 +1857,27 @@ async function importSurahRowTafsirSource(
   }
 
   console.log(`[Import] Tafseer (${source.id}) done: ${inserted} rows`);
+  return inserted;
+}
+
+export async function ensureTafsirSourceImported(
+  db: SQLiteDatabase,
+  sourceId: TafsirSourceId
+): Promise<void> {
+  const source = TAFSIR_SOURCES.find((item) => item.id === sourceId);
+  if (!source || source.importKind !== "surahRows") return;
+
+  const sourceCount = await db.getFirstAsync<{ count: number }>(
+    "SELECT COUNT(*) as count FROM tafseer WHERE source = ?",
+    [source.id]
+  );
+  if ((sourceCount?.count ?? 0) >= (source.expectedRows ?? 6236)) return;
+
+  await db.runAsync("DELETE FROM tafseer WHERE source = ?", [source.id]);
+  const inserted = await importSurahRowTafsirSource(db, source, () => {});
+  if (inserted === 0) {
+    throw new Error(`Tafsir source ${source.id} is unavailable`);
+  }
 }
 
 async function importConfiguredTafsirSources(

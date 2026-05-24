@@ -1,5 +1,3 @@
-import { Platform } from "react-native";
-
 export type TafsirSourceId =
   | "muyassar"
   | "zilal"
@@ -113,10 +111,7 @@ export const SURAH_ROW_TAFSIR_SOURCES = TAFSIR_SOURCES.filter(
   (source) => source.importKind === "surahRows"
 );
 
-export const AVAILABLE_TAFSIR_SOURCES =
-  Platform.OS === "web"
-    ? TAFSIR_SOURCES.filter((source) => source.id === "muyassar" || source.id === "zilal")
-    : TAFSIR_SOURCES;
+export const AVAILABLE_TAFSIR_SOURCES = TAFSIR_SOURCES;
 
 export function isTafsirSourceId(value: string | null | undefined): value is TafsirSourceId {
   return TAFSIR_SOURCES.some((source) => source.id === value);
