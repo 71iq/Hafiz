@@ -16,6 +16,7 @@ export type PublicProfile = {
   display_name: string | null;
   avatar_url: string | null;
   bio: string | null;
+  country: string | null;
   total_score: number;
   current_streak: number;
   longest_streak: number;
@@ -214,11 +215,11 @@ export async function fetchPublicProfile(userId: string): Promise<PublicProfile 
 
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, username, display_name, avatar_url, bio, total_score, current_streak, longest_streak, cards_reviewed, last_review_date")
+    .select("id, username, display_name, avatar_url, bio, country, total_score, current_streak, longest_streak, cards_reviewed, last_review_date")
     .eq("id", userId)
     .maybeSingle();
 
-  if (error && isMissingBioColumnError(error)) {
+  if (error && isMissingOptionalProfileColumnError(error)) {
     const fallback = await supabase
       .from("profiles")
       .select("id, username, display_name, avatar_url, total_score, current_streak, longest_streak, cards_reviewed, last_review_date")
@@ -226,7 +227,7 @@ export async function fetchPublicProfile(userId: string): Promise<PublicProfile 
       .maybeSingle();
 
     if (fallback.error) throw fallback.error;
-    return fallback.data ? ({ ...fallback.data, bio: null } as PublicProfile) : null;
+    return fallback.data ? ({ ...fallback.data, bio: null, country: null } as PublicProfile) : null;
   }
 
   if (error) throw error;
@@ -313,7 +314,8 @@ function parsePayload(value: unknown): Record<string, unknown> {
   }
 }
 
-function isMissingBioColumnError(error: { code?: string; message?: string; details?: string } | null): boolean {
+function isMissingOptionalProfileColumnError(error: { code?: string; message?: string; details?: string } | null): boolean {
   const message = `${error?.code ?? ""} ${error?.message ?? ""} ${error?.details ?? ""}`.toLowerCase();
-  return message.includes("bio") && (message.includes("column") || message.includes("schema") || message.includes("pgrst204"));
+  const referencesOptionalColumn = message.includes("bio") || message.includes("country");
+  return referencesOptionalColumn && (message.includes("column") || message.includes("schema") || message.includes("pgrst204"));
 }

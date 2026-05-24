@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, Text, View, useWindowDimensions } from "r
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
-import { Camera, Pencil, Save, Trash2, UserRound, type LucideIcon } from "lucide-react-native";
+import { Camera, MapPin, Pencil, Save, Trash2, UserRound, type LucideIcon } from "lucide-react-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { PublicBadgesGrid } from "@/components/achievements/PublicBadgesGrid";
 import { ActivityHeatmap } from "@/components/progress/ActivityHeatmap";
@@ -56,6 +56,7 @@ type ReviewSnapshot = {
 type ProfileTab = "overview" | "notes";
 
 const PROFILE_BIO_MAX_LENGTH = 280;
+const PROFILE_COUNTRY_MAX_LENGTH = 80;
 
 export function ProfileModalContent({ userId }: ProfileModalContentProps) {
   const router = useRouter();
@@ -72,6 +73,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
   const [editOpen, setEditOpen] = useState(false);
   const [displayNameDraft, setDisplayNameDraft] = useState("");
   const [bioDraft, setBioDraft] = useState("");
+  const [countryDraft, setCountryDraft] = useState("");
   const [avatarDraft, setAvatarDraft] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [avatarRemovalDraft, setAvatarRemovalDraft] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
@@ -136,6 +138,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
           display_name: profile.display_name,
           avatar_url: profile.avatar_url,
           bio: profile.bio,
+          country: profile.country,
           total_score: profile.total_score,
           current_streak: profile.current_streak,
           longest_streak: profile.longest_streak,
@@ -151,16 +154,20 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
   const username = visibleProfile?.username ?? null;
   const avatarUrl = visibleProfile?.avatar_url ?? null;
   const bio = visibleProfile?.bio?.trim() ?? "";
+  const country = visibleProfile?.country?.trim() ?? "";
   const currentDisplayName = profile?.display_name?.trim() ?? "";
   const displayNameValue = displayNameDraft.trim();
   const displayNameDirty = displayNameValue !== currentDisplayName;
   const currentBio = profile?.bio?.trim() ?? "";
   const bioValue = bioDraft.trim();
   const bioDirty = bioValue !== currentBio;
+  const currentCountry = profile?.country?.trim() ?? "";
+  const countryValue = countryDraft.trim();
+  const countryDirty = countryValue !== currentCountry;
   const bioCount = `${bioDraft.length.toLocaleString(numberLocale)} / ${PROFILE_BIO_MAX_LENGTH.toLocaleString(numberLocale)}`;
   const avatarPreviewUrl = avatarRemovalDraft ? null : avatarDraft?.uri ?? profile?.avatar_url ?? null;
   const avatarDirty = !!avatarDraft || avatarRemovalDraft;
-  const profileDirty = displayNameDirty || bioDirty || avatarDirty;
+  const profileDirty = displayNameDirty || bioDirty || countryDirty || avatarDirty;
   const saveProfileDisabled = !profileDirty || profileSaving || authLoading;
   const saveProfileIconColor = saveProfileDisabled && !profileSaving ? (isDark ? "#737373" : "#8A7764") : "#FFFFFF";
   const saveProfileTextColor = saveProfileDisabled && !profileSaving ? (isDark ? "#737373" : "#8A7764") : "#FFFFFF";
@@ -193,7 +200,8 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
   useEffect(() => {
     setDisplayNameDraft(profile?.display_name ?? "");
     setBioDraft(profile?.bio ?? "");
-  }, [profile?.bio, profile?.display_name, user?.id]);
+    setCountryDraft(profile?.country ?? "");
+  }, [profile?.bio, profile?.country, profile?.display_name, user?.id]);
 
   useEffect(() => {
     setAvatarDraft(null);
@@ -258,6 +266,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
       const updated = await updateProfile({
         displayName: displayNameDirty ? (displayNameValue.length > 0 ? displayNameValue : null) : undefined,
         bio: bioDirty ? (bioValue.length > 0 ? bioValue : null) : undefined,
+        country: countryDirty ? (countryValue.length > 0 ? countryValue : null) : undefined,
         avatarUrl: avatarDirty ? nextAvatarUrl : undefined,
       });
       setAvatarDraft(null);
@@ -271,7 +280,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
     } finally {
       setProfileSaving(false);
     }
-  }, [avatarDirty, avatarDraft, avatarRemovalDraft, bioDirty, bioValue, displayNameDirty, displayNameValue, invalidateProfileSurfaces, profileDirty, queryClient, updateProfile, user]);
+  }, [avatarDirty, avatarDraft, avatarRemovalDraft, bioDirty, bioValue, countryDirty, countryValue, displayNameDirty, displayNameValue, invalidateProfileSurfaces, profileDirty, queryClient, updateProfile, user]);
 
   const handlePickAvatar = useCallback(async () => {
     if (!user) return;
@@ -389,6 +398,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
               ) : (
                 <ProfileOverview
                   bio={bio}
+                  country={country}
                   stats={stats}
                   review={review}
                   surahProgress={surahProgress}
@@ -490,6 +500,25 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
               style={{ lineHeight: 21 }}
             />
           </View>
+          <View>
+            <Text
+              className="mb-1 text-warm-500 dark:text-neutral-400"
+              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
+            >
+              {s.profileCountryTitle}
+            </Text>
+            <Input
+              value={countryDraft}
+              onChangeText={(value) => {
+                setCountryDraft(value);
+                setProfileStatus(null);
+              }}
+              placeholder={s.profileCountryPlaceholder}
+              maxLength={PROFILE_COUNTRY_MAX_LENGTH}
+              dir={isRTL ? "rtl" : "ltr"}
+              className="bg-surface-high dark:bg-surface-dark-high"
+            />
+          </View>
           <Button
             className="gap-2"
             onPress={handleSaveProfile}
@@ -523,6 +552,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
 
 function ProfileOverview({
   bio,
+  country,
   stats,
   review,
   surahProgress,
@@ -533,6 +563,7 @@ function ProfileOverview({
   isRTL,
 }: {
   bio: string;
+  country: string;
   stats: { label: string; value: number }[];
   review: ReviewSnapshot;
   surahProgress: ProfileSurahProgress[];
@@ -553,6 +584,31 @@ function ProfileOverview({
 
   return (
     <View className="gap-5">
+      {country ? (
+        <Card elevation="low" className="p-5">
+          <View className={`items-center gap-3 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
+            <View className="h-10 w-10 items-center justify-center rounded-full bg-primary-accent/10 dark:bg-primary-bright/15">
+              <MapPin size={18} color={isDark ? "#2dd4bf" : "#0d9488"} />
+            </View>
+            <View className="min-w-0 flex-1">
+              <Text
+                className="text-charcoal dark:text-neutral-100"
+                style={{ fontFamily: "Manrope_700Bold", fontSize: 15, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
+              >
+                {s.profileCountryTitle}
+              </Text>
+              <Text
+                selectable
+                className="mt-0.5 text-warm-700 dark:text-neutral-300"
+                style={{ fontFamily: "Manrope_400Regular", fontSize: 14, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
+              >
+                {country}
+              </Text>
+            </View>
+          </View>
+        </Card>
+      ) : null}
+
       {bio ? (
         <Card elevation="low" className="p-5">
           <Text

@@ -31,6 +31,7 @@ function buildFallbackProfile(user: NonNullable<AuthState["user"]>): Profile {
     display_name: typeof metadata.display_name === "string" ? metadata.display_name : null,
     avatar_url: null,
     bio: null,
+    country: null,
     total_score: 0,
     current_streak: 0,
     longest_streak: 0,
@@ -289,7 +290,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     }
   },
 
-  updateProfile: async ({ displayName, avatarUrl, bio }) => {
+  updateProfile: async ({ displayName, avatarUrl, bio, country }) => {
     const user = get().user;
     if (!user) throw new Error("Not signed in");
 
@@ -300,6 +301,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       if (displayName !== undefined) patch.display_name = displayName;
       if (avatarUrl !== undefined) patch.avatar_url = avatarUrl;
       if (bio !== undefined) patch.bio = bio;
+      if (country !== undefined) patch.country = country;
 
       const { data, error } = await supabase
         .from("profiles")

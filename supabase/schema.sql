@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   display_name TEXT,
   avatar_url TEXT,
   bio TEXT CHECK (bio IS NULL OR char_length(bio) <= 280),
+  country TEXT CHECK (country IS NULL OR char_length(country) <= 80),
   total_score INTEGER DEFAULT 0,
   current_streak INTEGER DEFAULT 0,
   longest_streak INTEGER DEFAULT 0,
