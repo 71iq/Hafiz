@@ -1,12 +1,10 @@
 import React, {
   createContext,
-  useCallback,
   useContext,
   useEffect,
-  useRef,
   useState,
 } from "react";
-import { Platform, Pressable, Text, View } from "react-native";
+import { Platform } from "react-native";
 import {
   importDatabaseFromAssetAsync,
   openDatabaseAsync,
@@ -29,26 +27,88 @@ const DatabaseContext = createContext<DatabaseContextType>({
   error: null,
 });
 
-const CHANNEL_NAME = "hafiz-db-lock";
-const LOCK_NAME = "hafiz-db-exclusive";
+const quranDbAsset = require("../../assets/data/quran.db");
+const CHANNEL_NAME = "hafiz-db-bridge";
+const LOCK_NAME = "hafiz-db-host";
 const DATABASE_NAME = "hafiz.db";
 const OPEN_MAX_ATTEMPTS = 5;
 const OPEN_RETRY_DELAY_MS = 400;
+const HOST_WAIT_TIMEOUT_MS = 30000;
+const REQUEST_TIMEOUT_MS = 60000;
 const POST_CLOSE_SETTLE_MS = 200;
-const quranDbAsset = require("../../assets/data/quran.db");
 
-type ClaimMessage = { type: "claim"; tabId: string };
+type DbOperation = "exec" | "run" | "getFirst" | "getAll";
 
-export function useDatabase(): SQLiteDatabase {
-  const ctx = useContext(DatabaseContext);
-  if (!ctx.db) {
-    throw new Error("Database not initialized yet");
-  }
-  return ctx.db;
+type HostProbeMessage = { type: "host-probe"; tabId: string };
+type HostReadyMessage = { type: "host-ready"; tabId: string };
+type HostClosingMessage = { type: "host-closing"; tabId: string };
+type DbRequestMessage = {
+  type: "request";
+  requestId: string;
+  fromTabId: string;
+  targetTabId: string;
+  operation: DbOperation;
+  source: string;
+  params: unknown[];
+};
+type DbResponseMessage = {
+  type: "response";
+  requestId: string;
+  fromTabId: string;
+  targetTabId: string;
+  ok: boolean;
+  result?: unknown;
+  error?: string;
+};
+
+type DbMessage =
+  | HostProbeMessage
+  | HostReadyMessage
+  | HostClosingMessage
+  | DbRequestMessage
+  | DbResponseMessage;
+
+type PendingRequest = {
+  resolve: (value: unknown) => void;
+  reject: (error: Error) => void;
+  timeout: ReturnType<typeof setTimeout>;
+};
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function isOpfsLockError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    message.includes("Access Handles") ||
+    message.includes("SyncAccessHandle") ||
+    message.includes("NoModificationAllowedError") ||
+    message.includes("access handle") ||
+    message.includes("already open")
+  );
 }
 
-export function useDatabaseStatus() {
-  return useContext(DatabaseContext);
+function formatRemoteError(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function toCloneableResult(result: unknown) {
+  if (result == null) return null;
+  return JSON.parse(JSON.stringify(result)) as unknown;
+}
+
+async function executeDbOperation(db: SQLiteDatabase, message: DbRequestMessage) {
+  switch (message.operation) {
+    case "exec":
+      return db.execAsync(message.source);
+    case "run":
+      return db.runAsync(message.source, ...(message.params as any[]));
+    case "getFirst":
+      return db.getFirstAsync(message.source, ...(message.params as any[]));
+    case "getAll":
+      return db.getAllAsync(message.source, ...(message.params as any[]));
+    default:
+      throw new Error("Unsupported database operation");
+  }
 }
 
 export function DatabaseProvider({ children }: { children: React.ReactNode }) {
@@ -56,242 +116,392 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
   const [isReady, setIsReady] = useState(false);
   const [progress, setProgress] = useState<ImportProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [ejected, setEjected] = useState(false);
-
-  const reconnectRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
-    // ─── Per-effect state ────────────────────────────────────────────
     const tabId =
-      Math.random().toString(36).slice(2) + Date.now().toString(36);
-    const ejectedFlag = { current: false };
-
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : Math.random().toString(36).slice(2);
     let cancelled = false;
     let currentDb: SQLiteDatabase | null = null;
     let channel: BroadcastChannel | null = null;
     let releaseLock: (() => void) | null = null;
-
+    let hostTabId: string | null = null;
+    let isHostReady = false;
+    const pendingRequests = new Map<string, PendingRequest>();
     const isWeb = Platform.OS === "web";
     const hasBroadcastChannel =
       isWeb && typeof BroadcastChannel !== "undefined";
     const hasWebLocks =
       isWeb &&
       typeof navigator !== "undefined" &&
-      "locks" in navigator &&
       typeof (navigator as any).locks?.request === "function";
 
-    // ─── Helpers ────────────────────────────────────────────────────
-    function isOpfsLockError(err: unknown): boolean {
-      const msg = err instanceof Error ? err.message : String(err);
-      return (
-        msg.includes("Access Handles") ||
-        msg.includes("NoModificationAllowedError") ||
-        msg.includes("access handle") ||
-        msg.includes("already open")
-      );
+    function postMessage(message: DbMessage) {
+      channel?.postMessage(message);
     }
 
-    async function closeDbHandle() {
-      const toClose = currentDb;
-      currentDb = null;
-      if (toClose) {
-        try {
-          await toClose.closeAsync();
-        } catch {
-          // Handle may already be broken; ignore.
-        }
-        // OPFS Access Handles don't release synchronously on closeAsync;
-        // give the worker a moment before another tab tries to open.
-        await new Promise((r) => setTimeout(r, POST_CLOSE_SETTLE_MS));
+    function rejectPendingRequests(error: Error) {
+      for (const [requestId, pending] of pendingRequests) {
+        clearTimeout(pending.timeout);
+        pending.reject(error);
+        pendingRequests.delete(requestId);
       }
     }
 
-    function releaseLockHandle() {
-      const release = releaseLock;
-      releaseLock = null;
-      release?.();
+    function createRemoteDatabaseProxy(targetTabId: string) {
+      const request = (
+        operation: DbOperation,
+        source: string,
+        params: unknown[] = [],
+      ) =>
+        new Promise<unknown>((resolve, reject) => {
+          if (!channel) {
+            reject(new Error("Database channel is unavailable"));
+            return;
+          }
+
+          const requestId =
+            typeof crypto !== "undefined" && "randomUUID" in crypto
+              ? crypto.randomUUID()
+              : `${Date.now()}-${Math.random()}`;
+          const timeout = setTimeout(() => {
+            pendingRequests.delete(requestId);
+            reject(new Error("Database request timed out"));
+          }, REQUEST_TIMEOUT_MS);
+
+          pendingRequests.set(requestId, { resolve, reject, timeout });
+          postMessage({
+            type: "request",
+            requestId,
+            fromTabId: tabId,
+            targetTabId,
+            operation,
+            source,
+            params,
+          });
+        });
+
+      const proxy: any = {
+        execAsync: (source: string) =>
+          request("exec", source) as Promise<void>,
+        runAsync: (source: string, ...params: unknown[]) =>
+          request("run", source, params) as ReturnType<
+            SQLiteDatabase["runAsync"]
+          >,
+        getFirstAsync: (source: string, ...params: unknown[]) =>
+          request("getFirst", source, params) as ReturnType<
+            SQLiteDatabase["getFirstAsync"]
+          >,
+        getAllAsync: (source: string, ...params: unknown[]) =>
+          request("getAll", source, params) as ReturnType<
+            SQLiteDatabase["getAllAsync"]
+          >,
+        withTransactionAsync: async (task: () => Promise<void>) => {
+          await proxy.execAsync?.("BEGIN");
+          try {
+            await task();
+            await proxy.execAsync?.("COMMIT");
+          } catch (transactionError) {
+            try {
+              await proxy.execAsync?.("ROLLBACK");
+            } catch {
+              // Ignore rollback failures and surface the original transaction error.
+            }
+            throw transactionError;
+          }
+        },
+        prepareAsync: async (source: string) => ({
+          executeAsync: (...params: unknown[]) => request("run", source, params),
+          finalizeAsync: async () => {},
+        }),
+        closeAsync: async () => {},
+      };
+
+      return proxy as SQLiteDatabase;
     }
 
-    async function acquireLock(): Promise<void> {
-      if (!hasWebLocks) return;
-      await new Promise<void>((acquired) => {
-        (navigator as any).locks.request(
-          LOCK_NAME,
-          { mode: "exclusive" },
-          () =>
-            new Promise<void>((resolveInside) => {
-              releaseLock = resolveInside;
-              acquired();
-            })
-        );
+    function handleChannelMessage(event: MessageEvent<DbMessage>) {
+      const message = event.data;
+      if (!message || !("type" in message)) return;
+
+      if (message.type === "host-probe") {
+        if (message.tabId !== tabId && isHostReady) {
+          postMessage({ type: "host-ready", tabId });
+        }
+        return;
+      }
+
+      if (message.type === "host-closing") {
+        if (message.tabId === hostTabId && !releaseLock && !cancelled) {
+          hostTabId = null;
+          currentDb = null;
+          setDb(null);
+          setIsReady(false);
+          rejectPendingRequests(new Error("Database host closed"));
+          setTimeout(() => {
+            if (!cancelled) void runInit();
+          }, POST_CLOSE_SETTLE_MS);
+        }
+        return;
+      }
+
+      if (message.type === "request") {
+        if (message.targetTabId !== tabId || !isHostReady || !currentDb) return;
+
+        void (async () => {
+          try {
+            const result = toCloneableResult(
+              await executeDbOperation(currentDb!, message),
+            );
+            postMessage({
+              type: "response",
+              requestId: message.requestId,
+              fromTabId: tabId,
+              targetTabId: message.fromTabId,
+              ok: true,
+              result,
+            });
+          } catch (requestError) {
+            postMessage({
+              type: "response",
+              requestId: message.requestId,
+              fromTabId: tabId,
+              targetTabId: message.fromTabId,
+              ok: false,
+              error: formatRemoteError(requestError),
+            });
+          }
+        })();
+        return;
+      }
+
+      if (message.type === "response") {
+        if (message.targetTabId !== tabId) return;
+        const pending = pendingRequests.get(message.requestId);
+        if (!pending) return;
+
+        clearTimeout(pending.timeout);
+        pendingRequests.delete(message.requestId);
+        if (message.ok) {
+          pending.resolve(message.result);
+        } else {
+          pending.reject(new Error(message.error ?? "Database request failed"));
+        }
+      }
+    }
+
+    async function waitForHost() {
+      if (!channel) return null;
+      const activeChannel = channel;
+
+      return new Promise<string | null>((resolve) => {
+        let settled = false;
+        const timeout = setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          activeChannel.removeEventListener("message", onMessage);
+          resolve(null);
+        }, HOST_WAIT_TIMEOUT_MS);
+
+        const onMessage = (event: MessageEvent<DbMessage>) => {
+          const message = event.data;
+          if (message?.type !== "host-ready" || message.tabId === tabId) return;
+          if (settled) return;
+
+          settled = true;
+          clearTimeout(timeout);
+          activeChannel.removeEventListener("message", onMessage);
+          resolve(message.tabId);
+        };
+
+        activeChannel.addEventListener("message", onMessage);
+        activeChannel.postMessage({ type: "host-probe", tabId });
       });
     }
 
-    async function openWithRetry(): Promise<SQLiteDatabase> {
-      let lastErr: unknown = null;
-      for (let attempt = 0; attempt < OPEN_MAX_ATTEMPTS; attempt++) {
-        if (cancelled || ejectedFlag.current) throw new Error("aborted");
-        try {
-          await importDatabaseFromAssetAsync(DATABASE_NAME, {
-            assetId: quranDbAsset,
-          });
-          return await openDatabaseAsync(DATABASE_NAME);
-        } catch (err) {
-          lastErr = err;
-          if (!isOpfsLockError(err) || attempt === OPEN_MAX_ATTEMPTS - 1) {
-            throw err;
-          }
-          // Re-broadcast in case a newly-started tab missed the initial claim.
-          if (channel) {
-            channel.postMessage({
-              type: "claim",
-              tabId,
-            } satisfies ClaimMessage);
-          }
-          await new Promise((r) =>
-            setTimeout(r, OPEN_RETRY_DELAY_MS * (attempt + 1))
-          );
-        }
-      }
-      throw lastErr ?? new Error("openWithRetry: unreachable");
+    async function tryAcquireHostLock() {
+      if (!hasWebLocks) return true;
+
+      return new Promise<boolean>((resolve, reject) => {
+        const locks = (navigator as Navigator & {
+          locks: {
+            request: (
+              name: string,
+              options: { mode: "exclusive"; ifAvailable: true },
+              callback: (lock: unknown) => Promise<void> | void,
+            ) => Promise<void>;
+          };
+        }).locks;
+
+        locks
+          .request(
+            LOCK_NAME,
+            { mode: "exclusive", ifAvailable: true },
+            (lock) => {
+              if (!lock) {
+                resolve(false);
+                return;
+              }
+
+              return new Promise<void>((release) => {
+                releaseLock = release;
+                resolve(true);
+              });
+            },
+          )
+          .catch(reject);
+      });
     }
 
-    async function ejectOnClaim() {
-      if (ejectedFlag.current) return;
-      ejectedFlag.current = true;
+    async function releaseLockHandle() {
+      const release = releaseLock;
+      releaseLock = null;
+      isHostReady = false;
+      if (release) {
+        release();
+        await sleep(POST_CLOSE_SETTLE_MS);
+      }
+    }
 
-      // UI switches immediately so child consumers unmount.
-      setDb(null);
-      setIsReady(false);
-      setProgress(null);
-      setEjected(true);
+    async function closeDbHandle() {
+      const handle = currentDb;
+      currentDb = null;
+      if (handle) {
+        try {
+          await handle.closeAsync();
+        } catch {
+          // Ignore close failures during provider teardown.
+        }
+      }
+    }
 
-      await closeDbHandle();
-      releaseLockHandle();
+    async function openWithRetry(): Promise<SQLiteDatabase> {
+      let lastError: unknown;
+
+      for (let attempt = 1; attempt <= OPEN_MAX_ATTEMPTS; attempt += 1) {
+        try {
+          if (isWeb) {
+            await importDatabaseFromAssetAsync(DATABASE_NAME, {
+              assetId: quranDbAsset,
+            });
+          }
+          return await openDatabaseAsync(DATABASE_NAME);
+        } catch (err) {
+          lastError = err;
+          await closeDbHandle();
+
+          if (!isWeb || !isOpfsLockError(err) || attempt === OPEN_MAX_ATTEMPTS) {
+            break;
+          }
+
+          await releaseLockHandle();
+          await sleep(OPEN_RETRY_DELAY_MS * attempt);
+          if (!(await tryAcquireHostLock())) break;
+        }
+      }
+
+      throw lastError instanceof Error ? lastError : new Error(String(lastError));
+    }
+
+    async function connectToHost() {
+      const targetTabId = await waitForHost();
+      if (!targetTabId) {
+        throw new Error("Unable to connect to the active database tab");
+      }
+
+      hostTabId = targetTabId;
+      currentDb = createRemoteDatabaseProxy(targetTabId);
+      if (!cancelled) {
+        setDb(currentDb);
+        setProgress(null);
+        setError(null);
+        setIsReady(true);
+      }
     }
 
     async function runInit() {
       if (cancelled) return;
-
-      // Reset state for a fresh attempt (also matters for reconnect).
-      ejectedFlag.current = false;
-      setError(null);
-      setEjected(false);
       setIsReady(false);
+      setError(null);
       setProgress(null);
 
       try {
-        // 1. Signal any existing tab to release voluntarily.
-        if (channel) {
-          channel.postMessage({
-            type: "claim",
-            tabId,
-          } satisfies ClaimMessage);
-        }
+        const shouldHost = await tryAcquireHostLock();
+        if (cancelled) return;
 
-        // 2. Acquire exclusive ownership via Web Locks. Queues if another
-        // tab holds it, and auto-releases if that tab crashes.
-        await acquireLock();
-        if (cancelled || ejectedFlag.current) return;
-
-        // 3. Open the database (with retry for OPFS stragglers).
-        const database = await openWithRetry();
-        if (cancelled || ejectedFlag.current) {
-          try {
-            await database.closeAsync();
-          } catch {}
+        if (!shouldHost && hasBroadcastChannel) {
+          await connectToHost();
           return;
         }
+
+        const database = await openWithRetry();
         currentDb = database;
         setDb(database);
 
-        // 4. Run schema + data imports.
-        await initializeDatabase(database, (p) => {
-          if (!cancelled && !ejectedFlag.current && currentDb === database) {
-            setProgress(p);
-          }
-        });
+        await initializeDatabase(database, setProgress);
         await backfillAchievements(database, { notify: false });
 
-        if (!cancelled && !ejectedFlag.current && currentDb === database) {
+        if (!cancelled) {
+          isHostReady = true;
+          postMessage({ type: "host-ready", tabId });
+          setProgress(null);
+          setError(null);
           setIsReady(true);
         }
       } catch (err) {
-        if (cancelled || ejectedFlag.current) return;
-        console.error("[Database] Init error:", err);
+        if (cancelled) return;
+
+        await closeDbHandle();
+        await releaseLockHandle();
+
+        if (isWeb && hasBroadcastChannel && isOpfsLockError(err)) {
+          try {
+            await connectToHost();
+            return;
+          } catch (hostError) {
+            err = hostError;
+          }
+        }
+
+        console.error("Database initialization failed:", err);
+        setProgress(null);
         setError(err instanceof Error ? err.message : String(err));
       }
     }
 
-    // ─── Wire up broadcast listener ─────────────────────────────────
     if (hasBroadcastChannel) {
       channel = new BroadcastChannel(CHANNEL_NAME);
-      channel.addEventListener("message", (e: MessageEvent) => {
-        const data = e.data as ClaimMessage | undefined;
-        if (!data || data.type !== "claim" || data.tabId === tabId) return;
-        void ejectOnClaim();
-      });
+      channel.addEventListener("message", handleChannelMessage);
     }
-
-    reconnectRef.current = () => {
-      void runInit();
-    };
 
     void runInit();
 
     return () => {
       cancelled = true;
-      reconnectRef.current = null;
+      rejectPendingRequests(new Error("Database provider closed"));
+      if (isHostReady) postMessage({ type: "host-closing", tabId });
       void closeDbHandle();
-      releaseLockHandle();
-      if (channel) channel.close();
+      void releaseLockHandle();
+      channel?.close();
     };
-  }, []);
-
-  const reconnect = useCallback(() => {
-    reconnectRef.current?.();
   }, []);
 
   return (
     <DatabaseContext.Provider value={{ db, isReady, progress, error }}>
-      {ejected ? <TabTakeoverScreen onReconnect={reconnect} /> : children}
+      {children}
     </DatabaseContext.Provider>
   );
 }
 
-function TabTakeoverScreen({ onReconnect }: { onReconnect: () => void }) {
-  return (
-    <View className="flex-1 items-center justify-center bg-surface dark:bg-surface-dark px-8">
-      <View className="items-center max-w-sm">
-        <Text
-          className="text-charcoal dark:text-neutral-100 mb-3 text-center"
-          style={{ fontFamily: "NotoSerif_700Bold", fontSize: 28 }}
-        >
-          Hafiz is open in another tab
-        </Text>
-        <Text
-          className="text-warm-400 dark:text-neutral-500 text-center mb-8"
-          style={{
-            fontFamily: "Manrope_400Regular",
-            fontSize: 15,
-            lineHeight: 22,
-          }}
-        >
-          Only one tab can use the database at a time. Close the other tab, or
-          reconnect here to take over.
-        </Text>
-        <Pressable
-          onPress={onReconnect}
-          className="bg-primary dark:bg-primary-bright rounded-full px-8 py-3 active:opacity-80"
-        >
-          <Text
-            className="text-white dark:text-charcoal"
-            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15 }}
-          >
-            Reconnect
-          </Text>
-        </Pressable>
-      </View>
-    </View>
-  );
+export function useDatabase() {
+  const context = useContext(DatabaseContext);
+  if (!context.db) {
+    throw new Error("Database not initialized");
+  }
+  return context.db;
+}
+
+export function useDatabaseStatus() {
+  return useContext(DatabaseContext);
 }
