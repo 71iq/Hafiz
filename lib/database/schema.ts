@@ -362,18 +362,23 @@ export async function createSchema(db: SQLiteDatabase): Promise<void> {
     -- User highlights
     CREATE TABLE IF NOT EXISTS highlights (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      sync_id TEXT,
       surah INTEGER NOT NULL,
       ayah INTEGER NOT NULL,
       word_start INTEGER,
       word_end INTEGER,
       color TEXT NOT NULL,
-      created_at TEXT NOT NULL
+      created_at TEXT NOT NULL,
+      updated_at TEXT,
+      deleted_at TEXT
     );
 
     -- User settings (key-value store)
     CREATE TABLE IF NOT EXISTS user_settings (
       key TEXT PRIMARY KEY,
-      value TEXT NOT NULL
+      value TEXT NOT NULL,
+      updated_at TEXT,
+      deleted_at TEXT
     );
 
     -- Active non-English translation (6,236 rows max, swapped on language change)
@@ -512,6 +517,9 @@ export async function migrateUserSchema(db: SQLiteDatabase): Promise<void> {
   await addColumnIfMissing(db, "private_notes", "created_at", `created_at TEXT NOT NULL DEFAULT '${legacyDate}'`);
   await addColumnIfMissing(db, "private_notes", "updated_at", `updated_at TEXT NOT NULL DEFAULT '${legacyDate}'`);
   await addColumnIfMissing(db, "private_notes", "deleted_at", "deleted_at TEXT");
+  await addColumnIfMissing(db, "highlights", "sync_id", "sync_id TEXT");
+  await addColumnIfMissing(db, "highlights", "updated_at", "updated_at TEXT");
+  await addColumnIfMissing(db, "highlights", "deleted_at", "deleted_at TEXT");
   await addColumnIfMissing(db, "reflection_journey_entries", "created_at", `created_at TEXT NOT NULL DEFAULT '${legacyDate}'`);
   await addColumnIfMissing(db, "reflection_journey_entries", "updated_at", `updated_at TEXT NOT NULL DEFAULT '${legacyDate}'`);
   await addColumnIfMissing(db, "reflection_journey_entries", "completed_at", "completed_at TEXT");
@@ -519,6 +527,8 @@ export async function migrateUserSchema(db: SQLiteDatabase): Promise<void> {
   await addColumnIfMissing(db, "achievement_unlocks", "local_payload", "local_payload TEXT NOT NULL DEFAULT '{}'");
   await addColumnIfMissing(db, "achievement_unlocks", "public_payload", "public_payload TEXT NOT NULL DEFAULT '{}'");
   await addColumnIfMissing(db, "achievement_unlocks", "sync_status", "sync_status TEXT DEFAULT 'pending'");
+  await addColumnIfMissing(db, "user_settings", "updated_at", "updated_at TEXT");
+  await addColumnIfMissing(db, "user_settings", "deleted_at", "deleted_at TEXT");
   await addColumnIfMissing(db, "achievement_progress", "updated_at", `updated_at TEXT NOT NULL DEFAULT '${legacyDate}'`);
   await addColumnIfMissing(db, "achievement_progress", "payload", "payload TEXT NOT NULL DEFAULT '{}'");
   await addColumnIfMissing(db, "mutashabihat_refs", "pre_text", "pre_text TEXT");
@@ -535,10 +545,19 @@ export async function migrateUserSchema(db: SQLiteDatabase): Promise<void> {
     UPDATE private_notes
       SET updated_at = COALESCE(NULLIF(updated_at, ''), NULLIF(created_at, ''), '${legacyDate}')
       WHERE updated_at IS NULL OR updated_at = '';
+    UPDATE highlights
+      SET updated_at = COALESCE(NULLIF(updated_at, ''), NULLIF(created_at, ''), '${legacyDate}')
+      WHERE updated_at IS NULL OR updated_at = '';
+    UPDATE highlights
+      SET sync_id = 'highlight:' || surah || ':' || ayah || ':' || COALESCE(CAST(word_start AS TEXT), 'ayah') || ':' || COALESCE(CAST(word_end AS TEXT), 'ayah') || ':' || color
+      WHERE sync_id IS NULL OR sync_id = '';
     UPDATE reflection_journey_entries
       SET updated_at = COALESCE(NULLIF(updated_at, ''), NULLIF(completed_at, ''), NULLIF(created_at, ''), '${legacyDate}')
       WHERE updated_at IS NULL OR updated_at = '';
     UPDATE achievement_progress
+      SET updated_at = COALESCE(NULLIF(updated_at, ''), '${legacyDate}')
+      WHERE updated_at IS NULL OR updated_at = '';
+    UPDATE user_settings
       SET updated_at = COALESCE(NULLIF(updated_at, ''), '${legacyDate}')
       WHERE updated_at IS NULL OR updated_at = '';
   `);
@@ -566,8 +585,11 @@ async function addColumnIfMissing(
 async function createUserMigrationIndexes(db: SQLiteDatabase): Promise<void> {
   const statements = [
     "CREATE INDEX IF NOT EXISTS idx_private_notes_updated ON private_notes(updated_at)",
+    "CREATE INDEX IF NOT EXISTS idx_highlights_sync_id ON highlights(sync_id)",
+    "CREATE INDEX IF NOT EXISTS idx_highlights_updated ON highlights(updated_at)",
     "CREATE INDEX IF NOT EXISTS idx_reflection_journey_entries_updated ON reflection_journey_entries(updated_at)",
     "CREATE INDEX IF NOT EXISTS idx_reflection_journey_entries_completed ON reflection_journey_entries(completed_at)",
+    "CREATE INDEX IF NOT EXISTS idx_user_settings_updated ON user_settings(updated_at)",
   ];
 
   for (const statement of statements) {

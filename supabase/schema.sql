@@ -48,6 +48,8 @@ CREATE TABLE IF NOT EXISTS study_cards (
   marked_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL,
+  deleted_at TIMESTAMPTZ,
+  synced_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (user_id, id)
 );
 
@@ -64,6 +66,7 @@ CREATE TABLE IF NOT EXISTS study_log (
   elapsed_days INTEGER NOT NULL,
   scheduled_days INTEGER NOT NULL,
   reviewed_at TIMESTAMPTZ NOT NULL,
+  synced_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (user_id, id)
 );
 
@@ -80,6 +83,7 @@ CREATE TABLE IF NOT EXISTS bookmarks (
   qf_sync_error TEXT,
   qf_is_in_default_collection BOOLEAN NOT NULL DEFAULT false,
   qf_collections_count INTEGER NOT NULL DEFAULT 0,
+  synced_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (user_id, surah, ayah)
 );
 
@@ -87,13 +91,29 @@ CREATE TABLE IF NOT EXISTS bookmarks (
 CREATE TABLE IF NOT EXISTS highlights (
   id BIGSERIAL,
   user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  sync_id TEXT,
   surah INTEGER NOT NULL,
   ayah INTEGER NOT NULL,
   word_start INTEGER,
   word_end INTEGER,
   color TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ,
+  deleted_at TIMESTAMPTZ,
+  synced_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (user_id, id)
+);
+
+-- ─── User Settings (synced account-level settings) ──────────
+CREATE TABLE IF NOT EXISTS user_settings (
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  key TEXT NOT NULL,
+  value TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  deleted_at TIMESTAMPTZ,
+  synced_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, key)
 );
 
 -- ============================================================
@@ -107,6 +127,7 @@ ALTER TABLE study_cards ENABLE ROW LEVEL SECURITY;
 ALTER TABLE study_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE bookmarks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE highlights ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_settings ENABLE ROW LEVEL SECURITY;
 
 -- ─── Profiles: publicly readable (for leaderboard), writable only by owner
 CREATE POLICY "Profiles are publicly readable"
@@ -171,6 +192,24 @@ CREATE POLICY "Users can manage own highlights"
   ON highlights FOR ALL
   USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
+
+-- ─── User Settings: owner only
+CREATE POLICY "Users can read own user settings"
+  ON user_settings FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own user settings"
+  ON user_settings FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own user settings"
+  ON user_settings FOR UPDATE
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own user settings"
+  ON user_settings FOR DELETE
+  USING (auth.uid() = user_id);
 
 -- ─── Reflections (Community Feature) ────────────────────────
 CREATE TABLE IF NOT EXISTS reflections (
@@ -291,6 +330,7 @@ CREATE TABLE IF NOT EXISTS private_notes (
   qf_synced_at TIMESTAMPTZ,
   qf_sync_error TEXT,
   qf_ranges_json JSONB,
+  synced_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (user_id, id)
 );
 
@@ -328,6 +368,7 @@ CREATE TABLE IF NOT EXISTS reflection_journey_entries (
   created_at TIMESTAMPTZ NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL,
   completed_at TIMESTAMPTZ,
+  synced_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (user_id, level_id)
 );
 
@@ -337,6 +378,7 @@ CREATE TABLE IF NOT EXISTS achievement_unlocks (
   achievement_id TEXT NOT NULL,
   unlocked_at TIMESTAMPTZ NOT NULL,
   public_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+  synced_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (user_id, achievement_id)
 );
 
@@ -427,6 +469,7 @@ CREATE POLICY "Users can delete own public surah progress"
 
 GRANT SELECT ON public_surah_progress TO anon, authenticated;
 GRANT INSERT, UPDATE, DELETE ON public_surah_progress TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON user_settings TO authenticated;
 
 -- ─── Storage: profile avatars ────────────────────────────────
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
@@ -518,12 +561,18 @@ CREATE TRIGGER trg_reflection_comments_count
 CREATE INDEX IF NOT EXISTS idx_study_cards_user_due ON study_cards(user_id, due);
 CREATE INDEX IF NOT EXISTS idx_study_cards_user_buried ON study_cards(user_id, buried_until);
 CREATE INDEX IF NOT EXISTS idx_study_cards_user_marked ON study_cards(user_id, marked_at);
+CREATE INDEX IF NOT EXISTS idx_study_cards_user_synced ON study_cards(user_id, synced_at);
 CREATE INDEX IF NOT EXISTS idx_study_log_user_reviewed ON study_log(user_id, reviewed_at);
+CREATE INDEX IF NOT EXISTS idx_study_log_user_synced ON study_log(user_id, synced_at);
 CREATE INDEX IF NOT EXISTS idx_daily_scores_user_date ON daily_scores(user_id, date);
 CREATE INDEX IF NOT EXISTS idx_bookmarks_user ON bookmarks(user_id);
 CREATE INDEX IF NOT EXISTS idx_bookmarks_user_updated ON bookmarks(user_id, updated_at);
 CREATE INDEX IF NOT EXISTS idx_bookmarks_qf_id ON bookmarks(user_id, qf_bookmark_id);
+CREATE INDEX IF NOT EXISTS idx_bookmarks_user_synced ON bookmarks(user_id, synced_at);
 CREATE INDEX IF NOT EXISTS idx_highlights_user ON highlights(user_id);
+CREATE INDEX IF NOT EXISTS idx_highlights_user_synced ON highlights(user_id, synced_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_highlights_user_sync_id ON highlights(user_id, sync_id);
+CREATE INDEX IF NOT EXISTS idx_user_settings_user_synced ON user_settings(user_id, synced_at);
 CREATE INDEX IF NOT EXISTS idx_reflections_ayah ON reflections(surah, ayah_start, ayah_end);
 CREATE INDEX IF NOT EXISTS idx_reflections_user ON reflections(user_id);
 CREATE INDEX IF NOT EXISTS idx_reflections_feed_created ON reflections(status, created_at DESC);
@@ -536,9 +585,12 @@ CREATE INDEX IF NOT EXISTS idx_reports_reflection ON reports(reflection_id);
 CREATE INDEX IF NOT EXISTS idx_private_notes_user_updated ON private_notes(user_id, updated_at);
 CREATE INDEX IF NOT EXISTS idx_private_notes_ayah ON private_notes(user_id, surah, ayah_start, ayah_end);
 CREATE INDEX IF NOT EXISTS idx_private_notes_qf_id ON private_notes(user_id, qf_note_id);
+CREATE INDEX IF NOT EXISTS idx_private_notes_user_synced ON private_notes(user_id, synced_at);
 CREATE INDEX IF NOT EXISTS idx_qf_user_connections_status ON qf_user_connections(status, env);
 CREATE INDEX IF NOT EXISTS idx_qf_oauth_states_user ON qf_oauth_states(user_id, expires_at);
 CREATE INDEX IF NOT EXISTS idx_reflection_journey_entries_user_updated ON reflection_journey_entries(user_id, updated_at);
+CREATE INDEX IF NOT EXISTS idx_reflection_journey_entries_user_synced ON reflection_journey_entries(user_id, synced_at);
 CREATE INDEX IF NOT EXISTS idx_achievement_unlocks_user_unlocked ON achievement_unlocks(user_id, unlocked_at);
 CREATE INDEX IF NOT EXISTS idx_achievement_unlocks_public_unlocked ON achievement_unlocks(unlocked_at);
+CREATE INDEX IF NOT EXISTS idx_achievement_unlocks_user_synced ON achievement_unlocks(user_id, synced_at);
 CREATE INDEX IF NOT EXISTS idx_public_surah_progress_user_updated ON public_surah_progress(user_id, updated_at DESC);

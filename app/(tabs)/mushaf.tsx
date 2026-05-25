@@ -11,6 +11,7 @@ import { FlashList, FlashListRef } from "@shopify/flash-list";
 import { useChrome } from "@/lib/ui/chrome";
 import { BookOpen, AlignJustify, Eye, EyeOff, Home, Search, BookMarked, ListMusic, ScanLine } from "lucide-react-native";
 import { useDatabase } from "@/lib/database/provider";
+import { writeUserSetting } from "@/lib/database/user-settings";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { WordInteractionProvider } from "@/lib/word/context";
@@ -1106,10 +1107,7 @@ function MushafInner() {
           ? { mode: "verse", surah: topAyah.surah, ayah: topAyah.ayah }
           : null;
       if (!value) return;
-      db.runAsync(
-        "INSERT OR REPLACE INTO user_settings (key, value) VALUES (?, ?)",
-        ["last_mushaf_position", JSON.stringify(value)]
-      ).catch(() => {});
+      writeUserSetting(db, "last_mushaf_position", JSON.stringify(value)).catch(() => {});
     }, 600);
     return () => {
       if (lastSaveTimerRef.current) {

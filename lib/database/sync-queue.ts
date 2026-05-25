@@ -20,7 +20,7 @@ export async function enqueueSync(
 /** Get count of pending sync entries */
 export async function getPendingSyncCount(db: SQLiteDatabase): Promise<number> {
   const row = await db.getFirstAsync<{ count: number }>(
-    "SELECT COUNT(*) as count FROM sync_queue WHERE status = 'pending'"
+    "SELECT COUNT(*) as count FROM sync_queue WHERE status IN ('pending', 'failed')"
   );
   return row?.count ?? 0;
 }
@@ -31,7 +31,7 @@ export async function getPendingSyncEntries(
   limit: number = 50
 ): Promise<SyncQueueEntry[]> {
   return db.getAllAsync<SyncQueueEntry>(
-    "SELECT * FROM sync_queue WHERE status = 'pending' ORDER BY id ASC LIMIT ?",
+    "SELECT * FROM sync_queue WHERE status IN ('pending', 'failed') ORDER BY id ASC LIMIT ?",
     [limit]
   );
 }
@@ -42,11 +42,15 @@ export async function markSynced(
   ids: number[]
 ): Promise<void> {
   if (ids.length === 0) return;
-  const placeholders = ids.map(() => "?").join(",");
-  await db.runAsync(
-    `UPDATE sync_queue SET status = 'synced', synced_at = ? WHERE id IN (${placeholders})`,
-    [new Date().toISOString(), ...ids]
-  );
+  const syncedAt = new Date().toISOString();
+  for (let i = 0; i < ids.length; i += 500) {
+    const batch = ids.slice(i, i + 500);
+    const placeholders = batch.map(() => "?").join(",");
+    await db.runAsync(
+      `UPDATE sync_queue SET status = 'synced', synced_at = ? WHERE id IN (${placeholders})`,
+      [syncedAt, ...batch]
+    );
+  }
 }
 
 /** Mark entries as failed */
@@ -55,11 +59,14 @@ export async function markFailed(
   ids: number[]
 ): Promise<void> {
   if (ids.length === 0) return;
-  const placeholders = ids.map(() => "?").join(",");
-  await db.runAsync(
-    `UPDATE sync_queue SET status = 'failed' WHERE id IN (${placeholders})`,
-    ids
-  );
+  for (let i = 0; i < ids.length; i += 500) {
+    const batch = ids.slice(i, i + 500);
+    const placeholders = batch.map(() => "?").join(",");
+    await db.runAsync(
+      `UPDATE sync_queue SET status = 'failed' WHERE id IN (${placeholders})`,
+      batch
+    );
+  }
 }
 
 /** Clean up old synced entries (keep last 7 days) */

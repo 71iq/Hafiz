@@ -36,6 +36,7 @@ import {
   type WordTestMode,
 } from "./types";
 import { enqueueSync } from "@/lib/database/sync-queue";
+import { deleteUserSetting, writeUserSetting } from "@/lib/database/user-settings";
 import { emitReviewActivity } from "./review-events";
 import { recordAchievementEvent } from "@/lib/achievements/queries";
 import {
@@ -294,10 +295,7 @@ export async function createDeck(
 
   await db.withTransactionAsync(async () => {
     // Store deck metadata in user_settings
-    await db.runAsync(
-      "INSERT OR REPLACE INTO user_settings (key, value) VALUES (?, ?)",
-      [`deck_${deckId}`, JSON.stringify({ id: deckId, name, scope, createdAt: now })]
-    );
+    await writeUserSetting(db, `deck_${deckId}`, JSON.stringify({ id: deckId, name, scope, createdAt: now }));
 
     // Insert cards in batches
     const BATCH = 500;
@@ -331,6 +329,14 @@ export async function createDeck(
     }
   });
 
+  const rows = await db.getAllAsync<StudyCardRow>(
+    "SELECT * FROM study_cards WHERE deck_id = ?",
+    [deckId]
+  );
+  for (const row of rows) {
+    enqueueSync(db, "study_cards", "UPDATE", row.id, cardToSyncData(rowWithDefaultStatus(row))).catch(console.warn);
+  }
+
   recordAchievementEvent(db, { type: "deck_created", deckId, createdAt: now }).catch(console.warn);
 
   return ayahs.length;
@@ -351,26 +357,47 @@ export async function addAyahToDeck(
   );
   if (existing?.id) return false;
 
+  const row: StudyCardRow = {
+    id: cardId,
+    deck_id: deckId,
+    due: emptyCard.due.toISOString(),
+    stability: emptyCard.stability,
+    difficulty: emptyCard.difficulty,
+    elapsed_days: emptyCard.elapsed_days,
+    scheduled_days: emptyCard.scheduled_days,
+    learning_steps: emptyCard.learning_steps,
+    reps: emptyCard.reps,
+    lapses: emptyCard.lapses,
+    state: emptyCard.state,
+    last_review: null,
+    suspended_at: null,
+    buried_until: null,
+    marked_at: null,
+    created_at: now,
+    updated_at: now,
+  };
+
   await db.runAsync(
     `INSERT INTO study_cards (id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days, learning_steps, reps, lapses, state, last_review, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
-      cardId,
-      deckId,
-      emptyCard.due.toISOString(),
-      emptyCard.stability,
-      emptyCard.difficulty,
-      emptyCard.elapsed_days,
-      emptyCard.scheduled_days,
-      emptyCard.learning_steps,
-      emptyCard.reps,
-      emptyCard.lapses,
-      emptyCard.state,
-      null,
-      now,
-      now,
+      row.id,
+      row.deck_id,
+      row.due,
+      row.stability,
+      row.difficulty,
+      row.elapsed_days,
+      row.scheduled_days,
+      row.learning_steps,
+      row.reps,
+      row.lapses,
+      row.state,
+      row.last_review,
+      row.created_at,
+      row.updated_at,
     ]
   );
+  enqueueSync(db, "study_cards", "INSERT", cardId, cardToSyncData(row)).catch(console.warn);
   return true;
 }
 
@@ -522,10 +549,7 @@ export async function writeDeckReviewSettings(
   settings: Partial<DeckReviewSettings>
 ): Promise<void> {
   const normalized = normalizeDeckReviewSettings(settings);
-  await db.runAsync(
-    "INSERT OR REPLACE INTO user_settings (key, value) VALUES (?, ?)",
-    [deckReviewSettingsKey(deckId), JSON.stringify(normalized)]
-  );
+  await writeUserSetting(db, deckReviewSettingsKey(deckId), JSON.stringify(normalized));
 }
 
 export function meaningCardId(surah: number, ayah: number, wordPos: number): string {
@@ -550,36 +574,24 @@ async function ensureMutashabihatDeck(db: SQLiteDatabase, now: string): Promise<
   };
 
   if (!existing) {
-    await db.runAsync(
-      "INSERT INTO user_settings (key, value) VALUES (?, ?)",
-      [`deck_${MUTASHABIHAT_DECK_ID}`, JSON.stringify(metadata)]
-    );
+    await writeUserSetting(db, `deck_${MUTASHABIHAT_DECK_ID}`, JSON.stringify(metadata));
     return true;
   }
 
   try {
     const current = JSON.parse(existing.value);
     if (current?.name !== MUTASHABIHAT_DECK_NAME) {
-      await db.runAsync(
-        "UPDATE user_settings SET value = ? WHERE key = ?",
-        [
-          JSON.stringify({
-            ...metadata,
-            ...current,
-            id: MUTASHABIHAT_DECK_ID,
-            name: MUTASHABIHAT_DECK_NAME,
-            scope: current?.scope ?? metadata.scope,
-            createdAt: current?.createdAt ?? now,
-          }),
-          `deck_${MUTASHABIHAT_DECK_ID}`,
-        ]
-      );
+      await writeUserSetting(db, `deck_${MUTASHABIHAT_DECK_ID}`, JSON.stringify({
+        ...metadata,
+        ...current,
+        id: MUTASHABIHAT_DECK_ID,
+        name: MUTASHABIHAT_DECK_NAME,
+        scope: current?.scope ?? metadata.scope,
+        createdAt: current?.createdAt ?? now,
+      }));
     }
   } catch {
-    await db.runAsync(
-      "UPDATE user_settings SET value = ? WHERE key = ?",
-      [JSON.stringify(metadata), `deck_${MUTASHABIHAT_DECK_ID}`]
-    );
+    await writeUserSetting(db, `deck_${MUTASHABIHAT_DECK_ID}`, JSON.stringify(metadata));
   }
 
   return false;
@@ -608,17 +620,17 @@ export async function addMeaningCard(
   const emptyCard = createEmptyCard();
   const cardId = meaningCardId(surah, ayah, wordPos);
 
-  await db.runAsync(
-    "INSERT OR IGNORE INTO user_settings (key, value) VALUES (?, ?)",
-    [
-      `deck_${MEANINGS_DECK_ID}`,
-      JSON.stringify({
-        id: MEANINGS_DECK_ID,
-        scope: { type: "custom", surahStart: 1, ayahStart: 1, surahEnd: 1, ayahEnd: 1 },
-        createdAt: now,
-      }),
-    ]
+  const existingDeck = await db.getFirstAsync<{ value: string }>(
+    "SELECT value FROM user_settings WHERE key = ?",
+    [`deck_${MEANINGS_DECK_ID}`]
   );
+  if (!existingDeck) {
+    await writeUserSetting(db, `deck_${MEANINGS_DECK_ID}`, JSON.stringify({
+      id: MEANINGS_DECK_ID,
+      scope: { type: "custom", surahStart: 1, ayahStart: 1, surahEnd: 1, ayahEnd: 1 },
+      createdAt: now,
+    }));
+  }
 
   const result = await db.runAsync(
     `INSERT OR IGNORE INTO study_cards (id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days, learning_steps, reps, lapses, state, last_review, created_at, updated_at)
@@ -938,6 +950,12 @@ export async function getDecks(db: SQLiteDatabase): Promise<{ id: string; name?:
 }
 
 export async function deleteDeck(db: SQLiteDatabase, deckId: string): Promise<void> {
+  const rows = await db.getAllAsync<StudyCardRow>(
+    "SELECT * FROM study_cards WHERE deck_id = ?",
+    [deckId]
+  );
+  const deletedAt = new Date().toISOString();
+
   await db.withTransactionAsync(async () => {
     // Delete associated log entries
     await db.runAsync(
@@ -947,9 +965,17 @@ export async function deleteDeck(db: SQLiteDatabase, deckId: string): Promise<vo
     // Delete cards
     await db.runAsync("DELETE FROM study_cards WHERE deck_id = ?", [deckId]);
     // Delete deck metadata
-    await db.runAsync("DELETE FROM user_settings WHERE key = ?", [`deck_${deckId}`]);
-    await db.runAsync("DELETE FROM user_settings WHERE key = ?", [deckReviewSettingsKey(deckId)]);
+    await deleteUserSetting(db, `deck_${deckId}`);
+    await deleteUserSetting(db, deckReviewSettingsKey(deckId));
   });
+
+  for (const row of rows) {
+    enqueueSync(db, "study_cards", "DELETE", row.id, {
+      ...cardToSyncData(rowWithDefaultStatus(row)),
+      updated_at: deletedAt,
+      deleted_at: deletedAt,
+    }).catch(console.warn);
+  }
 }
 
 export async function ensureStudyCardRow(
@@ -1020,12 +1046,21 @@ export async function deleteStudyCard(
   deckId: string,
   cardId: string
 ): Promise<void> {
+  const row = await db.getFirstAsync<StudyCardRow>(
+    "SELECT * FROM study_cards WHERE id = ? AND deck_id = ?",
+    [cardId, deckId]
+  );
   const result = await db.runAsync(
     "DELETE FROM study_cards WHERE id = ? AND deck_id = ?",
     [cardId, deckId]
   );
   if ((result.changes ?? 0) > 0) {
-    enqueueSync(db, "study_cards", "DELETE", cardId, { id: cardId }).catch(console.warn);
+    const deletedAt = new Date().toISOString();
+    enqueueSync(db, "study_cards", "DELETE", cardId, row ? {
+      ...cardToSyncData(rowWithDefaultStatus(row)),
+      updated_at: deletedAt,
+      deleted_at: deletedAt,
+    } : { id: cardId, updated_at: deletedAt, deleted_at: deletedAt }).catch(console.warn);
   }
 }
 

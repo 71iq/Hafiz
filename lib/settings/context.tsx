@@ -3,6 +3,7 @@ import { Platform, useColorScheme as useSystemColorScheme, useWindowDimensions, 
 import { useColorScheme as useNativeWindColorScheme, vars } from "nativewind";
 import type { SQLiteDatabase } from "expo-sqlite";
 import { useDatabase } from "@/lib/database/provider";
+import { writeUserSetting } from "@/lib/database/user-settings";
 import { DEFAULT_LANGUAGE } from "@/lib/translations/languages";
 import { importTranslation } from "@/lib/translations/import";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
@@ -407,10 +408,7 @@ async function readSettings(db: SQLiteDatabase, keys: string[]): Promise<Record<
 }
 
 async function writeSetting(db: SQLiteDatabase, key: string, value: string): Promise<void> {
-  await db.runAsync(
-    "INSERT OR REPLACE INTO user_settings (key, value) VALUES (?, ?)",
-    [key, value]
-  );
+  await writeUserSetting(db, key, value);
 }
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {

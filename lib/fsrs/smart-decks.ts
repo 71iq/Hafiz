@@ -1,5 +1,6 @@
 import type { SQLiteDatabase } from "expo-sqlite";
 import { enqueueSync } from "@/lib/database/sync-queue";
+import { writeUserSetting } from "@/lib/database/user-settings";
 import { createEmptyCard } from "./scheduler";
 import {
   ALL_NEW_CARD_SORT_ORDERS,
@@ -149,10 +150,7 @@ export async function writeSmartDeckFilter(
   filter: BuiltInDeckFilter
 ): Promise<void> {
   const normalized = normalizeSmartDeckFilter(filter);
-  await db.runAsync(
-    "INSERT OR REPLACE INTO user_settings (key, value) VALUES (?, ?)",
-    [smartDeckFilterKey(deckId), JSON.stringify(normalized)]
-  );
+  await writeUserSetting(db, smartDeckFilterKey(deckId), JSON.stringify(normalized));
 }
 
 export async function getSmartDeckCandidateCardIds(

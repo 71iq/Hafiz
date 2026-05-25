@@ -17,6 +17,19 @@ type BookmarkRow = {
   qf_collections_count: number | null;
 };
 
+type HighlightRow = {
+  id: number;
+  sync_id: string | null;
+  surah: number;
+  ayah: number;
+  word_start: number | null;
+  word_end: number | null;
+  color: string;
+  created_at: string;
+  updated_at: string | null;
+  deleted_at: string | null;
+};
+
 export type QuranSelectionWordRef = {
   surah: number;
   ayah: number;
@@ -89,8 +102,33 @@ export async function removeBookmark(db: SQLiteDatabase, surah: number, ayah: nu
 
 export async function fetchAllHighlights(db: SQLiteDatabase): Promise<HighlightEntry[]> {
   return db.getAllAsync<HighlightEntry>(
-    "SELECT id, surah, ayah, word_start as wordStart, word_end as wordEnd, color FROM highlights"
+    "SELECT id, surah, ayah, word_start as wordStart, word_end as wordEnd, color FROM highlights WHERE deleted_at IS NULL"
   );
+}
+
+function highlightSyncId(
+  surah: number,
+  ayah: number,
+  wordStart: number | null | undefined,
+  wordEnd: number | null | undefined,
+  color: string
+): string {
+  return `highlight:${surah}:${ayah}:${wordStart ?? "ayah"}:${wordEnd ?? "ayah"}:${color}`;
+}
+
+function highlightToSyncData(row: HighlightRow): Record<string, any> {
+  return {
+    id: row.id,
+    sync_id: row.sync_id ?? highlightSyncId(row.surah, row.ayah, row.word_start, row.word_end, row.color),
+    surah: row.surah,
+    ayah: row.ayah,
+    word_start: row.word_start,
+    word_end: row.word_end,
+    color: row.color,
+    created_at: row.created_at,
+    updated_at: row.updated_at ?? row.created_at,
+    deleted_at: row.deleted_at ?? null,
+  };
 }
 
 export async function addHighlight(
@@ -102,21 +140,30 @@ export async function addHighlight(
   wordEnd?: number,
 ): Promise<number> {
   const now = new Date().toISOString();
+  const syncId = highlightSyncId(surah, ayah, wordStart, wordEnd, color);
   const result = await db.runAsync(
-    "INSERT INTO highlights (surah, ayah, word_start, word_end, color, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-    [surah, ayah, wordStart ?? null, wordEnd ?? null, color, now]
+    `INSERT INTO highlights (sync_id, surah, ayah, word_start, word_end, color, created_at, updated_at, deleted_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+    [syncId, surah, ayah, wordStart ?? null, wordEnd ?? null, color, now, now]
   );
   enqueueSync(db, "highlights", "INSERT", String(result.lastInsertRowId), {
-    id: result.lastInsertRowId, surah, ayah,
+    id: result.lastInsertRowId, sync_id: syncId, surah, ayah,
     word_start: wordStart ?? null, word_end: wordEnd ?? null,
-    color, created_at: now,
+    color, created_at: now, updated_at: now, deleted_at: null,
   }).catch(console.warn);
   return result.lastInsertRowId;
 }
 
 export async function removeHighlight(db: SQLiteDatabase, id: number): Promise<void> {
+  const row = await db.getFirstAsync<HighlightRow>("SELECT * FROM highlights WHERE id = ?", [id]);
+  if (!row) return;
+  const deletedAt = new Date().toISOString();
   await db.runAsync("DELETE FROM highlights WHERE id = ?", [id]);
-  enqueueSync(db, "highlights", "DELETE", String(id), { id }).catch(console.warn);
+  enqueueSync(db, "highlights", "DELETE", row.sync_id ?? String(id), {
+    ...highlightToSyncData(row),
+    updated_at: deletedAt,
+    deleted_at: deletedAt,
+  }).catch(console.warn);
 }
 
 export async function removeHighlightsForAyah(
@@ -124,7 +171,19 @@ export async function removeHighlightsForAyah(
   surah: number,
   ayah: number,
 ): Promise<void> {
+  const rows = await db.getAllAsync<HighlightRow>(
+    "SELECT * FROM highlights WHERE surah = ? AND ayah = ? AND deleted_at IS NULL",
+    [surah, ayah]
+  );
+  const deletedAt = new Date().toISOString();
   await db.runAsync("DELETE FROM highlights WHERE surah = ? AND ayah = ?", [surah, ayah]);
+  for (const row of rows) {
+    enqueueSync(db, "highlights", "DELETE", row.sync_id ?? String(row.id), {
+      ...highlightToSyncData(row),
+      updated_at: deletedAt,
+      deleted_at: deletedAt,
+    }).catch(console.warn);
+  }
 }
 
 export async function fetchUthmaniRange(
