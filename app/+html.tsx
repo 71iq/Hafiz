@@ -39,14 +39,15 @@ export default function Root({ children }: { children: React.ReactNode }) {
 
         {/* PWA / Add-to-Home */}
         <link rel="manifest" href="/manifest.webmanifest" />
-        <meta name="theme-color" content="#003638" />
+        <meta name="theme-color" content="#FFFFFF" />
         <meta name="application-name" content="Hafiz" />
 
         {/* iOS Add-to-Home */}
         <link rel="apple-touch-icon" href="/icon.png?v=2" />
+        <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-title" content="Hafiz" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 
         <script dangerouslySetInnerHTML={{ __html: startupThemeScript }} />
 
@@ -175,7 +176,17 @@ const startupThemeScript = `
           "--color-surface-dark-mid": "240 235 227",
           "--color-surface-dark-high": "232 225 218",
           "--color-surface-dark-dim": "223 217 209",
-          "--color-surface-dark-bright": "255 255 255"
+          "--color-surface-dark-bright": "255 255 255",
+          "--color-warm-50": "255 248 241",
+          "--color-warm-100": "249 243 235",
+          "--color-warm-200": "232 225 218",
+          "--color-warm-300": "223 217 209",
+          "--color-warm-400": "185 160 133",
+          "--color-warm-500": "165 138 108",
+          "--color-warm-600": "138 112 88",
+          "--color-warm-700": "110 90 71",
+          "--color-warm-800": "90 74 60",
+          "--color-warm-900": "74 62 51"
         }
       },
       white: {
@@ -192,7 +203,17 @@ const startupThemeScript = `
           "--color-surface-dark-mid": "244 244 245",
           "--color-surface-dark-high": "229 231 235",
           "--color-surface-dark-dim": "209 213 219",
-          "--color-surface-dark-bright": "255 255 255"
+          "--color-surface-dark-bright": "255 255 255",
+          "--color-warm-50": "255 255 255",
+          "--color-warm-100": "248 250 252",
+          "--color-warm-200": "229 231 235",
+          "--color-warm-300": "209 213 219",
+          "--color-warm-400": "113 113 122",
+          "--color-warm-500": "82 82 91",
+          "--color-warm-600": "63 63 70",
+          "--color-warm-700": "39 39 42",
+          "--color-warm-800": "24 24 27",
+          "--color-warm-900": "9 9 11"
         }
       },
       dark: {
@@ -209,7 +230,17 @@ const startupThemeScript = `
           "--color-surface-dark-mid": "26 26 26",
           "--color-surface-dark-high": "38 38 38",
           "--color-surface-dark-dim": "15 15 15",
-          "--color-surface-dark-bright": "45 45 45"
+          "--color-surface-dark-bright": "45 45 45",
+          "--color-warm-50": "10 10 10",
+          "--color-warm-100": "20 20 20",
+          "--color-warm-200": "38 38 38",
+          "--color-warm-300": "64 64 64",
+          "--color-warm-400": "115 115 115",
+          "--color-warm-500": "163 163 163",
+          "--color-warm-600": "212 212 212",
+          "--color-warm-700": "229 229 229",
+          "--color-warm-800": "245 245 245",
+          "--color-warm-900": "250 250 250"
         }
       },
       amoled: {
@@ -226,7 +257,17 @@ const startupThemeScript = `
           "--color-surface-dark-mid": "8 8 8",
           "--color-surface-dark-high": "15 15 15",
           "--color-surface-dark-dim": "0 0 0",
-          "--color-surface-dark-bright": "24 24 24"
+          "--color-surface-dark-bright": "24 24 24",
+          "--color-warm-50": "0 0 0",
+          "--color-warm-100": "3 3 3",
+          "--color-warm-200": "15 15 15",
+          "--color-warm-300": "38 38 38",
+          "--color-warm-400": "115 115 115",
+          "--color-warm-500": "163 163 163",
+          "--color-warm-600": "212 212 212",
+          "--color-warm-700": "229 229 229",
+          "--color-warm-800": "245 245 245",
+          "--color-warm-900": "250 250 250"
         }
       }
     };
@@ -299,6 +340,12 @@ const startupThemeScript = `
       root.style.setProperty(name, palette.variables[name]);
     });
     root.style.backgroundColor = palette.surface;
+    var themeMeta = document.querySelector('meta[name="theme-color"]');
+    if (themeMeta) themeMeta.setAttribute("content", palette.surface);
+    var statusBarMeta = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+    if (statusBarMeta) {
+      statusBarMeta.setAttribute("content", effectiveTheme === "dark" || effectiveTheme === "amoled" ? "black-translucent" : "default");
+    }
   } catch (error) {}
 })();
 `;

@@ -28,7 +28,7 @@ type WordHeaderMeta = {
 
 export function WordDetailSheet() {
   const { detailWord, openDetail, closeDetail } = useWordInteraction();
-  const { isDark, isRTL, uiLanguage } = useSettings();
+  const { effectiveTheme, isDark, isRTL, uiLanguage } = useSettings();
   const { width, height } = useWindowDimensions();
   const s = useStrings();
   const db = useDatabase();
@@ -174,6 +174,7 @@ export function WordDetailSheet() {
 
   const { surah, ayah, wordPos } = detailWord;
   const isArabicMode = uiLanguage === "ar";
+  const panelIconColor = isDark ? "#a3a3a3" : effectiveTheme === "white" ? "#71717A" : "#8B8178";
   const surahLabel = isArabicMode ? "السورة" : "Surah";
   const ayahLabel = isArabicMode ? "الآية" : "Ayah";
   const wordLabel = isArabicMode ? "الكلمة" : "Word";
@@ -195,13 +196,13 @@ export function WordDetailSheet() {
           actions={
             <View className={isRTL ? "flex-row-reverse items-center gap-1.5" : "flex-row items-center gap-1.5"}>
               <PanelNavIcon
-                icon={isRTL ? <ChevronRight size={16} color={isDark ? "#a3a3a3" : "#8B8178"} /> : <ChevronLeft size={16} color={isDark ? "#a3a3a3" : "#8B8178"} />}
+                icon={isRTL ? <ChevronRight size={16} color={panelIconColor} /> : <ChevronLeft size={16} color={panelIconColor} />}
                 onPress={() => handleNavigateWord("previous")}
                 disabled={!adjacentWords.previous}
                 accessibilityLabel={s.previousWord}
               />
               <PanelNavIcon
-                icon={isRTL ? <ChevronLeft size={16} color={isDark ? "#a3a3a3" : "#8B8178"} /> : <ChevronRight size={16} color={isDark ? "#a3a3a3" : "#8B8178"} />}
+                icon={isRTL ? <ChevronLeft size={16} color={panelIconColor} /> : <ChevronRight size={16} color={panelIconColor} />}
                 onPress={() => handleNavigateWord("next")}
                 disabled={!adjacentWords.next}
                 accessibilityLabel={s.nextWord}

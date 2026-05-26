@@ -59,16 +59,16 @@ module.exports = {
         charcoal: "#2D2D2D", // light mode body text (never pure black)
         // === Legacy scales (for gradations) ===
         warm: {
-          50: "#FFF8F1",
-          100: "#F9F3EB",
-          200: "#E8E1DA",
-          300: "#DFD9D1",
-          400: "#b9a085",
-          500: "#a58a6c",
-          600: "#8a7058",
-          700: "#6e5a47",
-          800: "#5a4a3c",
-          900: "#4a3e33",
+          50: colorVar("--color-warm-50", "255 248 241"),
+          100: colorVar("--color-warm-100", "249 243 235"),
+          200: colorVar("--color-warm-200", "232 225 218"),
+          300: colorVar("--color-warm-300", "223 217 209"),
+          400: colorVar("--color-warm-400", "185 160 133"),
+          500: colorVar("--color-warm-500", "165 138 108"),
+          600: colorVar("--color-warm-600", "138 112 88"),
+          700: colorVar("--color-warm-700", "110 90 71"),
+          800: colorVar("--color-warm-800", "90 74 60"),
+          900: colorVar("--color-warm-900", "74 62 51"),
         },
         teal: {
           50: "#f0fdfa",

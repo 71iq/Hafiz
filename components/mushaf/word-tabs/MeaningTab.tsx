@@ -27,7 +27,7 @@ type EnglishMeaning = {
 export function MeaningTab({ surah, ayah, wordPos }: Props) {
   const db = useDatabase();
   const s = useStrings();
-  const { uiLanguage, isRTL, isDark } = useSettings();
+  const { uiLanguage, isRTL, isDark, themeColors } = useSettings();
   const isArabicMode = uiLanguage === "ar";
 
   const [enData, setEnData] = useState<EnglishMeaning | null>(null);
@@ -166,7 +166,7 @@ export function MeaningTab({ surah, ayah, wordPos }: Props) {
             value={customMeaningDraft}
             onChangeText={setCustomMeaningDraft}
             placeholder={s.customWordMeaningPlaceholder}
-            placeholderTextColor={isDark ? "#737373" : "#b9a085"}
+            placeholderTextColor={isDark ? "#737373" : themeColors.surfaceDim}
             multiline
             className="mt-4 min-h-[92px] rounded-2xl bg-surface dark:bg-surface-dark px-4 py-3 text-charcoal dark:text-neutral-100"
             style={{

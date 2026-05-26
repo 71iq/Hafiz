@@ -236,6 +236,16 @@ const THEME_PALETTES: Record<
       "--color-surface-dark-high": "232 225 218",
       "--color-surface-dark-dim": "223 217 209",
       "--color-surface-dark-bright": "255 255 255",
+      "--color-warm-50": "255 248 241",
+      "--color-warm-100": "249 243 235",
+      "--color-warm-200": "232 225 218",
+      "--color-warm-300": "223 217 209",
+      "--color-warm-400": "185 160 133",
+      "--color-warm-500": "165 138 108",
+      "--color-warm-600": "138 112 88",
+      "--color-warm-700": "110 90 71",
+      "--color-warm-800": "90 74 60",
+      "--color-warm-900": "74 62 51",
     },
   },
   white: {
@@ -253,6 +263,16 @@ const THEME_PALETTES: Record<
       "--color-surface-dark-high": "229 231 235",
       "--color-surface-dark-dim": "209 213 219",
       "--color-surface-dark-bright": "255 255 255",
+      "--color-warm-50": "255 255 255",
+      "--color-warm-100": "248 250 252",
+      "--color-warm-200": "229 231 235",
+      "--color-warm-300": "209 213 219",
+      "--color-warm-400": "113 113 122",
+      "--color-warm-500": "82 82 91",
+      "--color-warm-600": "63 63 70",
+      "--color-warm-700": "39 39 42",
+      "--color-warm-800": "24 24 27",
+      "--color-warm-900": "9 9 11",
     },
   },
   dark: {
@@ -270,6 +290,16 @@ const THEME_PALETTES: Record<
       "--color-surface-dark-high": "38 38 38",
       "--color-surface-dark-dim": "15 15 15",
       "--color-surface-dark-bright": "45 45 45",
+      "--color-warm-50": "10 10 10",
+      "--color-warm-100": "20 20 20",
+      "--color-warm-200": "38 38 38",
+      "--color-warm-300": "64 64 64",
+      "--color-warm-400": "115 115 115",
+      "--color-warm-500": "163 163 163",
+      "--color-warm-600": "212 212 212",
+      "--color-warm-700": "229 229 229",
+      "--color-warm-800": "245 245 245",
+      "--color-warm-900": "250 250 250",
     },
   },
   amoled: {
@@ -287,6 +317,16 @@ const THEME_PALETTES: Record<
       "--color-surface-dark-high": "15 15 15",
       "--color-surface-dark-dim": "0 0 0",
       "--color-surface-dark-bright": "24 24 24",
+      "--color-warm-50": "0 0 0",
+      "--color-warm-100": "3 3 3",
+      "--color-warm-200": "15 15 15",
+      "--color-warm-300": "38 38 38",
+      "--color-warm-400": "115 115 115",
+      "--color-warm-500": "163 163 163",
+      "--color-warm-600": "212 212 212",
+      "--color-warm-700": "229 229 229",
+      "--color-warm-800": "245 245 245",
+      "--color-warm-900": "250 250 250",
     },
   },
 };
@@ -446,6 +486,25 @@ function readCachedScheduledRules(): ThemeScheduleRule[] {
 function cacheScheduledRules(rules: ThemeScheduleRule[]) {
   if (Platform.OS === "web" && typeof window !== "undefined") {
     window.localStorage.setItem(SCHEDULED_RULES_CACHE_KEY, JSON.stringify(normalizeThemeScheduleRulesList(rules)));
+  }
+}
+
+function applyWebThemePalette(effectiveTheme: ThemePalette) {
+  if (Platform.OS !== "web" || typeof document === "undefined") return;
+  const palette = THEME_PALETTES[effectiveTheme];
+  const root = document.documentElement;
+  Object.entries(palette.variables).forEach(([name, value]) => {
+    root.style.setProperty(name, value);
+  });
+  root.style.backgroundColor = palette.surface;
+  document.body.style.backgroundColor = palette.surface;
+
+  const themeMeta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+  if (themeMeta) themeMeta.content = palette.surface;
+
+  const statusBarMeta = document.querySelector<HTMLMetaElement>('meta[name="apple-mobile-web-app-status-bar-style"]');
+  if (statusBarMeta) {
+    statusBarMeta.content = effectiveTheme === "dark" || effectiveTheme === "amoled" ? "black-translucent" : "default";
   }
 }
 
@@ -696,6 +755,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     requestAnimationFrame(() => setColorScheme(nativeWindScheme));
   }, [nativeWindScheme, setColorScheme]);
+
+  useEffect(() => {
+    applyWebThemePalette(effectiveTheme);
+  }, [effectiveTheme]);
 
   const setFontSizeIndex = useCallback(
     (index: number) => {

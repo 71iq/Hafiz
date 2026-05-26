@@ -2,6 +2,7 @@ import { forwardRef } from "react";
 import { type ReactNode } from "react";
 import { TextInput, View, type TextInputProps } from "react-native";
 import { useColorScheme } from "nativewind";
+import { useSettings } from "@/lib/settings/context";
 import { useUIDirection, textAlignForDirection, type Direction } from "@/lib/ui/direction";
 import { cn } from "@/lib/utils";
 
@@ -33,7 +34,8 @@ export const Input = forwardRef<TextInput, InputProps>(
   ) => {
     const dir = useUIDirection(explicitDir);
     const { colorScheme } = useColorScheme();
-    const fallbackPlaceholderColor = colorScheme === "dark" ? "#737373" : "#b9a085";
+    const { themeColors } = useSettings();
+    const fallbackPlaceholderColor = colorScheme === "dark" ? "#737373" : themeColors.surfaceDim;
     const input = (
       <TextInput
         ref={ref}

@@ -270,8 +270,10 @@ export function OverlayHeader({
   isRTL: explicitIsRTL,
 }: OverlayHeaderProps) {
   const dir = useUIDirection(explicitDir);
+  const { effectiveTheme, isDark } = useSettings();
   const isRTL = explicitIsRTL ?? dir === "rtl";
   const rowClassName = isRTL ? "flex-row-reverse" : "flex-row";
+  const closeIconColor = isDark ? "#a3a3a3" : effectiveTheme === "white" ? "#71717A" : "#8B8178";
 
   return (
     <View className="px-5 pt-3 pb-4 border-b border-warm-200 dark:border-neutral-800">
@@ -327,7 +329,7 @@ export function OverlayHeader({
               className="h-9 w-9 items-center justify-center rounded-full bg-surface-low dark:bg-surface-dark-low"
               style={{ cursor: Platform.OS === "web" ? "pointer" : undefined }}
             >
-              <X size={18} color="#8B8178" />
+              <X size={18} color={closeIconColor} />
             </Pressable>
           ) : null}
         </View>

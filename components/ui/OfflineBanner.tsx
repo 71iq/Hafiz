@@ -3,6 +3,7 @@ import { Animated, View, Text } from "react-native";
 import { useColorScheme } from "nativewind";
 import { useNetInfo } from "@react-native-community/netinfo";
 import { WifiOff } from "lucide-react-native";
+import { useSettings, withThemeOpacity } from "@/lib/settings/context";
 
 const OFFLINE_TEXT = {
   en: "You\u2019re offline \u2014 study features work, community features will sync when connected",
@@ -20,6 +21,7 @@ type Props = {
  */
 export function OfflineBanner({ uiLanguage }: Props) {
   const { colorScheme } = useColorScheme();
+  const { effectiveTheme, themeColors } = useSettings();
   const isDark = colorScheme === "dark";
 
   const netInfo = useNetInfo();
@@ -67,10 +69,12 @@ export function OfflineBanner({ uiLanguage }: Props) {
 
   const backgroundColor = isDark
     ? "rgba(253,220,145,0.10)"
-    : "rgba(253,220,145,0.15)";
+    : effectiveTheme === "white"
+      ? withThemeOpacity(themeColors.surfaceHigh, 0.72)
+      : "rgba(253,220,145,0.15)";
 
-  const textColor = isDark ? "#a3a3a3" : "#8a7058"; // neutral-400 dark, warm-600 light
-  const iconColor = isDark ? "#a3a3a3" : "#8a7058";
+  const textColor = isDark ? "#a3a3a3" : effectiveTheme === "white" ? "#71717A" : "#8a7058";
+  const iconColor = textColor;
 
   return (
     <Animated.View
