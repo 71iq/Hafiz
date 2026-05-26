@@ -15,8 +15,7 @@ import { useDatabase, useDatabaseStatus } from "@/lib/database/provider";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { SettingsProvider, useSettings } from "@/lib/settings/context";
 import { useStrings, interpolate } from "@/lib/i18n/useStrings";
-import { createDeck, generateDeckId } from "@/lib/fsrs/queries";
-import type { DeckScope } from "@/lib/fsrs/types";
+import { materializeSmartDeckCards, SMART_DECK_IDS, writeSmartDeckFilter } from "@/lib/fsrs/smart-decks";
 import { StatusBar } from "expo-status-bar";
 
 // ─── Types ───────────────────────────────────────────────────
@@ -104,20 +103,19 @@ function OnboardingInner() {
     setCreating(true);
     setError(null);
     try {
-      const scope: DeckScope = {
+      await writeSmartDeckFilter(db, SMART_DECK_IDS.retention, {
         type: "surah",
         surahs: Array.from(selectedSurahs),
-      };
-      const deckId = generateDeckId(scope);
-      await createDeck(db, deckId, scope);
-      setCreatedDeckId(deckId);
+      });
+      await materializeSmartDeckCards(db, SMART_DECK_IDS.retention);
+      setCreatedDeckId(SMART_DECK_IDS.retention);
     } catch (err) {
-      console.error("[Onboarding] Failed to create deck:", err);
-      setError(s.deckCreateFailed);
+      console.error("[Onboarding] Failed to save retention filter:", err);
+      setError(s.deckFilterSaveFailed);
     } finally {
       setCreating(false);
     }
-  }, [db, selectedSurahs, s.deckCreateFailed]);
+  }, [db, selectedSurahs, s.deckFilterSaveFailed]);
 
   const handleStartReview = useCallback(async () => {
     if (!createdDeckId || completing) return;

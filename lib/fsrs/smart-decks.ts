@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from "expo-sqlite";
 import { enqueueSync } from "@/lib/database/sync-queue";
-import { writeUserSetting } from "@/lib/database/user-settings";
+import { deleteUserSetting, writeUserSetting } from "@/lib/database/user-settings";
 import { createEmptyCard } from "./scheduler";
 import {
   ALL_NEW_CARD_SORT_ORDERS,
@@ -18,6 +18,7 @@ import {
 } from "./types";
 
 export const SMART_DECK_IDS = {
+  retention: "default-retention",
   mutashabihat: "default-mutashabihat",
   similarTails: "default-similar-tails",
   qiraat: "default-qiraat",
@@ -83,6 +84,7 @@ export type DueCardsForReviewOptions = number | {
 };
 
 const SMART_DECK_ID_LIST: SmartDeckId[] = [
+  SMART_DECK_IDS.retention,
   SMART_DECK_IDS.mutashabihat,
   SMART_DECK_IDS.similarTails,
   SMART_DECK_IDS.qiraat,
@@ -90,12 +92,52 @@ const SMART_DECK_ID_LIST: SmartDeckId[] = [
 ];
 
 const SMART_CARD_PREFIXES = ["mutashabihat:", "similar-tail:", "qiraat:", "asbab:"];
+const LEGACY_MUTASHABIHAT_DECK_ID = "mutashabihat";
+const MEANINGS_DECK_ID = "meanings";
 const SQLITE_PARAM_BATCH = 800;
 const INSERT_BATCH = 500;
 const REVIEWABLE_CARD_SQL = "suspended_at IS NULL AND (buried_until IS NULL OR buried_until <= ?)";
 
 function isReviewableCard(row: StudyCardRow, nowIso: string): boolean {
   return !row.suspended_at && (!row.buried_until || row.buried_until <= nowIso);
+}
+
+function studyCardToSyncData(row: StudyCardRow): Record<string, any> {
+  return {
+    id: row.id,
+    deck_id: row.deck_id,
+    due: row.due,
+    stability: row.stability,
+    difficulty: row.difficulty,
+    elapsed_days: row.elapsed_days,
+    scheduled_days: row.scheduled_days,
+    learning_steps: row.learning_steps,
+    reps: row.reps,
+    lapses: row.lapses,
+    state: row.state,
+    last_review: row.last_review,
+    suspended_at: row.suspended_at,
+    buried_until: row.buried_until,
+    marked_at: row.marked_at,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+function parseAyahCardId(id: string): { surah: number; ayah: number } | null {
+  const [surahRaw, ayahRaw, extra] = id.split(":");
+  if (extra !== undefined) return null;
+  const surah = parseInt(surahRaw, 10);
+  const ayah = parseInt(ayahRaw, 10);
+  return Number.isFinite(surah) && Number.isFinite(ayah) ? { surah, ayah } : null;
+}
+
+function parseLegacyMutashabihatCardId(id: string): string | null {
+  const [prefix, surahRaw, ayahRaw, extra] = id.split(":");
+  if (prefix !== LEGACY_MUTASHABIHAT_DECK_ID || extra !== undefined) return null;
+  const surah = parseInt(surahRaw, 10);
+  const ayah = parseInt(ayahRaw, 10);
+  return Number.isFinite(surah) && Number.isFinite(ayah) ? `${surah}:${ayah}` : null;
 }
 
 export function isSmartDeckId(deckId: string | undefined | null): deckId is SmartDeckId {
@@ -153,12 +195,123 @@ export async function writeSmartDeckFilter(
   await writeUserSetting(db, smartDeckFilterKey(deckId), JSON.stringify(normalized));
 }
 
+export async function migrateLegacyRetentionDecks(db: SQLiteDatabase): Promise<number> {
+  const now = new Date().toISOString();
+  let migrated = 0;
+  const syncOps: Array<{
+    operation: "UPDATE" | "DELETE";
+    rowId: string;
+    data: Record<string, any>;
+  }> = [];
+
+  const rows = await db.getAllAsync<StudyCardRow>(
+    `SELECT * FROM study_cards
+      WHERE deck_id NOT IN (${SMART_DECK_ID_LIST.map(() => "?").join(",")})
+        AND deck_id != ?
+        AND id NOT LIKE 'word:%'`,
+    [...SMART_DECK_ID_LIST, MEANINGS_DECK_ID]
+  );
+
+  await db.withTransactionAsync(async () => {
+    for (const row of rows) {
+      const legacyAyahId = parseLegacyMutashabihatCardId(row.id);
+      if (legacyAyahId) {
+        const existing = await db.getFirstAsync<{ id: string }>(
+          "SELECT id FROM study_cards WHERE id = ?",
+          [legacyAyahId]
+        );
+        await db.runAsync("UPDATE study_log SET card_id = ? WHERE card_id = ?", [legacyAyahId, row.id]);
+        if (existing?.id) {
+          await db.runAsync("DELETE FROM study_cards WHERE id = ?", [row.id]);
+          syncOps.push({
+            operation: "DELETE",
+            rowId: row.id,
+            data: {
+              ...studyCardToSyncData(row),
+              updated_at: now,
+              deleted_at: now,
+            },
+          });
+        } else {
+          await db.runAsync(
+            "UPDATE study_cards SET id = ?, deck_id = ?, updated_at = ? WHERE id = ?",
+            [legacyAyahId, SMART_DECK_IDS.retention, now, row.id]
+          );
+          syncOps.push({
+            operation: "UPDATE",
+            rowId: legacyAyahId,
+            data: studyCardToSyncData({
+              ...row,
+              id: legacyAyahId,
+              deck_id: SMART_DECK_IDS.retention,
+              updated_at: now,
+            }),
+          });
+        }
+        migrated++;
+        continue;
+      }
+
+      if (!parseAyahCardId(row.id)) continue;
+      if (row.deck_id === SMART_DECK_IDS.retention) continue;
+      await db.runAsync(
+        "UPDATE study_cards SET deck_id = ?, updated_at = ? WHERE id = ?",
+        [SMART_DECK_IDS.retention, now, row.id]
+      );
+      syncOps.push({
+        operation: "UPDATE",
+        rowId: row.id,
+        data: studyCardToSyncData({
+          ...row,
+          deck_id: SMART_DECK_IDS.retention,
+          updated_at: now,
+        }),
+      });
+      migrated++;
+    }
+  });
+
+  for (const op of syncOps) {
+    enqueueSync(db, "study_cards", op.operation, op.rowId, op.data).catch(console.warn);
+  }
+
+  const deckSettings = await db.getAllAsync<{ key: string; value: string }>(
+    "SELECT key, value FROM user_settings WHERE key LIKE 'deck_%'"
+  );
+  await Promise.all(deckSettings.map(async (setting) => {
+    let deckId = setting.key.startsWith("deck_") ? setting.key.slice("deck_".length) : "";
+    try {
+      const deck = JSON.parse(setting.value);
+      deckId = typeof deck?.id === "string" ? deck.id : deckId;
+      if (deck?.id === MEANINGS_DECK_ID) return;
+    } catch {}
+    await deleteUserSetting(db, setting.key);
+    if (deckId && deckId !== MEANINGS_DECK_ID) {
+      await deleteUserSetting(db, `review_settings_${deckId}`);
+    }
+  }));
+
+  return migrated;
+}
+
 export async function getSmartDeckCandidateCardIds(
   db: SQLiteDatabase,
   deckId: SmartDeckId,
   filter?: BuiltInDeckFilter
 ): Promise<string[]> {
   const activeFilter = filter ?? await readSmartDeckFilter(db, deckId);
+  if (deckId === SMART_DECK_IDS.retention) {
+    const params: any[] = [];
+    const clause = buildFilterClause("q", activeFilter, params);
+    const rows = await db.getAllAsync<{ surah: number; ayah: number }>(
+      `SELECT q.surah, q.ayah
+         FROM quran_text q
+        ${clause ? `WHERE ${clause}` : ""}
+        ORDER BY q.surah, q.ayah`,
+      params
+    );
+    return rows.map((row) => `${row.surah}:${row.ayah}`);
+  }
   if (deckId === SMART_DECK_IDS.reasonsOfRevelation) {
     const params: any[] = [];
     const clause = buildFilterClause("an", activeFilter, params);
@@ -296,6 +449,9 @@ export async function getSmartDeckStats(
   deckId: SmartDeckId,
   filter?: BuiltInDeckFilter
 ): Promise<SmartDeckStats> {
+  if (deckId === SMART_DECK_IDS.retention) {
+    await migrateLegacyRetentionDecks(db);
+  }
   const ids = await getSmartDeckCandidateCardIds(db, deckId, filter);
   if (ids.length === 0) return { total: 0, due: 0, newCount: 0 };
 
@@ -315,6 +471,9 @@ export async function getSmartDeckTodayStats(
   deckId: SmartDeckId,
   options?: DueCardsForReviewOptions
 ): Promise<SmartDeckStats> {
+  if (deckId === SMART_DECK_IDS.retention) {
+    await migrateLegacyRetentionDecks(db);
+  }
   const ids = await getSmartDeckCandidateCardIds(db, deckId);
   if (ids.length === 0) return { total: 0, due: 0, newCount: 0 };
 
@@ -365,6 +524,9 @@ export async function materializeSmartDeckCards(
   limit?: number,
   newCardsLimit = DEFAULT_DECK_NEW_CARD_LIMIT
 ): Promise<number> {
+  if (deckId === SMART_DECK_IDS.retention) {
+    await migrateLegacyRetentionDecks(db);
+  }
   const ids = await getSmartDeckCandidateCardIds(db, deckId);
   if (ids.length === 0) return 0;
 
@@ -881,6 +1043,9 @@ async function getSmartDeckDueRows(
   deckId: SmartDeckId,
   now: string
 ): Promise<StudyCardRow[]> {
+  if (deckId === SMART_DECK_IDS.retention) {
+    await migrateLegacyRetentionDecks(db);
+  }
   const ids = await getSmartDeckCandidateCardIds(db, deckId);
   if (ids.length === 0) return [];
   const rows: StudyCardRow[] = [];

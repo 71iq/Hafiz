@@ -16,7 +16,7 @@ export type ProfileSurahProgress = {
   memorized: number;
 };
 
-export type DefaultDeckProgressKey = "mutashabihat" | "similarTails" | "qiraat" | "reasonsOfRevelation" | "vocabulary";
+export type DefaultDeckProgressKey = "retention" | "mutashabihat" | "similarTails" | "qiraat" | "reasonsOfRevelation" | "vocabulary";
 
 export type DefaultDeckProgressItem = {
   key: DefaultDeckProgressKey;
@@ -31,6 +31,7 @@ export type DefaultDeckProgressItem = {
 
 export async function getDefaultDeckProgress(db: SQLiteDatabase): Promise<DefaultDeckProgressItem[]> {
   const decks: Pick<DefaultDeckProgressItem, "key" | "deckId" | "isSmartDeck" | "color">[] = [
+    { key: "retention", deckId: SMART_DECK_IDS.retention, isSmartDeck: true, color: "#14b8a6" },
     { key: "mutashabihat", deckId: SMART_DECK_IDS.mutashabihat, isSmartDeck: true, color: "#0d9488" },
     { key: "similarTails", deckId: SMART_DECK_IDS.similarTails, isSmartDeck: true, color: "#ca8a04" },
     { key: "qiraat", deckId: SMART_DECK_IDS.qiraat, isSmartDeck: true, color: "#2563eb" },

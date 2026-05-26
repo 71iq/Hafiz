@@ -47,6 +47,7 @@ import {
   getSmartDeckStats,
   getSmartDeckTodayStats,
   isSmartDeckId,
+  migrateLegacyRetentionDecks,
   SMART_DECK_IDS,
   type DueCardsForReviewOptions,
 } from "./smart-decks";
@@ -560,6 +561,10 @@ export function mutashabihatCardId(surah: number, ayah: number): string {
   return `${MUTASHABIHAT_DECK_ID}:${surah}:${ayah}`;
 }
 
+export function retentionCardId(surah: number, ayah: number): string {
+  return `${surah}:${ayah}`;
+}
+
 async function ensureMutashabihatDeck(db: SQLiteDatabase, now: string): Promise<boolean> {
   const existing = await db.getFirstAsync<{ value: string }>(
     "SELECT value FROM user_settings WHERE key = ?",
@@ -693,9 +698,22 @@ export async function isMutashabihatCardSaved(
   surah: number,
   ayah: number
 ): Promise<boolean> {
+  return isRetentionCardSaved(db, surah, ayah);
+}
+
+export async function isRetentionCardSaved(
+  db: SQLiteDatabase,
+  surah: number,
+  ayah: number
+): Promise<boolean> {
+  const cardId = retentionCardId(surah, ayah);
+  const legacyCardId = mutashabihatCardId(surah, ayah);
   const row = await db.getFirstAsync<{ c: number }>(
-    "SELECT COUNT(*) as c FROM study_cards WHERE id = ? AND deck_id = ?",
-    [mutashabihatCardId(surah, ayah), MUTASHABIHAT_DECK_ID]
+    `SELECT COUNT(*) as c
+       FROM study_cards
+      WHERE (id = ? AND (deck_id = ? OR (deck_id != ? AND ${NON_SMART_CARD_SQL})))
+         OR (id = ? AND deck_id = ?)`,
+    [cardId, SMART_DECK_IDS.retention, MEANINGS_DECK_ID, legacyCardId, MUTASHABIHAT_DECK_ID]
   );
   return (row?.c ?? 0) > 0;
 }
@@ -705,17 +723,32 @@ export async function addMutashabihatCard(
   surah: number,
   ayah: number
 ): Promise<{ created: boolean }> {
+  return addRetentionCard(db, surah, ayah);
+}
+
+export async function addRetentionCard(
+  db: SQLiteDatabase,
+  surah: number,
+  ayah: number
+): Promise<{ created: boolean }> {
+  await migrateLegacyRetentionDecks(db);
   const now = new Date().toISOString();
   const emptyCard = createEmptyCard();
-  const cardId = mutashabihatCardId(surah, ayah);
-  const deckCreated = await ensureMutashabihatDeck(db, now);
+  const cardId = retentionCardId(surah, ayah);
+
+  const existing = await db.getFirstAsync<{ id: string }>(
+    "SELECT id FROM study_cards WHERE id = ? AND deck_id = ?",
+    [cardId, SMART_DECK_IDS.retention]
+  );
+  if (existing?.id) return { created: false };
 
   const result = await db.runAsync(
-    `INSERT OR IGNORE INTO study_cards (id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days, learning_steps, reps, lapses, state, last_review, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT OR IGNORE INTO study_cards
+      (id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days, learning_steps, reps, lapses, state, last_review, suspended_at, buried_until, marked_at, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       cardId,
-      MUTASHABIHAT_DECK_ID,
+      SMART_DECK_IDS.retention,
       emptyCard.due.toISOString(),
       emptyCard.stability,
       emptyCard.difficulty,
@@ -726,6 +759,9 @@ export async function addMutashabihatCard(
       emptyCard.lapses,
       emptyCard.state,
       null,
+      null,
+      null,
+      null,
       now,
       now,
     ]
@@ -735,7 +771,7 @@ export async function addMutashabihatCard(
   if (created) {
     enqueueSync(db, "study_cards", "INSERT", cardId, {
       id: cardId,
-      deck_id: MUTASHABIHAT_DECK_ID,
+      deck_id: SMART_DECK_IDS.retention,
       due: emptyCard.due.toISOString(),
       stability: emptyCard.stability,
       difficulty: emptyCard.difficulty,
@@ -752,10 +788,6 @@ export async function addMutashabihatCard(
       created_at: now,
       updated_at: now,
     }).catch(console.warn);
-  }
-
-  if (deckCreated) {
-    recordAchievementEvent(db, { type: "deck_created", deckId: MUTASHABIHAT_DECK_ID, createdAt: now }).catch(console.warn);
   }
 
   return { created };
@@ -904,17 +936,26 @@ async function getFilteredSmartMaterializedRows(db: SQLiteDatabase): Promise<Stu
 }
 
 export async function getTotalAyahCardCount(db: SQLiteDatabase): Promise<number> {
+  await migrateLegacyRetentionDecks(db);
   const row = await db.getFirstAsync<{ count: number }>(
-    `SELECT COUNT(*) as count FROM study_cards WHERE id NOT LIKE 'word:%' AND ${NON_SMART_CARD_SQL}`,
-    []
+    `SELECT COUNT(*) as count
+       FROM study_cards
+      WHERE id NOT LIKE 'word:%'
+        AND (${NON_SMART_CARD_SQL} OR deck_id = ?)`,
+    [SMART_DECK_IDS.retention]
   );
   return row?.count ?? 0;
 }
 
 export async function getMemorizedAyahCardCount(db: SQLiteDatabase): Promise<number> {
+  await migrateLegacyRetentionDecks(db);
   const row = await db.getFirstAsync<{ count: number }>(
-    `SELECT COUNT(*) as count FROM study_cards WHERE state = 2 AND id NOT LIKE 'word:%' AND ${NON_SMART_CARD_SQL}`,
-    []
+    `SELECT COUNT(*) as count
+       FROM study_cards
+      WHERE state = 2
+        AND id NOT LIKE 'word:%'
+        AND (${NON_SMART_CARD_SQL} OR deck_id = ?)`,
+    [SMART_DECK_IDS.retention]
   );
   return row?.count ?? 0;
 }
@@ -1187,6 +1228,9 @@ export async function getDeckCardsForList(
   deckId: string
 ): Promise<DeckCardListItem[]> {
   if (isSmartDeckId(deckId)) {
+    if (deckId === SMART_DECK_IDS.retention) {
+      await migrateLegacyRetentionDecks(db);
+    }
     const [candidateIds, existingRows] = await Promise.all([
       getSmartDeckCandidateCardIds(db, deckId),
       db.getAllAsync<StudyCardRow>("SELECT * FROM study_cards WHERE deck_id = ?", [deckId]),

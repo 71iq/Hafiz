@@ -24,7 +24,7 @@ import {
 import { useStrings } from "@/lib/i18n/useStrings";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { fetchReflectionCount } from "@/lib/reflections/api";
-import { addMutashabihatCard, isMutashabihatCardSaved } from "@/lib/fsrs/queries";
+import { addRetentionCard, isRetentionCardSaved } from "@/lib/fsrs/queries";
 import {
   addBookmark as dbAddBookmark,
   fetchSurahName,
@@ -36,7 +36,7 @@ import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { useAyahAudio } from "@/lib/audio/ayah-audio";
 import { AyahDetailModal } from "./AyahDetailModal";
 
-const mutashabihatSavedCache = new Map<string, boolean>();
+const retentionSavedCache = new Map<string, boolean>();
 
 type Props = {
   surah: number;
@@ -133,16 +133,16 @@ function AyahBlockInner({
   useEffect(() => {
     let cancelled = false;
     const cacheKey = `${surah}:${ayah}`;
-    const cached = mutashabihatSavedCache.get(cacheKey);
+    const cached = retentionSavedCache.get(cacheKey);
     if (cached !== undefined) {
       setSavedToReview(cached);
       setReviewBusy(false);
       return;
     }
     setReviewBusy(false);
-    isMutashabihatCardSaved(db, surah, ayah)
+    isRetentionCardSaved(db, surah, ayah)
       .then((saved) => {
-        mutashabihatSavedCache.set(cacheKey, saved);
+        retentionSavedCache.set(cacheKey, saved);
         if (!cancelled) setSavedToReview(saved);
       })
       .catch(() => {
@@ -217,8 +217,8 @@ function AyahBlockInner({
     if (reviewBusy || savedToReview) return;
     setReviewBusy(true);
     try {
-      const result = await addMutashabihatCard(db, surah, ayah);
-      mutashabihatSavedCache.set(`${surah}:${ayah}`, true);
+      const result = await addRetentionCard(db, surah, ayah);
+      retentionSavedCache.set(`${surah}:${ayah}`, true);
       setSavedToReview(true);
       showToast(result.created ? s.reviewActionAdded : (s.reviewActionAlreadyExists ?? s.reviewActionAdded));
     } catch (e) {

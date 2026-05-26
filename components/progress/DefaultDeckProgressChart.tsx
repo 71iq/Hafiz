@@ -20,6 +20,7 @@ export function DefaultDeckProgressChart({
   className = "p-5 mb-6",
 }: Props) {
   const titles: Record<DefaultDeckProgressKey, string> = {
+    retention: s.smartDeckRetentionTitle,
     mutashabihat: s.smartDeckMutashabihatTitle,
     similarTails: s.smartDeckSimilarTailsTitle,
     qiraat: s.smartDeckQiraatTitle,

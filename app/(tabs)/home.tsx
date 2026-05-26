@@ -1,39 +1,34 @@
 import React, { useState, useCallback, useEffect } from "react";
-import { ScrollView, View, Text, Pressable } from "react-native";
+import { View, Text, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, type Href } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
-import { Plus, Trash2, Play, Layers, CalendarCheck2, Search, Languages, UserPlus, BookMarked, X as XIcon, Settings2, Sparkles, BookOpenText, ListEnd, List } from "lucide-react-native";
+import { Play, Layers, CalendarCheck2, Search, Languages, UserPlus, BookMarked, X as XIcon, Settings2, Sparkles, BookOpenText, ListEnd, List } from "lucide-react-native";
 import { useAuthStore } from "@/lib/auth/store";
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { interpolate } from "@/lib/i18n/useStrings";
 import { Card } from "@/components/ui/Card";
-import { ScreenScrollView, useScreenContentLayout } from "@/components/ui/ScreenContent";
-import { CreateDeckSheet } from "@/components/flashcards/CreateDeckSheet";
+import { ScreenScrollView } from "@/components/ui/ScreenContent";
 import { DeckReviewSettingsSheet } from "@/components/flashcards/DeckReviewSettingsSheet";
 import { DeckCardsSheet } from "@/components/flashcards/DeckCardsSheet";
 import { SmartDeckFilterSheet } from "@/components/flashcards/SmartDeckFilterSheet";
 import { SearchCommand } from "@/components/SearchCommand";
 import { Toast } from "@/components/ui/Toast";
-import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { AchievementUnlockToast } from "@/components/achievements/AchievementUnlockToast";
 import {
-  getDecks,
   getDeckTodayStats,
   getMemorizedAyahCardCount,
   getTodayDueCount,
-  deleteDeck,
   getWirdStatus,
   readDeckReviewSettings,
   MEANINGS_DECK_ID,
 } from "@/lib/fsrs/queries";
 import type { WirdStatus } from "@/lib/fsrs/queries";
-import type { DeckScope } from "@/lib/fsrs/types";
 import {
+  migrateLegacyRetentionDecks,
   readSmartDeckFilter,
-  isSmartDeckId,
   SMART_DECK_IDS,
   type BuiltInDeckFilter,
   type SmartDeckId,
@@ -48,16 +43,6 @@ import type { AchievementUnlock } from "@/lib/achievements/types";
 import { getReflectionJourneySummary } from "@/lib/reflection-journey/queries";
 import { localizeReflectionJourneyText } from "@/lib/reflection-journey/schema";
 import { DESKTOP_CONTENT_MAX_WIDTH } from "@/lib/ui/viewport";
-
-type DeckDisplay = {
-  id: string;
-  name?: string;
-  scope: DeckScope;
-  createdAt: string;
-  cardCount: number;
-  dueCount: number;
-  newCount: number;
-};
 
 type SmartDeckDisplay = {
   id: SmartDeckId;
@@ -86,9 +71,7 @@ export default function HomeScreen() {
   const { isDark, isRTL, uiLanguage } = useSettings();
   const s = useStrings();
   const router = useRouter();
-  const { isLaptop } = useScreenContentLayout({ maxWidth: DESKTOP_CONTENT_MAX_WIDTH });
   const mirroredRowStyle = isRTL ? ({ direction: "ltr" } as const) : undefined;
-  const [decks, setDecks] = useState<DeckDisplay[]>([]);
   const [smartDecks, setSmartDecks] = useState<SmartDeckDisplay[]>([]);
   const [vocabStats, setVocabStats] = useState<{ total: number; dueCount: number; newCount: number }>({ total: 0, dueCount: 0, newCount: 0 });
   const [authBannerDismissed, setAuthBannerDismissed] = useState(false);
@@ -102,11 +85,8 @@ export default function HomeScreen() {
     lastReviewDate: null,
     state: "empty",
   });
-  const [showCreate, setShowCreate] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [deckToDelete, setDeckToDelete] = useState<string | null>(null);
-  const [deletingDeckId, setDeletingDeckId] = useState<string | null>(null);
   const [filterDeckId, setFilterDeckId] = useState<SmartDeckId | null>(null);
   const [reviewSettingsTarget, setReviewSettingsTarget] = useState<DeckReviewSettingsTarget | null>(null);
   const [deckCardsTarget, setDeckCardsTarget] = useState<DeckCardsTarget | null>(null);
@@ -137,8 +117,15 @@ export default function HomeScreen() {
       nameMap[row.number] = uiLanguage === "ar" ? row.name_arabic : row.name_english;
     }
     setSurahNames(nameMap);
+    await migrateLegacyRetentionDecks(db);
 
     const smartDefinitions = [
+      {
+        id: SMART_DECK_IDS.retention,
+        title: s.smartDeckRetentionTitle,
+        subtitle: s.smartDeckRetentionSubtitle,
+        icon: Layers,
+      },
       {
         id: SMART_DECK_IDS.mutashabihat,
         title: s.smartDeckMutashabihatTitle,
@@ -183,14 +170,6 @@ export default function HomeScreen() {
     );
     setSmartDecks(smartDisplays);
 
-    const rawDecks = (await getDecks(db)).filter((d) => d.id !== MEANINGS_DECK_ID && !isSmartDeckId(d.id));
-    const deckDisplays: DeckDisplay[] = [];
-    for (const d of rawDecks) {
-      const settings = await readDeckReviewSettings(db, d.id);
-      const stats = await getDeckTodayStats(db, d.id, settings);
-      deckDisplays.push({ ...d, cardCount: stats.total, dueCount: stats.dueCount, newCount: stats.newCount });
-    }
-    setDecks(deckDisplays);
     const [dashboardSettings, vocabSettings] = await Promise.all([
       readDeckReviewSettings(db, undefined),
       readDeckReviewSettings(db, MEANINGS_DECK_ID),
@@ -250,7 +229,7 @@ export default function HomeScreen() {
     } catch {
       setResume(null);
     }
-  }, [db, loadLatestUnlock, s.smartDeckMutashabihatTitle, s.smartDeckMutashabihatSubtitle, s.smartDeckSimilarTailsTitle, s.smartDeckSimilarTailsSubtitle, s.smartDeckQiraatTitle, s.smartDeckQiraatSubtitle, s.smartDeckReasonsTitle, s.smartDeckReasonsSubtitle, uiLanguage]);
+  }, [db, loadLatestUnlock, s.smartDeckRetentionTitle, s.smartDeckRetentionSubtitle, s.smartDeckMutashabihatTitle, s.smartDeckMutashabihatSubtitle, s.smartDeckSimilarTailsTitle, s.smartDeckSimilarTailsSubtitle, s.smartDeckQiraatTitle, s.smartDeckQiraatSubtitle, s.smartDeckReasonsTitle, s.smartDeckReasonsSubtitle, uiLanguage]);
 
   useFocusEffect(
     useCallback(() => {
@@ -280,23 +259,6 @@ export default function HomeScreen() {
       });
   }, [db, dismissingUnlockId, latestUnlock]);
 
-  const confirmDeleteDeck = async () => {
-    if (!deckToDelete || deletingDeckId) return;
-    const deckId = deckToDelete;
-    setDeletingDeckId(deckId);
-    try {
-      await deleteDeck(db, deckId);
-      setDecks((prev) => prev.filter((d) => d.id !== deckId));
-      await loadData();
-      setDeckToDelete(null);
-    } catch (e) {
-      console.warn("[Home] Failed to delete deck:", e);
-      setToast(s.deckDeleteFailed);
-    } finally {
-      setDeletingDeckId(null);
-    }
-  };
-
   const handleStartReview = (deckId?: string) => {
     router.push({ pathname: "/flashcards/session", params: deckId ? { deckId } : {} });
   };
@@ -313,51 +275,6 @@ export default function HomeScreen() {
       return `${s.flashcardsScopeByjuz}: ${filter.juzNumbers.join(", ")}`;
     }
     return s.smartDeckFilterAll;
-  };
-
-  const getDeckLabel = (deck: DeckDisplay): string => {
-    const { scope } = deck;
-    if (deck.name?.trim()) return deck.name.trim();
-    switch (scope.type) {
-      case "surah": {
-        const nums = [...scope.surahs].sort((a, b) => a - b);
-        const getName = (n: number) => surahNames[n] ? `${s.flashcardsScopeBysurah} ${surahNames[n]}` : String(n);
-        if (nums.length === 1) {
-          return `${getName(nums[0])} (${nums[0]})`;
-        }
-        const isContiguous = nums.every((n, i) => i === 0 || n === nums[i - 1] + 1);
-        if (isContiguous) {
-          return `${getName(nums[0])} - ${getName(nums[nums.length - 1])} (${nums[0]}-${nums[nums.length - 1]})`;
-        }
-        return `${nums.map(getName).join("، ")} (${nums.join(", ")})`;
-      }
-      case "juz":
-        return `${s.flashcardsScopeByjuz}: ${scope.juzNumbers.join(", ")}`;
-      case "hizb":
-        return `${s.flashcardsScopeByhizb}: ${scope.hizbNumbers.join(", ")}`;
-      case "custom":
-        return `${scope.surahStart}:${scope.ayahStart} → ${scope.surahEnd}:${scope.ayahEnd}`;
-    }
-  };
-
-  const getDeckDescription = (deck: DeckDisplay): string => {
-    const { scope } = deck;
-    switch (scope.type) {
-      case "surah": {
-        const nums = [...scope.surahs].sort((a, b) => a - b);
-        if (nums.length === 1) {
-          const n = nums[0];
-          return `${s.flashcardsScopeBysurah}: ${surahNames[n] ?? n}`;
-        }
-        return `${s.flashcardsScopeBysurah}: ${nums.length}`;
-      }
-      case "juz":
-        return `${s.flashcardsScopeByjuz}: ${scope.juzNumbers.join(", ")}`;
-      case "hizb":
-        return `${s.flashcardsScopeByhizb}: ${scope.hizbNumbers.join(", ")}`;
-      case "custom":
-        return `${scope.surahStart}:${scope.ayahStart} → ${scope.surahEnd}:${scope.ayahEnd}`;
-    }
   };
 
   const getWirdMessage = (): string => {
@@ -604,65 +521,9 @@ export default function HomeScreen() {
             />
           )}
         </View>
-
-        <View className="mb-3 mt-1">
-          <View
-            className="items-center gap-2"
-            style={{ direction: isRTL ? "rtl" : "ltr", flexDirection: "row" }}
-          >
-            <View className="h-px flex-1 bg-warm-200 dark:bg-neutral-800" />
-            <Text
-              className="text-warm-400 dark:text-neutral-500 uppercase"
-              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, letterSpacing: 1.4 }}
-            >
-              {s.flashcardsRetentionDecks}
-            </Text>
-            <View className="h-px flex-1 bg-warm-200 dark:bg-neutral-800" />
-          </View>
-        </View>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          className="mb-6"
-          contentContainerStyle={{
-            flexDirection: isRTL ? "row-reverse" : "row",
-            gap: 8,
-            paddingBottom: 4,
-          }}
-        >
-          {decks.map((deck) => (
-            <View key={deck.id} style={{ width: isLaptop ? 500 : 320 }}>
-              <DeckCard
-                deck={deck}
-                title={getDeckLabel(deck)}
-                description={getDeckDescription(deck)}
-                onStartReview={() => handleStartReview(deck.id)}
-                onConfigure={() => setReviewSettingsTarget({ id: deck.id, title: getDeckLabel(deck), mode: "ayah" })}
-                onShowCards={() => setDeckCardsTarget({ id: deck.id, title: getDeckLabel(deck) })}
-                onDelete={() => setDeckToDelete(deck.id)}
-                isDark={isDark}
-                isRTL={isRTL}
-                s={s}
-              />
-            </View>
-          ))}
-          <AddDeckTile
-            onPress={() => setShowCreate(true)}
-            label={s.flashcardsCreateDeck}
-          />
-        </ScrollView>
       </ScreenScrollView>
 
       <SearchCommand visible={showSearch} onClose={() => setShowSearch(false)} />
-
-      <CreateDeckSheet
-        visible={showCreate}
-        onClose={() => setShowCreate(false)}
-        onCreated={(count) => {
-          setToast(interpolate(s.flashcardsCardsCreated, { n: String(count) }));
-          loadData();
-        }}
-      />
 
       <SmartDeckFilterSheet
         visible={!!filterDeckId}
@@ -692,152 +553,7 @@ export default function HomeScreen() {
       />
 
       {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}
-      <ConfirmDialog
-        visible={!!deckToDelete}
-        title={s.flashcardsDeleteDeck}
-        message={s.flashcardsDeleteConfirm}
-        cancelLabel={s.flashcardsCancel}
-        confirmLabel={s.flashcardsDelete}
-        destructive
-        confirmLoading={!!deletingDeckId}
-        isDark={isDark}
-        isRTL={isRTL}
-        onCancel={() => {
-          if (!deletingDeckId) setDeckToDelete(null);
-        }}
-        onConfirm={confirmDeleteDeck}
-      />
     </SafeAreaView>
-  );
-}
-
-function AddDeckTile({
-  onPress,
-  label,
-}: {
-  onPress: () => void;
-  label: string;
-}) {
-  return (
-    <View style={{ width: 78, height: 64 }}>
-      <Card elevation="low" className="h-full items-center justify-center rounded-3xl">
-        <Pressable
-          onPress={onPress}
-          accessibilityRole="button"
-          accessibilityLabel={label}
-          className="h-10 w-10 rounded-full bg-primary-accent items-center justify-center"
-          style={({ pressed }) => ({
-            transform: [{ scale: pressed ? 0.96 : 1 }],
-          })}
-        >
-          <Plus size={20} color="#fff" />
-        </Pressable>
-      </Card>
-    </View>
-  );
-}
-
-function DeckCard({
-  deck,
-  title,
-  description,
-  onStartReview,
-  onConfigure,
-  onShowCards,
-  onDelete,
-  isDark,
-  isRTL,
-  s,
-}: {
-  deck: DeckDisplay;
-  title: string;
-  description: string;
-  onStartReview: () => void;
-  onConfigure: () => void;
-  onShowCards: () => void;
-  onDelete: () => void;
-  isDark: boolean;
-  isRTL: boolean;
-  s: any;
-}) {
-  const canStart = deck.cardCount > 0;
-  return (
-    <Pressable
-      onPress={canStart ? onStartReview : undefined}
-      accessibilityRole="button"
-      style={({ pressed }) => ({
-        opacity: canStart ? 1 : 0.55,
-        transform: [{ scale: pressed && canStart ? 0.985 : 1 }],
-      })}
-    >
-      <Card elevation="low" className="px-4 py-3 rounded-3xl">
-        <View
-          className="items-center gap-3"
-          style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
-        >
-          <View className="w-10 h-10 rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 items-center justify-center">
-            <Layers size={18} color={isDark ? "#2dd4bf" : "#0d9488"} />
-          </View>
-          <View className={`flex-1 ${isRTL ? "items-end" : "items-start"}`} style={{ minWidth: 0 }}>
-            <Text
-              className="text-charcoal dark:text-neutral-200"
-              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
-              numberOfLines={1}
-            >
-              {title}
-            </Text>
-            <Text
-              className="text-warm-400 dark:text-neutral-500 mt-0.5"
-              style={{ fontFamily: "Manrope_400Regular", fontSize: 11, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
-              numberOfLines={1}
-            >
-              {description}
-            </Text>
-          </View>
-          <View
-            className="flex-row items-center gap-1"
-            style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
-          >
-            <Pressable
-              onPress={(event) => {
-                event.stopPropagation?.();
-                onDelete();
-              }}
-              accessibilityRole="button"
-              className="w-8 h-8 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center"
-              hitSlop={8}
-            >
-              <Trash2 size={14} color={isDark ? "#a3a3a3" : "#8B8178"} />
-            </Pressable>
-            <Pressable
-              onPress={(event) => {
-                event.stopPropagation?.();
-                onShowCards();
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={s.deckCardsTitle}
-              className="w-8 h-8 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center"
-              hitSlop={8}
-            >
-              <List size={14} color={isDark ? "#a3a3a3" : "#8B8178"} />
-            </Pressable>
-            <Pressable
-              onPress={(event) => {
-                event.stopPropagation?.();
-                onConfigure();
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={s.deckReviewSettingsTitle}
-              className="w-8 h-8 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center"
-              hitSlop={8}
-            >
-              <Settings2 size={14} color={isDark ? "#a3a3a3" : "#8B8178"} />
-            </Pressable>
-          </View>
-          <DeckStats total={deck.cardCount} newCount={deck.newCount} dueCount={deck.dueCount} isDark={isDark} isRTL={isRTL} />
-        </View>
-      </Card>
-    </Pressable>
   );
 }
 
