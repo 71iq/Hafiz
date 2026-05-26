@@ -14,6 +14,7 @@ import {
   type NewCardSortOrder,
   type NewReviewOrder,
   type ReviewSortOrder,
+  type SurahAyahRange,
   type StudyCardRow,
 } from "./types";
 
@@ -29,8 +30,7 @@ export type SmartDeckId = (typeof SMART_DECK_IDS)[keyof typeof SMART_DECK_IDS];
 
 export type BuiltInDeckFilter =
   | { type: "all" }
-  | { type: "surah"; surahs: number[] }
-  | { type: "surahRange"; surahStart: number; surahEnd: number }
+  | { type: "surah"; surahs: number[]; ranges?: SurahAyahRange[] }
   | { type: "juz"; juzNumbers: number[] };
 
 export type SmartCardKind = "mutashabihat" | "similarTail" | "qiraat" | "asbab";
@@ -162,7 +162,10 @@ export function normalizeSmartDeckFilter(filter: unknown): BuiltInDeckFilter {
     const surahs = Array.isArray(raw.surahs)
       ? normalizeNumbers(raw.surahs, 1, 114)
       : [];
-    return surahs.length > 0 ? { type: "surah", surahs } : { type: "all" };
+    const ranges = Array.isArray(raw.ranges)
+      ? normalizeRanges(raw.ranges, surahs)
+      : [];
+    return surahs.length > 0 ? { type: "surah", surahs, ...(ranges.length > 0 ? { ranges } : {}) } : { type: "all" };
   }
   if (raw.type === "surahRange") {
     const surahStart = Number(raw.surahStart);
@@ -174,7 +177,10 @@ export function normalizeSmartDeckFilter(filter: unknown): BuiltInDeckFilter {
       surahEnd <= 114 &&
       surahStart <= surahEnd
     ) {
-      return { type: "surahRange", surahStart, surahEnd };
+      return {
+        type: "surah",
+        surahs: Array.from({ length: surahEnd - surahStart + 1 }, (_, index) => surahStart + index),
+      };
     }
     return { type: "all" };
   }
@@ -1124,12 +1130,23 @@ async function getStudyCardsByIds(
 function buildFilterClause(alias: string, filter: BuiltInDeckFilter, params: any[]): string {
   const normalized = normalizeSmartDeckFilter(filter);
   if (normalized.type === "surah") {
-    params.push(...normalized.surahs);
-    return `${alias}.surah IN (${normalized.surahs.map(() => "?").join(",")})`;
-  }
-  if (normalized.type === "surahRange") {
-    params.push(normalized.surahStart, normalized.surahEnd);
-    return `${alias}.surah BETWEEN ? AND ?`;
+    const ranges = normalized.ranges ?? [];
+    if (ranges.length === 0) {
+      params.push(...normalized.surahs);
+      return `${alias}.surah IN (${normalized.surahs.map(() => "?").join(",")})`;
+    }
+    const rangeSurahs = new Set(ranges.map((range) => range.surah));
+    const wholeSurahs = normalized.surahs.filter((surah) => !rangeSurahs.has(surah));
+    const clauses: string[] = [];
+    if (wholeSurahs.length > 0) {
+      params.push(...wholeSurahs);
+      clauses.push(`${alias}.surah IN (${wholeSurahs.map(() => "?").join(",")})`);
+    }
+    for (const range of ranges) {
+      params.push(range.surah, range.ayahStart, range.ayahEnd);
+      clauses.push(`(${alias}.surah = ? AND ${alias}.ayah BETWEEN ? AND ?)`);
+    }
+    return `(${clauses.join(" OR ")})`;
   }
   if (normalized.type === "juz") {
     params.push(...normalized.juzNumbers);
@@ -1149,6 +1166,30 @@ function normalizeNumbers(values: unknown[], min: number, max: number): number[]
       .map((value) => Number(value))
       .filter((value) => Number.isInteger(value) && value >= min && value <= max)
   )).sort((a, b) => a - b);
+}
+
+function normalizeRanges(values: unknown[], surahs: number[]): SurahAyahRange[] {
+  const selected = new Set(surahs);
+  const ranges = values
+    .map((value) => {
+      const range = value as Partial<SurahAyahRange>;
+      return {
+        surah: Number(range?.surah),
+        ayahStart: Number(range?.ayahStart),
+        ayahEnd: Number(range?.ayahEnd),
+      };
+    })
+    .filter((range) =>
+      selected.has(range.surah) &&
+      Number.isInteger(range.ayahStart) &&
+      Number.isInteger(range.ayahEnd) &&
+      range.ayahStart >= 1 &&
+      range.ayahEnd <= 286 &&
+      range.ayahStart <= range.ayahEnd
+    );
+  const bySurah = new Map<number, SurahAyahRange>();
+  for (const range of ranges) bySurah.set(range.surah, range);
+  return Array.from(bySurah.values()).sort((a, b) => a.surah - b.surah);
 }
 
 function chunks<T>(values: T[], size: number): T[][] {

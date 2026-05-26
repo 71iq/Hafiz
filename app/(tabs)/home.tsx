@@ -265,17 +265,19 @@ export default function HomeScreen() {
 
   const getSmartFilterLabel = (filter: BuiltInDeckFilter): string => {
     if (filter.type === "surah") {
+      const ranges = filter.ranges ?? [];
+      if (ranges.length === 1 && filter.surahs.length === 1) {
+        const range = ranges[0];
+        return `${s.flashcardsScopeBysurah}: ${surahNames[range.surah] ?? range.surah} ${range.ayahStart}-${range.ayahEnd}`;
+      }
+      if (ranges.length > 0) {
+        return `${s.flashcardsScopeBysurah}: ${filter.surahs.length} ${s.flashcardsScopeCustom}`;
+      }
       if (filter.surahs.length === 1) {
         const n = filter.surahs[0];
         return `${s.flashcardsScopeBysurah}: ${surahNames[n] ?? n}`;
       }
       return `${s.flashcardsScopeBysurah}: ${filter.surahs.length}`;
-    }
-    if (filter.type === "surahRange") {
-      if (filter.surahStart === filter.surahEnd) {
-        return `${s.flashcardsScopeBysurah}: ${surahNames[filter.surahStart] ?? filter.surahStart}`;
-      }
-      return `${s.flashcardsScopeSurahRange}: ${filter.surahStart}-${filter.surahEnd}`;
     }
     if (filter.type === "juz") {
       return `${s.flashcardsScopeByjuz}: ${filter.juzNumbers.join(", ")}`;

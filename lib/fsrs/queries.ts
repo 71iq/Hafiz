@@ -200,8 +200,13 @@ function calculateCurrentStreak(dateKeysDesc: string[], todayIndex: number): num
 
 export function generateDeckId(scope: DeckScope): string {
   switch (scope.type) {
-    case "surah":
+    case "surah": {
+      const ranges = normalizeScopeRanges(scope);
+      if (ranges.length > 0) {
+        return `surah-${ranges.map((range) => `${range.surah}:${range.ayahStart}-${range.ayahEnd}`).join(",")}`;
+      }
       return `surah-${scope.surahs.sort((a, b) => a - b).join(",")}`;
+    }
     case "surahRange":
       return `surah-range-${scope.surahStart}-${scope.surahEnd}`;
     case "juz":
@@ -223,6 +228,24 @@ export async function resolveScope(
 ): Promise<AyahRef[]> {
   switch (scope.type) {
     case "surah": {
+      const ranges = normalizeScopeRanges(scope);
+      if (ranges.length > 0) {
+        const ayahs: AyahRef[] = [];
+        const seen = new Set<string>();
+        for (const range of ranges) {
+          const rows = await db.getAllAsync<AyahRef>(
+            "SELECT surah, ayah FROM quran_text WHERE surah = ? AND ayah BETWEEN ? AND ? ORDER BY ayah",
+            [range.surah, range.ayahStart, range.ayahEnd]
+          );
+          for (const row of rows) {
+            const key = `${row.surah}:${row.ayah}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            ayahs.push(row);
+          }
+        }
+        return ayahs.sort((a, b) => a.surah - b.surah || a.ayah - b.ayah);
+      }
       const placeholders = scope.surahs.map(() => "?").join(",");
       return db.getAllAsync<AyahRef>(
         `SELECT surah, ayah FROM quran_text WHERE surah IN (${placeholders}) ORDER BY surah, ayah`,
@@ -289,6 +312,20 @@ export async function resolveScope(
       );
     }
   }
+}
+
+function normalizeScopeRanges(scope: Extract<DeckScope, { type: "surah" }>): NonNullable<typeof scope.ranges> {
+  if (!Array.isArray(scope.ranges)) return [];
+  const selected = new Set(scope.surahs);
+  return scope.ranges
+    .filter((range) =>
+      selected.has(range.surah) &&
+      Number.isInteger(range.ayahStart) &&
+      Number.isInteger(range.ayahEnd) &&
+      range.ayahStart >= 1 &&
+      range.ayahEnd >= range.ayahStart
+    )
+    .sort((a, b) => a.surah - b.surah || a.ayahStart - b.ayahStart);
 }
 
 // ─── Create deck (generate cards) ────────────────────────────
