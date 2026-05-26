@@ -369,13 +369,17 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
           </View>
         </View>
 
-        <View className={isRTL ? "mt-4 flex-row-reverse flex-wrap gap-2" : "mt-4 flex-row flex-wrap gap-2"}>
+        <View
+          className="mt-4 flex-row flex-wrap gap-2"
+          style={{ direction: isRTL ? "rtl" : "ltr", justifyContent: "flex-start" }}
+        >
           {tabs.map((tab) => (
             <TabButton
               key={tab.key}
               label={tab.label}
               icon={tab.icon}
               active={activeTab === tab.key}
+              isRTL={isRTL}
               onPress={() => setActiveTab(tab.key)}
             />
           ))}
@@ -505,11 +509,13 @@ function TabButton({
   label,
   icon,
   active,
+  isRTL,
   onPress,
 }: {
   label: string;
   icon: ReactNode;
   active: boolean;
+  isRTL: boolean;
   onPress: () => void;
 }) {
   return (
@@ -520,7 +526,10 @@ function TabButton({
           ? "bg-primary-accent/10 dark:bg-primary-bright/10"
           : "bg-surface dark:bg-surface-dark"
       }`}
-      style={{ cursor: Platform.OS === "web" ? "pointer" : undefined }}
+      style={{
+        direction: isRTL ? "rtl" : "ltr",
+        cursor: Platform.OS === "web" ? "pointer" : undefined,
+      }}
     >
       {icon}
       <Text
