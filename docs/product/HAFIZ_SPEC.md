@@ -128,6 +128,7 @@ Your existing `quran-data.json` contains:
 - **Optional font:** QPC V4 Tajweed — 604 per-page color fonts for the 1441H 15-line layout. Web uses WOFF2 COLR fonts and theme-specific `font-palette` values; native uses bundled TTF fonts through expo-font.
 - **Sources:** Quran Foundation CDN for QCF2 (`https://verses.quran.foundation/fonts/quran/hafs/v2/`) and QUL/Quran Foundation font resources for QPC V4 Tajweed.
 - **Structure:** One font per page. QCF2 uses `QCF2_001.ttf` through `QCF2_604.ttf`; QPC V4 Tajweed uses page font families like `p574-v4-tajweed`. Each font maps Quran words to PUA codepoints for pixel-perfect Mushaf rendering.
+- **Surah names and basmallah:** Surah headers and page structural basmallah use the bundled QPC V4 surah-name color font, separate from the per-page ayah fonts.
 - **License:** Free to use, copy, distribute. Cannot be sold, modified, or reverse-engineered.
 - **Usage:** Bundle all per-page font files locally. Fonts are loaded dynamically per-page (FontFace API on web, expo-font on native). Native V4 TTFs live under `assets/fonts/`; web V4 WOFF2 files live under `public/fonts/` so they stay static/offline without entering Metro's JS asset graph. Text data stored as `text_qcf2` column in `quran_text` with space-separated PUA codepoints per ayah; copy/share still use `text_uthmani`.
 
@@ -201,7 +202,7 @@ The Mushaf supports **two view modes** (togglable like quran.com):
 - **Font Size Control:** Slider to adjust text size. Persist preference.
 - **Theme:** Light / Dark mode. Follow system preference with manual override.
 - **Hide Ayahs:** Toggle to blur/mask ayah text for self-testing.
-- **Surah Header:** Decorative header with surah name (Arabic), English name, ayah count, revelation type. Basmala displayed for all surahs except At-Tawbah (surah 9).
+- **Surah Header:** Decorative header with the QPC V4 surah-name font in Arabic mode, English name, ayah count, revelation type. Basmala uses the same V4 surah-name font and is displayed for all surahs except At-Tawbah (surah 9).
 
 ### 3.2 Word-Level Interaction
 

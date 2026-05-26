@@ -48,7 +48,7 @@ For web UI stabilization and verification rules, `docs/agent/WEB_UI_CONTRACT.md`
 - **Verse-by-verse**: FlashList over 6,350 items (6,236 ayahs + 114 surah headers); `getItemType` distinguishes them.
 - **Page-based**: vertical FlatList over 604 pages, line-by-line flexbox from `page_lines` (15 lines/page); `getItemLayout` with pre-computed offsets.
 - **Quran page fonts**: web uses native FontFace API (`display: 'swap'`), native uses expo-font. Loaded per-page with opacity reveal via `requestAnimationFrame`. QPC V4 Tajweed adds COLR palette support on web.
-- **Quran page assignment**: group ayahs by `v2_page` (NOT `page_map` — 56 ayahs differ). Basmallah uses page-1 PUA glyphs `ﱁ–ﱄ`.
+- **Quran page assignment**: group ayahs by `v2_page` (NOT `page_map` — 56 ayahs differ). Surah headers and structural basmallah use the bundled QPC V4 surah-name font; ayah text uses the selected bundled per-page Quran font.
 - `text_qcf2` has no Bismillah prefix and embeds end-of-ayah markers as PUA glyphs.
 - **Deep linking**: `lib/deep-link.ts` holds module-level state. `app/open.tsx` route → `setPendingDeepLink` → Mushaf consumes via `useFocusEffect`.
 

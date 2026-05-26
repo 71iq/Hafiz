@@ -4,9 +4,13 @@ import { SurahHeader } from "./SurahHeader";
 import { WordToken } from "./WordToken";
 import {
   isQuranPageFontLoaded,
+  isSurahNameFontLoaded,
   loadQuranPageFont,
+  loadSurahNameFont,
   quranPageFontName,
   quranPageFontPaletteStyle,
+  surahNameBismillahGlyphs,
+  surahNameFontName,
 } from "@/lib/fonts/loader";
 import { useSelection } from "@/lib/selection/context";
 import { useSettings } from "@/lib/settings/context";
@@ -105,8 +109,6 @@ type PageGlyph = {
   identity: WordIdentity;
 };
 
-// QCF2 Basmallah: 4 word glyphs from page 1's font (Surah 1 Ayah 1 = the Basmallah)
-const BISMILLAH_QCF2 = "\uFC41 \uFC42 \uFC43 \uFC44";
 const BISMILLAH_UTHMANI = "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ";
 
 // Approximate QCF2 font-size to Mushaf-line width ratio, used by PageMushaf
@@ -194,6 +196,7 @@ function MushafPageInner({
   hifzVisibility = null,
 }: Props) {
   const [fontVisible, setFontVisible] = useState(false);
+  const [surahNameFontReady, setSurahNameFontReady] = useState(() => isSurahNameFontLoaded());
   const [wordsLoaded, setWordsLoaded] = useState(!!pageWordsData);
   const { getHighlightColor, selectAyah } = useSelection();
   const { quranFontStyle, effectiveTheme } = useSettings();
@@ -215,15 +218,14 @@ function MushafPageInner({
       requestAnimationFrame(() => setFontVisible(true));
     };
 
-    const fontsReady =
-      isQuranPageFontLoaded(quranFontStyle, pageNumber) && isQuranPageFontLoaded(quranFontStyle, 1);
+    const fontsReady = isQuranPageFontLoaded(quranFontStyle, pageNumber);
 
     if (fontsReady) {
       reveal();
       return;
     }
 
-    Promise.all([loadQuranPageFont(quranFontStyle, pageNumber), loadQuranPageFont(quranFontStyle, 1)])
+    loadQuranPageFont(quranFontStyle, pageNumber)
       .then(reveal)
       .catch(console.warn);
   }, [pageNumber, quranFontStyle]);
@@ -232,6 +234,30 @@ function MushafPageInner({
     () => buildPageGlyphs(ayahs),
     [ayahs],
   );
+
+  const needsSurahNameFont = useMemo(
+    () =>
+      lineLayout?.some((line) => line.line_type === "surah_name" || line.line_type === "basmallah") ?? false,
+    [lineLayout],
+  );
+
+  useEffect(() => {
+    if (!needsSurahNameFont) return;
+    if (isSurahNameFontLoaded()) {
+      setSurahNameFontReady(true);
+      return;
+    }
+    setSurahNameFontReady(false);
+    let cancelled = false;
+    loadSurahNameFont()
+      .then(() => {
+        if (!cancelled) requestAnimationFrame(() => setSurahNameFontReady(true));
+      })
+      .catch(console.warn);
+    return () => {
+      cancelled = true;
+    };
+  }, [needsSurahNameFont]);
 
   const ayahIndexByKey = useMemo(() => {
     const map = new Map<string, number>();
@@ -295,8 +321,6 @@ function MushafPageInner({
   const visualLineHeight = lineSlotHeight ?? lineHeight;
   const fontFamily = quranPageFontName(quranFontStyle, pageNumber);
   const fontPaletteStyle = quranPageFontPaletteStyle(quranFontStyle, pageNumber, effectiveTheme);
-  const bismillahFontFamily = quranPageFontName(quranFontStyle, 1);
-  const bismillahPaletteStyle = quranPageFontPaletteStyle(quranFontStyle, 1, effectiveTheme);
 
   // Show loading indicator while font is not loaded at all
   if (!isQuranPageFontLoaded(quranFontStyle, pageNumber)) {
@@ -374,14 +398,15 @@ function MushafPageInner({
               {...bismillahSelectionProps}
               className="text-charcoal dark:text-neutral-200 text-center"
               style={{
-                fontFamily: bismillahFontFamily,
-                ...bismillahPaletteStyle,
+                fontFamily: surahNameFontName(),
                 fontSize: fontSize * 0.85,
                 lineHeight: lineHeight * 0.85,
+                opacity: surahNameFontReady ? 1 : 0,
+                writingDirection: "rtl",
                 ...(Platform.OS === "web" ? ({ userSelect: "text" } as any) : null),
               }}
             >
-              {BISMILLAH_QCF2}
+              {surahNameBismillahGlyphs()}
             </Text>
           </View>
         );

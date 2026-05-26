@@ -2,12 +2,9 @@ import { useEffect, useState } from "react";
 import { Platform, Pressable, View, Text } from "react-native";
 import { Info } from "lucide-react-native";
 import {
-  loadQuranPageFont,
   loadSurahNameFont,
-  quranPageFontName,
-  quranPageFontPaletteStyle,
-  isQuranPageFontLoaded,
   isSurahNameFontLoaded,
+  surahNameBismillahGlyphs,
   surahNameFontName,
   surahNameGlyph,
 } from "@/lib/fonts/loader";
@@ -26,8 +23,6 @@ type Props = {
   compact?: boolean;
 };
 
-/** QCF2 Bismillah from page 1 font (PUA codepoints) */
-const BISMILLAH_QCF2 = "\uFC41 \uFC42 \uFC43 \uFC44";
 const BISMILLAH_UTHMANI = "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ";
 
 export function SurahHeader({
@@ -40,7 +35,7 @@ export function SurahHeader({
   compact,
 }: Props) {
   const s = useStrings();
-  const { uiLanguage, isDark, quranFontStyle, effectiveTheme } = useSettings();
+  const { uiLanguage, isDark } = useSettings();
   const showBismillah =
     !hideBismillah && surahNumber !== 9 && surahNumber !== 1;
   const isArabicMode = uiLanguage === "ar";
@@ -56,17 +51,13 @@ export function SurahHeader({
     nameEnglish,
   };
 
-  const [bismFontReady, setBismFontReady] = useState(() =>
-    isQuranPageFontLoaded(quranFontStyle, 1)
-  );
   const [surahNameFontReady, setSurahNameFontReady] = useState(() =>
     isSurahNameFontLoaded()
   );
+  const needsSurahNameFont = Boolean(decorativeNameGlyph || showBismillah);
   const useDecorativeSurahName = Boolean(decorativeNameGlyph && surahNameFontReady);
   const renderedSurahName = useDecorativeSurahName ? decorativeNameGlyph! : displayName;
   const renderedSurahNameDirection = useDecorativeSurahName ? "ltr" : nameDirection;
-  const bismillahFontFamily = quranPageFontName(quranFontStyle, 1);
-  const bismillahPaletteStyle = quranPageFontPaletteStyle(quranFontStyle, 1, effectiveTheme);
   const bismillahSelectionProps =
     Platform.OS === "web" && showBismillah
       ? ({
@@ -83,29 +74,12 @@ export function SurahHeader({
       : {};
 
   useEffect(() => {
-    if (!showBismillah) return;
-    setBismFontReady(false);
-    if (isQuranPageFontLoaded(quranFontStyle, 1)) {
-      requestAnimationFrame(() => setBismFontReady(true));
-      return;
-    }
-    let cancelled = false;
-    loadQuranPageFont(quranFontStyle, 1).then(() => {
-      if (!cancelled) {
-        requestAnimationFrame(() => setBismFontReady(true));
-      }
-    }).catch(console.warn);
-    return () => {
-      cancelled = true;
-    };
-  }, [quranFontStyle, showBismillah]);
-
-  useEffect(() => {
-    if (!decorativeNameGlyph) return;
+    if (!needsSurahNameFont) return;
     if (isSurahNameFontLoaded()) {
       setSurahNameFontReady(true);
       return;
     }
+    setSurahNameFontReady(false);
     let cancelled = false;
     loadSurahNameFont()
       .then(() => {
@@ -115,7 +89,7 @@ export function SurahHeader({
     return () => {
       cancelled = true;
     };
-  }, [decorativeNameGlyph]);
+  }, [needsSurahNameFont]);
 
   if (compact) {
     return (
@@ -173,13 +147,13 @@ export function SurahHeader({
                 style={{
                   fontSize: 18,
                   lineHeight: 32,
-                  fontFamily: bismillahFontFamily,
-                  ...bismillahPaletteStyle,
-                  opacity: bismFontReady ? 1 : 0,
+                  fontFamily: surahNameFontName(),
+                  opacity: surahNameFontReady ? 1 : 0,
+                  writingDirection: "rtl",
                   ...(Platform.OS === "web" ? ({ userSelect: "text" } as any) : null),
                 }}
               >
-                {BISMILLAH_QCF2}
+                {surahNameBismillahGlyphs()}
               </Text>
             </View>
           )}
@@ -247,7 +221,6 @@ export function SurahHeader({
         </View>
       </View>
 
-      {/* Bismillah (QCF2) */}
       {showBismillah && (
         <View className="items-center mt-6 mb-2">
           <Text
@@ -256,13 +229,13 @@ export function SurahHeader({
             style={{
               fontSize: 24,
               lineHeight: 48,
-              fontFamily: bismillahFontFamily,
-              ...bismillahPaletteStyle,
-              opacity: bismFontReady ? 1 : 0,
+              fontFamily: surahNameFontName(),
+              opacity: surahNameFontReady ? 1 : 0,
+              writingDirection: "rtl",
               ...(Platform.OS === "web" ? ({ userSelect: "text" } as any) : null),
             }}
           >
-            {BISMILLAH_QCF2}
+            {surahNameBismillahGlyphs()}
           </Text>
         </View>
       )}

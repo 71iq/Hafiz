@@ -6,11 +6,12 @@ import { QPC_V4_TAJWEED_FONTS } from "./qpc-v4-tajweed-fonts";
 const loadedFonts = new Set<string>();
 const inFlight = new Map<string, Promise<void>>();
 const paletteCss = new Set<string>();
-const SURAH_NAME_FONT_FAMILY = "QCF_SurahHeader_COLOR";
-const SURAH_NAME_FONT = require("../../assets/fonts/surah-names/QCF_SurahHeader_COLOR-Regular.ttf");
+const SURAH_NAME_FONT_FAMILY = "v4-surah-name";
+const SURAH_NAME_FONT = require("../../assets/fonts/surah-names/surah_names_v4.ttf");
 const QURAN_COMMON_FONT_FAMILY = "QuranCommon";
 const QURAN_COMMON_FONT = require("../../assets/fonts/quran-common/quran-common.ttf");
 export type QuranPageFontStyle = "qcf2" | "v4-tajweed";
+const SURAH_NAME_BISMILLAH_GLYPHS = "\uFC9A \uFC9B \uFC9E \uFCA4";
 const SURAH_NAME_GLYPHS: Record<number, string> = {
   1: "\uFC45",
   2: "\uFC46",
@@ -147,6 +148,10 @@ export function surahNameFontName(): string {
 
 export function surahNameGlyph(surah: number): string | undefined {
   return SURAH_NAME_GLYPHS[surah];
+}
+
+export function surahNameBismillahGlyphs(): string {
+  return SURAH_NAME_BISMILLAH_GLYPHS;
 }
 
 export function quranCommonFontName(): string {
@@ -353,13 +358,16 @@ export async function loadSurahNameFont(): Promise<void> {
   if (existing) return existing;
 
   const promise = (async () => {
-    if (Platform.OS === "web" && typeof document !== "undefined") {
-      await loadFontWeb(SURAH_NAME_FONT_FAMILY, SURAH_NAME_FONT);
-    } else {
-      await Font.loadAsync({ [SURAH_NAME_FONT_FAMILY]: SURAH_NAME_FONT });
+    try {
+      if (Platform.OS === "web" && typeof document !== "undefined") {
+        await loadFontWeb(SURAH_NAME_FONT_FAMILY, SURAH_NAME_FONT);
+      } else {
+        await Font.loadAsync({ [SURAH_NAME_FONT_FAMILY]: SURAH_NAME_FONT });
+      }
+      loadedFonts.add(SURAH_NAME_FONT_FAMILY);
+    } finally {
+      inFlight.delete(SURAH_NAME_FONT_FAMILY);
     }
-    loadedFonts.add(SURAH_NAME_FONT_FAMILY);
-    inFlight.delete(SURAH_NAME_FONT_FAMILY);
   })();
 
   inFlight.set(SURAH_NAME_FONT_FAMILY, promise);
