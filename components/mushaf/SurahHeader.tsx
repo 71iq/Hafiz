@@ -3,8 +3,12 @@ import { Platform, Pressable, View, Text } from "react-native";
 import { Info } from "lucide-react-native";
 import {
   loadQpcFont,
+  loadSurahNameFont,
   qpcFontName,
   isQpcFontLoaded,
+  isSurahNameFontLoaded,
+  surahNameFontName,
+  surahNameGlyph,
 } from "@/lib/fonts/loader";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { useSettings } from "@/lib/settings/context";
@@ -43,6 +47,7 @@ export function SurahHeader({
   const localizedAyahCount = isArabicMode ? toArabicNumber(ayahCount) : String(ayahCount);
   const displayName = isArabicMode ? nameArabic : nameEnglish;
   const nameDirection = isArabicMode ? "rtl" : "ltr";
+  const decorativeNameGlyph = isArabicMode ? surahNameGlyph(surahNumber) : undefined;
   const [infoOpen, setInfoOpen] = useState(false);
   const infoTarget: SurahInfoTarget = {
     surahNumber,
@@ -53,6 +58,12 @@ export function SurahHeader({
   const [bismFontReady, setBismFontReady] = useState(() =>
     isQpcFontLoaded(1)
   );
+  const [surahNameFontReady, setSurahNameFontReady] = useState(() =>
+    isSurahNameFontLoaded()
+  );
+  const useDecorativeSurahName = Boolean(decorativeNameGlyph && surahNameFontReady);
+  const renderedSurahName = useDecorativeSurahName ? decorativeNameGlyph! : displayName;
+  const renderedSurahNameDirection = useDecorativeSurahName ? "ltr" : nameDirection;
   const bismillahSelectionProps =
     Platform.OS === "web" && showBismillah
       ? ({
@@ -85,6 +96,23 @@ export function SurahHeader({
     };
   }, [showBismillah]);
 
+  useEffect(() => {
+    if (!decorativeNameGlyph) return;
+    if (isSurahNameFontLoaded()) {
+      setSurahNameFontReady(true);
+      return;
+    }
+    let cancelled = false;
+    loadSurahNameFont()
+      .then(() => {
+        if (!cancelled) requestAnimationFrame(() => setSurahNameFontReady(true));
+      })
+      .catch(console.warn);
+    return () => {
+      cancelled = true;
+    };
+  }, [decorativeNameGlyph]);
+
   if (compact) {
     return (
       <>
@@ -108,10 +136,16 @@ export function SurahHeader({
               >
                 <Text
                   className="text-primary dark:text-primary-bright text-center"
-                  style={{ flexShrink: 1, fontSize: 22, lineHeight: 36, writingDirection: nameDirection }}
+                  style={{
+                    flexShrink: 1,
+                    fontFamily: useDecorativeSurahName ? surahNameFontName() : undefined,
+                    fontSize: useDecorativeSurahName ? 42 : 22,
+                    lineHeight: useDecorativeSurahName ? 48 : 36,
+                    writingDirection: renderedSurahNameDirection,
+                  }}
                   numberOfLines={1}
                 >
-                  {displayName}
+                  {renderedSurahName}
                 </Text>
                 <View className="h-6 w-6 items-center justify-center rounded-full bg-primary-accent/10 dark:bg-primary-bright/10">
                   <Info size={12} color={isDark ? "#2dd4bf" : "#0d9488"} />
@@ -172,13 +206,14 @@ export function SurahHeader({
         <Text
           className="text-primary dark:text-primary-bright text-center mb-1.5"
           style={{
-            fontSize: 34,
-            lineHeight: 64,
-            writingDirection: nameDirection,
+            fontFamily: useDecorativeSurahName ? surahNameFontName() : undefined,
+            fontSize: useDecorativeSurahName ? 64 : 34,
+            lineHeight: useDecorativeSurahName ? 78 : 64,
+            writingDirection: renderedSurahNameDirection,
             paddingHorizontal: 14,
           }}
         >
-          {displayName}
+          {renderedSurahName}
         </Text>
 
         <Text
