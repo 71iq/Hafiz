@@ -13,6 +13,8 @@ import { useStrings } from "@/lib/i18n/useStrings";
 const TOOLTIP_HEIGHT = 36;
 const ARROW_SIZE = 6;
 const GAP = 6;
+const SIDE_MARGIN = 8;
+const MAX_TOOLTIP_WIDTH = 320;
 
 function TooltipPopup({
   position,
@@ -29,9 +31,12 @@ function TooltipPopup({
 }) {
   const [tooltipWidth, setTooltipWidth] = useState(0);
 
+  const viewportWidth = typeof window !== "undefined" ? window.innerWidth : 400;
+  const maxTooltipWidth = Math.min(MAX_TOOLTIP_WIDTH, viewportWidth - SIDE_MARGIN * 2);
+  const maxTextWidth = Math.max(80, maxTooltipWidth - 45);
   const centerX = position.x + position.width / 2;
   const left = tooltipWidth > 0
-    ? Math.max(8, Math.min(centerX - tooltipWidth / 2, (typeof window !== "undefined" ? window.innerWidth : 400) - tooltipWidth - 8))
+    ? Math.max(SIDE_MARGIN, Math.min(centerX - tooltipWidth / 2, viewportWidth - tooltipWidth - SIDE_MARGIN))
     : centerX;
   const top = position.y - TOOLTIP_HEIGHT - ARROW_SIZE - GAP;
 
@@ -47,6 +52,7 @@ function TooltipPopup({
         opacity: tooltipWidth > 0 ? 1 : 0,
         // @ts-ignore — cursor is valid on web
         cursor: "pointer",
+        maxWidth: maxTooltipWidth,
       }}
       onLayout={(e) => setTooltipWidth(e.nativeEvent.layout.width)}
       {...(onHoverIn && { onHoverIn })}
@@ -61,6 +67,7 @@ function TooltipPopup({
           flexDirection: "row",
           alignItems: "center",
           gap: 5,
+          maxWidth: maxTooltipWidth,
           // Ambient teal-tinted shadow per DESIGN.md
           shadowColor: "#003638",
           shadowOpacity: 0.04,
@@ -74,10 +81,14 @@ function TooltipPopup({
             color: "#fff",
             fontSize: 13,
             fontFamily: "Manrope_500Medium",
+            maxWidth: maxTextWidth,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
             // @ts-ignore — whiteSpace is valid CSS on web
             whiteSpace: "nowrap",
           }}
           numberOfLines={1}
+          ellipsizeMode="tail"
         >
           {translation ?? "…"}
         </Text>
