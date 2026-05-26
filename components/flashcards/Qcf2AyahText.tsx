@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
 import { Text, View } from "react-native";
-import { isQpcFontLoaded, loadQpcFont, qpcFontName } from "@/lib/fonts/loader";
+import {
+  isQuranPageFontLoaded,
+  loadQuranPageFont,
+  quranPageFontName,
+  quranPageFontPaletteStyle,
+} from "@/lib/fonts/loader";
+import { useSettings } from "@/lib/settings/context";
 
 type Props = {
   textQcf2: string;
@@ -19,25 +25,29 @@ export function Qcf2AyahText({
   colorClassName = "text-charcoal dark:text-neutral-100",
   highlightWordPos,
 }: Props) {
-  const [visible, setVisible] = useState(() => isQpcFontLoaded(v2Page));
+  const { quranFontStyle, effectiveTheme } = useSettings();
+  const [visible, setVisible] = useState(() => isQuranPageFontLoaded(quranFontStyle, v2Page));
 
   useEffect(() => {
-    if (isQpcFontLoaded(v2Page)) {
-      setVisible(true);
+    setVisible(false);
+    if (isQuranPageFontLoaded(quranFontStyle, v2Page)) {
+      requestAnimationFrame(() => setVisible(true));
       return;
     }
     let cancelled = false;
-    loadQpcFont(v2Page).then(() => {
+    loadQuranPageFont(quranFontStyle, v2Page).then(() => {
       if (!cancelled) requestAnimationFrame(() => setVisible(true));
     }).catch(console.warn);
     return () => {
       cancelled = true;
     };
-  }, [v2Page]);
+  }, [quranFontStyle, v2Page]);
 
   const tokens = textQcf2.split(" ").filter(Boolean);
   if (tokens.length === 0) return null;
   const highlightIndex = typeof highlightWordPos === "number" ? highlightWordPos - 1 : -1;
+  const fontFamily = quranPageFontName(quranFontStyle, v2Page);
+  const fontPaletteStyle = quranPageFontPaletteStyle(quranFontStyle, v2Page, effectiveTheme);
 
   return (
     <View
@@ -58,7 +68,8 @@ export function Qcf2AyahText({
             key={`${token}-${index}`}
             className={highlighted ? "text-primary-accent dark:text-primary-bright" : colorClassName}
             style={{
-              fontFamily: qpcFontName(v2Page),
+              fontFamily,
+              ...fontPaletteStyle,
               fontSize,
               lineHeight,
               paddingHorizontal: highlighted ? 7 : 1,

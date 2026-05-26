@@ -16,6 +16,7 @@ import {
   type ThemeMode,
   type UILanguage,
   type PageScroll,
+  type QuranFontStyle,
   type ViewMode,
 } from "@/lib/settings/context";
 import { useDatabase } from "@/lib/database/provider";
@@ -80,6 +81,7 @@ export default function SettingsScreen() {
     uiLanguage, setUiLanguage,
     pageScroll, setPageScroll,
     viewMode, setViewMode,
+    quranFontStyle, setQuranFontStyle,
   } = useSettings();
   const db = useDatabase();
   const s = useStrings();
@@ -583,6 +585,19 @@ export default function SettingsScreen() {
                 items={[
                   { value: "verse", label: s.mushafViewVerse },
                   { value: "page", label: s.mushafViewPage },
+                ]}
+              />
+            </SettingsControlRow>
+
+            <View className="h-4" />
+
+            <SettingsControlRow label={s.quranFontLabel} isRTL={isRTL}>
+              <ToggleGroup<QuranFontStyle>
+                value={quranFontStyle}
+                onValueChange={setQuranFontStyle}
+                items={[
+                  { value: "qcf2", label: s.quranFontQcf2 },
+                  { value: "v4-tajweed", label: s.quranFontV4Tajweed },
                 ]}
               />
             </SettingsControlRow>

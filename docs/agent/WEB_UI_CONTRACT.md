@@ -33,7 +33,7 @@ This document is the authoritative execution contract for the Hafiz web UI stabi
 
 ### Reader surfaces
 - Mushaf verse and page surfaces may use reader-specific width logic when needed for Quran layout fidelity.
-- Reader-specific exceptions must be documented and cannot weaken QCF2 correctness.
+- Reader-specific exceptions must be documented and cannot weaken Quran page-font correctness.
 
 ### Dialog and sheet widths
 - Phone overlays should prefer full-width bottom-sheet presentation with safe-area padding.
@@ -134,14 +134,14 @@ No implementation phase should fork search logic into separate page and modal be
 - Light and dark mode must both use the established surface and accent token ladders.
 - Hard borders and divider lines should be used only when they serve structure better than tonal separation.
 
-## QCF2 Reader Invariants
+## Quran Page-Font Reader Invariants
 
 These rules are non-negotiable across all UI phases:
-- Quran display uses QCF2 per-page fonts, not system Arabic fonts.
+- Quran display uses bundled per-page PUA fonts, not system Arabic fonts. QCF2 remains the default; QPC V4 Tajweed is an optional page-font style.
 - Page grouping uses `v2_page`, not `page_map`.
-- Web QCF2 loading uses the `FontFace` path in `lib/fonts/loader.ts`.
+- Web Quran page-font loading uses the `FontFace` path in `lib/fonts/loader.ts`; QPC V4 Tajweed also applies theme-specific web font palettes.
 - Quran word layout preserves the existing `direction: "ltr"` plus `flexDirection: "row-reverse"` behavior.
-- Copy and share flows use `text_uthmani`, not QCF2 PUA glyph text.
+- Copy and share flows use `text_uthmani`, not PUA glyph text.
 - Quran reads remain local SQLite reads; reading features do not block on network.
 
 ## Verification Gates

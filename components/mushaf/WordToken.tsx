@@ -7,6 +7,7 @@ import { useSettings } from "@/lib/settings/context";
 type Props = {
   glyph: string;
   fontFamily: string;
+  fontPalette?: string | null;
   fontSize: number;
   lineHeight: number;
   surah: number;
@@ -23,6 +24,7 @@ const DOUBLE_TAP_MS = 260;
 function WordTokenInner({
   glyph,
   fontFamily,
+  fontPalette,
   fontSize,
   lineHeight,
   surah,
@@ -150,6 +152,7 @@ function WordTokenInner({
         }
         style={{
           fontFamily,
+          ...(Platform.OS === "web" && fontPalette ? ({ fontPalette } as any) : null),
           fontSize,
           lineHeight,
           paddingHorizontal: 1,

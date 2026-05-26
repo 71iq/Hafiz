@@ -4,7 +4,12 @@ import { AudioLines, BookOpenText } from "lucide-react-native";
 import { Card } from "@/components/ui/Card";
 import { AyahDetailModal } from "@/components/mushaf/AyahDetailModal";
 import { useDatabase } from "@/lib/database/provider";
-import { isQpcFontLoaded, loadQpcFont, qpcFontName } from "@/lib/fonts/loader";
+import {
+  isQuranPageFontLoaded,
+  loadQuranPageFont,
+  quranPageFontName,
+  quranPageFontPaletteStyle,
+} from "@/lib/fonts/loader";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { DEFAULT_LANGUAGE, getLanguageByCode } from "@/lib/translations/languages";
 import { localizeReflectionJourneyText } from "@/lib/reflection-journey/schema";
@@ -40,7 +45,15 @@ type TextRow = {
 export function JourneyAyahCard({ block }: Props) {
   const db = useDatabase();
   const s = useStrings();
-  const { isDark, isRTL, uiLanguage, translationLanguage, tafseerSource } = useSettings();
+  const {
+    isDark,
+    isRTL,
+    uiLanguage,
+    translationLanguage,
+    tafseerSource,
+    quranFontStyle,
+    effectiveTheme,
+  } = useSettings();
   const [quranRows, setQuranRows] = useState<QuranRow[]>([]);
   const [textRows, setTextRows] = useState<TextRow[]>([]);
   const [fontsReady, setFontsReady] = useState(block.type !== "ayah_range");
@@ -167,8 +180,8 @@ export function JourneyAyahCard({ block }: Props) {
 
     Promise.all(
       uniquePages.map(async (page) => {
-        if (!isQpcFontLoaded(page)) {
-          await loadQpcFont(page);
+        if (!isQuranPageFontLoaded(quranFontStyle, page)) {
+          await loadQuranPageFont(quranFontStyle, page);
         }
       })
     )
@@ -178,14 +191,14 @@ export function JourneyAyahCard({ block }: Props) {
         }
       })
       .catch((error) => {
-        console.warn("[JourneyAyahCard] Failed to load QCF2 fonts:", error);
+        console.warn("[JourneyAyahCard] Failed to load Quran fonts:", error);
         if (!cancelled) setFontsReady(true);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [block.type, quranRows]);
+  }, [block.type, quranFontStyle, quranRows]);
 
   const placeholderBody = useMemo(() => {
     if (block.type !== "recitation_placeholder") return "";
@@ -263,7 +276,8 @@ export function JourneyAyahCard({ block }: Props) {
                           key={`${row.surah}:${row.ayah}:${index}`}
                           className="text-charcoal dark:text-neutral-100"
                           style={{
-                            fontFamily: qpcFontName(row.v2_page),
+                            fontFamily: quranPageFontName(quranFontStyle, row.v2_page),
+                            ...quranPageFontPaletteStyle(quranFontStyle, row.v2_page, effectiveTheme),
                             fontSize: 28,
                             lineHeight: 54,
                             paddingHorizontal: 2,

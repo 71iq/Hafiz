@@ -3,9 +3,10 @@ import { ActivityIndicator, View, Text, Pressable, Animated as RNAnimated, Platf
 import * as Clipboard from "expo-clipboard";
 import { useQuery } from "@tanstack/react-query";
 import {
-  loadQpcFont,
-  qpcFontName,
-  isQpcFontLoaded,
+  isQuranPageFontLoaded,
+  loadQuranPageFont,
+  quranPageFontName,
+  quranPageFontPaletteStyle,
 } from "@/lib/fonts/loader";
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
@@ -64,7 +65,7 @@ function AyahBlockInner({
   const { width } = useWindowDimensions();
   const isPhone = width < SIDEBAR_BREAKPOINT;
   const db = useDatabase();
-  const { translationLanguage, recitationId, isRTL, isDark } = useSettings();
+  const { translationLanguage, recitationId, isRTL, isDark, quranFontStyle, effectiveTheme } = useSettings();
   const langInfo = getLanguageByCode(translationLanguage);
   const s = useStrings();
   const { isBookmarked, getHighlightColor, showToast, refreshBookmarks, selectAyah } = useSelection();
@@ -78,7 +79,7 @@ function AyahBlockInner({
   });
 
   const [fontVisible, setFontVisible] = useState(() =>
-    isQpcFontLoaded(v2Page)
+    isQuranPageFontLoaded(quranFontStyle, v2Page)
   );
   const [revealed, setRevealed] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -111,20 +112,21 @@ function AyahBlockInner({
   }, [text]);
 
   useEffect(() => {
-    if (isQpcFontLoaded(v2Page)) {
-      setFontVisible(true);
+    setFontVisible(false);
+    if (isQuranPageFontLoaded(quranFontStyle, v2Page)) {
+      requestAnimationFrame(() => setFontVisible(true));
       return;
     }
     let cancelled = false;
-    loadQpcFont(v2Page).then(() => {
+    loadQuranPageFont(quranFontStyle, v2Page).then(() => {
       if (!cancelled) {
         requestAnimationFrame(() => setFontVisible(true));
       }
-    });
+    }).catch(console.warn);
     return () => {
       cancelled = true;
     };
-  }, [v2Page]);
+  }, [quranFontStyle, v2Page]);
 
   useEffect(() => {
     setRevealed(false);
@@ -163,7 +165,8 @@ function AyahBlockInner({
   }, [hideMode]);
 
   const isBlurred = hideMode && !revealed;
-  const fontFamily = qpcFontName(v2Page);
+  const fontFamily = quranPageFontName(quranFontStyle, v2Page);
+  const fontPaletteStyle = quranPageFontPaletteStyle(quranFontStyle, v2Page, effectiveTheme);
   const bookmarked = isBookmarked(surah, ayah);
   const highlightColor = getHighlightColor(surah, ayah);
   const qcf2LineHeight = Math.ceil(lineHeight + Math.max(6, fontSize * 0.16));
@@ -371,6 +374,7 @@ function AyahBlockInner({
                 key={`${surah}-${ayah}-w${i}`}
                 glyph={glyph}
                 fontFamily={fontFamily}
+                fontPalette={fontPaletteStyle?.fontPalette ?? null}
                 fontSize={fontSize}
                 lineHeight={qcf2LineHeight}
                 surah={surah}
@@ -400,6 +404,7 @@ function AyahBlockInner({
                 className="text-charcoal dark:text-neutral-100"
                 style={{
                   fontFamily,
+                  ...fontPaletteStyle,
                   fontSize,
                   lineHeight: qcf2LineHeight,
                   paddingHorizontal: 2,

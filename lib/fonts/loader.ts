@@ -1,13 +1,16 @@
 import * as Font from "expo-font";
 import { Platform } from "react-native";
 import { QPC_V2_FONTS } from "./qpc-v2-fonts";
+import { QPC_V4_TAJWEED_FONTS } from "./qpc-v4-tajweed-fonts";
 
 const loadedFonts = new Set<string>();
 const inFlight = new Map<string, Promise<void>>();
+const paletteCss = new Set<string>();
 const SURAH_NAME_FONT_FAMILY = "QCF_SurahHeader_COLOR";
 const SURAH_NAME_FONT = require("../../assets/fonts/surah-names/QCF_SurahHeader_COLOR-Regular.ttf");
 const QURAN_COMMON_FONT_FAMILY = "QuranCommon";
 const QURAN_COMMON_FONT = require("../../assets/fonts/quran-common/quran-common.ttf");
+export type QuranPageFontStyle = "qcf2" | "v4-tajweed";
 const SURAH_NAME_GLYPHS: Record<number, string> = {
   1: "\uFC45",
   2: "\uFC46",
@@ -130,6 +133,14 @@ export function qpcFontName(page: number): string {
   return `QCF2_${String(page).padStart(3, "0")}`;
 }
 
+export function qpcV4TajweedFontName(page: number): string {
+  return `p${page}-v4-tajweed`;
+}
+
+export function quranPageFontName(style: QuranPageFontStyle, page: number): string {
+  return style === "v4-tajweed" ? qpcV4TajweedFontName(page) : qpcFontName(page);
+}
+
 export function surahNameFontName(): string {
   return SURAH_NAME_FONT_FAMILY;
 }
@@ -155,6 +166,74 @@ export function juzNumberGlyph(juz: number): string | undefined {
   return formatJuzLigature("juz", juz);
 }
 
+const QPC_V4_TAJWEED_PALETTES = {
+  light: {
+    base: 0,
+    colors: [
+      "#000000ff", "#A5A5A5ff", "#A5A5A5ff", "#B50000ff", "#FF7B00ff", "#CE9E00ff",
+      "#09B000ff", "#3F48E6ff", "#2FADFFff", "#F40000ff", "#2CA4ABff", "#FF0080ff",
+      "#D8E9D8ff", "#000000ff", "#000000ff", "#A5A5A5ff", "#CC9E00ff", "#00B000ff",
+    ],
+  },
+  dark: {
+    base: 5,
+    colors: [
+      "#E8E8E8ff", "#B0B0B0ff", "#B0B0B0ff", "#FF6B6Bff", "#FFA94Dff", "#FFD93Dff",
+      "#6BCB77ff", "#4D96FFff", "#00D9FFff", "#FF4D6Dff", "#26C6DAff", "#FF80ABff",
+      "#343A40ff", "#E8E8E8ff", "#E8E8E8ff", "#B0B0B0ff", "#FFD700ff", "#69F0AEff",
+    ],
+  },
+  sepia: {
+    base: 2,
+    colors: [
+      "#3D2914ff", "#5C4033ff", "#5C4033ff", "#B84000ff", "#C65D00ff", "#8B6914ff",
+      "#1E7B1Eff", "#2E4A8Fff", "#0077A3ff", "#C41E3Aff", "#A32952ff", "#2D6A4Fff",
+      "#FFF7EAff", "#8B0000ff", "#3D2914ff", "#5C4033ff", "#8B6508ff", "#1A6B1Aff",
+    ],
+  },
+} as const;
+
+function qpcV4PaletteKey(theme: string): keyof typeof QPC_V4_TAJWEED_PALETTES {
+  if (theme === "dark" || theme === "amoled") return "dark";
+  if (theme === "beige") return "sepia";
+  return "light";
+}
+
+function qpcV4TajweedPaletteName(page: number, theme: string): string {
+  return `--hafiz-qpc-v4-${qpcV4PaletteKey(theme)}-p${page}`;
+}
+
+function ensureQpcV4TajweedPaletteCss(page: number, fontName: string) {
+  if (Platform.OS !== "web" || typeof document === "undefined") return;
+  const cssKey = `qpc-v4-${page}`;
+  if (paletteCss.has(cssKey)) return;
+
+  const css = Object.entries(QPC_V4_TAJWEED_PALETTES).map(([key, palette]) => {
+    const colors = palette.colors.map((color, index) => `${index} ${color}`).join(",\n      ");
+    return `@font-palette-values --hafiz-qpc-v4-${key}-p${page} {
+  font-family: '${fontName}';
+  base-palette: ${palette.base};
+  override-colors:
+      ${colors};
+}`;
+  }).join("\n\n");
+
+  const style = document.createElement("style");
+  style.id = `hafiz-qpc-v4-palette-${page}`;
+  style.textContent = css;
+  document.head.appendChild(style);
+  paletteCss.add(cssKey);
+}
+
+export function quranPageFontPaletteStyle(
+  style: QuranPageFontStyle,
+  page: number,
+  theme: string,
+): any {
+  if (style !== "v4-tajweed" || Platform.OS !== "web") return null;
+  return { fontPalette: qpcV4TajweedPaletteName(page, theme) };
+}
+
 /**
  * Load a QCF2 font on web using the native FontFace API with display: 'swap'.
  *
@@ -168,12 +247,15 @@ export function juzNumberGlyph(juz: number): string | undefined {
  * uses the custom font as soon as it's loaded — no post-hoc CSS patching needed.
  */
 async function loadFontWeb(name: string, asset: any): Promise<void> {
-  // On web, require('./font.ttf') goes through the metro bundler.
-  // expo-asset resolves it to a servable URL.
-  const { Asset } = await import("expo-asset");
-  const mod = Asset.fromModule(asset);
-  await mod.downloadAsync();
-  const uri = mod.localUri || mod.uri;
+  let uri: string;
+  if (typeof asset === "string") {
+    uri = asset;
+  } else {
+    const { Asset } = await import("expo-asset");
+    const mod = Asset.fromModule(asset);
+    await mod.downloadAsync();
+    uri = mod.localUri || mod.uri;
+  }
 
   const fontFace = new FontFace(name, `url("${uri}")`, { display: "swap" });
   (document.fonts as any).add(fontFace);
@@ -197,13 +279,16 @@ export async function loadQpcFont(page: number): Promise<void> {
   }
 
   const promise = (async () => {
-    if (Platform.OS === "web" && typeof document !== "undefined") {
-      await loadFontWeb(name, asset);
-    } else {
-      await Font.loadAsync({ [name]: asset });
+    try {
+      if (Platform.OS === "web" && typeof document !== "undefined") {
+        await loadFontWeb(name, asset);
+      } else {
+        await Font.loadAsync({ [name]: asset });
+      }
+      loadedFonts.add(name);
+    } finally {
+      inFlight.delete(name);
     }
-    loadedFonts.add(name);
-    inFlight.delete(name);
   })();
 
   inFlight.set(name, promise);
@@ -213,6 +298,52 @@ export async function loadQpcFont(page: number): Promise<void> {
 /** Check if the QPC V2 font for a page is already loaded */
 export function isQpcFontLoaded(page: number): boolean {
   return loadedFonts.has(qpcFontName(page));
+}
+
+export async function loadQpcV4TajweedFont(page: number): Promise<void> {
+  const name = qpcV4TajweedFontName(page);
+  if (loadedFonts.has(name)) {
+    ensureQpcV4TajweedPaletteCss(page, name);
+    return;
+  }
+
+  const existing = inFlight.get(name);
+  if (existing) return existing;
+
+  const asset = QPC_V4_TAJWEED_FONTS[page];
+  if (!asset) {
+    console.warn(`[QPC V4 Tajweed] No font asset for page ${page}`);
+    return;
+  }
+
+  const promise = (async () => {
+    try {
+      if (Platform.OS === "web" && typeof document !== "undefined") {
+        await loadFontWeb(name, asset);
+      } else {
+        await Font.loadAsync({ [name]: asset });
+      }
+      loadedFonts.add(name);
+      ensureQpcV4TajweedPaletteCss(page, name);
+    } finally {
+      inFlight.delete(name);
+    }
+  })();
+
+  inFlight.set(name, promise);
+  return promise;
+}
+
+export function isQpcV4TajweedFontLoaded(page: number): boolean {
+  return loadedFonts.has(qpcV4TajweedFontName(page));
+}
+
+export async function loadQuranPageFont(style: QuranPageFontStyle, page: number): Promise<void> {
+  return style === "v4-tajweed" ? loadQpcV4TajweedFont(page) : loadQpcFont(page);
+}
+
+export function isQuranPageFontLoaded(style: QuranPageFontStyle, page: number): boolean {
+  return style === "v4-tajweed" ? isQpcV4TajweedFontLoaded(page) : isQpcFontLoaded(page);
 }
 
 export async function loadSurahNameFont(): Promise<void> {

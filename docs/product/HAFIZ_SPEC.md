@@ -24,7 +24,7 @@ The UI is a **hybrid of quran.com and wahy.net**. The reading experience, layout
 - wahy.net — word interaction popover, linguistic data panels
 
 **Design Tokens:**
-- **Font (Quran text):** QCF2 / KFGQPC V2 (604 per-page fonts with PUA glyph mapping) — see §2.4 for details
+- **Font (Quran text):** Bundled per-page PUA fonts. QCF2 / KFGQPC V2 is the default; QPC V4 Tajweed is optional for colored tajweed rendering — see §2.4 for details
 - **Font (UI):** System default (San Francisco on iOS, Roboto on Android) for UI, plus a clean Arabic UI font (e.g., IBM Plex Arabic or Noto Sans Arabic) for non-Quran Arabic text
 - **Color palette:** Warm neutrals matching quran.com — not stark white. Dark mode support required.
 - **Spacing:** Generous line-height for Arabic text (minimum 2.0x). Clear visual hierarchy.
@@ -123,12 +123,13 @@ Your existing `quran-data.json` contains:
 - **Download:** `https://raw.githubusercontent.com/rn0x/Quran-Data/version-2.0/data/pagesQuran.json`
 - **Structure:** Array of `{ page, start: { surah_number, verse, name }, end: { surah_number, verse, name } }` for all 604 pages
 
-#### 2.4.5 Arabic Font (QCF2 / KFGQPC V2)
-- **Font:** QCF2 (Quran Complex Font v2) — 604 per-page fonts with Private Use Area (PUA) glyph mapping, same rendering used by quran.com's reading mode.
-- **Source:** Quran Foundation CDN — `https://verses.quran.foundation/fonts/quran/hafs/v2/`
-- **Structure:** One TTF per page (QCF2_001.ttf through QCF2_604.ttf). Each font maps Quran words to PUA codepoints (U+FC41+) for pixel-perfect Mushaf rendering.
+#### 2.4.5 Arabic Page Fonts (QCF2 / KFGQPC V2 and QPC V4 Tajweed)
+- **Default font:** QCF2 (Quran Complex Font v2) — 604 per-page fonts with Private Use Area (PUA) glyph mapping, same rendering used by quran.com's reading mode.
+- **Optional font:** QPC V4 Tajweed — 604 per-page color fonts for the 1441H 15-line layout. Web uses WOFF2 COLR fonts and theme-specific `font-palette` values; native uses bundled TTF fonts through expo-font.
+- **Sources:** Quran Foundation CDN for QCF2 (`https://verses.quran.foundation/fonts/quran/hafs/v2/`) and QUL/Quran Foundation font resources for QPC V4 Tajweed.
+- **Structure:** One font per page. QCF2 uses `QCF2_001.ttf` through `QCF2_604.ttf`; QPC V4 Tajweed uses page font families like `p574-v4-tajweed`. Each font maps Quran words to PUA codepoints for pixel-perfect Mushaf rendering.
 - **License:** Free to use, copy, distribute. Cannot be sold, modified, or reverse-engineered.
-- **Usage:** Bundle all 604 font files in `assets/fonts/qpc_v2/`. Fonts are loaded dynamically per-page (FontFace API on web, expo-font on native). Text data stored as `text_qcf2` column in `quran_text` with space-separated PUA codepoints per ayah.
+- **Usage:** Bundle all per-page font files locally. Fonts are loaded dynamically per-page (FontFace API on web, expo-font on native). Native V4 TTFs live under `assets/fonts/`; web V4 WOFF2 files live under `public/fonts/` so they stay static/offline without entering Metro's JS asset graph. Text data stored as `text_qcf2` column in `quran_text` with space-separated PUA codepoints per ayah; copy/share still use `text_uthmani`.
 
 #### 2.4.6 Word-by-Word English Translation
 - **Source:** Quranic Universal Library (QUL) at `https://qul.tarteel.ai/resources`
@@ -196,7 +197,7 @@ The Mushaf supports **two view modes** (togglable like quran.com):
 - Below each ayah (collapsible): translation, tafseer, reflections (like quran.com).
 
 #### 3.1.3 Common to Both Views
-- **Font:** QCF2 (KFGQPC V2) per-page fonts for all Quran text, rendered RTL.
+- **Font:** Bundled per-page Quran fonts for all Quran text, rendered RTL. QCF2 is the default; QPC V4 Tajweed can be selected for colored tajweed rendering.
 - **Font Size Control:** Slider to adjust text size. Persist preference.
 - **Theme:** Light / Dark mode. Follow system preference with manual override.
 - **Hide Ayahs:** Toggle to blur/mask ayah text for self-testing.
@@ -460,7 +461,7 @@ daily_scores (
 
 ### 3.8 Settings
 
-- **Reading preferences:** Font size, theme (light/dark/auto), default Mushaf view mode (page/verse-by-verse), show/hide translation inline, show/hide tafseer inline.
+- **Reading preferences:** Font size, Quran font style, theme (light/dark/auto), default Mushaf view mode (page/verse-by-verse), show/hide translation inline, show/hide tafseer inline.
 - **Flashcard deck preferences:** Per-deck enabled test modes and daily review limit.
 - **Notifications:** Daily review reminder (time picker).
 - **Account:** Login/logout, username, sync status.
@@ -540,7 +541,7 @@ Use Supabase Row Level Security (RLS) policies:
 
 1. Initialize Expo project with TypeScript and NativeWind.
 2. Configure `expo-sqlite`.
-3. Bundle the QCF2 per-page fonts (604 TTFs) and font loader.
+3. Bundle the Quran per-page fonts (QCF2 default, QPC V4 Tajweed optional) and font loader.
 4. Write a data import script that runs on first app launch:
    - Import `quran-data.json` into SQLite tables (surahs, quran_text, juz_map, hizb_map, word_roots).
    - Import tafseer JSON files into `tafseer` table.
@@ -558,7 +559,7 @@ Use Supabase Row Level Security (RLS) policies:
 
 1. Create tab navigation: Mushaf, Search, Flashcards, Leaderboard, Settings.
 2. Build the verse-by-verse Mushaf screen with FlashList.
-3. Render each ayah with QCF2 per-page font, ayah number badge, RTL layout.
+3. Render each ayah with the selected bundled per-page Quran font, ayah number badge, RTL layout.
 4. Add surah headers (decorative) with name, bismillah handling.
 5. Implement font size slider (persist in user_settings).
 6. Implement dark/light/auto theme toggle.
@@ -758,7 +759,8 @@ hafiz/
 │   └── useSync.ts                # Background sync hook
 ├── assets/
 │   ├── fonts/
-│   │   └── qpc_v2/               # 604 QCF2 per-page font files
+│   │   ├── qpc_v2/               # 604 QCF2 per-page font files
+│   │   └── QPC_V4_TAJWEED/       # 604 native QPC V4 Tajweed TTF files
 │   └── data/                     # Bundled datasets (JSON/SQLite)
 │       ├── quran-data.json
 │       ├── tafseer/
@@ -768,6 +770,9 @@ hafiz/
 │       ├── masaq/
 │       ├── morphology/
 │       └── tajweed.json
+├── public/
+│   └── fonts/
+│       └── QPC_V4_TAJWEED_WOFF2/ # 604 web QPC V4 Tajweed WOFF2 files
 ├── design-references/            # Screenshot references for UI
 ├── schemas/                      # Zod validation schemas
 │   ├── auth.ts
@@ -786,7 +791,7 @@ hafiz/
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
 | SRS Algorithm | FSRS-6 via ts-fsrs | 88% more accurate than SM-2. Zero deps, runs in Hermes. |
-| Font | QCF2 / KFGQPC V2 | 604 per-page fonts with PUA glyph mapping. Pixel-perfect Mushaf rendering matching quran.com reading mode. |
+| Font | QCF2 / KFGQPC V2 default; QPC V4 Tajweed optional | 604 per-page fonts with PUA glyph mapping. Pixel-perfect Mushaf rendering with optional colored tajweed palettes on web. |
 | Local DB | expo-sqlite | Expo-native, no native module headaches. |
 | Sync strategy | Offline-first, last-write-wins | Quran study is personal; merge conflicts are rare. |
 | Page mapping | Pre-bundled JSON | Offline-first requirement. No runtime API dependency. |

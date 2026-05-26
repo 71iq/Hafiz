@@ -2,8 +2,14 @@ import { memo, useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { View, Text, Pressable, ActivityIndicator, Platform } from "react-native";
 import { SurahHeader } from "./SurahHeader";
 import { WordToken } from "./WordToken";
-import { loadQpcFont, qpcFontName, isQpcFontLoaded } from "@/lib/fonts/loader";
+import {
+  isQuranPageFontLoaded,
+  loadQuranPageFont,
+  quranPageFontName,
+  quranPageFontPaletteStyle,
+} from "@/lib/fonts/loader";
 import { useSelection } from "@/lib/selection/context";
+import { useSettings } from "@/lib/settings/context";
 
 export type PageWordsByLine = Record<string, string>;
 export type PageWordsData = PageWordsByLine[];
@@ -190,6 +196,7 @@ function MushafPageInner({
   const [fontVisible, setFontVisible] = useState(false);
   const [wordsLoaded, setWordsLoaded] = useState(!!pageWordsData);
   const { getHighlightColor, selectAyah } = useSelection();
+  const { quranFontStyle, effectiveTheme } = useSettings();
   const lastMarkerTapRef = useRef<{ key: string; at: number } | null>(null);
   const skipNextMarkerPressRef = useRef<string | null>(null);
 
@@ -209,17 +216,17 @@ function MushafPageInner({
     };
 
     const fontsReady =
-      isQpcFontLoaded(pageNumber) && isQpcFontLoaded(1);
+      isQuranPageFontLoaded(quranFontStyle, pageNumber) && isQuranPageFontLoaded(quranFontStyle, 1);
 
     if (fontsReady) {
       reveal();
       return;
     }
 
-    Promise.all([loadQpcFont(pageNumber), loadQpcFont(1)])
+    Promise.all([loadQuranPageFont(quranFontStyle, pageNumber), loadQuranPageFont(quranFontStyle, 1)])
       .then(reveal)
       .catch(console.warn);
-  }, [pageNumber]);
+  }, [pageNumber, quranFontStyle]);
 
   const pageGlyphs = useMemo(
     () => buildPageGlyphs(ayahs),
@@ -286,10 +293,13 @@ function MushafPageInner({
   const maxContentWidth = Math.max(0, width - sidePadding * 2);
   const contentWidth = Math.max(0, Math.min(lineWidth ?? fontSize * MUSHAF_LINE_WIDTH_SCALE, maxContentWidth));
   const visualLineHeight = lineSlotHeight ?? lineHeight;
-  const fontFamily = qpcFontName(pageNumber);
+  const fontFamily = quranPageFontName(quranFontStyle, pageNumber);
+  const fontPaletteStyle = quranPageFontPaletteStyle(quranFontStyle, pageNumber, effectiveTheme);
+  const bismillahFontFamily = quranPageFontName(quranFontStyle, 1);
+  const bismillahPaletteStyle = quranPageFontPaletteStyle(quranFontStyle, 1, effectiveTheme);
 
   // Show loading indicator while font is not loaded at all
-  if (!isQpcFontLoaded(pageNumber)) {
+  if (!isQuranPageFontLoaded(quranFontStyle, pageNumber)) {
     return (
       <View style={{ width, minHeight: 200 }} className="items-center justify-center">
         {showLoadingIndicator && <ActivityIndicator size="small" color="#0d9488" />}
@@ -364,7 +374,8 @@ function MushafPageInner({
               {...bismillahSelectionProps}
               className="text-charcoal dark:text-neutral-200 text-center"
               style={{
-                fontFamily: qpcFontName(1),
+                fontFamily: bismillahFontFamily,
+                ...bismillahPaletteStyle,
                 fontSize: fontSize * 0.85,
                 lineHeight: lineHeight * 0.85,
                 ...(Platform.OS === "web" ? ({ userSelect: "text" } as any) : null),
@@ -429,6 +440,7 @@ function MushafPageInner({
                   key={`w-${lineNumber}-${i}`}
                   glyph={w}
                   fontFamily={fontFamily}
+                  fontPalette={fontPaletteStyle?.fontPalette ?? null}
                   fontSize={fontSize}
                   lineHeight={lineHeight}
                   surah={identity.surah}
@@ -475,6 +487,7 @@ function MushafPageInner({
                     className="text-charcoal dark:text-neutral-100"
                     style={{
                       fontFamily,
+                      ...fontPaletteStyle,
                       fontSize,
                       lineHeight,
                       paddingHorizontal: 2,
@@ -495,7 +508,7 @@ function MushafPageInner({
               <Text
                 key={`w-${lineNumber}-${i}`}
                 className="text-charcoal dark:text-neutral-100"
-                style={{ fontFamily, fontSize, lineHeight, paddingHorizontal: 2 }}
+                style={{ fontFamily, ...fontPaletteStyle, fontSize, lineHeight, paddingHorizontal: 2 }}
               >
                 {w}
               </Text>
@@ -575,6 +588,7 @@ function MushafPageInner({
         className="text-charcoal dark:text-neutral-100"
         style={{
           fontFamily,
+          ...fontPaletteStyle,
           fontSize,
           lineHeight,
           textAlign: "justify",

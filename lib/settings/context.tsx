@@ -54,6 +54,7 @@ export type ThemeColors = {
 };
 export type ViewMode = "verse" | "page";
 export type PageScroll = "vertical" | "horizontal";
+export type QuranFontStyle = "qcf2" | "v4-tajweed";
 export type UILanguage = "en" | "ar";
 export type TafseerSource = TafsirSourceId;
 const UI_LANGUAGE_CACHE_KEY = "hafiz_ui_language";
@@ -129,6 +130,8 @@ type SettingsContextType = {
   themeColors: ThemeColors;
   viewMode: ViewMode;
   setViewMode: (mode: ViewMode) => void;
+  quranFontStyle: QuranFontStyle;
+  setQuranFontStyle: (style: QuranFontStyle) => void;
   pageScroll: PageScroll;
   setPageScroll: (scroll: PageScroll) => void;
   showTranslation: boolean;
@@ -175,6 +178,8 @@ const SettingsContext = createContext<SettingsContextType>({
   themeColors: THEME_COLORS.beige,
   viewMode: "verse",
   setViewMode: () => {},
+  quranFontStyle: "qcf2",
+  setQuranFontStyle: () => {},
   pageScroll: "vertical",
   setPageScroll: () => {},
   showTranslation: false,
@@ -294,6 +299,10 @@ function normalizeThemeMode(value: string | null | undefined): ThemeMode | null 
   if (value === "light") return "beige";
   if (isThemePalette(value) || value === "system" || value === "scheduled") return value;
   return null;
+}
+
+function normalizeQuranFontStyle(value: string | null | undefined): QuranFontStyle | null {
+  return value === "qcf2" || value === "v4-tajweed" ? value : null;
 }
 
 function normalizeThemeTime(value: string | null | undefined): string | null {
@@ -485,6 +494,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [scheduledRules, setScheduledRulesState] = useState<ThemeScheduleRule[]>(readCachedScheduledRules);
   const [nowMinute, setNowMinute] = useState(getCurrentMinuteOfDay);
   const [viewMode, setViewModeState] = useState<ViewMode>("verse");
+  const [quranFontStyle, setQuranFontStyleState] = useState<QuranFontStyle>("qcf2");
   const effectiveFontIndex = fontSizeIndex;
   const [pageScroll, setPageScrollState] = useState<PageScroll>("vertical");
   const [showTranslation, setShowTranslationState] = useState(false);
@@ -511,6 +521,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           "scheduled_theme",
           "scheduled_switch_time",
           "view_mode",
+          "quran_font_style",
           "page_scroll",
           "show_translation",
           "show_tafseer",
@@ -569,6 +580,11 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         const savedViewMode = saved.view_mode;
         if (savedViewMode === "verse" || savedViewMode === "page") {
           setViewModeState(savedViewMode);
+        }
+
+        const savedQuranFontStyle = normalizeQuranFontStyle(saved.quran_font_style);
+        if (savedQuranFontStyle) {
+          setQuranFontStyleState(savedQuranFontStyle);
         }
 
         const savedPageScroll = saved.page_scroll;
@@ -766,6 +782,14 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     [db]
   );
 
+  const setQuranFontStyle = useCallback(
+    (style: QuranFontStyle) => {
+      setQuranFontStyleState(style);
+      writeSetting(db, "quran_font_style", style).catch(console.warn);
+    },
+    [db]
+  );
+
   const setPageScroll = useCallback(
     (scroll: PageScroll) => {
       setPageScrollState(scroll);
@@ -903,6 +927,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         themeColors,
         viewMode,
         setViewMode,
+        quranFontStyle,
+        setQuranFontStyle,
         pageScroll,
         setPageScroll,
         showTranslation,

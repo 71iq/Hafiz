@@ -7,7 +7,12 @@ import { QiraatTab } from "@/components/mushaf/word-tabs/QiraatTab";
 import { HadithTab } from "@/components/mushaf/ayah-tabs/HadithTab";
 import { PrivateNotesSection } from "@/components/notes/PrivateNotesSection";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
-import { isQpcFontLoaded, loadQpcFont, qpcFontName } from "@/lib/fonts/loader";
+import {
+  isQuranPageFontLoaded,
+  loadQuranPageFont,
+  quranPageFontName,
+  quranPageFontPaletteStyle,
+} from "@/lib/fonts/loader";
 import { useAyahAudio } from "@/lib/audio/ayah-audio";
 import { useDatabase } from "@/lib/database/provider";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -64,6 +69,8 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
     uiLanguage,
     isRTL,
     isDark,
+    quranFontStyle,
+    effectiveTheme,
   } = useSettings();
   const { isBookmarked, showToast, refreshBookmarks } = useSelection();
   const { getAyahState, toggleAyah } = useAyahAudio();
@@ -92,7 +99,10 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
   const isPhone = width < SIDEBAR_BREAKPOINT;
   const maxOverlayHeight = Math.min(height - (isPhone ? 12 : 48), isPhone ? height * 0.94 : 720);
   const qcf2Tokens = ayahRow?.text_qcf2.split(" ").filter(Boolean) ?? [];
-  const qcf2FontFamily = ayahRow ? qpcFontName(ayahRow.v2_page) : undefined;
+  const qcf2FontFamily = ayahRow ? quranPageFontName(quranFontStyle, ayahRow.v2_page) : undefined;
+  const qcf2FontPaletteStyle = ayahRow
+    ? quranPageFontPaletteStyle(quranFontStyle, ayahRow.v2_page, effectiveTheme)
+    : null;
   const selectedTafsir = tafsirRows?.find((row) => row.source === selectedTafsirSource) ?? tafsirRows?.[0] ?? null;
   const selectedTafsirIsRtl = selectedTafsir?.source !== "jalalayn-en";
   const title = ayahRow
@@ -175,18 +185,19 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
 
   useEffect(() => {
     if (!ayahRow) return;
-    if (isQpcFontLoaded(ayahRow.v2_page)) {
-      setFontVisible(true);
+    setFontVisible(false);
+    if (isQuranPageFontLoaded(quranFontStyle, ayahRow.v2_page)) {
+      requestAnimationFrame(() => setFontVisible(true));
       return;
     }
     let cancelled = false;
-    loadQpcFont(ayahRow.v2_page).then(() => {
+    loadQuranPageFont(quranFontStyle, ayahRow.v2_page).then(() => {
       if (!cancelled) requestAnimationFrame(() => setFontVisible(true));
     }).catch(console.warn);
     return () => {
       cancelled = true;
     };
-  }, [ayahRow]);
+  }, [ayahRow, quranFontStyle]);
 
   useEffect(() => {
     if (!activeTarget || !showTranslation) return;
@@ -420,6 +431,7 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
                   className="text-charcoal dark:text-neutral-100"
                   style={{
                     fontFamily: qcf2FontFamily,
+                    ...qcf2FontPaletteStyle,
                     fontSize: isPhone ? 30 : 36,
                     lineHeight: isPhone ? 58 : 66,
                     paddingHorizontal: 2,

@@ -2,10 +2,11 @@ import { useEffect, useState } from "react";
 import { Platform, Pressable, View, Text } from "react-native";
 import { Info } from "lucide-react-native";
 import {
-  loadQpcFont,
+  loadQuranPageFont,
   loadSurahNameFont,
-  qpcFontName,
-  isQpcFontLoaded,
+  quranPageFontName,
+  quranPageFontPaletteStyle,
+  isQuranPageFontLoaded,
   isSurahNameFontLoaded,
   surahNameFontName,
   surahNameGlyph,
@@ -39,7 +40,7 @@ export function SurahHeader({
   compact,
 }: Props) {
   const s = useStrings();
-  const { uiLanguage, isDark } = useSettings();
+  const { uiLanguage, isDark, quranFontStyle, effectiveTheme } = useSettings();
   const showBismillah =
     !hideBismillah && surahNumber !== 9 && surahNumber !== 1;
   const isArabicMode = uiLanguage === "ar";
@@ -56,7 +57,7 @@ export function SurahHeader({
   };
 
   const [bismFontReady, setBismFontReady] = useState(() =>
-    isQpcFontLoaded(1)
+    isQuranPageFontLoaded(quranFontStyle, 1)
   );
   const [surahNameFontReady, setSurahNameFontReady] = useState(() =>
     isSurahNameFontLoaded()
@@ -64,6 +65,8 @@ export function SurahHeader({
   const useDecorativeSurahName = Boolean(decorativeNameGlyph && surahNameFontReady);
   const renderedSurahName = useDecorativeSurahName ? decorativeNameGlyph! : displayName;
   const renderedSurahNameDirection = useDecorativeSurahName ? "ltr" : nameDirection;
+  const bismillahFontFamily = quranPageFontName(quranFontStyle, 1);
+  const bismillahPaletteStyle = quranPageFontPaletteStyle(quranFontStyle, 1, effectiveTheme);
   const bismillahSelectionProps =
     Platform.OS === "web" && showBismillah
       ? ({
@@ -81,20 +84,21 @@ export function SurahHeader({
 
   useEffect(() => {
     if (!showBismillah) return;
-    if (isQpcFontLoaded(1)) {
-      setBismFontReady(true);
+    setBismFontReady(false);
+    if (isQuranPageFontLoaded(quranFontStyle, 1)) {
+      requestAnimationFrame(() => setBismFontReady(true));
       return;
     }
     let cancelled = false;
-    loadQpcFont(1).then(() => {
+    loadQuranPageFont(quranFontStyle, 1).then(() => {
       if (!cancelled) {
         requestAnimationFrame(() => setBismFontReady(true));
       }
-    });
+    }).catch(console.warn);
     return () => {
       cancelled = true;
     };
-  }, [showBismillah]);
+  }, [quranFontStyle, showBismillah]);
 
   useEffect(() => {
     if (!decorativeNameGlyph) return;
@@ -169,7 +173,8 @@ export function SurahHeader({
                 style={{
                   fontSize: 18,
                   lineHeight: 32,
-                  fontFamily: qpcFontName(1),
+                  fontFamily: bismillahFontFamily,
+                  ...bismillahPaletteStyle,
                   opacity: bismFontReady ? 1 : 0,
                   ...(Platform.OS === "web" ? ({ userSelect: "text" } as any) : null),
                 }}
@@ -251,7 +256,8 @@ export function SurahHeader({
             style={{
               fontSize: 24,
               lineHeight: 48,
-              fontFamily: qpcFontName(1),
+              fontFamily: bismillahFontFamily,
+              ...bismillahPaletteStyle,
               opacity: bismFontReady ? 1 : 0,
               ...(Platform.OS === "web" ? ({ userSelect: "text" } as any) : null),
             }}

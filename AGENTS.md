@@ -15,7 +15,7 @@ For web UI stabilization and verification rules, `docs/agent/WEB_UI_CONTRACT.md`
 - **No mock data, ever.** Pull real data from `assets/data/`.
 - **All user-facing strings are bilingual (en + ar).** nothing should be missing between ar/en modes switches.
 - **RTL is first-class.** Every layout must work in RTL. See "Key Gotchas" below.
-- **QCF2 (KFGQPC V2) per-page fonts for ALL Quran text.** 604 fonts with PUA glyph mapping. Never use system Arabic fonts for Quran text. Clean Arabic UI font is fine for non-Quran Arabic (tafseer body, UI labels).
+- **Quran page fonts for ALL Quran text.** Default is QCF2 (KFGQPC V2); optional QPC V4 Tajweed uses the same PUA glyph text with bundled per-page fonts and web font palettes. Never use system Arabic fonts for Quran text. Clean Arabic UI font is fine for non-Quran Arabic (tafseer body, UI labels).
 - **All Quran data reads from local SQLite.** Never block on network for reading features.
 - **NativeWind (Tailwind) only.** Avoid inline `StyleSheet` unless NativeWind genuinely can't handle it.
 - **Sync writes never block local ops.** All `enqueueSync()` calls must be `.catch(console.warn)`.
@@ -25,7 +25,7 @@ For web UI stabilization and verification rules, `docs/agent/WEB_UI_CONTRACT.md`
 ## Tech Stack
 
 - Expo SDK 55 + TypeScript + NativeWind v4 (`darkMode: 'class'`)
-- expo-sqlite (local DB) + expo-font (QCF2 fonts)
+- expo-sqlite (local DB) + expo-font (QCF2 / QPC V4 Tajweed fonts)
 - Zustand v5 (auth state only) + TanStack Query v5 (Supabase async state)
 - ts-fsrs (FSRS-6 spaced repetition, `request_retention: 0.95`)
 - React Hook Form + Zod, Lucide React Native, Axios, FlashList
@@ -47,8 +47,8 @@ For web UI stabilization and verification rules, `docs/agent/WEB_UI_CONTRACT.md`
 
 - **Verse-by-verse**: FlashList over 6,350 items (6,236 ayahs + 114 surah headers); `getItemType` distinguishes them.
 - **Page-based**: vertical FlatList over 604 pages, line-by-line flexbox from `page_lines` (15 lines/page); `getItemLayout` with pre-computed offsets.
-- **QCF2 fonts**: web uses native FontFace API (`display: 'swap'`), native uses expo-font. Loaded per-page with opacity reveal via `requestAnimationFrame`.
-- **QCF2 page assignment**: group ayahs by `v2_page` (NOT `page_map` — 56 ayahs differ). Basmallah uses page-1 PUA glyphs `ﱁ–ﱄ`.
+- **Quran page fonts**: web uses native FontFace API (`display: 'swap'`), native uses expo-font. Loaded per-page with opacity reveal via `requestAnimationFrame`. QPC V4 Tajweed adds COLR palette support on web.
+- **Quran page assignment**: group ayahs by `v2_page` (NOT `page_map` — 56 ayahs differ). Basmallah uses page-1 PUA glyphs `ﱁ–ﱄ`.
 - `text_qcf2` has no Bismillah prefix and embeds end-of-ayah markers as PUA glyphs.
 - **Deep linking**: `lib/deep-link.ts` holds module-level state. `app/open.tsx` route → `setPendingDeepLink` → Mushaf consumes via `useFocusEffect`.
 
@@ -124,10 +124,10 @@ For web UI stabilization and verification rules, `docs/agent/WEB_UI_CONTRACT.md`
 
 ## Key Gotchas
 
-1. **QCF2 direction bug** — Quran word containers MUST set `direction: "ltr"` + `flexDirection: "row-reverse"`. Without this, Arabic UI direction causes double-reversal.
-2. **`text_qcf2` vs `text_uthmani`** — Copy/Share use `text_uthmani` (real Unicode). QCF2 PUA glyphs are display-only.
-3. **`v2_page` vs `page_map`** — 56 ayahs differ. Always use `v2_page` for QCF2 rendering.
-4. **Web font loading** — Must use the native `FontFace` API, not expo-font, to get `display: 'swap'` on QCF2.
+1. **Quran glyph direction bug** — Quran word containers MUST set `direction: "ltr"` + `flexDirection: "row-reverse"`. Without this, Arabic UI direction causes double-reversal.
+2. **`text_qcf2` vs `text_uthmani`** — Copy/Share use `text_uthmani` (real Unicode). PUA glyphs are display-only for QCF2 and QPC V4 Tajweed rendering.
+3. **`v2_page` vs `page_map`** — 56 ayahs differ. Always use `v2_page` for page-font rendering.
+4. **Web font loading** — Must use the native `FontFace` API, not expo-font, to get `display: 'swap'` on Quran PUA fonts.
 5. **Session route** — `app/flashcards/session.tsx` is outside tabs and needs its own `SettingsProvider`.
 6. **Sync never blocks** — every `enqueueSync` is `.catch(console.warn)`. Sync failures must never break local ops.
 7. **MASAQ aggregation** — multiple segments per word aggregated into one row via `GROUP_CONCAT`.

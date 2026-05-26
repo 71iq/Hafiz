@@ -38,7 +38,7 @@ import { AyahDetailModal } from "./AyahDetailModal";
 import { JuzNameText } from "./JuzNameText";
 import { toArabicNumber } from "@/lib/arabic";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
-import { loadQpcFont } from "@/lib/fonts/loader";
+import { loadQuranPageFont } from "@/lib/fonts/loader";
 
 type PageRow = {
   page: number;
@@ -413,7 +413,7 @@ export function PageMushaf({
   hifzVisibility = null,
 }: Props) {
   const db = useDatabase();
-  const { fontSize, lineHeight, pageScroll, isRTL, uiLanguage } = useSettings();
+  const { fontSize, lineHeight, pageScroll, isRTL, uiLanguage, quranFontStyle } = useSettings();
   const s = useStrings();
   const { width, height: windowHeight } = useWindowDimensions();
   const [containerWidth, setContainerWidth] = useState(0);
@@ -689,10 +689,10 @@ export function PageMushaf({
     const start = Math.max(1, currentPage - 2);
     const end = Math.min(pageData.length, currentPage + 2);
     for (let page = start; page <= end; page++) {
-      loadQpcFont(page).catch(console.warn);
+      loadQuranPageFont(quranFontStyle, page).catch(console.warn);
     }
-    loadQpcFont(1).catch(console.warn);
-  }, [currentPage, horizontal, pageData.length]);
+    loadQuranPageFont(quranFontStyle, 1).catch(console.warn);
+  }, [currentPage, horizontal, pageData.length, quranFontStyle]);
 
   useEffect(() => {
     if (Platform.OS !== "web") return;
