@@ -67,7 +67,7 @@ function AyahBlockInner({
   const { translationLanguage, recitationId, isRTL, isDark } = useSettings();
   const langInfo = getLanguageByCode(translationLanguage);
   const s = useStrings();
-  const { isBookmarked, getHighlightColor, showToast, refreshBookmarks } = useSelection();
+  const { isBookmarked, getHighlightColor, showToast, refreshBookmarks, selectAyah } = useSelection();
   const { getAyahState, toggleAyah } = useAyahAudio();
   const reflectionsEnabled = isSupabaseConfigured();
   const { data: reflectionCount = 0 } = useQuery({
@@ -188,6 +188,10 @@ function AyahBlockInner({
     }
   }, [bookmarkBusy, bookmarked, db, surah, ayah, showToast, s.bookmarkAdded, s.bookmarkRemoved, s.bookmarkActionFailed, refreshBookmarks]);
 
+  const handleSelectAyah = useCallback(() => {
+    selectAyah(surah, ayah);
+  }, [ayah, selectAyah, surah]);
+
   const handleShare = useCallback(async () => {
     if (shareBusy) return;
     setShareBusy(true);
@@ -269,14 +273,23 @@ function AyahBlockInner({
         }}
       >
         <View className={isRTL ? "flex-row-reverse items-center gap-1.5" : "flex-row items-center gap-1.5"}>
-          <View className="rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 px-3 py-2" style={{ position: "relative" }}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${surah}:${ayah}`}
+            onPress={handleSelectAyah}
+            className="rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 px-3 py-2"
+            style={({ pressed }) => ({
+              position: "relative",
+              transform: [{ scale: pressed ? 0.97 : 1 }],
+            })}
+          >
             <Text className="text-primary-accent dark:text-primary-bright" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11 }}>
               {surah}:{ayah}
             </Text>
             {bookmarked && (
               <View className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-gold" />
             )}
-          </View>
+          </Pressable>
           <ActionIcon
             icon={
               audioState.loading ? (

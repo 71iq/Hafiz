@@ -189,7 +189,7 @@ function MushafPageInner({
 }: Props) {
   const [fontVisible, setFontVisible] = useState(false);
   const [wordsLoaded, setWordsLoaded] = useState(!!pageWordsData);
-  const { getHighlightColor } = useSelection();
+  const { getHighlightColor, selectAyah } = useSelection();
   const lastMarkerTapRef = useRef<{ key: string; at: number } | null>(null);
   const skipNextMarkerPressRef = useRef<string | null>(null);
 
@@ -276,12 +276,11 @@ function MushafPageInner({
   }, [onOpenAyahDetail]);
 
   const handleMarkerLongPress = useCallback((surah: number, ayah: number) => {
-    if (!onOpenAyahDetail) return;
     const key = `${surah}:${ayah}`;
     skipNextMarkerPressRef.current = key;
     lastMarkerTapRef.current = null;
-    onOpenAyahDetail(surah, ayah);
-  }, [onOpenAyahDetail]);
+    selectAyah(surah, ayah);
+  }, [selectAyah]);
 
   const hasLineLayout = lineLayout && lineLayout.length > 0;
   const maxContentWidth = Math.max(0, width - sidePadding * 2);
