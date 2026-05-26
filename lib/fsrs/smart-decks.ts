@@ -96,10 +96,11 @@ const LEGACY_MUTASHABIHAT_DECK_ID = "mutashabihat";
 const MEANINGS_DECK_ID = "meanings";
 const SQLITE_PARAM_BATCH = 800;
 const INSERT_BATCH = 500;
-const REVIEWABLE_CARD_SQL = "suspended_at IS NULL AND (buried_until IS NULL OR buried_until <= ?)";
+const ACTIVE_CARD_SQL = "deleted_at IS NULL";
+const REVIEWABLE_CARD_SQL = `${ACTIVE_CARD_SQL} AND suspended_at IS NULL AND (buried_until IS NULL OR buried_until <= ?)`;
 
 function isReviewableCard(row: StudyCardRow, nowIso: string): boolean {
-  return !row.suspended_at && (!row.buried_until || row.buried_until <= nowIso);
+  return !row.deleted_at && !row.suspended_at && (!row.buried_until || row.buried_until <= nowIso);
 }
 
 function studyCardToSyncData(row: StudyCardRow): Record<string, any> {
@@ -121,6 +122,7 @@ function studyCardToSyncData(row: StudyCardRow): Record<string, any> {
     marked_at: row.marked_at,
     created_at: row.created_at,
     updated_at: row.updated_at,
+    deleted_at: row.deleted_at ?? null,
   };
 }
 
@@ -206,7 +208,8 @@ export async function migrateLegacyRetentionDecks(db: SQLiteDatabase): Promise<n
 
   const rows = await db.getAllAsync<StudyCardRow>(
     `SELECT * FROM study_cards
-      WHERE deck_id NOT IN (${SMART_DECK_ID_LIST.map(() => "?").join(",")})
+      WHERE deleted_at IS NULL
+        AND deck_id NOT IN (${SMART_DECK_ID_LIST.map(() => "?").join(",")})
         AND deck_id != ?
         AND id NOT LIKE 'word:%'`,
     [...SMART_DECK_ID_LIST, MEANINGS_DECK_ID]
@@ -217,12 +220,15 @@ export async function migrateLegacyRetentionDecks(db: SQLiteDatabase): Promise<n
       const legacyAyahId = parseLegacyMutashabihatCardId(row.id);
       if (legacyAyahId) {
         const existing = await db.getFirstAsync<{ id: string }>(
-          "SELECT id FROM study_cards WHERE id = ?",
+          "SELECT id FROM study_cards WHERE id = ? AND deleted_at IS NULL",
           [legacyAyahId]
         );
         await db.runAsync("UPDATE study_log SET card_id = ? WHERE card_id = ?", [legacyAyahId, row.id]);
         if (existing?.id) {
-          await db.runAsync("DELETE FROM study_cards WHERE id = ?", [row.id]);
+          await db.runAsync(
+            "UPDATE study_cards SET updated_at = ?, deleted_at = ? WHERE id = ? AND deleted_at IS NULL",
+            [now, now, row.id]
+          );
           syncOps.push({
             operation: "DELETE",
             rowId: row.id,
@@ -234,7 +240,7 @@ export async function migrateLegacyRetentionDecks(db: SQLiteDatabase): Promise<n
           });
         } else {
           await db.runAsync(
-            "UPDATE study_cards SET id = ?, deck_id = ?, updated_at = ? WHERE id = ?",
+            "UPDATE study_cards SET id = ?, deck_id = ?, updated_at = ?, deleted_at = NULL WHERE id = ? AND deleted_at IS NULL",
             [legacyAyahId, SMART_DECK_IDS.retention, now, row.id]
           );
           syncOps.push({
@@ -245,6 +251,7 @@ export async function migrateLegacyRetentionDecks(db: SQLiteDatabase): Promise<n
               id: legacyAyahId,
               deck_id: SMART_DECK_IDS.retention,
               updated_at: now,
+              deleted_at: null,
             }),
           });
         }
@@ -255,7 +262,7 @@ export async function migrateLegacyRetentionDecks(db: SQLiteDatabase): Promise<n
       if (!parseAyahCardId(row.id)) continue;
       if (row.deck_id === SMART_DECK_IDS.retention) continue;
       await db.runAsync(
-        "UPDATE study_cards SET deck_id = ?, updated_at = ? WHERE id = ?",
+        "UPDATE study_cards SET deck_id = ?, updated_at = ?, deleted_at = NULL WHERE id = ? AND deleted_at IS NULL",
         [SMART_DECK_IDS.retention, now, row.id]
       );
       syncOps.push({
@@ -265,6 +272,7 @@ export async function migrateLegacyRetentionDecks(db: SQLiteDatabase): Promise<n
           ...row,
           deck_id: SMART_DECK_IDS.retention,
           updated_at: now,
+          deleted_at: null,
         }),
       });
       migrated++;
@@ -567,12 +575,13 @@ export async function materializeSmartDeckCards(
     marked_at: null,
     created_at: nowIso,
     updated_at: nowIso,
+    deleted_at: null,
   }));
 
   await db.withTransactionAsync(async () => {
     for (let i = 0; i < createdRows.length; i += INSERT_BATCH) {
       const batch = createdRows.slice(i, i + INSERT_BATCH);
-      const placeholders = batch.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").join(",");
+      const placeholders = batch.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").join(",");
       const params: any[] = [];
       for (const row of batch) {
         params.push(
@@ -592,13 +601,33 @@ export async function materializeSmartDeckCards(
           row.buried_until,
           row.marked_at,
           row.created_at,
-          row.updated_at
+          row.updated_at,
+          row.deleted_at
         );
       }
       await db.runAsync(
-        `INSERT OR IGNORE INTO study_cards
-          (id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days, learning_steps, reps, lapses, state, last_review, suspended_at, buried_until, marked_at, created_at, updated_at)
-         VALUES ${placeholders}`,
+        `INSERT INTO study_cards
+          (id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days, learning_steps, reps, lapses, state, last_review, suspended_at, buried_until, marked_at, created_at, updated_at, deleted_at)
+         VALUES ${placeholders}
+         ON CONFLICT(id) DO UPDATE SET
+          deck_id = excluded.deck_id,
+          due = excluded.due,
+          stability = excluded.stability,
+          difficulty = excluded.difficulty,
+          elapsed_days = excluded.elapsed_days,
+          scheduled_days = excluded.scheduled_days,
+          learning_steps = excluded.learning_steps,
+          reps = excluded.reps,
+          lapses = excluded.lapses,
+          state = excluded.state,
+          last_review = excluded.last_review,
+          suspended_at = excluded.suspended_at,
+          buried_until = excluded.buried_until,
+          marked_at = excluded.marked_at,
+          created_at = excluded.created_at,
+          updated_at = excluded.updated_at,
+          deleted_at = NULL
+         WHERE study_cards.deleted_at IS NOT NULL`,
         params
       );
     }
@@ -1070,7 +1099,7 @@ async function getStudyCardsByIds(
   for (const chunk of chunks(ids, SQLITE_PARAM_BATCH)) {
     const placeholders = chunk.map(() => "?").join(",");
     rows.push(...await db.getAllAsync<StudyCardRow>(
-      `SELECT * FROM study_cards WHERE deck_id = ? AND id IN (${placeholders})`,
+      `SELECT * FROM study_cards WHERE deck_id = ? AND deleted_at IS NULL AND id IN (${placeholders})`,
       [deckId, ...chunk]
     ));
   }

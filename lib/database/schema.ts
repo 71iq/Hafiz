@@ -338,7 +338,8 @@ export async function createSchema(db: SQLiteDatabase): Promise<void> {
       buried_until TEXT,
       marked_at TEXT,
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      deleted_at TEXT
     );
 
     -- Study review log
@@ -535,6 +536,7 @@ export async function migrateUserSchema(db: SQLiteDatabase): Promise<void> {
   await addColumnIfMissing(db, "study_cards", "suspended_at", "suspended_at TEXT");
   await addColumnIfMissing(db, "study_cards", "buried_until", "buried_until TEXT");
   await addColumnIfMissing(db, "study_cards", "marked_at", "marked_at TEXT");
+  await addColumnIfMissing(db, "study_cards", "deleted_at", "deleted_at TEXT");
   await db.execAsync(`
     CREATE INDEX IF NOT EXISTS idx_study_cards_buried ON study_cards(buried_until);
     CREATE INDEX IF NOT EXISTS idx_study_cards_marked ON study_cards(marked_at);

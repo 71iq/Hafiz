@@ -501,7 +501,38 @@ async function upsertStudyCard(db: SQLiteDatabase, row: any): Promise<void> {
   if (local && remoteUpdatedAt && local.updated_at >= remoteUpdatedAt) return; // Local is newer
 
   if (row.deleted_at) {
-    await db.runAsync("DELETE FROM study_cards WHERE id = ?", [row.id]);
+    await db.runAsync(
+      `INSERT INTO study_cards
+       (id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days,
+        learning_steps, reps, lapses, state, last_review, suspended_at, buried_until,
+        marked_at, created_at, updated_at, deleted_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+        deck_id = excluded.deck_id,
+        due = excluded.due,
+        stability = excluded.stability,
+        difficulty = excluded.difficulty,
+        elapsed_days = excluded.elapsed_days,
+        scheduled_days = excluded.scheduled_days,
+        learning_steps = excluded.learning_steps,
+        reps = excluded.reps,
+        lapses = excluded.lapses,
+        state = excluded.state,
+        last_review = excluded.last_review,
+        suspended_at = excluded.suspended_at,
+        buried_until = excluded.buried_until,
+        marked_at = excluded.marked_at,
+        created_at = excluded.created_at,
+        updated_at = excluded.updated_at,
+        deleted_at = excluded.deleted_at`,
+      [
+        row.id, row.deck_id ?? "deleted", row.due ?? remoteUpdatedAt, row.stability ?? 0, row.difficulty ?? 0,
+        row.elapsed_days ?? 0, row.scheduled_days ?? 0, row.learning_steps ?? 0,
+        row.reps ?? 0, row.lapses ?? 0, row.state ?? 0, row.last_review ?? null,
+        row.suspended_at ?? null, row.buried_until ?? null, row.marked_at ?? null,
+        row.created_at ?? remoteUpdatedAt, remoteUpdatedAt, row.deleted_at,
+      ]
+    );
     return;
   }
 
@@ -509,8 +540,8 @@ async function upsertStudyCard(db: SQLiteDatabase, row: any): Promise<void> {
     `INSERT OR REPLACE INTO study_cards
      (id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days,
       learning_steps, reps, lapses, state, last_review, suspended_at, buried_until,
-      marked_at, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      marked_at, created_at, updated_at, deleted_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
     [
       row.id, row.deck_id, row.due, row.stability, row.difficulty,
       row.elapsed_days, row.scheduled_days, row.learning_steps,

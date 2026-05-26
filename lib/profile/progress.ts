@@ -83,7 +83,8 @@ export async function getLocalSurahProgress(db: SQLiteDatabase): Promise<Profile
          sc.reps,
          sc.last_review
        FROM study_cards sc
-       WHERE sc.id NOT LIKE 'word:%'
+       WHERE sc.deleted_at IS NULL
+         AND sc.id NOT LIKE 'word:%'
          AND sc.deck_id NOT IN (?, ?, ?, ?)
      )
      SELECT

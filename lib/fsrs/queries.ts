@@ -72,7 +72,8 @@ export type WirdStatus = {
 
 const SMART_CARD_SQL = `deck_id IN (${Object.values(SMART_DECK_IDS).map((id) => `'${id}'`).join(", ")})`;
 const NON_SMART_CARD_SQL = `NOT ${SMART_CARD_SQL}`;
-const REVIEWABLE_CARD_SQL = "suspended_at IS NULL AND (buried_until IS NULL OR buried_until <= ?)";
+const ACTIVE_CARD_SQL = "deleted_at IS NULL";
+const REVIEWABLE_CARD_SQL = `${ACTIVE_CARD_SQL} AND suspended_at IS NULL AND (buried_until IS NULL OR buried_until <= ?)`;
 
 function localStartOfTomorrow(): Date {
   const tomorrow = new Date();
@@ -108,6 +109,7 @@ function cardToSyncData(card: StudyCardRow): Record<string, any> {
     marked_at: card.marked_at,
     created_at: card.created_at,
     updated_at: card.updated_at,
+    deleted_at: card.deleted_at ?? null,
   };
 }
 
@@ -117,11 +119,12 @@ function rowWithDefaultStatus(row: StudyCardRow): StudyCardRow {
     suspended_at: row.suspended_at ?? null,
     buried_until: row.buried_until ?? null,
     marked_at: row.marked_at ?? null,
+    deleted_at: row.deleted_at ?? null,
   };
 }
 
 function isReviewableCard(row: StudyCardRow, nowIso: string): boolean {
-  return !row.suspended_at && (!row.buried_until || row.buried_until <= nowIso);
+  return !row.deleted_at && !row.suspended_at && (!row.buried_until || row.buried_until <= nowIso);
 }
 
 function formatLocalDateKey(date: Date): string {
@@ -302,7 +305,7 @@ export async function createDeck(
     const BATCH = 500;
     for (let i = 0; i < ayahs.length; i += BATCH) {
       const batch = ayahs.slice(i, i + BATCH);
-      const placeholders = batch.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").join(",");
+      const placeholders = batch.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").join(",");
       const params: any[] = [];
       for (const a of batch) {
         const cardId = `${a.surah}:${a.ayah}`;
@@ -320,18 +323,37 @@ export async function createDeck(
           emptyCard.state,
           null, // last_review
           now,
-          now
+          now,
+          null
         );
       }
       await db.runAsync(
-        `INSERT OR IGNORE INTO study_cards (id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days, learning_steps, reps, lapses, state, last_review, created_at, updated_at) VALUES ${placeholders}`,
+        `INSERT INTO study_cards
+          (id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days, learning_steps, reps, lapses, state, last_review, created_at, updated_at, deleted_at)
+         VALUES ${placeholders}
+         ON CONFLICT(id) DO UPDATE SET
+          deck_id = excluded.deck_id,
+          due = excluded.due,
+          stability = excluded.stability,
+          difficulty = excluded.difficulty,
+          elapsed_days = excluded.elapsed_days,
+          scheduled_days = excluded.scheduled_days,
+          learning_steps = excluded.learning_steps,
+          reps = excluded.reps,
+          lapses = excluded.lapses,
+          state = excluded.state,
+          last_review = excluded.last_review,
+          created_at = excluded.created_at,
+          updated_at = excluded.updated_at,
+          deleted_at = NULL
+         WHERE study_cards.deleted_at IS NOT NULL`,
         params
       );
     }
   });
 
   const rows = await db.getAllAsync<StudyCardRow>(
-    "SELECT * FROM study_cards WHERE deck_id = ?",
+    "SELECT * FROM study_cards WHERE deck_id = ? AND deleted_at IS NULL",
     [deckId]
   );
   for (const row of rows) {
@@ -353,7 +375,7 @@ export async function addAyahToDeck(
   const emptyCard = createEmptyCard();
   const cardId = `${surah}:${ayah}`;
   const existing = await db.getFirstAsync<{ id: string }>(
-    "SELECT id FROM study_cards WHERE id = ? AND deck_id = ?",
+    "SELECT id FROM study_cards WHERE id = ? AND deck_id = ? AND deleted_at IS NULL",
     [cardId, deckId]
   );
   if (existing?.id) return false;
@@ -378,9 +400,26 @@ export async function addAyahToDeck(
     updated_at: now,
   };
 
-  await db.runAsync(
-    `INSERT INTO study_cards (id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days, learning_steps, reps, lapses, state, last_review, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  const result = await db.runAsync(
+    `INSERT INTO study_cards
+      (id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days, learning_steps, reps, lapses, state, last_review, created_at, updated_at, deleted_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+     ON CONFLICT(id) DO UPDATE SET
+      deck_id = excluded.deck_id,
+      due = excluded.due,
+      stability = excluded.stability,
+      difficulty = excluded.difficulty,
+      elapsed_days = excluded.elapsed_days,
+      scheduled_days = excluded.scheduled_days,
+      learning_steps = excluded.learning_steps,
+      reps = excluded.reps,
+      lapses = excluded.lapses,
+      state = excluded.state,
+      last_review = excluded.last_review,
+      created_at = excluded.created_at,
+      updated_at = excluded.updated_at,
+      deleted_at = NULL
+     WHERE study_cards.deleted_at IS NOT NULL`,
     [
       row.id,
       row.deck_id,
@@ -398,6 +437,7 @@ export async function addAyahToDeck(
       row.updated_at,
     ]
   );
+  if ((result.changes ?? 0) <= 0) return false;
   enqueueSync(db, "study_cards", "INSERT", cardId, cardToSyncData(row)).catch(console.warn);
   return true;
 }
@@ -609,7 +649,7 @@ export async function isMeaningCardSaved(
   wordPos: number
 ): Promise<boolean> {
   const row = await db.getFirstAsync<{ c: number }>(
-    "SELECT COUNT(*) as c FROM study_cards WHERE id = ? AND deck_id = ?",
+    "SELECT COUNT(*) as c FROM study_cards WHERE id = ? AND deck_id = ? AND deleted_at IS NULL",
     [meaningCardId(surah, ayah, wordPos), MEANINGS_DECK_ID]
   );
   return (row?.c ?? 0) > 0;
@@ -638,8 +678,25 @@ export async function addMeaningCard(
   }
 
   const result = await db.runAsync(
-    `INSERT OR IGNORE INTO study_cards (id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days, learning_steps, reps, lapses, state, last_review, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO study_cards
+      (id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days, learning_steps, reps, lapses, state, last_review, created_at, updated_at, deleted_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+     ON CONFLICT(id) DO UPDATE SET
+      deck_id = excluded.deck_id,
+      due = excluded.due,
+      stability = excluded.stability,
+      difficulty = excluded.difficulty,
+      elapsed_days = excluded.elapsed_days,
+      scheduled_days = excluded.scheduled_days,
+      learning_steps = excluded.learning_steps,
+      reps = excluded.reps,
+      lapses = excluded.lapses,
+      state = excluded.state,
+      last_review = excluded.last_review,
+      created_at = excluded.created_at,
+      updated_at = excluded.updated_at,
+      deleted_at = NULL
+     WHERE study_cards.deleted_at IS NOT NULL`,
     [
       cardId,
       MEANINGS_DECK_ID,
@@ -678,6 +735,7 @@ export async function addMeaningCard(
       marked_at: null,
       created_at: now,
       updated_at: now,
+      deleted_at: null,
     }).catch(console.warn);
 
     recordAchievementEvent(db, {
@@ -711,8 +769,9 @@ export async function isRetentionCardSaved(
   const row = await db.getFirstAsync<{ c: number }>(
     `SELECT COUNT(*) as c
        FROM study_cards
-      WHERE (id = ? AND (deck_id = ? OR (deck_id != ? AND ${NON_SMART_CARD_SQL})))
-         OR (id = ? AND deck_id = ?)`,
+      WHERE deleted_at IS NULL
+        AND ((id = ? AND (deck_id = ? OR (deck_id != ? AND ${NON_SMART_CARD_SQL})))
+         OR (id = ? AND deck_id = ?))`,
     [cardId, SMART_DECK_IDS.retention, MEANINGS_DECK_ID, legacyCardId, MUTASHABIHAT_DECK_ID]
   );
   return (row?.c ?? 0) > 0;
@@ -737,15 +796,34 @@ export async function addRetentionCard(
   const cardId = retentionCardId(surah, ayah);
 
   const existing = await db.getFirstAsync<{ id: string }>(
-    "SELECT id FROM study_cards WHERE id = ? AND deck_id = ?",
+    "SELECT id FROM study_cards WHERE id = ? AND deck_id = ? AND deleted_at IS NULL",
     [cardId, SMART_DECK_IDS.retention]
   );
   if (existing?.id) return { created: false };
 
   const result = await db.runAsync(
-    `INSERT OR IGNORE INTO study_cards
-      (id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days, learning_steps, reps, lapses, state, last_review, suspended_at, buried_until, marked_at, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO study_cards
+      (id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days, learning_steps, reps, lapses, state, last_review, suspended_at, buried_until, marked_at, created_at, updated_at, deleted_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+     ON CONFLICT(id) DO UPDATE SET
+      deck_id = excluded.deck_id,
+      due = excluded.due,
+      stability = excluded.stability,
+      difficulty = excluded.difficulty,
+      elapsed_days = excluded.elapsed_days,
+      scheduled_days = excluded.scheduled_days,
+      learning_steps = excluded.learning_steps,
+      reps = excluded.reps,
+      lapses = excluded.lapses,
+      state = excluded.state,
+      last_review = excluded.last_review,
+      suspended_at = excluded.suspended_at,
+      buried_until = excluded.buried_until,
+      marked_at = excluded.marked_at,
+      created_at = excluded.created_at,
+      updated_at = excluded.updated_at,
+      deleted_at = NULL
+     WHERE study_cards.deleted_at IS NOT NULL`,
     [
       cardId,
       SMART_DECK_IDS.retention,
@@ -787,6 +865,7 @@ export async function addRetentionCard(
       marked_at: null,
       created_at: now,
       updated_at: now,
+      deleted_at: null,
     }).catch(console.warn);
   }
 
@@ -820,14 +899,18 @@ export async function getTodayReviewedCount(db: SQLiteDatabase, deckId?: string)
       `SELECT COUNT(*) as count
        FROM study_log sl
        JOIN study_cards sc ON sc.id = sl.card_id
-       WHERE sc.deck_id = ? AND sl.reviewed_at >= ? AND sl.reviewed_at < ?`,
+       WHERE sc.deck_id = ? AND sc.deleted_at IS NULL AND sl.reviewed_at >= ? AND sl.reviewed_at < ?`,
       [deckId, start, end]
     );
     return row?.count ?? 0;
   }
 
   const row = await db.getFirstAsync<{ count: number }>(
-    "SELECT COUNT(*) as count FROM study_log WHERE reviewed_at >= ? AND reviewed_at < ?",
+    `SELECT COUNT(*) as count
+       FROM study_log sl
+       JOIN study_cards sc ON sc.id = sl.card_id
+      WHERE sc.deleted_at IS NULL
+        AND sl.reviewed_at >= ? AND sl.reviewed_at < ?`,
     [start, end]
   );
   return row?.count ?? 0;
@@ -911,14 +994,14 @@ export async function getTotalCardCount(db: SQLiteDatabase, deckId?: string): Pr
   }
   if (deckId) {
     const row = await db.getFirstAsync<{ count: number }>(
-      "SELECT COUNT(*) as count FROM study_cards WHERE deck_id = ?",
+      "SELECT COUNT(*) as count FROM study_cards WHERE deck_id = ? AND deleted_at IS NULL",
       [deckId]
     );
     return row?.count ?? 0;
   }
   const [nonSmartRow, smartRows] = await Promise.all([
     db.getFirstAsync<{ count: number }>(
-      `SELECT COUNT(*) as count FROM study_cards WHERE ${NON_SMART_CARD_SQL}`,
+      `SELECT COUNT(*) as count FROM study_cards WHERE deleted_at IS NULL AND ${NON_SMART_CARD_SQL}`,
       []
     ),
     getFilteredSmartMaterializedRows(db),
@@ -928,7 +1011,7 @@ export async function getTotalCardCount(db: SQLiteDatabase, deckId?: string): Pr
 
 async function getFilteredSmartMaterializedRows(db: SQLiteDatabase): Promise<StudyCardRow[]> {
   const rows = await db.getAllAsync<StudyCardRow>(
-    `SELECT * FROM study_cards WHERE ${SMART_CARD_SQL}`,
+    `SELECT * FROM study_cards WHERE deleted_at IS NULL AND ${SMART_CARD_SQL}`,
     []
   );
   const matchingSmartIds = await getAllMatchingSmartCardIdSet(db);
@@ -939,8 +1022,9 @@ export async function getTotalAyahCardCount(db: SQLiteDatabase): Promise<number>
   await migrateLegacyRetentionDecks(db);
   const row = await db.getFirstAsync<{ count: number }>(
     `SELECT COUNT(*) as count
-       FROM study_cards
-      WHERE id NOT LIKE 'word:%'
+      FROM study_cards
+      WHERE deleted_at IS NULL
+        AND id NOT LIKE 'word:%'
         AND (${NON_SMART_CARD_SQL} OR deck_id = ?)`,
     [SMART_DECK_IDS.retention]
   );
@@ -951,8 +1035,9 @@ export async function getMemorizedAyahCardCount(db: SQLiteDatabase): Promise<num
   await migrateLegacyRetentionDecks(db);
   const row = await db.getFirstAsync<{ count: number }>(
     `SELECT COUNT(*) as count
-       FROM study_cards
-      WHERE state = 2
+      FROM study_cards
+      WHERE deleted_at IS NULL
+        AND state = 2
         AND id NOT LIKE 'word:%'
         AND (${NON_SMART_CARD_SQL} OR deck_id = ?)`,
     [SMART_DECK_IDS.retention]
@@ -992,7 +1077,7 @@ export async function getDecks(db: SQLiteDatabase): Promise<{ id: string; name?:
 
 export async function deleteDeck(db: SQLiteDatabase, deckId: string): Promise<void> {
   const rows = await db.getAllAsync<StudyCardRow>(
-    "SELECT * FROM study_cards WHERE deck_id = ?",
+    "SELECT * FROM study_cards WHERE deck_id = ? AND deleted_at IS NULL",
     [deckId]
   );
   const deletedAt = new Date().toISOString();
@@ -1003,8 +1088,10 @@ export async function deleteDeck(db: SQLiteDatabase, deckId: string): Promise<vo
       "DELETE FROM study_log WHERE card_id IN (SELECT id FROM study_cards WHERE deck_id = ?)",
       [deckId]
     );
-    // Delete cards
-    await db.runAsync("DELETE FROM study_cards WHERE deck_id = ?", [deckId]);
+    await db.runAsync(
+      "UPDATE study_cards SET updated_at = ?, deleted_at = ? WHERE deck_id = ? AND deleted_at IS NULL",
+      [deletedAt, deletedAt, deckId]
+    );
     // Delete deck metadata
     await deleteUserSetting(db, `deck_${deckId}`);
     await deleteUserSetting(db, deckReviewSettingsKey(deckId));
@@ -1025,7 +1112,7 @@ export async function ensureStudyCardRow(
   cardId: string
 ): Promise<StudyCardRow> {
   const existing = await db.getFirstAsync<StudyCardRow>(
-    "SELECT * FROM study_cards WHERE id = ? AND deck_id = ?",
+    "SELECT * FROM study_cards WHERE id = ? AND deck_id = ? AND deleted_at IS NULL",
     [cardId, deckId]
   );
   if (existing) return rowWithDefaultStatus(existing);
@@ -1051,13 +1138,33 @@ export async function ensureStudyCardRow(
     marked_at: null,
     created_at: nowIso,
     updated_at: nowIso,
+    deleted_at: null,
   };
 
   await db.runAsync(
-    `INSERT OR IGNORE INTO study_cards
+    `INSERT INTO study_cards
       (id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days, learning_steps,
-       reps, lapses, state, last_review, suspended_at, buried_until, marked_at, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       reps, lapses, state, last_review, suspended_at, buried_until, marked_at, created_at, updated_at, deleted_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+     ON CONFLICT(id) DO UPDATE SET
+      deck_id = excluded.deck_id,
+      due = excluded.due,
+      stability = excluded.stability,
+      difficulty = excluded.difficulty,
+      elapsed_days = excluded.elapsed_days,
+      scheduled_days = excluded.scheduled_days,
+      learning_steps = excluded.learning_steps,
+      reps = excluded.reps,
+      lapses = excluded.lapses,
+      state = excluded.state,
+      last_review = excluded.last_review,
+      suspended_at = excluded.suspended_at,
+      buried_until = excluded.buried_until,
+      marked_at = excluded.marked_at,
+      created_at = excluded.created_at,
+      updated_at = excluded.updated_at,
+      deleted_at = NULL
+     WHERE study_cards.deleted_at IS NOT NULL`,
     [
       row.id,
       row.deck_id,
@@ -1088,15 +1195,15 @@ export async function deleteStudyCard(
   cardId: string
 ): Promise<void> {
   const row = await db.getFirstAsync<StudyCardRow>(
-    "SELECT * FROM study_cards WHERE id = ? AND deck_id = ?",
+    "SELECT * FROM study_cards WHERE id = ? AND deck_id = ? AND deleted_at IS NULL",
     [cardId, deckId]
   );
+  const deletedAt = new Date().toISOString();
   const result = await db.runAsync(
-    "DELETE FROM study_cards WHERE id = ? AND deck_id = ?",
-    [cardId, deckId]
+    "UPDATE study_cards SET updated_at = ?, deleted_at = ? WHERE id = ? AND deck_id = ? AND deleted_at IS NULL",
+    [deletedAt, deletedAt, cardId, deckId]
   );
   if ((result.changes ?? 0) > 0) {
-    const deletedAt = new Date().toISOString();
     enqueueSync(db, "study_cards", "DELETE", cardId, row ? {
       ...cardToSyncData(rowWithDefaultStatus(row)),
       updated_at: deletedAt,
@@ -1215,8 +1322,9 @@ export async function getNextEligibleReviewDate(db: SQLiteDatabase): Promise<str
         WHEN buried_until IS NOT NULL AND buried_until > due THEN buried_until
         ELSE due
       END AS next_at
-       FROM study_cards
-      WHERE suspended_at IS NULL
+      FROM study_cards
+      WHERE deleted_at IS NULL
+        AND suspended_at IS NULL
       ORDER BY next_at ASC
       LIMIT 1`
   );
@@ -1233,7 +1341,7 @@ export async function getDeckCardsForList(
     }
     const [candidateIds, existingRows] = await Promise.all([
       getSmartDeckCandidateCardIds(db, deckId),
-      db.getAllAsync<StudyCardRow>("SELECT * FROM study_cards WHERE deck_id = ?", [deckId]),
+      db.getAllAsync<StudyCardRow>("SELECT * FROM study_cards WHERE deck_id = ? AND deleted_at IS NULL", [deckId]),
     ]);
     const rowById = new Map(existingRows.map((row) => [row.id, rowWithDefaultStatus(row)]));
     const now = new Date();
@@ -1266,7 +1374,7 @@ export async function getDeckCardsForList(
   }
 
   const rows = await db.getAllAsync<StudyCardRow>(
-    "SELECT * FROM study_cards WHERE deck_id = ? ORDER BY created_at ASC, id ASC",
+    "SELECT * FROM study_cards WHERE deck_id = ? AND deleted_at IS NULL ORDER BY created_at ASC, id ASC",
     [deckId]
   );
   const items: DeckCardListItem[] = [];
@@ -1444,7 +1552,7 @@ export async function updateCard(db: SQLiteDatabase, card: StudyCardRow): Promis
       due = ?, stability = ?, difficulty = ?, elapsed_days = ?, scheduled_days = ?,
       learning_steps = ?, reps = ?, lapses = ?, state = ?, last_review = ?,
       suspended_at = ?, buried_until = ?, marked_at = ?, updated_at = ?
-     WHERE id = ?`,
+     WHERE id = ? AND deleted_at IS NULL`,
     [
       card.due, card.stability, card.difficulty, card.elapsed_days, card.scheduled_days,
       card.learning_steps, card.reps, card.lapses, card.state, card.last_review,

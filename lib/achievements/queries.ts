@@ -277,7 +277,7 @@ async function backfillCompletionAchievements(db: SQLiteDatabase, notify: boolea
        COUNT(*) as total,
        SUM(CASE WHEN sc.state = 2 THEN 1 ELSE 0 END) as mastered
      FROM quran_text qt
-     LEFT JOIN study_cards sc ON sc.id = CAST(qt.surah AS TEXT) || ':' || CAST(qt.ayah AS TEXT)
+     LEFT JOIN study_cards sc ON sc.id = CAST(qt.surah AS TEXT) || ':' || CAST(qt.ayah AS TEXT) AND sc.deleted_at IS NULL
      GROUP BY qt.surah
      ORDER BY qt.surah`
   );
@@ -299,7 +299,7 @@ async function backfillCompletionAchievements(db: SQLiteDatabase, notify: boolea
        SUM(CASE WHEN sc.state = 2 THEN 1 ELSE 0 END) as mastered
      FROM juz_map jm
      JOIN quran_text qt ON qt.surah = jm.surah AND qt.ayah BETWEEN jm.ayah_start AND jm.ayah_end
-     LEFT JOIN study_cards sc ON sc.id = CAST(qt.surah AS TEXT) || ':' || CAST(qt.ayah AS TEXT)
+     LEFT JOIN study_cards sc ON sc.id = CAST(qt.surah AS TEXT) || ':' || CAST(qt.ayah AS TEXT) AND sc.deleted_at IS NULL
      GROUP BY jm.juz
      ORDER BY jm.juz`
   );
@@ -378,13 +378,13 @@ async function backfillReflectionAchievements(db: SQLiteDatabase, notify: boolea
 
 async function backfillVocabAchievements(db: SQLiteDatabase, notify: boolean): Promise<void> {
   const countRow = await db.getFirstAsync<{ count: number }>(
-    "SELECT COUNT(*) as count FROM study_cards WHERE id LIKE 'word:%'"
+    "SELECT COUNT(*) as count FROM study_cards WHERE id LIKE 'word:%' AND deleted_at IS NULL"
   );
   const count = countRow?.count ?? 0;
   await upsertProgress(db, "first_vocab_saved", Math.min(count, 1), 1);
   if (count > 0) {
     const first = await db.getFirstAsync<{ id: string; created_at: string }>(
-      "SELECT id, created_at FROM study_cards WHERE id LIKE 'word:%' ORDER BY created_at ASC LIMIT 1"
+      "SELECT id, created_at FROM study_cards WHERE id LIKE 'word:%' AND deleted_at IS NULL ORDER BY created_at ASC LIMIT 1"
     );
     await unlockAchievement(db, "first_vocab_saved", first?.created_at ?? new Date().toISOString(), { cardId: first?.id }, { cardId: first?.id }, notify);
   }
