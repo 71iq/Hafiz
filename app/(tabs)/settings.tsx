@@ -7,7 +7,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Toast } from "@/components/ui/Toast";
 import { ScreenScrollView, useScreenContentLayout } from "@/components/ui/ScreenContent";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Sun, Moon, Smartphone, Clock3, Circle, Minus, Plus, X, Check, ChevronRight, ChevronLeft, User, LogOut, BookOpen, RefreshCw, Unlink, Info, FileText, HeartHandshake, ExternalLink, Sparkles, SlidersHorizontal, type LucideIcon } from "lucide-react-native";
+import { Sun, Moon, Smartphone, Clock3, Circle, Minus, Plus, X, Check, ChevronRight, ChevronLeft, ChevronDown, User, LogOut, BookOpen, RefreshCw, Unlink, Info, FileText, HeartHandshake, ExternalLink, Sparkles, SlidersHorizontal, type LucideIcon } from "lucide-react-native";
 import {
   useSettings,
   FONT_SIZE_STEPS,
@@ -88,6 +88,7 @@ export default function SettingsScreen() {
   const configured = isSupabaseConfigured();
   const qfSyncEnabled = isQfSyncEnabled();
   const [pickerVisible, setPickerVisible] = useState(false);
+  const [tafseerPickerVisible, setTafseerPickerVisible] = useState(false);
   const [reciterPickerVisible, setReciterPickerVisible] = useState(false);
   const [zaytPreviewVisible, setZaytPreviewVisible] = useState(false);
   const [logoutDialogVisible, setLogoutDialogVisible] = useState(false);
@@ -99,6 +100,8 @@ export default function SettingsScreen() {
   const [toast, setToast] = useState<string | null>(null);
   const { width } = useWindowDimensions();
   const currentLang = getLanguageByCode(translationLanguage);
+  const currentTafseerSource = AVAILABLE_TAFSIR_SOURCES.find((source) => source.id === tafseerSource) ?? AVAILABLE_TAFSIR_SOURCES[0];
+  const currentTafseerTitle = s[currentTafseerSource.labelKey] ?? currentTafseerSource.id;
   const currentReciter = getReciterById(recitationId);
   const { user, profile, isLoading: authLoading, signOut } = useAuthStore();
   const accountName = profile?.display_name || profile?.username || user?.email?.split("@")[0] || s.authProfile;
@@ -306,14 +309,16 @@ export default function SettingsScreen() {
 
   const handleTafseerSourceSelect = useCallback(
     async (sourceId: TafsirSourceId) => {
-      if (sourceId === tafseerSource || importingTafseerSource) return;
+      if (sourceId === tafseerSource || importingTafseerSource) return false;
       setImportingTafseerSource(sourceId);
       try {
         await ensureTafsirSourceImported(db, sourceId);
         setTafseerSource(sourceId);
+        return true;
       } catch (err) {
         console.warn("[Settings] Failed to import tafsir source:", err);
         setToast(s.tafseerSourceImportFailed);
+        return false;
       } finally {
         setImportingTafseerSource(null);
       }
@@ -688,28 +693,41 @@ export default function SettingsScreen() {
 
             <View className="h-4" />
 
-            <Text
-              className="text-charcoal dark:text-neutral-300 mb-3"
-              style={{ fontFamily: "Manrope_500Medium", fontSize: 14 }}
+            <Pressable
+              onPress={() => setTafseerPickerVisible(true)}
+              disabled={importingTafseerSource !== null}
+              className="flex-row items-center justify-between gap-3 rounded-3xl bg-surface dark:bg-surface-dark px-4 py-4"
+              style={({ pressed }) => ({
+                direction: isRTL ? "rtl" : "ltr",
+                opacity: importingTafseerSource !== null ? 0.72 : pressed ? 0.78 : 1,
+              })}
             >
-              {s.tafseerSourceLabel}
-            </Text>
-            <View className="gap-2">
-              {AVAILABLE_TAFSIR_SOURCES.map((source) => (
-                <TafseerSourceOption
-                  key={source.id}
-                  value={source.id}
-                  title={s[source.labelKey] ?? source.id}
-                  description={s[source.descriptionKey] ?? ""}
-                  isActive={tafseerSource === source.id}
-                  isLoading={importingTafseerSource === source.id}
-                  disabled={importingTafseerSource !== null}
-                  onPress={() => handleTafseerSourceSelect(source.id)}
-                  isDark={isDark}
-                  isRTL={isRTL}
-                />
-              ))}
-            </View>
+              <View className="min-w-0 flex-1">
+                <Text
+                  className="text-charcoal dark:text-neutral-200"
+                  style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
+                >
+                  {s.tafseerSourceLabel}
+                </Text>
+                <Text
+                  className="mt-0.5 text-warm-400 dark:text-neutral-500"
+                  numberOfLines={2}
+                  style={{
+                    fontFamily: "Manrope_400Regular",
+                    fontSize: 12,
+                    textAlign: isRTL ? "right" : "left",
+                    writingDirection: isRTL ? "rtl" : "ltr",
+                  }}
+                >
+                  {currentTafseerTitle}
+                </Text>
+              </View>
+              {importingTafseerSource ? (
+                <ActivityIndicator size="small" color={isDark ? "#2dd4bf" : "#0d9488"} />
+              ) : (
+                <ChevronDown size={18} color={isDark ? "#525252" : "#DFD9D1"} />
+              )}
+            </Pressable>
 
             <View className="h-5" />
 
@@ -1090,6 +1108,13 @@ export default function SettingsScreen() {
         visible={pickerVisible}
         onClose={() => setPickerVisible(false)}
       />
+      <TafseerSourcePicker
+        visible={tafseerPickerVisible}
+        selectedSource={tafseerSource}
+        importingSource={importingTafseerSource}
+        onSelect={handleTafseerSourceSelect}
+        onClose={() => setTafseerPickerVisible(false)}
+      />
       <ReciterPicker
         visible={reciterPickerVisible}
         selectedId={recitationId}
@@ -1117,6 +1142,127 @@ function parseSettingsCategory(value: string | undefined): SettingsCategoryId | 
     default:
       return null;
   }
+}
+
+function TafseerSourcePicker({
+  visible,
+  selectedSource,
+  importingSource,
+  onSelect,
+  onClose,
+}: {
+  visible: boolean;
+  selectedSource: TafsirSourceId;
+  importingSource: TafsirSourceId | null;
+  onSelect: (sourceId: TafsirSourceId) => Promise<boolean>;
+  onClose: () => void;
+}) {
+  const { isDark, isRTL } = useSettings();
+  const s = useStrings();
+  const DisclosureChevron = isRTL ? ChevronLeft : ChevronRight;
+  const [pressedSource, setPressedSource] = useState<TafsirSourceId | null>(null);
+
+  useEffect(() => {
+    if (!visible) setPressedSource(null);
+  }, [visible]);
+
+  const handleSelect = async (sourceId: TafsirSourceId) => {
+    if (importingSource) return;
+    if (sourceId === selectedSource) {
+      onClose();
+      return;
+    }
+    const selected = await onSelect(sourceId);
+    if (selected) onClose();
+  };
+
+  return (
+    <ResponsiveSheet
+      open={visible}
+      onClose={onClose}
+      dismissOnBackdrop={!importingSource}
+      maxWidth={520}
+      maxHeight="80%"
+      surfaceColor={isDark ? "#1C1917" : "#FFF8F1"}
+    >
+      <OverlayHeader
+        title={s.tafseerSourceLabel}
+        onClose={importingSource ? undefined : onClose}
+        showHandle
+        isRTL={isRTL}
+      />
+
+      <OverlayBody contentContainerClassName="px-5 pt-2 pb-6">
+        <View className="gap-1">
+          {AVAILABLE_TAFSIR_SOURCES.map((source) => {
+            const isSelected = source.id === selectedSource;
+            const isPressed = source.id === pressedSource;
+            const isImporting = source.id === importingSource;
+            const title = s[source.labelKey] ?? source.id;
+            const description = s[source.descriptionKey] ?? "";
+
+            return (
+              <Pressable
+                key={source.id}
+                onPress={() => handleSelect(source.id)}
+                disabled={!!importingSource}
+                onPressIn={() => setPressedSource(source.id)}
+                onPressOut={() => setPressedSource(null)}
+                className="items-center justify-between gap-3 rounded-2xl px-3 py-3.5"
+                style={{
+                  direction: isRTL ? "rtl" : "ltr",
+                  flexDirection: "row",
+                  backgroundColor: isSelected
+                    ? isDark
+                      ? "rgba(45,212,191,0.08)"
+                      : "rgba(13,148,136,0.06)"
+                    : isPressed
+                      ? isDark
+                        ? "rgba(45,212,191,0.04)"
+                        : "rgba(13,148,136,0.03)"
+                      : "transparent",
+                  opacity: importingSource && !isImporting ? 0.45 : 1,
+                }}
+              >
+                <View className="min-w-0 flex-1">
+                  <Text
+                    className={isSelected ? "text-primary-accent dark:text-primary-bright" : "text-charcoal dark:text-neutral-300"}
+                    style={{
+                      fontFamily: isSelected ? "Manrope_600SemiBold" : "Manrope_500Medium",
+                      fontSize: 15,
+                      textAlign: isRTL ? "right" : "left",
+                      writingDirection: isRTL ? "rtl" : "ltr",
+                    }}
+                  >
+                    {title}
+                  </Text>
+                  <Text
+                    className="mt-0.5 text-warm-400 dark:text-neutral-500"
+                    style={{
+                      fontFamily: "Manrope_400Regular",
+                      fontSize: 13,
+                      textAlign: isRTL ? "right" : "left",
+                      writingDirection: isRTL ? "rtl" : "ltr",
+                    }}
+                  >
+                    {description}
+                  </Text>
+                </View>
+
+                {isImporting ? (
+                  <ActivityIndicator size="small" color={isDark ? "#2dd4bf" : "#0d9488"} />
+                ) : isSelected ? (
+                  <Check size={20} color={isDark ? "#2dd4bf" : "#0d9488"} />
+                ) : (
+                  <DisclosureChevron size={18} color={isDark ? "#737373" : "#8B8178"} />
+                )}
+              </Pressable>
+            );
+          })}
+        </View>
+      </OverlayBody>
+    </ResponsiveSheet>
+  );
 }
 
 function ReciterPicker({
@@ -1560,76 +1706,6 @@ function SettingsLinkRow({
       ) : (
         <RowChevron size={18} color={chevronColor} />
       )}
-    </Pressable>
-  );
-}
-
-function TafseerSourceOption({
-  value,
-  title,
-  description,
-  isActive,
-  isLoading,
-  disabled,
-  onPress,
-  isDark,
-  isRTL,
-}: {
-  value: string;
-  title: string;
-  description: string;
-  isActive: boolean;
-  isLoading?: boolean;
-  disabled?: boolean;
-  onPress: () => void;
-  isDark: boolean;
-  isRTL: boolean;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      className={`p-4 rounded-2xl ${
-        isActive
-          ? "bg-primary-accent/10 dark:bg-primary-bright/15"
-          : "bg-surface-high dark:bg-surface-dark-high"
-      }`}
-      style={({ pressed }) => ({
-        opacity: disabled && !isLoading ? 0.58 : 1,
-        transform: [{ scale: pressed ? 0.98 : 1 }],
-      })}
-    >
-      <View
-        className="items-center gap-3"
-        style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
-      >
-        <Text
-          className={isActive
-            ? "flex-1 text-primary-accent dark:text-primary-bright"
-            : "flex-1 text-charcoal dark:text-neutral-300"
-          }
-          style={{
-            fontFamily: isActive ? "Manrope_600SemiBold" : "Manrope_500Medium",
-            fontSize: 14,
-            writingDirection: isRTL ? "rtl" : "ltr",
-            textAlign: isRTL ? "right" : "left",
-          }}
-        >
-          {title}
-        </Text>
-        {isLoading && <ActivityIndicator size="small" color={isDark ? "#2dd4bf" : "#0d9488"} />}
-      </View>
-      <Text
-        className="text-warm-400 dark:text-neutral-500 mt-0.5"
-        style={{
-          fontFamily: "Manrope_400Regular",
-          fontSize: 12,
-          writingDirection: isRTL ? "rtl" : "ltr",
-          textAlign: isRTL ? "right" : "left",
-        }}
-      >
-        {description}
-      </Text>
     </Pressable>
   );
 }
