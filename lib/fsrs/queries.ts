@@ -815,9 +815,10 @@ export async function isRetentionCardSaved(
     `SELECT COUNT(*) as c
        FROM study_cards
       WHERE deleted_at IS NULL
-        AND ((id = ? AND (deck_id = ? OR (deck_id != ? AND ${NON_SMART_CARD_SQL})))
+        AND ((id = ? AND deck_id = ? AND marked_at IS NOT NULL)
+         OR (id = ? AND deck_id != ? AND ${NON_SMART_CARD_SQL})
          OR (id = ? AND deck_id = ?))`,
-    [cardId, SMART_DECK_IDS.retention, MEANINGS_DECK_ID, legacyCardId, MUTASHABIHAT_DECK_ID]
+    [cardId, SMART_DECK_IDS.retention, cardId, MEANINGS_DECK_ID, legacyCardId, MUTASHABIHAT_DECK_ID]
   );
   return (row?.c ?? 0) > 0;
 }
@@ -840,11 +841,19 @@ export async function addRetentionCard(
   const emptyCard = createEmptyCard();
   const cardId = retentionCardId(surah, ayah);
 
-  const existing = await db.getFirstAsync<{ id: string }>(
-    "SELECT id FROM study_cards WHERE id = ? AND deck_id = ? AND deleted_at IS NULL",
+  const existing = await db.getFirstAsync<StudyCardRow>(
+    "SELECT * FROM study_cards WHERE id = ? AND deck_id = ? AND deleted_at IS NULL",
     [cardId, SMART_DECK_IDS.retention]
   );
-  if (existing?.id) return { created: false };
+  if (existing?.id) {
+    if (existing.marked_at) return { created: false };
+    await updateCard(db, rowWithDefaultStatus({
+      ...existing,
+      marked_at: now,
+      updated_at: now,
+    }));
+    return { created: true };
+  }
 
   const result = await db.runAsync(
     `INSERT INTO study_cards
@@ -884,7 +893,7 @@ export async function addRetentionCard(
       null,
       null,
       null,
-      null,
+      now,
       now,
       now,
     ]
@@ -907,7 +916,7 @@ export async function addRetentionCard(
       last_review: null,
       suspended_at: null,
       buried_until: null,
-      marked_at: null,
+      marked_at: now,
       created_at: now,
       updated_at: now,
       deleted_at: null,

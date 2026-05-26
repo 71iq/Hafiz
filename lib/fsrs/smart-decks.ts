@@ -240,12 +240,26 @@ export async function migrateLegacyRetentionDecks(db: SQLiteDatabase): Promise<n
     for (const row of rows) {
       const legacyAyahId = parseLegacyMutashabihatCardId(row.id);
       if (legacyAyahId) {
-        const existing = await db.getFirstAsync<{ id: string }>(
-          "SELECT id FROM study_cards WHERE id = ? AND deleted_at IS NULL",
+        const existing = await db.getFirstAsync<StudyCardRow>(
+          "SELECT * FROM study_cards WHERE id = ? AND deleted_at IS NULL",
           [legacyAyahId]
         );
         await db.runAsync("UPDATE study_log SET card_id = ? WHERE card_id = ?", [legacyAyahId, row.id]);
         if (existing?.id) {
+          const markedAt = existing.marked_at ?? row.marked_at ?? now;
+          await db.runAsync(
+            "UPDATE study_cards SET marked_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL",
+            [markedAt, now, legacyAyahId]
+          );
+          syncOps.push({
+            operation: "UPDATE",
+            rowId: legacyAyahId,
+            data: studyCardToSyncData({
+              ...existing,
+              marked_at: markedAt,
+              updated_at: now,
+            }),
+          });
           await db.runAsync(
             "UPDATE study_cards SET updated_at = ?, deleted_at = ? WHERE id = ? AND deleted_at IS NULL",
             [now, now, row.id]
@@ -260,9 +274,10 @@ export async function migrateLegacyRetentionDecks(db: SQLiteDatabase): Promise<n
             },
           });
         } else {
+          const markedAt = row.marked_at ?? now;
           await db.runAsync(
-            "UPDATE study_cards SET id = ?, deck_id = ?, updated_at = ?, deleted_at = NULL WHERE id = ? AND deleted_at IS NULL",
-            [legacyAyahId, SMART_DECK_IDS.retention, now, row.id]
+            "UPDATE study_cards SET id = ?, deck_id = ?, marked_at = ?, updated_at = ?, deleted_at = NULL WHERE id = ? AND deleted_at IS NULL",
+            [legacyAyahId, SMART_DECK_IDS.retention, markedAt, now, row.id]
           );
           syncOps.push({
             operation: "UPDATE",
@@ -271,6 +286,7 @@ export async function migrateLegacyRetentionDecks(db: SQLiteDatabase): Promise<n
               ...row,
               id: legacyAyahId,
               deck_id: SMART_DECK_IDS.retention,
+              marked_at: markedAt,
               updated_at: now,
               deleted_at: null,
             }),
@@ -282,9 +298,10 @@ export async function migrateLegacyRetentionDecks(db: SQLiteDatabase): Promise<n
 
       if (!parseAyahCardId(row.id)) continue;
       if (row.deck_id === SMART_DECK_IDS.retention) continue;
+      const markedAt = row.marked_at ?? now;
       await db.runAsync(
-        "UPDATE study_cards SET deck_id = ?, updated_at = ?, deleted_at = NULL WHERE id = ? AND deleted_at IS NULL",
-        [SMART_DECK_IDS.retention, now, row.id]
+        "UPDATE study_cards SET deck_id = ?, marked_at = ?, updated_at = ?, deleted_at = NULL WHERE id = ? AND deleted_at IS NULL",
+        [SMART_DECK_IDS.retention, markedAt, now, row.id]
       );
       syncOps.push({
         operation: "UPDATE",
@@ -292,6 +309,7 @@ export async function migrateLegacyRetentionDecks(db: SQLiteDatabase): Promise<n
         data: studyCardToSyncData({
           ...row,
           deck_id: SMART_DECK_IDS.retention,
+          marked_at: markedAt,
           updated_at: now,
           deleted_at: null,
         }),
