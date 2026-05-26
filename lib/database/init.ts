@@ -12,6 +12,7 @@ import {
   type TafsirSourceConfig,
   type TafsirSourceId,
 } from "@/lib/tafsir/sources";
+import surahEnglishNameRows from "../../assets/data/surah-english-names.json";
 
 // ─── Platform-aware data loading ─────────────────────────────
 // On web: fetch from /data/ (static files served from public/)
@@ -1637,6 +1638,32 @@ async function writeSetting(db: SQLiteDatabase, key: string, value: string): Pro
   );
 }
 
+type SurahEnglishNameRow = { number: number; name_english: string };
+
+const DEFAULT_SURAH_ENGLISH_NAMES = new Map(
+  (surahEnglishNameRows as SurahEnglishNameRow[])
+    .filter((row) =>
+      Number.isInteger(row.number) && typeof row.name_english === "string" && row.name_english.length > 0
+    )
+    .map((row) => [row.number, row.name_english])
+);
+
+async function ensureDefaultSurahEnglishNames(db: SQLiteDatabase): Promise<void> {
+  const baqaraName = DEFAULT_SURAH_ENGLISH_NAMES.get(2);
+  if (!baqaraName) return;
+
+  const current = await db.getFirstAsync<{ name_english: string }>(
+    "SELECT name_english FROM surahs WHERE number = 2"
+  );
+  if (current?.name_english === baqaraName) return;
+
+  await batchInsert(
+    db,
+    "UPDATE surahs SET name_english = ? WHERE number = ?",
+    Array.from(DEFAULT_SURAH_ENGLISH_NAMES, ([number, name]) => [name, number])
+  );
+}
+
 // ─── Import functions ────────────────────────────────────────
 
 async function importSurahs(
@@ -1649,7 +1676,7 @@ async function importSurahs(
   console.log(`[Import] Importing ${surahs.length} surahs...`);
 
   const rows = surahs.map((s: any) => [
-    s.number, s.name_arabic, s.name_english, s.ayah_count, s.revelation_type,
+    s.number, s.name_arabic, DEFAULT_SURAH_ENGLISH_NAMES.get(s.number) ?? s.name_english, s.ayah_count, s.revelation_type,
   ]);
   await batchInsert(
     db,
@@ -2532,6 +2559,8 @@ export async function initializeDatabase(
 
   const populated = await isPopulated(db);
   if (populated) {
+    await ensureDefaultSurahEnglishNames(db);
+
     // Check if page_lines needs migration (added after initial import)
     const plCount = await db.getFirstAsync<{ count: number }>(
       "SELECT COUNT(*) as count FROM page_lines"

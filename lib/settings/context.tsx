@@ -4,7 +4,7 @@ import { useColorScheme as useNativeWindColorScheme, vars } from "nativewind";
 import type { SQLiteDatabase } from "expo-sqlite";
 import { useDatabase } from "@/lib/database/provider";
 import { writeUserSetting } from "@/lib/database/user-settings";
-import { DEFAULT_LANGUAGE } from "@/lib/translations/languages";
+import { DEFAULT_LANGUAGE, DEFAULT_TRANSLATION_LANGUAGE } from "@/lib/translations/languages";
 import { importTranslation } from "@/lib/translations/import";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { DEFAULT_RECITATION_ID, normalizeRecitationId } from "@/lib/quran-foundation/recitations";
@@ -186,7 +186,7 @@ const SettingsContext = createContext<SettingsContextType>({
   setShowTranslation: () => {},
   showTafseer: false,
   setShowTafseer: () => {},
-  translationLanguage: DEFAULT_LANGUAGE,
+  translationLanguage: DEFAULT_TRANSLATION_LANGUAGE,
   setTranslationLanguage: async () => {},
   isTranslationLoading: false,
   tafseerSource: DEFAULT_TAFSIR_SOURCE,
@@ -558,7 +558,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [pageScroll, setPageScrollState] = useState<PageScroll>("vertical");
   const [showTranslation, setShowTranslationState] = useState(false);
   const [showTafseer, setShowTafseerState] = useState(false);
-  const [translationLanguage, setTranslationLanguageState] = useState(DEFAULT_LANGUAGE);
+  const [translationLanguage, setTranslationLanguageState] = useState(DEFAULT_TRANSLATION_LANGUAGE);
   const [isTranslationLoading, setIsTranslationLoading] = useState(false);
   const [tafseerSource, setTafseerSourceState] = useState<TafseerSource>(DEFAULT_TAFSIR_SOURCE);
   const [recitationId, setRecitationIdState] = useState(DEFAULT_RECITATION_ID);
@@ -703,15 +703,18 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         if (savedHifzAutoAdvance === "true") setHifzAutoAdvancePageState(true);
 
         const savedLang = saved.translation_language;
-        if (savedLang && savedLang !== DEFAULT_LANGUAGE) {
-          setTranslationLanguageState(savedLang);
-          // Re-import if translation_active has wrong language or is empty
+        const nextTranslationLanguage = savedLang ?? DEFAULT_TRANSLATION_LANGUAGE;
+        setTranslationLanguageState(nextTranslationLanguage);
+        if (!savedLang) {
+          await writeSetting(db, "translation_language", nextTranslationLanguage);
+        }
+        if (nextTranslationLanguage !== DEFAULT_LANGUAGE) {
           const activeLang = saved.translation_active_lang;
-          if (activeLang !== savedLang) {
+          if (activeLang !== nextTranslationLanguage) {
             setIsTranslationLoading(true);
             try {
-              await importTranslation(db, savedLang);
-              await writeSetting(db, "translation_active_lang", savedLang);
+              await importTranslation(db, nextTranslationLanguage);
+              await writeSetting(db, "translation_active_lang", nextTranslationLanguage);
             } catch (e) {
               console.warn("[Settings] Failed to re-import translation:", e);
             } finally {

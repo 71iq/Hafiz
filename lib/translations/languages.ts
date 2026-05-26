@@ -6,6 +6,7 @@ export type TranslationLanguage = {
 };
 
 export const DEFAULT_LANGUAGE = "en";
+export const DEFAULT_TRANSLATION_LANGUAGE = "en-bridges";
 
 export const TRANSLATION_LANGUAGES: TranslationLanguage[] = [
   { code: "en", nameEnglish: "English", nameNative: "English", direction: "ltr" },

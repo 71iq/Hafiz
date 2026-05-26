@@ -395,6 +395,7 @@ async function main() {
 
   const db = new SqliteWriter(DB_PATH);
   const quranData = readJson("quran-data.json");
+  const surahEnglishNameMap = new Map(readJson("surah-english-names.json").map((row) => [row.number, row.name_english]));
   const qcf2Data = readJson("quran-qcf2.json");
   const masaqData = readJson("masaq/masaq-aggregated.json");
 
@@ -405,7 +406,13 @@ async function main() {
   const canonicalByAyah = buildCanonicalWordsByAyah(masaqData);
 
   await db.insertRows("surahs", ["number", "name_arabic", "name_english", "ayah_count", "revelation_type"],
-    quranData.tables.surahs.map((row) => [row.number, row.name_arabic, row.name_english, row.ayah_count, row.revelation_type]));
+    quranData.tables.surahs.map((row) => [
+      row.number,
+      row.name_arabic,
+      surahEnglishNameMap.get(row.number) ?? row.name_english,
+      row.ayah_count,
+      row.revelation_type,
+    ]));
 
   await db.insertRows("quran_text", ["surah", "ayah", "text_uthmani", "text_clean", "text_qcf2", "v2_page", "text_search"],
     quranData.tables.quran_text.map((row) => {
