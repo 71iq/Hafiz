@@ -6,6 +6,8 @@ const loadedFonts = new Set<string>();
 const inFlight = new Map<string, Promise<void>>();
 const SURAH_NAME_FONT_FAMILY = "QCF_SurahHeader_COLOR";
 const SURAH_NAME_FONT = require("../../assets/fonts/surah-names/QCF_SurahHeader_COLOR-Regular.ttf");
+const QURAN_COMMON_FONT_FAMILY = "QuranCommon";
+const QURAN_COMMON_FONT = require("../../assets/fonts/quran-common/quran-common.ttf");
 const SURAH_NAME_GLYPHS: Record<number, string> = {
   1: "\uFC45",
   2: "\uFC46",
@@ -136,6 +138,23 @@ export function surahNameGlyph(surah: number): string | undefined {
   return SURAH_NAME_GLYPHS[surah];
 }
 
+export function quranCommonFontName(): string {
+  return QURAN_COMMON_FONT_FAMILY;
+}
+
+function formatJuzLigature(prefix: string, juz: number): string | undefined {
+  if (!Number.isInteger(juz) || juz < 1 || juz > 30) return undefined;
+  return `${prefix}${String(juz).padStart(3, "0")}`;
+}
+
+export function juzNameGlyph(juz: number): string | undefined {
+  return formatJuzLigature("j", juz);
+}
+
+export function juzNumberGlyph(juz: number): string | undefined {
+  return formatJuzLigature("juz", juz);
+}
+
 /**
  * Load a QCF2 font on web using the native FontFace API with display: 'swap'.
  *
@@ -218,4 +237,28 @@ export async function loadSurahNameFont(): Promise<void> {
 
 export function isSurahNameFontLoaded(): boolean {
   return loadedFonts.has(SURAH_NAME_FONT_FAMILY);
+}
+
+export async function loadQuranCommonFont(): Promise<void> {
+  if (loadedFonts.has(QURAN_COMMON_FONT_FAMILY)) return;
+
+  const existing = inFlight.get(QURAN_COMMON_FONT_FAMILY);
+  if (existing) return existing;
+
+  const promise = (async () => {
+    if (Platform.OS === "web" && typeof document !== "undefined") {
+      await loadFontWeb(QURAN_COMMON_FONT_FAMILY, QURAN_COMMON_FONT);
+    } else {
+      await Font.loadAsync({ [QURAN_COMMON_FONT_FAMILY]: QURAN_COMMON_FONT });
+    }
+    loadedFonts.add(QURAN_COMMON_FONT_FAMILY);
+    inFlight.delete(QURAN_COMMON_FONT_FAMILY);
+  })();
+
+  inFlight.set(QURAN_COMMON_FONT_FAMILY, promise);
+  return promise;
+}
+
+export function isQuranCommonFontLoaded(): boolean {
+  return loadedFonts.has(QURAN_COMMON_FONT_FAMILY);
 }

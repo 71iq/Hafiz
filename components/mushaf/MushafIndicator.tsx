@@ -2,6 +2,7 @@ import { View, Text } from "react-native";
 import { toArabicNumber } from "@/lib/arabic";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
+import { JuzNameText } from "./JuzNameText";
 
 type Props = {
   surahName: string | null;
@@ -34,16 +35,21 @@ export function MushafIndicator({ surahName, juz }: Props) {
       >
         {surahName ? `${s.tabSurah} ${surahName}` : ""}
       </Text>
-      <Text
+      <JuzNameText
+        juz={juz}
+        enabled={isRTL}
+        fallback={juz ? `${s.tabJuz} ${juzLabel}` : ""}
         className="text-warm-500 dark:text-neutral-400"
         style={{
           fontFamily: "Manrope_500Medium",
           fontSize: 12,
         }}
+        glyphStyle={{
+          fontSize: 17,
+          lineHeight: 20,
+        }}
         numberOfLines={1}
-      >
-        {juz ? `${s.tabJuz} ${juzLabel}` : ""}
-      </Text>
+      />
     </View>
   );
 }

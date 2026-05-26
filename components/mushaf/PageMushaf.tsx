@@ -35,6 +35,7 @@ import {
   type PageWordsData,
 } from "./MushafPage";
 import { AyahDetailModal } from "./AyahDetailModal";
+import { JuzNameText } from "./JuzNameText";
 import { toArabicNumber } from "@/lib/arabic";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { loadQpcFont } from "@/lib/fonts/loader";
@@ -376,13 +377,15 @@ function PageSeparator({
           <View className="flex-1 h-px bg-warm-200 dark:bg-neutral-700" />
         </View>
 
-        <Text
+        <JuzNameText
+          juz={juz}
+          enabled={isRTL}
+          fallback={juzLabel}
           className="text-warm-500 dark:text-neutral-400"
           style={{ fontFamily: "Manrope_500Medium", fontSize: 12 }}
+          glyphStyle={{ fontSize: 18, lineHeight: 22 }}
           numberOfLines={1}
-        >
-          {juzLabel}
-        </Text>
+        />
       </View>
     </View>
   );
