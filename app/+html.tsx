@@ -161,6 +161,15 @@ const urlBarHideScript = `
 const startupThemeScript = `
 (function () {
   try {
+    var cachedLanguage = window.localStorage.getItem("hafiz_ui_language");
+    var startupLanguage =
+      cachedLanguage === "ar" || cachedLanguage === "en"
+        ? cachedLanguage
+        : window.navigator && window.navigator.language && window.navigator.language.toLowerCase().indexOf("ar") === 0
+          ? "ar"
+          : "en";
+    document.documentElement.setAttribute("lang", startupLanguage);
+    document.documentElement.setAttribute("dir", startupLanguage === "ar" ? "rtl" : "ltr");
     var palettes = {
       beige: {
         surface: "#FFF8F1",

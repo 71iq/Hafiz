@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Platform, View, Text, Image, I18nManager } from "react-native";
 import type { ImportProgress } from "@/lib/database/init";
 import { Progress } from "@/components/ui/Progress";
@@ -21,16 +21,29 @@ type Props = {
 };
 
 export function LoadingScreen({ progress }: Props) {
-  const [uiLanguage, setUiLanguage] = useState<"en" | "ar">(getStartupLanguage);
-  const s = strings[uiLanguage];
+  const [uiLanguage, setUiLanguage] = useState<"en" | "ar" | null>(() =>
+    Platform.OS === "web" ? null : getStartupLanguage()
+  );
+  const s = uiLanguage ? strings[uiLanguage] : null;
   const rawPct = progress ? (progress.current / progress.total) * 100 : 0;
   const percentage = Math.max(0, Math.min(100, Math.round(rawPct)));
-  const stepLabel = progress
-    ? `${progress.step} (${Math.min(progress.current, progress.total)}/${progress.total})`
-    : null;
+  const fonts = useMemo(
+    () => ({
+      title:
+        Platform.OS === "web"
+          ? "Georgia, 'Times New Roman', serif"
+          : "NotoSerif_700Bold",
+      body:
+        Platform.OS === "web"
+          ? "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+          : "Manrope_400Regular",
+    }),
+    []
+  );
 
   useEffect(() => {
     if (Platform.OS !== "web" || typeof window === "undefined") return;
+    setUiLanguage(getStartupLanguage());
     const onStorage = () => setUiLanguage(getStartupLanguage());
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
@@ -48,53 +61,44 @@ export function LoadingScreen({ progress }: Props) {
         />
         <Text
           className="text-charcoal dark:text-neutral-100 mb-2"
-          style={{ fontFamily: "NotoSerif_700Bold", fontSize: 40 }}
+          style={{
+            fontFamily: fonts.title,
+            fontSize: 40,
+            fontWeight: Platform.OS === "web" ? "700" : undefined,
+          }}
         >
           Hafiz
         </Text>
-        <Text
-          className="text-warm-400 dark:text-neutral-500"
-          style={{ fontFamily: "Manrope_400Regular", fontSize: 16 }}
-        >
-          {s.appSubtitle}
-        </Text>
+        {s && (
+          <Text
+            className="text-warm-400 dark:text-neutral-500"
+            style={{
+              fontFamily: fonts.body,
+              fontSize: 16,
+              writingDirection: uiLanguage === "ar" ? "rtl" : "ltr",
+            }}
+          >
+            {s.appSubtitle}
+          </Text>
+        )}
       </View>
 
-      {progress ? (
-        <View className="w-full max-w-xs gap-5">
-          <Progress value={percentage} />
+      <View className="w-full max-w-xs">
+        <Progress value={percentage} />
+      </View>
 
-          <View className="items-center gap-1">
-            <Text
-              className="text-charcoal dark:text-neutral-200 text-center"
-              style={{ fontFamily: "Manrope_500Medium", fontSize: 15 }}
-            >
-              {stepLabel}
-            </Text>
-            {progress.detail && (
-              <Text
-                className="text-warm-400 dark:text-neutral-500 text-center"
-                style={{ fontFamily: "Manrope_400Regular", fontSize: 13 }}
-              >
-                {progress.detail}
-              </Text>
-            )}
-            <Text
-              className="text-primary-accent dark:text-primary-bright text-center mt-1"
-              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}
-            >
-              {percentage}%
-            </Text>
-          </View>
-        </View>
-      ) : (
+      {!progress && s ? (
         <Text
-          className="text-warm-400 dark:text-neutral-500"
-          style={{ fontFamily: "Manrope_400Regular", fontSize: 15 }}
+          className="text-warm-400 dark:text-neutral-500 mt-5"
+          style={{
+            fontFamily: fonts.body,
+            fontSize: 15,
+            writingDirection: uiLanguage === "ar" ? "rtl" : "ltr",
+          }}
         >
           {s.preparingDatabase}
         </Text>
-      )}
+      ) : null}
     </View>
   );
 }
