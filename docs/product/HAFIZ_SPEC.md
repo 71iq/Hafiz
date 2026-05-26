@@ -82,7 +82,7 @@ Two categories of data:
 - Word-by-word translations
 - Morphology / إعراب / تصريف
 - Tajweed annotations
-- Tafseer
+- Tafsir
 - Surah/Juz/Hizb/Page metadata
 - Word roots
 
@@ -105,7 +105,7 @@ Your existing `quran-data.json` contains:
 - `hizb_map` (60 rows): hizb, surah_start, ayah_start, surah_end, ayah_end
 - `word_roots` (50,268 rows): surah, ayah, word_pos, word_text, root, lemma
 
-#### 2.4.2 Tafseer Al-Muyassar (التفسير الميسر)
+#### 2.4.2 Tafsir Al-Muyassar (التفسير الميسر)
 - **Source:** `spa5k/tafsir_api` (MIT license)
 - **Format:** JSON, one file per surah (114 files)
 - **Download pattern:** `https://cdn.jsdelivr.net/gh/spa5k/tafsir_api@main/tafsir/ar-tafsir-muyassar/{1-114}.json`
@@ -215,7 +215,7 @@ This is a key differentiator, inspired by wahy.net and quran.com's word-by-word 
 | Tab | Content | Data Source |
 |-----|---------|-------------|
 | **English Meaning** | Word-by-word English translation | QUL WBW dataset |
-| **المعنى** | Arabic meaning/context | Tafseer Al-Muyassar (ayah-level) |
+| **المعنى** | Arabic meaning/context | Tafsir Al-Muyassar (ayah-level) |
 | **إعراب** | Full grammatical parsing (syntactic role, case, etc.) | MASAQ dataset |
 | **تصريف** | Morphological analysis: root, pattern, verb form, POS, person/gender/number | mustafa0x/quran-morphology |
 | **حكم تجويدي** | Tajweed rule affecting this word (if any), with rule name and description | cpfair/quran-tajweed |
@@ -341,7 +341,7 @@ The user enables specific "test modes" per deck. Each enabled mode adds a step t
 | **Next Ayah** | Show unique prefix ayah(s) | Reveal the next ayah |
 | **Previous Ayah** | Show an ayah | Reveal what came before it |
 | **Translation** | Show Arabic ayah | Reveal English translation |
-| **Tafseer** | Show Arabic ayah | Reveal tafseer text |
+| **Tafsir** | Show Arabic ayah | Reveal tafsir text |
 | **First Letter** | Show first letter of each word in the ayah | Reveal full ayah |
 | **Surah Identification** | Show an ayah (without surah context) | Reveal which surah it's from |
 
@@ -629,7 +629,7 @@ Use Supabase Row Level Security (RLS) policies:
 4. Build the multi-sided card UI:
    - State machine: Front → Side 1 → Side 2 → ... → Grading.
    - Animate transitions between sides.
-5. Implement all test modes (§3.6.3): Next Ayah, Previous Ayah, Translation, Tafseer, First Letter, Surah Identification.
+5. Implement all test modes (§3.6.3): Next Ayah, Previous Ayah, Translation, Tafsir, First Letter, Surah Identification.
 6. Implement per-deck settings UI for enabling/disabling test modes.
 7. On grading: call `scheduler.next(card, now, rating)` and persist updated card state to `study_cards` table. Log the review to `study_log` table.
 8. Build session summary screen.

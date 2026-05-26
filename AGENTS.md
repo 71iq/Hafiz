@@ -58,7 +58,7 @@ For web UI stabilization and verification rules, `docs/agent/WEB_UI_CONTRACT.md`
 - Selection: tap badge → select ayah; long-press → range. `SelectionProvider` owns state.
 - Context menu: Copy, Share, Reflect, Highlight (4 colors), Bookmark.
 
-### Tafseer
+### Tafsir
 
 - Multi-source: `tafseer` table has a `source` column (PK: surah, ayah, source). Values: `'muyassar'`, `'zilal'`.
 - Zilal texts are truncated to 200 chars with "Read more"; source attribution shown for zilal.

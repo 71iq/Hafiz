@@ -53,7 +53,7 @@ export const TAFSIR_SOURCES: TafsirSourceConfig[] = [
     labelKey: "tafseerQurtubi",
     descriptionKey: "tafseerQurtubiDesc",
     importKind: "surahRows",
-    progressDetail: "Tafseer Al Qurtubi",
+    progressDetail: "Tafsir Al Qurtubi",
     expectedRows: 6234,
   },
   {

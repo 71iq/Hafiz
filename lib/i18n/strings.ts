@@ -49,7 +49,7 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     pageScrollVertical: "Scroll",
     pageScrollHorizontal: "Swipe",
     showTranslationLabel: "Always Show Translation",
-    showTafseerLabel: "Always Show Tafseer",
+    showTafseerLabel: "Always Show Tafsir",
     translationLanguageLabel: "Translation Language",
     appLanguageLabel: "App Language",
     // Mushaf header
@@ -98,7 +98,7 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     surahInfoUnavailable: "Surah information is unavailable.",
     surahInfoSource: "Source",
     // AyahBlock
-    tafseer: "Tafseer",
+    tafseer: "Tafsir",
     ayahTabHadith: "Hadith",
     hadithLoading: "Loading hadith references...",
     hadithEmpty: "No hadith references found for this ayah",
@@ -185,7 +185,7 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     creditQiraat: "Qiraʾat: Qurʾanic Encyclopedia via qul.tarteel.ai",
     creditAsbab: "Reasons of revelation: mostafaahmed97/asbab-al-nuzul-dataset (MIT)",
     creditTahrirTanwir: "Tafsir al-Tahrir wa al-Tanwir: QUL / Tarteel AI",
-    creditQurtubi: "Tafseer Al Qurtubi: QUL / Tarteel AI",
+    creditQurtubi: "Tafsir Al Qurtubi: QUL / Tarteel AI",
     creditKashshaf: "Al-Kashshaf Al-Zamakhshari: QUL / Tarteel AI",
     creditAlusi: "Tafsir Al-Alusi: QUL / Tarteel AI",
     creditNazamDurar: "Nazam Al-Durar Al-Biqa'i: QUL / Tarteel AI",
@@ -256,7 +256,7 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     wordMeaningRoot: "Root",
     wordMeaningLemma: "Lemma",
     noTafseerData: "No tafsir is available for this ayah",
-    // Tafseer sources
+    // Tafsir sources
     tafseerSourceLabel: "Tafsir Source",
     tafseerSourceImportFailed: "Could not load this tafsir source",
     tafseerDownloadHint: "Al-Muyassar and Fi Zilal are included. Other tafsirs download in the background before they are used.",
@@ -617,7 +617,7 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     flashcardsModeNextAyah: "Next Ayah",
     flashcardsModePreviousAyah: "Previous Ayah",
     flashcardsModeTranslation: "Translation",
-    flashcardsModeTafseer: "Tafseer",
+    flashcardsModeTafseer: "Tafsir",
     flashcardsModeSurahName: "Surah Name",
     flashcardsModeWordMeaningArabic: "Arabic Meaning",
     flashcardsModeWordMeaningTranslation: "Translation",

@@ -1797,7 +1797,7 @@ async function importTafseer(
   db: SQLiteDatabase,
   onProgress: ProgressCallback
 ): Promise<void> {
-  onProgress({ step: "Tafseer", current: 5, total: TOTAL_STEPS, detail: "Al-Muyassar (114 files)" });
+  onProgress({ step: "Tafsir", current: 5, total: TOTAL_STEPS, detail: "Al-Muyassar (114 files)" });
   console.log(`[Import] Importing tafseer (muyassar) from 114 files...`);
 
   // Fetch all 114 files in parallel instead of sequentially.
@@ -1821,14 +1821,14 @@ async function importTafseer(
     "INSERT OR IGNORE INTO tafseer (surah, ayah, source, text) VALUES (?, ?, ?, ?)",
     allRows
   );
-  console.log(`[Import] Tafseer (muyassar) done: ${totalRows} rows`);
+  console.log(`[Import] Tafsir (muyassar) done: ${totalRows} rows`);
 }
 
 async function importZilal(
   db: SQLiteDatabase,
   onProgress: ProgressCallback
 ): Promise<void> {
-  onProgress({ step: "Tafseer", current: 6, total: TOTAL_STEPS, detail: "Fi Zilal al-Quran" });
+  onProgress({ step: "Tafsir", current: 6, total: TOTAL_STEPS, detail: "Fi Zilal al-Quran" });
   console.log(`[Import] Importing tafseer (zilal)...`);
 
   const zilalData = await loadData("zilal.json");
@@ -1849,7 +1849,7 @@ async function importZilal(
     "INSERT OR IGNORE INTO tafseer (surah, ayah, source, text) VALUES (?, ?, ?, ?)",
     allRows
   );
-  console.log(`[Import] Tafseer (zilal) done: ${allRows.length} rows`);
+  console.log(`[Import] Tafsir (zilal) done: ${allRows.length} rows`);
 }
 
 async function importSurahRowTafsirSource(
@@ -1857,7 +1857,7 @@ async function importSurahRowTafsirSource(
   source: TafsirSourceConfig,
   onProgress: ProgressCallback
 ): Promise<number> {
-  onProgress({ step: "Tafseer", current: 7, total: TOTAL_STEPS, detail: source.progressDetail });
+  onProgress({ step: "Tafsir", current: 7, total: TOTAL_STEPS, detail: source.progressDetail });
   console.log(`[Import] Importing tafseer (${source.id}) from 114 surah files...`);
 
   let inserted = 0;
@@ -1882,7 +1882,7 @@ async function importSurahRowTafsirSource(
     inserted += rows.length;
   }
 
-  console.log(`[Import] Tafseer (${source.id}) done: ${inserted} rows`);
+  console.log(`[Import] Tafsir (${source.id}) done: ${inserted} rows`);
   return inserted;
 }
 
@@ -2635,10 +2635,10 @@ export async function initializeDatabase(
           ALTER TABLE tafseer_new RENAME TO tafseer;
           CREATE INDEX IF NOT EXISTS idx_tafseer_source ON tafseer(source);
         `);
-        console.log("[Import] Tafseer migration done.");
+        console.log("[Import] Tafsir migration done.");
       }
     } catch (e) {
-      console.warn("[Import] Tafseer migration check:", e);
+      console.warn("[Import] Tafsir migration check:", e);
     }
 
     // Import zilal if not yet imported
