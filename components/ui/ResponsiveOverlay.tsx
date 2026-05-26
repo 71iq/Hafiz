@@ -280,8 +280,11 @@ export function OverlayHeader({
           <View className="h-1.5 w-10 rounded-full bg-surface-high dark:bg-surface-dark-high" />
         </View>
       ) : null}
-      <View className={cn("items-center justify-between gap-3", rowClassName)}>
-        <View className={cn("min-w-0 flex-1 items-start gap-3", rowClassName, isRTL ? "items-end" : "items-start")}>
+      <View className={cn("items-center justify-between gap-3", rowClassName)} style={{ direction: "ltr" }}>
+        <View
+          className={cn("min-w-0 flex-1 items-start gap-3", rowClassName, isRTL ? "items-end" : "items-start")}
+          style={{ direction: "ltr" }}
+        >
           {leading ? <View>{leading}</View> : null}
           {(title || subtitle) ? (
             <View className={cn("min-w-0 flex-1", isRTL ? "items-end" : "items-start")}>
@@ -315,7 +318,7 @@ export function OverlayHeader({
             </View>
           ) : null}
         </View>
-        <View className={cn("items-center gap-2", rowClassName)}>
+        <View className={cn("items-center gap-2", rowClassName)} style={{ direction: "ltr" }}>
           {actions}
           {onClose ? (
             <Pressable
@@ -371,7 +374,7 @@ export function OverlayFooter({ children, dir: explicitDir, isRTL: explicitIsRTL
       )}
       style={{ paddingBottom: Math.max(insets.bottom, 12) }}
     >
-      <View className={cn("w-full gap-3", isRTL ? "flex-row-reverse" : "flex-row")}>{children}</View>
+      <View className={cn("w-full gap-3", isRTL ? "flex-row-reverse" : "flex-row")} style={{ direction: "ltr" }}>{children}</View>
     </View>
   );
 }

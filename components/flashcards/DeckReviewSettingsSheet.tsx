@@ -224,6 +224,7 @@ export function DeckReviewSettingsSheet({ visible, deckId, deckTitle, mode, onCl
       <View
         className="gap-3"
         style={{
+          direction: "ltr",
           flexDirection: compact ? (isRTL ? "row-reverse" : "row") : "column",
           flexWrap: compact ? "wrap" : "nowrap",
         }}
@@ -272,6 +273,7 @@ export function DeckReviewSettingsSheet({ visible, deckId, deckTitle, mode, onCl
         onClose={onClose}
         maxWidth={680}
         maxHeight="92%"
+        dir={isRTL ? "rtl" : "ltr"}
       >
         <OverlayHeader
           title={s.deckReviewSettingsTitle}
@@ -280,7 +282,10 @@ export function DeckReviewSettingsSheet({ visible, deckId, deckTitle, mode, onCl
           showHandle={isPhone}
         />
 
-        <OverlayBody contentContainerClassName="px-5 pb-8">
+        <OverlayBody
+          contentContainerClassName="px-5 pb-8"
+          contentContainerStyle={{ direction: isRTL ? "rtl" : "ltr" }}
+        >
           <Text
             className="mb-4 text-charcoal dark:text-neutral-100"
             style={{
@@ -355,6 +360,7 @@ export function DeckReviewSettingsSheet({ visible, deckId, deckTitle, mode, onCl
         onClose={() => setActiveInfo(null)}
         maxWidth={440}
         maxHeight={isPhone ? "70%" : 360}
+        dir={isRTL ? "rtl" : "ltr"}
       >
         <OverlayHeader
           title={activeInfo?.title ?? ""}
@@ -362,7 +368,10 @@ export function DeckReviewSettingsSheet({ visible, deckId, deckTitle, mode, onCl
           isRTL={isRTL}
           showHandle={isPhone}
         />
-        <OverlayBody contentContainerClassName="px-5 py-5">
+        <OverlayBody
+          contentContainerClassName="px-5 py-5"
+          contentContainerStyle={{ direction: isRTL ? "rtl" : "ltr" }}
+        >
           <Text
             className="text-charcoal dark:text-neutral-200"
             style={{
@@ -761,6 +770,7 @@ function SettingsRow({
       className="gap-3 py-2"
       style={{
         alignItems: compact ? "center" : "stretch",
+        direction: "ltr",
         flexDirection: compact ? (isRTL ? "row-reverse" : "row") : "column",
         justifyContent: "space-between",
       }}
@@ -927,6 +937,7 @@ function ChoiceRow<T extends string>({
         backgroundColor: rowBg,
         borderColor: rowBorder,
         borderWidth: 1,
+        direction: "ltr",
         flexDirection: isRTL ? "row-reverse" : "row",
         flexWrap: "wrap",
         justifyContent: "space-between",
@@ -946,6 +957,7 @@ function ChoiceRow<T extends string>({
       <View
         className="gap-2"
         style={{
+          direction: "ltr",
           flexDirection: isRTL ? "row-reverse" : "row",
           flexWrap: "wrap",
           flexShrink: 1,
@@ -1008,7 +1020,7 @@ function ReviewStepper({
   return (
     <View
       className="self-start rounded-full bg-surface-high p-1 dark:bg-surface-dark-high"
-      style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
+      style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
     >
       <Pressable
         onPress={onDecrement}
@@ -1080,6 +1092,7 @@ function ReviewSwitchRow({
         backgroundColor: quiet ? (value ? selectedBg : restingBg) : themeColors.surface,
         borderColor: quiet ? (value ? selectedText : restingBorder) : "transparent",
         borderWidth: quiet ? 1 : 0,
+        direction: "ltr",
         flexDirection: isRTL ? "row-reverse" : "row",
         justifyContent: "space-between",
         width: compact ? "48%" : "100%",
@@ -1087,7 +1100,7 @@ function ReviewSwitchRow({
     >
       <View
         className="min-w-0 flex-1 items-center gap-1.5"
-        style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
+        style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
       >
         <Text
           className="text-charcoal dark:text-neutral-300"
@@ -1135,7 +1148,7 @@ function SettingTitle({
   return (
     <View
       className="min-w-0 items-center gap-1.5"
-      style={{ flexDirection: isRTL ? "row-reverse" : "row", alignSelf: isRTL ? "flex-end" : "flex-start" }}
+      style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row", alignSelf: isRTL ? "flex-end" : "flex-start" }}
     >
       <Text
         className="text-charcoal dark:text-neutral-200"

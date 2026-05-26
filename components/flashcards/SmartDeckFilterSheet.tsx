@@ -230,6 +230,7 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
         onClose={onClose}
         maxWidth={760}
         maxHeight={720}
+        dir={isRTL ? "rtl" : "ltr"}
       >
         <OverlayHeader
           title={title}
@@ -245,6 +246,7 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
             contentContainerStyle={{
               gap: 8,
               alignItems: "center",
+              direction: "ltr",
               paddingHorizontal: 20,
               paddingVertical: 2,
               flexDirection: isRTL ? "row-reverse" : "row",
@@ -278,7 +280,10 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
           </ScrollView>
         </View>
 
-        <OverlayBody contentContainerClassName="px-5 pb-8">
+        <OverlayBody
+          contentContainerClassName="px-5 pb-8"
+          contentContainerStyle={{ direction: isRTL ? "rtl" : "ltr" }}
+        >
           {filterType === "all" && (
             <Card elevation="low" className="p-5">
               <Text
@@ -312,7 +317,10 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
           )}
 
           {filterType === "juz" && (
-            <View className="flex-row flex-wrap gap-3">
+            <View
+              className="flex-wrap gap-3"
+              style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
+            >
               {Array.from({ length: 30 }, (_, i) => i + 1).map((n) => (
                 <NumberChip key={n} number={n} selected={selectedJuz.has(n)} onToggle={() => toggleJuz(n)} isDark={isDark} />
               ))}
@@ -379,6 +387,7 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
         onClose={() => setActiveInfo(null)}
         maxWidth={440}
         maxHeight={isPhone ? "70%" : 360}
+        dir={isRTL ? "rtl" : "ltr"}
       >
         <OverlayHeader
           title={activeInfo?.title ?? ""}
@@ -386,7 +395,10 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
           isRTL={isRTL}
           showHandle={isPhone}
         />
-        <OverlayBody contentContainerClassName="px-5 py-5">
+        <OverlayBody
+          contentContainerClassName="px-5 py-5"
+          contentContainerStyle={{ direction: isRTL ? "rtl" : "ltr" }}
+        >
           <Text
             className="text-charcoal dark:text-neutral-200"
             style={{
@@ -434,7 +446,7 @@ function SurahFilterItem({
       className={`items-center p-4 rounded-2xl gap-3 ${isRTL ? "flex-row-reverse" : "flex-row"} ${
         selected ? "bg-primary-accent/10 dark:bg-primary-bright/15" : "bg-surface-low dark:bg-surface-dark-low"
       }`}
-      style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+      style={({ pressed }) => ({ direction: "ltr", transform: [{ scale: pressed ? 0.98 : 1 }] })}
     >
       <View
         className={`w-8 h-8 rounded-full items-center justify-center ${
