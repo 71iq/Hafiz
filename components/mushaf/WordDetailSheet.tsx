@@ -136,6 +136,7 @@ export function WordDetailSheet() {
         onClose={handleClose}
         maxWidth={760}
         maxHeight={maxModalHeight}
+        dir="ltr"
       >
         <OverlayHeader
           isRTL={isRTL}
@@ -202,10 +203,12 @@ export function WordDetailSheet() {
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={{
+                minWidth: "100%",
                 paddingHorizontal: 16,
                 gap: 6,
                 paddingVertical: 6,
                 alignItems: "center",
+                justifyContent: "flex-start",
                 flexDirection: isRTL ? "row-reverse" : "row",
               }}
             >
