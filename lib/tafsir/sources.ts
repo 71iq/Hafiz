@@ -24,6 +24,8 @@ export type TafsirSourceConfig = {
 
 export const DEFAULT_TAFSIR_SOURCE: TafsirSourceId = "muyassar";
 
+export const BUNDLED_TAFSIR_SOURCE_IDS: readonly TafsirSourceId[] = ["muyassar", "zilal"];
+
 export const TAFSIR_SOURCES: TafsirSourceConfig[] = [
   {
     id: "muyassar",
@@ -112,6 +114,10 @@ export const SURAH_ROW_TAFSIR_SOURCES = TAFSIR_SOURCES.filter(
 );
 
 export const AVAILABLE_TAFSIR_SOURCES = TAFSIR_SOURCES;
+
+export function isBundledTafsirSourceId(value: TafsirSourceId): boolean {
+  return BUNDLED_TAFSIR_SOURCE_IDS.includes(value);
+}
 
 export function isTafsirSourceId(value: string | null | undefined): value is TafsirSourceId {
   return TAFSIR_SOURCES.some((source) => source.id === value);

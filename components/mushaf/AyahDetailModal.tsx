@@ -6,6 +6,7 @@ import { ReflectionsSection } from "@/components/reflections/ReflectionsSection"
 import { QiraatTab } from "@/components/mushaf/word-tabs/QiraatTab";
 import { HadithTab } from "@/components/mushaf/ayah-tabs/HadithTab";
 import { PrivateNotesSection } from "@/components/notes/PrivateNotesSection";
+import { TafsirSourcePicker } from "@/components/settings/TafsirSourcePicker";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import {
   isQuranPageFontLoaded,
@@ -14,6 +15,7 @@ import {
   quranPageFontPaletteStyle,
 } from "@/lib/fonts/loader";
 import { useAyahAudio } from "@/lib/audio/ayah-audio";
+import { ensureTafsirSourceImported } from "@/lib/database/init";
 import { useDatabase } from "@/lib/database/provider";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { formatForCopy } from "@/lib/selection/format";
@@ -25,7 +27,7 @@ import {
 } from "@/lib/selection/queries";
 import { useSelection } from "@/lib/selection/context";
 import { useSettings } from "@/lib/settings/context";
-import { AVAILABLE_TAFSIR_SOURCES, DEFAULT_TAFSIR_SOURCE, type TafsirSourceId } from "@/lib/tafsir/sources";
+import { AVAILABLE_TAFSIR_SOURCES, type TafsirSourceId } from "@/lib/tafsir/sources";
 import { DEFAULT_LANGUAGE, getLanguageByCode } from "@/lib/translations/languages";
 
 type TargetAyah = {
@@ -71,6 +73,8 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
     isDark,
     quranFontStyle,
     effectiveTheme,
+    tafseerSource,
+    setTafseerSource,
   } = useSettings();
   const { isBookmarked, showToast, refreshBookmarks } = useSelection();
   const { getAyahState, toggleAyah } = useAyahAudio();
@@ -78,7 +82,10 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
   const [fontVisible, setFontVisible] = useState(false);
   const [translationText, setTranslationText] = useState<string | null>(null);
   const [tafsirRows, setTafsirRows] = useState<TafsirRow[] | null>(null);
-  const [selectedTafsirSource, setSelectedTafsirSource] = useState<TafsirSourceId>(DEFAULT_TAFSIR_SOURCE);
+  const [selectedTafsirSource, setSelectedTafsirSource] = useState<TafsirSourceId>(tafseerSource);
+  const [tafsirPickerVisible, setTafsirPickerVisible] = useState(false);
+  const [importingTafsirSource, setImportingTafsirSource] = useState<TafsirSourceId | null>(null);
+  const [tafsirReloadKey, setTafsirReloadKey] = useState(0);
   const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
   const [bookmarkBusy, setBookmarkBusy] = useState(false);
   const [shareBusy, setShareBusy] = useState(false);
@@ -124,7 +131,6 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
     setFontVisible(false);
     setTranslationText(null);
     setTafsirRows(null);
-    setSelectedTafsirSource(DEFAULT_TAFSIR_SOURCE);
   }, [activeTarget?.surah, activeTarget?.ayah]);
 
   useEffect(() => {
@@ -159,6 +165,10 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
       cancelled = true;
     };
   }, [db, activeTarget?.surah, activeTarget?.ayah]);
+
+  useEffect(() => {
+    setSelectedTafsirSource(tafseerSource);
+  }, [tafseerSource]);
 
   useEffect(() => {
     if (!showTranslation && activeTab === "translation") {
@@ -240,13 +250,15 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
       setSelectedTafsirSource((currentSource) => (
         orderedRows.some((item) => item.source === currentSource)
           ? currentSource
-          : orderedRows[0]?.source ?? DEFAULT_TAFSIR_SOURCE
+          : orderedRows.some((item) => item.source === tafseerSource)
+            ? tafseerSource
+            : orderedRows[0]?.source ?? tafseerSource
       ));
     }).catch(console.warn);
     return () => {
       cancelled = true;
     };
-  }, [db, activeTarget?.surah, activeTarget?.ayah]);
+  }, [db, activeTarget?.surah, activeTarget?.ayah, tafseerSource, tafsirReloadKey]);
 
   const handleBookmark = useCallback(async () => {
     if (!activeTarget || bookmarkBusy) return;
@@ -299,6 +311,37 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
     setCurrentTarget(nextTarget);
   }, [adjacentAyahs]);
 
+  const handleTafsirSourceSelect = useCallback(
+    async (sourceId: TafsirSourceId) => {
+      if (importingTafsirSource) return false;
+      if (sourceId === selectedTafsirSource && tafsirRows?.some((row) => row.source === sourceId)) return true;
+
+      setImportingTafsirSource(sourceId);
+      try {
+        await ensureTafsirSourceImported(db, sourceId);
+        setTafseerSource(sourceId);
+        setSelectedTafsirSource(sourceId);
+        setTafsirReloadKey((value) => value + 1);
+        return true;
+      } catch (err) {
+        console.warn("[AyahDetailModal] Failed to import tafsir source:", err);
+        showToast(s.tafseerSourceImportFailed);
+        return false;
+      } finally {
+        setImportingTafsirSource(null);
+      }
+    },
+    [
+      db,
+      importingTafsirSource,
+      s.tafseerSourceImportFailed,
+      selectedTafsirSource,
+      setTafseerSource,
+      showToast,
+      tafsirRows,
+    ]
+  );
+
   if (!activeTarget) return null;
 
   const tabs: Array<{ key: TabKey; label: string; icon: ReactNode }> = [
@@ -317,12 +360,13 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
   ];
 
   return (
-    <ResponsiveSheet
-      open={open}
-      onClose={onClose}
-      maxWidth={1080}
-      maxHeight={maxOverlayHeight}
-    >
+    <>
+      <ResponsiveSheet
+        open={open}
+        onClose={onClose}
+        maxWidth={1080}
+        maxHeight={maxOverlayHeight}
+      >
       <OverlayHeader
         title={title}
         subtitle={subtitle}
@@ -476,7 +520,62 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
             </Text>
           )}
           {activeTab === "tafsir" && (
-            <View>
+            <View className="gap-3">
+              <View
+                className="items-center justify-between gap-3"
+                style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
+              >
+                <View className="min-w-0 flex-1">
+                  <Text
+                    className="text-charcoal dark:text-neutral-200"
+                    style={{
+                      fontFamily: "Manrope_600SemiBold",
+                      fontSize: 13,
+                      textAlign: isRTL ? "right" : "left",
+                      writingDirection: isRTL ? "rtl" : "ltr",
+                    }}
+                  >
+                    {s.tafseerSourceLabel}
+                  </Text>
+                  <Text
+                    className="mt-0.5 text-warm-400 dark:text-neutral-500"
+                    style={{
+                      fontFamily: "Manrope_400Regular",
+                      fontSize: 12,
+                      lineHeight: 18,
+                      textAlign: isRTL ? "right" : "left",
+                      writingDirection: isRTL ? "rtl" : "ltr",
+                    }}
+                  >
+                    {s.tafseerPanelDownloadHint}
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={() => setTafsirPickerVisible(true)}
+                  disabled={!!importingTafsirSource}
+                  accessibilityRole="button"
+                  accessibilityLabel={s.tafseerManageSources}
+                  className={isRTL ? "flex-row-reverse items-center gap-1.5 rounded-full bg-surface dark:bg-surface-dark px-3 py-2" : "flex-row items-center gap-1.5 rounded-full bg-surface dark:bg-surface-dark px-3 py-2"}
+                  style={({ pressed }) => ({
+                    opacity: importingTafsirSource ? 0.72 : pressed ? 0.78 : 1,
+                    cursor: Platform.OS === "web" ? (importingTafsirSource ? "auto" : "pointer") : undefined,
+                  })}
+                >
+                  {importingTafsirSource ? (
+                    <ActivityIndicator size="small" color={isDark ? "#2dd4bf" : "#0d9488"} />
+                  ) : (
+                    <BookOpenText size={14} color={isDark ? "#2dd4bf" : "#0d9488"} />
+                  )}
+                  <Text
+                    className="text-primary-accent dark:text-primary-bright"
+                    numberOfLines={1}
+                    style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12, writingDirection: isRTL ? "rtl" : "ltr" }}
+                  >
+                    {s.tafseerManageSources}
+                  </Text>
+                </Pressable>
+              </View>
+
               {tafsirRows === null ? (
                 <Text
                   className="text-warm-700 dark:text-neutral-300"
@@ -504,7 +603,7 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
                   {s.noTafseerData}
                 </Text>
               ) : (
-                <>
+                <View>
                   <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
@@ -535,7 +634,7 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
                   >
                     {selectedTafsir?.text ?? s.noTafseerData}
                   </Text>
-                </>
+                </View>
               )}
             </View>
           )}
@@ -547,7 +646,16 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
           )}
         </View>
       </OverlayBody>
-    </ResponsiveSheet>
+      </ResponsiveSheet>
+      <TafsirSourcePicker
+        visible={tafsirPickerVisible}
+        selectedSource={selectedTafsirSource}
+        importingSource={importingTafsirSource}
+        onSelect={handleTafsirSourceSelect}
+        onClose={() => setTafsirPickerVisible(false)}
+        helperText={s.tafseerDownloadHint}
+      />
+    </>
   );
 }
 

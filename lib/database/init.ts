@@ -9,7 +9,6 @@ import {
 } from "@/lib/reflection-journey/schema";
 import {
   TAFSIR_SOURCES,
-  SURAH_ROW_TAFSIR_SOURCES,
   type TafsirSourceConfig,
   type TafsirSourceId,
 } from "@/lib/tafsir/sources";
@@ -1880,15 +1879,6 @@ export async function ensureTafsirSourceImported(
   }
 }
 
-async function importConfiguredTafsirSources(
-  db: SQLiteDatabase,
-  onProgress: ProgressCallback
-): Promise<void> {
-  for (const source of SURAH_ROW_TAFSIR_SOURCES) {
-    await importSurahRowTafsirSource(db, source, onProgress);
-  }
-}
-
 async function importTranslations(
   db: SQLiteDatabase,
   onProgress: ProgressCallback
@@ -2630,20 +2620,6 @@ export async function initializeDatabase(
       await importZilal(db, onProgress);
     }
 
-    if (Platform.OS !== "web") {
-      for (const source of SURAH_ROW_TAFSIR_SOURCES) {
-        const sourceCount = await db.getFirstAsync<{ count: number }>(
-          "SELECT COUNT(*) as count FROM tafseer WHERE source = ?",
-          [source.id]
-        );
-        if ((sourceCount?.count ?? 0) < (source.expectedRows ?? 6236)) {
-          console.log(`[Import] Importing ${source.id} tafseer...`);
-          await db.runAsync("DELETE FROM tafseer WHERE source = ?", [source.id]);
-          await importSurahRowTafsirSource(db, source, onProgress);
-        }
-      }
-    }
-
     // Add text_search column for diacritics-stripped search (Phase 4 migration)
     try { await db.execAsync("ALTER TABLE quran_text ADD COLUMN text_search TEXT NOT NULL DEFAULT ''"); } catch (_) {}
     const searchCheck = await db.getFirstAsync<{ text_search: string }>(
@@ -2741,9 +2717,6 @@ export async function initializeDatabase(
   await importWordRoots(db, onProgress);
   await importTafseer(db, onProgress);
   await importZilal(db, onProgress);
-  if (Platform.OS !== "web") {
-    await importConfiguredTafsirSources(db, onProgress);
-  }
   await importTranslations(db, onProgress);
   await importPageMap(db, onProgress);
   await importWordTranslations(db, onProgress);

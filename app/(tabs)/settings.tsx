@@ -23,6 +23,7 @@ import { useDatabase } from "@/lib/database/provider";
 import { getLanguageByCode } from "@/lib/translations/languages";
 import { AVAILABLE_TAFSIR_SOURCES, type TafsirSourceId } from "@/lib/tafsir/sources";
 import { ensureTafsirSourceImported } from "@/lib/database/init";
+import { TafsirSourcePicker } from "@/components/settings/TafsirSourcePicker";
 import { TranslationLanguagePicker } from "@/components/settings/TranslationLanguagePicker";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -311,7 +312,7 @@ export default function SettingsScreen() {
 
   const handleTafseerSourceSelect = useCallback(
     async (sourceId: TafsirSourceId) => {
-      if (sourceId === tafseerSource || importingTafseerSource) return false;
+      if (importingTafseerSource) return false;
       setImportingTafseerSource(sourceId);
       try {
         await ensureTafsirSourceImported(db, sourceId);
@@ -325,7 +326,7 @@ export default function SettingsScreen() {
         setImportingTafseerSource(null);
       }
     },
-    [db, importingTafseerSource, s.tafseerSourceImportFailed, setTafseerSource, tafseerSource]
+    [db, importingTafseerSource, s.tafseerSourceImportFailed, setTafseerSource]
   );
 
   const categoryPanels = (
@@ -1123,7 +1124,7 @@ export default function SettingsScreen() {
         visible={pickerVisible}
         onClose={() => setPickerVisible(false)}
       />
-      <TafseerSourcePicker
+      <TafsirSourcePicker
         visible={tafseerPickerVisible}
         selectedSource={tafseerSource}
         importingSource={importingTafseerSource}
@@ -1157,126 +1158,6 @@ function parseSettingsCategory(value: string | undefined): SettingsCategoryId | 
     default:
       return null;
   }
-}
-
-function TafseerSourcePicker({
-  visible,
-  selectedSource,
-  importingSource,
-  onSelect,
-  onClose,
-}: {
-  visible: boolean;
-  selectedSource: TafsirSourceId;
-  importingSource: TafsirSourceId | null;
-  onSelect: (sourceId: TafsirSourceId) => Promise<boolean>;
-  onClose: () => void;
-}) {
-  const { isDark, isRTL } = useSettings();
-  const s = useStrings();
-  const DisclosureChevron = isRTL ? ChevronLeft : ChevronRight;
-  const [pressedSource, setPressedSource] = useState<TafsirSourceId | null>(null);
-
-  useEffect(() => {
-    if (!visible) setPressedSource(null);
-  }, [visible]);
-
-  const handleSelect = async (sourceId: TafsirSourceId) => {
-    if (importingSource) return;
-    if (sourceId === selectedSource) {
-      onClose();
-      return;
-    }
-    const selected = await onSelect(sourceId);
-    if (selected) onClose();
-  };
-
-  return (
-    <ResponsiveSheet
-      open={visible}
-      onClose={onClose}
-      dismissOnBackdrop={!importingSource}
-      maxWidth={520}
-      maxHeight="80%"
-    >
-      <OverlayHeader
-        title={s.tafseerSourceLabel}
-        onClose={importingSource ? undefined : onClose}
-        showHandle
-        isRTL={isRTL}
-      />
-
-      <OverlayBody contentContainerClassName="px-5 pt-2 pb-6">
-        <View className="gap-1">
-          {AVAILABLE_TAFSIR_SOURCES.map((source) => {
-            const isSelected = source.id === selectedSource;
-            const isPressed = source.id === pressedSource;
-            const isImporting = source.id === importingSource;
-            const title = s[source.labelKey] ?? source.id;
-            const description = s[source.descriptionKey] ?? "";
-
-            return (
-              <Pressable
-                key={source.id}
-                onPress={() => handleSelect(source.id)}
-                disabled={!!importingSource}
-                onPressIn={() => setPressedSource(source.id)}
-                onPressOut={() => setPressedSource(null)}
-                className="items-center justify-between gap-3 rounded-2xl px-3 py-3.5"
-                style={{
-                  direction: isRTL ? "rtl" : "ltr",
-                  flexDirection: "row",
-                  backgroundColor: isSelected
-                    ? isDark
-                      ? "rgba(45,212,191,0.08)"
-                      : "rgba(13,148,136,0.06)"
-                    : isPressed
-                      ? isDark
-                        ? "rgba(45,212,191,0.04)"
-                        : "rgba(13,148,136,0.03)"
-                      : "transparent",
-                  opacity: importingSource && !isImporting ? 0.45 : 1,
-                }}
-              >
-                <View className="min-w-0 flex-1">
-                  <Text
-                    className={isSelected ? "text-primary-accent dark:text-primary-bright" : "text-charcoal dark:text-neutral-300"}
-                    style={{
-                      fontFamily: isSelected ? "Manrope_600SemiBold" : "Manrope_500Medium",
-                      fontSize: 15,
-                      textAlign: isRTL ? "right" : "left",
-                      writingDirection: isRTL ? "rtl" : "ltr",
-                    }}
-                  >
-                    {title}
-                  </Text>
-                  <Text
-                    className="mt-0.5 text-warm-400 dark:text-neutral-500"
-                    style={{
-                      fontFamily: "Manrope_400Regular",
-                      fontSize: 13,
-                      textAlign: isRTL ? "right" : "left",
-                      writingDirection: isRTL ? "rtl" : "ltr",
-                    }}
-                  >
-                    {description}
-                  </Text>
-                </View>
-
-                {isImporting ? (
-                  <ActivityIndicator size="small" color={isDark ? "#2dd4bf" : "#0d9488"} />
-                ) : isSelected ? (
-                  <Check size={20} color={isDark ? "#2dd4bf" : "#0d9488"} />
-                ) : (
-                  <DisclosureChevron size={18} color={isDark ? "#737373" : "#8B8178"} />
-                )}
-              </Pressable>
-            );
-          })}
-        </View>
-      </OverlayBody>
-    </ResponsiveSheet>
-  );
 }
 
 function ReciterPicker({
