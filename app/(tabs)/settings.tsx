@@ -598,6 +598,7 @@ export default function SettingsScreen() {
                 onValueChange={setQuranFontStyle}
                 items={[
                   { value: "qcf2", label: s.quranFontQcf2 },
+                  { value: "v4", label: s.quranFontV4 },
                   { value: "v4-tajweed", label: s.quranFontV4Tajweed },
                 ]}
               />

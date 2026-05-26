@@ -137,9 +137,9 @@ No implementation phase should fork search logic into separate page and modal be
 ## Quran Page-Font Reader Invariants
 
 These rules are non-negotiable across all UI phases:
-- Quran ayah display uses bundled per-page PUA fonts, not system Arabic fonts. QCF2 remains the default; QPC V4 Tajweed is an optional page-font style. Surah headers and structural basmallah use the bundled QPC V4 surah-name font.
+- Quran ayah display uses bundled per-page PUA fonts, not system Arabic fonts. QCF2 remains the default; QPC V4 and QPC V4 Tajweed are optional page-font styles. Surah headers and structural basmallah use the bundled QPC V4 surah-name font.
 - Page grouping uses `v2_page`, not `page_map`.
-- Web Quran page-font loading uses the `FontFace` path in `lib/fonts/loader.ts`; QPC V4 Tajweed also applies theme-specific web font palettes.
+- Web Quran page-font loading uses the `FontFace` path in `lib/fonts/loader.ts`; QPC V4 uses a monochrome web font palette, and QPC V4 Tajweed applies theme-specific tajweed color palettes.
 - Quran word layout preserves the existing `direction: "ltr"` plus `flexDirection: "row-reverse"` behavior.
 - Copy and share flows use `text_uthmani`, not PUA glyph text.
 - Quran reads remain local SQLite reads; reading features do not block on network.

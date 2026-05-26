@@ -10,7 +10,7 @@ const SURAH_NAME_FONT_FAMILY = "v4-surah-name";
 const SURAH_NAME_FONT = require("../../assets/fonts/surah-names/surah_names_v4.ttf");
 const QURAN_COMMON_FONT_FAMILY = "QuranCommon";
 const QURAN_COMMON_FONT = require("../../assets/fonts/quran-common/quran-common.ttf");
-export type QuranPageFontStyle = "qcf2" | "v4-tajweed";
+export type QuranPageFontStyle = "qcf2" | "v4" | "v4-tajweed";
 const SURAH_NAME_BISMILLAH_GLYPHS = "\uFC9A \uFC9B \uFC9E \uFCA4";
 const SURAH_NAME_GLYPHS: Record<number, string> = {
   1: "\uFC45",
@@ -138,8 +138,12 @@ export function qpcV4TajweedFontName(page: number): string {
   return `p${page}-v4-tajweed`;
 }
 
+function isQpcV4Style(style: QuranPageFontStyle): boolean {
+  return style === "v4" || style === "v4-tajweed";
+}
+
 export function quranPageFontName(style: QuranPageFontStyle, page: number): string {
-  return style === "v4-tajweed" ? qpcV4TajweedFontName(page) : qpcFontName(page);
+  return isQpcV4Style(style) ? qpcV4TajweedFontName(page) : qpcFontName(page);
 }
 
 export function surahNameFontName(): string {
@@ -198,6 +202,12 @@ const QPC_V4_TAJWEED_PALETTES = {
   },
 } as const;
 
+const QPC_V4_PLAIN_TEXT_COLORS = {
+  light: "#2D2D2Dff",
+  dark: "#F5F5F5ff",
+  sepia: "#2D2D2Dff",
+} as const;
+
 function qpcV4PaletteKey(theme: string): keyof typeof QPC_V4_TAJWEED_PALETTES {
   if (theme === "dark" || theme === "amoled") return "dark";
   if (theme === "beige") return "sepia";
@@ -213,18 +223,37 @@ function qpcV4TajweedPaletteName(page: number, theme: string): string {
   return `--hafiz-qpc-v4-${qpcV4PaletteKey(theme)}-p${page}`;
 }
 
-function ensureQpcV4TajweedPaletteCss(page: number, fontName: string) {
+function qpcV4PlainPaletteName(page: number, theme: string): string {
+  return `--hafiz-qpc-v4-plain-${qpcV4PaletteKey(theme)}-p${page}`;
+}
+
+function plainPaletteColors(themeKey: keyof typeof QPC_V4_TAJWEED_PALETTES): string[] {
+  return Array(QPC_V4_TAJWEED_PALETTES[themeKey].colors.length)
+    .fill(QPC_V4_PLAIN_TEXT_COLORS[themeKey]);
+}
+
+function ensureQpcV4PaletteCss(page: number, fontName: string) {
   if (Platform.OS !== "web" || typeof document === "undefined") return;
   const cssKey = `qpc-v4-${page}`;
   if (paletteCss.has(cssKey)) return;
 
   const css = Object.entries(QPC_V4_TAJWEED_PALETTES).map(([key, palette]) => {
     const colors = palette.colors.map((color, index) => `${index} ${color}`).join(",\n      ");
+    const plainColors = plainPaletteColors(key as keyof typeof QPC_V4_TAJWEED_PALETTES)
+      .map((color, index) => `${index} ${color}`)
+      .join(",\n      ");
     return `@font-palette-values --hafiz-qpc-v4-${key}-p${page} {
   font-family: '${fontName}';
   base-palette: ${palette.base};
   override-colors:
       ${colors};
+}
+
+@font-palette-values --hafiz-qpc-v4-plain-${key}-p${page} {
+  font-family: '${fontName}';
+  base-palette: ${palette.base};
+  override-colors:
+      ${plainColors};
 }`;
   }).join("\n\n");
 
@@ -240,8 +269,12 @@ export function quranPageFontPaletteStyle(
   page: number,
   theme: string,
 ): any {
-  if (style !== "v4-tajweed" || Platform.OS !== "web") return null;
-  return { fontPalette: qpcV4TajweedPaletteName(page, theme) };
+  if (!isQpcV4Style(style) || Platform.OS !== "web") return null;
+  return {
+    fontPalette: style === "v4"
+      ? qpcV4PlainPaletteName(page, theme)
+      : qpcV4TajweedPaletteName(page, theme),
+  };
 }
 
 /**
@@ -313,7 +346,7 @@ export function isQpcFontLoaded(page: number): boolean {
 export async function loadQpcV4TajweedFont(page: number): Promise<void> {
   const name = qpcV4TajweedFontName(page);
   if (loadedFonts.has(name)) {
-    ensureQpcV4TajweedPaletteCss(page, name);
+    ensureQpcV4PaletteCss(page, name);
     return;
   }
 
@@ -334,7 +367,7 @@ export async function loadQpcV4TajweedFont(page: number): Promise<void> {
         await Font.loadAsync({ [name]: asset });
       }
       loadedFonts.add(name);
-      ensureQpcV4TajweedPaletteCss(page, name);
+      ensureQpcV4PaletteCss(page, name);
     } finally {
       inFlight.delete(name);
     }
@@ -349,11 +382,11 @@ export function isQpcV4TajweedFontLoaded(page: number): boolean {
 }
 
 export async function loadQuranPageFont(style: QuranPageFontStyle, page: number): Promise<void> {
-  return style === "v4-tajweed" ? loadQpcV4TajweedFont(page) : loadQpcFont(page);
+  return isQpcV4Style(style) ? loadQpcV4TajweedFont(page) : loadQpcFont(page);
 }
 
 export function isQuranPageFontLoaded(style: QuranPageFontStyle, page: number): boolean {
-  return style === "v4-tajweed" ? isQpcV4TajweedFontLoaded(page) : isQpcFontLoaded(page);
+  return isQpcV4Style(style) ? isQpcV4TajweedFontLoaded(page) : isQpcFontLoaded(page);
 }
 
 export async function loadSurahNameFont(): Promise<void> {

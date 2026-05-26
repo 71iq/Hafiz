@@ -54,7 +54,7 @@ export type ThemeColors = {
 };
 export type ViewMode = "verse" | "page";
 export type PageScroll = "vertical" | "horizontal";
-export type QuranFontStyle = "qcf2" | "v4-tajweed";
+export type QuranFontStyle = "qcf2" | "v4" | "v4-tajweed";
 export type UILanguage = "en" | "ar";
 export type TafseerSource = TafsirSourceId;
 const UI_LANGUAGE_CACHE_KEY = "hafiz_ui_language";
@@ -342,7 +342,7 @@ function normalizeThemeMode(value: string | null | undefined): ThemeMode | null 
 }
 
 function normalizeQuranFontStyle(value: string | null | undefined): QuranFontStyle | null {
-  return value === "qcf2" || value === "v4-tajweed" ? value : null;
+  return value === "qcf2" || value === "v4" || value === "v4-tajweed" ? value : null;
 }
 
 function normalizeThemeTime(value: string | null | undefined): string | null {

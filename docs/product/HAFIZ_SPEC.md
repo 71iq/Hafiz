@@ -123,11 +123,11 @@ Your existing `quran-data.json` contains:
 - **Download:** `https://raw.githubusercontent.com/rn0x/Quran-Data/version-2.0/data/pagesQuran.json`
 - **Structure:** Array of `{ page, start: { surah_number, verse, name }, end: { surah_number, verse, name } }` for all 604 pages
 
-#### 2.4.5 Arabic Page Fonts (QCF2 / KFGQPC V2 and QPC V4 Tajweed)
+#### 2.4.5 Arabic Page Fonts (QCF2 / KFGQPC V2 and QPC V4)
 - **Default font:** QCF2 (Quran Complex Font v2) — 604 per-page fonts with Private Use Area (PUA) glyph mapping, same rendering used by quran.com's reading mode.
-- **Optional font:** QPC V4 Tajweed — 604 per-page color fonts for the 1441H 15-line layout. Web uses WOFF2 COLR fonts and theme-specific `font-palette` values; native uses bundled TTF fonts through expo-font.
+- **Optional fonts:** QPC V4 and QPC V4 Tajweed — 604 per-page fonts for the 1441H 15-line layout. Plain QPC V4 uses the V4 glyph font with a monochrome palette; QPC V4 Tajweed uses the same V4 glyph font with tajweed color palettes. Web uses WOFF2 COLR fonts and theme-specific `font-palette` values; native uses bundled TTF fonts through expo-font.
 - **Sources:** Quran Foundation CDN for QCF2 (`https://verses.quran.foundation/fonts/quran/hafs/v2/`) and QUL/Quran Foundation font resources for QPC V4 Tajweed.
-- **Structure:** One font per page. QCF2 uses `QCF2_001.ttf` through `QCF2_604.ttf`; QPC V4 Tajweed uses page font families like `p574-v4-tajweed`. Each font maps Quran words to PUA codepoints for pixel-perfect Mushaf rendering.
+- **Structure:** One font per page. QCF2 uses `QCF2_001.ttf` through `QCF2_604.ttf`; QPC V4 modes use page font families like `p574-v4-tajweed` with different palettes for plain and tajweed display. Each font maps Quran words to PUA codepoints for pixel-perfect Mushaf rendering.
 - **Surah names and basmallah:** Surah headers and page structural basmallah use the bundled QPC V4 surah-name color font, separate from the per-page ayah fonts.
 - **License:** Free to use, copy, distribute. Cannot be sold, modified, or reverse-engineered.
 - **Usage:** Bundle all per-page font files locally. Fonts are loaded dynamically per-page (FontFace API on web, expo-font on native). Native V4 TTFs live under `assets/fonts/`; web V4 WOFF2 files live under `public/fonts/` so they stay static/offline without entering Metro's JS asset graph. Text data stored as `text_qcf2` column in `quran_text` with space-separated PUA codepoints per ayah; copy/share still use `text_uthmani`.
@@ -761,7 +761,7 @@ hafiz/
 ├── assets/
 │   ├── fonts/
 │   │   ├── qpc_v2/               # 604 QCF2 per-page font files
-│   │   └── QPC_V4_TAJWEED/       # 604 native QPC V4 Tajweed TTF files
+│   │   └── QPC_V4_TAJWEED/       # 604 native QPC V4 TTF files used by plain and tajweed modes
 │   └── data/                     # Bundled datasets (JSON/SQLite)
 │       ├── quran-data.json
 │       ├── tafseer/
@@ -773,7 +773,7 @@ hafiz/
 │       └── tajweed.json
 ├── public/
 │   └── fonts/
-│       └── QPC_V4_TAJWEED_WOFF2/ # 604 web QPC V4 Tajweed WOFF2 files
+│       └── QPC_V4_TAJWEED_WOFF2/ # 604 web QPC V4 WOFF2 files used by plain and tajweed modes
 ├── design-references/            # Screenshot references for UI
 ├── schemas/                      # Zod validation schemas
 │   ├── auth.ts
