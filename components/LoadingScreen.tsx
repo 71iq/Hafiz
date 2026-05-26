@@ -86,19 +86,6 @@ export function LoadingScreen({ progress }: Props) {
       <View className="w-full max-w-xs">
         <Progress value={percentage} />
       </View>
-
-      {!progress && s ? (
-        <Text
-          className="text-warm-400 dark:text-neutral-500 mt-5"
-          style={{
-            fontFamily: fonts.body,
-            fontSize: 15,
-            writingDirection: uiLanguage === "ar" ? "rtl" : "ltr",
-          }}
-        >
-          {s.preparingDatabase}
-        </Text>
-      ) : null}
     </View>
   );
 }
