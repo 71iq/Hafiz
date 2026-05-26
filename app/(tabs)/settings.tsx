@@ -45,6 +45,12 @@ import {
 } from "@/lib/ui/viewport";
 import { ZaytPreviewModal } from "@/components/zayt/ZaytPreviewModal";
 import { ProfileIdentity } from "@/components/profile/ProfileIdentity";
+import {
+  isQuranPageFontLoaded,
+  loadQuranPageFont,
+  quranPageFontName,
+  quranPageFontPaletteStyle,
+} from "@/lib/fonts/loader";
 
 type SettingsCategoryId = "general" | "content" | "account" | "about" | "advanced";
 
@@ -53,6 +59,9 @@ type SettingsCategory = {
   title: string;
   icon: LucideIcon;
 };
+
+const SETTINGS_QURAN_PREVIEW_PAGE = 1;
+const SETTINGS_BISMILLAH_QCF2_TOKENS = ["ﱁ", "ﱂ", "ﱃ", "ﱄ"];
 
 function shiftThemeTime(time: string, deltaMinutes: number) {
   const [hours, minutes] = time.split(":").map((part) => Number(part));
@@ -76,7 +85,7 @@ export default function SettingsScreen() {
   const {
     theme, setTheme, fontSizeIndex, setFontSizeIndex, fontSize,
     scheduledRules, setScheduledRules,
-    translationLanguage, isTranslationLoading, isDark, isRTL,
+    translationLanguage, isTranslationLoading, isDark, isRTL, effectiveTheme,
     tafseerSource, setTafseerSource,
     recitationId, setRecitationId,
     uiLanguage, setUiLanguage,
@@ -109,6 +118,9 @@ export default function SettingsScreen() {
   const { user, profile, isLoading: authLoading, signOut } = useAuthStore();
   const accountName = profile?.display_name || profile?.username || user?.email?.split("@")[0] || s.authProfile;
   const fontSizeUsesFittedPageSize = viewMode === "page" && pageScroll === "horizontal";
+  const [quranPreviewFontReady, setQuranPreviewFontReady] = useState(() =>
+    isQuranPageFontLoaded(quranFontStyle, SETTINGS_QURAN_PREVIEW_PAGE)
+  );
   const fontSizeLevelLabel = isRTL ? toArabicNumber(fontSizeIndex + 1) : String(fontSizeIndex + 1);
   const fontSizeTotalLabel = isRTL ? toArabicNumber(FONT_SIZE_STEPS.length) : String(FONT_SIZE_STEPS.length);
   const TranslationChevron = isRTL ? ChevronLeft : ChevronRight;
@@ -130,6 +142,8 @@ export default function SettingsScreen() {
   const categoryParam = Array.isArray(params.category) ? params.category[0] : params.category;
   const desktopCategory = parseSettingsCategory(categoryParam) ?? "general";
   const activeCategory = usesCategorySidebar ? desktopCategory : mobileCategory;
+  const previewFontFamily = quranPageFontName(quranFontStyle, SETTINGS_QURAN_PREVIEW_PAGE);
+  const previewFontPaletteStyle = quranPageFontPaletteStyle(quranFontStyle, SETTINGS_QURAN_PREVIEW_PAGE, effectiveTheme);
   const refreshQfStatus = useCallback(async () => {
     if (!configured || !user || !qfSyncEnabled) {
       setQfStatus("disconnected");
@@ -155,6 +169,23 @@ export default function SettingsScreen() {
   useEffect(() => {
     refreshQfStatus().catch(console.warn);
   }, [refreshQfStatus]);
+
+  useEffect(() => {
+    setQuranPreviewFontReady(false);
+    if (isQuranPageFontLoaded(quranFontStyle, SETTINGS_QURAN_PREVIEW_PAGE)) {
+      requestAnimationFrame(() => setQuranPreviewFontReady(true));
+      return;
+    }
+    let cancelled = false;
+    loadQuranPageFont(quranFontStyle, SETTINGS_QURAN_PREVIEW_PAGE)
+      .then(() => {
+        if (!cancelled) requestAnimationFrame(() => setQuranPreviewFontReady(true));
+      })
+      .catch(console.warn);
+    return () => {
+      cancelled = true;
+    };
+  }, [quranFontStyle]);
 
   useEffect(() => {
     const qf = Array.isArray(params.qf) ? params.qf[0] : params.qf;
@@ -643,16 +674,32 @@ export default function SettingsScreen() {
             </View>
 
             <View className="my-4 bg-surface dark:bg-surface-dark rounded-2xl px-4 py-3">
-              <Text
-                className="text-charcoal dark:text-neutral-100 text-center"
+              <View
                 style={{
-                  fontSize,
-                  lineHeight: fontSize * 1.8,
-                  writingDirection: "rtl",
+                  direction: "ltr",
+                  flexDirection: "row-reverse",
+                  flexWrap: "wrap",
+                  justifyContent: "center",
+                  gap: Math.max(4, fontSize * 0.18),
+                  rowGap: Math.max(4, fontSize * 0.2),
+                  opacity: quranPreviewFontReady ? 1 : 0,
                 }}
               >
-                بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ
-              </Text>
+                {SETTINGS_BISMILLAH_QCF2_TOKENS.map((token, index) => (
+                  <Text
+                    key={`${token}-${index}`}
+                    className="text-charcoal dark:text-neutral-100 text-center"
+                    style={{
+                      fontFamily: previewFontFamily,
+                      ...previewFontPaletteStyle,
+                      fontSize,
+                      lineHeight: fontSize * 1.8,
+                    }}
+                  >
+                    {token}
+                  </Text>
+                ))}
+              </View>
             </View>
 
             <SettingsControlRow label={s.pageScrollLabel} isRTL={isRTL}>
