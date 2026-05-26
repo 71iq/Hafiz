@@ -759,11 +759,10 @@ export default function SettingsScreen() {
 
             <Pressable
               onPress={() => setTafseerPickerVisible(true)}
-              disabled={importingTafseerSource !== null}
               className="flex-row items-center justify-between gap-3 rounded-3xl bg-surface dark:bg-surface-dark px-4 py-4"
               style={({ pressed }) => ({
                 direction: isRTL ? "rtl" : "ltr",
-                opacity: importingTafseerSource !== null ? 0.72 : pressed ? 0.78 : 1,
+                opacity: pressed ? 0.78 : 1,
               })}
             >
               <View className="min-w-0 flex-1">
