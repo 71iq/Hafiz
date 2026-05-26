@@ -1289,14 +1289,16 @@ function ReciterPicker({
         <View className="gap-1">
           {pickerReciters.map((reciter) => {
             const selected = reciter.id === selectedId;
+            const reciterNumber = isRTL ? toArabicNumber(reciter.id) : String(reciter.id);
             return (
               <Pressable
                 key={reciter.id}
                 onPress={() => handleSelect(reciter.id)}
-                className="items-center justify-between gap-3 rounded-2xl px-3 py-3.5"
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                className={`w-full items-center justify-between gap-3 rounded-2xl px-3 py-3 ${isRTL ? "flex-row-reverse" : "flex-row"}`}
                 style={({ pressed }) => ({
                   direction: isRTL ? "rtl" : "ltr",
-                  flexDirection: "row",
                   backgroundColor: selected
                     ? isDark
                       ? "rgba(45,212,191,0.08)"
@@ -1305,10 +1307,32 @@ function ReciterPicker({
                       ? isDark
                         ? "rgba(45,212,191,0.04)"
                         : "rgba(13,148,136,0.03)"
-                      : "transparent",
+                      : isDark
+                        ? "rgba(255,255,255,0.025)"
+                        : "rgba(255,255,255,0.42)",
                 })}
               >
-                <View className="min-w-0 flex-1">
+                <View
+                  className="h-10 w-10 items-center justify-center rounded-2xl"
+                  style={{
+                    backgroundColor: selected
+                      ? isDark
+                        ? "rgba(45,212,191,0.16)"
+                        : "rgba(13,148,136,0.12)"
+                      : isDark
+                        ? "rgba(255,255,255,0.05)"
+                        : "rgba(95,78,64,0.08)",
+                  }}
+                >
+                  <Text
+                    className={selected ? "text-primary-accent dark:text-primary-bright" : "text-warm-500 dark:text-neutral-400"}
+                    style={{ fontFamily: "Manrope_700Bold", fontSize: 12 }}
+                  >
+                    {reciterNumber}
+                  </Text>
+                </View>
+
+                <View className="min-w-0 flex-1 gap-1">
                   <Text
                     className={selected ? "text-primary-accent dark:text-primary-bright" : "text-charcoal dark:text-neutral-300"}
                     style={{
@@ -1317,27 +1341,37 @@ function ReciterPicker({
                       textAlign: isRTL ? "right" : "left",
                       writingDirection: isRTL ? "rtl" : "ltr",
                     }}
+                    numberOfLines={1}
                   >
                     {uiLanguage === "ar" ? reciter.nameAr : reciter.nameEn}
                   </Text>
-                  <Text
-                    className="mt-0.5 text-warm-400 dark:text-neutral-500"
-                    style={{
-                      fontFamily: "Manrope_400Regular",
-                      fontSize: 13,
-                      textAlign: isRTL ? "right" : "left",
-                      writingDirection: isRTL ? "rtl" : "ltr",
-                    }}
-                  >
-                    {uiLanguage === "ar" ? reciter.styleAr : reciter.styleEn}
-                  </Text>
+                  <View style={{ alignItems: isRTL ? "flex-end" : "flex-start" }}>
+                    <View
+                      className="rounded-full px-2.5 py-1"
+                      style={{ backgroundColor: isDark ? "rgba(255,255,255,0.05)" : "rgba(95,78,64,0.07)" }}
+                    >
+                      <Text
+                        className="text-warm-500 dark:text-neutral-400"
+                        style={{
+                          fontFamily: "Manrope_600SemiBold",
+                          fontSize: 11,
+                          textAlign: isRTL ? "right" : "left",
+                          writingDirection: isRTL ? "rtl" : "ltr",
+                        }}
+                      >
+                        {uiLanguage === "ar" ? reciter.styleAr : reciter.styleEn}
+                      </Text>
+                    </View>
+                  </View>
                 </View>
 
-                {selected ? (
-                  <Check size={20} color={isDark ? "#2dd4bf" : "#0d9488"} />
-                ) : (
-                  <DisclosureChevron size={18} color={isDark ? "#737373" : "#8B8178"} />
-                )}
+                <View className="h-9 w-9 items-center justify-center rounded-full">
+                  {selected ? (
+                    <Check size={20} color={isDark ? "#2dd4bf" : "#0d9488"} />
+                  ) : (
+                    <DisclosureChevron size={18} color={isDark ? "#737373" : "#8B8178"} />
+                  )}
+                </View>
               </Pressable>
             );
           })}
