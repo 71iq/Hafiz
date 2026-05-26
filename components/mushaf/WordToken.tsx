@@ -17,6 +17,7 @@ type Props = {
   disabled?: boolean;
   highlightColor?: string;
   hidden?: boolean;
+  compactLayout?: boolean;
 };
 
 const DOUBLE_TAP_MS = 260;
@@ -34,6 +35,7 @@ function WordTokenInner({
   disabled = false,
   highlightColor,
   hidden = false,
+  compactLayout = false,
 }: Props) {
   const { tooltipWord, setTooltipWord, openDetail } = useWordInteraction();
   const { markActivity } = useChrome();
@@ -136,7 +138,7 @@ function WordTokenInner({
       delayLongPress={400}
       disabled={disabled || hidden}
       style={{
-        paddingHorizontal: 1,
+        paddingHorizontal: compactLayout ? 0 : 1,
         overflow: "visible",
         ...(Platform.OS === "web" ? ({ userSelect: hidden ? "none" : "text" } as any) : null),
       }}
@@ -155,7 +157,7 @@ function WordTokenInner({
           ...(Platform.OS === "web" && fontPalette ? ({ fontPalette } as any) : null),
           fontSize,
           lineHeight,
-          paddingHorizontal: 1,
+          paddingHorizontal: compactLayout ? 0 : 1,
           ...(bgColor && {
             backgroundColor: bgColor,
             borderRadius: 6,

@@ -111,10 +111,13 @@ type PageGlyph = {
 
 const BISMILLAH_UTHMANI = "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ";
 
-// Approximate QCF2 font-size to Mushaf-line width ratio, used by PageMushaf
-// to cap vertical page typography before a line can overflow the viewport.
-export const MUSHAF_LINE_WIDTH_SCALE = 17.5;
+export const MUSHAF_LINE_WIDTH_SCALE = 19.5;
+export const MUSHAF_LINE_WIDTH_SCALE_V4_TAJWEED = 21.5;
 const MARKER_DOUBLE_TAP_MS = 260;
+
+export function mushafLineWidthScale(fontStyle: string): number {
+  return fontStyle === "v4-tajweed" ? MUSHAF_LINE_WIDTH_SCALE_V4_TAJWEED : MUSHAF_LINE_WIDTH_SCALE;
+}
 
 /**
  * Build the canonical QCF2 token stream for this page. `page-words.json`
@@ -317,7 +320,8 @@ function MushafPageInner({
 
   const hasLineLayout = lineLayout && lineLayout.length > 0;
   const maxContentWidth = Math.max(0, width - sidePadding * 2);
-  const contentWidth = Math.max(0, Math.min(lineWidth ?? fontSize * MUSHAF_LINE_WIDTH_SCALE, maxContentWidth));
+  const lineWidthScale = mushafLineWidthScale(quranFontStyle);
+  const contentWidth = Math.max(0, Math.min(lineWidth ?? fontSize * lineWidthScale, maxContentWidth));
   const visualLineHeight = lineSlotHeight ?? lineHeight;
   const fontFamily = quranPageFontName(quranFontStyle, pageNumber);
   const fontPaletteStyle = quranPageFontPaletteStyle(quranFontStyle, pageNumber, effectiveTheme);
@@ -441,7 +445,7 @@ function MushafPageInner({
             rowGap: allowLineWrap ? Math.max(2, fontSize * 0.12) : undefined,
             alignItems: "center",
             alignContent: "center",
-            paddingHorizontal: 2,
+            paddingHorizontal: 0,
             overflow: "visible",
           }}
         >
@@ -474,6 +478,7 @@ function MushafPageInner({
                   v2Page={pageNumber}
                   highlightColor={hlColor}
                   hidden={isHifzWordHidden(identity)}
+                  compactLayout
                 />
               );
             }
@@ -515,7 +520,7 @@ function MushafPageInner({
                       ...fontPaletteStyle,
                       fontSize,
                       lineHeight,
-                      paddingHorizontal: 2,
+                      paddingHorizontal: 0,
                       ...(Platform.OS === "web" ? ({ userSelect: "text" } as any) : null),
                       ...(isTargetAyah && {
                         backgroundColor: "rgba(13, 148, 136, 0.125)",
@@ -533,7 +538,7 @@ function MushafPageInner({
               <Text
                 key={`w-${lineNumber}-${i}`}
                 className="text-charcoal dark:text-neutral-100"
-                style={{ fontFamily, ...fontPaletteStyle, fontSize, lineHeight, paddingHorizontal: 2 }}
+                style={{ fontFamily, ...fontPaletteStyle, fontSize, lineHeight, paddingHorizontal: 0 }}
               >
                 {w}
               </Text>
