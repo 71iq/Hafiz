@@ -24,6 +24,8 @@ type Props = {
 };
 
 const BISMILLAH_UTHMANI = "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ";
+const COMPACT_DECORATIVE_SURAH_NAME_SIZE = 34;
+const COMPACT_DECORATIVE_SURAH_NAME_LINE_HEIGHT = 44;
 
 export function SurahHeader({
   surahNumber,
@@ -101,7 +103,7 @@ export function SurahHeader({
               accessibilityRole="button"
               accessibilityLabel={s.surahInfoOpen}
               onPress={() => setInfoOpen(true)}
-              className="mx-3 min-w-[190px] max-w-[340px] rounded-2xl bg-surface-low dark:bg-surface-dark-low px-5 py-2"
+              className="mx-3 min-w-[190px] max-w-[340px] rounded-2xl bg-surface-low dark:bg-surface-dark-low px-5 py-1"
               style={({ pressed }) => ({
                 cursor: Platform.OS === "web" ? "pointer" : undefined,
                 flexShrink: 1,
@@ -117,8 +119,8 @@ export function SurahHeader({
                   style={{
                     flexShrink: 1,
                     fontFamily: useDecorativeSurahName ? surahNameFontName() : undefined,
-                    fontSize: useDecorativeSurahName ? 42 : 22,
-                    lineHeight: useDecorativeSurahName ? 48 : 36,
+                    fontSize: useDecorativeSurahName ? COMPACT_DECORATIVE_SURAH_NAME_SIZE : 22,
+                    lineHeight: useDecorativeSurahName ? COMPACT_DECORATIVE_SURAH_NAME_LINE_HEIGHT : 36,
                     writingDirection: renderedSurahNameDirection,
                   }}
                   numberOfLines={1}
