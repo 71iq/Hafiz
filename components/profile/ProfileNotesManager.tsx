@@ -222,7 +222,6 @@ export function ProfileNotesManager() {
         onClose={() => setAllNotesOpen(false)}
         maxWidth={720}
         maxHeight={maxOverlayHeight}
-        surfaceColor={isDark ? "#1a1a1a" : "#FFF8F1"}
       >
         <OverlayHeader
           title={s.profileNotesTitle}

@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, Pressable } from "react-native";
 import type { LucideIcon } from "lucide-react-native";
+import { useSettings, withThemeOpacity } from "@/lib/settings/context";
 
 type Props = {
   icon: LucideIcon;
@@ -16,8 +17,9 @@ type Props = {
  * Follows "The Serene Path" design system: warm neutrals, teal accent, pill buttons.
  */
 export function EmptyState({ icon: Icon, title, subtitle, actionLabel, onAction, isDark }: Props) {
+  const { themeColors } = useSettings();
   const iconColor = isDark ? "#525252" : "#DFD9D1";
-  const iconBg = isDark ? "rgba(82,82,82,0.15)" : "rgba(223,217,209,0.3)";
+  const iconBg = withThemeOpacity(themeColors.surfaceHigh, isDark ? 0.4 : 0.6);
   const titleColor = isDark ? "#a3a3a3" : "#8a7058";
   const subtitleColor = isDark ? "#737373" : "#A39B93";
   const accentColor = isDark ? "#2dd4bf" : "#0d9488";

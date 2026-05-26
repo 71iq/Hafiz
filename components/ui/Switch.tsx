@@ -1,5 +1,6 @@
 import { Pressable, Animated, View } from "react-native";
 import { useEffect, useRef } from "react";
+import { useSettings } from "@/lib/settings/context";
 
 type Props = {
   value: boolean;
@@ -9,6 +10,7 @@ type Props = {
 
 /** shadcn-style animated toggle switch, consistent on web + native */
 export function Switch({ value, onValueChange, disabled }: Props) {
+  const { themeColors } = useSettings();
   const thumbLeft = useRef(new Animated.Value(value ? 22 : 2)).current;
 
   useEffect(() => {
@@ -26,7 +28,7 @@ export function Switch({ value, onValueChange, disabled }: Props) {
         width: 44,
         height: 24,
         borderRadius: 12,
-        backgroundColor: value ? "#0d9488" : "#E8E1DA", // primary-accent : surface-high
+        backgroundColor: value ? "#0d9488" : themeColors.surfaceHigh,
         opacity: disabled ? 0.4 : 1,
         position: "relative",
         overflow: "hidden",

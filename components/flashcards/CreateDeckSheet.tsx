@@ -36,7 +36,6 @@ export function CreateDeckSheet({ visible, onClose, onCreated }: Props) {
   const [surahs, setSurahs] = useState<SurahRow[]>([]);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const surfaceColor = isDark ? "#1C1917" : "#FFF8F1";
 
   useEffect(() => {
     if (!visible) return;
@@ -150,7 +149,6 @@ export function CreateDeckSheet({ visible, onClose, onCreated }: Props) {
       onClose={onClose}
       maxWidth={760}
       maxHeight={720}
-      surfaceColor={surfaceColor}
     >
       <OverlayHeader
         title={s.flashcardsCreateDeckTitle}

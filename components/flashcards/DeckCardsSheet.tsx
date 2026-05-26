@@ -141,8 +141,6 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
       setDueDateError(null);
     });
   }, [db, deckId, dueDateText, dueTarget, runAction, s.cardDueDateInvalid, s.cardDueDatePast]);
-
-  const surfaceColor = isDark ? "#1C1917" : "#FFF8F1";
   const rowDirection = isRTL ? "row-reverse" : "row";
 
   return (
@@ -152,7 +150,6 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
         onClose={onClose}
         maxWidth={900}
         maxHeight="92%"
-        surfaceColor={surfaceColor}
       >
         <OverlayHeader title={s.deckCardsTitle} subtitle={deckTitle} onClose={onClose} isRTL={isRTL} showHandle />
         <OverlayBody contentContainerClassName="px-5 pb-8">
@@ -470,7 +467,6 @@ function DueDateEditor({
       onClose={onClose}
       maxWidth={420}
       maxHeight={360}
-      surfaceColor={isDark ? "#1C1917" : "#FFF8F1"}
       avoidKeyboard
     >
       <OverlayHeader title={s.cardSetDueDate} subtitle={s.cardDueDateHint} onClose={onClose} isRTL={isRTL} showHandle />

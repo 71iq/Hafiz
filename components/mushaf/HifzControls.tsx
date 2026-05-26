@@ -6,6 +6,7 @@ import {
   DEFAULT_HIFZ_AUTO_DELAY_MS,
   MIN_HIFZ_AUTO_DELAY_MS,
   useSettings,
+  withThemeOpacity,
 } from "@/lib/settings/context";
 import { toArabicNumber } from "@/lib/arabic";
 import { useStrings, interpolate } from "@/lib/i18n/useStrings";
@@ -54,15 +55,15 @@ function RailButton({
   tone?: "neutral" | "positive" | "negative" | "active";
   onPress: () => void;
 }) {
-  const { isDark } = useSettings();
+  const { isDark, themeColors } = useSettings();
   const backgroundColor =
     tone === "positive"
       ? isDark ? "rgba(45, 212, 191, 0.14)" : "rgba(13, 148, 136, 0.10)"
       : tone === "negative"
         ? isDark ? "rgba(248, 113, 113, 0.12)" : "rgba(254, 226, 226, 0.85)"
         : tone === "active"
-          ? isDark ? "rgba(255,255,255,0.08)" : "rgba(255,248,241,0.90)"
-          : isDark ? "rgba(38,38,38,0.84)" : "rgba(255,248,241,0.84)";
+          ? withThemeOpacity(isDark ? themeColors.surfaceBright : themeColors.surface, isDark ? 0.3 : 0.9)
+          : withThemeOpacity(themeColors.surfaceHigh, 0.84);
 
   return (
     <Pressable
@@ -100,6 +101,8 @@ export function HifzControls({
     setHifzAutoDelayMs,
     isDark,
     isRTL,
+    themeColors,
+    themeSurface,
   } = useSettings();
   const iconColor = isDark ? "#d4d4d4" : "#4b4037";
   const teal = isDark ? "#2dd4bf" : "#0d9488";
@@ -115,7 +118,7 @@ export function HifzControls({
       className="items-center justify-center gap-2 px-2 py-2"
       style={{
         flexDirection: isRTL ? "row-reverse" : "row",
-        backgroundColor: isDark ? "rgba(28,25,23,0.95)" : "rgba(255,248,241,0.95)",
+        backgroundColor: withThemeOpacity(themeSurface, 0.95),
       }}
     >
       <RailButton
@@ -143,7 +146,7 @@ export function HifzControls({
         accessibilityLabel={s.hifzSpeedSeconds}
         style={{
           flexDirection: isRTL ? "row-reverse" : "row",
-          backgroundColor: isDark ? "rgba(38,38,38,0.84)" : "rgba(255,248,241,0.84)",
+          backgroundColor: withThemeOpacity(themeColors.surfaceHigh, 0.84),
         }}
       >
         <RailButton

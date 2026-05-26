@@ -16,7 +16,7 @@ import { PrivateNoteSheet } from "@/components/notes/PrivateNoteSheet";
 export function SelectionActionBar() {
   const db = useDatabase();
   const s = useStrings();
-  const { isDark } = useSettings();
+  const { isDark, themeColors } = useSettings();
   const {
     selection,
     clearSelection,
@@ -221,7 +221,7 @@ export function SelectionActionBar() {
                   width: 36,
                   height: 36,
                   borderRadius: 18,
-                  backgroundColor: isDark ? "#262626" : "#F0EAE2",
+                  backgroundColor: themeColors.surfaceMid,
                   alignItems: "center",
                   justifyContent: "center",
                   opacity: actionBusy ? 0.45 : 1,

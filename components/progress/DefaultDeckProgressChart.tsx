@@ -1,6 +1,7 @@
 import { Text, View } from "react-native";
 import { BarChart3 } from "lucide-react-native";
 import { Card } from "@/components/ui/Card";
+import { useSettings } from "@/lib/settings/context";
 import type { DefaultDeckProgressItem, DefaultDeckProgressKey } from "@/lib/profile/progress";
 
 type Props = {
@@ -94,6 +95,7 @@ function DefaultDeckProgressRow({
   isRTL: boolean;
   s: any;
 }) {
+  const { themeColors } = useSettings();
   const startedPct = item.total > 0 ? Math.round((item.startedCount / item.total) * 100) : 0;
   const barWidth = `${startedPct}%` as `${number}%`;
   return (
@@ -116,7 +118,7 @@ function DefaultDeckProgressRow({
       <View
         className="h-3 overflow-hidden rounded-full"
         style={{
-          backgroundColor: isDark ? "#262626" : "#E9E1D8",
+          backgroundColor: themeColors.surfaceHigh,
         }}
       >
         <View
@@ -129,9 +131,9 @@ function DefaultDeckProgressRow({
         />
       </View>
       <View className={`mt-2 flex-row flex-wrap gap-2 ${isRTL ? "flex-row-reverse" : ""}`}>
-        <DeckMetric label={s.progressDeckStarted} value={item.startedCount} isDark={isDark} isRTL={isRTL} />
-        <DeckMetric label={s.flashcardsNewCards} value={item.newCount} isDark={isDark} isRTL={isRTL} />
-        <DeckMetric label={s.deckCardsFilterDue} value={item.dueCount} isDark={isDark} isRTL={isRTL} />
+        <DeckMetric label={s.progressDeckStarted} value={item.startedCount} isRTL={isRTL} />
+        <DeckMetric label={s.flashcardsNewCards} value={item.newCount} isRTL={isRTL} />
+        <DeckMetric label={s.deckCardsFilterDue} value={item.dueCount} isRTL={isRTL} />
       </View>
     </View>
   );
@@ -140,18 +142,17 @@ function DefaultDeckProgressRow({
 function DeckMetric({
   label,
   value,
-  isDark,
   isRTL,
 }: {
   label: string;
   value: number;
-  isDark: boolean;
   isRTL: boolean;
 }) {
+  const { themeColors } = useSettings();
   return (
     <View
       className={`flex-row items-center gap-1.5 rounded-full px-2.5 py-1 ${isRTL ? "flex-row-reverse" : ""}`}
-      style={{ backgroundColor: isDark ? "#171717" : "#F5EEE7" }}
+      style={{ backgroundColor: themeColors.surfaceLow }}
     >
       <Text
         className="text-charcoal dark:text-neutral-200"

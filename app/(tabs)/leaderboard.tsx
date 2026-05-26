@@ -27,7 +27,7 @@ import { LEADERBOARD_CONTENT_MAX_WIDTH } from "@/lib/ui/viewport";
 type Tab = "daily" | "weekly" | "alltime" | "streak";
 
 export default function LeaderboardScreen() {
-  const { isDark } = useSettings();
+  const { isDark, themeColors } = useSettings();
   const db = useDatabase();
   const s = useStrings();
   const { contentContainerStyle, railStyle, isLaptop } = useScreenContentLayout({ maxWidth: LEADERBOARD_CONTENT_MAX_WIDTH });
@@ -122,7 +122,7 @@ export default function LeaderboardScreen() {
       >
         <View
           className="flex-row rounded-full p-1.5"
-          style={[railStyle, { backgroundColor: isDark ? "#161616" : "#EFE8DE" }]}
+          style={[railStyle, { backgroundColor: themeColors.surfaceMid }]}
         >
         {tabs.map((tab) => {
           const isActive = activeTab === tab.key;
@@ -267,12 +267,13 @@ function LeaderboardPodiumCard({
   s: any;
   onPress: () => void;
 }) {
+  const { themeColors } = useSettings();
   const displayName = entry.display_name || entry.username;
   const isFirst = entry.rank === 1;
   const rankColor = entry.rank === 1 ? "#F5C24B" : entry.rank === 2 ? "#B7BECF" : "#C49A62";
   const cardBg = isDark
-    ? isFirst ? "#172B28" : "#141414"
-    : isFirst ? "#FFF3D8" : "#FAF8F5";
+    ? isFirst ? "#172B28" : themeColors.surfaceLow
+    : isFirst ? "#FFF3D8" : themeColors.surfaceLow;
   const scoreBg = isDark
     ? entry.rank === 1
       ? "rgba(245, 194, 75, 0.13)"
@@ -373,6 +374,7 @@ function LeaderboardRow({
   s: any;
   onPress: () => void;
 }) {
+  const { themeColors } = useSettings();
   const displayName = entry.display_name || entry.username;
   const mutedColor = isDark ? "#737373" : "#A39B93";
 
@@ -382,7 +384,7 @@ function LeaderboardRow({
   const scoreColor = isDark ? "#F3F2EF" : "#1D1D1B";
   const rowBg = isCurrentUser
     ? (isDark ? "rgba(45, 212, 191, 0.12)" : "rgba(13, 148, 136, 0.08)")
-    : (isDark ? "#141414" : "#FAF8F5");
+    : themeColors.surfaceLow;
   const scoreBg = isDark ? "rgba(255,255,255,0.05)" : "rgba(0,54,56,0.045)";
   const rankBg = hasMedal
     ? entry.rank === 1

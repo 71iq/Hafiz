@@ -90,7 +90,6 @@ export function PrivateNoteSheet({
       onClose={onClose}
       maxWidth={560}
       maxHeight={maxOverlayHeight}
-      surfaceColor={isDark ? "#1a1a1a" : "#FFF8F1"}
       dir={isRTL ? "rtl" : "ltr"}
       avoidKeyboard
     >

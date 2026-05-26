@@ -88,7 +88,6 @@ export function SurahInfoModal({
       dismissOnBackdrop
       maxWidth={760}
       maxHeight="86%"
-      surfaceColor={isDark ? "#0A0A0A" : "#FFF8F1"}
     >
       <OverlayHeader
         title={title}

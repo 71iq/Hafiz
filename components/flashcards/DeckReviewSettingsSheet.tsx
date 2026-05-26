@@ -72,7 +72,6 @@ export function DeckReviewSettingsSheet({ visible, deckId, deckTitle, mode, onCl
   const { width } = useWindowDimensions();
   const isPhone = width < SIDEBAR_BREAKPOINT;
   const compact = width >= SIDEBAR_BREAKPOINT;
-  const surfaceColor = isDark ? "#1C1917" : "#FFF8F1";
   const [dailyLimit, setDailyLimit] = useState(DEFAULT_DECK_DAILY_REVIEW_LIMIT);
   const [newCardsLimit, setNewCardsLimit] = useState(DEFAULT_DECK_NEW_CARD_LIMIT);
   const [requestRetention, setRequestRetention] = useState(DEFAULT_DECK_REQUEST_RETENTION);
@@ -273,7 +272,6 @@ export function DeckReviewSettingsSheet({ visible, deckId, deckTitle, mode, onCl
         onClose={onClose}
         maxWidth={680}
         maxHeight="92%"
-        surfaceColor={surfaceColor}
       >
         <OverlayHeader
           title={s.deckReviewSettingsTitle}
@@ -357,7 +355,6 @@ export function DeckReviewSettingsSheet({ visible, deckId, deckTitle, mode, onCl
         onClose={() => setActiveInfo(null)}
         maxWidth={440}
         maxHeight={isPhone ? "70%" : 360}
-        surfaceColor={surfaceColor}
       >
         <OverlayHeader
           title={activeInfo?.title ?? ""}
@@ -915,7 +912,8 @@ function ChoiceRow<T extends string>({
   isDark: boolean;
   isRTL: boolean;
 }) {
-  const rowBg = isDark ? "#141414" : "#F9F3EB";
+  const { themeColors } = useSettings();
+  const rowBg = themeColors.surfaceLow;
   const rowBorder = isDark ? "rgba(255,255,255,0.06)" : "rgba(45,45,45,0.06)";
   const selectedBg = isDark ? "rgba(45, 212, 191, 0.18)" : "#DFF8F3";
   const selectedText = isDark ? "#5eead4" : "#007D78";
@@ -1069,16 +1067,17 @@ function ReviewSwitchRow({
   isRTL: boolean;
   quiet: boolean;
 }) {
+  const { themeColors } = useSettings();
   const selectedBg = isDark ? "rgba(45, 212, 191, 0.14)" : "#CCFBF1";
   const selectedText = isDark ? "#5eead4" : "#0F766E";
-  const restingBg = isDark ? "#1C1917" : "#FFF8F1";
-  const restingBorder = isDark ? "#262626" : "#E8E1DA";
+  const restingBg = themeColors.surface;
+  const restingBorder = themeColors.surfaceHigh;
 
   return (
     <View
       className="items-center gap-3 rounded-2xl px-3 py-2.5"
       style={{
-        backgroundColor: quiet ? (value ? selectedBg : restingBg) : isDark ? "#0A0A0A" : "#FFF8F1",
+        backgroundColor: quiet ? (value ? selectedBg : restingBg) : themeColors.surface,
         borderColor: quiet ? (value ? selectedText : restingBorder) : "transparent",
         borderWidth: quiet ? 1 : 0,
         flexDirection: isRTL ? "row-reverse" : "row",

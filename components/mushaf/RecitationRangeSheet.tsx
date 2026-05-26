@@ -150,7 +150,6 @@ export function RecitationRangeSheet({ visible, onClose, currentAyah }: Props) {
       dismissOnBackdrop
       maxWidth={620}
       maxHeight={maxHeight}
-      surfaceColor={isDark ? "#0A0A0A" : "#FFF8F1"}
     >
       <OverlayHeader
         title={s.recitationSheetTitle}

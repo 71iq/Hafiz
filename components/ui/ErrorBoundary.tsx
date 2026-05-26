@@ -32,13 +32,11 @@ const viewStyles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 32,
     paddingVertical: 48,
-    backgroundColor: "#FFF8F1", // surface
   },
   iconWrapper: {
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: "#F9F3EB", // surface-low
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 20,
@@ -115,8 +113,8 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     }
 
     return (
-      <View style={viewStyles.container}>
-        <View style={viewStyles.iconWrapper}>
+      <View className="bg-surface dark:bg-surface-dark" style={viewStyles.container}>
+        <View className="bg-surface-low dark:bg-surface-dark-low" style={viewStyles.iconWrapper}>
           <AlertTriangle size={40} color="#8a7058" strokeWidth={1.5} />
         </View>
 

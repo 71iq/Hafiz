@@ -12,7 +12,7 @@ import { useChrome } from "@/lib/ui/chrome";
 import { BookOpen, AlignJustify, Eye, EyeOff, Home, Search, BookMarked, ListMusic, ScanLine } from "lucide-react-native";
 import { useDatabase } from "@/lib/database/provider";
 import { writeUserSetting } from "@/lib/database/user-settings";
-import { useSettings } from "@/lib/settings/context";
+import { useSettings, withThemeOpacity } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { WordInteractionProvider } from "@/lib/word/context";
 import { SelectionProvider, useSelection } from "@/lib/selection/context";
@@ -125,6 +125,7 @@ function ViewModeToggle({
   onPress: () => void;
 }) {
   const Icon = isPageMode ? BookOpen : AlignJustify;
+  const { themeSurface } = useSettings();
 
   return (
     <Pressable
@@ -146,7 +147,7 @@ function ViewModeToggle({
         borderWidth: glass ? 1 : 0,
         borderStyle: "solid",
         borderColor: glass ? "rgba(255,255,255,0.15)" : "transparent",
-        backgroundColor: glass ? (isDark ? "rgba(28,25,23,0.82)" : "rgba(255,248,241,0.82)") : undefined,
+        backgroundColor: glass ? withThemeOpacity(themeSurface, 0.82) : undefined,
         ...(glass && Platform.OS === "web"
           ? ({ backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" } as any)
           : null),
@@ -191,9 +192,9 @@ function MushafInner() {
     hifzAutoAdvancePage,
     focusScrollSpeed,
     setFocusScrollSpeed,
-    effectiveTheme,
     isDark,
     isRTL,
+    themeSurface,
     uiLanguage,
   } = useSettings();
   const s = useStrings();
@@ -949,9 +950,8 @@ function MushafInner() {
       ? Math.max(insets.bottom, 16)
       : 0;
   const pageScrollBottomInset = focusModeActive ? Math.max(insets.bottom, 12) + 96 : isPageMode ? 8 : undefined;
-  const lightRailBackground = effectiveTheme === "white" ? "rgba(255,255,255,0.95)" : "rgba(255,248,241,0.95)";
   const floatingRailSurface = {
-    backgroundColor: isDark ? "rgba(28,25,23,0.95)" : lightRailBackground,
+    backgroundColor: withThemeOpacity(themeSurface, 0.95),
     borderWidth: 1,
     borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.72)",
     shadowColor: "#000",
@@ -1273,7 +1273,7 @@ function MushafInner() {
                   style={{
                     flexDirection: "row",
                     gap: 2,
-                    backgroundColor: isDark ? "rgba(28,25,23,0.82)" : "rgba(255,248,241,0.82)",
+                    backgroundColor: withThemeOpacity(themeSurface, 0.82),
                     ...(Platform.OS === "web"
                       ? ({ backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" } as any)
                       : null),

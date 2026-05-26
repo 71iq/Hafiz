@@ -67,7 +67,6 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
   const { width } = useWindowDimensions();
   const isPhone = width < SIDEBAR_BREAKPOINT;
   const compact = width >= SIDEBAR_BREAKPOINT;
-  const surfaceColor = isDark ? "#1C1917" : "#FFF8F1";
   const [filterType, setFilterType] = useState<FilterType>("all");
   const [selectedSurahs, setSelectedSurahs] = useState<Set<number>>(new Set());
   const [selectedJuz, setSelectedJuz] = useState<Set<number>>(new Set());
@@ -231,7 +230,6 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
         onClose={onClose}
         maxWidth={760}
         maxHeight={720}
-        surfaceColor={surfaceColor}
       >
         <OverlayHeader
           title={title}
@@ -381,7 +379,6 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
         onClose={() => setActiveInfo(null)}
         maxWidth={440}
         maxHeight={isPhone ? "70%" : 360}
-        surfaceColor={surfaceColor}
       >
         <OverlayHeader
           title={activeInfo?.title ?? ""}

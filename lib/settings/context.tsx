@@ -44,6 +44,14 @@ export const HIFZ_AUTO_DELAY_STEP_MS = 250;
 export type ThemePalette = "beige" | "dark" | "white" | "amoled";
 export type ThemeMode = ThemePalette | "system" | "scheduled";
 export type ThemeScheduleRule = { id: string; theme: ThemePalette; time: string };
+export type ThemeColors = {
+  surface: string;
+  surfaceLow: string;
+  surfaceMid: string;
+  surfaceHigh: string;
+  surfaceDim: string;
+  surfaceBright: string;
+};
 export type ViewMode = "verse" | "page";
 export type PageScroll = "vertical" | "horizontal";
 export type UILanguage = "en" | "ar";
@@ -53,6 +61,55 @@ const THEME_CACHE_KEY = "hafiz_theme";
 const SCHEDULED_THEME_CACHE_KEY = "hafiz_scheduled_theme";
 const SCHEDULED_SWITCH_TIME_CACHE_KEY = "hafiz_scheduled_switch_time";
 const SCHEDULED_RULES_CACHE_KEY = "hafiz_scheduled_rules";
+
+export const THEME_COLORS: Record<ThemePalette, ThemeColors> = {
+  beige: {
+    surface: "#FFF8F1",
+    surfaceLow: "#F9F3EB",
+    surfaceMid: "#F0EBE3",
+    surfaceHigh: "#E8E1DA",
+    surfaceDim: "#DFD9D1",
+    surfaceBright: "#FFFFFF",
+  },
+  white: {
+    surface: "#FFFFFF",
+    surfaceLow: "#F8FAFC",
+    surfaceMid: "#F4F4F5",
+    surfaceHigh: "#E5E7EB",
+    surfaceDim: "#D1D5DB",
+    surfaceBright: "#FFFFFF",
+  },
+  dark: {
+    surface: "#0A0A0A",
+    surfaceLow: "#141414",
+    surfaceMid: "#1A1A1A",
+    surfaceHigh: "#262626",
+    surfaceDim: "#0F0F0F",
+    surfaceBright: "#2D2D2D",
+  },
+  amoled: {
+    surface: "#000000",
+    surfaceLow: "#030303",
+    surfaceMid: "#080808",
+    surfaceHigh: "#0F0F0F",
+    surfaceDim: "#000000",
+    surfaceBright: "#181818",
+  },
+};
+
+export function withThemeOpacity(color: string, opacity: number): string {
+  const hex = color.replace("#", "");
+  const normalized = hex.length === 3
+    ? hex.split("").map((char) => `${char}${char}`).join("")
+    : hex;
+  if (normalized.length !== 6) return color;
+
+  const red = Number.parseInt(normalized.slice(0, 2), 16);
+  const green = Number.parseInt(normalized.slice(2, 4), 16);
+  const blue = Number.parseInt(normalized.slice(4, 6), 16);
+  const alpha = Math.max(0, Math.min(1, opacity));
+  return `rgba(${red},${green},${blue},${alpha})`;
+}
 
 type SettingsContextType = {
   fontSizeIndex: number;
@@ -69,6 +126,7 @@ type SettingsContextType = {
   scheduledRules: ThemeScheduleRule[];
   setScheduledRules: (rules: ThemeScheduleRule[]) => void;
   themeSurface: string;
+  themeColors: ThemeColors;
   viewMode: ViewMode;
   setViewMode: (mode: ViewMode) => void;
   pageScroll: PageScroll;
@@ -114,6 +172,7 @@ const SettingsContext = createContext<SettingsContextType>({
   scheduledRules: [],
   setScheduledRules: () => {},
   themeSurface: "#FFF8F1",
+  themeColors: THEME_COLORS.beige,
   viewMode: "verse",
   setViewMode: () => {},
   pageScroll: "vertical",
@@ -603,7 +662,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const effectiveTheme: ThemePalette =
     theme === "system" ? systemTheme : theme === "scheduled" ? resolveScheduledTheme(scheduledRules, nowMinute, systemTheme) : theme;
   const isDark = effectiveTheme === "dark" || effectiveTheme === "amoled";
-  const themeSurface = THEME_PALETTES[effectiveTheme].surface;
+  const themeColors = THEME_COLORS[effectiveTheme];
+  const themeSurface = themeColors.surface;
   const themeVars = useMemo(
     () =>
       Platform.OS === "web" && typeof window === "undefined"
@@ -840,6 +900,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         scheduledRules,
         setScheduledRules,
         themeSurface,
+        themeColors,
         viewMode,
         setViewMode,
         pageScroll,

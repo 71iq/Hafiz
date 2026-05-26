@@ -29,7 +29,7 @@ export default function OpenDeepLink() {
 
   // Brief loading state while redirecting
   return (
-    <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#FFF8F1" }}>
+    <View className="flex-1 items-center justify-center bg-surface dark:bg-surface-dark">
       <ActivityIndicator size="large" color="#0d9488" />
     </View>
   );

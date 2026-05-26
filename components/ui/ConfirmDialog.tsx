@@ -38,7 +38,6 @@ export function ConfirmDialog({
       open={visible}
       onClose={handleClose}
       maxWidth={420}
-      surfaceColor={isDark ? "#0A0A0A" : "#FFF8F1"}
     >
       <OverlayHeader
         title={title}

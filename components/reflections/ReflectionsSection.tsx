@@ -23,7 +23,7 @@ type Props = {
 };
 
 export function ReflectionsSection({ surah, ayah, initiallyExpanded = false, showHeader = true }: Props) {
-  const { isDark } = useSettings();
+  const { isDark, themeColors } = useSettings();
   const s = useStrings();
   const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
@@ -119,7 +119,7 @@ export function ReflectionsSection({ surah, ayah, initiallyExpanded = false, sho
         <Pressable
           onPress={() => setExpanded((v) => !v)}
           className="flex-row items-center justify-between rounded-2xl px-4 py-3"
-          style={{ backgroundColor: isDark ? "#141414" : "#FAF8F5" }}
+          style={{ backgroundColor: themeColors.surfaceLow }}
         >
           <View className="flex-row items-center gap-2">
             <Text

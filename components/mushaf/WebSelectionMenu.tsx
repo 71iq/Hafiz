@@ -4,7 +4,7 @@ import * as Clipboard from "expo-clipboard";
 import { Copy } from "lucide-react-native";
 import { useDatabase } from "@/lib/database/provider";
 import { useStrings } from "@/lib/i18n/useStrings";
-import { useSettings } from "@/lib/settings/context";
+import { useSettings, withThemeOpacity } from "@/lib/settings/context";
 import { useSelection } from "@/lib/selection/context";
 import {
   fetchUthmaniWordsForSelection,
@@ -29,7 +29,7 @@ const SELECTION_STYLE_ID = "hafiz-quran-selection-style";
 export function WebSelectionMenu() {
   const db = useDatabase();
   const s = useStrings();
-  const { isDark, isRTL } = useSettings();
+  const { isDark, isRTL, themeSurface } = useSettings();
   const { showToast } = useSelection();
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [copyBusy, setCopyBusy] = useState(false);
@@ -247,7 +247,7 @@ export function WebSelectionMenu() {
           borderRadius: 14,
           borderWidth: 1,
           borderColor: border,
-          backgroundColor: isDark ? "rgba(38,38,38,0.98)" : "rgba(255,248,241,0.98)",
+          backgroundColor: withThemeOpacity(themeSurface, 0.98),
           alignItems: "center",
           justifyContent: "center",
           flexDirection: isRTL ? "row-reverse" : "row",

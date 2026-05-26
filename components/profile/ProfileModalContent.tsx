@@ -158,7 +158,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
   const queryClient = useQueryClient();
   const db = useDatabase();
   const s = useStrings();
-  const { isDark, isRTL, uiLanguage } = useSettings();
+  const { isDark, isRTL, themeColors, uiLanguage } = useSettings();
   const { width, height } = useWindowDimensions();
   const { user, profile, isLoading: authLoading, updateProfile } = useAuthStore();
   const [activeTab, setActiveTab] = useState<ProfileTab>("overview");
@@ -272,7 +272,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
   const saveProfileIconColor = saveProfileDisabled && !profileSaving ? (isDark ? "#737373" : "#8A7764") : "#FFFFFF";
   const saveProfileTextColor = saveProfileDisabled && !profileSaving ? (isDark ? "#737373" : "#8A7764") : "#FFFFFF";
   const saveProfileBackgroundColor = saveProfileDisabled && !profileSaving
-    ? isDark ? "#262626" : "#E6DED5"
+    ? themeColors.surfaceHigh
     : isDark ? "#0f766e" : "#0d9488";
   const ownStats = localStats ?? { currentStreak: 0, longestStreak: 0, cardsReviewed: 0, totalScore: 0 };
   const stats = [
@@ -443,7 +443,6 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
         onClose={close}
         maxWidth={880}
         maxHeight={maxOverlayHeight}
-        surfaceColor={isDark ? "#0A0A0A" : "#FFF8F1"}
         dir={isRTL ? "rtl" : "ltr"}
       >
         <OverlayHeader
@@ -529,7 +528,6 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
         open={editOpen}
         onClose={() => setEditOpen(false)}
         maxWidth={520}
-        surfaceColor={isDark ? "#0A0A0A" : "#FFF8F1"}
         dir={isRTL ? "rtl" : "ltr"}
         avoidKeyboard
       >

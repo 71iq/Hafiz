@@ -45,7 +45,6 @@ export function WriteReflectionSheet({
 
   const isPhone = width < SIDEBAR_BREAKPOINT;
   const maxOverlayHeight = Math.min(height - (isPhone ? 12 : 48), isPhone ? height * 0.94 : 640);
-  const surfaceColor = isDark ? "#1a1a1a" : "#FFF8F1";
   const mutedColor = isDark ? "#737373" : "#A39B93";
   const charCount = content.length;
   const isValid = charCount >= 10 && charCount <= 5000;
@@ -111,7 +110,6 @@ export function WriteReflectionSheet({
       onClose={handleClose}
       maxWidth={560}
       maxHeight={maxOverlayHeight}
-      surfaceColor={surfaceColor}
       dir={isRTL ? "rtl" : "ltr"}
       avoidKeyboard
     >

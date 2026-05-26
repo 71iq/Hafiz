@@ -26,7 +26,7 @@ const facebookLogo = require("@/assets/images/auth/facebook-icon-icon.png");
 export function OAuthButtons({ onError }: Props) {
   const s = useStrings();
   const db = useDatabase();
-  const { isDark } = useSettings();
+  const { isDark, themeColors } = useSettings();
   const [busyProvider, setBusyProvider] = useState<"google" | "apple" | "facebook" | "qf" | null>(null);
 
   if (!isSupabaseConfigured()) return null;
@@ -60,8 +60,8 @@ export function OAuthButtons({ onError }: Props) {
 
   const mutedColor = isDark ? "#525252" : "#DFD9D1";
   const appleSource = (isDark ? appleDarkLogo : appleLogo) as ImageSourcePropType;
-  const buttonBorderColor = isDark ? "#333" : "#E0E0E0";
-  const buttonBackground = isDark ? "#1a1a1a" : "#FFFFFF";
+  const buttonBorderColor = themeColors.surfaceHigh;
+  const buttonBackground = themeColors.surfaceBright;
   const qfAuthEnabled = isQfLoginEnabled();
 
   return (

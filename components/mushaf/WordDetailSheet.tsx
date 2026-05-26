@@ -47,7 +47,6 @@ export function WordDetailSheet() {
 
   const isPhone = width < SIDEBAR_BREAKPOINT;
   const maxModalHeight = Math.min(height - (isPhone ? 12 : 48), isPhone ? height * 0.94 : 720);
-  const surfaceColor = isDark ? "#0A0A0A" : "#FFF8F1";
 
   const tabs = useMemo(
     () => [
@@ -137,7 +136,6 @@ export function WordDetailSheet() {
         onClose={handleClose}
         maxWidth={760}
         maxHeight={maxModalHeight}
-        surfaceColor={surfaceColor}
       >
         <OverlayHeader
           isRTL={isRTL}

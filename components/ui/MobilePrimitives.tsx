@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColorScheme } from "nativewind";
+import { useSettings, withThemeOpacity } from "@/lib/settings/context";
 import { cn } from "@/lib/utils";
 
 export function ScreenScaffold({ className, contentClassName, children, ...props }: ViewProps & {
@@ -184,11 +185,12 @@ export function HairlineProgress({
 export function MobileGlassBar({ className, ...props }: ViewProps) {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === "dark";
+  const { themeSurface } = useSettings();
   return (
     <View
       className={cn("rounded-3xl border border-white/15 px-3 py-2", className)}
       style={{
-        backgroundColor: isDark ? "rgba(28,25,23,0.80)" : "rgba(255,248,241,0.80)",
+        backgroundColor: withThemeOpacity(themeSurface, isDark ? 0.8 : 0.86),
         ...(typeof window !== "undefined" ? ({
           backdropFilter: "blur(12px)",
           WebkitBackdropFilter: "blur(12px)",
@@ -209,8 +211,7 @@ type MobileBottomSheetProps = Omit<ModalProps, "animationType"> & {
 export function MobileBottomSheet({ open, onClose, className, children, ...props }: MobileBottomSheetProps) {
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
-  const { colorScheme } = useColorScheme();
-  const isDark = colorScheme === "dark";
+  const { themeSurface } = useSettings();
   const progress = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -228,7 +229,7 @@ export function MobileBottomSheet({ open, onClose, className, children, ...props
       <Animated.View
         className={cn("rounded-t-4xl px-5 pt-3 pb-7", className)}
         style={{
-          backgroundColor: isDark ? "#141414" : "#FFF8F1",
+          backgroundColor: themeSurface,
           paddingBottom: Math.max(insets.bottom, 20),
           transform: [{
             translateY: progress.interpolate({

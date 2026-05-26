@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { BookOpen, ChevronDown } from "lucide-react-native";
 import { setPendingDeepLink } from "@/lib/deep-link";
+import { useSettings } from "@/lib/settings/context";
 
 type SurahProgress = {
   surah: number;
@@ -38,6 +39,7 @@ export function SurahProgressList({
   s,
 }: Props) {
   const router = useRouter();
+  const { themeColors } = useSettings();
   const previewData = previewLimit ? data.slice(0, previewLimit) : data;
   const isHorizontalPreview = !!previewLimit;
 
@@ -130,7 +132,7 @@ export function SurahProgressList({
             style={{
               height: 2,
               borderRadius: 999,
-              backgroundColor: isDark ? "#262626" : "#E8E1DA",
+              backgroundColor: themeColors.surfaceHigh,
               overflow: "hidden",
             }}
           >

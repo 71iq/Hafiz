@@ -32,7 +32,7 @@ type SurahRow = {
 
 function OnboardingInner() {
   const db = useDatabase();
-  const { isDark, themeSurface } = useSettings();
+  const { isDark, themeColors, themeSurface } = useSettings();
   const s = useStrings();
   const router = useRouter();
   const { width: screenWidth } = useWindowDimensions();
@@ -151,13 +151,13 @@ function OnboardingInner() {
   const tealDark = "#2dd4bf";
   const accentColor = isDark ? tealDark : teal;
   const bgColor = themeSurface;
-  const cardBg = isDark ? "#1A1A1A" : "#FFFFFF";
+  const cardBg = themeColors.surfaceBright;
   const textPrimary = isDark ? "#F5F5F5" : "#2D2D2D";
   const textMuted = isDark ? "#A3A3A3" : "#8a7058";
-  const dotInactive = isDark ? "#404040" : "#DFD9D1";
-  const checkboxBorder = isDark ? "#525252" : "#DFD9D1";
+  const dotInactive = themeColors.surfaceDim;
+  const checkboxBorder = themeColors.surfaceDim;
   const checkboxChecked = accentColor;
-  const surahNumberBg = isDark ? "#262626" : "#F0EBE3";
+  const surahNumberBg = themeColors.surfaceMid;
 
   // ─── Screen 1: Welcome ─────────────────────────────────────
 

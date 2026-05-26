@@ -1183,7 +1183,6 @@ function TafseerSourcePicker({
       dismissOnBackdrop={!importingSource}
       maxWidth={520}
       maxHeight="80%"
-      surfaceColor={isDark ? "#1C1917" : "#FFF8F1"}
     >
       <OverlayHeader
         title={s.tafseerSourceLabel}
@@ -1324,7 +1323,6 @@ function ReciterPicker({
       dismissOnBackdrop
       maxWidth={560}
       maxHeight="82%"
-      surfaceColor={isDark ? "#1C1917" : "#FFF8F1"}
     >
       <OverlayHeader
         title={s.recitationReciterPickerTitle}
@@ -1658,6 +1656,7 @@ function SettingsLinkRow({
   external?: boolean;
 }) {
   const RowChevron = isRTL ? ChevronLeft : ChevronRight;
+  const { themeColors } = useSettings();
   const iconColor = isDark ? "#2dd4bf" : "#0d9488";
   const chevronColor = isDark ? "#525252" : "#DFD9D1";
 
@@ -1666,9 +1665,7 @@ function SettingsLinkRow({
       onPress={onPress}
       className={`${isRTL ? "flex-row-reverse" : "flex-row"} items-center gap-3 rounded-2xl px-3 py-3`}
       style={({ pressed }) => ({
-        backgroundColor: pressed
-          ? isDark ? "#1A1A1A" : "#F0EBE3"
-          : "transparent",
+        backgroundColor: pressed ? themeColors.surfaceMid : "transparent",
         opacity: pressed ? 0.86 : 1,
       })}
     >

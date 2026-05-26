@@ -52,7 +52,7 @@ export function ReflectionCard({
   onReferencePress,
   onAuthRequired,
 }: Props) {
-  const { isDark, isRTL, uiLanguage } = useSettings();
+  const { isDark, isRTL, uiLanguage, themeColors } = useSettings();
   const s = useStrings();
   const user = useAuthStore((s) => s.user);
   const [liked, setLiked] = useState(reflection.user_has_liked ?? false);
@@ -146,7 +146,7 @@ export function ReflectionCard({
     <View
       className={isFeed ? "mb-3 border px-4 py-4" : "mb-2.5 px-4 py-3.5"}
       style={{
-        backgroundColor: isDark ? "#171717" : "#FAF8F5",
+        backgroundColor: themeColors.surfaceLow,
         position: "relative",
         borderRadius: isFeed ? 28 : 24,
         borderColor: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,54,56,0.08)",
@@ -204,7 +204,7 @@ export function ReflectionCard({
             zIndex: 10,
             borderRadius: 12,
             padding: 4,
-            backgroundColor: isDark ? "#262626" : "#FFFFFF",
+            backgroundColor: themeColors.surfaceBright,
             shadowColor: "#003638",
             shadowOffset: { width: 0, height: 4 },
             shadowOpacity: 0.08,
@@ -261,7 +261,7 @@ export function ReflectionCard({
 
       <View
         className={`${rowClassName} items-center gap-2`}
-        style={isFeed ? { borderTopWidth: 1, borderTopColor: isDark ? "#242424" : "#EEE7DE", paddingTop: 12 } : undefined}
+        style={isFeed ? { borderTopWidth: 1, borderTopColor: themeColors.surfaceHigh, paddingTop: 12 } : undefined}
       >
         <Pressable
           onPress={handleLike}
@@ -269,7 +269,7 @@ export function ReflectionCard({
           className={`${rowClassName} items-center gap-1 rounded-full px-2.5 py-1.5`}
           style={({ pressed }) => ({
             opacity: pressed || likeBusy ? 0.6 : 1,
-            backgroundColor: isDark ? "#202020" : "#F0EAE2",
+            backgroundColor: themeColors.surfaceMid,
           })}
         >
           <Heart
@@ -289,7 +289,7 @@ export function ReflectionCard({
           className={`${rowClassName} items-center gap-1 rounded-full px-2.5 py-1.5`}
           style={({ pressed }) => ({
             opacity: pressed ? 0.6 : 1,
-            backgroundColor: isDark ? "#202020" : "#F0EAE2",
+            backgroundColor: themeColors.surfaceMid,
           })}
         >
           <MessageCircle size={15} color={mutedColor} />

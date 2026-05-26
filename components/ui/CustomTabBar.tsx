@@ -6,7 +6,7 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from "react-native-reanimated";
-import { useColorScheme } from "nativewind";
+import { useSettings, withThemeOpacity } from "@/lib/settings/context";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -14,8 +14,6 @@ const ACTIVE_BG = "#1B4D4F"; // primary-container
 const ACTIVE_TEXT = "#FDDC91"; // gold
 const INACTIVE_LIGHT = "rgba(45, 45, 45, 0.5)"; // charcoal/50
 const INACTIVE_DARK = "rgba(232, 225, 218, 0.5)"; // surface-high/50
-const BAR_BG_LIGHT = "rgba(255, 248, 241, 0.80)"; // surface/80
-const BAR_BG_DARK = "rgba(28, 25, 23, 0.80)"; // stone-900/80
 const SHADOW_COLOR = "rgba(0, 54, 56, 0.04)";
 
 function TabItem({
@@ -93,8 +91,9 @@ export function CustomTabBar({
   navigation,
 }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
-  const { colorScheme } = useColorScheme();
-  const isDark = colorScheme === "dark";
+  const { isDark, themeSurface } = useSettings();
+  const barBackground = withThemeOpacity(themeSurface, 0.8);
+  const nativeBarBackground = withThemeOpacity(themeSurface, 0.95);
 
   // Filter out routes with href: null (expo-router sets tabBarItemStyle.display: 'none')
   const visibleRoutes = state.routes.filter((route) => {
@@ -109,17 +108,14 @@ export function CustomTabBar({
         styles.container,
         {
           paddingBottom: Math.max(insets.bottom, 12),
-          backgroundColor: isDark ? BAR_BG_DARK : BAR_BG_LIGHT,
+          backgroundColor: barBackground,
           ...Platform.select({
             web: {
               backdropFilter: "blur(14px)",
               WebkitBackdropFilter: "blur(14px)",
             } as any,
             default: {
-              // On native without expo-blur, use slightly higher opacity
-              backgroundColor: isDark
-                ? "rgba(28, 25, 23, 0.95)"
-                : "rgba(255, 248, 241, 0.95)",
+              backgroundColor: nativeBarBackground,
             },
           }),
         },

@@ -67,7 +67,7 @@ export function CommentsSheet({
   onClose,
   onCommentAdded,
 }: Props) {
-  const { isDark, isRTL, uiLanguage } = useSettings();
+  const { isDark, isRTL, uiLanguage, themeColors } = useSettings();
   const s = useStrings();
   const user = useAuthStore((s) => s.user);
   const [localComments, setLocalComments] = useState<ReflectionComment[]>([]);
@@ -181,7 +181,7 @@ export function CommentsSheet({
               onPress={() => setSortOpen((open) => !open)}
               className={`items-center justify-between gap-2 rounded-full px-3.5 py-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`}
               style={({ pressed }) => ({
-                backgroundColor: isDark ? "#141414" : "#F8FAFC",
+                backgroundColor: themeColors.surfaceLow,
                 borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,54,56,0.08)",
                 borderWidth: 1,
                 opacity: pressed ? 0.72 : 1,
@@ -204,7 +204,7 @@ export function CommentsSheet({
               <View
                 className="mt-2 overflow-hidden rounded-2xl"
                 style={{
-                  backgroundColor: isDark ? "#141414" : "#FFFFFF",
+                  backgroundColor: themeColors.surfaceBright,
                   borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,54,56,0.08)",
                   borderWidth: 1,
                 }}

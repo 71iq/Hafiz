@@ -329,7 +329,6 @@ export function GoToNavigator({
       maxHeight={overlayMaxHeight}
       dismissOnBackdrop
       dismissOnEscape
-      surfaceColor={isDark ? "#1C1917" : "#FFF8F1"}
     >
       <OverlayHeader title={s.goToTitle} onClose={onClose} showHandle={isPhone} isRTL={isRTL} />
 

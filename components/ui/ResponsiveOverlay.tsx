@@ -13,10 +13,10 @@ import {
   type ViewStyle,
 } from "react-native";
 import { X } from "lucide-react-native";
-import { useColorScheme } from "nativewind";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { useUIDirection, type Direction } from "@/lib/ui/direction";
+import { useSettings } from "@/lib/settings/context";
 import { cn } from "@/lib/utils";
 
 type OverlayPresentation = "sheet" | "dialog" | "fullscreen";
@@ -66,9 +66,6 @@ type OverlayFooterProps = {
   isRTL?: boolean;
   className?: string;
 };
-
-const DEFAULT_OVERLAY_SURFACE_LIGHT = "#FFF8F1";
-const DEFAULT_OVERLAY_SURFACE_DARK = "#0A0A0A";
 
 let bodyScrollLockCount = 0;
 let restoreBodyOverflow = "";
@@ -127,14 +124,13 @@ export function ResponsiveOverlay({
   children,
 }: ResponsiveOverlayProps) {
   const { width, height } = useWindowDimensions();
-  const { colorScheme } = useColorScheme();
+  const { themeSurface } = useSettings();
   const dir = useUIDirection(explicitDir);
   const animation = useRef(new Animated.Value(0)).current;
   const overlayId = useRef(`overlay-${Math.random().toString(36).slice(2)}`).current;
   const isPhone = width < SIDEBAR_BREAKPOINT;
   const activePresentation = isPhone ? phonePresentation : desktopPresentation === "dialog" ? "dialog" : "panel";
-  const resolvedSurfaceColor =
-    surfaceColor ?? (colorScheme === "dark" ? DEFAULT_OVERLAY_SURFACE_DARK : DEFAULT_OVERLAY_SURFACE_LIGHT);
+  const resolvedSurfaceColor = surfaceColor ?? themeSurface;
 
   useEffect(() => {
     if (!open) return;

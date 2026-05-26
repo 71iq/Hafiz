@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { View, Text, Pressable, useWindowDimensions } from "react-native";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
+import { useSettings } from "@/lib/settings/context";
 
 type DayData = { date: string; count: number };
 
@@ -18,8 +19,8 @@ const BASE_CELL_SIZE = 13;
 const TOTAL_WEEKS = 13;
 const SUMMARY_BREAKPOINT = 560;
 
-function getColor(count: number, isDark: boolean): string {
-  if (count === 0) return isDark ? "#262626" : "#E8E1DA";
+function getColor(count: number, isDark: boolean, emptyColor: string): string {
+  if (count === 0) return emptyColor;
   if (count <= 10) return isDark ? "#134e4a" : "#99f6e4";
   if (count <= 25) return isDark ? "#0f766e" : "#2dd4bf";
   return isDark ? "#14b8a6" : "#0d9488";
@@ -48,6 +49,7 @@ function formatDateKey(date: Date): string {
 }
 
 export function ActivityHeatmap({ data, isDark, s, isRTL, activeDays, totalReviews, showSummaryStats = true }: Props) {
+  const { themeColors } = useSettings();
   const [tooltip, setTooltip] = useState<{ date: string; count: number } | null>(null);
   const [containerWidth, setContainerWidth] = useState(0);
   const { width } = useWindowDimensions();
@@ -233,7 +235,7 @@ export function ActivityHeatmap({ data, isDark, s, isRTL, activeDays, totalRevie
                         width: CELL_SIZE,
                         height: CELL_SIZE,
                         borderRadius: 3,
-                        backgroundColor: getColor(day.count, isDark),
+                        backgroundColor: getColor(day.count, isDark, themeColors.surfaceHigh),
                         borderWidth: isToday ? 1 : 0,
                         borderColor: isToday ? (isDark ? "#FDDC91" : "#785F22") : "transparent",
                       }}
@@ -249,7 +251,7 @@ export function ActivityHeatmap({ data, isDark, s, isRTL, activeDays, totalRevie
         {tooltip && (
           <View
             className="rounded-xl px-3 py-2 mt-3"
-            style={{ backgroundColor: isDark ? "#1a1a1a" : "#F5EDE4", alignSelf: "center" }}
+            style={{ backgroundColor: themeColors.surfaceMid, alignSelf: "center" }}
           >
             <Text style={{ fontFamily: "Manrope_500Medium", fontSize: 12, color: isDark ? "#d4d4d4" : "#6e5a47" }}>
               {tooltip.count} {s.heatmapReviews} — {tooltip.date}
@@ -276,7 +278,7 @@ export function ActivityHeatmap({ data, isDark, s, isRTL, activeDays, totalRevie
                   width: 10,
                   height: 10,
                   borderRadius: 2,
-                  backgroundColor: getColor(l === 0 ? 0 : l === 1 ? 5 : l === 2 ? 18 : 28, isDark),
+                  backgroundColor: getColor(l === 0 ? 0 : l === 1 ? 5 : l === 2 ? 18 : 28, isDark, themeColors.surfaceHigh),
                 }}
               />
             ))}

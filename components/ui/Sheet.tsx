@@ -6,7 +6,7 @@ import {
   Animated,
   useWindowDimensions,
 } from "react-native";
-import { useColorScheme } from "nativewind";
+import { useSettings } from "@/lib/settings/context";
 import { cn } from "@/lib/utils";
 import { forwardRef, useEffect, useRef } from "react";
 
@@ -25,8 +25,7 @@ export const Sheet = forwardRef<View, SheetProps>(
   ({ open, onClose, children, className, ...props }, ref) => {
     const slideAnim = useRef(new Animated.Value(0)).current;
     const { height } = useWindowDimensions();
-    const { colorScheme } = useColorScheme();
-    const isDark = colorScheme === "dark";
+    const { themeSurface } = useSettings();
 
     useEffect(() => {
       Animated.spring(slideAnim, {
@@ -56,7 +55,7 @@ export const Sheet = forwardRef<View, SheetProps>(
         <Animated.View
           className={cn("rounded-t-4xl", className)}
           style={{
-            backgroundColor: isDark ? "#141414" : "#FFF8F1",
+            backgroundColor: themeSurface,
             transform: [
               {
                 translateY: slideAnim.interpolate({

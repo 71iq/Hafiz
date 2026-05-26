@@ -292,7 +292,6 @@ export default function ProgressScreen() {
           open={achievementsModalOpen}
           onClose={() => setAchievementsModalOpen(false)}
           maxWidth={760}
-          surfaceColor={isDark ? "#0A0A0A" : "#FFF8F1"}
         >
           <OverlayHeader
             title={s.achievementsTitle}
@@ -318,7 +317,6 @@ export default function ProgressScreen() {
         open={surahProgressModalOpen}
         onClose={() => setSurahProgressModalOpen(false)}
         maxWidth={760}
-        surfaceColor={isDark ? "#0A0A0A" : "#FFF8F1"}
       >
         <OverlayHeader
           title={s.progressSurahProgress}

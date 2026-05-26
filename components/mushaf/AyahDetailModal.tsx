@@ -83,7 +83,6 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
   const audioIconColor = audioState.active ? "#0d9488" : iconColor;
   const isPhone = width < SIDEBAR_BREAKPOINT;
   const maxOverlayHeight = Math.min(height - (isPhone ? 12 : 48), isPhone ? height * 0.94 : 720);
-  const surfaceColor = isDark ? "#0A0A0A" : "#FFF8F1";
   const qcf2Tokens = ayahRow?.text_qcf2.split(" ").filter(Boolean) ?? [];
   const qcf2FontFamily = ayahRow ? qpcFontName(ayahRow.v2_page) : undefined;
   const selectedTafsir = tafsirRows?.find((row) => row.source === selectedTafsirSource) ?? tafsirRows?.[0] ?? null;
@@ -261,7 +260,6 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
       onClose={onClose}
       maxWidth={1080}
       maxHeight={maxOverlayHeight}
-      surfaceColor={surfaceColor}
     >
       <OverlayHeader
         title={title}

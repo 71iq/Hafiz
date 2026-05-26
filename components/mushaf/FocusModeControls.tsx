@@ -6,6 +6,7 @@ import {
   FOCUS_SCROLL_SPEED_MAX,
   FOCUS_SCROLL_SPEED_MIN,
   useSettings,
+  withThemeOpacity,
 } from "@/lib/settings/context";
 import { useStrings, interpolate } from "@/lib/i18n/useStrings";
 import { toArabicNumber } from "@/lib/arabic";
@@ -27,7 +28,7 @@ export function FocusModeControls({
   onExit,
   visible,
 }: Props) {
-  const { isDark, isRTL } = useSettings();
+  const { isDark, isRTL, themeSurface } = useSettings();
   const s = useStrings();
   const insets = useSafeAreaInsets();
   const [trackWidth, setTrackWidth] = useState(0);
@@ -65,7 +66,7 @@ export function FocusModeControls({
   if (!visible) return null;
 
   const mutedColor = isDark ? "#a3a3a3" : "#8B8178";
-  const controlSurface = isDark ? "rgba(28,25,23,0.92)" : "rgba(255,248,241,0.92)";
+  const controlSurface = withThemeOpacity(themeSurface, 0.92);
   const trackColor = isDark ? "rgba(255,255,255,0.14)" : "rgba(45,45,45,0.12)";
 
   return (

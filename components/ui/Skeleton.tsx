@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import { Animated, View, type ViewProps, type DimensionValue } from "react-native";
+import { useSettings } from "@/lib/settings/context";
 import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
@@ -56,13 +57,15 @@ export const Skeleton = React.memo(function Skeleton({
   ...props
 }: SkeletonProps) {
   const opacity = usePulse();
+  const { themeColors } = useSettings();
+  const backgroundColor = themeColors.surfaceHigh;
 
   return (
     <Animated.View
       className={cn("overflow-hidden", className)}
       style={[
         {
-          backgroundColor: isDark ? "#262626" : "#E8E1DA",
+          backgroundColor,
           width,
           height,
           borderRadius,

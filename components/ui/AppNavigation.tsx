@@ -17,8 +17,8 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useColorScheme } from "nativewind";
 import { useChrome } from "@/lib/ui/chrome";
+import { useSettings, withThemeOpacity } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { useAuthStore } from "@/lib/auth/store";
 import { ProfileIdentity } from "@/components/profile/ProfileIdentity";
@@ -47,8 +47,6 @@ const ACTIVE_TEXT = "#FDDC91";
 const INACTIVE_OPACITY = 0.5;
 const INACTIVE_LIGHT = "rgba(45, 45, 45, 0.5)";
 const INACTIVE_DARK = "rgba(232, 225, 218, 0.5)";
-const BAR_BG_LIGHT = "rgba(255, 248, 241, 0.80)";
-const BAR_BG_DARK = "rgba(28, 25, 23, 0.80)";
 const PANEL_WIDTH = 248;
 const SIDEBAR_PRIMARY_ROUTES = [
   "home",
@@ -155,11 +153,12 @@ function BottomTabItem({
 function BottomBar(props: BottomTabBarProps) {
   const { state, descriptors, navigation } = props;
   const insets = useSafeAreaInsets();
-  const { colorScheme } = useColorScheme();
-  const isDark = colorScheme === "dark";
+  const { isDark, themeSurface } = useSettings();
   const visibleRoutes = getVisibleRoutes(state, descriptors);
   const { visible, immersive } = useChrome();
   const chromeVisible = visible && !immersive;
+  const barBackground = withThemeOpacity(themeSurface, 0.8);
+  const nativeBarBackground = withThemeOpacity(themeSurface, 0.95);
 
   const hidden = useSharedValue(0);
   useEffect(() => {
@@ -183,7 +182,7 @@ function BottomBar(props: BottomTabBarProps) {
           bottom: Math.max(insets.bottom, 10),
           paddingBottom: 6,
           zIndex: 80,
-          backgroundColor: isDark ? BAR_BG_DARK : BAR_BG_LIGHT,
+          backgroundColor: barBackground,
           ...Platform.select({
             web: {
               backdropFilter: "blur(14px)",
@@ -191,7 +190,7 @@ function BottomBar(props: BottomTabBarProps) {
               pointerEvents: chromeVisible ? "auto" : "none",
             } as any,
             default: {
-              backgroundColor: isDark ? "rgba(28,25,23,0.95)" : "rgba(255,248,241,0.95)",
+              backgroundColor: nativeBarBackground,
             },
           }),
         },
@@ -560,8 +559,7 @@ function FloatingPanel(props: BottomTabBarProps & { isRTL?: boolean }) {
   const { isRTL } = props;
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
-  const { colorScheme } = useColorScheme();
-  const isDark = colorScheme === "dark";
+  const { isDark } = useSettings();
   const { immersive } = useChrome();
   const [open, setOpen] = useState(false);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);

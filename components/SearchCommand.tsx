@@ -470,7 +470,6 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
   const mutedColor = isDark ? "#737373" : "#8B8178";
   const isPhone = width < SIDEBAR_BREAKPOINT;
   const modalHeight = isPhone ? Math.min(height - 16, 900) : Math.min(height - 48, 760);
-  const surfaceColor = isDark ? "#1C1917" : "#FFF8F1";
 
   return (
     <ResponsiveSheet
@@ -479,7 +478,6 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
       dismissOnBackdrop
       maxWidth={900}
       maxHeight={modalHeight}
-      surfaceColor={surfaceColor}
     >
       <View className="flex-1" style={{ height: modalHeight, maxHeight: modalHeight }}>
         <OverlayHeader

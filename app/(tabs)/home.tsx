@@ -1031,6 +1031,7 @@ function DeckStats({
   isDark: boolean;
   isRTL: boolean;
 }) {
+  const { themeColors } = useSettings();
   return (
     <View className={`flex-row items-center gap-2 ${isRTL ? "flex-row-reverse" : ""}`} style={{ direction: "ltr" }}>
       <Text
@@ -1041,7 +1042,7 @@ function DeckStats({
       </Text>
       {showReviewStats && (
         <>
-          <View style={{ width: 1, height: 20, backgroundColor: isDark ? "#404040" : "#DFD9D1" }} />
+          <View style={{ width: 1, height: 20, backgroundColor: themeColors.surfaceDim }} />
           <Text
             className="text-center min-w-[24px]"
             style={{ fontFamily: "Manrope_700Bold", fontSize: 14, fontVariant: ["tabular-nums"], color: isDark ? "#4ade80" : "#16a34a" }}

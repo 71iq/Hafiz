@@ -44,7 +44,7 @@ type Props = {
 };
 
 export function AchievementBadge({ item, compact = false }: Props) {
-  const { isDark, isRTL } = useSettings();
+  const { isDark, isRTL, themeColors } = useSettings();
   const s = useStrings();
   const Icon = ICONS[item.icon];
   const unlocked = !!item.unlockedAt;
@@ -62,17 +62,17 @@ export function AchievementBadge({ item, compact = false }: Props) {
     <View
       className={`rounded-2xl border px-3.5 py-3 ${compact ? "w-[150px]" : "w-full"}`}
       style={{
-        borderColor: unlocked ? color : isDark ? "#262626" : "#E8DED4",
+        borderColor: unlocked ? color : themeColors.surfaceHigh,
         backgroundColor: unlocked
           ? (isDark ? "rgba(13,148,136,0.12)" : "rgba(13,148,136,0.08)")
-          : (isDark ? "#171717" : "#FFF8F1"),
+          : themeColors.surface,
         opacity: unlocked ? 1 : 0.78,
       }}
     >
       <View className={`flex-row items-start gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
         <View
           className="h-9 w-9 items-center justify-center rounded-full"
-          style={{ backgroundColor: unlocked ? `${color}22` : isDark ? "#262626" : "#F0EAE2" }}
+          style={{ backgroundColor: unlocked ? `${color}22` : themeColors.surfaceMid }}
         >
           <Icon size={17} color={iconColor} />
         </View>

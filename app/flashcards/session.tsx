@@ -1071,7 +1071,6 @@ function CardActionsSheet({
       onClose={onClose}
       maxWidth={420}
       maxHeight="80%"
-      surfaceColor={isDark ? "#1C1917" : "#FFF8F1"}
     >
       <OverlayHeader title={s.cardActionsTitle} onClose={onClose} isRTL={isRTL} showHandle />
       <OverlayBody scrollEnabled={false} contentContainerClassName="px-4 py-3">
@@ -1200,7 +1199,6 @@ function DueDateSheet({
       onClose={onClose}
       maxWidth={420}
       maxHeight={360}
-      surfaceColor={isDark ? "#1C1917" : "#FFF8F1"}
       avoidKeyboard
     >
       <OverlayHeader title={s.cardSetDueDate} subtitle={s.cardDueDateHint} onClose={onClose} isRTL={isRTL} showHandle />

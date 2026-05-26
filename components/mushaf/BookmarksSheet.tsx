@@ -36,7 +36,6 @@ export function BookmarksSheet({ visible, onClose, onNavigate }: Props) {
   const [removingKey, setRemovingKey] = useState<string | null>(null);
   const isPhone = width < SIDEBAR_BREAKPOINT;
   const maxOverlayHeight = Math.min(height - (isPhone ? 12 : 48), isPhone ? height * 0.94 : 640);
-  const surfaceColor = isDark ? "#1a1a1a" : "#FFF8F1";
 
   useEffect(() => {
     if (!visible || bookmarksList.length === 0) {
@@ -94,7 +93,6 @@ export function BookmarksSheet({ visible, onClose, onNavigate }: Props) {
       onClose={onClose}
       maxWidth={560}
       maxHeight={maxOverlayHeight}
-      surfaceColor={surfaceColor}
     >
       <OverlayHeader title={s.bookmarksTitle} onClose={onClose} showHandle={isPhone} isRTL={isRTL} />
       <OverlayBody
