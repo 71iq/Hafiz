@@ -204,6 +204,11 @@ function qpcV4PaletteKey(theme: string): keyof typeof QPC_V4_TAJWEED_PALETTES {
   return "light";
 }
 
+export function qpcV4TajweedPaletteColor(theme: string, colorIndex: number): string {
+  const palette = QPC_V4_TAJWEED_PALETTES[qpcV4PaletteKey(theme)];
+  return palette.colors[colorIndex] ?? palette.colors[0];
+}
+
 function qpcV4TajweedPaletteName(page: number, theme: string): string {
   return `--hafiz-qpc-v4-${qpcV4PaletteKey(theme)}-p${page}`;
 }

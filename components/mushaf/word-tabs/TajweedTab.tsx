@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { View, Text, Pressable } from "react-native";
+import { View, Text, Pressable, Platform } from "react-native";
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -38,8 +38,9 @@ type ResolvedEnRule = {
 export function TajweedTab({ surah, ayah, wordPos }: Props) {
   const db = useDatabase();
   const s = useStrings();
-  const { uiLanguage } = useSettings();
+  const { uiLanguage, effectiveTheme } = useSettings();
   const isArabicMode = uiLanguage === "ar";
+  const tajweedColorTheme = Platform.OS === "web" ? effectiveTheme : "white";
 
   const [arRules, setArRules] = useState<ResolvedArRule[]>([]);
   const [enRules, setEnRules] = useState<ResolvedEnRule[]>([]);
@@ -76,7 +77,7 @@ export function TajweedTab({ surah, ayah, wordPos }: Props) {
         );
         const resolved: ResolvedArRule[] = uniqueKeys.map((key, i) => {
           const row = fetched[i];
-          const fallback = getTajweedRule(key);
+          const fallback = getTajweedRule(key, tajweedColorTheme);
           return {
             ruleId: key,
             color: fallback.color,
@@ -93,7 +94,7 @@ export function TajweedTab({ surah, ayah, wordPos }: Props) {
         );
         const resolved: ResolvedEnRule[] = uniqueKeys.map((key, i) => {
           const row = fetched[i];
-          const fallback = getTajweedRule(key);
+          const fallback = getTajweedRule(key, tajweedColorTheme);
           return {
             ruleId: key,
             color: fallback.color,
@@ -107,7 +108,7 @@ export function TajweedTab({ surah, ayah, wordPos }: Props) {
       }
       setLoading(false);
     })();
-  }, [db, surah, ayah, wordPos, isArabicMode]);
+  }, [db, surah, ayah, wordPos, isArabicMode, tajweedColorTheme]);
 
   const toggle = (id: string) =>
     setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
