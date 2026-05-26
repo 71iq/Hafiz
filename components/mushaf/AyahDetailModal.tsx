@@ -53,12 +53,12 @@ type TafsirRow = {
   text: string;
 };
 
-type TabKey = "translation" | "tafsir" | "hadith" | "qiraat" | "notes" | "reflections";
+export type AyahDetailTabKey = "translation" | "tafsir" | "hadith" | "qiraat" | "notes" | "reflections";
 
 type Props = {
   target: TargetAyah | null;
   onClose: () => void;
-  initialTab?: TabKey;
+  initialTab?: AyahDetailTabKey;
 };
 
 export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Props) {
@@ -86,7 +86,7 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
   const [tafsirPickerVisible, setTafsirPickerVisible] = useState(false);
   const [importingTafsirSource, setImportingTafsirSource] = useState<TafsirSourceId | null>(null);
   const [tafsirReloadKey, setTafsirReloadKey] = useState(0);
-  const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
+  const [activeTab, setActiveTab] = useState<AyahDetailTabKey>(initialTab);
   const [bookmarkBusy, setBookmarkBusy] = useState(false);
   const [shareBusy, setShareBusy] = useState(false);
   const [currentTarget, setCurrentTarget] = useState<TargetAyah | null>(target);
@@ -344,10 +344,10 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
 
   if (!activeTarget) return null;
 
-  const tabs: Array<{ key: TabKey; label: string; icon: ReactNode }> = [
+  const tabs: Array<{ key: AyahDetailTabKey; label: string; icon: ReactNode }> = [
     ...(showTranslation
       ? [{
-          key: "translation" as TabKey,
+          key: "translation" as AyahDetailTabKey,
           label: langInfo?.nameEnglish ?? s.wordTranslation,
           icon: <BookOpenText size={15} color={activeTab === "translation" ? "#0d9488" : iconColor} />,
         }]

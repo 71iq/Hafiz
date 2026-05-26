@@ -1,7 +1,6 @@
 import { useEffect, useState, useCallback, useRef, useMemo, memo } from "react";
 import { ActivityIndicator, View, Text, Pressable, Animated as RNAnimated, Platform, useWindowDimensions } from "react-native";
 import * as Clipboard from "expo-clipboard";
-import { useQuery } from "@tanstack/react-query";
 import {
   isQuranPageFontLoaded,
   loadQuranPageFont,
@@ -10,21 +9,19 @@ import {
 } from "@/lib/fonts/loader";
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
-import { getLanguageByCode } from "@/lib/translations/languages";
 import { useSelection } from "@/lib/selection/context";
 import { WordToken } from "./WordToken";
 import {
   BookOpenText,
   Bookmark,
   Check,
+  NotebookPen,
   Pause,
   Play,
   PlusCircle,
   Share2,
 } from "lucide-react-native";
 import { useStrings } from "@/lib/i18n/useStrings";
-import { isSupabaseConfigured } from "@/lib/supabase";
-import { fetchReflectionCount } from "@/lib/reflections/api";
 import { addRetentionCard, isRetentionCardSaved } from "@/lib/fsrs/queries";
 import {
   addBookmark as dbAddBookmark,
@@ -35,7 +32,7 @@ import {
 import { formatForCopy } from "@/lib/selection/format";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { useAyahAudio } from "@/lib/audio/ayah-audio";
-import { AyahDetailModal } from "./AyahDetailModal";
+import { AyahDetailModal, type AyahDetailTabKey } from "./AyahDetailModal";
 
 const retentionSavedCache = new Map<string, boolean>();
 
@@ -65,25 +62,17 @@ function AyahBlockInner({
   const { width } = useWindowDimensions();
   const isPhone = width < SIDEBAR_BREAKPOINT;
   const db = useDatabase();
-  const { translationLanguage, recitationId, isRTL, isDark, quranFontStyle, effectiveTheme } = useSettings();
-  const langInfo = getLanguageByCode(translationLanguage);
+  const { recitationId, isRTL, isDark, quranFontStyle, effectiveTheme } = useSettings();
   const s = useStrings();
   const { isBookmarked, getHighlightColor, getWordHighlightColor, showToast, refreshBookmarks, selectAyah } = useSelection();
   const { getAyahState, toggleAyah } = useAyahAudio();
-  const reflectionsEnabled = isSupabaseConfigured();
-  const { data: reflectionCount = 0 } = useQuery({
-    queryKey: ["reflectionCount", surah, ayah],
-    queryFn: () => fetchReflectionCount(surah, ayah),
-    enabled: reflectionsEnabled,
-    staleTime: 1000 * 60 * 5,
-  });
 
   const [fontVisible, setFontVisible] = useState(() =>
     isQuranPageFontLoaded(quranFontStyle, v2Page)
   );
   const [revealed, setRevealed] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
-  const [detailTab, setDetailTab] = useState<"translation" | "tafsir" | "reflections">("translation");
+  const [detailTab, setDetailTab] = useState<AyahDetailTabKey>("hadith");
   const [reviewBusy, setReviewBusy] = useState(false);
   const [bookmarkBusy, setBookmarkBusy] = useState(false);
   const [shareBusy, setShareBusy] = useState(false);
@@ -155,7 +144,7 @@ function AyahBlockInner({
     };
   }, [db, surah, ayah]);
 
-  const openDetail = useCallback((tab: "translation" | "tafsir" | "reflections") => {
+  const openDetail = useCallback((tab: AyahDetailTabKey) => {
     setDetailTab(tab);
     setDetailOpen(true);
   }, []);
@@ -428,15 +417,14 @@ function AyahBlockInner({
       <View className="pt-3">
         <View className={isRTL ? "mt-1 flex-row-reverse flex-wrap gap-2" : "mt-1 flex-row flex-wrap gap-2"}>
           <ActionPill
-            label={langInfo?.nameEnglish ?? s.wordTranslation}
+            label={s.ayahTabHadith}
             icon={<BookOpenText size={14} color={iconColor} />}
-            onPress={() => openDetail("translation")}
+            onPress={() => openDetail("hadith")}
           />
           <ActionPill
-            label={s.reflections}
-            badge={reflectionCount}
+            label={s.wordTabQiraat}
             icon={<BookOpenText size={14} color={iconColor} />}
-            onPress={() => openDetail("reflections")}
+            onPress={() => openDetail("qiraat")}
           />
           <ActionPill
             label={savedToReview ? s.reviewActionAdded : reviewBusy ? s.addingToReview : s.addToReview}
@@ -454,9 +442,9 @@ function AyahBlockInner({
             disabled={reviewBusy || savedToReview}
           />
           <ActionPill
-            label={s.tafseer}
-            icon={<BookOpenText size={14} color={iconColor} />}
-            onPress={() => openDetail("tafsir")}
+            label={s.privateNotes}
+            icon={<NotebookPen size={14} color={iconColor} />}
+            onPress={() => openDetail("notes")}
           />
         </View>
       </View>
