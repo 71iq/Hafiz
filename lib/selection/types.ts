@@ -28,4 +28,7 @@ export const HIGHLIGHT_COLORS = [
   "#34D399", // Green
   "#60A5FA", // Blue
   "#F472B6", // Pink
+  "#A78BFA", // Violet
+  "#FB7185", // Rose
+  "#38BDF8", // Sky
 ] as const;

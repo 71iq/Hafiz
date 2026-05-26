@@ -8,7 +8,9 @@ import {
   removeBookmark as dbRemoveBookmark,
   fetchAllHighlights,
   addHighlight as dbAddHighlight,
+  addHighlightsForSelectionRefs,
   removeHighlightsForAyah,
+  type QuranSelectionWordRef,
 } from "./queries";
 
 type SelectionContextType = {
@@ -20,6 +22,7 @@ type SelectionContextType = {
   selectAyah: (surah: number, ayah: number) => void;
   clearSelection: () => void;
   addHighlightForSelection: (color: string) => Promise<void>;
+  addHighlightForRefs: (refs: QuranSelectionWordRef[], color: string) => Promise<void>;
   removeHighlightForSelection: () => Promise<void>;
   toggleBookmarkForSelection: () => Promise<"added" | "removed" | null>;
   showToast: (msg: string) => void;
@@ -28,6 +31,7 @@ type SelectionContextType = {
   refreshBookmarks: () => Promise<void>;
   isBookmarked: (surah: number, ayah: number) => boolean;
   getHighlightColor: (surah: number, ayah: number) => string | undefined;
+  getWordHighlightColor: (surah: number, ayah: number, wordPos: number) => string | undefined;
 };
 
 const SelectionContext = createContext<SelectionContextType>({
@@ -39,6 +43,7 @@ const SelectionContext = createContext<SelectionContextType>({
   selectAyah: () => {},
   clearSelection: () => {},
   addHighlightForSelection: async () => {},
+  addHighlightForRefs: async () => {},
   removeHighlightForSelection: async () => {},
   toggleBookmarkForSelection: async () => null,
   showToast: () => {},
@@ -47,6 +52,7 @@ const SelectionContext = createContext<SelectionContextType>({
   refreshBookmarks: async () => {},
   isBookmarked: () => false,
   getHighlightColor: () => undefined,
+  getWordHighlightColor: () => undefined,
 });
 
 export function useSelection() {
@@ -128,6 +134,20 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
     [selection, db, refreshHighlights]
   );
 
+  const addHighlightForRefs = useCallback(
+    async (refs: QuranSelectionWordRef[], color: string) => {
+      if (refs.length === 0) return;
+      try {
+        await addHighlightsForSelectionRefs(db, refs, color);
+        await refreshHighlights();
+      } catch (e) {
+        console.warn("[Selection] Failed to add text highlight:", e);
+        throw e;
+      }
+    },
+    [db, refreshHighlights],
+  );
+
   const removeHighlightForSelection = useCallback(
     async () => {
       if (!selection) return;
@@ -182,9 +202,22 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
   const getHighlightColor = useCallback(
     (surah: number, ayah: number): string | undefined => {
       const entries = highlights.get(ayahKey(surah, ayah));
-      return entries?.[0]?.color;
+      return entries?.find((entry) => entry.wordStart === null && entry.wordEnd === null)?.color;
     },
     [highlights]
+  );
+
+  const getWordHighlightColor = useCallback(
+    (surah: number, ayah: number, wordPos: number): string | undefined => {
+      const entries = highlights.get(ayahKey(surah, ayah));
+      return entries?.find((entry) => (
+        entry.wordStart !== null &&
+        entry.wordEnd !== null &&
+        wordPos >= entry.wordStart &&
+        wordPos <= entry.wordEnd
+      ))?.color;
+    },
+    [highlights],
   );
 
   return (
@@ -198,6 +231,7 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
         selectAyah,
         clearSelection,
         addHighlightForSelection,
+        addHighlightForRefs,
         removeHighlightForSelection,
         toggleBookmarkForSelection,
         showToast,
@@ -206,6 +240,7 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
         refreshBookmarks,
         isBookmarked,
         getHighlightColor,
+        getWordHighlightColor,
       }}
     >
       {children}

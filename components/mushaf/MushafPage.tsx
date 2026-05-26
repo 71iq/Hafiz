@@ -203,7 +203,7 @@ function MushafPageInner({
   const [fontVisible, setFontVisible] = useState(false);
   const [surahNameFontReady, setSurahNameFontReady] = useState(() => isSurahNameFontLoaded());
   const [wordsLoaded, setWordsLoaded] = useState(!!pageWordsData);
-  const { getHighlightColor, selectAyah } = useSelection();
+  const { getHighlightColor, getWordHighlightColor, selectAyah } = useSelection();
   const { quranFontStyle, effectiveTheme } = useSettings();
   const lastMarkerTapRef = useRef<{ key: string; at: number } | null>(null);
   const skipNextMarkerPressRef = useRef<string | null>(null);
@@ -465,7 +465,8 @@ function MushafPageInner({
               const hlColor =
                 isTargetWord || isTargetAyah
                   ? "#0d9488"
-                  : getHighlightColor(identity.surah, identity.ayah);
+                  : getWordHighlightColor(identity.surah, identity.ayah, identity.wordPos) ??
+                    getHighlightColor(identity.surah, identity.ayah);
               return (
                 <WordToken
                   key={`w-${lineNumber}-${i}`}

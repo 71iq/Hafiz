@@ -102,7 +102,10 @@ export async function removeBookmark(db: SQLiteDatabase, surah: number, ayah: nu
 
 export async function fetchAllHighlights(db: SQLiteDatabase): Promise<HighlightEntry[]> {
   return db.getAllAsync<HighlightEntry>(
-    "SELECT id, surah, ayah, word_start as wordStart, word_end as wordEnd, color FROM highlights WHERE deleted_at IS NULL"
+    `SELECT id, surah, ayah, word_start as wordStart, word_end as wordEnd, color
+     FROM highlights
+     WHERE deleted_at IS NULL
+     ORDER BY updated_at DESC, id DESC`
   );
 }
 
@@ -152,6 +155,27 @@ export async function addHighlight(
     color, created_at: now, updated_at: now, deleted_at: null,
   }).catch(console.warn);
   return result.lastInsertRowId;
+}
+
+export async function addHighlightsForSelectionRefs(
+  db: SQLiteDatabase,
+  refs: QuranSelectionWordRef[],
+  color: string,
+): Promise<number[]> {
+  const ids: number[] = [];
+  for (const range of selectionRefsToHighlightRanges(refs)) {
+    ids.push(
+      await addHighlight(
+        db,
+        range.surah,
+        range.ayah,
+        color,
+        range.wordStart ?? undefined,
+        range.wordEnd ?? undefined,
+      ),
+    );
+  }
+  return ids;
 }
 
 export async function removeHighlight(db: SQLiteDatabase, id: number): Promise<void> {
@@ -274,6 +298,40 @@ function selectableUthmaniWords(text: string, surah: number, ayah: number): stri
 
 function compareSelectionRefs(a: QuranSelectionWordRef, b: QuranSelectionWordRef): number {
   return a.surah - b.surah || a.ayah - b.ayah || a.wordPos - b.wordPos;
+}
+
+function selectionRefsToHighlightRanges(
+  refs: QuranSelectionWordRef[],
+): Array<{ surah: number; ayah: number; wordStart: number | null; wordEnd: number | null }> {
+  const deduped = new Map<string, QuranSelectionWordRef>();
+  for (const ref of refs) {
+    deduped.set(`${ref.surah}:${ref.ayah}:${ref.wordPos}:${ref.isMarker ? 1 : 0}`, ref);
+  }
+
+  const grouped = new Map<string, QuranSelectionWordRef[]>();
+  for (const ref of Array.from(deduped.values()).sort(compareSelectionRefs)) {
+    const key = `${ref.surah}:${ref.ayah}`;
+    grouped.set(key, [...(grouped.get(key) ?? []), ref]);
+  }
+
+  const ranges: Array<{ surah: number; ayah: number; wordStart: number | null; wordEnd: number | null }> = [];
+  for (const ayahRefs of grouped.values()) {
+    const first = ayahRefs[0];
+    const wordPositions = ayahRefs
+      .filter((ref) => !ref.isMarker && ref.wordPos > 0)
+      .map((ref) => ref.wordPos);
+    if (wordPositions.length === 0) {
+      ranges.push({ surah: first.surah, ayah: first.ayah, wordStart: null, wordEnd: null });
+      continue;
+    }
+    ranges.push({
+      surah: first.surah,
+      ayah: first.ayah,
+      wordStart: Math.min(...wordPositions),
+      wordEnd: Math.max(...wordPositions),
+    });
+  }
+  return ranges;
 }
 
 function compactSelectedAyahs(

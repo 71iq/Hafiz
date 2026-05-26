@@ -68,7 +68,7 @@ function AyahBlockInner({
   const { translationLanguage, recitationId, isRTL, isDark, quranFontStyle, effectiveTheme } = useSettings();
   const langInfo = getLanguageByCode(translationLanguage);
   const s = useStrings();
-  const { isBookmarked, getHighlightColor, showToast, refreshBookmarks, selectAyah } = useSelection();
+  const { isBookmarked, getHighlightColor, getWordHighlightColor, showToast, refreshBookmarks, selectAyah } = useSelection();
   const { getAyahState, toggleAyah } = useAyahAudio();
   const reflectionsEnabled = isSupabaseConfigured();
   const { data: reflectionCount = 0 } = useQuery({
@@ -369,22 +369,29 @@ function AyahBlockInner({
               }),
             }}
           >
-            {wordTokens.words.map((glyph, i) => (
-              <WordToken
-                key={`${surah}-${ayah}-w${i}`}
-                glyph={glyph}
-                fontFamily={fontFamily}
-                fontPalette={fontPaletteStyle?.fontPalette ?? null}
-                fontSize={fontSize}
-                lineHeight={qcf2LineHeight}
-                surah={surah}
-                ayah={ayah}
-                wordPos={i + 1}
-                v2Page={v2Page}
-                disabled={hideMode}
-                highlightColor={highlightedWordPos === i + 1 ? "#0d9488" : undefined}
-              />
-            ))}
+            {wordTokens.words.map((glyph, i) => {
+              const wordPos = i + 1;
+              return (
+                <WordToken
+                  key={`${surah}-${ayah}-w${i}`}
+                  glyph={glyph}
+                  fontFamily={fontFamily}
+                  fontPalette={fontPaletteStyle?.fontPalette ?? null}
+                  fontSize={fontSize}
+                  lineHeight={qcf2LineHeight}
+                  surah={surah}
+                  ayah={ayah}
+                  wordPos={wordPos}
+                  v2Page={v2Page}
+                  disabled={hideMode}
+                  highlightColor={
+                    highlightedWordPos === wordPos
+                      ? "#0d9488"
+                      : getWordHighlightColor(surah, ayah, wordPos)
+                  }
+                />
+              );
+            })}
             {/* Ayah end marker */}
             {wordTokens.marker && (
               <Text

@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Platform, Pressable, Text, View } from "react-native";
 import * as Clipboard from "expo-clipboard";
-import { Copy } from "lucide-react-native";
+import { Copy, Highlighter } from "lucide-react-native";
 import { useDatabase } from "@/lib/database/provider";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { useSettings, withThemeOpacity } from "@/lib/settings/context";
 import { useSelection } from "@/lib/selection/context";
+import { HIGHLIGHT_COLORS } from "@/lib/selection/types";
 import {
   fetchUthmaniWordsForSelection,
   type QuranSelectionWordRef,
@@ -21,8 +22,9 @@ type MenuState = {
 };
 
 const TOKEN_SELECTOR = "[data-hafiz-quran-token]";
-const MENU_WIDTH = 118;
-const MENU_HEIGHT = 44;
+const MENU_WIDTH = 246;
+const MENU_COLLAPSED_HEIGHT = 44;
+const MENU_EXPANDED_HEIGHT = 92;
 const VIEWPORT_GUTTER = 8;
 const SELECTION_STYLE_ID = "hafiz-quran-selection-style";
 
@@ -30,14 +32,20 @@ export function WebSelectionMenu() {
   const db = useDatabase();
   const s = useStrings();
   const { isDark, isRTL, themeSurface } = useSettings();
-  const { showToast } = useSelection();
+  const { showToast, addHighlightForRefs } = useSelection();
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [copyBusy, setCopyBusy] = useState(false);
+  const [highlightBusy, setHighlightBusy] = useState(false);
+  const [colorPickerOpen, setColorPickerOpen] = useState(false);
   const latestMenuRef = useRef<MenuState | null>(null);
 
   useEffect(() => {
     latestMenuRef.current = menu;
   }, [menu]);
+
+  useEffect(() => {
+    setColorPickerOpen(false);
+  }, [menu?.refsKey]);
 
   const buildCopyText = useCallback(
     async (refs: QuranSelectionWordRef[]) => {
@@ -81,14 +89,18 @@ export function WebSelectionMenu() {
     document.head.appendChild(style);
   }, []);
 
-  const positionForSelection = useCallback((selection: Selection, fallback?: { x: number; y: number }) => {
+  const positionForSelection = useCallback((
+    selection: Selection,
+    fallback?: { x: number; y: number },
+    menuHeight = MENU_COLLAPSED_HEIGHT,
+  ) => {
     const range = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
     const rect = range?.getBoundingClientRect();
     const rawX = rect && rect.width > 0 ? rect.left + rect.width / 2 : fallback?.x ?? 0;
-    const rawY = rect && rect.height > 0 ? rect.top - MENU_HEIGHT - 8 : (fallback?.y ?? 0) - MENU_HEIGHT - 8;
+    const rawY = rect && rect.height > 0 ? rect.top - menuHeight - 8 : (fallback?.y ?? 0) - menuHeight - 8;
     const belowY = rect && rect.height > 0 ? rect.bottom + 8 : (fallback?.y ?? 0) + 8;
     const maxX = Math.max(VIEWPORT_GUTTER, window.innerWidth - MENU_WIDTH - VIEWPORT_GUTTER);
-    const maxY = Math.max(VIEWPORT_GUTTER, window.innerHeight - MENU_HEIGHT - VIEWPORT_GUTTER);
+    const maxY = Math.max(VIEWPORT_GUTTER, window.innerHeight - menuHeight - VIEWPORT_GUTTER);
     const x = Math.min(Math.max(rawX - MENU_WIDTH / 2, VIEWPORT_GUTTER), maxX);
     const y = Math.min(Math.max(rawY < VIEWPORT_GUTTER ? belowY : rawY, VIEWPORT_GUTTER), maxY);
     return { x, y };
@@ -124,6 +136,8 @@ export function WebSelectionMenu() {
     if (Platform.OS !== "web") return;
 
     const handleMouseUp = (event: MouseEvent) => {
+      const target = event.target;
+      if (target instanceof Element && target.closest("[data-hafiz-selection-menu]")) return;
       window.setTimeout(() => {
         showForCurrentSelection({ x: event.clientX, y: event.clientY });
       }, 0);
@@ -213,10 +227,43 @@ export function WebSelectionMenu() {
     }
   }, [buildCopyText, copyBusy, menu, s.copied, s.copyFailed, showToast]);
 
+  const handleToggleColorPicker = useCallback(() => {
+    if (!menu || highlightBusy) return;
+    if (!colorPickerOpen) {
+      const selection = window.getSelection();
+      if (selection && !selection.isCollapsed && selection.rangeCount > 0) {
+        setMenu((current) => (
+          current ? { ...current, ...positionForSelection(selection, undefined, MENU_EXPANDED_HEIGHT) } : current
+        ));
+      }
+    }
+    setColorPickerOpen((open) => !open);
+  }, [colorPickerOpen, highlightBusy, menu, positionForSelection]);
+
+  const handleHighlight = useCallback(
+    async (color: string) => {
+      if (!menu || highlightBusy) return;
+      setHighlightBusy(true);
+      try {
+        await addHighlightForRefs(menu.refs, color);
+        window.getSelection()?.removeAllRanges();
+        setMenu(null);
+        showToast(s.highlightAdded);
+      } catch (e) {
+        console.warn("[WebSelectionMenu] Failed to highlight selected text:", e);
+        showToast(s.highlightActionFailed);
+      } finally {
+        setHighlightBusy(false);
+      }
+    },
+    [addHighlightForRefs, highlightBusy, menu, s.highlightActionFailed, s.highlightAdded, showToast],
+  );
+
   if (Platform.OS !== "web" || !menu) return null;
 
   const foreground = isDark ? "#f5f5f5" : "#2D2D2D";
   const border = isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)";
+  const buttonBackground = isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.045)";
   const menuRootProps = { dataSet: { hafizSelectionMenu: "true" } } as any;
   const menuButtonProps = { onMouseDown: (event: any) => event.preventDefault() } as any;
 
@@ -233,44 +280,125 @@ export function WebSelectionMenu() {
         zIndex: 1200,
       }}
     >
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={s.copy}
-        onPress={handleCopy}
-        disabled={copyBusy}
-        style={({ pressed }) => ({
+      <View
+        style={{
           position: "fixed" as any,
           left: menu.x,
           top: menu.y,
           width: MENU_WIDTH,
-          height: MENU_HEIGHT,
-          borderRadius: 14,
+          minHeight: colorPickerOpen ? MENU_EXPANDED_HEIGHT : MENU_COLLAPSED_HEIGHT,
+          borderRadius: 16,
           borderWidth: 1,
           borderColor: border,
           backgroundColor: withThemeOpacity(themeSurface, 0.98),
-          alignItems: "center",
-          justifyContent: "center",
-          flexDirection: isRTL ? "row-reverse" : "row",
-          gap: 8,
-          opacity: copyBusy ? 0.55 : pressed ? 0.78 : 1,
+          padding: 4,
           boxShadow: "0 14px 32px rgba(0, 0, 0, 0.18)",
           userSelect: "none",
-        } as any)}
-        {...menuButtonProps}
+        } as any}
       >
-        <Copy size={16} color={foreground} />
-        <Text
+        <View
           style={{
-            color: foreground,
-            fontFamily: "Manrope_600SemiBold",
-            fontSize: 13,
-            lineHeight: 18,
+            height: 36,
+            flexDirection: isRTL ? "row-reverse" : "row",
+            alignItems: "center",
+            gap: 4,
           }}
         >
-          {s.copy}
-        </Text>
-      </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={s.copy}
+            onPress={handleCopy}
+            disabled={copyBusy || highlightBusy}
+            style={({ pressed }) => ({
+              flex: 1,
+              height: 36,
+              borderRadius: 12,
+              alignItems: "center",
+              justifyContent: "center",
+              flexDirection: isRTL ? "row-reverse" : "row",
+              gap: 8,
+              opacity: copyBusy ? 0.55 : pressed ? 0.78 : 1,
+              backgroundColor: pressed ? buttonBackground : "transparent",
+            } as any)}
+            {...menuButtonProps}
+          >
+            <Copy size={16} color={foreground} />
+            <MenuLabel color={foreground}>{s.copy}</MenuLabel>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={s.highlight}
+            onPress={handleToggleColorPicker}
+            disabled={highlightBusy}
+            style={({ pressed }) => ({
+              flex: 1,
+              height: 36,
+              borderRadius: 12,
+              alignItems: "center",
+              justifyContent: "center",
+              flexDirection: isRTL ? "row-reverse" : "row",
+              gap: 8,
+              opacity: highlightBusy ? 0.55 : pressed || colorPickerOpen ? 0.86 : 1,
+              backgroundColor: pressed || colorPickerOpen ? buttonBackground : "transparent",
+            } as any)}
+            {...menuButtonProps}
+          >
+            <Highlighter size={16} color={foreground} />
+            <MenuLabel color={foreground}>{s.highlight}</MenuLabel>
+          </Pressable>
+        </View>
+
+        {colorPickerOpen && (
+          <View
+            style={{
+              flexDirection: isRTL ? "row-reverse" : "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 6,
+              paddingTop: 8,
+              paddingHorizontal: 6,
+            }}
+          >
+            {HIGHLIGHT_COLORS.map((color, index) => (
+              <Pressable
+                key={color}
+                accessibilityRole="button"
+                accessibilityLabel={`${s.highlight} ${index + 1}`}
+                onPress={() => handleHighlight(color)}
+                disabled={highlightBusy}
+                style={({ pressed }) => ({
+                  width: 24,
+                  height: 24,
+                  borderRadius: 12,
+                  backgroundColor: color,
+                  borderWidth: 2,
+                  borderColor: pressed ? foreground : withThemeOpacity(themeSurface, 0.98),
+                  opacity: highlightBusy ? 0.5 : pressed ? 0.78 : 1,
+                  boxShadow: isDark ? "0 0 0 1px rgba(255,255,255,0.12)" : "0 0 0 1px rgba(0,0,0,0.08)",
+                } as any)}
+                {...menuButtonProps}
+              />
+            ))}
+          </View>
+        )}
+      </View>
     </View>
+  );
+}
+
+function MenuLabel({ color, children }: { color: string; children: ReactNode }) {
+  return (
+    <Text
+      numberOfLines={1}
+      style={{
+        color,
+        fontFamily: "Manrope_600SemiBold",
+        fontSize: 13,
+        lineHeight: 18,
+      }}
+    >
+      {children}
+    </Text>
   );
 }
 
