@@ -41,6 +41,7 @@ export function ProfileIdentity({
         flexDirection: centered ? "column" : rowDirection,
         alignItems: centered ? "center" : "center",
         flex: centered ? undefined : 1,
+        direction: centered ? undefined : "ltr",
       }}
     >
       <ProfileAvatar avatarUrl={avatarUrl} name={displayName} size={avatarSize} isDark={isDark} />
