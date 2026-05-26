@@ -82,7 +82,6 @@ export function TafsirSourcePicker({
 
     const selection = onSelect(sourceId);
     if (needsDownload) {
-      onClose();
       void selection.then((selected) => {
         if (selected) refreshImportedSources().catch(console.warn);
       }).catch(console.warn);
