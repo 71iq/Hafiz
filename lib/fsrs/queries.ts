@@ -1351,7 +1351,17 @@ async function decorateDeckCardListItem(
         [parsed.surah, parsed.ayah, parsed.wordPos]
       ),
       db.getFirstAsync<{ word: string | null; meaning: string | null }>(
-        "SELECT word, meaning FROM word_meanings_ar WHERE surah = ? AND ayah = ? AND word_pos = ?",
+        `SELECT
+           COALESCE(NULLIF(base.word, ''), custom.word) AS word,
+           CASE
+             WHEN base.meaning IS NOT NULL AND TRIM(base.meaning) != '' THEN base.meaning
+             ELSE custom.meaning
+           END AS meaning
+         FROM (SELECT ? AS surah, ? AS ayah, ? AS word_pos) key
+         LEFT JOIN word_meanings_ar base
+           ON base.surah = key.surah AND base.ayah = key.ayah AND base.word_pos = key.word_pos
+         LEFT JOIN user_word_meanings custom
+           ON custom.surah = key.surah AND custom.ayah = key.ayah AND custom.word_pos = key.word_pos`,
         [parsed.surah, parsed.ayah, parsed.wordPos]
       ),
       db.getFirstAsync<{ arabic_word: string | null }>(

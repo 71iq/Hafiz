@@ -8,6 +8,7 @@ import {
   fetchWordMeaningAr,
 } from "@/lib/word/queries";
 import { useSettings } from "@/lib/settings/context";
+import { useStrings } from "@/lib/i18n/useStrings";
 
 const TOOLTIP_HEIGHT = 36;
 const ARROW_SIZE = 6;
@@ -104,6 +105,7 @@ export function FloatingWordTooltip() {
   const { tooltipWord, tooltipPosition, openDetail, cancelTooltipClear, clearTooltipDelayed } = useWordInteraction();
   const db = useDatabase();
   const { uiLanguage } = useSettings();
+  const s = useStrings();
   const [translation, setTranslation] = useState<string | null>(null);
 
   useEffect(() => {
@@ -112,22 +114,20 @@ export function FloatingWordTooltip() {
     const { surah, ayah, wordPos } = tooltipWord;
     if (uiLanguage === "ar") {
       fetchWordMeaningAr(db, surah, ayah, wordPos)
-        .then(async (row) => {
+        .then((row) => {
           if (row?.meaning) {
             setTranslation(row.meaning);
             return;
           }
-          // Fall back to English translation if no Arabic meaning is recorded
-          const en = await fetchWordTranslation(db, surah, ayah, wordPos);
-          setTranslation(en?.translation_en ?? "—");
+          setTranslation(s.noWordMeaningFallback);
         })
-        .catch(() => setTranslation("—"));
+        .catch(() => setTranslation(s.noWordMeaningFallback));
     } else {
       fetchWordTranslation(db, surah, ayah, wordPos).then(
         (row) => setTranslation(row?.translation_en ?? "—")
       );
     }
-  }, [db, tooltipWord?.surah, tooltipWord?.ayah, tooltipWord?.wordPos, uiLanguage]);
+  }, [db, s.noWordMeaningFallback, tooltipWord?.surah, tooltipWord?.ayah, tooltipWord?.wordPos, uiLanguage]);
 
   if (!tooltipWord || !tooltipPosition || Platform.OS !== "web") return null;
   if (typeof document === "undefined") return null;

@@ -384,7 +384,7 @@ function FlashcardSessionScreen() {
           if (cancelled) return;
 
           const wordMeaningAr = isWordCard && wordPos
-            ? (wordMeaningArRow?.meaning ?? null)
+            ? (wordMeaningArRow?.meaning?.trim() || s.noWordMeaningFallback)
             : null;
           const wordText = isWordCard && wordPos
             ? (canonicalWordText ?? wordTranslation?.word_arabic ?? null)
@@ -458,6 +458,7 @@ function FlashcardSessionScreen() {
     s.smartDeckQiraatTitle,
     s.smartDeckReasonsTitle,
     s.genericActionFailed,
+    s.noWordMeaningFallback,
   ]);
 
   const currentCard = cards[currentIndex] ?? null;

@@ -116,6 +116,21 @@ CREATE TABLE IF NOT EXISTS user_settings (
   PRIMARY KEY (user_id, key)
 );
 
+-- ─── User Word Meanings (custom vocabulary meaning overrides) ─
+CREATE TABLE IF NOT EXISTS user_word_meanings (
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  surah INTEGER NOT NULL,
+  ayah INTEGER NOT NULL,
+  word_pos INTEGER NOT NULL,
+  word TEXT,
+  meaning TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  deleted_at TIMESTAMPTZ,
+  synced_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, surah, ayah, word_pos)
+);
+
 -- ============================================================
 -- Row Level Security (RLS) Policies
 -- ============================================================
@@ -128,6 +143,7 @@ ALTER TABLE study_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE bookmarks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE highlights ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_word_meanings ENABLE ROW LEVEL SECURITY;
 
 -- ─── Profiles: publicly readable (for leaderboard), writable only by owner
 CREATE POLICY "Profiles are publicly readable"
@@ -209,6 +225,24 @@ CREATE POLICY "Users can update own user settings"
 
 CREATE POLICY "Users can delete own user settings"
   ON user_settings FOR DELETE
+  USING (auth.uid() = user_id);
+
+-- ─── User Word Meanings: owner only
+CREATE POLICY "Users can read own user word meanings"
+  ON user_word_meanings FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own user word meanings"
+  ON user_word_meanings FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own user word meanings"
+  ON user_word_meanings FOR UPDATE
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own user word meanings"
+  ON user_word_meanings FOR DELETE
   USING (auth.uid() = user_id);
 
 -- ─── Reflections (Community Feature) ────────────────────────
@@ -470,6 +504,7 @@ CREATE POLICY "Users can delete own public surah progress"
 GRANT SELECT ON public_surah_progress TO anon, authenticated;
 GRANT INSERT, UPDATE, DELETE ON public_surah_progress TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON user_settings TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON user_word_meanings TO authenticated;
 
 -- ─── Storage: profile avatars ────────────────────────────────
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
@@ -573,6 +608,7 @@ CREATE INDEX IF NOT EXISTS idx_highlights_user ON highlights(user_id);
 CREATE INDEX IF NOT EXISTS idx_highlights_user_synced ON highlights(user_id, synced_at);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_highlights_user_sync_id ON highlights(user_id, sync_id);
 CREATE INDEX IF NOT EXISTS idx_user_settings_user_synced ON user_settings(user_id, synced_at);
+CREATE INDEX IF NOT EXISTS idx_user_word_meanings_user_synced ON user_word_meanings(user_id, synced_at);
 CREATE INDEX IF NOT EXISTS idx_reflections_ayah ON reflections(surah, ayah_start, ayah_end);
 CREATE INDEX IF NOT EXISTS idx_reflections_user ON reflections(user_id);
 CREATE INDEX IF NOT EXISTS idx_reflections_feed_created ON reflections(status, created_at DESC);

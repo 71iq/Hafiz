@@ -304,6 +304,18 @@ export async function createSchema(db: SQLiteDatabase): Promise<void> {
       UNIQUE (surah, ayah, word_pos)
     );
 
+    -- User-supplied word meanings for bundled gaps
+    CREATE TABLE IF NOT EXISTS user_word_meanings (
+      surah INTEGER NOT NULL,
+      ayah INTEGER NOT NULL,
+      word_pos INTEGER NOT NULL,
+      word TEXT,
+      meaning TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (surah, ayah, word_pos)
+    );
+
     -- ============================================================
     -- USER DATA TABLES (read/write, synced)
     -- ============================================================
@@ -505,6 +517,19 @@ export async function createSchema(db: SQLiteDatabase): Promise<void> {
 export async function migrateUserSchema(db: SQLiteDatabase): Promise<void> {
   const legacyDate = "1970-01-01T00:00:00.000Z";
 
+  await db.execAsync(`
+    CREATE TABLE IF NOT EXISTS user_word_meanings (
+      surah INTEGER NOT NULL,
+      ayah INTEGER NOT NULL,
+      word_pos INTEGER NOT NULL,
+      word TEXT,
+      meaning TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (surah, ayah, word_pos)
+    );
+  `);
+
   await addColumnIfMissing(db, "study_cards", "created_at", `created_at TEXT NOT NULL DEFAULT '${legacyDate}'`);
   await addColumnIfMissing(db, "study_cards", "updated_at", `updated_at TEXT NOT NULL DEFAULT '${legacyDate}'`);
   await addColumnIfMissing(db, "study_cards", "suspended_at", "suspended_at TEXT");
@@ -590,6 +615,7 @@ async function createUserMigrationIndexes(db: SQLiteDatabase): Promise<void> {
     "CREATE INDEX IF NOT EXISTS idx_reflection_journey_entries_updated ON reflection_journey_entries(updated_at)",
     "CREATE INDEX IF NOT EXISTS idx_reflection_journey_entries_completed ON reflection_journey_entries(completed_at)",
     "CREATE INDEX IF NOT EXISTS idx_user_settings_updated ON user_settings(updated_at)",
+    "CREATE INDEX IF NOT EXISTS idx_user_word_meanings_updated ON user_word_meanings(updated_at)",
   ];
 
   for (const statement of statements) {

@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, View, Text, Pressable } from "react-native";
-import { BookmarkPlus, Check } from "lucide-react-native";
+import { ActivityIndicator, View, Text, Pressable, TextInput } from "react-native";
+import { BookmarkPlus, Check, Save } from "lucide-react-native";
 import { useDatabase } from "@/lib/database/provider";
 import {
   fetchWordTranslation,
   fetchWordMeaningAr,
+  upsertUserWordMeaning,
   type WordMeaningArRow,
 } from "@/lib/word/queries";
 import { useSettings } from "@/lib/settings/context";
@@ -26,11 +27,15 @@ type EnglishMeaning = {
 export function MeaningTab({ surah, ayah, wordPos }: Props) {
   const db = useDatabase();
   const s = useStrings();
-  const { uiLanguage, isRTL } = useSettings();
+  const { uiLanguage, isRTL, isDark } = useSettings();
   const isArabicMode = uiLanguage === "ar";
 
   const [enData, setEnData] = useState<EnglishMeaning | null>(null);
   const [arMeaning, setArMeaning] = useState<WordMeaningArRow | null>(null);
+  const [wordArabic, setWordArabic] = useState<string | null>(null);
+  const [customMeaningDraft, setCustomMeaningDraft] = useState("");
+  const [customMeaningSaving, setCustomMeaningSaving] = useState(false);
+  const [customMeaningError, setCustomMeaningError] = useState(false);
   const [loading, setLoading] = useState(true);
   const [savedToVocab, setSavedToVocab] = useState(false);
   const [savingToVocab, setSavingToVocab] = useState(false);
@@ -68,23 +73,68 @@ export function MeaningTab({ surah, ayah, wordPos }: Props) {
   };
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
+    setCustomMeaningDraft("");
+    setCustomMeaningSaving(false);
+    setCustomMeaningError(false);
+    setArMeaning(null);
+    setEnData(null);
+    setWordArabic(null);
     if (isArabicMode) {
-      fetchWordMeaningAr(db, surah, ayah, wordPos)
-        .then(setArMeaning)
-        .finally(() => setLoading(false));
+      Promise.all([
+        fetchWordMeaningAr(db, surah, ayah, wordPos),
+        fetchWordTranslation(db, surah, ayah, wordPos),
+      ])
+        .then(([meaning, translation]) => {
+          if (cancelled) return;
+          setArMeaning(meaning);
+          setWordArabic(meaning?.word ?? translation?.word_arabic ?? null);
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
     } else {
       fetchWordTranslation(db, surah, ayah, wordPos)
         .then((wt) => {
+          if (cancelled) return;
           setEnData({
             wordArabic: wt?.word_arabic ?? null,
             translationEn: wt?.translation_en ?? null,
             transliteration: wt?.transliteration ?? null,
           });
         })
-        .finally(() => setLoading(false));
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
     }
+    return () => {
+      cancelled = true;
+    };
   }, [db, surah, ayah, wordPos, isArabicMode]);
+
+  const saveCustomMeaning = async () => {
+    const meaning = customMeaningDraft.trim();
+    if (!meaning || customMeaningSaving) return;
+    setCustomMeaningSaving(true);
+    setCustomMeaningError(false);
+    try {
+      await upsertUserWordMeaning(db, {
+        surah,
+        ayah,
+        wordPos,
+        word: wordArabic,
+        meaning,
+      });
+      setArMeaning({ surah, ayah, word_pos: wordPos, word: wordArabic, meaning });
+      setCustomMeaningDraft("");
+    } catch (e) {
+      console.warn("[MeaningTab] saveCustomMeaning failed:", e);
+      setCustomMeaningError(true);
+    } finally {
+      setCustomMeaningSaving(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -97,13 +147,45 @@ export function MeaningTab({ surah, ayah, wordPos }: Props) {
   if (isArabicMode) {
     if (!arMeaning?.meaning) {
       return (
-        <View className="py-6 items-center">
+        <View className="py-4 px-1">
+          {wordArabic && (
+            <Text
+              className="text-2xl text-charcoal dark:text-neutral-100 mb-3"
+              style={{ writingDirection: "rtl", textAlign: "right", fontWeight: "600" }}
+            >
+              {wordArabic}
+            </Text>
+          )}
           <Text
-            className="text-warm-400 dark:text-neutral-500 text-sm"
-            style={{ writingDirection: "rtl" }}
+            className="text-warm-500 dark:text-neutral-400 text-sm"
+            style={{ writingDirection: "rtl", textAlign: "right", fontFamily: "Manrope_500Medium", lineHeight: 22 }}
           >
-            {s.noArabicMeaning}
+            {s.noWordMeaningFallback}
           </Text>
+          <TextInput
+            value={customMeaningDraft}
+            onChangeText={setCustomMeaningDraft}
+            placeholder={s.customWordMeaningPlaceholder}
+            placeholderTextColor={isDark ? "#737373" : "#b9a085"}
+            multiline
+            className="mt-4 min-h-[92px] rounded-2xl bg-surface dark:bg-surface-dark px-4 py-3 text-charcoal dark:text-neutral-100"
+            style={{
+              fontFamily: "Manrope_400Regular",
+              fontSize: 15,
+              lineHeight: 24,
+              textAlign: "right",
+              textAlignVertical: "top",
+              writingDirection: "rtl",
+            }}
+          />
+          <CustomMeaningButton
+            saving={customMeaningSaving}
+            disabled={!customMeaningDraft.trim()}
+            onPress={saveCustomMeaning}
+            label={customMeaningSaving ? s.customWordMeaningSaving : s.saveCustomWordMeaning}
+            isRTL={isRTL}
+          />
+          {customMeaningError && <SaveErrorText isRTL={isRTL} label={s.customWordMeaningFailed} />}
         </View>
       );
     }
@@ -181,6 +263,41 @@ export function MeaningTab({ surah, ayah, wordPos }: Props) {
       />
       {saveError && <SaveErrorText isRTL={isRTL} label={s.addToVocabFailed} />}
     </View>
+  );
+}
+
+function CustomMeaningButton({
+  saving,
+  disabled,
+  onPress,
+  label,
+  isRTL,
+}: {
+  saving: boolean;
+  disabled: boolean;
+  onPress: () => void;
+  label: string;
+  isRTL: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled || saving}
+      className={`mt-3 items-center gap-2 rounded-full px-4 py-2 ${isRTL ? "self-end flex-row-reverse" : "self-start flex-row"} bg-primary-accent dark:bg-primary-bright`}
+      style={({ pressed }) => ({
+        transform: [{ scale: pressed ? 0.98 : 1 }],
+        opacity: disabled ? 0.45 : saving ? 0.7 : 1,
+      })}
+    >
+      {saving ? (
+        <ActivityIndicator size="small" color="#FFFFFF" />
+      ) : (
+        <Save size={14} color="#FFFFFF" />
+      )}
+      <Text className="text-white" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}>
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 

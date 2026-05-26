@@ -205,8 +205,8 @@ export default function VocabSessionScreen() {
                   }}
                 >
                   {(uiLanguage === "ar"
-                    ? card?.meaning_ar ?? card?.meaning_en
-                    : card?.meaning_en ?? card?.meaning_ar) ?? "—"}
+                    ? card?.meaning_ar ?? s.noWordMeaningFallback
+                    : card?.meaning_en ?? card?.meaning_ar ?? s.noWordMeaningFallback)}
                 </Text>
               ) : (
                 <Pressable

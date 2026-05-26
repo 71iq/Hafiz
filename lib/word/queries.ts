@@ -1,5 +1,6 @@
 import type { SQLiteDatabase } from "expo-sqlite";
 import { normalizeArabicWord } from "@/lib/arabic";
+import { enqueueSync } from "@/lib/database/sync-queue";
 
 export type WordTranslationRow = {
   word_arabic: string | null;
@@ -196,9 +197,58 @@ export async function fetchWordMeaningsArForAyah(
   ayah: number,
 ): Promise<WordMeaningArRow[]> {
   return db.getAllAsync<WordMeaningArRow>(
-    "SELECT surah, ayah, word_pos, word, meaning FROM word_meanings_ar WHERE surah = ? AND ayah = ? ORDER BY word_pos",
-    [surah, ayah],
+    `WITH meaning_keys AS (
+       SELECT surah, ayah, word_pos FROM word_meanings_ar WHERE surah = ? AND ayah = ?
+       UNION
+       SELECT surah, ayah, word_pos FROM user_word_meanings WHERE surah = ? AND ayah = ?
+     )
+     SELECT
+       k.surah,
+       k.ayah,
+       k.word_pos,
+       COALESCE(NULLIF(base.word, ''), custom.word) AS word,
+       CASE
+         WHEN base.meaning IS NOT NULL AND TRIM(base.meaning) != '' THEN base.meaning
+         ELSE custom.meaning
+       END AS meaning
+     FROM meaning_keys k
+     LEFT JOIN word_meanings_ar base
+       ON base.surah = k.surah AND base.ayah = k.ayah AND base.word_pos = k.word_pos
+     LEFT JOIN user_word_meanings custom
+       ON custom.surah = k.surah AND custom.ayah = k.ayah AND custom.word_pos = k.word_pos
+     ORDER BY k.word_pos`,
+    [surah, ayah, surah, ayah],
   );
+}
+
+export async function upsertUserWordMeaning(
+  db: SQLiteDatabase,
+  params: {
+    surah: number;
+    ayah: number;
+    wordPos: number;
+    word: string | null;
+    meaning: string;
+  }
+): Promise<void> {
+  const now = new Date().toISOString();
+  await db.runAsync(
+    `INSERT INTO user_word_meanings
+       (surah, ayah, word_pos, word, meaning, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(surah, ayah, word_pos) DO UPDATE SET
+       word = COALESCE(excluded.word, user_word_meanings.word),
+       meaning = excluded.meaning,
+       updated_at = excluded.updated_at`,
+    [params.surah, params.ayah, params.wordPos, params.word, params.meaning, now, now],
+  );
+  const row = await db.getFirstAsync<Record<string, any>>(
+    "SELECT surah, ayah, word_pos, word, meaning, created_at, updated_at FROM user_word_meanings WHERE surah = ? AND ayah = ? AND word_pos = ?",
+    [params.surah, params.ayah, params.wordPos],
+  );
+  if (row) {
+    enqueueSync(db, "user_word_meanings", "UPDATE", `${params.surah}:${params.ayah}:${params.wordPos}`, row).catch(console.warn);
+  }
 }
 
 export async function fetchWordMeaningAr(
@@ -208,7 +258,20 @@ export async function fetchWordMeaningAr(
   wordPos: number,
 ): Promise<WordMeaningArRow | null> {
   return db.getFirstAsync<WordMeaningArRow>(
-    "SELECT surah, ayah, word_pos, word, meaning FROM word_meanings_ar WHERE surah = ? AND ayah = ? AND word_pos = ?",
+    `SELECT
+       key.surah,
+       key.ayah,
+       key.word_pos,
+       COALESCE(NULLIF(base.word, ''), custom.word) AS word,
+       CASE
+         WHEN base.meaning IS NOT NULL AND TRIM(base.meaning) != '' THEN base.meaning
+         ELSE custom.meaning
+       END AS meaning
+     FROM (SELECT ? AS surah, ? AS ayah, ? AS word_pos) key
+     LEFT JOIN word_meanings_ar base
+       ON base.surah = key.surah AND base.ayah = key.ayah AND base.word_pos = key.word_pos
+     LEFT JOIN user_word_meanings custom
+       ON custom.surah = key.surah AND custom.ayah = key.ayah AND custom.word_pos = key.word_pos`,
     [surah, ayah, wordPos],
   );
 }

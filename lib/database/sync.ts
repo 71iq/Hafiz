@@ -88,6 +88,13 @@ export async function pullRemoteChanges(db: SQLiteDatabase): Promise<number> {
     // Pull syncable deck/review settings before cards so decks exist when rows arrive.
     totalPulled += await pullTable(db, "user_settings", user.id, lastPullAt, upsertUserSetting);
 
+    // Pull user-supplied word meanings before cards so vocabulary previews resolve.
+    try {
+      totalPulled += await pullTable(db, "user_word_meanings", user.id, lastPullAt, upsertUserWordMeaning);
+    } catch (err: any) {
+      console.warn("[Sync] Pull user_word_meanings skipped:", err.message);
+    }
+
     // Pull study_cards
     totalPulled += await pullTable(db, "study_cards", user.id, lastPullAt, upsertStudyCard);
 
@@ -175,6 +182,9 @@ async function pushUpsert(
     case "user_settings":
       onConflict = "user_id,key";
       break;
+    case "user_word_meanings":
+      onConflict = "user_id,surah,ayah,word_pos";
+      break;
     case "study_cards":
       onConflict = "user_id,id";
       break;
@@ -235,7 +245,7 @@ function normalizeRemoteRow(tableName: string, row: Record<string, any>): Record
     delete row.id;
   }
 
-  if (tableName === "study_cards" || tableName === "highlights" || tableName === "user_settings") {
+  if (tableName === "study_cards" || tableName === "highlights" || tableName === "user_settings" || tableName === "user_word_meanings") {
     row.deleted_at = row.deleted_at ?? null;
   }
 
@@ -267,6 +277,9 @@ async function remoteIsNewer(
   switch (tableName) {
     case "user_settings":
       query = query.eq("key", row.key);
+      break;
+    case "user_word_meanings":
+      query = query.eq("surah", row.surah).eq("ayah", row.ayah).eq("word_pos", row.word_pos);
       break;
     case "study_cards":
       query = query.eq("id", row.id);
@@ -314,6 +327,14 @@ async function pushDelete(
     }, userId);
     return;
   }
+  if (tableName === "user_word_meanings" && data.surah && data.ayah && data.word_pos) {
+    await pushUpsert(tableName, {
+      ...data,
+      updated_at: data.updated_at ?? deletedAt,
+      deleted_at: deletedAt,
+    }, userId);
+    return;
+  }
   if (tableName === "study_cards" && data.deck_id) {
     await pushUpsert(tableName, {
       ...data,
@@ -355,6 +376,11 @@ async function pushDelete(
     case "user_settings":
       query = query.eq("key", rowId);
       break;
+    case "user_word_meanings": {
+      const [surah, ayah, wordPos] = rowId.split(":").map(Number);
+      query = query.eq("surah", surah).eq("ayah", ayah).eq("word_pos", wordPos);
+      break;
+    }
     case "private_notes":
       query = query.eq("id", rowId);
       break;
@@ -429,6 +455,38 @@ async function upsertUserSetting(db: SQLiteDatabase, row: any): Promise<void> {
   await db.runAsync(
     "INSERT OR REPLACE INTO user_settings (key, value, updated_at, deleted_at) VALUES (?, ?, ?, NULL)",
     [row.key, row.value, remoteUpdatedAt ?? new Date().toISOString()]
+  );
+}
+
+async function upsertUserWordMeaning(db: SQLiteDatabase, row: any): Promise<void> {
+  const remoteUpdatedAt = row.updated_at ?? row.created_at ?? row.synced_at;
+  const local = await db.getFirstAsync<{ updated_at: string | null }>(
+    "SELECT updated_at FROM user_word_meanings WHERE surah = ? AND ayah = ? AND word_pos = ?",
+    [row.surah, row.ayah, row.word_pos]
+  );
+  if (local?.updated_at && remoteUpdatedAt && local.updated_at >= remoteUpdatedAt) return;
+
+  if (row.deleted_at) {
+    await db.runAsync(
+      "DELETE FROM user_word_meanings WHERE surah = ? AND ayah = ? AND word_pos = ?",
+      [row.surah, row.ayah, row.word_pos]
+    );
+    return;
+  }
+
+  await db.runAsync(
+    `INSERT OR REPLACE INTO user_word_meanings
+     (surah, ayah, word_pos, word, meaning, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [
+      row.surah,
+      row.ayah,
+      row.word_pos,
+      row.word ?? null,
+      row.meaning,
+      row.created_at ?? remoteUpdatedAt ?? new Date().toISOString(),
+      remoteUpdatedAt ?? new Date().toISOString(),
+    ]
   );
 }
 
@@ -653,6 +711,7 @@ async function enqueueInitialLocalDataForSync(db: SQLiteDatabase, userId: string
     privateNotes,
     journeyEntries,
     achievements,
+    userWordMeanings,
   ] = await Promise.all([
     db.getAllAsync<{ key: string; value: string; updated_at: string | null; deleted_at: string | null }>(
       "SELECT key, value, updated_at, deleted_at FROM user_settings"
@@ -667,6 +726,7 @@ async function enqueueInitialLocalDataForSync(db: SQLiteDatabase, userId: string
     db.getAllAsync<Record<string, any>>("SELECT * FROM private_notes"),
     db.getAllAsync<Record<string, any>>("SELECT * FROM reflection_journey_entries"),
     db.getAllAsync<Record<string, any>>("SELECT achievement_id, unlocked_at, public_payload FROM achievement_unlocks"),
+    db.getAllAsync<Record<string, any>>("SELECT surah, ayah, word_pos, word, meaning, created_at, updated_at FROM user_word_meanings"),
   ]);
 
   const enqueueBackfill = async (
@@ -681,6 +741,9 @@ async function enqueueInitialLocalDataForSync(db: SQLiteDatabase, userId: string
   for (const row of settings) {
     if (!isSyncableUserSetting(row.key)) continue;
     await enqueueBackfill("user_settings", "UPDATE", row.key, userSettingToSyncData(row));
+  }
+  for (const row of userWordMeanings) {
+    await enqueueBackfill("user_word_meanings", "UPDATE", `${row.surah}:${row.ayah}:${row.word_pos}`, row);
   }
   for (const row of cards) {
     await enqueueBackfill("study_cards", "UPDATE", row.id, row);
