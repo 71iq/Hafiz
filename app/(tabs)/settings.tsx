@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, type ReactNode } from "react";
 import { View, Text, Pressable, ActivityIndicator, Linking, useWindowDimensions } from "react-native";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -44,7 +44,7 @@ import {
 import { ZaytPreviewModal } from "@/components/zayt/ZaytPreviewModal";
 import { ProfileIdentity } from "@/components/profile/ProfileIdentity";
 
-type SettingsCategoryId = "general" | "reading" | "content" | "account" | "about" | "advanced";
+type SettingsCategoryId = "general" | "content" | "account" | "about" | "advanced";
 
 type SettingsCategory = {
   id: SettingsCategoryId;
@@ -294,7 +294,6 @@ export default function SettingsScreen() {
 
   const settingsCategories: SettingsCategory[] = [
     { id: "general", title: s.settingsCategoryGeneral, icon: SlidersHorizontal },
-    { id: "reading", title: s.settingsCategoryReading, icon: BookOpen },
     { id: "content", title: s.settingsCategoryContent, icon: FileText },
     { id: "account", title: s.settingsCategoryAccount, icon: User },
     { id: "about", title: s.settingsCategoryAbout, icon: Info },
@@ -570,46 +569,46 @@ export default function SettingsScreen() {
             )}
           </Card>
 
-        </>
-      )}
-
-      {activeCategory === "reading" && (
-        <>
           <SectionLabel>{s.sectionReading}</SectionLabel>
-          <Card elevation="low" className="p-5 mb-8">
-            <Text
-              className="text-charcoal dark:text-neutral-200 mb-3"
-              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15 }}
+          <Card elevation="low" className="p-4 mb-8">
+            <SettingsControlRow label={s.mushafViewModeLabel} isRTL={isRTL}>
+              <ToggleGroup<ViewMode>
+                value={viewMode}
+                onValueChange={setViewMode}
+                items={[
+                  { value: "verse", label: s.mushafViewVerse },
+                  { value: "page", label: s.mushafViewPage },
+                ]}
+              />
+            </SettingsControlRow>
+
+            <View className="h-4" />
+
+            <View
+              className="items-center justify-between gap-3"
+              style={{ flexDirection: isRTL ? "row-reverse" : "row", flexWrap: "wrap" }}
             >
-              {s.mushafViewModeLabel}
-            </Text>
-            <ToggleGroup<ViewMode>
-              value={viewMode}
-              onValueChange={setViewMode}
-              items={[
-                { value: "verse", label: s.mushafViewVerse },
-                { value: "page", label: s.mushafViewPage },
-              ]}
-            />
-
-            <View className="h-5" />
-
-            <Text
-              className={`text-charcoal dark:text-neutral-200 ${fontSizeUsesFittedPageSize ? "mb-1" : "mb-4"}`}
-              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15 }}
-            >
-              {s.fontSizeLabel}
-            </Text>
-            {fontSizeUsesFittedPageSize && (
-              <Text
-                className="text-warm-400 dark:text-neutral-500 mb-4"
-                style={{ fontFamily: "Manrope_500Medium", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
-              >
-                {s.fontSizeFixedPageView}
-              </Text>
-            )}
-
-            <View className="mb-5" style={{ alignItems: isRTL ? "flex-end" : "flex-start" }}>
+              <View className="min-w-0 flex-1">
+                <Text
+                  className={`text-charcoal dark:text-neutral-200 ${fontSizeUsesFittedPageSize ? "mb-1" : ""}`}
+                  style={{
+                    fontFamily: "Manrope_600SemiBold",
+                    fontSize: 14,
+                    textAlign: isRTL ? "right" : "left",
+                    writingDirection: isRTL ? "rtl" : "ltr",
+                  }}
+                >
+                  {s.fontSizeLabel}
+                </Text>
+                {fontSizeUsesFittedPageSize && (
+                  <Text
+                    className="text-warm-400 dark:text-neutral-500"
+                    style={{ fontFamily: "Manrope_500Medium", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
+                  >
+                    {s.fontSizeFixedPageView}
+                  </Text>
+                )}
+              </View>
               <SettingsStepper
                 value={`${fontSizeLevelLabel}/${fontSizeTotalLabel}`}
                 onDecrement={() => setFontSizeIndex(fontSizeIndex - 1)}
@@ -621,12 +620,12 @@ export default function SettingsScreen() {
               />
             </View>
 
-            <View className="bg-surface dark:bg-surface-dark rounded-2xl p-5">
+            <View className="my-4 bg-surface dark:bg-surface-dark rounded-2xl px-4 py-3">
               <Text
                 className="text-charcoal dark:text-neutral-100 text-center"
                 style={{
                   fontSize,
-                  lineHeight: fontSize * 2.1,
+                  lineHeight: fontSize * 1.8,
                   writingDirection: "rtl",
                 }}
               >
@@ -634,23 +633,18 @@ export default function SettingsScreen() {
               </Text>
             </View>
 
-            <View className="h-5" />
-
-            <Text
-              className="text-charcoal dark:text-neutral-200 mb-3"
-              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15 }}
-            >
-              {s.pageScrollLabel}
-            </Text>
-            <ToggleGroup<PageScroll>
-              value={pageScroll}
-              onValueChange={setPageScroll}
-              items={[
-                { value: "vertical", label: s.pageScrollVertical },
-                { value: "horizontal", label: s.pageScrollHorizontal },
-              ]}
-            />
+            <SettingsControlRow label={s.pageScrollLabel} isRTL={isRTL}>
+              <ToggleGroup<PageScroll>
+                value={pageScroll}
+                onValueChange={setPageScroll}
+                items={[
+                  { value: "vertical", label: s.pageScrollVertical },
+                  { value: "horizontal", label: s.pageScrollHorizontal },
+                ]}
+              />
+            </SettingsControlRow>
           </Card>
+
         </>
       )}
 
@@ -1113,12 +1107,13 @@ export default function SettingsScreen() {
 function parseSettingsCategory(value: string | undefined): SettingsCategoryId | null {
   switch (value) {
     case "general":
-    case "reading":
     case "content":
     case "account":
     case "about":
     case "advanced":
       return value;
+    case "reading":
+      return "general";
     default:
       return null;
   }
@@ -1362,6 +1357,41 @@ function SettingsCategoryNav({
         })}
       </View>
     </Card>
+  );
+}
+
+function SettingsControlRow({
+  label,
+  isRTL,
+  children,
+}: {
+  label: string;
+  isRTL: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <View
+      className="items-center justify-between gap-3"
+      style={{ flexDirection: isRTL ? "row-reverse" : "row", flexWrap: "wrap" }}
+    >
+      <Text
+        className="text-charcoal dark:text-neutral-200"
+        style={{
+          flexGrow: 1,
+          flexShrink: 1,
+          fontFamily: "Manrope_600SemiBold",
+          fontSize: 14,
+          minWidth: 140,
+          textAlign: isRTL ? "right" : "left",
+          writingDirection: isRTL ? "rtl" : "ltr",
+        }}
+      >
+        {label}
+      </Text>
+      <View style={{ flexBasis: 320, flexGrow: 1, maxWidth: "100%", minWidth: 240 }}>
+        {children}
+      </View>
+    </View>
   );
 }
 

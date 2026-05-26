@@ -30,7 +30,6 @@ import {
 import {
   ArrowLeft,
   ArrowRight,
-  BookOpen,
   FileText,
   Info,
   PanelLeftOpen,
@@ -62,7 +61,6 @@ const SIDEBAR_PRIMARY_ROUTES = [
 const SIDEBAR_SETTINGS_ROUTE = "settings";
 const SETTINGS_CATEGORY_IDS = [
   "general",
-  "reading",
   "content",
   "account",
   "about",
@@ -73,7 +71,6 @@ type SettingsCategoryId = typeof SETTINGS_CATEGORY_IDS[number];
 
 const SETTINGS_CATEGORY_ICONS: Record<SettingsCategoryId, LucideIcon> = {
   general: SlidersHorizontal,
-  reading: BookOpen,
   content: FileText,
   account: User,
   about: Info,
@@ -371,7 +368,6 @@ function SettingsSidebarContent({
   const BackIcon = isRTL ? ArrowRight : ArrowLeft;
   const settingsCategories: Array<{ id: SettingsCategoryId; title: string; icon: LucideIcon }> = [
     { id: "general", title: s.settingsCategoryGeneral, icon: SETTINGS_CATEGORY_ICONS.general },
-    { id: "reading", title: s.settingsCategoryReading, icon: SETTINGS_CATEGORY_ICONS.reading },
     { id: "content", title: s.settingsCategoryContent, icon: SETTINGS_CATEGORY_ICONS.content },
     { id: "account", title: s.settingsCategoryAccount, icon: SETTINGS_CATEGORY_ICONS.account },
     { id: "about", title: s.settingsCategoryAbout, icon: SETTINGS_CATEGORY_ICONS.about },
