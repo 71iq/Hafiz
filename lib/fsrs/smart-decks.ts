@@ -30,6 +30,7 @@ export type SmartDeckId = (typeof SMART_DECK_IDS)[keyof typeof SMART_DECK_IDS];
 export type BuiltInDeckFilter =
   | { type: "all" }
   | { type: "surah"; surahs: number[] }
+  | { type: "surahRange"; surahStart: number; surahEnd: number }
   | { type: "juz"; juzNumbers: number[] };
 
 export type SmartCardKind = "mutashabihat" | "similarTail" | "qiraat" | "asbab";
@@ -156,16 +157,30 @@ export function smartDeckFilterKey(deckId: SmartDeckId): string {
 
 export function normalizeSmartDeckFilter(filter: unknown): BuiltInDeckFilter {
   if (!filter || typeof filter !== "object") return { type: "all" };
-  const raw = filter as Partial<BuiltInDeckFilter>;
+  const raw = filter as any;
   if (raw.type === "surah") {
-    const surahs = Array.isArray((raw as any).surahs)
-      ? normalizeNumbers((raw as any).surahs, 1, 114)
+    const surahs = Array.isArray(raw.surahs)
+      ? normalizeNumbers(raw.surahs, 1, 114)
       : [];
     return surahs.length > 0 ? { type: "surah", surahs } : { type: "all" };
   }
+  if (raw.type === "surahRange") {
+    const surahStart = Number(raw.surahStart);
+    const surahEnd = Number(raw.surahEnd);
+    if (
+      Number.isInteger(surahStart) &&
+      Number.isInteger(surahEnd) &&
+      surahStart >= 1 &&
+      surahEnd <= 114 &&
+      surahStart <= surahEnd
+    ) {
+      return { type: "surahRange", surahStart, surahEnd };
+    }
+    return { type: "all" };
+  }
   if (raw.type === "juz") {
-    const juzNumbers = Array.isArray((raw as any).juzNumbers)
-      ? normalizeNumbers((raw as any).juzNumbers, 1, 30)
+    const juzNumbers = Array.isArray(raw.juzNumbers)
+      ? normalizeNumbers(raw.juzNumbers, 1, 30)
       : [];
     return juzNumbers.length > 0 ? { type: "juz", juzNumbers } : { type: "all" };
   }
@@ -1111,6 +1126,10 @@ function buildFilterClause(alias: string, filter: BuiltInDeckFilter, params: any
   if (normalized.type === "surah") {
     params.push(...normalized.surahs);
     return `${alias}.surah IN (${normalized.surahs.map(() => "?").join(",")})`;
+  }
+  if (normalized.type === "surahRange") {
+    params.push(normalized.surahStart, normalized.surahEnd);
+    return `${alias}.surah BETWEEN ? AND ?`;
   }
   if (normalized.type === "juz") {
     params.push(...normalized.juzNumbers);

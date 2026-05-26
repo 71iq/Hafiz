@@ -202,6 +202,8 @@ export function generateDeckId(scope: DeckScope): string {
   switch (scope.type) {
     case "surah":
       return `surah-${scope.surahs.sort((a, b) => a - b).join(",")}`;
+    case "surahRange":
+      return `surah-range-${scope.surahStart}-${scope.surahEnd}`;
     case "juz":
       return `juz-${scope.juzNumbers.sort((a, b) => a - b).join(",")}`;
     case "hizb":
@@ -225,6 +227,12 @@ export async function resolveScope(
       return db.getAllAsync<AyahRef>(
         `SELECT surah, ayah FROM quran_text WHERE surah IN (${placeholders}) ORDER BY surah, ayah`,
         scope.surahs
+      );
+    }
+    case "surahRange": {
+      return db.getAllAsync<AyahRef>(
+        "SELECT surah, ayah FROM quran_text WHERE surah BETWEEN ? AND ? ORDER BY surah, ayah",
+        [scope.surahStart, scope.surahEnd]
       );
     }
     case "juz": {

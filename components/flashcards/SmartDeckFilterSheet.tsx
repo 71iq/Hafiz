@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View, useWindowDimensions } from "react-native";
 import { Check } from "lucide-react-native";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -70,6 +70,8 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
   const [filterType, setFilterType] = useState<FilterType>("all");
   const [selectedSurahs, setSelectedSurahs] = useState<Set<number>>(new Set());
   const [selectedJuz, setSelectedJuz] = useState<Set<number>>(new Set());
+  const [surahRangeFrom, setSurahRangeFrom] = useState("1");
+  const [surahRangeTo, setSurahRangeTo] = useState("114");
   const [surahs, setSurahs] = useState<SurahRow[]>([]);
   const [dailyLimit, setDailyLimit] = useState(DEFAULT_DECK_DAILY_REVIEW_LIMIT);
   const [newCardsLimit, setNewCardsLimit] = useState(DEFAULT_DECK_NEW_CARD_LIMIT);
@@ -101,6 +103,8 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
       setFilterType(filter.type);
       setSelectedSurahs(new Set(filter.type === "surah" ? filter.surahs : []));
       setSelectedJuz(new Set(filter.type === "juz" ? filter.juzNumbers : []));
+      setSurahRangeFrom(filter.type === "surahRange" ? String(filter.surahStart) : "1");
+      setSurahRangeTo(filter.type === "surahRange" ? String(filter.surahEnd) : "114");
       setDailyLimit(settings.dailyReviewLimit);
       setNewCardsLimit(settings.newCardsLimit);
       setRequestRetention(settings.requestRetention);
@@ -169,9 +173,20 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
     setMaximumInterval(Math.max(MIN_DECK_MAXIMUM_INTERVAL, Math.min(MAX_DECK_MAXIMUM_INTERVAL, value)));
   }, []);
 
+  const getSurahRangeFilter = (): BuiltInDeckFilter | null => {
+    const surahStart = Number(surahRangeFrom);
+    const surahEnd = Number(surahRangeTo);
+    if (![surahStart, surahEnd].every(Number.isInteger)) return null;
+    if (!surahs.some((row) => row.number === surahStart)) return null;
+    if (!surahs.some((row) => row.number === surahEnd)) return null;
+    if (surahEnd < surahStart) return null;
+    return { type: "surahRange", surahStart, surahEnd };
+  };
+
   const canSave = () => {
     if (!deckId) return false;
     if (filterType === "surah") return selectedSurahs.size > 0;
+    if (filterType === "surahRange") return getSurahRangeFilter() !== null;
     if (filterType === "juz") return selectedJuz.size > 0;
     return true;
   };
@@ -180,13 +195,14 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
     if (!deckId || saving) return;
     setError(null);
     if (!canSave()) {
-      setError(s.deckSelectionRequired);
+      setError(filterType === "surahRange" ? s.deckRangeInvalid : s.deckSelectionRequired);
       return;
     }
     setSaving(true);
     try {
       let filter: BuiltInDeckFilter = { type: "all" };
       if (filterType === "surah") filter = { type: "surah", surahs: [...selectedSurahs] };
+      if (filterType === "surahRange") filter = getSurahRangeFilter()!;
       if (filterType === "juz") filter = { type: "juz", juzNumbers: [...selectedJuz] };
       await writeSmartDeckFilter(db, deckId, filter);
       await writeDeckReviewSettings(db, deckId, {
@@ -220,6 +236,7 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
   const tabs: { value: FilterType; label: string }[] = [
     { value: "all", label: s.smartDeckFilterAll },
     { value: "surah", label: s.flashcardsScopeBysurah },
+    { value: "surahRange", label: s.flashcardsScopeSurahRange },
     { value: "juz", label: s.flashcardsScopeByjuz },
   ];
 
@@ -314,6 +331,30 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
                 />
               ))}
             </View>
+          )}
+
+          {filterType === "surahRange" && (
+            <Card elevation="low" className="p-5">
+              <View
+                className="gap-3"
+                style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
+              >
+                <RangeInput
+                  label={`${s.flashcardsFrom} ${s.tabSurah}`}
+                  value={surahRangeFrom}
+                  onChangeText={(v) => { setError(null); setSurahRangeFrom(v); }}
+                  isDark={isDark}
+                  isRTL={isRTL}
+                />
+                <RangeInput
+                  label={`${s.flashcardsTo} ${s.tabSurah}`}
+                  value={surahRangeTo}
+                  onChangeText={(v) => { setError(null); setSurahRangeTo(v); }}
+                  isDark={isDark}
+                  isRTL={isRTL}
+                />
+              </View>
+            </Card>
           )}
 
           {filterType === "juz" && (
@@ -476,6 +517,47 @@ function SurahFilterItem({
         {surah.name_arabic}
       </Text>
     </Pressable>
+  );
+}
+
+function RangeInput({
+  label,
+  value,
+  onChangeText,
+  isDark,
+  isRTL,
+}: {
+  label: string;
+  value: string;
+  onChangeText: (text: string) => void;
+  isDark: boolean;
+  isRTL: boolean;
+}) {
+  return (
+    <View className="flex-1">
+      <Text
+        className="text-warm-400 dark:text-neutral-500 mb-1"
+        style={{
+          fontFamily: "Manrope_400Regular",
+          fontSize: 11,
+          textAlign: isRTL ? "right" : "left",
+        }}
+      >
+        {label}
+      </Text>
+      <TextInput
+        value={value}
+        onChangeText={onChangeText}
+        keyboardType="number-pad"
+        className="bg-surface-high dark:bg-surface-dark-high rounded-xl px-4 py-3 text-charcoal dark:text-neutral-200"
+        style={{
+          fontFamily: "Manrope_500Medium",
+          fontSize: 15,
+          textAlign: isRTL ? "right" : "left",
+        }}
+        placeholderTextColor={isDark ? "#525252" : "#DFD9D1"}
+      />
+    </View>
   );
 }
 

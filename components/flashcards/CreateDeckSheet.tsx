@@ -11,7 +11,7 @@ import type { DeckScope } from "@/lib/fsrs/types";
 import { OverlayBody, OverlayFooter, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 
-type ScopeType = "surah" | "juz" | "hizb" | "custom";
+type ScopeType = "surah" | "surahRange" | "juz" | "hizb" | "custom";
 
 interface Props {
   visible: boolean;
@@ -31,6 +31,8 @@ export function CreateDeckSheet({ visible, onClose, onCreated }: Props) {
   const [selectedSurahs, setSelectedSurahs] = useState<Set<number>>(new Set());
   const [selectedJuz, setSelectedJuz] = useState<Set<number>>(new Set());
   const [selectedHizb, setSelectedHizb] = useState<Set<number>>(new Set());
+  const [surahRangeFrom, setSurahRangeFrom] = useState("1");
+  const [surahRangeTo, setSurahRangeTo] = useState("114");
   const [customFrom, setCustomFrom] = useState({ surah: "1", ayah: "1" });
   const [customTo, setCustomTo] = useState({ surah: "1", ayah: "7" });
   const [surahs, setSurahs] = useState<SurahRow[]>([]);
@@ -87,9 +89,20 @@ export function CreateDeckSheet({ visible, onClose, onCreated }: Props) {
     return { type: "custom", surahStart, ayahStart, surahEnd, ayahEnd };
   };
 
+  const getSurahRangeScope = (): DeckScope | null => {
+    const surahStart = Number(surahRangeFrom);
+    const surahEnd = Number(surahRangeTo);
+    if (![surahStart, surahEnd].every(Number.isInteger)) return null;
+    if (!surahs.some((row) => row.number === surahStart)) return null;
+    if (!surahs.some((row) => row.number === surahEnd)) return null;
+    if (surahEnd < surahStart) return null;
+    return { type: "surahRange", surahStart, surahEnd };
+  };
+
   const canCreate = () => {
     switch (scopeType) {
       case "surah": return selectedSurahs.size > 0;
+      case "surahRange": return getSurahRangeScope() !== null;
       case "juz": return selectedJuz.size > 0;
       case "hizb": return selectedHizb.size > 0;
       case "custom": return getCustomScope() !== null;
@@ -100,7 +113,7 @@ export function CreateDeckSheet({ visible, onClose, onCreated }: Props) {
     if (creating) return;
     setError(null);
     if (!canCreate()) {
-      setError(scopeType === "custom" ? s.deckRangeInvalid : s.deckSelectionRequired);
+      setError(scopeType === "custom" || scopeType === "surahRange" ? s.deckRangeInvalid : s.deckSelectionRequired);
       return;
     }
     setCreating(true);
@@ -109,6 +122,9 @@ export function CreateDeckSheet({ visible, onClose, onCreated }: Props) {
       switch (scopeType) {
         case "surah":
           scope = { type: "surah", surahs: [...selectedSurahs] };
+          break;
+        case "surahRange":
+          scope = getSurahRangeScope()!;
           break;
         case "juz":
           scope = { type: "juz", juzNumbers: [...selectedJuz] };
@@ -138,6 +154,7 @@ export function CreateDeckSheet({ visible, onClose, onCreated }: Props) {
 
   const SCOPE_TABS: { value: ScopeType; label: string }[] = [
     { value: "surah", label: s.flashcardsScopeBysurah },
+    { value: "surahRange", label: s.flashcardsScopeSurahRange },
     { value: "juz", label: s.flashcardsScopeByjuz },
     { value: "hizb", label: s.flashcardsScopeByhizb },
     { value: "custom", label: s.flashcardsScopeCustom },
@@ -214,6 +231,30 @@ export function CreateDeckSheet({ visible, onClose, onCreated }: Props) {
           </View>
         )}
 
+        {scopeType === "surahRange" && (
+          <Card elevation="low" className="p-5">
+            <View
+              className="gap-3"
+              style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
+            >
+              <RangeInput
+                label={`${s.flashcardsFrom} ${s.tabSurah}`}
+                value={surahRangeFrom}
+                onChangeText={(v) => { setError(null); setSurahRangeFrom(v); }}
+                isDark={isDark}
+                isRTL={isRTL}
+              />
+              <RangeInput
+                label={`${s.flashcardsTo} ${s.tabSurah}`}
+                value={surahRangeTo}
+                onChangeText={(v) => { setError(null); setSurahRangeTo(v); }}
+                isDark={isDark}
+                isRTL={isRTL}
+              />
+            </View>
+          </Card>
+        )}
+
         {scopeType === "juz" && (
           <View className="flex-row flex-wrap gap-3">
             {Array.from({ length: 30 }, (_, i) => i + 1).map((n) => (
@@ -234,13 +275,13 @@ export function CreateDeckSheet({ visible, onClose, onCreated }: Props) {
           <Card elevation="low" className="p-5">
             <Text className="text-charcoal dark:text-neutral-300 mb-3" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>{s.flashcardsFrom}</Text>
             <View className="flex-row gap-3 mb-5">
-              <RangeInput label={s.tabSurah} value={customFrom.surah} onChangeText={(v) => { setError(null); setCustomFrom((p) => ({ ...p, surah: v })); }} isDark={isDark} />
-              <RangeInput label={s.reflectionAyahLabel} value={customFrom.ayah} onChangeText={(v) => { setError(null); setCustomFrom((p) => ({ ...p, ayah: v })); }} isDark={isDark} />
+              <RangeInput label={s.tabSurah} value={customFrom.surah} onChangeText={(v) => { setError(null); setCustomFrom((p) => ({ ...p, surah: v })); }} isDark={isDark} isRTL={isRTL} />
+              <RangeInput label={s.reflectionAyahLabel} value={customFrom.ayah} onChangeText={(v) => { setError(null); setCustomFrom((p) => ({ ...p, ayah: v })); }} isDark={isDark} isRTL={isRTL} />
             </View>
             <Text className="text-charcoal dark:text-neutral-300 mb-3" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>{s.flashcardsTo}</Text>
             <View className="flex-row gap-3">
-              <RangeInput label={s.tabSurah} value={customTo.surah} onChangeText={(v) => { setError(null); setCustomTo((p) => ({ ...p, surah: v })); }} isDark={isDark} />
-              <RangeInput label={s.reflectionAyahLabel} value={customTo.ayah} onChangeText={(v) => { setError(null); setCustomTo((p) => ({ ...p, ayah: v })); }} isDark={isDark} />
+              <RangeInput label={s.tabSurah} value={customTo.surah} onChangeText={(v) => { setError(null); setCustomTo((p) => ({ ...p, surah: v })); }} isDark={isDark} isRTL={isRTL} />
+              <RangeInput label={s.reflectionAyahLabel} value={customTo.ayah} onChangeText={(v) => { setError(null); setCustomTo((p) => ({ ...p, ayah: v })); }} isDark={isDark} isRTL={isRTL} />
             </View>
           </Card>
         )}
@@ -379,17 +420,19 @@ function RangeInput({
   value,
   onChangeText,
   isDark,
+  isRTL,
 }: {
   label: string;
   value: string;
   onChangeText: (text: string) => void;
   isDark: boolean;
+  isRTL: boolean;
 }) {
   return (
     <View className="flex-1">
       <Text
         className="text-warm-400 dark:text-neutral-500 mb-1"
-        style={{ fontFamily: "Manrope_400Regular", fontSize: 11 }}
+        style={{ fontFamily: "Manrope_400Regular", fontSize: 11, textAlign: isRTL ? "right" : "left" }}
       >
         {label}
       </Text>
@@ -398,7 +441,7 @@ function RangeInput({
         onChangeText={onChangeText}
         keyboardType="number-pad"
         className="bg-surface-high dark:bg-surface-dark-high rounded-xl px-4 py-3 text-charcoal dark:text-neutral-200"
-        style={{ fontFamily: "Manrope_500Medium", fontSize: 15 }}
+        style={{ fontFamily: "Manrope_500Medium", fontSize: 15, textAlign: isRTL ? "right" : "left" }}
         placeholderTextColor={isDark ? "#525252" : "#DFD9D1"}
       />
     </View>

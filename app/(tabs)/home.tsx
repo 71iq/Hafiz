@@ -271,6 +271,12 @@ export default function HomeScreen() {
       }
       return `${s.flashcardsScopeBysurah}: ${filter.surahs.length}`;
     }
+    if (filter.type === "surahRange") {
+      if (filter.surahStart === filter.surahEnd) {
+        return `${s.flashcardsScopeBysurah}: ${surahNames[filter.surahStart] ?? filter.surahStart}`;
+      }
+      return `${s.flashcardsScopeSurahRange}: ${filter.surahStart}-${filter.surahEnd}`;
+    }
     if (filter.type === "juz") {
       return `${s.flashcardsScopeByjuz}: ${filter.juzNumbers.join(", ")}`;
     }

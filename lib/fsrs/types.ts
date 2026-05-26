@@ -3,6 +3,7 @@ import type { State, StepUnit } from "ts-fsrs";
 /** A deck is a logical grouping — we track it as metadata on cards */
 export type DeckScope =
   | { type: "surah"; surahs: number[] }
+  | { type: "surahRange"; surahStart: number; surahEnd: number }
   | { type: "juz"; juzNumbers: number[] }
   | { type: "hizb"; hizbNumbers: number[] }
   | { type: "custom"; surahStart: number; ayahStart: number; surahEnd: number; ayahEnd: number };
