@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { ActivityIndicator, Platform, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 import * as Clipboard from "expo-clipboard";
-import { BookOpenText, Bookmark, MessageCircle, NotebookPen, Pause, Play, Share2 } from "lucide-react-native";
+import { BookOpenText, Bookmark, ChevronLeft, ChevronRight, MessageCircle, NotebookPen, Pause, Play, Share2 } from "lucide-react-native";
 import { ReflectionsSection } from "@/components/reflections/ReflectionsSection";
 import { QiraatTab } from "@/components/mushaf/word-tabs/QiraatTab";
 import { HadithTab } from "@/components/mushaf/ayah-tabs/HadithTab";
@@ -26,6 +26,11 @@ import { DEFAULT_LANGUAGE, getLanguageByCode } from "@/lib/translations/language
 type TargetAyah = {
   surah: number;
   ayah: number;
+};
+
+type AdjacentAyahs = {
+  previous: TargetAyah | null;
+  next: TargetAyah | null;
 };
 
 type AyahRow = {
@@ -70,15 +75,18 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
   const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
   const [bookmarkBusy, setBookmarkBusy] = useState(false);
   const [shareBusy, setShareBusy] = useState(false);
+  const [currentTarget, setCurrentTarget] = useState<TargetAyah | null>(target);
+  const [adjacentAyahs, setAdjacentAyahs] = useState<AdjacentAyahs>({ previous: null, next: null });
 
-  const open = target !== null;
+  const activeTarget = target ? currentTarget ?? target : null;
+  const open = activeTarget !== null;
   const showTranslation = open && uiLanguage !== "ar";
   const langInfo = getLanguageByCode(translationLanguage);
   const translationIsRtl = langInfo?.direction === "rtl";
-  const bookmarked = target ? isBookmarked(target.surah, target.ayah) : false;
+  const bookmarked = activeTarget ? isBookmarked(activeTarget.surah, activeTarget.ayah) : false;
   const iconColor = isDark ? "#a3a3a3" : "#8B8178";
-  const audioState = target
-    ? getAyahState(target.surah, target.ayah, recitationId)
+  const audioState = activeTarget
+    ? getAyahState(activeTarget.surah, activeTarget.ayah, recitationId)
     : { active: false, playing: false, loading: false };
   const audioIconColor = audioState.active ? "#0d9488" : iconColor;
   const isPhone = width < SIDEBAR_BREAKPOINT;
@@ -89,21 +97,58 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
   const selectedTafsirIsRtl = selectedTafsir?.source !== "jalalayn-en";
   const title = ayahRow
     ? (uiLanguage === "ar" ? ayahRow.surah_name_arabic : ayahRow.surah_name_english)
-    : `${target?.surah ?? ""}:${target?.ayah ?? ""}`;
-  const subtitle = target ? `${target.surah}:${target.ayah}` : undefined;
+    : `${activeTarget?.surah ?? ""}:${activeTarget?.ayah ?? ""}`;
+  const subtitle = activeTarget ? `${activeTarget.surah}:${activeTarget.ayah}` : undefined;
   const tafsirSourceConfigs = useMemo(() => {
     const rowsBySource = new Set((tafsirRows ?? []).map((row) => row.source));
     return AVAILABLE_TAFSIR_SOURCES.filter((source) => rowsBySource.has(source.id));
   }, [tafsirRows]);
 
   useEffect(() => {
+    setCurrentTarget(target);
     setActiveTab(initialTab);
+  }, [target?.surah, target?.ayah, initialTab]);
+
+  useEffect(() => {
     setAyahRow(null);
     setFontVisible(false);
     setTranslationText(null);
     setTafsirRows(null);
     setSelectedTafsirSource(DEFAULT_TAFSIR_SOURCE);
-  }, [target?.surah, target?.ayah, initialTab]);
+  }, [activeTarget?.surah, activeTarget?.ayah]);
+
+  useEffect(() => {
+    if (!activeTarget) {
+      setAdjacentAyahs({ previous: null, next: null });
+      return;
+    }
+    let cancelled = false;
+    Promise.all([
+      db.getFirstAsync<TargetAyah>(
+        `SELECT surah, ayah
+         FROM quran_text
+         WHERE surah < ? OR (surah = ? AND ayah < ?)
+         ORDER BY surah DESC, ayah DESC
+         LIMIT 1`,
+        [activeTarget.surah, activeTarget.surah, activeTarget.ayah]
+      ),
+      db.getFirstAsync<TargetAyah>(
+        `SELECT surah, ayah
+         FROM quran_text
+         WHERE surah > ? OR (surah = ? AND ayah > ?)
+         ORDER BY surah, ayah
+         LIMIT 1`,
+        [activeTarget.surah, activeTarget.surah, activeTarget.ayah]
+      ),
+    ]).then(([previous, next]) => {
+      if (!cancelled) setAdjacentAyahs({ previous: previous ?? null, next: next ?? null });
+    }).catch(() => {
+      if (!cancelled) setAdjacentAyahs({ previous: null, next: null });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [db, activeTarget?.surah, activeTarget?.ayah]);
 
   useEffect(() => {
     if (!showTranslation && activeTab === "translation") {
@@ -112,21 +157,21 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
   }, [activeTab, showTranslation]);
 
   useEffect(() => {
-    if (!target) return;
+    if (!activeTarget) return;
     let cancelled = false;
     db.getFirstAsync<AyahRow>(
       `SELECT q.text_uthmani, q.text_qcf2, q.v2_page, s.name_arabic AS surah_name_arabic, s.name_english AS surah_name_english
        FROM quran_text q
        JOIN surahs s ON s.number = q.surah
        WHERE q.surah = ? AND q.ayah = ?`,
-      [target.surah, target.ayah]
+      [activeTarget.surah, activeTarget.ayah]
     ).then((row) => {
       if (!cancelled) setAyahRow(row ?? null);
     }).catch(console.warn);
     return () => {
       cancelled = true;
     };
-  }, [db, target]);
+  }, [db, activeTarget?.surah, activeTarget?.ayah]);
 
   useEffect(() => {
     if (!ayahRow) return;
@@ -144,17 +189,17 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
   }, [ayahRow]);
 
   useEffect(() => {
-    if (!target || !showTranslation) return;
+    if (!activeTarget || !showTranslation) return;
     setTranslationText(null);
     const query =
       translationLanguage === DEFAULT_LANGUAGE
         ? db.getFirstAsync<{ text_en: string }>(
             "SELECT text_en FROM translations WHERE surah = ? AND ayah = ?",
-            [target.surah, target.ayah]
+            [activeTarget.surah, activeTarget.ayah]
           ).then((row) => row?.text_en ?? "")
         : db.getFirstAsync<{ text: string }>(
             "SELECT text FROM translation_active WHERE surah = ? AND ayah = ?",
-            [target.surah, target.ayah]
+            [activeTarget.surah, activeTarget.ayah]
           ).then((row) => row?.text ?? "");
 
     let cancelled = false;
@@ -164,15 +209,15 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
     return () => {
       cancelled = true;
     };
-  }, [db, target, showTranslation, translationLanguage]);
+  }, [db, activeTarget?.surah, activeTarget?.ayah, showTranslation, translationLanguage]);
 
   useEffect(() => {
-    if (!target) return;
+    if (!activeTarget) return;
     setTafsirRows(null);
     let cancelled = false;
     db.getAllAsync<{ source: string; text: string }>(
       "SELECT source, text FROM tafseer WHERE surah = ? AND ayah = ?",
-      [target.surah, target.ayah]
+      [activeTarget.surah, activeTarget.ayah]
     ).then((row) => {
       if (cancelled) return;
       const rowsBySource = new Map(row.map((item) => [item.source, item.text]));
@@ -190,17 +235,17 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
     return () => {
       cancelled = true;
     };
-  }, [db, target]);
+  }, [db, activeTarget?.surah, activeTarget?.ayah]);
 
   const handleBookmark = useCallback(async () => {
-    if (!target || bookmarkBusy) return;
+    if (!activeTarget || bookmarkBusy) return;
     setBookmarkBusy(true);
     try {
       if (bookmarked) {
-        await dbRemoveBookmark(db, target.surah, target.ayah);
+        await dbRemoveBookmark(db, activeTarget.surah, activeTarget.ayah);
         showToast(s.bookmarkRemoved);
       } else {
-        await dbAddBookmark(db, target.surah, target.ayah);
+        await dbAddBookmark(db, activeTarget.surah, activeTarget.ayah);
         showToast(s.bookmarkAdded);
       }
       await refreshBookmarks();
@@ -210,15 +255,15 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
     } finally {
       setBookmarkBusy(false);
     }
-  }, [bookmarkBusy, bookmarked, db, target, showToast, s.bookmarkAdded, s.bookmarkRemoved, s.bookmarkActionFailed, refreshBookmarks]);
+  }, [bookmarkBusy, bookmarked, db, activeTarget?.surah, activeTarget?.ayah, showToast, s.bookmarkAdded, s.bookmarkRemoved, s.bookmarkActionFailed, refreshBookmarks]);
 
   const handleShare = useCallback(async () => {
-    if (!target || !ayahRow || shareBusy) return;
+    if (!activeTarget || !ayahRow || shareBusy) return;
     setShareBusy(true);
     try {
-      const surahName = await fetchSurahName(db, target.surah);
+      const surahName = await fetchSurahName(db, activeTarget.surah);
       await Clipboard.setStringAsync(
-        formatForCopy(ayahRow.text_uthmani, surahName, target.surah, target.ayah, target.ayah)
+        formatForCopy(ayahRow.text_uthmani, surahName, activeTarget.surah, activeTarget.ayah, activeTarget.ayah)
       );
       showToast(s.copied);
     } catch (e) {
@@ -227,17 +272,23 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
     } finally {
       setShareBusy(false);
     }
-  }, [ayahRow, shareBusy, db, target, showToast, s.copied, s.copyFailed]);
+  }, [ayahRow, shareBusy, db, activeTarget?.surah, activeTarget?.ayah, showToast, s.copied, s.copyFailed]);
 
   const handleAudioPress = useCallback(async () => {
-    if (!target) return;
-    const result = await toggleAyah(target.surah, target.ayah, recitationId);
+    if (!activeTarget) return;
+    const result = await toggleAyah(activeTarget.surah, activeTarget.ayah, recitationId);
     if (!result.ok) {
       showToast(result.code === "not_configured" ? s.qfContentMisconfigured : s.qfContentUnavailable);
     }
-  }, [target?.surah, target?.ayah, recitationId, toggleAyah, showToast, s.qfContentMisconfigured, s.qfContentUnavailable]);
+  }, [activeTarget?.surah, activeTarget?.ayah, recitationId, toggleAyah, showToast, s.qfContentMisconfigured, s.qfContentUnavailable]);
 
-  if (!target) return null;
+  const handleNavigateAyah = useCallback((direction: "previous" | "next") => {
+    const nextTarget = adjacentAyahs[direction];
+    if (!nextTarget) return;
+    setCurrentTarget(nextTarget);
+  }, [adjacentAyahs]);
+
+  if (!activeTarget) return null;
 
   const tabs: Array<{ key: TabKey; label: string; icon: ReactNode }> = [
     ...(showTranslation
@@ -269,6 +320,18 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
         showHandle={isPhone}
         actions={
           <View className={isRTL ? "flex-row-reverse items-center gap-1.5" : "flex-row items-center gap-1.5"}>
+            <ActionIcon
+              icon={isRTL ? <ChevronRight size={15} color={iconColor} /> : <ChevronLeft size={15} color={iconColor} />}
+              onPress={() => handleNavigateAyah("previous")}
+              disabled={!adjacentAyahs.previous}
+              accessibilityLabel={s.previousAyah}
+            />
+            <ActionIcon
+              icon={isRTL ? <ChevronLeft size={15} color={iconColor} /> : <ChevronRight size={15} color={iconColor} />}
+              onPress={() => handleNavigateAyah("next")}
+              disabled={!adjacentAyahs.next}
+              accessibilityLabel={s.nextAyah}
+            />
             <Pressable
               disabled
               hitSlop={8}
@@ -279,7 +342,7 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
                 className="text-primary-accent dark:text-primary-bright"
                 style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11 }}
               >
-                {target.surah}:{target.ayah}
+                {activeTarget.surah}:{activeTarget.ayah}
               </Text>
               {bookmarked && <View className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-gold" />}
             </Pressable>
@@ -353,7 +416,7 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
             >
               {qcf2Tokens.map((glyph, index) => (
                 <Text
-                  key={`${target.surah}-${target.ayah}-${index}`}
+                  key={`${activeTarget.surah}-${activeTarget.ayah}-${index}`}
                   className="text-charcoal dark:text-neutral-100"
                   style={{
                     fontFamily: qcf2FontFamily,
@@ -464,11 +527,11 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
               )}
             </View>
           )}
-          {activeTab === "hadith" && <HadithTab surah={target.surah} ayah={target.ayah} />}
-          {activeTab === "qiraat" && <QiraatTab surah={target.surah} ayah={target.ayah} />}
-          {activeTab === "notes" && <PrivateNotesSection surah={target.surah} ayah={target.ayah} />}
+          {activeTab === "hadith" && <HadithTab surah={activeTarget.surah} ayah={activeTarget.ayah} />}
+          {activeTab === "qiraat" && <QiraatTab surah={activeTarget.surah} ayah={activeTarget.ayah} />}
+          {activeTab === "notes" && <PrivateNotesSection surah={activeTarget.surah} ayah={activeTarget.ayah} />}
           {activeTab === "reflections" && (
-            <ReflectionsSection surah={target.surah} ayah={target.ayah} initiallyExpanded showHeader={false} />
+            <ReflectionsSection surah={activeTarget.surah} ayah={activeTarget.ayah} initiallyExpanded showHeader={false} />
           )}
         </View>
       </OverlayBody>

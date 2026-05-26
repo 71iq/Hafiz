@@ -1,7 +1,7 @@
-import { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { View, Text, Pressable, ScrollView, useWindowDimensions } from "react-native";
-import { BookOpen } from "lucide-react-native";
-import { useWordInteraction } from "@/lib/word/context";
+import { BookOpen, ChevronLeft, ChevronRight } from "lucide-react-native";
+import { useWordInteraction, type WordRef } from "@/lib/word/context";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { useDatabase } from "@/lib/database/provider";
@@ -27,7 +27,7 @@ type WordHeaderMeta = {
 };
 
 export function WordDetailSheet() {
-  const { detailWord, closeDetail } = useWordInteraction();
+  const { detailWord, openDetail, closeDetail } = useWordInteraction();
   const { isDark, isRTL, uiLanguage } = useSettings();
   const { width, height } = useWindowDimensions();
   const s = useStrings();
@@ -35,6 +35,10 @@ export function WordDetailSheet() {
 
   const [activeTab, setActiveTab] = useState<TabKey>("meaning");
   const [ayahModalOpen, setAyahModalOpen] = useState(false);
+  const [adjacentWords, setAdjacentWords] = useState<{ previous: WordRef | null; next: WordRef | null }>({
+    previous: null,
+    next: null,
+  });
   const [headerMeta, setHeaderMeta] = useState<WordHeaderMeta>({
     wordText: null,
     root: null,
@@ -65,6 +69,13 @@ export function WordDetailSheet() {
     setActiveTab("meaning");
     setAyahModalOpen(false);
   }, [closeDetail]);
+
+  const handleNavigateWord = useCallback((direction: "previous" | "next") => {
+    const targetWord = adjacentWords[direction];
+    if (!targetWord) return;
+    setAyahModalOpen(false);
+    openDetail(targetWord);
+  }, [adjacentWords, openDetail]);
 
   useEffect(() => {
     if (!detailWord) return;
@@ -99,6 +110,45 @@ export function WordDetailSheet() {
           setHeaderMeta({ wordText: null, root: null, lemma: null, rootCount: null, translationEn: null });
         }
       });
+    return () => {
+      cancelled = true;
+    };
+  }, [db, detailWord?.surah, detailWord?.ayah, detailWord?.wordPos]);
+
+  useEffect(() => {
+    if (!detailWord) {
+      setAdjacentWords({ previous: null, next: null });
+      return;
+    }
+    let cancelled = false;
+    Promise.all([
+      db.getFirstAsync<WordRef>(
+        `SELECT wr.surah, wr.ayah, wr.word_pos AS wordPos, q.v2_page AS v2Page
+         FROM word_roots wr
+         JOIN quran_text q ON q.surah = wr.surah AND q.ayah = wr.ayah
+         WHERE wr.surah < ?
+            OR (wr.surah = ? AND wr.ayah < ?)
+            OR (wr.surah = ? AND wr.ayah = ? AND wr.word_pos < ?)
+         ORDER BY wr.surah DESC, wr.ayah DESC, wr.word_pos DESC
+         LIMIT 1`,
+        [detailWord.surah, detailWord.surah, detailWord.ayah, detailWord.surah, detailWord.ayah, detailWord.wordPos]
+      ),
+      db.getFirstAsync<WordRef>(
+        `SELECT wr.surah, wr.ayah, wr.word_pos AS wordPos, q.v2_page AS v2Page
+         FROM word_roots wr
+         JOIN quran_text q ON q.surah = wr.surah AND q.ayah = wr.ayah
+         WHERE wr.surah > ?
+            OR (wr.surah = ? AND wr.ayah > ?)
+            OR (wr.surah = ? AND wr.ayah = ? AND wr.word_pos > ?)
+         ORDER BY wr.surah, wr.ayah, wr.word_pos
+         LIMIT 1`,
+        [detailWord.surah, detailWord.surah, detailWord.ayah, detailWord.surah, detailWord.ayah, detailWord.wordPos]
+      ),
+    ]).then(([previous, next]) => {
+      if (!cancelled) setAdjacentWords({ previous: previous ?? null, next: next ?? null });
+    }).catch(() => {
+      if (!cancelled) setAdjacentWords({ previous: null, next: null });
+    });
     return () => {
       cancelled = true;
     };
@@ -142,6 +192,22 @@ export function WordDetailSheet() {
           isRTL={isRTL}
           onClose={handleClose}
           showHandle={isPhone}
+          actions={
+            <View className={isRTL ? "flex-row-reverse items-center gap-1.5" : "flex-row items-center gap-1.5"}>
+              <PanelNavIcon
+                icon={isRTL ? <ChevronRight size={16} color={isDark ? "#a3a3a3" : "#8B8178"} /> : <ChevronLeft size={16} color={isDark ? "#a3a3a3" : "#8B8178"} />}
+                onPress={() => handleNavigateWord("previous")}
+                disabled={!adjacentWords.previous}
+                accessibilityLabel={s.previousWord}
+              />
+              <PanelNavIcon
+                icon={isRTL ? <ChevronLeft size={16} color={isDark ? "#a3a3a3" : "#8B8178"} /> : <ChevronRight size={16} color={isDark ? "#a3a3a3" : "#8B8178"} />}
+                onPress={() => handleNavigateWord("next")}
+                disabled={!adjacentWords.next}
+                accessibilityLabel={s.nextWord}
+              />
+            </View>
+          }
           leading={
             <View className={`flex-row items-center gap-2 ${isRTL ? "flex-row-reverse" : ""}`}>
               <View className="rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 px-3 py-1.5">
@@ -285,5 +351,31 @@ function QuickStat({ label, value }: { label: string; value: string }) {
         {value}
       </Text>
     </View>
+  );
+}
+
+function PanelNavIcon({
+  icon,
+  onPress,
+  disabled,
+  accessibilityLabel,
+}: {
+  icon: ReactNode;
+  onPress: () => void;
+  disabled: boolean;
+  accessibilityLabel: string;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      hitSlop={8}
+      className="h-8 w-8 items-center justify-center rounded-full bg-surface-low dark:bg-surface-dark-low"
+      style={{ opacity: disabled ? 0.45 : 1 }}
+    >
+      {icon}
+    </Pressable>
   );
 }
