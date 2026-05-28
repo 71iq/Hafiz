@@ -38,6 +38,7 @@ export function WebSelectionMenu() {
   const [highlightBusy, setHighlightBusy] = useState(false);
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
   const latestMenuRef = useRef<MenuState | null>(null);
+  const selectionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     latestMenuRef.current = menu;
@@ -135,18 +136,24 @@ export function WebSelectionMenu() {
   useEffect(() => {
     if (Platform.OS !== "web") return;
 
+    const scheduleSelectionMenu = (fallback?: { x: number; y: number }, delay = 0) => {
+      if (selectionTimerRef.current) {
+        clearTimeout(selectionTimerRef.current);
+      }
+      selectionTimerRef.current = setTimeout(() => {
+        selectionTimerRef.current = null;
+        showForCurrentSelection(fallback);
+      }, delay);
+    };
+
     const handleMouseUp = (event: MouseEvent) => {
       const target = event.target;
       if (target instanceof Element && target.closest("[data-hafiz-selection-menu]")) return;
-      window.setTimeout(() => {
-        showForCurrentSelection({ x: event.clientX, y: event.clientY });
-      }, 0);
+      scheduleSelectionMenu({ x: event.clientX, y: event.clientY });
     };
 
     const handleKeyUp = () => {
-      window.setTimeout(() => {
-        showForCurrentSelection();
-      }, 0);
+      scheduleSelectionMenu();
     };
 
     const handleScroll = () => setMenu(null);
@@ -155,6 +162,17 @@ export function WebSelectionMenu() {
       const target = event.target;
       if (target instanceof Element && target.closest("[data-hafiz-selection-menu]")) return;
       if (latestMenuRef.current) setMenu(null);
+    };
+
+    const handlePointerUp = (event: PointerEvent) => {
+      if (event.pointerType === "mouse") return;
+      const target = event.target;
+      if (target instanceof Element && target.closest("[data-hafiz-selection-menu]")) return;
+      scheduleSelectionMenu({ x: event.clientX, y: event.clientY }, 80);
+    };
+
+    const handleSelectionChange = () => {
+      scheduleSelectionMenu(undefined, 120);
     };
 
     const handleContextMenu = (event: MouseEvent) => {
@@ -196,14 +214,22 @@ export function WebSelectionMenu() {
     document.addEventListener("keyup", handleKeyUp);
     document.addEventListener("scroll", handleScroll, true);
     document.addEventListener("pointerdown", handlePointerDown, true);
+    document.addEventListener("pointerup", handlePointerUp, true);
+    document.addEventListener("selectionchange", handleSelectionChange);
     document.addEventListener("contextmenu", handleContextMenu, true);
     document.addEventListener("copy", handleCopyEvent);
 
     return () => {
+      if (selectionTimerRef.current) {
+        clearTimeout(selectionTimerRef.current);
+        selectionTimerRef.current = null;
+      }
       document.removeEventListener("mouseup", handleMouseUp);
       document.removeEventListener("keyup", handleKeyUp);
       document.removeEventListener("scroll", handleScroll, true);
       document.removeEventListener("pointerdown", handlePointerDown, true);
+      document.removeEventListener("pointerup", handlePointerUp, true);
+      document.removeEventListener("selectionchange", handleSelectionChange);
       document.removeEventListener("contextmenu", handleContextMenu, true);
       document.removeEventListener("copy", handleCopyEvent);
     };

@@ -39,7 +39,7 @@ function WordTokenInner({
 }: Props) {
   const { tooltipWord, setTooltipWord, openDetail } = useWordInteraction();
   const { markActivity } = useChrome();
-  const { isDark } = useSettings();
+  const { isDark, viewMode, pageScroll } = useSettings();
   const tokenRef = useRef<View>(null);
   const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTouchInput = useMemo(() => {
@@ -60,6 +60,11 @@ function WordTokenInner({
     tooltipWord.surah === surah &&
     tooltipWord.ayah === ayah &&
     tooltipWord.wordPos === wordPos;
+  const allowNativeTouchSelection =
+    Platform.OS === "web" &&
+    isTouchInput &&
+    viewMode === "page" &&
+    pageScroll === "horizontal";
 
   const wordRef = { surah, ayah, wordPos, v2Page };
 
@@ -134,7 +139,7 @@ function WordTokenInner({
     <Pressable
       ref={tokenRef as any}
       onPress={handlePress}
-      onLongPress={handleLongPress}
+      onLongPress={allowNativeTouchSelection ? undefined : handleLongPress}
       delayLongPress={400}
       disabled={disabled || hidden}
       style={{

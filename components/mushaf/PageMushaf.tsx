@@ -105,6 +105,21 @@ type WebDragState = {
   vx: number;
 };
 
+const QURAN_SELECTION_TARGET_SELECTOR = "[data-hafiz-quran-token]";
+
+function isQuranSelectionTarget(target: EventTarget | null | undefined): boolean {
+  if (Platform.OS !== "web" || typeof Element === "undefined" || !(target instanceof Element)) {
+    return false;
+  }
+  return Boolean(target.closest(QURAN_SELECTION_TARGET_SELECTOR));
+}
+
+function hasActiveBrowserSelection(): boolean {
+  if (Platform.OS !== "web" || typeof window === "undefined") return false;
+  const selection = window.getSelection();
+  return Boolean(selection && !selection.isCollapsed && selection.rangeCount > 0);
+}
+
 /**
  * Build page data using v2_page assignments.
  * QCF2 glyphs are PUA codepoints tied to per-page fonts, so each ayah
@@ -878,7 +893,7 @@ export function PageMushaf({
   );
 
   const handleHorizontalPointerDown = useCallback(
-    (event: { nativeEvent?: { button?: number; clientX?: number; clientY?: number } }) => {
+    (event: { target?: EventTarget | null; nativeEvent?: { button?: number; clientX?: number; clientY?: number; pointerType?: string; target?: EventTarget | null } }) => {
       const nativeEvent = event.nativeEvent;
       if (
         Platform.OS !== "web" ||
@@ -886,6 +901,11 @@ export function PageMushaf({
         horizontalAnimatingRef.current ||
         (nativeEvent.button !== undefined && nativeEvent.button !== 0)
       ) {
+        return;
+      }
+      const pointerType = nativeEvent.pointerType;
+      const target = event.target ?? nativeEvent.target;
+      if (hasActiveBrowserSelection() || (pointerType === "mouse" && isQuranSelectionTarget(target))) {
         return;
       }
       const x = nativeEvent.clientX ?? 0;
@@ -912,6 +932,12 @@ export function PageMushaf({
     const handlePointerMove = (event: PointerEvent) => {
       const state = webDragRef.current;
       if (!state.active) return;
+      if (hasActiveBrowserSelection()) {
+        state.active = false;
+        setWebDragging(false);
+        resetHorizontalDrag(0);
+        return;
+      }
       const dx = event.clientX - state.startX;
       const dy = event.clientY - state.startY;
       if (!state.claimed) {
@@ -962,6 +988,7 @@ export function PageMushaf({
       }
       const deltaX = nativeEvent.deltaX ?? 0;
       const deltaY = nativeEvent.deltaY ?? 0;
+      if (hasActiveBrowserSelection()) return;
       if (Math.abs(deltaX) < 36 || Math.abs(deltaX) < Math.abs(deltaY) * 1.25) return;
 
       onHorizontalGesture?.();
