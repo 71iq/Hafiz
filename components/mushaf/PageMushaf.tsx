@@ -275,7 +275,8 @@ function computePageItemHeight(
   lineHeight: number,
   isLast: boolean,
   pagePaddingTop: number,
-  pagePaddingBottom: number
+  pagePaddingBottom: number,
+  quranLineHeightMultiplier = 1
 ): number {
   let h = isLast ? 0 : SEPARATOR_HEIGHT;
   h += pagePaddingTop + pagePaddingBottom;
@@ -289,7 +290,7 @@ function computePageItemHeight(
           h += lineHeight * 0.85 + 8; // my-1 margins
         }
       }
-      h += page.pageWordLineNumbers.length * lineHeight;
+      h += page.pageWordLineNumbers.length * lineHeight * quranLineHeightMultiplier;
     } else {
       for (const line of page.lineLayout) {
         if (line.line_type === "surah_name") {
@@ -297,12 +298,12 @@ function computePageItemHeight(
         } else if (line.line_type === "basmallah") {
           h += lineHeight * 0.85 + 8; // my-1 margins
         } else {
-          h += lineHeight;
+          h += lineHeight * quranLineHeightMultiplier;
         }
       }
     }
   } else {
-    h += 15 * lineHeight; // fallback: standard 15 lines
+    h += 15 * lineHeight * quranLineHeightMultiplier; // fallback: standard 15 lines
   }
 
   return h;
@@ -321,7 +322,8 @@ function buildLayoutOffsets(
   pages: PageData[],
   lineHeight: number,
   pagePaddingTop: number,
-  pagePaddingBottom: number
+  pagePaddingBottom: number,
+  quranLineHeightMultiplier = 1
 ): { heights: number[]; offsets: number[] } {
   const heights: number[] = [];
   const offsets: number[] = [];
@@ -333,7 +335,8 @@ function buildLayoutOffsets(
       lineHeight,
       i === pages.length - 1,
       pagePaddingTop,
-      pagePaddingBottom
+      pagePaddingBottom,
+      quranLineHeightMultiplier
     );
     heights.push(h);
     offsets.push(cumOffset);
@@ -455,7 +458,7 @@ export function PageMushaf({
   hifzVisibility = null,
 }: Props) {
   const db = useDatabase();
-  const { fontSize, lineHeight, pageScroll, isRTL, uiLanguage, quranFontStyle } = useSettings();
+  const { fontSize, fontSizeIndex, lineHeight, pageScroll, isRTL, uiLanguage, quranFontStyle } = useSettings();
   const s = useStrings();
   const { width, height: windowHeight } = useWindowDimensions();
   const [containerWidth, setContainerWidth] = useState(0);
@@ -468,23 +471,35 @@ export function PageMushaf({
   const compactPageWidth = width < SIDEBAR_BREAKPOINT;
   const compactDefaultFontSize = FONT_SIZE_STEPS_MOBILE[DEFAULT_FONT_SIZE_INDEX];
   const lineWidthScale = mushafLineWidthScale(quranFontStyle);
+  const verticalUsesJustifiedLayout = fontSizeIndex === DEFAULT_FONT_SIZE_INDEX;
+  const verticalAllowsLineWrap = !verticalUsesJustifiedLayout;
   const verticalFitWidth = compactPageWidth
     ? pageAvailableWidth
     : Math.max(0, pageAvailableWidth - DESKTOP_PAGE_SAFE_GUTTER * 2);
   const verticalTypography = useMemo(
-    () => fitTypographyToPageWidth(fontSize, lineHeight, verticalFitWidth, lineWidthScale),
-    [fontSize, lineHeight, lineWidthScale, verticalFitWidth]
+    () =>
+      verticalUsesJustifiedLayout
+        ? fitTypographyToPageWidth(fontSize, lineHeight, verticalFitWidth, lineWidthScale)
+        : { fontSize, lineHeight },
+    [fontSize, lineHeight, lineWidthScale, verticalFitWidth, verticalUsesJustifiedLayout]
   );
   const verticalLineMaxWidth = useMemo(
-    () => computeVerticalLineMaxWidth(verticalTypography.fontSize, pageAvailableWidth, compactPageWidth, lineWidthScale),
-    [compactPageWidth, lineWidthScale, pageAvailableWidth, verticalTypography.fontSize]
+    () =>
+      verticalUsesJustifiedLayout
+        ? computeVerticalLineMaxWidth(verticalTypography.fontSize, pageAvailableWidth, compactPageWidth, lineWidthScale)
+        : pageAvailableWidth,
+    [compactPageWidth, lineWidthScale, pageAvailableWidth, verticalTypography.fontSize, verticalUsesJustifiedLayout]
   );
-  const verticalShouldFillAvailable = compactPageWidth && verticalTypography.fontSize >= compactDefaultFontSize;
+  const verticalShouldFillAvailable =
+    verticalAllowsLineWrap || (compactPageWidth && verticalTypography.fontSize >= compactDefaultFontSize);
   const verticalLineWidth = useMemo(
     () => computeLineWidth(verticalTypography.fontSize, pageAvailableWidth, verticalLineMaxWidth, lineWidthScale, verticalShouldFillAvailable),
     [lineWidthScale, pageAvailableWidth, verticalLineMaxWidth, verticalShouldFillAvailable, verticalTypography.fontSize]
   );
   const verticalLineSlotHeight = verticalTypography.lineHeight;
+  const verticalLineHeightMultiplier = verticalAllowsLineWrap
+    ? Math.max(1, Math.ceil((verticalTypography.fontSize * lineWidthScale) / Math.max(1, verticalLineWidth)))
+    : 1;
   const [pageData, setPageData] = useState<PageData[]>([]);
   const [surahMap, setSurahMap] = useState<Map<number, SurahRow>>(new Map());
   const [pageRows, setPageRows] = useState<PageRow[]>([]);
@@ -615,7 +630,7 @@ export function PageMushaf({
 
         const data = buildPageData(pages, ayahs, lineLookup, offsetLookup, pageWords);
         setPageData(data);
-        setLayoutInfo(buildLayoutOffsets(data, verticalLineSlotHeight, pagePaddingTop, pagePaddingBottom));
+        setLayoutInfo(buildLayoutOffsets(data, verticalLineSlotHeight, pagePaddingTop, pagePaddingBottom, verticalLineHeightMultiplier));
       } catch (err) {
         console.error("[PageMushaf] Failed to load data:", err);
       } finally {
@@ -642,9 +657,9 @@ export function PageMushaf({
   // Rebuild layout offsets when lineHeight changes (font size adjustment)
   useEffect(() => {
     if (pageData.length > 0) {
-      setLayoutInfo(buildLayoutOffsets(pageData, verticalLineSlotHeight, pagePaddingTop, pagePaddingBottom));
+      setLayoutInfo(buildLayoutOffsets(pageData, verticalLineSlotHeight, pagePaddingTop, pagePaddingBottom, verticalLineHeightMultiplier));
     }
-  }, [verticalLineSlotHeight, pageData, pagePaddingTop, pagePaddingBottom]);
+  }, [verticalLineHeightMultiplier, verticalLineSlotHeight, pageData, pagePaddingTop, pagePaddingBottom]);
 
   // getItemLayout enables instant scrollToIndex without rendering intermediate items
   const getItemLayout = useCallback(
@@ -1233,7 +1248,7 @@ export function PageMushaf({
             sidePadding={pageSidePadding}
             lineWidth={verticalLineWidth}
             lineSlotHeight={verticalLineSlotHeight}
-            allowLineWrap={false}
+            allowLineWrap={verticalAllowsLineWrap}
             hifzVisibility={hifzVisibility}
           />
           {index < pageData.length - 1 && (
@@ -1270,6 +1285,7 @@ export function PageMushaf({
       highlightedWord,
       verticalLineSlotHeight,
       hifzVisibility,
+      verticalAllowsLineWrap,
     ]
   );
 

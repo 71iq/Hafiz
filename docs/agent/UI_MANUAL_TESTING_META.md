@@ -404,6 +404,7 @@ Use this order for a full manual pass. For targeted changes, run the affected se
 - Verify QCF V4 and QCF V4 Tajweed render nonblank pages.
 - Verify V4 Tajweed colors match word-panel tajweed colors.
 - Verify line fitting on representative pages including Surah 67 and last 3 juz.
+- Verify default Quran font size keeps page lines justified, while non-default sizes grow and wrap instead of shrinking.
 - Verify surah headers and page separators are not clipped and use Quranic fonts where applicable.
 - Tap word for tooltip.
 - Tap outside and scroll to dismiss tooltip.

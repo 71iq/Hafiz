@@ -442,7 +442,7 @@ function MushafPageInner({
             justifyContent: shouldStretchLine && !allowLineWrap ? "space-between" : "center",
             width: contentWidth,
             minHeight: lineHeightStyle,
-            height: lineHeightStyle,
+            height: allowLineWrap ? undefined : lineHeightStyle,
             gap: shouldStretchLine && !allowLineWrap ? undefined : fontSize * 0.28,
             rowGap: allowLineWrap ? Math.max(2, fontSize * 0.12) : undefined,
             alignItems: "center",
