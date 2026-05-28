@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from "react";
-import { View, Text, Pressable } from "react-native";
+import { View, Text, Pressable, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, type Href } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
@@ -43,7 +43,7 @@ import {
 import type { AchievementUnlock } from "@/lib/achievements/types";
 import { getReflectionJourneySummary } from "@/lib/reflection-journey/queries";
 import { localizeReflectionJourneyText } from "@/lib/reflection-journey/schema";
-import { DESKTOP_CONTENT_MAX_WIDTH } from "@/lib/ui/viewport";
+import { DESKTOP_CONTENT_MAX_WIDTH, VIEWPORT_BREAKPOINTS } from "@/lib/ui/viewport";
 
 type SmartDeckDisplay = {
   id: SmartDeckId;
@@ -72,7 +72,9 @@ export default function HomeScreen() {
   const { isDark, isRTL, uiLanguage } = useSettings();
   const s = useStrings();
   const router = useRouter();
+  const { width } = useWindowDimensions();
   const mirroredRowStyle = isRTL ? ({ direction: "ltr" } as const) : undefined;
+  const compactDeckCards = width <= VIEWPORT_BREAKPOINTS.phoneLarge;
   const [smartDecks, setSmartDecks] = useState<SmartDeckDisplay[]>([]);
   const [vocabStats, setVocabStats] = useState<{ total: number; dueCount: number; newCount: number }>({ total: 0, dueCount: 0, newCount: 0 });
   const [authBannerDismissed, setAuthBannerDismissed] = useState(false);
@@ -518,6 +520,7 @@ export default function HomeScreen() {
               onShowCards={() => setDeckCardsTarget({ id: deck.id, title: deck.title })}
               isDark={isDark}
               isRTL={isRTL}
+              compact={compactDeckCards}
               s={s}
             />
           ))}
@@ -529,6 +532,7 @@ export default function HomeScreen() {
               onShowCards={() => setDeckCardsTarget({ id: MEANINGS_DECK_ID, title: s.vocabDeckTitle })}
               isDark={isDark}
               isRTL={isRTL}
+              compact={compactDeckCards}
               s={s}
             />
           )}
@@ -577,6 +581,7 @@ function SmartDeckCard({
   onShowCards,
   isDark,
   isRTL,
+  compact,
   s,
 }: {
   deck: SmartDeckDisplay;
@@ -586,10 +591,65 @@ function SmartDeckCard({
   onShowCards: () => void;
   isDark: boolean;
   isRTL: boolean;
+  compact: boolean;
   s: any;
 }) {
   const Icon = deck.icon;
   const canStart = deck.total > 0;
+  const iconNode = (
+    <View className="w-10 h-10 rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 items-center justify-center">
+      <Icon size={18} color={isDark ? "#2dd4bf" : "#0d9488"} />
+    </View>
+  );
+  const textNode = (
+    <View className={`flex-1 ${isRTL ? "items-end" : "items-start"}`} style={{ minWidth: 0 }}>
+      <Text
+        className="text-charcoal dark:text-neutral-200"
+        style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
+        numberOfLines={compact ? undefined : 1}
+      >
+        {deck.title}
+      </Text>
+      <Text
+        className="text-warm-400 dark:text-neutral-500 mt-0.5"
+        style={{ fontFamily: "Manrope_400Regular", fontSize: 11, lineHeight: 16, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
+        numberOfLines={compact ? undefined : 1}
+      >
+        {deck.subtitle} · {filterLabel}
+      </Text>
+    </View>
+  );
+  const actionNodes = (
+    <View
+      className="flex-row items-center gap-1"
+      style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
+    >
+      <Pressable
+        onPress={(event) => {
+          event.stopPropagation?.();
+          onShowCards();
+        }}
+        accessibilityRole="button"
+        accessibilityLabel={s.deckCardsTitle}
+        className="w-8 h-8 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center"
+        hitSlop={8}
+      >
+        <List size={14} color={isDark ? "#a3a3a3" : "#8B8178"} />
+      </Pressable>
+      <Pressable
+        onPress={(event) => {
+          event.stopPropagation?.();
+          onConfigure();
+        }}
+        className="w-8 h-8 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center"
+        hitSlop={8}
+      >
+        <Settings2 size={14} color={isDark ? "#a3a3a3" : "#8B8178"} />
+      </Pressable>
+    </View>
+  );
+  const statsNode = <DeckStats total={deck.total} newCount={deck.newCount} dueCount={deck.dueCount} isDark={isDark} isRTL={isRTL} />;
+
   return (
     <Pressable
       onPress={canStart ? onStartReview : undefined}
@@ -600,58 +660,34 @@ function SmartDeckCard({
       })}
     >
       <Card elevation="low" className="px-4 py-3 rounded-3xl">
-        <View
-          className="items-center gap-3"
-          style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
-        >
-          <View className="w-10 h-10 rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 items-center justify-center">
-            <Icon size={18} color={isDark ? "#2dd4bf" : "#0d9488"} />
-          </View>
-          <View className={`flex-1 ${isRTL ? "items-end" : "items-start"}`} style={{ minWidth: 0 }}>
-            <Text
-              className="text-charcoal dark:text-neutral-200"
-              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
-              numberOfLines={1}
+        {compact ? (
+          <View className="gap-3">
+            <View
+              className="items-center gap-3"
+              style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
             >
-              {deck.title}
-            </Text>
-            <Text
-              className="text-warm-400 dark:text-neutral-500 mt-0.5"
-              style={{ fontFamily: "Manrope_400Regular", fontSize: 11, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
-              numberOfLines={1}
+              {iconNode}
+              {textNode}
+            </View>
+            <View
+              className="items-center justify-between gap-2"
+              style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
             >
-              {deck.subtitle} · {filterLabel}
-            </Text>
+              {actionNodes}
+              {statsNode}
+            </View>
           </View>
+        ) : (
           <View
-            className="flex-row items-center gap-1"
+            className="items-center gap-3"
             style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
           >
-            <Pressable
-              onPress={(event) => {
-                event.stopPropagation?.();
-                onShowCards();
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={s.deckCardsTitle}
-              className="w-8 h-8 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center"
-              hitSlop={8}
-            >
-              <List size={14} color={isDark ? "#a3a3a3" : "#8B8178"} />
-            </Pressable>
-            <Pressable
-              onPress={(event) => {
-                event.stopPropagation?.();
-                onConfigure();
-              }}
-              className="w-8 h-8 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center"
-              hitSlop={8}
-            >
-              <Settings2 size={14} color={isDark ? "#a3a3a3" : "#8B8178"} />
-            </Pressable>
+            {iconNode}
+            {textNode}
+            {actionNodes}
+            {statsNode}
           </View>
-          <DeckStats total={deck.total} newCount={deck.newCount} dueCount={deck.dueCount} isDark={isDark} isRTL={isRTL} />
-        </View>
+        )}
       </Card>
     </Pressable>
   );
@@ -664,6 +700,7 @@ function VocabularyDeckCard({
   onShowCards,
   isDark,
   isRTL,
+  compact,
   s,
 }: {
   stats: { total: number; dueCount: number; newCount: number };
@@ -672,9 +709,66 @@ function VocabularyDeckCard({
   onShowCards: () => void;
   isDark: boolean;
   isRTL: boolean;
+  compact: boolean;
   s: any;
 }) {
   const canStart = stats.total > 0;
+  const iconNode = (
+    <View className="w-10 h-10 rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 items-center justify-center">
+      <Languages size={18} color={isDark ? "#2dd4bf" : "#0d9488"} />
+    </View>
+  );
+  const textNode = (
+    <View className={`flex-1 ${isRTL ? "items-end" : "items-start"}`} style={{ minWidth: 0 }}>
+      <Text
+        className="text-charcoal dark:text-neutral-200"
+        style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
+        numberOfLines={compact ? undefined : 1}
+      >
+        {s.vocabDeckTitle}
+      </Text>
+      <Text
+        className="text-warm-400 dark:text-neutral-500 mt-0.5"
+        style={{ fontFamily: "Manrope_400Regular", fontSize: 11, lineHeight: 16, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
+        numberOfLines={compact ? undefined : 1}
+      >
+        {s.vocabDeckSubtitle}
+      </Text>
+    </View>
+  );
+  const actionNodes = (
+    <View
+      className="flex-row items-center gap-1"
+      style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
+    >
+      <Pressable
+        onPress={(event) => {
+          event.stopPropagation?.();
+          onShowCards();
+        }}
+        accessibilityRole="button"
+        accessibilityLabel={s.deckCardsTitle}
+        className="w-8 h-8 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center"
+        hitSlop={8}
+      >
+        <List size={14} color={isDark ? "#a3a3a3" : "#8B8178"} />
+      </Pressable>
+      <Pressable
+        onPress={(event) => {
+          event.stopPropagation?.();
+          onConfigure();
+        }}
+        accessibilityRole="button"
+        accessibilityLabel={s.deckReviewSettingsTitle}
+        className="w-8 h-8 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center"
+        hitSlop={8}
+      >
+        <Settings2 size={14} color={isDark ? "#a3a3a3" : "#8B8178"} />
+      </Pressable>
+    </View>
+  );
+  const statsNode = <DeckStats total={stats.total} newCount={stats.newCount} dueCount={stats.dueCount} isDark={isDark} isRTL={isRTL} />;
+
   return (
     <Pressable
       onPress={canStart ? onStartReview : undefined}
@@ -685,60 +779,34 @@ function VocabularyDeckCard({
       })}
     >
       <Card elevation="low" className="px-4 py-3 rounded-3xl">
-        <View
-          className="items-center gap-3"
-          style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
-        >
-          <View className="w-10 h-10 rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 items-center justify-center">
-            <Languages size={18} color={isDark ? "#2dd4bf" : "#0d9488"} />
-          </View>
-          <View className={`flex-1 ${isRTL ? "items-end" : "items-start"}`} style={{ minWidth: 0 }}>
-            <Text
-              className="text-charcoal dark:text-neutral-200"
-              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
-              numberOfLines={1}
+        {compact ? (
+          <View className="gap-3">
+            <View
+              className="items-center gap-3"
+              style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
             >
-              {s.vocabDeckTitle}
-            </Text>
-            <Text
-              className="text-warm-400 dark:text-neutral-500 mt-0.5"
-              style={{ fontFamily: "Manrope_400Regular", fontSize: 11, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
-              numberOfLines={1}
+              {iconNode}
+              {textNode}
+            </View>
+            <View
+              className="items-center justify-between gap-2"
+              style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
             >
-              {s.vocabDeckSubtitle}
-            </Text>
+              {actionNodes}
+              {statsNode}
+            </View>
           </View>
+        ) : (
           <View
-            className="flex-row items-center gap-1"
+            className="items-center gap-3"
             style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
           >
-            <Pressable
-              onPress={(event) => {
-                event.stopPropagation?.();
-                onShowCards();
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={s.deckCardsTitle}
-              className="w-8 h-8 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center"
-              hitSlop={8}
-            >
-              <List size={14} color={isDark ? "#a3a3a3" : "#8B8178"} />
-            </Pressable>
-            <Pressable
-              onPress={(event) => {
-                event.stopPropagation?.();
-                onConfigure();
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={s.deckReviewSettingsTitle}
-              className="w-8 h-8 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center"
-              hitSlop={8}
-            >
-              <Settings2 size={14} color={isDark ? "#a3a3a3" : "#8B8178"} />
-            </Pressable>
+            {iconNode}
+            {textNode}
+            {actionNodes}
+            {statsNode}
           </View>
-          <DeckStats total={stats.total} newCount={stats.newCount} dueCount={stats.dueCount} isDark={isDark} isRTL={isRTL} />
-        </View>
+        )}
       </Card>
     </Pressable>
   );

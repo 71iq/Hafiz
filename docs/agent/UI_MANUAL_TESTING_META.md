@@ -589,6 +589,7 @@ Use this order for a full manual pass. For targeted changes, run the affected se
 - Verify Home with due reviews.
 - Verify "Move to" or recent reading page syncs across devices.
 - Verify default deck summary cards.
+- Verify default deck cards on phone show readable full titles/subtitles/filters without horizontal squeeze.
 - Verify signed-out state.
 - Verify offline state.
 - Verify Arabic RTL ordering for status cards that should not reverse semantic order.
