@@ -38,7 +38,13 @@ import { AyahDetailModal } from "./AyahDetailModal";
 import { JuzNameText } from "./JuzNameText";
 import { toArabicNumber } from "@/lib/arabic";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
-import { loadQuranPageFont } from "@/lib/fonts/loader";
+import {
+  isSurahNameFontLoaded,
+  loadQuranPageFont,
+  loadSurahNameFont,
+  surahNameFontName,
+  surahNameGlyph,
+} from "@/lib/fonts/loader";
 
 type PageRow = {
   page: number;
@@ -351,29 +357,58 @@ function findJuzForPageAyah(
 
 function PageSeparator({
   page,
+  surahNumber,
   surahName,
   juz,
   isRTL,
   width,
 }: {
   page: number;
+  surahNumber: number | null;
   surahName: string | null;
   juz: number | null;
   isRTL: boolean;
   width: number;
 }) {
+  const [surahNameFontReady, setSurahNameFontReady] = useState(() => isSurahNameFontLoaded());
   const pageLabel = isRTL ? toArabicNumber(page) : String(page);
   const surahLabel = surahName ? (isRTL ? `سورة ${surahName}` : `Surah ${surahName}`) : "";
   const juzLabel = juz ? (isRTL ? `الجزء ${toArabicNumber(juz)}` : `Juz ${juz}`) : "";
+  const glyph = typeof surahNumber === "number" ? surahNameGlyph(surahNumber) : undefined;
+  const useGlyph = Boolean(isRTL && glyph && surahNameFontReady);
+
+  useEffect(() => {
+    if (!isRTL || !glyph) return;
+    if (isSurahNameFontLoaded()) {
+      setSurahNameFontReady(true);
+      return;
+    }
+    let cancelled = false;
+    loadSurahNameFont()
+      .then(() => {
+        if (!cancelled) requestAnimationFrame(() => setSurahNameFontReady(true));
+      })
+      .catch(console.warn);
+    return () => {
+      cancelled = true;
+    };
+  }, [glyph, isRTL]);
+
   return (
     <View className="items-center justify-center px-3" style={{ height: SEPARATOR_HEIGHT }}>
       <View className="flex-row items-center justify-between" style={{ direction: isRTL ? "rtl" : "ltr", width }}>
         <Text
+          accessibilityLabel={surahLabel}
           className="text-warm-500 dark:text-neutral-400"
-          style={{ fontFamily: "Manrope_500Medium", fontSize: 12 }}
+          style={{
+            fontFamily: useGlyph ? surahNameFontName() : "Manrope_500Medium",
+            fontSize: useGlyph ? 18 : 12,
+            lineHeight: useGlyph ? 22 : undefined,
+            writingDirection: useGlyph ? "ltr" : isRTL ? "rtl" : "ltr",
+          }}
           numberOfLines={1}
         >
-          {surahLabel}
+          {useGlyph ? glyph : surahLabel}
         </Text>
 
         <View className="flex-row items-center" style={{ width: "40%" }}>
@@ -454,7 +489,7 @@ export function PageMushaf({
   const [surahMap, setSurahMap] = useState<Map<number, SurahRow>>(new Map());
   const [pageRows, setPageRows] = useState<PageRow[]>([]);
   const [juzRangeRows, setJuzRangeRows] = useState<JuzRangeRow[]>([]);
-  const [pageMetaMap, setPageMetaMap] = useState<Map<number, { surahName: string | null; juz: number | null }>>(new Map());
+  const [pageMetaMap, setPageMetaMap] = useState<Map<number, { surahNumber: number | null; surahName: string | null; juz: number | null }>>(new Map());
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [detailAyah, setDetailAyah] = useState<{ surah: number; ayah: number } | null>(null);
@@ -593,13 +628,13 @@ export function PageMushaf({
 
   useEffect(() => {
     if (pageRows.length === 0 || surahMap.size === 0) return;
-    const meta = new Map<number, { surahName: string | null; juz: number | null }>();
+    const meta = new Map<number, { surahNumber: number | null; surahName: string | null; juz: number | null }>();
     for (const p of pageRows) {
       const surahName = uiLanguage === "ar"
         ? surahMap.get(p.surah_start)?.name_arabic ?? null
         : surahMap.get(p.surah_start)?.name_english ?? null;
       const juz = findJuzForPageAyah(juzRangeRows, p.surah_start, p.ayah_start);
-      meta.set(p.page, { surahName, juz });
+      meta.set(p.page, { surahNumber: p.surah_start, surahName, juz });
     }
     setPageMetaMap(meta);
   }, [juzRangeRows, pageRows, surahMap, uiLanguage]);
@@ -1204,6 +1239,7 @@ export function PageMushaf({
           {index < pageData.length - 1 && (
             <PageSeparator
               page={item.page}
+              surahNumber={pageMetaMap.get(item.page)?.surahNumber ?? null}
               surahName={pageMetaMap.get(item.page)?.surahName ?? null}
               juz={pageMetaMap.get(item.page)?.juz ?? null}
               isRTL={isRTL}

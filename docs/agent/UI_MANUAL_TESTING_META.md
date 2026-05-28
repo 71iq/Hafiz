@@ -185,7 +185,7 @@ Spot-test these through every route that consumes them after any style, accessib
 - `components/mushaf/MushafSlider.tsx`
   - Page slider, thumb position, RTL, drag, keyboard/touch.
 - `components/mushaf/PageMushaf.tsx`
-  - Vertical page list, horizontal page swipe, page indicator, page selection, hifz, font loading.
+  - Vertical page list, horizontal page swipe, page indicator, page separators, page selection, hifz, font loading.
 - `components/mushaf/RecitationRangeSheet.tsx`
   - Single/range/surah recitation controls, repeat, unavailable audio.
 - `components/mushaf/SelectionActionBar.tsx`
@@ -404,7 +404,7 @@ Use this order for a full manual pass. For targeted changes, run the affected se
 - Verify QCF V4 and QCF V4 Tajweed render nonblank pages.
 - Verify V4 Tajweed colors match word-panel tajweed colors.
 - Verify line fitting on representative pages including Surah 67 and last 3 juz.
-- Verify surah headers and page separators are not clipped.
+- Verify surah headers and page separators are not clipped and use Quranic fonts where applicable.
 - Tap word for tooltip.
 - Tap outside and scroll to dismiss tooltip.
 - Long-press/tap word to open word detail sheet.
