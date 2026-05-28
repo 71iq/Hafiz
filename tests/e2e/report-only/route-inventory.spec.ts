@@ -1,7 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { waitForQaReady } from "../helpers";
-
-test.describe.configure({ mode: "serial" });
+import { captureConsole, type ConsoleCapture, waitForQaReady } from "../helpers";
 
 const frameworkOverlayPatterns = [
   /Failed to compile/i,
@@ -41,18 +39,38 @@ const routeInventory = [
   "/definitely-not-found",
 ];
 
-async function routeSnapshotIsHealthy(route: string, bodyText: string) {
+const knownStaticExportPageErrors = [
+  /Minified React error #418/,
+];
+
+function resetCapture(capture: ConsoleCapture) {
+  capture.errors.length = 0;
+  capture.pageErrors.length = 0;
+}
+
+async function routeSnapshotIsHealthy(route: string, bodyText: string, capture: ConsoleCapture) {
   expect.soft(bodyText.trim().length, `${route} should not render a blank body`).toBeGreaterThan(8);
   for (const pattern of frameworkOverlayPatterns) {
     expect.soft(bodyText, `${route} should not show a framework overlay`).not.toMatch(pattern);
   }
+
+  expect.soft(
+    capture.pageErrors.filter((message) => !knownStaticExportPageErrors.some((pattern) => pattern.test(message))),
+    `${route} should not throw unexpected page errors`
+  ).toEqual([]);
+  expect.soft(
+    capture.errors.filter((message) => !knownStaticExportPageErrors.some((pattern) => pattern.test(message))),
+    `${route} should not log unexpected console errors`
+  ).toEqual([]);
 }
 
 test.describe("manual route inventory", () => {
   let sharedPage: Page;
+  let capture: ConsoleCapture;
 
   test.beforeAll(async ({ browser }) => {
     sharedPage = await browser.newPage();
+    capture = captureConsole(sharedPage);
     await waitForQaReady(sharedPage);
   });
 
@@ -62,10 +80,11 @@ test.describe("manual route inventory", () => {
 
   for (const route of routeInventory) {
     test(`${route} renders nonblank without framework overlays`, async () => {
+      resetCapture(capture);
       await sharedPage.goto(route, { waitUntil: "domcontentloaded" });
       await sharedPage.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => {});
       const bodyText = await sharedPage.locator("body").innerText({ timeout: 20_000 });
-      await routeSnapshotIsHealthy(route, bodyText);
+      await routeSnapshotIsHealthy(route, bodyText, capture);
     });
   }
 });

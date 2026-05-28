@@ -1937,3 +1937,23 @@ Saved in `phase19/`:
 - `npm run build:web`: passed.
 - `npx expo start --web --port 8097 --localhost`: launched, but browser navigation to `/profile` hit the existing web bundler OOM path; retrying with `NODE_OPTIONS=--max-old-space-size=8192` also reached heap limit.
 - Static export fallback served from `dist` rendered `/profile` at 1009px and 412px with real local data bootstrap and the signed-out profile surface. Auth-gated stat cards were not visually reachable in this isolated browser state.
+
+## 2026-05-28 — UI Test Coverage Expansion Round 3
+
+### Scope decisions
+1. Improved tests only; no app UI/runtime code was changed.
+2. Promoted stable direct routes into strict smoke and left `/flashcards/vocab` report-only because it currently throws `Database not initialized` on direct static-export load.
+3. Added strict static/unit contracts for settings boundaries, public page bilingual/legal content, QF reciter defaults, and coverage-matrix ownership.
+
+### Implemented in this step
+- `tests/e2e/smoke.spec.ts`: strict smoke now covers 26 stable direct routes in one QA-ready browser session.
+- `tests/e2e/report-only/route-inventory.spec.ts`: route inventory now checks console/page errors, continues after failures, and reports the current `/flashcards/vocab` direct-load gap.
+- `tests/unit/settings-contract.test.ts`, `tests/unit/public-pages-contract.test.ts`, `tests/unit/recitations-contract.test.ts`, and `tests/unit/ui-manual-matrix.test.ts`: expanded fast regression coverage.
+- `docs/agent/UI_AUTOMATED_TEST_PHASES.md`: added the current coverage snapshot and route-smoke policy.
+
+### Validation result
+- `npm run typecheck`: passed.
+- `npm run test:unit`: passed, 239 tests.
+- `npm run test:e2e:smoke`: passed, 26 route checks after web export.
+- `UI_PHASE_SKIP_BUILD=1 npm run test:ui:phase -- route-inventory`: report-only, 26 passed / 1 failed (`/flashcards/vocab` direct-load provider gap), 0 skipped.
+- `UI_BASELINE_SKIP_BUILD=1 npm run test:ui:baseline`: report-only, 44 passed / 10 failed, 0 skipped.

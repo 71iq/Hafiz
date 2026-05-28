@@ -24,6 +24,13 @@ The implementation should expose these commands:
 - `npm run verify:quick`: typecheck, unit tests, and strict smoke tests.
 - `npm run verify:web`: typecheck, web export, and strict smoke tests.
 
+## Current Coverage Snapshot - 2026-05-28
+
+- Strict unit/static contracts: 239 passing tests across i18n, Quran data, translations, Mushaf font/layout invariants, client safety, settings, public legal pages, QF reciters, FSRS scoring, selection formatting, and the UI manual coverage matrix.
+- Strict browser smoke: 26 stable direct routes run after a web export with nonblank DOM, framework-overlay, console-error, and page-error checks.
+- Report-only UI baseline: 54 checks; latest run was 44 passing and 10 real gaps, with no skipped checks.
+- Known report-only route gap: `/flashcards/vocab` direct-loads into `Database not initialized` in the static export. It stays out of strict smoke until the route owns its provider boundary or otherwise becomes stable.
+
 ## Phase 1 - Coverage Map
 
 Goal: every manual surface has a stable automation owner.
@@ -60,6 +67,8 @@ Goal: every route listed in the manual meta loads without blank pages or framewo
 
 - Cover root, not-found, public, auth, onboarding, main tabs, flashcard, profile, open/deep-link, and QA routes.
 - For each route, check page identity, nonblank DOM, no framework overlay, and no unexpected console errors.
+- Keep stable direct routes in strict smoke; keep known direct-load provider failures in report-only route inventory until fixed.
+- Keep report-only route inventory non-serial so one failing route does not hide later route results.
 - Run the core set at 390 EN/light, 412 AR/beige, 768 AR/dark, and 1440 EN/white.
 - Exit criteria: strict smoke suite passes and can be run after each change.
 

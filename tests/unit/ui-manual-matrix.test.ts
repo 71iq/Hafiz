@@ -1,9 +1,20 @@
 import {
   getCoverageByPhase,
   getCoverageByStatus,
+  uiComponentCoverage,
   uiCoverageItems,
+  uiFlowCoverage,
   uiRouteCoverage,
 } from "../ui/ui-manual-matrix";
+
+const runnablePhases = [
+  "route-smoke",
+  "navigation-settings-rtl-theme",
+  "mushaf-reader",
+  "search-deeplinks-overlays",
+  "flashcards-home-progress",
+  "community-auth-online",
+];
 
 describe("UI manual coverage matrix", () => {
   it("keeps coverage IDs unique", () => {
@@ -30,5 +41,22 @@ describe("UI manual coverage matrix", () => {
     expect(getCoverageByStatus("strict").length).toBeGreaterThan(0);
     expect(getCoverageByStatus("report-only").length).toBeGreaterThan(0);
     expect(getCoverageByPhase("mushaf-reader").length).toBeGreaterThan(0);
+  });
+
+  test.each(runnablePhases)("%s owns at least one coverage item", (phase) => {
+    expect(getCoverageByPhase(phase).length).toBeGreaterThan(0);
+  });
+
+  it("keeps routes, components, and flows represented separately", () => {
+    expect(uiRouteCoverage.every((item) => item.tags.includes("route"))).toBe(true);
+    expect(uiComponentCoverage.every((item) => item.tags.includes("component"))).toBe(true);
+    expect(uiFlowCoverage.every((item) => item.tags.includes("flow"))).toBe(true);
+  });
+
+  it("keeps live environment checks out of strict local verification", () => {
+    for (const item of getCoverageByStatus("live-env")) {
+      expect(item.tags).toEqual(expect.arrayContaining(["supabase"]));
+      expect(item.status).not.toBe("strict");
+    }
   });
 });
