@@ -24,8 +24,8 @@ type Props = {
 };
 
 const BISMILLAH_UTHMANI = "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ";
-const COMPACT_DECORATIVE_SURAH_NAME_SIZE = 34;
-const COMPACT_DECORATIVE_SURAH_NAME_LINE_HEIGHT = 44;
+const COMPACT_DECORATIVE_SURAH_NAME_SIZE = 32;
+const COMPACT_DECORATIVE_SURAH_NAME_LINE_HEIGHT = 42;
 
 export function SurahHeader({
   surahNumber,
