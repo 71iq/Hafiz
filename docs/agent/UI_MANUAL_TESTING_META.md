@@ -559,6 +559,7 @@ Use this order for a full manual pass. For targeted changes, run the affected se
 - Start a due review session.
 - Start a session with no due cards and verify empty state.
 - Review each mode: next ayah, previous ayah, translation, tafsir, first letter, surah identification, vocabulary.
+- Review similar ayah tail cards and verify the answer shows only the missing tail, not a duplicate full ayah.
 - Reveal answer.
 - Move next/previous within card sides where applicable.
 - Grade Again, Hard, Good, Easy.

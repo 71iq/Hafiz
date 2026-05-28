@@ -1752,7 +1752,7 @@ function SmartRefsAnswer({
           </View>
         )}
 
-        {target && (
+        {card.kind !== "similarTail" && target && (
           <SmartRefCard refData={target} fontSize={fontSize} lineHeight={lineHeight} />
         )}
 
