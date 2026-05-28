@@ -15,6 +15,7 @@ import { isSyncableUserSetting, userSettingToSyncData } from "@/lib/database/use
 export type SyncStatus = "idle" | "syncing" | "synced" | "error" | "offline";
 
 const INITIAL_BACKFILL_VERSION = "20260525_sync_v1";
+const USER_SETTINGS_BACKFILL_VERSION = "20260528_user_settings_v1";
 
 function highlightSyncId(row: {
   surah: number;
@@ -37,6 +38,7 @@ export async function pushSyncQueue(db: SQLiteDatabase): Promise<number> {
   if (!user) return 0;
 
   await enqueueInitialLocalDataForSync(db, user.id);
+  await enqueueSyncableUserSettingsForSync(db, user.id);
 
   const entries = await getPendingSyncEntries(db, 10000);
   if (entries.length === 0) return 0;
@@ -727,6 +729,7 @@ function safeJson(value: unknown): unknown {
 
 async function enqueueInitialLocalDataForSync(db: SQLiteDatabase, userId: string): Promise<void> {
   const backfillKey = `sync_initial_backfill_${userId}_${INITIAL_BACKFILL_VERSION}`;
+  const settingsBackfillKey = userSettingsBackfillKey(userId);
   const done = await db.getFirstAsync<{ value: string }>(
     "SELECT value FROM user_settings WHERE key = ?",
     [backfillKey]
@@ -809,6 +812,36 @@ async function enqueueInitialLocalDataForSync(db: SQLiteDatabase, userId: string
       unlocked_at: row.unlocked_at,
       public_payload: safeJson(row.public_payload) ?? {},
     });
+  }
+
+  await db.runAsync(
+    "INSERT OR REPLACE INTO user_settings (key, value, updated_at, deleted_at) VALUES (?, 'true', ?, NULL)",
+    [backfillKey, new Date().toISOString()]
+  );
+  await db.runAsync(
+    "INSERT OR REPLACE INTO user_settings (key, value, updated_at, deleted_at) VALUES (?, 'true', ?, NULL)",
+    [settingsBackfillKey, new Date().toISOString()]
+  );
+}
+
+function userSettingsBackfillKey(userId: string): string {
+  return `sync_user_settings_backfill_${userId}_${USER_SETTINGS_BACKFILL_VERSION}`;
+}
+
+async function enqueueSyncableUserSettingsForSync(db: SQLiteDatabase, userId: string): Promise<void> {
+  const backfillKey = userSettingsBackfillKey(userId);
+  const done = await db.getFirstAsync<{ value: string }>(
+    "SELECT value FROM user_settings WHERE key = ?",
+    [backfillKey]
+  );
+  if (done?.value === "true") return;
+
+  const settings = await db.getAllAsync<{ key: string; value: string; updated_at: string | null; deleted_at: string | null }>(
+    "SELECT key, value, updated_at, deleted_at FROM user_settings"
+  );
+  for (const row of settings) {
+    if (!isSyncableUserSetting(row.key)) continue;
+    await enqueueSync(db, "user_settings", "UPDATE", row.key, userSettingToSyncData(row)).catch(console.warn);
   }
 
   await db.runAsync(

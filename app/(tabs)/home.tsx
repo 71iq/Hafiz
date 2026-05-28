@@ -34,6 +34,7 @@ import {
   type SmartDeckId,
 } from "@/lib/fsrs/smart-decks";
 import { subscribeReviewActivity } from "@/lib/fsrs/review-events";
+import { subscribeSyncCompleted } from "@/lib/sync/events";
 import {
   getLatestUnseenUnlock,
   markAchievementSeen,
@@ -238,6 +239,9 @@ export default function HomeScreen() {
   );
 
   useEffect(() => subscribeReviewActivity(loadData), [loadData]);
+  useEffect(() => subscribeSyncCompleted(({ pulled }) => {
+    if (pulled > 0) loadData();
+  }), [loadData]);
 
   useEffect(() => subscribeAchievementUnlocks((unlock) => setLatestUnlock(unlock)), []);
 

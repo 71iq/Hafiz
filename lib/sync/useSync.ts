@@ -7,6 +7,7 @@ import { isSupabaseConfigured } from "@/lib/supabase";
 import { fullSync, type SyncStatus } from "@/lib/database/sync";
 import { getPendingSyncCount } from "@/lib/database/sync-queue";
 import { fullQfUserSync, getPendingQfSyncCount } from "@/lib/quran-foundation/user-sync";
+import { emitSyncCompleted } from "@/lib/sync/events";
 
 /**
  * Hook that manages automatic background sync.
@@ -36,6 +37,7 @@ export function useSync() {
 
     try {
       const result = await fullSync(db);
+      if (result.pushed > 0 || result.pulled > 0) emitSyncCompleted(result);
       await fullQfUserSync(db);
       setStatus("synced");
 
