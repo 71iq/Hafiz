@@ -442,7 +442,7 @@ function CompactProgressStat({
     <View
       className="rounded-2xl bg-surface-bright px-4 py-3 dark:bg-surface-dark-low"
       style={{
-        width: isLaptop ? 174 : "48%",
+        width: isLaptop ? 174 : "47%",
         minHeight: 74,
         justifyContent: "space-between",
         borderColor: isDark ? "rgba(45, 212, 191, 0.16)" : "rgba(13, 148, 136, 0.16)",

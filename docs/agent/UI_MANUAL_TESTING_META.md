@@ -601,6 +601,7 @@ Use this order for a full manual pass. For targeted changes, run the affected se
 - Verify default deck progress charts show actual data.
 - Verify surah progress shows tracked surahs.
 - Verify stats cards for retention/reviews/wird consistency.
+- Verify progress stat widgets use two cards per row on phone widths.
 - Verify phone layout has no overlap or excessive horizontal scroll.
 
 ### 20. Leaderboard
