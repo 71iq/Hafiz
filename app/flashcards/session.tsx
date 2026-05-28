@@ -861,6 +861,14 @@ function FlashcardSessionScreen() {
             <Card elevation="low" className="p-6 mb-6 rounded-3xl bg-surface-low dark:bg-surface-dark-low">
               {isSmartReviewCard(currentCard) ? (
                 <SmartCardFront card={currentCard} fontSize={fontSize} lineHeight={lineHeight} s={s} />
+              ) : currentCard.isWordCard && currentCard.textQcf2 && currentCard.v2Page ? (
+                <Qcf2AyahText
+                  textQcf2={currentCard.textQcf2}
+                  v2Page={currentCard.v2Page}
+                  fontSize={fontSize * 0.85}
+                  lineHeight={lineHeight * 0.85}
+                  highlightWordPos={currentCard.wordPos}
+                />
               ) : (
                 <>
               {!currentCard.isWordCard && currentCard.uniqueFront.contextCount > 0 && (
