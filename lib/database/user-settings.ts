@@ -1,7 +1,7 @@
 import type { SQLiteDatabase } from "expo-sqlite";
 import { enqueueSync } from "@/lib/database/sync-queue";
 
-const SYNCABLE_SETTING_PREFIXES = ["deck_", "review_settings_", "smart_deck_filter_"];
+const SYNCABLE_SETTING_PREFIXES = ["deck_", "review_settings_", "smart_deck_filter_", "card_answer_"];
 const SYNCABLE_SETTING_KEYS = new Set(["daily_review_limit", "last_mushaf_position"]);
 
 export type UserSettingRow = {

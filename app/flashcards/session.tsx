@@ -10,7 +10,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { CalendarDays, ChevronRight, Clock3, EllipsisVertical, PauseCircle, RotateCcw, Star, Trash2, Trophy, X } from "lucide-react-native";
+import type { SQLiteDatabase } from "expo-sqlite";
+import { CalendarDays, ChevronRight, Clock3, EllipsisVertical, PauseCircle, Pencil, RotateCcw, Star, Trash2, Trophy, X } from "lucide-react-native";
 import { useDatabase, useDatabaseStatus } from "@/lib/database/provider";
 import { SettingsProvider, useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -65,6 +66,7 @@ import {
 } from "@/lib/fsrs/smart-decks";
 import { parseQiraatText, type QiraatBlock } from "@/lib/qiraat/parse";
 import { recordAchievementEvent } from "@/lib/achievements/queries";
+import { deleteUserSetting, writeUserSetting } from "@/lib/database/user-settings";
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -80,6 +82,7 @@ type CardData = {
   wordText?: string;
   wordMeaningAr?: string;
   wordMeaningEn?: string;
+  customAnswers?: Partial<Record<ReviewMode, string>>;
   surahName: string;
   textUthmani: string;
   textQcf2?: string;
@@ -131,6 +134,19 @@ const SMART_TEST_MODE_COLORS: Record<SmartTestMode, string> = {
   qiraatReading: "#8b5cf6",
   asbabReading: "#d97706",
 };
+const CARD_ANSWER_SETTING_PREFIX = "card_answer_";
+const EDITABLE_ANSWER_MODES: ReviewMode[] = [
+  "previousAyah",
+  "nextAyah",
+  "translation",
+  "tafseer",
+  "surahName",
+  "wordMeaningArabic",
+  "wordMeaningTranslation",
+  "smartRefs",
+  "qiraatReading",
+  "asbabReading",
+];
 
 // ─── Main Component ──────────────────────────────────────────
 
@@ -202,6 +218,9 @@ function FlashcardSessionScreen() {
   const [dueDateOpen, setDueDateOpen] = useState(false);
   const [dueDateText, setDueDateText] = useState("");
   const [dueDateError, setDueDateError] = useState<string | null>(null);
+  const [answerEditOpen, setAnswerEditOpen] = useState(false);
+  const [answerEditMode, setAnswerEditMode] = useState<ReviewMode | null>(null);
+  const [answerEditText, setAnswerEditText] = useState("");
   const [cardActionBusy, setCardActionBusy] = useState(false);
 
   const resetSessionProgress = useCallback(() => {
@@ -218,6 +237,9 @@ function FlashcardSessionScreen() {
     setConfirmCardAction(null);
     setDueDateOpen(false);
     setDueDateError(null);
+    setAnswerEditOpen(false);
+    setAnswerEditMode(null);
+    setAnswerEditText("");
     setCardActionBusy(false);
   }, []);
 
@@ -391,6 +413,8 @@ function FlashcardSessionScreen() {
             : null;
           const wordMeaningEn = isWordCard ? (wordTranslation?.translation_en ?? null) : null;
           const frontText = isWordCard ? (wordText ?? uniqueFront.text) : uniqueFront.text;
+          const customAnswers = await readCardAnswerOverrides(db, row.id);
+          if (cancelled) return;
 
           loaded.push({
             kind: isWordCard ? "word" : "ayah",
@@ -402,6 +426,7 @@ function FlashcardSessionScreen() {
             wordText: wordText ?? undefined,
             wordMeaningAr: wordMeaningAr ?? undefined,
             wordMeaningEn: wordMeaningEn ?? undefined,
+            customAnswers,
             surahName: surahRow?.name_arabic ?? "",
             textUthmani: ayahRow?.text_uthmani ?? "",
             textQcf2: ayahRow?.text_qcf2,
@@ -479,16 +504,16 @@ function FlashcardSessionScreen() {
     }
     if (currentCard.isWordCard) {
       return wordEnabledModes.filter((mode) => {
-        if (mode === "wordMeaningArabic" && !currentCard.wordMeaningAr) return false;
-        if (mode === "wordMeaningTranslation" && !currentCard.wordMeaningEn) return false;
+        if (mode === "wordMeaningArabic" && !currentCard.wordMeaningAr && !getCardAnswerOverride(currentCard, mode)) return false;
+        if (mode === "wordMeaningTranslation" && !currentCard.wordMeaningEn && !getCardAnswerOverride(currentCard, mode)) return false;
         return true;
       });
     }
     return enabledModes.filter((mode) => {
-      if (mode === "previousAyah" && (!currentCard.prevAyahText || currentCard.uniqueFront.contextCount > 0)) return false;
-      if (mode === "nextAyah" && !currentCard.nextAyahText) return false;
-      if (mode === "translation" && !currentCard.translation) return false;
-      if (mode === "tafseer" && !currentCard.tafseer) return false;
+      if (mode === "previousAyah" && (!currentCard.prevAyahText || currentCard.uniqueFront.contextCount > 0) && !getCardAnswerOverride(currentCard, mode)) return false;
+      if (mode === "nextAyah" && !currentCard.nextAyahText && !getCardAnswerOverride(currentCard, mode)) return false;
+      if (mode === "translation" && !currentCard.translation && !getCardAnswerOverride(currentCard, mode)) return false;
+      if (mode === "tafseer" && !currentCard.tafseer && !getCardAnswerOverride(currentCard, mode)) return false;
       return true;
     });
   }, [enabledModes, wordEnabledModes, currentCard]);
@@ -671,6 +696,39 @@ function FlashcardSessionScreen() {
     });
   }, [advanceAfterRemovingCurrentCard, currentCard, db, dueDateText, runCardAction, s.cardDueDateInvalid, s.cardDueDatePast]);
 
+  const openAnswerEditSheet = useCallback(() => {
+    if (!currentCard) return;
+    const mode = currentMode ?? activeModes[currentSideIndex] ?? activeModes[0] ?? null;
+    if (!mode) return;
+    setCardMenuOpen(false);
+    setAnswerEditMode(mode);
+    setAnswerEditText(getCardAnswerOverride(currentCard, mode) ?? getDefaultAnswerText(currentCard, mode, s));
+    setAnswerEditOpen(true);
+  }, [activeModes, currentCard, currentMode, currentSideIndex, s]);
+
+  const handleSaveAnswerEdit = useCallback(() => {
+    if (!currentCard || !answerEditMode) return;
+    runCardAction(async () => {
+      const value = answerEditText.trim();
+      const key = cardAnswerSettingKey(currentCard.card.id, answerEditMode);
+      if (value.length > 0) {
+        await writeUserSetting(db, key, value);
+      } else {
+        await deleteUserSetting(db, key);
+      }
+      setCards((prev) => prev.map((item, index) => {
+        if (index !== currentIndex) return item;
+        const customAnswers = { ...(item.customAnswers ?? {}) };
+        if (value.length > 0) customAnswers[answerEditMode] = value;
+        else delete customAnswers[answerEditMode];
+        return { ...item, customAnswers };
+      }));
+      setAnswerEditOpen(false);
+      setAnswerEditMode(null);
+      setAnswerEditText("");
+    });
+  }, [answerEditMode, answerEditText, currentCard, currentIndex, db, runCardAction]);
+
   const handleGrade = async (rating: Grade) => {
     if (!currentCard || gradingInFlightRef.current) return;
     gradingInFlightRef.current = true;
@@ -792,6 +850,7 @@ function FlashcardSessionScreen() {
   const translateY = flipAnim.interpolate({ inputRange: [0, 1], outputRange: [30, 0] });
   const opacity = flipAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
   const showModeTags = (phase === "front" || phase === "side") && activeModes.length > 0;
+  const editableAnswerMode = currentMode ?? activeModes[currentSideIndex] ?? activeModes[0] ?? null;
 
   return (
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
@@ -994,11 +1053,26 @@ function FlashcardSessionScreen() {
         onSuspend={handleSuspendCard}
         onBury={handleBuryCard}
         onToggleMark={handleToggleMarkCard}
+        onEditAnswer={openAnswerEditSheet}
+        canEditAnswer={!!editableAnswerMode}
         onReset={() => {
           setCardMenuOpen(false);
           setConfirmCardAction("reset");
         }}
         onSetDueDate={openDueDateSheet}
+      />
+      <AnswerEditSheet
+        visible={answerEditOpen}
+        value={answerEditText}
+        busy={cardActionBusy}
+        isDark={isDark}
+        isRTL={isRTL}
+        s={s}
+        onChange={setAnswerEditText}
+        onClose={() => {
+          if (!cardActionBusy) setAnswerEditOpen(false);
+        }}
+        onSave={handleSaveAnswerEdit}
       />
       <DueDateSheet
         visible={dueDateOpen}
@@ -1043,6 +1117,58 @@ function withOpacity(hexColor: string, opacity: number): string {
   return `rgba(${r},${g},${b},${opacity})`;
 }
 
+function cardAnswerSettingKey(cardId: string, mode: ReviewMode): string {
+  return `${CARD_ANSWER_SETTING_PREFIX}${cardId}:${mode}`;
+}
+
+async function readCardAnswerOverrides(db: SQLiteDatabase, cardId: string): Promise<Partial<Record<ReviewMode, string>>> {
+  const result: Partial<Record<ReviewMode, string>> = {};
+  await Promise.all(EDITABLE_ANSWER_MODES.map(async (mode) => {
+    const row = await db.getFirstAsync<{ value: string }>(
+      "SELECT value FROM user_settings WHERE key = ?",
+      [cardAnswerSettingKey(cardId, mode)]
+    );
+    if (row?.value?.trim()) result[mode] = row.value;
+  }));
+  return result;
+}
+
+function getCardAnswerOverride(card: CardData, mode: ReviewMode): string | null {
+  const value = card.customAnswers?.[mode]?.trim();
+  return value ? value : null;
+}
+
+function getDefaultAnswerText(card: CardData, mode: ReviewMode, s: any): string {
+  switch (mode) {
+    case "nextAyah":
+      return card.nextAyahText ?? "";
+    case "previousAyah":
+      return card.prevAyahText ?? "";
+    case "translation":
+      return card.translation;
+    case "tafseer":
+      return card.tafseer;
+    case "surahName":
+      return card.surahName;
+    case "wordMeaningArabic":
+      return card.wordMeaningAr ?? s.noWordMeaningFallback;
+    case "wordMeaningTranslation":
+      return card.wordMeaningEn ?? "";
+    case "smartRefs":
+      return card.smartRefs?.map((ref) => ref.textUthmani).join("\n\n") ?? "";
+    case "qiraatReading":
+      return card.qiraatText ?? card.qiraatGroup?.join("\n\n") ?? "";
+    case "asbabReading":
+      return card.asbabOccasions?.join("\n\n") ?? "";
+    default:
+      return "";
+  }
+}
+
+function containsArabic(value: string): boolean {
+  return /[\u0600-\u06FF]/.test(value);
+}
+
 function CardActionsSheet({
   visible,
   card,
@@ -1055,6 +1181,8 @@ function CardActionsSheet({
   onSuspend,
   onBury,
   onToggleMark,
+  onEditAnswer,
+  canEditAnswer,
   onReset,
   onSetDueDate,
 }: {
@@ -1069,6 +1197,8 @@ function CardActionsSheet({
   onSuspend: () => void;
   onBury: () => void;
   onToggleMark: () => void;
+  onEditAnswer: () => void;
+  canEditAnswer: boolean;
   onReset: () => void;
   onSetDueDate: () => void;
 }) {
@@ -1112,6 +1242,13 @@ function CardActionsSheet({
             disabled={busy}
             isRTL={isRTL}
             onPress={onToggleMark}
+          />
+          <CardActionRow
+            icon={<Pencil size={18} color={isDark ? "#5eead4" : "#0d9488"} />}
+            label={s.cardEditAnswer}
+            disabled={busy || !canEditAnswer}
+            isRTL={isRTL}
+            onPress={onEditAnswer}
           />
           <CardActionRow
             icon={<RotateCcw size={18} color={mutedColor} />}
@@ -1253,6 +1390,71 @@ function DueDateSheet({
   );
 }
 
+function AnswerEditSheet({
+  visible,
+  value,
+  busy,
+  isDark,
+  isRTL,
+  s,
+  onChange,
+  onClose,
+  onSave,
+}: {
+  visible: boolean;
+  value: string;
+  busy: boolean;
+  isDark: boolean;
+  isRTL: boolean;
+  s: any;
+  onChange: (value: string) => void;
+  onClose: () => void;
+  onSave: () => void;
+}) {
+  const answerIsRTL = isRTL || containsArabic(value);
+  return (
+    <ResponsiveSheet
+      open={visible}
+      onClose={onClose}
+      maxWidth={520}
+      maxHeight="80%"
+      avoidKeyboard
+    >
+      <OverlayHeader title={s.cardEditAnswerTitle} subtitle={s.cardEditAnswerHint} onClose={onClose} isRTL={isRTL} showHandle />
+      <OverlayBody scrollEnabled={false} contentContainerClassName="px-5 py-5">
+        <TextInput
+          value={value}
+          onChangeText={onChange}
+          placeholder={s.cardEditAnswerPlaceholder}
+          placeholderTextColor={isDark ? "#737373" : "#b9a085"}
+          multiline
+          textAlignVertical="top"
+          className="min-h-[160px] rounded-2xl bg-surface-low dark:bg-surface-dark-low px-4 py-3 text-charcoal dark:text-neutral-100"
+          style={{
+            fontFamily: "Manrope_500Medium",
+            fontSize: 16,
+            lineHeight: 25,
+            textAlign: answerIsRTL ? "right" : "left",
+            writingDirection: answerIsRTL ? "rtl" : "ltr",
+          }}
+        />
+      </OverlayBody>
+      <OverlayFooter isRTL={isRTL}>
+        <Button variant="outline" onPress={onClose} disabled={busy} className="flex-1">
+          <Text className="text-charcoal dark:text-neutral-200" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>
+            {s.flashcardsCancel}
+          </Text>
+        </Button>
+        <Button onPress={onSave} disabled={busy} className="flex-1">
+          <Text className="text-white" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>
+            {s.cardSaveAnswer}
+          </Text>
+        </Button>
+      </OverlayFooter>
+    </ResponsiveSheet>
+  );
+}
+
 // ─── Test Mode Components ────────────────────────────────────
 
 function ModeTagsRow({
@@ -1343,6 +1545,11 @@ function TestModeAnswer({
 }: {
   mode: ReviewMode; card: CardData; fontSize: number; lineHeight: number; s: any;
 }) {
+  const customAnswer = getCardAnswerOverride(card, mode);
+  if (customAnswer) {
+    return <CustomAnswerText text={customAnswer} fontSize={Math.max(15, fontSize * 0.55)} />;
+  }
+
   switch (mode) {
     case "nextAyah":
       return card.nextAyahQcf2 && card.nextV2Page ? (
@@ -1407,6 +1614,24 @@ function TestModeAnswer({
     default:
       return null;
   }
+}
+
+function CustomAnswerText({ text, fontSize }: { text: string; fontSize: number }) {
+  const answerIsRTL = containsArabic(text);
+  return (
+    <Text
+      className="text-charcoal dark:text-neutral-100"
+      style={{
+        fontFamily: "Manrope_400Regular",
+        fontSize,
+        lineHeight: Math.round(fontSize * 1.62),
+        textAlign: answerIsRTL ? "right" : "left",
+        writingDirection: answerIsRTL ? "rtl" : "ltr",
+      }}
+    >
+      {text}
+    </Text>
+  );
 }
 
 function SmartCardFront({
