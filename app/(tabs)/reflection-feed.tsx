@@ -47,6 +47,7 @@ type FilterOptions = {
 };
 
 const REFLECTION_FEED_MAX_WIDTH = 640;
+const REFLECTION_SEARCH_DEBOUNCE_MS = 500;
 
 export default function ReflectionFeedScreen() {
   const db = useDatabase();
@@ -75,7 +76,7 @@ export default function ReflectionFeedScreen() {
   useEffect(() => {
     const timer = setTimeout(() => {
       setSearchQuery(searchText);
-    }, 250);
+    }, REFLECTION_SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [searchText]);
 
@@ -318,6 +319,7 @@ export default function ReflectionFeedScreen() {
             <ReflectionFeedSearch
               value={searchText}
               onChangeText={setSearchText}
+              onSubmitSearch={() => setSearchQuery(searchText)}
               onClear={() => {
                 setSearchText("");
                 setSearchQuery("");
@@ -469,6 +471,7 @@ export default function ReflectionFeedScreen() {
 function ReflectionFeedSearch({
   value,
   onChangeText,
+  onSubmitSearch,
   onClear,
   placeholder,
   clearLabel,
@@ -477,6 +480,7 @@ function ReflectionFeedSearch({
 }: {
   value: string;
   onChangeText: (value: string) => void;
+  onSubmitSearch: () => void;
   onClear: () => void;
   placeholder: string;
   clearLabel: string;
@@ -497,6 +501,7 @@ function ReflectionFeedSearch({
         placeholder={placeholder}
         placeholderTextColor={isDark ? "#737373" : "#b9a085"}
         returnKeyType="search"
+        onSubmitEditing={onSubmitSearch}
         className="min-h-11 flex-1 py-2 text-charcoal dark:text-neutral-100"
         style={{
           fontFamily: "Manrope_400Regular",
