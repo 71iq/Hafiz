@@ -88,6 +88,7 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
   const [reviewSettings, setReviewSettings] = useState<DeckReviewSettings | null>(null);
   const [saving, setSaving] = useState(false);
   const [activeInfo, setActiveInfo] = useState<SettingInfo | null>(null);
+  const [rangeTarget, setRangeTarget] = useState<SurahRow | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -127,7 +128,10 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
   }, [db, visible, deckId, isRTL]);
 
   useEffect(() => {
-    if (!visible) setActiveInfo(null);
+    if (!visible) {
+      setActiveInfo(null);
+      setRangeTarget(null);
+    }
   }, [visible]);
 
   const openSettingInfo = useCallback((title: string, body: string) => {
@@ -355,11 +359,8 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
                   isRTL={isRTL}
                   ayahCountLabel={interpolate("{{n}} {{label}}", { n: surah.ayah_count, label: s.ayahs })}
                   range={selectedSurahRanges[surah.number] ?? { from: "1", to: String(surah.ayah_count) }}
-                  rangeLabels={{
-                    from: `${s.flashcardsFrom} ${s.reflectionAyahLabel}`,
-                    to: `${s.flashcardsTo} ${s.reflectionAyahLabel}`,
-                  }}
-                  onRangeChange={(field, value) => updateSurahRange(surah.number, field, value)}
+                  rangeActionLabel={s.deckSpecifyAyahRange}
+                  onRangePress={() => setRangeTarget(surah)}
                 />
               ))}
             </View>
@@ -462,6 +463,24 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
           </Text>
         </OverlayBody>
       </ResponsiveSheet>
+
+      <SurahRangeEditor
+        visible={visible && rangeTarget !== null}
+        surah={rangeTarget}
+        range={rangeTarget ? selectedSurahRanges[rangeTarget.number] ?? { from: "1", to: String(rangeTarget.ayah_count) } : null}
+        rangeLabels={{
+          from: `${s.flashcardsFrom} ${s.reflectionAyahLabel}`,
+          to: `${s.flashcardsTo} ${s.reflectionAyahLabel}`,
+        }}
+        title={s.deckSpecifyAyahRange}
+        doneLabel={s.deckAyahRangeDone}
+        isDark={isDark}
+        isRTL={isRTL}
+        onChange={(field, value) => {
+          if (rangeTarget) updateSurahRange(rangeTarget.number, field, value);
+        }}
+        onClose={() => setRangeTarget(null)}
+      />
     </>
   );
 }
@@ -482,8 +501,8 @@ function SurahFilterItem({
   isRTL,
   ayahCountLabel,
   range,
-  rangeLabels,
-  onRangeChange,
+  rangeActionLabel,
+  onRangePress,
 }: {
   surah: SurahRow;
   selected: boolean;
@@ -492,12 +511,14 @@ function SurahFilterItem({
   isRTL: boolean;
   ayahCountLabel: string;
   range: RangeInputValue;
-  rangeLabels: { from: string; to: string };
-  onRangeChange: (field: keyof RangeInputValue, value: string) => void;
+  rangeActionLabel: string;
+  onRangePress: () => void;
 }) {
+  const rangeSummary = `${range.from}-${range.to}`;
+
   return (
     <View
-      className={`p-4 rounded-2xl ${
+      className={`min-h-[68px] justify-center rounded-2xl px-4 py-3 ${
         selected ? "bg-primary-accent/10 dark:bg-primary-bright/15" : "bg-surface-low dark:bg-surface-dark-low"
       }`}
       style={{ direction: "ltr" }}
@@ -520,7 +541,7 @@ function SurahFilterItem({
             </Text>
           )}
         </View>
-        <View className="flex-1">
+        <View className="flex-1" style={{ minWidth: 0 }}>
           <Text className="text-charcoal dark:text-neutral-200" style={{ fontFamily: "Manrope_500Medium", fontSize: 14, textAlign: isRTL ? "right" : "left" }}>
             {surah.name_english}
           </Text>
@@ -534,29 +555,103 @@ function SurahFilterItem({
         >
           {surah.name_arabic}
         </Text>
+        {selected && (
+          <Pressable
+            onPress={(event) => {
+              event.stopPropagation?.();
+              onRangePress();
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={rangeActionLabel}
+            className="min-h-9 justify-center rounded-full bg-surface-high px-3 dark:bg-surface-dark-high"
+            style={({ pressed }) => ({ opacity: pressed ? 0.72 : 1 })}
+          >
+            <Text
+              className="text-primary-accent dark:text-primary-bright"
+              numberOfLines={1}
+              style={{
+                fontFamily: "Manrope_600SemiBold",
+                fontSize: 12,
+                textAlign: "center",
+                writingDirection: isRTL ? "rtl" : "ltr",
+              }}
+            >
+              {rangeActionLabel}
+            </Text>
+            <Text
+              className="text-warm-400 dark:text-neutral-500"
+              numberOfLines={1}
+              style={{ fontFamily: "Manrope_500Medium", fontSize: 10, textAlign: "center" }}
+            >
+              {rangeSummary}
+            </Text>
+          </Pressable>
+        )}
       </Pressable>
-      {selected && (
-        <View
-          className="mt-3 gap-3"
-          style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
-        >
-          <RangeInput
-            label={rangeLabels.from}
-            value={range.from}
-            onChangeText={(value) => onRangeChange("from", value)}
-            isDark={isDark}
-            isRTL={isRTL}
-          />
-          <RangeInput
-            label={rangeLabels.to}
-            value={range.to}
-            onChangeText={(value) => onRangeChange("to", value)}
-            isDark={isDark}
-            isRTL={isRTL}
-          />
-        </View>
-      )}
     </View>
+  );
+}
+
+function SurahRangeEditor({
+  visible,
+  surah,
+  range,
+  rangeLabels,
+  title,
+  doneLabel,
+  isDark,
+  isRTL,
+  onChange,
+  onClose,
+}: {
+  visible: boolean;
+  surah: SurahRow | null;
+  range: RangeInputValue | null;
+  rangeLabels: { from: string; to: string };
+  title: string;
+  doneLabel: string;
+  isDark: boolean;
+  isRTL: boolean;
+  onChange: (field: keyof RangeInputValue, value: string) => void;
+  onClose: () => void;
+}) {
+  return (
+    <ResponsiveSheet
+      open={visible}
+      onClose={onClose}
+      maxWidth={420}
+      maxHeight={320}
+      dir={isRTL ? "rtl" : "ltr"}
+    >
+      <OverlayHeader title={title} subtitle={surah?.name_english} onClose={onClose} isRTL={isRTL} showHandle />
+      <OverlayBody scrollEnabled={false} contentContainerClassName="px-5 py-5">
+        {range ? (
+          <View className="gap-3" style={{ flexDirection: isRTL ? "row-reverse" : "row" }}>
+            <RangeInput
+              label={rangeLabels.from}
+              value={range.from}
+              onChangeText={(value) => onChange("from", value)}
+              isDark={isDark}
+              isRTL={isRTL}
+            />
+            <RangeInput
+              label={rangeLabels.to}
+              value={range.to}
+              onChangeText={(value) => onChange("to", value)}
+              isDark={isDark}
+              isRTL={isRTL}
+            />
+          </View>
+        ) : null}
+      </OverlayBody>
+      <OverlayFooter isRTL={isRTL}>
+        <Button onPress={onClose} className="w-full">
+          <Text className="text-white" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15 }}>
+            {doneLabel}
+          </Text>
+        </Button>
+      </OverlayFooter>
+    </ResponsiveSheet>
   );
 }
 
