@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { CalendarDays, Clock3, PauseCircle, RotateCcw, Search, Star, Trash2 } from "lucide-react-native";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { DropdownMenu, type DropdownMenuItem } from "@/components/ui/DropdownMenu";
 import { OverlayBody, OverlayFooter, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { useDatabase } from "@/lib/database/provider";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -207,8 +208,8 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
             ) : null}
 
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View className="rounded-2xl border border-warm-200 dark:border-neutral-800 overflow-hidden" style={{ minWidth: 760, flex: 1 }}>
-                <DeckCardsHeader isDark={isDark} isRTL={isRTL} s={s} />
+              <View className="rounded-2xl border border-warm-200 dark:border-neutral-800 overflow-hidden" style={{ minWidth: 620, flex: 1 }}>
+                <DeckCardsHeader isRTL={isRTL} s={s} />
                 {loading ? (
                   <TableMessage text={s.deckCardsLoading} isRTL={isRTL} />
                 ) : filteredCards.length === 0 ? (
@@ -219,7 +220,6 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
                       key={card.id}
                       card={card}
                       busy={busyId === card.id}
-                      isDark={isDark}
                       isRTL={isRTL}
                       s={s}
                       onDelete={() => setConfirmAction({ type: "delete", card })}
@@ -292,7 +292,7 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
   );
 }
 
-function DeckCardsHeader({ isDark, isRTL, s }: { isDark: boolean; isRTL: boolean; s: any }) {
+function DeckCardsHeader({ isRTL, s }: { isRTL: boolean; s: any }) {
   return (
     <View
       className="items-center gap-3 bg-surface-low dark:bg-surface-dark-low px-3 py-2"
@@ -301,8 +301,7 @@ function DeckCardsHeader({ isDark, isRTL, s }: { isDark: boolean; isRTL: boolean
       <HeaderCell label={s.deckCardsCardColumn} flex={1.45} isRTL={isRTL} />
       <HeaderCell label={s.deckCardsDueColumn} flex={0.72} isRTL={isRTL} />
       <HeaderCell label={s.deckCardsStateColumn} flex={0.72} isRTL={isRTL} />
-      <HeaderCell label={s.deckCardsStatusColumn} flex={0.86} isRTL={isRTL} />
-      <View style={{ width: 180 }} />
+      <View style={{ width: 44 }} />
     </View>
   );
 }
@@ -322,7 +321,6 @@ function HeaderCell({ label, flex, isRTL }: { label: string; flex: number; isRTL
 function DeckCardRow({
   card,
   busy,
-  isDark,
   isRTL,
   s,
   onDelete,
@@ -334,7 +332,6 @@ function DeckCardRow({
 }: {
   card: DeckCardListItem;
   busy: boolean;
-  isDark: boolean;
   isRTL: boolean;
   s: any;
   onDelete: () => void;
@@ -346,7 +343,47 @@ function DeckCardRow({
 }) {
   const now = new Date().toISOString();
   const isBuried = !!card.buried_until && card.buried_until > now;
-  const mutedColor = isDark ? "#a3a3a3" : "#8B8178";
+  const menuItems: DropdownMenuItem[] = [
+    {
+      key: "mark",
+      label: card.marked_at ? s.cardUnmark : s.cardMark,
+      icon: (color) => <Star size={15} color={color} fill={card.marked_at ? color : "transparent"} />,
+      onPress: onToggleMark,
+    },
+    {
+      key: "suspend",
+      label: card.suspended_at ? s.cardUnsuspend : s.cardSuspend,
+      icon: (color) => <PauseCircle size={15} color={color} />,
+      onPress: onToggleSuspend,
+    },
+    {
+      key: "bury",
+      label: isBuried ? s.cardUnbury : s.cardBury,
+      icon: (color) => <Clock3 size={15} color={color} />,
+      onPress: onToggleBury,
+    },
+    {
+      key: "due",
+      label: s.cardSetDueDate,
+      icon: (color) => <CalendarDays size={15} color={color} />,
+      onPress: onSetDueDate,
+    },
+    {
+      key: "reset",
+      label: s.cardResetProgress,
+      icon: (color) => <RotateCcw size={15} color={color} />,
+      onPress: onReset,
+    },
+    {
+      key: "delete",
+      label: s.cardDelete,
+      icon: (color) => <Trash2 size={15} color={color} />,
+      onPress: onDelete,
+      disabled: card.isVirtual,
+      destructive: true,
+    },
+  ];
+
   return (
     <View
       className="items-center gap-3 border-t border-warm-200 dark:border-neutral-800 px-3 py-2"
@@ -378,35 +415,15 @@ function DeckCardRow({
       <View style={{ flex: 0.72 }}>
         <StatePill state={card.state} s={s} />
       </View>
-      <View className="items-center gap-1" style={{ flex: 0.86, flexDirection: isRTL ? "row-reverse" : "row" }}>
-        {card.marked_at ? <Star size={14} color={isDark ? "#facc15" : "#ca8a04"} fill={isDark ? "#facc15" : "#ca8a04"} /> : null}
-        {card.suspended_at ? <PauseCircle size={14} color={mutedColor} /> : null}
-        {isBuried ? <Clock3 size={14} color={isDark ? "#fbbf24" : "#d97706"} /> : null}
-      </View>
-      <View className="items-center gap-1" style={{ width: 180, flexDirection: isRTL ? "row-reverse" : "row" }}>
-        <IconButton label={card.marked_at ? s.cardUnmark : s.cardMark} disabled={busy} onPress={onToggleMark} icon={<Star size={13} color={isDark ? "#facc15" : "#ca8a04"} fill={card.marked_at ? (isDark ? "#facc15" : "#ca8a04") : "transparent"} />} />
-        <IconButton label={card.suspended_at ? s.cardUnsuspend : s.cardSuspend} disabled={busy} onPress={onToggleSuspend} icon={<PauseCircle size={13} color={mutedColor} />} />
-        <IconButton label={isBuried ? s.cardUnbury : s.cardBury} disabled={busy} onPress={onToggleBury} icon={<Clock3 size={13} color={isDark ? "#fbbf24" : "#d97706"} />} />
-        <IconButton label={s.cardSetDueDate} disabled={busy} onPress={onSetDueDate} icon={<CalendarDays size={13} color={mutedColor} />} />
-        <IconButton label={s.cardResetProgress} disabled={busy} onPress={onReset} icon={<RotateCcw size={13} color={mutedColor} />} />
-        <IconButton label={s.cardDelete} disabled={busy || card.isVirtual} onPress={onDelete} icon={<Trash2 size={13} color={isDark ? "#f87171" : "#dc2626"} />} />
+      <View className="items-center" style={{ width: 44, alignItems: isRTL ? "flex-start" : "flex-end" }}>
+        <DropdownMenu
+          triggerLabel={s.cardActionsTitle}
+          disabled={busy}
+          items={menuItems}
+          isRTL={isRTL}
+        />
       </View>
     </View>
-  );
-}
-
-function IconButton({ icon, label, disabled, onPress }: { icon: ReactNode; label: string; disabled: boolean; onPress: () => void }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      className="h-7 w-7 items-center justify-center rounded-full bg-surface-low dark:bg-surface-dark-low"
-      style={({ pressed }) => ({ opacity: disabled ? 0.35 : pressed ? 0.7 : 1 })}
-    >
-      {icon}
-    </Pressable>
   );
 }
 

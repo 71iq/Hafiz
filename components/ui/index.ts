@@ -28,6 +28,7 @@ export { Sheet, SheetHeader, SheetContent } from "./Sheet";
 export { Switch } from "./Switch";
 export { ToggleGroup } from "./ToggleGroup";
 export { TabBar } from "./Tabs";
+export { DropdownMenu, type DropdownMenuItem } from "./DropdownMenu";
 export {
   ScreenScaffold,
   EditorialHeader,
