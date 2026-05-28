@@ -21,12 +21,15 @@ import {
   getMemorizedAyahCardCount,
   getReviewStats,
   getTotalAyahCardCount,
+  getWirdStatus,
 } from "@/lib/fsrs/queries";
+import { getTotalScore } from "@/lib/fsrs/scoring";
 import { subscribeReviewActivity } from "@/lib/fsrs/review-events";
 import { getAchievementDashboard, type AchievementDashboard } from "@/lib/achievements/queries";
 import { getAchievementDefinition } from "@/lib/achievements/catalog";
 import { DESKTOP_CONTENT_MAX_WIDTH } from "@/lib/ui/viewport";
 import { getDefaultDeckProgress, getLocalSurahProgress, type DefaultDeckProgressItem, type ProfileSurahProgress } from "@/lib/profile/progress";
+import { subscribeSyncCompleted } from "@/lib/sync/events";
 
 type HeatmapDay = { date: string; count: number };
 
@@ -35,25 +38,18 @@ export default function ProgressScreen() {
   const { isDark, isRTL } = useSettings();
   const db = useDatabase();
   const user = useAuthStore((state) => state.user);
+  const authLoading = useAuthStore((state) => state.isLoading);
+  const authInitialized = useAuthStore((state) => state.isInitialized);
   const { isLaptop } = useScreenContentLayout({ maxWidth: DESKTOP_CONTENT_MAX_WIDTH });
-
-  if (isSupabaseConfigured() && !user) {
-    return (
-      <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
-        <AuthGate
-          title={s.authGateProgressTitle}
-          subtitle={s.authGateProgressSubtitle}
-        />
-      </SafeAreaView>
-    );
-  }
 
   const [totalAyahCards, setTotalAyahCards] = useState(0);
   const [memorizedAyahCards, setMemorizedAyahCards] = useState(0);
+  const [currentStreak, setCurrentStreak] = useState(0);
   const [longestStreak, setLongestStreak] = useState(0);
   const [avgDailyReviews, setAvgDailyReviews] = useState(0);
   const [activeReviewDays, setActiveReviewDays] = useState(0);
   const [totalReviews, setTotalReviews] = useState(0);
+  const [totalScore, setTotalScore] = useState(0);
   const [heatmapData, setHeatmapData] = useState<HeatmapDay[]>([]);
   const [surahProgress, setSurahProgress] = useState<ProfileSurahProgress[]>([]);
   const [defaultDeckProgress, setDefaultDeckProgress] = useState<DefaultDeckProgressItem[]>([]);
@@ -62,19 +58,23 @@ export default function ProgressScreen() {
   const [achievementsModalOpen, setAchievementsModalOpen] = useState(false);
 
   const loadData = useCallback(async () => {
-    const [cards, memorized, reviewStats, achievements, defaultDecks] = await Promise.all([
+    const [cards, memorized, reviewStats, wirdStatus, score, achievements, defaultDecks] = await Promise.all([
       getTotalAyahCardCount(db),
       getMemorizedAyahCardCount(db),
       getReviewStats(db),
+      getWirdStatus(db),
+      getTotalScore(db),
       getAchievementDashboard(db),
       getDefaultDeckProgress(db),
     ]);
     setTotalAyahCards(cards);
     setMemorizedAyahCards(memorized);
+    setCurrentStreak(wirdStatus.currentDays);
     setLongestStreak(reviewStats.longestStreak);
     setAvgDailyReviews(reviewStats.averageDailyReviews);
     setActiveReviewDays(reviewStats.activeDays);
     setTotalReviews(reviewStats.totalReviews);
+    setTotalScore(score);
     setHeatmapData(reviewStats.activity);
     setDefaultDeckProgress(defaultDecks);
     setAchievementDashboard(achievements);
@@ -89,14 +89,30 @@ export default function ProgressScreen() {
   );
 
   useEffect(() => subscribeReviewActivity(loadData), [loadData]);
+  useEffect(() => subscribeSyncCompleted(({ pulled }) => {
+    if (pulled > 0) loadData();
+  }), [loadData]);
 
-  const formatStat = (val: number) => val > 0 ? val.toLocaleString() : "—";
+  if (isSupabaseConfigured() && authInitialized && !authLoading && !user) {
+    return (
+      <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
+        <AuthGate
+          title={s.authGateProgressTitle}
+          subtitle={s.authGateProgressSubtitle}
+        />
+      </SafeAreaView>
+    );
+  }
+
+  const formatStat = (val: number) => val.toLocaleString();
   const masteryPct = totalAyahCards > 0 ? Math.round((memorizedAyahCards / totalAyahCards) * 100) : 0;
   const statItems = [
     { value: `${masteryPct}%`, label: s.progressRetention },
     { value: formatStat(memorizedAyahCards), label: s.progressTotalMemorized },
+    { value: formatStat(currentStreak), label: s.wirdCurrent },
     { value: formatStat(longestStreak), label: s.progressLongestStreak },
     { value: formatStat(avgDailyReviews), label: s.progressAvgDaily },
+    { value: formatStat(totalScore), label: s.leaderboardPoints },
   ];
   const recentAchievementItems: AchievementDashboard["items"] = [];
   if (achievementDashboard) {

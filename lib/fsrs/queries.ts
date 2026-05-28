@@ -1091,7 +1091,7 @@ export async function getMemorizedAyahCardCount(db: SQLiteDatabase): Promise<num
     `SELECT COUNT(*) as count
       FROM study_cards
       WHERE deleted_at IS NULL
-        AND state = 2
+        AND (reps > 0 OR last_review IS NOT NULL)
         AND id NOT LIKE 'word:%'
         AND (${NON_SMART_CARD_SQL} OR deck_id = ?)`,
     [SMART_DECK_IDS.retention]

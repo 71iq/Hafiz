@@ -113,6 +113,16 @@ export async function getLocalSurahProgress(db: SQLiteDatabase): Promise<Profile
   })));
 }
 
+export function summarizeSurahProgress(rows: ProfileSurahProgress[]): { totalCards: number; memorized: number; retentionPct: number } {
+  const totalCards = rows.reduce((sum, row) => sum + row.totalCards, 0);
+  const memorized = rows.reduce((sum, row) => sum + row.memorized, 0);
+  return {
+    totalCards,
+    memorized,
+    retentionPct: totalCards > 0 ? Math.round((memorized / totalCards) * 100) : 0,
+  };
+}
+
 export async function attachSurahNames(
   db: SQLiteDatabase,
   rows: Array<{ surah: number; totalCards: number; memorized: number }>

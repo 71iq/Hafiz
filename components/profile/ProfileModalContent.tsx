@@ -33,11 +33,13 @@ import {
   attachSurahNames,
   getDefaultDeckProgress,
   getLocalSurahProgress,
+  summarizeSurahProgress,
   type DefaultDeckProgressItem,
   type ProfileSurahProgress,
 } from "@/lib/profile/progress";
 import { useSettings } from "@/lib/settings/context";
 import type { UILanguage } from "@/lib/settings/context";
+import { subscribeSyncCompleted } from "@/lib/sync/events";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { cn } from "@/lib/utils";
 import { ProfileAvatar } from "./ProfileAvatar";
@@ -275,16 +277,23 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
     ? themeColors.surfaceHigh
     : isDark ? "#0f766e" : "#0d9488";
   const ownStats = localStats ?? { currentStreak: 0, longestStreak: 0, cardsReviewed: 0, totalScore: 0 };
-  const stats = [
-    { label: s.wirdCurrent, value: isOwnProfile ? ownStats.currentStreak : visibleProfile?.current_streak ?? 0 },
-    { label: s.wirdLongest, value: isOwnProfile ? ownStats.longestStreak : visibleProfile?.longest_streak ?? 0 },
-    { label: s.flashcardsSummaryReviewed, value: isOwnProfile ? ownStats.cardsReviewed : visibleProfile?.cards_reviewed ?? 0 },
-    { label: s.leaderboardPoints, value: isOwnProfile ? ownStats.totalScore : visibleProfile?.total_score ?? 0 },
-  ];
   const review = isOwnProfile
     ? localReview
     : publicActivityQuery.data ?? { activity: [], activeDays: 0, totalReviews: 0 };
   const surahProgress = isOwnProfile ? localSurahProgress : publicSurahProgressQuery.data ?? [];
+  const surahSummary = summarizeSurahProgress(surahProgress);
+  const averageDailyReviews = review.activeDays > 0 ? Math.round(review.totalReviews / review.activeDays) : 0;
+  const stats = [
+    { label: s.progressRetention, value: `${surahSummary.retentionPct}%` },
+    { label: s.progressTotalMemorized, value: surahSummary.memorized },
+    { label: s.wirdCurrent, value: isOwnProfile ? ownStats.currentStreak : visibleProfile?.current_streak ?? 0 },
+    { label: s.wirdLongest, value: isOwnProfile ? ownStats.longestStreak : visibleProfile?.longest_streak ?? 0 },
+    { label: s.progressAvgDaily, value: averageDailyReviews },
+    { label: s.flashcardsSummaryReviewed, value: isOwnProfile ? ownStats.cardsReviewed : visibleProfile?.cards_reviewed ?? 0 },
+    { label: s.leaderboardPoints, value: isOwnProfile ? ownStats.totalScore : visibleProfile?.total_score ?? 0 },
+    { label: s.heatmapActiveDays, value: review.activeDays },
+    { label: s.heatmapTotalReviews, value: review.totalReviews },
+  ];
   const publicBadges = isOwnProfile ? ownBadgesQuery.data ?? [] : publicBadgesQuery.data ?? [];
   const loadingPublic = !isOwnProfile && !isSignedOutOwnProfile && publicProfileQuery.isLoading;
   const statusMessage =
@@ -364,6 +373,16 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
       updateProfileStats(db).catch(console.warn);
       queryClient.invalidateQueries({ queryKey: ["publicReviewActivity", user?.id] });
       queryClient.invalidateQueries({ queryKey: ["publicSurahProgress", user?.id] });
+    });
+  }, [db, isOwnProfile, loadLocalOverview, queryClient, user?.id]);
+
+  useEffect(() => {
+    if (!isOwnProfile) return;
+    return subscribeSyncCompleted(({ pulled }) => {
+      if (pulled <= 0) return;
+      loadLocalOverview().catch(console.warn);
+      updateProfileStats(db).catch(console.warn);
+      queryClient.invalidateQueries({ queryKey: ["currentUserPublicAchievementUnlocks", user?.id] });
     });
   }, [db, isOwnProfile, loadLocalOverview, queryClient, user?.id]);
 
@@ -842,7 +861,7 @@ function ProfileOverview({
 }: {
   bio: string;
   country: string;
-  stats: { label: string; value: number }[];
+  stats: { label: string; value: number | string }[];
   review: ReviewSnapshot;
   defaultDeckProgress: DefaultDeckProgressItem[];
   surahProgress: ProfileSurahProgress[];
@@ -855,11 +874,6 @@ function ProfileOverview({
   const s = useStrings();
   const { width } = useWindowDimensions();
   const isWideActivity = width >= SIDEBAR_BREAKPOINT;
-  const activityStats = [
-    ...stats,
-    { label: s.heatmapActiveDays, value: review.activeDays },
-    { label: s.heatmapTotalReviews, value: review.totalReviews },
-  ];
 
   return (
     <View className="gap-5">
@@ -932,7 +946,7 @@ function ProfileOverview({
             />
           </View>
           <ProfileActivityStats
-            items={activityStats}
+            items={stats}
             numberLocale={numberLocale}
             isDark={isDark}
             isWide={isWideActivity}
@@ -981,7 +995,7 @@ function ProfileActivityStats({
   isWide,
   isRTL,
 }: {
-  items: { label: string; value: number }[];
+  items: { label: string; value: number | string }[];
   numberLocale: string;
   isDark: boolean;
   isWide: boolean;
@@ -1001,7 +1015,7 @@ function ProfileActivityStats({
       {items.map((item) => (
         <ProfileStatCard
           key={item.label}
-          value={item.value.toLocaleString(numberLocale)}
+          value={typeof item.value === "number" ? item.value.toLocaleString(numberLocale) : item.value}
           label={item.label}
           isDark={isDark}
           isRTL={isRTL}
