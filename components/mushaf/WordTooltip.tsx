@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { View, Text, Pressable, Platform } from "react-native";
 import { ChevronRight } from "lucide-react-native";
 import { useDatabase } from "@/lib/database/provider";
@@ -15,6 +15,16 @@ const ARROW_SIZE = 6;
 const GAP = 6;
 const SIDE_MARGIN = 8;
 const MAX_TOOLTIP_WIDTH = 320;
+const DISMISS_DRAG_DISTANCE = 8;
+const WORD_TOKEN_SELECTOR = "[data-hafiz-quran-token='word']";
+const TOOLTIP_SELECTOR = "[data-hafiz-word-tooltip='true']";
+
+function closestMatches(target: EventTarget | null, selector: string) {
+  if (!target || typeof Element === "undefined" || !(target instanceof Element)) {
+    return false;
+  }
+  return Boolean(target.closest(selector));
+}
 
 function TooltipPopup({
   position,
@@ -43,6 +53,9 @@ function TooltipPopup({
   return (
     <Pressable
       onPress={onPress}
+      {...(Platform.OS === "web"
+        ? ({ dataSet: { hafizWordTooltip: "true" } } as any)
+        : null)}
       // @ts-ignore — position:'fixed' is valid CSS/RN-Web but not in RN types
       style={{
         position: "fixed",
@@ -113,11 +126,12 @@ function TooltipPopup({
 }
 
 export function FloatingWordTooltip() {
-  const { tooltipWord, tooltipPosition, openDetail, cancelTooltipClear, clearTooltipDelayed } = useWordInteraction();
+  const { tooltipWord, tooltipPosition, openDetail, cancelTooltipClear, clearTooltip, clearTooltipDelayed } = useWordInteraction();
   const db = useDatabase();
   const { uiLanguage } = useSettings();
   const s = useStrings();
   const [translation, setTranslation] = useState<string | null>(null);
+  const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     if (!tooltipWord) return;
@@ -139,6 +153,62 @@ export function FloatingWordTooltip() {
       );
     }
   }, [db, s.noWordMeaningFallback, tooltipWord?.surah, tooltipWord?.ayah, tooltipWord?.wordPos, uiLanguage]);
+
+  useEffect(() => {
+    if (!tooltipWord || Platform.OS !== "web" || typeof document === "undefined") return;
+
+    const handlePointerDown = (event: any) => {
+      pointerStartRef.current = {
+        x: event.clientX ?? 0,
+        y: event.clientY ?? 0,
+      };
+
+      if (
+        closestMatches(event.target, WORD_TOKEN_SELECTOR) ||
+        closestMatches(event.target, TOOLTIP_SELECTOR)
+      ) {
+        return;
+      }
+
+      clearTooltip();
+    };
+
+    const handlePointerMove = (event: any) => {
+      const start = pointerStartRef.current;
+      if (!start) return;
+
+      const dx = Math.abs((event.clientX ?? start.x) - start.x);
+      const dy = Math.abs((event.clientY ?? start.y) - start.y);
+      if (dx < DISMISS_DRAG_DISTANCE && dy < DISMISS_DRAG_DISTANCE) return;
+
+      pointerStartRef.current = null;
+      clearTooltip();
+    };
+
+    const handlePointerEnd = () => {
+      pointerStartRef.current = null;
+    };
+
+    const handleScroll = () => {
+      pointerStartRef.current = null;
+      clearTooltip();
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown, true);
+    document.addEventListener("pointermove", handlePointerMove, true);
+    document.addEventListener("pointerup", handlePointerEnd, true);
+    document.addEventListener("pointercancel", handlePointerEnd, true);
+    document.addEventListener("scroll", handleScroll, true);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown, true);
+      document.removeEventListener("pointermove", handlePointerMove, true);
+      document.removeEventListener("pointerup", handlePointerEnd, true);
+      document.removeEventListener("pointercancel", handlePointerEnd, true);
+      document.removeEventListener("scroll", handleScroll, true);
+      pointerStartRef.current = null;
+    };
+  }, [clearTooltip, tooltipWord]);
 
   if (!tooltipWord || !tooltipPosition || Platform.OS !== "web") return null;
   if (typeof document === "undefined") return null;
