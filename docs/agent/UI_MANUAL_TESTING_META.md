@@ -362,7 +362,7 @@ Use this order for a full manual pass. For targeted changes, run the affected se
 - Change every theme: beige, white, dark, amoled, system, scheduled.
 - Verify browser status/theme color on mobile Safari for each theme.
 - Change Mushaf view mode between verse and page.
-- Change Quran font mode between QCF2, QCF V4, QCF V4 Tajweed.
+- Change Quran font mode between Classic, Modern, and Tajweed Colors.
 - Change Arabic font size and verify preview uses the selected Quran font mode.
 - Change page navigation between scroll and swipe.
 - Verify Reading setting labels stay on the RTL start/right side with controls beside them.
