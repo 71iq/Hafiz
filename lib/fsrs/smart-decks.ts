@@ -100,6 +100,7 @@ const SQLITE_PARAM_BATCH = 800;
 const INSERT_BATCH = 500;
 const ACTIVE_CARD_SQL = "deleted_at IS NULL";
 const REVIEWABLE_CARD_SQL = `${ACTIVE_CARD_SQL} AND suspended_at IS NULL AND (buried_until IS NULL OR buried_until <= ?)`;
+const retentionMigrationPromises = new WeakMap<SQLiteDatabase, Promise<number>>();
 
 function isReviewableCard(row: StudyCardRow, nowIso: string): boolean {
   return !row.deleted_at && !row.suspended_at && (!row.buried_until || row.buried_until <= nowIso);
@@ -220,6 +221,16 @@ export async function writeSmartDeckFilter(
 }
 
 export async function migrateLegacyRetentionDecks(db: SQLiteDatabase): Promise<number> {
+  const running = retentionMigrationPromises.get(db);
+  if (running) return running;
+  const promise = runLegacyRetentionDeckMigration(db).finally(() => {
+    retentionMigrationPromises.delete(db);
+  });
+  retentionMigrationPromises.set(db, promise);
+  return promise;
+}
+
+async function runLegacyRetentionDeckMigration(db: SQLiteDatabase): Promise<number> {
   const now = new Date().toISOString();
   let migrated = 0;
   const syncOps: Array<{
@@ -237,87 +248,89 @@ export async function migrateLegacyRetentionDecks(db: SQLiteDatabase): Promise<n
     [...SMART_DECK_ID_LIST, MEANINGS_DECK_ID]
   );
 
-  await db.withTransactionAsync(async () => {
-    for (const row of rows) {
-      const legacyAyahId = parseLegacyMutashabihatCardId(row.id);
-      if (legacyAyahId) {
-        const existing = await db.getFirstAsync<StudyCardRow>(
-          "SELECT * FROM study_cards WHERE id = ? AND deleted_at IS NULL",
-          [legacyAyahId]
-        );
-        await db.runAsync("UPDATE study_log SET card_id = ? WHERE card_id = ?", [legacyAyahId, row.id]);
-        if (existing?.id) {
-          const markedAt = existing.marked_at ?? row.marked_at ?? now;
-          await db.runAsync(
-            "UPDATE study_cards SET marked_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL",
-            [markedAt, now, legacyAyahId]
+  if (rows.length > 0) {
+    await db.withTransactionAsync(async () => {
+      for (const row of rows) {
+        const legacyAyahId = parseLegacyMutashabihatCardId(row.id);
+        if (legacyAyahId) {
+          const existing = await db.getFirstAsync<StudyCardRow>(
+            "SELECT * FROM study_cards WHERE id = ? AND deleted_at IS NULL",
+            [legacyAyahId]
           );
-          syncOps.push({
-            operation: "UPDATE",
-            rowId: legacyAyahId,
-            data: studyCardToSyncData({
-              ...existing,
-              marked_at: markedAt,
-              updated_at: now,
-            }),
-          });
-          await db.runAsync(
-            "UPDATE study_cards SET updated_at = ?, deleted_at = ? WHERE id = ? AND deleted_at IS NULL",
-            [now, now, row.id]
-          );
-          syncOps.push({
-            operation: "DELETE",
-            rowId: row.id,
-            data: {
-              ...studyCardToSyncData(row),
-              updated_at: now,
-              deleted_at: now,
-            },
-          });
-        } else {
-          const markedAt = row.marked_at ?? now;
-          await db.runAsync(
-            "UPDATE study_cards SET id = ?, deck_id = ?, marked_at = ?, updated_at = ?, deleted_at = NULL WHERE id = ? AND deleted_at IS NULL",
-            [legacyAyahId, SMART_DECK_IDS.retention, markedAt, now, row.id]
-          );
-          syncOps.push({
-            operation: "UPDATE",
-            rowId: legacyAyahId,
-            data: studyCardToSyncData({
-              ...row,
-              id: legacyAyahId,
-              deck_id: SMART_DECK_IDS.retention,
-              marked_at: markedAt,
-              updated_at: now,
-              deleted_at: null,
-            }),
-          });
+          await db.runAsync("UPDATE study_log SET card_id = ? WHERE card_id = ?", [legacyAyahId, row.id]);
+          if (existing?.id) {
+            const markedAt = existing.marked_at ?? row.marked_at ?? now;
+            await db.runAsync(
+              "UPDATE study_cards SET marked_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL",
+              [markedAt, now, legacyAyahId]
+            );
+            syncOps.push({
+              operation: "UPDATE",
+              rowId: legacyAyahId,
+              data: studyCardToSyncData({
+                ...existing,
+                marked_at: markedAt,
+                updated_at: now,
+              }),
+            });
+            await db.runAsync(
+              "UPDATE study_cards SET updated_at = ?, deleted_at = ? WHERE id = ? AND deleted_at IS NULL",
+              [now, now, row.id]
+            );
+            syncOps.push({
+              operation: "DELETE",
+              rowId: row.id,
+              data: {
+                ...studyCardToSyncData(row),
+                updated_at: now,
+                deleted_at: now,
+              },
+            });
+          } else {
+            const markedAt = row.marked_at ?? now;
+            await db.runAsync(
+              "UPDATE study_cards SET id = ?, deck_id = ?, marked_at = ?, updated_at = ?, deleted_at = NULL WHERE id = ? AND deleted_at IS NULL",
+              [legacyAyahId, SMART_DECK_IDS.retention, markedAt, now, row.id]
+            );
+            syncOps.push({
+              operation: "UPDATE",
+              rowId: legacyAyahId,
+              data: studyCardToSyncData({
+                ...row,
+                id: legacyAyahId,
+                deck_id: SMART_DECK_IDS.retention,
+                marked_at: markedAt,
+                updated_at: now,
+                deleted_at: null,
+              }),
+            });
+          }
+          migrated++;
+          continue;
         }
-        migrated++;
-        continue;
-      }
 
-      if (!parseAyahCardId(row.id)) continue;
-      if (row.deck_id === SMART_DECK_IDS.retention) continue;
-      const markedAt = row.marked_at ?? now;
-      await db.runAsync(
-        "UPDATE study_cards SET deck_id = ?, marked_at = ?, updated_at = ?, deleted_at = NULL WHERE id = ? AND deleted_at IS NULL",
-        [SMART_DECK_IDS.retention, markedAt, now, row.id]
-      );
-      syncOps.push({
-        operation: "UPDATE",
-        rowId: row.id,
-        data: studyCardToSyncData({
-          ...row,
-          deck_id: SMART_DECK_IDS.retention,
-          marked_at: markedAt,
-          updated_at: now,
-          deleted_at: null,
-        }),
-      });
-      migrated++;
-    }
-  });
+        if (!parseAyahCardId(row.id)) continue;
+        if (row.deck_id === SMART_DECK_IDS.retention) continue;
+        const markedAt = row.marked_at ?? now;
+        await db.runAsync(
+          "UPDATE study_cards SET deck_id = ?, marked_at = ?, updated_at = ?, deleted_at = NULL WHERE id = ? AND deleted_at IS NULL",
+          [SMART_DECK_IDS.retention, markedAt, now, row.id]
+        );
+        syncOps.push({
+          operation: "UPDATE",
+          rowId: row.id,
+          data: studyCardToSyncData({
+            ...row,
+            deck_id: SMART_DECK_IDS.retention,
+            marked_at: markedAt,
+            updated_at: now,
+            deleted_at: null,
+          }),
+        });
+        migrated++;
+      }
+    });
+  }
 
   for (const op of syncOps) {
     enqueueSync(db, "study_cards", op.operation, op.rowId, op.data).catch(console.warn);

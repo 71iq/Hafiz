@@ -58,14 +58,48 @@ export default function ProgressScreen() {
   const [achievementsModalOpen, setAchievementsModalOpen] = useState(false);
 
   const loadData = useCallback(async () => {
-    const [cards, memorized, reviewStats, wirdStatus, score, achievements, defaultDecks] = await Promise.all([
-      getTotalAyahCardCount(db),
-      getMemorizedAyahCardCount(db),
-      getReviewStats(db),
-      getWirdStatus(db),
-      getTotalScore(db),
-      getAchievementDashboard(db),
-      getDefaultDeckProgress(db),
+    const [
+      cards,
+      memorized,
+      reviewStats,
+      wirdStatus,
+      score,
+      achievements,
+      defaultDecks,
+      surahs,
+    ] = await Promise.all([
+      getTotalAyahCardCount(db).catch((error) => {
+        console.warn("[Progress] Failed to load total ayah cards:", error);
+        return 0;
+      }),
+      getMemorizedAyahCardCount(db).catch((error) => {
+        console.warn("[Progress] Failed to load memorized ayah cards:", error);
+        return 0;
+      }),
+      getReviewStats(db).catch((error) => {
+        console.warn("[Progress] Failed to load review stats:", error);
+        return { activity: [], activeDays: 0, totalReviews: 0, averageDailyReviews: 0, longestStreak: 0 };
+      }),
+      getWirdStatus(db).catch((error) => {
+        console.warn("[Progress] Failed to load wird status:", error);
+        return { currentDays: 0, longestDays: 0, maintainedToday: false, lastReviewDate: null, state: "empty" as const };
+      }),
+      getTotalScore(db).catch((error) => {
+        console.warn("[Progress] Failed to load score:", error);
+        return 0;
+      }),
+      getAchievementDashboard(db).catch((error) => {
+        console.warn("[Progress] Failed to load achievements:", error);
+        return null;
+      }),
+      getDefaultDeckProgress(db).catch((error) => {
+        console.warn("[Progress] Failed to load default deck progress:", error);
+        return [];
+      }),
+      getLocalSurahProgress(db).catch((error) => {
+        console.warn("[Progress] Failed to load surah progress:", error);
+        return [];
+      }),
     ]);
     setTotalAyahCards(cards);
     setMemorizedAyahCards(memorized);
@@ -78,19 +112,18 @@ export default function ProgressScreen() {
     setHeatmapData(reviewStats.activity);
     setDefaultDeckProgress(defaultDecks);
     setAchievementDashboard(achievements);
-
-    setSurahProgress(await getLocalSurahProgress(db));
+    setSurahProgress(surahs);
   }, [db]);
 
   useFocusEffect(
     useCallback(() => {
-      loadData();
+      loadData().catch(console.warn);
     }, [loadData])
   );
 
-  useEffect(() => subscribeReviewActivity(loadData), [loadData]);
+  useEffect(() => subscribeReviewActivity(() => loadData().catch(console.warn)), [loadData]);
   useEffect(() => subscribeSyncCompleted(({ pulled }) => {
-    if (pulled > 0) loadData();
+    if (pulled > 0) loadData().catch(console.warn);
   }), [loadData]);
 
   if (isSupabaseConfigured() && authInitialized && !authLoading && !user) {

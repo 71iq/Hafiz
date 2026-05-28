@@ -40,31 +40,42 @@ export async function getDefaultDeckProgress(db: SQLiteDatabase): Promise<Defaul
   ];
 
   return Promise.all(decks.map(async (deck) => {
-    if (deck.isSmartDeck) {
-      const stats = await getSmartDeckStats(db, deck.deckId as SmartDeckId, { type: "all" });
-      const newCount = Math.max(0, Math.min(stats.total, stats.newCount));
+    try {
+      if (deck.isSmartDeck) {
+        const stats = await getSmartDeckStats(db, deck.deckId as SmartDeckId, { type: "all" });
+        const newCount = Math.max(0, Math.min(stats.total, stats.newCount));
+        return {
+          ...deck,
+          total: stats.total,
+          newCount,
+          startedCount: Math.max(0, stats.total - newCount),
+          dueCount: Math.max(0, Math.min(stats.total, stats.due)),
+        };
+      }
+
+      const [total, rawNewCount, rawDueCount] = await Promise.all([
+        getTotalCardCount(db, deck.deckId),
+        getNewCount(db, deck.deckId),
+        getDueCount(db, deck.deckId),
+      ]);
+      const newCount = Math.max(0, Math.min(total, rawNewCount));
       return {
         ...deck,
-        total: stats.total,
+        total,
         newCount,
-        startedCount: Math.max(0, stats.total - newCount),
-        dueCount: Math.max(0, Math.min(stats.total, stats.due)),
+        startedCount: Math.max(0, total - newCount),
+        dueCount: Math.max(0, Math.min(total, rawDueCount)),
+      };
+    } catch (error) {
+      console.warn(`[Progress] Failed to load default deck progress for ${deck.deckId}:`, error);
+      return {
+        ...deck,
+        total: 0,
+        newCount: 0,
+        startedCount: 0,
+        dueCount: 0,
       };
     }
-
-    const [total, rawNewCount, rawDueCount] = await Promise.all([
-      getTotalCardCount(db, deck.deckId),
-      getNewCount(db, deck.deckId),
-      getDueCount(db, deck.deckId),
-    ]);
-    const newCount = Math.max(0, Math.min(total, rawNewCount));
-    return {
-      ...deck,
-      total,
-      newCount,
-      startedCount: Math.max(0, total - newCount),
-      dueCount: Math.max(0, Math.min(total, rawDueCount)),
-    };
   }));
 }
 
