@@ -18,6 +18,13 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
+    "test:unit": "jest --runInBand",
+    "build:web:test": "npm run build:web",
+    "test:e2e:smoke": "npm run build:web:test && playwright test --project=smoke-chromium tests/e2e/smoke.spec.ts",
+    "test:ui:phase": "node scripts/run-ui-phase.mjs",
+    "test:ui:baseline": "node scripts/run-ui-baseline.mjs",
+    "verify:quick": "npm run typecheck && npm run test:unit && npm run test:e2e:smoke",
+    "verify:web": "npm run typecheck && npm run build:web && npm run test:e2e:smoke",
     "validate:reflection-journey": "node --experimental-strip-types scripts/validate-reflection-journey.js",
     "build:db": "node scripts/build-quran-db.mjs",
     "build:web": "expo export --platform web",
@@ -81,7 +88,13 @@
     "zustand": "^5.0.12"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "@testing-library/react-native": "^13.3.3",
+    "@types/jest": "^29.5.14",
     "@types/react": "~19.2.2",
+    "jest": "^29.7.0",
+    "jest-expo": "~55.0.0",
+    "react-test-renderer": "^19.2.0",
     "sharp": "^0.34.5",
     "supabase": "^2.98.2",
     "typescript": "~5.9.2"

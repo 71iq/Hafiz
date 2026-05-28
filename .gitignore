@@ -16,6 +16,9 @@ public/data/
 # Scripts & screenshots (not part of the app)
 scrape_zilal.py
 screenshots/
+test-results/
+playwright-report/
+.playwright/
 
 # Original SQLite databases (pre-converted to JSON)
 assets/data/masaq/*.db
