@@ -232,7 +232,7 @@ export default function VocabSessionScreen() {
             )}
 
             {revealed && (
-              <View className="flex-row gap-2">
+              <View className="flex-row gap-2" style={{ direction: "ltr" }}>
                 {[
                   { r: Rating.Again, label: s.flashcardsAgain, color: "#dc2626" },
                   { r: Rating.Hard, label: s.flashcardsHard, color: "#b45309" },

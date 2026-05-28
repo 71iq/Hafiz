@@ -1724,7 +1724,7 @@ function GradingButtons({
 
   return (
     <View className="gap-3">
-      <View className="flex-row gap-3">
+      <View className="flex-row gap-3" style={{ direction: "ltr" }}>
         {GRADE_BUTTONS.map(({ rating, bgLight, bgDark }) => {
           const backgroundColor = isDark ? bgDark : bgLight;
           return (
