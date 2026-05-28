@@ -290,6 +290,7 @@ function FlashcardSessionScreen() {
             activeReviewSettings?.newCardsLimit
           );
         }
+        const sessionDueUntil = localEndOfTodayIso();
         const dueRows = remainingReviewLimit > 0
           ? await getDueCardsForReview(db, normalizedDeckId, activeReviewSettings
               ? {
@@ -298,8 +299,9 @@ function FlashcardSessionScreen() {
                   newReviewOrder: activeReviewSettings.newReviewOrder,
                   reviewSortOrder: activeReviewSettings.reviewSortOrder,
                   newCardSortOrder: activeReviewSettings.newCardSortOrder,
+                  dueUntil: sessionDueUntil,
                 }
-              : remainingReviewLimit)
+              : { limit: remainingReviewLimit, dueUntil: sessionDueUntil })
           : [];
         if (cancelled) return;
         if (dueRows.length === 0) {
@@ -755,6 +757,9 @@ function FlashcardSessionScreen() {
         updated_at: now.toISOString(),
       };
       await updateCard(db, updatedRow);
+      const requeuedCard = isCardDueThroughToday(updatedRow, now)
+        ? { ...currentCard, card: updatedRow }
+        : null;
 
       await insertStudyLog(
         db,
@@ -790,7 +795,11 @@ function FlashcardSessionScreen() {
         addTodayPoints(db, points).catch(console.warn);
       }
 
-      if (currentIndex < cards.length - 1) {
+      if (requeuedCard) {
+        setCards((prev) => [...prev, requeuedCard]);
+      }
+
+      if (currentIndex < cards.length - 1 || requeuedCard) {
         setCurrentIndex((i) => i + 1);
         setCurrentSideIndex(0);
         setRevealed(false);
@@ -2023,68 +2032,121 @@ function CardStateBadge({ state, s }: { state: number; s: any }) {
 // ─── Session Summary ─────────────────────────────────────────
 
 function SessionSummaryView({ summary, onDone, isDark, s, error }: { summary: SessionSummary; onDone: () => void; isDark: boolean; s: any; error?: string | null }) {
+  const { width, height } = useWindowDimensions();
   const durationMin = Math.max(1, Math.round(summary.durationMs / 60000));
-  const nextReview = summary.nextReviewDate ? new Date(summary.nextReviewDate).toLocaleDateString() : "—";
+  const nextReview = formatNextReviewDate(summary.nextReviewDate, s);
+  const compact = width < 430 || height < 760;
 
   return (
-    <ScrollView className="flex-1 px-6" contentContainerStyle={{ alignItems: "center", paddingTop: 60, paddingBottom: 100 }}>
+    <View
+      className="flex-1 px-5"
+      style={{
+        alignItems: "center",
+        justifyContent: "center",
+        paddingTop: compact ? 12 : 32,
+        paddingBottom: compact ? 16 : 40,
+      }}
+    >
       {error && (
         <Text
-          className="mb-4 text-center text-red-600 dark:text-red-400"
-          style={{ fontFamily: "Manrope_500Medium", fontSize: 13 }}
+          className="text-center text-red-600 dark:text-red-400"
+          style={{ fontFamily: "Manrope_500Medium", fontSize: compact ? 12 : 13, marginBottom: compact ? 8 : 14 }}
         >
           {error}
         </Text>
       )}
-      <View className="w-20 h-20 rounded-full items-center justify-center mb-6" style={{ backgroundColor: isDark ? "#1B4D4F" : "#f0fdfa" }}>
-        <Trophy size={36} color={isDark ? "#FDDC91" : "#0d9488"} />
+      <View
+        className="rounded-full items-center justify-center"
+        style={{
+          width: compact ? 58 : 72,
+          height: compact ? 58 : 72,
+          marginBottom: compact ? 14 : 20,
+          backgroundColor: isDark ? "#1B4D4F" : "#f0fdfa",
+        }}
+      >
+        <Trophy size={compact ? 28 : 34} color={isDark ? "#FDDC91" : "#0d9488"} />
       </View>
 
-      <Text className="text-charcoal dark:text-neutral-100 mb-8" style={{ fontFamily: "NotoSerif_700Bold", fontSize: 24 }}>
+      <Text
+        className="text-charcoal dark:text-neutral-100"
+        style={{ fontFamily: "NotoSerif_700Bold", fontSize: compact ? 21 : 24, marginBottom: compact ? 18 : 26 }}
+      >
         {s.flashcardsSummaryTitle}
       </Text>
 
-      <View className="w-full max-w-sm gap-4">
-        <SummaryRow label={s.flashcardsSummaryReviewed} value={String(summary.total)} />
+      <View className="w-full max-w-sm" style={{ gap: compact ? 10 : 14 }}>
+        <SummaryRow label={s.flashcardsSummaryReviewed} value={String(summary.total)} compact={compact} />
         {summary.total > 0 && (
           <SummaryRow
             label={summary.wirdMaintainedToday ? s.wirdMaintained : s.wirdConsistency}
             value={interpolate(s.wirdDays, { n: summary.wirdDays.toLocaleString() })}
+            compact={compact}
           />
         )}
-        <View className="flex-row gap-3">
-          <SummaryCard label={s.flashcardsSummaryNew} value={String(summary.newCount)} color="#3b82f6" />
-          <SummaryCard label={s.flashcardsSummaryReview} value={String(summary.reviewCount)} color="#22c55e" />
-          <SummaryCard label={s.flashcardsSummaryRelearning} value={String(summary.relearningCount)} color="#ef4444" />
+        <View className="flex-row" style={{ gap: compact ? 8 : 12 }}>
+          <SummaryCard label={s.flashcardsSummaryNew} value={String(summary.newCount)} color="#3b82f6" compact={compact} />
+          <SummaryCard label={s.flashcardsSummaryReview} value={String(summary.reviewCount)} color="#22c55e" compact={compact} />
+          <SummaryCard label={s.flashcardsSummaryRelearning} value={String(summary.relearningCount)} color="#ef4444" compact={compact} />
         </View>
-        <SummaryRow label={s.flashcardsSummaryDuration} value={interpolate(s.flashcardsSummaryMinutes, { n: String(durationMin) })} />
-        <SummaryRow label={s.flashcardsSummaryNextReview} value={nextReview} />
+        <SummaryRow label={s.flashcardsSummaryDuration} value={interpolate(s.flashcardsSummaryMinutes, { n: String(durationMin) })} compact={compact} />
+        <SummaryRow label={s.flashcardsSummaryNextReview} value={nextReview} compact={compact} />
       </View>
 
-      <Button onPress={onDone} className="mt-10 w-full max-w-sm">
-        <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16, color: "#fff" }}>{s.flashcardsSummaryDone}</Text>
+      <Button onPress={onDone} className="w-full max-w-sm" style={{ marginTop: compact ? 18 : 28 }}>
+        <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: compact ? 15 : 16, color: "#fff" }}>{s.flashcardsSummaryDone}</Text>
       </Button>
-    </ScrollView>
+    </View>
   );
 }
 
-function SummaryRow({ label, value }: { label: string; value: string }) {
+function SummaryRow({ label, value, compact = false }: { label: string; value: string; compact?: boolean }) {
   return (
-    <Card elevation="low" className="flex-row items-center justify-between p-5">
-      <Text className="text-warm-400 dark:text-neutral-500" style={{ fontFamily: "Manrope_500Medium", fontSize: 14 }}>{label}</Text>
-      <Text className="text-charcoal dark:text-neutral-100" style={{ fontFamily: "Manrope_700Bold", fontSize: 18 }}>{value}</Text>
+    <Card
+      elevation="low"
+      className="flex-row items-center justify-between"
+      style={{ minHeight: compact ? 48 : 62, paddingHorizontal: compact ? 16 : 20, paddingVertical: compact ? 12 : 16 }}
+    >
+      <Text className="text-warm-400 dark:text-neutral-500" style={{ fontFamily: "Manrope_500Medium", fontSize: compact ? 12 : 14 }}>{label}</Text>
+      <Text className="text-charcoal dark:text-neutral-100" style={{ fontFamily: "Manrope_700Bold", fontSize: compact ? 16 : 18 }}>{value}</Text>
     </Card>
   );
 }
 
-function SummaryCard({ label, value, color }: { label: string; value: string; color: string }) {
+function SummaryCard({ label, value, color, compact = false }: { label: string; value: string; color: string; compact?: boolean }) {
   return (
-    <Card elevation="low" className="flex-1 items-center p-4">
-      <View className="w-2 h-2 rounded-full mb-2" style={{ backgroundColor: color }} />
-      <Text className="text-charcoal dark:text-neutral-100" style={{ fontFamily: "Manrope_700Bold", fontSize: 20 }}>{value}</Text>
-      <Text className="text-warm-400 dark:text-neutral-500 mt-0.5" style={{ fontFamily: "Manrope_500Medium", fontSize: 11 }}>{label}</Text>
+    <Card
+      elevation="low"
+      className="flex-1 items-center"
+      style={{ minHeight: compact ? 78 : 96, paddingHorizontal: compact ? 8 : 12, paddingVertical: compact ? 12 : 16 }}
+    >
+      <View className="w-2 h-2 rounded-full" style={{ marginBottom: compact ? 8 : 10, backgroundColor: color }} />
+      <Text className="text-charcoal dark:text-neutral-100" style={{ fontFamily: "Manrope_700Bold", fontSize: compact ? 18 : 20 }}>{value}</Text>
+      <Text className="text-warm-400 dark:text-neutral-500 text-center" style={{ fontFamily: "Manrope_500Medium", fontSize: compact ? 10 : 11, marginTop: 2 }}>{label}</Text>
     </Card>
   );
+}
+
+function localEndOfTodayIso(base = new Date()): string {
+  const end = new Date(base);
+  end.setHours(23, 59, 59, 999);
+  return end.toISOString();
+}
+
+function isCardDueThroughToday(row: StudyCardRow, now: Date): boolean {
+  const nowIso = now.toISOString();
+  return (
+    !row.deleted_at &&
+    !row.suspended_at &&
+    (!row.buried_until || row.buried_until <= nowIso) &&
+    row.due <= localEndOfTodayIso(now)
+  );
+}
+
+function formatNextReviewDate(value: string | null, s: any): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date <= new Date(localEndOfTodayIso()) ? s.flashcardsToday : date.toLocaleDateString();
 }
 
 // ─── Helpers ─────────────────────────────────────────────────

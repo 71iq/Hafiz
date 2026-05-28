@@ -82,6 +82,7 @@ export type DueCardsForReviewOptions = number | {
   newReviewOrder?: NewReviewOrder;
   reviewSortOrder?: ReviewSortOrder;
   newCardSortOrder?: NewCardSortOrder;
+  dueUntil?: string;
 };
 
 const SMART_DECK_ID_LIST: SmartDeckId[] = [
@@ -423,7 +424,16 @@ function normalizeEnum<T extends string>(value: unknown, allowed: readonly T[], 
   return typeof value === "string" && allowed.includes(value as T) ? value as T : fallback;
 }
 
-function normalizeDueOptions(options?: DueCardsForReviewOptions): Required<NonNullable<Exclude<DueCardsForReviewOptions, number>>> {
+type NormalizedDueOptions = {
+  limit: number;
+  newCardsLimit: number;
+  newReviewOrder: NewReviewOrder;
+  reviewSortOrder: ReviewSortOrder;
+  newCardSortOrder: NewCardSortOrder;
+  dueUntil?: string;
+};
+
+function normalizeDueOptions(options?: DueCardsForReviewOptions): NormalizedDueOptions {
   if (typeof options === "number") {
     return {
       limit: options,
@@ -441,6 +451,7 @@ function normalizeDueOptions(options?: DueCardsForReviewOptions): Required<NonNu
     newReviewOrder: normalizeEnum(options?.newReviewOrder, ALL_NEW_REVIEW_ORDERS, DEFAULT_NEW_REVIEW_ORDER),
     reviewSortOrder: normalizeEnum(options?.reviewSortOrder, ALL_REVIEW_SORT_ORDERS, DEFAULT_REVIEW_SORT_ORDER),
     newCardSortOrder: normalizeEnum(options?.newCardSortOrder, ALL_NEW_CARD_SORT_ORDERS, DEFAULT_NEW_CARD_SORT_ORDER),
+    dueUntil: typeof options?.dueUntil === "string" ? options.dueUntil : undefined,
   };
 }
 
@@ -685,23 +696,24 @@ export async function getDueCardsForReview(
   options?: DueCardsForReviewOptions
 ): Promise<StudyCardRow[]> {
   const now = new Date().toISOString();
+  const dueUntil = normalizeDueOptions(options).dueUntil ?? now;
 
   if (isSmartDeckId(deckId)) {
-    const rows = await getSmartDeckDueRows(db, deckId, now);
+    const rows = await getSmartDeckDueRows(db, deckId, dueUntil, now);
     return applyReviewQueueOptions(rows, options);
   }
 
   if (deckId) {
     const rows = await db.getAllAsync<StudyCardRow>(
       `SELECT * FROM study_cards WHERE deck_id = ? AND due <= ? AND ${REVIEWABLE_CARD_SQL}`,
-      [deckId, now, now]
+      [deckId, dueUntil, now]
     );
     return applyReviewQueueOptions(rows, options);
   }
 
   const rows = await db.getAllAsync<StudyCardRow>(
     `SELECT * FROM study_cards WHERE due <= ? AND ${REVIEWABLE_CARD_SQL}`,
-    [now, now]
+    [dueUntil, now]
   );
   const matchingSmartIds = await getAllMatchingSmartCardIdSet(db);
   const filtered = rows.filter((row) => !isSmartDeckId(row.deck_id) || matchingSmartIds.has(row.id));
@@ -1109,6 +1121,7 @@ function normalizeArabicWords(text: string): string[] {
 async function getSmartDeckDueRows(
   db: SQLiteDatabase,
   deckId: SmartDeckId,
+  dueUntil: string,
   now: string
 ): Promise<StudyCardRow[]> {
   if (deckId === SMART_DECK_IDS.retention) {
@@ -1123,7 +1136,7 @@ async function getSmartDeckDueRows(
       `SELECT * FROM study_cards
         WHERE deck_id = ? AND due <= ? AND ${REVIEWABLE_CARD_SQL} AND id IN (${placeholders})
         ORDER BY due`,
-      [deckId, now, now, ...chunk]
+      [deckId, dueUntil, now, ...chunk]
     ));
   }
   return rows.sort((a, b) => a.due.localeCompare(b.due));
