@@ -10,7 +10,6 @@ const root = path.resolve(__dirname, "..");
 const reportPath = path.join(root, "test-results/playwright/results.json");
 const summaryPath = path.join(root, "test-results/ui-baseline-summary.json");
 const project = process.env.UI_BASELINE_PROJECT ?? "ui-390-chromium";
-const minimumFailureRate = Number(process.env.UI_BASELINE_MIN_FAILURE_RATE ?? 0.3);
 
 function collectTestResults(suite, results = []) {
   for (const spec of suite.specs ?? []) {
@@ -50,8 +49,6 @@ function summarize() {
     failed,
     skipped,
     failureRate,
-    minimumFailureRate,
-    thresholdMet: failureRate >= minimumFailureRate,
     failures: results.filter((item) => item.status !== "passed" && item.status !== "skipped"),
   };
 }
@@ -87,7 +84,6 @@ fs.writeFileSync(summaryPath, `${JSON.stringify(summary, null, 2)}\n`);
 console.log(
   `[UI baseline] total=${summary.total} passed=${summary.passed} failed=${summary.failed} skipped=${summary.skipped} failureRate=${(summary.failureRate * 100).toFixed(1)}%`
 );
-console.log(`[UI baseline] thresholdMet=${summary.thresholdMet}`);
 console.log(`[UI baseline] summary=${path.relative(root, summaryPath)}`);
 
 if (result.error) {

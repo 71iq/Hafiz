@@ -12,6 +12,9 @@ const project = process.env.UI_PHASE_PROJECT ?? "ui-390-chromium";
 
 const phaseFiles = {
   "provider-boundaries": "tests/e2e/report-only/provider-boundaries.spec.ts",
+  "responsive-overflow": "tests/e2e/report-only/responsive-overflow.spec.ts",
+  "route-inventory": "tests/e2e/report-only/route-inventory.spec.ts",
+  "sync-contract": "tests/e2e/report-only/sync-contract.spec.ts",
   "ui-contract": "tests/e2e/report-only/ui-contract.spec.ts",
 };
 
@@ -54,7 +57,7 @@ function summarize(reportPath) {
 }
 
 if (!phase || phase === "--help" || phase === "-h") {
-  console.log("Usage: npm run test:ui:phase -- <provider-boundaries|ui-contract|all>");
+  console.log("Usage: npm run test:ui:phase -- <provider-boundaries|responsive-overflow|route-inventory|sync-contract|ui-contract|all>");
   process.exit(0);
 }
 

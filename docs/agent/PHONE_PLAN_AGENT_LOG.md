@@ -23,6 +23,20 @@ Purpose: persistent continuity log for the new phone redesign so future sessions
 ### Next step
 - Add Jest and Playwright harnesses, then wire strict static tests and report-only browser baseline phases.
 
+## 2026-05-28 — UI Automated Coverage Clarification
+
+### Scope decisions
+1. Removed the earlier 30% failing-baseline target from the test strategy.
+2. Reframed report-only failures as a gap inventory only; coverage breadth and correctness matter more than failure percentage.
+3. Continued keeping default verification green while report-only checks expose real documented gaps.
+
+### Impacted files/routes
+- Updated `docs/agent/UI_AUTOMATED_TEST_PHASES.md`.
+- Added more strict static contract tests and broader report-only route/sync coverage in the test tree.
+
+### Next step
+- Keep promoting stable report-only checks into strict suites as app behavior is fixed.
+
 ## 2026-05-01 — Phase 0 Started
 
 ### Scope baseline audited

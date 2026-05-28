@@ -6,7 +6,7 @@ This file turns `docs/agent/UI_MANUAL_TESTING_META.md` into runnable automation 
 
 - Source of truth: `docs/agent/UI_MANUAL_TESTING_META.md`.
 - Runner policy: strict suites must pass; baseline suites are report-only.
-- Failure policy: the first full baseline must report at least 30% real failures against documented correct behavior. Do not add placeholder or synthetic failing tests.
+- Failure policy: baseline failures are useful only when they represent real documented behavior gaps. Do not add placeholder or synthetic failing tests, and do not chase any target percentage.
 - Data policy: no mock Quran data. Tests use bundled data and local SQLite paths.
 - Scope policy: add selectors and test support only where needed; do not rewrite UI to make tests easier.
 - Verification after UI changes:
@@ -115,15 +115,15 @@ Goal: cover online-only surfaces without making local verification brittle.
 - Gate live Supabase/QF checks behind explicit environment variables and skip when absent.
 - Exit criteria: local report-only phase runs without live secrets; live phase is opt-in.
 
-## Phase 10 - Baseline Failure Report
+## Phase 10 - Baseline Gap Report
 
-Goal: produce the required initial failure inventory.
+Goal: produce the broadest practical inventory of current UI gaps.
 
 - Add `scripts/run-ui-baseline.mjs`.
 - Run all report-only UI phases.
 - Print total assertions, failures, skipped checks, and failure percentage.
 - Exit zero by default so reporting does not block normal local work.
-- Initial acceptance: failure percentage is at least 30%, and every failure is tied to a documented manual behavior.
+- Acceptance: every failure is tied to a documented manual behavior, and newly added report-only checks increase meaningful coverage rather than padding counts.
 
 ## Phase 11 - Promotion
 
