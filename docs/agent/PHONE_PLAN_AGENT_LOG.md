@@ -7,6 +7,22 @@ Purpose: persistent continuity log for the new phone redesign so future sessions
 - Keep entries concrete: date, decision/change, rationale, impacted files/routes, and next step.
 - Do not mark a phase complete without explicit exit criteria.
 
+## 2026-05-28 — UI Automated Test Plan Baseline
+
+### Scope decisions
+1. Adopted a web-first automated UI test rollout based on `docs/agent/UI_MANUAL_TESTING_META.md`.
+2. Chose report-only handling for the required initial failing tests so strict verification can stay green while real UI gaps are tracked.
+3. Required the initial baseline failures to be real current product gaps, not placeholders.
+4. Deferred native iOS/Android automation to later phases; native remains manual under the existing manual matrix.
+
+### Impacted files/routes
+- Added the runnable phase plan in `docs/agent/UI_AUTOMATED_TEST_PHASES.md`.
+- Added the first coverage ownership map in `tests/ui/ui-manual-matrix.ts`.
+- No app routes or user-facing UI were changed.
+
+### Next step
+- Add Jest and Playwright harnesses, then wire strict static tests and report-only browser baseline phases.
+
 ## 2026-05-01 — Phase 0 Started
 
 ### Scope baseline audited
