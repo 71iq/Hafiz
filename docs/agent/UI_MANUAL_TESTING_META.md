@@ -365,6 +365,7 @@ Use this order for a full manual pass. For targeted changes, run the affected se
 - Change Quran font mode between QCF2, QCF V4, QCF V4 Tajweed.
 - Change Arabic font size and verify preview uses the selected Quran font mode.
 - Change page navigation between scroll and swipe.
+- Verify Reading setting labels stay on the RTL start/right side with controls beside them.
 - Open tafsir source select from settings.
 - Select bundled tafsirs.
 - Download optional tafsir and verify selector remains usable while downloading.

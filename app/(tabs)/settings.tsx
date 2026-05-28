@@ -639,7 +639,11 @@ export default function SettingsScreen() {
 
             <View
               className="items-center justify-between gap-3"
-              style={{ flexDirection: isRTL ? "row-reverse" : "row", flexWrap: "wrap" }}
+              style={{
+                direction: isRTL ? "rtl" : "ltr",
+                flexDirection: "row",
+                flexWrap: "wrap",
+              }}
             >
               <View className="min-w-0 flex-1">
                 <Text
@@ -1493,7 +1497,11 @@ function SettingsControlRow({
   return (
     <View
       className="items-center justify-between gap-3"
-      style={{ flexDirection: isRTL ? "row-reverse" : "row", flexWrap: "wrap" }}
+      style={{
+        direction: isRTL ? "rtl" : "ltr",
+        flexDirection: "row",
+        flexWrap: "wrap",
+      }}
     >
       <Text
         className="text-charcoal dark:text-neutral-200"
