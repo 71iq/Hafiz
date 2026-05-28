@@ -607,10 +607,12 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
                   <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
+                    style={{ direction: isRTL ? "rtl" : "ltr" }}
                     contentContainerStyle={{
                       gap: 8,
                       paddingBottom: 12,
-                      flexDirection: isRTL ? "row-reverse" : "row",
+                      flexDirection: "row",
+                      direction: isRTL ? "rtl" : "ltr",
                     }}
                   >
                     {tafsirSourceConfigs.map((source) => (
