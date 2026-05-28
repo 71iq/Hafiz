@@ -1,3 +1,15 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :where(input, textarea, [contenteditable="true"]) {
+    caret-color: #0d9488;
+  }
+
+  :where(input, textarea, [contenteditable="true"]):focus,
+  :where(input, textarea, [contenteditable="true"]):focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+  }
+}
