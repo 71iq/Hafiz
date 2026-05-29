@@ -16,7 +16,8 @@ import { z } from "zod";
 import { ChevronLeft, ChevronRight } from "lucide-react-native";
 import { useAuthStore } from "@/lib/auth/store";
 import { isSupabaseConfigured } from "@/lib/supabase";
-import { useStrings } from "@/lib/i18n/useStrings";
+import { strings } from "@/lib/i18n/strings";
+import { getStartupLanguage } from "@/lib/i18n/startup-language";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { FormTextField } from "@/components/ui/FormTextField";
@@ -29,7 +30,7 @@ type ForgotPasswordForm = z.infer<typeof forgotPasswordSchema>;
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
-  const s = useStrings();
+  const s = strings[getStartupLanguage()];
   const { sendPasswordReset, isLoading, error } = useAuthStore();
   const [message, setMessage] = useState<string | null>(null);
   const [messageType, setMessageType] = useState<"success" | "error">("error");

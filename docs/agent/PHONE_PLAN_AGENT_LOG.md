@@ -1957,3 +1957,26 @@ Saved in `phase19/`:
 - `npm run test:e2e:smoke`: passed, 26 route checks after web export.
 - `UI_PHASE_SKIP_BUILD=1 npm run test:ui:phase -- route-inventory`: report-only, 26 passed / 1 failed (`/flashcards/vocab` direct-load provider gap), 0 skipped.
 - `UI_BASELINE_SKIP_BUILD=1 npm run test:ui:baseline`: report-only, 44 passed / 10 failed, 0 skipped.
+
+## 2026-05-30 — UI Report-Only Failures Fixed
+
+### Scope decisions
+1. Fixed only the reported test gaps: provider-boundary contracts, hardcoded English route copy, and `/flashcards/vocab` direct-load initialization.
+2. Kept auth routes independent of database-backed settings by using cached startup language strings directly.
+3. Promoted `/flashcards/vocab` into strict smoke after adding a database-ready wrapper.
+
+### Implemented in this step
+- Added a shared startup-language helper for routes that need bilingual copy before settings are loaded.
+- Replaced hardcoded not-found and QA readiness shell copy with bilingual string keys.
+- Updated standalone auth and QF callback routes to read bilingual strings from startup language instead of `useStrings`.
+- Wrapped `app/flashcards/vocab.tsx` with a database-ready gate and `SettingsProvider` before calling `useDatabase`, `useSettings`, or `useStrings`.
+- Added `/flashcards/vocab` back to strict smoke and updated the automated-test coverage snapshot.
+
+### Validation result
+- `npm run typecheck`: passed.
+- `npm run test:unit`: passed, 239 tests.
+- `UI_PHASE_SKIP_BUILD=1 npm run test:ui:phase -- provider-boundaries`: passed, 9/9.
+- `UI_PHASE_SKIP_BUILD=1 npm run test:ui:phase -- ui-contract`: passed, 5/5.
+- `npm run test:e2e:smoke`: passed after web export, 27 route checks.
+- `UI_PHASE_SKIP_BUILD=1 npm run test:ui:phase -- route-inventory`: passed, 27/27.
+- `UI_BASELINE_SKIP_BUILD=1 npm run test:ui:baseline`: passed, 54/54.

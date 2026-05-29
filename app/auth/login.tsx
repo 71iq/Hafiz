@@ -16,7 +16,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useAuthStore } from "@/lib/auth/store";
 import { isSupabaseConfigured } from "@/lib/supabase";
-import { useStrings } from "@/lib/i18n/useStrings";
+import { strings } from "@/lib/i18n/strings";
+import { getStartupLanguage } from "@/lib/i18n/startup-language";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { FormTextField } from "@/components/ui/FormTextField";
@@ -32,7 +33,7 @@ type LoginForm = z.infer<typeof loginSchema>;
 
 export default function LoginScreen() {
   const router = useRouter();
-  const s = useStrings();
+  const s = strings[getStartupLanguage()];
   const { signIn, isLoading, error, clearError } = useAuthStore();
   const [showError, setShowError] = useState<string | null>(null);
   const configured = isSupabaseConfigured();

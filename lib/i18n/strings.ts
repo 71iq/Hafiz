@@ -427,6 +427,11 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     // LoadingScreen
     preparingDatabase: "Preparing database...",
     appSubtitle: "Memorize Through Reflection",
+    notFoundTitle: "Page not found",
+    notFoundMessage: "This screen does not exist.",
+    notFoundHome: "Go to home",
+    qaReadyTitle: "QA readiness",
+    qaReadySubtitle: "Wait for readiness before starting screenshot capture.",
     // Selection & context menu
     copy: "Copy",
     addReflection: "Reflect",
@@ -1277,6 +1282,11 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     translationLanguagePickerTitle: "لغة الترجمة",
     preparingDatabase: "جارٍ تهيئة قاعدة البيانات...",
     appSubtitle: "احفظ بالتدبر",
+    notFoundTitle: "الصفحة غير موجودة",
+    notFoundMessage: "هذه الصفحة غير موجودة.",
+    notFoundHome: "العودة إلى الرئيسية",
+    qaReadyTitle: "جاهزية الاختبار",
+    qaReadySubtitle: "انتظر ظهور الجاهزية قبل بدء التقاط اللقطات.",
     copy: "نسخ",
     addReflection: "تأمل",
     privateNoteAction: "ملاحظة",

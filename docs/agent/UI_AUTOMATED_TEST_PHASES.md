@@ -27,9 +27,9 @@ The implementation should expose these commands:
 ## Current Coverage Snapshot - 2026-05-28
 
 - Strict unit/static contracts: 239 passing tests across i18n, Quran data, translations, Mushaf font/layout invariants, client safety, settings, public legal pages, QF reciters, FSRS scoring, selection formatting, and the UI manual coverage matrix.
-- Strict browser smoke: 26 stable direct routes run after a web export with nonblank DOM, framework-overlay, console-error, and page-error checks.
-- Report-only UI baseline: 54 checks; latest run was 44 passing and 10 real gaps, with no skipped checks.
-- Known report-only route gap: `/flashcards/vocab` direct-loads into `Database not initialized` in the static export. It stays out of strict smoke until the route owns its provider boundary or otherwise becomes stable.
+- Strict browser smoke: 27 stable direct routes run after a web export with nonblank DOM, framework-overlay, console-error, and page-error checks.
+- Report-only UI baseline: 54 checks; latest run was 54 passing, 0 failing, and 0 skipped.
+- Resolved route gap: `/flashcards/vocab` now waits for database readiness before calling database/settings hooks and is included in strict smoke.
 
 ## Phase 1 - Coverage Map
 

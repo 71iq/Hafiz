@@ -3,16 +3,53 @@ import { ActivityIndicator, View, Text, Pressable, ScrollView } from "react-nati
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { ArrowLeft, ArrowRight, Trash2, X } from "lucide-react-native";
-import { useDatabase } from "@/lib/database/provider";
-import { useSettings } from "@/lib/settings/context";
+import { useDatabase, useDatabaseStatus } from "@/lib/database/provider";
+import { SettingsProvider, useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
+import { strings } from "@/lib/i18n/strings";
+import { getStartupLanguage } from "@/lib/i18n/startup-language";
+import { LoadingScreen } from "@/components/LoadingScreen";
 import { listVocabCards, deleteVocabCard, type VocabCard } from "@/lib/vocab/queries";
 import { Rating } from "@/lib/fsrs/scheduler";
 import { fsrs } from "ts-fsrs";
 
 const scheduler = fsrs({ request_retention: 0.95 });
 
-export default function VocabSessionScreen() {
+export default function VocabSessionScreenWrapper() {
+  const { isReady, progress, error } = useDatabaseStatus();
+  const s = strings[getStartupLanguage()];
+
+  if (error) {
+    return (
+      <View className="flex-1 items-center justify-center bg-surface dark:bg-surface-dark px-6">
+        <Text
+          className="text-red-600 mb-4"
+          style={{ fontFamily: "Manrope_700Bold", fontSize: 18 }}
+        >
+          {s.databaseError}
+        </Text>
+        <Text
+          className="text-red-500 text-center"
+          style={{ fontFamily: "Manrope_400Regular", fontSize: 15 }}
+        >
+          {error}
+        </Text>
+      </View>
+    );
+  }
+
+  if (!isReady) {
+    return <LoadingScreen progress={progress} />;
+  }
+
+  return (
+    <SettingsProvider>
+      <VocabSessionScreen />
+    </SettingsProvider>
+  );
+}
+
+function VocabSessionScreen() {
   const db = useDatabase();
   const { isDark, isRTL, uiLanguage } = useSettings();
   const s = useStrings();

@@ -1,6 +1,7 @@
 import { Text, View } from "react-native";
 import { useDatabaseStatus } from "@/lib/database/provider";
-import { useStrings } from "@/lib/i18n/useStrings";
+import { strings } from "@/lib/i18n/strings";
+import { getStartupLanguage } from "@/lib/i18n/startup-language";
 
 /**
  * Playwright/web QA probe route.
@@ -10,7 +11,7 @@ import { useStrings } from "@/lib/i18n/useStrings";
  */
 export default function QaReadyScreen() {
   const { isReady, error } = useDatabaseStatus();
-  const s = useStrings();
+  const s = strings[getStartupLanguage()];
 
   return (
     <View className="flex-1 items-center justify-center bg-surface dark:bg-surface-dark px-6">
@@ -18,13 +19,13 @@ export default function QaReadyScreen() {
         className="text-charcoal dark:text-neutral-100"
         style={{ fontFamily: "NotoSerif_700Bold", fontSize: 28 }}
       >
-        QA Readiness
+        {s.qaReadyTitle}
       </Text>
       <Text
         className="mt-3 text-warm-400 dark:text-neutral-500 text-center"
         style={{ fontFamily: "Manrope_400Regular", fontSize: 14, lineHeight: 22 }}
       >
-        Wait for ready before starting screenshot capture.
+        {s.qaReadySubtitle}
       </Text>
 
       <View

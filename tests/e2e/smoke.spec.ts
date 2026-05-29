@@ -25,6 +25,7 @@ const strictSmokeRoutes = [
   "/reflection-feed",
   "/reflection-journey",
   "/flashcards/session",
+  "/flashcards/vocab",
   "/profile",
   "/profile/missing-user",
   "/open?surah=2&ayah=255",

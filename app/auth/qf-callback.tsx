@@ -3,14 +3,15 @@ import { ActivityIndicator, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { completeQfOAuthConnection } from "@/lib/quran-foundation/user";
-import { useStrings } from "@/lib/i18n/useStrings";
+import { strings } from "@/lib/i18n/strings";
+import { getStartupLanguage } from "@/lib/i18n/startup-language";
 
 const QF_WEB_REDIRECT_URI = "https://hafizquran.app/auth/qf-callback";
 
 export default function QfCallbackScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ code?: string; state?: string; error?: string; error_description?: string }>();
-  const s = useStrings();
+  const s = strings[getStartupLanguage()];
   const [message, setMessage] = useState(s.qfAuthCallbackLoading);
 
   useEffect(() => {
