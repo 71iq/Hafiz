@@ -1699,7 +1699,13 @@ function SmartCueText({
         </Text>
       )}
       {card.smartPromptQcf2 && card.v2Page ? (
-        <Qcf2AyahText textQcf2={card.smartPromptQcf2} v2Page={card.v2Page} fontSize={fontSize} lineHeight={lineHeight} />
+        <Qcf2AyahText
+          textQcf2={card.smartPromptQcf2}
+          v2Page={card.v2Page}
+          fontSize={fontSize}
+          lineHeight={lineHeight}
+          showAyahMarker={false}
+        />
       ) : (
         <Text
           className="text-charcoal dark:text-neutral-100 text-center"

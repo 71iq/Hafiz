@@ -12,6 +12,7 @@ import {
   isQuranPageFontLoaded,
   loadQuranPageFont,
   quranPageFontName,
+  quranPageMarkerFontPaletteStyle,
   quranPageFontPaletteStyle,
 } from "@/lib/fonts/loader";
 import { useAyahAudio } from "@/lib/audio/ayah-audio";
@@ -72,6 +73,7 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
     isRTL,
     isDark,
     quranFontStyle,
+    quranMarkerStyle,
     effectiveTheme,
     tafseerSource,
     setTafseerSource,
@@ -109,6 +111,9 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
   const qcf2FontFamily = ayahRow ? quranPageFontName(quranFontStyle, ayahRow.v2_page) : undefined;
   const qcf2FontPaletteStyle = ayahRow
     ? quranPageFontPaletteStyle(quranFontStyle, ayahRow.v2_page, effectiveTheme)
+    : null;
+  const qcf2MarkerFontPaletteStyle = ayahRow
+    ? quranPageMarkerFontPaletteStyle(quranFontStyle, ayahRow.v2_page, effectiveTheme, quranMarkerStyle)
     : null;
   const selectedTafsir = tafsirRows?.find((row) => row.source === selectedTafsirSource) ?? tafsirRows?.[0] ?? null;
   const selectedTafsirIsRtl = selectedTafsir?.source !== "jalalayn-en";
@@ -469,21 +474,24 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
                 maxWidth: "100%",
               }}
             >
-              {qcf2Tokens.map((glyph, index) => (
-                <Text
-                  key={`${activeTarget.surah}-${activeTarget.ayah}-${index}`}
-                  className="text-charcoal dark:text-neutral-100"
-                  style={{
-                    fontFamily: qcf2FontFamily,
-                    ...qcf2FontPaletteStyle,
-                    fontSize: isPhone ? 30 : 36,
-                    lineHeight: isPhone ? 58 : 66,
-                    paddingHorizontal: 2,
-                  }}
-                >
-                  {glyph}
-                </Text>
-              ))}
+              {qcf2Tokens.map((glyph, index) => {
+                const isMarker = index === qcf2Tokens.length - 1;
+                return (
+                  <Text
+                    key={`${activeTarget.surah}-${activeTarget.ayah}-${index}`}
+                    className="text-charcoal dark:text-neutral-100"
+                    style={{
+                      fontFamily: qcf2FontFamily,
+                      ...(isMarker ? qcf2MarkerFontPaletteStyle : qcf2FontPaletteStyle),
+                      fontSize: isPhone ? 30 : 36,
+                      lineHeight: isPhone ? 58 : 66,
+                      paddingHorizontal: 2,
+                    }}
+                  >
+                    {glyph}
+                  </Text>
+                );
+              })}
             </View>
           </View>
         </View>

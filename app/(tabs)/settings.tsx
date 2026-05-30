@@ -17,6 +17,7 @@ import {
   type UILanguage,
   type PageScroll,
   type QuranFontStyle,
+  type QuranMarkerStyle,
   type ViewMode,
 } from "@/lib/settings/context";
 import { useDatabase } from "@/lib/database/provider";
@@ -91,6 +92,7 @@ export default function SettingsScreen() {
     pageScroll, setPageScroll,
     viewMode, setViewMode,
     quranFontStyle, setQuranFontStyle,
+    quranMarkerStyle, setQuranMarkerStyle,
   } = useSettings();
   const db = useDatabase();
   const s = useStrings();
@@ -631,6 +633,25 @@ export default function SettingsScreen() {
                 ]}
               />
             </SettingsControlRow>
+
+            {quranFontStyle !== "qcf2" && (
+              <>
+                <View className="h-4" />
+
+                <SettingsControlRow label={s.quranMarkerLabel} isRTL={isRTL}>
+                  <ToggleGroup<QuranMarkerStyle>
+                    value={quranMarkerStyle}
+                    onValueChange={setQuranMarkerStyle}
+                    items={[
+                      { value: "auto", label: s.quranMarkerAuto },
+                      { value: "light", label: s.quranMarkerLight },
+                      { value: "dark", label: s.quranMarkerDark },
+                      { value: "sepia", label: s.quranMarkerSepia },
+                    ]}
+                  />
+                </SettingsControlRow>
+              </>
+            )}
 
             <View className="h-4" />
 

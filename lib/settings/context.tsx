@@ -9,6 +9,7 @@ import { importTranslation } from "@/lib/translations/import";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { DEFAULT_RECITATION_ID, normalizeRecitationId } from "@/lib/quran-foundation/recitations";
 import { DirectionProvider } from "@/lib/ui/direction";
+import type { QuranMarkerStyle as QuranMarkerStylePreference } from "@/lib/fonts/loader";
 import {
   DEFAULT_TAFSIR_SOURCE,
   isAvailableTafsirSourceId,
@@ -55,6 +56,7 @@ export type ThemeColors = {
 export type ViewMode = "verse" | "page";
 export type PageScroll = "vertical" | "horizontal";
 export type QuranFontStyle = "qcf2" | "v4" | "v4-tajweed";
+export type QuranMarkerStyle = QuranMarkerStylePreference;
 export type UILanguage = "en" | "ar";
 export type TafseerSource = TafsirSourceId;
 const UI_LANGUAGE_CACHE_KEY = "hafiz_ui_language";
@@ -132,6 +134,8 @@ type SettingsContextType = {
   setViewMode: (mode: ViewMode) => void;
   quranFontStyle: QuranFontStyle;
   setQuranFontStyle: (style: QuranFontStyle) => void;
+  quranMarkerStyle: QuranMarkerStyle;
+  setQuranMarkerStyle: (style: QuranMarkerStyle) => void;
   pageScroll: PageScroll;
   setPageScroll: (scroll: PageScroll) => void;
   showTranslation: boolean;
@@ -180,6 +184,8 @@ const SettingsContext = createContext<SettingsContextType>({
   setViewMode: () => {},
   quranFontStyle: "qcf2",
   setQuranFontStyle: () => {},
+  quranMarkerStyle: "auto",
+  setQuranMarkerStyle: () => {},
   pageScroll: "vertical",
   setPageScroll: () => {},
   showTranslation: false,
@@ -343,6 +349,10 @@ function normalizeThemeMode(value: string | null | undefined): ThemeMode | null 
 
 function normalizeQuranFontStyle(value: string | null | undefined): QuranFontStyle | null {
   return value === "qcf2" || value === "v4" || value === "v4-tajweed" ? value : null;
+}
+
+function normalizeQuranMarkerStyle(value: string | null | undefined): QuranMarkerStyle | null {
+  return value === "auto" || value === "light" || value === "dark" || value === "sepia" ? value : null;
 }
 
 function normalizeThemeTime(value: string | null | undefined): string | null {
@@ -546,6 +556,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [nowMinute, setNowMinute] = useState(getCurrentMinuteOfDay);
   const [viewMode, setViewModeState] = useState<ViewMode>("verse");
   const [quranFontStyle, setQuranFontStyleState] = useState<QuranFontStyle>("qcf2");
+  const [quranMarkerStyle, setQuranMarkerStyleState] = useState<QuranMarkerStyle>("auto");
   const effectiveFontIndex = fontSizeIndex;
   const [pageScroll, setPageScrollState] = useState<PageScroll>("vertical");
   const [showTranslation, setShowTranslationState] = useState(false);
@@ -573,6 +584,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           "scheduled_switch_time",
           "view_mode",
           "quran_font_style",
+          "quran_marker_style",
           "page_scroll",
           "show_translation",
           "show_tafseer",
@@ -636,6 +648,11 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         const savedQuranFontStyle = normalizeQuranFontStyle(saved.quran_font_style);
         if (savedQuranFontStyle) {
           setQuranFontStyleState(savedQuranFontStyle);
+        }
+
+        const savedQuranMarkerStyle = normalizeQuranMarkerStyle(saved.quran_marker_style);
+        if (savedQuranMarkerStyle) {
+          setQuranMarkerStyleState(savedQuranMarkerStyle);
         }
 
         const savedPageScroll = saved.page_scroll;
@@ -848,6 +865,14 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     [db]
   );
 
+  const setQuranMarkerStyle = useCallback(
+    (style: QuranMarkerStyle) => {
+      setQuranMarkerStyleState(style);
+      writeSetting(db, "quran_marker_style", style).catch(console.warn);
+    },
+    [db]
+  );
+
   const setPageScroll = useCallback(
     (scroll: PageScroll) => {
       setPageScrollState(scroll);
@@ -987,6 +1012,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         setViewMode,
         quranFontStyle,
         setQuranFontStyle,
+        quranMarkerStyle,
+        setQuranMarkerStyle,
         pageScroll,
         setPageScroll,
         showTranslation,

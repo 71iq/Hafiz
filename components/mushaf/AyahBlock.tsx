@@ -5,6 +5,7 @@ import {
   isQuranPageFontLoaded,
   loadQuranPageFont,
   quranPageFontName,
+  quranPageMarkerFontPaletteStyle,
   quranPageFontPaletteStyle,
 } from "@/lib/fonts/loader";
 import { useDatabase } from "@/lib/database/provider";
@@ -62,7 +63,7 @@ function AyahBlockInner({
   const { width } = useWindowDimensions();
   const isPhone = width < SIDEBAR_BREAKPOINT;
   const db = useDatabase();
-  const { recitationId, isRTL, isDark, quranFontStyle, effectiveTheme } = useSettings();
+  const { recitationId, isRTL, isDark, quranFontStyle, quranMarkerStyle, effectiveTheme } = useSettings();
   const s = useStrings();
   const { isBookmarked, getHighlightColor, getWordHighlightColor, showToast, refreshBookmarks, selectAyah } = useSelection();
   const { getAyahState, toggleAyah } = useAyahAudio();
@@ -156,6 +157,12 @@ function AyahBlockInner({
   const isBlurred = hideMode && !revealed;
   const fontFamily = quranPageFontName(quranFontStyle, v2Page);
   const fontPaletteStyle = quranPageFontPaletteStyle(quranFontStyle, v2Page, effectiveTheme);
+  const markerFontPaletteStyle = quranPageMarkerFontPaletteStyle(
+    quranFontStyle,
+    v2Page,
+    effectiveTheme,
+    quranMarkerStyle,
+  );
   const bookmarked = isBookmarked(surah, ayah);
   const highlightColor = getHighlightColor(surah, ayah);
   const qcf2LineHeight = Math.ceil(lineHeight + Math.max(6, fontSize * 0.16));
@@ -400,7 +407,7 @@ function AyahBlockInner({
                 className="text-charcoal dark:text-neutral-100"
                 style={{
                   fontFamily,
-                  ...fontPaletteStyle,
+                  ...markerFontPaletteStyle,
                   fontSize,
                   lineHeight: qcf2LineHeight,
                   paddingHorizontal: 2,

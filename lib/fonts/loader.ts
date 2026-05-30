@@ -11,6 +11,7 @@ const SURAH_NAME_FONT = require("../../assets/fonts/surah-names/surah_names_v4.t
 const QURAN_COMMON_FONT_FAMILY = "QuranCommon";
 const QURAN_COMMON_FONT = require("../../assets/fonts/quran-common/quran-common.ttf");
 export type QuranPageFontStyle = "qcf2" | "v4" | "v4-tajweed";
+export type QuranMarkerStyle = "auto" | "light" | "dark" | "sepia";
 const SURAH_NAME_BISMILLAH_GLYPHS = "\uFC9A \uFC9B \uFC9E \uFCA4";
 const SURAH_NAME_GLYPHS: Record<number, string> = {
   1: "\uFC45",
@@ -208,6 +209,12 @@ const QPC_V4_PLAIN_TEXT_COLORS = {
   sepia: "#2D2D2Dff",
 } as const;
 
+const QPC_V4_MARKER_BASE_PALETTES = {
+  light: 3,
+  dark: 4,
+  sepia: 5,
+} as const;
+
 function qpcV4PaletteKey(theme: string): keyof typeof QPC_V4_TAJWEED_PALETTES {
   if (theme === "dark" || theme === "amoled") return "dark";
   if (theme === "beige") return "sepia";
@@ -227,6 +234,17 @@ function qpcV4PlainPaletteName(page: number, theme: string): string {
   return `--hafiz-qpc-v4-plain-${qpcV4PaletteKey(theme)}-p${page}`;
 }
 
+function qpcV4MarkerPaletteKey(
+  theme: string,
+  markerStyle: QuranMarkerStyle,
+): keyof typeof QPC_V4_MARKER_BASE_PALETTES {
+  return markerStyle === "auto" ? qpcV4PaletteKey(theme) : markerStyle;
+}
+
+function qpcV4MarkerPaletteName(page: number, theme: string, markerStyle: QuranMarkerStyle): string {
+  return `--hafiz-qpc-v4-marker-${qpcV4MarkerPaletteKey(theme, markerStyle)}-p${page}`;
+}
+
 function plainPaletteColors(themeKey: keyof typeof QPC_V4_TAJWEED_PALETTES): string[] {
   return Array(QPC_V4_TAJWEED_PALETTES[themeKey].colors.length)
     .fill(QPC_V4_PLAIN_TEXT_COLORS[themeKey]);
@@ -237,7 +255,7 @@ function ensureQpcV4PaletteCss(page: number, fontName: string) {
   const cssKey = `qpc-v4-${page}`;
   if (paletteCss.has(cssKey)) return;
 
-  const css = Object.entries(QPC_V4_TAJWEED_PALETTES).map(([key, palette]) => {
+  const textPaletteCss = Object.entries(QPC_V4_TAJWEED_PALETTES).map(([key, palette]) => {
     const colors = palette.colors.map((color, index) => `${index} ${color}`).join(",\n      ");
     const plainColors = plainPaletteColors(key as keyof typeof QPC_V4_TAJWEED_PALETTES)
       .map((color, index) => `${index} ${color}`)
@@ -256,6 +274,13 @@ function ensureQpcV4PaletteCss(page: number, fontName: string) {
       ${plainColors};
 }`;
   }).join("\n\n");
+  const markerPaletteCss = Object.entries(QPC_V4_MARKER_BASE_PALETTES).map(([key, basePalette]) => (
+    `@font-palette-values --hafiz-qpc-v4-marker-${key}-p${page} {
+  font-family: '${fontName}';
+  base-palette: ${basePalette};
+}`
+  )).join("\n\n");
+  const css = `${textPaletteCss}\n\n${markerPaletteCss}`;
 
   const style = document.createElement("style");
   style.id = `hafiz-qpc-v4-palette-${page}`;
@@ -274,6 +299,21 @@ export function quranPageFontPaletteStyle(
     fontPalette: style === "v4"
       ? qpcV4PlainPaletteName(page, theme)
       : qpcV4TajweedPaletteName(page, theme),
+  };
+}
+
+export function quranPageMarkerFontPaletteStyle(
+  style: QuranPageFontStyle,
+  page: number,
+  theme: string,
+  markerStyle: QuranMarkerStyle,
+): any {
+  if (!isQpcV4Style(style) || Platform.OS !== "web") return null;
+  if (style === "v4-tajweed" && markerStyle === "auto") {
+    return quranPageFontPaletteStyle(style, page, theme);
+  }
+  return {
+    fontPalette: qpcV4MarkerPaletteName(page, theme, markerStyle),
   };
 }
 

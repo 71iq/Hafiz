@@ -8,6 +8,7 @@ import {
   loadQuranPageFont,
   loadSurahNameFont,
   quranPageFontName,
+  quranPageMarkerFontPaletteStyle,
   quranPageFontPaletteStyle,
   surahNameBismillahGlyphs,
   surahNameFontName,
@@ -204,7 +205,7 @@ function MushafPageInner({
   const [surahNameFontReady, setSurahNameFontReady] = useState(() => isSurahNameFontLoaded());
   const [wordsLoaded, setWordsLoaded] = useState(!!pageWordsData);
   const { getHighlightColor, getWordHighlightColor, selectAyah } = useSelection();
-  const { quranFontStyle, effectiveTheme } = useSettings();
+  const { quranFontStyle, quranMarkerStyle, effectiveTheme } = useSettings();
   const lastMarkerTapRef = useRef<{ key: string; at: number } | null>(null);
   const skipNextMarkerPressRef = useRef<string | null>(null);
 
@@ -327,6 +328,12 @@ function MushafPageInner({
   const visualLineHeight = lineSlotHeight ?? lineHeight;
   const fontFamily = quranPageFontName(quranFontStyle, pageNumber);
   const fontPaletteStyle = quranPageFontPaletteStyle(quranFontStyle, pageNumber, effectiveTheme);
+  const markerFontPaletteStyle = quranPageMarkerFontPaletteStyle(
+    quranFontStyle,
+    pageNumber,
+    effectiveTheme,
+    quranMarkerStyle,
+  );
 
   // Show loading indicator while font is not loaded at all
   if (!isQuranPageFontLoaded(quranFontStyle, pageNumber)) {
@@ -520,7 +527,7 @@ function MushafPageInner({
                     className="text-charcoal dark:text-neutral-100"
                     style={{
                       fontFamily,
-                      ...fontPaletteStyle,
+                      ...markerFontPaletteStyle,
                       fontSize,
                       lineHeight,
                       paddingHorizontal: 0,

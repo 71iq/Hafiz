@@ -8,6 +8,7 @@ import {
   isQuranPageFontLoaded,
   loadQuranPageFont,
   quranPageFontName,
+  quranPageMarkerFontPaletteStyle,
   quranPageFontPaletteStyle,
 } from "@/lib/fonts/loader";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -52,6 +53,7 @@ export function JourneyAyahCard({ block }: Props) {
     translationLanguage,
     tafseerSource,
     quranFontStyle,
+    quranMarkerStyle,
     effectiveTheme,
   } = useSettings();
   const [quranRows, setQuranRows] = useState<QuranRow[]>([]);
@@ -271,21 +273,26 @@ export function JourneyAyahCard({ block }: Props) {
                         gap: 2,
                       }}
                     >
-                      {row.text_qcf2.split(" ").filter(Boolean).map((glyph, index) => (
-                        <Text
-                          key={`${row.surah}:${row.ayah}:${index}`}
-                          className="text-charcoal dark:text-neutral-100"
-                          style={{
-                            fontFamily: quranPageFontName(quranFontStyle, row.v2_page),
-                            ...quranPageFontPaletteStyle(quranFontStyle, row.v2_page, effectiveTheme),
-                            fontSize: 28,
-                            lineHeight: 54,
-                            paddingHorizontal: 2,
-                          }}
-                        >
-                          {glyph}
-                        </Text>
-                      ))}
+                      {row.text_qcf2.split(" ").filter(Boolean).map((glyph, index, tokens) => {
+                        const isMarker = index === tokens.length - 1;
+                        return (
+                          <Text
+                            key={`${row.surah}:${row.ayah}:${index}`}
+                            className="text-charcoal dark:text-neutral-100"
+                            style={{
+                              fontFamily: quranPageFontName(quranFontStyle, row.v2_page),
+                              ...(isMarker
+                                ? quranPageMarkerFontPaletteStyle(quranFontStyle, row.v2_page, effectiveTheme, quranMarkerStyle)
+                                : quranPageFontPaletteStyle(quranFontStyle, row.v2_page, effectiveTheme)),
+                              fontSize: 28,
+                              lineHeight: 54,
+                              paddingHorizontal: 2,
+                            }}
+                          >
+                            {glyph}
+                          </Text>
+                        );
+                      })}
                     </View>
                   </View>
                 )}
