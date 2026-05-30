@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, type ReactNode } from "react";
-import { View, Text, Pressable, ActivityIndicator, Linking, useWindowDimensions } from "react-native";
+import { View, Text, Pressable, ActivityIndicator, Linking, ScrollView, useWindowDimensions } from "react-native";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ToggleGroup } from "@/components/ui/ToggleGroup";
@@ -42,7 +42,6 @@ import {
   DESKTOP_CONTENT_GUTTER,
   PERSISTENT_SIDEBAR_WIDTH,
   SETTINGS_CONTENT_MAX_WIDTH,
-  SIDEBAR_BREAKPOINT,
 } from "@/lib/ui/viewport";
 import { ProfileIdentity } from "@/components/profile/ProfileIdentity";
 import {
@@ -104,7 +103,6 @@ export default function SettingsScreen() {
   const [tafseerPickerVisible, setTafseerPickerVisible] = useState(false);
   const [reciterPickerVisible, setReciterPickerVisible] = useState(false);
   const [logoutDialogVisible, setLogoutDialogVisible] = useState(false);
-  const [mobileCategory, setMobileCategory] = useState<SettingsCategoryId | null>(null);
   const [qfStatus, setQfStatus] = useState<QfConnectionStatus>("disconnected");
   const [qfBusy, setQfBusy] = useState(false);
   const [qfMessage, setQfMessage] = useState<string | null>(null);
@@ -138,10 +136,8 @@ export default function SettingsScreen() {
     0,
     Math.floor((Math.max(0, appearanceCardInnerWidth - 56) - 10 * (scheduledRuleThemeColumnCount - 1)) / scheduledRuleThemeColumnCount)
   );
-  const usesCategorySidebar = width >= SIDEBAR_BREAKPOINT;
   const categoryParam = Array.isArray(params.category) ? params.category[0] : params.category;
-  const desktopCategory = parseSettingsCategory(categoryParam) ?? "general";
-  const activeCategory = usesCategorySidebar ? desktopCategory : mobileCategory;
+  const activeCategory = parseSettingsCategory(categoryParam) ?? "general";
   const previewFontFamily = quranPageFontName(quranFontStyle, SETTINGS_QURAN_PREVIEW_PAGE);
   const previewFontPaletteStyle = quranPageFontPaletteStyle(quranFontStyle, SETTINGS_QURAN_PREVIEW_PAGE, effectiveTheme);
   const refreshQfStatus = useCallback(async () => {
@@ -337,8 +333,8 @@ export default function SettingsScreen() {
   ];
 
   const handleCategorySelect = useCallback((category: SettingsCategoryId) => {
-    setMobileCategory(category);
-  }, []);
+    router.setParams({ category });
+  }, [router]);
 
   const handleTafseerSourceSelect = useCallback(
     async (sourceId: TafsirSourceId) => {
@@ -1073,36 +1069,39 @@ export default function SettingsScreen() {
   return (
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
       <ScreenScrollView maxWidth={SETTINGS_CONTENT_MAX_WIDTH} contentContainerStyle={{ paddingBottom: 48 }}>
-        {/* Header */}
-        <View className="pt-8 pb-4">
+        <View
+          className="pt-8 pb-5"
+          style={{
+            alignItems: isLaptop ? "center" : "stretch",
+            flexDirection: isLaptop ? (isRTL ? "row-reverse" : "row") : "column",
+            gap: 18,
+            justifyContent: "space-between",
+          }}
+        >
           <Text
             className="text-charcoal dark:text-neutral-100"
-            style={{ fontFamily: "NotoSerif_700Bold", fontSize: isLaptop ? 32 : 28 }}
+            style={{
+              fontFamily: "NotoSerif_700Bold",
+              fontSize: isLaptop ? 32 : 28,
+              textAlign: isRTL ? "right" : "left",
+              writingDirection: isRTL ? "rtl" : "ltr",
+            }}
           >
             {s.settingsTitle}
           </Text>
+          <SettingsCategoryTabs
+            categories={settingsCategories}
+            activeCategory={activeCategory}
+            isDark={isDark}
+            isRTL={isRTL}
+            onSelect={handleCategorySelect}
+            compact={!isLaptop}
+          />
         </View>
 
-        {usesCategorySidebar ? (
-          <View className="pb-8">
-            {categoryPanels}
-          </View>
-        ) : (
-          <View className="pb-8">
-            <SettingsCategoryNav
-              categories={settingsCategories}
-              activeCategory={activeCategory}
-              isDark={isDark}
-              isRTL={isRTL}
-              onSelect={handleCategorySelect}
-            />
-            {!!activeCategory && (
-              <View className="mt-6">
-                {categoryPanels}
-              </View>
-            )}
-          </View>
-        )}
+        <View className="pb-8">
+          {categoryPanels}
+        </View>
       </ScreenScrollView>
       <ConfirmDialog
         visible={logoutDialogVisible}
@@ -1360,75 +1359,64 @@ function mergeReciters(primary: QfReciter[], fallback: QfReciter[]): QfReciter[]
   return Array.from(byId.values()).sort((a, b) => a.id - b.id);
 }
 
-function SettingsCategoryNav({
+function SettingsCategoryTabs({
   categories,
   activeCategory,
   isDark,
   isRTL,
   onSelect,
+  compact,
 }: {
   categories: SettingsCategory[];
-  activeCategory: SettingsCategoryId | null;
+  activeCategory: SettingsCategoryId;
   isDark: boolean;
   isRTL: boolean;
   onSelect: (category: SettingsCategoryId) => void;
+  compact: boolean;
 }) {
-  const RowChevron = isRTL ? ChevronLeft : ChevronRight;
+  const items = categories.map((category) => {
+    const isActive = activeCategory === category.id;
+    const Icon = category.icon;
+    const iconColor = isActive
+      ? isDark ? "#2dd4bf" : "#0d9488"
+      : isDark ? "#a3a3a3" : "#8a7661";
+    return {
+      value: category.id,
+      label: category.title,
+      icon: <Icon size={15} color={iconColor} />,
+    };
+  });
 
-  return (
-    <Card
-      elevation="low"
-      className="p-2"
-    >
-      <View className="gap-1">
-        {categories.map((category) => {
-          const isActive = activeCategory === category.id;
-          const Icon = category.icon;
-          const iconColor = isActive
-            ? isDark ? "#2dd4bf" : "#0d9488"
-            : isDark ? "#a3a3a3" : "#8a7661";
-          const chevronColor = isActive
-            ? isDark ? "#2dd4bf" : "#0d9488"
-            : isDark ? "#525252" : "#cbbda9";
-
-          return (
-            <Pressable
-              key={category.id}
-              onPress={() => onSelect(category.id)}
-              className={`w-full items-center gap-3 rounded-2xl px-3 py-4 ${
-                isActive
-                  ? "bg-primary-accent/10 dark:bg-primary-bright/15"
-                  : "bg-transparent"
-              }`}
-              style={({ pressed }) => ({
-                flexDirection: isRTL ? "row-reverse" : "row",
-                opacity: pressed ? 0.78 : 1,
-              })}
-            >
-              <View className="h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface dark:bg-surface-dark">
-                <Icon size={17} color={iconColor} />
-              </View>
-              <Text
-                className={isActive
-                  ? "flex-1 text-primary-accent dark:text-primary-bright"
-                  : "flex-1 text-charcoal dark:text-neutral-200"
-                }
-                style={{
-                  fontFamily: isActive ? "Manrope_700Bold" : "Manrope_600SemiBold",
-                  fontSize: 14,
-                  textAlign: isRTL ? "right" : "left",
-                  writingDirection: isRTL ? "rtl" : "ltr",
-                }}
-              >
-                {category.title}
-              </Text>
-              <RowChevron size={17} color={chevronColor} />
-            </Pressable>
-          );
-        })}
-      </View>
-    </Card>
+  const tabs = (
+    <ToggleGroup<SettingsCategoryId>
+      value={activeCategory}
+      onValueChange={onSelect}
+      items={items}
+      dir={isRTL ? "rtl" : "ltr"}
+      className="bg-surface-low/80 dark:bg-surface-dark-low/80"
+      style={{
+        flex: compact ? undefined : 1,
+        maxWidth: compact ? undefined : 620,
+        minWidth: compact ? undefined : 520,
+        width: compact ? 520 : undefined,
+      }}
+    />
   );
+
+  if (compact) {
+    return (
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={{ alignSelf: "stretch" }}
+        contentContainerStyle={{ flexGrow: 1 }}
+      >
+        {tabs}
+      </ScrollView>
+    );
+  }
+
+  return tabs;
 }
 
 function SettingsControlRow({
