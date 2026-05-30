@@ -42,11 +42,6 @@ async function buildDuplicateCache(db: SQLiteDatabase): Promise<Map<string, numb
   return map;
 }
 
-/** Clear the cache (call if data changes) */
-export function clearUniquenessCache() {
-  duplicateCache = null;
-}
-
 /**
  * Compute the unique front text for a card.
  * Returns the minimum context needed to make this card's prompt unique.
@@ -155,21 +150,4 @@ export async function computeUniqueFront(
     contextCount: 0,
     needsExplicitLabel: true,
   };
-}
-
-/**
- * Extract first letter of each word in an ayah (for First Letter test mode).
- * Strips diacritics to get the base letter.
- */
-const DIACRITICS = /[\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E4\u06E7\u06E8\u06EA-\u06ED\u0640]/g;
-
-export function getFirstLetters(text: string): string {
-  return text
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((word) => {
-      const stripped = word.replace(DIACRITICS, "");
-      return stripped.charAt(0);
-    })
-    .join(" ");
 }

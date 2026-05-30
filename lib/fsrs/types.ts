@@ -1,24 +1,6 @@
 import type { StepUnit } from "ts-fsrs";
 
-/** A deck is a logical grouping — we track it as metadata on cards */
 export type SurahAyahRange = { surah: number; ayahStart: number; ayahEnd: number };
-
-export type DeckScope =
-  | { type: "surah"; surahs: number[]; ranges?: SurahAyahRange[] }
-  | { type: "surahRange"; surahStart: number; surahEnd: number }
-  | { type: "juz"; juzNumbers: number[] }
-  | { type: "hizb"; hizbNumbers: number[] }
-  | { type: "custom"; surahStart: number; ayahStart: number; surahEnd: number; ayahEnd: number };
-
-export interface DeckInfo {
-  id: string;
-  name: string;
-  scope: DeckScope;
-  cardCount: number;
-  dueCount: number;
-  newCount: number;
-  createdAt: string;
-}
 
 export interface StudyCardRow {
   id: string; // ayah "2:255", word "word:2:255:4", or built-in smart deck id
@@ -50,20 +32,6 @@ export type DeckCardListItem = StudyCardRow & {
   kind: "ayah" | "word" | "smart";
   isVirtual: boolean;
 };
-
-export interface StudyLogRow {
-  id: number;
-  card_id: string;
-  rating: number;
-  state: number;
-  due: string;
-  stability: number;
-  difficulty: number;
-  elapsed_days: number;
-  scheduled_days: number;
-  reviewed_at: string;
-  sync_status: string;
-}
 
 /** Test modes available in flashcard review */
 export type TestMode =

@@ -23,8 +23,6 @@ function createScheduler(settings?: Pick<
   });
 }
 
-export const scheduler = createScheduler();
-
 /** Grade a card and return { card, log } for the given rating */
 export function gradeCard(card: Card, now: Date, rating: Grade, settings?: DeckReviewSettings): { card: Card; log: ReviewLog } {
   const results = createScheduler(settings).repeat(card, now);

@@ -178,18 +178,6 @@ export async function addHighlightsForSelectionRefs(
   return ids;
 }
 
-export async function removeHighlight(db: SQLiteDatabase, id: number): Promise<void> {
-  const row = await db.getFirstAsync<HighlightRow>("SELECT * FROM highlights WHERE id = ?", [id]);
-  if (!row) return;
-  const deletedAt = new Date().toISOString();
-  await db.runAsync("DELETE FROM highlights WHERE id = ?", [id]);
-  enqueueSync(db, "highlights", "DELETE", row.sync_id ?? String(id), {
-    ...highlightToSyncData(row),
-    updated_at: deletedAt,
-    deleted_at: deletedAt,
-  }).catch(console.warn);
-}
-
 export async function removeHighlightsForAyah(
   db: SQLiteDatabase,
   surah: number,

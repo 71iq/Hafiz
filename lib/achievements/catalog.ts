@@ -7,9 +7,9 @@ export type AchievementCategory =
   | "vocab"
   | "mutashabih";
 
-export type AchievementRarity = "common" | "uncommon" | "rare" | "epic" | "legendary";
+type AchievementRarity = "common" | "uncommon" | "rare" | "epic" | "legendary";
 
-export type AchievementPayloadPolicy = {
+type AchievementPayloadPolicy = {
   public: "none" | "summary";
   private: "none" | "summary";
 };
@@ -236,7 +236,7 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
   },
 ];
 
-export const ACHIEVEMENT_BY_ID = new Map(ACHIEVEMENTS.map((achievement) => [achievement.id, achievement]));
+const ACHIEVEMENT_BY_ID = new Map(ACHIEVEMENTS.map((achievement) => [achievement.id, achievement]));
 
 export function getAchievementDefinition(id: string): AchievementDefinition | undefined {
   return ACHIEVEMENT_BY_ID.get(id);

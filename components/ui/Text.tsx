@@ -53,18 +53,3 @@ export const Text = forwardRef<RNText, TypographyProps>(
 );
 
 Text.displayName = "Text";
-
-export const Typography = forwardRef<RNText, TypographyProps>(
-  ({ variant, className, dir, align, ...props }, ref) => (
-    <Text
-      ref={ref}
-      variant={variant}
-      dir={dir}
-      align={align}
-      className={className}
-      {...props}
-    />
-  )
-);
-Typography.displayName = "Typography";
-export { textVariants };

@@ -24,11 +24,3 @@ export function hapticSuccess() {
   if (Platform.OS === "web") return;
   Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
 }
-
-/**
- * Trigger a selection change haptic.
- */
-export function hapticSelection() {
-  if (Platform.OS === "web") return;
-  Haptics.selectionAsync().catch(() => {});
-}

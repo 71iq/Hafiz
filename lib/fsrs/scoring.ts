@@ -31,16 +31,6 @@ export function computeReviewPoints(
   return Math.round(points);
 }
 
-/** Get today's review count for anti-gaming cap */
-export async function getTodayReviewCount(db: SQLiteDatabase): Promise<number> {
-  const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
-  const row = await db.getFirstAsync<{ count: number }>(
-    "SELECT COUNT(*) as count FROM study_log WHERE DATE(reviewed_at) = ?",
-    [today]
-  );
-  return row?.count ?? 0;
-}
-
 /** Get today's total score from user_settings */
 export async function getTodayScore(db: SQLiteDatabase): Promise<{ score: number; reviewsCount: number }> {
   const today = new Date().toISOString().split("T")[0];

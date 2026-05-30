@@ -109,17 +109,12 @@ export const SkeletonText = React.memo(function SkeletonText({
   );
 });
 
-// ---------------------------------------------------------------------------
-// SkeletonCircle — avatar / rank badge placeholder
-// ---------------------------------------------------------------------------
-
 type SkeletonCircleProps = ViewProps & {
   isDark?: boolean;
-  /** Diameter in px. Defaults to 40 */
   size?: number;
 };
 
-export const SkeletonCircle = React.memo(function SkeletonCircle({
+const SkeletonCircle = React.memo(function SkeletonCircle({
   isDark = false,
   size = 40,
   className,
@@ -132,34 +127,6 @@ export const SkeletonCircle = React.memo(function SkeletonCircle({
       height={size}
       borderRadius={size / 2}
       className={className}
-      {...props}
-    />
-  );
-});
-
-// ---------------------------------------------------------------------------
-// SkeletonCard — card-shaped placeholder
-// ---------------------------------------------------------------------------
-
-type SkeletonCardProps = ViewProps & {
-  isDark?: boolean;
-  /** Card height in px. Defaults to 120 */
-  height?: number;
-};
-
-export const SkeletonCard = React.memo(function SkeletonCard({
-  isDark = false,
-  height = 120,
-  className,
-  ...props
-}: SkeletonCardProps) {
-  return (
-    <Skeleton
-      isDark={isDark}
-      width="100%"
-      height={height}
-      borderRadius={24}
-      className={cn("my-2", className)}
       {...props}
     />
   );

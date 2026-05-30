@@ -20,10 +20,6 @@ const QF_SYNC_ENABLED =
   expoExtra.qfSyncEnabled ??
   QF_USER_AUTH_ENABLED;
 
-export function isQfUserAuthEnabled(): boolean {
-  return ["1", "true", "yes"].includes(QF_USER_AUTH_ENABLED.trim().toLowerCase());
-}
-
 export function isQfLoginEnabled(): boolean {
   return ["1", "true", "yes"].includes(QF_LOGIN_ENABLED.trim().toLowerCase());
 }

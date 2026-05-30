@@ -130,11 +130,11 @@ const SURAH_NAME_GLYPHS: Record<number, string> = {
 };
 
 /** Returns the font family name for a QPC V2 page font, e.g. "QCF2_001" */
-export function qpcFontName(page: number): string {
+function qpcFontName(page: number): string {
   return `QCF2_${String(page).padStart(3, "0")}`;
 }
 
-export function qpcV4TajweedFontName(page: number): string {
+function qpcV4TajweedFontName(page: number): string {
   return `p${page}-v4-tajweed`;
 }
 
@@ -307,7 +307,7 @@ async function loadFontWeb(name: string, asset: any): Promise<void> {
 
 /** Load the QPC V2 font for a specific page. No-op if already loaded.
  *  Concurrent calls for the same page share one Promise. */
-export async function loadQpcFont(page: number): Promise<void> {
+async function loadQpcFont(page: number): Promise<void> {
   const name = qpcFontName(page);
   if (loadedFonts.has(name)) return;
 
@@ -339,11 +339,11 @@ export async function loadQpcFont(page: number): Promise<void> {
 }
 
 /** Check if the QPC V2 font for a page is already loaded */
-export function isQpcFontLoaded(page: number): boolean {
+function isQpcFontLoaded(page: number): boolean {
   return loadedFonts.has(qpcFontName(page));
 }
 
-export async function loadQpcV4TajweedFont(page: number): Promise<void> {
+async function loadQpcV4TajweedFont(page: number): Promise<void> {
   const name = qpcV4TajweedFontName(page);
   if (loadedFonts.has(name)) {
     ensureQpcV4PaletteCss(page, name);
@@ -377,7 +377,7 @@ export async function loadQpcV4TajweedFont(page: number): Promise<void> {
   return promise;
 }
 
-export function isQpcV4TajweedFontLoaded(page: number): boolean {
+function isQpcV4TajweedFontLoaded(page: number): boolean {
   return loadedFonts.has(qpcV4TajweedFontName(page));
 }
 

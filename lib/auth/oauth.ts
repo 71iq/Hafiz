@@ -73,7 +73,7 @@ export async function startAppOAuth(
   return { session, qfConnected };
 }
 
-export function getOAuthRedirectTo(): string | undefined {
+function getOAuthRedirectTo(): string | undefined {
   if (Platform.OS === "web") return globalThis.location?.origin;
   return Linking.createURL("auth/callback");
 }

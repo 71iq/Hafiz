@@ -75,13 +75,6 @@ export const Sheet = forwardRef<View, SheetProps>(
 
 Sheet.displayName = "Sheet";
 
-export const SheetHeader = forwardRef<View, { className?: string; children: React.ReactNode }>(
-  ({ className, ...props }, ref) => (
-    <View ref={ref} className={cn("px-6 pb-4", className)} {...props} />
-  )
-);
-SheetHeader.displayName = "SheetHeader";
-
 export const SheetContent = forwardRef<View, { className?: string; children: React.ReactNode }>(
   ({ className, ...props }, ref) => (
     <View ref={ref} className={cn("px-6 pb-8", className)} {...props} />

@@ -31,7 +31,7 @@ function highlightSyncId(row: {
  * Process the local sync queue — push pending changes to Supabase.
  * Returns the number of entries successfully synced.
  */
-export async function pushSyncQueue(db: SQLiteDatabase): Promise<number> {
+async function pushSyncQueue(db: SQLiteDatabase): Promise<number> {
   if (!isSupabaseConfigured()) return 0;
 
   const user = useAuthStore.getState().user;
@@ -72,7 +72,7 @@ export async function pushSyncQueue(db: SQLiteDatabase): Promise<number> {
  * Pull remote changes from Supabase to local SQLite.
  * For multi-device support: fetches data updated after last sync.
  */
-export async function pullRemoteChanges(db: SQLiteDatabase): Promise<number> {
+async function pullRemoteChanges(db: SQLiteDatabase): Promise<number> {
   if (!isSupabaseConfigured()) return 0;
 
   const user = useAuthStore.getState().user;

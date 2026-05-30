@@ -90,4 +90,3 @@ export const Button = forwardRef<any, ButtonProps>(
 );
 
 Button.displayName = "Button";
-export { buttonVariants, buttonTextVariants, buttonTextVariants as textVariants };

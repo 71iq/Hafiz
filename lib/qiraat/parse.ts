@@ -32,6 +32,6 @@ export function parseQiraatText(raw: string): QiraatBlock[] {
   return blocks.filter((block) => block.body.trim().length > 0);
 }
 
-export function formatQiraatBody(text: string): string {
+function formatQiraatBody(text: string): string {
   return text.replace(/([.])\s*([\d٠-٩]+\s*-)/g, "$1\n$2");
 }

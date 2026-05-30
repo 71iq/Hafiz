@@ -93,7 +93,6 @@ const SMART_DECK_ID_LIST: SmartDeckId[] = [
   SMART_DECK_IDS.reasonsOfRevelation,
 ];
 
-const SMART_CARD_PREFIXES = ["mutashabihat:", "similar-tail:", "qiraat:", "asbab:"];
 const LEGACY_MUTASHABIHAT_DECK_ID = "mutashabihat";
 const MEANINGS_DECK_ID = "meanings";
 const SQLITE_PARAM_BATCH = 800;
@@ -149,15 +148,11 @@ export function isSmartDeckId(deckId: string | undefined | null): deckId is Smar
   return !!deckId && (SMART_DECK_ID_LIST as string[]).includes(deckId);
 }
 
-export function isSmartCardId(cardId: string): boolean {
-  return SMART_CARD_PREFIXES.some((prefix) => cardId.startsWith(prefix));
-}
-
-export function smartDeckFilterKey(deckId: SmartDeckId): string {
+function smartDeckFilterKey(deckId: SmartDeckId): string {
   return `smart_deck_filter_${deckId}`;
 }
 
-export function normalizeSmartDeckFilter(filter: unknown): BuiltInDeckFilter {
+function normalizeSmartDeckFilter(filter: unknown): BuiltInDeckFilter {
   if (!filter || typeof filter !== "object") return { type: "all" };
   const raw = filter as any;
   if (raw.type === "surah") {

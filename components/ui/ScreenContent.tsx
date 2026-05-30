@@ -4,7 +4,6 @@ import {
   useWindowDimensions,
   View,
   type ScrollViewProps,
-  type ViewProps,
   type ViewStyle,
 } from "react-native";
 import { cn } from "@/lib/utils";
@@ -15,10 +14,6 @@ import {
   PERSISTENT_SIDEBAR_BREAKPOINT,
   PERSISTENT_SIDEBAR_WIDTH,
 } from "@/lib/ui/viewport";
-
-type ScreenRailProps = ViewProps & {
-  maxWidth?: number;
-};
 
 type ScreenScrollViewProps = ScrollViewProps & {
   maxWidth?: number;
@@ -66,16 +61,6 @@ export function useScreenContentLayout({
     contentContainerStyle,
     railStyle,
   };
-}
-
-export function ScreenRail({ maxWidth = DESKTOP_CONTENT_MAX_WIDTH, className, style, ...props }: ScreenRailProps) {
-  return (
-    <View
-      className={cn("w-full", className)}
-      style={[{ maxWidth }, style]}
-      {...props}
-    />
-  );
 }
 
 export function ScreenScrollView({

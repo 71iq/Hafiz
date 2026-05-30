@@ -28,7 +28,6 @@ import {
   MIN_DECK_NEW_CARD_LIMIT,
   MIN_DECK_REQUEST_RETENTION,
   type DeckReviewSettings,
-  type DeckScope,
   type DeckCardListItem,
   type SchedulerStep,
   type StudyCardRow,
@@ -36,7 +35,7 @@ import {
   type WordTestMode,
 } from "./types";
 import { enqueueSync } from "@/lib/database/sync-queue";
-import { deleteUserSetting, writeUserSetting } from "@/lib/database/user-settings";
+import { writeUserSetting } from "@/lib/database/user-settings";
 import { emitReviewActivity } from "./review-events";
 import { recordAchievementEvent } from "@/lib/achievements/queries";
 import {
@@ -52,7 +51,7 @@ import {
   type DueCardsForReviewOptions,
 } from "./smart-decks";
 
-export type ReviewActivityDay = { date: string; count: number };
+type ReviewActivityDay = { date: string; count: number };
 
 type ReviewStats = {
   activity: ReviewActivityDay[];
@@ -196,300 +195,8 @@ function calculateCurrentStreak(dateKeysDesc: string[], todayIndex: number): num
   return streak;
 }
 
-// ─── Deck ID generation ──────────────────────────────────────
-
-export function generateDeckId(scope: DeckScope): string {
-  switch (scope.type) {
-    case "surah": {
-      const ranges = normalizeScopeRanges(scope);
-      if (ranges.length > 0) {
-        return `surah-${ranges.map((range) => `${range.surah}:${range.ayahStart}-${range.ayahEnd}`).join(",")}`;
-      }
-      return `surah-${scope.surahs.sort((a, b) => a - b).join(",")}`;
-    }
-    case "surahRange":
-      return `surah-range-${scope.surahStart}-${scope.surahEnd}`;
-    case "juz":
-      return `juz-${scope.juzNumbers.sort((a, b) => a - b).join(",")}`;
-    case "hizb":
-      return `hizb-${scope.hizbNumbers.sort((a, b) => a - b).join(",")}`;
-    case "custom":
-      return `custom-${scope.surahStart}:${scope.ayahStart}-${scope.surahEnd}:${scope.ayahEnd}`;
-  }
-}
-
-// ─── Resolve scope to ayah list ──────────────────────────────
-
-type AyahRef = { surah: number; ayah: number };
-
-export async function resolveScope(
-  db: SQLiteDatabase,
-  scope: DeckScope
-): Promise<AyahRef[]> {
-  switch (scope.type) {
-    case "surah": {
-      const ranges = normalizeScopeRanges(scope);
-      if (ranges.length > 0) {
-        const ayahs: AyahRef[] = [];
-        const seen = new Set<string>();
-        for (const range of ranges) {
-          const rows = await db.getAllAsync<AyahRef>(
-            "SELECT surah, ayah FROM quran_text WHERE surah = ? AND ayah BETWEEN ? AND ? ORDER BY ayah",
-            [range.surah, range.ayahStart, range.ayahEnd]
-          );
-          for (const row of rows) {
-            const key = `${row.surah}:${row.ayah}`;
-            if (seen.has(key)) continue;
-            seen.add(key);
-            ayahs.push(row);
-          }
-        }
-        return ayahs.sort((a, b) => a.surah - b.surah || a.ayah - b.ayah);
-      }
-      const placeholders = scope.surahs.map(() => "?").join(",");
-      return db.getAllAsync<AyahRef>(
-        `SELECT surah, ayah FROM quran_text WHERE surah IN (${placeholders}) ORDER BY surah, ayah`,
-        scope.surahs
-      );
-    }
-    case "surahRange": {
-      return db.getAllAsync<AyahRef>(
-        "SELECT surah, ayah FROM quran_text WHERE surah BETWEEN ? AND ? ORDER BY surah, ayah",
-        [scope.surahStart, scope.surahEnd]
-      );
-    }
-    case "juz": {
-      const rows = await db.getAllAsync<{
-        surah: number;
-        ayah_start: number;
-        ayah_end: number;
-      }>(
-        `SELECT surah, ayah_start, ayah_end FROM juz_map WHERE juz IN (${scope.juzNumbers.map(() => "?").join(",")}) ORDER BY juz, surah, ayah_start`,
-        scope.juzNumbers
-      );
-      const ayahs: AyahRef[] = [];
-      for (const row of rows) {
-        for (let a = row.ayah_start; a <= row.ayah_end; a++) {
-          ayahs.push({ surah: row.surah, ayah: a });
-        }
-      }
-      return ayahs;
-    }
-    case "hizb": {
-      // hizb_map has (surah_start, ayah_start, surah_end, ayah_end)
-      const rows = await db.getAllAsync<{
-        surah_start: number;
-        ayah_start: number;
-        surah_end: number;
-        ayah_end: number;
-      }>(
-        `SELECT surah_start, ayah_start, surah_end, ayah_end FROM hizb_map WHERE hizb IN (${scope.hizbNumbers.map(() => "?").join(",")}) ORDER BY hizb`,
-        scope.hizbNumbers
-      );
-      const ayahs: AyahRef[] = [];
-      for (const row of rows) {
-        // Fetch all ayahs in this range
-        const rangeAyahs = await db.getAllAsync<AyahRef>(
-          `SELECT surah, ayah FROM quran_text
-           WHERE (surah > ? OR (surah = ? AND ayah >= ?))
-             AND (surah < ? OR (surah = ? AND ayah <= ?))
-           ORDER BY surah, ayah`,
-          [row.surah_start, row.surah_start, row.ayah_start,
-           row.surah_end, row.surah_end, row.ayah_end]
-        );
-        ayahs.push(...rangeAyahs);
-      }
-      return ayahs;
-    }
-    case "custom": {
-      return db.getAllAsync<AyahRef>(
-        `SELECT surah, ayah FROM quran_text
-         WHERE (surah > ? OR (surah = ? AND ayah >= ?))
-           AND (surah < ? OR (surah = ? AND ayah <= ?))
-         ORDER BY surah, ayah`,
-        [scope.surahStart, scope.surahStart, scope.ayahStart,
-         scope.surahEnd, scope.surahEnd, scope.ayahEnd]
-      );
-    }
-  }
-}
-
-function normalizeScopeRanges(scope: Extract<DeckScope, { type: "surah" }>): NonNullable<typeof scope.ranges> {
-  if (!Array.isArray(scope.ranges)) return [];
-  const selected = new Set(scope.surahs);
-  return scope.ranges
-    .filter((range) =>
-      selected.has(range.surah) &&
-      Number.isInteger(range.ayahStart) &&
-      Number.isInteger(range.ayahEnd) &&
-      range.ayahStart >= 1 &&
-      range.ayahEnd >= range.ayahStart
-    )
-    .sort((a, b) => a.surah - b.surah || a.ayahStart - b.ayahStart);
-}
-
-// ─── Create deck (generate cards) ────────────────────────────
-
-export async function createDeck(
-  db: SQLiteDatabase,
-  deckId: string,
-  scope: DeckScope,
-  name?: string
-): Promise<number> {
-  const ayahs = await resolveScope(db, scope);
-  if (ayahs.length === 0) return 0;
-
-  const now = new Date().toISOString();
-  const emptyCard = createEmptyCard();
-
-  await db.withTransactionAsync(async () => {
-    // Store deck metadata in user_settings
-    await writeUserSetting(db, `deck_${deckId}`, JSON.stringify({ id: deckId, name, scope, createdAt: now }));
-
-    // Insert cards in batches
-    const BATCH = 500;
-    for (let i = 0; i < ayahs.length; i += BATCH) {
-      const batch = ayahs.slice(i, i + BATCH);
-      const placeholders = batch.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").join(",");
-      const params: any[] = [];
-      for (const a of batch) {
-        const cardId = `${a.surah}:${a.ayah}`;
-        params.push(
-          cardId,
-          deckId,
-          emptyCard.due.toISOString(),
-          emptyCard.stability,
-          emptyCard.difficulty,
-          emptyCard.elapsed_days,
-          emptyCard.scheduled_days,
-          emptyCard.learning_steps,
-          emptyCard.reps,
-          emptyCard.lapses,
-          emptyCard.state,
-          null, // last_review
-          now,
-          now,
-          null
-        );
-      }
-      await db.runAsync(
-        `INSERT INTO study_cards
-          (id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days, learning_steps, reps, lapses, state, last_review, created_at, updated_at, deleted_at)
-         VALUES ${placeholders}
-         ON CONFLICT(id) DO UPDATE SET
-          deck_id = excluded.deck_id,
-          due = excluded.due,
-          stability = excluded.stability,
-          difficulty = excluded.difficulty,
-          elapsed_days = excluded.elapsed_days,
-          scheduled_days = excluded.scheduled_days,
-          learning_steps = excluded.learning_steps,
-          reps = excluded.reps,
-          lapses = excluded.lapses,
-          state = excluded.state,
-          last_review = excluded.last_review,
-          created_at = excluded.created_at,
-          updated_at = excluded.updated_at,
-          deleted_at = NULL
-         WHERE study_cards.deleted_at IS NOT NULL`,
-        params
-      );
-    }
-  });
-
-  const rows = await db.getAllAsync<StudyCardRow>(
-    "SELECT * FROM study_cards WHERE deck_id = ? AND deleted_at IS NULL",
-    [deckId]
-  );
-  for (const row of rows) {
-    enqueueSync(db, "study_cards", "UPDATE", row.id, cardToSyncData(rowWithDefaultStatus(row))).catch(console.warn);
-  }
-
-  recordAchievementEvent(db, { type: "deck_created", deckId, createdAt: now }).catch(console.warn);
-
-  return ayahs.length;
-}
-
-export async function addAyahToDeck(
-  db: SQLiteDatabase,
-  deckId: string,
-  surah: number,
-  ayah: number
-): Promise<boolean> {
-  const now = new Date().toISOString();
-  const emptyCard = createEmptyCard();
-  const cardId = `${surah}:${ayah}`;
-  const existing = await db.getFirstAsync<{ id: string }>(
-    "SELECT id FROM study_cards WHERE id = ? AND deck_id = ? AND deleted_at IS NULL",
-    [cardId, deckId]
-  );
-  if (existing?.id) return false;
-
-  const row: StudyCardRow = {
-    id: cardId,
-    deck_id: deckId,
-    due: emptyCard.due.toISOString(),
-    stability: emptyCard.stability,
-    difficulty: emptyCard.difficulty,
-    elapsed_days: emptyCard.elapsed_days,
-    scheduled_days: emptyCard.scheduled_days,
-    learning_steps: emptyCard.learning_steps,
-    reps: emptyCard.reps,
-    lapses: emptyCard.lapses,
-    state: emptyCard.state,
-    last_review: null,
-    suspended_at: null,
-    buried_until: null,
-    marked_at: null,
-    created_at: now,
-    updated_at: now,
-  };
-
-  const result = await db.runAsync(
-    `INSERT INTO study_cards
-      (id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days, learning_steps, reps, lapses, state, last_review, created_at, updated_at, deleted_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
-     ON CONFLICT(id) DO UPDATE SET
-      deck_id = excluded.deck_id,
-      due = excluded.due,
-      stability = excluded.stability,
-      difficulty = excluded.difficulty,
-      elapsed_days = excluded.elapsed_days,
-      scheduled_days = excluded.scheduled_days,
-      learning_steps = excluded.learning_steps,
-      reps = excluded.reps,
-      lapses = excluded.lapses,
-      state = excluded.state,
-      last_review = excluded.last_review,
-      created_at = excluded.created_at,
-      updated_at = excluded.updated_at,
-      deleted_at = NULL
-     WHERE study_cards.deleted_at IS NOT NULL`,
-    [
-      row.id,
-      row.deck_id,
-      row.due,
-      row.stability,
-      row.difficulty,
-      row.elapsed_days,
-      row.scheduled_days,
-      row.learning_steps,
-      row.reps,
-      row.lapses,
-      row.state,
-      row.last_review,
-      row.created_at,
-      row.updated_at,
-    ]
-  );
-  if ((result.changes ?? 0) <= 0) return false;
-  enqueueSync(db, "study_cards", "INSERT", cardId, cardToSyncData(row)).catch(console.warn);
-  return true;
-}
-
 export const MEANINGS_DECK_ID = "meanings";
 export const MUTASHABIHAT_DECK_ID = "mutashabihat";
-export const MUTASHABIHAT_DECK_NAME = "Mutashabihat";
 const DECK_REVIEW_SETTINGS_PREFIX = "review_settings_";
 
 function deckReviewSettingsKey(deckId: string): string {
@@ -759,14 +466,6 @@ export async function addMeaningCard(
   return { created };
 }
 
-export async function isMutashabihatCardSaved(
-  db: SQLiteDatabase,
-  surah: number,
-  ayah: number
-): Promise<boolean> {
-  return isRetentionCardSaved(db, surah, ayah);
-}
-
 export async function isRetentionCardSaved(
   db: SQLiteDatabase,
   surah: number,
@@ -784,14 +483,6 @@ export async function isRetentionCardSaved(
     [cardId, SMART_DECK_IDS.retention, cardId, MEANINGS_DECK_ID, legacyCardId, MUTASHABIHAT_DECK_ID]
   );
   return (row?.c ?? 0) > 0;
-}
-
-export async function addMutashabihatCard(
-  db: SQLiteDatabase,
-  surah: number,
-  ayah: number
-): Promise<{ created: boolean }> {
-  return addRetentionCard(db, surah, ayah);
 }
 
 export async function addRetentionCard(
@@ -891,14 +582,6 @@ export async function addRetentionCard(
 
 // ─── Query helpers ───────────────────────────────────────────
 
-export async function getDueCards(
-  db: SQLiteDatabase,
-  deckId?: string,
-  limit?: number
-): Promise<StudyCardRow[]> {
-  return getDueCardsForReview(db, deckId, limit);
-}
-
 function reviewQueueOptionsFromSettings(settings: DeckReviewSettings, limit: number): DueCardsForReviewOptions {
   return {
     limit,
@@ -909,7 +592,7 @@ function reviewQueueOptionsFromSettings(settings: DeckReviewSettings, limit: num
   };
 }
 
-export async function getTodayReviewedCount(db: SQLiteDatabase, deckId?: string): Promise<number> {
+async function getTodayReviewedCount(db: SQLiteDatabase, deckId?: string): Promise<number> {
   const { start, end } = todayBounds();
   if (deckId) {
     const row = await db.getFirstAsync<{ count: number }>(
@@ -1085,45 +768,7 @@ export async function getNewCount(db: SQLiteDatabase, deckId?: string): Promise<
   return (nonSmartRow?.count ?? 0) + smartRows.filter((row) => row.state === 0 && isReviewableCard(row, now)).length;
 }
 
-export async function getDecks(db: SQLiteDatabase): Promise<{ id: string; name?: string; scope: DeckScope; createdAt: string }[]> {
-  const rows = await db.getAllAsync<{ key: string; value: string }>(
-    "SELECT key, value FROM user_settings WHERE key LIKE 'deck_%'"
-  );
-  return rows.map((r) => JSON.parse(r.value));
-}
-
-export async function deleteDeck(db: SQLiteDatabase, deckId: string): Promise<void> {
-  const rows = await db.getAllAsync<StudyCardRow>(
-    "SELECT * FROM study_cards WHERE deck_id = ? AND deleted_at IS NULL",
-    [deckId]
-  );
-  const deletedAt = new Date().toISOString();
-
-  await db.withTransactionAsync(async () => {
-    // Delete associated log entries
-    await db.runAsync(
-      "DELETE FROM study_log WHERE card_id IN (SELECT id FROM study_cards WHERE deck_id = ?)",
-      [deckId]
-    );
-    await db.runAsync(
-      "UPDATE study_cards SET updated_at = ?, deleted_at = ? WHERE deck_id = ? AND deleted_at IS NULL",
-      [deletedAt, deletedAt, deckId]
-    );
-    // Delete deck metadata
-    await deleteUserSetting(db, `deck_${deckId}`);
-    await deleteUserSetting(db, deckReviewSettingsKey(deckId));
-  });
-
-  for (const row of rows) {
-    enqueueSync(db, "study_cards", "DELETE", row.id, {
-      ...cardToSyncData(rowWithDefaultStatus(row)),
-      updated_at: deletedAt,
-      deleted_at: deletedAt,
-    }).catch(console.warn);
-  }
-}
-
-export async function ensureStudyCardRow(
+async function ensureStudyCardRow(
   db: SQLiteDatabase,
   deckId: string,
   cardId: string
@@ -1707,11 +1352,4 @@ export async function getReviewStats(db: SQLiteDatabase, activityDays = 90): Pro
     averageDailyReviews: activeDays > 0 ? Math.round(totalReviews / activeDays) : 0,
     longestStreak: calculateLongestStreak(dateKeys),
   };
-}
-
-export async function getLastReviewDate(db: SQLiteDatabase): Promise<string | null> {
-  const row = await db.getFirstAsync<{ reviewed_at: string }>(
-    "SELECT reviewed_at FROM study_log ORDER BY reviewed_at DESC LIMIT 1"
-  );
-  return row?.reviewed_at ?? null;
 }

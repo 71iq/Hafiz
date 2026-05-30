@@ -109,18 +109,10 @@ export const TAFSIR_SOURCES: TafsirSourceConfig[] = [
   },
 ];
 
-export const SURAH_ROW_TAFSIR_SOURCES = TAFSIR_SOURCES.filter(
-  (source) => source.importKind === "surahRows"
-);
-
 export const AVAILABLE_TAFSIR_SOURCES = TAFSIR_SOURCES;
 
 export function isBundledTafsirSourceId(value: TafsirSourceId): boolean {
   return BUNDLED_TAFSIR_SOURCE_IDS.includes(value);
-}
-
-export function isTafsirSourceId(value: string | null | undefined): value is TafsirSourceId {
-  return TAFSIR_SOURCES.some((source) => source.id === value);
 }
 
 export function isAvailableTafsirSourceId(value: string | null | undefined): value is TafsirSourceId {

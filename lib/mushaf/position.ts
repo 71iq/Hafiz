@@ -99,11 +99,6 @@ export function findHizbForAyah(index: MushafIndex, surah: number, ayah: number)
   return best;
 }
 
-export function topmostSurahForPage(index: MushafIndex, page: number): number | null {
-  const row = index.pageByNumber.get(page);
-  return row?.surah_start ?? null;
-}
-
 export function topmostAyahForPage(index: MushafIndex, page: number): { surah: number; ayah: number } | null {
   const row = index.pageByNumber.get(page);
   if (!row) return null;

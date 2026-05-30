@@ -137,31 +137,3 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     );
   }
 }
-
-// ---------------------------------------------------------------------------
-// HOC wrapper for functional components
-// ---------------------------------------------------------------------------
-
-/**
- * Wrap any component in an ErrorBoundary.
- *
- * ```tsx
- * export default withErrorBoundary(MyScreen, "MyScreen");
- * ```
- */
-export function withErrorBoundary<P extends object>(
-  WrappedComponent: React.ComponentType<P>,
-  sectionName?: string,
-) {
-  const displayName =
-    WrappedComponent.displayName || WrappedComponent.name || "Component";
-
-  const Wrapped = (props: P) => (
-    <ErrorBoundary section={sectionName ?? displayName}>
-      <WrappedComponent {...props} />
-    </ErrorBoundary>
-  );
-
-  Wrapped.displayName = `withErrorBoundary(${displayName})`;
-  return Wrapped;
-}
