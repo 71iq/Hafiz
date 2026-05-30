@@ -36,7 +36,7 @@ export type CreatePrivateNoteInput = {
   content: string;
 };
 
-export class DuplicatePrivateNoteError extends Error {
+class DuplicatePrivateNoteError extends Error {
   constructor() {
     super("Duplicate private note");
     this.name = "DuplicatePrivateNoteError";

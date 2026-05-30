@@ -1,5 +1,4 @@
 import type { SQLiteDatabase } from "expo-sqlite";
-import { normalizeArabicWord } from "@/lib/arabic";
 import { enqueueSync } from "@/lib/database/sync-queue";
 
 export type WordTranslationRow = {
@@ -141,18 +140,6 @@ export async function fetchTextUthmani(
   return row?.text_uthmani ?? null;
 }
 
-export async function fetchAyahTafseer(
-  db: SQLiteDatabase,
-  surah: number,
-  ayah: number,
-): Promise<string | null> {
-  const row = await db.getFirstAsync<{ text: string }>(
-    "SELECT text FROM tafseer WHERE surah = ? AND ayah = ?",
-    [surah, ayah],
-  );
-  return row?.text ?? null;
-}
-
 // ─── New tab queries ──────────────────────────────────────────
 
 export type WordMeaningArRow = {
@@ -190,36 +177,6 @@ export type QiraatRow = {
   text: string | null;
   ayah_group: string | null;
 };
-
-export async function fetchWordMeaningsArForAyah(
-  db: SQLiteDatabase,
-  surah: number,
-  ayah: number,
-): Promise<WordMeaningArRow[]> {
-  return db.getAllAsync<WordMeaningArRow>(
-    `WITH meaning_keys AS (
-       SELECT surah, ayah, word_pos FROM word_meanings_ar WHERE surah = ? AND ayah = ?
-       UNION
-       SELECT surah, ayah, word_pos FROM user_word_meanings WHERE surah = ? AND ayah = ?
-     )
-     SELECT
-       k.surah,
-       k.ayah,
-       k.word_pos,
-       COALESCE(NULLIF(base.word, ''), custom.word) AS word,
-       CASE
-         WHEN base.meaning IS NOT NULL AND TRIM(base.meaning) != '' THEN base.meaning
-         ELSE custom.meaning
-       END AS meaning
-     FROM meaning_keys k
-     LEFT JOIN word_meanings_ar base
-       ON base.surah = k.surah AND base.ayah = k.ayah AND base.word_pos = k.word_pos
-     LEFT JOIN user_word_meanings custom
-       ON custom.surah = k.surah AND custom.ayah = k.ayah AND custom.word_pos = k.word_pos
-     ORDER BY k.word_pos`,
-    [surah, ayah, surah, ayah],
-  );
-}
 
 export async function upsertUserWordMeaning(
   db: SQLiteDatabase,
@@ -316,47 +273,4 @@ export async function fetchQiraat(
     "SELECT text, ayah_group FROM qiraat_encyclopedia WHERE surah = ? AND ayah = ?",
     [surah, ayah],
   );
-}
-
-/**
- * Find the best matching entry in a per-ayah list for a tapped word.
- * The Da'as and quran-words datasets group words differently from the Mushaf
- * (e.g., "بِسْمِ اللهِ" as one entry vs two Mushaf tokens). Strategy:
- *   1. Exact word_pos match.
- *   2. Normalized-text match (drop diacritics/spaces) — prefer containment.
- *   3. Fuzzy: first entry whose normalized word contains the tapped word.
- * Returns the index into `list`, or -1 if nothing matched.
- */
-export function findBestWordMatch<T extends { word_pos: number; word: string | null }>(
-  list: T[],
-  targetPos: number,
-  targetText: string,
-): number {
-  if (list.length === 0) return -1;
-  const exactIdx = list.findIndex((r) => r.word_pos === targetPos);
-  if (exactIdx !== -1) {
-    // If the exact-position row's word matches the tapped text (loosely),
-    // keep it. Otherwise fall through to text-based matching.
-    const row = list[exactIdx];
-    if (row.word) {
-      const a = normalizeArabicWord(row.word);
-      const b = normalizeArabicWord(targetText);
-      if (a && b && (a === b || a.includes(b) || b.includes(a))) return exactIdx;
-    } else {
-      return exactIdx;
-    }
-  }
-  const target = normalizeArabicWord(targetText);
-  if (!target) return exactIdx; // fall back to whatever we had
-  // Prefer exact normalized equality first
-  const eqIdx = list.findIndex((r) => r.word && normalizeArabicWord(r.word) === target);
-  if (eqIdx !== -1) return eqIdx;
-  // Then containment either direction
-  const containsIdx = list.findIndex((r) => {
-    if (!r.word) return false;
-    const w = normalizeArabicWord(r.word);
-    return w.includes(target) || target.includes(w);
-  });
-  if (containsIdx !== -1) return containsIdx;
-  return exactIdx;
 }

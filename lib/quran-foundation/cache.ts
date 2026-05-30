@@ -1,7 +1,7 @@
 import type { SQLiteDatabase } from "expo-sqlite";
 import type { QfAudioResponse, QfHadithResponse } from "./content";
 
-export const QF_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const QF_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 export type CachedQfAudio = QfAudioResponse & {
   isStale: boolean;

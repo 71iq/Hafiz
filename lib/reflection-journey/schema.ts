@@ -6,7 +6,7 @@ import type {
   ReflectionJourneySeed,
 } from "./types";
 
-export const REFLECTION_JOURNEY_SCHEMA_VERSION = 1;
+const REFLECTION_JOURNEY_SCHEMA_VERSION = 1;
 export const REFLECTION_JOURNEY_MIN_RESPONSE_CHARS = 10;
 export const REFLECTION_JOURNEY_MAX_RESPONSE_CHARS = 5000;
 
@@ -55,7 +55,7 @@ const recitationPlaceholderSchema = blockTitleSchema.extend({
   body: localizedTextSchema.optional(),
 });
 
-export const reflectionJourneyBlockSchema = z.discriminatedUnion("type", [
+const reflectionJourneyBlockSchema = z.discriminatedUnion("type", [
   ayahRangeSchema,
   translationSchema,
   tafseerSchema,
@@ -63,7 +63,7 @@ export const reflectionJourneyBlockSchema = z.discriminatedUnion("type", [
   recitationPlaceholderSchema,
 ]);
 
-export const reflectionJourneyBlocksSchema = z.array(reflectionJourneyBlockSchema);
+const reflectionJourneyBlocksSchema = z.array(reflectionJourneyBlockSchema);
 
 const reflectionJourneyLevelSchema = z.object({
   id: z.string().trim().min(1),

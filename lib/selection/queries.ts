@@ -38,7 +38,7 @@ export type QuranSelectionWordRef = {
   isMarker?: boolean;
 };
 
-export type UthmaniSelectionRange = {
+type UthmaniSelectionRange = {
   surah: number;
   surahName: string;
   ayahStart: number;

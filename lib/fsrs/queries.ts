@@ -345,15 +345,15 @@ export async function writeDeckReviewSettings(
   await writeUserSetting(db, deckReviewSettingsKey(deckId), JSON.stringify(normalized));
 }
 
-export function meaningCardId(surah: number, ayah: number, wordPos: number): string {
+function meaningCardId(surah: number, ayah: number, wordPos: number): string {
   return `word:${surah}:${ayah}:${wordPos}`;
 }
 
-export function mutashabihatCardId(surah: number, ayah: number): string {
+function mutashabihatCardId(surah: number, ayah: number): string {
   return `${MUTASHABIHAT_DECK_ID}:${surah}:${ayah}`;
 }
 
-export function retentionCardId(surah: number, ayah: number): string {
+function retentionCardId(surah: number, ayah: number): string {
   return `${surah}:${ayah}`;
 }
 

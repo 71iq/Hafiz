@@ -111,8 +111,8 @@ type PageGlyph = {
 
 const BISMILLAH_UTHMANI = "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ";
 
-export const MUSHAF_LINE_WIDTH_SCALE = 19.5;
-export const MUSHAF_LINE_WIDTH_SCALE_V4_TAJWEED = 21.5;
+const MUSHAF_LINE_WIDTH_SCALE = 19.5;
+const MUSHAF_LINE_WIDTH_SCALE_V4_TAJWEED = 21.5;
 const MARKER_DOUBLE_TAP_MS = 260;
 
 export function mushafLineWidthScale(fontStyle: string): number {

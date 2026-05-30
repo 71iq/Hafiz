@@ -77,7 +77,7 @@ export async function listReflectionJourneyLevels(
   });
 }
 
-export async function getReflectionJourneyLevel(
+async function getReflectionJourneyLevel(
   db: SQLiteDatabase,
   levelId: string
 ): Promise<ReflectionJourneyLevelDetail | null> {

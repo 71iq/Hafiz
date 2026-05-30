@@ -9,7 +9,7 @@ export type QfContentError = {
   message: string;
 };
 
-export type QfAudio = {
+type QfAudio = {
   url: string;
   duration?: number;
   format?: string;
@@ -26,12 +26,12 @@ export type QfAudioResponse = {
   fetchedAt: string;
 };
 
-export type QfHadithGrade = {
+type QfHadithGrade = {
   graded_by?: string;
   grade?: string;
 };
 
-export type QfHadithText = {
+type QfHadithText = {
   lang?: string;
   chapterNumber?: string;
   chapterTitle?: string;
@@ -77,7 +77,7 @@ export type QfRecitersResponse = {
   fetchedAt: string;
 };
 
-export type QfContentResponse = QfAudioResponse | QfHadithResponse | QfRecitersResponse | QfContentError;
+type QfContentResponse = QfAudioResponse | QfHadithResponse | QfRecitersResponse | QfContentError;
 
 type AudioRequest = {
   action: "audio-ayah";

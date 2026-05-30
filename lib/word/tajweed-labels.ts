@@ -34,11 +34,11 @@ const QPC_V4_TAJWEED_RULE_COLOR_INDEX: Record<string, number> = {
   lpieces_spieces: 11,
 };
 
-export function getTajweedRuleColor(ruleId: string, theme: string): string {
+function getTajweedRuleColor(ruleId: string, theme: string): string {
   return qpcV4TajweedPaletteColor(theme, QPC_V4_TAJWEED_RULE_COLOR_INDEX[ruleId] ?? 1);
 }
 
-export const TAJWEED_RULES: Record<string, TajweedRuleInfo> = {
+const TAJWEED_RULES: Record<string, TajweedRuleInfo> = {
   ghunnah: {
     arabic: "غنّة",
     english: "Ghunnah",

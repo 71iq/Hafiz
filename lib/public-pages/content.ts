@@ -7,7 +7,7 @@ export type PublicPageLink = {
   external?: boolean;
 };
 
-export type PublicPageSection = {
+type PublicPageSection = {
   id?: string;
   title: string;
   body?: string[];

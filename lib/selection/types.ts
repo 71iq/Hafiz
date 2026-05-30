@@ -1,4 +1,4 @@
-export type SelectionAnchor = {
+type SelectionAnchor = {
   surah: number;
   ayah: number;
 };

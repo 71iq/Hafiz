@@ -2767,33 +2767,3 @@ export async function initializeDatabase(
   console.log(`[Import] All imports complete in ${elapsed}s`);
   onProgress({ step: "Complete", current: TOTAL_STEPS, total: TOTAL_STEPS, detail: `Done in ${elapsed}s` });
 }
-
-export async function getTableCounts(
-  db: SQLiteDatabase
-): Promise<Record<string, number>> {
-  const tables = [
-    "surahs",
-    "surah_info",
-    "quran_text",
-    "juz_map",
-    "hizb_map",
-    "word_roots",
-    "page_map",
-    "tafseer",
-    "translations",
-    "word_translations",
-    "word_irab",
-    "tajweed_rules",
-    "asbab_al_nuzul",
-    "page_lines",
-  ];
-
-  const counts: Record<string, number> = {};
-  for (const table of tables) {
-    const result = await db.getFirstAsync<{ count: number }>(
-      `SELECT COUNT(*) as count FROM ${table}`
-    );
-    counts[table] = result?.count ?? 0;
-  }
-  return counts;
-}

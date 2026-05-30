@@ -20,16 +20,8 @@ export function useUIDirection(explicitDir?: Direction): Direction {
   return explicitDir ?? contextDir;
 }
 
-export function isRTLDirection(dir: Direction) {
-  return dir === "rtl";
-}
-
 export function textAlignForDirection(dir: Direction, align: "start" | "center" | "end" = "start") {
   if (align === "center") return "center";
   if (align === "end") return dir === "rtl" ? "left" : "right";
   return dir === "rtl" ? "right" : "left";
-}
-
-export function rowClassForDirection(dir: Direction) {
-  return dir === "rtl" ? "flex-row-reverse" : "flex-row";
 }

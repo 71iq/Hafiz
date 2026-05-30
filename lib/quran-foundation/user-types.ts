@@ -4,7 +4,7 @@ export const QF_DEFAULT_MUSHAF_ID = 1 as const;
 export const QF_NOTE_MIN_LENGTH = 6;
 export const QF_NOTE_MAX_LENGTH = 10000;
 
-export type QfUserErrorCode =
+type QfUserErrorCode =
   | "bad_request"
   | "not_configured"
   | "not_authenticated"
@@ -60,7 +60,7 @@ export type QfNote = {
   updatedAt: string;
 };
 
-export type QfUserSuccess =
+type QfUserSuccess =
   | QfConnectionStatusResponse
   | QfBeginOAuthResponse
   | QfCompleteOAuthResponse

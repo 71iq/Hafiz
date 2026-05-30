@@ -55,9 +55,3 @@ export async function assertHealthyPage(page: Page, capture: ConsoleCapture) {
   expect(unexpectedPageErrors, "unexpected page errors").toEqual([]);
   expect(unexpectedConsoleErrors, "unexpected console errors").toEqual([]);
 }
-
-export async function openHealthyRoute(page: Page, route: string, capture: ConsoleCapture) {
-  await waitForQaReady(page);
-  await page.goto(route, { waitUntil: "domcontentloaded" });
-  await assertHealthyPage(page, capture);
-}

@@ -1,13 +1,13 @@
 import type { SQLiteDatabase } from "expo-sqlite";
 
-export type JuzRow = {
+type JuzRow = {
   juz: number;
   surah: number;
   ayah_start: number;
   ayah_end: number;
 };
 
-export type HizbRow = {
+type HizbRow = {
   hizb: number;
   surah_start: number;
   ayah_start: number;
@@ -15,13 +15,13 @@ export type HizbRow = {
   ayah_end: number;
 };
 
-export type SurahMeta = {
+type SurahMeta = {
   number: number;
   name_arabic: string;
   name_english: string;
 };
 
-export type PageRow = {
+type PageRow = {
   page: number;
   surah_start: number;
   ayah_start: number;

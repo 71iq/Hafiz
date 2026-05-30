@@ -3,7 +3,7 @@ export type ReflectionJourneyLocalizedText = {
   ar: string;
 };
 
-export type ReflectionJourneyLevelBlockTitle = {
+type ReflectionJourneyLevelBlockTitle = {
   title?: ReflectionJourneyLocalizedText;
 };
 
@@ -29,7 +29,7 @@ export type ReflectionJourneyTafseerBlock = ReflectionJourneyLevelBlockTitle & {
   source: "muyassar" | "zilal" | "settings";
 };
 
-export type ReflectionJourneyCustomTextBlock = ReflectionJourneyLevelBlockTitle & {
+type ReflectionJourneyCustomTextBlock = ReflectionJourneyLevelBlockTitle & {
   type: "custom_text";
   body: ReflectionJourneyLocalizedText;
   tone?: "intro" | "note" | "prompt";
@@ -77,7 +77,7 @@ export type ReflectionJourneyEntry = {
   completedAt: string | null;
 };
 
-export type ReflectionJourneyLevelStatus = "locked" | "available" | "draft" | "completed";
+type ReflectionJourneyLevelStatus = "locked" | "available" | "draft" | "completed";
 
 export type ReflectionJourneyLevel = {
   id: string;

@@ -15,7 +15,7 @@ export type Profile = {
   created_at: string;
 };
 
-export type SignUpResult = {
+type SignUpResult = {
   status: "signedIn" | "needsEmailConfirmation" | "alreadyRegistered";
 };
 
