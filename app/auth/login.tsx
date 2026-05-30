@@ -34,7 +34,7 @@ type LoginForm = z.infer<typeof loginSchema>;
 export default function LoginScreen() {
   const router = useRouter();
   const s = strings[getStartupLanguage()];
-  const { signIn, isLoading, error, clearError } = useAuthStore();
+  const { signIn, isLoading, error } = useAuthStore();
   const [showError, setShowError] = useState<string | null>(null);
   const configured = isSupabaseConfigured();
 

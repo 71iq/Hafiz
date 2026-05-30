@@ -14,7 +14,6 @@ const ACTIVE_BG = "#1B4D4F"; // primary-container
 const ACTIVE_TEXT = "#FDDC91"; // gold
 const INACTIVE_LIGHT = "rgba(45, 45, 45, 0.5)"; // charcoal/50
 const INACTIVE_DARK = "rgba(232, 225, 218, 0.5)"; // surface-high/50
-const SHADOW_COLOR = "rgba(0, 54, 56, 0.04)";
 
 function TabItem({
   route,

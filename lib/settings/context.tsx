@@ -512,14 +512,6 @@ export function useSettings() {
   return useContext(SettingsContext);
 }
 
-async function readSetting(db: SQLiteDatabase, key: string): Promise<string | null> {
-  const row = await db.getFirstAsync<{ value: string }>(
-    "SELECT value FROM user_settings WHERE key = ?",
-    [key]
-  );
-  return row?.value ?? null;
-}
-
 async function readSettings(db: SQLiteDatabase, keys: string[]): Promise<Record<string, string | null>> {
   if (keys.length === 0) return {};
   const placeholders = keys.map(() => "?").join(", ");

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { View, Text } from "react-native";
 import { useDatabase } from "@/lib/database/provider";
 import { fetchWordIrab, fetchWordRoot, type WordIrabRow, type WordRootRow } from "@/lib/word/queries";
-import { decodeLabel, getVerbFormName } from "@/lib/word/morphology-labels";
+import { getVerbFormName } from "@/lib/word/morphology-labels";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { useSettings } from "@/lib/settings/context";
 

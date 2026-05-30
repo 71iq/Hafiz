@@ -65,7 +65,6 @@ export function DefaultDeckProgressChart({
               key={item.key}
               title={titles[item.key]}
               item={item}
-              isDark={isDark}
               isRTL={isRTL}
               s={s}
             />
@@ -86,13 +85,11 @@ export function DefaultDeckProgressChart({
 function DefaultDeckProgressRow({
   title,
   item,
-  isDark,
   isRTL,
   s,
 }: {
   title: string;
   item: DefaultDeckProgressItem;
-  isDark: boolean;
   isRTL: boolean;
   s: any;
 }) {

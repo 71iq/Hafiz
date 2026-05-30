@@ -99,26 +99,6 @@ export async function computeUniqueFront(
 
     if (prevRows.length !== ctx + 1) break; // Can't go further back (start of surah)
 
-    const combinedClean = prevRows.map((r) => r.text_clean).join(" ");
-
-    // Check if this combined text is unique
-    const match = await db.getFirstAsync<{ cnt: number }>(
-      `SELECT COUNT(*) as cnt FROM (
-        SELECT q1.surah, q1.ayah FROM quran_text q1
-        WHERE EXISTS (
-          SELECT 1 FROM quran_text q2
-          WHERE q2.surah = q1.surah
-            AND q2.ayah >= q1.ayah - ?
-            AND q2.ayah <= q1.ayah
-          GROUP BY q2.surah
-          HAVING GROUP_CONCAT(q2.text_clean, ' ') = ?
-        )
-      )`,
-      [ctx, combinedClean]
-    );
-
-    // Simpler approach: just check if the combined text + surah combo is unique enough
-    // Since we're prepending, the combo is already much more unique
     const combinedUthmani = prevRows.map((r) => r.text_uthmani).join(" ﴿...﴾ ");
 
     // For practical purposes, prepending even 1 ayah makes it unique in nearly all cases

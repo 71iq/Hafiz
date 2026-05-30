@@ -8,7 +8,6 @@ import {
   fetchTextUthmani,
   fetchTajweedRuleAr,
   fetchTajweedRuleEn,
-  type TajweedRow,
 } from "@/lib/word/queries";
 import { mapTajweedToWord } from "@/lib/word/tajweed-mapping";
 import { getTajweedRule } from "@/lib/word/tajweed-labels";

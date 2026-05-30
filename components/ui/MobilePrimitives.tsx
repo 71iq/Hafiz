@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import {
   Animated,
   Modal,

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, Text, View, useWindowDimensions } from "react-native";
+import { ActivityIndicator, Pressable, Text, useWindowDimensions } from "react-native";
 import { OverlayBody, OverlayFooter, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { Input } from "@/components/ui/Input";
 import { useDatabase } from "@/lib/database/provider";

@@ -650,43 +650,6 @@ export function retentionCardId(surah: number, ayah: number): string {
   return `${surah}:${ayah}`;
 }
 
-async function ensureMutashabihatDeck(db: SQLiteDatabase, now: string): Promise<boolean> {
-  const existing = await db.getFirstAsync<{ value: string }>(
-    "SELECT value FROM user_settings WHERE key = ?",
-    [`deck_${MUTASHABIHAT_DECK_ID}`]
-  );
-
-  const metadata = {
-    id: MUTASHABIHAT_DECK_ID,
-    name: MUTASHABIHAT_DECK_NAME,
-    scope: { type: "custom", surahStart: 1, ayahStart: 1, surahEnd: 1, ayahEnd: 1 },
-    createdAt: now,
-  };
-
-  if (!existing) {
-    await writeUserSetting(db, `deck_${MUTASHABIHAT_DECK_ID}`, JSON.stringify(metadata));
-    return true;
-  }
-
-  try {
-    const current = JSON.parse(existing.value);
-    if (current?.name !== MUTASHABIHAT_DECK_NAME) {
-      await writeUserSetting(db, `deck_${MUTASHABIHAT_DECK_ID}`, JSON.stringify({
-        ...metadata,
-        ...current,
-        id: MUTASHABIHAT_DECK_ID,
-        name: MUTASHABIHAT_DECK_NAME,
-        scope: current?.scope ?? metadata.scope,
-        createdAt: current?.createdAt ?? now,
-      }));
-    }
-  } catch {
-    await writeUserSetting(db, `deck_${MUTASHABIHAT_DECK_ID}`, JSON.stringify(metadata));
-  }
-
-  return false;
-}
-
 export async function isMeaningCardSaved(
   db: SQLiteDatabase,
   surah: number,

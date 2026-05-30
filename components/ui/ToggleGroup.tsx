@@ -1,6 +1,5 @@
 import { View, Pressable, Text, type ViewProps } from "react-native";
 import { cn } from "@/lib/utils";
-import { forwardRef } from "react";
 import { useUIDirection, type Direction } from "@/lib/ui/direction";
 
 type ToggleGroupProps<T extends string> = ViewProps & {

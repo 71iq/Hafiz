@@ -969,7 +969,7 @@ function FlashcardSessionScreen() {
           {phase === "side" && currentMode && (
             <View>
               <Card elevation="low" className="p-5 mb-4 rounded-3xl bg-surface-low dark:bg-surface-dark-low">
-                <TestModePrompt mode={currentMode} card={currentCard} fontSize={fontSize * 0.85} lineHeight={lineHeight * 0.85} s={s} />
+                <TestModePrompt mode={currentMode} card={currentCard} fontSize={fontSize * 0.85} lineHeight={lineHeight * 0.85} />
               </Card>
 
               {revealed && (
@@ -1519,16 +1519,16 @@ function ModeTagsRow({
 }
 
 function TestModePrompt({
-  mode, card, fontSize, lineHeight, s,
+  mode, card, fontSize, lineHeight,
 }: {
-  mode: ReviewMode; card: CardData; fontSize: number; lineHeight: number; s: any;
+  mode: ReviewMode; card: CardData; fontSize: number; lineHeight: number;
 }) {
   const wordMode = isWordTestMode(mode);
 
   return (
     <View>
       {mode === "smartRefs" ? (
-        <SmartCueText card={card} fontSize={fontSize} lineHeight={lineHeight} s={s} />
+        <SmartCueText card={card} fontSize={fontSize} lineHeight={lineHeight} />
       ) : card.textQcf2 && card.v2Page ? (
         <Qcf2AyahText
           textQcf2={card.textQcf2}
@@ -1672,7 +1672,7 @@ function SmartCardFront({
       {(card.kind === "qiraat" || card.kind === "asbab") && card.textQcf2 && card.v2Page ? (
         <Qcf2AyahText textQcf2={card.textQcf2} v2Page={card.v2Page} fontSize={fontSize} lineHeight={lineHeight} />
       ) : (
-        <SmartCueText card={card} fontSize={fontSize} lineHeight={lineHeight} s={s} />
+        <SmartCueText card={card} fontSize={fontSize} lineHeight={lineHeight} />
       )}
     </View>
   );
@@ -1682,12 +1682,10 @@ function SmartCueText({
   card,
   fontSize,
   lineHeight,
-  s,
 }: {
   card: CardData;
   fontSize: number;
   lineHeight: number;
-  s: any;
 }) {
   const promptText = card.smartPromptUthmani ?? card.uniqueFront.text;
   return (

@@ -42,7 +42,7 @@ type SignupForm = z.infer<typeof signupSchema>;
 export default function SignupScreen() {
   const router = useRouter();
   const s = strings[getStartupLanguage()];
-  const { signUp, resendSignupConfirmation, isLoading, error, clearError } = useAuthStore();
+  const { signUp, resendSignupConfirmation, isLoading, error } = useAuthStore();
   const [showError, setShowError] = useState<string | null>(null);
   const [pendingConfirmationEmail, setPendingConfirmationEmail] = useState<string | null>(null);
   const configured = isSupabaseConfigured();

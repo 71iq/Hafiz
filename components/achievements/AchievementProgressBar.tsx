@@ -4,10 +4,9 @@ import { useSettings } from "@/lib/settings/context";
 type Props = {
   current: number;
   target: number;
-  isDark?: boolean;
 };
 
-export function AchievementProgressBar({ current, target, isDark }: Props) {
+export function AchievementProgressBar({ current, target }: Props) {
   const { themeColors } = useSettings();
   const pct = target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0;
   return (

@@ -97,7 +97,7 @@ export function AchievementBadge({ item, compact = false }: Props) {
       </View>
       {showProgress && (
         <>
-          <AchievementProgressBar current={currentValue} target={targetValue} isDark={isDark} />
+          <AchievementProgressBar current={currentValue} target={targetValue} />
           <Text
             className="mt-1.5 text-warm-400 dark:text-neutral-500"
             style={{ fontFamily: "Manrope_500Medium", fontSize: 10, textAlign: isRTL ? "right" : "left" }}

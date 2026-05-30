@@ -1,6 +1,5 @@
 import { View, Pressable, Text, ScrollView, type ViewProps } from "react-native";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
 
 type Tab = {
   key: string;

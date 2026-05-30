@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { View, Text, ScrollView, Pressable } from "react-native";
 import { useDatabase } from "@/lib/database/provider";
 import { useWordInteraction } from "@/lib/word/context";
@@ -72,7 +72,7 @@ export function OccurrencesTab({ surah, ayah, wordPos }: Props) {
 
       {/* Occurrence list */}
       <ScrollView style={{ maxHeight: 280 }} showsVerticalScrollIndicator={false}>
-        {occurrences.map((occ, i) => {
+        {occurrences.map((occ) => {
           const isCurrent =
             occ.surah === surah &&
             occ.ayah === ayah &&

@@ -1,4 +1,4 @@
-import type { State, StepUnit } from "ts-fsrs";
+import type { StepUnit } from "ts-fsrs";
 
 /** A deck is a logical grouping — we track it as metadata on cards */
 export type SurahAyahRange = { surah: number; ayahStart: number; ayahEnd: number };

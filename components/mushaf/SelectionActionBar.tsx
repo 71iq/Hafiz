@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { View, Text, Pressable, Platform } from "react-native";
+import { View, Text, Pressable } from "react-native";
 import { Copy, BookMarked, Highlighter, PenLine, StickyNote, Trash2 } from "lucide-react-native";
 import * as Clipboard from "expo-clipboard";
 import { Sheet, SheetContent } from "@/components/ui/Sheet";

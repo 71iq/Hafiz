@@ -1,4 +1,4 @@
-import { Pressable, Animated, View } from "react-native";
+import { Pressable, Animated } from "react-native";
 import { useEffect, useRef } from "react";
 import { useSettings } from "@/lib/settings/context";
 

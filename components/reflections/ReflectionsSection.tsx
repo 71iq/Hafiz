@@ -39,7 +39,6 @@ export function ReflectionsSection({ surah, ayah, initiallyExpanded = false, sho
   if (!isSupabaseConfigured()) return null;
 
   const chevronColor = isDark ? "#525252" : "#DFD9D1";
-  const mutedColor = isDark ? "#737373" : "#A39B93";
 
   // Fetch count (always, for badge)
   const { data: count = 0 } = useQuery({
