@@ -46,7 +46,9 @@ describe("settings contracts", () => {
   it("keeps daily review limits bounded to documented increments", () => {
     expect(MIN_DAILY_REVIEW_LIMIT).toBe(10);
     expect(MAX_DAILY_REVIEW_LIMIT).toBe(30);
-    expect(DEFAULT_DAILY_REVIEW_LIMIT).toBe(MAX_DAILY_REVIEW_LIMIT);
+    expect(DEFAULT_DAILY_REVIEW_LIMIT).toBe(20);
+    expect(DEFAULT_DAILY_REVIEW_LIMIT).toBeGreaterThanOrEqual(MIN_DAILY_REVIEW_LIMIT);
+    expect(DEFAULT_DAILY_REVIEW_LIMIT).toBeLessThanOrEqual(MAX_DAILY_REVIEW_LIMIT);
     expect((MAX_DAILY_REVIEW_LIMIT - MIN_DAILY_REVIEW_LIMIT) % DAILY_REVIEW_LIMIT_STEP).toBe(0);
   });
 

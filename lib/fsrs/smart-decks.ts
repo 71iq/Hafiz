@@ -748,6 +748,18 @@ export async function materializeSmartDeckCards(
   return createdRows.length;
 }
 
+export async function materializeAllSmartDeckCards(
+  db: SQLiteDatabase,
+  limitPerDeck?: number,
+  newCardsLimit = DEFAULT_DECK_NEW_CARD_LIMIT
+): Promise<number> {
+  let created = 0;
+  for (const deckId of SMART_DECK_ID_LIST) {
+    created += await materializeSmartDeckCards(db, deckId, limitPerDeck, newCardsLimit);
+  }
+  return created;
+}
+
 export async function getDueCardsForReview(
   db: SQLiteDatabase,
   deckId?: string,

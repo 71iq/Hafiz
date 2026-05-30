@@ -67,10 +67,10 @@ export const DEFAULT_WORD_TEST_MODES: WordTestMode[] = [
   "wordMeaningTranslation",
 ];
 
-export const DEFAULT_DECK_DAILY_REVIEW_LIMIT = 30;
+export const DEFAULT_DECK_DAILY_REVIEW_LIMIT = 20;
 export const MIN_DECK_DAILY_REVIEW_LIMIT = 10;
 export const DECK_DAILY_REVIEW_LIMIT_STEP = 10;
-export const DEFAULT_DECK_NEW_CARD_LIMIT = 30;
+export const DEFAULT_DECK_NEW_CARD_LIMIT = 20;
 export const MIN_DECK_NEW_CARD_LIMIT = 0;
 export const DECK_NEW_CARD_LIMIT_STEP = 5;
 export const DEFAULT_DECK_REQUEST_RETENTION = 0.95;

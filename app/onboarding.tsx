@@ -30,8 +30,7 @@ import { LoadingScreen } from "@/components/LoadingScreen";
 import { SettingsProvider, useSettings } from "@/lib/settings/context";
 import { useStrings, interpolate } from "@/lib/i18n/useStrings";
 import {
-  materializeSmartDeckCards,
-  SMART_DECK_IDS,
+  materializeAllSmartDeckCards,
   writeAllDecksFilter,
 } from "@/lib/fsrs/smart-decks";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
@@ -58,7 +57,7 @@ function OnboardingInner() {
   const [creating, setCreating] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [createdDeckId, setCreatedDeckId] = useState<string | null>(null);
+  const [retentionSaved, setRetentionSaved] = useState(false);
   const screenAnim = useRef(new Animated.Value(1)).current;
 
   const isWide = width >= SIDEBAR_BREAKPOINT;
@@ -122,6 +121,8 @@ function OnboardingInner() {
     });
   }, [searchQuery, surahs]);
 
+  const allSurahsSelected = surahs.length > 0 && selectedSurahs.size === surahs.length;
+
   const selectionSummary = interpolate(
     selectedSurahs.size === 1 ? s.onboardingSelectionSummaryOne : s.onboardingSelectionSummary,
     {
@@ -169,8 +170,8 @@ function OnboardingInner() {
         type: "surah",
         surahs: Array.from(selectedSurahs),
       });
-      await materializeSmartDeckCards(db, SMART_DECK_IDS.retention);
-      setCreatedDeckId(SMART_DECK_IDS.retention);
+      await materializeAllSmartDeckCards(db);
+      setRetentionSaved(true);
     } catch (err) {
       console.error("[Onboarding] Failed to save deck filters:", err);
       setError(s.deckFilterSaveFailed);
@@ -180,19 +181,19 @@ function OnboardingInner() {
   }, [creating, db, selectedSurahs, s.deckFilterSaveFailed]);
 
   const handleStartReview = useCallback(async () => {
-    if (!createdDeckId || completing) return;
+    if (!retentionSaved || completing) return;
     setCompleting(true);
     setError(null);
     try {
       await writeUserSetting(db, "onboarding_completed", "true");
-      router.replace({ pathname: "/flashcards/session", params: { deckId: createdDeckId } });
+      router.replace({ pathname: "/flashcards/session" });
     } catch (e) {
       console.warn("[Onboarding] Failed to start review:", e);
       setError(s.onboardingSaveFailed);
     } finally {
       setCompleting(false);
     }
-  }, [completing, createdDeckId, db, router, s.onboardingSaveFailed]);
+  }, [completing, db, retentionSaved, router, s.onboardingSaveFailed]);
 
   const toggleSurah = useCallback((n: number) => {
     setSelectedSurahs((prev) => {
@@ -203,33 +204,34 @@ function OnboardingInner() {
     });
   }, []);
 
+  const toggleAllSurahs = useCallback(() => {
+    setSelectedSurahs((prev) => {
+      if (surahs.length > 0 && prev.size === surahs.length) return new Set();
+      return new Set(surahs.map((surah) => surah.number));
+    });
+  }, [surahs]);
+
   const primaryLabel = useMemo(() => {
     if (currentScreen === 0) return s.onboardingGetStarted;
-    if (currentScreen === 1) {
-      return selectedSurahs.size > 0
-        ? `${s.onboardingContinue} (${selectionSummary})`
-        : s.onboardingContinue;
-    }
-    if (createdDeckId) return s.flashcardsStartReview;
+    if (currentScreen === 1) return s.onboardingContinue;
+    if (retentionSaved) return s.flashcardsStartReview;
     return creating ? s.onboardingCreating : s.onboardingCreateAndStart;
   }, [
-    createdDeckId,
     creating,
     currentScreen,
+    retentionSaved,
     s.flashcardsStartReview,
     s.onboardingContinue,
     s.onboardingCreateAndStart,
     s.onboardingCreating,
     s.onboardingGetStarted,
-    selectedSurahs.size,
-    selectionSummary,
   ]);
 
   const primaryDisabled =
     (currentScreen === 1 && selectedSurahs.size === 0) ||
     creating ||
     completing ||
-    (currentScreen === 2 && !createdDeckId && selectedSurahs.size === 0);
+    (currentScreen === 2 && !retentionSaved && selectedSurahs.size === 0);
 
   const handlePrimary = () => {
     if (currentScreen === 0) {
@@ -240,7 +242,7 @@ function OnboardingInner() {
       animateTo(2);
       return;
     }
-    if (createdDeckId) {
+    if (retentionSaved) {
       handleStartReview();
       return;
     }
@@ -249,7 +251,7 @@ function OnboardingInner() {
 
   const renderPrimaryIcon = () => {
     if (creating || completing) return <ActivityIndicator size="small" color="#FFFFFF" />;
-    if (currentScreen === 2 && createdDeckId) return <Play size={18} color="#FFFFFF" fill="#FFFFFF" />;
+    if (currentScreen === 2 && retentionSaved) return <Play size={18} color="#FFFFFF" fill="#FFFFFF" />;
     return <ForwardIcon size={18} color="#FFFFFF" />;
   };
 
@@ -263,7 +265,7 @@ function OnboardingInner() {
           justifyContent: "space-between",
         }}
       >
-        {currentScreen > 0 && !(currentScreen === 2 && createdDeckId) ? (
+        {currentScreen > 0 && !(currentScreen === 2 && retentionSaved) ? (
           <Pressable
             accessibilityRole="button"
             hitSlop={10}
@@ -440,6 +442,32 @@ function OnboardingInner() {
         >
           {s.onboardingSubtitle}
         </Text>
+        <View style={{ alignItems: "center", gap: 4, paddingTop: 2 }}>
+          <Text
+            style={{
+              color: accentColor,
+              fontFamily: "Manrope_700Bold",
+              fontSize: 14,
+              lineHeight: 20,
+              textAlign: "center",
+              writingDirection: dir,
+            }}
+          >
+            {s.onboardingFocusTitle}
+          </Text>
+          <Text
+            style={{
+              color: textMuted,
+              fontFamily: "Manrope_600SemiBold",
+              fontSize: 13,
+              lineHeight: 19,
+              textAlign: "center",
+              writingDirection: dir,
+            }}
+          >
+            {s.onboardingFocusPractice}
+          </Text>
+        </View>
       </View>
     </View>
   );
@@ -557,18 +585,64 @@ function OnboardingInner() {
   const renderMemorization = () => (
     <View style={{ flex: 1, gap: 16 }}>
       <View style={{ gap: 8 }}>
-        <Text
+        <View
           style={{
-            color: textPrimary,
-            fontFamily: "NotoSerif_700Bold",
-            fontSize: 28,
-            lineHeight: 34,
-            textAlign: startTextAlign,
-            writingDirection: dir,
+            flexDirection: rowDirection,
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            gap: 12,
           }}
         >
-          {s.onboardingMemorizedTitle}
-        </Text>
+          <Text
+            style={{
+              flex: 1,
+              color: textPrimary,
+              fontFamily: "NotoSerif_700Bold",
+              fontSize: 28,
+              lineHeight: 34,
+              textAlign: startTextAlign,
+              writingDirection: dir,
+            }}
+          >
+            {s.onboardingMemorizedTitle}
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={toggleAllSurahs}
+            disabled={!surahsLoaded || surahs.length === 0}
+            style={({ pressed }) => ({
+              minHeight: 36,
+              borderRadius: 18,
+              borderWidth: 1,
+              borderColor: allSurahsSelected ? accentColor : borderColor,
+              backgroundColor: allSurahsSelected
+                ? isDark
+                  ? "rgba(45,212,191,0.12)"
+                  : "rgba(13,148,136,0.09)"
+                : softPanelBg,
+              flexDirection: rowDirection,
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              paddingHorizontal: 13,
+              opacity: !surahsLoaded || surahs.length === 0 ? 0.45 : pressed ? 0.72 : 1,
+            })}
+          >
+            {allSurahsSelected ? <Check size={15} color={accentColor} strokeWidth={3} /> : null}
+            <Text
+              numberOfLines={1}
+              style={{
+                color: allSurahsSelected ? accentColor : textMuted,
+                fontFamily: "Manrope_700Bold",
+                fontSize: 13,
+                textAlign: "center",
+                writingDirection: dir,
+              }}
+            >
+              {allSurahsSelected ? s.onboardingClearAll : s.onboardingSelectAll}
+            </Text>
+          </Pressable>
+        </View>
         <Text
           style={{
             color: textMuted,
@@ -709,16 +783,16 @@ function OnboardingInner() {
             borderRadius: 30,
             alignItems: "center",
             justifyContent: "center",
-            backgroundColor: createdDeckId
+            backgroundColor: retentionSaved
               ? isDark
                 ? "rgba(45,212,191,0.14)"
                 : "rgba(13,148,136,0.10)"
               : softPanelBg,
             borderWidth: 1,
-            borderColor: createdDeckId ? accentColor : borderColor,
+            borderColor: retentionSaved ? accentColor : borderColor,
           }}
         >
-          {createdDeckId ? (
+          {retentionSaved ? (
             <CheckCircle2 size={42} color={accentColor} strokeWidth={1.6} />
           ) : (
             <Layers size={40} color={accentColor} strokeWidth={1.6} />
@@ -737,7 +811,7 @@ function OnboardingInner() {
             writingDirection: dir,
           }}
         >
-          {createdDeckId ? s.onboardingDeckReadyTitle : s.onboardingCreateDeckTitle}
+          {s.onboardingCreateDeckTitle}
         </Text>
         <Text
           style={{
@@ -749,7 +823,7 @@ function OnboardingInner() {
             writingDirection: dir,
           }}
         >
-          {createdDeckId ? s.onboardingDeckReadyDesc : s.onboardingCreateDeckDesc}
+          {s.onboardingCreateDeckDesc}
         </Text>
       </View>
 
@@ -826,10 +900,10 @@ function OnboardingInner() {
         >
           <View
             style={{
-              width: createdDeckId ? "100%" : "64%",
+              width: retentionSaved ? "100%" : "64%",
               height: "100%",
               borderRadius: 999,
-              backgroundColor: createdDeckId ? accentColor : goldColor,
+              backgroundColor: retentionSaved ? accentColor : goldColor,
             }}
           />
         </View>
@@ -940,7 +1014,7 @@ function OnboardingInner() {
             {currentScreen > 0 ? (
               <Pressable
                 accessibilityRole="button"
-                onPress={createdDeckId ? completeOnboarding : completeOnboarding}
+                onPress={completeOnboarding}
                 disabled={creating || completing}
                 hitSlop={8}
                 style={({ pressed }) => ({
@@ -959,7 +1033,7 @@ function OnboardingInner() {
                     writingDirection: dir,
                   }}
                 >
-                  {createdDeckId ? s.onboardingContinue : s.onboardingSkipForNow}
+                  {retentionSaved ? s.onboardingContinue : s.onboardingSkipForNow}
                 </Text>
               </Pressable>
             ) : null}

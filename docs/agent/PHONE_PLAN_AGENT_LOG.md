@@ -2005,3 +2005,24 @@ Saved in `phase19/`:
 - `npx expo start --web --port 8097 --localhost`: launched but hit the known web bundler OOM path during browser screenshot capture.
 - Static-export fallback served from `dist` at `127.0.0.1:8098` passed Playwright visual checks at `360`, `412`, `768`, `1024` Arabic/dark, and `1440`.
 - Playwright workflow passed: welcome -> search "Opener" -> select The Opener -> save selection -> retention deck ready, with no relevant console errors or framework overlay.
+
+## 2026-05-30 — Onboarding Follow-Up Refinements
+
+### Scope decisions
+1. Kept the three-screen onboarding shell and combined the post-save ready state into the setup screen instead of adding a fourth page.
+2. Treated "all default decks" as all built-in smart decks, with the first review launched through the all-decks session route.
+3. Changed the FSRS and legacy settings defaults from 30 to 20 so new review sessions and new-card limits match the requested first-review size.
+
+### Implemented in this step
+- Updated the first-screen subtitle and added bilingual emphasis for memorization through reflection and practice.
+- Added a bilingual Select All / Clear All control to the memorized-surah selector.
+- Changed the final action from Save Selection to Save Retention, then Start Review after saving on the same screen.
+- Materialized all built-in smart decks after onboarding filter save, then started review without a deck-specific route param so the session randomly selects from all matching default decks.
+- Simplified the memorized-surah primary button to "Continue" so Select All does not truncate on phone widths.
+
+### Validation status
+- `npm run typecheck`: passed.
+- `npm run test:unit -- tests/unit/i18n-strings.test.ts tests/unit/settings-contract.test.ts`: passed.
+- `npm run build:web`: passed.
+- `npm run test:e2e:smoke`: passed after web export, 27 route checks.
+- Static-export Playwright flow passed at `390x844`: welcome copy -> Select All -> Save Retention -> Start Review -> `/flashcards/session` without `deckId`, showing a `1 / 20` first review card from a non-retention built-in deck.
