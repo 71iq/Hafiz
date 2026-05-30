@@ -39,6 +39,7 @@ import { writeUserSetting } from "@/lib/database/user-settings";
 import { emitReviewActivity } from "./review-events";
 import { recordAchievementEvent } from "@/lib/achievements/queries";
 import {
+  filterStudyRowsByDefaultDeckFilter,
   getAllMatchingSmartCardIdSet,
   getDueCardsForReview,
   getSmartCardContent,
@@ -643,20 +644,21 @@ export async function getDueCount(db: SQLiteDatabase, deckId?: string): Promise<
     return (await getSmartDeckStats(db, deckId)).due;
   }
   if (deckId) {
-    const row = await db.getFirstAsync<{ count: number }>(
-      `SELECT COUNT(*) as count FROM study_cards WHERE deck_id = ? AND due <= ? AND ${REVIEWABLE_CARD_SQL}`,
+    const rows = await db.getAllAsync<StudyCardRow>(
+      `SELECT * FROM study_cards WHERE deck_id = ? AND due <= ? AND ${REVIEWABLE_CARD_SQL}`,
       [deckId, now, now]
     );
-    return row?.count ?? 0;
+    return (await filterStudyRowsByDefaultDeckFilter(db, rows)).length;
   }
   const [nonSmartRow, smartRows] = await Promise.all([
-    db.getFirstAsync<{ count: number }>(
-      `SELECT COUNT(*) as count FROM study_cards WHERE due <= ? AND ${NON_SMART_CARD_SQL} AND ${REVIEWABLE_CARD_SQL}`,
+    db.getAllAsync<StudyCardRow>(
+      `SELECT * FROM study_cards WHERE due <= ? AND ${NON_SMART_CARD_SQL} AND ${REVIEWABLE_CARD_SQL}`,
       [now, now]
     ),
     getFilteredSmartMaterializedRows(db),
   ]);
-  return (nonSmartRow?.count ?? 0) + smartRows.filter((row) => row.due <= now && isReviewableCard(row, now)).length;
+  const nonSmartRows = await filterStudyRowsByDefaultDeckFilter(db, nonSmartRow);
+  return nonSmartRows.length + smartRows.filter((row) => row.due <= now && isReviewableCard(row, now)).length;
 }
 
 export async function getDeckTodayStats(
@@ -693,20 +695,21 @@ export async function getTotalCardCount(db: SQLiteDatabase, deckId?: string): Pr
     return (await getSmartDeckStats(db, deckId)).total;
   }
   if (deckId) {
-    const row = await db.getFirstAsync<{ count: number }>(
-      "SELECT COUNT(*) as count FROM study_cards WHERE deck_id = ? AND deleted_at IS NULL",
+    const rows = await db.getAllAsync<StudyCardRow>(
+      "SELECT * FROM study_cards WHERE deck_id = ? AND deleted_at IS NULL",
       [deckId]
     );
-    return row?.count ?? 0;
+    return (await filterStudyRowsByDefaultDeckFilter(db, rows)).length;
   }
   const [nonSmartRow, smartRows] = await Promise.all([
-    db.getFirstAsync<{ count: number }>(
-      `SELECT COUNT(*) as count FROM study_cards WHERE deleted_at IS NULL AND ${NON_SMART_CARD_SQL}`,
+    db.getAllAsync<StudyCardRow>(
+      `SELECT * FROM study_cards WHERE deleted_at IS NULL AND ${NON_SMART_CARD_SQL}`,
       []
     ),
     getFilteredSmartMaterializedRows(db),
   ]);
-  return (nonSmartRow?.count ?? 0) + smartRows.length;
+  const nonSmartRows = await filterStudyRowsByDefaultDeckFilter(db, nonSmartRow);
+  return nonSmartRows.length + smartRows.length;
 }
 
 async function getFilteredSmartMaterializedRows(db: SQLiteDatabase): Promise<StudyCardRow[]> {
@@ -720,21 +723,21 @@ async function getFilteredSmartMaterializedRows(db: SQLiteDatabase): Promise<Stu
 
 export async function getTotalAyahCardCount(db: SQLiteDatabase): Promise<number> {
   await migrateLegacyRetentionDecks(db);
-  const row = await db.getFirstAsync<{ count: number }>(
-    `SELECT COUNT(*) as count
+  const rows = await db.getAllAsync<StudyCardRow>(
+    `SELECT *
       FROM study_cards
       WHERE deleted_at IS NULL
         AND id NOT LIKE 'word:%'
         AND (${NON_SMART_CARD_SQL} OR deck_id = ?)`,
     [SMART_DECK_IDS.retention]
   );
-  return row?.count ?? 0;
+  return (await filterStudyRowsByDefaultDeckFilter(db, rows)).length;
 }
 
 export async function getMemorizedAyahCardCount(db: SQLiteDatabase): Promise<number> {
   await migrateLegacyRetentionDecks(db);
-  const row = await db.getFirstAsync<{ count: number }>(
-    `SELECT COUNT(*) as count
+  const rows = await db.getAllAsync<StudyCardRow>(
+    `SELECT *
       FROM study_cards
       WHERE deleted_at IS NULL
         AND (reps > 0 OR last_review IS NOT NULL)
@@ -742,7 +745,7 @@ export async function getMemorizedAyahCardCount(db: SQLiteDatabase): Promise<num
         AND (${NON_SMART_CARD_SQL} OR deck_id = ?)`,
     [SMART_DECK_IDS.retention]
   );
-  return row?.count ?? 0;
+  return (await filterStudyRowsByDefaultDeckFilter(db, rows)).length;
 }
 
 export async function getNewCount(db: SQLiteDatabase, deckId?: string): Promise<number> {
@@ -751,21 +754,22 @@ export async function getNewCount(db: SQLiteDatabase, deckId?: string): Promise<
   }
   if (deckId) {
     const now = new Date().toISOString();
-    const row = await db.getFirstAsync<{ count: number }>(
-      `SELECT COUNT(*) as count FROM study_cards WHERE deck_id = ? AND state = 0 AND ${REVIEWABLE_CARD_SQL}`,
+    const rows = await db.getAllAsync<StudyCardRow>(
+      `SELECT * FROM study_cards WHERE deck_id = ? AND state = 0 AND ${REVIEWABLE_CARD_SQL}`,
       [deckId, now]
     );
-    return row?.count ?? 0;
+    return (await filterStudyRowsByDefaultDeckFilter(db, rows)).length;
   }
   const now = new Date().toISOString();
   const [nonSmartRow, smartRows] = await Promise.all([
-    db.getFirstAsync<{ count: number }>(
-      `SELECT COUNT(*) as count FROM study_cards WHERE state = 0 AND ${NON_SMART_CARD_SQL} AND ${REVIEWABLE_CARD_SQL}`,
+    db.getAllAsync<StudyCardRow>(
+      `SELECT * FROM study_cards WHERE state = 0 AND ${NON_SMART_CARD_SQL} AND ${REVIEWABLE_CARD_SQL}`,
       [now]
     ),
     getFilteredSmartMaterializedRows(db),
   ]);
-  return (nonSmartRow?.count ?? 0) + smartRows.filter((row) => row.state === 0 && isReviewableCard(row, now)).length;
+  const nonSmartRows = await filterStudyRowsByDefaultDeckFilter(db, nonSmartRow);
+  return nonSmartRows.length + smartRows.filter((row) => row.state === 0 && isReviewableCard(row, now)).length;
 }
 
 async function ensureStudyCardRow(
@@ -979,18 +983,27 @@ export async function setStudyCardDueDate(
 }
 
 export async function getNextEligibleReviewDate(db: SQLiteDatabase): Promise<string | null> {
-  const row = await db.getFirstAsync<{ next_at: string }>(
-    `SELECT CASE
-        WHEN buried_until IS NOT NULL AND buried_until > due THEN buried_until
-        ELSE due
-      END AS next_at
-      FROM study_cards
+  const rows = await db.getAllAsync<StudyCardRow>(
+    `SELECT *
+       FROM study_cards
       WHERE deleted_at IS NULL
         AND suspended_at IS NULL
-      ORDER BY next_at ASC
-      LIMIT 1`
+      ORDER BY due ASC`
   );
-  return row?.next_at ?? null;
+  const matchingSmartIds = await getAllMatchingSmartCardIdSet(db);
+  const nonSmartRows = await filterStudyRowsByDefaultDeckFilter(
+    db,
+    rows.filter((row) => !isSmartDeckId(row.deck_id))
+  );
+  const smartRows = rows.filter((row) => isSmartDeckId(row.deck_id) && matchingSmartIds.has(row.id));
+  const [next] = [...nonSmartRows, ...smartRows].sort((a, b) =>
+    getReviewEligibleAt(a).localeCompare(getReviewEligibleAt(b))
+  );
+  return next ? getReviewEligibleAt(next) : null;
+}
+
+function getReviewEligibleAt(row: StudyCardRow): string {
+  return row.buried_until && row.buried_until > row.due ? row.buried_until : row.due;
 }
 
 export async function getDeckCardsForList(
@@ -1039,8 +1052,9 @@ export async function getDeckCardsForList(
     "SELECT * FROM study_cards WHERE deck_id = ? AND deleted_at IS NULL ORDER BY created_at ASC, id ASC",
     [deckId]
   );
+  const filteredRows = await filterStudyRowsByDefaultDeckFilter(db, rows);
   const items: DeckCardListItem[] = [];
-  for (const row of rows) {
+  for (const row of filteredRows) {
     items.push(await decorateDeckCardListItem(db, rowWithDefaultStatus(row), false));
   }
   return items;

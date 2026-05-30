@@ -95,6 +95,7 @@ const SMART_DECK_ID_LIST: SmartDeckId[] = [
 
 const LEGACY_MUTASHABIHAT_DECK_ID = "mutashabihat";
 const MEANINGS_DECK_ID = "meanings";
+const ALL_DECKS_FILTER_KEY = "smart_deck_filter_all_decks";
 const SQLITE_PARAM_BATCH = 800;
 const INSERT_BATCH = 500;
 const ACTIVE_CARD_SQL = "deleted_at IS NULL";
@@ -152,6 +153,19 @@ function smartDeckFilterKey(deckId: SmartDeckId): string {
   return `smart_deck_filter_${deckId}`;
 }
 
+async function readFilterSetting(db: SQLiteDatabase, key: string): Promise<BuiltInDeckFilter | null> {
+  const row = await db.getFirstAsync<{ value: string }>(
+    "SELECT value FROM user_settings WHERE key = ?",
+    [key]
+  );
+  if (!row?.value) return null;
+  try {
+    return normalizeSmartDeckFilter(JSON.parse(row.value));
+  } catch {
+    return null;
+  }
+}
+
 function normalizeSmartDeckFilter(filter: unknown): BuiltInDeckFilter {
   if (!filter || typeof filter !== "object") return { type: "all" };
   const raw = filter as any;
@@ -194,16 +208,8 @@ export async function readSmartDeckFilter(
   db: SQLiteDatabase,
   deckId: SmartDeckId
 ): Promise<BuiltInDeckFilter> {
-  const row = await db.getFirstAsync<{ value: string }>(
-    "SELECT value FROM user_settings WHERE key = ?",
-    [smartDeckFilterKey(deckId)]
-  );
-  if (!row?.value) return { type: "all" };
-  try {
-    return normalizeSmartDeckFilter(JSON.parse(row.value));
-  } catch {
-    return { type: "all" };
-  }
+  return await readFilterSetting(db, smartDeckFilterKey(deckId))
+    ?? await readDefaultDeckFilter(db);
 }
 
 export async function writeSmartDeckFilter(
@@ -213,6 +219,49 @@ export async function writeSmartDeckFilter(
 ): Promise<void> {
   const normalized = normalizeSmartDeckFilter(filter);
   await writeUserSetting(db, smartDeckFilterKey(deckId), JSON.stringify(normalized));
+}
+
+export async function readDefaultDeckFilter(db: SQLiteDatabase): Promise<BuiltInDeckFilter> {
+  return await readFilterSetting(db, ALL_DECKS_FILTER_KEY)
+    ?? await readFilterSetting(db, smartDeckFilterKey(SMART_DECK_IDS.retention))
+    ?? { type: "all" };
+}
+
+export async function writeAllDecksFilter(
+  db: SQLiteDatabase,
+  filter: BuiltInDeckFilter
+): Promise<void> {
+  const normalized = normalizeSmartDeckFilter(filter);
+  const value = JSON.stringify(normalized);
+  await writeUserSetting(db, ALL_DECKS_FILTER_KEY, value);
+  for (const deckId of SMART_DECK_ID_LIST) {
+    await writeUserSetting(db, smartDeckFilterKey(deckId), value);
+  }
+}
+
+export async function filterQuranRefsByDefaultDeckFilter<T extends { surah: number; ayah: number }>(
+  db: SQLiteDatabase,
+  rows: T[]
+): Promise<T[]> {
+  const filter = await readDefaultDeckFilter(db);
+  return filterQuranRefs(db, rows, filter);
+}
+
+export async function filterStudyRowsByDefaultDeckFilter<T extends { id: string }>(
+  db: SQLiteDatabase,
+  rows: T[]
+): Promise<T[]> {
+  const filter = await readDefaultDeckFilter(db);
+  if (filter.type === "all") return rows;
+  const keyedRows = rows
+    .map((row) => {
+      const ref = parseStudyCardRef(row.id);
+      return ref ? { row, ...ref } : null;
+    })
+    .filter((row): row is { row: T; surah: number; ayah: number } => !!row);
+  const matching = await filterQuranRefs(db, keyedRows, filter);
+  const allowed = new Set(matching.map((item) => item.row));
+  return rows.filter((row) => allowed.has(row));
 }
 
 export async function migrateLegacyRetentionDecks(db: SQLiteDatabase): Promise<number> {
@@ -716,7 +765,7 @@ export async function getDueCardsForReview(
       `SELECT * FROM study_cards WHERE deck_id = ? AND due <= ? AND ${REVIEWABLE_CARD_SQL}`,
       [deckId, dueUntil, now]
     );
-    return applyReviewQueueOptions(rows, options);
+    return applyReviewQueueOptions(await filterStudyRowsByDefaultDeckFilter(db, rows), options);
   }
 
   const rows = await db.getAllAsync<StudyCardRow>(
@@ -724,7 +773,12 @@ export async function getDueCardsForReview(
     [dueUntil, now]
   );
   const matchingSmartIds = await getAllMatchingSmartCardIdSet(db);
-  const filtered = rows.filter((row) => !isSmartDeckId(row.deck_id) || matchingSmartIds.has(row.id));
+  const nonSmartRows = await filterStudyRowsByDefaultDeckFilter(
+    db,
+    rows.filter((row) => !isSmartDeckId(row.deck_id))
+  );
+  const smartRows = rows.filter((row) => isSmartDeckId(row.deck_id) && matchingSmartIds.has(row.id));
+  const filtered = [...nonSmartRows, ...smartRows];
   return applyReviewQueueOptions(filtered, options);
 }
 
@@ -1229,6 +1283,68 @@ function normalizeRanges(values: unknown[], surahs: number[]): SurahAyahRange[] 
   const bySurah = new Map<number, SurahAyahRange>();
   for (const range of ranges) bySurah.set(range.surah, range);
   return Array.from(bySurah.values()).sort((a, b) => a.surah - b.surah);
+}
+
+async function filterQuranRefs<T extends { surah: number; ayah: number }>(
+  db: SQLiteDatabase,
+  rows: T[],
+  filter: BuiltInDeckFilter
+): Promise<T[]> {
+  const normalized = normalizeSmartDeckFilter(filter);
+  if (normalized.type === "all") return rows;
+  if (normalized.type === "surah") {
+    return rows.filter((row) => matchesSurahFilter(row.surah, row.ayah, normalized));
+  }
+  const ranges = await readJuzRanges(db, normalized.juzNumbers);
+  return rows.filter((row) => ranges.some((range) =>
+    range.surah === row.surah &&
+    row.ayah >= range.ayah_start &&
+    row.ayah <= range.ayah_end
+  ));
+}
+
+function matchesSurahFilter(
+  surah: number,
+  ayah: number,
+  filter: Extract<BuiltInDeckFilter, { type: "surah" }>
+): boolean {
+  if (!filter.surahs.includes(surah)) return false;
+  const range = filter.ranges?.find((item) => item.surah === surah);
+  return !range || (ayah >= range.ayahStart && ayah <= range.ayahEnd);
+}
+
+async function readJuzRanges(
+  db: SQLiteDatabase,
+  juzNumbers: number[]
+): Promise<Array<{ surah: number; ayah_start: number; ayah_end: number }>> {
+  if (juzNumbers.length === 0) return [];
+  const placeholders = juzNumbers.map(() => "?").join(",");
+  return db.getAllAsync<{ surah: number; ayah_start: number; ayah_end: number }>(
+    `SELECT surah, ayah_start, ayah_end
+       FROM juz_map
+      WHERE juz IN (${placeholders})`,
+    juzNumbers
+  );
+}
+
+function parseStudyCardRef(id: string): { surah: number; ayah: number } | null {
+  const parts = id.split(":");
+  if (parts[0] === "word" && parts.length >= 4) {
+    return parseNumberedRef(parts[1], parts[2]);
+  }
+  if ((parts[0] === "mutashabihat" || parts[0] === "qiraat" || parts[0] === "asbab") && parts.length >= 3) {
+    return parseNumberedRef(parts[1], parts[2]);
+  }
+  if (parts.length === 2) {
+    return parseNumberedRef(parts[0], parts[1]);
+  }
+  return null;
+}
+
+function parseNumberedRef(surahRaw: string, ayahRaw: string): { surah: number; ayah: number } | null {
+  const surah = parseInt(surahRaw, 10);
+  const ayah = parseInt(ayahRaw, 10);
+  return Number.isFinite(surah) && Number.isFinite(ayah) ? { surah, ayah } : null;
 }
 
 function chunks<T>(values: T[], size: number): T[][] {

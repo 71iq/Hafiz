@@ -1,4 +1,5 @@
 import type { SQLiteDatabase } from "expo-sqlite";
+import { filterQuranRefsByDefaultDeckFilter } from "@/lib/fsrs/smart-decks";
 
 export type VocabCard = {
   id: number;
@@ -23,7 +24,7 @@ export type VocabCard = {
 export async function listVocabCards(
   db: SQLiteDatabase
 ): Promise<VocabCard[]> {
-  return db.getAllAsync<VocabCard>(
+  const rows = await db.getAllAsync<VocabCard>(
     `SELECT
        v.id,
        v.surah,
@@ -47,6 +48,7 @@ export async function listVocabCards(
        ON custom.surah = v.surah AND custom.ayah = v.ayah AND custom.word_pos = v.word_pos
      ORDER BY datetime(v.due) ASC, v.id ASC`
   );
+  return filterQuranRefsByDefaultDeckFilter(db, rows);
 }
 
 export async function deleteVocabCard(
