@@ -1980,3 +1980,28 @@ Saved in `phase19/`:
 - `npm run test:e2e:smoke`: passed after web export, 27 route checks.
 - `UI_PHASE_SKIP_BUILD=1 npm run test:ui:phase -- route-inventory`: passed, 27/27.
 - `UI_BASELINE_SKIP_BUILD=1 npm run test:ui:baseline`: passed, 54/54.
+
+## 2026-05-30 — Onboarding Redesign Implemented
+
+### Scope decisions
+1. Redid only `app/onboarding.tsx`; auth routes, tab navigation, database schema, and Quran reader code were left unchanged.
+2. Kept the existing onboarding product flow: welcome, memorized-surah selection from local SQLite, then built-in retention deck setup.
+3. Used the approved parchment/teal/gold visual direction from the generated concept image:
+   `/home/ehab/.codex/generated_images/019e78a8-4154-7243-8e8b-fd042ca1120d/ig_0feb29d1de2d6b0c016a1acb69662c8191a2f853874595072b.png`.
+
+### Implemented in this step
+- Replaced the old horizontal pager with a step-based animated onboarding shell.
+- Added a searchable real-surah selection list with selected states, ayah counts, and a sticky action rail.
+- Preserved `writeAllDecksFilter`, `materializeSmartDeckCards`, `SMART_DECK_IDS.retention`, and post-save Start Review / Continue routing.
+- Switched onboarding completion writes to `writeUserSetting` for consistent `user_settings` timestamps.
+- Added bilingual onboarding strings for step labels, search, selection summary, empty search state, and deck-ready confirmation.
+
+### Validation status
+- `npm run typecheck`: passed.
+- `npm run test:unit`: failed on pre-existing manual inventory/public-page contract mismatches outside onboarding scope.
+- `npm run test:unit -- tests/unit/i18n-strings.test.ts`: passed.
+- `npm run build:web`: passed.
+- `npm run test:e2e:smoke`: passed after web export, 27 route checks.
+- `npx expo start --web --port 8097 --localhost`: launched but hit the known web bundler OOM path during browser screenshot capture.
+- Static-export fallback served from `dist` at `127.0.0.1:8098` passed Playwright visual checks at `360`, `412`, `768`, `1024` Arabic/dark, and `1440`.
+- Playwright workflow passed: welcome -> search "Opener" -> select The Opener -> save selection -> retention deck ready, with no relevant console errors or framework overlay.
