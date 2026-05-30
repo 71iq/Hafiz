@@ -36,8 +36,6 @@ import {
   DEFAULT_NEW_REVIEW_ORDER,
   DEFAULT_REVIEW_SORT_ORDER,
   MAX_DECK_MAXIMUM_INTERVAL,
-  MAX_DECK_DAILY_REVIEW_LIMIT,
-  MAX_DECK_NEW_CARD_LIMIT,
   MAX_DECK_REQUEST_RETENTION,
   MIN_DECK_MAXIMUM_INTERVAL,
   MIN_DECK_DAILY_REVIEW_LIMIT,
@@ -150,12 +148,12 @@ export function DeckReviewSettingsSheet({ visible, deckId, deckTitle, mode, onCl
 
   const setNextDailyLimit = useCallback((value: number) => {
     setError(null);
-    setDailyLimit(Math.max(MIN_DECK_DAILY_REVIEW_LIMIT, Math.min(MAX_DECK_DAILY_REVIEW_LIMIT, value)));
+    setDailyLimit(Math.max(MIN_DECK_DAILY_REVIEW_LIMIT, value));
   }, []);
 
   const setNextNewCardsLimit = useCallback((value: number) => {
     setError(null);
-    setNewCardsLimit(Math.max(MIN_DECK_NEW_CARD_LIMIT, Math.min(MAX_DECK_NEW_CARD_LIMIT, value)));
+    setNewCardsLimit(Math.max(MIN_DECK_NEW_CARD_LIMIT, value));
   }, []);
 
   const setNextRetention = useCallback((value: number) => {
@@ -543,7 +541,7 @@ export function SchedulerOptionsPanel({
             onDecrement={() => onDailyLimitChange(dailyLimit - DECK_DAILY_REVIEW_LIMIT_STEP)}
             onIncrement={() => onDailyLimitChange(dailyLimit + DECK_DAILY_REVIEW_LIMIT_STEP)}
             decrementDisabled={dailyLimit <= MIN_DECK_DAILY_REVIEW_LIMIT}
-            incrementDisabled={dailyLimit >= MAX_DECK_DAILY_REVIEW_LIMIT}
+            incrementDisabled={false}
             isDark={isDark}
             isRTL={isRTL}
           />
@@ -563,7 +561,7 @@ export function SchedulerOptionsPanel({
             onDecrement={() => onNewCardsLimitChange(newCardsLimit - DECK_NEW_CARD_LIMIT_STEP)}
             onIncrement={() => onNewCardsLimitChange(newCardsLimit + DECK_NEW_CARD_LIMIT_STEP)}
             decrementDisabled={newCardsLimit <= MIN_DECK_NEW_CARD_LIMIT}
-            incrementDisabled={newCardsLimit >= MAX_DECK_NEW_CARD_LIMIT}
+            incrementDisabled={false}
             isDark={isDark}
             isRTL={isRTL}
           />

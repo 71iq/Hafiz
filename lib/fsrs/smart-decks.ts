@@ -10,7 +10,6 @@ import {
   DEFAULT_NEW_CARD_SORT_ORDER,
   DEFAULT_NEW_REVIEW_ORDER,
   DEFAULT_REVIEW_SORT_ORDER,
-  MAX_DECK_NEW_CARD_LIMIT,
   type NewCardSortOrder,
   type NewReviewOrder,
   type ReviewSortOrder,
@@ -505,7 +504,7 @@ function normalizeDueOptions(options?: DueCardsForReviewOptions): NormalizedDueO
   return {
     limit: options?.limit ?? 0,
     newCardsLimit: typeof options?.newCardsLimit === "number" && Number.isFinite(options.newCardsLimit)
-      ? Math.max(0, Math.min(MAX_DECK_NEW_CARD_LIMIT, options.newCardsLimit))
+      ? Math.max(0, options.newCardsLimit)
       : DEFAULT_DECK_NEW_CARD_LIMIT,
     newReviewOrder: normalizeEnum(options?.newReviewOrder, ALL_NEW_REVIEW_ORDERS, DEFAULT_NEW_REVIEW_ORDER),
     reviewSortOrder: normalizeEnum(options?.reviewSortOrder, ALL_REVIEW_SORT_ORDERS, DEFAULT_REVIEW_SORT_ORDER),
@@ -652,7 +651,7 @@ export async function materializeSmartDeckCards(
   const existing = new Set(rows.map((row) => row.id));
   const targetDueCount = limit && limit > 0 ? Math.min(limit, ids.length) : ids.length;
   const safeNewCardsLimit = Number.isFinite(newCardsLimit)
-    ? Math.max(0, Math.min(MAX_DECK_NEW_CARD_LIMIT, newCardsLimit))
+    ? Math.max(0, newCardsLimit)
     : DEFAULT_DECK_NEW_CARD_LIMIT;
   const existingDueRows = rows.filter((row) => row.due <= nowIso && isReviewableCard(row, nowIso));
   const existingDueReviewCount = existingDueRows.filter((row) => row.state !== 0).length;

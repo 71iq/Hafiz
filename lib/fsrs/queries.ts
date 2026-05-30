@@ -20,8 +20,6 @@ import {
   DEFAULT_NEW_REVIEW_ORDER,
   DEFAULT_REVIEW_SORT_ORDER,
   MAX_DECK_MAXIMUM_INTERVAL,
-  MAX_DECK_DAILY_REVIEW_LIMIT,
-  MAX_DECK_NEW_CARD_LIMIT,
   MAX_DECK_REQUEST_RETENTION,
   MIN_DECK_MAXIMUM_INTERVAL,
   MIN_DECK_DAILY_REVIEW_LIMIT,
@@ -207,13 +205,13 @@ function deckReviewSettingsKey(deckId: string): string {
 function clampReviewLimit(value: unknown): number {
   const n = typeof value === "number" ? value : parseInt(String(value ?? ""), 10);
   if (!Number.isFinite(n)) return DEFAULT_DECK_DAILY_REVIEW_LIMIT;
-  return Math.max(MIN_DECK_DAILY_REVIEW_LIMIT, Math.min(MAX_DECK_DAILY_REVIEW_LIMIT, n));
+  return Math.max(MIN_DECK_DAILY_REVIEW_LIMIT, n);
 }
 
 function clampNewCardLimit(value: unknown): number {
   const n = typeof value === "number" ? value : parseInt(String(value ?? ""), 10);
   if (!Number.isFinite(n)) return DEFAULT_DECK_NEW_CARD_LIMIT;
-  return Math.max(MIN_DECK_NEW_CARD_LIMIT, Math.min(MAX_DECK_NEW_CARD_LIMIT, n));
+  return Math.max(MIN_DECK_NEW_CARD_LIMIT, n);
 }
 
 function clampRetention(value: unknown): number {

@@ -24,8 +24,6 @@ import {
   DEFAULT_REVIEW_SORT_ORDER,
   DEFAULT_WORD_TEST_MODES,
   MAX_DECK_MAXIMUM_INTERVAL,
-  MAX_DECK_DAILY_REVIEW_LIMIT,
-  MAX_DECK_NEW_CARD_LIMIT,
   MAX_DECK_REQUEST_RETENTION,
   MIN_DECK_MAXIMUM_INTERVAL,
   MIN_DECK_DAILY_REVIEW_LIMIT,
@@ -180,12 +178,12 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
 
   const setNextDailyLimit = useCallback((value: number) => {
     setError(null);
-    setDailyLimit(Math.max(MIN_DECK_DAILY_REVIEW_LIMIT, Math.min(MAX_DECK_DAILY_REVIEW_LIMIT, value)));
+    setDailyLimit(Math.max(MIN_DECK_DAILY_REVIEW_LIMIT, value));
   }, []);
 
   const setNextNewCardsLimit = useCallback((value: number) => {
     setError(null);
-    setNewCardsLimit(Math.max(MIN_DECK_NEW_CARD_LIMIT, Math.min(MAX_DECK_NEW_CARD_LIMIT, value)));
+    setNewCardsLimit(Math.max(MIN_DECK_NEW_CARD_LIMIT, value));
   }, []);
 
   const setNextRetention = useCallback((value: number) => {
