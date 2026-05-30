@@ -57,6 +57,8 @@ export type SmartCardContent = {
   cue: string;
   targetRef: SmartDeckRef;
   refs: SmartDeckRef[];
+  promptContextQcf2?: string;
+  promptContextV2Page?: number;
   promptQcf2?: string;
   promptUthmani?: string;
   hiddenAnswerQcf2?: string;
@@ -963,12 +965,51 @@ async function getMutashabihatCardContent(
     };
   }
 
+  const prompt = buildMutashabihatPrompt(targetRef, refs);
+  const previousAyahContext = prompt.needsExplicitRefLabel
+    ? await getPreviousAyahPromptContext(db, targetRef)
+    : null;
+
   return {
     kind,
     cue: rows[0].cue,
     targetRef,
     refs,
-    ...buildMutashabihatPrompt(targetRef, refs),
+    ...(previousAyahContext
+      ? {
+          promptContextQcf2: previousAyahContext.textQcf2,
+          promptContextV2Page: previousAyahContext.v2Page,
+        }
+      : {}),
+    ...prompt,
+  };
+}
+
+async function getPreviousAyahPromptContext(
+  db: SQLiteDatabase,
+  targetRef: SmartDeckRef
+): Promise<{ textQcf2: string; v2Page: number } | null> {
+  let previousSurah = targetRef.surah;
+  let previousAyah = targetRef.ayah - 1;
+  if (previousAyah < 1) {
+    if (targetRef.surah <= 1) return null;
+    previousSurah = targetRef.surah - 1;
+    const previousSurahRow = await db.getFirstAsync<{ ayah_count: number }>(
+      "SELECT ayah_count FROM surahs WHERE number = ?",
+      [previousSurah]
+    );
+    previousAyah = previousSurahRow?.ayah_count ?? 0;
+  }
+  if (previousAyah < 1) return null;
+
+  const row = await db.getFirstAsync<{ text_qcf2: string; v2_page: number }>(
+    "SELECT text_qcf2, v2_page FROM quran_text WHERE surah = ? AND ayah = ?",
+    [previousSurah, previousAyah]
+  );
+  if (!row?.text_qcf2 || !row.v2_page) return null;
+  return {
+    textQcf2: row.text_qcf2,
+    v2Page: row.v2_page,
   };
 }
 

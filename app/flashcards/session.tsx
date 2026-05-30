@@ -100,6 +100,8 @@ type CardData = {
   smartTargetRef?: SmartDeckRef;
   smartCue?: string;
   smartRefs?: SmartDeckRef[];
+  smartPromptContextQcf2?: string;
+  smartPromptContextV2Page?: number;
   smartPromptQcf2?: string;
   smartPromptUthmani?: string;
   smartHiddenAnswerQcf2?: string;
@@ -342,6 +344,8 @@ function FlashcardSessionScreen() {
               smartTargetRef: targetRef,
               smartCue: smartContent.cue,
               smartRefs: smartContent.refs,
+              smartPromptContextQcf2: smartContent.promptContextQcf2,
+              smartPromptContextV2Page: smartContent.promptContextV2Page,
               smartPromptQcf2: smartContent.promptQcf2,
               smartPromptUthmani: smartContent.promptUthmani,
               smartHiddenAnswerQcf2: smartContent.hiddenAnswerQcf2,
@@ -1701,6 +1705,16 @@ function SmartCueText({
           {card.surahName} {card.surah}:{card.ayah}
         </Text>
       )}
+      {card.kind === "mutashabihat" && card.smartPromptContextQcf2 && card.smartPromptContextV2Page ? (
+        <View className="mb-2 opacity-80">
+          <Qcf2AyahText
+            textQcf2={card.smartPromptContextQcf2}
+            v2Page={card.smartPromptContextV2Page}
+            fontSize={fontSize * 0.82}
+            lineHeight={lineHeight * 0.82}
+          />
+        </View>
+      ) : null}
       {card.smartPromptQcf2 && card.v2Page ? (
         <Qcf2AyahText
           textQcf2={card.smartPromptQcf2}
