@@ -196,6 +196,7 @@ function FlashcardSessionScreen() {
   const [phase, setPhase] = useState<SessionPhase>("loading");
   const [cards, setCards] = useState<CardData[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [sessionCardTotal, setSessionCardTotal] = useState(0);
   const [currentSideIndex, setCurrentSideIndex] = useState(0);
   const [revealed, setRevealed] = useState(false);
   const [enabledModes, setEnabledModes] = useState<TestMode[]>(DEFAULT_ENABLED_MODES);
@@ -230,6 +231,7 @@ function FlashcardSessionScreen() {
     sessionPointsRef.current = 0;
     reviewedCountsRef.current = { total: 0, newCount: 0, reviewCount: 0, relearningCount: 0 };
     setCards([]);
+    setSessionCardTotal(0);
     setCurrentIndex(0);
     setCurrentSideIndex(0);
     setRevealed(false);
@@ -454,6 +456,7 @@ function FlashcardSessionScreen() {
 
         sessionStartRef.current = Date.now();
         setCurrentIndex(0);
+        setSessionCardTotal(loaded.length);
         setCurrentSideIndex(0);
         setRevealed(false);
         setCards(loaded);
@@ -853,7 +856,7 @@ function FlashcardSessionScreen() {
 
   if (!currentCard) return null;
 
-  const sessionTotal = cards.length;
+  const sessionTotal = sessionCardTotal || cards.length;
   const currentProgress = Math.min(currentIndex + 1, sessionTotal);
   const progressPercent = sessionTotal > 0 ? (currentProgress / sessionTotal) * 100 : 0;
   const translateY = flipAnim.interpolate({ inputRange: [0, 1], outputRange: [30, 0] });
