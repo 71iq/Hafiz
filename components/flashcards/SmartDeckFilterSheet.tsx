@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View, useWindowDimensions } from "react-native";
 import { Check } from "lucide-react-native";
 import { Button } from "@/components/ui/Button";
@@ -88,6 +88,7 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
   const [reviewSettings, setReviewSettings] = useState<DeckReviewSettings | null>(null);
   const [saving, setSaving] = useState(false);
   const [activeInfo, setActiveInfo] = useState<SettingInfo | null>(null);
+  const [surahSelectorOpen, setSurahSelectorOpen] = useState(false);
   const [rangeTarget, setRangeTarget] = useState<SurahRow | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -130,6 +131,7 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
   useEffect(() => {
     if (!visible) {
       setActiveInfo(null);
+      setSurahSelectorOpen(false);
       setRangeTarget(null);
     }
   }, [visible]);
@@ -222,6 +224,19 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
     if (filterType === "juz") return selectedJuz.size > 0;
     return true;
   };
+
+  const selectedSurahPreview = useMemo(() => {
+    const selected = [...selectedSurahs].sort((a, b) => a - b);
+    if (selected.length === 0) return s.deckNoSurahsSelected;
+    return selected
+      .slice(0, 4)
+      .map((number) => {
+        const surah = surahs.find((row) => row.number === number);
+        if (!surah) return String(number);
+        return isRTL ? surah.name_arabic : surah.name_english;
+      })
+      .join(isRTL ? "، " : ", ");
+  }, [isRTL, s.deckNoSurahsSelected, selectedSurahs, surahs]);
 
   const handleSave = async () => {
     if (!deckId || saving) return;
@@ -348,22 +363,15 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
           )}
 
           {filterType === "surah" && (
-            <View className="gap-2">
-              {surahs.map((surah) => (
-                <SurahFilterItem
-                  key={surah.number}
-                  surah={surah}
-                  selected={selectedSurahs.has(surah.number)}
-                  onToggle={() => toggleSurah(surah.number)}
-                  isDark={isDark}
-                  isRTL={isRTL}
-                  ayahCountLabel={interpolate("{{n}} {{label}}", { n: surah.ayah_count, label: s.ayahs })}
-                  range={selectedSurahRanges[surah.number] ?? { from: "1", to: String(surah.ayah_count) }}
-                  rangeActionLabel={s.deckSpecifyAyahRange}
-                  onRangePress={() => setRangeTarget(surah)}
-                />
-              ))}
-            </View>
+            <SurahFilterSummary
+              selectedCount={selectedSurahs.size}
+              selectedPreview={selectedSurahPreview}
+              selectedLabel={interpolate(s.deckSurahsSelectedCount, { n: String(selectedSurahs.size) })}
+              noSelectionLabel={s.deckNoSurahsSelected}
+              actionLabel={selectedSurahs.size > 0 ? s.deckChangeSurahs : s.flashcardsSelectSurahs}
+              isRTL={isRTL}
+              onPress={() => setSurahSelectorOpen(true)}
+            />
           )}
 
           {filterType === "juz" && (
@@ -432,6 +440,24 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
         </OverlayFooter>
       </ResponsiveSheet>
 
+      <SurahSelectorSheet
+        visible={visible && surahSelectorOpen}
+        surahs={surahs}
+        selectedSurahs={selectedSurahs}
+        selectedSurahRanges={selectedSurahRanges}
+        selectedLabel={interpolate(s.deckSurahsSelectedCount, { n: String(selectedSurahs.size) })}
+        title={s.flashcardsSelectSurahs}
+        doneLabel={s.deckAyahRangeDone}
+        rangeActionLabel={s.deckSpecifyAyahRange}
+        isDark={isDark}
+        isRTL={isRTL}
+        isPhone={isPhone}
+        onToggleSurah={toggleSurah}
+        onRangePress={setRangeTarget}
+        onClose={() => setSurahSelectorOpen(false)}
+        ayahLabel={s.ayahs}
+      />
+
       <ResponsiveSheet
         open={visible && activeInfo !== null}
         onClose={() => setActiveInfo(null)}
@@ -482,6 +508,143 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
         onClose={() => setRangeTarget(null)}
       />
     </>
+  );
+}
+
+function SurahFilterSummary({
+  selectedCount,
+  selectedPreview,
+  selectedLabel,
+  noSelectionLabel,
+  actionLabel,
+  isRTL,
+  onPress,
+}: {
+  selectedCount: number;
+  selectedPreview: string;
+  selectedLabel: string;
+  noSelectionLabel: string;
+  actionLabel: string;
+  isRTL: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Card elevation="low" className="p-4">
+      <View className={`items-center gap-4 ${isRTL ? "flex-row-reverse" : "flex-row"}`} style={{ direction: "ltr" }}>
+        <View className="flex-1 gap-1" style={{ minWidth: 0 }}>
+          <Text
+            className="text-charcoal dark:text-neutral-200"
+            numberOfLines={1}
+            style={{
+              fontFamily: "Manrope_600SemiBold",
+              fontSize: 15,
+              textAlign: isRTL ? "right" : "left",
+              writingDirection: isRTL ? "rtl" : "ltr",
+            }}
+          >
+            {selectedCount > 0 ? selectedLabel : noSelectionLabel}
+          </Text>
+          {selectedCount > 0 ? (
+            <Text
+              className="text-warm-500 dark:text-neutral-400"
+              numberOfLines={2}
+              style={{
+                fontFamily: "Manrope_400Regular",
+                fontSize: 13,
+                lineHeight: 20,
+                textAlign: isRTL ? "right" : "left",
+                writingDirection: isRTL ? "rtl" : "ltr",
+              }}
+            >
+              {selectedPreview}
+            </Text>
+          ) : null}
+        </View>
+        <Button onPress={onPress} size="sm" className="shrink-0 px-5">
+          <Text className="text-white" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}>
+            {actionLabel}
+          </Text>
+        </Button>
+      </View>
+    </Card>
+  );
+}
+
+function SurahSelectorSheet({
+  visible,
+  surahs,
+  selectedSurahs,
+  selectedSurahRanges,
+  selectedLabel,
+  title,
+  doneLabel,
+  rangeActionLabel,
+  isDark,
+  isRTL,
+  isPhone,
+  onToggleSurah,
+  onRangePress,
+  onClose,
+  ayahLabel,
+}: {
+  visible: boolean;
+  surahs: SurahRow[];
+  selectedSurahs: Set<number>;
+  selectedSurahRanges: Record<number, RangeInputValue>;
+  selectedLabel: string;
+  title: string;
+  doneLabel: string;
+  rangeActionLabel: string;
+  isDark: boolean;
+  isRTL: boolean;
+  isPhone: boolean;
+  onToggleSurah: (surah: number) => void;
+  onRangePress: (surah: SurahRow) => void;
+  onClose: () => void;
+  ayahLabel: string;
+}) {
+  return (
+    <ResponsiveSheet
+      open={visible}
+      onClose={onClose}
+      maxWidth={640}
+      maxHeight={isPhone ? "86%" : 680}
+      dir={isRTL ? "rtl" : "ltr"}
+    >
+      <OverlayHeader
+        title={title}
+        subtitle={selectedLabel}
+        onClose={onClose}
+        isRTL={isRTL}
+        showHandle={isPhone}
+      />
+      <OverlayBody
+        contentContainerClassName="px-5 py-4"
+        contentContainerStyle={{ direction: isRTL ? "rtl" : "ltr", gap: 8 }}
+      >
+        {surahs.map((surah) => (
+          <SurahFilterItem
+            key={surah.number}
+            surah={surah}
+            selected={selectedSurahs.has(surah.number)}
+            onToggle={() => onToggleSurah(surah.number)}
+            isDark={isDark}
+            isRTL={isRTL}
+            ayahCountLabel={interpolate("{{n}} {{label}}", { n: surah.ayah_count, label: ayahLabel })}
+            range={selectedSurahRanges[surah.number] ?? { from: "1", to: String(surah.ayah_count) }}
+            rangeActionLabel={rangeActionLabel}
+            onRangePress={() => onRangePress(surah)}
+          />
+        ))}
+      </OverlayBody>
+      <OverlayFooter isRTL={isRTL}>
+        <Button onPress={onClose} className="w-full">
+          <Text className="text-white" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15 }}>
+            {doneLabel}
+          </Text>
+        </Button>
+      </OverlayFooter>
+    </ResponsiveSheet>
   );
 }
 
