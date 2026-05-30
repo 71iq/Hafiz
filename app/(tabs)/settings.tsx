@@ -7,7 +7,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Toast } from "@/components/ui/Toast";
 import { ScreenScrollView, useScreenContentLayout } from "@/components/ui/ScreenContent";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Sun, Moon, Smartphone, Clock3, Circle, Minus, Plus, X, Check, ChevronRight, ChevronLeft, ChevronDown, User, LogOut, BookOpen, RefreshCw, Unlink, Info, FileText, HeartHandshake, ExternalLink, Sparkles, SlidersHorizontal, type LucideIcon } from "lucide-react-native";
+import { Sun, Moon, Smartphone, Clock3, Circle, Minus, Plus, X, Check, ChevronRight, ChevronLeft, ChevronDown, User, LogOut, BookOpen, RefreshCw, Unlink, Info, FileText, HeartHandshake, ExternalLink, SlidersHorizontal, type LucideIcon } from "lucide-react-native";
 import {
   useSettings,
   FONT_SIZE_STEPS,
@@ -43,7 +43,6 @@ import {
   SETTINGS_CONTENT_MAX_WIDTH,
   SIDEBAR_BREAKPOINT,
 } from "@/lib/ui/viewport";
-import { ZaytPreviewModal } from "@/components/zayt/ZaytPreviewModal";
 import { ProfileIdentity } from "@/components/profile/ProfileIdentity";
 import {
   isQuranPageFontLoaded,
@@ -52,7 +51,7 @@ import {
   quranPageFontPaletteStyle,
 } from "@/lib/fonts/loader";
 
-type SettingsCategoryId = "general" | "content" | "account" | "about" | "advanced";
+type SettingsCategoryId = "general" | "content" | "account" | "about";
 
 type SettingsCategory = {
   id: SettingsCategoryId;
@@ -102,7 +101,6 @@ export default function SettingsScreen() {
   const [pickerVisible, setPickerVisible] = useState(false);
   const [tafseerPickerVisible, setTafseerPickerVisible] = useState(false);
   const [reciterPickerVisible, setReciterPickerVisible] = useState(false);
-  const [zaytPreviewVisible, setZaytPreviewVisible] = useState(false);
   const [logoutDialogVisible, setLogoutDialogVisible] = useState(false);
   const [mobileCategory, setMobileCategory] = useState<SettingsCategoryId | null>(null);
   const [qfStatus, setQfStatus] = useState<QfConnectionStatus>("disconnected");
@@ -334,7 +332,6 @@ export default function SettingsScreen() {
     { id: "content", title: s.settingsCategoryContent, icon: FileText },
     { id: "account", title: s.settingsCategoryAccount, icon: User },
     { id: "about", title: s.settingsCategoryAbout, icon: Info },
-    { id: "advanced", title: s.settingsCategoryAdvanced, icon: Sparkles },
   ];
 
   const handleCategorySelect = useCallback((category: SettingsCategoryId) => {
@@ -1021,6 +1018,14 @@ export default function SettingsScreen() {
                 isRTL={isRTL}
               />
               <SettingsLinkRow
+                icon={FileText}
+                title={s.creditsSection}
+                description={s.settingsCreditsDesc}
+                onPress={() => router.push("/credits" as any)}
+                isDark={isDark}
+                isRTL={isRTL}
+              />
+              <SettingsLinkRow
                 icon={ExternalLink}
                 title={s.settingsReportIssue}
                 description={s.settingsReportIssueDesc}
@@ -1037,83 +1042,6 @@ export default function SettingsScreen() {
                 isDark={isDark}
                 isRTL={isRTL}
               />
-            </View>
-          </Card>
-        </>
-      )}
-
-      {activeCategory === "advanced" && (
-        <>
-          <SectionLabel>{s.sectionDeveloperTools}</SectionLabel>
-          <Card elevation="low" className="p-2 mb-8">
-            <SettingsLinkRow
-              icon={Sparkles}
-              title={s.settingsZaytPreview}
-              description={s.settingsZaytPreviewDesc}
-              onPress={() => setZaytPreviewVisible(true)}
-              isDark={isDark}
-              isRTL={isRTL}
-            />
-          </Card>
-
-          <SectionLabel>{s.creditsSection}</SectionLabel>
-          <Card elevation="low" className="p-5 mb-8">
-            <View className="gap-2.5">
-              {[
-                s.creditWordMeanings,
-                s.creditIrab,
-                s.creditQiraat,
-                s.creditAsbab,
-                s.creditTahrirTanwir,
-                s.creditQurtubi,
-                s.creditKashshaf,
-                s.creditAlusi,
-                s.creditNazamDurar,
-                s.creditRazi,
-                s.creditAlBahrAlMadid,
-                s.creditJalalayn,
-                s.creditJalalaynEn,
-                s.creditBridgesTranslation,
-                s.creditNourQuran,
-                s.creditSurahInfo,
-                s.creditTajweedRules,
-                s.creditTajweedDesc,
-              ].map((line, i) => (
-                <View
-                  key={i}
-                  className="gap-2"
-                  style={{
-                    alignItems: "flex-start",
-                    direction: isRTL ? "rtl" : "ltr",
-                    flexDirection: "row",
-                  }}
-                >
-                  <Text
-                    className="text-warm-500 dark:text-neutral-400"
-                    style={{
-                      fontFamily: "Manrope_400Regular",
-                      fontSize: 12,
-                      lineHeight: 18,
-                      textAlign: "center",
-                      width: 10,
-                    }}
-                  >
-                    •
-                  </Text>
-                  <Text
-                    className="flex-1 text-warm-500 dark:text-neutral-400"
-                    style={{
-                      fontFamily: "Manrope_400Regular",
-                      fontSize: 12,
-                      lineHeight: 18,
-                      writingDirection: isRTL ? "rtl" : "ltr",
-                      textAlign: isRTL ? "right" : "left",
-                    }}
-                  >
-                    {line}
-                  </Text>
-                </View>
-              ))}
             </View>
           </Card>
         </>
@@ -1188,10 +1116,6 @@ export default function SettingsScreen() {
         onSelect={setRecitationId}
         onClose={() => setReciterPickerVisible(false)}
       />
-      <ZaytPreviewModal
-        visible={zaytPreviewVisible}
-        onClose={() => setZaytPreviewVisible(false)}
-      />
     </SafeAreaView>
   );
 }
@@ -1202,8 +1126,9 @@ function parseSettingsCategory(value: string | undefined): SettingsCategoryId | 
     case "content":
     case "account":
     case "about":
-    case "advanced":
       return value;
+    case "advanced":
+      return "about";
     case "reading":
       return "general";
     default:

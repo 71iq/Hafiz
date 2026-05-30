@@ -35,7 +35,6 @@ import {
   PanelLeftOpen,
   PanelRightOpen,
   SlidersHorizontal,
-  Sparkles,
   User,
   type LucideIcon,
 } from "lucide-react-native";
@@ -62,7 +61,6 @@ const SETTINGS_CATEGORY_IDS = [
   "content",
   "account",
   "about",
-  "advanced",
 ] as const;
 
 type SettingsCategoryId = typeof SETTINGS_CATEGORY_IDS[number];
@@ -72,11 +70,11 @@ const SETTINGS_CATEGORY_ICONS: Record<SettingsCategoryId, LucideIcon> = {
   content: FileText,
   account: User,
   about: Info,
-  advanced: Sparkles,
 };
 
 function parseSettingsCategory(value: string | string[] | undefined): SettingsCategoryId {
   const rawValue = Array.isArray(value) ? value[0] : value;
+  if (rawValue === "advanced") return "about";
   return SETTINGS_CATEGORY_IDS.includes(rawValue as SettingsCategoryId)
     ? rawValue as SettingsCategoryId
     : "general";
@@ -370,7 +368,6 @@ function SettingsSidebarContent({
     { id: "content", title: s.settingsCategoryContent, icon: SETTINGS_CATEGORY_ICONS.content },
     { id: "account", title: s.settingsCategoryAccount, icon: SETTINGS_CATEGORY_ICONS.account },
     { id: "about", title: s.settingsCategoryAbout, icon: SETTINGS_CATEGORY_ICONS.about },
-    { id: "advanced", title: s.settingsCategoryAdvanced, icon: SETTINGS_CATEGORY_ICONS.advanced },
   ];
   const headerColor = isPersistent ? ACTIVE_TEXT : isDark ? "#F5F5F4" : "#2D2D2D";
   const activeColor = isPersistent ? ACTIVE_TEXT : isDark ? "#2dd4bf" : "#0d9488";

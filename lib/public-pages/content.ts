@@ -1,5 +1,5 @@
 export type PublicPageLanguage = "en" | "ar";
-export type PublicPageKey = "about" | "privacy" | "terms";
+export type PublicPageKey = "about" | "privacy" | "terms" | "credits";
 
 export type PublicPageLink = {
   label: string;
@@ -23,6 +23,48 @@ export type PublicPageContent = {
   sections: PublicPageSection[];
   actions: PublicPageLink[];
 };
+
+const CREDIT_LINES_EN = [
+  "Word meanings: quran-words.com",
+  "I'rab: al-Da'as via qul.tarteel.ai",
+  "Qira'at: Qur'anic Encyclopedia via qul.tarteel.ai",
+  "Reasons of revelation: mostafaahmed97/asbab-al-nuzul-dataset (MIT)",
+  "Tafsir al-Tahrir wa al-Tanwir: QUL / Tarteel AI",
+  "Tafsir Al Qurtubi: QUL / Tarteel AI",
+  "Al-Kashshaf Al-Zamakhshari: QUL / Tarteel AI",
+  "Tafsir Al-Alusi: QUL / Tarteel AI",
+  "Nazam Al-Durar Al-Biqa'i: QUL / Tarteel AI",
+  "Tafsir Al-Razi: QUL / Tarteel AI",
+  "Al-Bahr Al-Madid: Quranpedia book 206",
+  "Tafsir Jalalayn: QUL / Tarteel AI",
+  "Tafsir Al Jalalayn - English: QUL / Tarteel AI",
+  "Bridges translation: Fadel Soliman via QUL / Tarteel AI",
+  "Mutashabihat and similar ayah tails: NourQuran.com.",
+  "Surah information: Sayyid Abul Ala Maududi - Tafhim al-Qur'an - The Meaning of the Quran",
+  "Tajweed markings: cpfair/quran-tajweed (CC BY 4.0)",
+  "Tajweed descriptions: adapted from educational sources",
+];
+
+const CREDIT_LINES_AR = [
+  "معاني كلمات القرآن (quran-words.com)",
+  "إعراب القرآن - الدعاس (qul.tarteel.ai)",
+  "الموسوعة القرآنية في القراءات (qul.tarteel.ai)",
+  "أسباب النزول: mostafaahmed97/asbab-al-nuzul-dataset (MIT)",
+  "تفسير التحرير والتنوير: QUL / Tarteel AI",
+  "تفسير القرطبي: QUL / Tarteel AI",
+  "الكشاف للزمخشري: QUL / Tarteel AI",
+  "تفسير الألوسي: QUL / Tarteel AI",
+  "نظم الدرر للبقاعي: QUL / Tarteel AI",
+  "تفسير الرازي: QUL / Tarteel AI",
+  "البحر المديد: Quranpedia (كتاب 206)",
+  "تفسير الجلالين: QUL / Tarteel AI",
+  "تفسير الجلالين بالإنجليزية: QUL / Tarteel AI",
+  "ترجمة Bridges: فاضل سليمان عبر QUL / Tarteel AI",
+  "المتشابهات وخواتيم الآيات: موقع نور قرآن NourQuran.com (بإذن مسبق).",
+  "معلومات السور: سيد أبو الأعلى المودودي - تفهيم القرآن - The Meaning of the Quran",
+  "علامات التجويد (cpfair/quran-tajweed، CC BY 4.0)",
+  "شرح أحكام التجويد - بتصرف من مصادر تعليمية متعددة",
+];
 
 export const PUBLIC_PAGE_LABELS: Record<
   PublicPageLanguage,
@@ -109,6 +151,7 @@ export const PUBLIC_PAGE_CONTENT: Record<
       actions: [
         { label: "Privacy Policy", href: "/privacy" },
         { label: "Terms of Service", href: "/terms" },
+        { label: "Credits & Sources", href: "/credits" },
       ],
     },
     ar: {
@@ -165,6 +208,7 @@ export const PUBLIC_PAGE_CONTENT: Record<
       actions: [
         { label: "سياسة الخصوصية", href: "/privacy" },
         { label: "شروط الخدمة", href: "/terms" },
+        { label: "المصادر والاعتمادات", href: "/credits" },
       ],
     },
   },
@@ -439,6 +483,42 @@ export const PUBLIC_PAGE_CONTENT: Record<
       actions: [
         { label: "عن حافظ", href: "/about" },
         { label: "سياسة الخصوصية", href: "/privacy" },
+      ],
+    },
+  },
+  credits: {
+    en: {
+      eyebrow: "Credits",
+      title: "Credits & Sources",
+      description:
+        "Hafiz uses Quran text, study data, translations, tafsir, fonts, and related datasets from multiple sources. These notices acknowledge the source materials used in the app.",
+      sections: [
+        {
+          title: "Sources",
+          bullets: CREDIT_LINES_EN,
+        },
+      ],
+      actions: [
+        { label: "About Hafiz", href: "/about" },
+        { label: "Privacy Policy", href: "/privacy" },
+        { label: "Terms of Service", href: "/terms" },
+      ],
+    },
+    ar: {
+      eyebrow: "المصادر",
+      title: "المصادر والاعتمادات",
+      description:
+        "يعتمد حافظ على نص القرآن وبيانات الدراسة والترجمات والتفاسير والخطوط وبيانات أخرى من مصادر متعددة. تعرض هذه الصفحة الإشعارات الخاصة بتلك المواد.",
+      sections: [
+        {
+          title: "المصادر",
+          bullets: CREDIT_LINES_AR,
+        },
+      ],
+      actions: [
+        { label: "عن حافظ", href: "/about" },
+        { label: "سياسة الخصوصية", href: "/privacy" },
+        { label: "شروط الخدمة", href: "/terms" },
       ],
     },
   },

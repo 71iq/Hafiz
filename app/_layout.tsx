@@ -32,9 +32,11 @@ function StableDocumentTitle() {
 
     const titles: Record<string, string> = {
       "/about": "About Hafiz | Hafiz",
+      "/credits": "Credits & Sources | Hafiz",
       "/privacy": "Privacy Policy | Hafiz",
       "/profile": "Profile | Hafiz",
       "/terms": "Terms of Service | Hafiz",
+      "/zayt-preview": "Zayt Preview | Hafiz",
     };
 
     const setTitle = () => {
@@ -110,8 +112,10 @@ export default function RootLayout() {
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="about" />
+            <Stack.Screen name="credits" />
             <Stack.Screen name="privacy" />
             <Stack.Screen name="terms" />
+            <Stack.Screen name="zayt-preview" />
             <Stack.Screen name="onboarding" options={{ animation: "fade" }} />
             <Stack.Screen name="open" />
             <Stack.Screen

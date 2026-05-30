@@ -21,7 +21,7 @@ import {
 } from "@/lib/public-pages/content";
 
 const UI_LANGUAGE_CACHE_KEY = "hafiz_ui_language";
-const PUBLIC_PAGE_TABS: PublicPageKey[] = ["about", "privacy", "terms"];
+const PUBLIC_PAGE_TABS: PublicPageKey[] = ["about", "privacy", "terms", "credits"];
 
 function readInitialLanguage(): PublicPageLanguage {
   if (Platform.OS !== "web" || typeof window === "undefined") return "en";
