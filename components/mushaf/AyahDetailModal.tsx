@@ -649,7 +649,7 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
             </View>
           )}
           {activeTab === "hadith" && <HadithTab surah={activeTarget.surah} ayah={activeTarget.ayah} />}
-          {activeTab === "qiraat" && <QiraatTab surah={activeTarget.surah} ayah={activeTarget.ayah} />}
+          {activeTab === "qiraat" && <QiraatTab surah={activeTarget.surah} ayah={activeTarget.ayah} showHeader={false} />}
           {activeTab === "notes" && <PrivateNotesSection surah={activeTarget.surah} ayah={activeTarget.ayah} />}
           {activeTab === "reflections" && (
             <ReflectionsSection surah={activeTarget.surah} ayah={activeTarget.ayah} initiallyExpanded showHeader={false} />

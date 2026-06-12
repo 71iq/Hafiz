@@ -8,13 +8,14 @@ import { parseQiraatText, type QiraatBlock } from "@/lib/qiraat/parse";
 type Props = {
   surah: number;
   ayah: number;
+  showHeader?: boolean;
 };
 
 function toArabicNumeral(n: number): string {
   return String(n).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[parseInt(d, 10)]);
 }
 
-export function QiraatTab({ surah, ayah }: Props) {
+export function QiraatTab({ surah, ayah, showHeader = true }: Props) {
   const db = useDatabase();
   const s = useStrings();
   const [text, setText] = useState<string | null>(null);
@@ -93,12 +94,14 @@ export function QiraatTab({ surah, ayah }: Props) {
 
   return (
     <View className="py-4 px-1">
-      <Text
-        className="text-xs font-medium text-warm-400 dark:text-neutral-500 uppercase tracking-wider mb-3"
-        style={{ writingDirection: "rtl", textAlign: "right" }}
-      >
-        {s.qiraatHeader}
-      </Text>
+      {showHeader && (
+        <Text
+          className="text-xs font-medium text-warm-400 dark:text-neutral-500 uppercase tracking-wider mb-3"
+          style={{ writingDirection: "rtl", textAlign: "right" }}
+        >
+          {s.qiraatHeader}
+        </Text>
+      )}
 
       {coversLabel && (
         <View className="mb-3 px-3 py-2 rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 self-start">
