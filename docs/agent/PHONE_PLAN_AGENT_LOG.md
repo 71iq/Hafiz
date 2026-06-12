@@ -2133,3 +2133,32 @@ Saved in `phase19/`:
 - Focus screenshot: `/tmp/hafiz-auth-social-qa/login-social-dark-phone-focus.png`.
 - Desktop screenshot: `/tmp/hafiz-auth-social-qa/login-social-dark-desktop.png`.
 - Manual DOM checks confirmed exact English aria labels, no horizontal overflow, equal mobile button boxes `50x50`, equal mobile image boxes `24x24`, equal desktop button boxes `54x54`, equal desktop image boxes `25x25`, hover background change, and focus border/ring.
+
+## 2026-06-12 — Auth Route Follow-Up: Brand Panel Contrast
+
+### Scope decisions
+1. Kept the auth layout and right-side login form structure unchanged.
+2. Increased only calm dark-mode contrast for the brand panel wordmark/headline and auth links; light mode keeps the original deeper teal.
+3. Kept decorative line art subtle by lowering dark-mode opacity instead of brightening it.
+
+### Implemented in this step
+- Added cached auth dark-mode detection to `AuthScreenShell` so root-stack auth routes can use readable colors without `SettingsProvider`.
+- Set the desktop brand panel wordmark and headline to calm teal `#14B8A6` in dark mode, with soft body text `#D4D4D4`.
+- Kept the brand divider warm and muted, and softened botanical line art in dark mode.
+- Updated auth action links on login/footer to use `#14B8A6` in dark mode and keep `#0d9488` in light mode.
+
+### Validation result
+- `npm run typecheck`: passed.
+- `npm run test:unit -- tests/unit/i18n-strings.test.ts`: passed.
+- `npm run build:web`: passed.
+- `npm run test:e2e:smoke`: passed (`27 passed`).
+- Configured-state Playwright visual QA used a temporary local auth-config patch, then reverted it before final validation.
+- Screenshot: `/tmp/hafiz-auth-contrast-qa/login-brand-dark-desktop.png`.
+- Dark-mode contrast checks at `1024x900`:
+  - Wordmark: `7.40:1`.
+  - Brand headline: `7.40:1`.
+  - Brand body: `12.43:1`.
+  - Forgot password link: `5.53:1`.
+  - Sign Up link: `5.53:1`.
+  - Quran Foundation provider text: `12.63:1`.
+  - Input placeholder: `14.13:1`.

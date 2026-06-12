@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ChevronLeft, ChevronRight } from "lucide-react-native";
+import { useColorScheme } from "nativewind";
 import { DirectionProvider, type Direction } from "@/lib/ui/direction";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 
@@ -47,6 +48,7 @@ export function AuthScreenShell({
 }: AuthScreenShellProps) {
   const { width, height } = useWindowDimensions();
   const isDesktop = width >= SIDEBAR_BREAKPOINT;
+  const isDark = useAuthDarkMode();
   const dir: Direction = locale === "ar" ? "rtl" : "ltr";
   const BackIcon = dir === "rtl" ? ChevronRight : ChevronLeft;
   const shellWidth = isDesktop ? Math.min(width - 48, 1088) : width;
@@ -94,6 +96,7 @@ export function AuthScreenShell({
                     headline={brandHeadline}
                     body={brandBody}
                     dir={dir}
+                    isDark={isDark}
                   />
                 ) : null}
 
@@ -112,6 +115,7 @@ export function AuthScreenShell({
                     BackIcon={BackIcon}
                     dir={dir}
                     showBrand={!isDesktop}
+                    isDark={isDark}
                   />
 
                   <View
@@ -219,6 +223,8 @@ export function AuthRouteLink({
   dir: Direction;
   onPress: () => void;
 }) {
+  const isDark = useAuthDarkMode();
+
   return (
     <View
       className="mb-2 mt-7 items-center justify-center gap-1"
@@ -233,7 +239,12 @@ export function AuthRouteLink({
       <Pressable onPress={onPress} hitSlop={8}>
         <Text
           className="text-primary-accent dark:text-primary-bright"
-          style={{ fontFamily: "Manrope_700Bold", fontSize: 14, writingDirection: dir }}
+          style={{
+            color: isDark ? "#14B8A6" : "#0d9488",
+            fontFamily: "Manrope_700Bold",
+            fontSize: 14,
+            writingDirection: dir,
+          }}
         >
           {action}
         </Text>
@@ -276,6 +287,7 @@ function TopBar({
   BackIcon,
   dir,
   showBrand,
+  isDark,
 }: {
   appName: string;
   backLabel: string;
@@ -283,6 +295,7 @@ function TopBar({
   BackIcon: typeof ChevronLeft;
   dir: Direction;
   showBrand: boolean;
+  isDark: boolean;
 }) {
   return (
     <View
@@ -310,6 +323,7 @@ function TopBar({
           <Text
             className="text-primary dark:text-primary-bright"
             style={{
+              color: isDark ? "#14B8A6" : "#003638",
               fontFamily: "NotoSerif_700Bold",
               fontSize: 28,
               lineHeight: 34,
@@ -333,12 +347,18 @@ function BrandPanel({
   headline,
   body,
   dir,
+  isDark,
 }: {
   appName: string;
   headline: string;
   body: string;
   dir: Direction;
+  isDark: boolean;
 }) {
+  const brandPrimary = isDark ? "#14B8A6" : "#003638";
+  const brandBody = isDark ? "#D4D4D4" : "#6E5A47";
+  const brandDivider = isDark ? "#C9A55C" : "#785F22";
+
   return (
     <View
       className="relative flex-1 overflow-hidden bg-surface-low"
@@ -358,6 +378,7 @@ function BrandPanel({
           <Text
             className="text-primary"
             style={{
+              color: brandPrimary,
               fontFamily: "NotoSerif_700Bold",
               fontSize: 50,
               lineHeight: 60,
@@ -372,6 +393,7 @@ function BrandPanel({
           <Text
             className="text-primary"
             style={{
+              color: brandPrimary,
               fontFamily: "NotoSerif_700Bold",
               fontSize: 34,
               lineHeight: 42,
@@ -384,11 +406,12 @@ function BrandPanel({
           </Text>
           <View
             className="bg-gold-dark"
-            style={{ width: 42, height: 2, marginTop: 28, marginBottom: 28 }}
+            style={{ width: 42, height: 2, marginTop: 28, marginBottom: 28, backgroundColor: brandDivider, opacity: 0.72 }}
           />
           <Text
             className="text-warm-700"
             style={{
+              color: brandBody,
               fontFamily: "Manrope_400Regular",
               fontSize: 17,
               lineHeight: 28,
@@ -403,7 +426,7 @@ function BrandPanel({
       </View>
 
       <PaperStack />
-      <BotanicalLines dir={dir} />
+      <BotanicalLines dir={dir} accentColor={brandPrimary} isDark={isDark} />
     </View>
   );
 }
@@ -494,7 +517,15 @@ function PaperStack() {
   );
 }
 
-function BotanicalLines({ dir }: { dir: Direction }) {
+function BotanicalLines({
+  dir,
+  accentColor,
+  isDark,
+}: {
+  dir: Direction;
+  accentColor: string;
+  isDark: boolean;
+}) {
   const horizontal = dir === "rtl" ? { left: 72 } : { right: 72 };
 
   return (
@@ -502,12 +533,13 @@ function BotanicalLines({ dir }: { dir: Direction }) {
       <View
         className="absolute bg-primary-soft"
         style={{
+          backgroundColor: accentColor,
           width: 1,
           height: 150,
           left: 61,
           top: 18,
           transform: [{ rotate: "16deg" }],
-          opacity: 0.58,
+          opacity: isDark ? 0.22 : 0.58,
         }}
       />
       {[0, 1, 2, 3, 4].map((index) => (
@@ -515,6 +547,7 @@ function BotanicalLines({ dir }: { dir: Direction }) {
           key={index}
           className="absolute border-primary-soft"
           style={{
+            borderColor: accentColor,
             width: 42,
             height: 18,
             left: index % 2 === 0 ? 21 : 59,
@@ -525,7 +558,7 @@ function BotanicalLines({ dir }: { dir: Direction }) {
             borderTopLeftRadius: index % 2 === 0 ? 32 : 0,
             borderTopRightRadius: index % 2 === 0 ? 0 : 32,
             transform: [{ rotate: index % 2 === 0 ? "28deg" : "-28deg" }],
-            opacity: 0.62,
+            opacity: isDark ? 0.24 : 0.62,
           }}
         />
       ))}
@@ -538,12 +571,31 @@ function BotanicalLines({ dir }: { dir: Direction }) {
             height: 12,
             left: 50 + index * 23,
             top: 8 + index * 43,
-            opacity: 0.78,
+            borderColor: isDark ? "#C9A55C" : "#785F22",
+            opacity: isDark ? 0.46 : 0.78,
           }}
         />
       ))}
     </View>
   );
+}
+
+export function useAuthDarkMode(): boolean {
+  const { colorScheme } = useColorScheme();
+  return getCachedAuthDarkMode() ?? colorScheme === "dark";
+}
+
+function getCachedAuthDarkMode(): boolean | null {
+  if (Platform.OS !== "web" || typeof window === "undefined") return null;
+
+  const theme = window.localStorage.getItem("hafiz_theme");
+  if (theme === "dark" || theme === "amoled") return true;
+  if (theme === "beige" || theme === "white") return false;
+  if (theme === "system") {
+    return window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? null;
+  }
+
+  return null;
 }
 
 function MobilePaperMotif() {

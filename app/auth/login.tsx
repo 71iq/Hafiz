@@ -16,6 +16,7 @@ import {
   AuthRouteLink,
   AuthScreenShell,
   AuthUnavailableState,
+  useAuthDarkMode,
 } from "@/components/auth/AuthScreenShell";
 import { OAuthButtons } from "@/components/auth/OAuthButtons";
 import type { Direction } from "@/lib/ui/direction";
@@ -42,6 +43,7 @@ export default function LoginScreen() {
   const [showError, setShowError] = useState<string | null>(null);
   const [passwordVisible, setPasswordVisible] = useState(false);
   const configured = isSupabaseConfigured();
+  const isDark = useAuthDarkMode();
   const passwordRef = useRef<TextInput>(null);
 
   const {
@@ -124,7 +126,12 @@ export default function LoginScreen() {
       >
         <Text
           className="text-primary-accent dark:text-primary-bright"
-          style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13, writingDirection: dir }}
+          style={{
+            color: isDark ? "#14B8A6" : "#0d9488",
+            fontFamily: "Manrope_600SemiBold",
+            fontSize: 13,
+            writingDirection: dir,
+          }}
         >
           {s.authForgotPassword}
         </Text>
