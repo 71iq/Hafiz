@@ -34,6 +34,8 @@ const DATABASE_NAME = "hafiz.db";
 const OPEN_MAX_ATTEMPTS = 5;
 const OPEN_RETRY_DELAY_MS = 400;
 const HOST_WAIT_TIMEOUT_MS = 30000;
+const HOST_RETRY_WAIT_TIMEOUT_MS = 1500;
+const HOST_CONNECT_RETRY_DELAY_MS = 300;
 const REQUEST_TIMEOUT_MS = 60000;
 const POST_CLOSE_SETTLE_MS = 200;
 
@@ -128,6 +130,9 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
     let releaseLock: (() => void) | null = null;
     let hostTabId: string | null = null;
     let isHostReady = false;
+    let isInitializing = false;
+    let isPageHidden = false;
+    let lifecycleClosePromise: Promise<void> | null = null;
     const pendingRequests = new Map<string, PendingRequest>();
     const isWeb = Platform.OS === "web";
     const hasBroadcastChannel =
@@ -291,7 +296,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    async function waitForHost() {
+    async function waitForHost(timeoutMs = HOST_WAIT_TIMEOUT_MS) {
       if (!channel) return null;
       const activeChannel = channel;
 
@@ -302,7 +307,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
           settled = true;
           activeChannel.removeEventListener("message", onMessage);
           resolve(null);
-        }, HOST_WAIT_TIMEOUT_MS);
+        }, timeoutMs);
 
         const onMessage = (event: MessageEvent<DbMessage>) => {
           const message = event.data;
@@ -364,6 +369,11 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
+    async function closeForLifecycleTransition() {
+      await closeDbHandle();
+      await releaseLockHandle();
+    }
+
     async function closeDbHandle() {
       const handle = currentDb;
       currentDb = null;
@@ -404,15 +414,15 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
       throw lastError instanceof Error ? lastError : new Error(String(lastError));
     }
 
-    async function connectToHost() {
-      const targetTabId = await waitForHost();
+    async function connectToHost(timeoutMs = HOST_WAIT_TIMEOUT_MS) {
+      const targetTabId = await waitForHost(timeoutMs);
       if (!targetTabId) {
         throw new Error("Unable to connect to the active database tab");
       }
 
       hostTabId = targetTabId;
       currentDb = createRemoteDatabaseProxy(targetTabId);
-      if (!cancelled) {
+      if (!cancelled && !isPageHidden) {
         setDb(currentDb);
         setProgress(null);
         setError(null);
@@ -420,44 +430,102 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
+    async function connectToHostOrAcquireLock() {
+      const deadline = Date.now() + HOST_WAIT_TIMEOUT_MS;
+      let lastError: unknown;
+
+      while (Date.now() < deadline) {
+        try {
+          await connectToHost(HOST_RETRY_WAIT_TIMEOUT_MS);
+          return true;
+        } catch (err) {
+          lastError = err;
+        }
+
+        if (cancelled || isPageHidden) return true;
+
+        await sleep(HOST_CONNECT_RETRY_DELAY_MS);
+        const acquiredLock = await tryAcquireHostLock();
+        if (cancelled || isPageHidden) {
+          await releaseLockHandle();
+          return true;
+        }
+        if (acquiredLock) return false;
+      }
+
+      throw lastError instanceof Error ? lastError : new Error(String(lastError));
+    }
+
+    async function initializeAsHost() {
+      const database = await openWithRetry();
+      if (cancelled || isPageHidden) {
+        await database.closeAsync().catch(() => {});
+        return;
+      }
+
+      currentDb = database;
+      setDb(database);
+
+      await initializeDatabase(database, setProgress);
+      await backfillAchievements(database, { notify: false });
+
+      if (cancelled || isPageHidden) {
+        await closeDbHandle();
+        await releaseLockHandle();
+        return;
+      }
+
+      if (!cancelled) {
+        isHostReady = true;
+        postMessage({ type: "host-ready", tabId });
+        setProgress(null);
+        setError(null);
+        setIsReady(true);
+      }
+    }
+
     async function runInit() {
-      if (cancelled) return;
+      if (cancelled || isPageHidden || isInitializing) return;
+      isInitializing = true;
+
+      if (lifecycleClosePromise) {
+        await lifecycleClosePromise;
+        lifecycleClosePromise = null;
+      }
+
+      if (cancelled || isPageHidden) {
+        isInitializing = false;
+        return;
+      }
+
       setIsReady(false);
       setError(null);
       setProgress(null);
 
       try {
         const shouldHost = await tryAcquireHostLock();
-        if (cancelled) return;
-
-        if (!shouldHost && hasBroadcastChannel) {
-          await connectToHost();
+        if (cancelled || isPageHidden) {
+          await releaseLockHandle();
           return;
         }
 
-        const database = await openWithRetry();
-        currentDb = database;
-        setDb(database);
-
-        await initializeDatabase(database, setProgress);
-        await backfillAchievements(database, { notify: false });
-
-        if (!cancelled) {
-          isHostReady = true;
-          postMessage({ type: "host-ready", tabId });
-          setProgress(null);
-          setError(null);
-          setIsReady(true);
+        if (!shouldHost && hasBroadcastChannel) {
+          const connectedToHost = await connectToHostOrAcquireLock();
+          if (cancelled || connectedToHost) return;
         }
+
+        await initializeAsHost();
       } catch (err) {
-        if (cancelled) return;
+        if (cancelled || isPageHidden) return;
 
         await closeDbHandle();
         await releaseLockHandle();
 
         if (isWeb && hasBroadcastChannel && isOpfsLockError(err)) {
           try {
-            await connectToHost();
+            const connectedToHost = await connectToHostOrAcquireLock();
+            if (cancelled || connectedToHost) return;
+            await initializeAsHost();
             return;
           } catch (hostError) {
             err = hostError;
@@ -467,7 +535,26 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
         console.error("Database initialization failed:", err);
         setProgress(null);
         setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        isInitializing = false;
       }
+    }
+
+    function handlePageHide() {
+      isPageHidden = true;
+      hostTabId = null;
+      rejectPendingRequests(new Error("Database page hidden"));
+      if (isHostReady) postMessage({ type: "host-closing", tabId });
+      isHostReady = false;
+      setDb(null);
+      setIsReady(false);
+      lifecycleClosePromise = closeForLifecycleTransition();
+    }
+
+    function handlePageShow() {
+      isPageHidden = false;
+      if (cancelled || currentDb || isInitializing) return;
+      void runInit();
     }
 
     if (hasBroadcastChannel) {
@@ -475,10 +562,19 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
       channel.addEventListener("message", handleChannelMessage);
     }
 
+    if (isWeb && typeof window !== "undefined") {
+      window.addEventListener("pagehide", handlePageHide);
+      window.addEventListener("pageshow", handlePageShow);
+    }
+
     void runInit();
 
     return () => {
       cancelled = true;
+      if (isWeb && typeof window !== "undefined") {
+        window.removeEventListener("pagehide", handlePageHide);
+        window.removeEventListener("pageshow", handlePageShow);
+      }
       rejectPendingRequests(new Error("Database provider closed"));
       if (isHostReady) postMessage({ type: "host-closing", tabId });
       void closeDbHandle();
