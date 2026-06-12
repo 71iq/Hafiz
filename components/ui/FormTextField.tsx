@@ -2,7 +2,7 @@ import { type Ref } from "react";
 import { TextInput } from "react-native";
 import { Controller, type Control, type FieldPath, type FieldValues } from "react-hook-form";
 import { Input, type InputProps } from "@/components/ui/Input";
-import { Field, FieldMessage, Label } from "@/components/ui/Field";
+import { Field, FieldMessage } from "@/components/ui/Field";
 import { type Direction } from "@/lib/ui/direction";
 
 type FormTextFieldProps<TFieldValues extends FieldValues> = {
@@ -26,7 +26,6 @@ export function FormTextField<TFieldValues extends FieldValues>({
 }: FormTextFieldProps<TFieldValues>) {
   return (
     <Field dir={dir} className="w-full">
-      <Label dir={dir}>{label}</Label>
       <Controller
         control={control}
         name={name}
@@ -35,8 +34,10 @@ export function FormTextField<TFieldValues extends FieldValues>({
             ref={inputRef}
             dir={dir}
             invalid={!!error}
+            accessibilityLabel={inputProps?.accessibilityLabel ?? label}
             onBlur={onBlur}
             onChangeText={onChange}
+            placeholder={inputProps?.placeholder ?? label}
             value={typeof value === "string" ? value : ""}
             {...inputProps}
           />

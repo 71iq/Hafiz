@@ -555,12 +555,6 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
           <View className={`items-center gap-3 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
             <ProfileAvatar avatarUrl={avatarPreviewUrl} name={displayName} size={58} isDark={isDark} />
             <View className="min-w-0 flex-1">
-              <Text
-                className="text-warm-500 dark:text-neutral-400"
-                style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
-              >
-                {s.authDisplayName}
-              </Text>
               <Input
                 value={displayNameDraft}
                 onChangeText={(value) => {
@@ -568,9 +562,10 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
                   setProfileStatus(null);
                 }}
                 placeholder={s.profileDisplayNamePlaceholder}
+                accessibilityLabel={s.authDisplayName}
                 maxLength={60}
                 dir={isRTL ? "rtl" : "ltr"}
-                className="mt-1 min-h-8 bg-transparent px-2 py-0"
+                className="min-h-8 bg-transparent px-2 py-0"
                 style={{ height: 32, lineHeight: 20 }}
               />
             </View>
@@ -600,13 +595,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
             ) : null}
           </View>
           <View>
-            <View className={`mb-1 items-center justify-between gap-3 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
-              <Text
-                className="text-warm-500 dark:text-neutral-400"
-                style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
-              >
-                {s.profileBioTitle}
-              </Text>
+            <View className={`mb-1 items-center ${isRTL ? "flex-row-reverse justify-start" : "flex-row justify-end"}`}>
               <Text
                 className="text-warm-500 dark:text-neutral-500"
                 style={{ fontFamily: "Manrope_500Medium", fontSize: 11, textAlign: isRTL ? "left" : "right" }}
@@ -621,6 +610,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
                 setProfileStatus(null);
               }}
               placeholder={s.profileBioPlaceholder}
+              accessibilityLabel={s.profileBioTitle}
               maxLength={PROFILE_BIO_MAX_LENGTH}
               multiline
               dir={isRTL ? "rtl" : "ltr"}
@@ -629,12 +619,6 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
             />
           </View>
           <View>
-            <Text
-              className="mb-1 text-warm-500 dark:text-neutral-400"
-              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
-            >
-              {s.profileCountryTitle}
-            </Text>
             <CountryCommandSelect
               value={countryDraft}
               onChange={(value) => {

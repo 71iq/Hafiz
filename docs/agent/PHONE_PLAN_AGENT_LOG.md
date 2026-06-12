@@ -2087,3 +2087,25 @@ Saved in `phase19/`:
 - `npm run test:e2e:smoke`: passed (`27 passed`).
 - Configured-state Playwright visual QA used a temporary local auth-config patch, then reverted it before final validation. Screenshot saved at `/tmp/hafiz-auth-fix-qa/login-dark-phone-configured.png`.
 - Visual QA at `400x1092`, dark, English confirmed: input wrappers both `360px`, login button `360px`, no horizontal overflow, OAuth circles `50px` with dark backgrounds, and circular logo parents.
+
+## 2026-06-12 — Auth Route Follow-Up: Placeholder-Only Fields
+
+### Scope decisions
+1. Removed visible field labels where a field already has a placeholder hint, per the latest signup screenshot feedback.
+2. Applied the same rule beyond auth to duplicate label/placeholder field patterns found in profile edit, smart deck range inputs, recitation reference inputs, and Reflection Journey response.
+3. Preserved accessibility labels for fields after removing visible labels.
+
+### Implemented in this step
+- Updated `components/ui/FormTextField.tsx` so auth forms render placeholders only while retaining `accessibilityLabel`.
+- Removed duplicate visible labels from profile edit display name, bio, and country controls.
+- Converted smart deck range labels into placeholders/accessibility labels.
+- Removed recitation reference visible labels while retaining placeholders/accessibility labels.
+- Removed the Reflection Journey response field label while keeping the instructional prompt and placeholder.
+
+### Validation result
+- `npm run typecheck`: passed.
+- `npm run test:unit -- tests/unit/i18n-strings.test.ts`: passed.
+- `npm run build:web`: passed.
+- `npm run test:e2e:smoke`: passed (`27 passed`).
+- Configured-state Playwright visual QA used a temporary local auth-config patch, then reverted it before final validation. Screenshot saved at `/tmp/hafiz-auth-label-qa/signup-dark-phone.png`.
+- Visual QA at `400x1092`, dark, English confirmed signup inputs have placeholders and accessibility labels, zero standalone visible labels for Email/Username/Display Name/Password, and no horizontal overflow.

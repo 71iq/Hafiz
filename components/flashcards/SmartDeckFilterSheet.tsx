@@ -850,19 +850,11 @@ function RangeInput({
 }) {
   return (
     <View className="flex-1">
-      <Text
-        className="text-warm-400 dark:text-neutral-500 mb-1"
-        style={{
-          fontFamily: "Manrope_400Regular",
-          fontSize: 11,
-          textAlign: isRTL ? "right" : "left",
-        }}
-      >
-        {label}
-      </Text>
       <TextInput
         value={value}
         onChangeText={onChangeText}
+        accessibilityLabel={label}
+        placeholder={label}
         keyboardType="number-pad"
         className="bg-surface-high dark:bg-surface-dark-high rounded-xl px-4 py-3 text-charcoal dark:text-neutral-200"
         style={{

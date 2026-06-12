@@ -295,12 +295,6 @@ function ReflectionJourneyInner() {
 
                 <Card elevation="low" className="rounded-4xl p-5">
                   <Text
-                    className="text-charcoal dark:text-neutral-100 mb-2"
-                    style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15, textAlign: isRTL ? "right" : "left" }}
-                  >
-                    {s.reflectionJourneyResponseLabel}
-                  </Text>
-                  <Text
                     className="text-warm-500 dark:text-neutral-400 mb-3"
                     style={{ fontFamily: "Manrope_400Regular", fontSize: 13, lineHeight: 22, textAlign: isRTL ? "right" : "left" }}
                   >
@@ -315,6 +309,7 @@ function ReflectionJourneyInner() {
                     }}
                     multiline
                     maxLength={REFLECTION_JOURNEY_MAX_RESPONSE_CHARS}
+                    accessibilityLabel={s.reflectionJourneyResponseLabel}
                     placeholder={s.reflectionJourneyResponsePlaceholder}
                     placeholderTextColor={isDark ? "#737373" : "#A39B93"}
                     textAlignVertical="top"

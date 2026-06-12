@@ -360,15 +360,10 @@ function LabeledInput({
 }) {
   return (
     <View>
-      <Text
-        className="mb-2 text-warm-500 dark:text-neutral-400"
-        style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
-      >
-        {label}
-      </Text>
       <TextInput
         value={value}
         onChangeText={onChangeText}
+        accessibilityLabel={label}
         placeholder={placeholder}
         placeholderTextColor={isDark ? "#737373" : "#b9a085"}
         keyboardType={Platform.OS === "web" ? "default" : "numbers-and-punctuation"}
