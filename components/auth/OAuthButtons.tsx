@@ -1,7 +1,16 @@
 import React, { useState } from "react";
-import { ActivityIndicator, Platform, View, Text, Pressable } from "react-native";
+import {
+  ActivityIndicator,
+  Image,
+  Platform,
+  View,
+  Text,
+  Pressable,
+  useWindowDimensions,
+  type ImageSourcePropType,
+} from "react-native";
 import { useColorScheme } from "nativewind";
-import { Apple, BookOpen, Facebook } from "lucide-react-native";
+import { BookOpen } from "lucide-react-native";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { startAppOAuth } from "@/lib/auth/oauth";
 import { useDatabaseStatus } from "@/lib/database/provider";
@@ -9,6 +18,7 @@ import { isQfLoginEnabled } from "@/lib/quran-foundation/config";
 import { runInitialQfUserSync } from "@/lib/quran-foundation/user-sync";
 import { QF_OAUTH_PROVIDER } from "@/lib/quran-foundation/user-types";
 import { useUIDirection } from "@/lib/ui/direction";
+import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 
 // NOTE: OAuth providers (Google, Apple, Facebook) must be configured in the
 // Supabase dashboard under Authentication > Providers before these buttons work.
@@ -18,14 +28,24 @@ type Props = {
   strings: {
     authOrContinueWith: string;
     authContinueWithQuranFoundation: string;
+    authContinueWithGoogle: string;
+    authContinueWithApple: string;
+    authContinueWithFacebook: string;
   };
   isDark?: boolean;
   onError?: (msg: string) => void;
 };
 
+const googleLogo = require("@/assets/images/auth/google.png") as ImageSourcePropType;
+const appleLogo = require("@/assets/images/auth/apple.png") as ImageSourcePropType;
+const appleDarkLogo = require("@/assets/images/auth/apple_dark.png") as ImageSourcePropType;
+const facebookLogo = require("@/assets/images/auth/facebook-icon.png") as ImageSourcePropType;
+
 export function OAuthButtons({ strings: s, isDark, onError }: Props) {
   const { db } = useDatabaseStatus();
   const { colorScheme } = useColorScheme();
+  const { width } = useWindowDimensions();
+  const isDesktop = width >= SIDEBAR_BREAKPOINT;
   const resolvedIsDark = isDark ?? getCachedWebDarkMode() ?? colorScheme === "dark";
   const dir = useUIDirection();
   const [busyProvider, setBusyProvider] = useState<"google" | "apple" | "facebook" | "qf" | null>(null);
@@ -63,7 +83,9 @@ export function OAuthButtons({ strings: s, isDark, onError }: Props) {
   const buttonBorderColor = resolvedIsDark ? "#404040" : "#DFD9D1";
   const buttonBackground = resolvedIsDark ? "#171717" : "#FFFFFF";
   const qfAuthEnabled = isQfLoginEnabled();
-  const iconColor = resolvedIsDark ? "#E5E5E5" : "#2D2D2D";
+  const providerButtonSize = isDesktop ? 54 : 50;
+  const providerIconSize = isDesktop ? 25 : 24;
+  const providerGap = isDesktop ? 16 : 13;
 
   return (
     <View>
@@ -85,29 +107,49 @@ export function OAuthButtons({ strings: s, isDark, onError }: Props) {
       </View>
 
       {/* OAuth buttons row */}
-      <View style={{ flexDirection: dir === "rtl" ? "row-reverse" : "row", justifyContent: "center", gap: 14 }}>
+      <View
+        style={{
+          flexDirection: dir === "rtl" ? "row-reverse" : "row",
+          justifyContent: "center",
+          gap: providerGap,
+        }}
+      >
         <OAuthIconButton
           onPress={() => handlePress("google")}
-          label="G"
-          labelColor="#4285F4"
+          accessibilityLabel={s.authContinueWithGoogle}
+          source={googleLogo}
           backgroundColor={buttonBackground}
           borderColor={buttonBorderColor}
+          hoverBackgroundColor={resolvedIsDark ? "#1F1F1F" : "#F7F1E8"}
+          focusBorderColor={resolvedIsDark ? "#2dd4bf" : "#0d9488"}
+          buttonSize={providerButtonSize}
+          iconSize={providerIconSize}
           disabled={!!busyProvider}
           loading={busyProvider === "google"}
         />
         <OAuthIconButton
           onPress={() => handlePress("apple")}
-          icon={<Apple size={23} color={iconColor} fill={iconColor} />}
+          accessibilityLabel={s.authContinueWithApple}
+          source={resolvedIsDark ? appleDarkLogo : appleLogo}
           backgroundColor={buttonBackground}
           borderColor={buttonBorderColor}
+          hoverBackgroundColor={resolvedIsDark ? "#1F1F1F" : "#F7F1E8"}
+          focusBorderColor={resolvedIsDark ? "#2dd4bf" : "#0d9488"}
+          buttonSize={providerButtonSize}
+          iconSize={providerIconSize}
           disabled={!!busyProvider}
           loading={busyProvider === "apple"}
         />
         <OAuthIconButton
           onPress={() => handlePress("facebook")}
-          icon={<Facebook size={23} color="#1877F2" fill="#1877F2" />}
+          accessibilityLabel={s.authContinueWithFacebook}
+          source={facebookLogo}
           backgroundColor={buttonBackground}
           borderColor={buttonBorderColor}
+          hoverBackgroundColor={resolvedIsDark ? "#1F1F1F" : "#F7F1E8"}
+          focusBorderColor={resolvedIsDark ? "#2dd4bf" : "#0d9488"}
+          buttonSize={providerButtonSize}
+          iconSize={providerIconSize}
           disabled={!!busyProvider}
           loading={busyProvider === "facebook"}
         />
@@ -169,55 +211,69 @@ function getCachedWebDarkMode(): boolean | null {
 
 function OAuthIconButton({
   onPress,
-  icon,
-  label,
-  labelColor,
+  accessibilityLabel,
+  source,
   backgroundColor,
   borderColor,
+  hoverBackgroundColor,
+  focusBorderColor,
+  buttonSize,
+  iconSize,
   disabled = false,
   loading = false,
 }: {
   onPress: () => void;
-  icon?: React.ReactNode;
-  label?: string;
-  labelColor?: string;
+  accessibilityLabel: string;
+  source: ImageSourcePropType;
   backgroundColor: string;
   borderColor: string;
+  hoverBackgroundColor: string;
+  focusBorderColor: string;
+  buttonSize: number;
+  iconSize: number;
   disabled?: boolean;
   loading?: boolean;
 }) {
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const isInteractive = !disabled && !loading;
+
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ disabled, busy: loading }}
+      onHoverIn={() => setHovered(true)}
+      onHoverOut={() => setHovered(false)}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
       style={({ pressed }) => ({
-        width: 50,
-        height: 50,
-        borderRadius: 25,
-        backgroundColor,
+        width: buttonSize,
+        height: buttonSize,
+        borderRadius: buttonSize / 2,
+        backgroundColor: hovered && isInteractive ? hoverBackgroundColor : backgroundColor,
         borderWidth: 1,
-        borderColor,
+        borderColor: focused && isInteractive ? focusBorderColor : borderColor,
         alignItems: "center",
         justifyContent: "center",
         opacity: disabled && !loading ? 0.55 : 1,
-        transform: [{ scale: pressed && !disabled ? 0.95 : 1 }],
+        transform: [{ scale: pressed && isInteractive ? 0.97 : 1 }],
+        boxShadow: focused
+          ? "0 0 0 2px rgba(45, 212, 191, 0.18)"
+          : "0 8px 18px rgba(0, 0, 0, 0.10)",
       })}
     >
       {loading ? (
         <ActivityIndicator size="small" color="#0d9488" />
-      ) : icon ? (
-        icon
       ) : (
-        <Text
-          style={{
-            color: labelColor ?? "#4285F4",
-            fontFamily: "Manrope_700Bold",
-            fontSize: 22,
-            lineHeight: 26,
-          }}
-        >
-          {label}
-        </Text>
+        <Image
+          source={source}
+          accessibilityIgnoresInvertColors
+          style={{ width: iconSize, height: iconSize }}
+          resizeMode="contain"
+        />
       )}
     </Pressable>
   );

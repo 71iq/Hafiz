@@ -157,6 +157,9 @@ export default function LoginScreen() {
         strings={{
           authOrContinueWith: s.authOrContinueWith,
           authContinueWithQuranFoundation: s.authContinueWithQuranFoundation,
+          authContinueWithGoogle: s.authContinueWithGoogle,
+          authContinueWithApple: s.authContinueWithApple,
+          authContinueWithFacebook: s.authContinueWithFacebook,
         }}
         onError={(msg) => setShowError(msg)}
       />

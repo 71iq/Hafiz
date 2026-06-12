@@ -2109,3 +2109,27 @@ Saved in `phase19/`:
 - `npm run test:e2e:smoke`: passed (`27 passed`).
 - Configured-state Playwright visual QA used a temporary local auth-config patch, then reverted it before final validation. Screenshot saved at `/tmp/hafiz-auth-label-qa/signup-dark-phone.png`.
 - Visual QA at `400x1092`, dark, English confirmed signup inputs have placeholders and accessibility labels, zero standalone visible labels for Email/Username/Display Name/Password, and no horizontal overflow.
+
+## 2026-06-12 — Auth Route Follow-Up: Social Login Brand Polish
+
+### Scope decisions
+1. Kept the rest of the login/signup page unchanged and scoped this pass to provider icon buttons plus required accessibility labels.
+2. Restored existing brand image assets for Google, Apple, and Facebook instead of redrawing or recoloring marks.
+3. Added bilingual provider accessibility strings; English labels match `Continue with Google`, `Continue with Apple`, and `Continue with Facebook`.
+
+### Implemented in this step
+- Updated `components/auth/OAuthButtons.tsx` to render official/provider image assets in equal-size provider buttons.
+- Added shared provider button geometry: `50px` mobile, `54px` desktop, centered `24px`/`25px` image marks, soft border, subtle shadow, hover background, pressed scale, and focus ring.
+- Passed provider accessibility labels from login/signup routes.
+
+### Validation result
+- `npm run typecheck`: passed.
+- `npm run test:unit -- tests/unit/i18n-strings.test.ts`: passed.
+- `npm run build:web`: passed.
+- `npm run test:e2e:smoke`: passed (`27 passed`).
+- Configured-state Playwright visual QA used a temporary local auth-config patch, then reverted it before final validation.
+- Mobile screenshot: `/tmp/hafiz-auth-social-qa/login-social-dark-phone.png`.
+- Hover screenshot: `/tmp/hafiz-auth-social-qa/login-social-dark-phone-hover.png`.
+- Focus screenshot: `/tmp/hafiz-auth-social-qa/login-social-dark-phone-focus.png`.
+- Desktop screenshot: `/tmp/hafiz-auth-social-qa/login-social-dark-desktop.png`.
+- Manual DOM checks confirmed exact English aria labels, no horizontal overflow, equal mobile button boxes `50x50`, equal mobile image boxes `24x24`, equal desktop button boxes `54x54`, equal desktop image boxes `25x25`, hover background change, and focus border/ring.
