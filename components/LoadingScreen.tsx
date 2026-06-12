@@ -53,12 +53,17 @@ export function LoadingScreen({ progress }: Props) {
     <View className="flex-1 items-center justify-center bg-surface dark:bg-surface-dark px-8">
       {/* Gallery feel: generous top spacing via justify-center + offset */}
       <View className="items-center mb-16">
-        <Image
-          source={logoSource}
-          style={{ width: 96, height: 96, marginBottom: 20 }}
-          resizeMode="contain"
-          accessibilityLabel="Hafiz"
-        />
+        <View
+          className="items-center justify-center rounded-full bg-surface-bright dark:bg-surface-dark-high"
+          style={{ width: 96, height: 96, borderRadius: 48, overflow: "hidden", marginBottom: 20 }}
+        >
+          <Image
+            source={logoSource}
+            style={{ width: 84, height: 84, borderRadius: 42 }}
+            resizeMode="contain"
+            accessibilityLabel="Hafiz"
+          />
+        </View>
         <Text
           className="text-charcoal dark:text-neutral-100 mb-2"
           style={{
