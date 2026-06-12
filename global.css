@@ -7,6 +7,24 @@
     caret-color: #0d9488;
   }
 
+  :where(input, textarea):-webkit-autofill,
+  :where(input, textarea):-webkit-autofill:hover,
+  :where(input, textarea):-webkit-autofill:focus,
+  :where(input, textarea):-webkit-autofill:active {
+    -webkit-text-fill-color: #2d2d2d !important;
+    caret-color: #0d9488;
+    box-shadow: 0 0 0 1000px #fffdf9 inset !important;
+    transition: background-color 999999s ease-in-out 0s;
+  }
+
+  .dark :where(input, textarea):-webkit-autofill,
+  .dark :where(input, textarea):-webkit-autofill:hover,
+  .dark :where(input, textarea):-webkit-autofill:focus,
+  .dark :where(input, textarea):-webkit-autofill:active {
+    -webkit-text-fill-color: #f5f5f5 !important;
+    box-shadow: 0 0 0 1000px #262626 inset !important;
+  }
+
   :where(input, textarea, [contenteditable="true"]):focus,
   :where(input, textarea, [contenteditable="true"]):focus-visible {
     outline: none !important;
