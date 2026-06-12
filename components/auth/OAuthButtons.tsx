@@ -1,9 +1,10 @@
 import React, { useState } from "react";
-import { ActivityIndicator, View, Text, Pressable, Image, type ImageSourcePropType } from "react-native";
-import { BookOpen } from "lucide-react-native";
+import { ActivityIndicator, Platform, View, Text, Pressable } from "react-native";
+import { useColorScheme } from "nativewind";
+import { Apple, BookOpen, Facebook } from "lucide-react-native";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { startAppOAuth } from "@/lib/auth/oauth";
-import { useDatabase } from "@/lib/database/provider";
+import { useDatabaseStatus } from "@/lib/database/provider";
 import { isQfLoginEnabled } from "@/lib/quran-foundation/config";
 import { runInitialQfUserSync } from "@/lib/quran-foundation/user-sync";
 import { QF_OAUTH_PROVIDER } from "@/lib/quran-foundation/user-types";
@@ -22,13 +23,10 @@ type Props = {
   onError?: (msg: string) => void;
 };
 
-const googleLogo = require("@/assets/images/auth/google-icon.png");
-const appleLogo = require("@/assets/images/auth/apple-icon.png");
-const appleDarkLogo = require("@/assets/images/auth/apple_dark-icon.png");
-const facebookLogo = require("@/assets/images/auth/facebook-icon-icon.png");
-
-export function OAuthButtons({ strings: s, isDark = false, onError }: Props) {
-  const db = useDatabase();
+export function OAuthButtons({ strings: s, isDark, onError }: Props) {
+  const { db } = useDatabaseStatus();
+  const { colorScheme } = useColorScheme();
+  const resolvedIsDark = isDark ?? getCachedWebDarkMode() ?? colorScheme === "dark";
   const dir = useUIDirection();
   const [busyProvider, setBusyProvider] = useState<"google" | "apple" | "facebook" | "qf" | null>(null);
 
@@ -51,7 +49,7 @@ export function OAuthButtons({ strings: s, isDark = false, onError }: Props) {
     setBusyProvider("qf");
     try {
       const result = await startAppOAuth(QF_OAUTH_PROVIDER);
-      if (result.qfConnected) {
+      if (result.qfConnected && db) {
         runInitialQfUserSync(db).catch(console.warn);
       }
     } catch (err: any) {
@@ -61,11 +59,11 @@ export function OAuthButtons({ strings: s, isDark = false, onError }: Props) {
     }
   };
 
-  const mutedColor = isDark ? "#525252" : "#DFD9D1";
-  const appleSource = (isDark ? appleDarkLogo : appleLogo) as ImageSourcePropType;
-  const buttonBorderColor = isDark ? "#404040" : "#DFD9D1";
-  const buttonBackground = isDark ? "#2D2D2D" : "#FFFFFF";
+  const mutedColor = resolvedIsDark ? "#525252" : "#DFD9D1";
+  const buttonBorderColor = resolvedIsDark ? "#404040" : "#DFD9D1";
+  const buttonBackground = resolvedIsDark ? "#171717" : "#FFFFFF";
   const qfAuthEnabled = isQfLoginEnabled();
+  const iconColor = resolvedIsDark ? "#E5E5E5" : "#2D2D2D";
 
   return (
     <View>
@@ -76,7 +74,7 @@ export function OAuthButtons({ strings: s, isDark = false, onError }: Props) {
           style={{
             fontFamily: "Manrope_500Medium",
             fontSize: 12,
-            color: isDark ? "#737373" : "#8B8178",
+            color: resolvedIsDark ? "#737373" : "#8B8178",
             marginHorizontal: 12,
             writingDirection: dir,
           }}
@@ -90,7 +88,8 @@ export function OAuthButtons({ strings: s, isDark = false, onError }: Props) {
       <View style={{ flexDirection: dir === "rtl" ? "row-reverse" : "row", justifyContent: "center", gap: 14 }}>
         <OAuthIconButton
           onPress={() => handlePress("google")}
-          source={googleLogo}
+          label="G"
+          labelColor="#4285F4"
           backgroundColor={buttonBackground}
           borderColor={buttonBorderColor}
           disabled={!!busyProvider}
@@ -98,7 +97,7 @@ export function OAuthButtons({ strings: s, isDark = false, onError }: Props) {
         />
         <OAuthIconButton
           onPress={() => handlePress("apple")}
-          source={appleSource}
+          icon={<Apple size={23} color={iconColor} fill={iconColor} />}
           backgroundColor={buttonBackground}
           borderColor={buttonBorderColor}
           disabled={!!busyProvider}
@@ -106,7 +105,7 @@ export function OAuthButtons({ strings: s, isDark = false, onError }: Props) {
         />
         <OAuthIconButton
           onPress={() => handlePress("facebook")}
-          source={facebookLogo}
+          icon={<Facebook size={23} color="#1877F2" fill="#1877F2" />}
           backgroundColor={buttonBackground}
           borderColor={buttonBorderColor}
           disabled={!!busyProvider}
@@ -127,13 +126,18 @@ export function OAuthButtons({ strings: s, isDark = false, onError }: Props) {
           })}
         >
           {busyProvider === "qf" ? (
-            <ActivityIndicator size="small" color={isDark ? "#2dd4bf" : "#0d9488"} />
+            <ActivityIndicator size="small" color={resolvedIsDark ? "#2dd4bf" : "#0d9488"} />
           ) : (
-            <BookOpen size={17} color={isDark ? "#2dd4bf" : "#0d9488"} />
+            <BookOpen size={17} color={resolvedIsDark ? "#2dd4bf" : "#0d9488"} />
           )}
           <Text
             className="text-charcoal dark:text-neutral-100"
-            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, writingDirection: dir }}
+            style={{
+              color: resolvedIsDark ? "#F5F5F5" : "#2D2D2D",
+              fontFamily: "Manrope_600SemiBold",
+              fontSize: 14,
+              writingDirection: dir,
+            }}
           >
             {s.authContinueWithQuranFoundation}
           </Text>
@@ -143,16 +147,40 @@ export function OAuthButtons({ strings: s, isDark = false, onError }: Props) {
   );
 }
 
+function getCachedWebDarkMode(): boolean | null {
+  if (Platform.OS !== "web" || typeof window === "undefined") return null;
+
+  const theme = window.localStorage.getItem("hafiz_theme");
+  if (theme === "dark" || theme === "amoled") return true;
+  if (theme === "beige" || theme === "white") return false;
+  if (theme === "system") {
+    return window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? null;
+  }
+
+  if (typeof document !== "undefined") {
+    const rootBackground = window.getComputedStyle(document.documentElement).backgroundColor;
+    if (rootBackground === "rgb(10, 10, 10)" || rootBackground === "rgb(38, 38, 38)") {
+      return true;
+    }
+  }
+
+  return null;
+}
+
 function OAuthIconButton({
   onPress,
-  source,
+  icon,
+  label,
+  labelColor,
   backgroundColor,
   borderColor,
   disabled = false,
   loading = false,
 }: {
   onPress: () => void;
-  source: ImageSourcePropType;
+  icon?: React.ReactNode;
+  label?: string;
+  labelColor?: string;
   backgroundColor: string;
   borderColor: string;
   disabled?: boolean;
@@ -177,8 +205,19 @@ function OAuthIconButton({
     >
       {loading ? (
         <ActivityIndicator size="small" color="#0d9488" />
+      ) : icon ? (
+        icon
       ) : (
-        <Image source={source} style={{ width: 32, height: 32 }} resizeMode="contain" />
+        <Text
+          style={{
+            color: labelColor ?? "#4285F4",
+            fontFamily: "Manrope_700Bold",
+            fontSize: 22,
+            lineHeight: 26,
+          }}
+        >
+          {label}
+        </Text>
       )}
     </Pressable>
   );

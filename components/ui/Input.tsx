@@ -69,7 +69,7 @@ export const Input = forwardRef<TextInput, InputProps>(
     return (
       <View
         className={cn(
-          "flex-row items-center gap-2 rounded-2xl bg-surface dark:bg-surface-dark-high px-4",
+          "w-full flex-row items-center gap-2 rounded-2xl bg-surface dark:bg-surface-dark-high px-4",
           dir === "rtl" && "flex-row-reverse",
           invalid && "border border-red-500",
           containerClassName

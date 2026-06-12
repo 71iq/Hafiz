@@ -129,12 +129,7 @@ export function AuthScreenShell({
                         style={{ width: 64, height: 64, marginBottom: 14 }}
                       >
                         {icon ?? (
-                          <Image
-                            source={logoSource}
-                            accessibilityLabel={appName}
-                            style={{ width: 58, height: 58 }}
-                            resizeMode="contain"
-                          />
+                          <AuthLogo appName={appName} size={64} imageSize={56} />
                         )}
                       </View>
                       <Text
@@ -311,12 +306,7 @@ function TopBar({
           className="items-center gap-2"
           style={{ flexDirection: dir === "rtl" ? "row-reverse" : "row" }}
         >
-          <Image
-            source={logoSource}
-            accessibilityLabel={appName}
-            style={{ width: 33, height: 33 }}
-            resizeMode="contain"
-          />
+          <AuthLogo appName={appName} size={34} imageSize={30} />
           <Text
             className="text-primary dark:text-primary-bright"
             style={{
@@ -364,12 +354,7 @@ function BrandPanel({
           className="items-center gap-4"
           style={{ flexDirection: dir === "rtl" ? "row-reverse" : "row" }}
         >
-          <Image
-            source={logoSource}
-            accessibilityLabel={appName}
-            style={{ width: 70, height: 70 }}
-            resizeMode="contain"
-          />
+          <AuthLogo appName={appName} size={72} imageSize={64} />
           <Text
             className="text-primary"
             style={{
@@ -419,6 +404,31 @@ function BrandPanel({
 
       <PaperStack />
       <BotanicalLines dir={dir} />
+    </View>
+  );
+}
+
+function AuthLogo({ appName, size, imageSize }: { appName: string; size: number; imageSize: number }) {
+  return (
+    <View
+      className="items-center justify-center rounded-full bg-surface-bright dark:bg-surface-dark-high"
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        overflow: "hidden",
+      }}
+    >
+      <Image
+        source={logoSource}
+        accessibilityLabel={appName}
+        style={{
+          width: imageSize,
+          height: imageSize,
+          borderRadius: imageSize / 2,
+        }}
+        resizeMode="contain"
+      />
     </View>
   );
 }

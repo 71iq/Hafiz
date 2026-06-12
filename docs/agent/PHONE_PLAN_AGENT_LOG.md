@@ -2065,3 +2065,25 @@ Saved in `phase19/`:
 
 ### Remaining notes
 - Local environment has no Supabase public configuration, so screenshots verify the unavailable branch. The configured form branch is implemented in source and covered by route smoke/build/typecheck, but full configured-state browser screenshots require real public Supabase env values in the browser bundle.
+
+## 2026-06-12 — Auth Route Follow-Up: Configured Login Polish
+
+### Scope decisions
+1. Kept the Digital Sanctuary auth shell and route behavior unchanged.
+2. Treated the user report as a configured-login visual polish pass: field widths, provider buttons in dark mode, and circular Hafiz logo treatment.
+3. Used Playwright instead of the Browser plugin because the Browser plugin is not available in this session.
+
+### Implemented in this step
+- Made icon-bearing inputs occupy the full parent width so email/password fields match each other and the primary action width on phone screens.
+- Wrapped the existing Hafiz logo in circular clipped containers across auth shell placements.
+- Replaced raster OAuth provider logo images with code-native provider glyphs/icons and dark-aware button surfaces.
+- Made `OAuthButtons` tolerate the database not being ready on initial auth render; QF initial sync still runs when a database handle is available.
+- Added a cached web-theme fallback for auth OAuth styling so startup dark mode does not require `SettingsProvider`.
+
+### Validation result
+- `npm run typecheck`: passed.
+- `npm run test:unit -- tests/unit/i18n-strings.test.ts`: passed.
+- `npm run build:web`: passed.
+- `npm run test:e2e:smoke`: passed (`27 passed`).
+- Configured-state Playwright visual QA used a temporary local auth-config patch, then reverted it before final validation. Screenshot saved at `/tmp/hafiz-auth-fix-qa/login-dark-phone-configured.png`.
+- Visual QA at `400x1092`, dark, English confirmed: input wrappers both `360px`, login button `360px`, no horizontal overflow, OAuth circles `50px` with dark backgrounds, and circular logo parents.
