@@ -405,6 +405,8 @@ function MushafInner() {
   });
   const goToPageRef = useRef<((page: number) => void) | null>(null);
   const flashListRef = useRef<FlashListRef<MushafItem>>(null);
+  const pendingVersePageRef = useRef<number | null>(null);
+  const verseScrollRetryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [surahHeaderIndices, setSurahHeaderIndices] = useState<
     Map<number, number>
@@ -413,6 +415,47 @@ function MushafInner() {
   // Target highlight: "surah:ayah" key from deep links, search, and cross-screen navigation.
   const [highlightedKey, setHighlightedKey] = useState<string | null>(null);
   const [highlightedWord, setHighlightedWord] = useState<{ surah: number; ayah: number; wordPos: number } | null>(null);
+
+  const commitCurrentPage = useCallback((page: number) => {
+    const next = Math.max(1, Math.min(604, Number.isFinite(page) ? Math.round(page) : 1));
+    currentPageRef.current = next;
+    setCurrentPage(next);
+  }, []);
+
+  const clearVerseScrollRetry = useCallback(() => {
+    if (verseScrollRetryRef.current) {
+      clearTimeout(verseScrollRetryRef.current);
+      verseScrollRetryRef.current = null;
+    }
+  }, []);
+
+  const scheduleVerseScrollToIndex = useCallback(
+    (index: number, animated = false) => {
+      clearVerseScrollRetry();
+      let attempts = 0;
+      const run = () => {
+        try {
+          if (flashListRef.current) {
+            flashListRef.current.scrollToIndex({
+              index,
+              animated,
+              viewPosition: 0.12,
+            });
+            verseScrollRetryRef.current = null;
+            return;
+          }
+        } catch {}
+        attempts += 1;
+        if (attempts < 12) {
+          verseScrollRetryRef.current = setTimeout(run, 80);
+        } else {
+          verseScrollRetryRef.current = null;
+        }
+      };
+      requestAnimationFrame(run);
+    },
+    [clearVerseScrollRetry]
+  );
 
   const highlightTarget = useCallback((target: MushafTarget) => {
     setHighlightedKey(`${target.surah}:${target.ayah}`);
@@ -692,19 +735,23 @@ function MushafInner() {
     clearHifzTimer();
   }, [clearHifzTimer]);
 
+  useEffect(() => () => {
+    clearVerseScrollRetry();
+  }, [clearVerseScrollRetry]);
+
   const scrollToTarget = useCallback(
     async (target: MushafTarget, animated = true) => {
       if (viewMode === "verse") {
         const idx = items.findIndex(
           (item) => item.type === "ayah" && item.surah === target.surah && item.ayah === target.ayah
         );
-        if (idx >= 0 && flashListRef.current) {
-          await flashListRef.current.scrollToIndex({
-            index: idx,
-            animated,
-            viewPosition: 0.12,
-          });
+        if (idx >= 0) {
+          const item = items[idx];
+          scheduleVerseScrollToIndex(idx, animated);
           setTopAyah({ surah: target.surah, ayah: target.ayah });
+          if (item?.type === "ayah") {
+            commitCurrentPage(item.v2Page);
+          }
         }
         return;
       }
@@ -724,7 +771,7 @@ function MushafInner() {
         goToPageRef.current(page);
       }
     },
-    [db, items, viewMode]
+    [commitCurrentPage, db, items, scheduleVerseScrollToIndex, viewMode]
   );
 
   const navigateToTarget = useCallback(
@@ -857,8 +904,21 @@ function MushafInner() {
 
   const viewModeLabel = isPageMode ? s.mushafViewPage : s.mushafViewVerse;
   const toggleViewMode = useCallback(() => {
-    setViewMode(isPageMode ? "verse" : "page");
-  }, [isPageMode, setViewMode]);
+    if (isPageMode) {
+      pendingVersePageRef.current = currentPageRef.current;
+      setViewMode("verse");
+      return;
+    }
+    if (topAyah) {
+      const ayahItem = items.find(
+        (item) => item.type === "ayah" && item.surah === topAyah.surah && item.ayah === topAyah.ayah
+      );
+      if (ayahItem?.type === "ayah") {
+        commitCurrentPage(ayahItem.v2Page);
+      }
+    }
+    setViewMode("page");
+  }, [commitCurrentPage, isPageMode, items, setViewMode, topAyah]);
   const canUseFocusMode = isPageMode && pageScroll === "vertical" && !hifzEnabled;
   const showHifzControls = isPageMode && hifzEnabled && !focusModeActive;
   const showBottomSlider = isPageMode && !focusModeActive && !hifzEnabled;
@@ -1145,7 +1205,7 @@ function MushafInner() {
           );
           if (idx >= 0) {
             setTimeout(() => {
-              flashListRef.current?.scrollToIndex({ index: idx, animated: false });
+              scheduleVerseScrollToIndex(idx, false);
             }, 150);
           }
         }
@@ -1153,7 +1213,7 @@ function MushafInner() {
         console.warn("[Mushaf] restore last position failed:", e);
       }
     })();
-  }, [loading, items, mushafIndex, isPageMode, db]);
+  }, [loading, items, mushafIndex, isPageMode, db, scheduleVerseScrollToIndex]);
 
   // Web only: ArrowLeft / ArrowRight in page mode → ±1 page (RTL aware)
   useEffect(() => {
@@ -1186,9 +1246,26 @@ function MushafInner() {
         .find((it) => it.type === "ayah");
       if (firstAyah && firstAyah.type === "ayah") {
         setTopAyah({ surah: firstAyah.surah, ayah: firstAyah.ayah });
+        commitCurrentPage(firstAyah.v2Page);
       }
     }
   ).current;
+
+  const initialVerseIndex = useMemo(() => {
+    if (items.length === 0) return undefined;
+    const page = pendingVersePageRef.current ?? currentPageRef.current;
+    const index = items.findIndex((item) => item.type === "ayah" && item.v2Page === page);
+    return index >= 0 ? index : undefined;
+  }, [currentPage, items, viewMode]);
+
+  useEffect(() => {
+    if (viewMode !== "verse" || pendingVersePageRef.current == null || items.length === 0) return;
+    const page = pendingVersePageRef.current;
+    const index = items.findIndex((item) => item.type === "ayah" && item.v2Page === page);
+    if (index < 0) return;
+    pendingVersePageRef.current = null;
+    scheduleVerseScrollToIndex(index, false);
+  }, [items, scheduleVerseScrollToIndex, viewMode]);
 
   // Resolve indicator labels from current top ayah
   const indicator = (() => {
@@ -1476,7 +1553,8 @@ function MushafInner() {
               style={{ overflow: "hidden" }}
             >
               <PageMushaf
-                onPageChange={setCurrentPage}
+                currentPage={currentPage}
+                onPageChange={commitCurrentPage}
                 goToPageRef={goToPageRef}
                 onScroll={handleScrollChrome}
                 onHorizontalGesture={() => {
@@ -1575,6 +1653,7 @@ function MushafInner() {
               scrollEventThrottle={16}
               onViewableItemsChanged={onViewableItemsChanged}
               viewabilityConfig={viewabilityConfig}
+              initialScrollIndex={initialVerseIndex}
             />
           </View>
         )}

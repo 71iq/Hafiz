@@ -184,6 +184,7 @@ function buildPageData(
 }
 
 type Props = {
+  currentPage?: number;
   onPageChange?: (page: number) => void;
   goToPageRef?: React.MutableRefObject<((page: number) => void) | null>;
   onScroll?: (e: NativeSyntheticEvent<NativeScrollEvent>) => void;
@@ -223,6 +224,12 @@ const HORIZONTAL_EASING = Easing.out(Easing.cubic);
 const DESKTOP_PAGE_LINE_MAX_WIDTH = 680;
 const DESKTOP_PAGE_SAFE_GUTTER = 32;
 const FOCUS_BASE_SECONDS_PER_PAGE = 90;
+const MAX_MUSHAF_PAGE = 604;
+
+function clampPage(page: number | undefined, maxPage = MAX_MUSHAF_PAGE): number {
+  const value = typeof page === "number" && Number.isFinite(page) ? Math.round(page) : 1;
+  return Math.max(1, Math.min(maxPage, value));
+}
 
 function fitTypographyToPageWidth(
   fontSize: number,
@@ -437,6 +444,7 @@ function PageSeparator({
 }
 
 export function PageMushaf({
+  currentPage: requestedPage,
   onPageChange,
   goToPageRef,
   onScroll,
@@ -506,9 +514,10 @@ export function PageMushaf({
   const [juzRangeRows, setJuzRangeRows] = useState<JuzRangeRow[]>([]);
   const [pageMetaMap, setPageMetaMap] = useState<Map<number, { surahNumber: number | null; surahName: string | null; juz: number | null }>>(new Map());
   const [loading, setLoading] = useState(true);
-  const [currentPage, setCurrentPage] = useState(1);
+  const initialPage = clampPage(requestedPage);
+  const [currentPage, setCurrentPage] = useState(initialPage);
   const [detailAyah, setDetailAyah] = useState<{ surah: number; ayah: number } | null>(null);
-  const currentPageRef = useRef(1);
+  const currentPageRef = useRef(initialPage);
   const dragStartPageRef = useRef(1);
   const pageIndicatorMountedRef = useRef(false);
   const pageIndicatorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -744,6 +753,14 @@ export function PageMushaf({
   }, [goToPageRef, jumpToPage]);
 
   useEffect(() => {
+    if (requestedPage === undefined || pageData.length === 0) return;
+    const page = clampPage(requestedPage, pageData.length);
+    if (page !== currentPageRef.current) {
+      jumpToPage(page, false);
+    }
+  }, [jumpToPage, pageData.length, requestedPage]);
+
+  useEffect(() => {
     if (!horizontal || pageData.length === 0) return;
     const start = Math.max(1, currentPage - 2);
     const end = Math.min(pageData.length, currentPage + 2);
@@ -789,26 +806,34 @@ export function PageMushaf({
     [layoutInfo]
   );
 
-  // Track which page is currently visible
-  const viewabilityConfig = useRef({
-    itemVisiblePercentThreshold: 50,
-  }).current;
-
-  const onViewableItemsChanged = useCallback(
-    ({ viewableItems }: { viewableItems: Array<{ item: PageData }> }) => {
-      if (viewableItems.length > 0) {
-        updateCurrentPage(viewableItems[0].item.page);
+  const pageForVerticalOffset = useCallback(
+    (offset: number) => {
+      if (!layoutInfo || pageData.length === 0) return null;
+      const probe = offset + Math.min(240, Math.max(0, effectiveContainerHeight * 0.3));
+      let low = 0;
+      let high = layoutInfo.offsets.length - 1;
+      while (low <= high) {
+        const mid = Math.floor((low + high) / 2);
+        if (layoutInfo.offsets[mid] <= probe) {
+          low = mid + 1;
+        } else {
+          high = mid - 1;
+        }
       }
+      const index = Math.max(0, Math.min(pageData.length - 1, high));
+      return pageData[index]?.page ?? null;
     },
-    [updateCurrentPage]
+    [effectiveContainerHeight, layoutInfo, pageData]
   );
 
   const handleVerticalScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       verticalOffsetRef.current = event.nativeEvent.contentOffset.y;
+      const page = pageForVerticalOffset(event.nativeEvent.contentOffset.y);
+      if (page !== null) updateCurrentPage(page);
       onScroll?.(event);
     },
-    [onScroll]
+    [onScroll, pageForVerticalOffset, updateCurrentPage]
   );
 
   const handleContentSizeChange = useCallback((_width: number, height: number) => {
@@ -1401,8 +1426,7 @@ export function PageMushaf({
           onScrollToIndexFailed={handleScrollToIndexFailed}
           scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}
-          onViewableItemsChanged={onViewableItemsChanged}
-          viewabilityConfig={viewabilityConfig}
+          initialScrollIndex={Math.max(0, currentPage - 1)}
           initialNumToRender={1}
           maxToRenderPerBatch={1}
           updateCellsBatchingPeriod={80}
