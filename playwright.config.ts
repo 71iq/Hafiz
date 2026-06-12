@@ -1,7 +1,11 @@
 import { defineConfig, devices } from "@playwright/test";
+import fs from "node:fs";
 
 const port = Number(process.env.PLAYWRIGHT_PORT ?? 8099);
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? `http://localhost:${port}`;
+const chromiumChannel =
+  !process.env.CI && fs.existsSync("/usr/bin/google-chrome") ? "chrome" : undefined;
+const chromiumUse = chromiumChannel ? { channel: chromiumChannel } : {};
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -36,6 +40,7 @@ export default defineConfig({
       name: "smoke-chromium",
       use: {
         ...devices["Desktop Chrome"],
+        ...chromiumUse,
         viewport: { width: 390, height: 844 },
       },
     },
@@ -43,6 +48,7 @@ export default defineConfig({
       name: "ui-360-chromium",
       use: {
         ...devices["Desktop Chrome"],
+        ...chromiumUse,
         viewport: { width: 360, height: 780 },
       },
     },
@@ -50,6 +56,7 @@ export default defineConfig({
       name: "ui-390-chromium",
       use: {
         ...devices["Desktop Chrome"],
+        ...chromiumUse,
         viewport: { width: 390, height: 844 },
       },
     },
@@ -57,6 +64,7 @@ export default defineConfig({
       name: "ui-412-chromium",
       use: {
         ...devices["Desktop Chrome"],
+        ...chromiumUse,
         viewport: { width: 412, height: 915 },
       },
     },
@@ -64,6 +72,7 @@ export default defineConfig({
       name: "ui-768-chromium",
       use: {
         ...devices["Desktop Chrome"],
+        ...chromiumUse,
         viewport: { width: 768, height: 1024 },
       },
     },
@@ -71,6 +80,7 @@ export default defineConfig({
       name: "ui-1024-chromium",
       use: {
         ...devices["Desktop Chrome"],
+        ...chromiumUse,
         viewport: { width: 1024, height: 900 },
       },
     },
@@ -78,6 +88,7 @@ export default defineConfig({
       name: "ui-1440-chromium",
       use: {
         ...devices["Desktop Chrome"],
+        ...chromiumUse,
         viewport: { width: 1440, height: 1000 },
       },
     },

@@ -2026,3 +2026,42 @@ Saved in `phase19/`:
 - `npm run build:web`: passed.
 - `npm run test:e2e:smoke`: passed after web export, 27 route checks.
 - Static-export Playwright flow passed at `390x844`: welcome copy -> Select All -> Save Retention -> Start Review -> `/flashcards/session` without `deckId`, showing a `1 / 20` first review card from a non-retention built-in deck.
+
+## 2026-06-12 — Auth Route Redesign: Digital Sanctuary Split
+
+### Scope decisions
+1. Implemented the approved Digital Sanctuary split direction from `/home/ehab/.codex/generated_images/019ebd00-6c89-77c0-8f06-46afc9dfadf7/ig_013e2ea6c1c0b7aa016a2c4b410cf081949b3e765203109568.png`.
+2. Applied one shared auth shell to login, signup, forgot password, and reset password.
+3. Kept the startup cached language behavior; no EN/Arabic toggle was added.
+4. Used the existing Hafiz logo plus code-native paper/book/botanical motifs; no decorative Quran text was added.
+5. Preserved Supabase-unconfigured behavior; local no-env builds show the unavailable state and do not render OAuth buttons.
+
+### Implemented in this step
+- Added `components/auth/AuthScreenShell.tsx` for safe area, keyboard avoidance, scroll ownership, RTL direction, mirrored back affordance, desktop split layout, mobile stacked layout, shared notices, route footer links, and unavailable-state content.
+- Updated:
+  - `app/auth/login.tsx`
+  - `app/auth/signup.tsx`
+  - `app/auth/forgot-password.tsx`
+  - `app/auth/reset-password.tsx`
+- Updated `components/auth/OAuthButtons.tsx` to accept route-provided strings and use `useUIDirection()` instead of reading `useStrings()` / `useSettings()`.
+- Added password visibility toggles for password fields with bilingual accessibility labels.
+- Replaced hardcoded English Zod validation messages with bilingual auth string keys in `lib/i18n/strings.ts`.
+- Extended report-only responsive overflow coverage to auth routes at 360, 412, 768, 1024, and 1440.
+- Fixed an existing typecheck blocker in `components/mushaf/WordTooltip.tsx` by removing unsupported `textOverflow` from React Native text style; `numberOfLines`/`ellipsizeMode` still provide truncation.
+- Added a local/non-CI Playwright config fallback to system Chrome for Ubuntu 26.04, where Playwright-managed Chromium installation is unsupported.
+
+### Validation result
+- `npm run typecheck`: passed.
+- `npm run test:unit -- tests/unit/i18n-strings.test.ts`: passed.
+- `npm run build:web`: passed.
+- `npm run test:e2e:smoke`: passed after adding the local system-Chrome fallback (`27 passed`).
+- `npm run test:ui:phase -- responsive-overflow`: passed (`40 passed`).
+- Attempted `npx expo start --web --port 8090 --localhost`; Metro hit Node heap OOM at 4 GB and again at 6 GB in this environment after bundling. Static export had already passed, so visual QA used `node scripts/serve-dist.mjs 8090`.
+- Playwright visual QA saved screenshots in `/tmp/hafiz-auth-qa` for:
+  - `/auth/login` at 360, 412, 768, 1024, 1440 in English and Arabic.
+  - `/auth/signup`, `/auth/forgot-password`, `/auth/reset-password` at 360 and 1440 in English and Arabic.
+- Visual QA checks passed for nonblank render, no framework overlay, no horizontal overflow, correct LTR/RTL document direction, mirrored back affordance, and no OAuth buttons in the Supabase-unconfigured state.
+- Static-export page errors were limited to known React minified `#418` hydration warnings already ignored by the smoke helper.
+
+### Remaining notes
+- Local environment has no Supabase public configuration, so screenshots verify the unavailable branch. The configured form branch is implemented in source and covered by route smoke/build/typecheck, but full configured-state browser screenshots require real public Supabase env values in the browser bundle.

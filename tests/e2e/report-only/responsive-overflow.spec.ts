@@ -3,10 +3,21 @@ import { waitForQaReady } from "../helpers";
 
 test.describe.configure({ mode: "serial" });
 
-const responsiveRoutes = ["/home", "/mushaf", "/progress", "/settings"];
+const responsiveRoutes = [
+  "/home",
+  "/mushaf",
+  "/progress",
+  "/settings",
+  "/auth/login",
+  "/auth/signup",
+  "/auth/forgot-password",
+  "/auth/reset-password",
+];
 const responsiveViewports = [
-  { label: "phone-390", width: 390, height: 844 },
+  { label: "phone-360", width: 360, height: 780 },
+  { label: "phone-412", width: 412, height: 915 },
   { label: "tablet-768", width: 768, height: 1024 },
+  { label: "tablet-1024", width: 1024, height: 900 },
   { label: "desktop-1440", width: 1440, height: 1000 },
 ];
 

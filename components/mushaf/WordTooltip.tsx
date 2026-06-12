@@ -96,7 +96,6 @@ function TooltipPopup({
             fontFamily: "Manrope_500Medium",
             maxWidth: maxTextWidth,
             overflow: "hidden",
-            textOverflow: "ellipsis",
             // @ts-ignore — whiteSpace is valid CSS on web
             whiteSpace: "nowrap",
           }}

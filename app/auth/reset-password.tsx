@@ -1,57 +1,61 @@
-import { useEffect, useRef, useState } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  Pressable,
-  KeyboardAvoidingView,
-  Platform,
-  ActivityIndicator,
-  I18nManager,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ActivityIndicator, Platform, Pressable, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { ChevronLeft, ChevronRight } from "lucide-react-native";
+import { Eye, EyeOff, Lock } from "lucide-react-native";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { useAuthStore } from "@/lib/auth/store";
 import { strings } from "@/lib/i18n/strings";
 import { getStartupLanguage } from "@/lib/i18n/startup-language";
 import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
 import { FormTextField } from "@/components/ui/FormTextField";
+import {
+  AuthFormNotice,
+  AuthScreenShell,
+  AuthUnavailableState,
+} from "@/components/auth/AuthScreenShell";
+import type { Direction } from "@/lib/ui/direction";
 
-const resetPasswordSchema = z
-  .object({
-    password: z.string().min(6, "Password must be at least 6 characters"),
-    confirmPassword: z.string().min(6, "Password must be at least 6 characters"),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    path: ["confirmPassword"],
-    message: "Passwords do not match",
-  });
+type ResetPasswordForm = {
+  password: string;
+  confirmPassword: string;
+};
 
-type ResetPasswordForm = z.infer<typeof resetPasswordSchema>;
+function createResetPasswordSchema(s: typeof strings.en) {
+  return z
+    .object({
+      password: z.string().min(6, s.authValidationPasswordMin),
+      confirmPassword: z.string().min(6, s.authValidationPasswordMin),
+    })
+    .refine((data) => data.password === data.confirmPassword, {
+      path: ["confirmPassword"],
+      message: s.authValidationPasswordsMismatch,
+    });
+}
 
 export default function ResetPasswordScreen() {
   const router = useRouter();
-  const s = strings[getStartupLanguage()];
+  const locale = getStartupLanguage();
+  const dir: Direction = locale === "ar" ? "rtl" : "ltr";
+  const s = strings[locale];
+  const schema = useMemo(() => createResetPasswordSchema(s), [s]);
   const { updatePassword, isLoading, error } = useAuthStore();
   const [message, setMessage] = useState<string | null>(null);
   const [messageType, setMessageType] = useState<"success" | "error">("error");
   const [ready, setReady] = useState(false);
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const [confirmPasswordVisible, setConfirmPasswordVisible] = useState(false);
   const configured = isSupabaseConfigured();
   const confirmPasswordRef = useRef<TextInput>(null);
-  const BackIcon = I18nManager.isRTL ? ChevronRight : ChevronLeft;
 
   const {
     control,
     handleSubmit,
     formState: { errors },
   } = useForm<ResetPasswordForm>({
-    resolver: zodResolver(resetPasswordSchema),
+    resolver: zodResolver(schema),
     defaultValues: { password: "", confirmPassword: "" },
   });
 
@@ -99,100 +103,94 @@ export default function ResetPasswordScreen() {
     }
   };
 
+  const unavailableContent = !configured ? (
+    <AuthUnavailableState title={s.authUnavailableTitle} subtitle={s.authUnavailableSubtitle} dir={dir} />
+  ) : undefined;
+
   return (
-    <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
-      <KeyboardAvoidingView
-        className="flex-1"
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
-        <View className="flex-row items-center px-4 pt-4 pb-2">
-          <Pressable
-            onPress={() => router.back()}
-            className="w-10 h-10 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center"
-            style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
-          >
-            <BackIcon size={20} color="#6e5a47" />
-          </Pressable>
-        </View>
+    <AuthScreenShell
+      locale={locale}
+      title={s.authResetPasswordTitle}
+      subtitle={configured ? s.authResetPasswordSubtitle : s.authUnavailableSubtitle}
+      appName={s.appName}
+      brandHeadline={s.authBrandHeadline}
+      brandBody={s.authBrandBody}
+      backLabel={s.authBack}
+      onBack={() => router.back()}
+      unavailableContent={unavailableContent}
+    >
+      <View className="w-full">
+        <AuthFormNotice message={message || error} tone={messageType} dir={dir} />
 
-        <View className="flex-1 px-6 justify-center" style={{ marginTop: -60 }}>
-          <Text
-            className="text-charcoal dark:text-neutral-100 text-center mb-2"
-            style={{ fontFamily: "NotoSerif_700Bold", fontSize: 28 }}
-          >
-            {s.authResetPasswordTitle}
-          </Text>
-          <Text
-            className="text-warm-400 dark:text-neutral-500 text-center mb-8"
-            style={{ fontFamily: "Manrope_400Regular", fontSize: 15, lineHeight: 22 }}
-          >
-            {configured ? s.authResetPasswordSubtitle : s.authUnavailableSubtitle}
-          </Text>
-
-          <Card elevation="low" className="p-6 mb-6">
-            {(message || error) && (
-              <View
-                className={`rounded-2xl p-3 mb-4 ${
-                  messageType === "success"
-                    ? "bg-primary-accent/10 dark:bg-primary-bright/10"
-                    : "bg-red-50 dark:bg-red-900/20"
-                }`}
+        <FormTextField
+          control={control}
+          name="password"
+          label={s.authNewPassword}
+          error={errors.password?.message}
+          dir={dir}
+          inputProps={{
+            placeholder: s.authNewPassword,
+            secureTextEntry: !passwordVisible,
+            returnKeyType: "next",
+            onSubmitEditing: () => confirmPasswordRef.current?.focus(),
+            blurOnSubmit: false,
+            startIcon: <Lock size={18} color="#8B8178" />,
+            endIcon: (
+              <Pressable
+                onPress={() => setPasswordVisible((current) => !current)}
+                accessibilityRole="button"
+                accessibilityLabel={passwordVisible ? s.authHidePassword : s.authShowPassword}
+                hitSlop={8}
               >
-                <Text
-                  className={`text-center ${
-                    messageType === "success"
-                      ? "text-primary-accent dark:text-primary-bright"
-                      : "text-red-600 dark:text-red-400"
-                  }`}
-                  style={{ fontFamily: "Manrope_500Medium", fontSize: 13 }}
-                >
-                  {message || error}
-                </Text>
-              </View>
-            )}
+                {passwordVisible ? <EyeOff size={18} color="#8B8178" /> : <Eye size={18} color="#8B8178" />}
+              </Pressable>
+            ),
+          }}
+        />
 
-            <FormTextField
-              control={control}
-              name="password"
-              label={s.authNewPassword}
-              error={errors.password?.message}
-              inputProps={{
-                placeholder: s.authNewPassword,
-                secureTextEntry: true,
-                returnKeyType: "next",
-                onSubmitEditing: () => confirmPasswordRef.current?.focus(),
-                blurOnSubmit: false,
-              }}
-            />
+        <View className="h-4" />
 
-            <View className="h-3" />
-            <FormTextField
-              control={control}
-              name="confirmPassword"
-              label={s.authConfirmPassword}
-              error={errors.confirmPassword?.message}
-              inputRef={confirmPasswordRef}
-              inputProps={{
-                placeholder: s.authConfirmPassword,
-                secureTextEntry: true,
-                returnKeyType: "done",
-                onSubmitEditing: handleSubmit(onSubmit),
-              }}
-            />
+        <FormTextField
+          control={control}
+          name="confirmPassword"
+          label={s.authConfirmPassword}
+          error={errors.confirmPassword?.message}
+          dir={dir}
+          inputRef={confirmPasswordRef}
+          inputProps={{
+            placeholder: s.authConfirmPassword,
+            secureTextEntry: !confirmPasswordVisible,
+            returnKeyType: "done",
+            onSubmitEditing: handleSubmit(onSubmit),
+            startIcon: <Lock size={18} color="#8B8178" />,
+            endIcon: (
+              <Pressable
+                onPress={() => setConfirmPasswordVisible((current) => !current)}
+                accessibilityRole="button"
+                accessibilityLabel={confirmPasswordVisible ? s.authHidePassword : s.authShowPassword}
+                hitSlop={8}
+              >
+                {confirmPasswordVisible ? <EyeOff size={18} color="#8B8178" /> : <Eye size={18} color="#8B8178" />}
+              </Pressable>
+            ),
+          }}
+        />
 
-            <View className="h-5" />
-            <Button onPress={handleSubmit(onSubmit)} disabled={isLoading || !ready}>
-              {isLoading ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Text className="text-white text-center" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16 }}>
-                  {s.authUpdatePassword}
-                </Text>
-              )}
-            </Button>
-          </Card>
-        </View>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+        <View className="h-7" />
+
+        <Button onPress={handleSubmit(onSubmit)} disabled={isLoading || !ready} size="lg" dir={dir}>
+          {isLoading ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <Text
+              className="text-center text-white"
+              style={{ fontFamily: "Manrope_700Bold", fontSize: 16, writingDirection: dir }}
+            >
+              {s.authUpdatePassword}
+            </Text>
+          )}
+        </Button>
+      </View>
+    </AuthScreenShell>
   );
 }
