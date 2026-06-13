@@ -2177,3 +2177,17 @@ Saved in `phase19/`:
 - `npm run typecheck`: passed.
 - `npm run build:web`: passed.
 - Live/browser testing skipped per user instruction; build validation is enough for this change.
+
+## 2026-06-13 — Mushaf Header View Toggle Spacing Follow-Up
+
+### Scope decisions
+1. Kept the fix scoped to the same Mushaf view-mode toggle.
+2. Skipped live/browser verification per user instruction; build validation is sufficient for this follow-up.
+
+### Implemented in this step
+- Removed the fixed compact minimum width for the non-menu view toggle so the pill hugs the label more closely.
+- Replaced the icon/text `gap` with explicit RTL-aware text margins so the icon does not touch the label on web.
+
+### Validation result
+- `npm run typecheck`: passed.
+- `npm run build:web`: passed.
