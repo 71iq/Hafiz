@@ -29,7 +29,7 @@ export function Qcf2AyahText({
   highlightWordPos,
   showAyahMarker = true,
 }: Props) {
-  const { quranFontStyle, quranMarkerStyle, effectiveTheme } = useSettings();
+  const { quranFontStyle, showAyahMarkers, quranMarkerStyle, effectiveTheme } = useSettings();
   const [visible, setVisible] = useState(() => isQuranPageFontLoaded(quranFontStyle, v2Page));
 
   useEffect(() => {
@@ -47,7 +47,8 @@ export function Qcf2AyahText({
     };
   }, [quranFontStyle, v2Page]);
 
-  const tokens = textQcf2.split(" ").filter(Boolean);
+  const allTokens = textQcf2.split(" ").filter(Boolean);
+  const tokens = showAyahMarker && showAyahMarkers ? allTokens : allTokens.slice(0, -1);
   if (tokens.length === 0) return null;
   const highlightIndex = typeof highlightWordPos === "number" ? highlightWordPos - 1 : -1;
   const fontFamily = quranPageFontName(quranFontStyle, v2Page);
@@ -73,7 +74,7 @@ export function Qcf2AyahText({
     >
       {tokens.map((token, index) => {
         const highlighted = index === highlightIndex;
-        const isMarker = showAyahMarker && index === tokens.length - 1;
+        const isMarker = showAyahMarker && showAyahMarkers && index === tokens.length - 1;
         return (
           <Text
             key={`${token}-${index}`}

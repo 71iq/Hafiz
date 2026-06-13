@@ -73,6 +73,7 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
     isRTL,
     isDark,
     quranFontStyle,
+    showAyahMarkers,
     quranMarkerStyle,
     effectiveTheme,
     tafseerSource,
@@ -107,7 +108,8 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
   const audioIconColor = audioState.active ? "#0d9488" : iconColor;
   const isPhone = width < SIDEBAR_BREAKPOINT;
   const maxOverlayHeight = Math.min(height - (isPhone ? 12 : 48), isPhone ? height * 0.94 : 720);
-  const qcf2Tokens = ayahRow?.text_qcf2.split(" ").filter(Boolean) ?? [];
+  const qcf2AllTokens = ayahRow?.text_qcf2.split(" ").filter(Boolean) ?? [];
+  const qcf2Tokens = showAyahMarkers ? qcf2AllTokens : qcf2AllTokens.slice(0, -1);
   const qcf2FontFamily = ayahRow ? quranPageFontName(quranFontStyle, ayahRow.v2_page) : undefined;
   const qcf2FontPaletteStyle = ayahRow
     ? quranPageFontPaletteStyle(quranFontStyle, ayahRow.v2_page, effectiveTheme)

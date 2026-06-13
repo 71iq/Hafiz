@@ -1156,6 +1156,7 @@ Saved in `phase19/`:
 
 ### Validation result
 - `npm run typecheck`: passed.
+- `npm run test:unit -- tests/unit/i18n-strings.test.ts`: passed.
 - `npm run build:web`: passed.
 
 ### Status
@@ -2205,3 +2206,38 @@ Saved in `phase19/`:
 ### Validation result
 - `npm run typecheck`: passed.
 - `npm run build:web`: passed.
+
+## 2026-06-13 — Mushaf Reading Settings Panel Redesign
+
+### Scope decisions
+1. Added a Mushaf-local Reading Settings panel matching the requested card/list composition instead of the old segmented control sheet.
+2. Kept all controls backed by real persisted settings: theme, Quran font, font size, marker visibility/style, tajweed colors, and tafsir source.
+3. Reused the persisted `show_ayah_markers` setting so the new Shown/Hidden marker row changes actual Quran rendering instead of being a decorative control.
+4. Preserved QCF2/V4 font loading, `v2_page` grouping, Quran token direction, and local SQLite tafsir imports.
+
+### Impacted files
+- `components/mushaf/ReadingSettingsSheet.tsx`
+- `app/(tabs)/mushaf.tsx`
+- `lib/settings/context.tsx`
+- `lib/i18n/strings.ts`
+- Quran renderers that honor marker visibility:
+  - `components/mushaf/AyahBlock.tsx`
+  - `components/mushaf/MushafPage.tsx`
+  - `components/mushaf/AyahDetailModal.tsx`
+  - `components/flashcards/Qcf2AyahText.tsx`
+- `app/(tabs)/settings.tsx`
+
+### Validation result
+- `npm run typecheck`: passed.
+- `npm run test:unit -- tests/unit/i18n-strings.test.ts`: passed.
+- `npm run build:web`: passed.
+- Dev server smoke was attempted with `NODE_OPTIONS=--max-old-space-size=8192 npx expo start --web --port 8099 --localhost`; the server bundled, but headless Chrome crashed loading the dev bundle, so final rendered QA used the production export.
+- Production-export QA used `node scripts/serve-dist.mjs 8100` and Playwright with system Chrome:
+  - `/qa-ready` -> `/mushaf` bootstrap completed.
+  - Reading Settings opened by pointer click at `412x892` and `1228x1589`.
+  - Marker visibility picker changed `Shown` to `Hidden`.
+  - No horizontal overflow offenders.
+  - No unexpected console/page errors; known static-export React `#418` hydration warning is already ignored by the project smoke helper.
+- Screenshots:
+  - `/tmp/hafiz-reading-settings-mobile-rebased-smoke.png`
+  - `/tmp/hafiz-reading-settings-desktop-rebased-smoke.png`
