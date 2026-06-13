@@ -47,6 +47,7 @@ type MushafTarget = { surah: number; ayah: number; wordPos?: number };
 type HifzPageAyah = { key: string; wordCount: number };
 
 const PAGE_RAIL_MAX_WIDTH = 760;
+const READER_INTERACTION_SELECTOR = '[data-hafiz-quran-token], [data-hafiz-word-tooltip="true"]';
 
 function isFromFocusModeControls(event: any) {
   const target = event?.nativeEvent?.target;
@@ -54,6 +55,15 @@ function isFromFocusModeControls(event: any) {
     target &&
     typeof target.closest === "function" &&
     target.closest('[data-focus-mode-controls="true"]')
+  );
+}
+
+function isFromReaderInteraction(event: any) {
+  const target = event?.nativeEvent?.target;
+  return !!(
+    target &&
+    typeof target.closest === "function" &&
+    target.closest(READER_INTERACTION_SELECTOR)
   );
 }
 
@@ -283,7 +293,7 @@ function MushafInner() {
     ? ({
         onPointerDown: (e: any) => {
           if (!focusModeActive && !isPhone && !isTablet) return;
-          if (isFromFocusModeControls(e)) {
+          if (isFromFocusModeControls(e) || isFromReaderInteraction(e)) {
             touchStartRef.current = null;
             return;
           }
@@ -295,7 +305,7 @@ function MushafInner() {
         },
         onPointerMove: (e: any) => {
           if (!focusModeActive && !isPhone && !isTablet) return;
-          if (isFromFocusModeControls(e)) return;
+          if (isFromFocusModeControls(e) || isFromReaderInteraction(e)) return;
           const start = touchStartRef.current;
           if (!start) return;
           const x = e?.nativeEvent?.pageX ?? e?.nativeEvent?.clientX;
@@ -310,11 +320,11 @@ function MushafInner() {
         },
         onPointerUp: (e: any) => {
           if (!focusModeActive && !isPhone && !isTablet) return;
-          if (isFromFocusModeControls(e)) {
+          if (isFromFocusModeControls(e) || isFromReaderInteraction(e)) {
             touchStartRef.current = null;
             return;
           }
-          if (!touchMovedRef.current) toggleChromeFromReaderTap();
+          if (touchStartRef.current && !touchMovedRef.current) toggleChromeFromReaderTap();
           touchStartRef.current = null;
         },
       } as Record<string, unknown>)

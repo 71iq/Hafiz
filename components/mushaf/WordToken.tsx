@@ -78,7 +78,6 @@ function WordTokenInner({
     if (disabled || hidden) return;
     if (!isTouchInput) {
       // Mouse / desktop: single click → tooltip
-      markActivity();
       showTooltip();
       return;
     }
@@ -93,7 +92,7 @@ function WordTokenInner({
       tapTimerRef.current = null;
       showTooltip();
     }, DOUBLE_TAP_MS);
-  }, [disabled, hidden, isTouchInput, markActivity, showTooltip]);
+  }, [disabled, hidden, isTouchInput, showTooltip]);
 
   const handleLongPress = useCallback(() => {
     if (disabled || hidden) return;
