@@ -2260,3 +2260,31 @@ Saved in `phase19/`:
 - Playwright LTR mobile (`390x844`, built `dist` served on localhost): passed. Menu `148x106`, rows `46px` each, no horizontal overflow, menu start aligned with the Page View pill, Swipe selected with same-row checkmark. Screenshot: `/tmp/hafiz-page-view-dropdown-mobile.png`.
 - Playwright RTL mobile (`390x844`, Arabic UI): passed. Menu `154.22x106`, rows `46px` each, no horizontal overflow, mirrored right-edge alignment, selected Swipe row has checkmark at visual end and icon at visual start. Screenshot: `/tmp/hafiz-page-view-dropdown-rtl.png`.
 - Expo dev server fallback was attempted for interactive verification but hit Metro OOM; verification used the built web output instead.
+
+## 2026-06-13 — Reading Settings Compact Modal Polish
+
+### Scope decisions
+1. Scoped this pass to `components/mushaf/ReadingSettingsSheet.tsx`; no app-wide redesign or public API changes.
+2. Kept every existing setting control and picker behavior intact.
+3. Targeted a compact dialog feel: desktop max width 620px, 80% max height, smaller header, calmer theme cards, tighter rows, and subtle right-side values.
+
+### Implemented in this step
+- Reduced the Reading Settings dialog from the prior wide panel to a centered compact modal.
+- Tightened header/body padding, section spacing, theme tile height, row height, icon sizes, value typography, chevrons, and the font-size stepper.
+- Kept mobile nearly full width with a 2x2 appearance grid and internal modal scrolling when content exceeds the 80vh cap.
+
+### Validation result
+- `npm run typecheck`: passed.
+- `npm run build:web`: passed.
+- `npx expo start --web --port 8099 --localhost`: attempted; default heap run OOMed, larger-heap run bundled but exited before browser interaction could complete.
+- Production-export QA used `node scripts/serve-dist.mjs 8100` and Playwright with system Chrome:
+  - `/qa-ready` -> `/mushaf` bootstrap completed.
+  - Reading Settings opened at `1440x1000` and `390x844` after normal scroll reveal of reader chrome.
+  - Desktop dialog rendered as a compact centered settings modal.
+  - Mobile rendered a safe-margin dialog with 2x2 appearance cards and reachable lower content through internal scrolling.
+  - No horizontal overflow offenders were found.
+  - Only the known React Native web animation warning appeared.
+- Screenshots:
+  - `/tmp/hafiz-reading-settings-desktop.png`
+  - `/tmp/hafiz-reading-settings-mobile.png`
+  - `/tmp/hafiz-reading-settings-mobile-scrolled.png`
