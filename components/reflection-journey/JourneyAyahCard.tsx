@@ -14,7 +14,6 @@ import {
 import { useStrings } from "@/lib/i18n/useStrings";
 import { DEFAULT_LANGUAGE, getLanguageByCode } from "@/lib/translations/languages";
 import { localizeReflectionJourneyText } from "@/lib/reflection-journey/schema";
-import { localizedAyahMarker } from "@/lib/quran/ayah-marker";
 import type {
   ReflectionJourneyAyahRangeBlock,
   ReflectionJourneyRecitationPlaceholderBlock,
@@ -291,7 +290,7 @@ export function JourneyAyahCard({ block }: Props) {
                               writingDirection: isMarker ? "rtl" : undefined,
                             }}
                           >
-                            {isMarker ? localizedAyahMarker(row.ayah, isRTL) : glyph}
+                            {glyph}
                           </Text>
                         );
                       })}

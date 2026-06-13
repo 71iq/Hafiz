@@ -34,7 +34,6 @@ import { formatForCopy } from "@/lib/selection/format";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { useAyahAudio } from "@/lib/audio/ayah-audio";
 import { AyahDetailModal, type AyahDetailTabKey } from "./AyahDetailModal";
-import { localizedAyahMarker } from "@/lib/quran/ayah-marker";
 
 const retentionSavedCache = new Map<string, boolean>();
 
@@ -416,7 +415,7 @@ function AyahBlockInner({
                   ...(Platform.OS === "web" ? ({ userSelect: hideMode ? "none" : "text" } as any) : null),
                 }}
               >
-                {localizedAyahMarker(ayah, isRTL)}
+                {wordTokens.marker}
               </Text>
             )}
           </View>

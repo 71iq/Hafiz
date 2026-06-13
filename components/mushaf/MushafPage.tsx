@@ -15,7 +15,6 @@ import {
 } from "@/lib/fonts/loader";
 import { useSelection } from "@/lib/selection/context";
 import { useSettings } from "@/lib/settings/context";
-import { localizedAyahMarker } from "@/lib/quran/ayah-marker";
 
 export type PageWordsByLine = Record<string, string>;
 export type PageWordsData = PageWordsByLine[];
@@ -206,7 +205,7 @@ function MushafPageInner({
   const [surahNameFontReady, setSurahNameFontReady] = useState(() => isSurahNameFontLoaded());
   const [wordsLoaded, setWordsLoaded] = useState(!!pageWordsData);
   const { getHighlightColor, getWordHighlightColor, selectAyah } = useSelection();
-  const { quranFontStyle, quranMarkerStyle, effectiveTheme, isRTL } = useSettings();
+  const { quranFontStyle, quranMarkerStyle, effectiveTheme } = useSettings();
   const lastMarkerTapRef = useRef<{ key: string; at: number } | null>(null);
   const skipNextMarkerPressRef = useRef<string | null>(null);
 
@@ -540,7 +539,7 @@ function MushafPageInner({
                       }),
                     }}
                   >
-                    {localizedAyahMarker(identity.ayah, isRTL)}
+                    {w}
                   </Text>
                 </Pressable>
               );

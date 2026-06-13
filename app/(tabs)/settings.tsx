@@ -51,7 +51,6 @@ import {
   quranPageFontPaletteStyle,
   quranPageMarkerFontPaletteStyle,
 } from "@/lib/fonts/loader";
-import { localizedAyahMarker } from "@/lib/quran/ayah-marker";
 
 type SettingsCategoryId = "general" | "content" | "account" | "about";
 
@@ -61,9 +60,13 @@ type SettingsCategory = {
   icon: LucideIcon;
 };
 
-const SETTINGS_QURAN_PREVIEW_PAGE = 1;
-const SETTINGS_BISMILLAH_QCF2_TOKENS = ["ﱁ", "ﱂ", "ﱃ", "ﱄ"];
-const SETTINGS_AYAH_MARKER_SAMPLE_AYAHS = [1, 2, 3, 4, 5, 6, 7];
+const SETTINGS_QURAN_PREVIEW_SURAH = 2;
+const SETTINGS_QURAN_PREVIEW_AYAH = 282;
+
+type QuranPreviewAyah = {
+  v2Page: number;
+  tokens: string[];
+};
 
 function shiftThemeTime(time: string, deltaMinutes: number) {
   const [hours, minutes] = time.split(":").map((part) => Number(part));
@@ -119,9 +122,8 @@ export default function SettingsScreen() {
   const { user, profile, isLoading: authLoading, signOut } = useAuthStore();
   const accountName = profile?.display_name || profile?.username || user?.email?.split("@")[0] || s.authProfile;
   const fontSizeUsesFittedPageSize = viewMode === "page" && pageScroll === "horizontal";
-  const [quranPreviewFontReady, setQuranPreviewFontReady] = useState(() =>
-    isQuranPageFontLoaded(quranFontStyle, SETTINGS_QURAN_PREVIEW_PAGE)
-  );
+  const [quranPreview, setQuranPreview] = useState<QuranPreviewAyah | null>(null);
+  const [quranPreviewFontReady, setQuranPreviewFontReady] = useState(false);
   const fontSizeLevelLabel = isRTL ? toArabicNumber(fontSizeIndex + 1) : String(fontSizeIndex + 1);
   const fontSizeTotalLabel = isRTL ? toArabicNumber(FONT_SIZE_STEPS.length) : String(FONT_SIZE_STEPS.length);
   const TranslationChevron = isRTL ? ChevronLeft : ChevronRight;
@@ -141,15 +143,15 @@ export default function SettingsScreen() {
   );
   const categoryParam = Array.isArray(params.category) ? params.category[0] : params.category;
   const activeCategory = parseSettingsCategory(categoryParam) ?? "general";
-  const previewFontFamily = quranPageFontName(quranFontStyle, SETTINGS_QURAN_PREVIEW_PAGE);
-  const previewFontPaletteStyle = quranPageFontPaletteStyle(quranFontStyle, SETTINGS_QURAN_PREVIEW_PAGE, effectiveTheme);
+  const previewPage = quranPreview?.v2Page ?? 1;
+  const previewFontFamily = quranPreview ? quranPageFontName(quranFontStyle, previewPage) : undefined;
+  const previewFontPaletteStyle = quranPageFontPaletteStyle(quranFontStyle, previewPage, effectiveTheme);
   const previewMarkerFontPaletteStyle = quranPageMarkerFontPaletteStyle(
     quranFontStyle,
-    SETTINGS_QURAN_PREVIEW_PAGE,
+    previewPage,
     effectiveTheme,
     quranMarkerStyle
   );
-  const markerPreviewFontSize = Math.min(34, Math.max(22, fontSize * 0.8));
   const refreshQfStatus = useCallback(async () => {
     if (!configured || !user || !qfSyncEnabled) {
       setQfStatus("disconnected");
@@ -177,13 +179,36 @@ export default function SettingsScreen() {
   }, [refreshQfStatus]);
 
   useEffect(() => {
+    let cancelled = false;
+    db.getFirstAsync<{ text_qcf2: string; v2_page: number }>(
+      "SELECT text_qcf2, v2_page FROM quran_text WHERE surah = ? AND ayah = ?",
+      [SETTINGS_QURAN_PREVIEW_SURAH, SETTINGS_QURAN_PREVIEW_AYAH],
+    )
+      .then((row) => {
+        if (cancelled) return;
+        const tokens = row?.text_qcf2.split(/\s+/).filter(Boolean) ?? [];
+        const marker = tokens[tokens.length - 1];
+        const words = tokens.slice(0, -1).slice(-8);
+        setQuranPreview(row && marker && words.length > 0 ? { v2Page: row.v2_page, tokens: [...words, marker] } : null);
+      })
+      .catch((err) => {
+        console.warn("[Settings] Failed to load Quran preview:", err);
+        if (!cancelled) setQuranPreview(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [db]);
+
+  useEffect(() => {
     setQuranPreviewFontReady(false);
-    if (isQuranPageFontLoaded(quranFontStyle, SETTINGS_QURAN_PREVIEW_PAGE)) {
+    if (!quranPreview) return;
+    if (isQuranPageFontLoaded(quranFontStyle, quranPreview.v2Page)) {
       requestAnimationFrame(() => setQuranPreviewFontReady(true));
       return;
     }
     let cancelled = false;
-    loadQuranPageFont(quranFontStyle, SETTINGS_QURAN_PREVIEW_PAGE)
+    loadQuranPageFont(quranFontStyle, quranPreview.v2Page)
       .then(() => {
         if (!cancelled) requestAnimationFrame(() => setQuranPreviewFontReady(true));
       })
@@ -191,7 +216,7 @@ export default function SettingsScreen() {
     return () => {
       cancelled = true;
     };
-  }, [quranFontStyle]);
+  }, [quranFontStyle, quranPreview]);
 
   useEffect(() => {
     const qf = Array.isArray(params.qf) ? params.qf[0] : params.qf;
@@ -657,35 +682,6 @@ export default function SettingsScreen() {
                   />
                 </SettingsControlRow>
 
-                <View className="mt-3 rounded-2xl bg-surface dark:bg-surface-dark px-4 py-3">
-                  <View
-                    style={{
-                      direction: "ltr",
-                      flexDirection: "row-reverse",
-                      flexWrap: "wrap",
-                      justifyContent: "center",
-                      alignItems: "center",
-                      gap: 12,
-                      opacity: quranPreviewFontReady ? 1 : 0,
-                    }}
-                  >
-                    {SETTINGS_AYAH_MARKER_SAMPLE_AYAHS.map((ayah) => (
-                      <Text
-                        key={ayah}
-                        className="text-charcoal dark:text-neutral-100 text-center"
-                        style={{
-                          fontFamily: previewFontFamily,
-                          ...previewMarkerFontPaletteStyle,
-                          fontSize: markerPreviewFontSize,
-                          lineHeight: markerPreviewFontSize * 1.5,
-                          writingDirection: "rtl",
-                        }}
-                      >
-                        {localizedAyahMarker(ayah, isRTL)}
-                      </Text>
-                    ))}
-                  </View>
-                </View>
               </>
             )}
 
@@ -731,33 +727,41 @@ export default function SettingsScreen() {
               />
             </View>
 
-            <View className="my-4 bg-surface dark:bg-surface-dark rounded-2xl px-4 py-3">
-              <View
-                style={{
-                  direction: "ltr",
-                  flexDirection: "row-reverse",
-                  flexWrap: "wrap",
-                  justifyContent: "center",
-                  gap: Math.max(4, fontSize * 0.18),
-                  rowGap: Math.max(4, fontSize * 0.2),
-                  opacity: quranPreviewFontReady ? 1 : 0,
-                }}
-              >
-                {SETTINGS_BISMILLAH_QCF2_TOKENS.map((token, index) => (
-                  <Text
-                    key={`${token}-${index}`}
-                    className="text-charcoal dark:text-neutral-100 text-center"
-                    style={{
-                      fontFamily: previewFontFamily,
-                      ...previewFontPaletteStyle,
-                      fontSize,
-                      lineHeight: fontSize * 1.8,
-                    }}
-                  >
-                    {token}
-                  </Text>
-                ))}
-              </View>
+            <View className="my-4 bg-surface dark:bg-surface-dark rounded-2xl px-4 py-4">
+              {quranPreview ? (
+                <View
+                  style={{
+                    direction: "ltr",
+                    flexDirection: "row-reverse",
+                    flexWrap: "wrap",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    gap: Math.max(4, fontSize * 0.18),
+                    rowGap: Math.max(4, fontSize * 0.2),
+                    opacity: quranPreviewFontReady ? 1 : 0,
+                  }}
+                >
+                  {quranPreview.tokens.map((token, index) => {
+                    const isMarker = index === quranPreview.tokens.length - 1;
+                    return (
+                      <Text
+                        key={`${token}-${index}`}
+                        className="text-charcoal dark:text-neutral-100 text-center"
+                        style={{
+                          fontFamily: previewFontFamily,
+                          ...(isMarker ? previewMarkerFontPaletteStyle : previewFontPaletteStyle),
+                          fontSize,
+                          lineHeight: fontSize * 1.8,
+                        }}
+                      >
+                        {token}
+                      </Text>
+                    );
+                  })}
+                </View>
+              ) : (
+                <ActivityIndicator size="small" color={isDark ? "#2dd4bf" : "#0d9488"} />
+              )}
             </View>
 
             <SettingsControlRow label={s.pageScrollLabel} isRTL={isRTL}>
