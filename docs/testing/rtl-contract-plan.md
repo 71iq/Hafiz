@@ -380,12 +380,12 @@ Promote checks from report-only to blocking only after they are stable across lo
 
 ### Phase 1: Source Contracts And Registry
 
-- [ ] Create RTL contract types, registry, and allowlist under `tests/rtl`.
-- [ ] Add `tests/unit/rtl-component-registry-coverage.test.ts`.
-- [ ] Add `tests/unit/rtl-style-contract.test.ts`.
-- [ ] Reuse existing fs/source-test style from `tests/unit/font-and-viewport-contract.test.ts`.
-- [ ] Keep the scanner conservative and document every allowlist reason.
-- [ ] Run `npm run test:unit`.
+- [x] Create RTL contract types, registry, and allowlist under `tests/rtl`.
+- [x] Add `tests/unit/rtl-component-registry-coverage.test.ts`.
+- [x] Add `tests/unit/rtl-style-contract.test.ts`.
+- [x] Reuse existing fs/source-test style from `tests/unit/font-and-viewport-contract.test.ts`.
+- [x] Keep the scanner conservative and document every allowlist reason.
+- [x] Run `npm run test:unit` (RTL tests pass; full suite is blocked by unrelated public-page/manual-inventory failures).
 
 ### Phase 2: Primitive RNTL Contracts
 
