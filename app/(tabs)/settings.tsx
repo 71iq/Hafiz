@@ -49,7 +49,9 @@ import {
   loadQuranPageFont,
   quranPageFontName,
   quranPageFontPaletteStyle,
+  quranPageMarkerFontPaletteStyle,
 } from "@/lib/fonts/loader";
+import { localizedAyahMarker } from "@/lib/quran/ayah-marker";
 
 type SettingsCategoryId = "general" | "content" | "account" | "about";
 
@@ -61,6 +63,7 @@ type SettingsCategory = {
 
 const SETTINGS_QURAN_PREVIEW_PAGE = 1;
 const SETTINGS_BISMILLAH_QCF2_TOKENS = ["ﱁ", "ﱂ", "ﱃ", "ﱄ"];
+const SETTINGS_AYAH_MARKER_SAMPLE_AYAHS = [1, 2, 3, 4, 5, 6, 7];
 
 function shiftThemeTime(time: string, deltaMinutes: number) {
   const [hours, minutes] = time.split(":").map((part) => Number(part));
@@ -140,6 +143,13 @@ export default function SettingsScreen() {
   const activeCategory = parseSettingsCategory(categoryParam) ?? "general";
   const previewFontFamily = quranPageFontName(quranFontStyle, SETTINGS_QURAN_PREVIEW_PAGE);
   const previewFontPaletteStyle = quranPageFontPaletteStyle(quranFontStyle, SETTINGS_QURAN_PREVIEW_PAGE, effectiveTheme);
+  const previewMarkerFontPaletteStyle = quranPageMarkerFontPaletteStyle(
+    quranFontStyle,
+    SETTINGS_QURAN_PREVIEW_PAGE,
+    effectiveTheme,
+    quranMarkerStyle
+  );
+  const markerPreviewFontSize = Math.min(34, Math.max(22, fontSize * 0.8));
   const refreshQfStatus = useCallback(async () => {
     if (!configured || !user || !qfSyncEnabled) {
       setQfStatus("disconnected");
@@ -646,6 +656,36 @@ export default function SettingsScreen() {
                     ]}
                   />
                 </SettingsControlRow>
+
+                <View className="mt-3 rounded-2xl bg-surface dark:bg-surface-dark px-4 py-3">
+                  <View
+                    style={{
+                      direction: "ltr",
+                      flexDirection: "row-reverse",
+                      flexWrap: "wrap",
+                      justifyContent: "center",
+                      alignItems: "center",
+                      gap: 12,
+                      opacity: quranPreviewFontReady ? 1 : 0,
+                    }}
+                  >
+                    {SETTINGS_AYAH_MARKER_SAMPLE_AYAHS.map((ayah) => (
+                      <Text
+                        key={ayah}
+                        className="text-charcoal dark:text-neutral-100 text-center"
+                        style={{
+                          fontFamily: previewFontFamily,
+                          ...previewMarkerFontPaletteStyle,
+                          fontSize: markerPreviewFontSize,
+                          lineHeight: markerPreviewFontSize * 1.5,
+                          writingDirection: "rtl",
+                        }}
+                      >
+                        {localizedAyahMarker(ayah, isRTL)}
+                      </Text>
+                    ))}
+                  </View>
+                </View>
               </>
             )}
 
