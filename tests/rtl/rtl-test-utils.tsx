@@ -32,3 +32,14 @@ export function expectTextAlignStart(node: RtlTestNode, dir: Direction) {
 export function expectFlexDirectionForDir(node: RtlTestNode, dir: Direction) {
   expect(getStyleValue(node, "flexDirection")).toBe(dir === "rtl" ? "row-reverse" : "row");
 }
+
+export function findAncestorByClassName(node: RtlTestNode, token: string): RtlTestNode {
+  let current = node.parent;
+  while (current) {
+    if (typeof current.props.className === "string" && current.props.className.includes(token)) {
+      return current;
+    }
+    current = current.parent;
+  }
+  throw new Error(`No ancestor with className containing ${token}`);
+}

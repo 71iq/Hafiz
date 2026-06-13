@@ -7,12 +7,15 @@ type Props = {
 };
 
 export function AchievementProgressBar({ current, target }: Props) {
-  const { themeColors } = useSettings();
+  const { isRTL, themeColors } = useSettings();
   const pct = target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0;
   return (
     <View
       className="mt-3 h-1.5 overflow-hidden rounded-full"
-      style={{ backgroundColor: themeColors.surfaceHigh }}
+      style={{
+        alignItems: isRTL ? "flex-end" : "flex-start",
+        backgroundColor: themeColors.surfaceHigh,
+      }}
     >
       <View
         className="h-full rounded-full bg-primary-accent dark:bg-primary-bright"

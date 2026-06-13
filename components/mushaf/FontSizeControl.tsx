@@ -28,7 +28,10 @@ export function FontSizeControl({ disabled = false, onChangeStart }: Props) {
   };
 
   return (
-    <View className="flex-row items-center gap-2" style={{ opacity: disabled ? 0.42 : 1 }}>
+    <View
+      className={`${isRTL ? "flex-row-reverse" : "flex-row"} items-center gap-2`}
+      style={{ direction: "ltr", opacity: disabled ? 0.42 : 1 }}
+    >
       <Text
         className="text-warm-400 dark:text-neutral-500"
         style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10 }}
@@ -37,6 +40,7 @@ export function FontSizeControl({ disabled = false, onChangeStart }: Props) {
       </Text>
 
       <Pressable
+        testID="font-size-decrease"
         onPress={decreaseFontSize}
         disabled={!canDecrease}
         className="w-7 h-7 rounded-full bg-surface-high dark:bg-surface-dark-high items-center justify-center"
@@ -47,14 +51,19 @@ export function FontSizeControl({ disabled = false, onChangeStart }: Props) {
 
       <View className="min-w-12 rounded-full bg-surface-high dark:bg-surface-dark-high px-2.5 py-1 items-center">
         <Text
-          className="text-charcoal dark:text-neutral-100"
-          style={{ fontFamily: "Manrope_700Bold", fontSize: 11 }}
+        className="text-charcoal dark:text-neutral-100"
+          style={{
+            fontFamily: "Manrope_700Bold",
+            fontSize: 11,
+            writingDirection: isRTL ? "rtl" : "ltr",
+          }}
         >
           {levelLabel}/{totalLabel}
         </Text>
       </View>
 
       <Pressable
+        testID="font-size-increase"
         onPress={increaseFontSize}
         disabled={!canIncrease}
         className="w-7 h-7 rounded-full bg-surface-high dark:bg-surface-dark-high items-center justify-center"

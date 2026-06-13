@@ -417,10 +417,15 @@ Promote checks from report-only to blocking only after they are stable across lo
 
 ### Phase 5: Higher-Level Components
 
-- [ ] Add second-wave RNTL tests for `ResponsiveOverlay`, `ConfirmDialog`, `DropdownMenu`, `AuthScreenShell`, `MushafIndicator`, `FontSizeControl`, and `JuzNameText`.
-- [ ] Add source contracts for `Progress`, `AchievementProgressBar`, `ActivityHeatmap`, and chart/grid chronology decisions.
-- [ ] Keep database-backed sheets and Supabase-backed surfaces report-only until stable mocks exist.
-- [ ] Run `npm run typecheck`, `npm run test:unit`, and relevant UI phase checks.
+- [x] Add second-wave RNTL tests for observable chrome in `ResponsiveOverlay`, `ConfirmDialog`, `AuthScreenShell`, `MushafIndicator`, `FontSizeControl`, `JuzNameText`, `Progress`, and `AchievementProgressBar`.
+- [x] Keep `DropdownMenu` source-level because the visible popup depends on measured native refs; cover internal row mirroring and coordinate placement in source contracts.
+- [x] Add source contracts for `Progress`, `AchievementProgressBar`, `ActivityHeatmap`, `DropdownMenu`, and chart/grid chronology decisions.
+- [x] Keep database-backed sheets and Supabase-backed surfaces report-only until stable mocks exist.
+- [x] Fix discovered explicit-direction gaps in `Progress`, `AchievementProgressBar`, `FontSizeControl`, `MushafIndicator`, and `ConfirmDialog`.
+- [x] Run `npm run typecheck`.
+- [x] Run `npm run test:unit -- --testPathPattern=rtl` (27 passed).
+- [x] Run `npm run test:unit` (RTL tests pass; full suite is still blocked by unrelated public-page/manual-inventory failures).
+- [x] Run `npm run test:ui:phase -- rtl-ui-contract` (10 passed; includes `npm run build:web`).
 
 ### Phase 6: Promotion And Documentation
 

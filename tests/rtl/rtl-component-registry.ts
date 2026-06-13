@@ -14,10 +14,10 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
   entry("components/SearchCommand.tsx", "overlay", "playwright", "Search modal rows and form chrome mirror; result content can keep its natural language direction."),
   entry("components/achievements/AchievementBadge.tsx", "button", "source", "Badge/icon row mirrors when placed in RTL containers."),
   entry("components/achievements/AchievementGrid.tsx", "progress-chart", "source", "Grid order mirrors while badge art remains unmirrored."),
-  entry("components/achievements/AchievementProgressBar.tsx", "progress-chart", "source", "Fill direction must be explicit before promoting beyond source coverage."),
+  entry("components/achievements/AchievementProgressBar.tsx", "progress-chart", "source", "Fill direction is explicit and follows settings RTL state."),
   entry("components/achievements/AchievementUnlockToast.tsx", "feedback", "source", "Toast content mirrors; achievement art stays neutral."),
   entry("components/achievements/PublicBadgesGrid.tsx", "progress-chart", "source", "Public badge grid mirrors visual order."),
-  entry("components/auth/AuthScreenShell.tsx", "app-shell", "source", "Auth chrome mirrors; logo and decorative artwork do not mirror."),
+  entry("components/auth/AuthScreenShell.tsx", "app-shell", "rntl", "Auth chrome mirrors; logo and decorative artwork do not mirror."),
   entry("components/auth/OAuthButtons.tsx", "button", "playwright", "Provider button row mirrors; provider logos remain unmirrored."),
   entry("components/flashcards/DeckCardsSheet.tsx", "overlay", "source", "Deck table sheet mirrors rows and actions; card text keeps natural direction."),
   entry("components/flashcards/DeckReviewSettingsSheet.tsx", "overlay", "source", "Review settings controls mirror inside sheet chrome."),
@@ -76,14 +76,14 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
   entry("components/ui/Button.tsx", "button", "rntl", "Icon/text order uses logical row direction."),
   entry("components/ui/Card.tsx", "card", "source", "Container is direction-neutral; child rows own mirroring."),
   entry("components/ui/ConfirmDialog.tsx", "overlay", "rntl", "Dialog title, close, and action row mirror."),
-  entry("components/ui/DropdownMenu.tsx", "picker-menu", "rntl", "Menu item rows mirror; measured popup coordinates are viewport based."),
+  entry("components/ui/DropdownMenu.tsx", "picker-menu", "source", "Menu item rows mirror; measured popup coordinates are viewport based."),
   entry("components/ui/EmptyState.tsx", "feedback", "source", "Centered empty state is direction-neutral unless action row is added."),
   entry("components/ui/ErrorBoundary.tsx", "feedback", "source", "Fallback actions should align logically if expanded."),
   entry("components/ui/Field.tsx", "form-field", "rntl", "Labels and messages align to start."),
   entry("components/ui/FormTextField.tsx", "form-field", "rntl", "Form wrapper passes direction to field and input chrome."),
   entry("components/ui/Input.tsx", "form-field", "rntl", "Text aligns start and icon slots mirror."),
   entry("components/ui/OfflineBanner.tsx", "feedback", "source", "Full-width banner is centered; action/close order mirrors when present."),
-  entry("components/ui/Progress.tsx", "progress-chart", "rntl", "Fill direction should become explicit as RTL contract tightens."),
+  entry("components/ui/Progress.tsx", "progress-chart", "rntl", "Fill direction is explicit and follows the active UI direction."),
   entry("components/ui/ResponsiveOverlay.tsx", "overlay", "rntl", "Overlay chrome, header, and footer action order mirror."),
   entry("components/ui/ScreenContent.tsx", "app-shell", "source", "Content gutters and sidebar offsets use direction-aware padding."),
   entry("components/ui/Sheet.tsx", "overlay", "source", "Legacy bottom sheet is position-neutral; internal content owns mirroring."),
@@ -101,4 +101,3 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
 export const rtlComponentRegistryByPath = Object.fromEntries(
   rtlComponentRegistry.map((item) => [item.path, item])
 ) as Record<string, RtlComponentRegistryEntry>;
-

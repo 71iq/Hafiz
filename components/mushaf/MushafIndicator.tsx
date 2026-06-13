@@ -22,14 +22,16 @@ export function MushafIndicator({ surahName, juz }: Props) {
   return (
     <View
       pointerEvents="none"
-      className="flex-row items-center justify-between px-5 py-1.5 bg-surface/60 dark:bg-surface-dark/60"
-      style={{ direction: isRTL ? "rtl" : "ltr" }}
+      className={`${isRTL ? "flex-row-reverse" : "flex-row"} items-center justify-between px-5 py-1.5 bg-surface/60 dark:bg-surface-dark/60`}
+      style={{ direction: "ltr" }}
     >
       <Text
         className="text-warm-500 dark:text-neutral-400"
         style={{
           fontFamily: "Manrope_500Medium",
           fontSize: 12,
+          textAlign: isRTL ? "right" : "left",
+          writingDirection: isRTL ? "rtl" : "ltr",
         }}
         numberOfLines={1}
       >

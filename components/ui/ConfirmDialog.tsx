@@ -38,6 +38,7 @@ export function ConfirmDialog({
       open={visible}
       onClose={handleClose}
       maxWidth={420}
+      dir={isRTL == null ? undefined : isRTL ? "rtl" : "ltr"}
     >
       <OverlayHeader
         title={title}
