@@ -406,14 +406,14 @@ Promote checks from report-only to blocking only after they are stable across lo
 
 ### Phase 4: Playwright RTL Report-Only
 
-- [ ] Add `tests/e2e/report-only/rtl-ui-contract.spec.ts`.
-- [ ] Seed `hafiz_ui_language=ar` before app boot.
-- [ ] Reuse `waitForQaReady`, `captureConsole`, and `assertHealthyPage`.
-- [ ] Add RTL/no-overflow helpers to `tests/e2e/helpers.ts` only if shared.
-- [ ] Add `rtl-ui-contract` to `scripts/run-ui-phase.mjs`.
-- [ ] Optionally add `test:ui:rtl` to `package.json`.
-- [ ] Run `npm run build:web`.
-- [ ] Run `npm run test:ui:phase -- rtl-ui-contract`.
+- [x] Add `tests/e2e/report-only/rtl-ui-contract.spec.ts`.
+- [x] Seed `hafiz_ui_language=ar` before app boot.
+- [x] Reuse `waitForQaReady`, `captureConsole`, and `assertHealthyPage`.
+- [x] Keep RTL/no-overflow helpers local to the spec because they are not shared yet.
+- [x] Add `rtl-ui-contract` to `scripts/run-ui-phase.mjs`.
+- [x] Do not add `test:ui:rtl` to `package.json`; the phase runner covers the workflow.
+- [x] Run `npm run build:web` through `npm run test:ui:phase -- rtl-ui-contract`.
+- [x] Run `npm run test:ui:phase -- rtl-ui-contract` (10 passed).
 
 ### Phase 5: Higher-Level Components
 
