@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useFocusEffect, router } from "expo-router";
-import { View, Text, Pressable, ActivityIndicator, Platform, useWindowDimensions } from "react-native";
+import { View, Text, Pressable, ActivityIndicator, Platform, ScrollView, useWindowDimensions } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
   useAnimatedStyle,
@@ -9,7 +9,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { FlashList, FlashListRef } from "@shopify/flash-list";
 import { useChrome } from "@/lib/ui/chrome";
-import { BookOpen, AlignJustify, Eye, EyeOff, Home, Search, BookMarked, ListMusic, ScanLine } from "lucide-react-native";
+import { BookOpen, AlignJustify, Eye, EyeOff, Home, Search, BookMarked, ListMusic, ScanLine, ChevronDown, SlidersHorizontal } from "lucide-react-native";
 import { useDatabase } from "@/lib/database/provider";
 import { writeUserSetting } from "@/lib/database/user-settings";
 import { useSettings, withThemeOpacity } from "@/lib/settings/context";
@@ -18,7 +18,6 @@ import { WordInteractionProvider } from "@/lib/word/context";
 import { SelectionProvider, useSelection } from "@/lib/selection/context";
 import { SurahHeader } from "@/components/mushaf/SurahHeader";
 import { AyahBlock } from "@/components/mushaf/AyahBlock";
-import { FontSizeControl } from "@/components/mushaf/FontSizeControl";
 import { PageMushaf } from "@/components/mushaf/PageMushaf";
 import { GoToNavigator } from "@/components/mushaf/GoToNavigator";
 import { MushafIndicator } from "@/components/mushaf/MushafIndicator";
@@ -27,6 +26,8 @@ import { FocusModeControls } from "@/components/mushaf/FocusModeControls";
 import { HifzControls } from "@/components/mushaf/HifzControls";
 import { WordDetailSheet } from "@/components/mushaf/WordDetailSheet";
 import { RecitationRangeSheet } from "@/components/mushaf/RecitationRangeSheet";
+import { ReadingSettingsSheet } from "@/components/mushaf/ReadingSettingsSheet";
+import { PageViewNavigationSheet } from "@/components/mushaf/PageViewNavigationSheet";
 import type { HifzVisibility } from "@/components/mushaf/MushafPage";
 import { loadMushafIndex, findJuzForAyah, findHizbForAyah, topmostAyahForPage, type MushafIndex } from "@/lib/mushaf/position";
 import { FloatingWordTooltip } from "@/components/mushaf/WordTooltip";
@@ -125,6 +126,8 @@ function ViewModeToggle({
   compact,
   glass,
   onPress,
+  onPageMenuPress,
+  pageMenuLabel,
 }: {
   isPageMode: boolean;
   isDark: boolean;
@@ -133,16 +136,21 @@ function ViewModeToggle({
   compact: boolean;
   glass: boolean;
   onPress: () => void;
+  onPageMenuPress?: () => void;
+  pageMenuLabel?: string;
 }) {
   const Icon = isPageMode ? BookOpen : AlignJustify;
   const { themeSurface } = useSettings();
+  const showPageMenu = isPageMode && !!onPageMenuPress;
+  const mutedIconColor = isDark ? "#737373" : "#8B8178";
+  const dividerColor = glass
+    ? "rgba(255,255,255,0.14)"
+    : isDark
+      ? "rgba(255,255,255,0.08)"
+      : "rgba(0,54,56,0.08)";
 
   return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityState={{ selected: true }}
-      accessibilityLabel={label}
+    <View
       className={`rounded-full ${compact ? "px-3 py-2" : "px-3.5 py-2"} ${
         glass ? "" : "bg-surface-high dark:bg-surface-dark-high"
       }`}
@@ -151,9 +159,9 @@ function ViewModeToggle({
         flexDirection: isRTL ? "row-reverse" : "row",
         alignItems: "center",
         justifyContent: "center",
-        flexWrap: "nowrap",
-        gap: 7,
-        minWidth: compact ? 112 : 126,
+        minWidth: showPageMenu ? (compact ? 124 : 144) : (compact ? 108 : 126),
+        paddingHorizontal: 0,
+        paddingVertical: 0,
         borderWidth: glass ? 1 : 0,
         borderStyle: "solid",
         borderColor: glass ? "rgba(255,255,255,0.15)" : "transparent",
@@ -163,20 +171,54 @@ function ViewModeToggle({
           : null),
       }}
     >
-      <Icon size={16} color={isDark ? "#2dd4bf" : "#0d9488"} strokeWidth={2} />
-      <Text
-        className="text-primary-accent dark:text-primary-bright"
-        numberOfLines={1}
-        style={{
-          flexShrink: 0,
-          fontFamily: "Manrope_600SemiBold",
-          fontSize: compact ? 12 : 13,
-          ...(Platform.OS === "web" ? ({ whiteSpace: "nowrap" } as any) : null),
-        }}
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityState={{ selected: true }}
+        accessibilityLabel={label}
+        className={`rounded-full ${compact ? "px-3 py-2" : "px-3.5 py-2"}`}
+        style={({ pressed }) => ({
+          flex: 1,
+          flexDirection: isRTL ? "row-reverse" : "row",
+          alignItems: "center",
+          justifyContent: "center",
+          flexWrap: "nowrap",
+          gap: 7,
+          transform: [{ scale: pressed ? 0.98 : 1 }],
+        })}
       >
-        {label}
-      </Text>
-    </Pressable>
+        <Icon size={16} color={isDark ? "#2dd4bf" : "#0d9488"} strokeWidth={2} />
+        <Text
+          className="text-primary-accent dark:text-primary-bright"
+          numberOfLines={1}
+          style={{
+            flexShrink: 0,
+            fontFamily: "Manrope_600SemiBold",
+            fontSize: compact ? 12 : 13,
+            ...(Platform.OS === "web" ? ({ whiteSpace: "nowrap" } as any) : null),
+          }}
+        >
+          {label}
+        </Text>
+      </Pressable>
+      {showPageMenu && (
+        <Pressable
+          onPress={onPageMenuPress}
+          accessibilityRole="button"
+          accessibilityLabel={pageMenuLabel}
+          className="h-full items-center justify-center px-2.5"
+          style={({ pressed }) => ({
+            alignSelf: "stretch",
+            borderLeftWidth: isRTL ? 0 : 1,
+            borderRightWidth: isRTL ? 1 : 0,
+            borderColor: dividerColor,
+            transform: [{ scale: pressed ? 0.96 : 1 }],
+          })}
+        >
+          <ChevronDown size={15} color={mutedIconColor} />
+        </Pressable>
+      )}
+    </View>
   );
 }
 
@@ -391,6 +433,8 @@ function MushafInner() {
   const [showBookmarks, setShowBookmarks] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [showRecitation, setShowRecitation] = useState(false);
+  const [showReadingSettings, setShowReadingSettings] = useState(false);
+  const [showPageViewNavigation, setShowPageViewNavigation] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [verseHideMode, setVerseHideMode] = useState(false);
   const [hifzEnabled, setHifzEnabled] = useState(false);
@@ -907,6 +951,17 @@ function MushafInner() {
     setShowNavigator(true);
   }, [pauseFocusAutoScroll, resetHifzForNavigation]);
 
+  const handleOpenReadingSettings = useCallback(() => {
+    pauseFocusAutoScroll();
+    setShowReadingSettings(true);
+  }, [pauseFocusAutoScroll]);
+
+  const handleOpenPageViewNavigation = useCallback(() => {
+    if (!isPageMode) return;
+    pauseFocusAutoScroll();
+    setShowPageViewNavigation(true);
+  }, [isPageMode, pauseFocusAutoScroll]);
+
   const handleGoHome = useCallback(() => {
     pauseFocusAutoScroll();
     router.navigate("/(tabs)/home");
@@ -1009,6 +1064,8 @@ function MushafInner() {
     setHifzAutoRunning(true);
   }, [hifzEnabled]);
   const pageFontSizeLocked = isPageMode && pageScroll === "horizontal";
+  const mobileToolbarIconClass = `rounded-full ${isPhone && isPageMode ? "px-1.5 py-2" : isNarrow ? "px-2 py-2" : "px-2.5 py-2"}`;
+  const desktopToolbarIconClass = `rounded-full bg-surface-high dark:bg-surface-dark-high ${isNarrow ? "px-2 py-2" : "px-3 py-2"}`;
   const mobileBottomNavHeight = 54;
   const mobileBottomNavGap = 6;
   const mobileBottomNavOffset = isPhone
@@ -1115,7 +1172,7 @@ function MushafInner() {
 
   useEffect(() => {
     if (!focusModeActive) return;
-    if (showNavigator || showBookmarks || showSearch || showRecitation || selection || detailWord) {
+    if (showNavigator || showBookmarks || showSearch || showRecitation || showReadingSettings || showPageViewNavigation || selection || detailWord) {
       pauseFocusAutoScroll();
     }
   }, [
@@ -1125,6 +1182,8 @@ function MushafInner() {
     selection,
     showBookmarks,
     showNavigator,
+    showPageViewNavigation,
+    showReadingSettings,
     showRecitation,
     showSearch,
   ]);
@@ -1229,7 +1288,7 @@ function MushafInner() {
   useEffect(() => {
     if (Platform.OS !== "web" || !isPageMode) return;
     const handler = (e: KeyboardEvent) => {
-      if (showNavigator || showSearch || showBookmarks || showRecitation) return;
+      if (showNavigator || showSearch || showBookmarks || showRecitation || showReadingSettings || showPageViewNavigation) return;
       const target = e.target as HTMLElement | null;
       const tag = target?.tagName?.toLowerCase();
       // Don't hijack typing inside inputs/textareas/contenteditable
@@ -1245,7 +1304,7 @@ function MushafInner() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [isPageMode, currentPage, showNavigator, showSearch, showBookmarks, showRecitation]);
+  }, [isPageMode, currentPage, showNavigator, showSearch, showBookmarks, showRecitation, showReadingSettings, showPageViewNavigation]);
 
   // Verse-view: track topmost visible ayah via FlashList viewable items
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 }).current;
@@ -1338,7 +1397,7 @@ function MushafInner() {
                   flexDirection: isRTL ? "row-reverse" : "row",
                   alignItems: "center",
                   justifyContent: "space-between",
-                  gap: 8,
+                  gap: isPhone && isPageMode ? 6 : 8,
                 }}
               >
                 {isPhone ? (
@@ -1350,96 +1409,120 @@ function MushafInner() {
                     compact
                     glass
                     onPress={toggleViewMode}
+                    onPageMenuPress={handleOpenPageViewNavigation}
+                    pageMenuLabel={s.pageViewOptions}
                   />
                 ) : (
                   <View />
                 )}
 
-                <View
-                  className="rounded-full border border-white/15 p-1"
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
                   style={{
-                    flexDirection: "row",
-                    gap: 2,
-                    backgroundColor: withThemeOpacity(themeSurface, 0.82),
-                    ...(Platform.OS === "web"
-                      ? ({ backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" } as any)
-                      : null),
+                    flexShrink: 1,
+                    width: isPhone ? Math.max(172, windowWidth - (isPageMode ? 154 : 140)) : undefined,
                   }}
+                  contentContainerStyle={{ flexGrow: 0 }}
                 >
-                  {isTablet && (
-                    <ViewModeToggle
-                      isPageMode={isPageMode}
-                      isDark={isDark}
-                      isRTL={isRTL}
-                      label={viewModeLabel}
-                      compact
-                      glass={false}
-                      onPress={toggleViewMode}
-                    />
-                  )}
-                  <Pressable
-                    onPress={handleGoHome}
-                    accessibilityRole="button"
-                    accessibilityLabel={s.tabHome}
-                    className="rounded-full px-2.5 py-2"
-                    style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+                  <View
+                    className={`rounded-full border border-white/15 ${isPhone && isPageMode ? "p-0.5" : "p-1"}`}
+                    style={{
+                      direction: isRTL ? "rtl" : "ltr",
+                      flexDirection: isRTL ? "row-reverse" : "row",
+                      gap: isPhone && isPageMode ? 1 : 2,
+                      backgroundColor: withThemeOpacity(themeSurface, 0.82),
+                      ...(Platform.OS === "web"
+                        ? ({ backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" } as any)
+                        : null),
+                    }}
                   >
-                    <Home size={16} color={isDark ? "#737373" : "#8B8178"} />
-                  </Pressable>
-                  <Pressable
-                    onPress={handleOpenBookmarks}
-                    accessibilityRole="button"
-                    className="rounded-full px-2.5 py-2"
-                    style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-                  >
-                    <BookMarked size={16} color={isDark ? "#737373" : "#8B8178"} />
-                  </Pressable>
-                  <Pressable
-                    onPress={handleOpenRecitation}
-                    accessibilityRole="button"
-                    accessibilityLabel={s.recitationToolbar}
-                    className={`rounded-full px-2.5 py-2 ${showRecitation ? "bg-primary-accent/15 dark:bg-primary-bright/15" : ""}`}
-                    style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-                  >
-                    <ListMusic size={16} color={showRecitation ? "#0d9488" : isDark ? "#737373" : "#8B8178"} />
-                  </Pressable>
-                  {viewMode === "verse" ? (
+                    {isTablet && (
+                      <ViewModeToggle
+                        isPageMode={isPageMode}
+                        isDark={isDark}
+                        isRTL={isRTL}
+                        label={viewModeLabel}
+                        compact
+                        glass={false}
+                        onPress={toggleViewMode}
+                        onPageMenuPress={handleOpenPageViewNavigation}
+                        pageMenuLabel={s.pageViewOptions}
+                      />
+                    )}
                     <Pressable
-                      onPress={() => setVerseHideMode((prev) => !prev)}
-                      className={`rounded-full px-2.5 py-2 ${verseHideMode ? "bg-primary-accent/15 dark:bg-primary-bright/15" : ""}`}
-                      style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-                    >
-                      {verseHideMode ? <EyeOff size={16} color="#0d9488" /> : <Eye size={16} color={isDark ? "#737373" : "#8B8178"} />}
-                    </Pressable>
-                  ) : (
-                    <Pressable
-                      onPress={toggleHifzMode}
-                      accessibilityLabel={s.hifzMode}
-                      className={`rounded-full px-2.5 py-2 ${hifzEnabled ? "bg-primary-accent/15 dark:bg-primary-bright/15" : ""}`}
-                      style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-                    >
-                      {hifzEnabled ? <EyeOff size={16} color="#0d9488" /> : <Eye size={16} color={isDark ? "#737373" : "#8B8178"} />}
-                    </Pressable>
-                  )}
-                  {canUseFocusMode && (
-                    <Pressable
-                      onPress={enterFocusMode}
+                      onPress={handleGoHome}
                       accessibilityRole="button"
-                      accessibilityLabel={s.enterFocusMode}
-                      className="rounded-full px-2.5 py-2"
+                      accessibilityLabel={s.tabHome}
+                      className={mobileToolbarIconClass}
                       style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
                     >
-                      <ScanLine size={16} color="#0d9488" />
+                      <Home size={16} color={isDark ? "#737373" : "#8B8178"} />
                     </Pressable>
-                  )}
-                  <Pressable
-                    onPress={handleOpenSearch}
-                    className="rounded-full px-2.5 py-2"
-                    style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-                  >
-                    <Search size={16} color={isDark ? "#737373" : "#8B8178"} />
-                  </Pressable>
-                </View>
+                    <Pressable
+                      onPress={handleOpenBookmarks}
+                      accessibilityRole="button"
+                      className={mobileToolbarIconClass}
+                      style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+                    >
+                      <BookMarked size={16} color={isDark ? "#737373" : "#8B8178"} />
+                    </Pressable>
+                    <Pressable
+                      onPress={handleOpenRecitation}
+                      accessibilityRole="button"
+                      accessibilityLabel={s.recitationToolbar}
+                      className={`${mobileToolbarIconClass} ${showRecitation ? "bg-primary-accent/15 dark:bg-primary-bright/15" : ""}`}
+                      style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+                    >
+                      <ListMusic size={16} color={showRecitation ? "#0d9488" : isDark ? "#737373" : "#8B8178"} />
+                    </Pressable>
+                    {viewMode === "verse" ? (
+                      <Pressable
+                        onPress={() => setVerseHideMode((prev) => !prev)}
+                        className={`${mobileToolbarIconClass} ${verseHideMode ? "bg-primary-accent/15 dark:bg-primary-bright/15" : ""}`}
+                        style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+                      >
+                        {verseHideMode ? <EyeOff size={16} color="#0d9488" /> : <Eye size={16} color={isDark ? "#737373" : "#8B8178"} />}
+                      </Pressable>
+                    ) : (
+                      <Pressable
+                        onPress={toggleHifzMode}
+                        accessibilityLabel={s.hifzMode}
+                        className={`${mobileToolbarIconClass} ${hifzEnabled ? "bg-primary-accent/15 dark:bg-primary-bright/15" : ""}`}
+                        style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+                      >
+                        {hifzEnabled ? <EyeOff size={16} color="#0d9488" /> : <Eye size={16} color={isDark ? "#737373" : "#8B8178"} />}
+                      </Pressable>
+                    )}
+                    {canUseFocusMode && (
+                      <Pressable
+                        onPress={enterFocusMode}
+                        accessibilityRole="button"
+                        accessibilityLabel={s.enterFocusMode}
+                        className={mobileToolbarIconClass}
+                        style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+                      >
+                        <ScanLine size={16} color="#0d9488" />
+                      </Pressable>
+                    )}
+                    <Pressable
+                      onPress={handleOpenSearch}
+                      className={mobileToolbarIconClass}
+                      style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+                    >
+                      <Search size={16} color={isDark ? "#737373" : "#8B8178"} />
+                    </Pressable>
+                    <Pressable
+                      onPress={handleOpenReadingSettings}
+                      accessibilityRole="button"
+                      accessibilityLabel={s.readingSettingsButton}
+                      className={`${mobileToolbarIconClass} ${showReadingSettings ? "bg-primary-accent/15 dark:bg-primary-bright/15" : ""}`}
+                      style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+                    >
+                      <SlidersHorizontal size={16} color={showReadingSettings ? "#0d9488" : isDark ? "#737373" : "#8B8178"} />
+                    </Pressable>
+                  </View>
+                </ScrollView>
               </View>
             </View>
           ) : (
@@ -1458,12 +1541,14 @@ function MushafInner() {
                   compact={isNarrow}
                   glass={false}
                   onPress={toggleViewMode}
+                  onPageMenuPress={handleOpenPageViewNavigation}
+                  pageMenuLabel={s.pageViewOptions}
                 />
                 <Pressable
                   onPress={handleGoHome}
                   accessibilityRole="button"
                   accessibilityLabel={s.tabHome}
-                  className={`rounded-full bg-surface-high dark:bg-surface-dark-high ${isNarrow ? "px-2 py-2" : "px-3 py-2"}`}
+                  className={desktopToolbarIconClass}
                   style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
                 >
                   <Home size={16} color={isDark ? "#737373" : "#8B8178"} />
@@ -1471,7 +1556,7 @@ function MushafInner() {
                 <Pressable
                   onPress={handleOpenBookmarks}
                   accessibilityRole="button"
-                  className={`rounded-full bg-surface-high dark:bg-surface-dark-high ${isNarrow ? "px-2 py-2" : "px-3 py-2"}`}
+                  className={desktopToolbarIconClass}
                   style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
                 >
                   <BookMarked size={16} color={isDark ? "#737373" : "#8B8178"} />
@@ -1480,10 +1565,10 @@ function MushafInner() {
                   onPress={handleOpenRecitation}
                   accessibilityRole="button"
                   accessibilityLabel={s.recitationToolbar}
-                  className={`rounded-full ${isNarrow ? "px-2 py-2" : "px-3 py-2"} ${
+                  className={`${desktopToolbarIconClass} ${
                     showRecitation
                       ? "bg-primary-accent/15 dark:bg-primary-bright/15"
-                      : "bg-surface-high dark:bg-surface-dark-high"
+                      : ""
                   }`}
                   style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
                 >
@@ -1492,10 +1577,10 @@ function MushafInner() {
                 {viewMode === "verse" ? (
                   <Pressable
                     onPress={() => setVerseHideMode((prev) => !prev)}
-                    className={`rounded-full ${isNarrow ? "px-2 py-2" : "px-3 py-2"} ${
+                    className={`${desktopToolbarIconClass} ${
                       verseHideMode
                         ? "bg-primary-accent/15 dark:bg-primary-bright/15"
-                        : "bg-surface-high dark:bg-surface-dark-high"
+                        : ""
                     }`}
                     style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
                   >
@@ -1505,10 +1590,10 @@ function MushafInner() {
                   <Pressable
                     onPress={toggleHifzMode}
                     accessibilityLabel={s.hifzMode}
-                    className={`rounded-full ${isNarrow ? "px-2 py-2" : "px-3 py-2"} ${
+                    className={`${desktopToolbarIconClass} ${
                       hifzEnabled
                         ? "bg-primary-accent/15 dark:bg-primary-bright/15"
-                        : "bg-surface-high dark:bg-surface-dark-high"
+                        : ""
                     }`}
                     style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
                   >
@@ -1520,7 +1605,7 @@ function MushafInner() {
                     onPress={enterFocusMode}
                     accessibilityRole="button"
                     accessibilityLabel={s.enterFocusMode}
-                    className={`rounded-full bg-surface-high dark:bg-surface-dark-high ${isNarrow ? "px-2 py-2" : "px-3 py-2"}`}
+                    className={desktopToolbarIconClass}
                     style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
                   >
                     <ScanLine size={16} color="#0d9488" />
@@ -1528,14 +1613,20 @@ function MushafInner() {
                 )}
                 <Pressable
                   onPress={handleOpenSearch}
-                  className={`rounded-full bg-surface-high dark:bg-surface-dark-high ${isNarrow ? "px-2 py-2" : "px-3 py-2"}`}
+                  className={desktopToolbarIconClass}
                   style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
                 >
                   <Search size={16} color={isDark ? "#737373" : "#8B8178"} />
                 </Pressable>
-                {!isNarrow && !pageFontSizeLocked && (
-                  <FontSizeControl onChangeStart={keepChromeVisibleDuringFontChange} />
-                )}
+                <Pressable
+                  onPress={handleOpenReadingSettings}
+                  accessibilityRole="button"
+                  accessibilityLabel={s.readingSettingsButton}
+                  className={`${desktopToolbarIconClass} ${showReadingSettings ? "bg-primary-accent/15 dark:bg-primary-bright/15" : ""}`}
+                  style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+                >
+                  <SlidersHorizontal size={16} color={showReadingSettings ? "#0d9488" : isDark ? "#737373" : "#8B8178"} />
+                </Pressable>
               </View>
               <View />
             </View>
@@ -1690,6 +1781,20 @@ function MushafInner() {
           visible={showRecitation}
           onClose={() => setShowRecitation(false)}
           currentAyah={topAyah}
+        />
+
+        <ReadingSettingsSheet
+          visible={showReadingSettings}
+          fontSizeLocked={pageFontSizeLocked}
+          onClose={() => setShowReadingSettings(false)}
+          onFontSizeChangeStart={keepChromeVisibleDuringFontChange}
+        />
+
+        <PageViewNavigationSheet
+          visible={showPageViewNavigation && isPageMode}
+          currentPage={currentPage}
+          onClose={() => setShowPageViewNavigation(false)}
+          onOpenGoTo={handleOpenNavigator}
         />
 
         {/* Floating word tooltip (portal-based, web only) */}

@@ -136,6 +136,8 @@ type SettingsContextType = {
   setQuranFontStyle: (style: QuranFontStyle) => void;
   quranMarkerStyle: QuranMarkerStyle;
   setQuranMarkerStyle: (style: QuranMarkerStyle) => void;
+  showAyahMarkers: boolean;
+  setShowAyahMarkers: (show: boolean) => void;
   pageScroll: PageScroll;
   setPageScroll: (scroll: PageScroll) => void;
   showTranslation: boolean;
@@ -186,6 +188,8 @@ const SettingsContext = createContext<SettingsContextType>({
   setQuranFontStyle: () => {},
   quranMarkerStyle: "auto",
   setQuranMarkerStyle: () => {},
+  showAyahMarkers: true,
+  setShowAyahMarkers: () => {},
   pageScroll: "vertical",
   setPageScroll: () => {},
   showTranslation: false,
@@ -557,6 +561,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [viewMode, setViewModeState] = useState<ViewMode>("verse");
   const [quranFontStyle, setQuranFontStyleState] = useState<QuranFontStyle>("qcf2");
   const [quranMarkerStyle, setQuranMarkerStyleState] = useState<QuranMarkerStyle>("auto");
+  const [showAyahMarkers, setShowAyahMarkersState] = useState(true);
   const effectiveFontIndex = fontSizeIndex;
   const [pageScroll, setPageScrollState] = useState<PageScroll>("vertical");
   const [showTranslation, setShowTranslationState] = useState(false);
@@ -585,6 +590,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           "view_mode",
           "quran_font_style",
           "quran_marker_style",
+          "show_ayah_markers",
           "page_scroll",
           "show_translation",
           "show_tafseer",
@@ -653,6 +659,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         const savedQuranMarkerStyle = normalizeQuranMarkerStyle(saved.quran_marker_style);
         if (savedQuranMarkerStyle) {
           setQuranMarkerStyleState(savedQuranMarkerStyle);
+        }
+
+        const savedShowAyahMarkers = saved.show_ayah_markers;
+        if (savedShowAyahMarkers === "false") {
+          setShowAyahMarkersState(false);
+        } else if (savedShowAyahMarkers === "true") {
+          setShowAyahMarkersState(true);
         }
 
         const savedPageScroll = saved.page_scroll;
@@ -873,6 +886,14 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     [db]
   );
 
+  const setShowAyahMarkers = useCallback(
+    (show: boolean) => {
+      setShowAyahMarkersState(show);
+      writeSetting(db, "show_ayah_markers", String(show)).catch(console.warn);
+    },
+    [db]
+  );
+
   const setPageScroll = useCallback(
     (scroll: PageScroll) => {
       setPageScrollState(scroll);
@@ -1014,6 +1035,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         setQuranFontStyle,
         quranMarkerStyle,
         setQuranMarkerStyle,
+        showAyahMarkers,
+        setShowAyahMarkers,
         pageScroll,
         setPageScroll,
         showTranslation,

@@ -205,7 +205,7 @@ function MushafPageInner({
   const [surahNameFontReady, setSurahNameFontReady] = useState(() => isSurahNameFontLoaded());
   const [wordsLoaded, setWordsLoaded] = useState(!!pageWordsData);
   const { getHighlightColor, getWordHighlightColor, selectAyah } = useSelection();
-  const { quranFontStyle, quranMarkerStyle, effectiveTheme } = useSettings();
+  const { quranFontStyle, quranMarkerStyle, showAyahMarkers, effectiveTheme } = useSettings();
   const lastMarkerTapRef = useRef<{ key: string; at: number } | null>(null);
   const skipNextMarkerPressRef = useRef<string | null>(null);
 
@@ -494,6 +494,7 @@ function MushafPageInner({
             }
             // Ayah end marker — opens ayah details modal
             if (identity && identity.isMarker) {
+              if (!showAyahMarkers) return null;
               const isTargetAyah =
                 !highlightedWord &&
                 highlightedAyahKey === `${identity.surah}:${identity.ayah}`;
