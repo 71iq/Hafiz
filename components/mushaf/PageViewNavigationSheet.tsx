@@ -25,8 +25,8 @@ export function PageViewNavigationSheet({
   const s = useStrings();
   const { height, width: viewportWidth } = useWindowDimensions();
   const { isDark, isRTL, pageScroll, setPageScroll, themeColors } = useSettings();
-  const menuWidth = Math.min(196, viewportWidth - 24);
-  const menuHeight = 104;
+  const menuWidth = Math.min(Math.max(anchor?.width ?? 132, 148), viewportWidth - 24);
+  const menuHeight = 108;
   const borderColor = isDark ? "rgba(255,255,255,0.08)" : "rgba(95,78,64,0.12)";
 
   const menuPosition = useMemo(() => {
@@ -36,7 +36,7 @@ export function PageViewNavigationSheet({
         top: 72,
       };
     }
-    const requestedLeft = isRTL ? anchor.x : anchor.x + anchor.width - menuWidth;
+    const requestedLeft = isRTL ? anchor.x + anchor.width - menuWidth : anchor.x;
     const left = Math.min(Math.max(requestedLeft, 12), viewportWidth - menuWidth - 12);
     const belowTop = anchor.y + anchor.height + 8;
     const aboveTop = anchor.y - menuHeight - 8;
@@ -63,15 +63,17 @@ export function PageViewNavigationSheet({
       <View className="flex-1">
         <Pressable className="absolute inset-0" onPress={onClose} />
         <View
-          className="absolute overflow-hidden rounded-2xl border py-1.5 shadow-2xl"
+          accessibilityRole="menu"
+          className="absolute overflow-hidden rounded-2xl border shadow-2xl"
           style={{
             backgroundColor: themeColors.surface,
             borderColor,
             left: menuPosition.left,
             top: menuPosition.top,
             width: menuWidth,
+            padding: 6,
             ...(Platform.OS === "web"
-              ? ({ boxShadow: "0 18px 44px rgba(15, 23, 42, 0.16)" } as any)
+              ? ({ boxShadow: "0 12px 28px rgba(15, 23, 42, 0.14)" } as any)
               : null),
           }}
         >
@@ -86,22 +88,32 @@ export function PageViewNavigationSheet({
                 accessibilityLabel={item.label}
                 accessibilityState={{ selected: active }}
                 onPress={() => selectPageScroll(item.value)}
-                className="min-h-11 items-center gap-3 px-3.5"
                 style={({ pressed }) => ({
-                  backgroundColor: active || pressed ? themeColors.surfaceLow : "transparent",
                   direction: "ltr",
+                  display: "flex",
                   flexDirection: isRTL ? "row-reverse" : "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  minHeight: 46,
+                  paddingHorizontal: 10,
+                  borderRadius: 12,
+                  backgroundColor: active || pressed ? themeColors.surfaceLow : "transparent",
                 })}
               >
-                <View className="h-5 w-5 items-center justify-center">
+                <View
+                  className="h-5 w-5 items-center justify-center"
+                  style={isRTL ? { marginLeft: 8 } : { marginRight: 8 }}
+                >
                   <Icon size={17} color={color} />
                 </View>
                 <Text
-                  className="min-w-0 flex-1"
                   style={{
+                    flex: 1,
+                    minWidth: 0,
                     color,
                     fontFamily: "Manrope_600SemiBold",
                     fontSize: 13,
+                    lineHeight: 18,
                     textAlign: isRTL ? "right" : "left",
                     writingDirection: isRTL ? "rtl" : "ltr",
                   }}

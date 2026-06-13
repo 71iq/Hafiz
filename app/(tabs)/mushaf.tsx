@@ -141,7 +141,7 @@ function ViewModeToggle({
 }) {
   const Icon = isPageMode ? BookOpen : AlignJustify;
   const { themeSurface } = useSettings();
-  const pageMenuTriggerRef = useRef<any>(null);
+  const pageMenuAnchorRef = useRef<any>(null);
   const showPageMenu = isPageMode && !!onPageMenuPress;
   const mutedIconColor = isDark ? "#737373" : "#8B8178";
   const dividerColor = glass
@@ -152,6 +152,8 @@ function ViewModeToggle({
 
   return (
     <View
+      ref={pageMenuAnchorRef}
+      collapsable={false}
       className={`rounded-full ${compact ? "px-3 py-2" : "px-3.5 py-2"} ${
         glass ? "" : "bg-surface-high dark:bg-surface-dark-high"
       }`}
@@ -206,10 +208,8 @@ function ViewModeToggle({
       </Pressable>
       {showPageMenu && (
         <Pressable
-          ref={pageMenuTriggerRef}
-          collapsable={false}
           onPress={() => {
-            const trigger = pageMenuTriggerRef.current;
+            const trigger = pageMenuAnchorRef.current;
             if (trigger?.measureInWindow) {
               trigger.measureInWindow((x: number, y: number, width: number, height: number) => {
                 onPageMenuPress({ x, y, width, height });

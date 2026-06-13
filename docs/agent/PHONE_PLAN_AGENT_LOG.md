@@ -2241,3 +2241,22 @@ Saved in `phase19/`:
 - Screenshots:
   - `/tmp/hafiz-reading-settings-mobile-rebased-smoke.png`
   - `/tmp/hafiz-reading-settings-desktop-rebased-smoke.png`
+
+## 2026-06-13 — Page View Dropdown Compact Popover Fix
+
+### Scope decisions
+1. Scoped this pass to the Page View navigation dropdown only.
+2. Kept toolbar structure and verse/page mode switching behavior unchanged.
+3. Required Playwright screenshot and bounding-box verification for the dropdown before reporting done.
+
+### Implemented in this step
+- Anchored the dropdown to the full Page View pill instead of the chevron sub-button.
+- Sized the dropdown close to the pill width with compact padding and existing Hafiz surface/border/shadow styling.
+- Made Scroll and Swipe options explicit horizontal rows with icon, label, and selected checkmark on the same row, mirrored for RTL.
+
+### Validation result
+- `npm run typecheck`: passed.
+- `npm run build:web`: passed.
+- Playwright LTR mobile (`390x844`, built `dist` served on localhost): passed. Menu `148x106`, rows `46px` each, no horizontal overflow, menu start aligned with the Page View pill, Swipe selected with same-row checkmark. Screenshot: `/tmp/hafiz-page-view-dropdown-mobile.png`.
+- Playwright RTL mobile (`390x844`, Arabic UI): passed. Menu `154.22x106`, rows `46px` each, no horizontal overflow, mirrored right-edge alignment, selected Swipe row has checkmark at visual end and icon at visual start. Screenshot: `/tmp/hafiz-page-view-dropdown-rtl.png`.
+- Expo dev server fallback was attempted for interactive verification but hit Metro OOM; verification used the built web output instead.
