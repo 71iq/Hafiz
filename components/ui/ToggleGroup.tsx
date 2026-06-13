@@ -19,6 +19,7 @@ export function ToggleGroup<T extends string>({
   items,
   dir: explicitDir,
   className,
+  style,
   ...props
 }: ToggleGroupProps<T>) {
   const dir = useUIDirection(explicitDir);
@@ -29,6 +30,7 @@ export function ToggleGroup<T extends string>({
         dir === "rtl" && "flex-row-reverse",
         className
       )}
+      style={[style, { flexDirection: dir === "rtl" ? "row-reverse" : "row" }]}
       {...props}
     >
       {items.map((item) => {

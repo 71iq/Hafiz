@@ -1040,7 +1040,8 @@ export default function SettingsScreen() {
           className="pt-8 pb-5"
           style={{
             alignItems: isLaptop ? "center" : "stretch",
-            flexDirection: isLaptop ? (isRTL ? "row-reverse" : "row") : "column",
+            direction: isRTL ? "rtl" : "ltr",
+            flexDirection: isLaptop ? "row" : "column",
             gap: 18,
             justifyContent: "space-between",
           }}
