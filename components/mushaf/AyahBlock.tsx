@@ -426,6 +426,16 @@ function AyahBlockInner({
       <View className="pt-3">
         <View className={isRTL ? "mt-1 flex-row-reverse flex-wrap gap-2" : "mt-1 flex-row flex-wrap gap-2"}>
           <ActionPill
+            label={s.tafseer}
+            icon={<BookOpenText size={14} color={iconColor} />}
+            onPress={() => openDetail("tafsir")}
+          />
+          <ActionPill
+            label={s.wordTranslation}
+            icon={<BookOpenText size={14} color={iconColor} />}
+            onPress={() => openDetail("translation")}
+          />
+          <ActionPill
             label={s.ayahTabHadith}
             icon={<BookOpenText size={14} color={iconColor} />}
             onPress={() => openDetail("hadith")}
