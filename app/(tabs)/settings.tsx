@@ -779,115 +779,42 @@ export default function SettingsScreen() {
         <>
           <SectionLabel>{s.sectionInlineContent}</SectionLabel>
           <Card elevation="low" className="p-5 mb-8">
-            <Pressable
-              onPress={() => setPickerVisible(true)}
-              className="items-center justify-between gap-3"
-              style={{
-                direction: isRTL ? "rtl" : "ltr",
-                flexDirection: "row",
-              }}
-            >
-              <View className="flex-1">
-                <Text
-                  className="text-charcoal dark:text-neutral-300"
-                  style={{ fontFamily: "Manrope_500Medium", fontSize: 14, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
-                >
-                  {s.translationLanguageLabel}
-                </Text>
-                <Text
-                  className="text-warm-400 dark:text-neutral-500 mt-0.5"
-                  style={{
-                    fontFamily: "Manrope_400Regular",
-                    fontSize: 12,
-                    textAlign: isRTL ? "right" : "left",
-                    writingDirection: isRTL ? "rtl" : "ltr",
-                  }}
-                >
-                  {currentLang?.nameEnglish ?? "English"}
-                </Text>
-              </View>
-              {isTranslationLoading ? (
-                <ActivityIndicator size="small" color="#0d9488" />
-              ) : (
-                <TranslationChevron size={18} color={isDark ? "#525252" : "#DFD9D1"} />
-              )}
-            </Pressable>
-
-            <View className="h-4" />
-
-            <Pressable
-              onPress={() => setTafseerPickerVisible(true)}
-              className="flex-row items-center justify-between gap-3 rounded-3xl bg-surface dark:bg-surface-dark px-4 py-4"
-              style={({ pressed }) => ({
-                direction: isRTL ? "rtl" : "ltr",
-                opacity: pressed ? 0.78 : 1,
-              })}
-            >
-              <View className="min-w-0 flex-1">
-                <Text
-                  className="text-charcoal dark:text-neutral-200"
-                  style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
-                >
-                  {s.tafseerSourceLabel}
-                </Text>
-                <Text
-                  className="mt-0.5 text-warm-400 dark:text-neutral-500"
-                  numberOfLines={2}
-                  style={{
-                    fontFamily: "Manrope_400Regular",
-                    fontSize: 12,
-                    textAlign: isRTL ? "right" : "left",
-                    writingDirection: isRTL ? "rtl" : "ltr",
-                  }}
-                >
-                  {currentTafseerTitle}
-                </Text>
-              </View>
-              {importingTafseerSource ? (
-                <ActivityIndicator size="small" color={isDark ? "#2dd4bf" : "#0d9488"} />
-              ) : (
-                <ChevronDown size={18} color={isDark ? "#525252" : "#DFD9D1"} />
-              )}
-            </Pressable>
+            <SettingsSubsectionLabel isRTL={isRTL}>{s.readingContentSettingsLabel}</SettingsSubsectionLabel>
+            <View className="gap-3">
+              <SettingsPickerRow
+                label={s.translationLanguageLabel}
+                value={currentLang?.nameEnglish ?? "English"}
+                isRTL={isRTL}
+                trailing={isTranslationLoading ? (
+                  <ActivityIndicator size="small" color={isDark ? "#2dd4bf" : "#0d9488"} />
+                ) : (
+                  <TranslationChevron size={18} color={isDark ? "#525252" : "#DFD9D1"} />
+                )}
+                onPress={() => setPickerVisible(true)}
+              />
+              <SettingsPickerRow
+                label={s.tafseerSourceLabel}
+                value={currentTafseerTitle}
+                isRTL={isRTL}
+                trailing={importingTafseerSource ? (
+                  <ActivityIndicator size="small" color={isDark ? "#2dd4bf" : "#0d9488"} />
+                ) : (
+                  <ChevronDown size={18} color={isDark ? "#525252" : "#DFD9D1"} />
+                )}
+                onPress={() => setTafseerPickerVisible(true)}
+              />
+            </View>
 
             <View className="h-5" />
 
-            <Text
-              className="text-charcoal dark:text-neutral-300 mb-3"
-              style={{ fontFamily: "Manrope_500Medium", fontSize: 14, textAlign: isRTL ? "right" : "left" }}
-            >
-              {s.recitationSettingsLabel}
-            </Text>
-            <Pressable
+            <SettingsSubsectionLabel isRTL={isRTL}>{s.recitationSettingsLabel}</SettingsSubsectionLabel>
+            <SettingsPickerRow
+              label={s.recitationFavoriteReciter}
+              value={formatReciterLabel(currentReciter, uiLanguage)}
+              isRTL={isRTL}
+              trailing={<TranslationChevron size={18} color={isDark ? "#525252" : "#DFD9D1"} />}
               onPress={() => setReciterPickerVisible(true)}
-              className="items-center justify-between gap-3 rounded-3xl bg-surface dark:bg-surface-dark px-4 py-4"
-              style={{
-                direction: isRTL ? "rtl" : "ltr",
-                flexDirection: "row",
-              }}
-            >
-              <View className="min-w-0 flex-1">
-                <Text
-                  className="text-charcoal dark:text-neutral-200"
-                  style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
-                >
-                  {s.recitationFavoriteReciter}
-                </Text>
-                <Text
-                  className="mt-0.5 text-warm-400 dark:text-neutral-500"
-                  numberOfLines={2}
-                  style={{
-                    fontFamily: "Manrope_400Regular",
-                    fontSize: 12,
-                    textAlign: isRTL ? "right" : "left",
-                    writingDirection: isRTL ? "rtl" : "ltr",
-                  }}
-                >
-                  {formatReciterLabel(currentReciter, uiLanguage)}
-                </Text>
-              </View>
-              <TranslationChevron size={18} color={isDark ? "#525252" : "#DFD9D1"} />
-            </Pressable>
+            />
           </Card>
         </>
       )}
@@ -1495,6 +1422,75 @@ function SettingsControlRow({
         {children}
       </View>
     </View>
+  );
+}
+
+function SettingsSubsectionLabel({ children, isRTL }: { children: string; isRTL: boolean }) {
+  return (
+    <Text
+      className="mb-3 text-charcoal dark:text-neutral-300"
+      style={{
+        fontFamily: "Manrope_600SemiBold",
+        fontSize: 14,
+        textAlign: isRTL ? "right" : "left",
+        writingDirection: isRTL ? "rtl" : "ltr",
+      }}
+    >
+      {children}
+    </Text>
+  );
+}
+
+function SettingsPickerRow({
+  label,
+  value,
+  isRTL,
+  trailing,
+  onPress,
+}: {
+  label: string;
+  value: string;
+  isRTL: boolean;
+  trailing: ReactNode;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      className="items-center justify-between gap-3 rounded-3xl bg-surface dark:bg-surface-dark px-4 py-4"
+      style={({ pressed }) => ({
+        direction: isRTL ? "rtl" : "ltr",
+        flexDirection: "row",
+        opacity: pressed ? 0.78 : 1,
+      })}
+    >
+      <View className="min-w-0 flex-1">
+        <Text
+          className="text-charcoal dark:text-neutral-200"
+          style={{
+            fontFamily: "Manrope_600SemiBold",
+            fontSize: 14,
+            textAlign: isRTL ? "right" : "left",
+            writingDirection: isRTL ? "rtl" : "ltr",
+          }}
+        >
+          {label}
+        </Text>
+        <Text
+          className="mt-0.5 text-warm-400 dark:text-neutral-500"
+          numberOfLines={2}
+          style={{
+            fontFamily: "Manrope_400Regular",
+            fontSize: 12,
+            textAlign: isRTL ? "right" : "left",
+            writingDirection: isRTL ? "rtl" : "ltr",
+          }}
+        >
+          {value}
+        </Text>
+      </View>
+      {trailing}
+    </Pressable>
   );
 }
 

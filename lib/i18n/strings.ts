@@ -53,6 +53,7 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     pageScrollHorizontal: "Swipe",
     showTranslationLabel: "Always Show Translation",
     showTafseerLabel: "Always Show Tafsir",
+    readingContentSettingsLabel: "Reading Content",
     translationLanguageLabel: "Translation Language",
     appLanguageLabel: "App Language",
     // Mushaf header
@@ -968,6 +969,7 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     pageScrollHorizontal: "تمرير أفقي",
     showTranslationLabel: "عرض الترجمة دائمًا",
     showTafseerLabel: "عرض التفسير دائمًا",
+    readingContentSettingsLabel: "محتوى القراءة",
     translationLanguageLabel: "لغة الترجمة",
     appLanguageLabel: "لغة التطبيق",
     goTo: "انتقال",
