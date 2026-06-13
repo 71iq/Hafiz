@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { ActivityIndicator, Platform, Pressable, Text, TextInput, View, useWindowDimensions } from "react-native";
-import { ListMusic, Minus, Play, Plus, Repeat2, Square, Timer } from "lucide-react-native";
+import { ChevronLeft, ChevronRight, ListMusic, Minus, Play, Plus, Repeat2, Square, Timer } from "lucide-react-native";
 import { ToggleGroup } from "@/components/ui/ToggleGroup";
 import { OverlayBody, OverlayFooter, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
+import { ReciterPicker } from "@/components/settings/ReciterPicker";
 import { useAyahAudio, type AyahAudioTarget, type RangeAudioState } from "@/lib/audio/ayah-audio";
 import { useDatabase } from "@/lib/database/provider";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -29,7 +30,7 @@ export function RecitationRangeSheet({ visible, onClose, currentAyah }: Props) {
   const db = useDatabase();
   const s = useStrings();
   const { width, height } = useWindowDimensions();
-  const { recitationId, uiLanguage, isDark, isRTL } = useSettings();
+  const { recitationId, setRecitationId, uiLanguage, isDark, isRTL } = useSettings();
   const { playRange, rangeState, stop } = useAyahAudio();
   const [mode, setMode] = useState<RecitationMode>("single");
   const [singleRef, setSingleRef] = useState("1:1");
@@ -40,8 +41,10 @@ export function RecitationRangeSheet({ visible, onClose, currentAyah }: Props) {
   const [delaySeconds, setDelaySeconds] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
+  const [reciterPickerVisible, setReciterPickerVisible] = useState(false);
 
   const isPhone = width < SIDEBAR_BREAKPOINT;
+  const DisclosureChevron = isRTL ? ChevronLeft : ChevronRight;
   const maxHeight = Math.min(height - (isPhone ? 12 : 48), isPhone ? height * 0.94 : 760);
   const current = currentAyah ?? { surah: 1, ayah: 1 };
   const reciter = getReciterById(recitationId);
@@ -144,23 +147,33 @@ export function RecitationRangeSheet({ visible, onClose, currentAyah }: Props) {
   const primaryLabel = rangeState.active ? s.recitationStop : s.recitationStart;
 
   return (
-    <ResponsiveSheet
-      open={visible}
-      onClose={onClose}
-      dismissOnBackdrop
-      maxWidth={620}
-      maxHeight={maxHeight}
-    >
-      <OverlayHeader
-        title={s.recitationSheetTitle}
-        subtitle={s.recitationSheetSubtitle}
-        isRTL={isRTL}
+    <>
+      <ResponsiveSheet
+        open={visible}
         onClose={onClose}
-        showHandle={isPhone}
-      />
+        dismissOnBackdrop
+        maxWidth={620}
+        maxHeight={maxHeight}
+      >
+        <OverlayHeader
+          title={s.recitationSheetTitle}
+          subtitle={s.recitationSheetSubtitle}
+          isRTL={isRTL}
+          onClose={onClose}
+          showHandle={isPhone}
+        />
 
       <OverlayBody contentContainerClassName="px-5 pt-4 pb-5">
-        <View className="rounded-3xl bg-surface-low dark:bg-surface-dark-low p-4">
+        <Pressable
+          onPress={() => setReciterPickerVisible(true)}
+          accessibilityRole="button"
+          accessibilityLabel={s.recitationReciterPickerTitle}
+          className="rounded-3xl bg-surface-low dark:bg-surface-dark-low p-4"
+          style={({ pressed }) => ({
+            opacity: pressed ? 0.78 : 1,
+            transform: [{ scale: pressed ? 0.99 : 1 }],
+          })}
+        >
           <View className={isRTL ? "flex-row-reverse items-center gap-3" : "flex-row items-center gap-3"}>
             <View className="h-11 w-11 items-center justify-center rounded-full bg-primary-accent/10 dark:bg-primary-bright/10">
               <ListMusic size={19} color={isDark ? "#2dd4bf" : "#0d9488"} />
@@ -186,8 +199,11 @@ export function RecitationRangeSheet({ visible, onClose, currentAyah }: Props) {
                 {reciterLabel}
               </Text>
             </View>
+            <View className="h-9 w-9 items-center justify-center rounded-full bg-surface dark:bg-surface-dark">
+              <DisclosureChevron size={18} color={isDark ? "#737373" : "#8B8178"} />
+            </View>
           </View>
-        </View>
+        </Pressable>
 
         <View className="mt-4">
           <ToggleGroup<RecitationMode>
@@ -339,7 +355,14 @@ export function RecitationRangeSheet({ visible, onClose, currentAyah }: Props) {
           </View>
         </Pressable>
       </OverlayFooter>
-    </ResponsiveSheet>
+      </ResponsiveSheet>
+      <ReciterPicker
+        visible={reciterPickerVisible}
+        selectedId={recitationId}
+        onSelect={setRecitationId}
+        onClose={() => setReciterPickerVisible(false)}
+      />
+    </>
   );
 }
 
