@@ -118,6 +118,20 @@ export async function fetchWordText(
   return words[wordPos - 1] ?? null;
 }
 
+export async function fetchWordQcf2Glyph(
+  db: SQLiteDatabase,
+  surah: number,
+  ayah: number,
+  wordPos: number,
+): Promise<string | null> {
+  const row = await db.getFirstAsync<{ text_qcf2: string | null }>(
+    "SELECT text_qcf2 FROM quran_text WHERE surah = ? AND ayah = ?",
+    [surah, ayah],
+  );
+  const tokens = row?.text_qcf2?.split(/\s+/).filter(Boolean) ?? [];
+  return tokens[wordPos - 1] ?? null;
+}
+
 export async function fetchRootOccurrences(
   db: SQLiteDatabase,
   root: string,

@@ -7,18 +7,26 @@ import { useStrings } from "@/lib/i18n/useStrings";
 import { useDatabase } from "@/lib/database/provider";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
+import {
+  isQuranPageFontLoaded,
+  loadQuranPageFont,
+  quranPageFontName,
+  quranPageFontPaletteStyle,
+} from "@/lib/fonts/loader";
 import { MeaningTab } from "./word-tabs/MeaningTab";
 import { IrabTab } from "./word-tabs/IrabTab";
 import { TasreefTab } from "./word-tabs/TasreefTab";
 import { TajweedTab } from "./word-tabs/TajweedTab";
 import { OccurrencesTab } from "./word-tabs/OccurrencesTab";
 import { AyahDetailModal } from "./AyahDetailModal";
-import { fetchWordRoot, fetchWordText, fetchWordTranslation } from "@/lib/word/queries";
+import { fetchWordQcf2Glyph, fetchWordRoot, fetchWordText, fetchWordTranslation } from "@/lib/word/queries";
 
 type TabKey = "meaning" | "irab" | "tajweed" | "tasreef" | "occurrences";
+const WORD_HEADER_FONT_STYLE = "v4-tajweed";
 
 type WordHeaderMeta = {
   wordText: string | null;
+  qcf2Glyph: string | null;
   root: string | null;
   lemma: string | null;
   rootCount: number | null;
@@ -38,8 +46,10 @@ export function WordDetailSheet() {
     previous: null,
     next: null,
   });
+  const [wordHeaderFontReady, setWordHeaderFontReady] = useState(false);
   const [headerMeta, setHeaderMeta] = useState<WordHeaderMeta>({
     wordText: null,
+    qcf2Glyph: null,
     root: null,
     lemma: null,
     rootCount: null,
@@ -50,6 +60,10 @@ export function WordDetailSheet() {
 
   const isPhone = width < SIDEBAR_BREAKPOINT;
   const maxModalHeight = Math.min(height - (isPhone ? 12 : 48), isPhone ? height * 0.94 : 720);
+  const headerFontFamily = detailWord ? quranPageFontName(WORD_HEADER_FONT_STYLE, detailWord.v2Page) : undefined;
+  const headerFontPaletteStyle = detailWord
+    ? quranPageFontPaletteStyle(WORD_HEADER_FONT_STYLE, detailWord.v2Page, effectiveTheme)
+    : null;
 
   const tabs = useMemo(
     () => [
@@ -78,13 +92,14 @@ export function WordDetailSheet() {
   useEffect(() => {
     if (!detailWord) return;
     let cancelled = false;
-    setHeaderMeta({ wordText: null, root: null, lemma: null, rootCount: null, translationEn: null });
+    setHeaderMeta({ wordText: null, qcf2Glyph: null, root: null, lemma: null, rootCount: null, translationEn: null });
     Promise.all([
       fetchWordText(db, detailWord.surah, detailWord.ayah, detailWord.wordPos),
+      fetchWordQcf2Glyph(db, detailWord.surah, detailWord.ayah, detailWord.wordPos),
       fetchWordRoot(db, detailWord.surah, detailWord.ayah, detailWord.wordPos),
       fetchWordTranslation(db, detailWord.surah, detailWord.ayah, detailWord.wordPos),
     ])
-      .then(async ([wordText, rootMeta, wordTranslation]) => {
+      .then(async ([wordText, qcf2Glyph, rootMeta, wordTranslation]) => {
         if (cancelled) return;
         let rootCount: number | null = null;
         if (rootMeta?.root) {
@@ -97,6 +112,7 @@ export function WordDetailSheet() {
         if (cancelled) return;
         setHeaderMeta({
           wordText,
+          qcf2Glyph,
           root: rootMeta?.root ?? null,
           lemma: rootMeta?.lemma ?? null,
           rootCount,
@@ -105,13 +121,34 @@ export function WordDetailSheet() {
       })
       .catch(() => {
         if (!cancelled) {
-          setHeaderMeta({ wordText: null, root: null, lemma: null, rootCount: null, translationEn: null });
+          setHeaderMeta({ wordText: null, qcf2Glyph: null, root: null, lemma: null, rootCount: null, translationEn: null });
         }
       });
     return () => {
       cancelled = true;
     };
   }, [db, detailWord?.surah, detailWord?.ayah, detailWord?.wordPos]);
+
+  useEffect(() => {
+    if (!detailWord) {
+      setWordHeaderFontReady(false);
+      return;
+    }
+    setWordHeaderFontReady(false);
+    if (isQuranPageFontLoaded(WORD_HEADER_FONT_STYLE, detailWord.v2Page)) {
+      requestAnimationFrame(() => setWordHeaderFontReady(true));
+      return;
+    }
+    let cancelled = false;
+    loadQuranPageFont(WORD_HEADER_FONT_STYLE, detailWord.v2Page)
+      .then(() => {
+        if (!cancelled) requestAnimationFrame(() => setWordHeaderFontReady(true));
+      })
+      .catch(console.warn);
+    return () => {
+      cancelled = true;
+    };
+  }, [detailWord?.v2Page]);
 
   useEffect(() => {
     if (!detailWord) {
@@ -232,9 +269,16 @@ export function WordDetailSheet() {
           <View className={`px-4 py-3 flex-shrink-0 ${isRTL ? "items-end" : "items-start"}`}>
             <Text
               className="text-charcoal dark:text-neutral-100"
-              style={{ fontFamily: "NotoSerif_700Bold", fontSize: 27, writingDirection: "rtl" }}
+              style={{
+                fontFamily: headerFontFamily,
+                ...headerFontPaletteStyle,
+                fontSize: 38,
+                lineHeight: 58,
+                opacity: wordHeaderFontReady ? 1 : 0,
+                writingDirection: "ltr",
+              }}
             >
-              {headerMeta.wordText?.trim() ? headerMeta.wordText : "—"}
+              {headerMeta.qcf2Glyph?.trim() || headerMeta.wordText?.trim() || "—"}
             </Text>
             {!isArabicMode && !!headerMeta.translationEn && (
               <Text
