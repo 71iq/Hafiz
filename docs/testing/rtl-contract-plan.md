@@ -389,12 +389,12 @@ Promote checks from report-only to blocking only after they are stable across lo
 
 ### Phase 2: Primitive RNTL Contracts
 
-- [ ] Add `tests/rtl/rtl-test-utils.tsx`.
-- [ ] Add `tests/unit/rtl-component-contracts.test.tsx`.
-- [ ] Start with `Text`, `Button`, `Field`, `FormTextField`, `Input`, and `ToggleGroup`.
-- [ ] Add only the required mocks to `tests/jest/setup.ts`.
-- [ ] Record discovered implementation gaps instead of overfitting tests.
-- [ ] Run `npm run typecheck` and `npm run test:unit`.
+- [x] Add `tests/rtl/rtl-test-utils.tsx`.
+- [x] Add `tests/unit/rtl-component-contracts.test.tsx`.
+- [x] Start with `Text`, `Button`, `Field`, `FormTextField`, `Input`, and `ToggleGroup`.
+- [x] Add only the required mocks to `tests/jest/setup.ts`.
+- [x] Record discovered implementation gaps instead of overfitting tests (no primitive implementation gaps found).
+- [x] Run `npm run typecheck` and `npm run test:unit` (RTL tests and typecheck pass; full suite is blocked by unrelated public-page/manual-inventory failures).
 
 ### Phase 3: Quran Source Invariants
 
