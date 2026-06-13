@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import { View, Text, Pressable, ScrollView, RefreshControl } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
-import { Trophy, CalendarCheck2, Medal } from "lucide-react-native";
+import { Trophy, CalendarCheck2, Medal, LogIn } from "lucide-react-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSettings } from "@/lib/settings/context";
 import { useDatabase } from "@/lib/database/provider";
@@ -12,7 +12,6 @@ import { isSupabaseConfigured } from "@/lib/supabase";
 import { syncDailyScore, updateProfileStats } from "@/lib/fsrs/leaderboard-sync";
 import { LeaderboardSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { AuthGate } from "@/components/ui/AuthGate";
 import { useScreenContentLayout } from "@/components/ui/ScreenContent";
 import { ProfileIdentity } from "@/components/profile/ProfileIdentity";
 import {
@@ -27,7 +26,7 @@ import { LEADERBOARD_CONTENT_MAX_WIDTH } from "@/lib/ui/viewport";
 type Tab = "daily" | "weekly" | "alltime" | "streak";
 
 export default function LeaderboardScreen() {
-  const { isDark, themeColors } = useSettings();
+  const { isDark, isRTL, themeColors } = useSettings();
   const db = useDatabase();
   const s = useStrings();
   const { contentContainerStyle, railStyle, isLaptop } = useScreenContentLayout({ maxWidth: LEADERBOARD_CONTENT_MAX_WIDTH });
@@ -42,17 +41,6 @@ export default function LeaderboardScreen() {
     await syncDailyScore(db);
     await updateProfileStats(db);
   }, [configured, db, user]);
-
-  if (!user) {
-    return (
-      <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
-        <AuthGate
-          title={s.authGateLeaderboardTitle}
-          subtitle={s.authGateLeaderboardSubtitle}
-        />
-      </SafeAreaView>
-    );
-  }
 
   const queryFn = useCallback(() => {
     switch (activeTab) {
@@ -103,10 +91,11 @@ export default function LeaderboardScreen() {
 
   const scoreUnit = activeTab === "streak" ? s.leaderboardDays : s.leaderboardPoints;
   const activeTabLabel = tabs.find((tab) => tab.key === activeTab)?.label ?? "";
+  const visibleEntries = user ? entries : entries.slice(0, 10);
   const featuredEntries = isLaptop
-    ? [entries[1], entries[0], entries[2]].filter((entry): entry is LeaderboardEntry => Boolean(entry))
+    ? [visibleEntries[1], visibleEntries[0], visibleEntries[2]].filter((entry): entry is LeaderboardEntry => Boolean(entry))
     : [];
-  const rowEntries = isLaptop ? entries.slice(3) : entries;
+  const rowEntries = isLaptop ? visibleEntries.slice(3) : visibleEntries;
   const openProfile = useCallback(
     (userId: string) => {
       router.push(userId === user?.id ? "/profile" as any : `/profile/${userId}` as any);
@@ -158,7 +147,7 @@ export default function LeaderboardScreen() {
           <View style={railStyle}>
             <EmptyState
               icon={Trophy}
-              title={s.authGateLeaderboardTitle}
+              title={s.leaderboardTitle}
               subtitle={s.leaderboardNotConfigured}
               isDark={isDark}
             />
@@ -191,6 +180,15 @@ export default function LeaderboardScreen() {
               subtitle={s.emptyLeaderboardSubtitle}
               isDark={isDark}
             />
+            {!user && (
+              <LeaderboardSignInPrompt
+                label={s.leaderboardSignInPrompt}
+                buttonLabel={s.authLogin}
+                isDark={isDark}
+                isRTL={isRTL}
+                onPress={() => router.push("/auth/login" as any)}
+              />
+            )}
           </View>
         </View>
       ) : (
@@ -245,10 +243,82 @@ export default function LeaderboardScreen() {
               onPress={() => openProfile(entry.user_id)}
             />
           ))}
+          {!user && (
+            <LeaderboardSignInPrompt
+              label={s.leaderboardSignInPrompt}
+              buttonLabel={s.authLogin}
+              isDark={isDark}
+              isRTL={isRTL}
+              onPress={() => router.push("/auth/login" as any)}
+            />
+          )}
           </View>
         </ScrollView>
       )}
     </SafeAreaView>
+  );
+}
+
+function LeaderboardSignInPrompt({
+  label,
+  buttonLabel,
+  isDark,
+  isRTL,
+  onPress,
+}: {
+  label: string;
+  buttonLabel: string;
+  isDark: boolean;
+  isRTL: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <View
+      className="mt-4 rounded-3xl px-4 py-4"
+      style={{
+        backgroundColor: isDark ? "rgba(45, 212, 191, 0.10)" : "rgba(13, 148, 136, 0.08)",
+        borderColor: isDark ? "rgba(45, 212, 191, 0.22)" : "rgba(13, 148, 136, 0.18)",
+        borderWidth: 1,
+      }}
+    >
+      <View
+        className="items-center gap-3"
+        style={{
+          flexDirection: isRTL ? "row-reverse" : "row",
+          justifyContent: "space-between",
+        }}
+      >
+        <Text
+          className="min-w-0 flex-1 text-charcoal dark:text-neutral-100"
+          style={{
+            fontFamily: "Manrope_700Bold",
+            fontSize: 14,
+            lineHeight: 20,
+            textAlign: isRTL ? "right" : "left",
+            writingDirection: isRTL ? "rtl" : "ltr",
+          }}
+        >
+          {label}
+        </Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={buttonLabel}
+          onPress={onPress}
+          className="rounded-full px-4 py-2.5"
+          style={({ pressed }) => ({
+            backgroundColor: isDark ? "#1B4D4F" : "#003638",
+            opacity: pressed ? 0.76 : 1,
+          })}
+        >
+          <View className="flex-row items-center gap-2" style={{ flexDirection: isRTL ? "row-reverse" : "row" }}>
+            <LogIn size={15} color="#FDDC91" />
+            <Text style={{ color: "#FDDC91", fontFamily: "Manrope_700Bold", fontSize: 12 }}>
+              {buttonLabel}
+            </Text>
+          </View>
+        </Pressable>
+      </View>
+    </View>
   );
 }
 

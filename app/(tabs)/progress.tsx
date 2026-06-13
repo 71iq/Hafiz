@@ -2,7 +2,8 @@ import { useState, useCallback, useEffect } from "react";
 import { View, Text, ScrollView, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
-import { BookOpen, ChevronDown, Trophy } from "lucide-react-native";
+import { router } from "expo-router";
+import { BookOpen, ChevronDown, LogIn, Trophy } from "lucide-react-native";
 import { Card } from "@/components/ui/Card";
 import { ScreenScrollView, useScreenContentLayout } from "@/components/ui/ScreenContent";
 import { OverlayBody, OverlayHeader, ResponsiveModal } from "@/components/ui/ResponsiveOverlay";
@@ -11,7 +12,6 @@ import { DefaultDeckProgressChart } from "@/components/progress/DefaultDeckProgr
 import { SurahProgressList } from "@/components/progress/SurahProgressList";
 import { AchievementBadge } from "@/components/achievements/AchievementBadge";
 import { AchievementGrid } from "@/components/achievements/AchievementGrid";
-import { AuthGate } from "@/components/ui/AuthGate";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { useSettings } from "@/lib/settings/context";
 import { useDatabase } from "@/lib/database/provider";
@@ -126,17 +126,7 @@ export default function ProgressScreen() {
     if (pulled > 0) loadData().catch(console.warn);
   }), [loadData]);
 
-  if (isSupabaseConfigured() && authInitialized && !authLoading && !user) {
-    return (
-      <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
-        <AuthGate
-          title={s.authGateProgressTitle}
-          subtitle={s.authGateProgressSubtitle}
-        />
-      </SafeAreaView>
-    );
-  }
-
+  const showSyncPrompt = isSupabaseConfigured() && authInitialized && !authLoading && !user;
   const formatStat = (val: number) => val.toLocaleString();
   const masteryPct = totalAyahCards > 0 ? Math.round((memorizedAyahCards / totalAyahCards) * 100) : 0;
   const statItems = [
@@ -197,6 +187,16 @@ export default function ProgressScreen() {
             )}
           </View>
         </Card>
+
+        {showSyncPrompt && (
+          <ProgressSignInPrompt
+            label={s.progressSignInPrompt}
+            buttonLabel={s.authLogin}
+            isDark={isDark}
+            isRTL={isRTL}
+            onPress={() => router.push("/auth/login" as any)}
+          />
+        )}
 
         {/* Activity and stats */}
         <Card elevation="low" className="p-5 mb-6">
@@ -392,6 +392,62 @@ export default function ProgressScreen() {
         </OverlayBody>
       </ResponsiveModal>
     </SafeAreaView>
+  );
+}
+
+function ProgressSignInPrompt({
+  label,
+  buttonLabel,
+  isDark,
+  isRTL,
+  onPress,
+}: {
+  label: string;
+  buttonLabel: string;
+  isDark: boolean;
+  isRTL: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Card elevation="low" className="mb-6 px-5 py-4">
+      <View
+        className="items-center gap-3"
+        style={{
+          flexDirection: isRTL ? "row-reverse" : "row",
+          justifyContent: "space-between",
+        }}
+      >
+        <Text
+          className="min-w-0 flex-1 text-charcoal dark:text-neutral-100"
+          style={{
+            fontFamily: "Manrope_700Bold",
+            fontSize: 14,
+            lineHeight: 20,
+            textAlign: isRTL ? "right" : "left",
+            writingDirection: isRTL ? "rtl" : "ltr",
+          }}
+        >
+          {label}
+        </Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={buttonLabel}
+          onPress={onPress}
+          className="rounded-full px-4 py-2.5"
+          style={({ pressed }) => ({
+            backgroundColor: isDark ? "#1B4D4F" : "#003638",
+            opacity: pressed ? 0.76 : 1,
+          })}
+        >
+          <View className="flex-row items-center gap-2" style={{ flexDirection: isRTL ? "row-reverse" : "row" }}>
+            <LogIn size={15} color="#FDDC91" />
+            <Text style={{ color: "#FDDC91", fontFamily: "Manrope_700Bold", fontSize: 12 }}>
+              {buttonLabel}
+            </Text>
+          </View>
+        </Pressable>
+      </View>
+    </Card>
   );
 }
 
