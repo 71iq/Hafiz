@@ -438,6 +438,7 @@ function MushafPageInner({
       if (words.length === 0) return null;
       const shouldStretchLine = !centered && words.length > 1;
       const lineHeightStyle = allowLineWrap ? visualLineHeight : lineHeight;
+      const lineGap = pageNumber === 2 && lineNumber === 4 ? fontSize * 0.12 : fontSize * 0.28;
 
       return (
         <View
@@ -450,7 +451,7 @@ function MushafPageInner({
             width: contentWidth,
             minHeight: lineHeightStyle,
             height: allowLineWrap ? undefined : lineHeightStyle,
-            gap: shouldStretchLine && !allowLineWrap ? undefined : fontSize * 0.28,
+            gap: shouldStretchLine && !allowLineWrap ? undefined : lineGap,
             rowGap: allowLineWrap ? Math.max(2, fontSize * 0.12) : undefined,
             alignItems: "center",
             alignContent: "center",

@@ -2191,3 +2191,17 @@ Saved in `phase19/`:
 ### Validation result
 - `npm run typecheck`: passed.
 - `npm run build:web`: passed.
+
+## 2026-06-13 — Mushaf Page 2 Line 4 Spacing Exception
+
+### Scope decisions
+1. Scoped this pass only to page view rendering for page 2, line 4.
+2. Kept existing full-line justification for normal non-centered Mushaf lines unchanged.
+3. Skipped live/browser verification per user instruction; build validation is sufficient.
+
+### Implemented in this step
+- Reduced the centered token gap only for page 2 line 4 so words no longer appear over-spaced.
+
+### Validation result
+- `npm run typecheck`: passed.
+- `npm run build:web`: passed.
