@@ -160,7 +160,7 @@ function ViewModeToggle({
         flexDirection: isRTL ? "row-reverse" : "row",
         alignItems: "center",
         justifyContent: "center",
-        minWidth: showPageMenu ? (compact ? 124 : 144) : (compact ? 108 : 126),
+        minWidth: showPageMenu ? (compact ? 132 : 144) : (compact ? 142 : 150),
         paddingHorizontal: 0,
         paddingVertical: 0,
         borderWidth: glass ? 1 : 0,
@@ -177,8 +177,9 @@ function ViewModeToggle({
         accessibilityRole="button"
         accessibilityState={{ selected: true }}
         accessibilityLabel={label}
-        className={`rounded-full ${compact ? "px-3 py-2" : "px-3.5 py-2"}`}
+        className={`flex-row items-center justify-center rounded-full ${compact ? "px-3 py-2" : "px-3.5 py-2"}`}
         style={({ pressed }) => ({
+          display: "flex",
           flex: 1,
           flexDirection: isRTL ? "row-reverse" : "row",
           alignItems: "center",

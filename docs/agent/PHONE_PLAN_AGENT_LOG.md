@@ -2162,3 +2162,18 @@ Saved in `phase19/`:
   - Sign Up link: `5.53:1`.
   - Quran Foundation provider text: `12.63:1`.
   - Input placeholder: `14.13:1`.
+
+## 2026-06-13 — Mushaf Header View Toggle Height Fix
+
+### Scope decisions
+1. Scoped this pass to the Mushaf view-mode toggle shown in the phone/tablet header chrome.
+2. Kept the existing glass styling, icons, bilingual labels, and page-view dropdown behavior unchanged.
+
+### Implemented in this step
+- Made the view-mode trigger explicitly horizontal with flex-row alignment on the pressable itself.
+- Increased the compact non-menu minimum width so the English `Verse by Verse` label fits beside the icon instead of stacking below it.
+
+### Validation result
+- `npm run typecheck`: passed.
+- `npm run build:web`: passed.
+- Live/browser testing skipped per user instruction; build validation is enough for this change.
