@@ -11,12 +11,11 @@ import { MeaningTab } from "./word-tabs/MeaningTab";
 import { IrabTab } from "./word-tabs/IrabTab";
 import { TasreefTab } from "./word-tabs/TasreefTab";
 import { TajweedTab } from "./word-tabs/TajweedTab";
-import { QiraatTab } from "./word-tabs/QiraatTab";
 import { OccurrencesTab } from "./word-tabs/OccurrencesTab";
 import { AyahDetailModal } from "./AyahDetailModal";
 import { fetchWordRoot, fetchWordText, fetchWordTranslation } from "@/lib/word/queries";
 
-type TabKey = "meaning" | "irab" | "tajweed" | "tasreef" | "qiraat" | "occurrences";
+type TabKey = "meaning" | "irab" | "tajweed" | "tasreef" | "occurrences";
 
 type WordHeaderMeta = {
   wordText: string | null;
@@ -58,7 +57,6 @@ export function WordDetailSheet() {
       { key: "irab" as TabKey, label: s.wordTabIrab },
       { key: "tajweed" as TabKey, label: s.wordTabTajweed },
       { key: "tasreef" as TabKey, label: s.wordTabTasreef },
-      { key: "qiraat" as TabKey, label: s.wordTabQiraat },
       { key: "occurrences" as TabKey, label: s.wordTabOccurrences },
     ],
     [s]
@@ -315,7 +313,6 @@ export function WordDetailSheet() {
             )}
             {activeTab === "tajweed" && <TajweedTab surah={surah} ayah={ayah} wordPos={wordPos} />}
             {activeTab === "tasreef" && <TasreefTab surah={surah} ayah={ayah} wordPos={wordPos} />}
-            {activeTab === "qiraat" && <QiraatTab surah={surah} ayah={ayah} />}
             {activeTab === "occurrences" && <OccurrencesTab surah={surah} ayah={ayah} wordPos={wordPos} />}
           </OverlayBody>
         </View>
@@ -323,7 +320,7 @@ export function WordDetailSheet() {
       <AyahDetailModal
         target={ayahModalOpen ? { surah, ayah } : null}
         onClose={() => setAyahModalOpen(false)}
-        initialTab={activeTab === "qiraat" ? "qiraat" : activeTab === "meaning" ? "translation" : "tafsir"}
+        initialTab={activeTab === "meaning" ? "translation" : "tafsir"}
       />
     </>
   );
