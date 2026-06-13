@@ -398,11 +398,11 @@ Promote checks from report-only to blocking only after they are stable across lo
 
 ### Phase 3: Quran Source Invariants
 
-- [ ] Extend unit/source tests for QCF/Qur'an no-mirror behavior.
-- [ ] Cover `MushafPage`, `AyahBlock`, `Qcf2AyahText`, and `PageMushaf`.
-- [ ] Assert required `direction: "ltr"` plus `flexDirection: "row-reverse"` cases remain intact.
-- [ ] Assert no Quran content uses horizontal mirror transforms.
-- [ ] Run `npm run test:unit`.
+- [x] Extend unit/source tests for QCF/Qur'an no-mirror behavior.
+- [x] Cover `MushafPage`, `AyahBlock`, `Qcf2AyahText`, and `PageMushaf`.
+- [x] Assert required `direction: "ltr"` plus `flexDirection: "row-reverse"` cases remain intact.
+- [x] Assert no Quran content uses horizontal mirror transforms.
+- [x] Run `npm run test:unit` (RTL tests pass; full suite is blocked by unrelated public-page/manual-inventory failures).
 
 ### Phase 4: Playwright RTL Report-Only
 
