@@ -1,116 +1,122 @@
-import { Pressable, Text, View } from "react-native";
-import { BookOpen, ChevronLeft, ChevronRight } from "lucide-react-native";
-import { ToggleGroup } from "@/components/ui/ToggleGroup";
-import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
-import { useStrings, interpolate } from "@/lib/i18n/useStrings";
+import { Modal, Platform, Pressable, Text, View, useWindowDimensions } from "react-native";
+import { AlignJustify, Check, MoveHorizontal } from "lucide-react-native";
+import { useMemo } from "react";
+import { useStrings } from "@/lib/i18n/useStrings";
 import { useSettings, type PageScroll } from "@/lib/settings/context";
-import { toArabicNumber } from "@/lib/arabic";
+
+export type PageViewNavigationAnchor = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
 
 type Props = {
   visible: boolean;
-  currentPage: number;
+  anchor: PageViewNavigationAnchor | null;
   onClose: () => void;
-  onOpenGoTo: () => void;
 };
 
 export function PageViewNavigationSheet({
   visible,
-  currentPage,
+  anchor,
   onClose,
-  onOpenGoTo,
 }: Props) {
   const s = useStrings();
-  const { isDark, isRTL, pageScroll, setPageScroll } = useSettings();
-  const pageLabel = interpolate(s.pageN, { n: isRTL ? toArabicNumber(currentPage) : String(currentPage) });
-  const RowChevron = isRTL ? ChevronLeft : ChevronRight;
-  const mutedColor = isDark ? "#737373" : "#8B8178";
+  const { height, width: viewportWidth } = useWindowDimensions();
+  const { isDark, isRTL, pageScroll, setPageScroll, themeColors } = useSettings();
+  const menuWidth = Math.min(196, viewportWidth - 24);
+  const menuHeight = 104;
+  const borderColor = isDark ? "rgba(255,255,255,0.08)" : "rgba(95,78,64,0.12)";
+
+  const menuPosition = useMemo(() => {
+    if (!anchor) {
+      return {
+        left: Math.max(12, (viewportWidth - menuWidth) / 2),
+        top: 72,
+      };
+    }
+    const requestedLeft = isRTL ? anchor.x : anchor.x + anchor.width - menuWidth;
+    const left = Math.min(Math.max(requestedLeft, 12), viewportWidth - menuWidth - 12);
+    const belowTop = anchor.y + anchor.height + 8;
+    const aboveTop = anchor.y - menuHeight - 8;
+    const top = belowTop + menuHeight <= height - 12 ? belowTop : Math.max(12, aboveTop);
+    return { left, top };
+  }, [anchor, height, isRTL, menuWidth, viewportWidth]);
+
+  const selectPageScroll = (value: PageScroll) => {
+    setPageScroll(value);
+    onClose();
+  };
+
+  const items: {
+    value: PageScroll;
+    label: string;
+    icon: typeof AlignJustify;
+  }[] = [
+    { value: "vertical", label: s.pageScrollVertical, icon: AlignJustify },
+    { value: "horizontal", label: s.pageScrollHorizontal, icon: MoveHorizontal },
+  ];
 
   return (
-    <ResponsiveSheet
-      open={visible}
-      onClose={onClose}
-      dismissOnBackdrop
-      maxWidth={430}
-      maxHeight="70%"
-    >
-      <OverlayHeader
-        title={s.pageViewMenuTitle}
-        subtitle={s.pageViewMenuSubtitle}
-        onClose={onClose}
-        showHandle
-        isRTL={isRTL}
-      />
-
-      <OverlayBody contentContainerClassName="px-5 pt-4 pb-6">
-        <View className="gap-5">
-          <View>
-            <Text
-              className="mb-3 text-warm-400 dark:text-neutral-500"
-              style={{
-                fontFamily: "Manrope_700Bold",
-                fontSize: 12,
-                textAlign: isRTL ? "right" : "left",
-                textTransform: "uppercase",
-                writingDirection: isRTL ? "rtl" : "ltr",
-              }}
-            >
-              {s.pageScrollLabel}
-            </Text>
-            <ToggleGroup<PageScroll>
-              value={pageScroll}
-              onValueChange={setPageScroll}
-              items={[
-                { value: "vertical", label: s.pageScrollVertical },
-                { value: "horizontal", label: s.pageScrollHorizontal },
-              ]}
-              dir={isRTL ? "rtl" : "ltr"}
-            />
-          </View>
-
-          <Pressable
-            onPress={() => {
-              onClose();
-              onOpenGoTo();
-            }}
-            className="items-center justify-between gap-3 rounded-3xl bg-surface-low dark:bg-surface-dark-low px-4 py-4"
-            style={({ pressed }) => ({
-              direction: isRTL ? "rtl" : "ltr",
-              flexDirection: "row",
-              opacity: pressed ? 0.78 : 1,
-              transform: [{ scale: pressed ? 0.99 : 1 }],
-            })}
-          >
-            <View className="h-10 w-10 items-center justify-center rounded-full bg-primary-accent/10 dark:bg-primary-bright/15">
-              <BookOpen size={18} color={isDark ? "#2dd4bf" : "#0d9488"} />
-            </View>
-            <View className="min-w-0 flex-1">
-              <Text
-                className="text-charcoal dark:text-neutral-200"
-                style={{
-                  fontFamily: "Manrope_700Bold",
-                  fontSize: 14,
-                  textAlign: isRTL ? "right" : "left",
-                  writingDirection: isRTL ? "rtl" : "ltr",
-                }}
+    <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
+      <View className="flex-1">
+        <Pressable className="absolute inset-0" onPress={onClose} />
+        <View
+          className="absolute overflow-hidden rounded-2xl border py-1.5 shadow-2xl"
+          style={{
+            backgroundColor: themeColors.surface,
+            borderColor,
+            left: menuPosition.left,
+            top: menuPosition.top,
+            width: menuWidth,
+            ...(Platform.OS === "web"
+              ? ({ boxShadow: "0 18px 44px rgba(15, 23, 42, 0.16)" } as any)
+              : null),
+          }}
+        >
+          {items.map((item) => {
+            const active = item.value === pageScroll;
+            const Icon = item.icon;
+            const color = active ? (isDark ? "#2dd4bf" : "#0d9488") : isDark ? "#d4d4d4" : "#2D2D2D";
+            return (
+              <Pressable
+                key={item.value}
+                accessibilityRole="menuitem"
+                accessibilityLabel={item.label}
+                accessibilityState={{ selected: active }}
+                onPress={() => selectPageScroll(item.value)}
+                className="min-h-11 items-center gap-3 px-3.5"
+                style={({ pressed }) => ({
+                  backgroundColor: active || pressed ? themeColors.surfaceLow : "transparent",
+                  direction: "ltr",
+                  flexDirection: isRTL ? "row-reverse" : "row",
+                })}
               >
-                {s.pageViewGoTo}
-              </Text>
-              <Text
-                className="mt-0.5 text-warm-400 dark:text-neutral-500"
-                style={{
-                  fontFamily: "Manrope_500Medium",
-                  fontSize: 12,
-                  textAlign: isRTL ? "right" : "left",
-                  writingDirection: isRTL ? "rtl" : "ltr",
-                }}
-              >
-                {pageLabel}
-              </Text>
-            </View>
-            <RowChevron size={18} color={mutedColor} />
-          </Pressable>
+                <View className="h-5 w-5 items-center justify-center">
+                  <Icon size={17} color={color} />
+                </View>
+                <Text
+                  className="min-w-0 flex-1"
+                  style={{
+                    color,
+                    fontFamily: "Manrope_600SemiBold",
+                    fontSize: 13,
+                    textAlign: isRTL ? "right" : "left",
+                    writingDirection: isRTL ? "rtl" : "ltr",
+                  }}
+                  numberOfLines={1}
+                >
+                  {item.label}
+                </Text>
+                <View className="h-5 w-5 items-center justify-center">
+                  {active ? <Check size={17} color={color} /> : null}
+                </View>
+              </Pressable>
+            );
+          })}
         </View>
-      </OverlayBody>
-    </ResponsiveSheet>
+      </View>
+    </Modal>
   );
 }

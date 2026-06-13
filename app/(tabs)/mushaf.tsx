@@ -27,7 +27,7 @@ import { HifzControls } from "@/components/mushaf/HifzControls";
 import { WordDetailSheet } from "@/components/mushaf/WordDetailSheet";
 import { RecitationRangeSheet } from "@/components/mushaf/RecitationRangeSheet";
 import { ReadingSettingsSheet } from "@/components/mushaf/ReadingSettingsSheet";
-import { PageViewNavigationSheet } from "@/components/mushaf/PageViewNavigationSheet";
+import { PageViewNavigationSheet, type PageViewNavigationAnchor } from "@/components/mushaf/PageViewNavigationSheet";
 import type { HifzVisibility } from "@/components/mushaf/MushafPage";
 import { loadMushafIndex, findJuzForAyah, findHizbForAyah, topmostAyahForPage, type MushafIndex } from "@/lib/mushaf/position";
 import { FloatingWordTooltip } from "@/components/mushaf/WordTooltip";
@@ -136,11 +136,12 @@ function ViewModeToggle({
   compact: boolean;
   glass: boolean;
   onPress: () => void;
-  onPageMenuPress?: () => void;
+  onPageMenuPress?: (anchor: PageViewNavigationAnchor | null) => void;
   pageMenuLabel?: string;
 }) {
   const Icon = isPageMode ? BookOpen : AlignJustify;
   const { themeSurface } = useSettings();
+  const pageMenuTriggerRef = useRef<any>(null);
   const showPageMenu = isPageMode && !!onPageMenuPress;
   const mutedIconColor = isDark ? "#737373" : "#8B8178";
   const dividerColor = glass
@@ -203,7 +204,18 @@ function ViewModeToggle({
       </Pressable>
       {showPageMenu && (
         <Pressable
-          onPress={onPageMenuPress}
+          ref={pageMenuTriggerRef}
+          collapsable={false}
+          onPress={() => {
+            const trigger = pageMenuTriggerRef.current;
+            if (trigger?.measureInWindow) {
+              trigger.measureInWindow((x: number, y: number, width: number, height: number) => {
+                onPageMenuPress({ x, y, width, height });
+              });
+              return;
+            }
+            onPageMenuPress(null);
+          }}
           accessibilityRole="button"
           accessibilityLabel={pageMenuLabel}
           className="h-full items-center justify-center px-2.5"
@@ -435,6 +447,7 @@ function MushafInner() {
   const [showRecitation, setShowRecitation] = useState(false);
   const [showReadingSettings, setShowReadingSettings] = useState(false);
   const [showPageViewNavigation, setShowPageViewNavigation] = useState(false);
+  const [pageViewNavigationAnchor, setPageViewNavigationAnchor] = useState<PageViewNavigationAnchor | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [verseHideMode, setVerseHideMode] = useState(false);
   const [hifzEnabled, setHifzEnabled] = useState(false);
@@ -956,11 +969,17 @@ function MushafInner() {
     setShowReadingSettings(true);
   }, [pauseFocusAutoScroll]);
 
-  const handleOpenPageViewNavigation = useCallback(() => {
+  const handleOpenPageViewNavigation = useCallback((anchor: PageViewNavigationAnchor | null) => {
     if (!isPageMode) return;
     pauseFocusAutoScroll();
+    setPageViewNavigationAnchor(anchor);
     setShowPageViewNavigation(true);
   }, [isPageMode, pauseFocusAutoScroll]);
+
+  const handleClosePageViewNavigation = useCallback(() => {
+    setShowPageViewNavigation(false);
+    setPageViewNavigationAnchor(null);
+  }, []);
 
   const handleGoHome = useCallback(() => {
     pauseFocusAutoScroll();
@@ -1792,9 +1811,8 @@ function MushafInner() {
 
         <PageViewNavigationSheet
           visible={showPageViewNavigation && isPageMode}
-          currentPage={currentPage}
-          onClose={() => setShowPageViewNavigation(false)}
-          onOpenGoTo={handleOpenNavigator}
+          anchor={pageViewNavigationAnchor}
+          onClose={handleClosePageViewNavigation}
         />
 
         {/* Floating word tooltip (portal-based, web only) */}
