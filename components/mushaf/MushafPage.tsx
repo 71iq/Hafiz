@@ -15,6 +15,7 @@ import {
 } from "@/lib/fonts/loader";
 import { useSelection } from "@/lib/selection/context";
 import { useSettings } from "@/lib/settings/context";
+import { localizedAyahMarker } from "@/lib/quran/ayah-marker";
 
 export type PageWordsByLine = Record<string, string>;
 export type PageWordsData = PageWordsByLine[];
@@ -531,6 +532,7 @@ function MushafPageInner({
                       fontSize,
                       lineHeight,
                       paddingHorizontal: 0,
+                      writingDirection: "rtl",
                       ...(Platform.OS === "web" ? ({ userSelect: "text" } as any) : null),
                       ...(isTargetAyah && {
                         backgroundColor: "rgba(13, 148, 136, 0.125)",
@@ -538,7 +540,7 @@ function MushafPageInner({
                       }),
                     }}
                   >
-                    {w}
+                    {localizedAyahMarker(identity.ayah, isRTL)}
                   </Text>
                 </Pressable>
               );

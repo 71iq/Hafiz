@@ -943,6 +943,7 @@ function FlashcardSessionScreen() {
                   fontSize={fontSize * 0.85}
                   lineHeight={lineHeight * 0.85}
                   highlightWordPos={currentCard.wordPos}
+                  ayah={currentCard.ayah}
                 />
               ) : (
                 <>
@@ -958,7 +959,7 @@ function FlashcardSessionScreen() {
                 </Text>
               )}
               {!currentCard.isWordCard && currentCard.uniqueFront.contextCount === 0 && currentCard.textQcf2 && currentCard.v2Page ? (
-                <Qcf2AyahText textQcf2={currentCard.textQcf2} v2Page={currentCard.v2Page} fontSize={fontSize} lineHeight={lineHeight} />
+                <Qcf2AyahText textQcf2={currentCard.textQcf2} v2Page={currentCard.v2Page} fontSize={fontSize} lineHeight={lineHeight} ayah={currentCard.ayah} />
               ) : (
                 <Text
                   className="text-charcoal dark:text-neutral-100 text-center"
@@ -998,6 +999,7 @@ function FlashcardSessionScreen() {
                   v2Page={currentCard.v2Page}
                   fontSize={fontSize * 0.8}
                   lineHeight={lineHeight * 0.8}
+                  ayah={currentCard.ayah}
                 />
               ) : (
                 <Text
@@ -1543,6 +1545,7 @@ function TestModePrompt({
           fontSize={fontSize}
           lineHeight={lineHeight}
           highlightWordPos={wordMode ? card.wordPos : undefined}
+          ayah={card.ayah}
         />
       ) : (
         <Text
@@ -1677,7 +1680,7 @@ function SmartCardFront({
         {prompt}
       </Text>
       {(card.kind === "qiraat" || card.kind === "asbab") && card.textQcf2 && card.v2Page ? (
-        <Qcf2AyahText textQcf2={card.textQcf2} v2Page={card.v2Page} fontSize={fontSize} lineHeight={lineHeight} />
+        <Qcf2AyahText textQcf2={card.textQcf2} v2Page={card.v2Page} fontSize={fontSize} lineHeight={lineHeight} ayah={card.ayah} />
       ) : (
         <SmartCueText card={card} fontSize={fontSize} lineHeight={lineHeight} />
       )}
@@ -1722,6 +1725,7 @@ function SmartCueText({
           fontSize={fontSize}
           lineHeight={lineHeight}
           showAyahMarker={false}
+          ayah={card.ayah}
         />
       ) : (
         <Text
@@ -1769,6 +1773,7 @@ function SmartRefsAnswer({
               fontSize={fontSize * 1.08}
               lineHeight={lineHeight * 1.08}
               colorClassName="text-primary-accent dark:text-primary-bright"
+              ayah={target.ayah}
             />
           </View>
         )}
@@ -1835,7 +1840,7 @@ function SmartRefCard({
           {refData.surahNameAr}
         </Text>
       </View>
-      <Qcf2AyahText textQcf2={refData.textQcf2} v2Page={refData.v2Page} fontSize={fontSize} lineHeight={lineHeight} />
+      <Qcf2AyahText textQcf2={refData.textQcf2} v2Page={refData.v2Page} fontSize={fontSize} lineHeight={lineHeight} ayah={refData.ayah} />
     </View>
   );
 }

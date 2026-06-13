@@ -8,6 +8,7 @@ import {
   quranPageFontPaletteStyle,
 } from "@/lib/fonts/loader";
 import { useSettings } from "@/lib/settings/context";
+import { localizedAyahMarker } from "@/lib/quran/ayah-marker";
 
 type Props = {
   textQcf2: string;
@@ -17,6 +18,7 @@ type Props = {
   colorClassName?: string;
   highlightWordPos?: number;
   showAyahMarker?: boolean;
+  ayah?: number;
 };
 
 export function Qcf2AyahText({
@@ -27,8 +29,9 @@ export function Qcf2AyahText({
   colorClassName = "text-charcoal dark:text-neutral-100",
   highlightWordPos,
   showAyahMarker = true,
+  ayah,
 }: Props) {
-  const { quranFontStyle, quranMarkerStyle, effectiveTheme } = useSettings();
+  const { isRTL, quranFontStyle, quranMarkerStyle, effectiveTheme } = useSettings();
   const [visible, setVisible] = useState(() => isQuranPageFontLoaded(quranFontStyle, v2Page));
 
   useEffect(() => {
@@ -83,11 +86,12 @@ export function Qcf2AyahText({
               fontSize,
               lineHeight,
               paddingHorizontal: highlighted ? 7 : 1,
+              writingDirection: isMarker ? "rtl" : undefined,
               borderRadius: highlighted ? 10 : 0,
               backgroundColor: highlighted ? "rgba(13, 148, 136, 0.13)" : "transparent",
             }}
           >
-            {token}
+            {isMarker && typeof ayah === "number" ? localizedAyahMarker(ayah, isRTL) : token}
           </Text>
         );
       })}
