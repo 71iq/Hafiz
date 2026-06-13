@@ -424,26 +424,37 @@ function AyahBlockInner({
       )}
 
       <View className="pt-3">
-        <View className={isRTL ? "mt-1 flex-row-reverse flex-wrap gap-2" : "mt-1 flex-row flex-wrap gap-2"}>
+        <View
+          className="mt-1 flex-wrap gap-2"
+          style={{
+            direction: isRTL ? "rtl" : "ltr",
+            flexDirection: isRTL ? "row-reverse" : "row",
+            justifyContent: "flex-start",
+          }}
+        >
           <ActionPill
             label={s.tafseer}
             icon={<BookOpenText size={14} color={iconColor} />}
             onPress={() => openDetail("tafsir")}
+            isRTL={isRTL}
           />
           <ActionPill
             label={s.wordTranslation}
             icon={<BookOpenText size={14} color={iconColor} />}
             onPress={() => openDetail("translation")}
+            isRTL={isRTL}
           />
           <ActionPill
             label={s.ayahTabHadith}
             icon={<BookOpenText size={14} color={iconColor} />}
             onPress={() => openDetail("hadith")}
+            isRTL={isRTL}
           />
           <ActionPill
             label={s.wordTabQiraat}
             icon={<BookOpenText size={14} color={iconColor} />}
             onPress={() => openDetail("qiraat")}
+            isRTL={isRTL}
           />
           <ActionPill
             label={savedToReview ? s.reviewActionAdded : reviewBusy ? s.addingToReview : s.addToReview}
@@ -459,11 +470,13 @@ function AyahBlockInner({
             onPress={handleAddToReview}
             active={reviewBusy || savedToReview}
             disabled={reviewBusy || savedToReview}
+            isRTL={isRTL}
           />
           <ActionPill
             label={s.privateNotes}
             icon={<NotebookPen size={14} color={iconColor} />}
             onPress={() => openDetail("notes")}
+            isRTL={isRTL}
           />
         </View>
       </View>
@@ -515,6 +528,7 @@ function ActionPill({
   badge,
   onPress,
   disabled = false,
+  isRTL = false,
 }: {
   label: string;
   icon: React.ReactNode;
@@ -522,22 +536,32 @@ function ActionPill({
   badge?: number;
   onPress: () => void;
   disabled?: boolean;
+  isRTL?: boolean;
 }) {
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
-      className={`flex-row items-center gap-1.5 rounded-full px-3 py-2 ${
+      className={`items-center gap-1.5 rounded-full px-3 py-2 ${
         active
           ? "bg-primary-accent/10 dark:bg-primary-bright/10"
           : "bg-surface dark:bg-surface-dark"
       }`}
-      style={{ opacity: disabled && !active ? 0.55 : 1 }}
+      style={{
+        direction: isRTL ? "rtl" : "ltr",
+        flexDirection: isRTL ? "row-reverse" : "row",
+        opacity: disabled && !active ? 0.55 : 1,
+      }}
     >
       {icon}
       <Text
         className={active ? "text-primary-accent dark:text-primary-bright" : "text-warm-500 dark:text-neutral-400"}
-        style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11 }}
+        style={{
+          fontFamily: "Manrope_600SemiBold",
+          fontSize: 11,
+          textAlign: isRTL ? "right" : "left",
+          writingDirection: isRTL ? "rtl" : "ltr",
+        }}
       >
         {label}
       </Text>
