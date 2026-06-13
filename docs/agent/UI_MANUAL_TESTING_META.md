@@ -55,6 +55,8 @@ Every route below should be included in full manual regression passes. Hidden or
   - Privacy content, QF/Supabase disclosures, scrolling, links, language.
 - `app/terms.tsx`
   - Terms content, source notices, scrolling, links, language.
+- `app/credits.tsx`
+  - Credits and source notices, links, language, theme, responsive behavior.
 
 ### Auth Routes
 
@@ -121,8 +123,6 @@ All user-visible components below need manual UI coverage when changed. Componen
   - Search modal, results, filters, recent searches, keyboard behavior.
 - `components/ui/AppNavigation.tsx`
   - Sidebar and mobile bottom navigation, active state, RTL order.
-- `components/ui/CustomTabBar.tsx`
-  - Mobile tab bar, hidden tab behavior, safe area.
 - `components/ui/OfflineBanner.tsx`
   - Offline/online transitions, overlay coexistence.
 - `components/ui/SyncIndicator.tsx`
@@ -137,7 +137,6 @@ All user-visible components below need manual UI coverage when changed. Componen
 Spot-test these through every route that consumes them after any style, accessibility, or interaction change.
 
 - `components/ui/AuthGate.tsx`
-- `components/ui/Badge.tsx`
 - `components/ui/Button.tsx`
 - `components/ui/Card.tsx`
 - `components/ui/ConfirmDialog.tsx`
@@ -145,20 +144,15 @@ Spot-test these through every route that consumes them after any style, accessib
 - `components/ui/EmptyState.tsx`
 - `components/ui/Field.tsx`
 - `components/ui/FormTextField.tsx`
-- `components/ui/Icon.tsx`
 - `components/ui/Input.tsx`
-- `components/ui/MobilePrimitives.tsx`
 - `components/ui/Progress.tsx`
 - `components/ui/ResponsiveOverlay.tsx`
 - `components/ui/ScreenContent.tsx`
-- `components/ui/Separator.tsx`
 - `components/ui/Sheet.tsx`
 - `components/ui/Skeleton.tsx`
 - `components/ui/Switch.tsx`
-- `components/ui/Tabs.tsx`
 - `components/ui/Text.tsx`
 - `components/ui/ToggleGroup.tsx`
-- `components/ui/index.ts`
 
 ### Mushaf Components
 
@@ -219,8 +213,6 @@ Spot-test these through every route that consumes them after any style, accessib
 
 ### Flashcard Components
 
-- `components/flashcards/CreateDeckSheet.tsx`
-  - Deck creation, surah/juz/range scope, ayah range modal, validation, RTL.
 - `components/flashcards/DeckCardsSheet.tsx`
   - Card list, filters, dropdown actions, status/state display, delete/restore behavior.
 - `components/flashcards/DeckReviewSettingsSheet.tsx`
@@ -304,8 +296,6 @@ Spot-test these through every route that consumes them after any style, accessib
 
 ### Zayt Components
 
-- `components/zayt/ZaytPreviewModal.tsx`
-  - Preview modal, loading/error, close behavior.
 - `components/zayt/ZaytRivePreview.tsx`
   - Shared preview wrapper.
 - `components/zayt/ZaytRivePreview.web.tsx`
@@ -684,6 +674,34 @@ Use this order for a full manual pass. For targeted changes, run the affected se
 - Verify icon-only buttons have accessibility labels.
 - Verify phone hit targets are usable.
 - Verify text does not clip under dynamic font-size/browser zoom.
+
+## RTL Automation
+
+Use this phase for any change that touches direction, Arabic mode, navigation order, overlay chrome, form chrome, progress/chart direction, or Quran display.
+
+- Stable contract doc: `docs/testing/rtl-contract.md`.
+- Source and RNTL gate: `npm run test:unit -- --testPathPattern=rtl`.
+- Report-only route phase: `npm run test:ui:phase -- rtl-ui-contract`.
+- Blocking route gate: `npm run test:ui:rtl`.
+- The blocking route gate builds the web export and runs `tests/e2e/report-only/rtl-ui-contract.spec.ts` on `ui-390-chromium`.
+- `npm run verify:quick` and `npm run verify:web` intentionally do not include the RTL UI gate yet; run it explicitly for RTL or layout work.
+
+Current automated RTL coverage:
+
+- component registry coverage for every user-visible component under `components`.
+- static source guard for unconditional physical left/right UI styles.
+- primitive RNTL contracts for text, buttons, fields, inputs, and segmented controls.
+- higher-level RNTL contracts for overlay chrome, auth shell helpers, Mushaf indicator, font-size controls, Juz glyph labels, and progress fills.
+- Quran source invariants for page fonts, `v2_page`, `text_qcf2`, no horizontal mirror transforms, and Uthmani copy/share.
+- Arabic web route checks for `/qa-ready`, auth routes, Home, Mushaf, Settings, Progress, Leaderboard, Flashcards, and Profile.
+
+Manual RTL follow-up still required:
+
+- Arabic at 412, 768, 1024, and 1440 widths.
+- Safari/iOS Quran selection and browser chrome.
+- live Supabase/auth/profile/reflection states.
+- database-backed sheets and complex reader overlays.
+- heatmap semantics and chart meaning with real user data.
 
 ## High-Risk Regression Areas
 

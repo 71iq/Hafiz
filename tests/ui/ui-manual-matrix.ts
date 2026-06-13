@@ -25,6 +25,7 @@ export const uiRouteCoverage: CoverageItem[] = [
   { id: "route.about", title: "About page", source: "UI_MANUAL_TESTING_META.md#public-routes", phase: "route-smoke", status: "strict", tags: ["route", "public"] },
   { id: "route.privacy", title: "Privacy page", source: "UI_MANUAL_TESTING_META.md#public-routes", phase: "route-smoke", status: "strict", tags: ["route", "public", "legal"] },
   { id: "route.terms", title: "Terms page", source: "UI_MANUAL_TESTING_META.md#public-routes", phase: "route-smoke", status: "strict", tags: ["route", "public", "legal"] },
+  { id: "route.credits", title: "Credits and source notices page", source: "UI_MANUAL_TESTING_META.md#public-routes", phase: "route-smoke", status: "strict", tags: ["route", "public", "credits"] },
   { id: "route.login", title: "Login form and auth states", source: "UI_MANUAL_TESTING_META.md#auth-routes", phase: "route-smoke", status: "strict", tags: ["route", "auth"] },
   { id: "route.signup", title: "Signup form and validation", source: "UI_MANUAL_TESTING_META.md#auth-routes", phase: "route-smoke", status: "strict", tags: ["route", "auth"] },
   { id: "route.forgot-password", title: "Forgot password flow", source: "UI_MANUAL_TESTING_META.md#auth-routes", phase: "route-smoke", status: "strict", tags: ["route", "auth"] },
@@ -47,7 +48,7 @@ export const uiRouteCoverage: CoverageItem[] = [
 ];
 
 export const uiComponentCoverage: CoverageItem[] = [
-  { id: "component.global-navigation", title: "AppNavigation and CustomTabBar", source: "UI_MANUAL_TESTING_META.md#global-and-navigation-components", phase: "navigation-settings-rtl-theme", status: "report-only", tags: ["component", "navigation", "rtl"] },
+  { id: "component.global-navigation", title: "AppNavigation shell", source: "UI_MANUAL_TESTING_META.md#global-and-navigation-components", phase: "navigation-settings-rtl-theme", status: "report-only", tags: ["component", "navigation", "rtl"] },
   { id: "component.loading-offline-sync-toast-error", title: "Loading, offline, sync, toast, error boundary", source: "UI_MANUAL_TESTING_META.md#global-and-navigation-components", phase: "route-smoke", status: "strict", tags: ["component", "shell"] },
   { id: "component.search-command", title: "SearchCommand modal and results", source: "UI_MANUAL_TESTING_META.md#global-and-navigation-components", phase: "search-deeplinks-overlays", status: "report-only", tags: ["component", "search"] },
   { id: "component.ui-primitives", title: "Shared UI primitives", source: "UI_MANUAL_TESTING_META.md#ui-primitive-components", phase: "navigation-settings-rtl-theme", status: "report-only", tags: ["component", "primitive", "a11y"] },
@@ -61,7 +62,7 @@ export const uiComponentCoverage: CoverageItem[] = [
   { id: "component.progress", title: "Heatmap, default deck chart, Surah progress", source: "UI_MANUAL_TESTING_META.md#progress-components", phase: "flashcards-home-progress", status: "report-only", tags: ["component", "progress"] },
   { id: "component.settings-pickers", title: "Tafsir and translation pickers", source: "UI_MANUAL_TESTING_META.md#settings-components", phase: "navigation-settings-rtl-theme", status: "report-only", tags: ["component", "settings", "overlay"] },
   { id: "component.public-pages", title: "PublicPage legal/about shell", source: "UI_MANUAL_TESTING_META.md#public-page-components", phase: "route-smoke", status: "strict", tags: ["component", "public"] },
-  { id: "component.zayt", title: "Zayt preview modal and Rive wrapper", source: "UI_MANUAL_TESTING_META.md#zayt-components", phase: "community-auth-online", status: "report-only", tags: ["component", "zayt"] },
+  { id: "component.zayt", title: "Zayt Rive preview wrappers", source: "UI_MANUAL_TESTING_META.md#zayt-components", phase: "community-auth-online", status: "report-only", tags: ["component", "zayt"] },
 ];
 
 export const uiFlowCoverage: CoverageItem[] = [
@@ -91,6 +92,7 @@ export const uiFlowCoverage: CoverageItem[] = [
   { id: "flow.error-empty-loading-offline", title: "Offline, skeletons, empty states, error boundary, toasts", source: "UI_MANUAL_TESTING_META.md#24-error-empty-loading-and-offline-states", phase: "community-auth-online", status: "report-only", tags: ["flow", "offline"] },
   { id: "flow.sync-cross-device", title: "Cross-device sync and conflicts", source: "UI_MANUAL_TESTING_META.md#25-sync-and-cross-device", phase: "community-auth-online", status: "live-env", tags: ["flow", "sync", "supabase"] },
   { id: "flow.accessibility-keyboard", title: "Keyboard navigation, focus, Escape, labels, hit targets", source: "UI_MANUAL_TESTING_META.md#26-accessibility-and-keyboard", phase: "navigation-settings-rtl-theme", status: "report-only", tags: ["flow", "a11y"] },
+  { id: "flow.rtl-automation", title: "RTL source, RNTL, and Arabic route automation", source: "UI_MANUAL_TESTING_META.md#rtl-automation", phase: "rtl-contract", status: "strict", tags: ["flow", "rtl", "automation"] },
 ];
 
 export const uiCoverageItems = [

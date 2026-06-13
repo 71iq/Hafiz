@@ -22,6 +22,7 @@
     "build:web:test": "npm run build:web",
     "test:e2e:smoke": "npm run build:web:test && playwright test --project=smoke-chromium tests/e2e/smoke.spec.ts",
     "test:ui:phase": "node scripts/run-ui-phase.mjs",
+    "test:ui:rtl": "npm run build:web:test && playwright test --project=ui-390-chromium tests/e2e/report-only/rtl-ui-contract.spec.ts",
     "test:ui:baseline": "node scripts/run-ui-baseline.mjs",
     "verify:quick": "npm run typecheck && npm run test:unit && npm run test:e2e:smoke",
     "verify:web": "npm run typecheck && npm run build:web && npm run test:e2e:smoke",

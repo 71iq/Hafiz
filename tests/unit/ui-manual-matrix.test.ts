@@ -14,6 +14,7 @@ const runnablePhases = [
   "search-deeplinks-overlays",
   "flashcards-home-progress",
   "community-auth-online",
+  "rtl-contract",
 ];
 
 describe("UI manual coverage matrix", () => {

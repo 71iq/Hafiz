@@ -411,7 +411,7 @@ Promote checks from report-only to blocking only after they are stable across lo
 - [x] Reuse `waitForQaReady`, `captureConsole`, and `assertHealthyPage`.
 - [x] Keep RTL/no-overflow helpers local to the spec because they are not shared yet.
 - [x] Add `rtl-ui-contract` to `scripts/run-ui-phase.mjs`.
-- [x] Do not add `test:ui:rtl` to `package.json`; the phase runner covers the workflow.
+- [x] Do not add `test:ui:rtl` during Phase 4; keep the phase runner as the initial workflow.
 - [x] Run `npm run build:web` through `npm run test:ui:phase -- rtl-ui-contract`.
 - [x] Run `npm run test:ui:phase -- rtl-ui-contract` (10 passed).
 
@@ -429,10 +429,10 @@ Promote checks from report-only to blocking only after they are stable across lo
 
 ### Phase 6: Promotion And Documentation
 
-- [ ] Create `docs/testing/rtl-contract.md` from the stable contract.
-- [ ] Update `docs/agent/UI_MANUAL_TESTING_META.md` and `tests/ui/ui-manual-matrix.ts` with the official RTL automation phase.
-- [ ] Promote stable report-only checks into blocking test scripts only after repeated clean runs.
-- [ ] Keep `npm run verify:quick` and `npm run verify:web` behavior intentional.
+- [x] Create `docs/testing/rtl-contract.md` from the stable contract.
+- [x] Update `docs/agent/UI_MANUAL_TESTING_META.md` and `tests/ui/ui-manual-matrix.ts` with the official RTL automation phase.
+- [x] Promote the stable RTL route phase into explicit blocking script `npm run test:ui:rtl`.
+- [x] Keep `npm run verify:quick` and `npm run verify:web` unchanged intentionally.
 
 ## Acceptance Criteria
 
@@ -441,5 +441,5 @@ Promote checks from report-only to blocking only after they are stable across lo
 - Unconditional physical left/right styles are caught or allowlisted with reasons.
 - Primitive direction behavior is covered by RNTL where it is actually observable.
 - Quran/QCF/Mushaf content is protected against horizontal mirroring.
-- Arabic web routes can be checked in report-only Playwright without visual snapshots.
+- Arabic web routes can be checked in report-only or blocking Playwright without visual snapshots.
 - The plan and implementation reuse existing Hafiz test infrastructure instead of creating a parallel test universe.
