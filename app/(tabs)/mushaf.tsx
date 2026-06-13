@@ -1439,7 +1439,6 @@ function MushafInner() {
                 isNarrow ? "px-2 py-2" : "px-4 py-3"
               }`}
             >
-              <View />
               <View className={`flex-row items-center ${isNarrow ? "gap-1" : "gap-2.5"}`}>
                 <ViewModeToggle
                   isPageMode={isPageMode}
@@ -1528,6 +1527,7 @@ function MushafInner() {
                   <FontSizeControl onChangeStart={keepChromeVisibleDuringFontChange} />
                 )}
               </View>
+              <View />
             </View>
           )}
         </Animated.View>
