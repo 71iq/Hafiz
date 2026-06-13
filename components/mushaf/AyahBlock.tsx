@@ -15,15 +15,12 @@ import { WordToken } from "./WordToken";
 import {
   BookOpenText,
   Bookmark,
-  Check,
   NotebookPen,
   Pause,
   Play,
-  PlusCircle,
   Share2,
 } from "lucide-react-native";
 import { useStrings } from "@/lib/i18n/useStrings";
-import { addRetentionCard, isRetentionCardSaved } from "@/lib/fsrs/queries";
 import {
   addBookmark as dbAddBookmark,
   fetchSurahName,
@@ -34,8 +31,6 @@ import { formatForCopy } from "@/lib/selection/format";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { useAyahAudio } from "@/lib/audio/ayah-audio";
 import { AyahDetailModal, type AyahDetailTabKey } from "./AyahDetailModal";
-
-const retentionSavedCache = new Map<string, boolean>();
 
 type Props = {
   surah: number;
@@ -74,10 +69,8 @@ function AyahBlockInner({
   const [revealed, setRevealed] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailTab, setDetailTab] = useState<AyahDetailTabKey>("hadith");
-  const [reviewBusy, setReviewBusy] = useState(false);
   const [bookmarkBusy, setBookmarkBusy] = useState(false);
   const [shareBusy, setShareBusy] = useState(false);
-  const [savedToReview, setSavedToReview] = useState(false);
 
   // Target highlight pulses once, then remains visible for navigated/search results.
   const pulseAnim = useRef(new RNAnimated.Value(0)).current;
@@ -121,29 +114,6 @@ function AyahBlockInner({
   useEffect(() => {
     setRevealed(false);
   }, [hideMode]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const cacheKey = `${surah}:${ayah}`;
-    const cached = retentionSavedCache.get(cacheKey);
-    if (cached !== undefined) {
-      setSavedToReview(cached);
-      setReviewBusy(false);
-      return;
-    }
-    setReviewBusy(false);
-    isRetentionCardSaved(db, surah, ayah)
-      .then((saved) => {
-        retentionSavedCache.set(cacheKey, saved);
-        if (!cancelled) setSavedToReview(saved);
-      })
-      .catch(() => {
-        if (!cancelled) setSavedToReview(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [db, surah, ayah]);
 
   const openDetail = useCallback((tab: AyahDetailTabKey) => {
     setDetailTab(tab);
@@ -215,22 +185,6 @@ function AyahBlockInner({
       showToast(result.code === "not_configured" ? s.qfContentMisconfigured : s.qfContentUnavailable);
     }
   }, [ayah, recitationId, showToast, s.qfContentMisconfigured, s.qfContentUnavailable, surah, toggleAyah]);
-
-  const handleAddToReview = useCallback(async () => {
-    if (reviewBusy || savedToReview) return;
-    setReviewBusy(true);
-    try {
-      const result = await addRetentionCard(db, surah, ayah);
-      retentionSavedCache.set(`${surah}:${ayah}`, true);
-      setSavedToReview(true);
-      showToast(result.created ? s.reviewActionAdded : (s.reviewActionAlreadyExists ?? s.reviewActionAdded));
-    } catch (e) {
-      console.warn("[AyahBlock] Failed to add ayah to review:", e);
-      showToast(s.reviewActionFailed);
-    } finally {
-      setReviewBusy(false);
-    }
-  }, [reviewBusy, savedToReview, db, surah, ayah, showToast, s.reviewActionAdded, s.reviewActionAlreadyExists, s.reviewActionFailed]);
 
   const iconColor = isDark ? "#a3a3a3" : "#8B8178";
   const audioState = getAyahState(surah, ayah, recitationId);
@@ -432,15 +386,15 @@ function AyahBlockInner({
           }}
         >
           <ActionPill
-            label={s.tafseer}
-            icon={<BookOpenText size={14} color={iconColor} />}
-            onPress={() => openDetail("tafsir")}
-            isRTL={isRTL}
-          />
-          <ActionPill
             label={s.wordTranslation}
             icon={<BookOpenText size={14} color={iconColor} />}
             onPress={() => openDetail("translation")}
+            isRTL={isRTL}
+          />
+          <ActionPill
+            label={s.tafseer}
+            icon={<BookOpenText size={14} color={iconColor} />}
+            onPress={() => openDetail("tafsir")}
             isRTL={isRTL}
           />
           <ActionPill
@@ -453,22 +407,6 @@ function AyahBlockInner({
             label={s.wordTabQiraat}
             icon={<BookOpenText size={14} color={iconColor} />}
             onPress={() => openDetail("qiraat")}
-            isRTL={isRTL}
-          />
-          <ActionPill
-            label={savedToReview ? s.reviewActionAdded : reviewBusy ? s.addingToReview : s.addToReview}
-            icon={
-              reviewBusy ? (
-                <ActivityIndicator size="small" color={iconColor} />
-              ) : savedToReview ? (
-                <Check size={14} color="#0d9488" />
-              ) : (
-                <PlusCircle size={14} color={iconColor} />
-              )
-            }
-            onPress={handleAddToReview}
-            active={reviewBusy || savedToReview}
-            disabled={reviewBusy || savedToReview}
             isRTL={isRTL}
           />
           <ActionPill
