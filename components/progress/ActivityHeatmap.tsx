@@ -13,6 +13,7 @@ type Props = {
   activeDays?: number;
   totalReviews?: number;
   showSummaryStats?: boolean;
+  size?: "compact" | "expanded";
 };
 
 const BASE_CELL_SIZE = 13;
@@ -48,7 +49,16 @@ function formatDateKey(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-export function ActivityHeatmap({ data, isDark, s, isRTL, activeDays, totalReviews, showSummaryStats = true }: Props) {
+export function ActivityHeatmap({
+  data,
+  isDark,
+  s,
+  isRTL,
+  activeDays,
+  totalReviews,
+  showSummaryStats = true,
+  size = "compact",
+}: Props) {
   const { themeColors } = useSettings();
   const [tooltip, setTooltip] = useState<{ date: string; count: number } | null>(null);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -59,7 +69,21 @@ export function ActivityHeatmap({ data, isDark, s, isRTL, activeDays, totalRevie
   const isSidebarWidth = width >= SIDEBAR_BREAKPOINT;
   const isDesktopWidth = width >= 1024;
   const CELL_GAP = isDesktopWidth ? 5 : isSidebarWidth ? 4 : 3;
-  const maxCellSize = isDesktopWidth ? 24 : isSidebarWidth ? 18 : showSummary ? 15 : BASE_CELL_SIZE;
+  const maxCellSize = size === "expanded"
+    ? isDesktopWidth
+      ? 42
+      : isSidebarWidth
+        ? 32
+        : showSummary
+          ? 16
+          : 18
+    : isDesktopWidth
+      ? 24
+      : isSidebarWidth
+        ? 18
+        : showSummary
+          ? 15
+          : BASE_CELL_SIZE;
   const DAY_LABEL_WIDTH = isArabic ? (showSummary ? 70 : 58) : (showSummary ? 34 : 28);
   const reservedSummaryWidth = showSummary ? (isSidebarWidth ? 200 : 150) : 0;
   const reservedSummaryGap = showSummary ? (isSidebarWidth ? 32 : 20) : 0;

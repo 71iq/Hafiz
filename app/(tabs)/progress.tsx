@@ -232,6 +232,7 @@ export default function ProgressScreen() {
                 activeDays={activeReviewDays}
                 totalReviews={totalReviews}
                 showSummaryStats={false}
+                size="expanded"
               />
             </View>
             <CompactProgressStats
