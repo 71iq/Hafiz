@@ -1,21 +1,12 @@
 import { useCallback, useMemo, useState } from "react";
 import { ActivityIndicator, Platform, Pressable, Text, View, useWindowDimensions } from "react-native";
 import {
-  BookOpen,
-  BookOpenText,
   Check,
   ChevronLeft,
   ChevronRight,
-  Info,
   Minus,
-  Monitor,
-  Moon,
-  Palette,
   Plus,
-  Sun,
-  Type,
   X,
-  type LucideIcon,
 } from "lucide-react-native";
 import { TafsirSourcePicker } from "@/components/settings/TafsirSourcePicker";
 import { OverlayBody, ResponsiveOverlay } from "@/components/ui/ResponsiveOverlay";
@@ -80,7 +71,7 @@ export function ReadingSettingsSheet({
   const [importingTafseerSource, setImportingTafseerSource] = useState<TafsirSourceId | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const Chevron = isRTL ? ChevronLeft : ChevronRight;
-  const iconColor = isDark ? "#a3a3a3" : "#7C6A58";
+  const controlColor = isDark ? "#a3a3a3" : "#7C6A58";
   const accentColor = isDark ? DARK_ACCENT : ACCENT;
   const fontSizeLevelLabel = isRTL ? toArabicNumber(fontSizeIndex + 1) : String(fontSizeIndex + 1);
   const fontSizeTotalLabel = isRTL ? toArabicNumber(FONT_SIZE_STEPS.length) : String(FONT_SIZE_STEPS.length);
@@ -94,9 +85,8 @@ export function ReadingSettingsSheet({
   const horizontalTextAlign = isRTL ? "right" : "left";
   const rowDirection = isRTL ? "row-reverse" : "row";
   const compactRows = width < 460;
-  const useFourColumnThemeGrid = width >= 768;
-  const modalHorizontalPadding = compactRows ? 16 : 24;
-  const titleFontSize = compactRows ? 22 : 24;
+  const modalHorizontalPadding = compactRows ? 16 : 28;
+  const titleFontSize = compactRows ? 21 : 24;
 
   const fontOptions = useMemo<ChoiceOption<"qcf2" | "v4">[]>(
     () => [
@@ -168,18 +158,15 @@ export function ReadingSettingsSheet({
         onClose={onClose}
         phonePresentation="dialog"
         desktopPresentation="dialog"
-        maxWidth={620}
-        maxHeight="80%"
+        maxWidth={680}
+        maxHeight="82%"
         surfaceColor={themeSurface}
       >
         <View
-          className="border-b border-warm-200/40 pt-3 pb-4 dark:border-neutral-800/70"
+          className="border-b border-warm-200/35 py-4 dark:border-neutral-800/70"
           style={{ paddingHorizontal: modalHorizontalPadding }}
         >
-          <View className="items-center pb-3">
-            <View className="h-1 w-12 rounded-full bg-surface-high dark:bg-surface-dark-high" />
-          </View>
-          <View className="items-start justify-between gap-3" style={{ flexDirection: rowDirection, direction: "ltr" }}>
+          <View className="items-start justify-between gap-3" style={{ flexDirection: rowDirection }}>
             <View className="min-w-0 flex-1">
               <Text
                 className="text-charcoal dark:text-neutral-100"
@@ -211,73 +198,44 @@ export function ReadingSettingsSheet({
               accessibilityRole="button"
               accessibilityLabel={s.genericClose}
               hitSlop={8}
-              className="h-10 w-10 items-center justify-center rounded-full bg-surface-low dark:bg-surface-dark-low"
+              className="h-8 w-8 items-center justify-center rounded-full bg-surface-low/70 dark:bg-surface-dark-low/70"
               style={({ pressed }) => ({
                 opacity: pressed ? 0.72 : 1,
                 transform: [{ scale: pressed ? 0.97 : 1 }],
                 cursor: Platform.OS === "web" ? "pointer" : undefined,
               })}
             >
-              <X size={18} color={isDark ? "#d4d4d4" : "#6E6258"} />
+              <X size={16} color={isDark ? "#d4d4d4" : "#6E6258"} />
             </Pressable>
           </View>
         </View>
 
-        <OverlayBody contentContainerStyle={{ paddingHorizontal: modalHorizontalPadding, paddingTop: 18, paddingBottom: 22 }}>
+        <OverlayBody contentContainerStyle={{ paddingHorizontal: modalHorizontalPadding, paddingTop: 18, paddingBottom: 20 }}>
           <SettingsSectionLabel label={s.sectionAppearance} isRTL={isRTL} />
-          <View className="mb-6" style={{ flexDirection: rowDirection, flexWrap: "wrap", gap: 10 }}>
-            <ThemeTile
-              label={s.themeLight}
-              value="white"
-              active={theme === "white"}
-              icon={Sun}
-              isDark={isDark}
-              fourColumns={useFourColumnThemeGrid}
-              onPress={setTheme}
-            />
-            <ThemeTile
-              label={s.themeBeige}
-              value="beige"
-              active={theme === "beige"}
-              icon={BookOpen}
-              isDark={isDark}
-              fourColumns={useFourColumnThemeGrid}
-              onPress={setTheme}
-            />
-            <ThemeTile
-              label={s.themeDark}
-              value="dark"
-              active={theme === "dark" || theme === "amoled"}
-              icon={Moon}
-              isDark={isDark}
-              fourColumns={useFourColumnThemeGrid}
-              onPress={setTheme}
-            />
-            <ThemeTile
-              label={s.themeSystem}
-              value="system"
-              active={theme === "system" || theme === "scheduled"}
-              icon={Monitor}
-              isDark={isDark}
-              fourColumns={useFourColumnThemeGrid}
-              onPress={setTheme}
-            />
-          </View>
+          <ThemeSegmentedControl
+            isDark={isDark}
+            isRTL={isRTL}
+            options={[
+              { value: "white", label: s.themeLight, active: theme === "white" },
+              { value: "beige", label: s.themeBeige, active: theme === "beige" },
+              { value: "dark", label: s.themeDark, active: theme === "dark" || theme === "amoled" },
+              { value: "system", label: s.themeSystem, active: theme === "system" || theme === "scheduled" },
+            ]}
+            onChange={setTheme}
+          />
 
           <SettingsSectionLabel label={s.sectionReading} isRTL={isRTL} />
-          <View className="mb-6 overflow-hidden rounded-2xl border border-warm-200/50 bg-surface-bright dark:border-neutral-800/80 dark:bg-surface-dark-low">
+          <View className="mb-5 overflow-hidden rounded-xl border border-warm-200/45 bg-surface-bright/80 dark:border-neutral-800/80 dark:bg-surface-dark-low/70">
             <SettingsActionRow
-              icon={<BookOpenText size={20} color={iconColor} />}
               title={s.quranFontLabel}
               value={quranBaseFontLabel}
               isRTL={isRTL}
               onPress={() => setFontPickerVisible(true)}
-              trailing={<Chevron size={18} color={iconColor} />}
+              trailing={<Chevron size={17} color={controlColor} />}
               compact={compactRows}
             />
             <Divider />
             <SettingsActionRow
-              icon={<Type size={20} color={iconColor} />}
               title={s.fontSizeLabel}
               subtitle={fontSizeUsesFittedPageSize ? s.fontSizeFixedPageView : undefined}
               isRTL={isRTL}
@@ -297,7 +255,6 @@ export function ReadingSettingsSheet({
             />
             <Divider />
             <SettingsActionRow
-              icon={<Palette size={20} color={iconColor} />}
               title={s.quranFontV4Tajweed}
               isRTL={isRTL}
               trailing={<Switch value={tajweedEnabled} onValueChange={handleTajweedToggle} />}
@@ -306,44 +263,36 @@ export function ReadingSettingsSheet({
           </View>
 
           <SettingsSectionLabel label={s.readingSettingsAyahDisplay} isRTL={isRTL} />
-          <View className="mb-6 overflow-hidden rounded-2xl border border-warm-200/50 bg-surface-bright dark:border-neutral-800/80 dark:bg-surface-dark-low">
+          <View className="mb-5 overflow-hidden rounded-xl border border-warm-200/45 bg-surface-bright/80 dark:border-neutral-800/80 dark:bg-surface-dark-low/70">
             <SettingsActionRow
-              icon={<BookOpen size={20} color={iconColor} />}
               title={s.quranMarkerStyleLabel}
               value={markerStyleLabel}
               isRTL={isRTL}
               onPress={() => setMarkerStylePickerVisible(true)}
-              trailing={<Chevron size={18} color={iconColor} />}
+              trailing={<Chevron size={17} color={controlColor} />}
               compact={compactRows}
             />
           </View>
 
           <SettingsSectionLabel label={s.tafseer} isRTL={isRTL} />
-          <View className="overflow-hidden rounded-2xl border border-warm-200/50 bg-surface-bright dark:border-neutral-800/80 dark:bg-surface-dark-low">
+          <View className="overflow-hidden rounded-xl border border-warm-200/45 bg-surface-bright/80 dark:border-neutral-800/80 dark:bg-surface-dark-low/70">
             <SettingsActionRow
-              icon={
-                importingTafseerSource ? (
-                  <ActivityIndicator size="small" color={accentColor} />
-                ) : (
-                  <BookOpenText size={20} color={iconColor} />
-                )
-              }
               title={s.tafseerSourceLabel}
               value={currentTafseerTitle}
               isRTL={isRTL}
               onPress={() => setTafseerPickerVisible(true)}
-              trailing={<Chevron size={18} color={iconColor} />}
+              trailing={importingTafseerSource ? <ActivityIndicator size="small" color={accentColor} /> : <Chevron size={17} color={controlColor} />}
               compact={compactRows}
             />
           </View>
 
-          <View className="mt-5 items-center justify-center gap-2" style={{ flexDirection: rowDirection }}>
-            <Info size={14} color={isDark ? "#737373" : "#B4AAA0"} />
+          <View className="mt-5 items-center justify-center">
             <Text
               className="text-warm-400 dark:text-neutral-500"
               style={{
-                fontFamily: "Manrope_500Medium",
-                fontSize: 12,
+                fontFamily: "Manrope_400Regular",
+                fontSize: 11,
+                lineHeight: 16,
                 textAlign: "center",
                 writingDirection: isRTL ? "rtl" : "ltr",
               }}
@@ -389,81 +338,64 @@ export function ReadingSettingsSheet({
   );
 }
 
-function ThemeTile({
-  label,
-  value,
-  active,
-  icon: Icon,
+function ThemeSegmentedControl({
+  options,
   isDark,
-  fourColumns,
-  onPress,
+  isRTL,
+  onChange,
 }: {
-  label: string;
-  value: ThemeMode;
-  active: boolean;
-  icon: LucideIcon;
+  options: Array<{ value: ThemeMode; label: string; active: boolean }>;
   isDark: boolean;
-  fourColumns: boolean;
-  onPress: (theme: ThemeMode) => void;
+  isRTL: boolean;
+  onChange: (theme: ThemeMode) => void;
 }) {
-  const isDarkTile = value === "dark";
-  const activeBackgroundColor = isDark ? "rgba(45,212,191,0.08)" : "rgba(13,148,136,0.05)";
-  const iconColor = active
-    ? isDark
-      ? DARK_ACCENT
-      : ACCENT
-    : isDarkTile
-      ? "#E5E7EB"
-      : value === "beige"
-        ? "#9A7658"
-        : "#7A7A7A";
-  const labelColor = isDarkTile
-      ? "#F5F5F5"
-      : value === "beige"
-        ? "#9A7658"
-        : isDark
-          ? "#D4D4D4"
-          : "#7C6A58";
-
   return (
-    <Pressable
-      onPress={() => onPress(value)}
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
-      className="items-center justify-center gap-2 rounded-2xl px-2 py-3"
-      style={{
-        flexBasis: fourColumns ? "22%" : "47%",
-        flexGrow: 1,
-        minHeight: fourColumns ? 82 : 78,
-        backgroundColor:
-          active
-            ? activeBackgroundColor
-            : value === "dark"
-            ? "#262626"
-            : value === "beige"
-              ? isDark
-                ? "rgba(154,118,88,0.12)"
-                : "#FBF7F1"
-              : isDark
-                ? "rgba(255,255,255,0.03)"
-                : "#FFFFFF",
-        borderColor: active ? (isDark ? "rgba(45,212,191,0.55)" : "rgba(13,148,136,0.45)") : isDark ? "rgba(255,255,255,0.08)" : "#EEE8E0",
-        borderWidth: 1,
-        cursor: Platform.OS === "web" ? "pointer" : undefined,
-      }}
+    <View
+      className="mb-5 rounded-xl border border-warm-200/45 bg-surface-bright/70 p-1 dark:border-neutral-800/80 dark:bg-surface-dark-low/70"
+      style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
     >
-      <Icon size={22} color={iconColor} strokeWidth={active ? 2 : 1.7} />
-      <Text
-        style={{
-          color: labelColor,
-          fontFamily: "Manrope_600SemiBold",
-          fontSize: 13,
-          textAlign: "center",
-        }}
-      >
-        {label}
-      </Text>
-    </Pressable>
+      {options.map((option) => {
+        const color = option.active
+          ? isDark ? "#F5F5F5" : "#2E2A26"
+          : isDark ? "#a3a3a3" : "#7C6A58";
+        return (
+          <Pressable
+            key={option.value}
+            onPress={() => onChange(option.value)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: option.active }}
+            className="h-10 flex-1 items-center justify-center rounded-lg px-2"
+            style={({ pressed }) => ({
+              backgroundColor: option.active
+                ? isDark ? "rgba(255,255,255,0.08)" : "rgba(13,148,136,0.07)"
+                : "transparent",
+              borderColor: option.active
+                ? isDark ? "rgba(255,255,255,0.12)" : "rgba(13,148,136,0.22)"
+                : "transparent",
+              borderWidth: 1,
+              opacity: pressed ? 0.72 : 1,
+              cursor: Platform.OS === "web" ? "pointer" : undefined,
+            })}
+          >
+            <Text
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.82}
+              style={{
+                color,
+                fontFamily: option.active ? "Manrope_600SemiBold" : "Manrope_500Medium",
+                fontSize: 13,
+                lineHeight: 17,
+                textAlign: "center",
+                writingDirection: isRTL ? "rtl" : "ltr",
+              }}
+            >
+              {option.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
   );
 }
 
@@ -486,7 +418,6 @@ function SettingsSectionLabel({ label, isRTL }: { label: string; isRTL: boolean 
 }
 
 function SettingsActionRow({
-  icon,
   title,
   subtitle,
   value,
@@ -496,7 +427,6 @@ function SettingsActionRow({
   disabled = false,
   compact = false,
 }: {
-  icon: React.ReactNode;
   title: string;
   subtitle?: string;
   value?: string;
@@ -508,13 +438,12 @@ function SettingsActionRow({
 }) {
   const content = (
     <>
-      <View className={`${compact ? "w-8" : "w-9"} items-center justify-center`}>{icon}</View>
       <View className="min-w-0 flex-1">
         <Text
           className="text-charcoal dark:text-neutral-100"
           style={{
             fontFamily: "Manrope_600SemiBold",
-            fontSize: compact ? 14 : 15,
+            fontSize: compact ? 14 : 14.5,
             lineHeight: compact ? 19 : 20,
             textAlign: isRTL ? "right" : "left",
             writingDirection: isRTL ? "rtl" : "ltr",
@@ -609,10 +538,10 @@ function SettingsStepper({
   compact?: boolean;
 }) {
   const iconColor = isDark ? "#d4d4d4" : "#6E6258";
-  const buttonSizeClass = "h-9 w-9";
+  const buttonSizeClass = compact ? "h-8 w-8" : "h-8 w-8";
   return (
     <View
-      className="rounded-full bg-surface-low p-0.5 dark:bg-surface-dark-high"
+      className="rounded-lg border border-warm-200/40 bg-surface-low/60 p-0.5 dark:border-neutral-800 dark:bg-surface-dark-high/70"
       style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
     >
       <Pressable
@@ -625,12 +554,12 @@ function SettingsStepper({
           cursor: Platform.OS === "web" ? (decrementDisabled ? "auto" : "pointer") : undefined,
         })}
       >
-        <Minus size={16} color={iconColor} />
+        <Minus size={15} color={iconColor} />
       </Pressable>
-      <View className={`${compact ? "min-w-12" : "min-w-14"} items-center justify-center px-1`}>
+      <View className={`${compact ? "min-w-11" : "min-w-12"} items-center justify-center px-1`}>
         <Text
           className="text-charcoal dark:text-neutral-100"
-          style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}
+          style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12.5 }}
         >
           {value}
         </Text>
@@ -645,7 +574,7 @@ function SettingsStepper({
           cursor: Platform.OS === "web" ? (incrementDisabled ? "auto" : "pointer") : undefined,
         })}
       >
-        <Plus size={16} color={iconColor} />
+        <Plus size={15} color={iconColor} />
       </Pressable>
     </View>
   );
