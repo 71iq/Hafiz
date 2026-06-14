@@ -10,7 +10,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { router } from "expo-router";
-import { Search, X, Clock, ChevronDown, ChevronRight } from "lucide-react-native";
+import { Search, X, Clock, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react-native";
 import { SearchResultsSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useDatabase } from "@/lib/database/provider";
@@ -468,6 +468,7 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
 
   const tealColor = "#0d9488";
   const mutedColor = isDark ? "#737373" : "#8B8178";
+  const LemmaDisclosureChevron = isRTL ? ChevronLeft : ChevronRight;
   const isPhone = width < SIDEBAR_BREAKPOINT;
   const modalHeight = isPhone ? Math.min(height - 16, 900) : Math.min(height - 48, 760);
 
@@ -802,14 +803,21 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
                   <View className="mb-1">
                     <Pressable
                       onPress={() => toggleLemma(group.lemma)}
-                      className="flex-row items-center justify-between px-5 py-3 bg-surface-low dark:bg-surface-dark-low"
-                      style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
+                      className="items-center justify-between bg-surface-low px-5 py-3 dark:bg-surface-dark-low"
+                      style={({ pressed }) => ({
+                        direction: "ltr",
+                        flexDirection: isRTL ? "row-reverse" : "row",
+                        opacity: pressed ? 0.8 : 1,
+                      })}
                     >
-                      <View className="flex-row items-center gap-2">
+                      <View
+                        className="items-center gap-2"
+                        style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
+                      >
                         {isExpanded ? (
                           <ChevronDown size={14} color={tealColor} />
                         ) : (
-                          <ChevronRight size={14} color={tealColor} />
+                          <LemmaDisclosureChevron size={14} color={tealColor} />
                         )}
                         <Text
                           className="text-charcoal dark:text-neutral-100"

@@ -85,8 +85,8 @@ export function TranslationLanguagePicker({ visible, onClose }: Props) {
                 onPressOut={() => setPressedCode(null)}
                 className="items-center justify-between gap-3 rounded-2xl px-3 py-3.5"
                 style={{
-                  direction: isRTL ? "rtl" : "ltr",
-                  flexDirection: "row",
+                  direction: "ltr",
+                  flexDirection: isRTL ? "row-reverse" : "row",
                   backgroundColor: isSelected
                     ? isDark
                       ? "rgba(45,212,191,0.08)"

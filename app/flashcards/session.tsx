@@ -11,7 +11,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import type { SQLiteDatabase } from "expo-sqlite";
-import { CalendarDays, ChevronRight, Clock3, EllipsisVertical, PauseCircle, Pencil, RotateCcw, Star, Trash2, Trophy, X } from "lucide-react-native";
+import { CalendarDays, ChevronLeft, ChevronRight, Clock3, EllipsisVertical, PauseCircle, Pencil, RotateCcw, Star, Trash2, Trophy, X } from "lucide-react-native";
 import { useDatabase, useDatabaseStatus } from "@/lib/database/provider";
 import { SettingsProvider, useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -190,6 +190,7 @@ function FlashcardSessionScreen() {
   const db = useDatabase();
   const { isDark, isRTL, fontSize, lineHeight, tafseerSource, themeSurface, isLoaded: settingsLoaded } = useSettings();
   const s = useStrings();
+  const NextIcon = isRTL ? ChevronLeft : ChevronRight;
   const router = useRouter();
   const { deckId } = useLocalSearchParams<{ deckId?: string }>();
   const { width } = useWindowDimensions();
@@ -1030,11 +1031,14 @@ function FlashcardSessionScreen() {
 
           {phase === "side" && revealed && !isLastSide && (
             <Button onPress={handleNext} className="w-full">
-              <View className="flex-row items-center gap-2">
+              <View
+                className="items-center gap-2"
+                style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
+              >
                 <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16, color: "#fff" }}>
                   {s.flashcardsNext}
                 </Text>
-                <ChevronRight size={18} color="#fff" />
+                <NextIcon size={18} color="#fff" />
               </View>
             </Button>
           )}

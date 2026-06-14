@@ -174,7 +174,10 @@ export function RecitationRangeSheet({ visible, onClose, currentAyah }: Props) {
             transform: [{ scale: pressed ? 0.99 : 1 }],
           })}
         >
-          <View className={isRTL ? "flex-row-reverse items-center gap-3" : "flex-row items-center gap-3"}>
+          <View
+            className="items-center gap-3"
+            style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
+          >
             <View className="h-11 w-11 items-center justify-center rounded-full bg-primary-accent/10 dark:bg-primary-bright/10">
               <ListMusic size={19} color={isDark ? "#2dd4bf" : "#0d9488"} />
             </View>

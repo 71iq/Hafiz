@@ -150,9 +150,10 @@ export function TafsirSourcePicker({
                 accessibilityRole="button"
                 onPressIn={() => setPressedSource(source.id)}
                 onPressOut={() => setPressedSource(null)}
-                className="flex-row items-center justify-between gap-3 rounded-2xl px-3 py-3.5"
+                className="items-center justify-between gap-3 rounded-2xl px-3 py-3.5"
                 style={({ pressed }) => ({
-                  direction: isRTL ? "rtl" : "ltr",
+                  direction: "ltr",
+                  flexDirection: isRTL ? "row-reverse" : "row",
                   backgroundColor: isSelected
                     ? isDark
                       ? "rgba(45,212,191,0.08)"

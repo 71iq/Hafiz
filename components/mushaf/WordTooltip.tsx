@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { View, Text, Pressable, Platform } from "react-native";
-import { ChevronRight } from "lucide-react-native";
+import { ChevronLeft, ChevronRight } from "lucide-react-native";
 import { useDatabase } from "@/lib/database/provider";
 import { useWordInteraction, type TooltipPosition } from "@/lib/word/context";
 import {
@@ -29,17 +29,20 @@ function closestMatches(target: EventTarget | null, selector: string) {
 function TooltipPopup({
   position,
   translation,
+  isRTL,
   onPress,
   onHoverIn,
   onHoverOut,
 }: {
   position: TooltipPosition;
   translation: string | null;
+  isRTL: boolean;
   onPress: () => void;
   onHoverIn?: () => void;
   onHoverOut?: () => void;
 }) {
   const [tooltipWidth, setTooltipWidth] = useState(0);
+  const TooltipChevron = isRTL ? ChevronLeft : ChevronRight;
 
   const viewportWidth = typeof window !== "undefined" ? window.innerWidth : 400;
   const maxTooltipWidth = Math.min(MAX_TOOLTIP_WIDTH, viewportWidth - SIDE_MARGIN * 2);
@@ -77,7 +80,8 @@ function TooltipPopup({
           borderRadius: 20, // pill shape per DESIGN.md
           paddingHorizontal: 14,
           paddingVertical: 8,
-          flexDirection: "row",
+          direction: "ltr",
+          flexDirection: isRTL ? "row-reverse" : "row",
           alignItems: "center",
           gap: 5,
           maxWidth: maxTooltipWidth,
@@ -98,13 +102,15 @@ function TooltipPopup({
             overflow: "hidden",
             // @ts-ignore — whiteSpace is valid CSS on web
             whiteSpace: "nowrap",
+            textAlign: isRTL ? "right" : "left",
+            writingDirection: isRTL ? "rtl" : "ltr",
           }}
           numberOfLines={1}
           ellipsizeMode="tail"
         >
           {translation ?? "…"}
         </Text>
-        <ChevronRight size={12} color="rgba(255,255,255,0.6)" />
+        <TooltipChevron size={12} color="rgba(255,255,255,0.6)" />
       </View>
       {/* Down-pointing caret */}
       <View
@@ -127,7 +133,7 @@ function TooltipPopup({
 export function FloatingWordTooltip() {
   const { tooltipWord, tooltipPosition, openDetail, cancelTooltipClear, clearTooltip, clearTooltipDelayed } = useWordInteraction();
   const db = useDatabase();
-  const { uiLanguage } = useSettings();
+  const { isRTL, uiLanguage } = useSettings();
   const s = useStrings();
   const [translation, setTranslation] = useState<string | null>(null);
   const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -218,6 +224,7 @@ export function FloatingWordTooltip() {
     <TooltipPopup
       position={tooltipPosition}
       translation={translation}
+      isRTL={isRTL}
       onPress={() => openDetail(tooltipWord)}
       onHoverIn={cancelTooltipClear}
       onHoverOut={clearTooltipDelayed}

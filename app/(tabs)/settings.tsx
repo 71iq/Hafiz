@@ -826,8 +826,12 @@ export default function SettingsScreen() {
                   onPress={() => router.push("/profile" as any)}
                   accessibilityRole="button"
                   accessibilityLabel={s.settingsProfile}
-                  className={`mb-4 items-center gap-3 rounded-3xl bg-surface dark:bg-surface-dark p-4 ${isRTL ? "flex-row-reverse" : "flex-row"}`}
-                  style={({ pressed }) => ({ opacity: pressed ? 0.74 : 1 })}
+                  className="mb-4 items-center gap-3 rounded-3xl bg-surface p-4 dark:bg-surface-dark"
+                  style={({ pressed }) => ({
+                    direction: "ltr",
+                    flexDirection: isRTL ? "row-reverse" : "row",
+                    opacity: pressed ? 0.74 : 1,
+                  })}
                 >
                   <ProfileIdentity
                     displayName={accountName}
@@ -1537,9 +1541,11 @@ function SettingsLinkRow({
   return (
     <Pressable
       onPress={onPress}
-      className={`${isRTL ? "flex-row-reverse" : "flex-row"} items-center gap-3 rounded-2xl px-3 py-3`}
+      className="items-center gap-3 rounded-2xl px-3 py-3"
       style={({ pressed }) => ({
         backgroundColor: pressed ? themeColors.surfaceMid : "transparent",
+        direction: "ltr",
+        flexDirection: isRTL ? "row-reverse" : "row",
         opacity: pressed ? 0.86 : 1,
       })}
     >

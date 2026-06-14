@@ -485,11 +485,10 @@ function SettingsActionRow({
     </>
   );
 
-  const rowClassName = `${compact ? "min-h-14 gap-2 px-3 py-3" : "min-h-16 gap-3 px-4 py-3"} ${
-    isRTL ? "flex-row-reverse" : "flex-row"
-  } items-center`;
+  const rowClassName = `${compact ? "min-h-14 gap-2 px-3 py-3" : "min-h-16 gap-3 px-4 py-3"} items-center`;
   const rowStyle = {
-    direction: isRTL ? "rtl" : "ltr",
+    direction: "ltr",
+    flexDirection: isRTL ? "row-reverse" : "row",
     opacity: disabled ? 0.42 : 1,
   } as const;
 

@@ -88,9 +88,10 @@ export function ReciterPicker({ visible, selectedId, onSelect, onClose }: Props)
                 onPress={() => handleSelect(reciter.id)}
                 accessibilityRole="button"
                 accessibilityState={{ selected }}
-                className={`w-full items-center justify-between gap-3 rounded-2xl px-3 py-3 ${isRTL ? "flex-row-reverse" : "flex-row"}`}
+                className="w-full items-center justify-between gap-3 rounded-2xl px-3 py-3"
                 style={({ pressed }) => ({
-                  direction: isRTL ? "rtl" : "ltr",
+                  direction: "ltr",
+                  flexDirection: isRTL ? "row-reverse" : "row",
                   backgroundColor: selected
                     ? isDark
                       ? "rgba(45,212,191,0.08)"
