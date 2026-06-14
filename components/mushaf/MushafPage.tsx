@@ -15,6 +15,7 @@ import {
 } from "@/lib/fonts/loader";
 import { useSelection } from "@/lib/selection/context";
 import { useSettings } from "@/lib/settings/context";
+import { shouldJustifyMushafLine } from "@/lib/mushaf/page-layout";
 
 export type PageWordsByLine = Record<string, string>;
 export type PageWordsData = PageWordsByLine[];
@@ -436,9 +437,9 @@ function MushafPageInner({
       centered: boolean,
     ) => {
       if (words.length === 0) return null;
-      const shouldStretchLine = !centered && words.length > 1;
+      const shouldStretchLine = shouldJustifyMushafLine(pageNumber, lineNumber, centered, words.length);
       const lineHeightStyle = allowLineWrap ? visualLineHeight : lineHeight;
-      const lineGap = pageNumber === 2 && lineNumber === 4 ? fontSize * 0.12 : fontSize * 0.28;
+      const lineGap = pageNumber === 2 && (lineNumber === 4 || lineNumber === 5) ? fontSize * 0.12 : fontSize * 0.28;
 
       return (
         <View
