@@ -67,6 +67,9 @@ type ProfileTab = "overview" | "notes";
 
 const PROFILE_BIO_MAX_LENGTH = 280;
 const PROFILE_COUNTRY_MAX_LENGTH = 80;
+const EDIT_PROFILE_MODAL_MAX_WIDTH = 780;
+const EDIT_PROFILE_AVATAR_SIZE = 118;
+const EDIT_PROFILE_AVATAR_SIZE_PHONE = 88;
 
 const COUNTRY_REGION_CODES = [
   "AF", "AX", "AL", "DZ", "AS", "AD", "AO", "AI", "AQ", "AG", "AR", "AM", "AW", "AU", "AT", "AZ", "BS", "BH",
@@ -580,123 +583,313 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
       <ResponsiveModal
         open={editOpen}
         onClose={() => setEditOpen(false)}
-        maxWidth={520}
+        maxWidth={EDIT_PROFILE_MODAL_MAX_WIDTH}
+        maxHeight={maxOverlayHeight}
+        surfaceColor={isDark ? themeColors.surfaceLow : themeColors.surfaceBright}
         dir={isRTL ? "rtl" : "ltr"}
         avoidKeyboard
       >
-        <OverlayHeader title={s.profileEditTitle} subtitle={s.profileEditSubtitle} onClose={() => setEditOpen(false)} isRTL={isRTL} />
-        <OverlayBody contentContainerClassName="gap-4 px-5 py-5">
-          <View className={`items-center gap-3 ${isRTL ? "flex-row-reverse" : "flex-row"}`} style={mirroredRowStyle}>
-            <ProfileAvatar avatarUrl={avatarPreviewUrl} name={displayName} size={58} isDark={isDark} />
-            <View className="min-w-0 flex-1">
-              <Input
-                value={displayNameDraft}
-                onChangeText={(value) => {
-                  setDisplayNameDraft(value);
-                  setProfileStatus(null);
-                }}
-                placeholder={s.profileDisplayNamePlaceholder}
-                accessibilityLabel={s.authDisplayName}
-                maxLength={60}
-                dir={isRTL ? "rtl" : "ltr"}
-                className="min-h-8 bg-transparent px-2 py-0"
-                style={{ height: 32, lineHeight: 20 }}
-              />
-            </View>
-          </View>
-          <View className={`gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`} style={mirroredRowStyle}>
-            <Button
-              variant="outline"
-              className="flex-1 gap-2 bg-surface-high dark:bg-surface-dark-high"
-              onPress={handlePickAvatar}
-              disabled={profileSaving || authLoading}
-            >
-              <Camera size={16} color={isDark ? "#5eead4" : "#003638"} />
-              <Text className="text-charcoal dark:text-neutral-200" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>
-                {s.profileChangePhoto}
-              </Text>
-            </Button>
-            {avatarPreviewUrl ? (
-              <Button
-                variant="outline"
-                size="icon"
-                className="bg-surface-high dark:bg-surface-dark-high"
-                onPress={handleRemoveAvatar}
-                disabled={profileSaving || authLoading}
-              >
-                <Trash2 size={16} color={isDark ? "#fca5a5" : "#dc2626"} />
-              </Button>
-            ) : null}
-          </View>
-          <View>
-            <View className={`mb-1 items-center ${isRTL ? "flex-row-reverse justify-start" : "flex-row justify-end"}`}>
-              <Text
-                className="text-warm-500 dark:text-neutral-500"
-                style={{ fontFamily: "Manrope_500Medium", fontSize: 11, textAlign: isRTL ? "left" : "right" }}
-              >
-                {bioCount}
-              </Text>
-            </View>
-            <Input
-              value={bioDraft}
-              onChangeText={(value) => {
-                setBioDraft(value);
-                setProfileStatus(null);
-              }}
-              placeholder={s.profileBioPlaceholder}
-              accessibilityLabel={s.profileBioTitle}
-              maxLength={PROFILE_BIO_MAX_LENGTH}
-              multiline
-              dir={isRTL ? "rtl" : "ltr"}
-              className="min-h-[104px] rounded-2xl bg-surface-high dark:bg-surface-dark-high"
-              style={{ lineHeight: 21 }}
-            />
-          </View>
-          <View>
-            <CountryCommandSelect
-              value={countryDraft}
-              onChange={(value) => {
-                setCountryDraft(value);
-                setProfileStatus(null);
-              }}
-              placeholder={s.profileCountryPlaceholder}
-              searchPlaceholder={s.profileCountrySearchPlaceholder}
-              emptyLabel={s.profileCountryNoResults}
-              clearLabel={s.profileCountryClear}
-              language={uiLanguage}
-              isDark={isDark}
-              isRTL={isRTL}
-              disabled={profileSaving || authLoading}
-            />
-          </View>
-          <Button
-            className="gap-2"
-            onPress={handleSaveProfile}
-            disabled={saveProfileDisabled}
-            style={{ backgroundColor: saveProfileBackgroundColor, opacity: saveProfileDisabled && !profileSaving ? 1 : undefined }}
-          >
-            {profileSaving ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Save size={16} color={saveProfileIconColor} />}
-            <Text style={{ color: saveProfileTextColor, fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>
-              {s.profileSave}
-            </Text>
-          </Button>
-          {statusMessage ? (
+        <View
+          className="border-b border-warm-200 dark:border-neutral-800"
+          style={{
+            direction: "ltr",
+            flexDirection: isRTL ? "row-reverse" : "row",
+            justifyContent: "space-between",
+            gap: 20,
+            paddingHorizontal: isPhone ? 24 : 32,
+            paddingTop: isPhone ? 24 : 30,
+            paddingBottom: isPhone ? 22 : 28,
+          }}
+        >
+          <View className="min-w-0 flex-1" style={{ alignItems: isRTL ? "flex-end" : "flex-start" }}>
             <Text
-              className={profileStatus === "saved" ? "text-primary-accent dark:text-primary-bright" : "text-red-600 dark:text-red-400"}
+              className="text-charcoal dark:text-neutral-100"
               style={{
-                fontFamily: "Manrope_500Medium",
-                fontSize: 12,
+                fontFamily: "Manrope_700Bold",
+                fontSize: isPhone ? 28 : 32,
+                lineHeight: isPhone ? 34 : 39,
                 textAlign: isRTL ? "right" : "left",
                 writingDirection: isRTL ? "rtl" : "ltr",
               }}
             >
-              {statusMessage}
+              {s.profileEditTitle}
             </Text>
-          ) : null}
+            <Text
+              className="mt-2 text-warm-500 dark:text-neutral-400"
+              style={{
+                fontFamily: "Manrope_400Regular",
+                fontSize: isPhone ? 17 : 19,
+                lineHeight: isPhone ? 24 : 27,
+                textAlign: isRTL ? "right" : "left",
+                writingDirection: isRTL ? "rtl" : "ltr",
+              }}
+            >
+              {s.profileEditSubtitle}
+            </Text>
+          </View>
+          <Pressable
+            onPress={() => setEditOpen(false)}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={s.genericClose}
+            className="items-center justify-center rounded-full bg-surface-low dark:bg-surface-dark-high"
+            style={{ height: isPhone ? 48 : 56, width: isPhone ? 48 : 56 }}
+          >
+            <X size={isPhone ? 24 : 27} color={isDark ? "#d4d4d4" : "#3f3f46"} />
+          </Pressable>
+        </View>
+
+        <OverlayBody
+          contentContainerStyle={{
+            paddingHorizontal: isPhone ? 24 : 32,
+            paddingVertical: isPhone ? 24 : 34,
+          }}
+        >
+          <View style={{ gap: isPhone ? 24 : 32 }}>
+            <View
+              style={{
+                alignItems: isPhone ? (isRTL ? "flex-end" : "flex-start") : "center",
+                direction: "ltr",
+                flexDirection: isPhone ? "column" : isRTL ? "row-reverse" : "row",
+                gap: isPhone ? 18 : 32,
+              }}
+            >
+              <ProfileAvatar
+                avatarUrl={avatarPreviewUrl}
+                name={displayName}
+                size={isPhone ? EDIT_PROFILE_AVATAR_SIZE_PHONE : EDIT_PROFILE_AVATAR_SIZE}
+                isDark={isDark}
+              />
+              <View
+                className="min-w-0 flex-1"
+                style={{ alignItems: isRTL ? "flex-end" : "flex-start", gap: 12, width: isPhone ? "100%" : undefined }}
+              >
+                <Input
+                  value={displayNameDraft}
+                  onChangeText={(value) => {
+                    setDisplayNameDraft(value);
+                    setProfileStatus(null);
+                  }}
+                  placeholder={s.profileDisplayNamePlaceholder}
+                  accessibilityLabel={s.authDisplayName}
+                  maxLength={60}
+                  dir={isRTL ? "rtl" : "ltr"}
+                  className="min-h-10 rounded-none bg-transparent px-0 py-0"
+                  style={{
+                    fontFamily: "Manrope_700Bold",
+                    fontSize: isPhone ? 22 : 24,
+                    height: 40,
+                    lineHeight: 30,
+                    minWidth: isPhone ? 260 : 320,
+                  }}
+                />
+                <Text
+                  className="text-warm-500 dark:text-neutral-400"
+                  style={{
+                    fontFamily: "Manrope_400Regular",
+                    fontSize: isPhone ? 16 : 18,
+                    lineHeight: isPhone ? 22 : 25,
+                    textAlign: isRTL ? "right" : "left",
+                    writingDirection: isRTL ? "rtl" : "ltr",
+                  }}
+                >
+                  {s.profileEditIntroSubtitle}
+                </Text>
+                <View
+                  style={{
+                    direction: "ltr",
+                    flexDirection: isRTL ? "row-reverse" : "row",
+                    flexWrap: "wrap",
+                    gap: 12,
+                    justifyContent: isRTL ? "flex-end" : "flex-start",
+                    marginTop: 4,
+                  }}
+                >
+                  <ProfileEditActionButton
+                    icon={Camera}
+                    label={s.profileChangePhoto}
+                    color={isDark ? "#5eead4" : "#003638"}
+                    borderColor={isDark ? themeColors.surfaceHigh : "rgba(45,45,45,0.16)"}
+                    disabled={profileSaving || authLoading}
+                    isRTL={isRTL}
+                    onPress={handlePickAvatar}
+                  />
+                  {avatarPreviewUrl ? (
+                    <ProfileEditActionButton
+                      icon={Trash2}
+                      label={s.profileRemovePhoto}
+                      color={isDark ? "#f87171" : "#dc2626"}
+                      borderColor={isDark ? themeColors.surfaceHigh : "rgba(45,45,45,0.16)"}
+                      disabled={profileSaving || authLoading}
+                      isRTL={isRTL}
+                      onPress={handleRemoveAvatar}
+                    />
+                  ) : null}
+                </View>
+              </View>
+            </View>
+
+            <View style={{ gap: 12 }}>
+              <ProfileEditFieldLabel label={s.profileBioTitle} isRTL={isRTL} />
+              <View
+                className="overflow-hidden rounded-2xl border border-warm-200 bg-surface-bright dark:border-neutral-800 dark:bg-surface-dark"
+                style={{ minHeight: isPhone ? 150 : 170 }}
+              >
+                <Input
+                  value={bioDraft}
+                  onChangeText={(value) => {
+                    setBioDraft(value);
+                    setProfileStatus(null);
+                  }}
+                  placeholder={s.profileBioPlaceholder}
+                  accessibilityLabel={s.profileBioTitle}
+                  maxLength={PROFILE_BIO_MAX_LENGTH}
+                  multiline
+                  dir={isRTL ? "rtl" : "ltr"}
+                  className="min-h-[148px] rounded-none bg-transparent px-5 py-4"
+                  style={{
+                    lineHeight: 23,
+                    paddingBottom: 40,
+                  }}
+                />
+                <Text
+                  className="absolute bottom-4 text-warm-500 dark:text-neutral-500"
+                  style={{
+                    [isRTL ? "left" : "right"]: 18,
+                    fontFamily: "Manrope_500Medium",
+                    fontSize: 15,
+                    textAlign: isRTL ? "left" : "right",
+                  }}
+                >
+                  {bioCount}
+                </Text>
+              </View>
+            </View>
+
+            <View style={{ gap: 12 }}>
+              <ProfileEditFieldLabel label={s.profileCountryTitle} isRTL={isRTL} />
+              <CountryCommandSelect
+                value={countryDraft}
+                onChange={(value) => {
+                  setCountryDraft(value);
+                  setProfileStatus(null);
+                }}
+                placeholder={s.profileCountryPlaceholder}
+                searchPlaceholder={s.profileCountrySearchPlaceholder}
+                emptyLabel={s.profileCountryNoResults}
+                clearLabel={s.profileCountryClear}
+                language={uiLanguage}
+                isDark={isDark}
+                isRTL={isRTL}
+                disabled={profileSaving || authLoading}
+              />
+            </View>
+
+            {statusMessage ? (
+              <Text
+                className={profileStatus === "saved" ? "text-primary-accent dark:text-primary-bright" : "text-red-600 dark:text-red-400"}
+                style={{
+                  fontFamily: "Manrope_500Medium",
+                  fontSize: 13,
+                  textAlign: isRTL ? "right" : "left",
+                  writingDirection: isRTL ? "rtl" : "ltr",
+                }}
+              >
+                {statusMessage}
+              </Text>
+            ) : null}
+          </View>
         </OverlayBody>
+
+        <View
+          className="border-t border-warm-200 dark:border-neutral-800"
+          style={{
+            paddingHorizontal: isPhone ? 24 : 32,
+            paddingTop: isPhone ? 18 : 22,
+            paddingBottom: isPhone ? 24 : 26,
+          }}
+        >
+          <Button
+            size="lg"
+            className="w-full gap-3 rounded-2xl"
+            onPress={handleSaveProfile}
+            disabled={saveProfileDisabled}
+            dir={isRTL ? "rtl" : "ltr"}
+            style={{ backgroundColor: saveProfileBackgroundColor, minHeight: 58, opacity: saveProfileDisabled && !profileSaving ? 1 : undefined }}
+          >
+            {profileSaving ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Save size={22} color={saveProfileIconColor} />}
+            <Text style={{ color: saveProfileTextColor, fontFamily: "Manrope_600SemiBold", fontSize: 20 }}>
+              {s.profileSave}
+            </Text>
+          </Button>
+        </View>
       </ResponsiveModal>
 
     </>
+  );
+}
+
+function ProfileEditFieldLabel({ label, isRTL }: { label: string; isRTL: boolean }) {
+  return (
+    <Text
+      className="text-charcoal dark:text-neutral-100"
+      style={{
+        fontFamily: "Manrope_600SemiBold",
+        fontSize: 18,
+        lineHeight: 24,
+        textAlign: isRTL ? "right" : "left",
+        writingDirection: isRTL ? "rtl" : "ltr",
+      }}
+    >
+      {label}
+    </Text>
+  );
+}
+
+function ProfileEditActionButton({
+  icon: Icon,
+  label,
+  color,
+  borderColor,
+  disabled,
+  isRTL,
+  onPress,
+}: {
+  icon: LucideIcon;
+  label: string;
+  color: string;
+  borderColor: string;
+  disabled: boolean;
+  isRTL: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      className="items-center rounded-2xl border bg-surface-bright px-5 dark:bg-surface-dark"
+      style={{
+        borderColor,
+        direction: "ltr",
+        flexDirection: isRTL ? "row-reverse" : "row",
+        gap: 12,
+        minHeight: 46,
+        opacity: disabled ? 0.45 : 1,
+      }}
+    >
+      <Icon size={21} strokeWidth={2.2} color={color} />
+      <Text
+        style={{
+          color,
+          fontFamily: "Manrope_600SemiBold",
+          fontSize: 16,
+          writingDirection: isRTL ? "rtl" : "ltr",
+        }}
+      >
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -754,7 +947,7 @@ function CountryCommandSelect({
         accessibilityRole="button"
         accessibilityState={{ expanded: open, disabled }}
         className={cn(
-          "min-h-11 rounded-2xl bg-surface-high px-4 py-3 dark:bg-surface-dark-high",
+          "min-h-14 rounded-2xl border border-warm-200 bg-surface-bright px-4 py-3 dark:border-neutral-800 dark:bg-surface-dark",
           disabled && "opacity-50"
         )}
       >
