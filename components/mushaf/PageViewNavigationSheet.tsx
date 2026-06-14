@@ -1,5 +1,5 @@
 import { Modal, Platform, Pressable, Text, View, useWindowDimensions } from "react-native";
-import { AlignJustify, Check, MoveHorizontal } from "lucide-react-native";
+import { Check, MoveHorizontal, MoveVertical, type LucideIcon } from "lucide-react-native";
 import { useMemo } from "react";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { useSettings, type PageScroll } from "@/lib/settings/context";
@@ -52,9 +52,9 @@ export function PageViewNavigationSheet({
   const items: {
     value: PageScroll;
     label: string;
-    icon: typeof AlignJustify;
+    icon: LucideIcon;
   }[] = [
-    { value: "vertical", label: s.pageScrollVertical, icon: AlignJustify },
+    { value: "vertical", label: s.pageScrollVertical, icon: MoveVertical },
     { value: "horizontal", label: s.pageScrollHorizontal, icon: MoveHorizontal },
   ];
 
