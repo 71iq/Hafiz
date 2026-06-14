@@ -9,6 +9,12 @@ import {
 
 const pageKeys = Object.keys(PUBLIC_PAGE_CONTENT) as PublicPageKey[];
 const languages = Object.keys(PUBLIC_PAGE_LABELS) as PublicPageLanguage[];
+const minimumSectionCounts: Record<PublicPageKey, number> = {
+  about: 3,
+  privacy: 3,
+  terms: 3,
+  credits: 1,
+};
 
 function allText(content: PublicPageContent): string {
   return [
@@ -35,7 +41,7 @@ function collectLinks(content: PublicPageContent): PublicPageLink[] {
 
 describe("public page content contracts", () => {
   it("keeps the public page inventory stable", () => {
-    expect(pageKeys.sort()).toEqual(["about", "privacy", "terms"]);
+    expect(pageKeys.sort()).toEqual(["about", "credits", "privacy", "terms"]);
     expect(languages.sort()).toEqual(["ar", "en"]);
   });
 
@@ -67,7 +73,7 @@ describe("public page content contracts", () => {
       expect(content.eyebrow.trim()).toBeTruthy();
       expect(content.title.trim()).toBeTruthy();
       expect(content.description.trim()).toBeTruthy();
-      expect(content.sections.length).toBeGreaterThanOrEqual(3);
+      expect(content.sections.length).toBeGreaterThanOrEqual(minimumSectionCounts[pageKey]);
       expect(content.actions.length).toBeGreaterThanOrEqual(2);
 
       for (const section of content.sections) {

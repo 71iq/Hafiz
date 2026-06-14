@@ -37,6 +37,14 @@ describe("higher-level RTL source contracts", () => {
     ]);
   });
 
+  it("keeps Settings category tabs on the shared ToggleGroup RTL contract", () => {
+    expectSourceContainsAll("app/(tabs)/settings.tsx", [
+      "function SettingsCategoryTabs({",
+      "<ToggleGroup<SettingsCategoryId>",
+      'dir={isRTL ? "rtl" : "ltr"}',
+    ]);
+  });
+
   it("keeps progress components using logical-start fill alignment without mirror transforms", () => {
     expectSourceContainsAll("components/ui/Progress.tsx", [
       "useUIDirection",

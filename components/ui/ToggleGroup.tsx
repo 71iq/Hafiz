@@ -30,7 +30,7 @@ export function ToggleGroup<T extends string>({
         dir === "rtl" && "flex-row-reverse",
         className
       )}
-      style={[style, { flexDirection: dir === "rtl" ? "row-reverse" : "row" }]}
+      style={[style, { direction: "ltr", flexDirection: dir === "rtl" ? "row-reverse" : "row" }]}
       {...props}
     >
       {items.map((item) => {

@@ -175,6 +175,7 @@ describe("RTL primitive component contracts", () => {
     const container = UNSAFE_getByType(View);
     expect(container.props.className).toContain("flex-row-reverse");
     expectFlexDirectionForDir(container, "rtl");
+    expect(getStyleValue(container, "direction")).toBe("ltr");
 
     const root = getByText("Root");
     const page = getByText("Page");
