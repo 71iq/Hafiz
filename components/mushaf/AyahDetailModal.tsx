@@ -533,7 +533,7 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
             <View className="gap-3">
               <View
                 className="items-center justify-between gap-3"
-                style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
+                style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
               >
                 <View className="min-w-0 flex-1">
                   <Text
@@ -565,8 +565,10 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
                   disabled={!!importingTafsirSource}
                   accessibilityRole="button"
                   accessibilityLabel={s.tafseerManageSources}
-                  className={isRTL ? "flex-row-reverse items-center gap-1.5 rounded-full bg-surface dark:bg-surface-dark px-3 py-2" : "flex-row items-center gap-1.5 rounded-full bg-surface dark:bg-surface-dark px-3 py-2"}
+                  className="items-center gap-1.5 rounded-full bg-surface dark:bg-surface-dark px-3 py-2"
                   style={({ pressed }) => ({
+                    direction: "ltr",
+                    flexDirection: isRTL ? "row-reverse" : "row",
                     opacity: importingTafsirSource ? 0.72 : pressed ? 0.78 : 1,
                     cursor: Platform.OS === "web" ? (importingTafsirSource ? "auto" : "pointer") : undefined,
                   })}
