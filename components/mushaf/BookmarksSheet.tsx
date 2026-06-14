@@ -115,9 +115,11 @@ export function BookmarksSheet({ visible, onClose, onNavigate }: Props) {
               key={`${b.surah}-${b.ayah}`}
               onPress={() => handleTap(b.surah, b.ayah)}
               style={({ pressed }) => ({
+                direction: "ltr",
                 flexDirection: isRTL ? "row-reverse" : "row",
                 alignItems: "center",
                 justifyContent: "space-between",
+                gap: 10,
                 paddingVertical: 14,
                 paddingHorizontal: 4,
                 borderRadius: 12,
@@ -128,6 +130,7 @@ export function BookmarksSheet({ visible, onClose, onNavigate }: Props) {
             >
               <View
                 style={{
+                  direction: "ltr",
                   flexDirection: isRTL ? "row-reverse" : "row",
                   alignItems: "center",
                   gap: 12,
