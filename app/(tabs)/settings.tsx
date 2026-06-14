@@ -1434,7 +1434,7 @@ function SettingsStepper({
   return (
     <View
       className="self-start rounded-full bg-surface-high dark:bg-surface-dark-high p-1"
-      style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
+      style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
     >
       <Pressable
         onPress={onDecrement}

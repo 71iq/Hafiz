@@ -102,6 +102,20 @@ describe("higher-level RTL source contracts", () => {
     ]);
   });
 
+  it("keeps font size steppers from double-reversing under ambient RTL direction", () => {
+    expectSourceContainsAll("components/mushaf/FontSizeControl.tsx", [
+      'style={{ direction: "ltr", opacity: disabled ? 0.42 : 1 }}',
+      'isRTL ? "flex-row-reverse" : "flex-row"',
+    ]);
+
+    for (const relativePath of ["components/mushaf/ReadingSettingsSheet.tsx", "app/(tabs)/settings.tsx"]) {
+      expectSourceContainsAll(relativePath, [
+        'direction: "ltr"',
+        'flexDirection: isRTL ? "row-reverse" : "row"',
+      ]);
+    }
+  });
+
   it("keeps progress components using logical-start fill alignment without mirror transforms", () => {
     expectSourceContainsAll("components/ui/Progress.tsx", [
       "useUIDirection",
