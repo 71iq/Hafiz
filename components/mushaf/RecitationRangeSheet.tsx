@@ -427,7 +427,10 @@ function LoopControl({
   const iconColor = isDark ? "#d4d4d4" : "#6e5a47";
   return (
     <View className="rounded-3xl bg-surface-low dark:bg-surface-dark-low p-3">
-      <View className={isRTL ? "flex-row-reverse items-center gap-3" : "flex-row items-center gap-3"}>
+      <View
+        className="items-center gap-3"
+        style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
+      >
         <View className="h-9 w-9 items-center justify-center rounded-full bg-primary-accent/10 dark:bg-primary-bright/10">
           {icon}
         </View>
@@ -437,7 +440,10 @@ function LoopControl({
         >
           {label}
         </Text>
-        <View className={isRTL ? "flex-row-reverse items-center rounded-full bg-surface dark:bg-surface-dark p-1" : "flex-row items-center rounded-full bg-surface dark:bg-surface-dark p-1"}>
+        <View
+          className="items-center rounded-full bg-surface p-1 dark:bg-surface-dark"
+          style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
+        >
           <Pressable onPress={onDecrease} className="h-8 w-8 items-center justify-center rounded-full">
             <Minus size={15} color={iconColor} />
           </Pressable>
