@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, type ReactNode } from "react";
-import { View, Text, Pressable, ActivityIndicator, Linking, ScrollView, useWindowDimensions } from "react-native";
+import { View, Text, Pressable, ActivityIndicator, Linking, ScrollView, StyleSheet, useWindowDimensions } from "react-native";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ToggleGroup } from "@/components/ui/ToggleGroup";
@@ -7,7 +7,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Toast } from "@/components/ui/Toast";
 import { ScreenScrollView, useScreenContentLayout } from "@/components/ui/ScreenContent";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Sun, Moon, Smartphone, Clock3, Circle, Minus, Plus, X, ChevronRight, ChevronLeft, ChevronDown, User, LogOut, BookOpen, RefreshCw, Unlink, Info, FileText, HeartHandshake, ExternalLink, SlidersHorizontal, type LucideIcon } from "lucide-react-native";
+import { Sun, Moon, Smartphone, Clock3, Circle, Minus, Plus, X, ChevronRight, ChevronLeft, User, LogOut, BookOpen, RefreshCw, Unlink, Info, FileText, HeartHandshake, ExternalLink, SlidersHorizontal, type LucideIcon } from "lucide-react-native";
 import {
   useSettings,
   FONT_SIZE_STEPS,
@@ -63,6 +63,8 @@ type SettingsCategory = {
 
 const SETTINGS_QURAN_PREVIEW_SURAH = 2;
 const SETTINGS_QURAN_PREVIEW_AYAH = 282;
+const CONTENT_SETTINGS_MAX_WIDTH = 720;
+const CONTENT_SETTINGS_ROW_HEIGHT = 60;
 
 type QuranPreviewAyah = {
   v2Page: number;
@@ -777,47 +779,40 @@ export default function SettingsScreen() {
       )}
 
       {activeCategory === "content" && (
-        <>
-          <SectionLabel>{s.sectionInlineContent}</SectionLabel>
-          <Card elevation="low" className="p-5 mb-8">
-            <SettingsSubsectionLabel isRTL={isRTL}>{s.readingContentSettingsLabel}</SettingsSubsectionLabel>
-            <View className="gap-3">
-              <SettingsPickerRow
+        <ContentSettingsPanel isRTL={isRTL}>
+          <ContentSettingsTitle isRTL={isRTL}>{s.sectionInlineContent}</ContentSettingsTitle>
+          <View style={{ gap: 34 }}>
+            <ContentSettingsGroup title={s.readingContentSettingsLabel} isRTL={isRTL}>
+              <ContentSettingsRow
                 label={s.translationLanguageLabel}
                 value={currentLang?.nameEnglish ?? "English"}
                 isRTL={isRTL}
-                trailing={isTranslationLoading ? (
-                  <ActivityIndicator size="small" color={isDark ? "#2dd4bf" : "#0d9488"} />
-                ) : (
-                  <TranslationChevron size={18} color={isDark ? "#525252" : "#DFD9D1"} />
-                )}
+                isDark={isDark}
+                loading={isTranslationLoading}
+                showDivider
                 onPress={() => setPickerVisible(true)}
               />
-              <SettingsPickerRow
+              <ContentSettingsRow
                 label={s.tafseerSourceLabel}
                 value={currentTafseerTitle}
                 isRTL={isRTL}
-                trailing={importingTafseerSource ? (
-                  <ActivityIndicator size="small" color={isDark ? "#2dd4bf" : "#0d9488"} />
-                ) : (
-                  <ChevronDown size={18} color={isDark ? "#525252" : "#DFD9D1"} />
-                )}
+                isDark={isDark}
+                loading={Boolean(importingTafseerSource)}
                 onPress={() => setTafseerPickerVisible(true)}
               />
-            </View>
+            </ContentSettingsGroup>
 
-            <View className="h-5" />
-
-            <SettingsSubsectionLabel isRTL={isRTL}>{s.recitationSettingsLabel}</SettingsSubsectionLabel>
-            <SettingsPickerRow
-              label={s.recitationFavoriteReciter}
-              value={formatReciterLabel(currentReciter, uiLanguage)}
-              isRTL={isRTL}
-              trailing={<TranslationChevron size={18} color={isDark ? "#525252" : "#DFD9D1"} />}
-              onPress={() => setReciterPickerVisible(true)}
-            />
-          </Card>
-        </>
+            <ContentSettingsGroup title={s.recitationSettingsLabel} isRTL={isRTL}>
+              <ContentSettingsRow
+                label={s.recitationFavoriteReciter}
+                value={formatReciterLabel(currentReciter, uiLanguage)}
+                isRTL={isRTL}
+                isDark={isDark}
+                onPress={() => setReciterPickerVisible(true)}
+              />
+            </ContentSettingsGroup>
+          </View>
+        </ContentSettingsPanel>
       )}
 
       {activeCategory === "account" && (
@@ -1224,13 +1219,28 @@ function SettingsControlRow({
   );
 }
 
-function SettingsSubsectionLabel({ children, isRTL }: { children: string; isRTL: boolean }) {
+function ContentSettingsPanel({ children, isRTL }: { children: ReactNode; isRTL: boolean }) {
+  return (
+    <View
+      style={{
+        alignSelf: isRTL ? "flex-end" : "flex-start",
+        maxWidth: CONTENT_SETTINGS_MAX_WIDTH,
+        width: "100%",
+      }}
+    >
+      {children}
+    </View>
+  );
+}
+
+function ContentSettingsTitle({ children, isRTL }: { children: string; isRTL: boolean }) {
   return (
     <Text
-      className="mb-3 text-charcoal dark:text-neutral-300"
+      className="mb-7 text-charcoal dark:text-neutral-100"
       style={{
-        fontFamily: "Manrope_600SemiBold",
-        fontSize: 14,
+        fontFamily: "Manrope_700Bold",
+        fontSize: 24,
+        lineHeight: 31,
         textAlign: isRTL ? "right" : "left",
         writingDirection: isRTL ? "rtl" : "ltr",
       }}
@@ -1240,57 +1250,126 @@ function SettingsSubsectionLabel({ children, isRTL }: { children: string; isRTL:
   );
 }
 
-function SettingsPickerRow({
+function ContentSettingsGroup({ title, isRTL, children }: { title: string; isRTL: boolean; children: ReactNode }) {
+  const { isDark, themeColors } = useSettings();
+  return (
+    <View>
+      <Text
+        className="mb-4 text-charcoal dark:text-neutral-100"
+        style={{
+          fontFamily: "Manrope_700Bold",
+          fontSize: 20,
+          lineHeight: 26,
+          textAlign: isRTL ? "right" : "left",
+          writingDirection: isRTL ? "rtl" : "ltr",
+        }}
+      >
+        {title}
+      </Text>
+      <View
+        style={{
+          backgroundColor: isDark ? themeColors.surfaceLow : themeColors.surfaceBright,
+          borderColor: isDark ? themeColors.surfaceHigh : "rgba(45,45,45,0.10)",
+          borderRadius: 16,
+          borderWidth: 1,
+          overflow: "hidden",
+        }}
+      >
+        {children}
+      </View>
+    </View>
+  );
+}
+
+function ContentSettingsRow({
   label,
   value,
   isRTL,
-  trailing,
+  isDark,
+  loading,
+  showDivider,
   onPress,
 }: {
   label: string;
   value: string;
   isRTL: boolean;
-  trailing: ReactNode;
+  isDark: boolean;
+  loading?: boolean;
+  showDivider?: boolean;
   onPress: () => void;
 }) {
+  const { themeColors } = useSettings();
+  const RowChevron = isRTL ? ChevronLeft : ChevronRight;
+  const valueDirection = getInlineValueDirection(value);
+  const chevronColor = isDark ? "#8A8A8A" : "#8B8178";
+  const valueColor = isDark ? "#A3A3A3" : "#6F7280";
+
   return (
     <Pressable
       onPress={onPress}
-      className="items-center justify-between gap-3 rounded-3xl bg-surface dark:bg-surface-dark px-4 py-4"
-      style={({ pressed }) => ({
-        direction: isRTL ? "rtl" : "ltr",
-        flexDirection: "row",
-        opacity: pressed ? 0.78 : 1,
-      })}
+      accessibilityRole="button"
+      style={{
+        alignItems: "center",
+        backgroundColor: "transparent",
+        borderBottomColor: isDark ? themeColors.surfaceHigh : "rgba(45,45,45,0.08)",
+        borderBottomWidth: showDivider ? StyleSheet.hairlineWidth : 0,
+        direction: "ltr",
+        flexDirection: isRTL ? "row-reverse" : "row",
+        gap: 18,
+        justifyContent: "space-between",
+        minHeight: CONTENT_SETTINGS_ROW_HEIGHT,
+        paddingHorizontal: 18,
+        paddingVertical: 0,
+      }}
     >
-      <View className="min-w-0 flex-1">
+      <Text
+        className="text-charcoal dark:text-neutral-100"
+        numberOfLines={1}
+        style={{
+          flexShrink: 0,
+          fontFamily: "Manrope_600SemiBold",
+          fontSize: 16,
+          maxWidth: "48%",
+          textAlign: isRTL ? "right" : "left",
+          writingDirection: isRTL ? "rtl" : "ltr",
+        }}
+      >
+        {label}
+      </Text>
+      <View
+        className="min-w-0 flex-1 items-center"
+        style={{
+          direction: "ltr",
+          flexDirection: isRTL ? "row-reverse" : "row",
+          gap: 10,
+          justifyContent: isRTL ? "flex-start" : "flex-end",
+        }}
+      >
         <Text
-          className="text-charcoal dark:text-neutral-200"
+          numberOfLines={1}
           style={{
-            fontFamily: "Manrope_600SemiBold",
-            fontSize: 14,
-            textAlign: isRTL ? "right" : "left",
-            writingDirection: isRTL ? "rtl" : "ltr",
-          }}
-        >
-          {label}
-        </Text>
-        <Text
-          className="mt-0.5 text-warm-400 dark:text-neutral-500"
-          numberOfLines={2}
-          style={{
-            fontFamily: "Manrope_400Regular",
-            fontSize: 12,
-            textAlign: isRTL ? "right" : "left",
-            writingDirection: isRTL ? "rtl" : "ltr",
+            color: valueColor,
+            flexShrink: 1,
+            fontFamily: "Manrope_500Medium",
+            fontSize: 15,
+            textAlign: isRTL ? "left" : "right",
+            writingDirection: valueDirection,
           }}
         >
           {value}
         </Text>
+        {loading ? (
+          <ActivityIndicator size="small" color={isDark ? "#2dd4bf" : "#0d9488"} />
+        ) : (
+          <RowChevron size={21} strokeWidth={2.25} color={chevronColor} />
+        )}
       </View>
-      {trailing}
     </Pressable>
   );
+}
+
+function getInlineValueDirection(value: string): "rtl" | "ltr" {
+  return /[\u0600-\u06FF]/.test(value) ? "rtl" : "ltr";
 }
 
 function SettingsStepper({
