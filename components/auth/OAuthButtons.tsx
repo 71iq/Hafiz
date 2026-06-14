@@ -38,7 +38,6 @@ type Props = {
 
 const googleLogo = require("@/assets/images/auth/google.png") as ImageSourcePropType;
 const appleLogo = require("@/assets/images/auth/apple.png") as ImageSourcePropType;
-const appleDarkLogo = require("@/assets/images/auth/apple_dark.png") as ImageSourcePropType;
 const facebookLogo = require("@/assets/images/auth/facebook-icon.png") as ImageSourcePropType;
 
 export function OAuthButtons({ strings: s, isDark, onError }: Props) {
@@ -80,12 +79,14 @@ export function OAuthButtons({ strings: s, isDark, onError }: Props) {
   };
 
   const mutedColor = resolvedIsDark ? "#525252" : "#DFD9D1";
-  const buttonBorderColor = resolvedIsDark ? "#404040" : "#DFD9D1";
-  const buttonBackground = resolvedIsDark ? "#171717" : "#FFFFFF";
+  const buttonBorderColor = resolvedIsDark ? "#E5E7EB" : "#DFD9D1";
+  const buttonBackground = "#FFFFFF";
   const qfAuthEnabled = isQfLoginEnabled();
-  const providerButtonSize = isDesktop ? 54 : 50;
-  const providerIconSize = isDesktop ? 25 : 24;
-  const providerGap = isDesktop ? 16 : 13;
+  const providerButtonWidth = isDesktop ? 120 : 104;
+  const providerButtonHeight = 56;
+  const providerIconSize = 26;
+  const providerIconBoxSize = 28;
+  const providerGap = isDesktop ? 14 : 12;
 
   return (
     <View>
@@ -120,23 +121,27 @@ export function OAuthButtons({ strings: s, isDark, onError }: Props) {
           source={googleLogo}
           backgroundColor={buttonBackground}
           borderColor={buttonBorderColor}
-          hoverBackgroundColor={resolvedIsDark ? "#1F1F1F" : "#F7F1E8"}
+          hoverBackgroundColor="#F8FAFC"
           focusBorderColor={resolvedIsDark ? "#2dd4bf" : "#0d9488"}
-          buttonSize={providerButtonSize}
+          buttonWidth={providerButtonWidth}
+          buttonHeight={providerButtonHeight}
           iconSize={providerIconSize}
+          iconBoxSize={providerIconBoxSize}
           disabled={!!busyProvider}
           loading={busyProvider === "google"}
         />
         <OAuthIconButton
           onPress={() => handlePress("apple")}
           accessibilityLabel={s.authContinueWithApple}
-          source={resolvedIsDark ? appleDarkLogo : appleLogo}
+          source={appleLogo}
           backgroundColor={buttonBackground}
           borderColor={buttonBorderColor}
-          hoverBackgroundColor={resolvedIsDark ? "#1F1F1F" : "#F7F1E8"}
+          hoverBackgroundColor="#F8FAFC"
           focusBorderColor={resolvedIsDark ? "#2dd4bf" : "#0d9488"}
-          buttonSize={providerButtonSize}
-          iconSize={providerIconSize}
+          buttonWidth={providerButtonWidth}
+          buttonHeight={providerButtonHeight}
+          iconSize={24}
+          iconBoxSize={providerIconBoxSize}
           disabled={!!busyProvider}
           loading={busyProvider === "apple"}
         />
@@ -146,10 +151,12 @@ export function OAuthButtons({ strings: s, isDark, onError }: Props) {
           source={facebookLogo}
           backgroundColor={buttonBackground}
           borderColor={buttonBorderColor}
-          hoverBackgroundColor={resolvedIsDark ? "#1F1F1F" : "#F7F1E8"}
+          hoverBackgroundColor="#F8FAFC"
           focusBorderColor={resolvedIsDark ? "#2dd4bf" : "#0d9488"}
-          buttonSize={providerButtonSize}
+          buttonWidth={providerButtonWidth}
+          buttonHeight={providerButtonHeight}
           iconSize={providerIconSize}
+          iconBoxSize={providerIconBoxSize}
           disabled={!!busyProvider}
           loading={busyProvider === "facebook"}
         />
@@ -217,8 +224,10 @@ function OAuthIconButton({
   borderColor,
   hoverBackgroundColor,
   focusBorderColor,
-  buttonSize,
+  buttonWidth,
+  buttonHeight,
   iconSize,
+  iconBoxSize,
   disabled = false,
   loading = false,
 }: {
@@ -229,8 +238,10 @@ function OAuthIconButton({
   borderColor: string;
   hoverBackgroundColor: string;
   focusBorderColor: string;
-  buttonSize: number;
+  buttonWidth: number;
+  buttonHeight: number;
   iconSize: number;
+  iconBoxSize: number;
   disabled?: boolean;
   loading?: boolean;
 }) {
@@ -250,30 +261,53 @@ function OAuthIconButton({
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
       style={({ pressed }) => ({
-        width: buttonSize,
-        height: buttonSize,
-        borderRadius: buttonSize / 2,
+        width: buttonWidth,
+        height: buttonHeight,
+        borderRadius: 14,
         backgroundColor: hovered && isInteractive ? hoverBackgroundColor : backgroundColor,
         borderWidth: 1,
         borderColor: focused && isInteractive ? focusBorderColor : borderColor,
         alignItems: "center",
         justifyContent: "center",
+        overflow: "visible",
         opacity: disabled && !loading ? 0.55 : 1,
         transform: [{ scale: pressed && isInteractive ? 0.97 : 1 }],
         boxShadow: focused
           ? "0 0 0 2px rgba(45, 212, 191, 0.18)"
-          : "0 8px 18px rgba(0, 0, 0, 0.10)",
+          : "0 4px 12px rgba(0, 0, 0, 0.06)",
       })}
     >
       {loading ? (
         <ActivityIndicator size="small" color="#0d9488" />
       ) : (
-        <Image
-          source={source}
-          accessibilityIgnoresInvertColors
-          style={{ width: iconSize, height: iconSize }}
-          resizeMode="contain"
-        />
+        <View
+          pointerEvents="none"
+          style={{
+            width: iconBoxSize,
+            height: iconBoxSize,
+            alignItems: "center",
+            justifyContent: "center",
+            overflow: "visible",
+          }}
+        >
+          <Image
+            source={source}
+            accessibilityIgnoresInvertColors
+            style={[
+              { width: iconSize, height: iconSize },
+              Platform.OS === "web"
+                ? ({
+                    display: "block",
+                    lineHeight: 0,
+                    objectFit: "contain",
+                    overflow: "visible",
+                    verticalAlign: "middle",
+                  } as any)
+                : null,
+            ]}
+            resizeMode="contain"
+          />
+        </View>
       )}
     </Pressable>
   );
