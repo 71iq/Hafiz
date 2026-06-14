@@ -22,6 +22,7 @@ import {
   type LeaderboardEntry,
 } from "@/lib/leaderboard/api";
 import { LEADERBOARD_CONTENT_MAX_WIDTH } from "@/lib/ui/viewport";
+import { cn } from "@/lib/utils";
 
 type Tab = "daily" | "weekly" | "alltime" | "streak";
 
@@ -111,7 +112,14 @@ export default function LeaderboardScreen() {
       >
         <View
           className="flex-row rounded-full p-1.5"
-          style={[railStyle, { backgroundColor: themeColors.surfaceMid }]}
+          style={[
+            railStyle,
+            {
+              backgroundColor: themeColors.surfaceMid,
+              direction: "ltr",
+              flexDirection: isRTL ? "row-reverse" : "row",
+            },
+          ]}
         >
         {tabs.map((tab) => {
           const isActive = activeTab === tab.key;
@@ -131,6 +139,8 @@ export default function LeaderboardScreen() {
                   fontFamily: isActive ? "Manrope_600SemiBold" : "Manrope_500Medium",
                   fontSize: 13,
                   color: isActive ? "#FDDC91" : mutedColor,
+                  textAlign: "center",
+                  writingDirection: isRTL ? "rtl" : "ltr",
                 }}
               >
                 {tab.label}
@@ -201,7 +211,10 @@ export default function LeaderboardScreen() {
         >
           <View style={railStyle}>
           {featuredEntries.length > 0 && (
-            <View className="mb-7 justify-center gap-5" style={{ flexDirection: "row", direction: "ltr" }}>
+            <View
+              className="mb-7 justify-center gap-5"
+              style={{ flexDirection: isRTL ? "row-reverse" : "row", direction: "ltr" }}
+            >
               {featuredEntries.map((entry) => (
                 <LeaderboardPodiumCard
                   key={entry.user_id}
@@ -215,7 +228,10 @@ export default function LeaderboardScreen() {
               ))}
             </View>
           )}
-          <View className="mb-3 flex-row items-end justify-between" style={{ direction: "ltr" }}>
+          <View
+            className="mb-3 flex-row items-end justify-between"
+            style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
+          >
             <Text
               style={{
                 fontFamily: "Manrope_600SemiBold",
@@ -223,11 +239,21 @@ export default function LeaderboardScreen() {
                 letterSpacing: 2,
                 textTransform: "uppercase",
                 color: mutedColor,
+                textAlign: isRTL ? "right" : "left",
+                writingDirection: isRTL ? "rtl" : "ltr",
               }}
             >
               {`${activeTabLabel}`}
             </Text>
-            <Text style={{ fontFamily: "Manrope_500Medium", fontSize: 11, color: mutedColor }}>
+            <Text
+              style={{
+                fontFamily: "Manrope_500Medium",
+                fontSize: 11,
+                color: mutedColor,
+                textAlign: isRTL ? "left" : "right",
+                writingDirection: isRTL ? "rtl" : "ltr",
+              }}
+            >
               {`${entries.length} ${s.leaderboardPlayers}`}
             </Text>
           </View>
@@ -239,6 +265,7 @@ export default function LeaderboardScreen() {
               isDark={isDark}
               unit={scoreUnit}
               isStreak={activeTab === "streak"}
+              isRTL={isRTL}
               s={s}
               onPress={() => openProfile(entry.user_id)}
             />
@@ -284,6 +311,7 @@ function LeaderboardSignInPrompt({
       <View
         className="items-center gap-3"
         style={{
+          direction: "ltr",
           flexDirection: isRTL ? "row-reverse" : "row",
           justifyContent: "space-between",
         }}
@@ -310,7 +338,7 @@ function LeaderboardSignInPrompt({
             opacity: pressed ? 0.76 : 1,
           })}
         >
-          <View className="flex-row items-center gap-2" style={{ flexDirection: isRTL ? "row-reverse" : "row" }}>
+          <View className="flex-row items-center gap-2" style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}>
             <LogIn size={15} color="#FDDC91" />
             <Text style={{ color: "#FDDC91", fontFamily: "Manrope_700Bold", fontSize: 12 }}>
               {buttonLabel}
@@ -427,12 +455,13 @@ function LeaderboardPodiumCard({
   );
 }
 
-function LeaderboardRow({
+export function LeaderboardRow({
   entry,
   isCurrentUser,
   isDark,
   unit,
   isStreak,
+  isRTL,
   s,
   onPress,
 }: {
@@ -441,6 +470,7 @@ function LeaderboardRow({
   isDark: boolean;
   unit: string;
   isStreak: boolean;
+  isRTL: boolean;
   s: any;
   onPress: () => void;
 }) {
@@ -467,9 +497,10 @@ function LeaderboardRow({
   return (
     <Pressable
       onPress={onPress}
-      className="mb-2.5 flex-row items-center rounded-3xl px-4 py-3.5"
+      className={`mb-2.5 flex-row items-center gap-3 rounded-3xl px-4 py-3.5 ${isRTL ? "flex-row-reverse" : ""}`}
       style={{
         direction: "ltr",
+        flexDirection: isRTL ? "row-reverse" : "row",
         backgroundColor: rowBg,
         borderColor: isCurrentUser ? (isDark ? "rgba(45, 212, 191, 0.22)" : "rgba(13, 148, 136, 0.18)") : "transparent",
         borderWidth: isCurrentUser ? 1 : 0,
@@ -481,14 +512,18 @@ function LeaderboardRow({
         </Text>
       </View>
 
-      <View className="mx-3 min-w-0 flex-1">
-        <View className="flex-row items-center gap-2" style={{ direction: "ltr" }}>
+      <View className="min-w-0 flex-1">
+        <View
+          className={`flex-row items-center gap-2 ${isRTL ? "flex-row-reverse" : ""}`}
+          style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
+        >
           <View className="min-w-0 flex-1">
             <ProfileIdentity
               displayName={displayName}
               username={entry.username}
               avatarUrl={entry.avatar_url}
               isDark={isDark}
+              isRTL={isRTL}
               avatarSize={40}
               nameSize={14}
               handleSize={11}
@@ -507,8 +542,8 @@ function LeaderboardRow({
         </View>
       </View>
 
-      <View className="ml-2 min-w-[112px] items-end rounded-2xl px-3 py-2" style={{ backgroundColor: scoreBg }}>
-        <View className="flex-row items-center gap-1.5">
+      <View className={cn("min-w-[112px] rounded-2xl px-3 py-2", isRTL ? "items-start" : "items-end")} style={{ backgroundColor: scoreBg }}>
+        <View className={`flex-row items-center gap-1.5 ${isRTL ? "flex-row-reverse" : ""}`} style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}>
           {hasMedal && <Medal size={15} color={medalColor} />}
           {isStreak && <CalendarCheck2 size={14} color={isDark ? "#2dd4bf" : "#0d9488"} />}
           <Text

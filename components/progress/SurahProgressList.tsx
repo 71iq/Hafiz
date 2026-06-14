@@ -61,6 +61,10 @@ export function SurahProgressList({
     router.push("/(tabs)/mushaf");
     onItemPress?.();
   };
+  const rowFlexStyle = {
+    direction: "ltr" as const,
+    flexDirection: isRTL ? "row-reverse" as const : "row" as const,
+  };
 
   const renderItem = (item: SurahProgress, cardWidth?: number) => {
     const pct = item.totalCards > 0 ? (item.memorized / item.totalCards) * 100 : 0;
@@ -68,14 +72,14 @@ export function SurahProgressList({
         <Card elevation="low" className="p-4">
           <View
             style={{
-              flexDirection: isRTL ? "row-reverse" : "row",
+              ...rowFlexStyle,
               justifyContent: "space-between",
               alignItems: "center",
               marginBottom: 8,
               gap: 10,
             }}
           >
-            <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 8, flex: 1 }}>
+            <View style={{ ...rowFlexStyle, alignItems: "center", gap: 8, flex: 1 }}>
               <View
                 style={{
                   width: 30,
@@ -143,6 +147,7 @@ export function SurahProgressList({
                   borderRadius: 999,
                   backgroundColor: isDark ? "#14b8a6" : "#0d9488",
                   width: `${Math.min(pct, 100)}%`,
+                  alignSelf: isRTL ? "flex-end" : "flex-start",
                 }}
               />
             )}
@@ -177,7 +182,7 @@ export function SurahProgressList({
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: 8, flexDirection: isRTL ? "row-reverse" : "row", paddingHorizontal: 1 }}
+        contentContainerStyle={{ gap: 8, ...rowFlexStyle, paddingHorizontal: 1 }}
       >
         {previewData.map((item) => renderItem(item, 184))}
         {onViewAll ? (
@@ -191,7 +196,7 @@ export function SurahProgressList({
             })}
           >
             <Card elevation="low" className="h-full min-h-[86px] items-center justify-center p-4">
-              <View className={`items-center gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
+              <View className={`items-center gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`} style={rowFlexStyle}>
                 <Text
                   className="text-primary dark:text-primary-bright"
                   style={{ fontFamily: "Manrope_700Bold", fontSize: 13 }}
@@ -211,6 +216,7 @@ export function SurahProgressList({
     <View
       style={{
         flexDirection: isCompact ? (isRTL ? "row-reverse" : "row") : "column",
+        direction: "ltr",
         flexWrap: isCompact ? "wrap" : "nowrap",
         gap: 8,
       }}

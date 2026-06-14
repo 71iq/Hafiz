@@ -37,6 +37,63 @@ describe("higher-level RTL source contracts", () => {
     ]);
   });
 
+  it("keeps RTL page rows from double-reversing under web ambient direction", () => {
+    expectSourceContainsAll("components/reflections/ReflectionCard.tsx", [
+      "const rowFlexStyle = {",
+      'direction: "ltr" as const',
+      'flexDirection: isRTL ? "row-reverse" as const : "row" as const',
+      "style={rowFlexStyle}",
+      "...rowFlexStyle",
+    ]);
+
+    expectSourceContainsAll("components/progress/DefaultDeckProgressChart.tsx", [
+      "const rowFlexStyle = {",
+      'direction: "ltr" as const',
+      'flexDirection: isRTL ? "row-reverse" as const : "row" as const',
+      "style={rowFlexStyle}",
+      'alignSelf: isRTL ? "flex-end" : "flex-start"',
+    ]);
+
+    expectSourceContainsAll("components/progress/SurahProgressList.tsx", [
+      "const rowFlexStyle = {",
+      'direction: "ltr" as const',
+      'flexDirection: isRTL ? "row-reverse" as const : "row" as const',
+      "contentContainerStyle={{ gap: 8, ...rowFlexStyle, paddingHorizontal: 1 }}",
+      'alignSelf: isRTL ? "flex-end" : "flex-start"',
+    ]);
+
+    expectSourceContainsAll("components/profile/ProfileModalContent.tsx", [
+      "const mirroredRowStyle = {",
+      "const rowFlexStyle = {",
+      'direction: "ltr" as const',
+      'flexDirection: isWideActivity ? (isRTL ? "row-reverse" as const : "row" as const) : "column" as const',
+      "style={mirroredRowStyle}",
+    ]);
+
+    expectSourceContainsAll("app/(tabs)/progress.tsx", [
+      "const mirroredRowStyle = {",
+      'direction: "ltr" as const',
+      'flexDirection: isRTL ? "row-reverse" as const : "row" as const',
+      "style={mirroredRowStyle}",
+      'contentContainerStyle={{ gap: 8, direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row", paddingHorizontal: 1 }}',
+    ]);
+
+    expectSourceContainsAll("app/(tabs)/leaderboard.tsx", [
+      "export function LeaderboardRow({",
+      "isRTL={isRTL}",
+      "isRTL: boolean;",
+      'direction: "ltr"',
+      'flexDirection: isRTL ? "row-reverse" : "row"',
+    ]);
+
+    expectSourceContainsAll("components/achievements/PublicBadgesGrid.tsx", [
+      'style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}',
+    ]);
+    expectSourceContainsAll("components/achievements/AchievementBadge.tsx", [
+      'style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}',
+    ]);
+  });
+
   it("keeps Settings category tabs on the shared ToggleGroup RTL contract", () => {
     expectSourceContainsAll("app/(tabs)/settings.tsx", [
       "function SettingsCategoryTabs({",

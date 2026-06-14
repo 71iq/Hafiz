@@ -28,10 +28,14 @@ export function DefaultDeckProgressChart({
     vocabulary: s["achievementCategory.vocab"] ?? s.vocabDeckTitle,
   };
   const totalCards = items.reduce((sum, item) => sum + item.total, 0);
+  const rowFlexStyle = {
+    direction: "ltr" as const,
+    flexDirection: isRTL ? "row-reverse" as const : "row" as const,
+  };
 
   return (
     <Card elevation="low" className={className}>
-      <View className={`flex-row items-center gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
+      <View className={`flex-row items-center gap-3 ${isRTL ? "flex-row-reverse" : ""}`} style={rowFlexStyle}>
         <View
           className="h-11 w-11 items-center justify-center rounded-full"
           style={{ backgroundColor: isDark ? "rgba(45,212,191,0.12)" : "rgba(13,148,136,0.10)" }}
@@ -53,7 +57,10 @@ export function DefaultDeckProgressChart({
           </Text>
         </View>
       </View>
-      <View className={`mt-4 flex-row items-center gap-3 ${isRTL ? "flex-row-reverse" : ""}`} style={{ flexWrap: "wrap" }}>
+      <View
+        className={`mt-4 flex-row items-center gap-3 ${isRTL ? "flex-row-reverse" : ""}`}
+        style={{ ...rowFlexStyle, flexWrap: "wrap" }}
+      >
         <DeckLegendDot label={s.progressDeckStarted} color={isDark ? "#2dd4bf" : "#0d9488"} isRTL={isRTL} />
         <DeckLegendDot label={s.flashcardsNewCards} color={isDark ? "#525252" : "#E5DDD4"} isRTL={isRTL} />
       </View>
@@ -96,9 +103,13 @@ function DefaultDeckProgressRow({
   const { themeColors } = useSettings();
   const startedPct = item.total > 0 ? Math.round((item.startedCount / item.total) * 100) : 0;
   const barWidth = `${startedPct}%` as `${number}%`;
+  const rowFlexStyle = {
+    direction: "ltr" as const,
+    flexDirection: isRTL ? "row-reverse" as const : "row" as const,
+  };
   return (
     <View>
-      <View className={`mb-2 flex-row items-center justify-between gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
+      <View className={`mb-2 flex-row items-center justify-between gap-3 ${isRTL ? "flex-row-reverse" : ""}`} style={rowFlexStyle}>
         <Text
           className="min-w-0 flex-1 text-charcoal dark:text-neutral-200"
           style={{ fontFamily: "Manrope_700Bold", fontSize: 13, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
@@ -128,7 +139,7 @@ function DefaultDeckProgressRow({
           }}
         />
       </View>
-      <View className={`mt-2 flex-row flex-wrap gap-2 ${isRTL ? "flex-row-reverse" : ""}`}>
+      <View className={`mt-2 flex-row flex-wrap gap-2 ${isRTL ? "flex-row-reverse" : ""}`} style={rowFlexStyle}>
         <DeckMetric label={s.progressDeckStarted} value={item.startedCount} isRTL={isRTL} />
         <DeckMetric label={s.flashcardsNewCards} value={item.newCount} isRTL={isRTL} />
         <DeckMetric label={s.deckCardsFilterDue} value={item.dueCount} isRTL={isRTL} />
@@ -147,10 +158,14 @@ function DeckMetric({
   isRTL: boolean;
 }) {
   const { themeColors } = useSettings();
+  const rowFlexStyle = {
+    direction: "ltr" as const,
+    flexDirection: isRTL ? "row-reverse" as const : "row" as const,
+  };
   return (
     <View
       className={`flex-row items-center gap-1.5 rounded-full px-2.5 py-1 ${isRTL ? "flex-row-reverse" : ""}`}
-      style={{ backgroundColor: themeColors.surfaceLow }}
+      style={{ ...rowFlexStyle, backgroundColor: themeColors.surfaceLow }}
     >
       <Text
         className="text-charcoal dark:text-neutral-200"
@@ -177,8 +192,12 @@ function DeckLegendDot({
   color: string;
   isRTL: boolean;
 }) {
+  const rowFlexStyle = {
+    direction: "ltr" as const,
+    flexDirection: isRTL ? "row-reverse" as const : "row" as const,
+  };
   return (
-    <View className={`flex-row items-center gap-1.5 ${isRTL ? "flex-row-reverse" : ""}`}>
+    <View className={`flex-row items-center gap-1.5 ${isRTL ? "flex-row-reverse" : ""}`} style={rowFlexStyle}>
       <View className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
       <Text
         className="text-warm-500 dark:text-neutral-500"

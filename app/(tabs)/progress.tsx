@@ -137,6 +137,10 @@ export default function ProgressScreen() {
     { value: formatStat(avgDailyReviews), label: s.progressAvgDaily },
     { value: formatStat(totalScore), label: s.leaderboardPoints },
   ];
+  const mirroredRowStyle = {
+    direction: "ltr" as const,
+    flexDirection: isRTL ? "row-reverse" as const : "row" as const,
+  };
   const recentAchievementItems: AchievementDashboard["items"] = [];
   if (achievementDashboard) {
     for (const unlock of achievementDashboard.recentUnlocks) {
@@ -204,6 +208,7 @@ export default function ProgressScreen() {
             className="gap-5"
             style={{
               flexDirection: isLaptop ? (isRTL ? "row-reverse" : "row") : "column",
+              direction: "ltr",
               alignItems: "stretch",
             }}
           >
@@ -268,8 +273,8 @@ export default function ProgressScreen() {
         {/* Achievements */}
         {achievementDashboard && (
           <Card elevation="low" className="p-5 mt-6 mb-6">
-            <View className={`flex-row items-center justify-between gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
-              <View className={`min-w-0 flex-1 flex-row items-center gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
+            <View className={`flex-row items-center justify-between gap-3 ${isRTL ? "flex-row-reverse" : ""}`} style={mirroredRowStyle}>
+              <View className={`min-w-0 flex-1 flex-row items-center gap-3 ${isRTL ? "flex-row-reverse" : ""}`} style={mirroredRowStyle}>
                 <View
                   className="h-11 w-11 items-center justify-center rounded-full"
                   style={{ backgroundColor: isDark ? "rgba(45,212,191,0.12)" : "rgba(13,148,136,0.10)" }}
@@ -301,7 +306,7 @@ export default function ProgressScreen() {
                   opacity: pressed ? 0.72 : 1,
                 })}
               >
-                <View className={`flex-row items-center gap-1.5 ${isRTL ? "flex-row-reverse" : ""}`}>
+                <View className={`flex-row items-center gap-1.5 ${isRTL ? "flex-row-reverse" : ""}`} style={mirroredRowStyle}>
                   <Text
                     className="text-primary dark:text-primary-bright"
                     style={{ fontFamily: "Manrope_700Bold", fontSize: 12 }}
@@ -324,7 +329,7 @@ export default function ProgressScreen() {
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{ gap: 8, flexDirection: isRTL ? "row-reverse" : "row", paddingHorizontal: 1 }}
+                  contentContainerStyle={{ gap: 8, direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row", paddingHorizontal: 1 }}
                 >
                   {recentAchievementItems.map((item) => (
                     <AchievementBadge key={item.id} compact item={item} />
@@ -413,6 +418,7 @@ function ProgressSignInPrompt({
       <View
         className="items-center gap-3"
         style={{
+          direction: "ltr",
           flexDirection: isRTL ? "row-reverse" : "row",
           justifyContent: "space-between",
         }}
@@ -439,7 +445,7 @@ function ProgressSignInPrompt({
             opacity: pressed ? 0.76 : 1,
           })}
         >
-          <View className="flex-row items-center gap-2" style={{ flexDirection: isRTL ? "row-reverse" : "row" }}>
+          <View className="flex-row items-center gap-2" style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}>
             <LogIn size={15} color="#FDDC91" />
             <Text style={{ color: "#FDDC91", fontFamily: "Manrope_700Bold", fontSize: 12 }}>
               {buttonLabel}
@@ -467,6 +473,7 @@ function CompactProgressStats({
       className="gap-3"
       style={{
         width: isLaptop ? 360 : "100%",
+        direction: "ltr",
         flexDirection: isRTL ? "row-reverse" : "row",
         flexWrap: "wrap",
         alignContent: "flex-start",

@@ -69,7 +69,10 @@ export function AchievementBadge({ item, compact = false }: Props) {
         opacity: unlocked ? 1 : 0.78,
       }}
     >
-      <View className={`flex-row items-start gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
+      <View
+        className={`flex-row items-start gap-3 ${isRTL ? "flex-row-reverse" : ""}`}
+        style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
+      >
         <View
           className="h-9 w-9 items-center justify-center rounded-full"
           style={{ backgroundColor: unlocked ? `${color}22` : themeColors.surfaceMid }}

@@ -475,8 +475,13 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
     [isOwnProfile, s.profileNotesTab, s.profileOverviewTab]
   );
 
+  const mirroredRowStyle = {
+    direction: "ltr" as const,
+    flexDirection: isRTL ? "row-reverse" as const : "row" as const,
+  };
+
   const headerActions = isOwnProfile && user ? (
-    <View className={`items-center gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
+    <View className={`items-center gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`} style={mirroredRowStyle}>
       <HeaderAction icon={Pencil} label={s.profileEditAction} color={isDark ? "#2dd4bf" : "#0d9488"} onPress={() => setEditOpen(true)} />
     </View>
   ) : null;
@@ -520,7 +525,10 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
           ) : (
             <View className="gap-5">
               {tabs.length > 0 ? (
-                <View className={`rounded-full bg-surface-high p-1 dark:bg-surface-dark-high ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
+                <View
+                  className={`rounded-full bg-surface-high p-1 dark:bg-surface-dark-high ${isRTL ? "flex-row-reverse" : "flex-row"}`}
+                  style={mirroredRowStyle}
+                >
                   {tabs.map((tab) => {
                     const active = activeTab === tab.key;
                     return (
@@ -578,7 +586,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
       >
         <OverlayHeader title={s.profileEditTitle} subtitle={s.profileEditSubtitle} onClose={() => setEditOpen(false)} isRTL={isRTL} />
         <OverlayBody contentContainerClassName="gap-4 px-5 py-5">
-          <View className={`items-center gap-3 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
+          <View className={`items-center gap-3 ${isRTL ? "flex-row-reverse" : "flex-row"}`} style={mirroredRowStyle}>
             <ProfileAvatar avatarUrl={avatarPreviewUrl} name={displayName} size={58} isDark={isDark} />
             <View className="min-w-0 flex-1">
               <Input
@@ -596,7 +604,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
               />
             </View>
           </View>
-          <View className={`gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
+          <View className={`gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`} style={mirroredRowStyle}>
             <Button
               variant="outline"
               className="flex-1 gap-2 bg-surface-high dark:bg-surface-dark-high"
@@ -727,6 +735,10 @@ function CountryCommandSelect({
   );
   const iconColor = isDark ? "#a3a3a3" : "#8A7764";
   const activeColor = isDark ? "#5eead4" : "#0d9488";
+  const rowFlexStyle = {
+    direction: "ltr" as const,
+    flexDirection: isRTL ? "row-reverse" as const : "row" as const,
+  };
 
   useEffect(() => {
     if (!open) setQuery("");
@@ -746,7 +758,7 @@ function CountryCommandSelect({
           disabled && "opacity-50"
         )}
       >
-        <View className={`items-center gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
+        <View className={`items-center gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`} style={rowFlexStyle}>
           <Text
             className={selectedLabel ? "text-charcoal dark:text-neutral-100" : "text-warm-500 dark:text-neutral-500"}
             numberOfLines={1}
@@ -818,7 +830,7 @@ function CountryCommandSelect({
                       selected ? "bg-primary-accent/10 dark:bg-primary-bright/15" : "bg-transparent"
                     )}
                   >
-                    <View className={`items-center gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
+                    <View className={`items-center gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`} style={rowFlexStyle}>
                       <Text
                         className="min-w-0 flex-1 text-charcoal dark:text-neutral-100"
                         numberOfLines={1}
@@ -884,12 +896,20 @@ function ProfileOverview({
   const s = useStrings();
   const { width } = useWindowDimensions();
   const isWideActivity = width >= SIDEBAR_BREAKPOINT;
+  const rowFlexStyle = {
+    direction: "ltr" as const,
+    flexDirection: isWideActivity ? (isRTL ? "row-reverse" as const : "row" as const) : "column" as const,
+  };
+  const inlineRowFlexStyle = {
+    direction: "ltr" as const,
+    flexDirection: isRTL ? "row-reverse" as const : "row" as const,
+  };
 
   return (
     <View className="gap-5">
       {country ? (
         <Card elevation="low" className="p-5">
-          <View className={`items-center gap-3 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
+          <View className={`items-center gap-3 ${isRTL ? "flex-row-reverse" : "flex-row"}`} style={inlineRowFlexStyle}>
             <View className="h-10 w-10 items-center justify-center rounded-full bg-primary-accent/10 dark:bg-primary-bright/15">
               <MapPin size={18} color={isDark ? "#2dd4bf" : "#0d9488"} />
             </View>
@@ -940,7 +960,7 @@ function ProfileOverview({
         <View
           className="gap-5"
           style={{
-            flexDirection: isWideActivity ? (isRTL ? "row-reverse" : "row") : "column",
+            ...rowFlexStyle,
             alignItems: "stretch",
           }}
         >
@@ -1015,6 +1035,7 @@ function ProfileActivityStats({
     <View
       className="gap-3"
       style={{
+        direction: "ltr",
         width: isWide ? 360 : "100%",
         flexDirection: isRTL ? "row-reverse" : "row",
         flexWrap: "wrap",

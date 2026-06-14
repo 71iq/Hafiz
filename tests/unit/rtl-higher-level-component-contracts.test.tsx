@@ -12,6 +12,7 @@ import {
 import { FontSizeControl } from "@/components/mushaf/FontSizeControl";
 import { JuzNameText } from "@/components/mushaf/JuzNameText";
 import { MushafIndicator } from "@/components/mushaf/MushafIndicator";
+import { DefaultDeckProgressChart } from "@/components/progress/DefaultDeckProgressChart";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { OverlayFooter, OverlayHeader } from "@/components/ui/ResponsiveOverlay";
 import { Progress } from "@/components/ui/Progress";
@@ -275,5 +276,53 @@ describe("RTL higher-level component contracts", () => {
     expect(getStyleValue(achievementTrack, "alignItems")).toBe("flex-end");
     expect(getStyleValue(achievementFill, "width")).toBe("50%");
     expect(getStyleValue(achievementFill, "transform")).toBeUndefined();
+  });
+
+  it("Default deck progress chart resets ambient RTL before mirroring rows", () => {
+    const s = {
+      smartDeckRetentionTitle: "Retention",
+      smartDeckMutashabihatTitle: "Mutashabihat",
+      smartDeckSimilarTailsTitle: "Similar Tails",
+      smartDeckQiraatTitle: "Qiraat",
+      smartDeckReasonsTitle: "Reasons of Revelation",
+      "achievementCategory.vocab": "Vocabulary",
+      vocabDeckTitle: "Vocabulary",
+      progressDefaultDecks: "Default Deck Progress",
+      flashcardsTotalCards: "Total Cards",
+      progressDeckStarted: "Started",
+      flashcardsNewCards: "New",
+      deckCardsFilterDue: "Due",
+      progressDefaultDecksEmpty: "No deck progress yet",
+    };
+
+    setMockSettings({ isRTL: true, uiLanguage: "ar" });
+    const { getByText } = render(
+      <DefaultDeckProgressChart
+        items={[
+          {
+            key: "retention",
+            deckId: "smart-retention",
+            isSmartDeck: true,
+            color: "#14b8a6",
+            total: 7,
+            startedCount: 7,
+            newCount: 0,
+            dueCount: 7,
+          },
+        ]}
+        isDark={false}
+        isRTL
+        s={s}
+      />
+    );
+
+    const headerRow = findAncestorByClassName(getByText("Default Deck Progress"), "flex-row");
+    const deckRow = findAncestorByClassName(getByText("Retention"), "justify-between");
+    const metricsRow = findAncestorByClassName(getByText("Due"), "flex-wrap");
+
+    for (const row of [headerRow, deckRow, metricsRow]) {
+      expect(getStyleValue(row, "direction")).toBe("ltr");
+      expect(getStyleValue(row, "flexDirection")).toBe("row-reverse");
+    }
   });
 });

@@ -120,6 +120,10 @@ export function ReflectionCard({
   const heartColor = liked ? "#ef4444" : mutedColor;
   const contentAlign = isRTL ? "right" : "left";
   const rowClassName = isRTL ? "flex-row-reverse" : "flex-row";
+  const rowFlexStyle = {
+    direction: "ltr" as const,
+    flexDirection: isRTL ? "row-reverse" as const : "row" as const,
+  };
   const menuSide = isRTL ? { left: 12 } : { right: 12 };
   const isFeed = variant === "feed";
   const openProfile = useCallback(() => {
@@ -158,8 +162,8 @@ export function ReflectionCard({
         elevation: isFeed ? 1 : 0,
       }}
     >
-      <View className={`${rowClassName} items-center justify-between mb-2`}>
-        <View className={`${rowClassName} items-center gap-2`}>
+      <View className={`${rowClassName} items-center justify-between mb-2`} style={rowFlexStyle}>
+        <View className={`${rowClassName} items-center gap-2`} style={rowFlexStyle}>
           <Pressable
             onPress={openProfile}
             accessibilityRole="button"
@@ -216,7 +220,10 @@ export function ReflectionCard({
             onPress={handleReport}
             disabled={reported || reportBusy}
             className={`${rowClassName} items-center gap-2 px-3 py-2`}
-            style={({ pressed }) => ({ opacity: pressed || reported || reportBusy ? 0.6 : 1 })}
+            style={({ pressed }) => ({
+              ...rowFlexStyle,
+              opacity: pressed || reported || reportBusy ? 0.6 : 1,
+            })}
           >
             <Flag size={14} color={reported ? mutedColor : "#ef4444"} />
             <Text
@@ -261,13 +268,17 @@ export function ReflectionCard({
 
       <View
         className={`${rowClassName} items-center gap-2`}
-        style={isFeed ? { borderTopWidth: 1, borderTopColor: themeColors.surfaceHigh, paddingTop: 12 } : undefined}
+        style={{
+          ...rowFlexStyle,
+          ...(isFeed ? { borderTopWidth: 1, borderTopColor: themeColors.surfaceHigh, paddingTop: 12 } : null),
+        }}
       >
         <Pressable
           onPress={handleLike}
           disabled={likeBusy}
           className={`${rowClassName} items-center gap-1 rounded-full px-2.5 py-1.5`}
           style={({ pressed }) => ({
+            ...rowFlexStyle,
             opacity: pressed || likeBusy ? 0.6 : 1,
             backgroundColor: themeColors.surfaceMid,
           })}
@@ -288,6 +299,7 @@ export function ReflectionCard({
           onPress={() => onCommentsPress(reflection.id)}
           className={`${rowClassName} items-center gap-1 rounded-full px-2.5 py-1.5`}
           style={({ pressed }) => ({
+            ...rowFlexStyle,
             opacity: pressed ? 0.6 : 1,
             backgroundColor: themeColors.surfaceMid,
           })}

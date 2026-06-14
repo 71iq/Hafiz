@@ -41,7 +41,10 @@ export function PublicBadgesGrid({ unlocks }: Props) {
   }
 
   return (
-    <View className={`flex-row flex-wrap gap-2 ${isRTL ? "flex-row-reverse" : ""}`}>
+    <View
+      className={`flex-row flex-wrap gap-2 ${isRTL ? "flex-row-reverse" : ""}`}
+      style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
+    >
       {items.map((item) => (
         <AchievementBadge key={item.id} item={item} compact />
       ))}
