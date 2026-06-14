@@ -38,6 +38,7 @@ import { fullQfUserSync, runInitialQfUserSync } from "@/lib/quran-foundation/use
 import type { QfConnectionStatus } from "@/lib/quran-foundation/user-types";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { toArabicNumber } from "@/lib/arabic";
+import { localizedAyahMarker } from "@/lib/quran/ayah-marker";
 import {
   DESKTOP_CONTENT_GUTTER,
   PERSISTENT_SIDEBAR_WIDTH,
@@ -745,18 +746,21 @@ export default function SettingsScreen() {
                 >
                   {quranPreview.tokens.map((token, index) => {
                     const isMarker = index === quranPreview.tokens.length - 1;
+                    const usesLocalizedMarker = isMarker && !isRTL;
+                    const displayToken = usesLocalizedMarker ? localizedAyahMarker(SETTINGS_QURAN_PREVIEW_AYAH, false) : token;
                     return (
                       <Text
                         key={`${token}-${index}`}
                         className="text-charcoal dark:text-neutral-100 text-center"
                         style={{
-                          fontFamily: previewFontFamily,
-                          ...(isMarker ? previewMarkerFontPaletteStyle : previewFontPaletteStyle),
-                          fontSize,
+                          fontFamily: usesLocalizedMarker ? "Manrope_600SemiBold" : previewFontFamily,
+                          ...(usesLocalizedMarker ? {} : isMarker ? previewMarkerFontPaletteStyle : previewFontPaletteStyle),
+                          fontSize: usesLocalizedMarker ? Math.max(14, fontSize * 0.62) : fontSize,
                           lineHeight: fontSize * 1.8,
+                          writingDirection: usesLocalizedMarker ? "ltr" : undefined,
                         }}
                       >
-                        {token}
+                        {displayToken}
                       </Text>
                     );
                   })}
