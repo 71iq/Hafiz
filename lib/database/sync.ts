@@ -16,6 +16,26 @@ export type SyncStatus = "idle" | "syncing" | "synced" | "error" | "offline";
 
 const INITIAL_BACKFILL_VERSION = "20260525_sync_v1";
 const USER_SETTINGS_BACKFILL_VERSION = "20260528_user_settings_v1";
+const ACCOUNT_RESTORE_VERSION = "20260614_account_restore_v1";
+const REMOTE_RESTORE_TABLES = [
+  "user_settings",
+  "user_word_meanings",
+  "study_cards",
+  "study_log",
+  "bookmarks",
+  "highlights",
+  "private_notes",
+  "reflection_journey_entries",
+  "achievement_unlocks",
+] as const;
+
+type RemoteRestoreTable = typeof REMOTE_RESTORE_TABLES[number];
+type RemoteAccountRows = Record<RemoteRestoreTable, any[]>;
+type AccountRestoreResult = {
+  pulled: number;
+  accountRestored: boolean;
+  localDataReplaced: boolean;
+};
 
 function highlightSyncId(row: {
   surah: number;
@@ -133,15 +153,197 @@ async function pullRemoteChanges(db: SQLiteDatabase): Promise<number> {
 }
 
 /**
- * Full sync: push local changes, then pull remote changes.
+ * Full sync: restore account state before any upload, then run normal queue sync.
  */
-export async function fullSync(db: SQLiteDatabase): Promise<{ pushed: number; pulled: number }> {
+export async function fullSync(db: SQLiteDatabase): Promise<{ pushed: number; pulled: number; accountRestored: boolean; localDataReplaced: boolean }> {
+  const restored = await restoreAccountDataIfNeeded(db);
   const pushed = await pushSyncQueue(db);
   const pulled = await pullRemoteChanges(db);
-  return { pushed, pulled };
+  return {
+    pushed,
+    pulled: restored.pulled + pulled,
+    accountRestored: restored.accountRestored,
+    localDataReplaced: restored.localDataReplaced,
+  };
 }
 
 // ─── Internal helpers ──────────────────────────────────────────
+
+function accountRestoreKey(userId: string): string {
+  return `sync_account_restore_${userId}_${ACCOUNT_RESTORE_VERSION}`;
+}
+
+function isSyncInternalSetting(key: string): boolean {
+  return key === "last_pull_at" ||
+    key.startsWith("sync_initial_backfill_") ||
+    key.startsWith("sync_user_settings_backfill_") ||
+    key.startsWith("sync_account_restore_");
+}
+
+export async function hasCompletedAccountRestore(db: SQLiteDatabase, userId: string): Promise<boolean> {
+  const row = await db.getFirstAsync<{ value: string }>(
+    "SELECT value FROM user_settings WHERE key = ?",
+    [accountRestoreKey(userId)]
+  );
+  return row?.value === "true";
+}
+
+async function markAccountRestoreComplete(db: SQLiteDatabase, userId: string, restoredFromRemote: boolean): Promise<void> {
+  const now = new Date().toISOString();
+  await db.runAsync(
+    "INSERT OR REPLACE INTO user_settings (key, value, updated_at, deleted_at) VALUES (?, 'true', ?, NULL)",
+    [accountRestoreKey(userId), now]
+  );
+  await db.runAsync(
+    "INSERT OR REPLACE INTO user_settings (key, value, updated_at, deleted_at) VALUES ('last_pull_at', ?, ?, NULL)",
+    [now, now]
+  );
+  if (!restoredFromRemote) return;
+  await db.runAsync(
+    "INSERT OR REPLACE INTO user_settings (key, value, updated_at, deleted_at) VALUES (?, 'true', ?, NULL)",
+    [`sync_initial_backfill_${userId}_${INITIAL_BACKFILL_VERSION}`, now]
+  );
+  await db.runAsync(
+    "INSERT OR REPLACE INTO user_settings (key, value, updated_at, deleted_at) VALUES (?, 'true', ?, NULL)",
+    [userSettingsBackfillKey(userId), now]
+  );
+}
+
+async function restoreAccountDataIfNeeded(db: SQLiteDatabase): Promise<AccountRestoreResult> {
+  if (!isSupabaseConfigured()) return { pulled: 0, accountRestored: false, localDataReplaced: false };
+
+  const user = useAuthStore.getState().user;
+  if (!user) return { pulled: 0, accountRestored: false, localDataReplaced: false };
+
+  if (await hasCompletedAccountRestore(db, user.id)) {
+    return { pulled: 0, accountRestored: false, localDataReplaced: false };
+  }
+
+  const remoteRows = await fetchRemoteAccountRows(user.id);
+  const remoteRowCount = REMOTE_RESTORE_TABLES.reduce((sum, tableName) => sum + remoteRows[tableName].length, 0);
+  if (remoteRowCount === 0) {
+    await markAccountRestoreComplete(db, user.id, false);
+    return { pulled: 0, accountRestored: false, localDataReplaced: false };
+  }
+
+  const hadLocalData = await hasLocalSyncableData(db);
+  await db.withTransactionAsync(async () => {
+    await clearLocalSyncableData(db);
+    await applyRemoteAccountRows(db, remoteRows);
+    await markAccountRestoreComplete(db, user.id, true);
+  });
+
+  return {
+    pulled: remoteRowCount,
+    accountRestored: true,
+    localDataReplaced: hadLocalData,
+  };
+}
+
+async function fetchRemoteAccountRows(userId: string): Promise<RemoteAccountRows> {
+  const rows = Object.fromEntries(REMOTE_RESTORE_TABLES.map((tableName) => [tableName, []])) as unknown as RemoteAccountRows;
+  for (const tableName of REMOTE_RESTORE_TABLES) {
+    try {
+      rows[tableName] = await fetchRemoteRows(tableName, userId);
+    } catch (err: any) {
+      if (tableName === "user_word_meanings") {
+        console.warn("[Sync] Restore user_word_meanings skipped:", err.message);
+        continue;
+      }
+      throw err;
+    }
+  }
+  return rows;
+}
+
+async function fetchRemoteRows(tableName: string, userId: string, since?: string): Promise<any[]> {
+  const timeCol = "synced_at";
+  const batchSize = 500;
+  const rows: any[] = [];
+  let offset = 0;
+
+  while (true) {
+    let query = supabase
+      .from(tableName)
+      .select("*")
+      .eq("user_id", userId);
+
+    if (since) query = query.gt(timeCol, since);
+
+    const { data, error } = await query
+      .order(timeCol, { ascending: true })
+      .range(offset, offset + batchSize - 1);
+
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+
+    rows.push(...data);
+    if (data.length < batchSize) break;
+    offset += data.length;
+  }
+
+  return rows;
+}
+
+async function hasLocalSyncableData(db: SQLiteDatabase): Promise<boolean> {
+  const [
+    settings,
+    cards,
+    logs,
+    bookmarks,
+    highlights,
+    notes,
+    journeyEntries,
+    achievements,
+    wordMeanings,
+  ] = await Promise.all([
+    db.getAllAsync<{ key: string }>("SELECT key FROM user_settings"),
+    db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM study_cards"),
+    db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM study_log"),
+    db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM bookmarks"),
+    db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM highlights"),
+    db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM private_notes"),
+    db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM reflection_journey_entries"),
+    db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM achievement_unlocks"),
+    db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM user_word_meanings"),
+  ]);
+
+  return settings.some((row) => isSyncableUserSetting(row.key)) ||
+    [cards, logs, bookmarks, highlights, notes, journeyEntries, achievements, wordMeanings]
+      .some((row) => (row?.count ?? 0) > 0);
+}
+
+async function clearLocalSyncableData(db: SQLiteDatabase): Promise<void> {
+  await db.runAsync("DELETE FROM study_cards");
+  await db.runAsync("DELETE FROM study_log");
+  await db.runAsync("DELETE FROM bookmarks");
+  await db.runAsync("DELETE FROM highlights");
+  await db.runAsync("DELETE FROM private_notes");
+  await db.runAsync("DELETE FROM reflection_journey_entries");
+  await db.runAsync("DELETE FROM achievement_unlocks");
+  await db.runAsync("DELETE FROM user_word_meanings");
+  await db.runAsync("DELETE FROM sync_queue");
+  await db.runAsync("DELETE FROM qf_sync_queue");
+
+  const settings = await db.getAllAsync<{ key: string }>("SELECT key FROM user_settings");
+  for (const row of settings) {
+    if (isSyncableUserSetting(row.key) || isSyncInternalSetting(row.key)) {
+      await db.runAsync("DELETE FROM user_settings WHERE key = ?", [row.key]);
+    }
+  }
+}
+
+async function applyRemoteAccountRows(db: SQLiteDatabase, rows: RemoteAccountRows): Promise<void> {
+  for (const row of rows.user_settings) await upsertUserSetting(db, row);
+  for (const row of rows.user_word_meanings) await upsertUserWordMeaning(db, row);
+  for (const row of rows.study_cards) await upsertStudyCard(db, row);
+  for (const row of rows.study_log) await upsertStudyLog(db, row);
+  for (const row of rows.bookmarks) await upsertBookmark(db, row);
+  for (const row of rows.highlights) await upsertHighlight(db, row);
+  for (const row of rows.private_notes) await upsertPrivateNote(db, row);
+  for (const row of rows.reflection_journey_entries) await upsertReflectionJourneyEntry(db, row);
+  for (const row of rows.achievement_unlocks) await upsertAchievementUnlock(db, row);
+}
 
 function groupByTable(entries: SyncQueueEntry[]): Record<string, SyncQueueEntry[]> {
   const groups: Record<string, SyncQueueEntry[]> = {};

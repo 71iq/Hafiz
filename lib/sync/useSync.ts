@@ -20,7 +20,9 @@ export function useSync() {
   const user = useAuthStore((s) => s.user);
   const [status, setStatus] = useState<SyncStatus>("idle");
   const [pendingCount, setPendingCount] = useState(0);
+  const [accountRestoreNotice, setAccountRestoreNotice] = useState(false);
   const isSyncing = useRef(false);
+  const dismissAccountRestoreNotice = useCallback(() => setAccountRestoreNotice(false), []);
 
   const doSync = useCallback(async () => {
     if (!isSupabaseConfigured() || !user || isSyncing.current) return;
@@ -37,6 +39,7 @@ export function useSync() {
 
     try {
       const result = await fullSync(db);
+      if (result.localDataReplaced) setAccountRestoreNotice(true);
       if (result.pushed > 0 || result.pulled > 0) emitSyncCompleted(result);
       await fullQfUserSync(db);
       setStatus("synced");
@@ -97,5 +100,11 @@ export function useSync() {
       .catch(console.warn);
   }, [db, user, status]);
 
-  return { status, pendingCount, triggerSync: doSync };
+  return {
+    status,
+    pendingCount,
+    triggerSync: doSync,
+    accountRestoreNotice,
+    dismissAccountRestoreNotice,
+  };
 }

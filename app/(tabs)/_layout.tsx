@@ -8,6 +8,7 @@ import { useStrings } from "@/lib/i18n/useStrings";
 import { AppNavigation } from "@/components/ui/AppNavigation";
 import { useSync } from "@/lib/sync/useSync";
 import { SyncIndicator } from "@/components/ui/SyncIndicator";
+import { Toast } from "@/components/ui/Toast";
 import { OfflineBanner } from "@/components/ui/OfflineBanner";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -15,24 +16,34 @@ import { ChromeProvider, useChrome } from "@/lib/ui/chrome";
 import { StatusBar } from "expo-status-bar";
 
 function SyncOverlay() {
-  const { status } = useSync();
+  const { status, accountRestoreNotice, dismissAccountRestoreNotice } = useSync();
   const { isDark, isRTL } = useSettings();
   const insets = useSafeAreaInsets();
+  const s = useStrings();
 
-  if (status === "idle") return null;
+  if (status === "idle" && !accountRestoreNotice) return null;
 
   return (
-    <View
-      style={{
-        position: "absolute",
-        top: insets.top + 8,
-        ...(isRTL ? { left: 16 } : { right: 16 }),
-        zIndex: 100,
-      }}
-      pointerEvents="none"
-    >
-      <SyncIndicator status={status} isDark={isDark} />
-    </View>
+    <>
+      {status !== "idle" ? (
+        <View
+          style={{
+            position: "absolute",
+            top: insets.top + 8,
+            ...(isRTL ? { left: 16 } : { right: 16 }),
+            zIndex: 100,
+          }}
+          pointerEvents="none"
+        >
+          <SyncIndicator status={status} isDark={isDark} />
+        </View>
+      ) : null}
+      <Toast
+        message={accountRestoreNotice ? s.syncAccountRestoredNotice : null}
+        onDismiss={dismissAccountRestoreNotice}
+        duration={5000}
+      />
+    </>
   );
 }
 

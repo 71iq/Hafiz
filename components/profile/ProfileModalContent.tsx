@@ -155,6 +155,22 @@ function getLocalizedCountryValue(value: string, language: UILanguage): string {
   return findCountryOptionByValue(value, options)?.label ?? value;
 }
 
+function chooseRicherReview(local: ReviewSnapshot, remote: ReviewSnapshot | null | undefined): ReviewSnapshot {
+  if (!remote) return local;
+  if (remote.totalReviews > local.totalReviews) return remote;
+  if (remote.totalReviews === local.totalReviews && remote.activeDays > local.activeDays) return remote;
+  return local;
+}
+
+function chooseRicherSurahProgress(local: ProfileSurahProgress[], remote: ProfileSurahProgress[]): ProfileSurahProgress[] {
+  if (remote.length === 0) return local;
+  const localSummary = summarizeSurahProgress(local);
+  const remoteSummary = summarizeSurahProgress(remote);
+  if (remoteSummary.memorized > localSummary.memorized) return remote;
+  if (remoteSummary.memorized === localSummary.memorized && remoteSummary.totalCards > localSummary.totalCards) return remote;
+  return local;
+}
+
 export function ProfileModalContent({ userId }: ProfileModalContentProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -208,14 +224,14 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
   const publicActivityQuery = useQuery({
     queryKey: ["publicReviewActivity", requestedUserId],
     queryFn: () => fetchPublicReviewActivity(requestedUserId),
-    enabled: !!requestedUserId && !isOwnProfile,
+    enabled: !!requestedUserId && !isSignedOutOwnProfile,
     staleTime: 1000 * 60 * 2,
   });
 
   const publicSurahProgressQuery = useQuery({
     queryKey: ["publicSurahProgress", requestedUserId],
     queryFn: async () => attachSurahNames(db, await fetchPublicSurahProgress(requestedUserId)),
-    enabled: !!requestedUserId && !isOwnProfile,
+    enabled: !!requestedUserId && !isSignedOutOwnProfile,
     staleTime: 1000 * 60 * 2,
   });
 
@@ -276,11 +292,21 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
   const saveProfileBackgroundColor = saveProfileDisabled && !profileSaving
     ? themeColors.surfaceHigh
     : isDark ? "#0f766e" : "#0d9488";
-  const ownStats = localStats ?? { currentStreak: 0, longestStreak: 0, cardsReviewed: 0, totalScore: 0 };
+  const localStatsSnapshot = localStats ?? { currentStreak: 0, longestStreak: 0, cardsReviewed: 0, totalScore: 0 };
+  const today = new Date().toISOString().slice(0, 10);
+  const remoteReview = publicActivityQuery.data ?? null;
   const review = isOwnProfile
-    ? localReview
-    : publicActivityQuery.data ?? { activity: [], activeDays: 0, totalReviews: 0 };
-  const surahProgress = isOwnProfile ? localSurahProgress : publicSurahProgressQuery.data ?? [];
+    ? chooseRicherReview(localReview, remoteReview)
+    : remoteReview ?? { activity: [], activeDays: 0, totalReviews: 0 };
+  const ownRemoteCurrentStreak = visibleProfile?.last_review_date?.slice(0, 10) === today ? visibleProfile?.current_streak ?? 0 : 0;
+  const ownStats = {
+    currentStreak: Math.max(localStatsSnapshot.currentStreak, ownRemoteCurrentStreak),
+    longestStreak: Math.max(localStatsSnapshot.longestStreak, visibleProfile?.longest_streak ?? 0),
+    cardsReviewed: Math.max(localStatsSnapshot.cardsReviewed, visibleProfile?.cards_reviewed ?? 0, review.totalReviews),
+    totalScore: Math.max(localStatsSnapshot.totalScore, visibleProfile?.total_score ?? 0),
+  };
+  const remoteSurahProgress = publicSurahProgressQuery.data ?? [];
+  const surahProgress = isOwnProfile ? chooseRicherSurahProgress(localSurahProgress, remoteSurahProgress) : remoteSurahProgress;
   const surahSummary = summarizeSurahProgress(surahProgress);
   const averageDailyReviews = review.activeDays > 0 ? Math.round(review.totalReviews / review.activeDays) : 0;
   const stats = [

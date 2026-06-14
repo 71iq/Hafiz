@@ -1,6 +1,8 @@
 type SyncCompletedSummary = {
   pushed: number;
   pulled: number;
+  accountRestored?: boolean;
+  localDataReplaced?: boolean;
 };
 
 type Listener = (summary: SyncCompletedSummary) => void;
