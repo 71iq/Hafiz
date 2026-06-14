@@ -1085,6 +1085,7 @@ function MushafInner() {
   const pageFontSizeLocked = isPageMode && pageScroll === "horizontal";
   const mobileToolbarIconClass = `rounded-full ${isPhone && isPageMode ? "px-1.5 py-2" : isNarrow ? "px-2 py-2" : "px-2.5 py-2"}`;
   const desktopToolbarIconClass = `rounded-full bg-surface-high dark:bg-surface-dark-high ${isNarrow ? "px-2 py-2" : "px-3 py-2"}`;
+  const toolbarIconColor = isDark ? "#737373" : "#8B8178";
   const mobileBottomNavHeight = 54;
   const mobileBottomNavGap = 6;
   const mobileBottomNavOffset = isPhone
@@ -1521,7 +1522,7 @@ function MushafInner() {
                         className={mobileToolbarIconClass}
                         style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
                       >
-                        <ScanLine size={16} color="#0d9488" />
+                        <ScanLine size={16} color={toolbarIconColor} />
                       </Pressable>
                     )}
                     <Pressable
@@ -1627,7 +1628,7 @@ function MushafInner() {
                     className={desktopToolbarIconClass}
                     style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
                   >
-                    <ScanLine size={16} color="#0d9488" />
+                    <ScanLine size={16} color={toolbarIconColor} />
                   </Pressable>
                 )}
                 <Pressable
