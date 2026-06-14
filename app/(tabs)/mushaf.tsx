@@ -149,6 +149,7 @@ function ViewModeToggle({
     : isDark
       ? "rgba(255,255,255,0.08)"
       : "rgba(0,54,56,0.08)";
+  const pageMenuSlotWidth = compact ? 36 : 38;
 
   return (
     <View
@@ -159,6 +160,7 @@ function ViewModeToggle({
       }`}
       style={{
         ...(Platform.OS === "web" ? ({ appearance: "none", outlineStyle: "none" } as any) : null),
+        direction: "ltr",
         flexDirection: isRTL ? "row-reverse" : "row",
         alignItems: "center",
         justifyContent: "center",
@@ -174,6 +176,7 @@ function ViewModeToggle({
           : null),
       }}
     >
+      {showPageMenu && <View pointerEvents="none" style={{ width: pageMenuSlotWidth }} />}
       <Pressable
         onPress={onPress}
         accessibilityRole="button"
@@ -183,6 +186,8 @@ function ViewModeToggle({
         style={({ pressed }) => ({
           display: "flex",
           flex: 1,
+          minWidth: 0,
+          direction: "ltr",
           flexDirection: isRTL ? "row-reverse" : "row",
           alignItems: "center",
           justifyContent: "center",
@@ -198,6 +203,9 @@ function ViewModeToggle({
             flexShrink: 0,
             fontFamily: "Manrope_600SemiBold",
             fontSize: compact ? 12 : 13,
+            lineHeight: compact ? 18 : 19,
+            textAlign: "center",
+            writingDirection: isRTL ? "rtl" : "ltr",
             ...(Platform.OS === "web" ? ({ whiteSpace: "nowrap" } as any) : null),
           }}
         >
@@ -220,6 +228,7 @@ function ViewModeToggle({
           accessibilityLabel={pageMenuLabel}
           className="h-full items-center justify-center px-2.5"
           style={({ pressed }) => ({
+            width: pageMenuSlotWidth,
             alignSelf: "stretch",
             borderLeftWidth: isRTL ? 0 : 1,
             borderRightWidth: isRTL ? 1 : 0,
