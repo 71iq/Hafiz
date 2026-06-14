@@ -177,10 +177,10 @@ These limits are valid as local decisions, but they are not yet governed by one 
 
 ### Current truth
 - Documentation-only changes should be validated against the current code paths, not by changing runtime behavior.
-- Later UI phases must run:
+- Later UI phases should default to:
   - `npx tsc --noEmit`
-  - `npx expo export --platform web`
-  - `npx expo start --web`
+  - `npx expo export --platform web` only when the change needs a web export check.
+  - Do not start localhost, Expo dev servers, Metro, or browser sessions unless the user explicitly asks for live visual testing. If rendered verification is truly required, prefer the lightest Playwright/static-export path and stop it immediately after the check.
 
 ### Known local verification hazard
 - `tsconfig.json` includes `**/*.ts` and `**/*.tsx` across the repository.

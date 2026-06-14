@@ -174,7 +174,7 @@ If the user invokes `/audit` it triggers a sweep that reads several of these in 
 - **Comments**: default to none. Only add when the _why_ is non-obvious (hidden constraint, surprising invariant, workaround for a known bug). Never describe what the code does — names should do that.
 - **No speculative abstractions.** Three similar lines beat a premature helper. Don't add error handling for impossible states; trust internal callers, validate only at system boundaries.
 - **Reference code with `path:line`** so the user can jump straight there.
-- **Run `npm run typecheck` and `npm run build:web`** (or `npx expo start --web`) before claiming a UI change is done. Type-check ≠ feature-correct.
+- **Do not start localhost, Expo dev servers, Metro, or browser sessions unless the user explicitly asks for live visual testing.** The default verification path is `npm run typecheck` plus targeted unit/static checks; use `npm run build:web` only when the change needs a web export check. If rendered verification is truly required, prefer the lightest Playwright/static-export path and stop it immediately after the check.
 - **Memory / persistence**: Treat each session as cold; rely on `AGENTS.md`, the spec, and the codebase. If the user wants something durable, write it into `AGENTS.md` or `docs/product/HAFIZ_SPEC.md`.
 
 ---

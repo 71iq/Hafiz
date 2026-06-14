@@ -1,6 +1,6 @@
 # Hafiz UI Automated Test Phases
 
-This file turns `docs/agent/UI_MANUAL_TESTING_META.md` into runnable automation phases. It is intentionally web-first: browser automation covers the shared Expo web UI now, while iOS and Android remain manual until a later native runner phase.
+This file turns `docs/agent/UI_MANUAL_TESTING_META.md` into runnable automation phases. Browser automation exists for targeted shared Expo web UI checks, while iOS and Android remain manual until a later native runner phase. Do not treat browser automation as default verification.
 
 ## Operating Rules
 
@@ -10,19 +10,21 @@ This file turns `docs/agent/UI_MANUAL_TESTING_META.md` into runnable automation 
 - Data policy: no mock Quran data. Tests use bundled data and local SQLite paths.
 - Scope policy: add selectors and test support only where needed; do not rewrite UI to make tests easier.
 - Verification after UI changes:
-  - Small changes: `npm run typecheck`, `npm run test:unit`, `npm run test:e2e:smoke`.
-  - Broad UI changes: add `npm run build:web` and `npm run test:ui:baseline`.
+  - Small changes: `npm run typecheck` plus targeted unit/static checks.
+  - Broad UI changes: add `npm run build:web` only when a web export check is needed.
+  - Run Playwright/browser suites only when the user explicitly asks for live visual testing or the changed surface specifically requires rendered route verification.
+  - Do not start localhost, Expo dev servers, Metro, or browser sessions as routine verification.
 
 ## Phase Commands
 
 The implementation should expose these commands:
 
 - `npm run test:unit`: strict Jest unit/static contract tests.
-- `npm run test:e2e:smoke`: strict Playwright smoke tests for route health and key chrome.
+- `npm run test:e2e:smoke`: strict Playwright smoke tests for route health and key chrome; run only when rendered route verification is specifically needed.
 - `npm run test:ui:phase -- <phase-id>`: report-only UI behavior phase runner.
 - `npm run test:ui:baseline`: report-only full UI baseline with pass/fail percentage.
-- `npm run verify:quick`: typecheck, unit tests, and strict smoke tests.
-- `npm run verify:web`: typecheck, web export, and strict smoke tests.
+- `npm run verify:quick`: typecheck, unit tests, and strict smoke tests. This is not the default agent command on memory-constrained machines because it opens browser automation.
+- `npm run verify:web`: typecheck, web export, and strict smoke tests. This is not the default agent command on memory-constrained machines because it opens browser automation.
 
 ## Current Coverage Snapshot - 2026-05-28
 

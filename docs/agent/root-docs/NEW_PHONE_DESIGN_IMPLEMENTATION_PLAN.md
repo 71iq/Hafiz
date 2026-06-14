@@ -641,7 +641,7 @@ Tasks:
   - SVG progress rings.
 - Remove or reduce effects where they harm Android/web performance.
 - Ensure no screen renders the full Quran unnecessarily.
-- Check memory on web export and mobile dev server.
+- Check memory on web export when a web export check is needed; do not use the mobile dev server unless the user explicitly asks for live visual testing.
 - Keep static imports reasonable; avoid loading all mockup assets.
 
 Exit criteria:
@@ -656,7 +656,8 @@ Goal: verify the implemented design against the mockups.
 
 Tasks:
 
-- Run `npx expo start --web` for visual testing.
+- Do not start localhost, Expo dev servers, Metro, or browser sessions unless the user explicitly asks for live visual testing.
+- If screenshots are explicitly requested, prefer the lightest Playwright/static-export path and stop it immediately after the check.
 - Capture screenshots with Playwright for:
   - 320x740.
   - 375x812.

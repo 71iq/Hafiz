@@ -681,10 +681,10 @@ Use this phase for any change that touches direction, Arabic mode, navigation or
 
 - Stable contract doc: `docs/testing/rtl-contract.md`.
 - Source and RNTL gate: `npm run test:unit -- --testPathPattern=rtl`.
-- Report-only route phase: `npm run test:ui:phase -- rtl-ui-contract`.
-- Blocking route gate: `npm run test:ui:rtl`.
+- Report-only route phase: `npm run test:ui:phase -- rtl-ui-contract`, only when rendered route verification is specifically needed.
+- Blocking route gate: `npm run test:ui:rtl`, only when rendered route verification is specifically needed.
 - The blocking route gate builds the web export and runs `tests/e2e/report-only/rtl-ui-contract.spec.ts` on `ui-390-chromium`.
-- `npm run verify:quick` and `npm run verify:web` intentionally do not include the RTL UI gate yet; run it explicitly for RTL or layout work.
+- `npm run verify:quick` and `npm run verify:web` intentionally do not include the RTL UI gate yet. Prefer source/unit RTL checks by default; run rendered RTL gates only when the user explicitly asks for live visual testing or the change specifically requires browser geometry.
 
 Current automated RTL coverage:
 

@@ -2288,3 +2288,13 @@ Saved in `phase19/`:
   - `/tmp/hafiz-reading-settings-desktop.png`
   - `/tmp/hafiz-reading-settings-mobile.png`
   - `/tmp/hafiz-reading-settings-mobile-scrolled.png`
+
+## 2026-06-14 — Verification Memory Policy Update
+
+### Scope decisions
+1. Updated agent-facing verification guidance to stop treating localhost, Expo dev servers, Metro, or browser sessions as default checks.
+2. Superseded older redesign log entries that used `npx expo start --web` for routine visual QA; future sessions should only do live visual testing when the user explicitly asks for it.
+3. Default verification is now `npm run typecheck` plus targeted unit/static checks, with `npm run build:web` only when a web export check is needed.
+
+### Validation result
+- Documentation-only change; verified current guidance with `rg`.

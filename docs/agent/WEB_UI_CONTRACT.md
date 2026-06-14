@@ -153,8 +153,9 @@ These rules are non-negotiable across all UI phases:
 
 ### Required commands for implementation phases
 - `npm run typecheck`
-- `npm run build:web`
-- `npx expo start --web`
+- Run targeted unit/static checks for the changed surface.
+- Run `npm run build:web` only when the change needs a web export check.
+- Do not start localhost, Expo dev servers, Metro, or browser sessions unless the user explicitly asks for live visual testing. If rendered verification is truly required, prefer the lightest Playwright/static-export path and stop it immediately after the check.
 
 ### Required manual coverage
 - `360px`, English, light and dark where applicable

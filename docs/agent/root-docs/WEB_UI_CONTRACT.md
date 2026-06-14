@@ -125,8 +125,8 @@ These rules are non-negotiable across all UI phases:
 
 ### Required commands for implementation phases
 - `npx tsc --noEmit`
-- `npx expo export --platform web`
-- `npx expo start --web`
+- `npx expo export --platform web` only when the change needs a web export check.
+- Do not start localhost, Expo dev servers, Metro, or browser sessions unless the user explicitly asks for live visual testing. If rendered verification is truly required, prefer the lightest Playwright/static-export path and stop it immediately after the check.
 
 ### Required manual coverage
 - `360px`, English, light and dark where applicable

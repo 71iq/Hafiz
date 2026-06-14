@@ -218,10 +218,11 @@ These limits are valid as local decisions, but they are not yet governed by one 
 
 ### Current truth
 - Documentation-only changes should be validated against the current code paths, not by changing runtime behavior.
-- Later UI phases must run:
+- Later UI phases should default to:
   - `npm run typecheck`
-  - `npm run build:web`
-  - `npx expo start --web`
+  - targeted unit/static checks for the changed surface
+  - `npm run build:web` only when the change needs a web export check
+- Do not start localhost, Expo dev servers, Metro, or browser sessions unless the user explicitly asks for live visual testing. If rendered verification is truly required, prefer the lightest Playwright/static-export path and stop it immediately after the check.
 
 ### TypeScript scope boundary
 - `tsconfig.json` includes Hafiz source files broadly, but now explicitly excludes `quran.com-frontend-next/**`.
