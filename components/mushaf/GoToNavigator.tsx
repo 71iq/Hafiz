@@ -194,7 +194,7 @@ export function GoToNavigator({
           <Pressable
             key={surah.number}
             onPress={() => handleSelectSurah(surah.number)}
-            className={`items-center py-3 px-3 rounded-2xl ${isRTL ? "flex-row-reverse" : "flex-row"}`}
+            className={`items-center gap-3.5 py-3 px-3 rounded-2xl ${isRTL ? "flex-row-reverse" : "flex-row"}`}
             style={({ pressed }) => ({
               backgroundColor: pressed
                 ? isDark
@@ -203,9 +203,7 @@ export function GoToNavigator({
                 : "transparent",
             })}
           >
-            <View
-              className={`w-10 h-10 rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 items-center justify-center ${isRTL ? "ml-3.5" : "mr-3.5"}`}
-            >
+            <View className="w-10 h-10 rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 items-center justify-center">
               <Text
                 className="text-primary-accent dark:text-primary-bright"
                 style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11 }}
@@ -259,7 +257,7 @@ export function GoToNavigator({
           <Pressable
             key={juz.juz}
             onPress={() => handleSelectJuz(juz)}
-            className={`items-center py-3 px-3 rounded-2xl ${isRTL ? "flex-row-reverse" : "flex-row"}`}
+            className={`items-center gap-3.5 py-3 px-3 rounded-2xl ${isRTL ? "flex-row-reverse" : "flex-row"}`}
             style={({ pressed }) => ({
               backgroundColor: pressed
                 ? isDark
@@ -268,9 +266,7 @@ export function GoToNavigator({
                 : "transparent",
             })}
           >
-            <View
-              className={`w-10 h-10 rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 items-center justify-center ${isRTL ? "ml-3.5" : "mr-3.5"}`}
-            >
+            <View className="w-10 h-10 rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 items-center justify-center">
               <Text
                 className="text-primary-accent dark:text-primary-bright"
                 style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11 }}
@@ -334,11 +330,11 @@ export function GoToNavigator({
 
       <View className="bg-surface dark:bg-surface-dark px-5 pt-4">
         <View
-          className={`items-center bg-surface-low dark:bg-surface-dark-mid rounded-2xl px-4 py-3 ${isRTL ? "flex-row-reverse" : "flex-row"}`}
+          className={`items-center gap-2.5 bg-surface-low dark:bg-surface-dark-mid rounded-2xl px-4 py-3 ${isRTL ? "flex-row-reverse" : "flex-row"}`}
         >
           <Search size={16} color={isDark ? "#525252" : "#DFD9D1"} />
           <TextInput
-            className={`flex-1 text-charcoal dark:text-neutral-100 ${isRTL ? "mr-2.5" : "ml-2.5"}`}
+            className="flex-1 text-charcoal dark:text-neutral-100"
             style={{
               fontFamily: "Manrope_400Regular",
               fontSize: 15,

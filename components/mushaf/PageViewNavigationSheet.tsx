@@ -101,26 +101,28 @@ export function PageViewNavigationSheet({
                 })}
               >
                 <View
-                  className="h-5 w-5 items-center justify-center"
-                  style={isRTL ? { marginLeft: 8 } : { marginRight: 8 }}
+                  className={`min-w-0 flex-1 items-center gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`}
+                  style={{ direction: "ltr" }}
                 >
-                  <Icon size={17} color={color} />
+                  <View className="h-5 w-5 items-center justify-center">
+                    <Icon size={17} color={color} />
+                  </View>
+                  <Text
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      color,
+                      fontFamily: "Manrope_600SemiBold",
+                      fontSize: 13,
+                      lineHeight: 18,
+                      textAlign: isRTL ? "right" : "left",
+                      writingDirection: isRTL ? "rtl" : "ltr",
+                    }}
+                    numberOfLines={1}
+                  >
+                    {item.label}
+                  </Text>
                 </View>
-                <Text
-                  style={{
-                    flex: 1,
-                    minWidth: 0,
-                    color,
-                    fontFamily: "Manrope_600SemiBold",
-                    fontSize: 13,
-                    lineHeight: 18,
-                    textAlign: isRTL ? "right" : "left",
-                    writingDirection: isRTL ? "rtl" : "ltr",
-                  }}
-                  numberOfLines={1}
-                >
-                  {item.label}
-                </Text>
                 <View className="h-5 w-5 items-center justify-center">
                   {active ? <Check size={17} color={color} /> : null}
                 </View>

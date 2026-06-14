@@ -83,6 +83,7 @@ describe("RTL primitive component contracts", () => {
     );
     const ltrButton = ltr.getByTestId("save-button");
     expect(ltrButton.props.className).toContain("flex-row");
+    expect(ltrButton.props.className).toContain("gap-2");
     expect(ltrButton.props.className).not.toContain("flex-row-reverse");
     expectWritingDirection(ltr.getByText("Save"), "ltr");
 
@@ -182,7 +183,10 @@ describe("RTL primitive component contracts", () => {
     expectWritingDirection(root, "rtl");
     const selectedButton = findAncestorByClassName(root, "bg-surface-bright");
     expect(selectedButton.props.className).toContain("bg-surface-bright");
-    expect(page.props.className).toContain("mr-1.5");
+    const iconButton = findAncestorByClassName(page, "gap-1.5");
+    expect(iconButton.props.className).toContain("flex-row-reverse");
+    expect(page.props.className).not.toContain("mr-1.5");
+    expect(page.props.className).not.toContain("ml-1.5");
 
     fireEvent.press(selectedButton as any);
     expect(onValueChange).toHaveBeenCalledWith("root");

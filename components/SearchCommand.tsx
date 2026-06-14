@@ -490,7 +490,7 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
 
         {/* Search bar */}
         <View className="px-5 pt-4 pb-3">
-          <View className="flex-row items-center bg-surface-low dark:bg-surface-dark-low rounded-full px-4 py-2.5">
+          <View className={`${isRTL ? "flex-row-reverse" : "flex-row"} items-center gap-2.5 bg-surface-low dark:bg-surface-dark-low rounded-full px-4 py-2.5`}>
             <Search size={18} color={mutedColor} />
             <TextInput
               ref={inputRef}
@@ -507,8 +507,6 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
                 fontFamily: "Manrope_500Medium",
                 fontSize: 15,
                 color: isDark ? "#e5e5e5" : "#2D2D2D",
-                marginLeft: 10,
-                marginRight: 8,
                 writingDirection: isRTL ? "rtl" : "ltr",
                 textAlign: isRTL ? "right" : "left",
                 paddingVertical: 4,
@@ -617,7 +615,7 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
                   renderItem={({ item }) => (
                     <Pressable
                       onPress={() => handleHistoryTap(item)}
-                      className="flex-row items-center py-3"
+                      className={`${isRTL ? "flex-row-reverse" : "flex-row"} items-center gap-3 py-3`}
                       style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
                     >
                       <Clock size={14} color={mutedColor} />
@@ -626,7 +624,6 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
                         style={{
                           fontFamily: "Manrope_500Medium",
                           fontSize: 15,
-                          marginLeft: 12,
                           writingDirection: isRTL ? "rtl" : "ltr",
                           textAlign: isRTL ? "right" : "left",
                         }}

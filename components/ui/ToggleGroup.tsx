@@ -40,10 +40,12 @@ export function ToggleGroup<T extends string>({
             key={item.value}
             onPress={() => onValueChange(item.value)}
             className={cn(
-              "flex-1 flex-row items-center justify-center rounded-full py-2 px-3",
+              "flex-1 flex-row items-center justify-center gap-1.5 rounded-full py-2 px-3",
+              dir === "rtl" && "flex-row-reverse",
               active && "bg-surface-bright dark:bg-surface-dark-bright"
             )}
             style={({ pressed }) => ({
+              direction: "ltr",
               transform: [{ scale: pressed ? 0.98 : 1 }],
             })}
           >
@@ -51,13 +53,12 @@ export function ToggleGroup<T extends string>({
             <Text
               className={cn(
                 "font-manrope-semibold text-sm text-center",
-                  active
-                    ? "text-primary-accent dark:text-primary-bright"
-                    : "text-warm-400 dark:text-neutral-500",
-                  item.icon ? (dir === "rtl" ? "mr-1.5" : "ml-1.5") : ""
-                )}
-                style={{ writingDirection: dir }}
-              >
+                active
+                  ? "text-primary-accent dark:text-primary-bright"
+                  : "text-warm-400 dark:text-neutral-500"
+              )}
+              style={{ writingDirection: dir }}
+            >
               {item.label}
             </Text>
           </Pressable>

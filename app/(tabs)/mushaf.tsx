@@ -179,7 +179,7 @@ function ViewModeToggle({
         accessibilityRole="button"
         accessibilityState={{ selected: true }}
         accessibilityLabel={label}
-        className={`flex-row items-center justify-center rounded-full ${compact ? "px-2.5 py-2" : "px-3.5 py-2"}`}
+        className={`flex-row items-center justify-center gap-1.5 rounded-full ${compact ? "px-2.5 py-2" : "px-3.5 py-2"}`}
         style={({ pressed }) => ({
           display: "flex",
           flex: 1,
@@ -198,8 +198,6 @@ function ViewModeToggle({
             flexShrink: 0,
             fontFamily: "Manrope_600SemiBold",
             fontSize: compact ? 12 : 13,
-            marginLeft: isRTL ? 0 : 6,
-            marginRight: isRTL ? 6 : 0,
             ...(Platform.OS === "web" ? ({ whiteSpace: "nowrap" } as any) : null),
           }}
         >

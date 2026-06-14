@@ -6,7 +6,7 @@ import { forwardRef } from "react";
 import { useUIDirection, type Direction } from "@/lib/ui/direction";
 
 const buttonVariants = cva(
-  "flex-row items-center justify-center",
+  "flex-row items-center justify-center gap-2",
   {
     variants: {
       variant: {
