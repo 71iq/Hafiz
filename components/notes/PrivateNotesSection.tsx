@@ -73,7 +73,10 @@ export function PrivateNotesSection({ surah, ayah }: Props) {
 
   return (
     <View>
-      <View className={`mb-3 flex-row items-center justify-between ${isRTL ? "flex-row-reverse" : ""}`}>
+      <View
+        className="mb-3 items-center justify-between"
+        style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
+      >
         <Text
           className="text-charcoal dark:text-neutral-100"
           style={{ fontFamily: "Manrope_700Bold", fontSize: 15, textAlign: isRTL ? "right" : "left" }}
@@ -82,7 +85,8 @@ export function PrivateNotesSection({ surah, ayah }: Props) {
         </Text>
         <Pressable
           onPress={openCreate}
-          className={`items-center gap-1 rounded-full bg-primary-accent px-3 py-1.5 ${isRTL ? "flex-row-reverse" : "flex-row"}`}
+          className="items-center gap-1 rounded-full bg-primary-accent px-3 py-1.5"
+          style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
         >
           <Plus size={13} color="#FFFFFF" />
           <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12, color: "#FFFFFF" }}>
@@ -116,7 +120,10 @@ export function PrivateNotesSection({ surah, ayah }: Props) {
               className="rounded-2xl bg-surface-low px-3.5 py-3 dark:bg-surface-dark-low"
               style={({ pressed }) => ({ opacity: pressed ? 0.75 : 1 })}
             >
-              <View className={`flex-row items-start gap-3 ${isRTL ? "flex-row-reverse" : ""}`}>
+              <View
+                className="items-start gap-3"
+                style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
+              >
                 <View className="min-w-0 flex-1">
                   <Text
                     className="text-charcoal dark:text-neutral-200"
