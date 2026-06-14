@@ -27,7 +27,7 @@ import { ensureTafsirSourceImported } from "@/lib/database/init";
 import { TafsirSourcePicker } from "@/components/settings/TafsirSourcePicker";
 import { TranslationLanguagePicker } from "@/components/settings/TranslationLanguagePicker";
 import { ReciterPicker } from "@/components/settings/ReciterPicker";
-import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
+import { OverlayBody, OverlayHeader, ResponsiveModal, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { useAuthStore } from "@/lib/auth/store";
 import { isSupabaseConfigured } from "@/lib/supabase";
@@ -112,6 +112,7 @@ export default function SettingsScreen() {
   const [tafseerPickerVisible, setTafseerPickerVisible] = useState(false);
   const [reciterPickerVisible, setReciterPickerVisible] = useState(false);
   const [logoutDialogVisible, setLogoutDialogVisible] = useState(false);
+  const [donorModalVisible, setDonorModalVisible] = useState(false);
   const [qfStatus, setQfStatus] = useState<QfConnectionStatus>("disconnected");
   const [qfBusy, setQfBusy] = useState(false);
   const [qfMessage, setQfMessage] = useState<string | null>(null);
@@ -1018,7 +1019,7 @@ export default function SettingsScreen() {
                 icon={HeartHandshake}
                 title={s.settingsBecomeDonor}
                 description={s.settingsBecomeDonorDesc}
-                onPress={() => router.push("/about" as any)}
+                onPress={() => setDonorModalVisible(true)}
                 isDark={isDark}
                 isRTL={isRTL}
               />
@@ -1082,6 +1083,46 @@ export default function SettingsScreen() {
         }}
         onConfirm={handleLogout}
       />
+      <ResponsiveModal
+        open={donorModalVisible}
+        onClose={() => setDonorModalVisible(false)}
+        maxWidth={420}
+        dir={isRTL ? "rtl" : "ltr"}
+      >
+        <OverlayHeader
+          title={s.settingsBecomeDonor}
+          isRTL={isRTL}
+          onClose={() => setDonorModalVisible(false)}
+          leading={
+            <View className="h-11 w-11 items-center justify-center rounded-full bg-primary-accent/10 dark:bg-primary-bright/15">
+              <HeartHandshake size={20} color={isDark ? "#2dd4bf" : "#0d9488"} />
+            </View>
+          }
+        />
+        <OverlayBody scrollEnabled={false}>
+          <View className={isRTL ? "items-end px-5 py-5" : "items-start px-5 py-5"}>
+            <Text
+              className="text-warm-500 dark:text-neutral-400"
+              style={{
+                fontFamily: "Manrope_400Regular",
+                fontSize: 14,
+                lineHeight: 22,
+                textAlign: isRTL ? "right" : "left",
+                writingDirection: isRTL ? "rtl" : "ltr",
+              }}
+            >
+              {s.settingsBecomeDonorModalMessage}
+            </Text>
+          </View>
+        </OverlayBody>
+        <View className="border-t border-warm-200 px-5 py-4 dark:border-neutral-800">
+          <Button onPress={() => setDonorModalVisible(false)} className="w-full">
+            <Text className="text-white" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>
+              {s.genericClose}
+            </Text>
+          </Button>
+        </View>
+      </ResponsiveModal>
       {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}
       <TranslationLanguagePicker
         visible={pickerVisible}
