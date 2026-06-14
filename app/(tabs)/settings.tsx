@@ -641,37 +641,31 @@ export default function SettingsScreen() {
 
           <SectionLabel>{s.sectionReading}</SectionLabel>
           <Card elevation="low" className="p-4 mb-8">
-            <SettingsControlRow label={s.mushafViewModeLabel} isRTL={isRTL}>
-              <ToggleGroup<ViewMode>
-                value={viewMode}
-                onValueChange={setViewMode}
-                items={[
-                  { value: "verse", label: s.mushafViewVerse },
-                  { value: "page", label: s.mushafViewPage },
-                ]}
-              />
-            </SettingsControlRow>
+            <View className="gap-4">
+              <SettingsControlRow label={s.mushafViewModeLabel} isRTL={isRTL}>
+                <ToggleGroup<ViewMode>
+                  value={viewMode}
+                  onValueChange={setViewMode}
+                  items={[
+                    { value: "verse", label: s.mushafViewVerse },
+                    { value: "page", label: s.mushafViewPage },
+                  ]}
+                />
+              </SettingsControlRow>
 
-            <View className="h-4" />
+              <SettingsControlRow label={s.quranFontLabel} isRTL={isRTL}>
+                <ToggleGroup<QuranFontStyle>
+                  value={quranFontStyle}
+                  onValueChange={setQuranFontStyle}
+                  items={[
+                    { value: "qcf2", label: s.quranFontQcf2 },
+                    { value: "v4", label: s.quranFontV4 },
+                    { value: "v4-tajweed", label: s.quranFontV4Tajweed },
+                  ]}
+                />
+              </SettingsControlRow>
 
-            <SettingsControlRow label={s.quranFontLabel} isRTL={isRTL}>
-              <ToggleGroup<QuranFontStyle>
-                value={quranFontStyle}
-                onValueChange={setQuranFontStyle}
-                items={[
-                  { value: "qcf2", label: s.quranFontQcf2 },
-                  { value: "v4", label: s.quranFontV4 },
-                  { value: "v4-tajweed", label: s.quranFontV4Tajweed },
-                ]}
-              />
-            </SettingsControlRow>
-
-            <View className="h-4" />
-
-            {quranFontStyle !== "qcf2" && (
-              <>
-                <View className="h-4" />
-
+              {quranFontStyle !== "qcf2" && (
                 <SettingsControlRow label={s.quranMarkerStyleLabel} isRTL={isRTL}>
                   <ToggleGroup<QuranMarkerStyle>
                     value={quranMarkerStyle}
@@ -684,102 +678,99 @@ export default function SettingsScreen() {
                     ]}
                   />
                 </SettingsControlRow>
+              )}
 
-              </>
-            )}
-
-            <View className="h-4" />
-
-            <View
-              className="items-center justify-between gap-3"
-              style={{
-                direction: isRTL ? "rtl" : "ltr",
-                flexDirection: "row",
-                flexWrap: "wrap",
-              }}
-            >
-              <View className="min-w-0 flex-1">
-                <Text
-                  className={`text-charcoal dark:text-neutral-200 ${fontSizeUsesFittedPageSize ? "mb-1" : ""}`}
-                  style={{
-                    fontFamily: "Manrope_600SemiBold",
-                    fontSize: 14,
-                    textAlign: isRTL ? "right" : "left",
-                    writingDirection: isRTL ? "rtl" : "ltr",
-                  }}
-                >
-                  {s.fontSizeLabel}
-                </Text>
-                {fontSizeUsesFittedPageSize && (
+              <View
+                className="items-center justify-between gap-3"
+                style={{
+                  direction: isRTL ? "rtl" : "ltr",
+                  flexDirection: "row",
+                  flexWrap: "wrap",
+                }}
+              >
+                <View className="min-w-0 flex-1">
                   <Text
-                    className="text-warm-400 dark:text-neutral-500"
-                    style={{ fontFamily: "Manrope_500Medium", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
+                    className={`text-charcoal dark:text-neutral-200 ${fontSizeUsesFittedPageSize ? "mb-1" : ""}`}
+                    style={{
+                      fontFamily: "Manrope_600SemiBold",
+                      fontSize: 14,
+                      textAlign: isRTL ? "right" : "left",
+                      writingDirection: isRTL ? "rtl" : "ltr",
+                    }}
                   >
-                    {s.fontSizeFixedPageView}
+                    {s.fontSizeLabel}
                   </Text>
+                  {fontSizeUsesFittedPageSize && (
+                    <Text
+                      className="text-warm-400 dark:text-neutral-500"
+                      style={{ fontFamily: "Manrope_500Medium", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
+                    >
+                      {s.fontSizeFixedPageView}
+                    </Text>
+                  )}
+                </View>
+                <SettingsStepper
+                  value={`${fontSizeLevelLabel}/${fontSizeTotalLabel}`}
+                  onDecrement={() => setFontSizeIndex(fontSizeIndex - 1)}
+                  onIncrement={() => setFontSizeIndex(fontSizeIndex + 1)}
+                  decrementDisabled={fontSizeIndex === 0}
+                  incrementDisabled={fontSizeIndex === FONT_SIZE_STEPS.length - 1}
+                  isDark={isDark}
+                  isRTL={isRTL}
+                />
+              </View>
+
+              <View className="bg-surface dark:bg-surface-dark rounded-2xl px-4 py-4">
+                {quranPreview ? (
+                  <View
+                    style={{
+                      direction: "ltr",
+                      flexDirection: "row-reverse",
+                      flexWrap: "wrap",
+                      justifyContent: "center",
+                      alignItems: "center",
+                      gap: Math.max(4, fontSize * 0.18),
+                      rowGap: Math.max(4, fontSize * 0.2),
+                      opacity: quranPreviewFontReady ? 1 : 0,
+                    }}
+                  >
+                    {quranPreview.tokens.map((token, index) => {
+                      const isMarker = index === quranPreview.tokens.length - 1;
+                      const usesLocalizedMarker = isMarker && !isRTL;
+                      const displayToken = usesLocalizedMarker ? localizedAyahMarker(SETTINGS_QURAN_PREVIEW_AYAH, false) : token;
+                      return (
+                        <Text
+                          key={`${token}-${index}`}
+                          className="text-charcoal dark:text-neutral-100 text-center"
+                          style={{
+                            fontFamily: usesLocalizedMarker ? "Manrope_600SemiBold" : previewFontFamily,
+                            ...(usesLocalizedMarker ? {} : isMarker ? previewMarkerFontPaletteStyle : previewFontPaletteStyle),
+                            fontSize: usesLocalizedMarker ? Math.max(14, fontSize * 0.62) : fontSize,
+                            lineHeight: fontSize * 1.8,
+                            writingDirection: usesLocalizedMarker ? "ltr" : undefined,
+                          }}
+                        >
+                          {displayToken}
+                        </Text>
+                      );
+                    })}
+                  </View>
+                ) : (
+                  <ActivityIndicator size="small" color={isDark ? "#2dd4bf" : "#0d9488"} />
                 )}
               </View>
-              <SettingsStepper
-                value={`${fontSizeLevelLabel}/${fontSizeTotalLabel}`}
-                onDecrement={() => setFontSizeIndex(fontSizeIndex - 1)}
-                onIncrement={() => setFontSizeIndex(fontSizeIndex + 1)}
-                decrementDisabled={fontSizeIndex === 0}
-                incrementDisabled={fontSizeIndex === FONT_SIZE_STEPS.length - 1}
-                isDark={isDark}
-                isRTL={isRTL}
-              />
-            </View>
 
-            <View className="my-4 bg-surface dark:bg-surface-dark rounded-2xl px-4 py-4">
-              {quranPreview ? (
-                <View
-                  style={{
-                    direction: "ltr",
-                    flexDirection: "row-reverse",
-                    flexWrap: "wrap",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    gap: Math.max(4, fontSize * 0.18),
-                    rowGap: Math.max(4, fontSize * 0.2),
-                    opacity: quranPreviewFontReady ? 1 : 0,
-                  }}
-                >
-                  {quranPreview.tokens.map((token, index) => {
-                    const isMarker = index === quranPreview.tokens.length - 1;
-                    const usesLocalizedMarker = isMarker && !isRTL;
-                    const displayToken = usesLocalizedMarker ? localizedAyahMarker(SETTINGS_QURAN_PREVIEW_AYAH, false) : token;
-                    return (
-                      <Text
-                        key={`${token}-${index}`}
-                        className="text-charcoal dark:text-neutral-100 text-center"
-                        style={{
-                          fontFamily: usesLocalizedMarker ? "Manrope_600SemiBold" : previewFontFamily,
-                          ...(usesLocalizedMarker ? {} : isMarker ? previewMarkerFontPaletteStyle : previewFontPaletteStyle),
-                          fontSize: usesLocalizedMarker ? Math.max(14, fontSize * 0.62) : fontSize,
-                          lineHeight: fontSize * 1.8,
-                          writingDirection: usesLocalizedMarker ? "ltr" : undefined,
-                        }}
-                      >
-                        {displayToken}
-                      </Text>
-                    );
-                  })}
-                </View>
-              ) : (
-                <ActivityIndicator size="small" color={isDark ? "#2dd4bf" : "#0d9488"} />
-              )}
+              <SettingsControlRow label={s.pageScrollLabel} isRTL={isRTL}>
+                <ToggleGroup<PageScroll>
+                  value={pageScroll}
+                  onValueChange={setPageScroll}
+                  items={[
+                    { value: "vertical", label: s.pageScrollVertical },
+                    { value: "horizontal", label: s.pageScrollHorizontal },
+                  ]}
+                />
+              </SettingsControlRow>
             </View>
-
-            <SettingsControlRow label={s.pageScrollLabel} isRTL={isRTL}>
-              <ToggleGroup<PageScroll>
-                value={pageScroll}
-                onValueChange={setPageScroll}
-                items={[
-                  { value: "vertical", label: s.pageScrollVertical },
-                  { value: "horizontal", label: s.pageScrollHorizontal },
-                ]}
-              />
-            </SettingsControlRow>
           </Card>
 
         </>
