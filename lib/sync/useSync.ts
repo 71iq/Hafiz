@@ -6,6 +6,7 @@ import { useAuthStore } from "@/lib/auth/store";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { fullSync, type SyncStatus } from "@/lib/database/sync";
 import { getPendingSyncCount } from "@/lib/database/sync-queue";
+import { updateProfileStats } from "@/lib/fsrs/leaderboard-sync";
 import { fullQfUserSync, getPendingQfSyncCount } from "@/lib/quran-foundation/user-sync";
 import { emitSyncCompleted } from "@/lib/sync/events";
 
@@ -39,6 +40,9 @@ export function useSync() {
 
     try {
       const result = await fullSync(db);
+      await updateProfileStats(db).catch((error) => {
+        console.warn("[Sync] Failed to update public profile aggregates:", error.message);
+      });
       if (result.localDataReplaced) setAccountRestoreNotice(true);
       if (result.pushed > 0 || result.pulled > 0) emitSyncCompleted(result);
       await fullQfUserSync(db);
