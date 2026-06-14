@@ -2298,3 +2298,21 @@ Saved in `phase19/`:
 
 ### Validation result
 - Documentation-only change; verified current guidance with `rg`.
+
+## 2026-06-14 — Marker Visibility Control Removal
+
+### Scope decisions
+1. Removed the marker Shown/Hidden controls from both Settings and the Mushaf Reading Settings panel.
+2. Kept marker style customization in place.
+3. Stopped loading the old `show_ayah_markers` persisted value so existing hidden-marker preferences no longer keep markers hidden without a visible restore control.
+
+### Implemented in this step
+- Deleted the Settings page marker visibility segmented control.
+- Deleted the Mushaf Reading Settings marker visibility row and picker.
+- Removed dead marker visibility strings from the bilingual string table.
+
+### Validation result
+- `rg` found no remaining marker visibility UI/string references.
+- `npm run typecheck`: passed.
+- `npm run build:web`: passed.
+- `npm run test:unit -- tests/unit/i18n-strings.test.ts`: passed.

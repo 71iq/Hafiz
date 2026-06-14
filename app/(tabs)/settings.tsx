@@ -97,7 +97,6 @@ export default function SettingsScreen() {
     pageScroll, setPageScroll,
     viewMode, setViewMode,
     quranFontStyle, setQuranFontStyle,
-    showAyahMarkers, setShowAyahMarkers,
     quranMarkerStyle, setQuranMarkerStyle,
   } = useSettings();
   const db = useDatabase();
@@ -668,18 +667,7 @@ export default function SettingsScreen() {
 
             <View className="h-4" />
 
-            <SettingsControlRow label={s.quranMarkersVisibilityLabel} isRTL={isRTL}>
-              <ToggleGroup<"shown" | "hidden">
-                value={showAyahMarkers ? "shown" : "hidden"}
-                onValueChange={(value) => setShowAyahMarkers(value === "shown")}
-                items={[
-                  { value: "shown", label: s.quranMarkersShown },
-                  { value: "hidden", label: s.quranMarkersHidden },
-                ]}
-              />
-            </SettingsControlRow>
-
-            {quranFontStyle !== "qcf2" && showAyahMarkers && (
+            {quranFontStyle !== "qcf2" && (
               <>
                 <View className="h-4" />
 

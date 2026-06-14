@@ -6,7 +6,6 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
-  CircleDot,
   Info,
   Minus,
   Monitor,
@@ -67,8 +66,6 @@ export function ReadingSettingsSheet({
     setFontSizeIndex,
     quranFontStyle,
     setQuranFontStyle,
-    showAyahMarkers,
-    setShowAyahMarkers,
     quranMarkerStyle,
     setQuranMarkerStyle,
     tafseerSource,
@@ -78,7 +75,6 @@ export function ReadingSettingsSheet({
     themeSurface,
   } = useSettings();
   const [fontPickerVisible, setFontPickerVisible] = useState(false);
-  const [markerVisibilityPickerVisible, setMarkerVisibilityPickerVisible] = useState(false);
   const [markerStylePickerVisible, setMarkerStylePickerVisible] = useState(false);
   const [tafseerPickerVisible, setTafseerPickerVisible] = useState(false);
   const [importingTafseerSource, setImportingTafseerSource] = useState<TafsirSourceId | null>(null);
@@ -91,8 +87,6 @@ export function ReadingSettingsSheet({
   const quranBaseFont = quranFontStyle === "qcf2" ? "qcf2" : "v4";
   const quranBaseFontLabel = quranBaseFont === "qcf2" ? s.quranFontQcf2 : s.quranFontV4;
   const tajweedEnabled = quranFontStyle === "v4-tajweed";
-  const markerVisibilityValue = showAyahMarkers ? "shown" : "hidden";
-  const markerVisibilityLabel = showAyahMarkers ? s.quranMarkersShown : s.quranMarkersHidden;
   const markerStyleLabel = markerLabelForValue(quranMarkerStyle, s);
   const currentTafseerSource = AVAILABLE_TAFSIR_SOURCES.find((source) => source.id === tafseerSource);
   const currentTafseerTitle = currentTafseerSource ? s[currentTafseerSource.labelKey] ?? currentTafseerSource.id : tafseerSource;
@@ -110,13 +104,6 @@ export function ReadingSettingsSheet({
       { value: "v4", label: s.quranFontV4 },
     ],
     [s.quranFontQcf2, s.quranFontV4]
-  );
-  const markerVisibilityOptions = useMemo<ChoiceOption<"shown" | "hidden">[]>(
-    () => [
-      { value: "shown", label: s.quranMarkersShown },
-      { value: "hidden", label: s.quranMarkersHidden },
-    ],
-    [s.quranMarkersHidden, s.quranMarkersShown]
   );
   const markerStyleOptions = useMemo<ChoiceOption<QuranMarkerStyle>[]>(
     () => [
@@ -321,22 +308,11 @@ export function ReadingSettingsSheet({
           <SettingsSectionLabel label={s.readingSettingsAyahDisplay} isRTL={isRTL} />
           <View className="mb-6 overflow-hidden rounded-2xl border border-warm-200/50 bg-surface-bright dark:border-neutral-800/80 dark:bg-surface-dark-low">
             <SettingsActionRow
-              icon={<CircleDot size={20} color={iconColor} />}
-              title={s.quranMarkersVisibilityLabel}
-              value={markerVisibilityLabel}
-              isRTL={isRTL}
-              onPress={() => setMarkerVisibilityPickerVisible(true)}
-              trailing={<Chevron size={18} color={iconColor} />}
-              compact={compactRows}
-            />
-            <Divider />
-            <SettingsActionRow
               icon={<BookOpen size={20} color={iconColor} />}
               title={s.quranMarkerStyleLabel}
               value={markerStyleLabel}
               isRTL={isRTL}
-              onPress={() => showAyahMarkers && setMarkerStylePickerVisible(true)}
-              disabled={!showAyahMarkers}
+              onPress={() => setMarkerStylePickerVisible(true)}
               trailing={<Chevron size={18} color={iconColor} />}
               compact={compactRows}
             />
@@ -385,17 +361,6 @@ export function ReadingSettingsSheet({
         options={fontOptions}
         onChange={handleBaseFontChange}
         onClose={() => setFontPickerVisible(false)}
-        isRTL={isRTL}
-        isDark={isDark}
-        surfaceColor={themeSurface}
-      />
-      <ChoiceDialog
-        visible={markerVisibilityPickerVisible}
-        title={s.readingSettingsChooseMarkerVisibility}
-        value={markerVisibilityValue}
-        options={markerVisibilityOptions}
-        onChange={(value) => setShowAyahMarkers(value === "shown")}
-        onClose={() => setMarkerVisibilityPickerVisible(false)}
         isRTL={isRTL}
         isDark={isDark}
         surfaceColor={themeSurface}

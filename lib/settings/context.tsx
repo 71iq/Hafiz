@@ -590,7 +590,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           "view_mode",
           "quran_font_style",
           "quran_marker_style",
-          "show_ayah_markers",
           "page_scroll",
           "show_translation",
           "show_tafseer",
@@ -659,13 +658,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         const savedQuranMarkerStyle = normalizeQuranMarkerStyle(saved.quran_marker_style);
         if (savedQuranMarkerStyle) {
           setQuranMarkerStyleState(savedQuranMarkerStyle);
-        }
-
-        const savedShowAyahMarkers = saved.show_ayah_markers;
-        if (savedShowAyahMarkers === "false") {
-          setShowAyahMarkersState(false);
-        } else if (savedShowAyahMarkers === "true") {
-          setShowAyahMarkersState(true);
         }
 
         const savedPageScroll = saved.page_scroll;
