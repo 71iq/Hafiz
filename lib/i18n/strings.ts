@@ -241,9 +241,9 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     morphologicalTag: "Morphological Tag",
     noIrabData: "No grammatical analysis available",
     // TasreefTab
-    rootLabel: "Root (الجذر)",
-    lemmaLabel: "Lemma (الصيغة)",
-    patternLabel: "Pattern (الوزن)",
+    rootLabel: "Root",
+    lemmaLabel: "Lemma",
+    patternLabel: "Pattern",
     noTasreefData: "No morphology data available",
     // TajweedTab
     noTajweedRules: "No tajweed rules for this word",
@@ -482,7 +482,7 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     searchTitle: "Search",
     searchPlaceholder: "Search the Quran...",
     searchTextMode: "Text + English",
-    searchRootMode: "Root (جذر)",
+    searchRootMode: "Root",
     searchNoResults: "No results found",
     searchResultCount: "{{n}} results",
     searchMinChars: "Enter at least 2 characters",
