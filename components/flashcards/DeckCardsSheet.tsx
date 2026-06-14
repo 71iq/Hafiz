@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { Pressable, ScrollView, Text, TextInput, View, type ViewStyle } from "react-native";
 import { CalendarDays, Clock3, PauseCircle, RotateCcw, Search, Star, Trash2 } from "lucide-react-native";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -142,7 +142,10 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
       setDueDateError(null);
     });
   }, [db, deckId, dueDateText, dueTarget, runAction, s.cardDueDateInvalid, s.cardDueDatePast]);
-  const rowDirection = isRTL ? "row-reverse" : "row";
+  const rowFlexStyle: ViewStyle = {
+    direction: "ltr",
+    flexDirection: isRTL ? "row-reverse" : "row",
+  };
 
   return (
     <>
@@ -151,13 +154,14 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
         onClose={onClose}
         maxWidth={900}
         maxHeight="92%"
+        dir={isRTL ? "rtl" : "ltr"}
       >
         <OverlayHeader title={s.deckCardsTitle} subtitle={deckTitle} onClose={onClose} isRTL={isRTL} showHandle />
         <OverlayBody contentContainerClassName="px-5 pb-8">
           <View className="gap-3">
             <View
               className="items-center gap-2 rounded-2xl bg-surface-low dark:bg-surface-dark-low px-4"
-              style={{ flexDirection: rowDirection }}
+              style={rowFlexStyle}
             >
               <Search size={17} color={isDark ? "#737373" : "#8B8178"} />
               <TextInput
@@ -175,7 +179,7 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
               />
             </View>
 
-            <View className="flex-row flex-wrap gap-2" style={{ flexDirection: rowDirection }}>
+            <View className="flex-row flex-wrap gap-2" style={{ ...rowFlexStyle, flexWrap: "wrap" }}>
               {CARD_FILTERS.map((value) => (
                 <Pressable
                   key={value}
@@ -207,9 +211,17 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
               </Text>
             ) : null}
 
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View className="rounded-2xl border border-warm-200 dark:border-neutral-800 overflow-hidden" style={{ minWidth: 620, flex: 1 }}>
-                <DeckCardsHeader isRTL={isRTL} s={s} />
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={{ width: "100%" }}
+              contentContainerStyle={{ flexGrow: 1, minWidth: "100%" }}
+            >
+              <View
+                className="rounded-2xl border border-warm-200 dark:border-neutral-800 overflow-hidden"
+                style={{ minWidth: 620, width: "100%" }}
+              >
+                <DeckCardsHeader isRTL={isRTL} s={s} rowFlexStyle={rowFlexStyle} />
                 {loading ? (
                   <TableMessage text={s.deckCardsLoading} isRTL={isRTL} />
                 ) : filteredCards.length === 0 ? (
@@ -221,6 +233,7 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
                       card={card}
                       busy={busyId === card.id}
                       isRTL={isRTL}
+                      rowFlexStyle={rowFlexStyle}
                       s={s}
                       onDelete={() => setConfirmAction({ type: "delete", card })}
                       onReset={() => setConfirmAction({ type: "reset", card })}
@@ -292,11 +305,11 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
   );
 }
 
-function DeckCardsHeader({ isRTL, s }: { isRTL: boolean; s: any }) {
+function DeckCardsHeader({ isRTL, s, rowFlexStyle }: { isRTL: boolean; s: any; rowFlexStyle: ViewStyle }) {
   return (
     <View
       className="items-center gap-3 bg-surface-low dark:bg-surface-dark-low px-3 py-2"
-      style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
+      style={rowFlexStyle}
     >
       <HeaderCell label={s.deckCardsCardColumn} flex={1.45} isRTL={isRTL} />
       <HeaderCell label={s.deckCardsDueColumn} flex={0.72} isRTL={isRTL} />
@@ -322,6 +335,7 @@ function DeckCardRow({
   card,
   busy,
   isRTL,
+  rowFlexStyle,
   s,
   onDelete,
   onReset,
@@ -333,6 +347,7 @@ function DeckCardRow({
   card: DeckCardListItem;
   busy: boolean;
   isRTL: boolean;
+  rowFlexStyle: ViewStyle;
   s: any;
   onDelete: () => void;
   onReset: () => void;
@@ -387,7 +402,7 @@ function DeckCardRow({
   return (
     <View
       className="items-center gap-3 border-t border-warm-200 dark:border-neutral-800 px-3 py-2"
-      style={{ flexDirection: isRTL ? "row-reverse" : "row", opacity: busy ? 0.55 : 1 }}
+      style={{ ...rowFlexStyle, opacity: busy ? 0.55 : 1 }}
     >
       <View style={{ flex: 1.45, minWidth: 0 }}>
         <Text
@@ -412,7 +427,7 @@ function DeckCardRow({
       >
         {formatShortDate(card.due)}
       </Text>
-      <View style={{ flex: 0.72 }}>
+      <View style={{ flex: 0.72, alignItems: isRTL ? "flex-end" : "flex-start" }}>
         <StatePill state={card.state} s={s} />
       </View>
       <View className="items-center" style={{ width: 44, alignItems: isRTL ? "flex-start" : "flex-end" }}>
@@ -436,7 +451,7 @@ function StatePill({ state, s }: { state: number; s: any }) {
   };
   const item = map[state] ?? map[State.New];
   return (
-    <View className="self-start rounded-full px-2 py-1" style={{ backgroundColor: item.color }}>
+    <View className="rounded-full px-2 py-1" style={{ backgroundColor: item.color }}>
       <Text style={{ color: "#fff", fontFamily: "Manrope_700Bold", fontSize: 10 }} numberOfLines={1}>
         {item.label}
       </Text>
