@@ -10,10 +10,12 @@ describe("Mushaf toolbar contract", () => {
     expect(source).not.toContain('<ScanLine size={16} color="#0d9488" />');
   });
 
-  it("keeps the page view toggle centered when the chevron menu is visible", () => {
-    expect(source).toContain("const pageMenuSlotWidth = compact ? 36 : 38;");
+  it("keeps the page view toggle compact when the chevron menu is visible", () => {
+    expect(source).toContain("const pageMenuSlotWidth = compact ? 30 : 32;");
     expect(source).toContain('direction: "ltr",');
-    expect(source).toContain('{showPageMenu && <View pointerEvents="none" style={{ width: pageMenuSlotWidth }} />}');
+    expect(source).not.toContain('{showPageMenu && <View pointerEvents="none" style={{ width: pageMenuSlotWidth }} />}');
+    expect(source).not.toContain("minWidth: showPageMenu ? (compact ? 132 : 144) : undefined,");
+    expect(source).toContain("flexShrink: 0,");
     expect(source).toContain("width: pageMenuSlotWidth,");
     expect(source).toContain('writingDirection: isRTL ? "rtl" : "ltr",');
   });
