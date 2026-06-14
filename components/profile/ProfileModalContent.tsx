@@ -308,6 +308,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
     cardsReviewed: Math.max(localStatsSnapshot.cardsReviewed, visibleProfile?.cards_reviewed ?? 0, review.totalReviews),
     totalScore: Math.max(localStatsSnapshot.totalScore, visibleProfile?.total_score ?? 0),
   };
+  const publicCardsReviewed = Math.max(visibleProfile?.cards_reviewed ?? 0, review.totalReviews);
   const remoteSurahProgress = publicSurahProgressQuery.data ?? [];
   const surahProgress = isOwnProfile ? chooseRicherSurahProgress(localSurahProgress, remoteSurahProgress) : remoteSurahProgress;
   const surahSummary = summarizeSurahProgress(surahProgress);
@@ -318,7 +319,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
     { label: s.wirdCurrent, value: isOwnProfile ? ownStats.currentStreak : visibleProfile?.current_streak ?? 0 },
     { label: s.wirdLongest, value: isOwnProfile ? ownStats.longestStreak : visibleProfile?.longest_streak ?? 0 },
     { label: s.progressAvgDaily, value: averageDailyReviews },
-    { label: s.flashcardsSummaryReviewed, value: isOwnProfile ? ownStats.cardsReviewed : visibleProfile?.cards_reviewed ?? 0 },
+    { label: s.flashcardsSummaryReviewed, value: isOwnProfile ? ownStats.cardsReviewed : publicCardsReviewed },
     { label: s.leaderboardPoints, value: isOwnProfile ? ownStats.totalScore : visibleProfile?.total_score ?? 0 },
     { label: s.heatmapActiveDays, value: review.activeDays },
     { label: s.heatmapTotalReviews, value: review.totalReviews },

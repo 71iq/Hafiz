@@ -32,6 +32,197 @@ export type PublicSurahProgressRow = {
   memorized: number;
 };
 
+type PublicReviewStats = {
+  totalReviews: number;
+  activeDays: number;
+  currentStreak: number;
+  longestStreak: number;
+  lastReviewDate: string | null;
+};
+
+type PublicScoreSummary = {
+  totalScore: number;
+  cardsReviewed: number;
+  currentStreak: number;
+  longestStreak: number;
+  lastReviewDate: string | null;
+};
+
+type PublicReviewActivityResult = {
+  activity: PublicReviewActivityDay[];
+  activeDays: number;
+  totalReviews: number;
+};
+
+function toDayIndex(ymd: string): number {
+  const [year, month, day] = ymd.split("-").map(Number);
+  return Math.floor(Date.UTC(year, (month || 1) - 1, day || 1) / 86400000);
+}
+
+function formatLocalDateKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function summarizeDailyScoreRows(rows: Array<{ date: string; score?: number | null; reviews_count?: number | null }>): PublicScoreSummary {
+  const activeDates = rows
+    .filter((row) => (row.reviews_count ?? 0) > 0)
+    .map((row) => row.date.slice(0, 10));
+  const uniqueDates = Array.from(new Set(activeDates)).sort();
+  const today = formatLocalDateKey(new Date());
+  const indicesDesc = uniqueDates.map(toDayIndex).sort((a, b) => b - a);
+  const todayIndex = toDayIndex(today);
+
+  let currentStreak = 0;
+  if (indicesDesc[0] === todayIndex) {
+    let expected = todayIndex;
+    for (const index of indicesDesc) {
+      if (index === expected) {
+        currentStreak += 1;
+        expected -= 1;
+      } else if (index < expected) {
+        break;
+      }
+    }
+  }
+
+  let longestStreak = 0;
+  let run = 0;
+  let previous: number | null = null;
+  for (const index of [...indicesDesc].sort((a, b) => a - b)) {
+    run = previous === null || index === previous + 1 ? run + 1 : 1;
+    longestStreak = Math.max(longestStreak, run);
+    previous = index;
+  }
+
+  return {
+    totalScore: rows.reduce((sum, row) => sum + (row.score ?? 0), 0),
+    cardsReviewed: rows.reduce((sum, row) => sum + (row.reviews_count ?? 0), 0),
+    currentStreak,
+    longestStreak,
+    lastReviewDate: uniqueDates.at(-1) ?? null,
+  };
+}
+
+function emptyScoreSummary(): PublicScoreSummary {
+  return { totalScore: 0, cardsReviewed: 0, currentStreak: 0, longestStreak: 0, lastReviewDate: null };
+}
+
+function isMissingPublicReviewAggregateError(error: { code?: string; message?: string; details?: string } | null): boolean {
+  const message = `${error?.code ?? ""} ${error?.message ?? ""} ${error?.details ?? ""}`.toLowerCase();
+  return (
+    message.includes("public_review_activity") ||
+    message.includes("public_review_stats")
+  ) && (
+    message.includes("does not exist") ||
+    message.includes("schema cache") ||
+    message.includes("pgrst205") ||
+    message.includes("42p01")
+  );
+}
+
+function mergePublicProfileStats(
+  profile: PublicProfile,
+  reviewStats: PublicReviewStats | null,
+  scoreSummary: PublicScoreSummary
+): PublicProfile {
+  const normalizedProfile = normalizePublicProfileStreak(profile);
+  return {
+    ...normalizedProfile,
+    total_score: Math.max(normalizedProfile.total_score ?? 0, scoreSummary.totalScore),
+    current_streak: Math.max(normalizedProfile.current_streak ?? 0, reviewStats?.currentStreak ?? 0, scoreSummary.currentStreak),
+    longest_streak: Math.max(normalizedProfile.longest_streak ?? 0, reviewStats?.longestStreak ?? 0, scoreSummary.longestStreak),
+    cards_reviewed: Math.max(normalizedProfile.cards_reviewed ?? 0, reviewStats?.totalReviews ?? 0, scoreSummary.cardsReviewed),
+    last_review_date: [normalizedProfile.last_review_date?.slice(0, 10), reviewStats?.lastReviewDate, scoreSummary.lastReviewDate]
+      .filter((date): date is string => Boolean(date))
+      .sort()
+      .at(-1) ?? null,
+  };
+}
+
+async function fetchPublicScoreSummary(userId: string): Promise<PublicScoreSummary> {
+  const { data, error } = await supabase
+    .from("daily_scores")
+    .select("date, score, reviews_count")
+    .eq("user_id", userId);
+
+  if (error) throw error;
+  return summarizeDailyScoreRows((data ?? []) as Array<{ date: string; score: number | null; reviews_count: number | null }>);
+}
+
+async function fetchPublicReviewStats(userId: string): Promise<PublicReviewStats | null> {
+  const { data, error } = await supabase
+    .from("public_review_stats")
+    .select("total_reviews, active_days, current_streak, longest_streak, last_review_date")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    if (isMissingPublicReviewAggregateError(error)) return null;
+    throw error;
+  }
+  if (!data) return null;
+  const lastReviewDate = (data as any).last_review_date?.slice(0, 10) ?? null;
+  const today = formatLocalDateKey(new Date());
+  return {
+    totalReviews: (data as any).total_reviews ?? 0,
+    activeDays: (data as any).active_days ?? 0,
+    currentStreak: lastReviewDate === today ? (data as any).current_streak ?? 0 : 0,
+    longestStreak: (data as any).longest_streak ?? 0,
+    lastReviewDate,
+  };
+}
+
+async function fetchDailyScoreActivity(userId: string, startDate: string): Promise<PublicReviewActivityResult> {
+  const { data, error } = await supabase
+    .from("daily_scores")
+    .select("date, reviews_count")
+    .eq("user_id", userId)
+    .gte("date", startDate)
+    .order("date", { ascending: true });
+
+  if (error) throw error;
+
+  const activity = (data ?? []).map((row: any) => ({
+    date: row.date,
+    count: row.reviews_count ?? 0,
+  }));
+  return {
+    activity,
+    activeDays: activity.filter((day) => day.count > 0).length,
+    totalReviews: activity.reduce((sum, day) => sum + day.count, 0),
+  };
+}
+
+async function fetchPublicReviewAggregateActivity(userId: string, startDate: string): Promise<PublicReviewActivityResult | null> {
+  const [stats, rowsResult] = await Promise.all([
+    fetchPublicReviewStats(userId),
+    supabase
+      .from("public_review_activity")
+      .select("date, reviews_count")
+      .eq("user_id", userId)
+      .gte("date", startDate)
+      .order("date", { ascending: true }),
+  ]);
+
+  if (rowsResult.error) {
+    if (isMissingPublicReviewAggregateError(rowsResult.error)) return null;
+    throw rowsResult.error;
+  }
+
+  const activity = (rowsResult.data ?? []).map((row: any) => ({
+    date: row.date,
+    count: row.reviews_count ?? 0,
+  }));
+  return {
+    activity,
+    activeDays: Math.max(stats?.activeDays ?? 0, activity.filter((day) => day.count > 0).length),
+    totalReviews: Math.max(stats?.totalReviews ?? 0, activity.reduce((sum, day) => sum + day.count, 0)),
+  };
+}
+
 /** Daily leaderboard: top scorers today */
 export async function fetchDailyLeaderboard(): Promise<LeaderboardEntry[]> {
   if (!isSupabaseConfigured()) return [];
@@ -212,11 +403,16 @@ export async function fetchStreakLeaderboard(): Promise<LeaderboardEntry[]> {
 export async function fetchPublicProfile(userId: string): Promise<PublicProfile | null> {
   if (!isSupabaseConfigured()) return null;
 
-  const { data, error } = await supabase
+  const [profileResult, reviewStats, scoreSummary] = await Promise.all([
+    supabase
     .from("profiles")
     .select("id, username, display_name, avatar_url, bio, country, total_score, current_streak, longest_streak, cards_reviewed, last_review_date")
     .eq("id", userId)
-    .maybeSingle();
+      .maybeSingle(),
+    fetchPublicReviewStats(userId),
+    fetchPublicScoreSummary(userId).catch(() => emptyScoreSummary()),
+  ]);
+  const { data, error } = profileResult;
 
   if (error && isMissingOptionalProfileColumnError(error)) {
     const fallback = await supabase
@@ -226,11 +422,13 @@ export async function fetchPublicProfile(userId: string): Promise<PublicProfile 
       .maybeSingle();
 
     if (fallback.error) throw fallback.error;
-    return fallback.data ? normalizePublicProfileStreak({ ...fallback.data, bio: null, country: null } as PublicProfile) : null;
+    return fallback.data
+      ? mergePublicProfileStats({ ...fallback.data, bio: null, country: null } as PublicProfile, reviewStats, scoreSummary)
+      : null;
   }
 
   if (error) throw error;
-  return data ? normalizePublicProfileStreak(data as PublicProfile) : null;
+  return data ? mergePublicProfileStats(data as PublicProfile, reviewStats, scoreSummary) : null;
 }
 
 export async function fetchPublicAchievementUnlocks(userId: string): Promise<AchievementUnlock[]> {
@@ -264,23 +462,18 @@ export async function fetchPublicReviewActivity(userId: string, days = 90): Prom
   start.setDate(start.getDate() - Math.max(days - 1, 0));
   const startDate = start.toISOString().split("T")[0];
 
-  const { data, error } = await supabase
-    .from("daily_scores")
-    .select("date, reviews_count")
-    .eq("user_id", userId)
-    .gte("date", startDate)
-    .order("date", { ascending: true });
+  const [aggregate, dailyScores] = await Promise.all([
+    fetchPublicReviewAggregateActivity(userId, startDate),
+    fetchDailyScoreActivity(userId, startDate),
+  ]);
+  const aggregateTotal = aggregate?.totalReviews ?? 0;
+  const dailyTotal = dailyScores.totalReviews;
+  const activity = aggregate && aggregateTotal >= dailyTotal ? aggregate.activity : dailyScores.activity;
 
-  if (error) throw error;
-
-  const activity = (data ?? []).map((row: any) => ({
-    date: row.date,
-    count: row.reviews_count ?? 0,
-  }));
   return {
     activity,
-    activeDays: activity.filter((day) => day.count > 0).length,
-    totalReviews: activity.reduce((sum, day) => sum + day.count, 0),
+    activeDays: Math.max(aggregate?.activeDays ?? 0, dailyScores.activeDays),
+    totalReviews: Math.max(aggregateTotal, dailyTotal),
   };
 }
 
@@ -303,7 +496,7 @@ export async function fetchPublicSurahProgress(userId: string): Promise<PublicSu
 
 function normalizePublicProfileStreak(profile: PublicProfile): PublicProfile {
   const lastReviewDate = profile.last_review_date?.slice(0, 10) ?? null;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = formatLocalDateKey(new Date());
   return {
     ...profile,
     current_streak: lastReviewDate === today ? profile.current_streak ?? 0 : 0,

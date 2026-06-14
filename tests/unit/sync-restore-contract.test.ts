@@ -82,7 +82,9 @@ describe("account sync restore contract", () => {
     expect(syncDailyScore).toContain("Math.max(reviewsCount, existing?.reviews_count ?? 0)");
     expect(updateProfileStats).toContain("fetchDailyScoreSummary");
     expect(updateProfileStats).toContain("Math.max(totalScore, remoteDailySummary.totalScore, profile?.total_score ?? 0)");
-    expect(updateProfileStats).toContain("Math.max(localReviewedCount, remoteDailySummary.cardsReviewed, profile?.cards_reviewed ?? 0)");
+    expect(updateProfileStats).toContain("localReviewSummary.totalReviews");
+    expect(updateProfileStats).toContain("remotePublicReviewSummary?.totalReviews");
+    expect(updateProfileStats).toContain("upsertPublicReviewSummary");
   });
 
   it("uses account-backed public activity as the owner profile fallback", () => {
