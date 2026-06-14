@@ -14,12 +14,18 @@ type Props = {
 
 function InfoRow({ label, value, isRTL }: { label: string; value: string; isRTL: boolean }) {
   return (
-    <View className={`${isRTL ? "flex-row-reverse" : "flex-row"} items-start py-2 mb-1.5`}>
-      <Text className={`text-sm text-warm-400 dark:text-neutral-500 ${isRTL ? "w-24 text-right" : "w-28"}`}>
+    <View
+      className="mb-1.5 items-start gap-3 py-2"
+      style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
+    >
+      <Text
+        className={`text-sm text-warm-400 dark:text-neutral-500 ${isRTL ? "w-24 text-right" : "w-28 text-left"}`}
+        style={{ writingDirection: isRTL ? "rtl" : "ltr" }}
+      >
         {label}
       </Text>
       <Text
-        className={`text-base text-charcoal dark:text-neutral-100 flex-1 text-right ${isRTL ? "pr-3" : ""}`}
+        className="flex-1 text-right text-base text-charcoal dark:text-neutral-100"
         style={{ writingDirection: "rtl" }}
       >
         {value}
@@ -31,8 +37,7 @@ function InfoRow({ label, value, isRTL }: { label: string; value: string; isRTL:
 export function TasreefTab({ surah, ayah, wordPos }: Props) {
   const db = useDatabase();
   const s = useStrings();
-  const { isRTL, uiLanguage } = useSettings();
-  const isArabicMode = uiLanguage === "ar";
+  const { isRTL } = useSettings();
   const [irab, setIrab] = useState<WordIrabRow | null>(null);
   const [rootData, setRootData] = useState<WordRootRow | null>(null);
   const [loading, setLoading] = useState(true);
@@ -58,11 +63,11 @@ export function TasreefTab({ surah, ayah, wordPos }: Props) {
     );
   }
 
-  const root = irab?.root ?? rootData?.root;
-  const lemma = irab?.lemma ?? rootData?.lemma;
-  const pattern = irab?.pattern;
+  const root = (irab?.root ?? rootData?.root)?.trim() || null;
+  const lemma = (irab?.lemma ?? rootData?.lemma)?.trim() || null;
+  const pattern = irab?.pattern?.trim() || null;
 
-  const hasVisibleData = (isArabicMode && (!!root || !!lemma)) || !!pattern;
+  const hasVisibleData = !!root || !!lemma || !!pattern;
 
   if (!hasVisibleData) {
     return (
@@ -76,8 +81,8 @@ export function TasreefTab({ surah, ayah, wordPos }: Props) {
 
   return (
     <View className="pt-2 pb-1 px-0">
-      {isArabicMode && root && <InfoRow label={s.rootLabel} value={root} isRTL={isRTL} />}
-      {isArabicMode && lemma && <InfoRow label={s.lemmaLabel} value={lemma} isRTL={isRTL} />}
+      {root && <InfoRow label={s.rootLabel} value={root} isRTL={isRTL} />}
+      {lemma && <InfoRow label={s.lemmaLabel} value={lemma} isRTL={isRTL} />}
       {pattern && (
         <InfoRow
           label={s.patternLabel}
