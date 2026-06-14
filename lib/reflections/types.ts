@@ -27,7 +27,7 @@ export type ReflectionComment = {
   reflection_id: string;
   user_id: string;
   content: string;
-  likes_count?: number | null;
+  likes_count: number;
   created_at: string;
   // Joined from profiles
   profiles?: {
@@ -35,6 +35,8 @@ export type ReflectionComment = {
     display_name: string | null;
     avatar_url: string | null;
   };
+  // Whether the current user has liked this comment
+  user_has_liked?: boolean;
 };
 
 export type ReflectionFeedSort = "newest" | "oldest" | "popular" | "less";

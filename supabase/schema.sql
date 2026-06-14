@@ -281,7 +281,16 @@ CREATE TABLE IF NOT EXISTS reflection_comments (
   reflection_id UUID REFERENCES reflections(id) ON DELETE CASCADE,
   user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
   content TEXT NOT NULL CHECK (length(content) BETWEEN 1 AND 2000),
+  likes_count INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- ─── Reflection Comment Likes ──────────────────────────────
+CREATE TABLE IF NOT EXISTS reflection_comment_likes (
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  comment_id UUID REFERENCES reflection_comments(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  PRIMARY KEY (user_id, comment_id)
 );
 
 -- ─── Reports (moderation queue) ────────────────────────────
@@ -297,7 +306,11 @@ CREATE TABLE IF NOT EXISTS reports (
 ALTER TABLE reflections ENABLE ROW LEVEL SECURITY;
 ALTER TABLE reflection_likes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE reflection_comments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reflection_comment_likes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE reports ENABLE ROW LEVEL SECURITY;
+
+GRANT SELECT ON reflection_comment_likes TO anon, authenticated;
+GRANT INSERT, DELETE ON reflection_comment_likes TO authenticated;
 
 -- ─── Reflections: publicly readable (active only), writable by author
 CREATE POLICY "Active reflections are publicly readable"
@@ -339,6 +352,19 @@ CREATE POLICY "Users can insert own comments"
 CREATE POLICY "Users can delete own comments"
   ON reflection_comments FOR DELETE
   USING (auth.uid() = user_id);
+
+-- ─── Reflection Comment Likes: publicly readable, auth required to write
+CREATE POLICY "Comment likes are publicly readable"
+  ON reflection_comment_likes FOR SELECT
+  USING (true);
+
+CREATE POLICY "Users can insert own comment likes"
+  ON reflection_comment_likes FOR INSERT
+  WITH CHECK ((SELECT auth.uid()) = user_id);
+
+CREATE POLICY "Users can delete own comment likes"
+  ON reflection_comment_likes FOR DELETE
+  USING ((SELECT auth.uid()) = user_id);
 
 -- ─── Reports: only author can see own, insert requires auth
 CREATE POLICY "Users can see own reports"
@@ -589,6 +615,24 @@ CREATE TRIGGER trg_reflection_comments_count
   AFTER INSERT OR DELETE ON reflection_comments
   FOR EACH ROW EXECUTE FUNCTION update_reflection_comments_count();
 
+-- ─── Trigger: auto-update likes_count on reflection comments
+CREATE OR REPLACE FUNCTION update_reflection_comment_likes_count()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    UPDATE reflection_comments SET likes_count = likes_count + 1 WHERE id = NEW.comment_id;
+  ELSIF TG_OP = 'DELETE' THEN
+    UPDATE reflection_comments SET likes_count = GREATEST(likes_count - 1, 0) WHERE id = OLD.comment_id;
+  END IF;
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_reflection_comment_likes_count ON reflection_comment_likes;
+CREATE TRIGGER trg_reflection_comment_likes_count
+  AFTER INSERT OR DELETE ON reflection_comment_likes
+  FOR EACH ROW EXECUTE FUNCTION update_reflection_comment_likes_count();
+
 -- ============================================================
 -- Indexes
 -- ============================================================
@@ -617,6 +661,8 @@ CREATE INDEX IF NOT EXISTS idx_reflections_surah_feed ON reflections(status, sur
 CREATE INDEX IF NOT EXISTS idx_reflections_juz_feed ON reflections(status, juz_start, juz_end, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_reflection_likes_reflection ON reflection_likes(reflection_id);
 CREATE INDEX IF NOT EXISTS idx_reflection_comments_reflection ON reflection_comments(reflection_id);
+CREATE INDEX IF NOT EXISTS idx_reflection_comment_likes_comment ON reflection_comment_likes(comment_id);
+CREATE INDEX IF NOT EXISTS idx_reflection_comments_popular ON reflection_comments(reflection_id, likes_count DESC, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_reports_reflection ON reports(reflection_id);
 CREATE INDEX IF NOT EXISTS idx_private_notes_user_updated ON private_notes(user_id, updated_at);
 CREATE INDEX IF NOT EXISTS idx_private_notes_ayah ON private_notes(user_id, surah, ayah_start, ayah_end);

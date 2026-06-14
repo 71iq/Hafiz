@@ -42,6 +42,17 @@ function isMissingColumnError(error: { code?: string; message?: string } | null,
   );
 }
 
+function isMissingCommentLikesTableError(error: { code?: string; message?: string; details?: string } | null): boolean {
+  const message = `${error?.code ?? ""} ${error?.message ?? ""} ${error?.details ?? ""}`.toLowerCase();
+  return (
+    message.includes("reflection_comment_likes") &&
+    (message.includes("does not exist") ||
+      message.includes("schema cache") ||
+      message.includes("pgrst205") ||
+      message.includes("42p01"))
+  );
+}
+
 function normalizeSearchTerm(value?: string): string {
   return (value ?? "").trim().replace(/\s+/g, " ").slice(0, MAX_SEARCH_LENGTH);
 }
@@ -66,6 +77,38 @@ async function attachUserLikes(reflections: Reflection[], userId?: string): Prom
   return reflections.map((reflection) => ({
     ...reflection,
     user_has_liked: likedSet.has(reflection.id),
+  }));
+}
+
+function normalizeComment(comment: ReflectionComment): ReflectionComment {
+  return {
+    ...comment,
+    likes_count: comment.likes_count ?? 0,
+  };
+}
+
+async function attachUserCommentLikes(comments: ReflectionComment[], userId?: string): Promise<ReflectionComment[]> {
+  const normalized = comments.map(normalizeComment);
+  if (!userId || normalized.length === 0) return normalized;
+
+  const { data: likes, error } = await supabase
+    .from("reflection_comment_likes")
+    .select("comment_id")
+    .eq("user_id", userId)
+    .in(
+      "comment_id",
+      normalized.map((comment) => comment.id)
+    );
+
+  if (error) {
+    if (isMissingCommentLikesTableError(error)) return normalized;
+    throw error;
+  }
+
+  const likedSet = new Set((likes ?? []).map((like) => like.comment_id));
+  return normalized.map((comment) => ({
+    ...comment,
+    user_has_liked: likedSet.has(comment.id),
   }));
 }
 
@@ -260,7 +303,8 @@ export async function toggleLike(
 export async function fetchComments(
   reflectionId: string,
   page: number,
-  sort: ReflectionCommentSort = "oldest"
+  sort: ReflectionCommentSort = "oldest",
+  userId?: string
 ): Promise<{ data: ReflectionComment[]; hasMore: boolean }> {
   if (!isSupabaseConfigured()) return { data: [], hasMore: false };
 
@@ -285,11 +329,13 @@ export async function fetchComments(
   if (error && sort === "popular" && isMissingColumnError(error, "likes_count")) {
     const fallback = await applySort(buildQuery(), sort, false).range(from, to);
     if (fallback.error) throw fallback.error;
-    return pageResult((fallback.data ?? []) as ReflectionComment[], COMMENT_PAGE_SIZE);
+    const result = pageResult((fallback.data ?? []) as ReflectionComment[], COMMENT_PAGE_SIZE);
+    return { ...result, data: await attachUserCommentLikes(result.data, userId) };
   }
 
   if (error) throw error;
-  return pageResult((data ?? []) as ReflectionComment[], COMMENT_PAGE_SIZE);
+  const result = pageResult((data ?? []) as ReflectionComment[], COMMENT_PAGE_SIZE);
+  return { ...result, data: await attachUserCommentLikes(result.data, userId) };
 }
 
 /** Add a comment to a reflection */
@@ -305,7 +351,30 @@ export async function addComment(
     .single();
 
   if (error) throw error;
-  return data as ReflectionComment;
+  return { ...(data as ReflectionComment), likes_count: (data as ReflectionComment).likes_count ?? 0, user_has_liked: false };
+}
+
+/** Toggle like on a comment */
+export async function toggleCommentLike(
+  userId: string,
+  commentId: string,
+  currentlyLiked: boolean
+): Promise<boolean> {
+  if (currentlyLiked) {
+    const { error } = await supabase
+      .from("reflection_comment_likes")
+      .delete()
+      .eq("user_id", userId)
+      .eq("comment_id", commentId);
+    if (error) throw error;
+    return false;
+  }
+
+  const { error } = await supabase
+    .from("reflection_comment_likes")
+    .insert({ user_id: userId, comment_id: commentId });
+  if (error) throw error;
+  return true;
 }
 
 /** Report a reflection */

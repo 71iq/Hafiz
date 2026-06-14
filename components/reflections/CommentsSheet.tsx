@@ -1,12 +1,13 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { View, Text, Pressable, ActivityIndicator } from "react-native";
-import { ChevronDown, Send } from "lucide-react-native";
+import { ChevronDown, Heart, Send } from "lucide-react-native";
 import { router } from "expo-router";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useAuthStore } from "@/lib/auth/store";
+import { hapticLight } from "@/lib/haptics";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
-import { fetchComments, addComment } from "@/lib/reflections/api";
+import { fetchComments, addComment, toggleCommentLike } from "@/lib/reflections/api";
 import type { Reflection, ReflectionComment, ReflectionCommentSort } from "@/lib/reflections/types";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { Input } from "@/components/ui/Input";
@@ -75,6 +76,8 @@ export function CommentsSheet({
   const [sortOpen, setSortOpen] = useState(false);
   const [text, setText] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [commentLikeBusy, setCommentLikeBusy] = useState<Record<string, boolean>>({});
+  const [commentLikeOverrides, setCommentLikeOverrides] = useState<Record<string, { liked: boolean; likesCount: number }>>({});
   const [error, setError] = useState<string | null>(null);
 
   const sortOptions = useMemo<{ value: ReflectionCommentSort; label: string }[]>(
@@ -88,8 +91,8 @@ export function CommentsSheet({
   const selectedSortLabel = sortOptions.find((option) => option.value === sort)?.label ?? s.commentSortOldest;
 
   const commentsQuery = useInfiniteQuery({
-    queryKey: ["reflectionComments", reflectionId, sort],
-    queryFn: ({ pageParam }) => fetchComments(reflectionId ?? "", pageParam, sort),
+    queryKey: ["reflectionComments", reflectionId, sort, user?.id],
+    queryFn: ({ pageParam }) => fetchComments(reflectionId ?? "", pageParam, sort, user?.id),
     initialPageParam: 0,
     getNextPageParam: (lastPage, allPages) => (lastPage.hasMore ? allPages.length : undefined),
     enabled: !!reflectionId,
@@ -103,14 +106,23 @@ export function CommentsSheet({
 
   const comments = useMemo(() => {
     const loadedIds = new Set(loadedComments.map((comment) => comment.id));
-    return sortComments([...loadedComments, ...localComments.filter((comment) => !loadedIds.has(comment.id))], sort);
-  }, [loadedComments, localComments, sort]);
+    const merged = [...loadedComments, ...localComments.filter((comment) => !loadedIds.has(comment.id))];
+    return sortComments(
+      merged.map((comment) => {
+        const override = commentLikeOverrides[comment.id];
+        return override ? { ...comment, likes_count: override.likesCount, user_has_liked: override.liked } : comment;
+      }),
+      sort
+    );
+  }, [commentLikeOverrides, loadedComments, localComments, sort]);
 
   useEffect(() => {
     setLocalComments([]);
     setText("");
     setError(null);
     setSortOpen(false);
+    setCommentLikeBusy({});
+    setCommentLikeOverrides({});
   }, [reflectionId]);
 
   useEffect(() => {
@@ -146,6 +158,43 @@ export function CommentsSheet({
       setError(s.commentLoadFailed);
     }
   }, [commentsQuery, s.commentLoadFailed]);
+
+  const handleCommentLike = useCallback(
+    async (comment: ReflectionComment) => {
+      if (!user) {
+        onAuthRequired?.();
+        return;
+      }
+      if (commentLikeBusy[comment.id]) return;
+
+      const wasLiked = comment.user_has_liked ?? false;
+      const previousCount = comment.likes_count ?? 0;
+      const nextLiked = !wasLiked;
+      const nextCount = Math.max(0, previousCount + (wasLiked ? -1 : 1));
+
+      setError(null);
+      setCommentLikeBusy((prev) => ({ ...prev, [comment.id]: true }));
+      setCommentLikeOverrides((prev) => ({
+        ...prev,
+        [comment.id]: { liked: nextLiked, likesCount: nextCount },
+      }));
+      hapticLight();
+
+      try {
+        await toggleCommentLike(user.id, comment.id, wasLiked);
+      } catch (e) {
+        console.warn("[Comments] Failed to update like:", e);
+        setCommentLikeOverrides((prev) => ({
+          ...prev,
+          [comment.id]: { liked: wasLiked, likesCount: previousCount },
+        }));
+        setError(s.reflectionLikeFailed);
+      } finally {
+        setCommentLikeBusy((prev) => ({ ...prev, [comment.id]: false }));
+      }
+    },
+    [commentLikeBusy, onAuthRequired, s.reflectionLikeFailed, user]
+  );
 
   const mutedColor = isDark ? "#737373" : "#A39B93";
   const openProfile = useCallback(
@@ -312,6 +361,37 @@ export function CommentsSheet({
                   >
                     {c.content}
                   </Text>
+                  <View
+                    className={`mt-1.5 items-center ${isRTL ? "flex-row-reverse" : "flex-row"}`}
+                    style={{
+                      direction: "ltr",
+                      flexDirection: isRTL ? "row-reverse" : "row",
+                    }}
+                  >
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => handleCommentLike(c)}
+                      disabled={!!commentLikeBusy[c.id]}
+                      className={`items-center gap-1 rounded-full px-2 py-1 ${isRTL ? "flex-row-reverse" : "flex-row"}`}
+                      style={({ pressed }) => ({
+                        direction: "ltr",
+                        flexDirection: isRTL ? "row-reverse" : "row",
+                        opacity: pressed || commentLikeBusy[c.id] ? 0.6 : 1,
+                        backgroundColor: themeColors.surfaceMid,
+                      })}
+                    >
+                      <Heart
+                        size={14}
+                        color={c.user_has_liked ? "#ef4444" : mutedColor}
+                        fill={c.user_has_liked ? "#ef4444" : "none"}
+                      />
+                      {(c.likes_count ?? 0) > 0 ? (
+                        <Text style={{ fontFamily: "Manrope_500Medium", fontSize: 11, color: mutedColor }}>
+                          {c.likes_count}
+                        </Text>
+                      ) : null}
+                    </Pressable>
+                  </View>
                 </View>
               ))}
 
