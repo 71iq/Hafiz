@@ -68,6 +68,12 @@ export function SurahProgressList({
 
   const renderItem = (item: SurahProgress, cardWidth?: number) => {
     const pct = item.totalCards > 0 ? (item.memorized / item.totalCards) * 100 : 0;
+    const primaryName = isRTL ? item.nameArabic || item.nameEnglish : item.nameEnglish || item.nameArabic;
+    const secondaryName = isRTL
+      ? item.nameEnglish && item.nameEnglish !== primaryName ? item.nameEnglish : ""
+      : item.nameArabic && item.nameArabic !== primaryName ? item.nameArabic : "";
+    const primaryDirection = isRTL ? "rtl" : "ltr";
+    const secondaryDirection = isRTL ? "ltr" : "rtl";
     const content = (
         <Card elevation="low" className="p-4">
           <View
@@ -100,24 +106,27 @@ export function SurahProgressList({
                     fontFamily: "Manrope_600SemiBold",
                     fontSize: 14,
                     color: isDark ? "#e5e5e5" : "#2D2D2D",
-                    writingDirection: "rtl",
-                    textAlign: "right",
-                  }}
-                  numberOfLines={1}
-                >
-                  {item.nameArabic}
-                </Text>
-                <Text
-                  style={{
-                    fontFamily: "Manrope_400Regular",
-                    fontSize: 11,
-                    color: isDark ? "#737373" : "#8B8178",
+                    writingDirection: primaryDirection,
                     textAlign: isRTL ? "right" : "left",
                   }}
                   numberOfLines={1}
                 >
-                  {item.nameEnglish}
+                  {primaryName}
                 </Text>
+                {secondaryName ? (
+                  <Text
+                    style={{
+                      fontFamily: "Manrope_400Regular",
+                      fontSize: 11,
+                      color: isDark ? "#737373" : "#8B8178",
+                      textAlign: isRTL ? "right" : "left",
+                      writingDirection: secondaryDirection,
+                    }}
+                    numberOfLines={1}
+                  >
+                    {secondaryName}
+                  </Text>
+                ) : null}
               </View>
             </View>
             <Text

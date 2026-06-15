@@ -58,6 +58,10 @@ describe("higher-level RTL source contracts", () => {
       "const rowFlexStyle = {",
       'direction: "ltr" as const',
       'flexDirection: isRTL ? "row-reverse" as const : "row" as const',
+      "const primaryName = isRTL ? item.nameArabic || item.nameEnglish : item.nameEnglish || item.nameArabic;",
+      "const secondaryName = isRTL",
+      "const primaryDirection = isRTL ? \"rtl\" : \"ltr\";",
+      "const secondaryDirection = isRTL ? \"ltr\" : \"rtl\";",
       "contentContainerStyle={{ gap: 8, ...rowFlexStyle, paddingHorizontal: 1 }}",
       'alignSelf: isRTL ? "flex-end" : "flex-start"',
     ]);
