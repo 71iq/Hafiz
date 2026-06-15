@@ -71,6 +71,7 @@ describe("RTL primitive component contracts", () => {
       "rtl"
     );
     const mirroredRow = row.getByTestId("mirrored-row");
+    expect(mirroredRow.props.className).toContain("flex-row-reverse");
     expect(getStyleValue(mirroredRow, "direction")).toBe("ltr");
     expect(getStyleValue(mirroredRow, "flexDirection")).toBe("row-reverse");
 
@@ -90,6 +91,7 @@ describe("RTL primitive component contracts", () => {
       : flattenStyle(disclosureRow.props.style);
     expect(resolvedStyle.direction).toBe("ltr");
     expect(resolvedStyle.flexDirection).toBe("row-reverse");
+    expect(disclosureRow.props.className).toContain("flex-row-reverse");
     expect(disclosureRow.props.className).toContain("items-center");
     expect(disclosureRow.props.className).toContain("justify-between");
     expect(disclosureRow.props.className).toContain("gap-3");

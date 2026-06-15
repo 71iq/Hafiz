@@ -34,6 +34,10 @@ function mirroredRowStyle(dir: Direction): ViewStyle {
   };
 }
 
+function mirroredRowClassName(dir: Direction) {
+  return dir === "rtl" ? "flex-row-reverse" : "flex-row";
+}
+
 export const MirroredRow = forwardRef<View, MirroredRowProps>(
   ({ dir: explicitDir, className, style, ...props }, ref) => {
     const dir = useUIDirection(explicitDir);
@@ -41,7 +45,7 @@ export const MirroredRow = forwardRef<View, MirroredRowProps>(
     return (
       <View
         ref={ref}
-        className={cn(className)}
+        className={cn(className, mirroredRowClassName(dir))}
         style={[style, mirroredRowStyle(dir)]}
         {...props}
       />
@@ -58,7 +62,7 @@ export const MirroredPressableRow = forwardRef<PressableRef, MirroredPressableRo
     return (
       <Pressable
         ref={ref}
-        className={cn(className)}
+        className={cn(className, mirroredRowClassName(dir))}
         style={(state: PressableStateCallbackType) => [
           typeof style === "function" ? style(state) : style,
           mirroredRowStyle(dir),
