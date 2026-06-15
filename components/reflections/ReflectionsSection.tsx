@@ -35,8 +35,7 @@ export function ReflectionsSection({ surah, ayah, initiallyExpanded = false, sho
   const [error, setError] = useState<string | null>(null);
   const [commentsReflectionId, setCommentsReflectionId] = useState<string | null>(null);
   const [writeOpen, setWriteOpen] = useState(false);
-
-  if (!isSupabaseConfigured()) return null;
+  const supabaseConfigured = isSupabaseConfigured();
 
   const chevronColor = isDark ? "#525252" : "#DFD9D1";
 
@@ -44,11 +43,16 @@ export function ReflectionsSection({ surah, ayah, initiallyExpanded = false, sho
   const { data: count = 0 } = useQuery({
     queryKey: ["reflectionCount", surah, ayah],
     queryFn: () => fetchReflectionCount(surah, ayah),
+    enabled: supabaseConfigured,
     staleTime: 1000 * 60 * 5,
   });
 
   // Fetch first page when expanded
-  const { isLoading, error: reflectionsError, refetch: refetchReflections } = useQuery({
+  const {
+    isLoading,
+    error: reflectionsError,
+    refetch: refetchReflections,
+  } = useQuery({
     queryKey: ["reflections", surah, ayah, 0, user?.id],
     queryFn: async () => {
       const result = await fetchReflections(surah, ayah, 0, user?.id);
@@ -58,7 +62,7 @@ export function ReflectionsSection({ surah, ayah, initiallyExpanded = false, sho
       setPage(0);
       return result;
     },
-    enabled: expanded,
+    enabled: supabaseConfigured && expanded,
     staleTime: 1000 * 60 * 5,
   });
 
@@ -78,39 +82,29 @@ export function ReflectionsSection({ surah, ayah, initiallyExpanded = false, sho
     } finally {
       setLoadingMore(false);
     }
-  }, [surah, ayah, page, user?.id, hasMore, loadingMore]);
+  }, [surah, ayah, page, user?.id, hasMore, loadingMore, s.reflectionLoadFailed]);
 
-  const handleLikeToggled = useCallback(
-    (reflectionId: string, liked: boolean, delta: number) => {
-      setAllReflections((prev) =>
-        prev.map((r) =>
-          r.id === reflectionId
-            ? { ...r, user_has_liked: liked, likes_count: r.likes_count + delta }
-            : r
-        )
-      );
-    },
-    []
-  );
+  const handleLikeToggled = useCallback((reflectionId: string, liked: boolean, delta: number) => {
+    setAllReflections((prev) =>
+      prev.map((r) =>
+        r.id === reflectionId ? { ...r, user_has_liked: liked, likes_count: r.likes_count + delta } : r,
+      ),
+    );
+  }, []);
 
-  const handleCommentAdded = useCallback(
-    (reflectionId: string) => {
-      setAllReflections((prev) =>
-        prev.map((r) =>
-          r.id === reflectionId
-            ? { ...r, comments_count: r.comments_count + 1 }
-            : r
-        )
-      );
-    },
-    []
-  );
+  const handleCommentAdded = useCallback((reflectionId: string) => {
+    setAllReflections((prev) =>
+      prev.map((r) => (r.id === reflectionId ? { ...r, comments_count: r.comments_count + 1 } : r)),
+    );
+  }, []);
 
   const handleWriteSuccess = useCallback(() => {
     // Invalidate and refetch
     queryClient.invalidateQueries({ queryKey: ["reflections", surah, ayah] });
     queryClient.invalidateQueries({ queryKey: ["reflectionCount", surah, ayah] });
   }, [queryClient, surah, ayah]);
+
+  if (!supabaseConfigured) return null;
 
   return (
     <>
@@ -143,11 +137,7 @@ export function ReflectionsSection({ surah, ayah, initiallyExpanded = false, sho
               </View>
             )}
           </View>
-          {expanded ? (
-            <ChevronUp size={14} color={chevronColor} />
-          ) : (
-            <ChevronDown size={14} color={chevronColor} />
-          )}
+          {expanded ? <ChevronUp size={14} color={chevronColor} /> : <ChevronDown size={14} color={chevronColor} />}
         </Pressable>
       )}
 
@@ -165,12 +155,7 @@ export function ReflectionsSection({ surah, ayah, initiallyExpanded = false, sho
               isDark={isDark}
             />
           ) : allReflections.length === 0 ? (
-            <EmptyState
-              icon={MessageSquare}
-              title={s.reflectionEmpty}
-              subtitle={s.reflectionBeFirst}
-              isDark={isDark}
-            />
+            <EmptyState icon={MessageSquare} title={s.reflectionEmpty} subtitle={s.reflectionBeFirst} isDark={isDark} />
           ) : (
             allReflections.map((r) => (
               <ReflectionCard
@@ -234,9 +219,7 @@ export function ReflectionsSection({ surah, ayah, initiallyExpanded = false, sho
             })}
           >
             <PenLine size={15} color="#FDDC91" />
-            <Text
-              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13, color: "#FDDC91" }}
-            >
+            <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13, color: "#FDDC91" }}>
               {s.reflectionWrite}
             </Text>
           </Pressable>

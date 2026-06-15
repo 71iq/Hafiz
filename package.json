@@ -30,7 +30,9 @@
     "build:db": "node scripts/build-quran-db.mjs",
     "build:web": "expo export --platform web",
     "prebuild:web": "bash scripts/prepare-web-data.sh",
-    "postinstall": "node scripts/fix-rn-gradle-plugin.js"
+    "postinstall": "node scripts/fix-rn-gradle-plugin.js",
+    "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
+    "format": "prettier . --write --ignore-unknown"
   },
   "dependencies": {
     "@expo-google-fonts/manrope": "^0.4.2",
@@ -91,8 +93,11 @@
     "@testing-library/react-native": "^13.3.3",
     "@types/jest": "^29.5.14",
     "@types/react": "~19.2.2",
+    "eslint": "^9.39.4",
+    "eslint-config-expo": "^56.0.4",
     "jest": "^29.7.0",
     "jest-expo": "~55.0.0",
+    "prettier": "^3.8.4",
     "react-test-renderer": "^19.2.0",
     "supabase": "^2.98.2",
     "typescript": "~5.9.2"
