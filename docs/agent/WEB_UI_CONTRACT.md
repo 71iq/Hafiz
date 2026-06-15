@@ -85,6 +85,7 @@ This document is the authoritative execution contract for the Hafiz web UI stabi
 - safe-area aware bottom padding
 - scroll ownership inside the overlay, not accidental body scrolling
 - width and max-height rules derived from the shared viewport contract
+- phone content sheets use a fixed, predefined height derived from their configured max-height so content loading or tab changes do not resize the sheet
 - web body scroll locking while overlays are open
 - top-most `Escape` handling so nested overlays close one level at a time
 

@@ -197,6 +197,7 @@ export function ResponsiveOverlay({
       width: contentWidth,
       maxWidth: activePresentation === "sheet" ? "100%" : contentWidth,
       maxHeight: computedMaxHeight,
+      height: activePresentation === "sheet" && isPhone ? computedMaxHeight : undefined,
       backgroundColor: resolvedSurfaceColor,
       borderTopLeftRadius: activePresentation === "sheet" ? 28 : 28,
       borderTopRightRadius: activePresentation === "sheet" ? 28 : 28,
@@ -218,7 +219,7 @@ export function ResponsiveOverlay({
             ],
       opacity: animation,
     }),
-    [activePresentation, animation, computedMaxHeight, contentWidth, resolvedSurfaceColor]
+    [activePresentation, animation, computedMaxHeight, contentWidth, isPhone, resolvedSurfaceColor]
   );
 
   const overlayAlignment =

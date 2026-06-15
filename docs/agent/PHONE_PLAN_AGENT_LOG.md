@@ -37,6 +37,21 @@ Purpose: persistent continuity log for the new phone redesign so future sessions
 ### Next step
 - Keep promoting stable report-only checks into strict suites as app behavior is fixed.
 
+## 2026-06-15 — Phone Sheet Height Stabilization
+
+### Scope decision
+1. Standardized migrated phone content sheets to fixed heights at the shared `ResponsiveOverlay` layer instead of letting sheet height shrink-wrap current content.
+- Rationale: ayah, word, search, comments, bookmark, deck, recitation, and other migrated sheets should not resize when async content loads or tabs change.
+- Legacy `components/ui/Sheet.tsx` remains unchanged because its remaining use is the compact selection action bar, not a full content sheet.
+
+### Impacted files/routes
+- `components/ui/ResponsiveOverlay.tsx`
+- `docs/agent/WEB_UI_CONTRACT.md`
+- A strict unit contract guards the phone sheet height behavior.
+
+### Next step
+- Continue migrating any remaining full content overlays to `ResponsiveOverlay`; only compact action bars should stay on legacy sheet primitives.
+
 ## 2026-05-01 — Phase 0 Started
 
 ### Scope baseline audited
