@@ -7,6 +7,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSettings } from "@/lib/settings/context";
 import { useDatabase } from "@/lib/database/provider";
 import { useStrings } from "@/lib/i18n/useStrings";
+import type { UIStrings } from "@/lib/i18n/strings";
 import { useAuthStore } from "@/lib/auth/store";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { syncDailyScore, updateProfileStats } from "@/lib/fsrs/leaderboard-sync";
@@ -362,7 +363,7 @@ function LeaderboardPodiumCard({
   isCurrentUser: boolean;
   isDark: boolean;
   unit: string;
-  s: any;
+  s: UIStrings;
   onPress: () => void;
 }) {
   const { themeColors } = useSettings();
@@ -471,7 +472,7 @@ export function LeaderboardRow({
   unit: string;
   isStreak: boolean;
   isRTL: boolean;
-  s: any;
+  s: UIStrings;
   onPress: () => void;
 }) {
   const { themeColors } = useSettings();

@@ -1,7 +1,7 @@
 import { useSettings } from "@/lib/settings/context";
-import { strings } from "./strings";
+import { strings, type UIStringKey, type UIStrings } from "./strings";
 
-export function useStrings() {
+export function useStrings(): UIStrings {
   const { uiLanguage } = useSettings();
   return strings[uiLanguage] ?? strings.en;
 }
@@ -15,4 +15,8 @@ export function interpolate(
     (s, [k, v]) => s.replace(`{{${k}}}`, String(v)),
     template
   );
+}
+
+export function stringByKey(s: UIStrings, key: string, fallback = ""): string {
+  return key in s ? s[key as UIStringKey] : fallback;
 }

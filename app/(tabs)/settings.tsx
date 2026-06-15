@@ -28,7 +28,7 @@ import { TafsirSourcePicker } from "@/components/settings/TafsirSourcePicker";
 import { TranslationLanguagePicker } from "@/components/settings/TranslationLanguagePicker";
 import { ReciterPicker } from "@/components/settings/ReciterPicker";
 import { OverlayBody, OverlayHeader, ResponsiveModal, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
-import { useStrings } from "@/lib/i18n/useStrings";
+import { stringByKey, useStrings } from "@/lib/i18n/useStrings";
 import { useAuthStore } from "@/lib/auth/store";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { isQfSyncEnabled } from "@/lib/quran-foundation/config";
@@ -120,7 +120,7 @@ export default function SettingsScreen() {
   const { width } = useWindowDimensions();
   const currentLang = getLanguageByCode(translationLanguage);
   const currentTafseerSource = AVAILABLE_TAFSIR_SOURCES.find((source) => source.id === tafseerSource) ?? AVAILABLE_TAFSIR_SOURCES[0];
-  const currentTafseerTitle = s[currentTafseerSource.labelKey] ?? currentTafseerSource.id;
+  const currentTafseerTitle = stringByKey(s, currentTafseerSource.labelKey, currentTafseerSource.id);
   const currentReciter = getReciterById(recitationId);
   const { user, profile, isLoading: authLoading, signOut } = useAuthStore();
   const accountName = profile?.display_name || profile?.username || user?.email?.split("@")[0] || s.authProfile;

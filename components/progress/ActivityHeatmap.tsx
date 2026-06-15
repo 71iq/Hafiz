@@ -2,13 +2,14 @@ import React, { useMemo, useState } from "react";
 import { View, Text, Pressable, useWindowDimensions } from "react-native";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { useSettings } from "@/lib/settings/context";
+import type { UIStrings } from "@/lib/i18n/strings";
 
 type DayData = { date: string; count: number };
 
 type Props = {
   data: DayData[];
   isDark: boolean;
-  s: Record<string, string>;
+  s: UIStrings;
   isRTL?: boolean;
   activeDays?: number;
   totalReviews?: number;

@@ -1,9 +1,8 @@
-export type UIStrings = { [key: string]: string };
-
-export const strings: Record<"en" | "ar", UIStrings> = {
+export const strings = {
   en: {
     appName: "Hafiz",
     genericClose: "Close",
+    saving: "Saving...",
     // Tabs
     tabHome: "Home",
     tabMushaf: "Mushaf",
@@ -942,6 +941,7 @@ export const strings: Record<"en" | "ar", UIStrings> = {
   ar: {
     appName: "حافظ",
     genericClose: "إغلاق",
+    saving: "جارٍ الحفظ...",
     tabHome: "الرئيسية",
     tabMushaf: "المصحف",
     tabProgress: "التقدم",
@@ -1853,4 +1853,8 @@ export const strings: Record<"en" | "ar", UIStrings> = {
     errorSubtitle: "لم يتم تحميل هذا القسم بشكل صحيح",
     errorTryAgain: "حاول مجددًا",
   },
-};
+} as const;
+
+export type Locale = keyof typeof strings;
+export type UIStringKey = keyof typeof strings.en;
+export type UIStrings = { readonly [K in UIStringKey]: string };

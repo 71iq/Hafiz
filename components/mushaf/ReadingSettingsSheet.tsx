@@ -15,7 +15,8 @@ import { Toast } from "@/components/ui/Toast";
 import { ensureTafsirSourceImported } from "@/lib/database/init";
 import { useDatabase } from "@/lib/database/provider";
 import { toArabicNumber } from "@/lib/arabic";
-import { useStrings } from "@/lib/i18n/useStrings";
+import { stringByKey, useStrings } from "@/lib/i18n/useStrings";
+import type { UIStrings } from "@/lib/i18n/strings";
 import {
   FONT_SIZE_STEPS,
   useSettings,
@@ -80,7 +81,7 @@ export function ReadingSettingsSheet({
   const tajweedEnabled = quranFontStyle === "v4-tajweed";
   const markerStyleLabel = markerLabelForValue(quranMarkerStyle, s);
   const currentTafseerSource = AVAILABLE_TAFSIR_SOURCES.find((source) => source.id === tafseerSource);
-  const currentTafseerTitle = currentTafseerSource ? s[currentTafseerSource.labelKey] ?? currentTafseerSource.id : tafseerSource;
+  const currentTafseerTitle = currentTafseerSource ? stringByKey(s, currentTafseerSource.labelKey, currentTafseerSource.id) : tafseerSource;
   const fontSizeUsesFittedPageSize = fontSizeLocked;
   const horizontalTextAlign = isRTL ? "right" : "left";
   const rowDirection = isRTL ? "row-reverse" : "row";
@@ -696,7 +697,7 @@ function ChoiceDialog<T extends string>({
   );
 }
 
-function markerLabelForValue(value: QuranMarkerStyle, s: Record<string, string>) {
+function markerLabelForValue(value: QuranMarkerStyle, s: UIStrings) {
   switch (value) {
     case "light":
       return s.quranMarkerLight;

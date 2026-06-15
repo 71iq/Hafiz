@@ -4,7 +4,7 @@ import { Check, ChevronLeft, ChevronRight, Download } from "lucide-react-native"
 import { DisclosureRow } from "@/components/ui/MirroredRow";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { useDatabase } from "@/lib/database/provider";
-import { useStrings } from "@/lib/i18n/useStrings";
+import { stringByKey, useStrings } from "@/lib/i18n/useStrings";
 import { useSettings } from "@/lib/settings/context";
 import {
   AVAILABLE_TAFSIR_SOURCES,
@@ -131,8 +131,8 @@ export function TafsirSourcePicker({
             const isIncluded = isBundledTafsirSourceId(source.id);
             const isDownloaded = importedSources.has(source.id);
             const needsDownload = !isDownloaded;
-            const title = s[source.labelKey] ?? source.id;
-            const description = s[source.descriptionKey] ?? "";
+            const title = stringByKey(s, source.labelKey, source.id);
+            const description = stringByKey(s, source.descriptionKey);
             const statusText = isImporting
               ? s.tafseerDownloading
               : needsDownload

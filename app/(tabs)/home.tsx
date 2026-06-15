@@ -9,6 +9,7 @@ import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { interpolate } from "@/lib/i18n/useStrings";
+import type { UIStrings } from "@/lib/i18n/strings";
 import { Card } from "@/components/ui/Card";
 import { ScreenScrollView } from "@/components/ui/ScreenContent";
 import { DeckReviewSettingsSheet } from "@/components/flashcards/DeckReviewSettingsSheet";
@@ -592,7 +593,7 @@ function SmartDeckCard({
   isDark: boolean;
   isRTL: boolean;
   compact: boolean;
-  s: any;
+  s: UIStrings;
 }) {
   const Icon = deck.icon;
   const canStart = deck.total > 0;
@@ -710,7 +711,7 @@ function VocabularyDeckCard({
   isDark: boolean;
   isRTL: boolean;
   compact: boolean;
-  s: any;
+  s: UIStrings;
 }) {
   const canStart = stats.total > 0;
   const iconNode = (

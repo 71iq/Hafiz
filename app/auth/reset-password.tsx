@@ -8,6 +8,7 @@ import { Eye, EyeOff, Lock } from "lucide-react-native";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { useAuthStore } from "@/lib/auth/store";
 import { strings } from "@/lib/i18n/strings";
+import type { UIStrings } from "@/lib/i18n/strings";
 import { getStartupLanguage } from "@/lib/i18n/startup-language";
 import { Button } from "@/components/ui/Button";
 import { FormTextField } from "@/components/ui/FormTextField";
@@ -23,7 +24,7 @@ type ResetPasswordForm = {
   confirmPassword: string;
 };
 
-function createResetPasswordSchema(s: typeof strings.en) {
+function createResetPasswordSchema(s: UIStrings) {
   return z
     .object({
       password: z.string().min(6, s.authValidationPasswordMin),

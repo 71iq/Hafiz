@@ -12,7 +12,7 @@ export default function QfCallbackScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ code?: string; state?: string; error?: string; error_description?: string }>();
   const s = strings[getStartupLanguage()];
-  const [message, setMessage] = useState(s.qfAuthCallbackLoading);
+  const [message, setMessage] = useState<string>(s.qfAuthCallbackLoading);
 
   useEffect(() => {
     let cancelled = false;

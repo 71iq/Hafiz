@@ -18,7 +18,7 @@ import {
 import { useAyahAudio } from "@/lib/audio/ayah-audio";
 import { ensureTafsirSourceImported } from "@/lib/database/init";
 import { useDatabase } from "@/lib/database/provider";
-import { useStrings } from "@/lib/i18n/useStrings";
+import { stringByKey, useStrings } from "@/lib/i18n/useStrings";
 import { formatForCopy } from "@/lib/selection/format";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import {
@@ -630,7 +630,7 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
                     {tafsirSourceConfigs.map((source) => (
                       <TafsirSourceButton
                         key={source.id}
-                        label={s[source.labelKey] ?? source.id}
+                        label={stringByKey(s, source.labelKey, source.id)}
                         active={selectedTafsirSource === source.id}
                         onPress={() => setSelectedTafsirSource(source.id)}
                       />

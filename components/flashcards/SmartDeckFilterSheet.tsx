@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/Card";
 import { OverlayBody, OverlayFooter, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { useDatabase } from "@/lib/database/provider";
 import { interpolate, useStrings } from "@/lib/i18n/useStrings";
+import type { UIStrings } from "@/lib/i18n/strings";
 import { useSettings } from "@/lib/settings/context";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { SchedulerOptionsPanel, formatStepText, parseStepText } from "@/components/flashcards/DeckReviewSettingsSheet";
@@ -646,7 +647,7 @@ function SurahSelectorSheet({
   );
 }
 
-function getSmartDeckTitle(deckId: SmartDeckId, s: any): string {
+function getSmartDeckTitle(deckId: SmartDeckId, s: UIStrings): string {
   if (deckId === SMART_DECK_IDS.retention) return s.smartDeckRetentionTitle;
   if (deckId === SMART_DECK_IDS.mutashabihat) return s.smartDeckMutashabihatTitle;
   if (deckId === SMART_DECK_IDS.similarTails) return s.smartDeckSimilarTailsTitle;

@@ -12,7 +12,7 @@ import {
   type LucideIcon,
 } from "lucide-react-native";
 import { useSettings } from "@/lib/settings/context";
-import { useStrings, interpolate } from "@/lib/i18n/useStrings";
+import { useStrings, interpolate, stringByKey } from "@/lib/i18n/useStrings";
 import type { AchievementDashboardItem } from "@/lib/achievements/queries";
 import type { AchievementDefinition } from "@/lib/achievements/catalog";
 import { AchievementProgressBar } from "./AchievementProgressBar";
@@ -50,8 +50,8 @@ export function AchievementBadge({ item, compact = false }: Props) {
   const unlocked = !!item.unlockedAt;
   const color = RARITY_COLOR[item.rarity];
   const juzNumber = getJuzNumber(item.id);
-  const title = interpolate(s[item.titleKey] ?? item.id, { n: String(juzNumber ?? item.target) });
-  const description = interpolate(s[item.descriptionKey] ?? "", { n: String(juzNumber ?? item.target) });
+  const title = interpolate(stringByKey(s, item.titleKey, item.id), { n: String(juzNumber ?? item.target) });
+  const description = interpolate(stringByKey(s, item.descriptionKey), { n: String(juzNumber ?? item.target) });
   const progress = item.progress;
   const showProgress = !unlocked && !!progress && progress.targetValue > 1;
   const currentValue = progress?.currentValue ?? 0;

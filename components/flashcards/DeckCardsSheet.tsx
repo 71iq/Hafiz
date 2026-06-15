@@ -7,6 +7,7 @@ import { DropdownMenu, type DropdownMenuItem } from "@/components/ui/DropdownMen
 import { OverlayBody, OverlayFooter, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { useDatabase } from "@/lib/database/provider";
 import { useStrings } from "@/lib/i18n/useStrings";
+import type { UIStrings } from "@/lib/i18n/strings";
 import {
   deleteStudyCard,
   getDeckCardsForList,
@@ -306,7 +307,7 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
   );
 }
 
-function DeckCardsHeader({ isRTL, s, rowFlexStyle }: { isRTL: boolean; s: any; rowFlexStyle: ViewStyle }) {
+function DeckCardsHeader({ isRTL, s, rowFlexStyle }: { isRTL: boolean; s: UIStrings; rowFlexStyle: ViewStyle }) {
   return (
     <View
       className="items-center gap-3 bg-surface-low dark:bg-surface-dark-low px-3 py-2"
@@ -349,7 +350,7 @@ function DeckCardRow({
   busy: boolean;
   isRTL: boolean;
   rowFlexStyle: ViewStyle;
-  s: any;
+  s: UIStrings;
   onDelete: () => void;
   onReset: () => void;
   onToggleMark: () => void;
@@ -443,7 +444,7 @@ function DeckCardRow({
   );
 }
 
-function StatePill({ state, s }: { state: number; s: any }) {
+function StatePill({ state, s }: { state: number; s: UIStrings }) {
   const map: Record<number, { label: string; color: string }> = {
     [State.New]: { label: s.flashcardsSummaryNew, color: "#3b82f6" },
     [State.Learning]: { label: s.flashcardsSummaryLearning, color: "#f97316" },
@@ -489,7 +490,7 @@ function DueDateEditor({
   busy: boolean;
   isDark: boolean;
   isRTL: boolean;
-  s: any;
+  s: UIStrings;
   onChange: (value: string) => void;
   onClose: () => void;
   onSave: () => void;
@@ -538,7 +539,7 @@ function DueDateEditor({
   );
 }
 
-function getFilterLabel(filter: Filter, s: any): string {
+function getFilterLabel(filter: Filter, s: UIStrings): string {
   if (filter === "due") return s.deckCardsFilterDue;
   if (filter === "scheduled") return s.deckCardsFilterScheduled;
   if (filter === "new") return s.deckCardsFilterNew;

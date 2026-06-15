@@ -16,6 +16,7 @@ import { useDatabase, useDatabaseStatus } from "@/lib/database/provider";
 import { SettingsProvider, useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { interpolate } from "@/lib/i18n/useStrings";
+import type { UIStrings } from "@/lib/i18n/strings";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { LoadingScreen } from "@/components/LoadingScreen";
@@ -1161,7 +1162,7 @@ function getCardAnswerOverride(card: CardData, mode: ReviewMode): string | null 
   return value ? value : null;
 }
 
-function getDefaultAnswerText(card: CardData, mode: ReviewMode, s: any): string {
+function getDefaultAnswerText(card: CardData, mode: ReviewMode, s: UIStrings): string {
   switch (mode) {
     case "nextAyah":
       return card.nextAyahText ?? "";
@@ -1214,7 +1215,7 @@ function CardActionsSheet({
   isDark: boolean;
   isRTL: boolean;
   busy: boolean;
-  s: any;
+  s: UIStrings;
   onClose: () => void;
   onDelete: () => void;
   onSuspend: () => void;
@@ -1357,7 +1358,7 @@ function DueDateSheet({
   busy: boolean;
   isDark: boolean;
   isRTL: boolean;
-  s: any;
+  s: UIStrings;
   onChange: (value: string) => void;
   onClose: () => void;
   onSave: () => void;
@@ -1429,7 +1430,7 @@ function AnswerEditSheet({
   busy: boolean;
   isDark: boolean;
   isRTL: boolean;
-  s: any;
+  s: UIStrings;
   onChange: (value: string) => void;
   onClose: () => void;
   onSave: () => void;
@@ -1491,7 +1492,7 @@ function ModeTagsRow({
   currentSideIndex: number;
   maxWidth: number;
   isRTL: boolean;
-  s: any;
+  s: UIStrings;
 }) {
   return (
     <View className="items-center px-6 pb-3">
@@ -1567,7 +1568,7 @@ function TestModePrompt({
 function TestModeAnswer({
   mode, card, fontSize, lineHeight, s,
 }: {
-  mode: ReviewMode; card: CardData; fontSize: number; lineHeight: number; s: any;
+  mode: ReviewMode; card: CardData; fontSize: number; lineHeight: number; s: UIStrings;
 }) {
   const customAnswer = getCardAnswerOverride(card, mode);
   if (customAnswer) {
@@ -1667,7 +1668,7 @@ function SmartCardFront({
   card: CardData;
   fontSize: number;
   lineHeight: number;
-  s: any;
+  s: UIStrings;
 }) {
   const prompt = getSmartPrompt(card, s);
   return (
@@ -1753,7 +1754,7 @@ function SmartRefsAnswer({
   card: CardData;
   fontSize: number;
   lineHeight: number;
-  s: any;
+  s: UIStrings;
 }) {
   const refs = card.smartRefs ?? [];
   const target = card.smartTargetRef ?? refs[0] ?? null;
@@ -1850,7 +1851,7 @@ function SmartRefCard({
   );
 }
 
-function QiraatAnswer({ card, s }: { card: CardData; s: any }) {
+function QiraatAnswer({ card, s }: { card: CardData; s: UIStrings }) {
   const blocks = parseQiraatText(card.qiraatText ?? "");
   if (blocks.length === 0) {
     return (
@@ -1907,7 +1908,7 @@ function QiraatAnswer({ card, s }: { card: CardData; s: any }) {
   );
 }
 
-function AsbabAnswer({ card, s }: { card: CardData; s: any }) {
+function AsbabAnswer({ card, s }: { card: CardData; s: UIStrings }) {
   const occasions = card.asbabOccasions ?? [];
   if (occasions.length === 0) {
     return (
@@ -1985,7 +1986,7 @@ function GradingButtons({
   onGrade: (rating: Grade) => void;
   previews: Record<number, string>;
   isDark: boolean;
-  s: any;
+  s: UIStrings;
   disabled?: boolean;
 }) {
   const labels: Record<number, string> = {
@@ -2044,7 +2045,7 @@ function GradingButtons({
 
 // ─── Card State Badge ────────────────────────────────────────
 
-function CardStateBadge({ state, s }: { state: number; s: any }) {
+function CardStateBadge({ state, s }: { state: number; s: UIStrings }) {
   const config: Record<number, { label: string; bg: string }> = {
     [State.New]: { label: s.flashcardsSummaryNew, bg: "#3b82f6" },
     [State.Learning]: { label: s.flashcardsSummaryLearning, bg: "#f97316" },
@@ -2062,7 +2063,7 @@ function CardStateBadge({ state, s }: { state: number; s: any }) {
 
 // ─── Session Summary ─────────────────────────────────────────
 
-function SessionSummaryView({ summary, onDone, isDark, s, error }: { summary: SessionSummary; onDone: () => void; isDark: boolean; s: any; error?: string | null }) {
+function SessionSummaryView({ summary, onDone, isDark, s, error }: { summary: SessionSummary; onDone: () => void; isDark: boolean; s: UIStrings; error?: string | null }) {
   const { width, height } = useWindowDimensions();
   const durationMin = Math.max(1, Math.round(summary.durationMs / 60000));
   const nextReview = formatNextReviewDate(summary.nextReviewDate, s);
@@ -2173,7 +2174,7 @@ function isCardDueThroughToday(row: StudyCardRow, now: Date): boolean {
   );
 }
 
-function formatNextReviewDate(value: string | null, s: any): string {
+function formatNextReviewDate(value: string | null, s: UIStrings): string {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
@@ -2182,7 +2183,7 @@ function formatNextReviewDate(value: string | null, s: any): string {
 
 // ─── Helpers ─────────────────────────────────────────────────
 
-function getModeName(mode: ReviewMode, s: any): string {
+function getModeName(mode: ReviewMode, s: UIStrings): string {
   const map: Record<ReviewMode, string> = {
     nextAyah: s.flashcardsModeNextAyah,
     previousAyah: s.flashcardsModePreviousAyah,
@@ -2292,14 +2293,14 @@ function formatCompactNumber(value: number, isRTL: boolean): string {
   return isRTL ? toArabicNumeral(value) : String(value);
 }
 
-function getSmartDeckTitleForKind(kind: SmartCardKind, s: any): string {
+function getSmartDeckTitleForKind(kind: SmartCardKind, s: UIStrings): string {
   if (kind === "mutashabihat") return s.smartDeckMutashabihatTitle;
   if (kind === "similarTail") return s.smartDeckSimilarTailsTitle;
   if (kind === "qiraat") return s.smartDeckQiraatTitle;
   return s.smartDeckReasonsTitle;
 }
 
-function getSmartPrompt(card: CardData, s: any): string {
+function getSmartPrompt(card: CardData, s: UIStrings): string {
   if (card.kind === "similarTail") return s.smartDeckTailCompletePrompt;
   if (card.kind === "qiraat") return s.smartDeckQiraatPrompt;
   if (card.kind === "asbab") return s.smartDeckReasonsPrompt;

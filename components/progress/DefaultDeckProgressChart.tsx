@@ -2,13 +2,31 @@ import { Text, View } from "react-native";
 import { BarChart3 } from "lucide-react-native";
 import { Card } from "@/components/ui/Card";
 import { useSettings } from "@/lib/settings/context";
+import type { UIStrings } from "@/lib/i18n/strings";
 import type { DefaultDeckProgressItem, DefaultDeckProgressKey } from "@/lib/profile/progress";
+
+type DefaultDeckProgressStrings = Pick<
+  UIStrings,
+  | "smartDeckRetentionTitle"
+  | "smartDeckMutashabihatTitle"
+  | "smartDeckSimilarTailsTitle"
+  | "smartDeckQiraatTitle"
+  | "smartDeckReasonsTitle"
+  | "achievementCategory.vocab"
+  | "vocabDeckTitle"
+  | "progressDefaultDecks"
+  | "flashcardsTotalCards"
+  | "progressDeckStarted"
+  | "flashcardsNewCards"
+  | "progressDefaultDecksEmpty"
+  | "deckCardsFilterDue"
+>;
 
 type Props = {
   items: DefaultDeckProgressItem[];
   isDark: boolean;
   isRTL: boolean;
-  s: any;
+  s: DefaultDeckProgressStrings;
   className?: string;
 };
 
@@ -98,7 +116,7 @@ function DefaultDeckProgressRow({
   title: string;
   item: DefaultDeckProgressItem;
   isRTL: boolean;
-  s: any;
+  s: DefaultDeckProgressStrings;
 }) {
   const { themeColors } = useSettings();
   const startedPct = item.total > 0 ? Math.round((item.startedCount / item.total) * 100) : 0;

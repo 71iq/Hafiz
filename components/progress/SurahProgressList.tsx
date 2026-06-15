@@ -6,6 +6,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { BookOpen, ChevronDown } from "lucide-react-native";
 import { setPendingDeepLink } from "@/lib/deep-link";
 import { useSettings } from "@/lib/settings/context";
+import type { UIStrings } from "@/lib/i18n/strings";
 
 type SurahProgress = {
   surah: number;
@@ -24,7 +25,7 @@ type Props = {
   onItemPress?: () => void;
   onViewAll?: () => void;
   readOnly?: boolean;
-  s: Record<string, string>;
+  s: UIStrings;
 };
 
 export function SurahProgressList({
