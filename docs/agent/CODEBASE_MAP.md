@@ -1,7 +1,7 @@
 # Hafiz Codebase Map
 
 ## Purpose
-This document maps the current web-facing UI surfaces in Hafiz before the stabilization pass. It is a descriptive baseline for responsive, RTL, i18n, modal, and verification work; `docs/agent/WEB_UI_CONTRACT.md` remains authoritative when rules overlap.
+This document maps the current web-facing UI surfaces in Hafiz after the initial stabilization pass. It is a descriptive baseline for responsive, RTL, i18n, modal, and verification work; `docs/agent/WEB_UI_CONTRACT.md` remains authoritative when rules overlap.
 
 ## Route Graph
 
@@ -13,18 +13,18 @@ This document maps the current web-facing UI surfaces in Hafiz before the stabil
 | Onboarding | `app/onboarding.tsx` | Three-step onboarding flow backed by local SQLite and deck creation. Wraps its inner screen in its own `SettingsProvider` because it sits outside tabs. |
 | Deep-link bridge | `app/open.tsx` | Parses `hafiz://open` and redirects to Mushaf after calling `setPendingDeepLink()`. |
 | Flashcards session | `app/flashcards/session.tsx` | Outside tabs; owns its own `SettingsProvider`. |
-| Vocab review | `app/flashcards/vocab.tsx` | Outside tabs. Uses `useSettings()` and `useStrings()` today without wrapping its own `SettingsProvider`, so it falls back to default context values. |
-| Auth routes | `app/auth/login.tsx`, `app/auth/signup.tsx`, `app/auth/forgot-password.tsx`, `app/auth/reset-password.tsx` | Modal-style full screens pushed from the root stack. |
-| Public profile | `app/profile/[userId].tsx` | Leaderboard profile drill-down backed by TanStack Query. |
-| QA probe | `app/qa-ready.tsx` | Deterministic readiness route for browser automation and screenshot flows. |
-| Not-found | `app/+not-found.tsx` | Root catch-all surface. Uses hardcoded English strings today and sits outside tab-level settings. |
+| Vocab review | `app/flashcards/vocab.tsx` | Outside tabs; owns its own `SettingsProvider`. |
+| Auth routes | `app/auth/login.tsx`, `app/auth/signup.tsx`, `app/auth/forgot-password.tsx`, `app/auth/reset-password.tsx` | Modal-style full screens pushed from the root stack. They use startup-language strings directly. |
+| Public profile | `app/profile/[userId].tsx` | Leaderboard profile drill-down backed by TanStack Query; owns its own `SettingsProvider`. |
+| QA probe | `app/qa-ready.tsx` | Deterministic readiness route for browser automation and screenshot flows. Uses startup-language strings. |
+| Not-found | `app/+not-found.tsx` | Root catch-all surface. Uses startup-language strings and sits outside tab-level settings. |
 | HTML shell | `app/+html.tsx` | Web-only root document. Owns root metadata plus body/root scroll behavior used to collapse the mobile browser URL bar. |
 
 ### Tabs group
 | Surface | File | Notes |
 | --- | --- | --- |
 | Index redirect | `app/(tabs)/index.tsx` | Checks `user_settings.onboarding_completed` and redirects to onboarding or Mushaf. |
-| Home | `app/(tabs)/home.tsx` | Deck dashboard, review CTA, resume reading, auth banner, create-deck sheet, and search modal launcher. |
+| Home | `app/(tabs)/home.tsx` | Deck dashboard, review CTA, resume reading, auth banner, deck cards/settings/filter sheets, and search modal launcher. |
 | Mushaf | `app/(tabs)/mushaf.tsx` | Main reader route for verse and page modes; owns the highest number of overlays and responsive chrome decisions. |
 | Leaderboard | `app/(tabs)/leaderboard.tsx` | TanStack Query + Supabase-backed leaderboard tabs. |
 | Progress | `app/(tabs)/progress.tsx` | Local statistics and heatmap, optionally auth-gated when Supabase is configured. |
@@ -38,22 +38,21 @@ This document maps the current web-facing UI surfaces in Hafiz before the stabil
 - `app/(tabs)/_layout.tsx` is the only shared tab-level owner of `SettingsProvider`.
 - `app/onboarding.tsx` wraps itself in `SettingsProvider`.
 - `app/flashcards/session.tsx` wraps itself in `SettingsProvider`.
+- `app/flashcards/vocab.tsx`, `app/profile/index.tsx`, `app/profile/[userId].tsx`, and `app/zayt-preview.tsx` wrap themselves in `SettingsProvider`.
 
 ### Root-level routes outside tab settings today
 - `app/auth/login.tsx`
 - `app/auth/signup.tsx`
 - `app/auth/forgot-password.tsx`
 - `app/auth/reset-password.tsx`
-- `app/profile/[userId].tsx`
 - `app/qa-ready.tsx`
-- `app/flashcards/vocab.tsx`
 - `app/open.tsx`
 - `app/+not-found.tsx`
 
 ### Current implication
-- Auth, profile, QA, and vocab review already call `useStrings()` and/or `useSettings()` outside `SettingsProvider`, so they silently use the default English/light/LTR settings context.
+- Auth, QA, and not-found use `getStartupLanguage()` plus the static string catalog because they render outside a settings provider.
 - `app/open.tsx` currently does not consume strings or settings, so the missing provider is only a boundary note there.
-- `app/+not-found.tsx` does not consume `useStrings()`, but it hardcodes English copy and therefore still bypasses the bilingual contract.
+- Provider-backed root routes now use the same `useStrings()`/`useSettings()` path as tab routes.
 
 ## Navigation And Chrome
 
@@ -155,21 +154,27 @@ These exports currently exist as a parallel primitive layer or dormant surface a
 
 | Surface | File | Primitive |
 | --- | --- | --- |
-| Search | `components/SearchCommand.tsx` | raw `Modal` |
+| Search | `components/SearchCommand.tsx` | `ResponsiveSheet` |
 | Confirm dialog | `components/ui/ConfirmDialog.tsx` | `ResponsiveModal` |
-| Translation language picker | `components/settings/TranslationLanguagePicker.tsx` | raw `Modal` |
-| Create deck | `components/flashcards/CreateDeckSheet.tsx` | raw `Modal` |
-| Bookmarks | `components/mushaf/BookmarksSheet.tsx` | raw `Modal` |
-| Go to page/surah/juz | `components/mushaf/GoToNavigator.tsx` | raw `Modal` |
+| Translation language picker | `components/settings/TranslationLanguagePicker.tsx` | `ResponsiveSheet` |
+| Deck card list/actions | `components/flashcards/DeckCardsSheet.tsx` | `ResponsiveSheet` |
+| Deck review settings | `components/flashcards/DeckReviewSettingsSheet.tsx` | `ResponsiveSheet` |
+| Smart deck filters | `components/flashcards/SmartDeckFilterSheet.tsx` | `ResponsiveSheet` |
+| Bookmarks | `components/mushaf/BookmarksSheet.tsx` | `ResponsiveSheet` |
+| Go to page/surah/juz | `components/mushaf/GoToNavigator.tsx` | `ResponsiveOverlay` |
 | Ayah detail | `components/mushaf/AyahDetailModal.tsx` | `ResponsiveSheet` |
-| Word detail | `components/mushaf/WordDetailSheet.tsx` | raw `Modal` |
-| Reflections comments | `components/reflections/CommentsSheet.tsx` | raw `Modal` |
+| Word detail | `components/mushaf/WordDetailSheet.tsx` | `ResponsiveSheet` |
+| Reflections comments | `components/reflections/CommentsSheet.tsx` | `ResponsiveSheet` |
+| Write reflection | `components/reflections/WriteReflectionSheet.tsx` | `ResponsiveSheet` |
+| Private note | `components/notes/PrivateNoteSheet.tsx` | `ResponsiveSheet` |
+| Recitation range | `components/mushaf/RecitationRangeSheet.tsx` | `ResponsiveSheet` |
+| Reading settings | `components/mushaf/ReadingSettingsSheet.tsx` | `ResponsiveOverlay` |
+| Page view navigation | `components/mushaf/PageViewNavigationSheet.tsx` | specialized raw `Modal` popover |
+| Dropdown menu | `components/ui/DropdownMenu.tsx` | specialized raw `Modal` popover |
 | Selection actions | `components/mushaf/SelectionActionBar.tsx` | shared `Sheet` |
-| Write reflection | `components/reflections/WriteReflectionSheet.tsx` | shared `Sheet` |
 | Mobile bottom sheet prototype | `components/ui/MobilePrimitives.tsx` | `MobileBottomSheet` export, not adopted |
-| Deck picker inside ayah block | `components/mushaf/AyahBlock.tsx` | inline raw `Modal` |
 
-Current implication: `components/ui/ResponsiveOverlay.tsx` is now the canonical adaptive overlay shell, but most overlays still remain on the legacy `Modal` or `Sheet` paths with separate width, backdrop, safe-area, animation, and close behavior rules.
+Current implication: `components/ui/ResponsiveOverlay.tsx` is the canonical adaptive overlay shell. Remaining non-canonical overlay work is concentrated in specialized popovers and `SelectionActionBar`'s legacy `Sheet`.
 
 ## Responsive Breakpoints And Width Rules
 
@@ -209,7 +214,7 @@ These limits are valid as local decisions, but they are not yet governed by one 
 | Flashcards session | `study_cards`, `study_log`, `user_settings`, `quran_text`, `translations`, `tafseer`, word lookup tables | optional leaderboard sync when configured |
 | Vocab review | `vocab_cards` plus local FSRS scheduling fields stored on those rows | none |
 | Public profile | none | Supabase `profiles` read through TanStack Query (`fetchPublicProfile`) |
-| Auth recovery | no local app tables; uses route params, default strings context, and auth store state | Supabase Auth reset email, hash-session restore, and password update |
+| Auth recovery | no local app tables; uses route params, startup-language strings, and auth store state | Supabase Auth reset email, hash-session restore, and password update |
 | QA readiness | database boot status only via `useDatabaseStatus()` | none |
 | Not-found | none | none |
 | Reflections surfaces | local route context for ayah references | Supabase CRUD through TanStack Query and API helpers |
