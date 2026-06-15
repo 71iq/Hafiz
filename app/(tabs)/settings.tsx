@@ -826,7 +826,7 @@ export default function SettingsScreen() {
                   onPress={() => router.push("/profile" as any)}
                   accessibilityRole="button"
                   accessibilityLabel={s.settingsProfile}
-                  className="mb-4 items-center gap-3 rounded-3xl bg-surface p-4 dark:bg-surface-dark"
+                  className={`mb-4 items-center gap-3 rounded-3xl bg-surface p-4 dark:bg-surface-dark ${isRTL ? "flex-row-reverse" : "flex-row"}`}
                   style={({ pressed }) => ({
                     direction: "ltr",
                     flexDirection: isRTL ? "row-reverse" : "row",
@@ -843,7 +843,9 @@ export default function SettingsScreen() {
                     nameSize={16}
                     handleSize={12}
                   />
-                  <TranslationChevron size={18} color={isDark ? "#525252" : "#DFD9D1"} />
+                  <View className="h-6 w-6 shrink-0 items-center justify-center">
+                    <TranslationChevron size={18} color={isDark ? "#525252" : "#DFD9D1"} />
+                  </View>
                 </Pressable>
                 {configured && qfSyncEnabled && (
                   <View className="mb-4 rounded-3xl bg-surface dark:bg-surface-dark p-4">

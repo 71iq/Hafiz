@@ -55,7 +55,8 @@ describe("RTL disclosure chevron contract", () => {
     }
 
     expectContains("app/(tabs)/settings.tsx", [
-      'className="mb-4 items-center gap-3 rounded-3xl bg-surface p-4 dark:bg-surface-dark"',
+      'className={`mb-4 items-center gap-3 rounded-3xl bg-surface p-4 dark:bg-surface-dark ${isRTL ? "flex-row-reverse" : "flex-row"}`}',
+      'className="h-6 w-6 shrink-0 items-center justify-center"',
       "<TranslationChevron size={18} color={isDark ? \"#525252\" : \"#DFD9D1\"} />",
     ]);
   });
