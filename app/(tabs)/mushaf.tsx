@@ -1691,7 +1691,6 @@ function MushafInner() {
                 pagePaddingBottom={isPhone ? 12 : isTablet ? 0 : 32}
                 scrollBottomInset={pageScrollBottomInset}
                 pageSidePadding={isPhone ? 6 : 16}
-                centerVerticalOnPhone={isPhone}
                 horizontalTopInset={0}
                 horizontalBottomInset={0}
                 highlightedAyahKey={highlightedKey}

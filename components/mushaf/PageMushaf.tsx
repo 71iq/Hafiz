@@ -191,7 +191,6 @@ type Props = {
   pagePaddingTop?: number;
   pagePaddingBottom?: number;
   pageSidePadding?: number;
-  centerVerticalOnPhone?: boolean;
   horizontalTopInset?: number;
   horizontalBottomInset?: number;
   scrollBottomInset?: number;
@@ -451,7 +450,6 @@ export function PageMushaf({
   pagePaddingTop = 8,
   pagePaddingBottom = 32,
   pageSidePadding = 16,
-  centerVerticalOnPhone = false,
   horizontalTopInset = 0,
   horizontalBottomInset = 0,
   scrollBottomInset,
@@ -1247,13 +1245,8 @@ export function PageMushaf({
 
   const renderPage = useCallback(
     ({ item, index }: { item: PageData; index: number }) => {
-      const shouldCenter = centerVerticalOnPhone && !horizontal && effectiveContainerHeight > 0;
-      const minPageHeight = shouldCenter
-        ? Math.max(0, effectiveContainerHeight - (index < pageData.length - 1 ? SEPARATOR_HEIGHT : 0))
-        : undefined;
-
       return (
-        <View style={minPageHeight ? { minHeight: minPageHeight, justifyContent: "center" } : undefined}>
+        <View>
           <MushafPage
             pageNumber={item.page}
             ayahs={item.ayahs}
@@ -1302,9 +1295,6 @@ export function PageMushaf({
       pagePaddingBottom,
       pageSidePadding,
       verticalLineWidth,
-      centerVerticalOnPhone,
-      horizontal,
-      effectiveContainerHeight,
       isRTL,
       highlightedAyahKey,
       highlightedWord,
