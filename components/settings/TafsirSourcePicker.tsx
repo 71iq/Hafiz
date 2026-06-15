@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Platform, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Platform, Text, View } from "react-native";
 import { Check, ChevronLeft, ChevronRight, Download } from "lucide-react-native";
+import { DisclosureRow } from "@/components/ui/MirroredRow";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { useDatabase } from "@/lib/database/provider";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -143,7 +144,7 @@ export function TafsirSourcePicker({
                     : s.tafseerDownloaded;
 
             return (
-              <Pressable
+              <DisclosureRow
                 key={source.id}
                 onPress={() => handleSelect(source.id, needsDownload)}
                 disabled={!!importingSource}
@@ -151,9 +152,8 @@ export function TafsirSourcePicker({
                 onPressIn={() => setPressedSource(source.id)}
                 onPressOut={() => setPressedSource(null)}
                 className="items-center justify-between gap-3 rounded-2xl px-3 py-3.5"
+                dir={isRTL ? "rtl" : "ltr"}
                 style={({ pressed }) => ({
-                  direction: "ltr",
-                  flexDirection: isRTL ? "row-reverse" : "row",
                   backgroundColor: isSelected
                     ? isDark
                       ? "rgba(45,212,191,0.08)"
@@ -166,53 +166,52 @@ export function TafsirSourcePicker({
                   opacity: importingSource && !isImporting ? 0.45 : 1,
                   cursor: Platform.OS === "web" ? (importingSource ? "auto" : "pointer") : undefined,
                 })}
+                trailing={
+                  isImporting ? (
+                    <ActivityIndicator size="small" color={isDark ? "#2dd4bf" : "#0d9488"} />
+                  ) : needsDownload ? (
+                    <Download size={19} color={isDark ? "#2dd4bf" : "#0d9488"} />
+                  ) : isSelected ? (
+                    <Check size={20} color={isDark ? "#2dd4bf" : "#0d9488"} />
+                  ) : (
+                    <DisclosureChevron size={18} color={isDark ? "#737373" : "#8B8178"} />
+                  )
+                }
               >
-                <View className="min-w-0 flex-1">
-                  <Text
-                    className={isSelected ? "text-primary-accent dark:text-primary-bright" : "text-charcoal dark:text-neutral-300"}
-                    style={{
-                      fontFamily: isSelected ? "Manrope_600SemiBold" : "Manrope_500Medium",
-                      fontSize: 15,
-                      textAlign: isRTL ? "right" : "left",
-                      writingDirection: isRTL ? "rtl" : "ltr",
-                    }}
-                  >
-                    {title}
-                  </Text>
-                  <Text
-                    className="mt-0.5 text-warm-400 dark:text-neutral-500"
-                    style={{
-                      fontFamily: "Manrope_400Regular",
-                      fontSize: 13,
-                      textAlign: isRTL ? "right" : "left",
-                      writingDirection: isRTL ? "rtl" : "ltr",
-                    }}
-                  >
-                    {description}
-                  </Text>
-                  <Text
-                    className={needsDownload ? "mt-1 text-primary-accent dark:text-primary-bright" : "mt-1 text-warm-400 dark:text-neutral-500"}
-                    style={{
-                      fontFamily: "Manrope_600SemiBold",
-                      fontSize: 11,
-                      textAlign: isRTL ? "right" : "left",
-                      writingDirection: isRTL ? "rtl" : "ltr",
-                    }}
-                  >
-                    {statusText}
-                  </Text>
-                </View>
-
-                {isImporting ? (
-                  <ActivityIndicator size="small" color={isDark ? "#2dd4bf" : "#0d9488"} />
-                ) : needsDownload ? (
-                  <Download size={19} color={isDark ? "#2dd4bf" : "#0d9488"} />
-                ) : isSelected ? (
-                  <Check size={20} color={isDark ? "#2dd4bf" : "#0d9488"} />
-                ) : (
-                  <DisclosureChevron size={18} color={isDark ? "#737373" : "#8B8178"} />
-                )}
-              </Pressable>
+                <Text
+                  className={isSelected ? "text-primary-accent dark:text-primary-bright" : "text-charcoal dark:text-neutral-300"}
+                  style={{
+                    fontFamily: isSelected ? "Manrope_600SemiBold" : "Manrope_500Medium",
+                    fontSize: 15,
+                    textAlign: isRTL ? "right" : "left",
+                    writingDirection: isRTL ? "rtl" : "ltr",
+                  }}
+                >
+                  {title}
+                </Text>
+                <Text
+                  className="mt-0.5 text-warm-400 dark:text-neutral-500"
+                  style={{
+                    fontFamily: "Manrope_400Regular",
+                    fontSize: 13,
+                    textAlign: isRTL ? "right" : "left",
+                    writingDirection: isRTL ? "rtl" : "ltr",
+                  }}
+                >
+                  {description}
+                </Text>
+                <Text
+                  className={needsDownload ? "mt-1 text-primary-accent dark:text-primary-bright" : "mt-1 text-warm-400 dark:text-neutral-500"}
+                  style={{
+                    fontFamily: "Manrope_600SemiBold",
+                    fontSize: 11,
+                    textAlign: isRTL ? "right" : "left",
+                    writingDirection: isRTL ? "rtl" : "ltr",
+                  }}
+                >
+                  {statusText}
+                </Text>
+              </DisclosureRow>
             );
           })}
         </View>

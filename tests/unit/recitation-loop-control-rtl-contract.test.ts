@@ -11,8 +11,10 @@ describe("Recitation loop control RTL contract", () => {
 
     expect(loopStart).toBeGreaterThan(-1);
     expect(parseStart).toBeGreaterThan(loopStart);
+    expect(source).toContain('import { DisclosureRow, MirroredRow } from "@/components/ui/MirroredRow";');
+    expect(loopSource).toContain("<MirroredRow");
+    expect(loopSource).toContain('dir={isRTL ? "rtl" : "ltr"}');
     expect(loopSource).toContain('className="items-center gap-3"');
-    expect(loopSource).toContain('style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}');
     expect(loopSource).toContain('className="items-center rounded-full bg-surface p-1 dark:bg-surface-dark"');
     expect(loopSource).toContain("<Pressable onPress={onDecrease}");
     expect(loopSource).toContain("<Minus size={15} color={iconColor} />");

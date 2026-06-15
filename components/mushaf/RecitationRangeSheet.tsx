@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { ActivityIndicator, Platform, Pressable, Text, TextInput, View, useWindowDimensions } from "react-native";
 import { ChevronLeft, ChevronRight, ListMusic, Minus, Play, Plus, Repeat2, Square, Timer } from "lucide-react-native";
 import { ToggleGroup } from "@/components/ui/ToggleGroup";
+import { DisclosureRow, MirroredRow } from "@/components/ui/MirroredRow";
 import { OverlayBody, OverlayFooter, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { ReciterPicker } from "@/components/settings/ReciterPicker";
 import { useAyahAudio, type AyahAudioTarget, type RangeAudioState } from "@/lib/audio/ayah-audio";
@@ -164,49 +165,47 @@ export function RecitationRangeSheet({ visible, onClose, currentAyah }: Props) {
         />
 
       <OverlayBody contentContainerClassName="px-5 pt-4 pb-5">
-        <Pressable
+        <DisclosureRow
           onPress={() => setReciterPickerVisible(true)}
           accessibilityRole="button"
           accessibilityLabel={s.recitationReciterPickerTitle}
           className="rounded-3xl bg-surface-low dark:bg-surface-dark-low p-4"
+          dir={isRTL ? "rtl" : "ltr"}
           style={({ pressed }) => ({
             opacity: pressed ? 0.78 : 1,
             transform: [{ scale: pressed ? 0.99 : 1 }],
           })}
-        >
-          <View
-            className="items-center gap-3"
-            style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
-          >
+          leading={
             <View className="h-11 w-11 items-center justify-center rounded-full bg-primary-accent/10 dark:bg-primary-bright/10">
               <ListMusic size={19} color={isDark ? "#2dd4bf" : "#0d9488"} />
             </View>
-            <View className="min-w-0 flex-1">
-              <Text
-                className="text-charcoal dark:text-neutral-100"
-                style={{ fontFamily: "Manrope_700Bold", fontSize: 14, textAlign: isRTL ? "right" : "left" }}
-              >
-                {s.recitationReciter}
-              </Text>
-              <Text
-                className="mt-0.5 text-warm-500 dark:text-neutral-400"
-                numberOfLines={2}
-                style={{
-                  fontFamily: "Manrope_500Medium",
-                  fontSize: 12,
-                  lineHeight: 18,
-                  textAlign: isRTL ? "right" : "left",
-                  writingDirection: isRTL ? "rtl" : "ltr",
-                }}
-              >
-                {reciterLabel}
-              </Text>
-            </View>
+          }
+          trailing={
             <View className="h-9 w-9 items-center justify-center rounded-full bg-surface dark:bg-surface-dark">
               <DisclosureChevron size={18} color={isDark ? "#737373" : "#8B8178"} />
             </View>
-          </View>
-        </Pressable>
+          }
+        >
+          <Text
+            className="text-charcoal dark:text-neutral-100"
+            style={{ fontFamily: "Manrope_700Bold", fontSize: 14, textAlign: isRTL ? "right" : "left" }}
+          >
+            {s.recitationReciter}
+          </Text>
+          <Text
+            className="mt-0.5 text-warm-500 dark:text-neutral-400"
+            numberOfLines={2}
+            style={{
+              fontFamily: "Manrope_500Medium",
+              fontSize: 12,
+              lineHeight: 18,
+              textAlign: isRTL ? "right" : "left",
+              writingDirection: isRTL ? "rtl" : "ltr",
+            }}
+          >
+            {reciterLabel}
+          </Text>
+        </DisclosureRow>
 
         <View className="mt-4">
           <ToggleGroup<RecitationMode>
@@ -427,9 +426,9 @@ function LoopControl({
   const iconColor = isDark ? "#d4d4d4" : "#6e5a47";
   return (
     <View className="rounded-3xl bg-surface-low dark:bg-surface-dark-low p-3">
-      <View
+      <MirroredRow
+        dir={isRTL ? "rtl" : "ltr"}
         className="items-center gap-3"
-        style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
       >
         <View className="h-9 w-9 items-center justify-center rounded-full bg-primary-accent/10 dark:bg-primary-bright/10">
           {icon}
@@ -440,9 +439,9 @@ function LoopControl({
         >
           {label}
         </Text>
-        <View
+        <MirroredRow
+          dir={isRTL ? "rtl" : "ltr"}
           className="items-center rounded-full bg-surface p-1 dark:bg-surface-dark"
-          style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
         >
           <Pressable onPress={onDecrease} className="h-8 w-8 items-center justify-center rounded-full">
             <Minus size={15} color={iconColor} />
@@ -455,8 +454,8 @@ function LoopControl({
           <Pressable onPress={onIncrease} className="h-8 w-8 items-center justify-center rounded-full">
             <Plus size={15} color={iconColor} />
           </Pressable>
-        </View>
-      </View>
+        </MirroredRow>
+      </MirroredRow>
     </View>
   );
 }

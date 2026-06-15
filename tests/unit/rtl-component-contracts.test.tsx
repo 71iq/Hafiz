@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Field, FieldMessage, Label } from "@/components/ui/Field";
 import { FormTextField } from "@/components/ui/FormTextField";
 import { Input } from "@/components/ui/Input";
+import { DisclosureRow, MirroredRow } from "@/components/ui/MirroredRow";
 import { Text } from "@/components/ui/Text";
 import { ToggleGroup } from "@/components/ui/ToggleGroup";
 import { textAlignForDirection } from "@/lib/ui/direction";
@@ -59,6 +60,39 @@ describe("RTL primitive component contracts", () => {
     expect(textAlignForDirection("rtl", "end")).toBe("left");
     expect(textAlignForDirection("ltr", "center")).toBe("center");
     expect(textAlignForDirection("rtl", "center")).toBe("center");
+  });
+
+  it("MirroredRow and DisclosureRow mirror physical row order in RTL", () => {
+    const row = renderWithDirection(
+      <MirroredRow testID="mirrored-row">
+        <RNText>Leading</RNText>
+        <RNText>Trailing</RNText>
+      </MirroredRow>,
+      "rtl"
+    );
+    const mirroredRow = row.getByTestId("mirrored-row");
+    expect(getStyleValue(mirroredRow, "direction")).toBe("ltr");
+    expect(getStyleValue(mirroredRow, "flexDirection")).toBe("row-reverse");
+
+    const disclosure = renderWithDirection(
+      <DisclosureRow
+        testID="disclosure-row"
+        leading={<RNText>Icon</RNText>}
+        trailing={<RNText>Chevron</RNText>}
+      >
+        <RNText>Value</RNText>
+      </DisclosureRow>,
+      "rtl"
+    );
+    const disclosureRow = disclosure.getByTestId("disclosure-row");
+    const resolvedStyle = typeof disclosureRow.props.style === "function"
+      ? flattenStyle(disclosureRow.props.style({ pressed: false }))
+      : flattenStyle(disclosureRow.props.style);
+    expect(resolvedStyle.direction).toBe("ltr");
+    expect(resolvedStyle.flexDirection).toBe("row-reverse");
+    expect(disclosureRow.props.className).toContain("items-center");
+    expect(disclosureRow.props.className).toContain("justify-between");
+    expect(disclosureRow.props.className).toContain("gap-3");
   });
 
   it("Text aligns to logical start and writes in the active direction", () => {
