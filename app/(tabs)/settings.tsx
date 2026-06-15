@@ -1541,7 +1541,7 @@ function SettingsLinkRow({
   return (
     <Pressable
       onPress={onPress}
-      className="items-center gap-3 rounded-2xl px-3 py-3"
+      className={`items-center gap-3 rounded-2xl px-3 py-3 ${isRTL ? "flex-row-reverse" : "flex-row"}`}
       style={({ pressed }) => ({
         backgroundColor: pressed ? themeColors.surfaceMid : "transparent",
         direction: "ltr",
@@ -1552,9 +1552,10 @@ function SettingsLinkRow({
       <View className="h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-accent/10 dark:bg-primary-bright/15">
         <Icon size={17} color={iconColor} />
       </View>
-      <View className="flex-1">
+      <View className="min-w-0 flex-1">
         <Text
           className="text-charcoal dark:text-neutral-100"
+          numberOfLines={1}
           style={{
             fontFamily: "Manrope_600SemiBold",
             fontSize: 14,
@@ -1578,11 +1579,13 @@ function SettingsLinkRow({
           {description}
         </Text>
       </View>
-      {external ? (
-        <ExternalLink size={16} color={chevronColor} />
-      ) : (
-        <RowChevron size={18} color={chevronColor} />
-      )}
+      <View className="h-6 w-6 shrink-0 items-center justify-center">
+        {external ? (
+          <ExternalLink size={16} color={chevronColor} />
+        ) : (
+          <RowChevron size={18} color={chevronColor} />
+        )}
+      </View>
     </Pressable>
   );
 }
