@@ -498,9 +498,17 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
           </View>
         </View>
 
-        <View
-          className="mt-4 flex-row flex-wrap gap-2"
-          style={{ direction: isRTL ? "rtl" : "ltr", justifyContent: "flex-start" }}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          bounces={false}
+          className="mt-4"
+          contentContainerStyle={{
+            direction: isRTL ? "rtl" : "ltr",
+            flexDirection: isRTL ? "row-reverse" : "row",
+            gap: 8,
+            paddingHorizontal: 0,
+          }}
         >
           {tabs.map((tab) => (
             <TabButton
@@ -512,7 +520,7 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
               onPress={() => setActiveTab(tab.key)}
             />
           ))}
-        </View>
+        </ScrollView>
 
         <View className="mt-4 rounded-2xl bg-surface-low dark:bg-surface-dark-low px-4 py-3">
           {activeTab === "translation" && (
@@ -725,13 +733,22 @@ function TabButton({
       }`}
       style={{
         direction: isRTL ? "rtl" : "ltr",
+        flexDirection: isRTL ? "row-reverse" : "row",
+        flexShrink: 0,
         cursor: Platform.OS === "web" ? "pointer" : undefined,
       }}
     >
       {icon}
       <Text
+        numberOfLines={1}
         className={active ? "text-primary-accent dark:text-primary-bright" : "text-warm-500 dark:text-neutral-400"}
-        style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
+        style={{
+          fontFamily: "Manrope_600SemiBold",
+          fontSize: 12,
+          textAlign: isRTL ? "right" : "left",
+          writingDirection: isRTL ? "rtl" : "ltr",
+          ...(Platform.OS === "web" ? ({ whiteSpace: "nowrap" } as any) : null),
+        }}
       >
         {label}
       </Text>
