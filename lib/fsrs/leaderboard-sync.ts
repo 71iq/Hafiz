@@ -5,6 +5,7 @@ import { getTodayScore, getTotalScore } from "./scoring";
 import { getWirdStatus } from "./queries";
 import { getLocalSurahProgress } from "@/lib/profile/progress";
 import { hasCompletedAccountRestore } from "@/lib/database/sync";
+import { dayIndexFromUtcDateKey as toDayIndex, formatLocalDateKey } from "@/lib/date";
 
 type ProfileStatsPatch = {
   total_score: number;
@@ -56,18 +57,6 @@ async function canWriteAccountDerivedStats(db: SQLiteDatabase, userId: string): 
 
 function maxDate(...dates: Array<string | null | undefined>): string | null {
   return dates.filter((date): date is string => Boolean(date)).sort().at(-1) ?? null;
-}
-
-function formatLocalDateKey(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function toDayIndex(ymd: string): number {
-  const [year, month, day] = ymd.split("-").map(Number);
-  return Math.floor(Date.UTC(year, (month || 1) - 1, day || 1) / 86400000);
 }
 
 function calculateCurrentStreak(dateKeysDesc: string[], todayIndex: number): number {

@@ -17,6 +17,7 @@ import {
   setStudyCardSuspended,
 } from "@/lib/fsrs/queries";
 import type { DeckCardListItem } from "@/lib/fsrs/types";
+import { formatLocalDateInput, parseDueDateInput } from "@/lib/date";
 import { useSettings } from "@/lib/settings/context";
 import { State } from "@/lib/fsrs/scheduler";
 
@@ -569,40 +570,4 @@ function formatShortDate(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
   return formatLocalDateInput(date);
-}
-
-function normalizeDateDigits(value: string): string {
-  const western = "0123456789";
-  const arabic = "٠١٢٣٤٥٦٧٨٩";
-  const eastern = "۰۱۲۳۴۵۶۷۸۹";
-  return value.replace(/[٠-٩۰-۹]/g, (digit) => {
-    const arabicIndex = arabic.indexOf(digit);
-    if (arabicIndex >= 0) return western[arabicIndex];
-    return western[eastern.indexOf(digit)];
-  });
-}
-
-function formatLocalDateInput(date: Date): string {
-  const safeDate = Number.isNaN(date.getTime()) ? new Date() : date;
-  const year = safeDate.getFullYear();
-  const month = String(safeDate.getMonth() + 1).padStart(2, "0");
-  const day = String(safeDate.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function parseDueDateInput(value: string): { ok: true; date: Date } | { ok: false; reason: "invalid" | "past" } {
-  const normalized = normalizeDateDigits(value.trim());
-  const match = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!match) return { ok: false, reason: "invalid" };
-  const year = parseInt(match[1], 10);
-  const month = parseInt(match[2], 10);
-  const day = parseInt(match[3], 10);
-  const date = new Date(year, month - 1, day);
-  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
-    return { ok: false, reason: "invalid" };
-  }
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  if (date < today) return { ok: false, reason: "past" };
-  return { ok: true, date };
 }

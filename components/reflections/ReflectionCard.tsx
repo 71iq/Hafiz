@@ -7,6 +7,7 @@ import { hapticLight } from "@/lib/haptics";
 import { toggleLike, reportReflection } from "@/lib/reflections/api";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
+import { formatRelativeTime } from "@/lib/i18n/relative-time";
 import type { Reflection } from "@/lib/reflections/types";
 import { ProfileIdentity } from "@/components/profile/ProfileIdentity";
 
@@ -21,25 +22,6 @@ type Props = {
   onReferencePress?: (reflection: Reflection) => void;
   onAuthRequired?: () => void;
 };
-
-function relativeTime(dateStr: string, justNowLabel: string, locale: string): string {
-  const now = Date.now();
-  const then = new Date(dateStr).getTime();
-  const diff = Math.floor((now - then) / 1000);
-
-  if (diff < 60) return justNowLabel;
-  try {
-    const formatter = new Intl.RelativeTimeFormat(locale, { numeric: "auto", style: "short" });
-    if (diff < 3600) return formatter.format(-Math.floor(diff / 60), "minute");
-    if (diff < 86400) return formatter.format(-Math.floor(diff / 3600), "hour");
-    if (diff < 604800) return formatter.format(-Math.floor(diff / 86400), "day");
-  } catch {
-    if (diff < 3600) return `${Math.floor(diff / 60)}m`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
-    if (diff < 604800) return `${Math.floor(diff / 86400)}d`;
-  }
-  return new Date(dateStr).toLocaleDateString(locale);
-}
 
 export function ReflectionCard({
   reflection,
@@ -184,7 +166,7 @@ export function ReflectionCard({
           <Text
             style={{ fontFamily: "Manrope_400Regular", fontSize: 11, color: mutedColor }}
           >
-            {relativeTime(reflection.created_at, s.justNow, uiLanguage)}
+            {formatRelativeTime(reflection.created_at, s.justNow, uiLanguage)}
           </Text>
         </View>
 

@@ -7,6 +7,7 @@ import { useAuthStore } from "@/lib/auth/store";
 import { hapticLight } from "@/lib/haptics";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
+import { formatRelativeTime } from "@/lib/i18n/relative-time";
 import { fetchComments, addComment, toggleCommentLike } from "@/lib/reflections/api";
 import type { Reflection, ReflectionComment, ReflectionCommentSort } from "@/lib/reflections/types";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
@@ -25,24 +26,6 @@ type Props = {
   onClose: () => void;
   onCommentAdded: (reflectionId: string) => void;
 };
-
-function relativeTime(dateStr: string, justNowLabel: string, locale: string): string {
-  const now = Date.now();
-  const then = new Date(dateStr).getTime();
-  const diff = Math.floor((now - then) / 1000);
-  if (diff < 60) return justNowLabel;
-  try {
-    const formatter = new Intl.RelativeTimeFormat(locale, { numeric: "auto", style: "short" });
-    if (diff < 3600) return formatter.format(-Math.floor(diff / 60), "minute");
-    if (diff < 86400) return formatter.format(-Math.floor(diff / 3600), "hour");
-    if (diff < 604800) return formatter.format(-Math.floor(diff / 86400), "day");
-  } catch {
-    if (diff < 3600) return `${Math.floor(diff / 60)}m`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
-    if (diff < 604800) return `${Math.floor(diff / 86400)}d`;
-  }
-  return new Date(dateStr).toLocaleDateString(locale);
-}
 
 function sortComments(comments: ReflectionComment[], sort: ReflectionCommentSort): ReflectionComment[] {
   const sorted = [...comments];
@@ -346,7 +329,7 @@ export function CommentsSheet({
                       />
                     </Pressable>
                     <Text style={{ fontFamily: "Manrope_400Regular", fontSize: 10, color: mutedColor }}>
-                      {relativeTime(c.created_at, s.justNow, uiLanguage)}
+                      {formatRelativeTime(c.created_at, s.justNow, uiLanguage)}
                     </Text>
                   </View>
                   <Text

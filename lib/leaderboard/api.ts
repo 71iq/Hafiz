@@ -1,5 +1,10 @@
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import type { AchievementUnlock } from "@/lib/achievements/types";
+import {
+  dayIndexFromLocalDateKey,
+  dayIndexFromUtcDateKey as toDayIndex,
+  formatLocalDateKey,
+} from "@/lib/date";
 
 export type LeaderboardEntry = {
   user_id: string;
@@ -53,18 +58,6 @@ type PublicReviewActivityResult = {
   activeDays: number;
   totalReviews: number;
 };
-
-function toDayIndex(ymd: string): number {
-  const [year, month, day] = ymd.split("-").map(Number);
-  return Math.floor(Date.UTC(year, (month || 1) - 1, day || 1) / 86400000);
-}
-
-function formatLocalDateKey(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
 
 function summarizeDailyScoreRows(rows: Array<{ date: string; score?: number | null; reviews_count?: number | null }>): PublicScoreSummary {
   const activeDates = rows
@@ -342,13 +335,7 @@ export async function fetchStreakLeaderboard(): Promise<LeaderboardEntry[]> {
 
   if (error) throw error;
 
-  const toDayIndex = (ymd: string) => {
-    const [y, m, d] = ymd.split("-").map(Number);
-    return Math.floor(new Date(y, (m || 1) - 1, d || 1).getTime() / 86400000);
-  };
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const todayIdx = Math.floor(today.getTime() / 86400000);
+  const todayIdx = dayIndexFromLocalDateKey(formatLocalDateKey(new Date()));
 
   const byUser = new Map<string, { username: string; display_name: string | null; avatar_url: string | null; dates: Set<string> }>();
   for (const row of data ?? []) {
@@ -366,7 +353,7 @@ export async function fetchStreakLeaderboard(): Promise<LeaderboardEntry[]> {
   }
 
   const ranked = Array.from(byUser.entries()).map(([user_id, info]) => {
-    const indices = Array.from(info.dates).map(toDayIndex).sort((a, b) => b - a);
+    const indices = Array.from(info.dates).map(dayIndexFromLocalDateKey).sort((a, b) => b - a);
     if (indices.length === 0) {
       return { user_id, username: info.username, display_name: info.display_name, avatar_url: info.avatar_url, score: 0 };
     }

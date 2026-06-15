@@ -42,6 +42,7 @@ import { computeReviewPoints, addTodayPoints } from "@/lib/fsrs/scoring";
 import { hapticMedium, hapticSuccess } from "@/lib/haptics";
 import { Skeleton, SkeletonText } from "@/components/ui/Skeleton";
 import { syncDailyScore, updateProfileStats } from "@/lib/fsrs/leaderboard-sync";
+import { formatLocalDateInput, parseDueDateInput } from "@/lib/date";
 import type { StudyCardRow, TestMode, WordTestMode } from "@/lib/fsrs/types";
 import type { DeckReviewSettings } from "@/lib/fsrs/types";
 import {
@@ -2213,46 +2214,6 @@ function isSmartTestMode(mode: ReviewMode): mode is SmartTestMode {
 
 function isSmartReviewCard(card: CardData): boolean {
   return card.kind === "mutashabihat" || card.kind === "similarTail" || card.kind === "qiraat" || card.kind === "asbab";
-}
-
-function normalizeDateDigits(value: string): string {
-  const western = "0123456789";
-  const arabic = "٠١٢٣٤٥٦٧٨٩";
-  const eastern = "۰۱۲۳۴۵۶۷۸۹";
-  return value.replace(/[٠-٩۰-۹]/g, (digit) => {
-    const arabicIndex = arabic.indexOf(digit);
-    if (arabicIndex >= 0) return western[arabicIndex];
-    return western[eastern.indexOf(digit)];
-  });
-}
-
-function formatLocalDateInput(date: Date): string {
-  const safeDate = Number.isNaN(date.getTime()) ? new Date() : date;
-  const year = safeDate.getFullYear();
-  const month = String(safeDate.getMonth() + 1).padStart(2, "0");
-  const day = String(safeDate.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function parseDueDateInput(value: string): { ok: true; date: Date } | { ok: false; reason: "invalid" | "past" } {
-  const normalized = normalizeDateDigits(value.trim());
-  const match = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!match) return { ok: false, reason: "invalid" };
-  const year = parseInt(match[1], 10);
-  const month = parseInt(match[2], 10);
-  const day = parseInt(match[3], 10);
-  const date = new Date(year, month - 1, day);
-  if (
-    date.getFullYear() !== year ||
-    date.getMonth() !== month - 1 ||
-    date.getDate() !== day
-  ) {
-    return { ok: false, reason: "invalid" };
-  }
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  if (date < today) return { ok: false, reason: "past" };
-  return { ok: true, date };
 }
 
 function toFSRSCard(row: StudyCardRow): FSRSCard {

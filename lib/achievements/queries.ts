@@ -1,5 +1,6 @@
 import type { SQLiteDatabase } from "expo-sqlite";
 import { enqueueSync } from "@/lib/database/sync-queue";
+import { dayIndexFromLocalDateKey as dayIndexFromDateKey, formatLocalDateKey } from "@/lib/date";
 import { ACHIEVEMENTS, getAchievementDefinition, type AchievementDefinition } from "./catalog";
 import type { AchievementEvent, AchievementProgress, AchievementUnlock } from "./types";
 
@@ -502,18 +503,6 @@ function buildLocalReviewCounts(rows: { reviewed_at: string }[]): Map<string, nu
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
   return counts;
-}
-
-function formatLocalDateKey(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function dayIndexFromDateKey(dateKey: string): number {
-  const [year, month, day] = dateKey.split("-").map(Number);
-  return Math.floor(new Date(year, (month || 1) - 1, day || 1).getTime() / 86400000);
 }
 
 function calculateLongestStreak(dateKeys: string[]): number {

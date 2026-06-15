@@ -34,6 +34,13 @@ import {
 } from "./types";
 import { enqueueSync } from "@/lib/database/sync-queue";
 import { writeUserSetting } from "@/lib/database/user-settings";
+import {
+  dayDiffLocal,
+  dayIndexFromLocalDateKey as dayIndexFromDateKey,
+  formatLocalDateKey,
+  localStartOfTomorrow,
+  todayBounds,
+} from "@/lib/date";
 import { emitReviewActivity } from "./review-events";
 import { recordAchievementEvent } from "@/lib/achievements/queries";
 import {
@@ -73,21 +80,6 @@ const NON_SMART_CARD_SQL = `NOT ${SMART_CARD_SQL}`;
 const ACTIVE_CARD_SQL = "deleted_at IS NULL";
 const REVIEWABLE_CARD_SQL = `${ACTIVE_CARD_SQL} AND suspended_at IS NULL AND (buried_until IS NULL OR buried_until <= ?)`;
 
-function localStartOfTomorrow(): Date {
-  const tomorrow = new Date();
-  tomorrow.setHours(0, 0, 0, 0);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  return tomorrow;
-}
-
-function dayDiffLocal(from: Date, to: Date): number {
-  const fromStart = new Date(from);
-  fromStart.setHours(0, 0, 0, 0);
-  const toStart = new Date(to);
-  toStart.setHours(0, 0, 0, 0);
-  return Math.max(0, Math.round((toStart.getTime() - fromStart.getTime()) / 86400000));
-}
-
 function cardToSyncData(card: StudyCardRow): Record<string, any> {
   return {
     id: card.id,
@@ -123,26 +115,6 @@ function rowWithDefaultStatus(row: StudyCardRow): StudyCardRow {
 
 function isReviewableCard(row: StudyCardRow, nowIso: string): boolean {
   return !row.deleted_at && !row.suspended_at && (!row.buried_until || row.buried_until <= nowIso);
-}
-
-function formatLocalDateKey(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function dayIndexFromDateKey(dateKey: string): number {
-  const [year, month, day] = dateKey.split("-").map(Number);
-  return Math.floor(new Date(year, (month || 1) - 1, day || 1).getTime() / 86400000);
-}
-
-function todayBounds(): { start: string; end: string } {
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(start);
-  end.setDate(start.getDate() + 1);
-  return { start: start.toISOString(), end: end.toISOString() };
 }
 
 function buildLocalReviewCounts(rows: { reviewed_at: string }[]): Map<string, number> {
