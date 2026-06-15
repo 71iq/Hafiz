@@ -88,18 +88,20 @@ export const DisclosureRow = forwardRef<PressableRef, DisclosureRowProps>(
     },
     ref
   ) => {
+    const resolvedDir = useUIDirection(dir);
+
     return (
       <MirroredPressableRow
         ref={ref}
-        dir={dir}
-        className={cn("items-center justify-between gap-3", className)}
+        dir={resolvedDir}
+        className={cn("w-full items-center justify-between gap-3", className)}
         {...props}
       >
         {leading}
-        <View className={cn("min-w-0 flex-1", contentClassName)}>
+        <View className={cn("min-w-0 flex-1", resolvedDir === "rtl" ? "items-end" : "items-start", contentClassName)}>
           {children}
         </View>
-        {trailing}
+        {trailing ? <View className="h-9 w-9 shrink-0 items-center justify-center">{trailing}</View> : null}
       </MirroredPressableRow>
     );
   }

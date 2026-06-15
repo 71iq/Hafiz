@@ -92,9 +92,18 @@ describe("RTL primitive component contracts", () => {
     expect(resolvedStyle.direction).toBe("ltr");
     expect(resolvedStyle.flexDirection).toBe("row-reverse");
     expect(disclosureRow.props.className).toContain("flex-row-reverse");
+    expect(disclosureRow.props.className).toContain("w-full");
     expect(disclosureRow.props.className).toContain("items-center");
     expect(disclosureRow.props.className).toContain("justify-between");
     expect(disclosureRow.props.className).toContain("gap-3");
+
+    const content = findAncestorByClassName(disclosure.getByText("Value"), "min-w-0");
+    expect(content.props.className).toContain("flex-1");
+    expect(content.props.className).toContain("items-end");
+
+    const trailing = findAncestorByClassName(disclosure.getByText("Chevron"), "shrink-0");
+    expect(trailing.props.className).toContain("h-9");
+    expect(trailing.props.className).toContain("w-9");
   });
 
   it("Text aligns to logical start and writes in the active direction", () => {
