@@ -7,7 +7,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Toast } from "@/components/ui/Toast";
 import { ScreenScrollView, useScreenContentLayout } from "@/components/ui/ScreenContent";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Sun, Moon, Smartphone, Clock3, Circle, Minus, Plus, X, ChevronRight, ChevronLeft, User, LogOut, BookOpen, RefreshCw, Unlink, Info, FileText, HeartHandshake, ExternalLink, SlidersHorizontal, type LucideIcon } from "lucide-react-native";
+import { Minus, Plus, X, ChevronRight, ChevronLeft, User, LogOut, BookOpen, RefreshCw, Unlink, Info, FileText, HeartHandshake, ExternalLink, SlidersHorizontal, type LucideIcon } from "lucide-react-native";
 import {
   useSettings,
   FONT_SIZE_STEPS,
@@ -64,6 +64,12 @@ const SETTINGS_QURAN_PREVIEW_SURAH = 2;
 const SETTINGS_QURAN_PREVIEW_AYAH = 282;
 const CONTENT_SETTINGS_MAX_WIDTH = 720;
 const CONTENT_SETTINGS_ROW_HEIGHT = 60;
+const THEME_CHOICE_VISUALS: Record<ThemePalette, { backgroundColor: string; borderColor: string; textColor: string }> = {
+  dark: { backgroundColor: "#141414", borderColor: "#3F3F46", textColor: "#F5F5F5" },
+  beige: { backgroundColor: "#FFF8F1", borderColor: "#E8E1DA", textColor: "#6E5A47" },
+  white: { backgroundColor: "#FFFFFF", borderColor: "#D1D5DB", textColor: "#27272A" },
+  amoled: { backgroundColor: "#000000", borderColor: "#27272A", textColor: "#FFFFFF" },
+};
 
 type QuranPreviewAyah = {
   v2Page: number;
@@ -86,6 +92,30 @@ function getThemeTimeParts(time: string) {
 function formatThemeTimePart(value: number, isRTL: boolean) {
   const text = String(value).padStart(2, "0");
   return isRTL ? text.replace(/\d/g, (digit) => toArabicNumber(Number(digit))) : text;
+}
+
+function getThemeChoiceVisual(value: ThemeMode, isActive: boolean, isDark: boolean) {
+  const accent = isDark ? "#2DD4BF" : "#0D9488";
+  if (value === "system") {
+    return {
+      backgroundColor: isDark ? "#171717" : "#F8FAFC",
+      borderColor: isActive ? accent : isDark ? "#3F3F46" : "#D1D5DB",
+      textColor: isActive ? accent : isDark ? "#D4D4D4" : "#52525B",
+    };
+  }
+  if (value === "scheduled") {
+    return {
+      backgroundColor: isDark ? "#062F2D" : "#E7F3EE",
+      borderColor: isActive ? accent : isDark ? "#0F766E" : "#B7DCD4",
+      textColor: isActive ? accent : isDark ? "#5EEAD4" : "#0F766E",
+    };
+  }
+
+  const visual = THEME_CHOICE_VISUALS[value];
+  return {
+    ...visual,
+    borderColor: isActive ? accent : visual.borderColor,
+  };
 }
 
 export default function SettingsScreen() {
@@ -139,11 +169,14 @@ export default function SettingsScreen() {
   const themeCardWidth = Math.floor(
     (appearanceCardInnerWidth - (isLaptop ? 24 : 12)) / (isLaptop ? 3 : 2)
   );
+  const scheduleRuleInline = isLaptop && appearanceCardInnerWidth >= 620;
   const scheduledRuleThemeColumnCount = isLaptop && appearanceCardInnerWidth >= 560 ? 4 : 2;
-  const scheduledRuleThemeCardWidth = Math.max(
-    0,
-    Math.floor((Math.max(0, appearanceCardInnerWidth - 56) - 10 * (scheduledRuleThemeColumnCount - 1)) / scheduledRuleThemeColumnCount)
-  );
+  const scheduledRuleThemeChipBasis = scheduleRuleInline
+    ? 76
+    : Math.max(
+        96,
+        Math.floor((Math.max(0, appearanceCardInnerWidth - 56) - 8 * (scheduledRuleThemeColumnCount - 1)) / scheduledRuleThemeColumnCount)
+      );
   const categoryParam = Array.isArray(params.category) ? params.category[0] : params.category;
   const activeCategory = parseSettingsCategory(categoryParam) ?? "general";
   const previewPage = quranPreview?.v2Page ?? 1;
@@ -321,19 +354,19 @@ export default function SettingsScreen() {
     });
   }, [s.externalLinkFailed]);
 
-  const THEME_OPTIONS: { value: ThemeMode; label: string; icon: LucideIcon }[] = [
-    { value: "dark", label: s.themeDark, icon: Moon },
-    { value: "beige", label: s.themeBeige, icon: Sun },
-    { value: "white", label: s.themeWhite, icon: Circle },
-    { value: "amoled", label: s.themeAmoled, icon: Moon },
-    { value: "system", label: s.themeSystem, icon: Smartphone },
-    { value: "scheduled", label: s.themeScheduled, icon: Clock3 },
+  const THEME_OPTIONS: { value: ThemeMode; label: string }[] = [
+    { value: "dark", label: s.themeDark },
+    { value: "beige", label: s.themeBeige },
+    { value: "white", label: s.themeWhite },
+    { value: "amoled", label: s.themeAmoled },
+    { value: "system", label: s.themeSystem },
+    { value: "scheduled", label: s.themeScheduled },
   ];
-  const SCHEDULED_THEME_OPTIONS: { value: ThemePalette; label: string; icon: LucideIcon }[] = [
-    { value: "dark", label: s.themeDark, icon: Moon },
-    { value: "beige", label: s.themeBeige, icon: Sun },
-    { value: "white", label: s.themeWhite, icon: Circle },
-    { value: "amoled", label: s.themeAmoled, icon: Moon },
+  const SCHEDULED_THEME_OPTIONS: { value: ThemePalette; label: string }[] = [
+    { value: "dark", label: s.themeDark },
+    { value: "beige", label: s.themeBeige },
+    { value: "white", label: s.themeWhite },
+    { value: "amoled", label: s.themeAmoled },
   ];
 
   const updateScheduledRule = useCallback(
@@ -432,34 +465,25 @@ export default function SettingsScreen() {
             >
               {THEME_OPTIONS.map((option) => {
                 const isActive = theme === option.value;
-                const IconComponent = option.icon;
+                const themeVisual = getThemeChoiceVisual(option.value, isActive, isDark);
                 return (
-                  <View key={option.value} style={{ width: themeCardWidth, minHeight: 96 }}>
+                  <View key={option.value} style={{ width: themeCardWidth, minHeight: 86 }}>
                     <Pressable
                       onPress={() => setTheme(option.value)}
-                      className={`flex-1 items-center justify-center rounded-2xl px-3 py-4 ${
-                        isActive
-                          ? "bg-primary-accent/10 dark:bg-primary-bright/15"
-                          : "bg-surface-high dark:bg-surface-dark-high"
-                      }`}
+                      className="flex-1 items-center justify-center rounded-2xl px-3 py-4"
                       style={({ pressed }) => ({
+                        backgroundColor: themeVisual.backgroundColor,
+                        borderColor: themeVisual.borderColor,
+                        borderWidth: isActive ? 2 : 1,
                         transform: [{ scale: pressed ? 0.98 : 1 }],
                       })}
                     >
-                      <IconComponent
-                        size={20}
-                        color={isActive ? (isDark ? "#2dd4bf" : "#0d9488") : (isDark ? "#737373" : "#b9a085")}
-                      />
                       <Text
-                        className={`text-sm mt-2 ${
-                          isActive
-                            ? "text-primary-accent dark:text-primary-bright"
-                            : "text-warm-400 dark:text-neutral-500"
-                        }`}
+                        className="text-sm"
                         numberOfLines={2}
                         style={{
+                          color: themeVisual.textColor,
                           fontFamily: isActive ? "Manrope_600SemiBold" : "Manrope_500Medium",
-                          minHeight: 36,
                           textAlign: "center",
                           writingDirection: isRTL ? "rtl" : "ltr",
                         }}
@@ -519,74 +543,86 @@ export default function SettingsScreen() {
                         )}
                       </View>
                       <View
+                        className="items-center gap-4"
                         style={{
-                          flexDirection: isRTL ? "row-reverse" : "row",
-                          flexWrap: "wrap",
-                          gap: 10,
+                          flexDirection: scheduleRuleInline ? (isRTL ? "row-reverse" : "row") : "column",
+                          alignItems: scheduleRuleInline ? "center" : "stretch",
                         }}
                       >
-                        {SCHEDULED_THEME_OPTIONS.map((option) => {
-                          const isActive = rule.theme === option.value;
-                          const IconComponent = option.icon;
-                          return (
-                            <View key={option.value} style={{ width: scheduledRuleThemeCardWidth, minHeight: 76 }}>
-                              <Pressable
-                                onPress={() => updateScheduledRule(rule.id, { theme: option.value })}
-                                className={`flex-1 items-center justify-center rounded-2xl px-3 py-3 ${
-                                  isActive
-                                    ? "bg-primary-accent/10 dark:bg-primary-bright/15"
-                                    : "bg-surface-high dark:bg-surface-dark-high"
-                                }`}
-                                style={({ pressed }) => ({
-                                  transform: [{ scale: pressed ? 0.98 : 1 }],
-                                })}
-                              >
-                                <IconComponent
-                                  size={18}
-                                  color={isActive ? (isDark ? "#2dd4bf" : "#0d9488") : (isDark ? "#737373" : "#b9a085")}
-                                />
-                                <Text
-                                  className={`mt-1.5 text-xs ${
-                                    isActive
-                                      ? "text-primary-accent dark:text-primary-bright"
-                                      : "text-warm-400 dark:text-neutral-500"
-                                  }`}
-                                  numberOfLines={2}
-                                  style={{
-                                    fontFamily: isActive ? "Manrope_600SemiBold" : "Manrope_500Medium",
-                                    minHeight: 32,
-                                    textAlign: "center",
-                                    writingDirection: isRTL ? "rtl" : "ltr",
-                                  }}
-                                >
-                                  {option.label}
-                                </Text>
-                              </Pressable>
-                            </View>
-                          );
-                        })}
-                      </View>
-
-                      <View
-                        className="mt-4 items-center justify-between gap-4"
-                        style={{ flexDirection: isLaptop ? (isRTL ? "row-reverse" : "row") : "column" }}
-                      >
-                        <Text
-                          className="text-charcoal dark:text-neutral-200"
+                        <View
                           style={{
-                            alignSelf: isLaptop ? "auto" : isRTL ? "flex-end" : "flex-start",
-                            fontFamily: "Manrope_600SemiBold",
-                            fontSize: 13,
-                            textAlign: isRTL ? "right" : "left",
-                            writingDirection: isRTL ? "rtl" : "ltr",
+                            flex: scheduleRuleInline ? 1 : undefined,
+                            minWidth: scheduleRuleInline ? 330 : undefined,
                           }}
                         >
-                          {s.themeScheduleAt}
-                        </Text>
+                          <View
+                            style={{
+                              flexDirection: isRTL ? "row-reverse" : "row",
+                              flexWrap: "wrap",
+                              gap: 8,
+                            }}
+                          >
+                            {SCHEDULED_THEME_OPTIONS.map((option) => {
+                              const isActive = rule.theme === option.value;
+                              const themeVisual = getThemeChoiceVisual(option.value, isActive, isDark);
+                              return (
+                                <View
+                                  key={option.value}
+                                  style={{
+                                    flexBasis: scheduledRuleThemeChipBasis,
+                                    flexGrow: 1,
+                                    maxWidth: scheduleRuleInline ? 96 : undefined,
+                                    minHeight: 44,
+                                    minWidth: 72,
+                                  }}
+                                >
+                                  <Pressable
+                                    onPress={() => updateScheduledRule(rule.id, { theme: option.value })}
+                                    className="flex-1 items-center justify-center rounded-xl px-2"
+                                    style={({ pressed }) => ({
+                                      backgroundColor: themeVisual.backgroundColor,
+                                      borderColor: themeVisual.borderColor,
+                                      borderWidth: isActive ? 2 : 1,
+                                      transform: [{ scale: pressed ? 0.98 : 1 }],
+                                    })}
+                                  >
+                                    <Text
+                                      className="text-xs"
+                                      numberOfLines={1}
+                                      style={{
+                                        color: themeVisual.textColor,
+                                        fontFamily: isActive ? "Manrope_700Bold" : "Manrope_600SemiBold",
+                                        textAlign: "center",
+                                        writingDirection: isRTL ? "rtl" : "ltr",
+                                      }}
+                                    >
+                                      {option.label}
+                                    </Text>
+                                  </Pressable>
+                                </View>
+                              );
+                            })}
+                          </View>
+                        </View>
                         <View
                           className="items-center gap-2"
-                          style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
+                          style={{
+                            alignSelf: scheduleRuleInline ? "auto" : isRTL ? "flex-start" : "flex-end",
+                            flexDirection: isRTL ? "row-reverse" : "row",
+                            flexShrink: 0,
+                          }}
                         >
+                          <Text
+                            className="text-charcoal dark:text-neutral-200"
+                            style={{
+                              fontFamily: "Manrope_600SemiBold",
+                              fontSize: 13,
+                              textAlign: isRTL ? "right" : "left",
+                              writingDirection: isRTL ? "rtl" : "ltr",
+                            }}
+                          >
+                            {s.themeScheduleAt}
+                          </Text>
                           <SettingsStepper
                             value={formatThemeTimePart(timeParts.hours, isRTL)}
                             onDecrement={() => updateScheduledRule(rule.id, { time: shiftThemeTime(rule.time, -60) })}
@@ -595,10 +631,11 @@ export default function SettingsScreen() {
                             incrementDisabled={false}
                             isDark={isDark}
                             isRTL={isRTL}
+                            compact
                           />
                           <Text
                             className="text-charcoal dark:text-neutral-100"
-                            style={{ fontFamily: "Manrope_700Bold", fontSize: 18 }}
+                            style={{ fontFamily: "Manrope_700Bold", fontSize: 16 }}
                           >
                             :
                           </Text>
@@ -610,6 +647,7 @@ export default function SettingsScreen() {
                             incrementDisabled={false}
                             isDark={isDark}
                             isRTL={isRTL}
+                            compact
                           />
                         </View>
                       </View>
@@ -1423,6 +1461,7 @@ function SettingsStepper({
   incrementDisabled,
   isDark,
   isRTL,
+  compact = false,
 }: {
   value: string;
   onDecrement: () => void;
@@ -1431,8 +1470,12 @@ function SettingsStepper({
   incrementDisabled: boolean;
   isDark: boolean;
   isRTL: boolean;
+  compact?: boolean;
 }) {
   const iconColor = isDark ? "#d4d4d4" : "#6e5a47";
+  const buttonSize = compact ? 30 : 36;
+  const valueMinWidth = compact ? 42 : 64;
+  const iconSize = compact ? 15 : 17;
   return (
     <View
       className="self-start rounded-full bg-surface-high dark:bg-surface-dark-high p-1"
@@ -1441,18 +1484,23 @@ function SettingsStepper({
       <Pressable
         onPress={onDecrement}
         disabled={decrementDisabled}
-        className="h-9 w-9 items-center justify-center rounded-full"
+        className="items-center justify-center rounded-full"
         style={({ pressed }) => ({
+          height: buttonSize,
           opacity: decrementDisabled ? 0.35 : pressed ? 0.68 : 1,
           transform: [{ scale: pressed && !decrementDisabled ? 0.96 : 1 }],
+          width: buttonSize,
         })}
       >
-        <Minus size={17} color={iconColor} />
+        <Minus size={iconSize} color={iconColor} />
       </Pressable>
-      <View className="min-w-16 items-center justify-center px-3">
+      <View
+        className="items-center justify-center"
+        style={{ minWidth: valueMinWidth, paddingHorizontal: compact ? 8 : 12 }}
+      >
         <Text
           className="text-charcoal dark:text-neutral-100"
-          style={{ fontFamily: "Manrope_700Bold", fontSize: 14 }}
+          style={{ fontFamily: "Manrope_700Bold", fontSize: compact ? 13 : 14 }}
         >
           {value}
         </Text>
@@ -1460,13 +1508,15 @@ function SettingsStepper({
       <Pressable
         onPress={onIncrement}
         disabled={incrementDisabled}
-        className="h-9 w-9 items-center justify-center rounded-full"
+        className="items-center justify-center rounded-full"
         style={({ pressed }) => ({
+          height: buttonSize,
           opacity: incrementDisabled ? 0.35 : pressed ? 0.68 : 1,
           transform: [{ scale: pressed && !incrementDisabled ? 0.96 : 1 }],
+          width: buttonSize,
         })}
       >
-        <Plus size={17} color={iconColor} />
+        <Plus size={iconSize} color={iconColor} />
       </Pressable>
     </View>
   );
