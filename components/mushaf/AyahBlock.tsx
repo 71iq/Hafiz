@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef, useMemo, memo } from "react";
-import { ActivityIndicator, View, Text, Pressable, Animated as RNAnimated, Platform, useWindowDimensions } from "react-native";
+import { ActivityIndicator, View, Text, Pressable, Animated as RNAnimated, Platform, ScrollView, useWindowDimensions } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import {
   isQuranPageFontLoaded,
@@ -377,12 +377,16 @@ function AyahBlockInner({
       )}
 
       <View className="pt-3">
-        <View
-          className="mt-1 flex-wrap gap-2"
-          style={{
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          bounces={false}
+          className="mt-1"
+          contentContainerStyle={{
             direction: isRTL ? "rtl" : "ltr",
             flexDirection: isRTL ? "row-reverse" : "row",
-            justifyContent: "flex-start",
+            gap: 8,
+            paddingHorizontal: 0,
           }}
         >
           <ActionPill
@@ -415,7 +419,7 @@ function AyahBlockInner({
             onPress={() => openDetail("notes")}
             isRTL={isRTL}
           />
-        </View>
+        </ScrollView>
       </View>
       <AyahDetailModal
         target={detailOpen ? { surah, ayah } : null}
@@ -487,17 +491,20 @@ function ActionPill({
       style={{
         direction: isRTL ? "rtl" : "ltr",
         flexDirection: isRTL ? "row-reverse" : "row",
+        flexShrink: 0,
         opacity: disabled && !active ? 0.55 : 1,
       }}
     >
       {icon}
       <Text
+        numberOfLines={1}
         className={active ? "text-primary-accent dark:text-primary-bright" : "text-warm-500 dark:text-neutral-400"}
         style={{
           fontFamily: "Manrope_600SemiBold",
           fontSize: 11,
           textAlign: isRTL ? "right" : "left",
           writingDirection: isRTL ? "rtl" : "ltr",
+          ...(Platform.OS === "web" ? ({ whiteSpace: "nowrap" } as any) : null),
         }}
       >
         {label}
