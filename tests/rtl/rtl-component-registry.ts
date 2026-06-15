@@ -82,6 +82,7 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
   entry("components/ui/Field.tsx", "form-field", "rntl", "Labels and messages align to start."),
   entry("components/ui/FormTextField.tsx", "form-field", "rntl", "Form wrapper passes direction to field and input chrome."),
   entry("components/ui/Input.tsx", "form-field", "rntl", "Text aligns start and icon slots mirror."),
+  entry("components/ui/MirroredRow.tsx", "app-shell", "rntl", "Shared row primitives force physical row order to mirror while keeping ambient direction stable."),
   entry("components/ui/OfflineBanner.tsx", "feedback", "source", "Full-width banner is centered; action/close order mirrors when present."),
   entry("components/ui/Progress.tsx", "progress-chart", "rntl", "Fill direction is explicit and follows the active UI direction."),
   entry("components/ui/ResponsiveOverlay.tsx", "overlay", "rntl", "Overlay chrome, header, and footer action order mirror."),

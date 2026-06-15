@@ -91,11 +91,6 @@ export const rtlStyleAllowlist: RtlStyleAllowlistEntry[] = [
     reason: "Heatmap cells and month labels use chart coordinates; chronology must be checked explicitly later.",
   },
   {
-    file: "components/progress/SurahProgressList.tsx",
-    pattern: /textAlign: "right"/,
-    reason: "Arabic surah labels intentionally align right inside a mixed-language progress row.",
-  },
-  {
     file: "components/ui/AppNavigation.tsx",
     pattern: /left|right/,
     reason: "Navigation contains direction-branched sidebar offsets plus centered absolute mobile chrome.",
