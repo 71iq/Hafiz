@@ -48,7 +48,7 @@ type MushafTarget = { surah: number; ayah: number; wordPos?: number };
 type HifzPageAyah = { key: string; wordCount: number };
 
 const PAGE_RAIL_MAX_WIDTH = 760;
-const READER_INTERACTION_SELECTOR = '[data-hafiz-quran-token], [data-hafiz-word-tooltip="true"]';
+const READER_INTERACTION_SELECTOR = '[data-hafiz-quran-token], [data-hafiz-word-tooltip="true"], [data-hafiz-reader-interaction="true"]';
 
 function isFromFocusModeControls(event: any) {
   const target = event?.nativeEvent?.target;

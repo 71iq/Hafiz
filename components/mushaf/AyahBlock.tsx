@@ -32,6 +32,27 @@ import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { useAyahAudio } from "@/lib/audio/ayah-audio";
 import { AyahDetailModal, type AyahDetailTabKey } from "./AyahDetailModal";
 
+function stopReaderChromeToggle(event: any) {
+  event?.stopPropagation?.();
+}
+
+const readerControlProps =
+  Platform.OS === "web"
+    ? ({
+        dataSet: { hafizReaderInteraction: "true" },
+        onPointerDown: stopReaderChromeToggle,
+        onPointerMove: stopReaderChromeToggle,
+        onPointerUp: stopReaderChromeToggle,
+        onTouchStart: stopReaderChromeToggle,
+        onTouchMove: stopReaderChromeToggle,
+        onTouchEnd: stopReaderChromeToggle,
+      } as any)
+    : ({
+        onTouchStart: stopReaderChromeToggle,
+        onTouchMove: stopReaderChromeToggle,
+        onTouchEnd: stopReaderChromeToggle,
+      } as any);
+
 type Props = {
   surah: number;
   ayah: number;
@@ -230,6 +251,7 @@ function AyahBlockInner({
             accessibilityRole="button"
             accessibilityLabel={`${surah}:${ayah}`}
             onPress={handleSelectAyah}
+            {...readerControlProps}
             className="rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 px-3 py-2"
             style={({ pressed }) => ({
               position: "relative",
@@ -382,6 +404,7 @@ function AyahBlockInner({
           showsHorizontalScrollIndicator={false}
           bounces={false}
           className="mt-1"
+          {...readerControlProps}
           contentContainerStyle={{
             direction: isRTL ? "rtl" : "ltr",
             flexDirection: isRTL ? "row-reverse" : "row",
@@ -450,6 +473,7 @@ function ActionIcon({
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       hitSlop={8}
+      {...readerControlProps}
       className="h-8 w-8 items-center justify-center rounded-full bg-surface-low dark:bg-surface-dark-low"
       style={{
         opacity: disabled ? 0.45 : 1,
@@ -483,6 +507,7 @@ function ActionPill({
     <Pressable
       onPress={onPress}
       disabled={disabled}
+      {...readerControlProps}
       className={`items-center gap-1.5 rounded-full px-3 py-2 ${
         active
           ? "bg-primary-accent/10 dark:bg-primary-bright/10"
