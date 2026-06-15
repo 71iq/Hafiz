@@ -1,11 +1,15 @@
 import { useState, useCallback, useEffect } from "react";
 import { View, Text, ScrollView, Pressable } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
 import { BookOpen, ChevronDown, LogIn, Trophy } from "lucide-react-native";
 import { Card } from "@/components/ui/Card";
-import { ScreenScrollView, useScreenContentLayout } from "@/components/ui/ScreenContent";
+import {
+  Screen,
+  ScreenScrollView,
+  TAB_SCREEN_BOTTOM_INSET,
+  useScreenContentLayout,
+} from "@/components/ui/ScreenContent";
 import { OverlayBody, OverlayHeader, ResponsiveModal } from "@/components/ui/ResponsiveOverlay";
 import { ActivityHeatmap } from "@/components/progress/ActivityHeatmap";
 import { DefaultDeckProgressChart } from "@/components/progress/DefaultDeckProgressChart";
@@ -17,18 +21,18 @@ import { useSettings } from "@/lib/settings/context";
 import { useDatabase } from "@/lib/database/provider";
 import { useAuthStore } from "@/lib/auth/store";
 import { isSupabaseConfigured } from "@/lib/supabase";
-import {
-  getMemorizedAyahCardCount,
-  getReviewStats,
-  getTotalAyahCardCount,
-  getWirdStatus,
-} from "@/lib/fsrs/queries";
+import { getMemorizedAyahCardCount, getReviewStats, getTotalAyahCardCount, getWirdStatus } from "@/lib/fsrs/queries";
 import { getTotalScore } from "@/lib/fsrs/scoring";
 import { subscribeReviewActivity } from "@/lib/fsrs/review-events";
 import { getAchievementDashboard, type AchievementDashboard } from "@/lib/achievements/queries";
 import { getAchievementDefinition } from "@/lib/achievements/catalog";
 import { DESKTOP_CONTENT_MAX_WIDTH } from "@/lib/ui/viewport";
-import { getDefaultDeckProgress, getLocalSurahProgress, type DefaultDeckProgressItem, type ProfileSurahProgress } from "@/lib/profile/progress";
+import {
+  getDefaultDeckProgress,
+  getLocalSurahProgress,
+  type DefaultDeckProgressItem,
+  type ProfileSurahProgress,
+} from "@/lib/profile/progress";
 import { subscribeSyncCompleted } from "@/lib/sync/events";
 
 type HeatmapDay = { date: string; count: number };
@@ -58,16 +62,7 @@ export default function ProgressScreen() {
   const [achievementsModalOpen, setAchievementsModalOpen] = useState(false);
 
   const loadData = useCallback(async () => {
-    const [
-      cards,
-      memorized,
-      reviewStats,
-      wirdStatus,
-      score,
-      achievements,
-      defaultDecks,
-      surahs,
-    ] = await Promise.all([
+    const [cards, memorized, reviewStats, wirdStatus, score, achievements, defaultDecks, surahs] = await Promise.all([
       getTotalAyahCardCount(db).catch((error) => {
         console.warn("[Progress] Failed to load total ayah cards:", error);
         return 0;
@@ -82,7 +77,13 @@ export default function ProgressScreen() {
       }),
       getWirdStatus(db).catch((error) => {
         console.warn("[Progress] Failed to load wird status:", error);
-        return { currentDays: 0, longestDays: 0, maintainedToday: false, lastReviewDate: null, state: "empty" as const };
+        return {
+          currentDays: 0,
+          longestDays: 0,
+          maintainedToday: false,
+          lastReviewDate: null,
+          state: "empty" as const,
+        };
       }),
       getTotalScore(db).catch((error) => {
         console.warn("[Progress] Failed to load score:", error);
@@ -118,13 +119,17 @@ export default function ProgressScreen() {
   useFocusEffect(
     useCallback(() => {
       loadData().catch(console.warn);
-    }, [loadData])
+    }, [loadData]),
   );
 
   useEffect(() => subscribeReviewActivity(() => loadData().catch(console.warn)), [loadData]);
-  useEffect(() => subscribeSyncCompleted(({ pulled }) => {
-    if (pulled > 0) loadData().catch(console.warn);
-  }), [loadData]);
+  useEffect(
+    () =>
+      subscribeSyncCompleted(({ pulled }) => {
+        if (pulled > 0) loadData().catch(console.warn);
+      }),
+    [loadData],
+  );
 
   const showSyncPrompt = isSupabaseConfigured() && authInitialized && !authLoading && !user;
   const formatStat = (val: number) => val.toLocaleString();
@@ -139,7 +144,7 @@ export default function ProgressScreen() {
   ];
   const mirroredRowStyle = {
     direction: "ltr" as const,
-    flexDirection: isRTL ? "row-reverse" as const : "row" as const,
+    flexDirection: isRTL ? ("row-reverse" as const) : ("row" as const),
   };
   const recentAchievementItems: AchievementDashboard["items"] = [];
   if (achievementDashboard) {
@@ -159,8 +164,8 @@ export default function ProgressScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
-      <ScreenScrollView maxWidth={DESKTOP_CONTENT_MAX_WIDTH} contentContainerStyle={{ paddingBottom: 100 }}>
+    <Screen>
+      <ScreenScrollView maxWidth={DESKTOP_CONTENT_MAX_WIDTH} bottomInset={TAB_SCREEN_BOTTOM_INSET}>
         {/* Daily reminder card */}
         <Card elevation="low" className="mt-8 mb-6 bg-primary-soft dark:bg-primary-soft px-6 py-7">
           <View style={{ alignSelf: "center", maxWidth: isLaptop ? 720 : "100%", width: "100%" }}>
@@ -248,12 +253,7 @@ export default function ProgressScreen() {
           </View>
         </Card>
 
-        <DefaultDeckProgressChart
-          items={defaultDeckProgress}
-          isDark={isDark}
-          isRTL={isRTL}
-          s={s}
-        />
+        <DefaultDeckProgressChart items={defaultDeckProgress} isDark={isDark} isRTL={isRTL} s={s} />
 
         {/* Surah progress */}
         <Text
@@ -274,8 +274,14 @@ export default function ProgressScreen() {
         {/* Achievements */}
         {achievementDashboard && (
           <Card elevation="low" className="p-5 mt-6 mb-6">
-            <View className={`flex-row items-center justify-between gap-3 ${isRTL ? "flex-row-reverse" : ""}`} style={mirroredRowStyle}>
-              <View className={`min-w-0 flex-1 flex-row items-center gap-3 ${isRTL ? "flex-row-reverse" : ""}`} style={mirroredRowStyle}>
+            <View
+              className={`flex-row items-center justify-between gap-3 ${isRTL ? "flex-row-reverse" : ""}`}
+              style={mirroredRowStyle}
+            >
+              <View
+                className={`min-w-0 flex-1 flex-row items-center gap-3 ${isRTL ? "flex-row-reverse" : ""}`}
+                style={mirroredRowStyle}
+              >
                 <View
                   className="h-11 w-11 items-center justify-center rounded-full"
                   style={{ backgroundColor: isDark ? "rgba(45,212,191,0.12)" : "rgba(13,148,136,0.10)" }}
@@ -307,7 +313,10 @@ export default function ProgressScreen() {
                   opacity: pressed ? 0.72 : 1,
                 })}
               >
-                <View className={`flex-row items-center gap-1.5 ${isRTL ? "flex-row-reverse" : ""}`} style={mirroredRowStyle}>
+                <View
+                  className={`flex-row items-center gap-1.5 ${isRTL ? "flex-row-reverse" : ""}`}
+                  style={mirroredRowStyle}
+                >
                   <Text
                     className="text-primary dark:text-primary-bright"
                     style={{ fontFamily: "Manrope_700Bold", fontSize: 12 }}
@@ -330,7 +339,12 @@ export default function ProgressScreen() {
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{ gap: 8, direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row", paddingHorizontal: 1 }}
+                  contentContainerStyle={{
+                    gap: 8,
+                    direction: "ltr",
+                    flexDirection: isRTL ? "row-reverse" : "row",
+                    paddingHorizontal: 1,
+                  }}
                 >
                   {recentAchievementItems.map((item) => (
                     <AchievementBadge key={item.id} compact item={item} />
@@ -343,11 +357,7 @@ export default function ProgressScreen() {
       </ScreenScrollView>
 
       {achievementDashboard && (
-        <ResponsiveModal
-          open={achievementsModalOpen}
-          onClose={() => setAchievementsModalOpen(false)}
-          maxWidth={760}
-        >
+        <ResponsiveModal open={achievementsModalOpen} onClose={() => setAchievementsModalOpen(false)} maxWidth={760}>
           <OverlayHeader
             title={s.achievementsTitle}
             subtitle={`${achievementDashboard.unlockedCount} / ${achievementDashboard.totalCount}`}
@@ -368,11 +378,7 @@ export default function ProgressScreen() {
         </ResponsiveModal>
       )}
 
-      <ResponsiveModal
-        open={surahProgressModalOpen}
-        onClose={() => setSurahProgressModalOpen(false)}
-        maxWidth={760}
-      >
+      <ResponsiveModal open={surahProgressModalOpen} onClose={() => setSurahProgressModalOpen(false)} maxWidth={760}>
         <OverlayHeader
           title={s.progressSurahProgress}
           isRTL={isRTL}
@@ -397,7 +403,7 @@ export default function ProgressScreen() {
           />
         </OverlayBody>
       </ResponsiveModal>
-    </SafeAreaView>
+    </Screen>
   );
 }
 
@@ -446,11 +452,12 @@ function ProgressSignInPrompt({
             opacity: pressed ? 0.76 : 1,
           })}
         >
-          <View className="flex-row items-center gap-2" style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}>
+          <View
+            className="flex-row items-center gap-2"
+            style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
+          >
             <LogIn size={15} color="#FDDC91" />
-            <Text style={{ color: "#FDDC91", fontFamily: "Manrope_700Bold", fontSize: 12 }}>
-              {buttonLabel}
-            </Text>
+            <Text style={{ color: "#FDDC91", fontFamily: "Manrope_700Bold", fontSize: 12 }}>{buttonLabel}</Text>
           </View>
         </Pressable>
       </View>
@@ -483,7 +490,14 @@ function CompactProgressStats({
       }}
     >
       {items.map((item) => (
-        <CompactProgressStat key={item.label} value={item.value} label={item.label} isDark={isDark} isLaptop={isLaptop} isRTL={isRTL} />
+        <CompactProgressStat
+          key={item.label}
+          value={item.value}
+          label={item.label}
+          isDark={isDark}
+          isLaptop={isLaptop}
+          isRTL={isRTL}
+        />
       ))}
     </View>
   );

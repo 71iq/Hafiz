@@ -1,17 +1,29 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { View, Text, Pressable, useWindowDimensions } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, type Href } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
-import { Play, Layers, CalendarCheck2, Search, Languages, UserPlus, BookMarked, X as XIcon, Settings2, Sparkles, BookOpenText, ListEnd, List } from "lucide-react-native";
+import {
+  Play,
+  Layers,
+  CalendarCheck2,
+  Search,
+  Languages,
+  UserPlus,
+  BookMarked,
+  X as XIcon,
+  Settings2,
+  Sparkles,
+  BookOpenText,
+  ListEnd,
+  List,
+} from "lucide-react-native";
 import { useAuthStore } from "@/lib/auth/store";
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
-import { useStrings } from "@/lib/i18n/useStrings";
-import { interpolate } from "@/lib/i18n/useStrings";
+import { interpolate, useStrings } from "@/lib/i18n/useStrings";
 import type { UIStrings } from "@/lib/i18n/strings";
 import { Card } from "@/components/ui/Card";
-import { ScreenScrollView } from "@/components/ui/ScreenContent";
+import { Screen, ScreenScrollView, TAB_SCREEN_BOTTOM_INSET } from "@/components/ui/ScreenContent";
 import { DeckReviewSettingsSheet } from "@/components/flashcards/DeckReviewSettingsSheet";
 import { DeckCardsSheet } from "@/components/flashcards/DeckCardsSheet";
 import { SmartDeckFilterSheet } from "@/components/flashcards/SmartDeckFilterSheet";
@@ -36,11 +48,7 @@ import {
 } from "@/lib/fsrs/smart-decks";
 import { subscribeReviewActivity } from "@/lib/fsrs/review-events";
 import { subscribeSyncCompleted } from "@/lib/sync/events";
-import {
-  getLatestUnseenUnlock,
-  markAchievementSeen,
-  subscribeAchievementUnlocks,
-} from "@/lib/achievements/queries";
+import { getLatestUnseenUnlock, markAchievementSeen, subscribeAchievementUnlocks } from "@/lib/achievements/queries";
 import type { AchievementUnlock } from "@/lib/achievements/types";
 import { getReflectionJourneySummary } from "@/lib/reflection-journey/queries";
 import { localizeReflectionJourneyText } from "@/lib/reflection-journey/schema";
@@ -77,7 +85,11 @@ export default function HomeScreen() {
   const mirroredRowStyle = isRTL ? ({ direction: "ltr" } as const) : undefined;
   const compactDeckCards = width <= VIEWPORT_BREAKPOINTS.phoneLarge;
   const [smartDecks, setSmartDecks] = useState<SmartDeckDisplay[]>([]);
-  const [vocabStats, setVocabStats] = useState<{ total: number; dueCount: number; newCount: number }>({ total: 0, dueCount: 0, newCount: 0 });
+  const [vocabStats, setVocabStats] = useState<{ total: number; dueCount: number; newCount: number }>({
+    total: 0,
+    dueCount: 0,
+    newCount: 0,
+  });
   const [authBannerDismissed, setAuthBannerDismissed] = useState(false);
   const user = useAuthStore((state) => state.user);
   const [totalDue, setTotalDue] = useState(0);
@@ -98,7 +110,11 @@ export default function HomeScreen() {
   const [resume, setResume] = useState<{ surah: number; ayah: number; page: number } | null>(null);
   const [latestUnlock, setLatestUnlock] = useState<AchievementUnlock | null>(null);
   const [dismissingUnlockId, setDismissingUnlockId] = useState<string | null>(null);
-  const [journeySummary, setJourneySummary] = useState<{ totalLevels: number; completedLevels: number; currentLevelTitle: string | null }>({
+  const [journeySummary, setJourneySummary] = useState<{
+    totalLevels: number;
+    completedLevels: number;
+    currentLevelTitle: string | null;
+  }>({
     totalLevels: 0,
     completedLevels: 0,
     currentLevelTitle: null,
@@ -114,7 +130,7 @@ export default function HomeScreen() {
 
   const loadData = useCallback(async () => {
     const surahRows = await db.getAllAsync<{ number: number; name_arabic: string; name_english: string }>(
-      "SELECT number, name_arabic, name_english FROM surahs"
+      "SELECT number, name_arabic, name_english FROM surahs",
     );
     const nameMap: Record<number, string> = {};
     for (const row of surahRows) {
@@ -170,7 +186,7 @@ export default function HomeScreen() {
           dueCount: stats.dueCount,
           newCount: stats.newCount,
         };
-      })
+      }),
     );
     setSmartDecks(smartDisplays);
 
@@ -178,13 +194,15 @@ export default function HomeScreen() {
       readDeckReviewSettings(db, undefined),
       readDeckReviewSettings(db, MEANINGS_DECK_ID),
     ]);
-    const [dashboardDue, memorizedTotal, nextWirdStatus, vocabTodayStats, reflectionJourneySummary] = await Promise.all([
-      getTodayDueCount(db, undefined, dashboardSettings),
-      getMemorizedAyahCardCount(db),
-      getWirdStatus(db),
-      getDeckTodayStats(db, MEANINGS_DECK_ID, vocabSettings),
-      getReflectionJourneySummary(db),
-    ]);
+    const [dashboardDue, memorizedTotal, nextWirdStatus, vocabTodayStats, reflectionJourneySummary] = await Promise.all(
+      [
+        getTodayDueCount(db, undefined, dashboardSettings),
+        getMemorizedAyahCardCount(db),
+        getWirdStatus(db),
+        getDeckTodayStats(db, MEANINGS_DECK_ID, vocabSettings),
+        getReflectionJourneySummary(db),
+      ],
+    );
     setTotalDue(dashboardDue);
     setMemorizedCards(memorizedTotal);
     setWirdStatus(nextWirdStatus);
@@ -200,7 +218,7 @@ export default function HomeScreen() {
 
     try {
       const row = await db.getFirstAsync<{ value: string }>(
-        "SELECT value FROM user_settings WHERE key = 'last_mushaf_position'"
+        "SELECT value FROM user_settings WHERE key = 'last_mushaf_position'",
       );
       if (!row?.value) {
         setResume(null);
@@ -210,21 +228,17 @@ export default function HomeScreen() {
       if (parsed?.mode === "page" && typeof parsed.page === "number") {
         const pageMeta = await db.getFirstAsync<{ surah_start: number; ayah_start: number }>(
           "SELECT surah_start, ayah_start FROM page_map WHERE page = ?",
-          [parsed.page]
+          [parsed.page],
         );
         if (pageMeta) {
           setResume({ surah: pageMeta.surah_start, ayah: pageMeta.ayah_start, page: parsed.page });
         } else {
           setResume(null);
         }
-      } else if (
-        parsed?.mode === "verse" &&
-        typeof parsed.surah === "number" &&
-        typeof parsed.ayah === "number"
-      ) {
+      } else if (parsed?.mode === "verse" && typeof parsed.surah === "number" && typeof parsed.ayah === "number") {
         const page = await db.getFirstAsync<{ v2_page: number }>(
           "SELECT v2_page FROM quran_text WHERE surah = ? AND ayah = ?",
-          [parsed.surah, parsed.ayah]
+          [parsed.surah, parsed.ayah],
         );
         setResume({ surah: parsed.surah, ayah: parsed.ayah, page: page?.v2_page ?? 1 });
       } else {
@@ -233,18 +247,36 @@ export default function HomeScreen() {
     } catch {
       setResume(null);
     }
-  }, [db, loadLatestUnlock, s.smartDeckRetentionTitle, s.smartDeckRetentionSubtitle, s.smartDeckMutashabihatTitle, s.smartDeckMutashabihatSubtitle, s.smartDeckSimilarTailsTitle, s.smartDeckSimilarTailsSubtitle, s.smartDeckQiraatTitle, s.smartDeckQiraatSubtitle, s.smartDeckReasonsTitle, s.smartDeckReasonsSubtitle, uiLanguage]);
+  }, [
+    db,
+    loadLatestUnlock,
+    s.smartDeckRetentionTitle,
+    s.smartDeckRetentionSubtitle,
+    s.smartDeckMutashabihatTitle,
+    s.smartDeckMutashabihatSubtitle,
+    s.smartDeckSimilarTailsTitle,
+    s.smartDeckSimilarTailsSubtitle,
+    s.smartDeckQiraatTitle,
+    s.smartDeckQiraatSubtitle,
+    s.smartDeckReasonsTitle,
+    s.smartDeckReasonsSubtitle,
+    uiLanguage,
+  ]);
 
   useFocusEffect(
     useCallback(() => {
       loadData();
-    }, [loadData])
+    }, [loadData]),
   );
 
   useEffect(() => subscribeReviewActivity(loadData), [loadData]);
-  useEffect(() => subscribeSyncCompleted(({ pulled }) => {
-    if (pulled > 0) loadData();
-  }), [loadData]);
+  useEffect(
+    () =>
+      subscribeSyncCompleted(({ pulled }) => {
+        if (pulled > 0) loadData();
+      }),
+    [loadData],
+  );
 
   useEffect(() => subscribeAchievementUnlocks((unlock) => setLatestUnlock(unlock)), []);
 
@@ -299,10 +331,13 @@ export default function HomeScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
-      <ScreenScrollView maxWidth={DESKTOP_CONTENT_MAX_WIDTH} contentContainerStyle={{ paddingBottom: 100 }}>
+    <Screen>
+      <ScreenScrollView maxWidth={DESKTOP_CONTENT_MAX_WIDTH} bottomInset={TAB_SCREEN_BOTTOM_INSET}>
         <View className="pt-6 pb-3">
-          <View className={`flex-row items-center justify-between ${isRTL ? "flex-row-reverse" : ""}`} style={mirroredRowStyle}>
+          <View
+            className={`flex-row items-center justify-between ${isRTL ? "flex-row-reverse" : ""}`}
+            style={mirroredRowStyle}
+          >
             <Text
               className="text-warm-400 dark:text-neutral-500 uppercase"
               style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, letterSpacing: 1.8 }}
@@ -319,26 +354,47 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {latestUnlock && (
-          <AchievementUnlockToast unlock={latestUnlock} onDismiss={dismissLatestUnlock} />
-        )}
+        {latestUnlock && <AchievementUnlockToast unlock={latestUnlock} onDismiss={dismissLatestUnlock} />}
 
         <View className="mb-6">
-          <View className={`flex-row items-end justify-between gap-3 ${isRTL ? "flex-row-reverse" : ""}`} style={mirroredRowStyle}>
-            <View className={`flex-1 flex-row items-end gap-3 ${isRTL ? "flex-row-reverse" : ""}`} style={mirroredRowStyle}>
+          <View
+            className={`flex-row items-end justify-between gap-3 ${isRTL ? "flex-row-reverse" : ""}`}
+            style={mirroredRowStyle}
+          >
+            <View
+              className={`flex-1 flex-row items-end gap-3 ${isRTL ? "flex-row-reverse" : ""}`}
+              style={mirroredRowStyle}
+            >
               <View className={isRTL ? "items-end" : "items-start"}>
-                <Text className="text-charcoal dark:text-neutral-100" style={{ fontFamily: "NotoSerif_700Bold", fontSize: 68, lineHeight: 68 }}>
+                <Text
+                  className="text-charcoal dark:text-neutral-100"
+                  style={{ fontFamily: "NotoSerif_700Bold", fontSize: 68, lineHeight: 68 }}
+                >
                   {totalDue}
                 </Text>
-                <Text className="text-warm-400 dark:text-neutral-500" style={{ fontFamily: "Manrope_500Medium", fontSize: 12, textAlign: isRTL ? "right" : "left" }}>
+                <Text
+                  className="text-warm-400 dark:text-neutral-500"
+                  style={{ fontFamily: "Manrope_500Medium", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
+                >
                   {s.flashcardsDueToday}
                 </Text>
               </View>
               <View className={`pb-1 ${isRTL ? "items-end" : "items-start"}`}>
-                <Text className="text-warm-500 dark:text-neutral-400" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 24, lineHeight: 28, fontVariant: ["tabular-nums"] }}>
+                <Text
+                  className="text-warm-500 dark:text-neutral-400"
+                  style={{
+                    fontFamily: "Manrope_600SemiBold",
+                    fontSize: 24,
+                    lineHeight: 28,
+                    fontVariant: ["tabular-nums"],
+                  }}
+                >
                   {memorizedCards.toLocaleString()}
                 </Text>
-                <Text className="text-warm-400 dark:text-neutral-500" style={{ fontFamily: "Manrope_500Medium", fontSize: 11, textAlign: isRTL ? "right" : "left" }}>
+                <Text
+                  className="text-warm-400 dark:text-neutral-500"
+                  style={{ fontFamily: "Manrope_500Medium", fontSize: 11, textAlign: isRTL ? "right" : "left" }}
+                >
                   {s.homeMemorized}
                 </Text>
               </View>
@@ -357,13 +413,25 @@ export default function HomeScreen() {
               </Pressable>
             )}
           </View>
-          <View className={`flex-row items-center justify-between mt-4 rounded-3xl bg-surface-low dark:bg-surface-dark-low px-4 py-3 ${isRTL ? "flex-row-reverse" : ""}`} style={mirroredRowStyle}>
-            <View className={`flex-row items-center gap-1.5 ${isRTL ? "flex-row-reverse" : ""}`} style={mirroredRowStyle}>
+          <View
+            className={`flex-row items-center justify-between mt-4 rounded-3xl bg-surface-low dark:bg-surface-dark-low px-4 py-3 ${isRTL ? "flex-row-reverse" : ""}`}
+            style={mirroredRowStyle}
+          >
+            <View
+              className={`flex-row items-center gap-1.5 ${isRTL ? "flex-row-reverse" : ""}`}
+              style={mirroredRowStyle}
+            >
               <CalendarCheck2 size={14} color={isDark ? "#2dd4bf" : "#0d9488"} />
-              <Text className="text-charcoal dark:text-neutral-100" style={{ fontFamily: "Manrope_700Bold", fontSize: 16 }}>
+              <Text
+                className="text-charcoal dark:text-neutral-100"
+                style={{ fontFamily: "Manrope_700Bold", fontSize: 16 }}
+              >
                 {wirdStatus.currentDays.toLocaleString()}
               </Text>
-              <Text className="text-warm-400 dark:text-neutral-500" style={{ fontFamily: "Manrope_500Medium", fontSize: 11 }}>
+              <Text
+                className="text-warm-400 dark:text-neutral-500"
+                style={{ fontFamily: "Manrope_500Medium", fontSize: 11 }}
+              >
                 {s.homeStreak}
               </Text>
             </View>
@@ -393,13 +461,22 @@ export default function HomeScreen() {
                   <Play size={16} color={isDark ? "#2dd4bf" : "#0d9488"} />
                 </View>
                 <View className="flex-1">
-                  <Text className="text-warm-400 dark:text-neutral-500 uppercase" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, letterSpacing: 1.5 }}>
+                  <Text
+                    className="text-warm-400 dark:text-neutral-500 uppercase"
+                    style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, letterSpacing: 1.5 }}
+                  >
                     {s.goTo}
                   </Text>
-                  <Text className="text-charcoal dark:text-neutral-100" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15 }}>
+                  <Text
+                    className="text-charcoal dark:text-neutral-100"
+                    style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15 }}
+                  >
                     {`${s.flashcardsScopeBysurah} ${surahNames[resume.surah] ?? resume.surah} · ${resume.surah}:${resume.ayah}`}
                   </Text>
-                  <Text className="text-warm-400 dark:text-neutral-500" style={{ fontFamily: "Manrope_500Medium", fontSize: 12 }}>
+                  <Text
+                    className="text-warm-400 dark:text-neutral-500"
+                    style={{ fontFamily: "Manrope_500Medium", fontSize: 12 }}
+                  >
                     {interpolate(s.pageN, { n: resume.page })}
                   </Text>
                 </View>
@@ -443,7 +520,10 @@ export default function HomeScreen() {
                     className="rounded-full bg-surface-high dark:bg-surface-dark-high px-4 py-1.5"
                     style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.97 : 1 }] })}
                   >
-                    <Text className="text-charcoal dark:text-neutral-200" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}>
+                    <Text
+                      className="text-charcoal dark:text-neutral-200"
+                      style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}
+                    >
                       {s.homeAuthCardSignUp}
                     </Text>
                   </Pressable>
@@ -486,7 +566,12 @@ export default function HomeScreen() {
                   </Text>
                   <Text
                     className="text-warm-500 dark:text-neutral-400 mt-1"
-                    style={{ fontFamily: "Manrope_400Regular", fontSize: 13, lineHeight: 21, textAlign: isRTL ? "right" : "left" }}
+                    style={{
+                      fontFamily: "Manrope_400Regular",
+                      fontSize: 13,
+                      lineHeight: 21,
+                      textAlign: isRTL ? "right" : "left",
+                    }}
                   >
                     {journeySummary.currentLevelTitle
                       ? interpolate(s.reflectionJourneyCurrentLevel, { title: journeySummary.currentLevelTitle })
@@ -504,7 +589,12 @@ export default function HomeScreen() {
         <View className={`mb-3 ${isRTL ? "items-end" : "items-start"}`}>
           <Text
             className="text-charcoal dark:text-neutral-100"
-            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
+            style={{
+              fontFamily: "Manrope_600SemiBold",
+              fontSize: 16,
+              textAlign: isRTL ? "right" : "left",
+              writingDirection: isRTL ? "rtl" : "ltr",
+            }}
           >
             {s.flashcardsDecks}
           </Text>
@@ -529,7 +619,9 @@ export default function HomeScreen() {
             <VocabularyDeckCard
               stats={vocabStats}
               onStartReview={() => handleStartReview(MEANINGS_DECK_ID)}
-              onConfigure={() => setReviewSettingsTarget({ id: MEANINGS_DECK_ID, title: s.vocabDeckTitle, mode: "word" })}
+              onConfigure={() =>
+                setReviewSettingsTarget({ id: MEANINGS_DECK_ID, title: s.vocabDeckTitle, mode: "word" })
+              }
               onShowCards={() => setDeckCardsTarget({ id: MEANINGS_DECK_ID, title: s.vocabDeckTitle })}
               isDark={isDark}
               isRTL={isRTL}
@@ -570,7 +662,7 @@ export default function HomeScreen() {
       />
 
       {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}
-    </SafeAreaView>
+    </Screen>
   );
 }
 
@@ -606,14 +698,25 @@ function SmartDeckCard({
     <View className={`flex-1 ${isRTL ? "items-end" : "items-start"}`} style={{ minWidth: 0 }}>
       <Text
         className="text-charcoal dark:text-neutral-200"
-        style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
+        style={{
+          fontFamily: "Manrope_600SemiBold",
+          fontSize: 14,
+          textAlign: isRTL ? "right" : "left",
+          writingDirection: isRTL ? "rtl" : "ltr",
+        }}
         numberOfLines={compact ? undefined : 1}
       >
         {deck.title}
       </Text>
       <Text
         className="text-warm-400 dark:text-neutral-500 mt-0.5"
-        style={{ fontFamily: "Manrope_400Regular", fontSize: 11, lineHeight: 16, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
+        style={{
+          fontFamily: "Manrope_400Regular",
+          fontSize: 11,
+          lineHeight: 16,
+          textAlign: isRTL ? "right" : "left",
+          writingDirection: isRTL ? "rtl" : "ltr",
+        }}
         numberOfLines={compact ? undefined : 1}
       >
         {deck.subtitle} · {filterLabel}
@@ -649,7 +752,9 @@ function SmartDeckCard({
       </Pressable>
     </View>
   );
-  const statsNode = <DeckStats total={deck.total} newCount={deck.newCount} dueCount={deck.dueCount} isDark={isDark} isRTL={isRTL} />;
+  const statsNode = (
+    <DeckStats total={deck.total} newCount={deck.newCount} dueCount={deck.dueCount} isDark={isDark} isRTL={isRTL} />
+  );
 
   return (
     <Pressable
@@ -723,14 +828,25 @@ function VocabularyDeckCard({
     <View className={`flex-1 ${isRTL ? "items-end" : "items-start"}`} style={{ minWidth: 0 }}>
       <Text
         className="text-charcoal dark:text-neutral-200"
-        style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
+        style={{
+          fontFamily: "Manrope_600SemiBold",
+          fontSize: 14,
+          textAlign: isRTL ? "right" : "left",
+          writingDirection: isRTL ? "rtl" : "ltr",
+        }}
         numberOfLines={compact ? undefined : 1}
       >
         {s.vocabDeckTitle}
       </Text>
       <Text
         className="text-warm-400 dark:text-neutral-500 mt-0.5"
-        style={{ fontFamily: "Manrope_400Regular", fontSize: 11, lineHeight: 16, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
+        style={{
+          fontFamily: "Manrope_400Regular",
+          fontSize: 11,
+          lineHeight: 16,
+          textAlign: isRTL ? "right" : "left",
+          writingDirection: isRTL ? "rtl" : "ltr",
+        }}
         numberOfLines={compact ? undefined : 1}
       >
         {s.vocabDeckSubtitle}
@@ -768,7 +884,9 @@ function VocabularyDeckCard({
       </Pressable>
     </View>
   );
-  const statsNode = <DeckStats total={stats.total} newCount={stats.newCount} dueCount={stats.dueCount} isDark={isDark} isRTL={isRTL} />;
+  const statsNode = (
+    <DeckStats total={stats.total} newCount={stats.newCount} dueCount={stats.dueCount} isDark={isDark} isRTL={isRTL} />
+  );
 
   return (
     <Pressable
@@ -842,13 +960,23 @@ function DeckStats({
           <View style={{ width: 1, height: 20, backgroundColor: themeColors.surfaceDim }} />
           <Text
             className="text-center min-w-[24px]"
-            style={{ fontFamily: "Manrope_700Bold", fontSize: 14, fontVariant: ["tabular-nums"], color: isDark ? "#4ade80" : "#16a34a" }}
+            style={{
+              fontFamily: "Manrope_700Bold",
+              fontSize: 14,
+              fontVariant: ["tabular-nums"],
+              color: isDark ? "#4ade80" : "#16a34a",
+            }}
           >
             {newCount}
           </Text>
           <Text
             className="text-center min-w-[24px]"
-            style={{ fontFamily: "Manrope_700Bold", fontSize: 14, fontVariant: ["tabular-nums"], color: isDark ? "#f87171" : "#dc2626" }}
+            style={{
+              fontFamily: "Manrope_700Bold",
+              fontSize: 14,
+              fontVariant: ["tabular-nums"],
+              color: isDark ? "#f87171" : "#dc2626",
+            }}
           >
             {dueCount}
           </Text>

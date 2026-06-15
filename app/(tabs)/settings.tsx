@@ -1,13 +1,43 @@
 import { useState, useEffect, useCallback, type ReactNode } from "react";
-import { View, Text, Pressable, ActivityIndicator, Linking, ScrollView, StyleSheet, useWindowDimensions } from "react-native";
+import {
+  View,
+  Text,
+  Pressable,
+  ActivityIndicator,
+  Linking,
+  ScrollView,
+  StyleSheet,
+  useWindowDimensions,
+} from "react-native";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ToggleGroup } from "@/components/ui/ToggleGroup";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Toast } from "@/components/ui/Toast";
-import { ScreenScrollView, useScreenContentLayout } from "@/components/ui/ScreenContent";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { Minus, Plus, X, ChevronRight, ChevronLeft, User, LogOut, BookOpen, RefreshCw, Unlink, Info, FileText, HeartHandshake, ExternalLink, SlidersHorizontal, type LucideIcon } from "lucide-react-native";
+import {
+  COMPACT_SCREEN_BOTTOM_INSET,
+  Screen,
+  ScreenScrollView,
+  useScreenContentLayout,
+} from "@/components/ui/ScreenContent";
+import {
+  Minus,
+  Plus,
+  X,
+  ChevronRight,
+  ChevronLeft,
+  User,
+  LogOut,
+  BookOpen,
+  RefreshCw,
+  Unlink,
+  Info,
+  FileText,
+  HeartHandshake,
+  ExternalLink,
+  SlidersHorizontal,
+  type LucideIcon,
+} from "lucide-react-native";
 import {
   useSettings,
   FONT_SIZE_STEPS,
@@ -27,22 +57,23 @@ import { ensureTafsirSourceImported } from "@/lib/database/init";
 import { TafsirSourcePicker } from "@/components/settings/TafsirSourcePicker";
 import { TranslationLanguagePicker } from "@/components/settings/TranslationLanguagePicker";
 import { ReciterPicker } from "@/components/settings/ReciterPicker";
-import { OverlayBody, OverlayHeader, ResponsiveModal, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
+import { OverlayBody, OverlayHeader, ResponsiveModal } from "@/components/ui/ResponsiveOverlay";
 import { stringByKey, useStrings } from "@/lib/i18n/useStrings";
 import { useAuthStore } from "@/lib/auth/store";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { isQfSyncEnabled } from "@/lib/quran-foundation/config";
 import { formatReciterLabel, getReciterById } from "@/lib/quran-foundation/recitations";
-import { beginQfOAuthConnection, disconnectQfUser, getQfConnectionStatus, getQfLinkedIdentityState } from "@/lib/quran-foundation/user";
+import {
+  beginQfOAuthConnection,
+  disconnectQfUser,
+  getQfConnectionStatus,
+  getQfLinkedIdentityState,
+} from "@/lib/quran-foundation/user";
 import { fullQfUserSync, runInitialQfUserSync } from "@/lib/quran-foundation/user-sync";
 import type { QfConnectionStatus } from "@/lib/quran-foundation/user-types";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { toArabicNumber } from "@/lib/arabic";
-import {
-  DESKTOP_CONTENT_GUTTER,
-  PERSISTENT_SIDEBAR_WIDTH,
-  SETTINGS_CONTENT_MAX_WIDTH,
-} from "@/lib/ui/viewport";
+import { DESKTOP_CONTENT_GUTTER, PERSISTENT_SIDEBAR_WIDTH, SETTINGS_CONTENT_MAX_WIDTH } from "@/lib/ui/viewport";
 import { ProfileIdentity } from "@/components/profile/ProfileIdentity";
 import {
   isQuranPageFontLoaded,
@@ -64,12 +95,13 @@ const SETTINGS_QURAN_PREVIEW_SURAH = 2;
 const SETTINGS_QURAN_PREVIEW_AYAH = 282;
 const CONTENT_SETTINGS_MAX_WIDTH = 720;
 const CONTENT_SETTINGS_ROW_HEIGHT = 60;
-const THEME_CHOICE_VISUALS: Record<ThemePalette, { backgroundColor: string; borderColor: string; textColor: string }> = {
-  dark: { backgroundColor: "#141414", borderColor: "#3F3F46", textColor: "#F5F5F5" },
-  beige: { backgroundColor: "#FFF8F1", borderColor: "#E8E1DA", textColor: "#6E5A47" },
-  white: { backgroundColor: "#FFFFFF", borderColor: "#D1D5DB", textColor: "#27272A" },
-  amoled: { backgroundColor: "#000000", borderColor: "#27272A", textColor: "#FFFFFF" },
-};
+const THEME_CHOICE_VISUALS: Record<ThemePalette, { backgroundColor: string; borderColor: string; textColor: string }> =
+  {
+    dark: { backgroundColor: "#141414", borderColor: "#3F3F46", textColor: "#F5F5F5" },
+    beige: { backgroundColor: "#FFF8F1", borderColor: "#E8E1DA", textColor: "#6E5A47" },
+    white: { backgroundColor: "#FFFFFF", borderColor: "#D1D5DB", textColor: "#27272A" },
+    amoled: { backgroundColor: "#000000", borderColor: "#27272A", textColor: "#FFFFFF" },
+  };
 
 type QuranPreviewAyah = {
   v2Page: number;
@@ -120,16 +152,32 @@ function getThemeChoiceVisual(value: ThemeMode, isActive: boolean, isDark: boole
 
 export default function SettingsScreen() {
   const {
-    theme, setTheme, fontSizeIndex, setFontSizeIndex, fontSize,
-    scheduledRules, setScheduledRules,
-    translationLanguage, isTranslationLoading, isDark, isRTL, effectiveTheme,
-    tafseerSource, setTafseerSource,
-    recitationId, setRecitationId,
-    uiLanguage, setUiLanguage,
-    pageScroll, setPageScroll,
-    viewMode, setViewMode,
-    quranFontStyle, setQuranFontStyle,
-    quranMarkerStyle, setQuranMarkerStyle,
+    theme,
+    setTheme,
+    fontSizeIndex,
+    setFontSizeIndex,
+    fontSize,
+    scheduledRules,
+    setScheduledRules,
+    translationLanguage,
+    isTranslationLoading,
+    isDark,
+    isRTL,
+    effectiveTheme,
+    tafseerSource,
+    setTafseerSource,
+    recitationId,
+    setRecitationId,
+    uiLanguage,
+    setUiLanguage,
+    pageScroll,
+    setPageScroll,
+    viewMode,
+    setViewMode,
+    quranFontStyle,
+    setQuranFontStyle,
+    quranMarkerStyle,
+    setQuranMarkerStyle,
   } = useSettings();
   const db = useDatabase();
   const s = useStrings();
@@ -149,7 +197,8 @@ export default function SettingsScreen() {
   const [toast, setToast] = useState<string | null>(null);
   const { width } = useWindowDimensions();
   const currentLang = getLanguageByCode(translationLanguage);
-  const currentTafseerSource = AVAILABLE_TAFSIR_SOURCES.find((source) => source.id === tafseerSource) ?? AVAILABLE_TAFSIR_SOURCES[0];
+  const currentTafseerSource =
+    AVAILABLE_TAFSIR_SOURCES.find((source) => source.id === tafseerSource) ?? AVAILABLE_TAFSIR_SOURCES[0];
   const currentTafseerTitle = stringByKey(s, currentTafseerSource.labelKey, currentTafseerSource.id);
   const currentReciter = getReciterById(recitationId);
   const { user, profile, isLoading: authLoading, signOut } = useAuthStore();
@@ -163,19 +212,20 @@ export default function SettingsScreen() {
   const { isLaptop } = useScreenContentLayout({ maxWidth: SETTINGS_CONTENT_MAX_WIDTH });
   const settingsRailWidth = Math.min(
     SETTINGS_CONTENT_MAX_WIDTH,
-    Math.max(0, width - (isLaptop ? PERSISTENT_SIDEBAR_WIDTH + DESKTOP_CONTENT_GUTTER * 2 : 48))
+    Math.max(0, width - (isLaptop ? PERSISTENT_SIDEBAR_WIDTH + DESKTOP_CONTENT_GUTTER * 2 : 48)),
   );
   const appearanceCardInnerWidth = Math.max(0, settingsRailWidth - 40);
-  const themeCardWidth = Math.floor(
-    (appearanceCardInnerWidth - (isLaptop ? 24 : 12)) / (isLaptop ? 3 : 2)
-  );
+  const themeCardWidth = Math.floor((appearanceCardInnerWidth - (isLaptop ? 24 : 12)) / (isLaptop ? 3 : 2));
   const scheduleRuleInline = isLaptop && appearanceCardInnerWidth >= 620;
   const scheduledRuleThemeColumnCount = isLaptop && appearanceCardInnerWidth >= 560 ? 4 : 2;
   const scheduledRuleThemeChipBasis = scheduleRuleInline
     ? 76
     : Math.max(
         96,
-        Math.floor((Math.max(0, appearanceCardInnerWidth - 56) - 8 * (scheduledRuleThemeColumnCount - 1)) / scheduledRuleThemeColumnCount)
+        Math.floor(
+          (Math.max(0, appearanceCardInnerWidth - 56) - 8 * (scheduledRuleThemeColumnCount - 1)) /
+            scheduledRuleThemeColumnCount,
+        ),
       );
   const categoryParam = Array.isArray(params.category) ? params.category[0] : params.category;
   const activeCategory = parseSettingsCategory(categoryParam) ?? "general";
@@ -186,7 +236,7 @@ export default function SettingsScreen() {
     quranFontStyle,
     previewPage,
     effectiveTheme,
-    quranMarkerStyle
+    quranMarkerStyle,
   );
   const refreshQfStatus = useCallback(async () => {
     if (!configured || !user || !qfSyncEnabled) {
@@ -338,7 +388,7 @@ export default function SettingsScreen() {
           ? s.qfSyncComplete
           : result.status === "needs_reauth"
             ? s.qfNeedsReauth
-            : s.qfFinishConnection
+            : s.qfFinishConnection,
       );
     } catch (err: any) {
       setQfMessage(err.message || s.qfSyncFailed);
@@ -371,13 +421,17 @@ export default function SettingsScreen() {
 
   const updateScheduledRule = useCallback(
     (ruleId: string, patch: Partial<Pick<ThemeScheduleRule, "theme" | "time">>) => {
-      setScheduledRules(scheduledRules.map((rule) => rule.id === ruleId ? { ...rule, ...patch } : rule));
+      setScheduledRules(scheduledRules.map((rule) => (rule.id === ruleId ? { ...rule, ...patch } : rule)));
     },
-    [scheduledRules, setScheduledRules]
+    [scheduledRules, setScheduledRules],
   );
 
   const addScheduledRule = useCallback(() => {
-    const lastRule = scheduledRules[scheduledRules.length - 1] ?? { id: "default", theme: "dark" as ThemePalette, time: "21:00" };
+    const lastRule = scheduledRules[scheduledRules.length - 1] ?? {
+      id: "default",
+      theme: "dark" as ThemePalette,
+      time: "21:00",
+    };
     setScheduledRules([
       ...scheduledRules,
       {
@@ -393,7 +447,7 @@ export default function SettingsScreen() {
       if (scheduledRules.length <= 1) return;
       setScheduledRules(scheduledRules.filter((rule) => rule.id !== ruleId));
     },
-    [scheduledRules, setScheduledRules]
+    [scheduledRules, setScheduledRules],
   );
 
   const settingsCategories: SettingsCategory[] = [
@@ -403,9 +457,12 @@ export default function SettingsScreen() {
     { id: "about", title: s.settingsCategoryAbout, icon: Info },
   ];
 
-  const handleCategorySelect = useCallback((category: SettingsCategoryId) => {
-    router.setParams({ category });
-  }, [router]);
+  const handleCategorySelect = useCallback(
+    (category: SettingsCategoryId) => {
+      router.setParams({ category });
+    },
+    [router],
+  );
 
   const handleTafseerSourceSelect = useCallback(
     async (sourceId: TafsirSourceId) => {
@@ -423,7 +480,7 @@ export default function SettingsScreen() {
         setImportingTafseerSource(null);
       }
     },
-    [db, importingTafseerSource, s.tafseerSourceImportFailed, setTafseerSource]
+    [db, importingTafseerSource, s.tafseerSourceImportFailed, setTafseerSource],
   );
 
   const categoryPanels = (
@@ -809,7 +866,6 @@ export default function SettingsScreen() {
               </SettingsControlRow>
             </View>
           </Card>
-
         </>
       )}
 
@@ -890,13 +946,21 @@ export default function SettingsScreen() {
                       <View className="flex-1">
                         <Text
                           className="text-charcoal dark:text-neutral-100"
-                          style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, textAlign: isRTL ? "right" : "left" }}
+                          style={{
+                            fontFamily: "Manrope_600SemiBold",
+                            fontSize: 14,
+                            textAlign: isRTL ? "right" : "left",
+                          }}
                         >
                           {s.qfConnectionTitle}
                         </Text>
                         <Text
                           className="text-warm-400 dark:text-neutral-500 mt-0.5"
-                          style={{ fontFamily: "Manrope_400Regular", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
+                          style={{
+                            fontFamily: "Manrope_400Regular",
+                            fontSize: 12,
+                            textAlign: isRTL ? "right" : "left",
+                          }}
                         >
                           {qfStatus === "connected"
                             ? s.qfConnected
@@ -925,7 +989,11 @@ export default function SettingsScreen() {
                             className="flex-1 flex-row items-center justify-center gap-2 rounded-full bg-primary-accent px-3 py-2.5"
                             style={({ pressed }) => ({ opacity: qfBusy ? 0.5 : pressed ? 0.8 : 1 })}
                           >
-                            {qfBusy ? <ActivityIndicator size="small" color="#FFFFFF" /> : <RefreshCw size={15} color="#FFFFFF" />}
+                            {qfBusy ? (
+                              <ActivityIndicator size="small" color="#FFFFFF" />
+                            ) : (
+                              <RefreshCw size={15} color="#FFFFFF" />
+                            )}
                             <Text style={{ color: "#FFFFFF", fontFamily: "Manrope_600SemiBold", fontSize: 13 }}>
                               {s.qfManualSync}
                             </Text>
@@ -946,7 +1014,11 @@ export default function SettingsScreen() {
                           className="flex-1 flex-row items-center justify-center gap-2 rounded-full bg-primary-accent px-3 py-2.5"
                           style={({ pressed }) => ({ opacity: qfBusy ? 0.5 : pressed ? 0.8 : 1 })}
                         >
-                          {qfBusy ? <ActivityIndicator size="small" color="#FFFFFF" /> : <BookOpen size={15} color="#FFFFFF" />}
+                          {qfBusy ? (
+                            <ActivityIndicator size="small" color="#FFFFFF" />
+                          ) : (
+                            <BookOpen size={15} color="#FFFFFF" />
+                          )}
                           <Text style={{ color: "#FFFFFF", fontFamily: "Manrope_600SemiBold", fontSize: 13 }}>
                             {qfStatus === "needs_reauth" || qfStatus === "linked_no_sync" ? s.qfReconnect : s.qfConnect}
                           </Text>
@@ -980,22 +1052,12 @@ export default function SettingsScreen() {
                   isDark={isDark}
                   isRTL={isRTL}
                 />
-                <Button
-                  onPress={() => router.push("/auth/login")}
-                  disabled={authLoading}
-                >
-                  <Text
-                    className="text-white"
-                    style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15 }}
-                  >
+                <Button onPress={() => router.push("/auth/login")} disabled={authLoading}>
+                  <Text className="text-white" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15 }}>
                     {s.authLogin}
                   </Text>
                 </Button>
-                <Button
-                  variant="outline"
-                  onPress={() => router.push("/auth/signup")}
-                  disabled={authLoading}
-                >
+                <Button variant="outline" onPress={() => router.push("/auth/signup")} disabled={authLoading}>
                   <Text
                     className="text-charcoal dark:text-neutral-200"
                     style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15 }}
@@ -1071,8 +1133,8 @@ export default function SettingsScreen() {
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
-      <ScreenScrollView maxWidth={SETTINGS_CONTENT_MAX_WIDTH} contentContainerStyle={{ paddingBottom: 48 }}>
+    <Screen>
+      <ScreenScrollView maxWidth={SETTINGS_CONTENT_MAX_WIDTH} bottomInset={COMPACT_SCREEN_BOTTOM_INSET}>
         <View
           className="pt-8 pb-5"
           style={{
@@ -1104,9 +1166,7 @@ export default function SettingsScreen() {
           />
         </View>
 
-        <View className="pb-8">
-          {categoryPanels}
-        </View>
+        <View className="pb-8">{categoryPanels}</View>
       </ScreenScrollView>
       <ConfirmDialog
         visible={logoutDialogVisible}
@@ -1164,10 +1224,7 @@ export default function SettingsScreen() {
         </View>
       </ResponsiveModal>
       {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}
-      <TranslationLanguagePicker
-        visible={pickerVisible}
-        onClose={() => setPickerVisible(false)}
-      />
+      <TranslationLanguagePicker visible={pickerVisible} onClose={() => setPickerVisible(false)} />
       <TafsirSourcePicker
         visible={tafseerPickerVisible}
         selectedSource={tafseerSource}
@@ -1181,7 +1238,7 @@ export default function SettingsScreen() {
         onSelect={setRecitationId}
         onClose={() => setReciterPickerVisible(false)}
       />
-    </SafeAreaView>
+    </Screen>
   );
 }
 
@@ -1219,9 +1276,7 @@ function SettingsCategoryTabs({
   const items = categories.map((category) => {
     const isActive = activeCategory === category.id;
     const Icon = category.icon;
-    const iconColor = isActive
-      ? isDark ? "#2dd4bf" : "#0d9488"
-      : isDark ? "#a3a3a3" : "#8a7661";
+    const iconColor = isActive ? (isDark ? "#2dd4bf" : "#0d9488") : isDark ? "#a3a3a3" : "#8a7661";
     return {
       value: category.id,
       label: category.title,
@@ -1261,15 +1316,7 @@ function SettingsCategoryTabs({
   return tabs;
 }
 
-function SettingsControlRow({
-  label,
-  isRTL,
-  children,
-}: {
-  label: string;
-  isRTL: boolean;
-  children: ReactNode;
-}) {
+function SettingsControlRow({ label, isRTL, children }: { label: string; isRTL: boolean; children: ReactNode }) {
   return (
     <View
       className="items-center justify-between gap-3"
@@ -1293,9 +1340,7 @@ function SettingsControlRow({
       >
         {label}
       </Text>
-      <View style={{ flexBasis: 320, flexGrow: 1, maxWidth: "100%", minWidth: 240 }}>
-        {children}
-      </View>
+      <View style={{ flexBasis: 320, flexGrow: 1, maxWidth: "100%", minWidth: 240 }}>{children}</View>
     </View>
   );
 }
@@ -1550,7 +1595,7 @@ function clearQfSettingsQuery() {
 function safeDecode(value: string): string {
   try {
     return decodeURIComponent(value);
-  } catch (_) {
+  } catch {
     return value;
   }
 }
@@ -1628,11 +1673,7 @@ function SettingsLinkRow({
         </Text>
       </View>
       <View className="h-6 w-6 shrink-0 items-center justify-center">
-        {external ? (
-          <ExternalLink size={16} color={chevronColor} />
-        ) : (
-          <RowChevron size={18} color={chevronColor} />
-        )}
+        {external ? <ExternalLink size={16} color={chevronColor} /> : <RowChevron size={18} color={chevronColor} />}
       </View>
     </Pressable>
   );
