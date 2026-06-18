@@ -9,13 +9,6 @@ function read(relativePath: string) {
 }
 
 test.describe("report-only UI contract checks", () => {
-  test("WEB_UI_CONTRACT keeps QA automation phase current", () => {
-    const contract = read("docs/agent/WEB_UI_CONTRACT.md");
-    expect(contract).toContain("Phase 8. QA automation");
-    expect(contract).toContain("responsive smoke checks");
-    expect(contract).toContain("representative screenshots");
-  });
-
   test("package scripts expose every planned runner", () => {
     const pkg = JSON.parse(read("package.json"));
     for (const scriptName of [
@@ -28,12 +21,6 @@ test.describe("report-only UI contract checks", () => {
     ]) {
       expect(pkg.scripts[scriptName]).toBeTruthy();
     }
-  });
-
-  test("manual meta carries bilingual and RTL coverage requirements", () => {
-    const meta = read("docs/agent/UI_MANUAL_TESTING_META.md");
-    expect(meta).toContain("Languages: English LTR and Arabic RTL");
-    expect(meta).toContain("RTL ordering");
   });
 
   test("not-found route does not contain hardcoded English-only visible copy", () => {

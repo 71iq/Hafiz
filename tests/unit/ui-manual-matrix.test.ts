@@ -26,7 +26,7 @@ describe("UI manual coverage matrix", () => {
   it("assigns every coverage item to a runnable phase and source section", () => {
     for (const item of uiCoverageItems) {
       expect(item.phase).toMatch(/^[a-z0-9-]+$/);
-      expect(item.source).toContain("UI_MANUAL_TESTING_META.md#");
+      expect(item.source).toContain("ui-manual-matrix#");
       expect(item.tags.length).toBeGreaterThan(0);
     }
   });
