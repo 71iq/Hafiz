@@ -2,9 +2,7 @@
 
 ## Project
 
-**Hafiz** — Quran retention app (iOS / Android / Web via Expo).
-Full spec lives in `docs/product/HAFIZ_SPEC.md`. Read it before starting non-trivial work.
-For web UI stabilization and verification rules, `docs/agent/WEB_UI_CONTRACT.md` is the authoritative UI contract.
+**Hafiz** — Quran retention, reflective memorization, and putting what you learn into action (iOS / Android / Web via Expo).
 
 ---
 
@@ -175,12 +173,4 @@ If the user invokes `/audit` it triggers a sweep that reads several of these in 
 - **No speculative abstractions.** Three similar lines beat a premature helper. Don't add error handling for impossible states; trust internal callers, validate only at system boundaries.
 - **Reference code with `path:line`** so the user can jump straight there.
 - **Do not start localhost, Expo dev servers, Metro, or browser sessions unless the user explicitly asks for live visual testing.** The default verification path is `npm run typecheck` plus targeted unit/static checks; use `npm run build:web` only when the change needs a web export check. If rendered verification is truly required, prefer the lightest Playwright/static-export path and stop it immediately after the check.
-- **Memory / persistence**: Treat each session as cold; rely on `AGENTS.md`, the spec, and the codebase. If the user wants something durable, write it into `AGENTS.md` or `docs/product/HAFIZ_SPEC.md`.
-
----
-
-## Phone Redesign Continuity
-
-- Persistent log file: `docs/agent/PHONE_PLAN_AGENT_LOG.md`.
-- For the new phone redesign plan, every decision, scope change, phase progress update, and blocker must be appended there as part of the same change.
-- Start each new redesign session by reading that file first, then continue from the latest entry.
+- **Memory / persistence**: Treat each session as cold; rely on `AGENTS.md` and the codebase. If the user wants something durable, write it into `AGENTS.md`.
