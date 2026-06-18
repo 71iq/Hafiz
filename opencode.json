@@ -1,6 +1,11 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "instructions": ["AGENTS.md"],
+  "plugin": [
+    "opencode-wakatime",
+    "opencode-sessions",
+    "@tarquinen/opencode-dcp"
+  ],
   "lsp": true,
   "formatter": true,
   "mcp": {
