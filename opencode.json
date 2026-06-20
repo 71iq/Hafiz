@@ -1,23 +1,13 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "instructions": ["AGENTS.md"],
-  "plugin": [
-    "opencode-wakatime",
-    "opencode-sessions",
-    "@tarquinen/opencode-dcp"
-  ],
+  "plugin": ["opencode-wakatime", "opencode-sessions", "@tarquinen/opencode-dcp"],
   "lsp": true,
   "formatter": true,
   "mcp": {
     "playwright": {
       "type": "local",
       "command": ["npx", "-y", "@playwright/mcp"],
-      "enabled": true,
-      "timeout": 30000
-    },
-    "sqlite": {
-      "type": "local",
-      "command": ["npx", "-y", "@modelcontextprotocol/server-sqlite", "./assets/data/quran.db"],
       "enabled": true,
       "timeout": 30000
     },
@@ -30,20 +20,6 @@
         "Authorization": "Bearer {env:GITHUB_PERSONAL_ACCESS_TOKEN}"
       },
       "timeout": 30000
-    },
-    "vercel": {
-      "type": "remote",
-      "url": "https://mcp.vercel.com",
-      "enabled": true,
-      "oauth": true,
-      "timeout": 30000
-    },
-    "supabase": {
-      "type": "remote",
-      "url": "https://mcp.supabase.com/mcp?read_only=true",
-      "enabled": true,
-      "oauth": true,
-      "timeout": 30000
     }
   },
   "skills": {
@@ -51,14 +27,9 @@
   },
   "permission": {
     "bash": {
-      "npm run *": "allow",
-      "git status*": "allow",
-      "git log*": "allow",
-      "git diff*": "allow",
-      "git add *": "ask",
-      "git commit*": "ask",
-      "git push*": "ask",
-      "*": "ask"
+      "rm": "ask",
+      "git push --force": "ask",
+      "*": "allow"
     },
     "external_directory": {
       "~/code/Hafiz/**": "allow",
