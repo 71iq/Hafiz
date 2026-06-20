@@ -20,6 +20,30 @@
       "command": ["npx", "-y", "@modelcontextprotocol/server-sqlite", "./assets/data/quran.db"],
       "enabled": true,
       "timeout": 30000
+    },
+    "github": {
+      "type": "remote",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "enabled": true,
+      "oauth": false,
+      "headers": {
+        "Authorization": "Bearer {env:GITHUB_PERSONAL_ACCESS_TOKEN}"
+      },
+      "timeout": 30000
+    },
+    "vercel": {
+      "type": "remote",
+      "url": "https://mcp.vercel.com",
+      "enabled": true,
+      "oauth": true,
+      "timeout": 30000
+    },
+    "supabase": {
+      "type": "remote",
+      "url": "https://mcp.supabase.com/mcp?read_only=true",
+      "enabled": true,
+      "oauth": true,
+      "timeout": 30000
     }
   },
   "skills": {
