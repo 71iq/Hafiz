@@ -45,7 +45,7 @@ export function Switch({ value, onValueChange, disabled }: Props) {
           height: 20,
           borderRadius: 10,
           backgroundColor: "#ffffff",
-          // Ambient teal-tinted shadow per DESIGN.md
+          // Ambient teal-tinted shadow
           shadowColor: "#003638",
           shadowOffset: { width: 0, height: 1 },
           shadowOpacity: 0.04,

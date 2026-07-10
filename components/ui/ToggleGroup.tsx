@@ -11,7 +11,7 @@ type ToggleGroupProps<T extends string> = ViewProps & {
 
 /**
  * Segmented toggle group with pill selection indicator.
- * Uses tonal shift for active state (no borders per DESIGN.md).
+ * Uses tonal shift for active state
  */
 export function ToggleGroup<T extends string>({
   value,
@@ -28,7 +28,7 @@ export function ToggleGroup<T extends string>({
       className={cn(
         "flex-row rounded-full bg-surface-high dark:bg-surface-dark-high p-1",
         dir === "rtl" && "flex-row-reverse",
-        className
+        className,
       )}
       style={[style, { direction: "ltr", flexDirection: dir === "rtl" ? "row-reverse" : "row" }]}
       {...props}
@@ -42,7 +42,7 @@ export function ToggleGroup<T extends string>({
             className={cn(
               "flex-1 flex-row items-center justify-center gap-1.5 rounded-full py-2 px-3",
               dir === "rtl" && "flex-row-reverse",
-              active && "bg-surface-bright dark:bg-surface-dark-bright"
+              active && "bg-surface-bright dark:bg-surface-dark-bright",
             )}
             style={({ pressed }) => ({
               direction: "ltr",
@@ -53,9 +53,7 @@ export function ToggleGroup<T extends string>({
             <Text
               className={cn(
                 "font-manrope-semibold text-sm text-center",
-                active
-                  ? "text-primary-accent dark:text-primary-bright"
-                  : "text-warm-400 dark:text-neutral-500"
+                active ? "text-primary-accent dark:text-primary-bright" : "text-warm-400 dark:text-neutral-500",
               )}
               style={{ writingDirection: dir }}
             >

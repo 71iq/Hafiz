@@ -3,10 +3,7 @@ import { View, Text, Pressable, Platform } from "react-native";
 import { ChevronLeft, ChevronRight } from "lucide-react-native";
 import { useDatabase } from "@/lib/database/provider";
 import { useWordInteraction, type TooltipPosition } from "@/lib/word/context";
-import {
-  fetchWordTranslation,
-  fetchWordMeaningAr,
-} from "@/lib/word/queries";
+import { fetchWordTranslation, fetchWordMeaningAr } from "@/lib/word/queries";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
 
@@ -48,17 +45,16 @@ function TooltipPopup({
   const maxTooltipWidth = Math.min(MAX_TOOLTIP_WIDTH, viewportWidth - SIDE_MARGIN * 2);
   const maxTextWidth = Math.max(80, maxTooltipWidth - 45);
   const centerX = position.x + position.width / 2;
-  const left = tooltipWidth > 0
-    ? Math.max(SIDE_MARGIN, Math.min(centerX - tooltipWidth / 2, viewportWidth - tooltipWidth - SIDE_MARGIN))
-    : centerX;
+  const left =
+    tooltipWidth > 0
+      ? Math.max(SIDE_MARGIN, Math.min(centerX - tooltipWidth / 2, viewportWidth - tooltipWidth - SIDE_MARGIN))
+      : centerX;
   const top = position.y - TOOLTIP_HEIGHT - ARROW_SIZE - GAP;
 
   return (
     <Pressable
       onPress={onPress}
-      {...(Platform.OS === "web"
-        ? ({ dataSet: { hafizWordTooltip: "true" } } as any)
-        : null)}
+      {...(Platform.OS === "web" ? ({ dataSet: { hafizWordTooltip: "true" } } as any) : null)}
       // @ts-ignore — position:'fixed' is valid CSS/RN-Web but not in RN types
       style={{
         position: "fixed",
@@ -77,7 +73,7 @@ function TooltipPopup({
       <View
         style={{
           backgroundColor: "#003638", // primary deep teal
-          borderRadius: 20, // pill shape per DESIGN.md
+          borderRadius: 20, // pill shape
           paddingHorizontal: 14,
           paddingVertical: 8,
           direction: "ltr",
@@ -85,7 +81,7 @@ function TooltipPopup({
           alignItems: "center",
           gap: 5,
           maxWidth: maxTooltipWidth,
-          // Ambient teal-tinted shadow per DESIGN.md
+          // Ambient teal-tinted shadow
           shadowColor: "#003638",
           shadowOpacity: 0.04,
           shadowRadius: 32,
@@ -131,7 +127,8 @@ function TooltipPopup({
 }
 
 export function FloatingWordTooltip() {
-  const { tooltipWord, tooltipPosition, openDetail, cancelTooltipClear, clearTooltip, clearTooltipDelayed } = useWordInteraction();
+  const { tooltipWord, tooltipPosition, openDetail, cancelTooltipClear, clearTooltip, clearTooltipDelayed } =
+    useWordInteraction();
   const db = useDatabase();
   const { isRTL, uiLanguage } = useSettings();
   const s = useStrings();
@@ -153,9 +150,7 @@ export function FloatingWordTooltip() {
         })
         .catch(() => setTranslation(s.noWordMeaningFallback));
     } else {
-      fetchWordTranslation(db, surah, ayah, wordPos).then(
-        (row) => setTranslation(row?.translation_en ?? "—")
-      );
+      fetchWordTranslation(db, surah, ayah, wordPos).then((row) => setTranslation(row?.translation_en ?? "—"));
     }
   }, [db, s.noWordMeaningFallback, tooltipWord?.surah, tooltipWord?.ayah, tooltipWord?.wordPos, uiLanguage]);
 
@@ -168,10 +163,7 @@ export function FloatingWordTooltip() {
         y: event.clientY ?? 0,
       };
 
-      if (
-        closestMatches(event.target, WORD_TOKEN_SELECTOR) ||
-        closestMatches(event.target, TOOLTIP_SELECTOR)
-      ) {
+      if (closestMatches(event.target, WORD_TOKEN_SELECTOR) || closestMatches(event.target, TOOLTIP_SELECTOR)) {
         return;
       }
 
@@ -229,6 +221,6 @@ export function FloatingWordTooltip() {
       onHoverIn={cancelTooltipClear}
       onHoverOut={clearTooltipDelayed}
     />,
-    document.body
+    document.body,
   );
 }

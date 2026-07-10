@@ -2,11 +2,7 @@ const colorVar = (name, fallback) => `rgb(var(${name}, ${fallback}) / <alpha-val
 
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  content: [
-    "./app/**/*.{js,jsx,ts,tsx}",
-    "./components/**/*.{js,jsx,ts,tsx}",
-    "./lib/**/*.{js,jsx,ts,tsx}",
-  ],
+  content: ["./app/**/*.{js,jsx,ts,tsx}", "./components/**/*.{js,jsx,ts,tsx}", "./lib/**/*.{js,jsx,ts,tsx}"],
   presets: [require("nativewind/preset")],
   darkMode: "class",
   theme: {
@@ -21,7 +17,7 @@ module.exports = {
         "noto-serif-bold": ["NotoSerif_700Bold"],
       },
       colors: {
-        // === Surface hierarchy (DESIGN.md "The Digital Sanctuary") ===
+        // Surface hierarchy
         surface: {
           DEFAULT: colorVar("--color-surface", "255 255 255"), // base layer
           low: colorVar("--color-surface-low", "248 250 252"), // grouped content
@@ -83,7 +79,7 @@ module.exports = {
           900: "#003638",
           950: "#1B4D4F",
         },
-        // === Outline (ghost borders — DESIGN.md 10% opacity only) ===
+        // Outline (ghost borders 10% opacity only)
         outline: {
           DEFAULT: "rgba(223, 217, 209, 0.10)",
           subtle: "rgba(223, 217, 209, 0.05)",

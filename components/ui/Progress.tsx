@@ -9,7 +9,7 @@ type ProgressProps = ViewProps & {
 };
 
 /**
- * Hairline progress bar (2px stroke) per DESIGN.md.
+ * Hairline progress bar (2px stroke)
  * Track uses outline-variant at 15% opacity, fill uses primary accent.
  */
 export const Progress = forwardRef<View, ProgressProps>(
@@ -34,7 +34,7 @@ export const Progress = forwardRef<View, ProgressProps>(
         />
       </View>
     );
-  }
+  },
 );
 
 Progress.displayName = "Progress";
