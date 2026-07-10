@@ -10,11 +10,7 @@ import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { DEFAULT_RECITATION_ID, normalizeRecitationId } from "@/lib/quran-foundation/recitations";
 import { DirectionProvider } from "@/lib/ui/direction";
 import type { QuranMarkerStyle as QuranMarkerStylePreference } from "@/lib/fonts/loader";
-import {
-  DEFAULT_TAFSIR_SOURCE,
-  isAvailableTafsirSourceId,
-  type TafsirSourceId,
-} from "@/lib/tafsir/sources";
+import { DEFAULT_TAFSIR_SOURCE, isAvailableTafsirSourceId, type TafsirSourceId } from "@/lib/tafsir/sources";
 
 // Desktop / large-viewport scale. Also the canonical length (10 levels) used
 // by UI controls like the font size picker.
@@ -102,9 +98,13 @@ export const THEME_COLORS: Record<ThemePalette, ThemeColors> = {
 
 export function withThemeOpacity(color: string, opacity: number): string {
   const hex = color.replace("#", "");
-  const normalized = hex.length === 3
-    ? hex.split("").map((char) => `${char}${char}`).join("")
-    : hex;
+  const normalized =
+    hex.length === 3
+      ? hex
+          .split("")
+          .map((char) => `${char}${char}`)
+          .join("")
+      : hex;
   if (normalized.length !== 6) return color;
 
   const red = Number.parseInt(normalized.slice(0, 2), 16);
@@ -378,11 +378,13 @@ function normalizeThemeScheduleRules(value: string | null | undefined): ThemeSch
       const theme = isThemePalette(rule?.theme) ? rule.theme : null;
       const time = normalizeThemeTime(rule?.time);
       if (!theme || !time) return [];
-      return [{
-        id: typeof rule?.id === "string" && rule.id.trim() ? rule.id : `rule-${index}`,
-        theme,
-        time,
-      }];
+      return [
+        {
+          id: typeof rule?.id === "string" && rule.id.trim() ? rule.id : `rule-${index}`,
+          theme,
+          time,
+        },
+      ];
     });
     return rules.length > 0 ? sortThemeScheduleRules(rules) : null;
   } catch {
@@ -399,11 +401,13 @@ function normalizeThemeScheduleRulesList(rules: ThemeScheduleRule[]): ThemeSched
     const theme = isThemePalette(rule.theme) ? rule.theme : null;
     const time = normalizeThemeTime(rule.time);
     if (!theme || !time) return [];
-    return [{
-      id: rule.id.trim() || `rule-${index}`,
-      theme,
-      time,
-    }];
+    return [
+      {
+        id: rule.id.trim() || `rule-${index}`,
+        theme,
+        time,
+      },
+    ];
   });
   return sortThemeScheduleRules(normalized.length > 0 ? normalized : DEFAULT_SCHEDULED_RULES);
 }
@@ -422,7 +426,11 @@ function isThemeScheduleActive(time: string, currentMinute: number) {
   return currentMinute >= getThemeTimeMinuteOfDay(time);
 }
 
-function resolveScheduledTheme(rules: ThemeScheduleRule[], currentMinute: number, systemTheme: ThemePalette): ThemePalette {
+function resolveScheduledTheme(
+  rules: ThemeScheduleRule[],
+  currentMinute: number,
+  systemTheme: ThemePalette,
+): ThemePalette {
   const normalized = normalizeThemeScheduleRulesList(rules);
   if (normalized.length === 1) {
     return isThemeScheduleActive(normalized[0].time, currentMinute) ? normalized[0].theme : systemTheme;
@@ -478,7 +486,9 @@ function cacheScheduledTheme(theme: ThemePalette) {
 
 function readCachedScheduledSwitchTime(): string {
   if (Platform.OS !== "web" || typeof window === "undefined") return DEFAULT_SCHEDULED_SWITCH_TIME;
-  return normalizeThemeTime(window.localStorage.getItem(SCHEDULED_SWITCH_TIME_CACHE_KEY)) ?? DEFAULT_SCHEDULED_SWITCH_TIME;
+  return (
+    normalizeThemeTime(window.localStorage.getItem(SCHEDULED_SWITCH_TIME_CACHE_KEY)) ?? DEFAULT_SCHEDULED_SWITCH_TIME
+  );
 }
 
 function cacheScheduledSwitchTime(time: string) {
@@ -489,12 +499,15 @@ function cacheScheduledSwitchTime(time: string) {
 
 function readCachedScheduledRules(): ThemeScheduleRule[] {
   if (Platform.OS !== "web" || typeof window === "undefined") return DEFAULT_SCHEDULED_RULES;
-  return normalizeThemeScheduleRules(window.localStorage.getItem(SCHEDULED_RULES_CACHE_KEY)) ??
-    [{
-      id: "default",
-      theme: readCachedScheduledTheme(),
-      time: readCachedScheduledSwitchTime(),
-    }];
+  return (
+    normalizeThemeScheduleRules(window.localStorage.getItem(SCHEDULED_RULES_CACHE_KEY)) ?? [
+      {
+        id: "default",
+        theme: readCachedScheduledTheme(),
+        time: readCachedScheduledSwitchTime(),
+      },
+    ]
+  );
 }
 
 function cacheScheduledRules(rules: ThemeScheduleRule[]) {
@@ -531,7 +544,7 @@ async function readSettings(db: SQLiteDatabase, keys: string[]): Promise<Record<
   const placeholders = keys.map(() => "?").join(", ");
   const rows = await db.getAllAsync<{ key: string; value: string }>(
     `SELECT key, value FROM user_settings WHERE key IN (${placeholders})`,
-    keys
+    keys,
   );
   const values = Object.fromEntries(keys.map((key) => [key, null])) as Record<string, string | null>;
   for (const row of rows) {
@@ -636,11 +649,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           setScheduledRulesState(savedScheduledRules);
           cacheScheduledRules(savedScheduledRules);
         } else if (isThemePalette(savedScheduledTheme) || normalizedScheduledTime) {
-          const fallbackRules = normalizeThemeScheduleRulesList([{
-            id: "default",
-            theme: isThemePalette(savedScheduledTheme) ? savedScheduledTheme : DEFAULT_SCHEDULED_THEME,
-            time: normalizedScheduledTime ?? DEFAULT_SCHEDULED_SWITCH_TIME,
-          }]);
+          const fallbackRules = normalizeThemeScheduleRulesList([
+            {
+              id: "default",
+              theme: isThemePalette(savedScheduledTheme) ? savedScheduledTheme : DEFAULT_SCHEDULED_THEME,
+              time: normalizedScheduledTime ?? DEFAULT_SCHEDULED_SWITCH_TIME,
+            },
+          ]);
           setScheduledRulesState(fallbackRules);
           cacheScheduledRules(fallbackRules);
         }
@@ -699,9 +714,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         if (savedFocusSpeed !== null) {
           const n = Number(savedFocusSpeed);
           if (Number.isFinite(n)) {
-            setFocusScrollSpeedState(
-              Math.max(FOCUS_SCROLL_SPEED_MIN, Math.min(FOCUS_SCROLL_SPEED_MAX, n))
-            );
+            setFocusScrollSpeedState(Math.max(FOCUS_SCROLL_SPEED_MIN, Math.min(FOCUS_SCROLL_SPEED_MAX, n)));
           }
         }
 
@@ -750,9 +763,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     return () => clearInterval(intervalId);
   }, []);
 
-  const systemTheme = systemScheme === "dark" ? "dark" : "beige";
+  const systemTheme = systemScheme === "dark" ? "dark" : "white";
   const effectiveTheme: ThemePalette =
-    theme === "system" ? systemTheme : theme === "scheduled" ? resolveScheduledTheme(scheduledRules, nowMinute, systemTheme) : theme;
+    theme === "system"
+      ? systemTheme
+      : theme === "scheduled"
+        ? resolveScheduledTheme(scheduledRules, nowMinute, systemTheme)
+        : theme;
   const isDark = effectiveTheme === "dark" || effectiveTheme === "amoled";
   const themeColors = THEME_COLORS[effectiveTheme];
   const themeSurface = themeColors.surface;
@@ -761,13 +778,14 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       Platform.OS === "web" && typeof window === "undefined"
         ? undefined
         : vars(THEME_PALETTES[effectiveTheme].variables),
-    [effectiveTheme]
+    [effectiveTheme],
   );
-  const nativeWindScheme = theme === "system" || (theme === "scheduled" && scheduledUsesSystemFallback(scheduledRules, nowMinute))
-    ? "system"
-    : isDark
-      ? "dark"
-      : "light";
+  const nativeWindScheme =
+    theme === "system" || (theme === "scheduled" && scheduledUsesSystemFallback(scheduledRules, nowMinute))
+      ? "system"
+      : isDark
+        ? "dark"
+        : "light";
 
   useEffect(() => {
     requestAnimationFrame(() => setColorScheme(nativeWindScheme));
@@ -783,7 +801,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       setFontSizeIndexState(index);
       writeSetting(db, "font_size_index", String(index)).catch(console.warn);
     },
-    [db]
+    [db],
   );
 
   const setTheme = useCallback(
@@ -792,7 +810,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       cacheThemeMode(newTheme);
       writeSetting(db, "theme", newTheme).catch(console.warn);
     },
-    [db]
+    [db],
   );
 
   const setScheduledTheme = useCallback(
@@ -812,7 +830,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       writeSetting(db, "scheduled_theme", nextRules[0].theme).catch(console.warn);
       writeSetting(db, "scheduled_switch_time", nextRules[0].time).catch(console.warn);
     },
-    [db, scheduledRules]
+    [db, scheduledRules],
   );
 
   const setScheduledSwitchTime = useCallback(
@@ -834,7 +852,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       writeSetting(db, "scheduled_theme", nextRules[0].theme).catch(console.warn);
       writeSetting(db, "scheduled_switch_time", nextRules[0].time).catch(console.warn);
     },
-    [db, scheduledRules]
+    [db, scheduledRules],
   );
 
   const setScheduledRules = useCallback(
@@ -851,7 +869,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       writeSetting(db, "scheduled_theme", nextRules[0].theme).catch(console.warn);
       writeSetting(db, "scheduled_switch_time", nextRules[0].time).catch(console.warn);
     },
-    [db]
+    [db],
   );
 
   const setViewMode = useCallback(
@@ -859,7 +877,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       setViewModeState(mode);
       writeSetting(db, "view_mode", mode).catch(console.warn);
     },
-    [db]
+    [db],
   );
 
   const setQuranFontStyle = useCallback(
@@ -867,7 +885,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       setQuranFontStyleState(style);
       writeSetting(db, "quran_font_style", style).catch(console.warn);
     },
-    [db]
+    [db],
   );
 
   const setQuranMarkerStyle = useCallback(
@@ -875,7 +893,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       setQuranMarkerStyleState(style);
       writeSetting(db, "quran_marker_style", style).catch(console.warn);
     },
-    [db]
+    [db],
   );
 
   const setShowAyahMarkers = useCallback(
@@ -883,7 +901,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       setShowAyahMarkersState(show);
       writeSetting(db, "show_ayah_markers", String(show)).catch(console.warn);
     },
-    [db]
+    [db],
   );
 
   const setPageScroll = useCallback(
@@ -891,7 +909,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       setPageScrollState(scroll);
       writeSetting(db, "page_scroll", scroll).catch(console.warn);
     },
-    [db]
+    [db],
   );
 
   const setShowTranslation = useCallback(
@@ -899,7 +917,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       setShowTranslationState(show);
       writeSetting(db, "show_translation", String(show)).catch(console.warn);
     },
-    [db]
+    [db],
   );
 
   const setShowTafseer = useCallback(
@@ -907,7 +925,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       setShowTafseerState(show);
       writeSetting(db, "show_tafseer", String(show)).catch(console.warn);
     },
-    [db]
+    [db],
   );
 
   const setTranslationLanguage = useCallback(
@@ -935,7 +953,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         }
       }
     },
-    [db, translationLanguage]
+    [db, translationLanguage],
   );
 
   const setTafseerSource = useCallback(
@@ -943,7 +961,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       setTafseerSourceState(source);
       writeSetting(db, "tafseer_source", source).catch(console.warn);
     },
-    [db]
+    [db],
   );
 
   const setRecitationId = useCallback(
@@ -952,7 +970,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       setRecitationIdState(next);
       writeSetting(db, "recitation_id", String(next)).catch(console.warn);
     },
-    [db]
+    [db],
   );
 
   const setDailyReviewLimit = useCallback(
@@ -961,7 +979,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       setDailyReviewLimitState(clamped);
       writeSetting(db, "daily_review_limit", String(clamped)).catch(console.warn);
     },
-    [db]
+    [db],
   );
 
   const setFocusScrollSpeed = useCallback(
@@ -972,7 +990,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       setFocusScrollSpeedState(rounded);
       writeSetting(db, "focus_scroll_speed", String(rounded)).catch(console.warn);
     },
-    [db]
+    [db],
   );
 
   const setHifzAutoDelayMs = useCallback(
@@ -981,7 +999,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       setHifzAutoDelayMsState(clamped);
       writeSetting(db, "hifz_auto_delay_ms", String(clamped)).catch(console.warn);
     },
-    [db]
+    [db],
   );
 
   const setHifzAutoAdvancePage = useCallback(
@@ -989,7 +1007,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       setHifzAutoAdvancePageState(enabled);
       writeSetting(db, "hifz_auto_advance_page", String(enabled)).catch(console.warn);
     },
-    [db]
+    [db],
   );
 
   const setUiLanguage = useCallback(
@@ -998,7 +1016,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       cacheUiLanguage(lang);
       writeSetting(db, "ui_language", lang).catch(console.warn);
     },
-    [db]
+    [db],
   );
 
   const isRTL = uiLanguage === "ar";

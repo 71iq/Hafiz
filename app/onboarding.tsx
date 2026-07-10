@@ -8,27 +8,27 @@ import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import {
-    ArrowLeft,
-    ArrowRight,
-    BookOpen,
-    Check,
-    CheckCircle2,
-    ChevronLeft,
-    ChevronRight,
-    Layers,
-    Play,
-    Search,
+  ArrowLeft,
+  ArrowRight,
+  BookOpen,
+  Check,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Layers,
+  Play,
+  Search,
 } from "lucide-react-native";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    Animated,
-    Pressable,
-    ScrollView,
-    Text,
-    TextInput,
-    useWindowDimensions,
-    View,
+  ActivityIndicator,
+  Animated,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  useWindowDimensions,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 

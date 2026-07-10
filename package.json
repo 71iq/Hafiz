@@ -16,7 +16,7 @@
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web",
+    "web": "EXPO_NO_DEV_TOOLS=1 expo start --web",
     "typecheck": "tsc --noEmit",
     "test:unit": "jest --runInBand",
     "build:web:test": "npm run build:web",
