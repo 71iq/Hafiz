@@ -1,39 +1,36 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  Animated,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  useWindowDimensions,
-  View,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
-import {
-  ArrowLeft,
-  ArrowRight,
-  BookOpen,
-  Check,
-  CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
-  Layers,
-  Play,
-  Search,
-} from "lucide-react-native";
-import { StatusBar } from "expo-status-bar";
+import { LoadingScreen } from "@/components/LoadingScreen";
 import { useDatabase, useDatabaseStatus } from "@/lib/database/provider";
 import { writeUserSetting } from "@/lib/database/user-settings";
-import { LoadingScreen } from "@/components/LoadingScreen";
+import { materializeAllSmartDeckCards, writeAllDecksFilter } from "@/lib/fsrs/smart-decks";
+import { interpolate, useStrings } from "@/lib/i18n/useStrings";
 import { SettingsProvider, useSettings } from "@/lib/settings/context";
-import { useStrings, interpolate } from "@/lib/i18n/useStrings";
-import {
-  materializeAllSmartDeckCards,
-  writeAllDecksFilter,
-} from "@/lib/fsrs/smart-decks";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
+import { useRouter } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import {
+    ArrowLeft,
+    ArrowRight,
+    BookOpen,
+    Check,
+    CheckCircle2,
+    ChevronLeft,
+    ChevronRight,
+    Layers,
+    Play,
+    Search,
+} from "lucide-react-native";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+    ActivityIndicator,
+    Animated,
+    Pressable,
+    ScrollView,
+    Text,
+    TextInput,
+    useWindowDimensions,
+    View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 type SurahRow = {
   number: number;
@@ -79,9 +76,7 @@ function OnboardingInner() {
 
   useEffect(() => {
     let cancelled = false;
-    db.getAllAsync<SurahRow>(
-      "SELECT number, name_arabic, name_english, ayah_count FROM surahs ORDER BY number"
-    )
+    db.getAllAsync<SurahRow>("SELECT number, name_arabic, name_english, ayah_count FROM surahs ORDER BY number")
       .then((rows) => {
         if (cancelled) return;
         setSurahs(rows);
@@ -101,13 +96,10 @@ function OnboardingInner() {
 
   const selectedRows = useMemo(
     () => surahs.filter((surah) => selectedSurahs.has(surah.number)),
-    [selectedSurahs, surahs]
+    [selectedSurahs, surahs],
   );
 
-  const totalAyahs = useMemo(
-    () => selectedRows.reduce((sum, surah) => sum + surah.ayah_count, 0),
-    [selectedRows]
-  );
+  const totalAyahs = useMemo(() => selectedRows.reduce((sum, surah) => sum + surah.ayah_count, 0), [selectedRows]);
 
   const filteredSurahs = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -128,7 +120,7 @@ function OnboardingInner() {
     {
       surahs: selectedSurahs.size,
       ayahs: totalAyahs.toLocaleString(),
-    }
+    },
   );
 
   const animateTo = useCallback(
@@ -143,7 +135,7 @@ function OnboardingInner() {
         useNativeDriver: false,
       }).start();
     },
-    [completing, creating, currentScreen, screenAnim]
+    [completing, creating, currentScreen, screenAnim],
   );
 
   const completeOnboarding = useCallback(async () => {
@@ -765,7 +757,10 @@ function OnboardingInner() {
               writingDirection: dir,
             }}
           >
-            {selectedRows.slice(0, 3).map((surah) => surah.name_english).join(", ")}
+            {selectedRows
+              .slice(0, 3)
+              .map((surah) => surah.name_english)
+              .join(", ")}
             {selectedRows.length > 3 ? ` +${selectedRows.length - 3}` : ""}
           </Text>
         </View>
@@ -931,7 +926,7 @@ function OnboardingInner() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: themeColors.surface }}>
       <StatusBar style={isDark ? "light" : "dark"} backgroundColor={themeColors.surface} />
-      <View style={{ flex: 1, alignItems: "center" }}>
+      <View style={{ flex: 1, alignItems: "center", backgroundColor: themeColors.surface }}>
         <View
           style={{
             flex: 1,
@@ -1051,16 +1046,10 @@ export default function OnboardingScreen() {
   if (error) {
     return (
       <View className="flex-1 items-center justify-center bg-surface dark:bg-surface-dark px-6">
-        <Text
-          className="text-red-600 mb-4"
-          style={{ fontFamily: "Manrope_700Bold", fontSize: 18 }}
-        >
+        <Text className="text-red-600 mb-4" style={{ fontFamily: "Manrope_700Bold", fontSize: 18 }}>
           {s.databaseError}
         </Text>
-        <Text
-          className="text-red-500 text-center"
-          style={{ fontFamily: "Manrope_400Regular", fontSize: 15 }}
-        >
+        <Text className="text-red-500 text-center" style={{ fontFamily: "Manrope_400Regular", fontSize: 15 }}>
           {error}
         </Text>
       </View>

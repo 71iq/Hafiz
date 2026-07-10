@@ -18,6 +18,7 @@ screenshots/
 test-results/
 playwright-report/
 .playwright/
+.playwright-mcp/
 
 # Original SQLite databases (pre-converted to JSON)
 assets/data/masaq/*.db
