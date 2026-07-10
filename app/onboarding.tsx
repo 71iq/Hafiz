@@ -44,7 +44,7 @@ type SurahRow = {
 
 function OnboardingInner() {
   const db = useDatabase();
-  const { isDark, isLoaded, isRTL, themeColors, themeSurface } = useSettings();
+  const { isDark, isLoaded, isRTL, themeColors } = useSettings();
   const s = useStrings();
   const router = useRouter();
   const { width } = useWindowDimensions();
@@ -919,8 +919,8 @@ function OnboardingInner() {
 
   if (!isLoaded) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: themeSurface }}>
-        <StatusBar style={isDark ? "light" : "dark"} backgroundColor={themeSurface} />
+      <SafeAreaView style={{ flex: 1, backgroundColor: themeColors.surface }}>
+        <StatusBar style={isDark ? "light" : "dark"} backgroundColor={themeColors.surface} />
         <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
           <ActivityIndicator size="large" color={accentColor} />
         </View>
@@ -929,8 +929,8 @@ function OnboardingInner() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: themeSurface }}>
-      <StatusBar style={isDark ? "light" : "dark"} backgroundColor={themeSurface} />
+    <SafeAreaView style={{ flex: 1, backgroundColor: themeColors.surface }}>
+      <StatusBar style={isDark ? "light" : "dark"} backgroundColor={themeColors.surface} />
       <View style={{ flex: 1, alignItems: "center" }}>
         <View
           style={{
