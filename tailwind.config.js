@@ -23,11 +23,11 @@ module.exports = {
       colors: {
         // === Surface hierarchy (DESIGN.md "The Digital Sanctuary") ===
         surface: {
-          DEFAULT: colorVar("--color-surface", "255 248 241"), // base layer
-          low: colorVar("--color-surface-low", "249 243 235"), // grouped content
-          mid: colorVar("--color-surface-mid", "240 235 227"), // elevated content
-          high: colorVar("--color-surface-high", "232 225 218"), // interactive cards
-          dim: colorVar("--color-surface-dim", "223 217 209"), // receded backgrounds
+          DEFAULT: colorVar("--color-surface", "255 255 255"), // base layer
+          low: colorVar("--color-surface-low", "248 250 252"), // grouped content
+          mid: colorVar("--color-surface-mid", "244 244 245"), // elevated content
+          high: colorVar("--color-surface-high", "229 231 235"), // interactive cards
+          dim: colorVar("--color-surface-dim", "209 213 219"), // receded backgrounds
           bright: colorVar("--color-surface-bright", "255 255 255"), // most elevated
         },
         // Dark mode surfaces

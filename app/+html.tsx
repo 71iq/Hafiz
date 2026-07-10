@@ -334,7 +334,7 @@ const startupThemeScript = `
     var now = new Date();
     var currentMinute = now.getHours() * 60 + now.getMinutes();
     var systemTheme =
-      window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "beige";
+      window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "white";
     var theme = normalizeTheme(window.localStorage.getItem("hafiz_theme")) || "system";
     var scheduledRules = readScheduleRules();
     var effectiveTheme =
@@ -343,7 +343,7 @@ const startupThemeScript = `
         : theme === "scheduled"
           ? resolveScheduledTheme(scheduledRules, currentMinute, systemTheme)
           : theme;
-    var palette = palettes[effectiveTheme] || palettes.beige;
+    var palette = palettes[effectiveTheme] || palettes.white;
     var root = document.documentElement;
     Object.keys(palette.variables).forEach(function (name) {
       root.style.setProperty(name, palette.variables[name]);
