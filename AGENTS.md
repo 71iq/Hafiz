@@ -25,6 +25,12 @@ Use TypeScript, two-space indentation, double quotes, trailing commas, and a 120
 
 Jest uses `jest-expo`; place tests under `tests/` and name them `*.test.ts` or `*.test.tsx`. Run `npm run test:unit`. Playwright specs use `*.spec.ts` under `tests/e2e/`; run `npm run test:e2e:smoke` for the required web smoke flow. Add regression coverage for changed behavior, including RTL and responsive contracts when UI is affected. No numeric coverage threshold is configured.
 
+## Agent Task Triage & Verification
+
+Assess the task's complexity and risk before starting implementation. If the task is clearly easy and bounded, delegate it to a smaller, faster model when one is available and delegation will not add unnecessary coordination.
+
+Agents are prohibited from spending time on manual UI or browser verification for changes they judge to be small or trivially verifiable from the code. Use the appropriate automated build and test commands for verification instead.
+
 ## Commits & Pull Requests
 
 History uses short, imperative summaries, sometimes with prefixes such as `fix:`, `docs:`, or `chore:`. Keep commits focused. Unsolicited external PRs are not accepted. Maintainer-requested PRs must stay narrowly scoped, describe the change and verification, link the issue, and include before/after screenshots for visual changes.
