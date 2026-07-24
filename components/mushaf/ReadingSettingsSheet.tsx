@@ -220,7 +220,7 @@ export function ReadingSettingsSheet({
               { value: "white", label: s.themeLight, active: theme === "white" },
               { value: "beige", label: s.themeBeige, active: theme === "beige" },
               { value: "dark", label: s.themeDark, active: theme === "dark" || theme === "amoled" },
-              { value: "system", label: s.themeSystem, active: theme === "system" || theme === "scheduled" },
+              { value: "system", label: s.themeSystem, active: theme === "system" },
             ]}
             onChange={setTheme}
           />
