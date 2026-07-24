@@ -40,7 +40,7 @@ import {
 import {
   useSettings,
   FONT_SIZE_STEPS,
-  type ThemePalette,
+  getThemeChoiceVisual,
   type ThemeMode,
   type UILanguage,
   type PageScroll,
@@ -93,34 +93,10 @@ const SETTINGS_QURAN_PREVIEW_SURAH = 2;
 const SETTINGS_QURAN_PREVIEW_AYAH = 282;
 const CONTENT_SETTINGS_MAX_WIDTH = 720;
 const CONTENT_SETTINGS_ROW_HEIGHT = 60;
-const THEME_CHOICE_VISUALS: Record<ThemePalette, { backgroundColor: string; borderColor: string; textColor: string }> =
-  {
-    dark: { backgroundColor: "#141414", borderColor: "#3F3F46", textColor: "#F5F5F5" },
-    beige: { backgroundColor: "#FFF8F1", borderColor: "#E8E1DA", textColor: "#6E5A47" },
-    white: { backgroundColor: "#FFFFFF", borderColor: "#D1D5DB", textColor: "#27272A" },
-    amoled: { backgroundColor: "#000000", borderColor: "#27272A", textColor: "#FFFFFF" },
-  };
-
 type QuranPreviewAyah = {
   v2Page: number;
   tokens: string[];
 };
-
-function getThemeChoiceVisual(value: ThemeMode, isActive: boolean, isDark: boolean) {
-  const accent = isDark ? "#2DD4BF" : "#0D9488";
-  if (value === "system") {
-    return {
-      backgroundColor: isDark ? "#171717" : "#F8FAFC",
-      borderColor: isActive ? accent : isDark ? "#3F3F46" : "#D1D5DB",
-      textColor: isActive ? accent : isDark ? "#D4D4D4" : "#52525B",
-    };
-  }
-  const visual = THEME_CHOICE_VISUALS[value];
-  return {
-    ...visual,
-    borderColor: isActive ? accent : visual.borderColor,
-  };
-}
 
 export default function SettingsScreen() {
   const {
@@ -134,6 +110,7 @@ export default function SettingsScreen() {
     isDark,
     isRTL,
     effectiveTheme,
+    systemTheme,
     tafseerSource,
     setTafseerSource,
     recitationId,
@@ -443,7 +420,7 @@ export default function SettingsScreen() {
             >
               {THEME_OPTIONS.map((option) => {
                 const isActive = theme === option.value;
-                const themeVisual = getThemeChoiceVisual(option.value, isActive, isDark);
+                const themeVisual = getThemeChoiceVisual(option.value, systemTheme, isActive);
                 return (
                   <View key={option.value} style={{ width: themeCardWidth, minHeight: 86 }}>
                     <Pressable

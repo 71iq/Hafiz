@@ -92,6 +92,31 @@ export const THEME_COLORS: Record<ThemePalette, ThemeColors> = {
   },
 };
 
+const THEME_CHOICE_FOREGROUNDS: Record<ThemePalette, string> = {
+  beige: "#6E5A47",
+  white: "#27272A",
+  dark: "#F5F5F5",
+  amoled: "#FFFFFF",
+};
+
+const THEME_CHOICE_BORDERS: Record<ThemePalette, string> = {
+  beige: "#E8E1DA",
+  white: "#D1D5DB",
+  dark: "#3F3F46",
+  amoled: "#27272A",
+};
+
+export function getThemeChoiceVisual(theme: ThemeMode, systemTheme: "dark" | "white", isActive: boolean) {
+  const palette = theme === "system" ? systemTheme : theme;
+  const isDarkPalette = palette === "dark" || palette === "amoled";
+
+  return {
+    backgroundColor: THEME_COLORS[palette].surface,
+    borderColor: isActive ? (isDarkPalette ? "#2DD4BF" : "#0D9488") : THEME_CHOICE_BORDERS[palette],
+    textColor: THEME_CHOICE_FOREGROUNDS[palette],
+  };
+}
+
 export function withThemeOpacity(color: string, opacity: number): string {
   const hex = color.replace("#", "");
   const normalized =
@@ -118,6 +143,7 @@ type SettingsContextType = {
   theme: ThemeMode;
   setTheme: (theme: ThemeMode) => void;
   effectiveTheme: ThemePalette;
+  systemTheme: "dark" | "white";
   themeSurface: string;
   themeColors: ThemeColors;
   viewMode: ViewMode;
@@ -164,6 +190,7 @@ const SettingsContext = createContext<SettingsContextType>({
   theme: "system",
   setTheme: () => {},
   effectiveTheme: "white",
+  systemTheme: "white",
   themeSurface: "#FFFFFF",
   themeColors: THEME_COLORS.white,
   viewMode: "verse",
@@ -766,6 +793,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         theme,
         setTheme,
         effectiveTheme,
+        systemTheme,
         themeSurface,
         themeColors,
         viewMode,

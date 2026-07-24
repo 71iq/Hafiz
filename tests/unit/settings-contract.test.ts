@@ -16,6 +16,7 @@ import {
   MIN_DAILY_REVIEW_LIMIT,
   MIN_HIFZ_AUTO_DELAY_MS,
   THEME_COLORS,
+  getThemeChoiceVisual,
   withThemeOpacity,
 } from "@/lib/settings/context";
 import { isSyncableUserSetting, userSettingToSyncData } from "@/lib/database/user-settings";
@@ -76,6 +77,25 @@ describe("settings contracts", () => {
         expect(color).toMatch(/^#[0-9A-F]{6}$/i);
       }
     }
+  });
+
+  it("previews each theme with its own surface and readable foreground", () => {
+    expect(getThemeChoiceVisual("dark", "white", false)).toMatchObject({
+      backgroundColor: THEME_COLORS.dark.surface,
+      textColor: "#F5F5F5",
+    });
+    expect(getThemeChoiceVisual("amoled", "white", false)).toMatchObject({
+      backgroundColor: THEME_COLORS.amoled.surface,
+      textColor: "#FFFFFF",
+    });
+    expect(getThemeChoiceVisual("system", "dark", true)).toMatchObject({
+      backgroundColor: THEME_COLORS.dark.surface,
+      textColor: "#F5F5F5",
+    });
+    expect(getThemeChoiceVisual("system", "white", true)).toMatchObject({
+      backgroundColor: THEME_COLORS.white.surface,
+      textColor: "#27272A",
+    });
   });
 
   it("converts theme hex colors to clamped rgba values", () => {

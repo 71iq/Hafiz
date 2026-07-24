@@ -32,6 +32,8 @@ describe("ReadingSettingsSheet UI contract", () => {
     const appearanceSource = source.slice(appearanceStart, choiceDialogStart);
     expect(appearanceSource).toContain("options.map");
     expect(appearanceSource).toContain("option.label");
+    expect(appearanceSource).toContain("getThemeChoiceVisual(option.value, systemTheme, option.active)");
+    expect(appearanceSource).toContain("backgroundColor: themeVisual.backgroundColor");
     expect(appearanceSource).not.toContain("<Check");
     expect(appearanceSource).not.toContain("Icon");
   });

@@ -19,6 +19,7 @@ import { stringByKey, useStrings } from "@/lib/i18n/useStrings";
 import type { UIStrings } from "@/lib/i18n/strings";
 import {
   FONT_SIZE_STEPS,
+  getThemeChoiceVisual,
   useSettings,
   type QuranFontStyle,
   type QuranMarkerStyle,
@@ -64,6 +65,7 @@ export function ReadingSettingsSheet({
     setTafseerSource,
     isDark,
     isRTL,
+    systemTheme,
     themeSurface,
   } = useSettings();
   const [fontPickerVisible, setFontPickerVisible] = useState(false);
@@ -214,12 +216,13 @@ export function ReadingSettingsSheet({
         <OverlayBody contentContainerStyle={{ paddingHorizontal: modalHorizontalPadding, paddingTop: 18, paddingBottom: 20 }}>
           <SettingsSectionLabel label={s.sectionAppearance} isRTL={isRTL} />
           <ThemeSegmentedControl
-            isDark={isDark}
+            systemTheme={systemTheme}
             isRTL={isRTL}
             options={[
               { value: "white", label: s.themeLight, active: theme === "white" },
               { value: "beige", label: s.themeBeige, active: theme === "beige" },
-              { value: "dark", label: s.themeDark, active: theme === "dark" || theme === "amoled" },
+              { value: "dark", label: s.themeDark, active: theme === "dark" },
+              { value: "amoled", label: s.themeAmoled, active: theme === "amoled" },
               { value: "system", label: s.themeSystem, active: theme === "system" },
             ]}
             onChange={setTheme}
@@ -341,12 +344,12 @@ export function ReadingSettingsSheet({
 
 function ThemeSegmentedControl({
   options,
-  isDark,
+  systemTheme,
   isRTL,
   onChange,
 }: {
   options: Array<{ value: ThemeMode; label: string; active: boolean }>;
-  isDark: boolean;
+  systemTheme: "dark" | "white";
   isRTL: boolean;
   onChange: (theme: ThemeMode) => void;
 }) {
@@ -356,9 +359,7 @@ function ThemeSegmentedControl({
       style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
     >
       {options.map((option) => {
-        const color = option.active
-          ? isDark ? "#F5F5F5" : "#2E2A26"
-          : isDark ? "#a3a3a3" : "#7C6A58";
+        const themeVisual = getThemeChoiceVisual(option.value, systemTheme, option.active);
         return (
           <Pressable
             key={option.value}
@@ -367,12 +368,8 @@ function ThemeSegmentedControl({
             accessibilityState={{ selected: option.active }}
             className="h-10 flex-1 items-center justify-center rounded-lg px-2"
             style={({ pressed }) => ({
-              backgroundColor: option.active
-                ? isDark ? "rgba(255,255,255,0.08)" : "rgba(13,148,136,0.07)"
-                : "transparent",
-              borderColor: option.active
-                ? isDark ? "rgba(255,255,255,0.12)" : "rgba(13,148,136,0.22)"
-                : "transparent",
+              backgroundColor: themeVisual.backgroundColor,
+              borderColor: themeVisual.borderColor,
               borderWidth: 1,
               opacity: pressed ? 0.72 : 1,
               cursor: Platform.OS === "web" ? "pointer" : undefined,
@@ -383,7 +380,7 @@ function ThemeSegmentedControl({
               adjustsFontSizeToFit
               minimumFontScale={0.82}
               style={{
-                color,
+                color: themeVisual.textColor,
                 fontFamily: option.active ? "Manrope_600SemiBold" : "Manrope_500Medium",
                 fontSize: 13,
                 lineHeight: 17,
