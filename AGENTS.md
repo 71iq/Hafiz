@@ -71,6 +71,13 @@ Build and data:
 5. Preserve offline-first behavior and web/native compatibility. Do not make local reading features depend on Supabase or another network service.
 6. Use `@/` imports from the repository root. ESLint and Prettier are authoritative; do not hand-format protected datasets.
 
+## Delegation and parallel work
+
+- For a trivial task, the main agent should default to spawning one fast, lightweight sub-agent when there is a concrete independent check or lookup that can run in parallel and shorten elapsed time. Good examples are locating the relevant implementation, checking an existing pattern, or reviewing a finished diff while the main agent makes the edit.
+- Keep trivial-task delegation small: use at most one helper, choose the lowest-latency capable agent/model available, give it a tightly bounded prompt, and keep the main agent working on the critical path.
+- Do not delegate the task's only atomic action, assign multiple agents to the same lines, or wait on a helper whose coordination cost is likely to exceed the work itself. The purpose of delegation is faster completion, not delegation for its own sake.
+- For larger tasks, parallelize only genuinely independent subtasks and keep one owner for the final integration and verification.
+
 ## UI and UX requirements
 
 - Arabic RTL and English LTR are first-class modes. Add user-facing text to both locales and keep direction-sensitive alignment, icon order, gestures, and navigation correct.
@@ -99,15 +106,19 @@ Build and data:
 
 ## Minimum verification
 
+- Verification must be proportional to the change. Run the smallest check that can catch a plausible regression; do not automatically stack typecheck, full lint, unit suites, builds, browser automation, and manual matrices for a small localized edit.
 - Documentation-only: re-read changed instructions against current files, validate every path/command, and review the diff. State that application checks were not run.
-- TypeScript or logic: `npm run typecheck`, `npm run lint`, and the relevant Jest test(s); run the full unit suite for cross-cutting changes.
-- UI: TypeScript/lint plus relevant unit/contract tests, then browser verification of the changed behavior. Check Arabic/English, RTL/LTR, affected responsive widths, relevant themes, keyboard/mouse, and touch behavior.
+- Trivial or isolated source changes: run the nearest focused test, lint only the changed file(s), or perform a targeted manual check as appropriate. Do not require all three. Run `npm run typecheck` only when types, imports, component contracts, or TypeScript logic could be affected.
+- Small UI changes: verify the changed state at one representative viewport and locale/theme, and run the nearest relevant unit or contract test when one exists. Expand to Arabic/English, RTL/LTR, multiple widths/themes, keyboard/mouse, and touch only when the change affects those dimensions.
+- Logic changes: run the most focused relevant Jest test(s). Add typecheck or lint when the change could plausibly introduce those classes of failure; run the full unit suite only for shared or cross-cutting behavior.
 - Configuration, data pipeline, database, navigation, or cross-cutting changes: run relevant unit tests and `npm run build:web`; use `npm run verify:quick` or `npm run verify:web` when scope warrants it.
 - Native-specific changes: verify the affected native target when the environment permits. Never claim native verification from a web-only check.
+- Do not rerun equivalent checks through an aggregate verification command after their constituent checks already passed unless the task's risk warrants the redundancy.
 - Clearly report every skipped, blocked, or unavailable check and the resulting risk.
 
 ## Git and completion rules
 
 - Review `git diff --check`, `git diff --stat`, and the full task diff before finishing. Keep lockfile and generated-file changes intentional.
-- Do not revert unrelated changes. Do not amend, commit, push, rebase, reset, force-update, delete files, or clean the worktree unless explicitly requested.
+- For every completed change task, stage only the task-scoped files, create a descriptive commit, and push the current branch before the final response. This is the default workflow and does not require a separate request. If the user explicitly asks not to commit or push, follow that request instead; if authentication, remote configuration, or branch protection blocks the push, report the exact blocker.
+- Do not revert, stage, or commit unrelated changes. Do not amend, rebase, reset, force-update, delete files, or clean the worktree unless explicitly requested.
 - Final response must include: root cause or implementation rationale; files changed; concise behavioral summary; commands/tests run; manual verification performed; and remaining risks or unverified areas.
