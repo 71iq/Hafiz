@@ -606,7 +606,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         : vars(THEME_PALETTES[effectiveTheme].variables),
     [effectiveTheme],
   );
-  const nativeWindScheme = theme === "system" ? "system" : isDark ? "dark" : "light";
+  const nativeWindScheme = isDark ? "dark" : "light";
 
   useEffect(() => {
     requestAnimationFrame(() => setColorScheme(nativeWindScheme));
