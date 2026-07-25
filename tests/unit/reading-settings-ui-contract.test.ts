@@ -33,9 +33,12 @@ describe("ReadingSettingsSheet UI contract", () => {
     expect(appearanceSource).toContain("options.map");
     expect(appearanceSource).toContain("accessibilityLabel={option.label}");
     expect(appearanceSource).toContain("aria-checked={option.active}");
-    expect(appearanceSource).toContain("<ThemeColorSwatch theme={option.value} selected={option.active}");
-    expect(appearanceSource).toContain("getThemeChoiceVisual(option.value, systemTheme, option.active)");
-    expect(appearanceSource).toContain("backgroundColor: themeVisual.backgroundColor");
+    expect(appearanceSource).toContain(
+      "<ThemeColorSwatch theme={option.value} systemTheme={systemTheme} selected={option.active}",
+    );
+    expect(appearanceSource).toContain('flexDirection: "row"');
+    expect(appearanceSource).not.toContain("getThemeChoiceVisual");
+    expect(appearanceSource).not.toContain("border");
     expect(appearanceSource).not.toContain("<Text");
     expect(appearanceSource).not.toContain("<Check");
     expect(appearanceSource).not.toContain("Icon");

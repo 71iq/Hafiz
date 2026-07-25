@@ -1,14 +1,5 @@
 import { useState, useEffect, useCallback, type ReactNode } from "react";
-import {
-  View,
-  Text,
-  Pressable,
-  ActivityIndicator,
-  Linking,
-  ScrollView,
-  StyleSheet,
-  useWindowDimensions,
-} from "react-native";
+import { View, Text, Pressable, ActivityIndicator, Linking, ScrollView, StyleSheet } from "react-native";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ToggleGroup } from "@/components/ui/ToggleGroup";
@@ -41,7 +32,6 @@ import {
 import {
   useSettings,
   FONT_SIZE_STEPS,
-  getThemeChoiceVisual,
   type ThemeMode,
   type UILanguage,
   type PageScroll,
@@ -72,7 +62,7 @@ import { fullQfUserSync, runInitialQfUserSync } from "@/lib/quran-foundation/use
 import type { QfConnectionStatus } from "@/lib/quran-foundation/user-types";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { toArabicNumber } from "@/lib/arabic";
-import { DESKTOP_CONTENT_GUTTER, PERSISTENT_SIDEBAR_WIDTH, SETTINGS_CONTENT_MAX_WIDTH } from "@/lib/ui/viewport";
+import { SETTINGS_CONTENT_MAX_WIDTH } from "@/lib/ui/viewport";
 import { ProfileIdentity } from "@/components/profile/ProfileIdentity";
 import {
   isQuranPageFontLoaded,
@@ -143,7 +133,6 @@ export default function SettingsScreen() {
   const [qfMessage, setQfMessage] = useState<string | null>(null);
   const [importingTafseerSource, setImportingTafseerSource] = useState<TafsirSourceId | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const { width } = useWindowDimensions();
   const currentLang = getLanguageByCode(translationLanguage);
   const currentTafseerSource =
     AVAILABLE_TAFSIR_SOURCES.find((source) => source.id === tafseerSource) ?? AVAILABLE_TAFSIR_SOURCES[0];
@@ -158,12 +147,6 @@ export default function SettingsScreen() {
   const fontSizeTotalLabel = isRTL ? toArabicNumber(FONT_SIZE_STEPS.length) : String(FONT_SIZE_STEPS.length);
   const TranslationChevron = isRTL ? ChevronLeft : ChevronRight;
   const { isLaptop } = useScreenContentLayout({ maxWidth: SETTINGS_CONTENT_MAX_WIDTH });
-  const settingsRailWidth = Math.min(
-    SETTINGS_CONTENT_MAX_WIDTH,
-    Math.max(0, width - (isLaptop ? PERSISTENT_SIDEBAR_WIDTH + DESKTOP_CONTENT_GUTTER * 2 : 48)),
-  );
-  const appearanceCardInnerWidth = Math.max(0, settingsRailWidth - 40);
-  const themeCardWidth = Math.floor((appearanceCardInnerWidth - (isLaptop ? 24 : 12)) / (isLaptop ? 3 : 2));
   const categoryParam = Array.isArray(params.category) ? params.category[0] : params.category;
   const activeCategory = parseSettingsCategory(categoryParam) ?? "general";
   const previewPage = quranPreview?.v2Page ?? 1;
@@ -342,11 +325,11 @@ export default function SettingsScreen() {
   }, [s.externalLinkFailed]);
 
   const THEME_OPTIONS: { value: ThemeMode; label: string }[] = [
-    { value: "dark", label: s.themeDark },
-    { value: "beige", label: s.themeBeige },
     { value: "white", label: s.themeWhite },
-    { value: "amoled", label: s.themeAmoled },
+    { value: "beige", label: s.themeBeige },
     { value: "system", label: s.themeSystem },
+    { value: "dark", label: s.themeDark },
+    { value: "amoled", label: s.themeAmoled },
   ];
 
   const settingsCategories: SettingsCategory[] = [
@@ -414,33 +397,27 @@ export default function SettingsScreen() {
             </Text>
             <View
               style={{
-                flexDirection: isRTL ? "row-reverse" : "row",
-                flexWrap: "wrap",
-                gap: 12,
+                flexDirection: "row",
+                gap: 8,
               }}
             >
               {THEME_OPTIONS.map((option) => {
                 const isActive = theme === option.value;
-                const themeVisual = getThemeChoiceVisual(option.value, systemTheme, isActive);
                 return (
-                  <View key={option.value} style={{ width: themeCardWidth, minHeight: 86 }}>
-                    <Pressable
-                      onPress={() => setTheme(option.value)}
-                      accessibilityRole="radio"
-                      accessibilityLabel={option.label}
-                      accessibilityState={{ checked: isActive }}
-                      aria-checked={isActive}
-                      className="flex-1 items-center justify-center rounded-2xl px-3 py-4"
-                      style={({ pressed }) => ({
-                        backgroundColor: themeVisual.backgroundColor,
-                        borderColor: themeVisual.borderColor,
-                        borderWidth: isActive ? 2 : 1,
-                        transform: [{ scale: pressed ? 0.98 : 1 }],
-                      })}
-                    >
-                      <ThemeColorSwatch theme={option.value} selected={isActive} size={42} />
-                    </Pressable>
-                  </View>
+                  <Pressable
+                    key={option.value}
+                    onPress={() => setTheme(option.value)}
+                    accessibilityRole="radio"
+                    accessibilityLabel={option.label}
+                    accessibilityState={{ checked: isActive }}
+                    aria-checked={isActive}
+                    style={({ pressed }) => ({
+                      flex: 1,
+                      opacity: pressed ? 0.72 : 1,
+                    })}
+                  >
+                    <ThemeColorSwatch theme={option.value} systemTheme={systemTheme} selected={isActive} size={42} />
+                  </Pressable>
                 );
               })}
             </View>

@@ -1,13 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { ActivityIndicator, Platform, Pressable, Text, View, useWindowDimensions } from "react-native";
-import {
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  Minus,
-  Plus,
-  X,
-} from "lucide-react-native";
+import { Check, ChevronLeft, ChevronRight, Minus, Plus, X } from "lucide-react-native";
 import { TafsirSourcePicker } from "@/components/settings/TafsirSourcePicker";
 import { OverlayBody, ResponsiveOverlay } from "@/components/ui/ResponsiveOverlay";
 import { Switch } from "@/components/ui/Switch";
@@ -20,7 +13,6 @@ import { stringByKey, useStrings } from "@/lib/i18n/useStrings";
 import type { UIStrings } from "@/lib/i18n/strings";
 import {
   FONT_SIZE_STEPS,
-  getThemeChoiceVisual,
   useSettings,
   type QuranFontStyle,
   type QuranMarkerStyle,
@@ -218,13 +210,12 @@ export function ReadingSettingsSheet({
           <SettingsSectionLabel label={s.sectionAppearance} isRTL={isRTL} />
           <ThemeSegmentedControl
             systemTheme={systemTheme}
-            isRTL={isRTL}
             options={[
-              { value: "white", label: s.themeLight, active: theme === "white" },
+              { value: "white", label: s.themeWhite, active: theme === "white" },
               { value: "beige", label: s.themeBeige, active: theme === "beige" },
+              { value: "system", label: s.themeSystem, active: theme === "system" },
               { value: "dark", label: s.themeDark, active: theme === "dark" },
               { value: "amoled", label: s.themeAmoled, active: theme === "amoled" },
-              { value: "system", label: s.themeSystem, active: theme === "system" },
             ]}
             onChange={setTheme}
           />
@@ -347,21 +338,15 @@ export function ReadingSettingsSheet({
 function ThemeSegmentedControl({
   options,
   systemTheme,
-  isRTL,
   onChange,
 }: {
   options: Array<{ value: ThemeMode; label: string; active: boolean }>;
   systemTheme: "dark" | "white";
-  isRTL: boolean;
   onChange: (theme: ThemeMode) => void;
 }) {
   return (
-    <View
-      className="mb-5 rounded-xl border border-warm-200/45 bg-surface-bright/70 p-1 dark:border-neutral-800/80 dark:bg-surface-dark-low/70"
-      style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
-    >
+    <View className="mb-5" style={{ flexDirection: "row", gap: 8 }}>
       {options.map((option) => {
-        const themeVisual = getThemeChoiceVisual(option.value, systemTheme, option.active);
         return (
           <Pressable
             key={option.value}
@@ -370,16 +355,13 @@ function ThemeSegmentedControl({
             accessibilityLabel={option.label}
             accessibilityState={{ checked: option.active }}
             aria-checked={option.active}
-            className="h-10 flex-1 items-center justify-center rounded-lg"
+            className="flex-1 items-center justify-center"
             style={({ pressed }) => ({
-              backgroundColor: themeVisual.backgroundColor,
-              borderColor: themeVisual.borderColor,
-              borderWidth: 1,
               opacity: pressed ? 0.72 : 1,
               cursor: Platform.OS === "web" ? "pointer" : undefined,
             })}
           >
-            <ThemeColorSwatch theme={option.value} selected={option.active} size={26} />
+            <ThemeColorSwatch theme={option.value} systemTheme={systemTheme} selected={option.active} size={40} />
           </Pressable>
         );
       })}

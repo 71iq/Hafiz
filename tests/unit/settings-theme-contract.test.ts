@@ -12,10 +12,10 @@ describe("settings theme layout contract", () => {
 
     expect(optionsStart).toBeGreaterThan(-1);
     expect(optionsEnd).toBeGreaterThan(optionsStart);
-    expect(settingsSource).toContain("getThemeChoiceVisual(option.value, systemTheme, isActive)");
-    expect(settingsSource).toContain("backgroundColor: themeVisual.backgroundColor");
-    expect(settingsSource).toContain("borderColor: themeVisual.borderColor");
-    expect(settingsSource).toContain("<ThemeColorSwatch theme={option.value} selected={isActive}");
+    expect(settingsSource).toContain(
+      "<ThemeColorSwatch theme={option.value} systemTheme={systemTheme} selected={isActive}",
+    );
+    expect(settingsSource).toContain('flexDirection: "row"');
     expect(settingsSource).toContain("accessibilityLabel={option.label}");
     expect(settingsSource).toContain("aria-checked={isActive}");
     expect(themeSource).toContain("backgroundColor: THEME_COLORS[palette].surface");
@@ -33,6 +33,6 @@ describe("settings theme layout contract", () => {
     const optionsSource = settingsSource.slice(optionsStart, optionsEnd);
     const values = [...optionsSource.matchAll(/\{ value: "([^"]+)", label:/g)].map((match) => match[1]);
 
-    expect(values).toEqual(["dark", "beige", "white", "amoled", "system"]);
+    expect(values).toEqual(["white", "beige", "system", "dark", "amoled"]);
   });
 });
