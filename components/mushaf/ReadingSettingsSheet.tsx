@@ -274,6 +274,7 @@ export function ReadingSettingsSheet({
               value={markerStyleLabel}
               isRTL={isRTL}
               onPress={() => setMarkerStylePickerVisible(true)}
+              disabled={quranFontStyle === "qcf2"}
               trailing={<Chevron size={17} color={controlColor} />}
               compact={compactRows}
             />
@@ -492,6 +493,7 @@ function SettingsActionRow({
       onPress={onPress}
       disabled={disabled}
       accessibilityRole="button"
+      accessibilityState={{ disabled }}
       className={rowClassName}
       style={[rowStyle, Platform.OS === "web" ? ({ cursor: disabled ? "auto" : "pointer" } as any) : null]}
     >
