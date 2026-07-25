@@ -22,11 +22,17 @@ export function ThemeColorSwatch({ theme, selected = false, size = 36, systemThe
         borderRadius: 6,
         borderWidth: selected ? 2 : 1,
         borderColor: selected ? accentColor : "rgba(127,127,127,0.45)",
-        backgroundColor,
+        backgroundColor: theme === "system" ? undefined : backgroundColor,
         overflow: "hidden",
         pointerEvents: "none",
       }}
     >
+      {theme === "system" && (
+        <View style={{ flex: 1, flexDirection: "row" }}>
+          <View style={{ flex: 1, backgroundColor: THEME_COLORS.white.surface }} />
+          <View style={{ flex: 1, backgroundColor: THEME_COLORS.dark.surface }} />
+        </View>
+      )}
       {selected && (
         <Text
           accessible={false}
