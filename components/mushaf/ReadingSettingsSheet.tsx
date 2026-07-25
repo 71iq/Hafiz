@@ -12,6 +12,7 @@ import { TafsirSourcePicker } from "@/components/settings/TafsirSourcePicker";
 import { OverlayBody, ResponsiveOverlay } from "@/components/ui/ResponsiveOverlay";
 import { Switch } from "@/components/ui/Switch";
 import { Toast } from "@/components/ui/Toast";
+import { ThemeColorSwatch } from "@/components/ui/ThemeColorSwatch";
 import { ensureTafsirSourceImported } from "@/lib/database/init";
 import { useDatabase } from "@/lib/database/provider";
 import { toArabicNumber } from "@/lib/arabic";
@@ -364,9 +365,11 @@ function ThemeSegmentedControl({
           <Pressable
             key={option.value}
             onPress={() => onChange(option.value)}
-            accessibilityRole="button"
-            accessibilityState={{ selected: option.active }}
-            className="h-10 flex-1 items-center justify-center rounded-lg px-2"
+            accessibilityRole="radio"
+            accessibilityLabel={option.label}
+            accessibilityState={{ checked: option.active }}
+            aria-checked={option.active}
+            className="h-10 flex-1 items-center justify-center rounded-lg"
             style={({ pressed }) => ({
               backgroundColor: themeVisual.backgroundColor,
               borderColor: themeVisual.borderColor,
@@ -375,21 +378,7 @@ function ThemeSegmentedControl({
               cursor: Platform.OS === "web" ? "pointer" : undefined,
             })}
           >
-            <Text
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.82}
-              style={{
-                color: themeVisual.textColor,
-                fontFamily: option.active ? "Manrope_600SemiBold" : "Manrope_500Medium",
-                fontSize: 13,
-                lineHeight: 17,
-                textAlign: "center",
-                writingDirection: isRTL ? "rtl" : "ltr",
-              }}
-            >
-              {option.label}
-            </Text>
+            <ThemeColorSwatch theme={option.value} selected={option.active} size={26} />
           </Pressable>
         );
       })}

@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/Button";
 import { ToggleGroup } from "@/components/ui/ToggleGroup";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Toast } from "@/components/ui/Toast";
+import { ThemeColorSwatch } from "@/components/ui/ThemeColorSwatch";
 import {
   COMPACT_SCREEN_BOTTOM_INSET,
   Screen,
@@ -425,6 +426,10 @@ export default function SettingsScreen() {
                   <View key={option.value} style={{ width: themeCardWidth, minHeight: 86 }}>
                     <Pressable
                       onPress={() => setTheme(option.value)}
+                      accessibilityRole="radio"
+                      accessibilityLabel={option.label}
+                      accessibilityState={{ checked: isActive }}
+                      aria-checked={isActive}
                       className="flex-1 items-center justify-center rounded-2xl px-3 py-4"
                       style={({ pressed }) => ({
                         backgroundColor: themeVisual.backgroundColor,
@@ -433,18 +438,7 @@ export default function SettingsScreen() {
                         transform: [{ scale: pressed ? 0.98 : 1 }],
                       })}
                     >
-                      <Text
-                        className="text-sm"
-                        numberOfLines={2}
-                        style={{
-                          color: themeVisual.textColor,
-                          fontFamily: isActive ? "Manrope_600SemiBold" : "Manrope_500Medium",
-                          textAlign: "center",
-                          writingDirection: isRTL ? "rtl" : "ltr",
-                        }}
-                      >
-                        {option.label}
-                      </Text>
+                      <ThemeColorSwatch theme={option.value} selected={isActive} size={42} />
                     </Pressable>
                   </View>
                 );

@@ -15,6 +15,9 @@ describe("settings theme layout contract", () => {
     expect(settingsSource).toContain("getThemeChoiceVisual(option.value, systemTheme, isActive)");
     expect(settingsSource).toContain("backgroundColor: themeVisual.backgroundColor");
     expect(settingsSource).toContain("borderColor: themeVisual.borderColor");
+    expect(settingsSource).toContain("<ThemeColorSwatch theme={option.value} selected={isActive}");
+    expect(settingsSource).toContain("accessibilityLabel={option.label}");
+    expect(settingsSource).toContain("aria-checked={isActive}");
     expect(themeSource).toContain("backgroundColor: THEME_COLORS[palette].surface");
     expect(themeSource).toContain('const palette = theme === "system" ? systemTheme : theme;');
     expect(optionsSource).not.toContain("icon:");
