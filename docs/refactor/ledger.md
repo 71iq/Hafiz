@@ -65,7 +65,7 @@ Every slice must satisfy these checks or record the exact exception.
 
 ## Slice 001, flashcard review transition
 
-Status: selected.
+Status: completed and pushed in `0cf8b24`.
 
 Goal: move FSRS card conversion, transition mapping, review-log mapping, and same-day requeue eligibility from the route into one pure module under `lib/fsrs/`.
 
@@ -82,3 +82,27 @@ Open product decisions:
 
 - Decide whether leaderboard points should use pre-review or post-review scheduling values.
 - Decide whether a review must persist its card update and study log in one atomic operation.
+
+### Outcome
+
+- Added `lib/fsrs/review-transition.ts` with one pure interface for saved reviews and schedule previews.
+- Moved scheduler-card conversion, updated-row mapping, review-record mapping, state validation, and same-day requeue eligibility out of `app/flashcards/session.tsx`.
+- Deleted the route's `toFSRSCard` and `isCardDueThroughToday` copies. Two production callers remain, both in the session route.
+- Replaced the persisted-state cast with an explicit check for the four supported scheduler states.
+- Preserved card-update then study-log ordering, pre-review point inputs, queue ordering, scheduler defaults, and all route rendering.
+
+### Characterization and verification
+
+- The focused Jest file first failed because `lib/fsrs/review-transition.ts` did not exist.
+- The completed interface has 12 transition cases. Together with existing FSRS scoring coverage, 15 focused tests passed.
+- `npm run typecheck` passed.
+- ESLint on the three changed TypeScript files reported 0 errors and 5 pre-existing warnings in the session route.
+- `npm run build:web` passed and exported 39 routes.
+- The Chromium smoke suite passed all 27 routes.
+- No manual seeded-database grade, native device run, or visual comparison was performed. The route smoke test checks startup only.
+
+### Sibling result
+
+`app/flashcards/vocab.tsx` remains a separate raw `ts-fsrs` path. It uses the `vocab_cards` schema, different scheduler setup, no study log, and two casts. Treat it as a separate characterization slice before changing its defaults or persistence behavior.
+
+The full security-focused patch review is in [HAFIZ_DIFFERENTIAL_REVIEW_2026-08-30.md](../../HAFIZ_DIFFERENTIAL_REVIEW_2026-08-30.md). It found no security regression and records the history, blast radius, test limits, and remaining product decisions.
