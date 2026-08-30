@@ -20,8 +20,9 @@ import type { UIStrings } from "@/lib/i18n/strings";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { LoadingScreen } from "@/components/LoadingScreen";
-import { gradeCard, Rating, State } from "@/lib/fsrs/scheduler";
-import type { Card as FSRSCard, Grade } from "@/lib/fsrs/scheduler";
+import { Rating, State } from "@/lib/fsrs/scheduler";
+import type { Grade } from "@/lib/fsrs/scheduler";
+import { calculateReviewTransition } from "@/lib/fsrs/review-transition";
 import {
   updateCard,
   insertStudyLog,
@@ -748,40 +749,31 @@ function FlashcardSessionScreen() {
     setSessionError(null);
     try {
       hapticMedium();
-      const now = new Date();
+      const reviewedAt = new Date();
+      const transition = calculateReviewTransition({
+        card: currentCard.card,
+        rating,
+        reviewedAt,
+        reviewPolicy: reviewSettings ?? undefined,
+      });
 
-      const result = gradeCard(toFSRSCard(currentCard.card), now, rating, reviewSettings ?? undefined);
-
-      const updatedRow: StudyCardRow = {
-        ...currentCard.card,
-        due: result.card.due.toISOString(),
-        stability: result.card.stability,
-        difficulty: result.card.difficulty,
-        elapsed_days: result.card.elapsed_days,
-        scheduled_days: result.card.scheduled_days,
-        learning_steps: result.card.learning_steps,
-        reps: result.card.reps,
-        lapses: result.card.lapses,
-        state: result.card.state,
-        last_review: now.toISOString(),
-        updated_at: now.toISOString(),
-      };
-      await updateCard(db, updatedRow);
-      const requeuedCard = isCardDueThroughToday(updatedRow, now)
-        ? { ...currentCard, card: updatedRow }
+      await updateCard(db, transition.updatedCard);
+      const requeuedCard = transition.shouldRequeueToday
+        ? { ...currentCard, card: transition.updatedCard }
         : null;
 
+      const { reviewRecord } = transition;
       await insertStudyLog(
         db,
         currentCard.card.id,
-        rating,
-        result.log.state,
-        result.log.due.toISOString(),
-        result.log.stability,
-        result.log.difficulty,
-        result.log.elapsed_days,
-        result.log.scheduled_days,
-        now.toISOString()
+        reviewRecord.rating,
+        reviewRecord.state,
+        reviewRecord.due,
+        reviewRecord.stability,
+        reviewRecord.difficulty,
+        reviewRecord.elapsedDays,
+        reviewRecord.scheduledDays,
+        reviewRecord.reviewedAt
       );
       recordReviewedCard(currentCard.card.state);
 
@@ -789,7 +781,7 @@ function FlashcardSessionScreen() {
         recordAchievementEvent(db, {
           type: "mutashabih_pair_reviewed",
           pairId: currentCard.card.id,
-          reviewedAt: now.toISOString(),
+          reviewedAt: reviewRecord.reviewedAt,
         }).catch(console.warn);
       }
 
@@ -2164,16 +2156,6 @@ function localEndOfTodayIso(base = new Date()): string {
   return end.toISOString();
 }
 
-function isCardDueThroughToday(row: StudyCardRow, now: Date): boolean {
-  const nowIso = now.toISOString();
-  return (
-    !row.deleted_at &&
-    !row.suspended_at &&
-    (!row.buried_until || row.buried_until <= nowIso) &&
-    row.due <= localEndOfTodayIso(now)
-  );
-}
-
 function formatNextReviewDate(value: string | null, s: UIStrings): string {
   if (!value) return "—";
   const date = new Date(value);
@@ -2217,21 +2199,6 @@ function isSmartReviewCard(card: CardData): boolean {
   return card.kind === "mutashabihat" || card.kind === "similarTail" || card.kind === "qiraat" || card.kind === "asbab";
 }
 
-function toFSRSCard(row: StudyCardRow): FSRSCard {
-  return {
-    due: new Date(row.due),
-    stability: row.stability,
-    difficulty: row.difficulty,
-    elapsed_days: row.elapsed_days,
-    scheduled_days: row.scheduled_days,
-    learning_steps: row.learning_steps,
-    reps: row.reps,
-    lapses: row.lapses,
-    state: row.state as State,
-    last_review: row.last_review ? new Date(row.last_review) : undefined,
-  };
-}
-
 function getGradeSchedulePreviews(
   row: StudyCardRow,
   settings: DeckReviewSettings | null,
@@ -2241,9 +2208,14 @@ function getGradeSchedulePreviews(
   const previews: Record<number, string> = {};
 
   for (const { rating } of GRADE_BUTTONS) {
-    const result = gradeCard(toFSRSCard(row), now, rating, settings ?? undefined);
-    const stepLabel = getLearningStepPreview(result.card, settings, isRTL);
-    const returnLabel = formatReturnDelay(result.card.due, now, isRTL);
+    const transition = calculateReviewTransition({
+      card: row,
+      rating,
+      reviewedAt: now,
+      reviewPolicy: settings ?? undefined,
+    });
+    const stepLabel = getLearningStepPreview(transition.updatedCard, settings, isRTL);
+    const returnLabel = formatReturnDelay(new Date(transition.updatedCard.due), now, isRTL);
     previews[rating] = stepLabel ? `${stepLabel} · ${returnLabel}` : returnLabel;
   }
 
@@ -2251,7 +2223,7 @@ function getGradeSchedulePreviews(
 }
 
 function getLearningStepPreview(
-  nextCard: FSRSCard,
+  nextCard: Pick<StudyCardRow, "state" | "learning_steps">,
   settings: DeckReviewSettings | null,
   isRTL: boolean
 ): string | null {
