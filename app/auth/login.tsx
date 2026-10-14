@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Eye, EyeOff, Lock, Mail } from "lucide-react-native";
 import { useAuthStore } from "@/lib/auth/store";
+import { isEmailAuthFlowsEnabled, isSocialAuthEnabled } from "@/lib/auth/config";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { strings } from "@/lib/i18n/strings";
 import type { UIStrings } from "@/lib/i18n/strings";
@@ -73,6 +74,9 @@ export default function LoginScreen() {
   const form = configured ? (
     <View className="w-full">
       <AuthFormNotice message={showError || error} dir={dir} />
+      {(!isEmailAuthFlowsEnabled() || !isSocialAuthEnabled()) && (
+        <AuthFormNotice message={s.authTemporarilyLimited} dir={dir} />
+      )}
 
       <FormTextField
         control={control}
@@ -120,23 +124,21 @@ export default function LoginScreen() {
         }}
       />
 
-      <Pressable
-        onPress={() => router.push("/auth/forgot-password" as any)}
-        className="mt-2 self-end"
-        hitSlop={8}
-      >
-        <Text
-          className="text-primary-accent dark:text-primary-bright"
-          style={{
-            color: isDark ? "#14B8A6" : "#0d9488",
-            fontFamily: "Manrope_600SemiBold",
-            fontSize: 13,
-            writingDirection: dir,
-          }}
-        >
-          {s.authForgotPassword}
-        </Text>
-      </Pressable>
+      {isEmailAuthFlowsEnabled() && (
+        <Pressable onPress={() => router.push("/auth/forgot-password" as any)} className="mt-2 self-end" hitSlop={8}>
+          <Text
+            className="text-primary-accent dark:text-primary-bright"
+            style={{
+              color: isDark ? "#14B8A6" : "#0d9488",
+              fontFamily: "Manrope_600SemiBold",
+              fontSize: 13,
+              writingDirection: dir,
+            }}
+          >
+            {s.authForgotPassword}
+          </Text>
+        </Pressable>
+      )}
 
       <View className="h-7" />
 
@@ -171,12 +173,14 @@ export default function LoginScreen() {
         }}
         onError={(msg) => setShowError(msg)}
       />
-      <AuthRouteLink
-        prompt={s.authNoAccount}
-        action={s.authSignup}
-        dir={dir}
-        onPress={() => router.replace("/auth/signup")}
-      />
+      {isEmailAuthFlowsEnabled() && (
+        <AuthRouteLink
+          prompt={s.authNoAccount}
+          action={s.authSignup}
+          dir={dir}
+          onPress={() => router.replace("/auth/signup")}
+        />
+      )}
     </>
   ) : null;
 

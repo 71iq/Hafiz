@@ -3,6 +3,7 @@ import * as ReactNative from "react-native";
 import { Image, View } from "react-native";
 import { render } from "@testing-library/react-native";
 import { OAuthButtons } from "@/components/auth/OAuthButtons";
+import { isSocialAuthEnabled } from "@/lib/auth/config";
 import { DirectionProvider } from "@/lib/ui/direction";
 import { flattenStyle, type RtlTestNode } from "../rtl/rtl-test-utils";
 
@@ -16,6 +17,10 @@ jest.mock("@/lib/supabase", () => ({
 
 jest.mock("@/lib/auth/oauth", () => ({
   startAppOAuth: jest.fn(),
+}));
+
+jest.mock("@/lib/auth/config", () => ({
+  isSocialAuthEnabled: jest.fn(),
 }));
 
 jest.mock("@/lib/database/provider", () => ({
@@ -44,6 +49,7 @@ function resolvePressableStyle(style: unknown) {
 
 describe("OAuth social button contracts", () => {
   beforeEach(() => {
+    jest.mocked(isSocialAuthEnabled).mockReturnValue(true);
     jest.spyOn(ReactNative, "useWindowDimensions").mockReturnValue({
       width: 1024,
       height: 768,
@@ -56,11 +62,20 @@ describe("OAuth social button contracts", () => {
     jest.restoreAllMocks();
   });
 
+  it("hides social providers and their divider when disabled", () => {
+    jest.mocked(isSocialAuthEnabled).mockReturnValue(false);
+    const { queryByLabelText, queryByText } = render(<OAuthButtons strings={strings} />);
+    expect(queryByLabelText(strings.authContinueWithGoogle)).toBeNull();
+    expect(queryByLabelText(strings.authContinueWithApple)).toBeNull();
+    expect(queryByLabelText(strings.authContinueWithFacebook)).toBeNull();
+    expect(queryByText(strings.authOrContinueWith)).toBeNull();
+  });
+
   it("renders clean icon-only rounded rectangles for social providers", () => {
     const { getByLabelText, queryByText, UNSAFE_getAllByType } = render(
       <DirectionProvider dir="ltr">
         <OAuthButtons strings={strings} isDark={false} />
-      </DirectionProvider>
+      </DirectionProvider>,
     );
 
     const buttons = [
@@ -97,6 +112,8 @@ describe("OAuth social button contracts", () => {
       expect(flattenStyle(image.parent?.props.style).overflow).toBe("visible");
     }
 
-    expect(UNSAFE_getAllByType(View).some((node: RtlTestNode) => flattenStyle(node.props.style).width === 28)).toBe(true);
+    expect(UNSAFE_getAllByType(View).some((node: RtlTestNode) => flattenStyle(node.props.style).width === 28)).toBe(
+      true,
+    );
   });
 });

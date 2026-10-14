@@ -1,22 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Platform, Pressable, Text, TextInput, View } from "react-native";
-import { useRouter } from "expo-router";
+import { Redirect, useRouter } from "expo-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Eye, EyeOff, Lock } from "lucide-react-native";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { isEmailAuthFlowsEnabled } from "@/lib/auth/config";
 import { useAuthStore } from "@/lib/auth/store";
 import { strings } from "@/lib/i18n/strings";
 import type { UIStrings } from "@/lib/i18n/strings";
 import { getStartupLanguage } from "@/lib/i18n/startup-language";
 import { Button } from "@/components/ui/Button";
 import { FormTextField } from "@/components/ui/FormTextField";
-import {
-  AuthFormNotice,
-  AuthScreenShell,
-  AuthUnavailableState,
-} from "@/components/auth/AuthScreenShell";
+import { AuthFormNotice, AuthScreenShell, AuthUnavailableState } from "@/components/auth/AuthScreenShell";
 import type { Direction } from "@/lib/ui/direction";
 
 type ResetPasswordForm = {
@@ -37,6 +34,11 @@ function createResetPasswordSchema(s: UIStrings) {
 }
 
 export default function ResetPasswordScreen() {
+  if (!isEmailAuthFlowsEnabled()) return <Redirect href="/auth/login" />;
+  return <ResetPasswordFormScreen />;
+}
+
+function ResetPasswordFormScreen() {
   const router = useRouter();
   const locale = getStartupLanguage();
   const dir: Direction = locale === "ar" ? "rtl" : "ltr";

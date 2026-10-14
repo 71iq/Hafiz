@@ -1,10 +1,11 @@
 import { useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, Text, TextInput, View } from "react-native";
-import { useRouter } from "expo-router";
+import { Redirect, useRouter } from "expo-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Eye, EyeOff, Lock, Mail, User, UserRound } from "lucide-react-native";
+import { isEmailAuthFlowsEnabled } from "@/lib/auth/config";
 import { useAuthStore } from "@/lib/auth/store";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { strings } from "@/lib/i18n/strings";
@@ -43,6 +44,11 @@ function createSignupSchema(s: UIStrings) {
 }
 
 export default function SignupScreen() {
+  if (!isEmailAuthFlowsEnabled()) return <Redirect href="/auth/login" />;
+  return <SignupFormScreen />;
+}
+
+function SignupFormScreen() {
   const router = useRouter();
   const locale = getStartupLanguage();
   const dir: Direction = locale === "ar" ? "rtl" : "ltr";

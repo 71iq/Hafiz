@@ -48,6 +48,7 @@ import { TranslationLanguagePicker } from "@/components/settings/TranslationLang
 import { ReciterPicker } from "@/components/settings/ReciterPicker";
 import { OverlayBody, OverlayHeader, ResponsiveModal } from "@/components/ui/ResponsiveOverlay";
 import { stringByKey, useStrings } from "@/lib/i18n/useStrings";
+import { isEmailAuthFlowsEnabled } from "@/lib/auth/config";
 import { useAuthStore } from "@/lib/auth/store";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { isQfContentEnabled, isQfSyncEnabled } from "@/lib/quran-foundation/config";
@@ -747,7 +748,8 @@ export default function SettingsScreen() {
                     {s.authLogin}
                   </Text>
                 </Button>
-                <Button variant="outline" onPress={() => router.push("/auth/signup")} disabled={authLoading}>
+                {isEmailAuthFlowsEnabled() && (
+<Button variant="outline" onPress={() => router.push("/auth/signup")} disabled={authLoading}>
                   <Text
                     className="text-charcoal dark:text-neutral-200"
                     style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15 }}
@@ -755,6 +757,7 @@ export default function SettingsScreen() {
                     {s.authSignup}
                   </Text>
                 </Button>
+      )}
               </View>
             )}
           </Card>

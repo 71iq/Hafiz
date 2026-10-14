@@ -16,6 +16,9 @@ services:
   auth:
     container_name: hafiz-auth
     env_file: /etc/hafiz/auth.env
+    environment:
+      GOTRUE_DISABLE_SIGNUP: "true"
+      GOTRUE_EXTERNAL_GOOGLE_ENABLED: "false"
     mem_limit: 128m
     cpus: 0.5
   rest:

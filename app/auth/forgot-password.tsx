@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
 import { ActivityIndicator, Text, View } from "react-native";
-import { useRouter } from "expo-router";
+import { Redirect, useRouter } from "expo-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Mail } from "lucide-react-native";
+import { isEmailAuthFlowsEnabled } from "@/lib/auth/config";
 import { useAuthStore } from "@/lib/auth/store";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { strings } from "@/lib/i18n/strings";
@@ -12,11 +13,7 @@ import type { UIStrings } from "@/lib/i18n/strings";
 import { getStartupLanguage } from "@/lib/i18n/startup-language";
 import { Button } from "@/components/ui/Button";
 import { FormTextField } from "@/components/ui/FormTextField";
-import {
-  AuthFormNotice,
-  AuthScreenShell,
-  AuthUnavailableState,
-} from "@/components/auth/AuthScreenShell";
+import { AuthFormNotice, AuthScreenShell, AuthUnavailableState } from "@/components/auth/AuthScreenShell";
 import type { Direction } from "@/lib/ui/direction";
 
 type ForgotPasswordForm = {
@@ -30,6 +27,11 @@ function createForgotPasswordSchema(s: UIStrings) {
 }
 
 export default function ForgotPasswordScreen() {
+  if (!isEmailAuthFlowsEnabled()) return <Redirect href="/auth/login" />;
+  return <ForgotPasswordFormScreen />;
+}
+
+function ForgotPasswordFormScreen() {
   const router = useRouter();
   const locale = getStartupLanguage();
   const dir: Direction = locale === "ar" ? "rtl" : "ltr";

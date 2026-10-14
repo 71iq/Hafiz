@@ -14,6 +14,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Input } from "@/components/ui/Input";
 import { OverlayBody, OverlayHeader, ResponsiveModal, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { getRecentUnlocks } from "@/lib/achievements/queries";
+import { isEmailAuthFlowsEnabled } from "@/lib/auth/config";
 import { useAuthStore } from "@/lib/auth/store";
 import { useDatabase } from "@/lib/database/provider";
 import { getWirdStatus, getReviewStats } from "@/lib/fsrs/queries";
@@ -1269,7 +1270,8 @@ function SignedOutProfile({ isDark, isRTL, onClose }: { isDark: boolean; isRTL: 
             {s.authLogin}
           </Text>
         </Button>
-        <Button
+        {isEmailAuthFlowsEnabled() && (
+<Button
           variant="outline"
           onPress={() => {
             onClose();
@@ -1283,6 +1285,7 @@ function SignedOutProfile({ isDark, isRTL, onClose }: { isDark: boolean; isRTL: 
             {s.authSignup}
           </Text>
         </Button>
+      )}
       </View>
     </View>
   );

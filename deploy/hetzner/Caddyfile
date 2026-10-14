@@ -31,6 +31,12 @@ api.hafizquran.app {
   }
   # The dashboard, metadata, pooler and database have no public route.
   # Quran Foundation functions remain backed up but are temporarily disabled.
+  # Email-dependent flows and new accounts are disabled until SMTP is configured.
+  @disabled_auth path /auth/v1/signup /auth/v1/recover /auth/v1/resend /auth/v1/otp /auth/v1/magiclink /auth/v1/invite /auth/v1/reauthenticate
+  handle @disabled_auth {
+    header Content-Type application/json
+    respond `{"code":"feature_disabled","msg":"Signup and password reset are temporarily unavailable."}` 503
+  }
   @client_api path /auth/v1/* /rest/v1/* /storage/v1/*
   handle @client_api {
     reverse_proxy 127.0.0.1:8100 {

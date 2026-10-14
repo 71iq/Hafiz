@@ -3,6 +3,7 @@ import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
+import { isSocialAuthEnabled } from "@/lib/auth/config";
 import { connectQfFromSession, connectQfProviderTokens } from "@/lib/quran-foundation/user";
 import { QF_OAUTH_PROVIDER, QF_OAUTH_SCOPES } from "@/lib/quran-foundation/user-types";
 
@@ -15,6 +16,7 @@ export async function startAppOAuth(
   mode: OAuthMode = "sign-in"
 ): Promise<{ session: Session | null; qfConnected: boolean }> {
   const isQf = provider === QF_OAUTH_PROVIDER;
+  if (!isQf && !isSocialAuthEnabled()) throw new Error("Social sign-in is temporarily unavailable.");
   const redirectTo = getOAuthRedirectTo();
   const options = {
     redirectTo,

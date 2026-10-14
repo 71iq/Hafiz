@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { Platform } from "react-native";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { startAppOAuth } from "@/lib/auth/oauth";
+import { isEmailAuthFlowsEnabled } from "@/lib/auth/config";
 import { isQfLoginEnabled, isQfSyncEnabled } from "@/lib/quran-foundation/config";
 import { connectQfFromSession } from "@/lib/quran-foundation/user";
 import { QF_OAUTH_PROVIDER } from "@/lib/quran-foundation/user-types";
@@ -179,6 +180,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     username: string,
     displayName: string
   ) => {
+    if (!isEmailAuthFlowsEnabled()) throw new Error("Signup is temporarily unavailable.");
     set({ isLoading: true, error: null });
     try {
       // Pass username and display_name as user metadata so the
@@ -214,6 +216,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   },
 
   resendSignupConfirmation: async (email: string) => {
+    if (!isEmailAuthFlowsEnabled()) throw new Error("Signup is temporarily unavailable.");
     set({ isLoading: true, error: null });
     try {
       const { error } = await supabase.auth.resend({
@@ -231,6 +234,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   },
 
   sendPasswordReset: async (email: string) => {
+    if (!isEmailAuthFlowsEnabled()) throw new Error("Password reset is temporarily unavailable.");
     set({ isLoading: true, error: null });
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {

@@ -22,6 +22,8 @@ jobs:
       EXPO_PUBLIC_SUPABASE_AUTH_STORAGE_KEY: sb-frzewjaxijhtezfvcgll-auth-token
       EXPO_PUBLIC_QF_USER_AUTH_ENABLED: ${{ vars.EXPO_PUBLIC_QF_USER_AUTH_ENABLED }}
       EXPO_PUBLIC_QF_CONTENT_ENABLED: ${{ vars.EXPO_PUBLIC_QF_CONTENT_ENABLED }}
+      EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED: ${{ vars.EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED }}
+      EXPO_PUBLIC_SOCIAL_AUTH_ENABLED: ${{ vars.EXPO_PUBLIC_SOCIAL_AUTH_ENABLED }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -38,7 +40,7 @@ jobs:
           test -n "$EXPO_PUBLIC_SUPABASE_ANON_KEY"
           npm ci
           npm run typecheck
-          npx jest --runInBand tests/unit/quran-data-contract.test.ts tests/unit/sync-restore-contract.test.ts tests/unit/sync-concurrency.test.tsx tests/unit/oauth-buttons-contract.test.tsx tests/unit/qf-oauth-redirect.test.ts tests/unit/qf-content-disabled.test.ts tests/unit/public-review-activity-contract.test.ts tests/unit/public-surah-progress-contract.test.ts
+          npx jest --runInBand tests/unit/quran-data-contract.test.ts tests/unit/sync-restore-contract.test.ts tests/unit/sync-concurrency.test.tsx tests/unit/oauth-buttons-contract.test.tsx tests/unit/auth-disabled.test.ts tests/unit/qf-oauth-redirect.test.ts tests/unit/qf-content-disabled.test.ts tests/unit/public-review-activity-contract.test.ts tests/unit/public-surah-progress-contract.test.ts
           python3 scripts/test-web-release.py
           npm run build:web
           npx playwright install --with-deps chromium

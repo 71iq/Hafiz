@@ -13,6 +13,7 @@ import { useColorScheme } from "nativewind";
 import { BookOpen } from "lucide-react-native";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { startAppOAuth } from "@/lib/auth/oauth";
+import { isSocialAuthEnabled } from "@/lib/auth/config";
 import { useDatabaseStatus } from "@/lib/database/provider";
 import { isQfLoginEnabled } from "@/lib/quran-foundation/config";
 import { runInitialQfUserSync } from "@/lib/quran-foundation/user-sync";
@@ -49,7 +50,7 @@ export function OAuthButtons({ strings: s, isDark, onError }: Props) {
   const dir = useUIDirection();
   const [busyProvider, setBusyProvider] = useState<"google" | "apple" | "facebook" | "qf" | null>(null);
 
-  if (!isSupabaseConfigured()) return null;
+  if (!isSupabaseConfigured() || !isSocialAuthEnabled()) return null;
 
   const handlePress = async (provider: "google" | "apple" | "facebook") => {
     if (busyProvider) return;
@@ -272,9 +273,7 @@ function OAuthIconButton({
         overflow: "visible",
         opacity: disabled && !loading ? 0.55 : 1,
         transform: [{ scale: pressed && isInteractive ? 0.97 : 1 }],
-        boxShadow: focused
-          ? "0 0 0 2px rgba(45, 212, 191, 0.18)"
-          : "0 4px 12px rgba(0, 0, 0, 0.06)",
+        boxShadow: focused ? "0 0 0 2px rgba(45, 212, 191, 0.18)" : "0 4px 12px rgba(0, 0, 0, 0.06)",
       })}
     >
       {loading ? (
