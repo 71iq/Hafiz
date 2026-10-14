@@ -28,6 +28,7 @@ export function useSync() {
   const dismissAccountRestoreNotice = useCallback(() => setAccountRestoreNotice(false), []);
 
   const doSync = useCallback(async () => {
+    console.info("[Sync diagnostic] readiness", { configured: isSupabaseConfigured(), signedIn: Boolean(user), isLoaded, isTranslationLoading, busy: isSyncing.current });
     if (!isSupabaseConfigured() || !user || !isLoaded || isTranslationLoading || isSyncing.current) return;
 
     // Acquire before checking connectivity so simultaneous triggers share one run.
@@ -35,12 +36,14 @@ export function useSync() {
 
     try {
       const netState = await NetInfo.fetch();
+      console.info("[Sync diagnostic] connectivity", { connected: netState.isConnected });
       if (!netState.isConnected) {
         setStatus("offline");
         return;
       }
       setStatus("syncing");
       const result = await fullSync(db);
+      console.info("[Sync diagnostic] completed", { pushed: result.pushed, pulled: result.pulled });
       await updateProfileStats(db).catch((error) => {
         console.warn("[Sync] Failed to update public profile aggregates:", error.message);
       });
