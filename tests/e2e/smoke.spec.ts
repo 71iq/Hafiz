@@ -69,5 +69,9 @@ test.describe("strict route smoke", () => {
     await sharedPage.goto("/open?surah=2&ayah=255", { waitUntil: "domcontentloaded" });
     await expect(sharedPage.getByRole("button", { name: "2:255", exact: true })).toBeInViewport({ timeout: 30_000 });
     await expect(sharedPage.locator("html")).toHaveAttribute("dir", "rtl");
+    await sharedPage.goto("/open?surah=2&ayah=149", { waitUntil: "domcontentloaded" });
+    await expect(sharedPage.getByRole("button", { name: "2:149", exact: true })).toBeInViewport();
+    await sharedPage.goto("/open?surah=2&ayah=255", { waitUntil: "domcontentloaded" });
+    await expect(sharedPage.getByRole("button", { name: "2:255", exact: true })).toBeInViewport();
   });
 });

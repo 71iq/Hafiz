@@ -314,9 +314,12 @@ white, beige, dark, AMOLED and system themes.
 
 Cold Arabic phone deep links exposed a list-positioning issue during verification.
 The reader now waits for settings and the requested page font before positioning
-a deep link, and uses an immediate scroll. The new Chromium regression test
+a deep link, and uses an immediate scroll. It awaits FlashList's asynchronous
+scroll, checks the visible index range and retries missed targets. A new
+request or unmount cancels further attempts. The Chromium regression test
 checks that 2:255 is actually in the viewport, rather than only checking that the
-route renders. It failed before the change and passed after it.
+route renders. It covers a cold link and navigation from a saved position.
+It failed before the change and passed after it.
 
 The static export still emits an occasional recoverable React hydration warning
 and the existing React Native web animation fallback warning. No blank screen or

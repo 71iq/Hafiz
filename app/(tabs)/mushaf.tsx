@@ -40,6 +40,7 @@ import { useWordInteraction } from "@/lib/word/context";
 import { consumePendingDeepLink, peekPendingDeepLink } from "@/lib/deep-link";
 import { isQfContentEnabled } from "@/lib/quran-foundation/config";
 import { loadQuranPageFont } from "@/lib/fonts/loader";
+import { scrollToVisibleIndex } from "@/lib/mushaf/scroll-to-visible-index";
 import { toArabicNumber } from "@/lib/arabic";
 import {
   SIDEBAR_BREAKPOINT,
@@ -484,7 +485,7 @@ function MushafInner() {
   const goToPageRef = useRef<((page: number) => void) | null>(null);
   const flashListRef = useRef<FlashListRef<MushafItem>>(null);
   const pendingVersePageRef = useRef<number | null>(null);
-  const verseScrollRetryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const verseScrollRequestRef = useRef(0);
 
   const [surahHeaderIndices, setSurahHeaderIndices] = useState<
     Map<number, number>
@@ -501,36 +502,19 @@ function MushafInner() {
   }, []);
 
   const clearVerseScrollRetry = useCallback(() => {
-    if (verseScrollRetryRef.current) {
-      clearTimeout(verseScrollRetryRef.current);
-      verseScrollRetryRef.current = null;
-    }
+    verseScrollRequestRef.current += 1;
   }, []);
 
   const scheduleVerseScrollToIndex = useCallback(
     (index: number, animated = false) => {
       clearVerseScrollRetry();
-      let attempts = 0;
-      const run = () => {
-        try {
-          if (flashListRef.current) {
-            flashListRef.current.scrollToIndex({
-              index,
-              animated,
-              viewPosition: 0.12,
-            });
-            verseScrollRetryRef.current = null;
-            return;
-          }
-        } catch {}
-        attempts += 1;
-        if (attempts < 12) {
-          verseScrollRetryRef.current = setTimeout(run, 80);
-        } else {
-          verseScrollRetryRef.current = null;
-        }
-      };
-      requestAnimationFrame(run);
+      const request = verseScrollRequestRef.current;
+      return scrollToVisibleIndex(
+        () => flashListRef.current,
+        index,
+        animated,
+        () => verseScrollRequestRef.current === request,
+      );
     },
     [clearVerseScrollRetry]
   );
@@ -828,7 +812,7 @@ function MushafInner() {
           if (item?.type === "ayah") {
             await loadQuranPageFont(quranFontStyle, item.v2Page);
           }
-          scheduleVerseScrollToIndex(idx, animated);
+          await scheduleVerseScrollToIndex(idx, animated);
           setTopAyah({ surah: target.surah, ayah: target.ayah });
           if (item?.type === "ayah") {
             commitCurrentPage(item.v2Page);
