@@ -76,6 +76,13 @@ checksum manifest. The deploy step has a separate Hafiz SSH key. Its forced
 command accepts `deploy <40-character-commit>` and a bounded archive.
 It does not allow an interactive shell or forwarding.
 
+The archive permits Expo's exact `dist/_expo/.routes.json` path. Other hidden
+files remain forbidden. Caddy caches hashed bundles under `/_expo/static`
+and bundled assets, while HTML and the route manifest require revalidation.
+The Quran Foundation connection flow returns to its initiating web origin,
+so staging can test the callback without sending it to the old production app.
+Native clients retain the canonical HTTPS callback.
+
 `hafiz-promote` validates paths, entry types, file counts, size limits and every
 file checksum, then swaps `/opt/hafiz/current` atomically. If the HTTP check
 fails, it restores the previous link. Five releases remain under

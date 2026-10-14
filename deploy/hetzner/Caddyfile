@@ -4,9 +4,8 @@
   encode zstd gzip
   header X-Content-Type-Options nosniff
   header Referrer-Policy strict-origin-when-cross-origin
-  @html path / /index.html *.html
-  header @html Cache-Control "no-cache"
-  @versioned path /_expo/* /assets/*
+  header Cache-Control "no-cache"
+  @versioned path /_expo/static/* /assets/*
   header @versioned Cache-Control "public, max-age=31536000, immutable"
   @profile path_regexp profile ^/profile/[^/]+/?$
   rewrite @profile /profile/[userId].html

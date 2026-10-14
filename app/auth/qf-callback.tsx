@@ -5,8 +5,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { completeQfOAuthConnection } from "@/lib/quran-foundation/user";
 import { strings } from "@/lib/i18n/strings";
 import { getStartupLanguage } from "@/lib/i18n/startup-language";
-
-const QF_WEB_REDIRECT_URI = "https://hafizquran.app/auth/qf-callback";
+import { getQfOAuthRedirectUri } from "@/lib/quran-foundation/oauth-redirect";
 
 export default function QfCallbackScreen() {
   const router = useRouter();
@@ -34,7 +33,7 @@ export default function QfCallbackScreen() {
         return;
       }
 
-      const response = await completeQfOAuthConnection(code, state, QF_WEB_REDIRECT_URI);
+      const response = await completeQfOAuthConnection(code, state, getQfOAuthRedirectUri());
       if (response.ok) {
         router.replace("/settings?qf=connected");
         return;

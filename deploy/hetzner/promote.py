@@ -28,8 +28,10 @@ def checked_members(archive):
         members.append(member)
         name = member.name.rstrip("/")
         parts = name.split("/")
+        hidden = any(part.startswith(".") for part in parts)
         if (len(members) > 30000 or not name or name.startswith("/") or "\\" in name
-                or any(part in ("", ".", "..") or part.startswith(".") for part in parts)
+                or any(part in ("", ".", "..") for part in parts)
+                or (hidden and name != "dist/_expo/.routes.json")
                 or not (parts[0] == "dist" or name == "SHA256SUMS")
                 or not (member.isfile() or member.isdir()) or member.size < 0
                 or name in found):

@@ -83,6 +83,15 @@ class ArchiveMemberTests(unittest.TestCase):
         self.assert_invalid(valid_entries()[:1] + [("dist/../escape", "file", b"x")] + valid_entries()[1:])
         self.assert_invalid(valid_entries()[:1] + [("/tmp/escape", "file", b"x")] + valid_entries()[1:])
 
+    def test_accepts_expo_route_manifest(self):
+        entries = valid_entries() + [("dist/_expo/.routes.json", "file", b"{}")]
+        with tarfile.open(fileobj=io.BytesIO(tar_bytes(entries)), mode="r:") as archive:
+            self.assertEqual(len(promote.checked_members(archive)), len(entries))
+
+    def test_rejects_hidden_credentials_and_directories(self):
+        self.assert_invalid(valid_entries() + [("dist/.env", "file", b"secret")])
+        self.assert_invalid(valid_entries() + [("dist/.private/key", "file", b"secret")])
+
     def test_rejects_symbolic_and_hard_links(self):
         self.assert_invalid(valid_entries()[:1] + [("dist/link", "symlink", "index.html")] + valid_entries()[1:])
         self.assert_invalid(valid_entries()[:1] + [("dist/link", "hardlink", "dist/index.html")] + valid_entries()[1:])

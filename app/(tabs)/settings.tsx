@@ -51,6 +51,7 @@ import { stringByKey, useStrings } from "@/lib/i18n/useStrings";
 import { useAuthStore } from "@/lib/auth/store";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { isQfSyncEnabled } from "@/lib/quran-foundation/config";
+import { getQfOAuthRedirectUri } from "@/lib/quran-foundation/oauth-redirect";
 import { formatReciterLabel, getReciterById } from "@/lib/quran-foundation/recitations";
 import {
   beginQfOAuthConnection,
@@ -271,7 +272,7 @@ export default function SettingsScreen() {
     setQfBusy(true);
     setQfMessage(null);
     try {
-      const response = await beginQfOAuthConnection("https://hafizquran.app/auth/qf-callback", "/settings");
+      const response = await beginQfOAuthConnection(getQfOAuthRedirectUri(), "/settings");
       if (!response.ok) throw new Error(response.message);
       setQfMessage(s.qfConnectionStarted);
       await openQfAuthorizationUrl(response.authorizationUrl);
