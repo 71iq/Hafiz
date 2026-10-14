@@ -345,10 +345,8 @@ export async function updateProfileStats(db: SQLiteDatabase): Promise<void> {
 
   const { data, error } = await supabase
     .from("profiles")
-    .upsert({
-      id: user.id,
-      ...stats,
-    })
+    .update(stats)
+    .eq("id", user.id)
     .select("*")
     .single();
 

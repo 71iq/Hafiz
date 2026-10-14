@@ -51,6 +51,14 @@ keeps its own managed Auth migration history. Empty Auth tables unavailable
 in the pinned image are omitted; nonempty incompatible tables must stop the
 restore. The signup trigger on `auth.users` is restored separately.
 
+The cloud schema is missing `user_word_meanings`, which the current client
+syncs. Apply the existing
+`supabase/migrations/20260526153500_user_word_meanings.sql` to the VM and reload
+the PostgREST schema cache. This adds an empty table with ownership policies
+and the authenticated-role grants. Existing source table fingerprints remain
+unchanged. Profile counters update the existing account row; an upsert with
+only counters fails the required username check before conflict handling.
+
 Hafiz's original symmetric signing secret is retained, with a new private EC
 signing key and the source EC public key for verifying existing tokens. Never
 copy any El Psy Congroo credential into this stack. GoTrue selects its signer
