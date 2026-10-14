@@ -94,10 +94,21 @@ The web build sets `EXPO_PUBLIC_SUPABASE_AUTH_STORAGE_KEY` to
 `sb-frzewjaxijhtezfvcgll-auth-token` to preserve the original browser session
 storage entry. Verify a real session refresh before accepting continuity.
 
-Supabase exposes function-secret hashes, not their original values. The
-existing Quran Foundation content/user credentials and token encryption key
-must be supplied privately and checked against those hashes. Preserve the
-encryption key so the migrated connection can decrypt its saved tokens.
+Supabase exposes secret hashes, not their original values. Its Auth config
+also returns a hash for the Google client secret. Use the original credential
+or a new second secret from the existing Google OAuth client, while preserving
+the first secret for the old hosting.
+
+The owner confirmed that the original Quran Foundation encryption key is
+unavailable and requested disabling the integration for now. Set
+`EXPO_PUBLIC_QF_USER_AUTH_ENABLED=false` and
+`EXPO_PUBLIC_QF_CONTENT_ENABLED=false` in the web build. Login, connection,
+external sync, audio and remote hadith controls are hidden, content requests
+stop before calling Supabase, and Caddy has no public function route.
+All connection records, identities, cached content and original deployed
+functions remain in the migration backups. Do not generate a replacement key
+and assume it can decrypt the old connection. Re-enabling the integration
+requires credentials and reauthorization of the affected connection.
 The source uses Supabase's shared email sender. Supply an existing SMTP
 service before testing confirmation and password reset. Keep email
 confirmation enabled.
@@ -144,12 +155,12 @@ an administrator deployment. The web deploy key cannot modify them.
    configuration before every reload. Preserve the existing file's contents
    and save its pre-migration copy at `/root/hafiz-migration/Caddyfile.before`.
 5. Add the new API callback to the existing Google OAuth client's authorized
-   redirect URLs. Preserve its old callback. Check the custom Quran Foundation
-   OAuth provider and its allowed callback in the same way.
+   redirect URLs. Preserve its old callback and original client secret.
 6. Test the real VM web export at phone, tablet and desktop widths, both
    languages and the relevant themes. Verify Quran rendering, fonts, SQLite
    startup, deep links, reading, review, login, private access and two-client
-   sync. Verify actual email delivery and the Quran Foundation actions.
+   sync. Verify actual email delivery and confirm the disabled Quran Foundation
+   controls and routes stay unavailable.
 7. Test backup restoration and restart recovery. Repeat ehabmaali.com checks.
 8. Stop source writers for the final snapshot. Repeat export, restore and
    fingerprint checks. Reconcile avatar URLs and source storage ownership.
@@ -161,9 +172,8 @@ an administrator deployment. The web deploy key cannot modify them.
 10. Verify the already enabled backup and health timers. Retain Vercel and the source data for
     rollback until production acceptance and native compatibility are confirmed.
 
-Installed native clients have the old Supabase URL embedded. The observed
-source sessions were browser sessions, but that does not prove there are no
-installed native apps. Rebuild native clients with the new public backend
+The owner confirmed that Hafiz is currently used only on the web. No installed
+native clients require a migration. Future native builds must use the new public backend
 settings and verify them before retiring the old endpoint. Do not allow both
 backends to accept independent production writes after cutover. A temporary
 compatibility plan must preserve queued local writes and prevent split data.
@@ -244,8 +254,8 @@ An original imported account refresh token was accepted by the VM and kept
 its original user ID. Browser continuity at the production origin still needs
 verification after cutover.
 
-Email delivery, Quran Foundation actions and installed native clients remain
-acceptance checks. The source hosting and
+Email delivery and Google OAuth remain acceptance checks. Quran Foundation
+is intentionally disabled, and the owner confirmed web-only usage. The source hosting and
 backend remain available, and the apex DNS record remains unchanged.
 
 Supabase's [platform restore guide](https://supabase.com/docs/guides/self-hosting/restore-from-platform)

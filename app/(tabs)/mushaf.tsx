@@ -38,6 +38,7 @@ import { Toast } from "@/components/ui/Toast";
 import { SearchCommand } from "@/components/SearchCommand";
 import { useWordInteraction } from "@/lib/word/context";
 import { consumePendingDeepLink, peekPendingDeepLink } from "@/lib/deep-link";
+import { isQfContentEnabled } from "@/lib/quran-foundation/config";
 import { toArabicNumber } from "@/lib/arabic";
 import {
   SIDEBAR_BREAKPOINT,
@@ -1497,15 +1498,17 @@ function MushafInner() {
                     >
                       <BookMarked size={16} color={isDark ? "#737373" : "#8B8178"} />
                     </Pressable>
-                    <Pressable
-                      onPress={handleOpenRecitation}
-                      accessibilityRole="button"
-                      accessibilityLabel={s.recitationToolbar}
-                      className={`${mobileToolbarIconClass} ${showRecitation ? "bg-primary-accent/15 dark:bg-primary-bright/15" : ""}`}
-                      style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-                    >
-                      <ListMusic size={16} color={showRecitation ? "#0d9488" : isDark ? "#737373" : "#8B8178"} />
-                    </Pressable>
+                    {isQfContentEnabled() && (
+                      <Pressable
+                        onPress={handleOpenRecitation}
+                        accessibilityRole="button"
+                        accessibilityLabel={s.recitationToolbar}
+                        className={`${mobileToolbarIconClass} ${showRecitation ? "bg-primary-accent/15 dark:bg-primary-bright/15" : ""}`}
+                        style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+                      >
+                        <ListMusic size={16} color={showRecitation ? "#0d9488" : isDark ? "#737373" : "#8B8178"} />
+                      </Pressable>
+                    )}
                     {viewMode === "verse" ? (
                       <Pressable
                         onPress={() => setVerseHideMode((prev) => !prev)}
@@ -1591,19 +1594,21 @@ function MushafInner() {
                 >
                   <BookMarked size={16} color={isDark ? "#737373" : "#8B8178"} />
                 </Pressable>
-                <Pressable
-                  onPress={handleOpenRecitation}
-                  accessibilityRole="button"
-                  accessibilityLabel={s.recitationToolbar}
-                  className={`${desktopToolbarIconClass} ${
-                    showRecitation
-                      ? "bg-primary-accent/15 dark:bg-primary-bright/15"
-                      : ""
-                  }`}
-                  style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
-                >
-                  <ListMusic size={16} color={showRecitation ? "#0d9488" : isDark ? "#737373" : "#8B8178"} />
-                </Pressable>
+                {isQfContentEnabled() && (
+                  <Pressable
+                    onPress={handleOpenRecitation}
+                    accessibilityRole="button"
+                    accessibilityLabel={s.recitationToolbar}
+                    className={`${desktopToolbarIconClass} ${
+                      showRecitation
+                        ? "bg-primary-accent/15 dark:bg-primary-bright/15"
+                        : ""
+                    }`}
+                    style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }] })}
+                  >
+                    <ListMusic size={16} color={showRecitation ? "#0d9488" : isDark ? "#737373" : "#8B8178"} />
+                  </Pressable>
+                )}
                 {viewMode === "verse" ? (
                   <Pressable
                     onPress={() => setVerseHideMode((prev) => !prev)}

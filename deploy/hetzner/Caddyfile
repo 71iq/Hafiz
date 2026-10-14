@@ -30,7 +30,8 @@ api.hafizquran.app {
     max_size 8MB
   }
   # The dashboard, metadata, pooler and database have no public route.
-  @client_api path /auth/v1/* /rest/v1/* /storage/v1/* /functions/v1/*
+  # Quran Foundation functions remain backed up but are temporarily disabled.
+  @client_api path /auth/v1/* /rest/v1/* /storage/v1/*
   handle @client_api {
     reverse_proxy 127.0.0.1:8100 {
       header_up -Cookie

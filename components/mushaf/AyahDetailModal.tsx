@@ -16,6 +16,7 @@ import {
   quranPageFontPaletteStyle,
 } from "@/lib/fonts/loader";
 import { useAyahAudio } from "@/lib/audio/ayah-audio";
+import { isQfContentEnabled } from "@/lib/quran-foundation/config";
 import { ensureTafsirSourceImported } from "@/lib/database/init";
 import { useDatabase } from "@/lib/database/provider";
 import { stringByKey, useStrings } from "@/lib/i18n/useStrings";
@@ -360,7 +361,7 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
         }]
       : []),
     { key: "tafsir", label: s.tafseer, icon: <BookOpenText size={15} color={activeTab === "tafsir" ? "#0d9488" : iconColor} /> },
-    { key: "hadith", label: s.ayahTabHadith, icon: <BookOpenText size={15} color={activeTab === "hadith" ? "#0d9488" : iconColor} /> },
+    ...(isQfContentEnabled() ? [{ key: "hadith" as AyahDetailTabKey, label: s.ayahTabHadith, icon: <BookOpenText size={15} color={activeTab === "hadith" ? "#0d9488" : iconColor} /> }] : []),
     { key: "qiraat", label: s.wordTabQiraat, icon: <BookOpenText size={15} color={activeTab === "qiraat" ? "#0d9488" : iconColor} /> },
     { key: "notes", label: s.privateNotes, icon: <NotebookPen size={15} color={activeTab === "notes" ? "#0d9488" : iconColor} /> },
     { key: "reflections", label: s.reflections, icon: <MessageCircle size={15} color={activeTab === "reflections" ? "#0d9488" : iconColor} /> },
@@ -408,20 +409,22 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
               </Text>
               {bookmarked && <View className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-gold" />}
             </Pressable>
-            <ActionIcon
-              icon={
-                audioState.loading ? (
-                  <ActivityIndicator size="small" color={audioIconColor} />
-                ) : audioState.playing ? (
-                  <Pause size={15} color={audioIconColor} />
-                ) : (
-                  <Play size={15} color={audioIconColor} />
-                )
-              }
-              onPress={handleAudioPress}
-              disabled={audioState.loading}
-              accessibilityLabel={audioState.loading ? s.audioLoading : audioState.playing ? s.audioPause : s.audioPlay}
-            />
+            {isQfContentEnabled() && (
+              <ActionIcon
+                icon={
+                  audioState.loading ? (
+                    <ActivityIndicator size="small" color={audioIconColor} />
+                  ) : audioState.playing ? (
+                    <Pause size={15} color={audioIconColor} />
+                  ) : (
+                    <Play size={15} color={audioIconColor} />
+                  )
+                }
+                onPress={handleAudioPress}
+                disabled={audioState.loading}
+                accessibilityLabel={audioState.loading ? s.audioLoading : audioState.playing ? s.audioPause : s.audioPlay}
+              />
+            )}
             <ActionIcon
               icon={
                 bookmarkBusy ? (
@@ -660,7 +663,7 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
               )}
             </View>
           )}
-          {activeTab === "hadith" && <HadithTab surah={activeTarget.surah} ayah={activeTarget.ayah} />}
+          {isQfContentEnabled() && activeTab === "hadith" && <HadithTab surah={activeTarget.surah} ayah={activeTarget.ayah} />}
           {activeTab === "qiraat" && <QiraatTab surah={activeTarget.surah} ayah={activeTarget.ayah} showHeader={false} />}
           {activeTab === "notes" && <PrivateNotesSection surah={activeTarget.surah} ayah={activeTarget.ayah} />}
           {activeTab === "reflections" && (

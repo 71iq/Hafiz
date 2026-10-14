@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { DEFAULT_RECITATION_ID } from "@/lib/quran-foundation/recitations";
+import { isQfContentEnabled } from "@/lib/quran-foundation/config";
 
 export type QfContentErrorCode = "bad_request" | "not_configured" | "rate_limited" | "upstream";
 
@@ -100,14 +101,14 @@ type RecitersRequest = {
   language: "en" | "ar";
 };
 
-export const QF_DEFAULT_RECITATION_ID = parsePositiveInt(
-  process.env.EXPO_PUBLIC_QF_DEFAULT_RECITATION_ID ?? process.env.QF_DEFAULT_RECITATION_ID
-) ?? DEFAULT_RECITATION_ID;
+export const QF_DEFAULT_RECITATION_ID =
+  parsePositiveInt(process.env.EXPO_PUBLIC_QF_DEFAULT_RECITATION_ID ?? process.env.QF_DEFAULT_RECITATION_ID) ??
+  DEFAULT_RECITATION_ID;
 
 export async function fetchQfAyahAudio(
   surah: number,
   ayah: number,
-  recitationId = QF_DEFAULT_RECITATION_ID
+  recitationId = QF_DEFAULT_RECITATION_ID,
 ): Promise<QfAudioResponse | QfContentError> {
   return invokeQfContent<QfAudioResponse>({
     action: "audio-ayah",
@@ -122,7 +123,7 @@ export async function fetchQfAyahHadiths(
   ayah: number,
   language: "en" | "ar",
   page = 1,
-  limit = 4
+  limit = 4,
 ): Promise<QfHadithResponse | QfContentError> {
   return invokeQfContent<QfHadithResponse>({
     action: "hadith-ayah",
@@ -142,9 +143,9 @@ export async function fetchQfReciters(language: "en" | "ar"): Promise<QfReciters
 }
 
 async function invokeQfContent<T extends QfAudioResponse | QfHadithResponse | QfRecitersResponse>(
-  body: AudioRequest | HadithRequest | RecitersRequest
+  body: AudioRequest | HadithRequest | RecitersRequest,
 ): Promise<T | QfContentError> {
-  if (!isSupabaseConfigured()) {
+  if (!isQfContentEnabled() || !isSupabaseConfigured()) {
     return {
       ok: false,
       code: "not_configured",

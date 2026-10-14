@@ -50,7 +50,7 @@ import { OverlayBody, OverlayHeader, ResponsiveModal } from "@/components/ui/Res
 import { stringByKey, useStrings } from "@/lib/i18n/useStrings";
 import { useAuthStore } from "@/lib/auth/store";
 import { isSupabaseConfigured } from "@/lib/supabase";
-import { isQfSyncEnabled } from "@/lib/quran-foundation/config";
+import { isQfContentEnabled, isQfSyncEnabled } from "@/lib/quran-foundation/config";
 import { getQfOAuthRedirectUri } from "@/lib/quran-foundation/oauth-redirect";
 import { formatReciterLabel, getReciterById } from "@/lib/quran-foundation/recitations";
 import {
@@ -581,15 +581,17 @@ export default function SettingsScreen() {
               />
             </ContentSettingsGroup>
 
-            <ContentSettingsGroup title={s.recitationSettingsLabel} isRTL={isRTL}>
-              <ContentSettingsRow
-                label={s.recitationFavoriteReciter}
-                value={formatReciterLabel(currentReciter, uiLanguage)}
-                isRTL={isRTL}
-                isDark={isDark}
-                onPress={() => setReciterPickerVisible(true)}
-              />
-            </ContentSettingsGroup>
+            {isQfContentEnabled() && (
+              <ContentSettingsGroup title={s.recitationSettingsLabel} isRTL={isRTL}>
+                <ContentSettingsRow
+                  label={s.recitationFavoriteReciter}
+                  value={formatReciterLabel(currentReciter, uiLanguage)}
+                  isRTL={isRTL}
+                  isDark={isDark}
+                  onPress={() => setReciterPickerVisible(true)}
+                />
+              </ContentSettingsGroup>
+            )}
           </View>
         </ContentSettingsPanel>
       )}

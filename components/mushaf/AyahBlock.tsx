@@ -30,6 +30,7 @@ import {
 import { formatForCopy } from "@/lib/selection/format";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { useAyahAudio } from "@/lib/audio/ayah-audio";
+import { isQfContentEnabled } from "@/lib/quran-foundation/config";
 import { AyahDetailModal, type AyahDetailTabKey } from "./AyahDetailModal";
 
 function stopReaderChromeToggle(event: any) {
@@ -265,20 +266,22 @@ function AyahBlockInner({
               <View className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-gold" />
             )}
           </Pressable>
-          <ActionIcon
-            icon={
-              audioState.loading ? (
-                <ActivityIndicator size="small" color={audioIconColor} />
-              ) : audioState.playing ? (
-                <Pause size={15} color={audioIconColor} />
-              ) : (
-                <Play size={15} color={audioIconColor} />
-              )
-            }
-            onPress={handleAudioPress}
-            disabled={audioState.loading}
-            accessibilityLabel={audioState.loading ? s.audioLoading : audioState.playing ? s.audioPause : s.audioPlay}
-          />
+          {isQfContentEnabled() && (
+            <ActionIcon
+              icon={
+                audioState.loading ? (
+                  <ActivityIndicator size="small" color={audioIconColor} />
+                ) : audioState.playing ? (
+                  <Pause size={15} color={audioIconColor} />
+                ) : (
+                  <Play size={15} color={audioIconColor} />
+                )
+              }
+              onPress={handleAudioPress}
+              disabled={audioState.loading}
+              accessibilityLabel={audioState.loading ? s.audioLoading : audioState.playing ? s.audioPause : s.audioPlay}
+            />
+          )}
           <ActionIcon
             icon={shareBusy ? <ActivityIndicator size="small" color={iconColor} /> : <Share2 size={15} color={iconColor} />}
             onPress={handleShare}
@@ -424,12 +427,14 @@ function AyahBlockInner({
             onPress={() => openDetail("tafsir")}
             isRTL={isRTL}
           />
-          <ActionPill
-            label={s.ayahTabHadith}
-            icon={<BookOpenText size={14} color={iconColor} />}
-            onPress={() => openDetail("hadith")}
-            isRTL={isRTL}
-          />
+          {isQfContentEnabled() && (
+            <ActionPill
+              label={s.ayahTabHadith}
+              icon={<BookOpenText size={14} color={iconColor} />}
+              onPress={() => openDetail("hadith")}
+              isRTL={isRTL}
+            />
+          )}
           <ActionPill
             label={s.wordTabQiraat}
             icon={<BookOpenText size={14} color={iconColor} />}
