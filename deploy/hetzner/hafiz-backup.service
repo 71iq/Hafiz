@@ -1,0 +1,14 @@
+[Unit]
+Description=Back up Hafiz database, storage and configuration
+After=hafiz-backend.service
+Requires=hafiz-backend.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/hafiz-backup
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+MemoryMax=384M
+CPUQuota=50%
+TimeoutStartSec=600

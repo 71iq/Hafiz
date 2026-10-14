@@ -1,0 +1,16 @@
+[Unit]
+Description=Hafiz isolated Supabase services
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/hafiz-compose up -d --wait --wait-timeout 180
+ExecStop=/usr/local/sbin/hafiz-compose stop
+TimeoutStartSec=240
+TimeoutStopSec=120
+
+[Install]
+WantedBy=multi-user.target

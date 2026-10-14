@@ -1,0 +1,43 @@
+# Import this file from the existing Caddyfile after validating both together.
+(hafiz_static) {
+  root * /opt/hafiz/current/dist
+  encode zstd gzip
+  header X-Content-Type-Options nosniff
+  header Referrer-Policy strict-origin-when-cross-origin
+  @html path / /index.html *.html
+  header @html Cache-Control "no-cache"
+  @versioned path /_expo/* /assets/*
+  header @versioned Cache-Control "public, max-age=31536000, immutable"
+  @profile path_regexp profile ^/profile/[^/]+/?$
+  rewrite @profile /profile/[userId].html
+  try_files {path} {path}.html {path}/index.html /+not-found.html
+  file_server
+}
+
+http://127.0.0.1:8081 {
+  import hafiz_static
+}
+
+hafizquran.app, staging.hafizquran.app {
+  import hafiz_static
+}
+
+www.hafizquran.app {
+  redir https://hafizquran.app{uri} permanent
+}
+
+api.hafizquran.app {
+  request_body {
+    max_size 8MB
+  }
+  # The dashboard, metadata, pooler and database have no public route.
+  @client_api path /auth/v1/* /rest/v1/* /storage/v1/* /functions/v1/*
+  handle @client_api {
+    reverse_proxy 127.0.0.1:8100 {
+      header_up -Cookie
+    }
+  }
+  handle {
+    respond 404
+  }
+}

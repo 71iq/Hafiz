@@ -1,0 +1,8 @@
+[Unit]
+Description=Check Hafiz web and backend readiness
+After=hafiz-backend.service caddy.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/hafiz-health
+TimeoutStartSec=60

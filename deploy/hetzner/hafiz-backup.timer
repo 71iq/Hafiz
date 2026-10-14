@@ -1,0 +1,9 @@
+[Unit]
+Description=Nightly Hafiz backup, after El Psy Congroo backup
+
+[Timer]
+OnCalendar=*-*-* 04:00:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target

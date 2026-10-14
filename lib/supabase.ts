@@ -82,6 +82,10 @@ export const supabase: SupabaseClient = new Proxy({} as SupabaseClient, {
       }
       _client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
         auth: {
+          // Keep the original browser session when the backend hostname changes.
+          ...(process.env.EXPO_PUBLIC_SUPABASE_AUTH_STORAGE_KEY
+            ? { storageKey: process.env.EXPO_PUBLIC_SUPABASE_AUTH_STORAGE_KEY }
+            : {}),
           ...(Platform.OS !== "web" ? { storage: AsyncStorage } : {}),
           autoRefreshToken: true,
           persistSession: true,

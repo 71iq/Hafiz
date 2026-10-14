@@ -1,0 +1,59 @@
+# Layer over Supabase self-hosted/v0.8.2, commit
+# 564eab8ad7840b13324f68b1bfac074ef8d51c21. Always use project name hafiz.
+services:
+  api-gw:
+    container_name: hafiz-gateway
+    depends_on: !reset {}
+    ports: !override
+      - "127.0.0.1:8100:8000/tcp"
+    mem_limit: 128m
+    cpus: 0.5
+  db:
+    container_name: hafiz-db
+    mem_limit: 768m
+    cpus: 1.5
+    shm_size: 128m
+  auth:
+    container_name: hafiz-auth
+    env_file: /etc/hafiz/auth.env
+    mem_limit: 128m
+    cpus: 0.5
+  rest:
+    container_name: hafiz-rest
+    environment:
+      PGRST_DB_POOL: 10
+    mem_limit: 192m
+    cpus: 0.5
+  storage:
+    container_name: hafiz-storage
+    mem_limit: 256m
+    cpus: 0.5
+  imgproxy:
+    container_name: hafiz-imgproxy
+    mem_limit: 192m
+    cpus: 0.5
+  functions:
+    container_name: hafiz-functions
+    env_file: /etc/hafiz/functions.env
+    mem_limit: 384m
+    cpus: 0.75
+  # The app uses REST sync, not Realtime subscriptions. Administration and
+  # pooling services are available only when explicitly requested by an operator.
+  studio:
+    container_name: hafiz-studio
+    profiles: [operator]
+  meta:
+    container_name: hafiz-meta
+    profiles: [operator]
+  realtime:
+    container_name: hafiz-realtime
+    profiles: [operator]
+    networks:
+      default:
+        aliases: [realtime-dev.supabase-realtime]
+  supavisor:
+    container_name: hafiz-pooler
+    profiles: [operator]
+    ports: !override
+      - "127.0.0.1:55432:5432/tcp"
+      - "127.0.0.1:56543:6543/tcp"

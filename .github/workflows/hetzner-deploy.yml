@@ -1,0 +1,68 @@
+name: Deploy Hafiz to Hetzner
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: hafiz-hetzner-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      EXPO_PUBLIC_SUPABASE_URL: ${{ vars.EXPO_PUBLIC_SUPABASE_URL }}
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+      EXPO_PUBLIC_SUPABASE_AUTH_STORAGE_KEY: sb-frzewjaxijhtezfvcgll-auth-token
+      EXPO_PUBLIC_QF_USER_AUTH_ENABLED: ${{ vars.EXPO_PUBLIC_QF_USER_AUTH_ENABLED }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "24"
+          cache: npm
+      - name: Build and verify
+        run: |
+          set -euo pipefail
+          test -n "$EXPO_PUBLIC_SUPABASE_URL"
+          test -n "$EXPO_PUBLIC_SUPABASE_ANON_KEY"
+          npm ci
+          npm run typecheck
+          npx jest --runInBand tests/unit/quran-data-contract.test.ts tests/unit/sync-restore-contract.test.ts tests/unit/oauth-buttons-contract.test.tsx
+          python3 scripts/test-web-release.py
+          npm run build:web
+          npx playwright install --with-deps chromium
+          npx playwright test --project=smoke-chromium tests/e2e/smoke.spec.ts
+          git diff --check
+      - name: Deploy verified static export
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEPLOY_KEY: ${{ secrets.HAFIZ_HETZNER_DEPLOY_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.HAFIZ_HETZNER_KNOWN_HOSTS }}
+          DEPLOY_HOST: ${{ vars.HAFIZ_HETZNER_HOST }}
+        run: |
+          set -euo pipefail
+          umask 077
+          task_dir=$(mktemp -d)
+          trap 'rm -r -- "$task_dir"' EXIT
+          printf '%s\n' "$DEPLOY_KEY" > "$task_dir/key"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$task_dir/known_hosts"
+          python3 scripts/package-web-release.py "$task_dir/runtime.tar.gz"
+          release_sha=$(git rev-parse HEAD)
+          current_sha=$(gh api "repos/${{ github.repository }}/git/ref/heads/main" --jq .object.sha)
+          if [ "$release_sha" != "$current_sha" ]; then
+            echo 'A newer main revision will deploy in the next queued run.'
+            exit 0
+          fi
+          ssh -i "$task_dir/key" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$task_dir/known_hosts" -o ConnectTimeout=20 \
+            "hafizdeploy@$DEPLOY_HOST" "deploy $release_sha" < "$task_dir/runtime.tar.gz"

@@ -1,0 +1,5 @@
+#!/bin/bash
+set -euo pipefail
+cd /opt/hafiz/supabase
+exec docker compose --project-name hafiz --env-file /etc/hafiz/supabase.env \
+  -f docker-compose.yml -f /etc/hafiz/docker-compose.private.yml "$@"
