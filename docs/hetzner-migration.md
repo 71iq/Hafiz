@@ -31,6 +31,12 @@ current export size. Deployment refuses to start below 5 GiB free disk and
 limits both compressed and expanded archives. Nightly backups run at 04:00 UTC,
 after the existing application's backup and cleanup jobs.
 
+During a CI deployment, one-second samples recorded at least 5,236 MiB
+available RAM and 55.47 GiB free disk. A backup run recorded at least
+5,299 MiB available RAM and 55.99 GiB free disk. Peak one-minute loads were
+1.90 and 1.06 respectively on four vCPUs. These measurements describe the
+current 12-account dataset; monitor growth before raising service limits.
+
 ## Credentials and source backups
 
 Local migration files live in
@@ -59,9 +65,13 @@ schema cache:
 - `supabase/migrations/20260524062349_add_profile_bio.sql`
 - `supabase/migrations/20260524065455_add_profile_country.sql`
 - `supabase/migrations/20260526153500_user_word_meanings.sql`
+- `supabase/migrations/20261014104500_serialize_public_aggregate_refresh.sql`
 
 The changes add nullable columns and an empty vocabulary table with ownership
-policies. They preserve existing records. Compare original columns when
+policies. The new aggregate migration serializes refreshes per account and
+handles competing inserts into public progress and review activity. It changes
+the two existing trigger functions without rewriting historical rows.
+Compare original columns when
 repeating source fingerprints after these migrations.
 
 Profile counters update the existing account row; an upsert with only counters
@@ -71,6 +81,10 @@ the asynchronous connectivity check, which previously allowed simultaneous
 startup runs and overlapping SQLite transactions. The review upload checks
 whether any matching event exists, including when the source has duplicates.
 It preserves those historical rows.
+
+The Mushaf records a consumed deep link before navigation. Saved-position
+restoration checks that record before scheduling or executing a scroll, so
+restoration cannot move the reader away from the requested ayah.
 
 Hafiz's original symmetric signing secret is retained, with a new private EC
 signing key and the source EC public key for verifying existing tokens. Never
@@ -160,7 +174,9 @@ The root-owned backup script shares `/run/hafiz/operation.lock` with deployment.
 It stops only Hafiz Auth, REST, Storage and Functions while taking a consistent
 database and file snapshot, then restarts those services even on failure.
 Reading the static site remains available. Backups include a PostgreSQL custom
-dump, storage archive, private configuration, release pointer and SHA-256
+dump, database roles, the private database configuration volume, storage,
+Edge Function code, private configuration, release pointer, row fingerprints
+captured while writers are stopped and a SHA-256
 manifest. Complete backups retain seven days under `/var/backups/hafiz`.
 Partial backups remain for operator review. Copy completed backups off the VM
 into the local private migration directory. Existing Hetzner VM backups also
@@ -178,15 +194,19 @@ systemctl status hafiz-backend.service hafiz-backup.timer hafiz-health.timer
 For a restore drill, verify the manifest, create a separate database in
 `hafiz-db`, and restore with `supabase_admin` and `pg_restore --exit-on-error`.
 Compare counts and fingerprints before removing the disposable database.
+Use the backup's `fingerprints.jsonl`, since the running database may have
+received new writes after the backup.
 Inspect the storage archive and verify every file hash. Do not restore over
 the running production database during a drill.
 
 For real recovery, stop Hafiz writers, restore the matched database, storage
 and private configuration into the pinned initialized stack, and verify
 private access and checksums before enabling writes. On a replacement VM,
-recreate the isolated project and restore its named database configuration
-volume as required. Restore Caddy's Hafiz import without replacing the other
-site's configuration.
+recreate the isolated project, restore `roles.sql` and unpack
+`database-config.tar.gz` into Hafiz's own `hafiz_db-config` volume at
+`/etc/postgresql-custom`. Restore the backed-up Edge Function files before
+starting the runtime. Restore Caddy's Hafiz import without replacing the
+other site's configuration.
 
 To roll back the web release, atomically point `/opt/hafiz/current` at a retained
 verified release and run the local health check. A rollback to Vercel also
@@ -206,6 +226,10 @@ into the separate `hafiz_restore_check` database with matching fingerprints,
 12 original accounts and 2,482 review-log rows. The storage archive also passed
 path, size and SHA-256 checks. Restarting `hafiz-backend.service` brought all
 seven containers back healthy while Caddy and ehabmaali.com remained active.
+
+The revised backup also restored into `hafiz_restore_verified`. All 54 tables
+and 6,756 rows matched the fingerprints captured while backup writers were
+stopped. This count includes managed tables and sanitized staging fixtures.
 
 Real browser checks covered SQLite initialization, Quran glyphs and fonts,
 the `2:255` deep link, English and Arabic direction, phone, tablet and desktop

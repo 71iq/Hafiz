@@ -466,6 +466,7 @@ function MushafInner() {
   const [pageModeHifzAyahs, setPageModeHifzAyahs] = useState<HifzPageAyah[]>([]);
   const isPageMode = viewMode === "page";
   const currentPageRef = useRef(1);
+  const deepLinkHandledRef = useRef(false);
   const hifzCurrentPageAyahsRef = useRef<HifzPageAyah[]>([]);
   const hifzEnabledRef = useRef(false);
   const hifzAutoAdvancePageRef = useRef(false);
@@ -869,6 +870,7 @@ function MushafInner() {
       const target = consumePendingDeepLink();
       if (!target) return;
 
+      deepLinkHandledRef.current = true;
       setTimeout(() => navigateToTarget(target), 100);
     }, [isPageMode, loading, items.length, navigateToTarget])
   );
@@ -1288,10 +1290,11 @@ function MushafInner() {
         if (!row?.value) return;
         const parsed = JSON.parse(row.value);
         // Defer to deep-link handler if one is pending — peek without consuming
-        if (peekPendingDeepLink()) return;
+        if (deepLinkHandledRef.current || peekPendingDeepLink()) return;
 
         if (parsed?.mode === "page" && isPageMode && parsed.page > 1 && goToPageRef.current) {
           setTimeout(() => {
+            if (deepLinkHandledRef.current) return;
             if (currentPageRef.current === 1) goToPageRef.current?.(parsed.page);
           }, 150);
         } else if (parsed?.mode === "verse" && !isPageMode) {
@@ -1300,6 +1303,7 @@ function MushafInner() {
           );
           if (idx >= 0) {
             setTimeout(() => {
+              if (deepLinkHandledRef.current) return;
               scheduleVerseScrollToIndex(idx, false);
             }, 150);
           }

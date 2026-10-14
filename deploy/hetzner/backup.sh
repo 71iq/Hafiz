@@ -24,14 +24,24 @@ restart_writers() {
 trap restart_writers EXIT
 docker stop --time 30 "${writers[@]}" >/dev/null
 docker exec hafiz-db pg_dump -U supabase_admin -d postgres --format=custom > "$folder/database.dump"
+docker exec -i hafiz-db psql -U supabase_admin -d postgres -XAt -v ON_ERROR_STOP=1 > "$folder/fingerprints.jsonl" <<'SQL'
+SELECT format(
+  'SELECT json_build_object(''table'', %L, ''rows'', count(*), ''sha256'', encode(sha256(convert_to(coalesce(string_agg(h, '''' ORDER BY h), ''''), ''UTF8'')), ''hex'')) FROM (SELECT encode(sha256(convert_to(row_to_json(t)::text, ''UTF8'')), ''hex'') h FROM %I.%I t) rows;',
+  schemaname || '.' || tablename, schemaname, tablename
+) FROM pg_tables WHERE schemaname IN ('public', 'auth', 'storage') ORDER BY schemaname, tablename
+\gexec
+SQL
+docker exec hafiz-db pg_dumpall -U supabase_admin --globals-only > "$folder/roles.sql"
+docker exec hafiz-db tar -C /etc/postgresql-custom -czf - . > "$folder/database-config.tar.gz"
 tar -C /opt/hafiz/supabase -czf "$folder/storage.tar.gz" volumes/storage
 tar -czf "$folder/configuration.tar.gz" \
   /etc/hafiz /etc/caddy/hafiz.caddy /etc/systemd/system/hafiz*.service \
   /etc/systemd/system/hafiz*.timer /etc/tmpfiles.d/hafiz.conf \
   /usr/local/sbin/hafiz-* /usr/local/bin/hafiz-receive \
-  /etc/sudoers.d/hafiz-deploy /var/lib/hafizdeploy/.ssh/authorized_keys
+  /etc/sudoers.d/hafiz-deploy /var/lib/hafizdeploy/.ssh/authorized_keys \
+  /opt/hafiz/supabase/volumes/functions
 readlink /opt/hafiz/current > "$folder/release.txt"
-(cd "$folder" && sha256sum database.dump storage.tar.gz configuration.tar.gz release.txt > SHA256SUMS)
+(cd "$folder" && sha256sum database.dump fingerprints.jsonl roles.sql database-config.tar.gz storage.tar.gz configuration.tar.gz release.txt > SHA256SUMS)
 mv "$folder" "$root/$stamp"
 # Complete dated backups only. Partial backups require operator review.
 find "$root" -mindepth 1 -maxdepth 1 -type d -mtime +7 \
