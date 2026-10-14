@@ -9,6 +9,7 @@ import { getPendingSyncCount } from "@/lib/database/sync-queue";
 import { updateProfileStats } from "@/lib/fsrs/leaderboard-sync";
 import { fullQfUserSync, getPendingQfSyncCount } from "@/lib/quran-foundation/user-sync";
 import { emitSyncCompleted } from "@/lib/sync/events";
+import { useSettings } from "@/lib/settings/context";
 
 /**
  * Hook that manages automatic background sync.
@@ -18,6 +19,7 @@ import { emitSyncCompleted } from "@/lib/sync/events";
  */
 export function useSync() {
   const db = useDatabase();
+  const { isLoaded, isTranslationLoading } = useSettings();
   const user = useAuthStore((s) => s.user);
   const [status, setStatus] = useState<SyncStatus>("idle");
   const [pendingCount, setPendingCount] = useState(0);
@@ -26,19 +28,18 @@ export function useSync() {
   const dismissAccountRestoreNotice = useCallback(() => setAccountRestoreNotice(false), []);
 
   const doSync = useCallback(async () => {
-    if (!isSupabaseConfigured() || !user || isSyncing.current) return;
+    if (!isSupabaseConfigured() || !user || !isLoaded || isTranslationLoading || isSyncing.current) return;
 
-    // Check connectivity
-    const netState = await NetInfo.fetch();
-    if (!netState.isConnected) {
-      setStatus("offline");
-      return;
-    }
-
+    // Acquire before checking connectivity so simultaneous triggers share one run.
     isSyncing.current = true;
-    setStatus("syncing");
 
     try {
+      const netState = await NetInfo.fetch();
+      if (!netState.isConnected) {
+        setStatus("offline");
+        return;
+      }
+      setStatus("syncing");
       const result = await fullSync(db);
       await updateProfileStats(db).catch((error) => {
         console.warn("[Sync] Failed to update public profile aggregates:", error.message);
@@ -49,7 +50,7 @@ export function useSync() {
       setStatus("synced");
 
       // Update pending count
-      const remaining = await getPendingSyncCount(db) + await getPendingQfSyncCount(db);
+      const remaining = (await getPendingSyncCount(db)) + (await getPendingQfSyncCount(db));
       setPendingCount(remaining);
 
       // Reset to idle after a brief display of "synced"
@@ -62,7 +63,7 @@ export function useSync() {
     } finally {
       isSyncing.current = false;
     }
-  }, [db, user]);
+  }, [db, user, isLoaded, isTranslationLoading]);
 
   // Sync when app comes to foreground
   useEffect(() => {

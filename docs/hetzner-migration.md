@@ -51,13 +51,26 @@ keeps its own managed Auth migration history. Empty Auth tables unavailable
 in the pinned image are omitted; nonempty incompatible tables must stop the
 restore. The signup trigger on `auth.users` is restored separately.
 
-The cloud schema is missing `user_word_meanings`, which the current client
-syncs. Apply the existing
-`supabase/migrations/20260526153500_user_word_meanings.sql` to the VM and reload
-the PostgREST schema cache. This adds an empty table with ownership policies
-and the authenticated-role grants. Existing source table fingerprints remain
-unchanged. Profile counters update the existing account row; an upsert with
-only counters fails the required username check before conflict handling.
+The cloud schema is missing fields that the current client uses. After the
+restore, apply these existing migrations to the VM and reload the PostgREST
+schema cache:
+
+- `supabase/migrations/20260523142000_study_card_statuses.sql`
+- `supabase/migrations/20260524062349_add_profile_bio.sql`
+- `supabase/migrations/20260524065455_add_profile_country.sql`
+- `supabase/migrations/20260526153500_user_word_meanings.sql`
+
+The changes add nullable columns and an empty vocabulary table with ownership
+policies. They preserve existing records. Compare original columns when
+repeating source fingerprints after these migrations.
+
+Profile counters update the existing account row; an upsert with only counters
+fails the required username check before conflict handling. Automatic sync
+waits for initial settings and translation import. It acquires its guard before
+the asynchronous connectivity check, which previously allowed simultaneous
+startup runs and overlapping SQLite transactions. The review upload checks
+whether any matching event exists, including when the source has duplicates.
+It preserves those historical rows.
 
 Hafiz's original symmetric signing secret is retained, with a new private EC
 signing key and the source EC public key for verifying existing tokens. Never
@@ -131,7 +144,7 @@ an administrator deployment. The web deploy key cannot modify them.
    configuration, then change only the apex hosting A record. Its original
    value was `216.198.79.1`; `www` already points to the apex. Verify public
    DNS, automatic HTTPS, redirect behavior and the deployed commit.
-10. Enable backup and health timers. Retain Vercel and the source data for
+10. Verify the already enabled backup and health timers. Retain Vercel and the source data for
     rollback until production acceptance and native compatibility are confirmed.
 
 Installed native clients have the old Supabase URL embedded. The observed
@@ -184,6 +197,32 @@ settings. Changing DNS alone can lose newer writes.
 The health timer runs every five minutes and reports failures through systemd
 and the journal. It checks static HTTP, the Auth endpoint, database readiness
 and Docker health. No external alert destination is configured.
+
+## Verification recorded during staging
+
+The first restore matched 28 source tables and all 6,541 rows. All four restored
+avatar objects matched their original hashes. A completed VM backup restored
+into the separate `hafiz_restore_check` database with matching fingerprints,
+12 original accounts and 2,482 review-log rows. The storage archive also passed
+path, size and SHA-256 checks. Restarting `hafiz-backend.service` brought all
+seven containers back healthy while Caddy and ehabmaali.com remained active.
+
+Real browser checks covered SQLite initialization, Quran glyphs and fonts,
+the `2:255` deep link, English and Arabic direction, phone, tablet and desktop
+widths, and white, beige, dark, AMOLED and system themes. Sanitized VM-only
+accounts passed password sign-in, token refresh, owned bookmark/vocabulary
+access and isolation from another account and anonymous access. Separate
+Chrome and in-app browser clients signed in successfully. The review reveal
+and grading flow saved a test result. These fixtures must be removed before
+the final source snapshot.
+
+An original imported account refresh token was accepted by the VM and kept
+its original user ID. Browser continuity at the production origin still needs
+verification after cutover.
+
+Email delivery, Quran Foundation actions and installed native clients remain
+acceptance checks. The source hosting and
+backend remain available, and the apex DNS record remains unchanged.
 
 Supabase's [platform restore guide](https://supabase.com/docs/guides/self-hosting/restore-from-platform)
 documents the separate storage, function, OAuth and SMTP configuration needed

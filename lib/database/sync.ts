@@ -430,6 +430,7 @@ async function pushStudyLog(row: Record<string, any>, userId: string): Promise<v
     .eq("user_id", userId)
     .eq("card_id", row.card_id)
     .eq("reviewed_at", row.reviewed_at)
+    .limit(1)
     .maybeSingle();
 
   if (existingError) throw existingError;
