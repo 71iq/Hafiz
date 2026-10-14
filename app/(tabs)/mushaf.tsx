@@ -39,6 +39,7 @@ import { SearchCommand } from "@/components/SearchCommand";
 import { useWordInteraction } from "@/lib/word/context";
 import { consumePendingDeepLink, peekPendingDeepLink } from "@/lib/deep-link";
 import { isQfContentEnabled } from "@/lib/quran-foundation/config";
+import { loadQuranPageFont } from "@/lib/fonts/loader";
 import { toArabicNumber } from "@/lib/arabic";
 import {
   SIDEBAR_BREAKPOINT,
@@ -267,6 +268,8 @@ function MushafInner() {
     isRTL,
     themeSurface,
     uiLanguage,
+    quranFontStyle,
+    isLoaded: settingsLoaded,
   } = useSettings();
   const s = useStrings();
   const { width: windowWidth } = useWindowDimensions();
@@ -822,6 +825,9 @@ function MushafInner() {
         );
         if (idx >= 0) {
           const item = items[idx];
+          if (item?.type === "ayah") {
+            await loadQuranPageFont(quranFontStyle, item.v2Page);
+          }
           scheduleVerseScrollToIndex(idx, animated);
           setTopAyah({ surah: target.surah, ayah: target.ayah });
           if (item?.type === "ayah") {
@@ -846,7 +852,7 @@ function MushafInner() {
         goToPageRef.current(page);
       }
     },
-    [commitCurrentPage, db, items, scheduleVerseScrollToIndex, viewMode]
+    [commitCurrentPage, db, items, quranFontStyle, scheduleVerseScrollToIndex, viewMode]
   );
 
   const navigateToTarget = useCallback(
@@ -867,13 +873,13 @@ function MushafInner() {
   // Consume pending deep link on tab focus (supports both hafiz:// links and search navigation)
   useFocusEffect(
     useCallback(() => {
-      if (loading || (!isPageMode && items.length === 0)) return;
+      if (!settingsLoaded || loading || (!isPageMode && items.length === 0)) return;
       const target = consumePendingDeepLink();
       if (!target) return;
 
       deepLinkHandledRef.current = true;
-      setTimeout(() => navigateToTarget(target), 100);
-    }, [isPageMode, loading, items.length, navigateToTarget])
+      setTimeout(() => navigateToTarget(target, false), 100);
+    }, [isPageMode, loading, items.length, navigateToTarget, settingsLoaded])
   );
 
   const renderItem = useCallback(

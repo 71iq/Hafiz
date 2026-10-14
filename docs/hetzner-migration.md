@@ -1,8 +1,9 @@
 # Hafiz on the existing Hetzner VM
 
-Production cutover is pending. The apex still points to Vercel. Do not disable
-the source backend until the checks below pass and client compatibility has
-been confirmed.
+Production moved to this VM on 2026-10-14. `hafizquran.app`, `www.hafizquran.app`,
+`api.hafizquran.app` and `staging.hafizquran.app` use automatic HTTPS. The source
+Supabase project is paused, and Vercel automatic Git deployments are disabled.
+The source hosting, final export and original configuration remain recoverable.
 
 ## Deployment
 
@@ -109,9 +110,15 @@ All connection records, identities, cached content and original deployed
 functions remain in the migration backups. Do not generate a replacement key
 and assume it can decrypt the old connection. Re-enabling the integration
 requires credentials and reauthorization of the affected connection.
-The source uses Supabase's shared email sender. Supply an existing SMTP
-service before testing confirmation and password reset. Keep email
-confirmation enabled.
+The owner requested temporarily disabling signup, password reset and Google
+login. Build with `EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=false` and
+`EXPO_PUBLIC_SOCIAL_AUTH_ENABLED=false`. The app hides those actions and redirects
+direct signup/recovery routes to login. Caddy rejects email-dependent endpoints.
+GoTrue has `GOTRUE_DISABLE_SIGNUP=true` and `GOTRUE_EXTERNAL_GOOGLE_ENABLED=false`.
+Existing password login, session refresh and account sync remain enabled.
+Keep email confirmation enabled. To restore the disabled flows, supply SMTP and
+a valid Google client secret, update the server settings and CI variables, then
+verify email delivery and OAuth before re-enabling the controls.
 
 ## Automatic releases
 
@@ -136,8 +143,9 @@ fails, it restores the previous link. Five releases remain under
 health and exits without replacing it.
 
 Public CI variables are `EXPO_PUBLIC_SUPABASE_URL`,
-`EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_QF_USER_AUTH_ENABLED` and
-`HAFIZ_HETZNER_HOST`. CI secrets are `HAFIZ_HETZNER_DEPLOY_KEY` and
+`EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_QF_USER_AUTH_ENABLED`,
+`EXPO_PUBLIC_QF_CONTENT_ENABLED`, `EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED`,
+`EXPO_PUBLIC_SOCIAL_AUTH_ENABLED` and `HAFIZ_HETZNER_HOST`. CI secrets are `HAFIZ_HETZNER_DEPLOY_KEY` and
 `HAFIZ_HETZNER_KNOWN_HOSTS`. Server secrets never enter the web build or Git.
 Infrastructure, database migrations and Edge Function source changes require
 an administrator deployment. The web deploy key cannot modify them.
@@ -159,8 +167,8 @@ an administrator deployment. The web deploy key cannot modify them.
 6. Test the real VM web export at phone, tablet and desktop widths, both
    languages and the relevant themes. Verify Quran rendering, fonts, SQLite
    startup, deep links, reading, review, login, private access and two-client
-   sync. Verify actual email delivery and confirm the disabled Quran Foundation
-   controls and routes stay unavailable.
+   sync. Confirm signup, recovery, Google and Quran Foundation controls and routes
+   stay unavailable, while password login and refresh still work.
 7. Test backup restoration and restart recovery. Repeat ehabmaali.com checks.
 8. Stop source writers for the final snapshot. Repeat export, restore and
    fingerprint checks. Reconcile avatar URLs and source storage ownership.
@@ -247,18 +255,82 @@ widths, and white, beige, dark, AMOLED and system themes. Sanitized VM-only
 accounts passed password sign-in, token refresh, owned bookmark/vocabulary
 access and isolation from another account and anonymous access. Separate
 Chrome and in-app browser clients signed in successfully. The review reveal
-and grading flow saved a test result. These fixtures must be removed before
-the final source snapshot.
+and grading flow saved a test result. Both disposable production test accounts and their data were removed after
+verification. The final database retains all 12 original accounts.
 
 An original imported account refresh token was accepted by the VM and kept
-its original user ID. Browser continuity at the production origin still needs
-verification after cutover.
+its original user ID. The web build keeps the original Auth storage key. Existing browser tabs that
+still run the old bundle must reload to use the new API. Their local SQLite
+files and queued changes are not reset by the migration.
 
-Email delivery and Google OAuth remain acceptance checks. Quran Foundation
-is intentionally disabled, and the owner confirmed web-only usage. The source hosting and
-backend remain available, and the apex DNS record remains unchanged.
+Signup, password reset, Google login and Quran Foundation are intentionally
+disabled at the owner's request. The owner confirmed web-only usage. Restoring
+Google login requires a valid client secret; restoring signup and recovery
+requires SMTP. Quran Foundation also needs credentials and reauthorization.
 
 Supabase's [platform restore guide](https://supabase.com/docs/guides/self-hosting/restore-from-platform)
 documents the separate storage, function, OAuth and SMTP configuration needed
 for self-hosting. Its [signing-key guide](https://supabase.com/docs/guides/self-hosting/self-hosted-auth-keys)
 describes verification of symmetric and asymmetric tokens.
+
+## Production verification and recovery points
+
+The final source snapshot contains 28 application/Auth tables and 6,541 rows.
+Every table fingerprint matched the candidate database before reconciling one
+profile avatar URL to the new API. All four avatar files, their ownership and
+source timestamps were verified. Empty managed Auth tables with incompatible
+versions were skipped; nonempty incompatible data causes the import to stop.
+The generated Quran database retained SHA-256
+`1c849fad2ddb62408f68d80acc804f44249071c16f41fbb20cc9bf5f11adeb9f`.
+Quran text, page mappings, fonts, datasets and licenses were not regenerated.
+
+The final snapshot and verification manifests are under
+`/root/hafiz-migration/final-source` on the VM and
+`/home/ehab/.local/share/hafiz-hetzner-migration/final-source` locally.
+The saved staging database is `hafiz_staging_before_cutover`; the running
+application database remains `postgres`. It contains the original 12 accounts,
+102 private notes and 2,482 review rows after removing test accounts.
+
+The clean backup `20261014T162113Z` restored into
+`hafiz_restore_final_20261014`. All 54 tables and 6,718 rows matched the frozen
+backup fingerprints. The four storage archive paths, sizes and SHA-256 hashes
+also matched. A private copy is under the local migration directory's
+`vm-backups/20261014T162113Z` folder. Additional backups taken after the final
+web release use the same verified backup procedure.
+
+Restarting only `hafiz-backend.service` recovered all seven healthy containers.
+Caddy and El Psy Congroo stayed active. The existing site's authenticated browser
+session loaded and reported that all device changes had synced; its private
+localhost health endpoint also returned `status: ok`. Hafiz still has roughly
+5.3 GiB of available RAM and 56 GiB of free disk on this VM.
+
+Production checks verified automatic HTTPS, HTTP redirects, the www redirect
+with its query string, password login, original-token refresh, private-note
+ownership and isolation, and review persistence. A note written in the main
+production app arrived in a second browser using the same API and export on
+staging. Reading, translation and review reveal/grading worked. The same export
+was checked at phone, tablet and desktop sizes, in English and Arabic, and in
+white, beige, dark, AMOLED and system themes.
+
+Cold Arabic phone deep links exposed a list-positioning issue during verification.
+The reader now waits for settings and the requested page font before positioning
+a deep link, and uses an immediate scroll. The new Chromium regression test
+checks that 2:255 is actually in the viewport, rather than only checking that the
+route renders. It failed before the change and passed after it.
+
+The static export still emits an occasional recoverable React hydration warning
+and the existing React Native web animation fallback warning. No blank screen or
+failed tested flow resulted. These warnings remain separate application issues.
+No native build was tested because no installed native clients are in use.
+
+The apex A record is now `159.69.191.148`, with DNS proxying off. The www CNAME,
+five mail MX records and SPF TXT record were preserved. Vercel keeps its old
+deployments, but `git.deploymentEnabled=false`, its build-ignore command is
+`exit 0`, and `gitProviderOptions.createDeployments` is `disabled`. Rollback must
+restore those settings and reconcile any newer VM writes before resuming the
+source database. Its previous apex A record was `216.198.79.1`.
+
+The ignored Supabase CLI link still names the source cloud project. Do not use
+`supabase db push --linked` for production. Apply reviewed migrations through
+Hafiz's private VM database connection. Do not rerun the private bootstrap
+credential generator against an existing stack.

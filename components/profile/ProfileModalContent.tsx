@@ -1271,21 +1271,21 @@ function SignedOutProfile({ isDark, isRTL, onClose }: { isDark: boolean; isRTL: 
           </Text>
         </Button>
         {isEmailAuthFlowsEnabled() && (
-<Button
-          variant="outline"
-          onPress={() => {
-            onClose();
-            router.push("/auth/signup" as any);
-          }}
-        >
-          <Text
-            className="text-charcoal dark:text-neutral-200"
-            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15, textAlign: isRTL ? "right" : "left" }}
+          <Button
+            variant="outline"
+            onPress={() => {
+              onClose();
+              router.push("/auth/signup" as any);
+            }}
           >
-            {s.authSignup}
-          </Text>
-        </Button>
-      )}
+            <Text
+              className="text-charcoal dark:text-neutral-200"
+              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15, textAlign: isRTL ? "right" : "left" }}
+            >
+              {s.authSignup}
+            </Text>
+          </Button>
+        )}
       </View>
     </View>
   );

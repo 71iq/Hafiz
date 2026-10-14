@@ -749,15 +749,15 @@ export default function SettingsScreen() {
                   </Text>
                 </Button>
                 {isEmailAuthFlowsEnabled() && (
-<Button variant="outline" onPress={() => router.push("/auth/signup")} disabled={authLoading}>
-                  <Text
-                    className="text-charcoal dark:text-neutral-200"
-                    style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15 }}
-                  >
-                    {s.authSignup}
-                  </Text>
-                </Button>
-      )}
+                  <Button variant="outline" onPress={() => router.push("/auth/signup")} disabled={authLoading}>
+                    <Text
+                      className="text-charcoal dark:text-neutral-200"
+                      style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15 }}
+                    >
+                      {s.authSignup}
+                    </Text>
+                  </Button>
+                )}
               </View>
             )}
           </Card>

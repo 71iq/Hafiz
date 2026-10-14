@@ -3,7 +3,6 @@
   "outputDirectory": "dist",
   "cleanUrls": true,
   "trailingSlash": false,
-  "rewrites": [
-    { "source": "/profile/:userId", "destination": "/profile/[userId]" }
-  ]
+  "git": { "deploymentEnabled": false },
+  "rewrites": [{ "source": "/profile/:userId", "destination": "/profile/[userId]" }]
 }

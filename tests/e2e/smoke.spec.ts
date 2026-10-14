@@ -1,4 +1,4 @@
-import { test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { assertHealthyPage, captureConsole, type ConsoleCapture, waitForQaReady } from "./helpers";
 
 test.describe.configure({ mode: "serial" });
@@ -60,4 +60,14 @@ test.describe("strict route smoke", () => {
       await assertHealthyPage(sharedPage, capture);
     });
   }
+
+  test("Arabic phone verse deep link keeps the requested ayah in view", async () => {
+    await sharedPage.goto("/settings", { waitUntil: "domcontentloaded" });
+    await sharedPage.getByText("Verse by Verse", { exact: true }).click();
+    await sharedPage.getByRole("radio", { name: "Dark", exact: true }).click();
+    await sharedPage.getByText("العربية", { exact: true }).click();
+    await sharedPage.goto("/open?surah=2&ayah=255", { waitUntil: "domcontentloaded" });
+    await expect(sharedPage.getByRole("button", { name: "2:255", exact: true })).toBeInViewport({ timeout: 30_000 });
+    await expect(sharedPage.locator("html")).toHaveAttribute("dir", "rtl");
+  });
 });
