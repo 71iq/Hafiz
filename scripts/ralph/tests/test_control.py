@@ -164,6 +164,78 @@ class IterationTests(unittest.TestCase):
         self.assertEqual(self.current_task()['attempts'], 0)
         self.assertEqual((self.root / 'fixture.txt').read_text(), 'after\n')
 
+    def exhaust_after_generation(self):
+        def generate(*_args, **_kwargs):
+            result = self.generate()
+            control.write_json(self.state / 'batch.json', {'started_epoch': control.time.time(), 'tokens': 1000})
+            return result
+        with patch('sys.stdin.read', return_value='prompt'), patch.object(control, 'agent', side_effect=generate):
+            control.iteration()
+        self.assertEqual(self.current_task()['status'], 'retry')
+        self.assertEqual(self.current_task()['attempts'], 0)
+        control.write_json(self.state / 'batch.json', {'started_epoch': control.time.time(), 'tokens': 0})
+
+    def test_budget_resume_verifies_and_reviews_without_repeating_generation(self):
+        self.exhaust_after_generation()
+        with patch('sys.stdin.read', return_value='prompt'), patch.object(control, 'agent', return_value={'verdict': 'pass', 'findings': []}) as agent:
+            control.iteration()
+        self.assertEqual(agent.call_count, 1)
+        self.assertTrue(agent.call_args.kwargs['readonly'])
+        self.assertEqual(self.current_task()['status'], 'verified')
+        evidence = self.root / self.current_task()['evidence']
+        self.assertEqual(control.read_json(evidence / 'verification.json')[0]['exit'], 0)
+
+    def test_checkpoint_rejects_changed_candidate_specification_head_or_index(self):
+        self.exhaust_after_generation()
+        candidate = self.current_task()
+        self.assertIsNotNone(control.generation_checkpoint(candidate))
+        (self.root / 'fixture.txt').write_text('changed after checkpoint\n')
+        self.assertIsNone(control.generation_checkpoint(candidate))
+        (self.root / 'fixture.txt').write_text('after\n')
+        self.assertIsNotNone(control.generation_checkpoint(candidate))
+        changed_spec = dict(candidate, acceptance_criteria=['New mandatory criterion'])
+        self.assertIsNone(control.generation_checkpoint(changed_spec))
+        config = self.config.read_text()
+        self.config.write_text(config.replace('1000', '2000'))
+        self.assertIsNone(control.generation_checkpoint(candidate))
+        self.config.write_text(config)
+        self.assertIsNotNone(control.generation_checkpoint(candidate))
+        self.git('add', 'fixture.txt')
+        self.assertIsNone(control.generation_checkpoint(candidate))
+        self.git('commit', '-qm', 'changed base')
+        self.assertIsNone(control.generation_checkpoint(candidate))
+
+    def test_rejected_review_invalidates_generation_checkpoint(self):
+        self.exhaust_after_generation()
+        with patch('sys.stdin.read', return_value='prompt'), patch.object(control, 'agent', return_value={'verdict': 'fail', 'findings': ['Missing regression case']}):
+            with self.assertRaisesRegex(RuntimeError, 'Independent review failed'):
+                control.iteration()
+        self.assertIsNone(control.generation_checkpoint(self.current_task()))
+
+    def test_changed_checkpoint_candidate_returns_to_generator(self):
+        self.exhaust_after_generation()
+        (self.root / 'fixture.txt').write_text('external edit\n')
+        def run_agent(*args, **kwargs):
+            return {'verdict': 'pass', 'findings': []} if kwargs.get('readonly') else self.generate()
+        with patch('sys.stdin.read', return_value='prompt'), patch.object(control, 'agent', side_effect=run_agent) as agent:
+            control.iteration()
+        self.assertEqual(agent.call_count, 2)
+        self.assertEqual(self.current_task()['status'], 'verified')
+
+    def test_agent_cannot_modify_checkpoint_even_on_timeout(self):
+        self.exhaust_after_generation()
+        checkpoint = self.state / 'generation-checkpoint.json'
+        directory = self.state / 'timeout-checkpoint'
+        directory.mkdir()
+        def timed_out(*_args, **_kwargs):
+            checkpoint.write_text('{}')
+            raise RuntimeError('Time limit')
+        config = control.read_json(self.config)
+        config.update({'model': 'fixture', 'reasoning_effort': 'low'})
+        with patch.object(control, 'run_process', side_effect=timed_out):
+            with self.assertRaisesRegex(control.InvariantError, 'executable configuration'):
+                control.agent('fixture prompt', control.GENERATOR_SCHEMA, directory, 'generator', config)
+
     def test_reconciles_verified_record_without_commit(self):
         backlog = control.read_json(self.backlog)
         backlog['tasks'][0]['status'] = 'verified'

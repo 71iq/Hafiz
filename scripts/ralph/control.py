@@ -4,6 +4,7 @@ import argparse
 import datetime
 import fcntl
 import fnmatch
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -61,7 +62,8 @@ def changed_paths():
 
 
 def controller_snapshot():
-    paths = [BACKLOG, CONFIG, ROOT / 'docs/refactoring/PROGRESS.md', STATE / '.env']
+    paths = [BACKLOG, CONFIG, ROOT / 'docs/refactoring/PROGRESS.md', STATE / '.env',
+             STATE / 'generation-checkpoint.json']
     paths.extend((ROOT / 'scripts/ralph').rglob('*'))
     return {str(p): p.read_bytes() for p in paths if p.is_file() and '__pycache__' not in p.parts}
 
@@ -102,6 +104,55 @@ def path_allowed(path, task):
         if ('*' in pattern or '?' in pattern) and fnmatch.fnmatchcase(path, pattern.replace('[', '[[]')):
             return True
     return False
+
+
+def generation_identity(task):
+    runtime = {'status', 'attempts', 'started_at', 'completed_at', 'failure', 'evidence', 'summary'}
+    specification = {k: v for k, v in task.items() if k not in runtime}
+    owned = {'docs/refactoring/backlog.json', 'docs/refactoring/PROGRESS.md'}
+    paths = [p for p in changed_paths() if p not in owned]
+    if not paths or any(not path_allowed(p, task) for p in paths):
+        return None
+    files = {}
+    for path in paths:
+        source = ROOT / path
+        if source.is_symlink():
+            value = {'link': os.readlink(source)}
+        elif source.is_file():
+            value = {'sha256': hashlib.sha256(source.read_bytes()).hexdigest()}
+        elif not source.exists():
+            value = {'deleted': True}
+        else:
+            return None
+        if source.exists() or source.is_symlink():
+            value['mode'] = source.lstat().st_mode
+        files[path] = value
+    return {'specification': specification, 'head': git('rev-parse', 'HEAD'),
+            'config': read_json(CONFIG), 'files': files,
+            'index': hashlib.sha256(git('diff', '--cached', '--binary', '--no-renames').encode()).hexdigest()}
+
+
+def save_generation_checkpoint(task, result, directory):
+    identity = generation_identity(task)
+    if identity is None or result.get('status') != 'implemented':
+        raise InvariantError('Cannot checkpoint an invalid generation')
+    record = {'version': 1, 'identity': identity, 'result': result,
+              'evidence': str(directory.relative_to(ROOT))}
+    write_json(STATE / 'generation-checkpoint.json', record)
+    return record
+
+
+def generation_checkpoint(task):
+    if task['status'] not in ('running', 'retry'):
+        return None
+    try:
+        record = read_json(STATE / 'generation-checkpoint.json')
+        if (record['version'] == 1 and record['identity'] == generation_identity(task)
+                and record['result']['status'] == 'implemented'):
+            return record
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    return None
 
 
 def log_event(event, **fields):
@@ -312,7 +363,8 @@ def iteration():
               'Return blocked if required platform verification is unavailable.\n'
               f'TASK:\n{json.dumps(task, indent=2)}\n')
     try:
-        result = agent(prompt, GENERATOR_SCHEMA, directory, 'generator', config)
+        checkpoint = generation_checkpoint(task)
+        result = checkpoint['result'] if checkpoint else agent(prompt, GENERATOR_SCHEMA, directory, 'generator', config)
         if BACKLOG.read_bytes() != policy or git('rev-parse', 'HEAD') != head:
             raise InvariantError('Agent changed controller state or committed; manual inspection required')
         if result['status'] != 'implemented':
@@ -321,6 +373,9 @@ def iteration():
         edits = [p for p in paths if p not in state_owned]
         if not edits or any(not path_allowed(p, task) for p in edits):
             raise InvariantError(f'Task paths invalid or empty: {edits}')
+        if not checkpoint:
+            checkpoint = save_generation_checkpoint(task, result, directory)
+        write_json(directory / 'generation.json', checkpoint)
         verification_snapshot = controller_snapshot()
         try:
             verify_commands(task, directory, config)
@@ -340,6 +395,7 @@ def iteration():
                        'offline/native/RTL compatibility and acceptance evidence. Review only. Do not edit, commit, '
                        'push, deploy or modify state. Reject meaningful gaps and missing mandatory manual checks. '
                        f'Task: {json.dumps(task)}. Verification logs: {directory.relative_to(ROOT)}/verification.json. '
+                       f'Generation result and original evidence: {directory.relative_to(ROOT)}/generation.json. '
                        'Return pass or fail with actionable findings.', REVIEW_SCHEMA, directory, 'review', config, readonly=True)
         if git('diff', 'HEAD') != diff_before or any((ROOT / p).read_bytes() != data for p, data in untracked_before.items()):
             raise InvariantError('Read-only reviewer changed task files')
@@ -373,6 +429,9 @@ def iteration():
         print(str(error))
         return
     except Exception as error:
+        checkpoint_path = STATE / 'generation-checkpoint.json'
+        if checkpoint_path.exists():
+            checkpoint_path.replace(directory / 'invalidated-generation-checkpoint.json')
         task['status'] = 'blocked' if isinstance(error, InvariantError) or task['attempts'] >= config['max_attempts'] else 'retry'
         task['failure'] = str(error)
         task['evidence'] = str(directory.relative_to(ROOT))
