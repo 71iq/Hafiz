@@ -6,7 +6,6 @@ type ChromeContextType = {
   immersive: boolean;
   setImmersive: Dispatch<SetStateAction<boolean>>;
   markActivity: () => void;
-  setAutoHideEnabled: (_enabled: boolean) => void;
 };
 
 const ChromeContext = createContext<ChromeContextType>({
@@ -15,7 +14,6 @@ const ChromeContext = createContext<ChromeContextType>({
   immersive: false,
   setImmersive: (_value) => {},
   markActivity: () => {},
-  setAutoHideEnabled: () => {},
 });
 
 export function useChrome() {
@@ -32,12 +30,8 @@ export function ChromeProvider({ children }: { children: React.ReactNode }) {
     setVisible(true);
   }, [immersive]);
 
-  const setAutoHideEnabled = useCallback((_enabled: boolean) => {
-    // Reader chrome no longer auto-hides on inactivity.
-  }, []);
-
   return (
-    <ChromeContext.Provider value={{ visible, setVisible, immersive, setImmersive, markActivity, setAutoHideEnabled }}>
+    <ChromeContext.Provider value={{ visible, setVisible, immersive, setImmersive, markActivity }}>
       {children}
     </ChromeContext.Provider>
   );

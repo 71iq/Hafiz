@@ -21,3 +21,5 @@ The mission is active. This file records durable events; backlog.json owns task 
 - 2026-10-15. A new path regression test failed before the first route-guard follow-up commit was noticed. A second corrective commit limits glob matching to explicit star/question patterns and escapes route brackets. The original test stays intact. The available gpt-5.6-luna is now selected for bounded mechanical generators; independent evaluation remains on gpt-6-astra.
 
 - 2026-10-15T13:12:04.837210+00:00 `RF-001` verified. Reused the existing startup-language helper in both profile routes and preserved their loading, error, and navigation behavior. The approved patch was already present in the worktree; I verified it without touching unrelated edits. Evidence `.ralph/runs/RF-001-1-1792069758983570846`.
+
+- 2026-10-15T13:14:45.803769+00:00 `RF-002` verified. Removed the unused chrome auto-hide API from lib/ui/chrome.tsx. No source callers remain; visible, immersive, and markActivity behavior is preserved. Reused the existing Chrome context/provider and added no abstractions. Evidence `.ralph/runs/RF-002-1-1792069964121611860`.

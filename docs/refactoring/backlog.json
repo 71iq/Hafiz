@@ -78,11 +78,15 @@
       ],
       "risk": "low",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "lib/ui/chrome.tsx"
       ],
-      "attempts": 0
+      "attempts": 1,
+      "started_at": "2026-10-15T13:12:44.121117+00:00",
+      "completed_at": "2026-10-15T13:14:45.803200+00:00",
+      "evidence": ".ralph/runs/RF-002-1-1792069964121611860",
+      "summary": "Removed the unused chrome auto-hide API from lib/ui/chrome.tsx. No source callers remain; visible, immersive, and markActivity behavior is preserved. Reused the existing Chrome context/provider and added no abstractions."
     },
     {
       "id": "RF-003",
