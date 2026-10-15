@@ -60,4 +60,4 @@ The active thread heartbeat `hafiz-modernization-supervisor` checks hourly at 45
 
 The supervisor reads current progress and scopes later work as primary engineer. It never replaces the Ralph implementation/evaluation loop. Pause the supervisor only when the mission actually meets its documented completion criteria or the user requests a stop.
 
-RF-005 is verified and committed. RF-006 is the current unfinished task; inspect backlog.json and the matching generation checkpoint before resuming. The user raised the five-hour threshold to 95 percent on 2026-10-16. The weekly threshold remains 90 percent.
+Read backlog.json and the matching generation checkpoint to identify unfinished work. Do not infer current task state from an older progress entry. The user raised the five-hour threshold to 95 percent on 2026-10-16. The weekly threshold remains 90 percent.

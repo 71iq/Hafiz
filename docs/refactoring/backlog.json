@@ -271,9 +271,9 @@
     },
     {
       "id": "RF-007",
-      "title": "Triage critical transitive dependency advisories",
-      "description": "Triage critical transitive dependency advisories",
-      "rationale": "Baseline reports critical shell-quote and tar findings.",
+      "title": "Patch critical transitive tool dependencies",
+      "description": "Apply the primary-reviewed transitive patches for shell-quote and tar without upgrading the framework or Supabase CLI.",
+      "rationale": "The lock has shell-quote 1.8.4 through react-devtools-core and tar 7.5.13 pinned by Supabase CLI 2.98.2. Official advisories identify patched releases, and current stable same-major versions are 1.12.0 and 7.5.22.",
       "modules": [
         "package.json",
         "package-lock.json",
@@ -283,11 +283,25 @@
         "RF-006"
       ],
       "acceptance_criteria": [
-        "Trace dependency paths and affected operations using official advisories.",
-        "Use compatible scoped updates with lockfile review and no forced bulk fixes.",
-        "Record remaining reachability and required build checks."
+        "Keep all direct dependency versions and application source unchanged. Add exactly scoped overrides: react-devtools-core -> shell-quote 1.12.0 and supabase -> tar 7.5.22. The primary engineer owns this choice; do not select broader upgrades.",
+        "The generator edits package.json and docs/refactoring/SECURITY.md only. Do not hand-edit package-lock.json or install packages. The first controller verification command resolves and installs the overrides locally with lifecycle scripts disabled. The lockfile is an allowed controller output.",
+        "Review the resolved lock diff. Only the two targeted package versions and their necessary metadata may change. Escalate unexpected dependency-tree changes instead of accepting a bulk refresh. Preserve existing native patches and Supabase CLI 2.98.2.",
+        "Require parent-resolved patched versions, harmless quoting rejection and parent-resolved ESM installer archive API checks via scripts/ralph/check-security-dependencies.cjs. Never execute advisory shell output or an archive exhaustion exploit.",
+        "Update SECURITY.md with the selected overrides, official sources, limited reachability evidence, retirement rule and remaining limitations. Reference controller verification evidence through the backlog rather than inventing results.",
+        "Critical-level npm audit, strict typecheck, full unit suite and web export must pass after installation. Noncritical findings remain visible and are separate work. No backend command, production connection, deployment, protected-input change or native dependency upgrade is part of this task."
       ],
       "verification": [
+        [
+          "npm",
+          "install",
+          "--ignore-scripts",
+          "--no-audit",
+          "--no-fund"
+        ],
+        [
+          "node",
+          "scripts/ralph/check-security-dependencies.cjs"
+        ],
         [
           "npm",
           "audit",
@@ -301,11 +315,16 @@
         [
           "npm",
           "run",
+          "test:unit"
+        ],
+        [
+          "npm",
+          "run",
           "build:web"
         ]
       ],
       "risk": "high",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
         "package.json",
