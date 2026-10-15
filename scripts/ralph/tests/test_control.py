@@ -49,6 +49,9 @@ class SelectionTests(unittest.TestCase):
         dynamic['allowed_paths'] = ['app/profile/[userId].tsx']
         self.assertTrue(control.path_allowed('app/profile/[userId].tsx', dynamic))
         self.assertFalse(control.path_allowed('app/profile/u.tsx', dynamic))
+        dynamic['allowed_paths'] = ['app/*/[userId].tsx']
+        self.assertTrue(control.path_allowed('app/profile/[userId].tsx', dynamic))
+        self.assertFalse(control.path_allowed('app/profile/u.tsx', dynamic))
 
     def test_staged_protected_rename_source_is_denied(self):
         candidate = task()

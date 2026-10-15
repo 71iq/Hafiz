@@ -7,5 +7,6 @@
   "batch_tokens": 600000,
   "memory_max": "6G",
   "model": "gpt-6-astra",
-  "reasoning_effort": "high"
+  "reasoning_effort": "high",
+  "generator_model": "gpt-5.6-luna"
 }

@@ -17,3 +17,5 @@ The mission is active. This file records durable events; backlog.json owns task 
 
 - 2026-10-15. First source task stopped before controller verification because fnmatch interpreted the literal dynamic-route brackets as a pattern. Source changes remain uncommitted. Exact path matching now precedes glob matching, with a dedicated regression test. Resume will reverify and independently review RF-001.
 - 2026-10-15. Android debug compilation passed in 15m55s, 564 tasks executed. APK was not installed. No device runtime or iOS verification occurred. Evidence `.refactor-baseline/android-build.log`.
+
+- 2026-10-15. A new path regression test failed before the first route-guard follow-up commit was noticed. A second corrective commit limits glob matching to explicit star/question patterns and escapes route brackets. The original test stays intact. The available gpt-5.6-luna is now selected for bounded mechanical generators; independent evaluation remains on gpt-6-astra.

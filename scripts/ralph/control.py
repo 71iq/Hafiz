@@ -96,7 +96,12 @@ def path_allowed(path, task):
         return False
     if any(path.startswith(p) for p in hard_denied):
         return False
-    return any(path == pattern or fnmatch.fnmatchcase(path, pattern) for pattern in task['allowed_paths'])
+    for pattern in task['allowed_paths']:
+        if path == pattern:
+            return True
+        if ('*' in pattern or '?' in pattern) and fnmatch.fnmatchcase(path, pattern.replace('[', '[[]')):
+            return True
+    return False
 
 
 def log_event(event, **fields):
@@ -181,7 +186,7 @@ def agent(prompt, schema, directory, role, config, readonly=False):
             '--sandbox', 'read-only' if readonly else 'workspace-write',
             '-c', 'approval_policy="never"', '-c', 'sandbox_workspace_write.network_access=false',
             '-c', f'model_reasoning_effort="{config["reasoning_effort"]}"',
-            '-m', config['model'], '--output-schema', str(schema_path),
+            '-m', config['model'] if readonly else config.get('generator_model', config['model']), '--output-schema', str(schema_path),
             '--output-last-message', str(result_path), '-']
     snapshot = controller_snapshot()
     batch_before = (STATE / 'batch.json').read_bytes()
@@ -302,7 +307,9 @@ def iteration():
               'Inspect callers and tests, record reuse choices in your response, implement the smallest coherent change.\n'
               'Only edit task allowed_paths. Do not edit the backlog, progress, runner, agents, protected data or infrastructure.\n'
               'Do not commit, push, merge, deploy, call live services or install packages. The controller verifies and commits.\n'
-              'Use installed focused skills when relevant. Return blocked if required platform verification is unavailable.\n'
+              'Use installed focused skills when relevant. For a lightweight model, use adaptive-coding engineering guided.\n'
+              'Architecture, security choices and final acceptance belong to the primary engineer.\n'
+              'Return blocked if required platform verification is unavailable.\n'
               f'TASK:\n{json.dumps(task, indent=2)}\n')
     try:
         result = agent(prompt, GENERATOR_SCHEMA, directory, 'generator', config)
