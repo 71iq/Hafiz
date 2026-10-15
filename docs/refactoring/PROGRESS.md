@@ -19,3 +19,5 @@ The mission is active. This file records durable events; backlog.json owns task 
 - 2026-10-15. Android debug compilation passed in 15m55s, 564 tasks executed. APK was not installed. No device runtime or iOS verification occurred. Evidence `.refactor-baseline/android-build.log`.
 
 - 2026-10-15. A new path regression test failed before the first route-guard follow-up commit was noticed. A second corrective commit limits glob matching to explicit star/question patterns and escapes route brackets. The original test stays intact. The available gpt-5.6-luna is now selected for bounded mechanical generators; independent evaluation remains on gpt-6-astra.
+
+- 2026-10-15T13:12:04.837210+00:00 `RF-001` verified. Reused the existing startup-language helper in both profile routes and preserved their loading, error, and navigation behavior. The approved patch was already present in the worktree; I verified it without touching unrelated edits. Evidence `.ralph/runs/RF-001-1-1792069758983570846`.

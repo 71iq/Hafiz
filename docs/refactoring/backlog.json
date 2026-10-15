@@ -39,7 +39,7 @@
       ],
       "risk": "low",
       "approved": true,
-      "status": "blocked",
+      "status": "verified",
       "allowed_paths": [
         "app/profile/index.tsx",
         "app/profile/[userId].tsx",
@@ -47,9 +47,12 @@
         "tests/unit/startup-language.test.ts"
       ],
       "attempts": 1,
-      "started_at": "2026-10-15T13:04:36.900906+00:00",
+      "started_at": "2026-10-15T13:09:18.982887+00:00",
       "failure": "Task paths invalid or empty: ['app/profile/[userId].tsx', 'app/profile/index.tsx', 'tests/unit/startup-language.test.ts']",
-      "evidence": ".ralph/runs/RF-001-1-1792069476901497968"
+      "evidence": ".ralph/runs/RF-001-1-1792069758983570846",
+      "recovery_note": "Controller path-pattern defect fixed and 18 fixture tests passed; reverify preserved source patch and run independent review.",
+      "completed_at": "2026-10-15T13:12:04.836511+00:00",
+      "summary": "Reused the existing startup-language helper in both profile routes and preserved their loading, error, and navigation behavior. The approved patch was already present in the worktree; I verified it without touching unrelated edits."
     },
     {
       "id": "RF-002",

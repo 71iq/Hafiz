@@ -1,12 +1,11 @@
-import { I18nManager, Platform, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { ProfileModalContent } from "@/components/profile/ProfileModalContent";
 import { useDatabaseStatus } from "@/lib/database/provider";
 import { strings } from "@/lib/i18n/strings";
+import { getStartupLanguage } from "@/lib/i18n/startup-language";
 import { SettingsProvider } from "@/lib/settings/context";
-
-const UI_LANGUAGE_CACHE_KEY = "hafiz_ui_language";
 
 export default function PublicProfileScreen() {
   const { userId } = useLocalSearchParams<{ userId: string }>();
@@ -36,12 +35,4 @@ function RouteDatabaseError({ message }: { message: string }) {
       </Text>
     </View>
   );
-}
-
-function getStartupLanguage(): "en" | "ar" {
-  if (Platform.OS === "web" && typeof window !== "undefined") {
-    const cached = window.localStorage.getItem(UI_LANGUAGE_CACHE_KEY);
-    if (cached === "en" || cached === "ar") return cached;
-  }
-  return I18nManager.isRTL ? "ar" : "en";
 }
