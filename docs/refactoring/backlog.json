@@ -48,11 +48,11 @@
       ],
       "attempts": 1,
       "started_at": "2026-10-15T13:09:18.982887+00:00",
-      "failure": "Task paths invalid or empty: ['app/profile/[userId].tsx', 'app/profile/index.tsx', 'tests/unit/startup-language.test.ts']",
       "evidence": ".ralph/runs/RF-001-1-1792069758983570846",
       "recovery_note": "Controller path-pattern defect fixed and 18 fixture tests passed; reverify preserved source patch and run independent review.",
       "completed_at": "2026-10-15T13:12:04.836511+00:00",
-      "summary": "Reused the existing startup-language helper in both profile routes and preserved their loading, error, and navigation behavior. The approved patch was already present in the worktree; I verified it without touching unrelated edits."
+      "summary": "Reused the existing startup-language helper in both profile routes and preserved their loading, error, and navigation behavior. The approved patch was already present in the worktree; I verified it without touching unrelated edits.",
+      "historical_failure": "Task paths invalid or empty: ['app/profile/[userId].tsx', 'app/profile/index.tsx', 'tests/unit/startup-language.test.ts']"
     },
     {
       "id": "RF-002",
@@ -211,21 +211,21 @@
     },
     {
       "id": "RF-006",
-      "title": "Classify ThemeColorSwatch and verify directional placement",
-      "description": "Classify ThemeColorSwatch and verify directional placement",
+      "title": "Classify and test the decorative theme swatch",
+      "description": "Repair the two baseline classification failures while preserving swatch rendering. The selected checkmark is a decorative internal coordinate, like the existing switch thumb, so keep its fixed corner and document the precise exception.",
       "rationale": "Two baseline failures identify an unregistered component and physical right offset.",
       "modules": [
-        "components/ui/ThemeColorSwatch.tsx",
         "tests/rtl/rtl-component-registry.ts",
-        "tests/unit/rtl-style-contract.test.ts",
-        "tests/unit/rtl-component-contracts.test.tsx"
+        "tests/rtl/rtl-style-allowlist.ts",
+        "tests/unit/theme-color-swatch.test.tsx"
       ],
       "dependencies": [
         "RF-005"
       ],
       "acceptance_criteria": [
-        "Add correct registry fixture. Determine if marker uses directional end or a justified physical exception.",
-        "Verify rendered RTL/LTR and selection state. No broad allowlist bypass."
+        "Leave components/ui/ThemeColorSwatch.tsx unchanged. Its checkmark decorates the color sample and does not encode reading order.",
+        "Add the correct direction-neutral registry entry, linked to rendered component coverage. Add one exact physical-right allowlist entry with the concrete decorative-coordinate rationale. Do not broaden regexes or silence other styles.",
+        "Render actual ThemeColorSwatch in RTL/LTR. Cover selected/unselected, white/beige/dark/AMOLED/system palettes, system halves and accessible=false/pointerEvents=none. Check border/marker props preserve current output."
       ],
       "verification": [
         [
@@ -234,9 +234,9 @@
           "test:unit",
           "--",
           "--runTestsByPath",
+          "tests/unit/theme-color-swatch.test.tsx",
           "tests/unit/rtl-style-contract.test.ts",
-          "tests/unit/rtl-component-registry-coverage.test.ts",
-          "tests/unit/rtl-component-contracts.test.tsx"
+          "tests/unit/rtl-component-registry-coverage.test.ts"
         ],
         [
           "npm",
@@ -245,13 +245,12 @@
         ]
       ],
       "risk": "medium",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
-        "components/ui/ThemeColorSwatch.tsx",
         "tests/rtl/rtl-component-registry.ts",
-        "tests/unit/rtl-style-contract.test.ts",
-        "tests/unit/rtl-component-contracts.test.tsx"
+        "tests/rtl/rtl-style-allowlist.ts",
+        "tests/unit/theme-color-swatch.test.tsx"
       ],
       "attempts": 0
     },
