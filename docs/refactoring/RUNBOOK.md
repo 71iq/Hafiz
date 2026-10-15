@@ -51,3 +51,11 @@ For a blocked task, inspect its evidence, current Git diff and failure first. Th
 The controller requires an active batch identity and the dedicated branch for direct iterations. It stages only selected task files and its own progress records, checks staged paths and the complete diff, runs task commands itself and requires a separate read-only evaluator to pass. Agent self-reported success cannot complete a task.
 
 The initial first four ready items are intentionally small. The remaining workstream items need the primary engineer to choose the next exact file set and acceptance evidence. That is engineering preparation under the existing authorization, not a request for user permission on every change.
+
+## Budget-aware continuation
+
+The active thread heartbeat `hafiz-modernization-supervisor` checks hourly at 45 minutes past the hour. It inspects account usage and writer locks first. It starts at most one bounded Ralph iteration only when five-hour usage is below 80 percent and weekly usage is below 90 percent. Unknown usage or an active writer prevents a new batch. Routine unchanged/budget-blocked checks remain quiet. No reset credits, purchases or provider switching are authorized.
+
+The supervisor reads current progress and scopes later work as primary engineer. It never replaces the Ralph implementation/evaluation loop. Pause the supervisor only when the mission actually meets its documented completion criteria or the user requests a stop.
+
+On 2026-10-15 the RF-005 generator finished its test patch, then the batch admission limit stopped further sessions before controller verification/evaluation. Its source remains uncommitted, status retry, with hashes in `.ralph/preserved-rf005.json`. At capture the account window was 96 percent used and reset at 20:40 Asia/Hebron. The next eligible hourly check after that reset is 20:45, subject to current account usage and the desktop remaining active.

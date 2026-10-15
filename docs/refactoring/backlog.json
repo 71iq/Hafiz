@@ -202,12 +202,14 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "pending",
+      "status": "retry",
       "allowed_paths": [
         "tests/unit/rtl-higher-level-source-contract.test.ts",
         "tests/unit/progress-screen-rtl.test.tsx"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "started_at": "2026-10-15T13:29:26.220345+00:00",
+      "failure": "Batch resource limit reached"
     },
     {
       "id": "RF-006",
