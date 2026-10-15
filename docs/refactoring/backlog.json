@@ -325,13 +325,17 @@
       ],
       "risk": "high",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "package.json",
         "package-lock.json",
         "docs/refactoring/SECURITY.md"
       ],
-      "attempts": 0
+      "attempts": 1,
+      "started_at": "2026-10-15T23:43:54.165332+00:00",
+      "completed_at": "2026-10-15T23:47:14.249628+00:00",
+      "evidence": ".ralph/runs/RF-007-1-1792107834166140763",
+      "summary": "Added the two approved parent-scoped npm overrides and documented them. package-lock.json was intentionally left for controller-owned installation and review."
     },
     {
       "id": "RF-008",

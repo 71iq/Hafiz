@@ -17,7 +17,7 @@ The public registry reports stable shell-quote 1.12.0 and tar 7.5.22. Tar requir
 
 ## Selected change
 
-Use parent-scoped overrides for react-devtools-core's shell-quote and the Supabase CLI's tar. Keep direct dependency versions fixed. The devtools range already allows the newer shell-quote. The CLI pins tar exactly, so its override requires an installer API compatibility check.
+The manifest records exactly two parent-scoped overrides: `react-devtools-core > shell-quote` at 1.12.0 and `supabase > tar` at 7.5.22. Keep direct dependency versions fixed. The devtools range already allows the newer shell-quote. The CLI pins tar exactly, so its override requires an installer API compatibility check.
 
 The current Supabase CLI installer fetches published GitHub release archives, gunzips them, and calls `extract({ cwd }, [binName])`. The new check resolves tar through the CLI dependency, loads its ESM import entry, and exercises that API using a tiny local text archive. It makes no backend request and downloads no CLI binary.
 
