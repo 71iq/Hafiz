@@ -1,0 +1,27 @@
+[
+  {
+    "repository": "expo/skills",
+    "upstream_main_at_research": "d4f484024fec15196bfd3c272e953e3f983972cf",
+    "commit_date": "2026-10-05T17:42:22Z"
+  },
+  {
+    "repository": "vercel-labs/agent-skills",
+    "upstream_main_at_research": "063bee94c3f4df8453406c830b0a7df0f2860278",
+    "commit_date": "2026-08-28T13:36:07Z"
+  },
+  {
+    "repository": "obra/superpowers",
+    "upstream_main_at_research": "bb92a77741419a4ab5f06e711a283343f1ada0c3",
+    "commit_date": "2026-10-10T00:28:04Z"
+  },
+  {
+    "repository": "amragl/codebase-review",
+    "upstream_main_at_research": "de57f226e42f53ee64543f4df00c7c4561ad6098",
+    "commit_date": "2026-03-21T07:47:47Z"
+  },
+  {
+    "repository": "vlkalex/ai-agent-coding-standards",
+    "upstream_main_at_research": "3d9e8296595357a43afafca6ba7aec30fa81a9be",
+    "commit_date": "2026-09-04T08:23:54Z"
+  }
+]

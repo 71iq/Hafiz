@@ -1,0 +1,4 @@
+interface:
+  display_name: "Reuse-First Authoring"
+  short_description: "Reuse canonical code before creating abstractions"
+  default_prompt: "Use $reuse-first-authoring before implementing this change to discover and justify reuse decisions."

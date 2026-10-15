@@ -1,0 +1,27 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "app/**/*.{ts,tsx}",
+    "scripts/*.{js,mjs}",
+    "app.config.*",
+    "*.config.{js,ts}",
+    "tests/**/*.{test,spec}.{ts,tsx}"
+  ],
+  "project": [
+    "app/**/*.{ts,tsx}",
+    "components/**/*.{ts,tsx}",
+    "lib/**/*.{ts,tsx}",
+    "scripts/*.{js,mjs}",
+    "tests/**/*.{ts,tsx}"
+  ],
+  "ignore": [
+    "assets/**",
+    "public/**",
+    "supabase/**",
+    "quran.com-frontend-next/**",
+    "lib/database/native-loaders.native.ts",
+    "lib/translations/translation-requires.ts",
+    "scripts/ralph/vendor/**"
+  ],
+  "ignoreDependencies": ["@expo/metro-runtime", "react-dom", "react-native-web"]
+}

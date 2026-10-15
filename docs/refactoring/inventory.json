@@ -1,0 +1,86 @@
+{
+  "files": 288,
+  "lines": 65685,
+  "largest": [
+    {
+      "path": "app/flashcards/session.tsx",
+      "lines": 2290
+    },
+    {
+      "path": "app/(tabs)/mushaf.tsx",
+      "lines": 1916
+    },
+    {
+      "path": "lib/i18n/strings.ts",
+      "lines": 1848
+    },
+    {
+      "path": "lib/database/native-loaders.native.ts",
+      "lines": 1620
+    },
+    {
+      "path": "components/mushaf/PageMushaf.tsx",
+      "lines": 1443
+    },
+    {
+      "path": "lib/database/init.ts",
+      "lines": 1427
+    },
+    {
+      "path": "lib/fsrs/smart-decks.ts",
+      "lines": 1416
+    },
+    {
+      "path": "app/(tabs)/settings.tsx",
+      "lines": 1373
+    },
+    {
+      "path": "lib/fsrs/queries.ts",
+      "lines": 1339
+    },
+    {
+      "path": "components/profile/ProfileModalContent.tsx",
+      "lines": 1316
+    },
+    {
+      "path": "components/flashcards/DeckReviewSettingsSheet.tsx",
+      "lines": 1194
+    },
+    {
+      "path": "app/onboarding.tsx",
+      "lines": 1068
+    },
+    {
+      "path": "lib/database/sync.ts",
+      "lines": 1054
+    },
+    {
+      "path": "app/(tabs)/home.tsx",
+      "lines": 987
+    },
+    {
+      "path": "supabase/functions/qf-user/index.ts",
+      "lines": 920
+    },
+    {
+      "path": "components/SearchCommand.tsx",
+      "lines": 906
+    },
+    {
+      "path": "components/flashcards/SmartDeckFilterSheet.tsx",
+      "lines": 902
+    },
+    {
+      "path": "lib/settings/context.tsx",
+      "lines": 840
+    },
+    {
+      "path": "app/(tabs)/reflection-feed.tsx",
+      "lines": 820
+    },
+    {
+      "path": "components/mushaf/AyahDetailModal.tsx",
+      "lines": 790
+    }
+  ]
+}

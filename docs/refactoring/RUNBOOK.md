@@ -1,0 +1,53 @@
+# Ralph operations
+
+Run commands from the isolated worktree `/home/ehab/.codex/worktrees/hafiz-modernization/Hafiz`. The branch must be `codex/hafiz-modernization`. The original checkout is not a loop target.
+
+## Installed runner and skills
+
+The actual loop is SantanderAI/ralph, pinned at `0b710b21802913fea395b7db7fa9b886518eee1b`. Its official installer copied the unmodified script into scripts/ralph/vendor with `--no-skills`. The local controller is an adapter around its configurable Codex command. It supplies task selection, independent review, machine-run checks, scoped commits and recovery. Every generator and evaluator invocation is a new `codex exec` session.
+
+The original snarktank script documents Amp/Claude. ralphctl 0.26.0 was installed and inspected because it supports Codex and an evaluator, but that release exposes its implement flow through the interactive TUI, not a documented headless command in CLI help. It is not the unattended runner. [Santander installation/configuration](https://github.com/SantanderAI/ralph), [original Ralph](https://github.com/snarktank/ralph), [ralphctl](https://github.com/lukas-grigis/ralphctl).
+
+Codex CLI 0.160.1 is installed and reports an authenticated ChatGPT session. It uses the existing user authentication; no key was copied or purchased. Config pins the current configured gpt-6-astra model at high effort. Tooling and model selections must be rechecked before changing them.
+
+Official Codex marketplace installs added `expo` and `superpowers`. They become available in fresh sessions. The curated Expo plugin currently contains older skill names than upstream main; inspect its installed catalog instead of assuming a name. Vercel React Native and composition skills were installed into `.agents/skills` using Codex's skill installer. The official `ai-agent-standards init` command installed reuse-first-authoring and its reference docs. The Claude copy is part of that install but the runner uses Codex. amragl/codebase-review is Claude-oriented; its evidence, modularization and audit checklists informed AUDIT.md, while execution uses the native Codex evaluator and installed verification skill. jscpd is a pinned analysis CLI, not an agent skill.
+
+Review upstream instructions before adopting them. The mission and Hafiz constraints remain authoritative. No deployment plugin or paid EAS operation runs as part of this setup.
+
+## Commands
+
+```sh
+npm run test:refactor-runner
+python3 scripts/ralph/control.py smoke
+npm run refactor:start -- --iterations 3
+npm run refactor:status
+npm run refactor:stop
+npm run refactor:resume -- --iterations 3
+```
+
+`stop` is graceful. It writes a controller-owned stop.md, lets the current iteration settle, and prevents the next one. `resume` removes only a controller-owned stop marker. It never clears an arbitrary user stop file. To inspect live logs, use `tail -f .ralph/logs/iteration-*.log`, `.ralph/events.jsonl`, the batch log named by status and task directories under `.ralph/runs/`. Status reports metadata from the last batch; a recorded PID or start time alone is not proof it is still alive. Use `ps -p PID` or the writer lock to verify process state.
+
+For persistence beyond a shell session, launch in tmux and inspect the session separately:
+
+```sh
+tmux new-session -d -s hafiz-modernization -c /home/ehab/.codex/worktrees/hafiz-modernization/Hafiz 'npm run refactor:start -- --iterations 3'
+tmux capture-pane -pt hafiz-modernization -S -80
+```
+
+A tmux session can exit when its bounded batch finishes. Do not describe it as running after it has exited. The primary engineer can launch the next bounded batch after checking status and refining ready tasks. No cron or limitless restart policy is installed.
+
+## Limits and recovery
+
+Defaults in scripts/ralph/config.json allow at most three iterations, two attempts per task, 15 minutes per agent/check and 90 minutes per batch. A 600,000 reported-token admission limit stops additional sessions after a completed turn crosses it. Codex reports token usage after a turn, so one turn can exceed the threshold. This is not a hard dollar cap. Unknown usage after termination exhausts the batch rather than counting as zero. No credits or paid resources are purchased automatically.
+
+The upstream runner requests a 6 GiB process memory scope. If systemd user scopes are unavailable it prints a warning; then time/iteration limits still apply, but the kernel RAM limit does not. Batch logs record the actual enforcement result. Tool rotation is disabled, avoiding silent switching to another account/provider.
+
+The controller and each worker acquire file locks that descendants inherit. This prevents a second writer while a surviving child still owns the worktree. SIGTERM writes a stop signal and reaps the child before releasing its lease. A SIGKILL can leave a child running, so inspect process state and lock ownership before restarting. Never delete lock files to bypass an owner.
+
+State writes use atomic replacement. An interrupted running/retry task resumes before new work. Startup reconciles an uncommitted verified record against the committed backlog and re-verifies it. Retry exhaustion preserves the diff, records an exact failure and stops. A path/controller invariant violation stops immediately. Resource exhaustion ends the batch without spending a task retry.
+
+For a blocked task, inspect its evidence, current Git diff and failure first. The primary engineer repairs or narrows the task, records the diagnosis, changes only that item's status to retry and resets attempts when justified, then runs refactor:resume. No reset, clean, forced checkout, blind deletion or automatic discard occurs. Other tasks proceed only after the worktree is coherent.
+
+The controller requires an active batch identity and the dedicated branch for direct iterations. It stages only selected task files and its own progress records, checks staged paths and the complete diff, runs task commands itself and requires a separate read-only evaluator to pass. Agent self-reported success cannot complete a task.
+
+The initial first four ready items are intentionally small. The remaining workstream items need the primary engineer to choose the next exact file set and acceptance evidence. That is engineering preparation under the existing authorization, not a request for user permission on every change.

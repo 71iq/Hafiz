@@ -122,3 +122,11 @@ Build and data:
 - For every completed change task, stage only the task-scoped files, create a descriptive commit, and push the current branch before the final response. This is the default workflow and does not require a separate request. If the user explicitly asks not to commit or push, follow that request instead; if authentication, remote configuration, or branch protection blocks the push, report the exact blocker.
 - Do not revert, stage, or commit unrelated changes. Do not amend, rebase, reset, force-update, delete files, or clean the worktree unless explicitly requested.
 - Final response must include: root cause or implementation rationale; files changed; concise behavioral summary; commands/tests run; manual verification performed; and remaining risks or unverified areas.
+
+## Autonomous modernization branch
+
+For modernization work, read `docs/refactoring/ARCHITECTURE.md`, `CONVENTIONS.md`, `TECH_STACK.md`, `PROGRESS.md` and the selected item in `backlog.json`. Use `.agents/skills/reuse-first-authoring/SKILL.md` before a nontrivial extraction. Native UI work can consult `.agents/skills/react-native-skills/SKILL.md`; project behavior and verified compatibility take precedence over generic library recommendations.
+
+The current mission overrides the default push rule. Keep commits local on `codex/hafiz-modernization`. Push, merge, deployment, production operations, live policy changes and destructive data operations require separate user authorization. The original checkout's AppNavigation change belongs to the user.
+
+Use `npm run refactor:status` to inspect the loop and `docs/refactoring/RUNBOOK.md` for start, stop, recovery and resource limits. One controller owns writes. Implementation sessions edit only approved task paths; the controller owns task statuses, independent review, verification and commits. Read-only reviewers do not modify source. A completed batch does not mean the mission is complete.

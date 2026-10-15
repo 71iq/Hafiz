@@ -1,0 +1,1698 @@
+{
+  "date": "2026-10-15",
+  "base_commit": "e5020b3",
+  "duplication": {
+    "detectionDate": "2026-10-15T12:45:06.006Z",
+    "formats": {
+      "tsx": {
+        "clones": 25,
+        "duplicatedLines": 591,
+        "duplicatedTokens": 3373,
+        "lines": 38501,
+        "newClones": 0,
+        "newDuplicatedLines": 0,
+        "percentage": 1.5350250642840446,
+        "percentageTokens": 1.502469966191085,
+        "sources": 119,
+        "tokens": 224497
+      },
+      "typescript": {
+        "clones": 6,
+        "duplicatedLines": 116,
+        "duplicatedTokens": 815,
+        "lines": 14386,
+        "newClones": 0,
+        "newDuplicatedLines": 0,
+        "percentage": 0.8063394967329348,
+        "percentageTokens": 0.9844302987111815,
+        "sources": 59,
+        "tokens": 82789
+      }
+    },
+    "total": {
+      "clones": 31,
+      "duplicatedLines": 707,
+      "duplicatedTokens": 4188,
+      "lines": 52887,
+      "newClones": 0,
+      "newDuplicatedLines": 0,
+      "percentage": 1.3368124491841096,
+      "percentageTokens": 1.3628997090658215,
+      "sources": 178,
+      "tokens": 307286
+    }
+  },
+  "clones": [
+    {
+      "firstFile": {
+        "end": 202,
+        "endLoc": {
+          "column": 7,
+          "line": 202,
+          "position": 6002
+        },
+        "name": "(tabs)/_layout.tsx",
+        "start": 173,
+        "startLoc": {
+          "column": 33,
+          "line": 173,
+          "position": 5297
+        }
+      },
+      "format": "tsx",
+      "fragment": "export default function TabLayout() {\n  const { isReady, progress, error } = useDatabaseStatus();\n  const s = useStrings();\n\n  if (error) {\n    return (\n      <View className=\"flex-1 items-center justify-center bg-surface dark:bg-surface-dark px-6\">\n        <Text\n          className=\"text-red-600 mb-4\"\n          style={{ fontFamily: \"Manrope_700Bold\", fontSize: 18 }}\n        >\n          {s.databaseError}\n        </Text>\n        <Text\n          className=\"text-red-500 text-center\"\n          style={{ fontFamily: \"Manrope_400Regular\", fontSize: 15 }}\n        >\n          {error}\n        </Text>\n      </View>\n    );\n  }\n\n  if (!isReady) {\n    return <LoadingScreen progress={progress} />;\n  }\n\n  return (\n    <SettingsProvider>\n      <ChromeProvider>",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 30,
+      "secondFile": {
+        "end": 187,
+        "endLoc": {
+          "column": 7,
+          "line": 187,
+          "position": 6303
+        },
+        "name": "flashcards/session.tsx",
+        "start": 158,
+        "startLoc": {
+          "column": 53,
+          "line": 158,
+          "position": 5598
+        }
+      },
+      "tokens": 129
+    },
+    {
+      "firstFile": {
+        "end": 202,
+        "endLoc": {
+          "column": 7,
+          "line": 202,
+          "position": 6002
+        },
+        "name": "(tabs)/_layout.tsx",
+        "start": 173,
+        "startLoc": {
+          "column": 33,
+          "line": 173,
+          "position": 5297
+        }
+      },
+      "format": "tsx",
+      "fragment": "export default function TabLayout() {\n  const { isReady, progress, error } = useDatabaseStatus();\n  const s = useStrings();\n\n  if (error) {\n    return (\n      <View className=\"flex-1 items-center justify-center bg-surface dark:bg-surface-dark px-6\">\n        <Text\n          className=\"text-red-600 mb-4\"\n          style={{ fontFamily: \"Manrope_700Bold\", fontSize: 18 }}\n        >\n          {s.databaseError}\n        </Text>\n        <Text\n          className=\"text-red-500 text-center\"\n          style={{ fontFamily: \"Manrope_400Regular\", fontSize: 15 }}\n        >\n          {error}\n        </Text>\n      </View>\n    );\n  }\n\n  if (!isReady) {\n    return <LoadingScreen progress={progress} />;\n  }\n\n  return (\n    <SettingsProvider>\n      <ChromeProvider>",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 30,
+      "secondFile": {
+        "end": 1065,
+        "endLoc": {
+          "column": 7,
+          "line": 1065,
+          "position": 31967
+        },
+        "name": "onboarding.tsx",
+        "start": 1042,
+        "startLoc": {
+          "column": 40,
+          "line": 1042,
+          "position": 31320
+        }
+      },
+      "tokens": 129
+    },
+    {
+      "firstFile": {
+        "end": 202,
+        "endLoc": {
+          "column": 7,
+          "line": 202,
+          "position": 6002
+        },
+        "name": "(tabs)/_layout.tsx",
+        "start": 175,
+        "startLoc": {
+          "column": 24,
+          "line": 175,
+          "position": 5386
+        }
+      },
+      "format": "tsx",
+      "fragment": "  const s = useStrings();\n\n  if (error) {\n    return (\n      <View className=\"flex-1 items-center justify-center bg-surface dark:bg-surface-dark px-6\">\n        <Text\n          className=\"text-red-600 mb-4\"\n          style={{ fontFamily: \"Manrope_700Bold\", fontSize: 18 }}\n        >\n          {s.databaseError}\n        </Text>\n        <Text\n          className=\"text-red-500 text-center\"\n          style={{ fontFamily: \"Manrope_400Regular\", fontSize: 15 }}\n        >\n          {error}\n        </Text>\n      </View>\n    );\n  }\n\n  if (!isReady) {\n    return <LoadingScreen progress={progress} />;\n  }\n\n  return (\n    <SettingsProvider>\n      <ChromeProvider>",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 28,
+      "secondFile": {
+        "end": 47,
+        "endLoc": {
+          "column": 7,
+          "line": 47,
+          "position": 1681
+        },
+        "name": "flashcards/vocab.tsx",
+        "start": 20,
+        "startLoc": {
+          "column": 41,
+          "line": 20,
+          "position": 1065
+        }
+      },
+      "tokens": 107
+    },
+    {
+      "firstFile": {
+        "end": 709,
+        "endLoc": {
+          "column": 9,
+          "line": 709,
+          "position": 26793
+        },
+        "name": "(tabs)/home.tsx",
+        "start": 694,
+        "startLoc": {
+          "column": 12,
+          "line": 694,
+          "position": 26280
+        }
+      },
+      "format": "tsx",
+      "fragment": "      <Icon size={18} color={isDark ? \"#2dd4bf\" : \"#0d9488\"} />\n    </View>\n  );\n  const textNode = (\n    <View className={`flex-1 ${isRTL ? \"items-end\" : \"items-start\"}`} style={{ minWidth: 0 }}>\n      <Text\n        className=\"text-charcoal dark:text-neutral-200\"\n        style={{\n          fontFamily: \"Manrope_600SemiBold\",\n          fontSize: 14,\n          textAlign: isRTL ? \"right\" : \"left\",\n          writingDirection: isRTL ? \"rtl\" : \"ltr\",\n        }}\n        numberOfLines={compact ? undefined : 1}\n      >\n        {deck.title}",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 16,
+      "secondFile": {
+        "end": 839,
+        "endLoc": {
+          "column": 9,
+          "line": 839,
+          "position": 30629
+        },
+        "name": "(tabs)/home.tsx",
+        "start": 824,
+        "startLoc": {
+          "column": 17,
+          "line": 824,
+          "position": 30116
+        }
+      },
+      "tokens": 98
+    },
+    {
+      "firstFile": {
+        "end": 747,
+        "endLoc": {
+          "column": 10,
+          "line": 747,
+          "position": 27951
+        },
+        "name": "(tabs)/home.tsx",
+        "start": 722,
+        "startLoc": {
+          "column": 39,
+          "line": 722,
+          "position": 27209
+        }
+      },
+      "format": "tsx",
+      "fragment": "        {deck.subtitle} \u00b7 {filterLabel}\n      </Text>\n    </View>\n  );\n  const actionNodes = (\n    <View\n      className=\"flex-row items-center gap-1\"\n      style={{ direction: \"ltr\", flexDirection: isRTL ? \"row-reverse\" : \"row\" }}\n    >\n      <Pressable\n        onPress={(event) => {\n          event.stopPropagation?.();\n          onShowCards();\n        }}\n        accessibilityRole=\"button\"\n        accessibilityLabel={s.deckCardsTitle}\n        className=\"w-8 h-8 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center\"\n        hitSlop={8}\n      >\n        <List size={14} color={isDark ? \"#a3a3a3\" : \"#8B8178\"} />\n      </Pressable>\n      <Pressable\n        onPress={(event) => {\n          event.stopPropagation?.();\n          onConfigure();\n        }}",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 26,
+      "secondFile": {
+        "end": 877,
+        "endLoc": {
+          "column": 10,
+          "line": 877,
+          "position": 31782
+        },
+        "name": "(tabs)/home.tsx",
+        "start": 852,
+        "startLoc": {
+          "column": 28,
+          "line": 852,
+          "position": 31040
+        }
+      },
+      "tokens": 131
+    },
+    {
+      "firstFile": {
+        "end": 802,
+        "endLoc": {
+          "column": 8,
+          "line": 802,
+          "position": 29578
+        },
+        "name": "(tabs)/home.tsx",
+        "start": 756,
+        "startLoc": {
+          "column": 73,
+          "line": 756,
+          "position": 28291
+        }
+      },
+      "format": "tsx",
+      "fragment": "    <DeckStats total={deck.total} newCount={deck.newCount} dueCount={deck.dueCount} isDark={isDark} isRTL={isRTL} />\n  );\n\n  return (\n    <Pressable\n      onPress={canStart ? onStartReview : undefined}\n      accessibilityRole=\"button\"\n      style={({ pressed }) => ({\n        opacity: canStart ? 1 : 0.55,\n        transform: [{ scale: pressed && canStart ? 0.985 : 1 }],\n      })}\n    >\n      <Card elevation=\"low\" className=\"px-4 py-3 rounded-3xl\">\n        {compact ? (\n          <View className=\"gap-3\">\n            <View\n              className=\"items-center gap-3\"\n              style={{ direction: \"ltr\", flexDirection: isRTL ? \"row-reverse\" : \"row\" }}\n            >\n              {iconNode}\n              {textNode}\n            </View>\n            <View\n              className=\"items-center justify-between gap-2\"\n              style={{ direction: \"ltr\", flexDirection: isRTL ? \"row-reverse\" : \"row\" }}\n            >\n              {actionNodes}\n              {statsNode}\n            </View>\n          </View>\n        ) : (\n          <View\n            className=\"items-center gap-3\"\n            style={{ direction: \"ltr\", flexDirection: isRTL ? \"row-reverse\" : \"row\" }}\n          >\n            {iconNode}\n            {textNode}\n            {actionNodes}\n            {statsNode}\n          </View>\n        )}\n      </Card>\n    </Pressable>\n  );\n}\n\nfunction VocabularyDeckCard({",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 47,
+      "secondFile": {
+        "end": 934,
+        "endLoc": {
+          "column": 8,
+          "line": 934,
+          "position": 33502
+        },
+        "name": "(tabs)/home.tsx",
+        "start": 888,
+        "startLoc": {
+          "column": 76,
+          "line": 888,
+          "position": 32215
+        }
+      },
+      "tokens": 235
+    },
+    {
+      "firstFile": {
+        "end": 362,
+        "endLoc": {
+          "column": 6,
+          "line": 362,
+          "position": 12283
+        },
+        "name": "(tabs)/leaderboard.tsx",
+        "start": 322,
+        "startLoc": {
+          "column": 4,
+          "line": 322,
+          "position": 10981
+        }
+      },
+      "format": "tsx",
+      "fragment": "    >\n      <View\n        className=\"items-center gap-3\"\n        style={{\n          direction: \"ltr\",\n          flexDirection: isRTL ? \"row-reverse\" : \"row\",\n          justifyContent: \"space-between\",\n        }}\n      >\n        <Text\n          className=\"min-w-0 flex-1 text-charcoal dark:text-neutral-100\"\n          style={{\n            fontFamily: \"Manrope_700Bold\",\n            fontSize: 14,\n            lineHeight: 20,\n            textAlign: isRTL ? \"right\" : \"left\",\n            writingDirection: isRTL ? \"rtl\" : \"ltr\",\n          }}\n        >\n          {label}\n        </Text>\n        <Pressable\n          accessibilityRole=\"button\"\n          accessibilityLabel={buttonLabel}\n          onPress={onPress}\n          className=\"rounded-full px-4 py-2.5\"\n          style={({ pressed }) => ({\n            backgroundColor: isDark ? \"#1B4D4F\" : \"#003638\",\n            opacity: pressed ? 0.76 : 1,\n          })}\n        >\n          <View\n            className=\"flex-row items-center gap-2\"\n            style={{ direction: \"ltr\", flexDirection: isRTL ? \"row-reverse\" : \"row\" }}\n          >\n            <LogIn size={15} color=\"#FDDC91\" />\n            <Text style={{ color: \"#FDDC91\", fontFamily: \"Manrope_700Bold\", fontSize: 12 }}>{buttonLabel}</Text>\n          </View>\n        </Pressable>\n      </View>\n    </View>",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 41,
+      "secondFile": {
+        "end": 464,
+        "endLoc": {
+          "column": 6,
+          "line": 464,
+          "position": 18196
+        },
+        "name": "(tabs)/progress.tsx",
+        "start": 424,
+        "startLoc": {
+          "column": 52,
+          "line": 424,
+          "position": 16894
+        }
+      },
+      "tokens": 213
+    },
+    {
+      "firstFile": {
+        "end": 92,
+        "endLoc": {
+          "column": 15,
+          "line": 92,
+          "position": 3177
+        },
+        "name": "auth/forgot-password.tsx",
+        "start": 79,
+        "startLoc": {
+          "column": 58,
+          "line": 79,
+          "position": 2748
+        }
+      },
+      "format": "tsx",
+      "fragment": "      subtitle={configured ? s.authForgotPasswordSubtitle : s.authUnavailableSubtitle}\n      appName={s.appName}\n      brandHeadline={s.authBrandHeadline}\n      brandBody={s.authBrandBody}\n      backLabel={s.authBack}\n      onBack={() => router.back()}\n      unavailableContent={unavailableContent}\n    >\n      <View className=\"w-full\">\n        <AuthFormNotice message={message || error} tone={messageType} dir={dir} />\n\n        <FormTextField\n          control={control}\n          name=\"email\"",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 14,
+      "secondFile": {
+        "end": 130,
+        "endLoc": {
+          "column": 15,
+          "line": 130,
+          "position": 4537
+        },
+        "name": "auth/reset-password.tsx",
+        "start": 117,
+        "startLoc": {
+          "column": 57,
+          "line": 117,
+          "position": 4108
+        }
+      },
+      "tokens": 90
+    },
+    {
+      "firstFile": {
+        "end": 127,
+        "endLoc": {
+          "column": 6,
+          "line": 127,
+          "position": 4250
+        },
+        "name": "auth/login.tsx",
+        "start": 95,
+        "startLoc": {
+          "column": 27,
+          "line": 95,
+          "position": 3266
+        }
+      },
+      "format": "tsx",
+      "fragment": "          startIcon: <Mail size={18} color=\"#8B8178\" />,\n        }}\n      />\n\n      <View className=\"h-4\" />\n\n      <FormTextField\n        control={control}\n        name=\"password\"\n        label={s.authPassword}\n        error={errors.password?.message}\n        dir={dir}\n        inputRef={passwordRef}\n        inputProps={{\n          placeholder: s.authPassword,\n          secureTextEntry: !passwordVisible,\n          returnKeyType: \"done\",\n          onSubmitEditing: handleSubmit(onSubmit),\n          startIcon: <Lock size={18} color=\"#8B8178\" />,\n          endIcon: (\n            <Pressable\n              onPress={() => setPasswordVisible((current) => !current)}\n              accessibilityRole=\"button\"\n              accessibilityLabel={passwordVisible ? s.authHidePassword : s.authShowPassword}\n              hitSlop={8}\n            >\n              {passwordVisible ? <EyeOff size={18} color=\"#8B8178\" /> : <Eye size={18} color=\"#8B8178\" />}\n            </Pressable>\n          ),\n        }}\n      />\n\n      {isEmailAuthFlowsEnabled() && (",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 33,
+      "secondFile": {
+        "end": 198,
+        "endLoc": {
+          "column": 6,
+          "line": 198,
+          "position": 6376
+        },
+        "name": "auth/signup.tsx",
+        "start": 166,
+        "startLoc": {
+          "column": 27,
+          "line": 166,
+          "position": 5392
+        }
+      },
+      "tokens": 186
+    },
+    {
+      "firstFile": {
+        "end": 176,
+        "endLoc": {
+          "column": 6,
+          "line": 176,
+          "position": 5896
+        },
+        "name": "auth/login.tsx",
+        "start": 156,
+        "startLoc": {
+          "column": 15,
+          "line": 156,
+          "position": 5239
+        }
+      },
+      "format": "tsx",
+      "fragment": "      </Button>\n    </View>\n  ) : null;\n\n  const unavailableContent = !configured ? (\n    <AuthUnavailableState title={s.authUnavailableTitle} subtitle={s.authUnavailableSubtitle} dir={dir} />\n  ) : undefined;\n\n  const footer = configured ? (\n    <>\n      <OAuthButtons\n        strings={{\n          authOrContinueWith: s.authOrContinueWith,\n          authContinueWithQuranFoundation: s.authContinueWithQuranFoundation,\n          authContinueWithGoogle: s.authContinueWithGoogle,\n          authContinueWithApple: s.authContinueWithApple,\n          authContinueWithFacebook: s.authContinueWithFacebook,\n        }}\n        onError={(msg) => setShowError(msg)}\n      />\n      {isEmailAuthFlowsEnabled() && (",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 21,
+      "secondFile": {
+        "end": 260,
+        "endLoc": {
+          "column": 6,
+          "line": 260,
+          "position": 8348
+        },
+        "name": "auth/signup.tsx",
+        "start": 240,
+        "startLoc": {
+          "column": 15,
+          "line": 240,
+          "position": 7691
+        }
+      },
+      "tokens": 105
+    },
+    {
+      "firstFile": {
+        "end": 1372,
+        "endLoc": {
+          "column": 63,
+          "line": 1372,
+          "position": 50070
+        },
+        "name": "flashcards/session.tsx",
+        "start": 1335,
+        "startLoc": {
+          "column": 21,
+          "line": 1335,
+          "position": 49214
+        }
+      },
+      "format": "tsx",
+      "fragment": "function DueDateSheet({\n  visible,\n  value,\n  error,\n  busy,\n  isDark,\n  isRTL,\n  s,\n  onChange,\n  onClose,\n  onSave,\n}: {\n  visible: boolean;\n  value: string;\n  error: string | null;\n  busy: boolean;\n  isDark: boolean;\n  isRTL: boolean;\n  s: UIStrings;\n  onChange: (value: string) => void;\n  onClose: () => void;\n  onSave: () => void;\n}) {\n  return (\n    <ResponsiveSheet\n      open={visible}\n      onClose={onClose}\n      maxWidth={420}\n      maxHeight={360}\n      avoidKeyboard\n    >\n      <OverlayHeader title={s.cardSetDueDate} subtitle={s.cardDueDateHint} onClose={onClose} isRTL={isRTL} showHandle />\n      <OverlayBody scrollEnabled={false} contentContainerClassName=\"px-5 py-5\">\n        <TextInput\n          value={value}\n          onChangeText={onChange}\n          placeholder={s.cardDueDatePlaceholder}\n          placeholderTextColor={isDark ? \"#737373\" : \"#b9a085\"}",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 38,
+      "secondFile": {
+        "end": 512,
+        "endLoc": {
+          "column": 63,
+          "line": 512,
+          "position": 17124
+        },
+        "name": "flashcards/DeckCardsSheet.tsx",
+        "start": 475,
+        "startLoc": {
+          "column": 22,
+          "line": 475,
+          "position": 16268
+        }
+      },
+      "tokens": 179
+    },
+    {
+      "firstFile": {
+        "end": 1409,
+        "endLoc": {
+          "column": 8,
+          "line": 1409,
+          "position": 51460
+        },
+        "name": "flashcards/session.tsx",
+        "start": 1382,
+        "startLoc": {
+          "column": 10,
+          "line": 1382,
+          "position": 50497
+        }
+      },
+      "format": "tsx",
+      "fragment": "          }}\n        />\n        {error ? (\n          <Text\n            className=\"mt-3 text-red-600 dark:text-red-400\"\n            style={{ fontFamily: \"Manrope_500Medium\", fontSize: 13, textAlign: isRTL ? \"right\" : \"left\", writingDirection: isRTL ? \"rtl\" : \"ltr\" }}\n          >\n            {error}\n          </Text>\n        ) : null}\n      </OverlayBody>\n      <OverlayFooter isRTL={isRTL}>\n        <Button variant=\"outline\" onPress={onClose} disabled={busy} className=\"flex-1\">\n          <Text className=\"text-charcoal dark:text-neutral-200\" style={{ fontFamily: \"Manrope_600SemiBold\", fontSize: 14 }}>\n            {s.flashcardsCancel}\n          </Text>\n        </Button>\n        <Button onPress={onSave} disabled={busy} className=\"flex-1\">\n          <Text className=\"text-white\" style={{ fontFamily: \"Manrope_600SemiBold\", fontSize: 14 }}>\n            {s.cardSaveDueDate}\n          </Text>\n        </Button>\n      </OverlayFooter>\n    </ResponsiveSheet>\n  );\n}\n\nfunction AnswerEditSheet({",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 28,
+      "secondFile": {
+        "end": 542,
+        "endLoc": {
+          "column": 8,
+          "line": 542,
+          "position": 18393
+        },
+        "name": "flashcards/DeckCardsSheet.tsx",
+        "start": 515,
+        "startLoc": {
+          "column": 127,
+          "line": 515,
+          "position": 17430
+        }
+      },
+      "tokens": 194
+    },
+    {
+      "firstFile": {
+        "end": 1401,
+        "endLoc": {
+          "column": 15,
+          "line": 1401,
+          "position": 51345
+        },
+        "name": "flashcards/session.tsx",
+        "start": 1391,
+        "startLoc": {
+          "column": 17,
+          "line": 1391,
+          "position": 50821
+        }
+      },
+      "format": "tsx",
+      "fragment": "        ) : null}\n      </OverlayBody>\n      <OverlayFooter isRTL={isRTL}>\n        <Button variant=\"outline\" onPress={onClose} disabled={busy} className=\"flex-1\">\n          <Text className=\"text-charcoal dark:text-neutral-200\" style={{ fontFamily: \"Manrope_600SemiBold\", fontSize: 14 }}>\n            {s.flashcardsCancel}\n          </Text>\n        </Button>\n        <Button onPress={onSave} disabled={busy} className=\"flex-1\">\n          <Text className=\"text-white\" style={{ fontFamily: \"Manrope_600SemiBold\", fontSize: 14 }}>\n            {s.cardSaveDueDate}",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 11,
+      "secondFile": {
+        "end": 1466,
+        "endLoc": {
+          "column": 15,
+          "line": 1466,
+          "position": 53332
+        },
+        "name": "flashcards/session.tsx",
+        "start": 1456,
+        "startLoc": {
+          "column": 10,
+          "line": 1456,
+          "position": 52808
+        }
+      },
+      "tokens": 111
+    },
+    {
+      "firstFile": {
+        "end": 1899,
+        "endLoc": {
+          "column": 6,
+          "line": 1899,
+          "position": 67156
+        },
+        "name": "flashcards/session.tsx",
+        "start": 1881,
+        "startLoc": {
+          "column": 48,
+          "line": 1881,
+          "position": 66558
+        }
+      },
+      "format": "tsx",
+      "fragment": "      {blocks.map((block: QiraatBlock, i: number) => (\n        <View key={i} className=\"mb-4\">\n          {block.heading && (\n            <Text\n              className=\"text-lg text-primary-accent dark:text-primary-bright mb-1.5\"\n              style={{ writingDirection: \"rtl\", textAlign: \"right\", fontWeight: \"700\" }}\n            >\n              {block.heading}\n            </Text>\n          )}\n          <Text\n            className=\"text-base text-charcoal dark:text-neutral-200 leading-8\"\n            style={{ writingDirection: \"rtl\", textAlign: \"right\" }}\n          >\n            {block.body}\n          </Text>\n        </View>\n      ))}\n    </ScrollView>",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 19,
+      "secondFile": {
+        "end": 135,
+        "endLoc": {
+          "column": 6,
+          "line": 135,
+          "position": 3948
+        },
+        "name": "mushaf/word-tabs/QiraatTab.tsx",
+        "start": 117,
+        "startLoc": {
+          "column": 27,
+          "line": 117,
+          "position": 3350
+        }
+      },
+      "tokens": 99
+    },
+    {
+      "firstFile": {
+        "end": 47,
+        "endLoc": {
+          "column": 1,
+          "line": 47,
+          "position": 1760
+        },
+        "name": "profile/[userId].tsx",
+        "start": 20,
+        "startLoc": {
+          "column": 84,
+          "line": 20,
+          "position": 892
+        }
+      },
+      "format": "tsx",
+      "fragment": "      <ProfileModalContent userId={typeof userId === \"string\" ? userId : undefined} />\n    </SettingsProvider>\n  );\n}\n\nfunction RouteDatabaseError({ message }: { message: string }) {\n  const uiLanguage = getStartupLanguage();\n  const s = strings[uiLanguage];\n\n  return (\n    <View className=\"flex-1 items-center justify-center bg-surface px-6 dark:bg-surface-dark\">\n      <Text className=\"mb-2 text-red-600\" style={{ fontFamily: \"Manrope_700Bold\", fontSize: 18 }}>\n        {s.databaseError}\n      </Text>\n      <Text className=\"text-center text-red-500\" style={{ fontFamily: \"Manrope_400Regular\", fontSize: 14 }}>\n        {message}\n      </Text>\n    </View>\n  );\n}\n\nfunction getStartupLanguage(): \"en\" | \"ar\" {\n  if (Platform.OS === \"web\" && typeof window !== \"undefined\") {\n    const cached = window.localStorage.getItem(UI_LANGUAGE_CACHE_KEY);\n    if (cached === \"en\" || cached === \"ar\") return cached;\n  }\n  return I18nManager.isRTL ? \"ar\" : \"en\";\n}",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 28,
+      "secondFile": {
+        "end": 45,
+        "endLoc": {
+          "column": 1,
+          "line": 45,
+          "position": 1580
+        },
+        "name": "profile/index.tsx",
+        "start": 18,
+        "startLoc": {
+          "column": 27,
+          "line": 18,
+          "position": 712
+        }
+      },
+      "tokens": 174
+    },
+    {
+      "firstFile": {
+        "end": 596,
+        "endLoc": {
+          "column": 3,
+          "line": 596,
+          "position": 16834
+        },
+        "name": "auth/AuthScreenShell.tsx",
+        "start": 588,
+        "startLoc": {
+          "column": 30,
+          "line": 588,
+          "position": 16447
+        }
+      },
+      "format": "tsx",
+      "fragment": "function getCachedAuthDarkMode(): boolean | null {\n  if (Platform.OS !== \"web\" || typeof window === \"undefined\") return null;\n\n  const theme = window.localStorage.getItem(\"hafiz_theme\");\n  if (theme === \"dark\" || theme === \"amoled\") return true;\n  if (theme === \"beige\" || theme === \"white\") return false;\n  if (theme === \"system\") {\n    return window.matchMedia?.(\"(prefers-color-scheme: dark)\").matches ?? null;\n  }",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 9,
+      "secondFile": {
+        "end": 208,
+        "endLoc": {
+          "column": 3,
+          "line": 208,
+          "position": 7489
+        },
+        "name": "auth/OAuthButtons.tsx",
+        "start": 200,
+        "startLoc": {
+          "column": 29,
+          "line": 200,
+          "position": 7102
+        }
+      },
+      "tokens": 82
+    },
+    {
+      "firstFile": {
+        "end": 84,
+        "endLoc": {
+          "column": 9,
+          "line": 84,
+          "position": 3495
+        },
+        "name": "flashcards/DeckReviewSettingsSheet.tsx",
+        "start": 72,
+        "startLoc": {
+          "column": 45,
+          "line": 72,
+          "position": 2422
+        }
+      },
+      "format": "tsx",
+      "fragment": "  const compact = width >= SIDEBAR_BREAKPOINT;\n  const [dailyLimit, setDailyLimit] = useState(DEFAULT_DECK_DAILY_REVIEW_LIMIT);\n  const [newCardsLimit, setNewCardsLimit] = useState(DEFAULT_DECK_NEW_CARD_LIMIT);\n  const [requestRetention, setRequestRetention] = useState(DEFAULT_DECK_REQUEST_RETENTION);\n  const [maximumInterval, setMaximumInterval] = useState(DEFAULT_DECK_MAXIMUM_INTERVAL);\n  const [enableFuzz, setEnableFuzz] = useState(DEFAULT_DECK_ENABLE_FUZZ);\n  const [enableShortTerm, setEnableShortTerm] = useState(DEFAULT_DECK_ENABLE_SHORT_TERM);\n  const [learningStepsText, setLearningStepsText] = useState(() => formatStepText(DEFAULT_DECK_LEARNING_STEPS, isRTL));\n  const [relearningStepsText, setRelearningStepsText] = useState(() => formatStepText(DEFAULT_DECK_RELEARNING_STEPS, isRTL));\n  const [newReviewOrder, setNewReviewOrder] = useState<NewReviewOrder>(DEFAULT_NEW_REVIEW_ORDER);\n  const [reviewSortOrder, setReviewSortOrder] = useState<ReviewSortOrder>(DEFAULT_REVIEW_SORT_ORDER);\n  const [newCardSortOrder, setNewCardSortOrder] = useState<NewCardSortOrder>(DEFAULT_NEW_CARD_SORT_ORDER);\n  const [testModes, setTestModes] = useState<TestMode[]>(DEFAULT_ENABLED_MODES);",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 13,
+      "secondFile": {
+        "end": 87,
+        "endLoc": {
+          "column": 9,
+          "line": 87,
+          "position": 3979
+        },
+        "name": "flashcards/SmartDeckFilterSheet.tsx",
+        "start": 75,
+        "startLoc": {
+          "column": 54,
+          "line": 75,
+          "position": 2906
+        }
+      },
+      "tokens": 160
+    },
+    {
+      "firstFile": {
+        "end": 129,
+        "endLoc": {
+          "column": 53,
+          "line": 129,
+          "position": 5588
+        },
+        "name": "flashcards/DeckReviewSettingsSheet.tsx",
+        "start": 118,
+        "startLoc": {
+          "column": 19,
+          "line": 118,
+          "position": 4980
+        }
+      },
+      "format": "tsx",
+      "fragment": "      setError(null);\n      setDailyLimit(settings.dailyReviewLimit);\n      setNewCardsLimit(settings.newCardsLimit);\n      setRequestRetention(settings.requestRetention);\n      setMaximumInterval(settings.maximumInterval);\n      setEnableFuzz(settings.enableFuzz);\n      setEnableShortTerm(settings.enableShortTerm);\n      setLearningStepsText(formatStepText(settings.learningSteps, isRTL));\n      setRelearningStepsText(formatStepText(settings.relearningSteps, isRTL));\n      setNewReviewOrder(settings.newReviewOrder);\n      setReviewSortOrder(settings.reviewSortOrder);\n      setNewCardSortOrder(settings.newCardSortOrder);",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 12,
+      "secondFile": {
+        "end": 119,
+        "endLoc": {
+          "column": 53,
+          "line": 119,
+          "position": 5713
+        },
+        "name": "flashcards/SmartDeckFilterSheet.tsx",
+        "start": 108,
+        "startLoc": {
+          "column": 113,
+          "line": 108,
+          "position": 5105
+        }
+      },
+      "tokens": 89
+    },
+    {
+      "firstFile": {
+        "end": 170,
+        "endLoc": {
+          "column": 7,
+          "line": 170,
+          "position": 6895
+        },
+        "name": "flashcards/DeckReviewSettingsSheet.tsx",
+        "start": 146,
+        "startLoc": {
+          "column": 32,
+          "line": 146,
+          "position": 6108
+        }
+      },
+      "format": "tsx",
+      "fragment": "    setActiveInfo({ title, body });\n  }, []);\n\n  const setNextDailyLimit = useCallback((value: number) => {\n    setError(null);\n    setDailyLimit(Math.max(MIN_DECK_DAILY_REVIEW_LIMIT, value));\n  }, []);\n\n  const setNextNewCardsLimit = useCallback((value: number) => {\n    setError(null);\n    setNewCardsLimit(Math.max(MIN_DECK_NEW_CARD_LIMIT, value));\n  }, []);\n\n  const setNextRetention = useCallback((value: number) => {\n    setError(null);\n    const clamped = Math.max(MIN_DECK_REQUEST_RETENTION, Math.min(MAX_DECK_REQUEST_RETENTION, value));\n    setRequestRetention(Number(clamped.toFixed(2)));\n  }, []);\n\n  const setNextMaximumInterval = useCallback((value: number) => {\n    setError(null);\n    setMaximumInterval(Math.max(MIN_DECK_MAXIMUM_INTERVAL, Math.min(MAX_DECK_MAXIMUM_INTERVAL, value)));\n  }, []);\n\n  const toggleTestMode = useCallback((value: TestMode) => {",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 25,
+      "secondFile": {
+        "end": 201,
+        "endLoc": {
+          "column": 7,
+          "line": 201,
+          "position": 8343
+        },
+        "name": "flashcards/SmartDeckFilterSheet.tsx",
+        "start": 177,
+        "startLoc": {
+          "column": 4,
+          "line": 177,
+          "position": 7556
+        }
+      },
+      "tokens": 177
+    },
+    {
+      "firstFile": {
+        "end": 323,
+        "endLoc": {
+          "column": 41,
+          "line": 323,
+          "position": 12087
+        },
+        "name": "flashcards/DeckReviewSettingsSheet.tsx",
+        "start": 300,
+        "startLoc": {
+          "column": 10,
+          "line": 300,
+          "position": 10901
+        }
+      },
+      "format": "tsx",
+      "fragment": "          <SchedulerOptionsPanel\n            dailyLimit={dailyLimit}\n            newCardsLimit={newCardsLimit}\n            requestRetention={requestRetention}\n            maximumInterval={maximumInterval}\n            enableFuzz={enableFuzz}\n            enableShortTerm={enableShortTerm}\n            learningStepsText={learningStepsText}\n            relearningStepsText={relearningStepsText}\n            newReviewOrder={newReviewOrder}\n            reviewSortOrder={reviewSortOrder}\n            newCardSortOrder={newCardSortOrder}\n            onDailyLimitChange={setNextDailyLimit}\n            onNewCardsLimitChange={setNextNewCardsLimit}\n            onRequestRetentionChange={setNextRetention}\n            onMaximumIntervalChange={setNextMaximumInterval}\n            onEnableFuzzChange={setEnableFuzz}\n            onEnableShortTermChange={setEnableShortTerm}\n            onLearningStepsTextChange={setLearningStepsText}\n            onRelearningStepsTextChange={setRelearningStepsText}\n            onNewReviewOrderChange={setNewReviewOrder}\n            onReviewSortOrderChange={setReviewSortOrder}\n            onNewCardSortOrderChange={setNewCardSortOrder}\n            onInfoPress={openSettingInfo}",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 24,
+      "secondFile": {
+        "end": 411,
+        "endLoc": {
+          "column": 43,
+          "line": 411,
+          "position": 16600
+        },
+        "name": "flashcards/SmartDeckFilterSheet.tsx",
+        "start": 388,
+        "startLoc": {
+          "column": 12,
+          "line": 388,
+          "position": 15368
+        }
+      },
+      "tokens": 117
+    },
+    {
+      "firstFile": {
+        "end": 386,
+        "endLoc": {
+          "column": 24,
+          "line": 386,
+          "position": 14172
+        },
+        "name": "flashcards/DeckReviewSettingsSheet.tsx",
+        "start": 354,
+        "startLoc": {
+          "column": 23,
+          "line": 354,
+          "position": 13182
+        }
+      },
+      "format": "tsx",
+      "fragment": "      </ResponsiveSheet>\n\n      <ResponsiveSheet\n        open={visible && activeInfo !== null}\n        onClose={() => setActiveInfo(null)}\n        maxWidth={440}\n        maxHeight={isPhone ? \"70%\" : 360}\n        dir={isRTL ? \"rtl\" : \"ltr\"}\n      >\n        <OverlayHeader\n          title={activeInfo?.title ?? \"\"}\n          onClose={() => setActiveInfo(null)}\n          isRTL={isRTL}\n          showHandle={isPhone}\n        />\n        <OverlayBody\n          contentContainerClassName=\"px-5 py-5\"\n          contentContainerStyle={{ direction: isRTL ? \"rtl\" : \"ltr\" }}\n        >\n          <Text\n            className=\"text-charcoal dark:text-neutral-200\"\n            style={{\n              fontFamily: \"Manrope_400Regular\",\n              fontSize: 14,\n              lineHeight: 23,\n              textAlign: isRTL ? \"right\" : \"left\",\n              writingDirection: isRTL ? \"rtl\" : \"ltr\",\n            }}\n          >\n            {activeInfo?.body ?? \"\"}\n          </Text>\n        </OverlayBody>\n      </ResponsiveSheet>",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 33,
+      "secondFile": {
+        "end": 490,
+        "endLoc": {
+          "column": 24,
+          "line": 490,
+          "position": 19235
+        },
+        "name": "flashcards/SmartDeckFilterSheet.tsx",
+        "start": 458,
+        "startLoc": {
+          "column": 7,
+          "line": 458,
+          "position": 18245
+        }
+      },
+      "tokens": 167
+    },
+    {
+      "firstFile": {
+        "end": 284,
+        "endLoc": {
+          "column": 12,
+          "line": 284,
+          "position": 9586
+        },
+        "name": "mushaf/AyahBlock.tsx",
+        "start": 269,
+        "startLoc": {
+          "column": 10,
+          "line": 269,
+          "position": 8946
+        }
+      },
+      "format": "tsx",
+      "fragment": "          {isQfContentEnabled() && (\n            <ActionIcon\n              icon={\n                audioState.loading ? (\n                  <ActivityIndicator size=\"small\" color={audioIconColor} />\n                ) : audioState.playing ? (\n                  <Pause size={15} color={audioIconColor} />\n                ) : (\n                  <Play size={15} color={audioIconColor} />\n                )\n              }\n              onPress={handleAudioPress}\n              disabled={audioState.loading}\n              accessibilityLabel={audioState.loading ? s.audioLoading : audioState.playing ? s.audioPause : s.audioPlay}\n            />\n          )}",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 16,
+      "secondFile": {
+        "end": 427,
+        "endLoc": {
+          "column": 14,
+          "line": 427,
+          "position": 17263
+        },
+        "name": "mushaf/AyahDetailModal.tsx",
+        "start": 412,
+        "startLoc": {
+          "column": 12,
+          "line": 412,
+          "position": 16593
+        }
+      },
+      "tokens": 107
+    },
+    {
+      "firstFile": {
+        "end": 267,
+        "endLoc": {
+          "column": 27,
+          "line": 267,
+          "position": 7470
+        },
+        "name": "mushaf/MushafPage.tsx",
+        "start": 249,
+        "startLoc": {
+          "column": 3,
+          "line": 249,
+          "position": 7019
+        }
+      },
+      "format": "tsx",
+      "fragment": "  );\n\n  useEffect(() => {\n    if (!needsSurahNameFont) return;\n    if (isSurahNameFontLoaded()) {\n      setSurahNameFontReady(true);\n      return;\n    }\n    setSurahNameFontReady(false);\n    let cancelled = false;\n    loadSurahNameFont()\n      .then(() => {\n        if (!cancelled) requestAnimationFrame(() => setSurahNameFontReady(true));\n      })\n      .catch(console.warn);\n    return () => {\n      cancelled = true;\n    };\n  }, [needsSurahNameFont]);",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 19,
+      "secondFile": {
+        "end": 94,
+        "endLoc": {
+          "column": 27,
+          "line": 94,
+          "position": 3101
+        },
+        "name": "mushaf/SurahHeader.tsx",
+        "start": 76,
+        "startLoc": {
+          "column": 10,
+          "line": 76,
+          "position": 2650
+        }
+      },
+      "tokens": 93
+    },
+    {
+      "firstFile": {
+        "end": 252,
+        "endLoc": {
+          "column": 16,
+          "line": 252,
+          "position": 8168
+        },
+        "name": "reflection-journey/JourneyAyahCard.tsx",
+        "start": 241,
+        "startLoc": {
+          "column": 45,
+          "line": 241,
+          "position": 7614
+        }
+      },
+      "format": "tsx",
+      "fragment": "                key={`${row.surah}:${row.ayah}`}\n                onPress={() => setDetailTarget({ surah: row.surah, ayah: row.ayah })}\n                className=\"rounded-3xl bg-surface dark:bg-surface-dark px-4 py-4\"\n                style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.99 : 1 }] })}\n              >\n                <Text\n                  className=\"text-warm-400 dark:text-neutral-500 mb-2\"\n                  style={{ fontFamily: \"Manrope_600SemiBold\", fontSize: 11 }}\n                >\n                  {`${row.surah}:${row.ayah}`}\n                </Text>\n                {!fontsReady ? (",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 12,
+      "secondFile": {
+        "end": 320,
+        "endLoc": {
+          "column": 16,
+          "line": 320,
+          "position": 11122
+        },
+        "name": "reflection-journey/JourneyAyahCard.tsx",
+        "start": 309,
+        "startLoc": {
+          "column": 59,
+          "line": 309,
+          "position": 10568
+        }
+      },
+      "tokens": 94
+    },
+    {
+      "firstFile": {
+        "end": 190,
+        "endLoc": {
+          "column": 19,
+          "line": 190,
+          "position": 6940
+        },
+        "name": "settings/TafsirSourcePicker.tsx",
+        "start": 173,
+        "startLoc": {
+          "column": 40,
+          "line": 173,
+          "position": 6134
+        }
+      },
+      "format": "tsx",
+      "fragment": "                    <Download size={19} color={isDark ? \"#2dd4bf\" : \"#0d9488\"} />\n                  ) : isSelected ? (\n                    <Check size={20} color={isDark ? \"#2dd4bf\" : \"#0d9488\"} />\n                  ) : (\n                    <DisclosureChevron size={18} color={isDark ? \"#737373\" : \"#8B8178\"} />\n                  )\n                }\n              >\n                <Text\n                  className={isSelected ? \"text-primary-accent dark:text-primary-bright\" : \"text-charcoal dark:text-neutral-300\"}\n                  style={{\n                    fontFamily: isSelected ? \"Manrope_600SemiBold\" : \"Manrope_500Medium\",\n                    fontSize: 15,\n                    textAlign: isRTL ? \"right\" : \"left\",\n                    writingDirection: isRTL ? \"rtl\" : \"ltr\",\n                  }}\n                >\n                  {title}",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 18,
+      "secondFile": {
+        "end": 126,
+        "endLoc": {
+          "column": 19,
+          "line": 126,
+          "position": 4431
+        },
+        "name": "settings/TranslationLanguagePicker.tsx",
+        "start": 103,
+        "startLoc": {
+          "column": 52,
+          "line": 103,
+          "position": 3497
+        }
+      },
+      "tokens": 107
+    },
+    {
+      "firstFile": {
+        "end": 497,
+        "endLoc": {
+          "column": 8,
+          "line": 497,
+          "position": 19942
+        },
+        "name": "achievements/queries.ts",
+        "start": 485,
+        "startLoc": {
+          "column": 24,
+          "line": 485,
+          "position": 19553
+        }
+      },
+      "format": "typescript",
+      "fragment": "function parseJsonRecord(value: unknown): Record<string, unknown> {\n  if (!value) return {};\n  if (typeof value === \"object\" && !Array.isArray(value)) return value as Record<string, unknown>;\n  if (typeof value !== \"string\") return {};\n  try {\n    const parsed = JSON.parse(value);\n    return parsed && typeof parsed === \"object\" && !Array.isArray(parsed) ? parsed : {};\n  } catch {\n    return {};\n  }\n}\n\nfunction buildLocalReviewCounts(rows: { reviewed_at: string }[]): Map<string, number> {",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 13,
+      "secondFile": {
+        "end": 505,
+        "endLoc": {
+          "column": 8,
+          "line": 505,
+          "position": 17001
+        },
+        "name": "leaderboard/api.ts",
+        "start": 493,
+        "startLoc": {
+          "column": 21,
+          "line": 493,
+          "position": 16612
+        }
+      },
+      "tokens": 101
+    },
+    {
+      "firstFile": {
+        "end": 521,
+        "endLoc": {
+          "column": 1,
+          "line": 521,
+          "position": 20736
+        },
+        "name": "achievements/queries.ts",
+        "start": 495,
+        "startLoc": {
+          "column": 0,
+          "line": 495,
+          "position": 19931
+        }
+      },
+      "format": "typescript",
+      "fragment": "}\n\nfunction buildLocalReviewCounts(rows: { reviewed_at: string }[]): Map<string, number> {\n  const counts = new Map<string, number>();\n  for (const row of rows) {\n    const reviewedAt = new Date(row.reviewed_at);\n    if (Number.isNaN(reviewedAt.getTime())) continue;\n    const key = formatLocalDateKey(reviewedAt);\n    counts.set(key, (counts.get(key) ?? 0) + 1);\n  }\n  return counts;\n}\n\nfunction calculateLongestStreak(dateKeys: string[]): number {\n  let maxStreak = 0;\n  let runStreak = 0;\n  let prevIndex: number | null = null;\n\n  for (const dateKey of dateKeys) {\n    const dayIndex = dayIndexFromDateKey(dateKey);\n    runStreak = prevIndex !== null && dayIndex - prevIndex === 1 ? runStreak + 1 : 1;\n    maxStreak = Math.max(maxStreak, runStreak);\n    prevIndex = dayIndex;\n  }\n\n  return maxStreak;\n}",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 27,
+      "secondFile": {
+        "end": 144,
+        "endLoc": {
+          "column": 1,
+          "line": 144,
+          "position": 4327
+        },
+        "name": "fsrs/queries.ts",
+        "start": 118,
+        "startLoc": {
+          "column": 0,
+          "line": 118,
+          "position": 3522
+        }
+      },
+      "tokens": 187
+    },
+    {
+      "firstFile": {
+        "end": 146,
+        "endLoc": {
+          "column": 1,
+          "line": 146,
+          "position": 4795
+        },
+        "name": "fsrs/leaderboard-sync.ts",
+        "start": 132,
+        "startLoc": {
+          "column": 62,
+          "line": 132,
+          "position": 4293
+        }
+      },
+      "format": "typescript",
+      "fragment": "  return summarizeDailyScores((data ?? []) as DailyScoreRow[]);\n}\n\nfunction isMissingPublicReviewAggregateError(error: { code?: string; message?: string; details?: string } | null): boolean {\n  const message = `${error?.code ?? \"\"} ${error?.message ?? \"\"} ${error?.details ?? \"\"}`.toLowerCase();\n  return (\n    message.includes(\"public_review_activity\") ||\n    message.includes(\"public_review_stats\")\n  ) && (\n    message.includes(\"does not exist\") ||\n    message.includes(\"schema cache\") ||\n    message.includes(\"pgrst205\") ||\n    message.includes(\"42p01\")\n  );\n}",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 15,
+      "secondFile": {
+        "end": 117,
+        "endLoc": {
+          "column": 1,
+          "line": 117,
+          "position": 3328
+        },
+        "name": "leaderboard/api.ts",
+        "start": 103,
+        "startLoc": {
+          "column": 102,
+          "line": 103,
+          "position": 2826
+        }
+      },
+      "tokens": 104
+    },
+    {
+      "firstFile": {
+        "end": 823,
+        "endLoc": {
+          "column": 27,
+          "line": 823,
+          "position": 28841
+        },
+        "name": "fsrs/smart-decks.ts",
+        "start": 812,
+        "startLoc": {
+          "column": 33,
+          "line": 812,
+          "position": 28432
+        }
+      },
+      "format": "typescript",
+      "fragment": "  if (cardId.startsWith(\"qiraat:\")) {\n    const [, surahRaw, ayahRaw] = cardId.split(\":\");\n    const surah = parseInt(surahRaw, 10);\n    const ayah = parseInt(ayahRaw, 10);\n    if (!Number.isFinite(surah) || !Number.isFinite(ayah)) return null;\n    const row = await db.getFirstAsync<{\n      text_uthmani: string;\n      text_clean: string;\n      text_qcf2: string;\n      v2_page: number;\n      name_arabic: string;\n      name_english: string;",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 12,
+      "secondFile": {
+        "end": 869,
+        "endLoc": {
+          "column": 27,
+          "line": 869,
+          "position": 30330
+        },
+        "name": "fsrs/smart-decks.ts",
+        "start": 858,
+        "startLoc": {
+          "column": 32,
+          "line": 858,
+          "position": 29921
+        }
+      },
+      "tokens": 92
+    },
+    {
+      "firstFile": {
+        "end": 289,
+        "endLoc": {
+          "column": 21,
+          "line": 289,
+          "position": 9445
+        },
+        "name": "leaderboard/api.ts",
+        "start": 254,
+        "startLoc": {
+          "column": 27,
+          "line": 254,
+          "position": 8403
+        }
+      },
+      "format": "typescript",
+      "fragment": "    .gte(\"date\", weekAgoStr)\n    .order(\"score\", { ascending: false });\n\n  if (error) throw error;\n\n  // Aggregate by user\n  const userMap = new Map<string, { username: string; display_name: string | null; avatar_url: string | null; score: number }>();\n  for (const row of data ?? []) {\n    const existing = userMap.get(row.user_id);\n    if (existing) {\n      existing.score += row.score;\n    } else {\n      userMap.set(row.user_id, {\n        username: (row as any).profiles?.username ?? \"unknown\",\n        display_name: (row as any).profiles?.display_name ?? null,\n        avatar_url: (row as any).profiles?.avatar_url ?? null,\n        score: row.score,\n      });\n    }\n  }\n\n  return Array.from(userMap.entries())\n    .sort((a, b) => b[1].score - a[1].score)\n    .slice(0, 50)\n    .map(([user_id, info], i) => ({\n      user_id,\n      username: info.username,\n      display_name: info.display_name,\n      avatar_url: info.avatar_url,\n      score: info.score,\n      rank: i + 1,\n    }));\n}\n\n/** All-time leaderboard: by total_score from profiles */\nexport async function fetchAllTimeLeaderboard(): Promise<LeaderboardEntry[]> {",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 36,
+      "secondFile": {
+        "end": 328,
+        "endLoc": {
+          "column": 21,
+          "line": 328,
+          "position": 10742
+        },
+        "name": "leaderboard/api.ts",
+        "start": 294,
+        "startLoc": {
+          "column": 109,
+          "line": 294,
+          "position": 9722
+        }
+      },
+      "tokens": 250
+    },
+    {
+      "firstFile": {
+        "end": 252,
+        "endLoc": {
+          "column": 71,
+          "line": 252,
+          "position": 7650
+        },
+        "name": "notes/queries.ts",
+        "start": 240,
+        "startLoc": {
+          "column": 2,
+          "line": 240,
+          "position": 7244
+        }
+      },
+      "format": "typescript",
+      "fragment": "  return {\n    id: row.id,\n    surah: row.surah,\n    ayah_start: row.ayah_start,\n    ayah_end: row.ayah_end,\n    content: row.content,\n    created_at: row.created_at,\n    updated_at: row.updated_at,\n    deleted_at: row.deleted_at,\n    qf_note_id: row.qf_note_id,\n    qf_synced_at: row.qf_synced_at,\n    qf_sync_error: row.qf_sync_error,\n    qf_ranges_json: row.qf_ranges_json ? safeJson(row.qf_ranges_json) : null,",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 13,
+      "secondFile": {
+        "end": 717,
+        "endLoc": {
+          "column": 71,
+          "line": 717,
+          "position": 24509
+        },
+        "name": "quran-foundation/user-sync.ts",
+        "start": 705,
+        "startLoc": {
+          "column": 2,
+          "line": 705,
+          "position": 24103
+        }
+      },
+      "tokens": 81
+    }
+  ],
+  "knip": {
+    "issues": [
+      {
+        "file": "components/ui/AuthGate.tsx",
+        "binaries": [],
+        "catalog": [],
+        "catalogReferences": [],
+        "dependencies": [],
+        "devDependencies": [],
+        "duplicates": [],
+        "enumMembers": [],
+        "exports": [],
+        "files": [
+          {
+            "name": "components/ui/AuthGate.tsx"
+          }
+        ],
+        "namespaceMembers": [],
+        "optionalPeerDependencies": [],
+        "types": [],
+        "unlisted": [],
+        "unresolved": []
+      },
+      {
+        "file": "components/zayt/ZaytRivePreview.native.tsx",
+        "binaries": [],
+        "catalog": [],
+        "catalogReferences": [],
+        "dependencies": [],
+        "devDependencies": [],
+        "duplicates": [],
+        "enumMembers": [],
+        "exports": [],
+        "files": [
+          {
+            "name": "components/zayt/ZaytRivePreview.native.tsx"
+          }
+        ],
+        "namespaceMembers": [],
+        "optionalPeerDependencies": [],
+        "types": [],
+        "unlisted": [],
+        "unresolved": []
+      },
+      {
+        "file": "components/zayt/ZaytRivePreview.web.tsx",
+        "binaries": [],
+        "catalog": [],
+        "catalogReferences": [],
+        "dependencies": [],
+        "devDependencies": [],
+        "duplicates": [],
+        "enumMembers": [],
+        "exports": [],
+        "files": [
+          {
+            "name": "components/zayt/ZaytRivePreview.web.tsx"
+          }
+        ],
+        "namespaceMembers": [],
+        "optionalPeerDependencies": [],
+        "types": [],
+        "unlisted": [],
+        "unresolved": []
+      },
+      {
+        "file": "lib/database/native-loaders.web.ts",
+        "binaries": [],
+        "catalog": [],
+        "catalogReferences": [],
+        "dependencies": [],
+        "devDependencies": [],
+        "duplicates": [],
+        "enumMembers": [],
+        "exports": [],
+        "files": [
+          {
+            "name": "lib/database/native-loaders.web.ts"
+          }
+        ],
+        "namespaceMembers": [],
+        "optionalPeerDependencies": [],
+        "types": [],
+        "unlisted": [],
+        "unresolved": []
+      },
+      {
+        "file": "lib/fonts/qpc-v4-tajweed-fonts.web.ts",
+        "binaries": [],
+        "catalog": [],
+        "catalogReferences": [],
+        "dependencies": [],
+        "devDependencies": [],
+        "duplicates": [],
+        "enumMembers": [],
+        "exports": [],
+        "files": [
+          {
+            "name": "lib/fonts/qpc-v4-tajweed-fonts.web.ts"
+          }
+        ],
+        "namespaceMembers": [],
+        "optionalPeerDependencies": [],
+        "types": [],
+        "unlisted": [],
+        "unresolved": []
+      },
+      {
+        "file": "package.json",
+        "binaries": [],
+        "catalog": [],
+        "catalogReferences": [],
+        "dependencies": [
+          {
+            "name": "@rive-app/react-native",
+            "line": 55,
+            "col": 6,
+            "pos": 2565
+          },
+          {
+            "name": "@rive-app/react-webgl2",
+            "line": 56,
+            "col": 6,
+            "pos": 2605
+          },
+          {
+            "name": "expo-modules-core",
+            "line": 74,
+            "col": 6,
+            "pos": 3213
+          },
+          {
+            "name": "react-native-nitro-modules",
+            "line": 87,
+            "col": 6,
+            "pos": 3631
+          }
+        ],
+        "devDependencies": [
+          {
+            "name": "supabase",
+            "line": 117,
+            "col": 6,
+            "pos": 4571
+          }
+        ],
+        "duplicates": [],
+        "enumMembers": [],
+        "exports": [],
+        "files": [],
+        "namespaceMembers": [],
+        "optionalPeerDependencies": [],
+        "types": [],
+        "unlisted": [],
+        "unresolved": []
+      },
+      {
+        "file": "app.json",
+        "binaries": [],
+        "catalog": [],
+        "catalogReferences": [],
+        "dependencies": [],
+        "devDependencies": [],
+        "duplicates": [],
+        "enumMembers": [],
+        "exports": [],
+        "files": [],
+        "namespaceMembers": [],
+        "optionalPeerDependencies": [],
+        "types": [],
+        "unlisted": [
+          {
+            "name": "expo-updates"
+          },
+          {
+            "name": "expo-system-ui"
+          }
+        ],
+        "unresolved": []
+      },
+      {
+        "file": "components/ui/AppNavigation.tsx",
+        "binaries": [],
+        "catalog": [],
+        "catalogReferences": [],
+        "dependencies": [],
+        "devDependencies": [],
+        "duplicates": [],
+        "enumMembers": [],
+        "exports": [],
+        "files": [],
+        "namespaceMembers": [],
+        "optionalPeerDependencies": [],
+        "types": [],
+        "unlisted": [
+          {
+            "name": "@react-navigation/bottom-tabs",
+            "line": 10,
+            "col": 40,
+            "pos": 179
+          }
+        ],
+        "unresolved": []
+      },
+      {
+        "file": "scripts/generate-icons.mjs",
+        "binaries": [],
+        "catalog": [],
+        "catalogReferences": [],
+        "dependencies": [],
+        "devDependencies": [],
+        "duplicates": [],
+        "enumMembers": [],
+        "exports": [],
+        "files": [],
+        "namespaceMembers": [],
+        "optionalPeerDependencies": [],
+        "types": [],
+        "unlisted": [
+          {
+            "name": "sharp",
+            "line": 1,
+            "col": 19,
+            "pos": 18
+          }
+        ],
+        "unresolved": []
+      },
+      {
+        "file": "scripts/build-quran-db.mjs",
+        "binaries": [
+          {
+            "name": "sqlite3"
+          }
+        ],
+        "catalog": [],
+        "catalogReferences": [],
+        "dependencies": [],
+        "devDependencies": [],
+        "duplicates": [],
+        "enumMembers": [],
+        "exports": [],
+        "files": [],
+        "namespaceMembers": [],
+        "optionalPeerDependencies": [],
+        "types": [],
+        "unlisted": [],
+        "unresolved": []
+      },
+      {
+        "file": "lib/fsrs/smart-decks.ts",
+        "binaries": [],
+        "catalog": [],
+        "catalogReferences": [],
+        "dependencies": [],
+        "devDependencies": [],
+        "duplicates": [],
+        "enumMembers": [],
+        "exports": [
+          {
+            "name": "readDefaultDeckFilter",
+            "line": 225,
+            "col": 23,
+            "pos": 6911
+          }
+        ],
+        "files": [],
+        "namespaceMembers": [],
+        "optionalPeerDependencies": [],
+        "types": [],
+        "unlisted": [],
+        "unresolved": []
+      },
+      {
+        "file": "lib/fsrs/queries.ts",
+        "binaries": [],
+        "catalog": [],
+        "catalogReferences": [],
+        "dependencies": [],
+        "devDependencies": [],
+        "duplicates": [],
+        "enumMembers": [],
+        "exports": [
+          {
+            "name": "isRetentionCardSaved",
+            "line": 440,
+            "col": 23,
+            "pos": 15063
+          },
+          {
+            "name": "addRetentionCard",
+            "line": 459,
+            "col": 23,
+            "pos": 15725
+          }
+        ],
+        "files": [],
+        "namespaceMembers": [],
+        "optionalPeerDependencies": [],
+        "types": [],
+        "unlisted": [],
+        "unresolved": []
+      },
+      {
+        "file": "components/ui/MirroredRow.tsx",
+        "binaries": [],
+        "catalog": [],
+        "catalogReferences": [],
+        "dependencies": [],
+        "devDependencies": [],
+        "duplicates": [],
+        "enumMembers": [],
+        "exports": [
+          {
+            "name": "MirroredPressableRow",
+            "line": 58,
+            "col": 14,
+            "pos": 1368
+          }
+        ],
+        "files": [],
+        "namespaceMembers": [],
+        "optionalPeerDependencies": [],
+        "types": [],
+        "unlisted": [],
+        "unresolved": []
+      },
+      {
+        "file": "tests/rtl/rtl-component-registry.ts",
+        "binaries": [],
+        "catalog": [],
+        "catalogReferences": [],
+        "dependencies": [],
+        "devDependencies": [],
+        "duplicates": [],
+        "enumMembers": [],
+        "exports": [
+          {
+            "name": "rtlComponentRegistryByPath",
+            "line": 102,
+            "col": 14,
+            "pos": 12267
+          }
+        ],
+        "files": [],
+        "namespaceMembers": [],
+        "optionalPeerDependencies": [],
+        "types": [],
+        "unlisted": [],
+        "unresolved": []
+      },
+      {
+        "file": "lib/i18n/strings.ts",
+        "binaries": [],
+        "catalog": [],
+        "catalogReferences": [],
+        "dependencies": [],
+        "devDependencies": [],
+        "duplicates": [],
+        "enumMembers": [],
+        "exports": [],
+        "files": [],
+        "namespaceMembers": [],
+        "optionalPeerDependencies": [],
+        "types": [
+          {
+            "name": "Locale",
+            "line": 1846,
+            "col": 13,
+            "pos": 91118
+          }
+        ],
+        "unlisted": [],
+        "unresolved": []
+      },
+      {
+        "file": "lib/fsrs/review-transition.ts",
+        "binaries": [],
+        "catalog": [],
+        "catalogReferences": [],
+        "dependencies": [],
+        "devDependencies": [],
+        "duplicates": [],
+        "enumMembers": [],
+        "exports": [],
+        "files": [],
+        "namespaceMembers": [],
+        "optionalPeerDependencies": [],
+        "types": [
+          {
+            "name": "ReviewRecord",
+            "line": 5,
+            "col": 13,
+            "pos": 218
+          }
+        ],
+        "unlisted": [],
+        "unresolved": []
+      },
+      {
+        "file": "lib/tafsir/sources.ts",
+        "binaries": [],
+        "catalog": [],
+        "catalogReferences": [],
+        "dependencies": [],
+        "devDependencies": [],
+        "duplicates": [
+          [
+            {
+              "name": "TAFSIR_SOURCES",
+              "line": 29,
+              "col": 14,
+              "pos": 626
+            },
+            {
+              "name": "AVAILABLE_TAFSIR_SOURCES",
+              "line": 112,
+              "col": 14,
+              "pos": 2718
+            }
+          ]
+        ],
+        "enumMembers": [],
+        "exports": [],
+        "files": [],
+        "namespaceMembers": [],
+        "optionalPeerDependencies": [],
+        "types": [],
+        "unlisted": [],
+        "unresolved": []
+      },
+      {
+        "file": "lib/quran-foundation/recitations.ts",
+        "binaries": [],
+        "catalog": [],
+        "catalogReferences": [],
+        "dependencies": [],
+        "devDependencies": [],
+        "duplicates": [
+          [
+            {
+              "name": "QF_HUSARY_MURATTAL_RECITATION_ID",
+              "line": 9,
+              "col": 14,
+              "pos": 131
+            },
+            {
+              "name": "DEFAULT_RECITATION_ID",
+              "line": 10,
+              "col": 14,
+              "pos": 182
+            }
+          ]
+        ],
+        "enumMembers": [],
+        "exports": [],
+        "files": [],
+        "namespaceMembers": [],
+        "optionalPeerDependencies": [],
+        "types": [],
+        "unlisted": [],
+        "unresolved": []
+      }
+    ]
+  },
+  "security_counts": {
+    "info": 0,
+    "low": 1,
+    "moderate": 17,
+    "high": 60,
+    "critical": 2,
+    "total": 80
+  }
+}

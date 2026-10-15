@@ -32,5 +32,15 @@ expo-env.d.ts
 # @end expo-cli
 .vercel
 supabase/.temp/
+
+# Local modernization evidence and single-writer loop state
+.refactor-baseline/
+.ralph/
+stop.md
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
 .aider*
 .vscode/
+android/.kotlin/

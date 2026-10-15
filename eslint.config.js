@@ -15,6 +15,10 @@ module.exports = defineConfig([
   {
     ignores: [
       ".expo/**",
+      ".ralph/**",
+      ".refactor-baseline/**",
+      ".agents/**",
+      ".claude/**",
       "coverage/**",
       "dist/**",
       "node_modules/**",

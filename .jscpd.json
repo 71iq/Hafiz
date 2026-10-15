@@ -1,0 +1,18 @@
+{
+  "path": ["app", "components", "lib"],
+  "ignore": [
+    "**/native-loaders.native.ts",
+    "**/translation-requires.ts",
+    "**/qpc-v2-fonts.ts",
+    "**/qpc-v4-tajweed-fonts*.ts",
+    "**/i18n/strings.ts",
+    "**/word/*-labels.ts"
+  ],
+  "minLines": 8,
+  "minTokens": 80,
+  "format": ["typescript", "tsx", "javascript"],
+  "reporters": ["json", "console"],
+  "output": ".refactor-baseline/jscpd",
+  "absolute": false,
+  "gitignore": true
+}
