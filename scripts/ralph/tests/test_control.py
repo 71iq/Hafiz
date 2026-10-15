@@ -44,6 +44,12 @@ class SelectionTests(unittest.TestCase):
                 self.assertFalse(control.path_allowed(path, broad))
         self.assertTrue(control.path_allowed('lib/example.ts', broad))
 
+    def test_dynamic_route_brackets_match_literal_paths(self):
+        dynamic = task()
+        dynamic['allowed_paths'] = ['app/profile/[userId].tsx']
+        self.assertTrue(control.path_allowed('app/profile/[userId].tsx', dynamic))
+        self.assertFalse(control.path_allowed('app/profile/u.tsx', dynamic))
+
     def test_staged_protected_rename_source_is_denied(self):
         candidate = task()
         candidate['allowed_paths'] = ['lib/new.ts']

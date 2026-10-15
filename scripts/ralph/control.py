@@ -96,7 +96,7 @@ def path_allowed(path, task):
         return False
     if any(path.startswith(p) for p in hard_denied):
         return False
-    return any(fnmatch.fnmatchcase(path, pattern) for pattern in task['allowed_paths'])
+    return any(path == pattern or fnmatch.fnmatchcase(path, pattern) for pattern in task['allowed_paths'])
 
 
 def log_event(event, **fields):

@@ -23,36 +23,62 @@
         "Keep LoadingScreen, settings defaults and Quran data unchanged."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--runTestsByPath", "tests/unit/startup-language.test.ts"],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/startup-language.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "low",
       "approved": true,
-      "status": "pending",
+      "status": "blocked",
       "allowed_paths": [
         "app/profile/index.tsx",
         "app/profile/[userId].tsx",
         "lib/i18n/startup-language.ts",
         "tests/unit/startup-language.test.ts"
       ],
-      "attempts": 0
+      "attempts": 1,
+      "started_at": "2026-10-15T13:04:36.900906+00:00",
+      "failure": "Task paths invalid or empty: ['app/profile/[userId].tsx', 'app/profile/index.tsx', 'tests/unit/startup-language.test.ts']",
+      "evidence": ".ralph/runs/RF-001-1-1792069476901497968"
     },
     {
       "id": "RF-002",
       "title": "Remove unused chrome auto-hide API",
       "description": "Remove unused chrome auto-hide API",
       "rationale": "No caller uses the setAutoHideEnabled no-op.",
-      "modules": ["lib/ui/chrome.tsx"],
-      "dependencies": ["RF-001"],
+      "modules": [
+        "lib/ui/chrome.tsx"
+      ],
+      "dependencies": [
+        "RF-001"
+      ],
       "acceptance_criteria": [
         "Remove the unused context member, default no-op, implementation and provider property.",
         "Preserve markActivity, visible, immersive and their existing behavior. Confirm no callers before deletion."
       ],
-      "verification": [["npm", "run", "typecheck"]],
+      "verification": [
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
+      ],
       "risk": "low",
       "approved": true,
       "status": "pending",
-      "allowed_paths": ["lib/ui/chrome.tsx"],
+      "allowed_paths": [
+        "lib/ui/chrome.tsx"
+      ],
       "attempts": 0
     },
     {
@@ -60,21 +86,40 @@
       "title": "Reuse the shared theme opacity helper in review session",
       "description": "Reuse the shared theme opacity helper in review session",
       "rationale": "The sole local helper caller uses a six-digit palette color supported by withThemeOpacity.",
-      "modules": ["app/flashcards/session.tsx", "tests/unit/settings-contract.test.ts"],
-      "dependencies": ["RF-002"],
+      "modules": [
+        "app/flashcards/session.tsx",
+        "tests/unit/settings-contract.test.ts"
+      ],
+      "dependencies": [
+        "RF-002"
+      ],
       "acceptance_criteria": [
         "Replace the local withOpacity call with existing withThemeOpacity.",
         "Delete the duplicate helper and preserve the exact color result for themeSurface at alpha 0.95.",
         "Extend meaningful helper behavior tests only if missing. No broader session formatting."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--runTestsByPath", "tests/unit/settings-contract.test.ts"],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/settings-contract.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "low",
       "approved": true,
       "status": "pending",
-      "allowed_paths": ["app/flashcards/session.tsx", "tests/unit/settings-contract.test.ts"],
+      "allowed_paths": [
+        "app/flashcards/session.tsx",
+        "tests/unit/settings-contract.test.ts"
+      ],
       "attempts": 0
     },
     {
@@ -82,17 +127,28 @@
       "title": "Triage every measured clone group",
       "description": "Triage every measured clone group",
       "rationale": "Source similarity needs a semantic reuse decision before merging code.",
-      "modules": ["docs/refactoring/duplication-triage.json"],
-      "dependencies": ["RF-003"],
+      "modules": [
+        "docs/refactoring/duplication-triage.json"
+      ],
+      "dependencies": [
+        "RF-003"
+      ],
       "acceptance_criteria": [
         "Classify every clone in analysis-summary.json as refactor, intentional, or needs-characterization with paths and concrete rationale.",
         "Name a small follow-up task for each actionable clone. Preserve all platform/data semantics."
       ],
-      "verification": [["python3", "scripts/ralph/check-triage.py"]],
+      "verification": [
+        [
+          "python3",
+          "scripts/ralph/check-triage.py"
+        ]
+      ],
       "risk": "low",
       "approved": true,
       "status": "pending",
-      "allowed_paths": ["docs/refactoring/duplication-triage.json"],
+      "allowed_paths": [
+        "docs/refactoring/duplication-triage.json"
+      ],
       "attempts": 0
     },
     {
@@ -104,7 +160,9 @@
         "tests/unit/rtl-higher-level-source-contract.test.ts",
         "tests/unit/rtl-higher-level-component-contracts.test.tsx"
       ],
-      "dependencies": ["RF-004"],
+      "dependencies": [
+        "RF-004"
+      ],
       "acceptance_criteria": [
         "Identify the current direction contract. Replace only the failing spelling assertion with equivalent rendered RTL/LTR coverage. Do not weaken other tests."
       ],
@@ -139,7 +197,9 @@
         "tests/unit/rtl-style-contract.test.ts",
         "tests/unit/rtl-component-contracts.test.tsx"
       ],
-      "dependencies": ["RF-005"],
+      "dependencies": [
+        "RF-005"
+      ],
       "acceptance_criteria": [
         "Add correct registry fixture. Determine if marker uses directional end or a justified physical exception.",
         "Verify rendered RTL/LTR and selection state. No broad allowlist bypass."
@@ -155,7 +215,11 @@
           "tests/unit/rtl-component-registry-coverage.test.ts",
           "tests/unit/rtl-component-contracts.test.tsx"
         ],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "medium",
       "approved": false,
@@ -173,22 +237,44 @@
       "title": "Triage critical transitive dependency advisories",
       "description": "Triage critical transitive dependency advisories",
       "rationale": "Baseline reports critical shell-quote and tar findings.",
-      "modules": ["package.json", "package-lock.json", "docs/refactoring/SECURITY.md"],
-      "dependencies": ["RF-006"],
+      "modules": [
+        "package.json",
+        "package-lock.json",
+        "docs/refactoring/SECURITY.md"
+      ],
+      "dependencies": [
+        "RF-006"
+      ],
       "acceptance_criteria": [
         "Trace dependency paths and affected operations using official advisories.",
         "Use compatible scoped updates with lockfile review and no forced bulk fixes.",
         "Record remaining reachability and required build checks."
       ],
       "verification": [
-        ["npm", "audit", "--audit-level=critical"],
-        ["npm", "run", "typecheck"],
-        ["npm", "run", "build:web"]
+        [
+          "npm",
+          "audit",
+          "--audit-level=critical"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ]
       ],
       "risk": "high",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["package.json", "package-lock.json", "docs/refactoring/SECURITY.md"],
+      "allowed_paths": [
+        "package.json",
+        "package-lock.json",
+        "docs/refactoring/SECURITY.md"
+      ],
       "attempts": 0
     },
     {
@@ -196,24 +282,57 @@
       "title": "Align SDK 55 patch dependencies",
       "description": "Align SDK 55 patch dependencies",
       "rationale": "Expo reports 19 mismatches including ESLint config 56.",
-      "modules": ["package.json", "package-lock.json", "patches/*", "docs/refactoring/TECH_STACK.md"],
-      "dependencies": ["RF-007"],
+      "modules": [
+        "package.json",
+        "package-lock.json",
+        "patches/*",
+        "docs/refactoring/TECH_STACK.md"
+      ],
+      "dependencies": [
+        "RF-007"
+      ],
       "acceptance_criteria": [
         "Use Expo recommended SDK55 versions, inspect existing patches and preserve native APIs.",
         "Remove direct expo-modules-core only after confirming callers/autolinking.",
         "Verify no duplicate native modules. Split native changes from major upgrades."
       ],
       "verification": [
-        ["npx", "expo", "install", "--check"],
-        ["npm", "run", "diagnose:expo"],
-        ["npm", "run", "typecheck"],
-        ["npm", "run", "test:unit"],
-        ["npm", "run", "build:web"]
+        [
+          "npx",
+          "expo",
+          "install",
+          "--check"
+        ],
+        [
+          "npm",
+          "run",
+          "diagnose:expo"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ]
       ],
       "risk": "high",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["package.json", "package-lock.json", "patches/*", "docs/refactoring/TECH_STACK.md"],
+      "allowed_paths": [
+        "package.json",
+        "package-lock.json",
+        "patches/*",
+        "docs/refactoring/TECH_STACK.md"
+      ],
       "attempts": 0
     },
     {
@@ -221,17 +340,31 @@
       "title": "Calibrate native and web unused-code roots",
       "description": "Calibrate native and web unused-code roots",
       "rationale": "Knip reports platform variants as unused candidates.",
-      "modules": ["knip.json", "docs/refactoring/UNUSED.md"],
-      "dependencies": ["RF-008"],
+      "modules": [
+        "knip.json",
+        "docs/refactoring/UNUSED.md"
+      ],
+      "dependencies": [
+        "RF-008"
+      ],
       "acceptance_criteria": [
         "Recognize Expo routes, platform resolution and runtime assets. Justify exclusions individually.",
         "Produce actionable unused files/exports/dependencies without deleting protected inputs."
       ],
-      "verification": [["npm", "run", "analyze:unused"]],
+      "verification": [
+        [
+          "npm",
+          "run",
+          "analyze:unused"
+        ]
+      ],
       "risk": "medium",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["knip.json", "docs/refactoring/UNUSED.md"],
+      "allowed_paths": [
+        "knip.json",
+        "docs/refactoring/UNUSED.md"
+      ],
       "attempts": 0
     },
     {
@@ -239,20 +372,38 @@
       "title": "Remove one verified unused source group",
       "description": "Remove one verified unused source group",
       "rationale": "Deletion requires callers and platform evidence.",
-      "modules": ["components/ui/AuthGate.tsx", "tests/rtl/*", "docs/refactoring/UNUSED.md"],
-      "dependencies": ["RF-009"],
+      "modules": [
+        "components/ui/AuthGate.tsx",
+        "tests/rtl/*",
+        "docs/refactoring/UNUSED.md"
+      ],
+      "dependencies": [
+        "RF-009"
+      ],
       "acceptance_criteria": [
         "Confirm AuthGate is unused across native/web and entry conventions.",
         "Remove only verified dead files and matching registry records. Split any additional candidate into a new task."
       ],
       "verification": [
-        ["npm", "run", "typecheck"],
-        ["npm", "run", "test:unit"]
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit"
+        ]
       ],
       "risk": "medium",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["components/ui/AuthGate.tsx", "tests/rtl/*", "docs/refactoring/UNUSED.md"],
+      "allowed_paths": [
+        "components/ui/AuthGate.tsx",
+        "tests/rtl/*",
+        "docs/refactoring/UNUSED.md"
+      ],
       "attempts": 0
     },
     {
@@ -260,20 +411,38 @@
       "title": "Remove verified unused dependencies",
       "description": "Remove verified unused dependencies",
       "rationale": "Avoid unused binary size and upgrade burden.",
-      "modules": ["package.json", "package-lock.json", "docs/refactoring/UNUSED.md"],
-      "dependencies": ["RF-009"],
+      "modules": [
+        "package.json",
+        "package-lock.json",
+        "docs/refactoring/UNUSED.md"
+      ],
+      "dependencies": [
+        "RF-009"
+      ],
       "acceptance_criteria": [
         "Inspect side effects, scripts, Expo/native autolinking and web platform use before removal.",
         "One coherent dependency removal per child task."
       ],
       "verification": [
-        ["npm", "run", "typecheck"],
-        ["npm", "run", "build:web"]
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ]
       ],
       "risk": "medium",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["package.json", "package-lock.json", "docs/refactoring/UNUSED.md"],
+      "allowed_paths": [
+        "package.json",
+        "package-lock.json",
+        "docs/refactoring/UNUSED.md"
+      ],
       "attempts": 0
     },
     {
@@ -281,17 +450,33 @@
       "title": "Establish native dependency-boundary analysis",
       "description": "Establish native dependency-boundary analysis",
       "rationale": "Current cruise prefers web and cannot certify native resolution.",
-      "modules": [".dependency-cruiser.cjs", "package.json", "docs/refactoring/ARCHITECTURE.md"],
-      "dependencies": ["RF-008"],
+      "modules": [
+        ".dependency-cruiser.cjs",
+        "package.json",
+        "docs/refactoring/ARCHITECTURE.md"
+      ],
+      "dependencies": [
+        "RF-008"
+      ],
       "acceptance_criteria": [
         "Run separate native and web graph configurations.",
         "Enforce no route imports from domain/shared UI and no newly introduced cycles."
       ],
-      "verification": [["npm", "run", "analyze:boundaries"]],
+      "verification": [
+        [
+          "npm",
+          "run",
+          "analyze:boundaries"
+        ]
+      ],
       "risk": "medium",
       "approved": false,
       "status": "pending",
-      "allowed_paths": [".dependency-cruiser.cjs", "package.json", "docs/refactoring/ARCHITECTURE.md"],
+      "allowed_paths": [
+        ".dependency-cruiser.cjs",
+        "package.json",
+        "docs/refactoring/ARCHITECTURE.md"
+      ],
       "attempts": 0
     },
     {
@@ -299,8 +484,13 @@
       "title": "Repair ayah-marker preference hydration",
       "description": "Repair ayah-marker preference hydration",
       "rationale": "Settings writes show_ayah_markers but omits its load key.",
-      "modules": ["lib/settings/context.tsx", "tests/unit/settings-hydration.test.tsx"],
-      "dependencies": ["RF-008"],
+      "modules": [
+        "lib/settings/context.tsx",
+        "tests/unit/settings-hydration.test.tsx"
+      ],
+      "dependencies": [
+        "RF-008"
+      ],
       "acceptance_criteria": [
         "Reproduce persisted false resetting on reload with an isolated database/provider fixture.",
         "Load the preference with current validation/default semantics. Preserve offline boot."
@@ -315,12 +505,19 @@
           "tests/unit/settings-hydration.test.tsx",
           "tests/unit/settings-contract.test.ts"
         ],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "medium",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["lib/settings/context.tsx", "tests/unit/settings-hydration.test.tsx"],
+      "allowed_paths": [
+        "lib/settings/context.tsx",
+        "tests/unit/settings-hydration.test.tsx"
+      ],
       "attempts": 0
     },
     {
@@ -334,15 +531,28 @@
         "lib/settings/*",
         "tests/unit/tafsir-selection.test.tsx"
       ],
-      "dependencies": ["RF-013"],
+      "dependencies": [
+        "RF-013"
+      ],
       "acceptance_criteria": [
         "Cover import success, failure and simultaneous selection.",
         "Share only matching two callbacks. Keep AyahDetailModal refresh semantics explicit.",
         "Verify relevant rendered picker state."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--runTestsByPath", "tests/unit/tafsir-selection.test.tsx"],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/tafsir-selection.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "medium",
       "approved": false,
@@ -360,21 +570,46 @@
       "title": "Characterize Hifz progress transitions",
       "description": "Characterize Hifz progress transitions",
       "rationale": "Reader orchestration lacks direct transition tests.",
-      "modules": ["lib/mushaf/*", "app/(tabs)/mushaf.tsx", "tests/unit/hifz-transitions.test.ts"],
-      "dependencies": ["RF-014"],
+      "modules": [
+        "lib/mushaf/*",
+        "app/(tabs)/mushaf.tsx",
+        "tests/unit/hifz-transitions.test.ts"
+      ],
+      "dependencies": [
+        "RF-014"
+      ],
       "acceptance_criteria": [
         "Cover zero-word ayahs, partial/previous/next reveal, page reset/completion and the existing final timer tick.",
         "Extract pure policy without modifying data, glyph/page mapping or gestures."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--runTestsByPath", "tests/unit/hifz-transitions.test.ts"],
-        ["npm", "run", "typecheck"],
-        ["npm", "run", "build:web"]
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/hifz-transitions.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ]
       ],
       "risk": "high",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["lib/mushaf/*", "app/(tabs)/mushaf.tsx", "tests/unit/hifz-transitions.test.ts"],
+      "allowed_paths": [
+        "lib/mushaf/*",
+        "app/(tabs)/mushaf.tsx",
+        "tests/unit/hifz-transitions.test.ts"
+      ],
       "attempts": 0
     },
     {
@@ -382,8 +617,14 @@
       "title": "Extract tested Mushaf geometry calculations",
       "description": "Extract tested Mushaf geometry calculations",
       "rationale": "Geometry, loading and gestures currently share a large component.",
-      "modules": ["components/mushaf/PageMushaf.tsx", "lib/mushaf/*", "tests/unit/mushaf-geometry.test.ts"],
-      "dependencies": ["RF-015"],
+      "modules": [
+        "components/mushaf/PageMushaf.tsx",
+        "lib/mushaf/*",
+        "tests/unit/mushaf-geometry.test.ts"
+      ],
+      "dependencies": [
+        "RF-015"
+      ],
       "acceptance_criteria": [
         "Characterize structural lines, font fitting, offsets and page bounds before extraction.",
         "Verify representative phone/tablet/desktop, Arabic/English and themes in rendered output."
@@ -398,13 +639,25 @@
           "tests/unit/mushaf-geometry.test.ts",
           "tests/unit/mushaf-page-tokens.test.ts"
         ],
-        ["npm", "run", "typecheck"],
-        ["npm", "run", "build:web"]
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ]
       ],
       "risk": "high",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["components/mushaf/PageMushaf.tsx", "lib/mushaf/*", "tests/unit/mushaf-geometry.test.ts"],
+      "allowed_paths": [
+        "components/mushaf/PageMushaf.tsx",
+        "lib/mushaf/*",
+        "tests/unit/mushaf-geometry.test.ts"
+      ],
       "attempts": 0
     },
     {
@@ -418,14 +671,27 @@
         "app/(tabs)/reflection-feed.tsx",
         "tests/unit/mushaf-position.test.ts"
       ],
-      "dependencies": ["RF-016"],
+      "dependencies": [
+        "RF-016"
+      ],
       "acceptance_criteria": [
         "Test missing and overlapping ranges before selecting a common interface.",
         "Keep caller-specific nullable/fallback outcomes. Do not alter Quran mappings."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--runTestsByPath", "tests/unit/mushaf-position.test.ts"],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/mushaf-position.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "medium",
       "approved": false,
@@ -443,20 +709,39 @@
       "title": "Test stale search completion and cancellation",
       "description": "Test stale search completion and cancellation",
       "rationale": "Search can receive responses in a different order from requests.",
-      "modules": ["components/SearchCommand.tsx", "tests/unit/search-results.test.tsx"],
-      "dependencies": ["RF-008"],
+      "modules": [
+        "components/SearchCommand.tsx",
+        "tests/unit/search-results.test.tsx"
+      ],
+      "dependencies": [
+        "RF-008"
+      ],
       "acceptance_criteria": [
         "Use deferred responses to reproduce any actual stale-result bug.",
         "Guard request ownership and unmount if reproduced. Preserve grouping/root resolution and offline SQL."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--runTestsByPath", "tests/unit/search-results.test.tsx"],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/search-results.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "medium",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["components/SearchCommand.tsx", "tests/unit/search-results.test.tsx"],
+      "allowed_paths": [
+        "components/SearchCommand.tsx",
+        "tests/unit/search-results.test.tsx"
+      ],
       "attempts": 0
     },
     {
@@ -464,21 +749,46 @@
       "title": "Extract search query and grouping policy",
       "description": "Extract search query and grouping policy",
       "rationale": "Search mixes data work and rendering.",
-      "modules": ["components/SearchCommand.tsx", "lib/search/*", "tests/unit/search-results.test.tsx"],
-      "dependencies": ["RF-018"],
+      "modules": [
+        "components/SearchCommand.tsx",
+        "lib/search/*",
+        "tests/unit/search-results.test.tsx"
+      ],
+      "dependencies": [
+        "RF-018"
+      ],
       "acceptance_criteria": [
         "Move only independently tested query/group rules. Keep keyboard, focus, selection and navigation behavior.",
         "Verify search on representative web and native input when available."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--runTestsByPath", "tests/unit/search-results.test.tsx"],
-        ["npm", "run", "typecheck"],
-        ["npm", "run", "build:web"]
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/search-results.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ]
       ],
       "risk": "medium",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["components/SearchCommand.tsx", "lib/search/*", "tests/unit/search-results.test.tsx"],
+      "allowed_paths": [
+        "components/SearchCommand.tsx",
+        "lib/search/*",
+        "tests/unit/search-results.test.tsx"
+      ],
       "attempts": 0
     },
     {
@@ -486,8 +796,14 @@
       "title": "Characterize review-session orchestration",
       "description": "Characterize review-session orchestration",
       "rationale": "Transition extraction already exists; remaining orchestration needs direct regression tests.",
-      "modules": ["app/flashcards/session.tsx", "lib/fsrs/*", "tests/unit/review-session.test.tsx"],
-      "dependencies": ["RF-008"],
+      "modules": [
+        "app/flashcards/session.tsx",
+        "lib/fsrs/*",
+        "tests/unit/review-session.test.tsx"
+      ],
+      "dependencies": [
+        "RF-008"
+      ],
       "acceptance_criteria": [
         "Cover persistence order, same-day requeue, score inputs, cancellation and failures.",
         "Keep review-transition as the existing domain owner. Identify the next smallest extraction."
@@ -503,12 +819,20 @@
           "tests/unit/fsrs-review-transition.test.ts",
           "tests/unit/fsrs-scoring.test.ts"
         ],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "high",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["app/flashcards/session.tsx", "lib/fsrs/*", "tests/unit/review-session.test.tsx"],
+      "allowed_paths": [
+        "app/flashcards/session.tsx",
+        "lib/fsrs/*",
+        "tests/unit/review-session.test.tsx"
+      ],
       "attempts": 0
     },
     {
@@ -522,7 +846,9 @@
         "lib/fsrs/*",
         "tests/unit/review-session.test.tsx"
       ],
-      "dependencies": ["RF-020"],
+      "dependencies": [
+        "RF-020"
+      ],
       "acceptance_criteria": [
         "One independently named extraction, with current persistence/error/session behavior.",
         "No mega-hook replacement or changed scheduling policy."
@@ -537,8 +863,16 @@
           "tests/unit/review-session.test.tsx",
           "tests/unit/fsrs-review-transition.test.ts"
         ],
-        ["npm", "run", "typecheck"],
-        ["npm", "run", "build:web"]
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ]
       ],
       "risk": "high",
       "approved": false,
@@ -556,20 +890,41 @@
       "title": "Characterize smart-deck and queue query invariants",
       "description": "Characterize smart-deck and queue query invariants",
       "rationale": "Large query modules encode deck membership, limits and scheduling.",
-      "modules": ["lib/fsrs/queries.ts", "lib/fsrs/smart-decks.ts", "tests/unit/smart-decks.test.ts"],
-      "dependencies": ["RF-020"],
+      "modules": [
+        "lib/fsrs/queries.ts",
+        "lib/fsrs/smart-decks.ts",
+        "tests/unit/smart-decks.test.ts"
+      ],
+      "dependencies": [
+        "RF-020"
+      ],
       "acceptance_criteria": [
         "Test uniqueness, limits, ordering, empty decks, soft deletion and stable timestamps in isolated SQLite-equivalent fixtures.",
         "Split follow-up refactors by actual invariant ownership."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--runTestsByPath", "tests/unit/smart-decks.test.ts"],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/smart-decks.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "high",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["lib/fsrs/queries.ts", "lib/fsrs/smart-decks.ts", "tests/unit/smart-decks.test.ts"],
+      "allowed_paths": [
+        "lib/fsrs/queries.ts",
+        "lib/fsrs/smart-decks.ts",
+        "tests/unit/smart-decks.test.ts"
+      ],
       "attempts": 0
     },
     {
@@ -584,12 +939,20 @@
         "components/profile/*",
         "components/reflections/*"
       ],
-      "dependencies": ["RF-008"],
+      "dependencies": [
+        "RF-008"
+      ],
       "acceptance_criteria": [
         "Inventory keys, viewer-dependent fields, stale data, cancellation, identity changes and invalidation owners.",
         "Reproduce any cache leak with isolated fixtures before repair. No live accounts."
       ],
-      "verification": [["npm", "run", "typecheck"]],
+      "verification": [
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
+      ],
       "risk": "high",
       "approved": false,
       "status": "pending",
@@ -613,14 +976,27 @@
         "app/(tabs)/reflection-feed.tsx",
         "tests/unit/reflection-query-keys.test.ts"
       ],
-      "dependencies": ["RF-023"],
+      "dependencies": [
+        "RF-023"
+      ],
       "acceptance_criteria": [
         "Include all result inputs and viewer identity. Preserve public/private cache separation.",
         "Migrate matching callers and invalidations together, with pagination tests."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--runTestsByPath", "tests/unit/reflection-query-keys.test.ts"],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/reflection-query-keys.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "high",
       "approved": false,
@@ -638,8 +1014,15 @@
       "title": "Verify auth cache isolation and late requests",
       "description": "Verify auth cache isolation and late requests",
       "rationale": "Account switches must not receive previous user results.",
-      "modules": ["app/_layout.tsx", "lib/auth/*", "lib/query/*", "tests/unit/auth-query-lifecycle.test.tsx"],
-      "dependencies": ["RF-024"],
+      "modules": [
+        "app/_layout.tsx",
+        "lib/auth/*",
+        "lib/query/*",
+        "tests/unit/auth-query-lifecycle.test.tsx"
+      ],
+      "dependencies": [
+        "RF-024"
+      ],
       "acceptance_criteria": [
         "Test sign-in, sign-out, account switch, late responses, subscription cleanup and offline restore.",
         "Cancel/remove private cache at the correct lifecycle point with no new auth behavior."
@@ -654,12 +1037,21 @@
           "tests/unit/auth-query-lifecycle.test.tsx",
           "tests/unit/auth-disabled.test.ts"
         ],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "high",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["app/_layout.tsx", "lib/auth/*", "lib/query/*", "tests/unit/auth-query-lifecycle.test.tsx"],
+      "allowed_paths": [
+        "app/_layout.tsx",
+        "lib/auth/*",
+        "lib/query/*",
+        "tests/unit/auth-query-lifecycle.test.tsx"
+      ],
       "attempts": 0
     },
     {
@@ -673,14 +1065,27 @@
         "lib/reflections/*",
         "tests/unit/reflection-mutations.test.tsx"
       ],
-      "dependencies": ["RF-024"],
+      "dependencies": [
+        "RF-024"
+      ],
       "acceptance_criteria": [
         "Test failed and concurrent likes/comments, page boundaries and targeted invalidation.",
         "Preserve compatibility handling for missing server columns without hiding unrelated errors."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--runTestsByPath", "tests/unit/reflection-mutations.test.tsx"],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/reflection-mutations.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "high",
       "approved": false,
@@ -698,13 +1103,26 @@
       "title": "Audit remaining manual remote fetches for Query ownership",
       "description": "Audit remaining manual remote fetches for Query ownership",
       "rationale": "Only remote server state should migrate to Query.",
-      "modules": ["docs/refactoring/QUERY_AUDIT.md", "lib/profile/*", "lib/leaderboard/*", "lib/quran-foundation/*"],
-      "dependencies": ["RF-023"],
+      "modules": [
+        "docs/refactoring/QUERY_AUDIT.md",
+        "lib/profile/*",
+        "lib/leaderboard/*",
+        "lib/quran-foundation/*"
+      ],
+      "dependencies": [
+        "RF-023"
+      ],
       "acceptance_criteria": [
         "Classify every manual remote fetch by cache/lifecycle needs.",
         "Prepare small migrations only where they remove duplicate state. Keep local SQLite and queue writes outside Query."
       ],
-      "verification": [["npm", "run", "typecheck"]],
+      "verification": [
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
+      ],
       "risk": "medium",
       "approved": false,
       "status": "pending",
@@ -721,20 +1139,41 @@
       "title": "Integrate native Query online and focus lifecycle",
       "description": "Integrate native Query online and focus lifecycle",
       "rationale": "Query native reconnection needs explicit lifecycle handling.",
-      "modules": ["app/_layout.tsx", "lib/query/*", "tests/unit/query-native-lifecycle.test.tsx"],
-      "dependencies": ["RF-025"],
+      "modules": [
+        "app/_layout.tsx",
+        "lib/query/*",
+        "tests/unit/query-native-lifecycle.test.tsx"
+      ],
+      "dependencies": [
+        "RF-025"
+      ],
       "acceptance_criteria": [
         "Use existing NetInfo and AppState with listener cleanup.",
         "Test offline boot, reconnect, background/foreground, auth and strict remount. Do not automatically replay writes."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--runTestsByPath", "tests/unit/query-native-lifecycle.test.tsx"],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/query-native-lifecycle.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "high",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["app/_layout.tsx", "lib/query/*", "tests/unit/query-native-lifecycle.test.tsx"],
+      "allowed_paths": [
+        "app/_layout.tsx",
+        "lib/query/*",
+        "tests/unit/query-native-lifecycle.test.tsx"
+      ],
       "attempts": 0
     },
     {
@@ -742,8 +1181,14 @@
       "title": "Characterize sync partial failure and status",
       "description": "Characterize sync partial failure and status",
       "rationale": "Pull catches failures while callers may report synced.",
-      "modules": ["lib/database/sync.ts", "lib/sync/useSync.ts", "tests/unit/sync-partial-failure.test.tsx"],
-      "dependencies": ["RF-025"],
+      "modules": [
+        "lib/database/sync.ts",
+        "lib/sync/useSync.ts",
+        "tests/unit/sync-partial-failure.test.tsx"
+      ],
+      "dependencies": [
+        "RF-025"
+      ],
       "acceptance_criteria": [
         "Test partial pulls, failed upload, lost connectivity, watermark advancement and retry.",
         "Separate successful/partial/failed outcomes without changing restore-before-upload or queue semantics."
@@ -759,12 +1204,20 @@
           "tests/unit/sync-concurrency.test.tsx",
           "tests/unit/sync-restore-contract.test.ts"
         ],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "high",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["lib/database/sync.ts", "lib/sync/useSync.ts", "tests/unit/sync-partial-failure.test.tsx"],
+      "allowed_paths": [
+        "lib/database/sync.ts",
+        "lib/sync/useSync.ts",
+        "tests/unit/sync-partial-failure.test.tsx"
+      ],
       "attempts": 0
     },
     {
@@ -772,21 +1225,46 @@
       "title": "Validate web database bridge messages and SQL values",
       "description": "Validate web database bridge messages and SQL values",
       "rationale": "Bridge wire values currently pass through any casts.",
-      "modules": ["lib/database/provider.tsx", "lib/database/bridge*", "tests/unit/database-bridge.test.ts"],
-      "dependencies": ["RF-029"],
+      "modules": [
+        "lib/database/provider.tsx",
+        "lib/database/bridge*",
+        "tests/unit/database-bridge.test.ts"
+      ],
+      "dependencies": [
+        "RF-029"
+      ],
       "acceptance_criteria": [
         "Test malformed/unknown messages, bind-value validation, host changes, stale replies, timeouts and cancellation.",
         "Preserve native/web initialization and one-writer OPFS behavior."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--runTestsByPath", "tests/unit/database-bridge.test.ts"],
-        ["npm", "run", "typecheck"],
-        ["npm", "run", "build:web"]
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/database-bridge.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ]
       ],
       "risk": "high",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["lib/database/provider.tsx", "lib/database/bridge*", "tests/unit/database-bridge.test.ts"],
+      "allowed_paths": [
+        "lib/database/provider.tsx",
+        "lib/database/bridge*",
+        "tests/unit/database-bridge.test.ts"
+      ],
       "attempts": 0
     },
     {
@@ -800,7 +1278,9 @@
         "lib/database/user-settings.ts",
         "tests/unit/sync-payloads.test.ts"
       ],
-      "dependencies": ["RF-030"],
+      "dependencies": [
+        "RF-030"
+      ],
       "acceptance_criteria": [
         "Define validated per-table payloads with stable IDs/timestamps/deletes.",
         "Use isolated fixtures and preserve unknown-version handling. No production migration or data rewrite."
@@ -815,7 +1295,11 @@
           "tests/unit/sync-payloads.test.ts",
           "tests/unit/sync-restore-contract.test.ts"
         ],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "high",
       "approved": false,
@@ -840,14 +1324,27 @@
         "lib/quran-foundation/user-sync.ts",
         "tests/unit/local-write-contracts.test.ts"
       ],
-      "dependencies": ["RF-031"],
+      "dependencies": [
+        "RF-031"
+      ],
       "acceptance_criteria": [
         "Characterize privacy, IDs, timestamps, queue operations and failure order before shared helpers.",
         "Move one matching repeated rule per follow-up task."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--runTestsByPath", "tests/unit/local-write-contracts.test.ts"],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/local-write-contracts.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "high",
       "approved": false,
@@ -866,17 +1363,29 @@
       "title": "Audit local schema and remote migration parity offline",
       "description": "Audit local schema and remote migration parity offline",
       "rationale": "Production policy changes are outside authorization.",
-      "modules": ["docs/refactoring/DATA_AUDIT.md"],
-      "dependencies": ["RF-031"],
+      "modules": [
+        "docs/refactoring/DATA_AUDIT.md"
+      ],
+      "dependencies": [
+        "RF-031"
+      ],
       "acceptance_criteria": [
         "Inspect schema.sql, every migration, RLS ownership, SQLite sync columns and Edge Function auth.",
         "Record concrete gaps and separate authorization needs. Never apply SQL or contact production."
       ],
-      "verification": [["git", "diff", "--check"]],
+      "verification": [
+        [
+          "git",
+          "diff",
+          "--check"
+        ]
+      ],
       "risk": "high",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["docs/refactoring/DATA_AUDIT.md"],
+      "allowed_paths": [
+        "docs/refactoring/DATA_AUDIT.md"
+      ],
       "attempts": 0
     },
     {
@@ -884,8 +1393,14 @@
       "title": "Standardize one inconsistent multi-field form",
       "description": "Standardize one inconsistent multi-field form",
       "rationale": "RHF and Zod already exist and should own complex validation.",
-      "modules": ["app/auth/*", "components/profile/*", "tests/unit/form-validation.test.tsx"],
-      "dependencies": ["RF-025"],
+      "modules": [
+        "app/auth/*",
+        "components/profile/*",
+        "tests/unit/form-validation.test.tsx"
+      ],
+      "dependencies": [
+        "RF-025"
+      ],
       "acceptance_criteria": [
         "Inventory current validation and preserve messages, trimming, disabled auth flows and submit/error state.",
         "Migrate one form only after selecting an exact bounded path set."
@@ -900,12 +1415,20 @@
           "tests/unit/form-validation.test.tsx",
           "tests/unit/auth-disabled.test.ts"
         ],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "medium",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["app/auth/*", "components/profile/*", "tests/unit/form-validation.test.tsx"],
+      "allowed_paths": [
+        "app/auth/*",
+        "components/profile/*",
+        "tests/unit/form-validation.test.tsx"
+      ],
       "attempts": 0
     },
     {
@@ -919,14 +1442,27 @@
         "lib/i18n/strings.ts",
         "tests/unit/reading-stepper.test.tsx"
       ],
-      "dependencies": ["RF-014"],
+      "dependencies": [
+        "RF-014"
+      ],
       "acceptance_criteria": [
         "Use bilingual labels, disabled state and accessible role. Preserve font size, range, touch targets and RTL order.",
         "Render representative phone RTL/LTR and check keyboard/touch."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--runTestsByPath", "tests/unit/reading-stepper.test.tsx"],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/reading-stepper.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "medium",
       "approved": false,
@@ -950,15 +1486,32 @@
         "app/(tabs)/settings.tsx",
         "tests/unit/reading-stepper.test.tsx"
       ],
-      "dependencies": ["RF-035"],
+      "dependencies": [
+        "RF-035"
+      ],
       "acceptance_criteria": [
         "Share semantics only when range/disabled/accessibility contracts match. Keep legitimate layout variants.",
         "Verify all relevant themes and viewport dimensions."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--runTestsByPath", "tests/unit/reading-stepper.test.tsx"],
-        ["npm", "run", "typecheck"],
-        ["npm", "run", "build:web"]
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/reading-stepper.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ]
       ],
       "risk": "medium",
       "approved": false,
@@ -976,17 +1529,31 @@
       "title": "Measure settings render subscriptions",
       "description": "Measure settings render subscriptions",
       "rationale": "Settings context has many consumers; splitting needs evidence.",
-      "modules": ["docs/refactoring/PERFORMANCE.md", "lib/settings/context.tsx"],
-      "dependencies": ["RF-013"],
+      "modules": [
+        "docs/refactoring/PERFORMANCE.md",
+        "lib/settings/context.tsx"
+      ],
+      "dependencies": [
+        "RF-013"
+      ],
       "acceptance_criteria": [
         "Measure representative setting updates and reader renders before/after any proposed selector/context split.",
         "Do not introduce Zustand duplication of persisted settings without an ADR."
       ],
-      "verification": [["npm", "run", "typecheck"]],
+      "verification": [
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
+      ],
       "risk": "medium",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["docs/refactoring/PERFORMANCE.md", "lib/settings/context.tsx"],
+      "allowed_paths": [
+        "docs/refactoring/PERFORMANCE.md",
+        "lib/settings/context.tsx"
+      ],
       "attempts": 0
     },
     {
@@ -994,20 +1561,41 @@
       "title": "Add reduced-motion behavior where animation warrants it",
       "description": "Add reduced-motion behavior where animation warrants it",
       "rationale": "Searched UI modules lack explicit reduced-motion handling.",
-      "modules": ["components/ui/*", "lib/ui/*", "tests/unit/reduced-motion.test.tsx"],
-      "dependencies": ["RF-036"],
+      "modules": [
+        "components/ui/*",
+        "lib/ui/*",
+        "tests/unit/reduced-motion.test.tsx"
+      ],
+      "dependencies": [
+        "RF-036"
+      ],
       "acceptance_criteria": [
         "Inventory animated controls and preserve useful state feedback with motion disabled.",
         "Use platform-aware preference with cleanup and fallback; verify web/native where available."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--runTestsByPath", "tests/unit/reduced-motion.test.tsx"],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/reduced-motion.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "medium",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["components/ui/*", "lib/ui/*", "tests/unit/reduced-motion.test.tsx"],
+      "allowed_paths": [
+        "components/ui/*",
+        "lib/ui/*",
+        "tests/unit/reduced-motion.test.tsx"
+      ],
       "attempts": 0
     },
     {
@@ -1015,17 +1603,30 @@
       "title": "Profile reader and review performance before optimizing",
       "description": "Profile reader and review performance before optimizing",
       "rationale": "Large lists already use measured/virtualized behavior.",
-      "modules": ["docs/refactoring/PERFORMANCE.md"],
-      "dependencies": ["RF-016", "RF-021"],
+      "modules": [
+        "docs/refactoring/PERFORMANCE.md"
+      ],
+      "dependencies": [
+        "RF-016",
+        "RF-021"
+      ],
       "acceptance_criteria": [
         "Record reproducible devices/fixtures, frame/render/interaction metrics and bottlenecks.",
         "Add only measured actionable follow-up tasks, not blanket memoization."
       ],
-      "verification": [["git", "diff", "--check"]],
+      "verification": [
+        [
+          "git",
+          "diff",
+          "--check"
+        ]
+      ],
       "risk": "medium",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["docs/refactoring/PERFORMANCE.md"],
+      "allowed_paths": [
+        "docs/refactoring/PERFORMANCE.md"
+      ],
       "attempts": 0
     },
     {
@@ -1033,18 +1634,36 @@
       "title": "Prepare an isolated Android QA package and Maestro flow",
       "description": "Prepare an isolated Android QA package and Maestro flow",
       "rationale": "Native E2E must avoid production app data.",
-      "modules": ["docs/refactoring/NATIVE_TESTING.md", "scripts/qa/*", ".maestro/*", "package.json"],
-      "dependencies": ["RF-008"],
+      "modules": [
+        "docs/refactoring/NATIVE_TESTING.md",
+        "scripts/qa/*",
+        ".maestro/*",
+        "package.json"
+      ],
+      "dependencies": [
+        "RF-008"
+      ],
       "acceptance_criteria": [
         "Create reversible QA configuration using a distinct applicationId and sanitized local fixtures.",
         "No uninstall, data clearing, signing-key replacement or writes to the production app.",
         "Only install Maestro following current official docs and record device availability."
       ],
-      "verification": [["npm", "run", "build:web"]],
+      "verification": [
+        [
+          "npm",
+          "run",
+          "build:web"
+        ]
+      ],
       "risk": "high",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["docs/refactoring/NATIVE_TESTING.md", "scripts/qa/*", ".maestro/*", "package.json"],
+      "allowed_paths": [
+        "docs/refactoring/NATIVE_TESTING.md",
+        "scripts/qa/*",
+        ".maestro/*",
+        "package.json"
+      ],
       "attempts": 0
     },
     {
@@ -1052,17 +1671,29 @@
       "title": "Run Android regression verification",
       "description": "Run Android regression verification",
       "rationale": "A web result cannot certify native behavior.",
-      "modules": ["docs/refactoring/NATIVE_TESTING.md"],
-      "dependencies": ["RF-040"],
+      "modules": [
+        "docs/refactoring/NATIVE_TESTING.md"
+      ],
+      "dependencies": [
+        "RF-040"
+      ],
       "acceptance_criteria": [
         "Build Android and run isolated QA smoke covering offline reading, navigation, settings and review.",
         "Record exact emulator/device/build IDs, accessibility and data preservation. Block if no device."
       ],
-      "verification": [["bash", "-c", "cd android && ./gradlew :app:assembleDebug --no-daemon --max-workers=2"]],
+      "verification": [
+        [
+          "bash",
+          "-c",
+          "cd android && ./gradlew :app:assembleDebug --no-daemon --max-workers=2"
+        ]
+      ],
       "risk": "high",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["docs/refactoring/NATIVE_TESTING.md"],
+      "allowed_paths": [
+        "docs/refactoring/NATIVE_TESTING.md"
+      ],
       "attempts": 0
     },
     {
@@ -1070,8 +1701,12 @@
       "title": "Run iOS regression verification on supported infrastructure",
       "description": "Run iOS regression verification on supported infrastructure",
       "rationale": "This Linux environment cannot execute Xcode.",
-      "modules": ["docs/refactoring/NATIVE_TESTING.md"],
-      "dependencies": ["RF-040"],
+      "modules": [
+        "docs/refactoring/NATIVE_TESTING.md"
+      ],
+      "dependencies": [
+        "RF-040"
+      ],
       "acceptance_criteria": [
         "Use authorized macOS/Xcode or approved cloud environment with isolated QA target.",
         "Record actual build/runtime evidence or exact blocker and recovery command. Never mark passed from web."
@@ -1086,7 +1721,9 @@
       "risk": "high",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["docs/refactoring/NATIVE_TESTING.md"],
+      "allowed_paths": [
+        "docs/refactoring/NATIVE_TESTING.md"
+      ],
       "attempts": 0
     },
     {
@@ -1094,17 +1731,30 @@
       "title": "Audit remaining TypeScript escapes by boundary",
       "description": "Audit remaining TypeScript escapes by boundary",
       "rationale": "Any/suppressions should be removed by real validation.",
-      "modules": ["docs/refactoring/TYPES.md"],
-      "dependencies": ["RF-030", "RF-031"],
+      "modules": [
+        "docs/refactoring/TYPES.md"
+      ],
+      "dependencies": [
+        "RF-030",
+        "RF-031"
+      ],
       "acceptance_criteria": [
         "Inventory any, assertions and suppressions with ownership and priority.",
         "Prepare bounded tasks at remote/storage boundaries first. Preserve deliberate platform typings until tested."
       ],
-      "verification": [["git", "diff", "--check"]],
+      "verification": [
+        [
+          "git",
+          "diff",
+          "--check"
+        ]
+      ],
       "risk": "medium",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["docs/refactoring/TYPES.md"],
+      "allowed_paths": [
+        "docs/refactoring/TYPES.md"
+      ],
       "attempts": 0
     },
     {
@@ -1112,20 +1762,45 @@
       "title": "Resolve lint warnings through small behavioral checks",
       "description": "Resolve lint warnings through small behavioral checks",
       "rationale": "The baseline has 71 warnings.",
-      "modules": ["docs/refactoring/LINT.md", "app/*", "components/*", "lib/*", "scripts/*"],
-      "dependencies": ["RF-043"],
+      "modules": [
+        "docs/refactoring/LINT.md",
+        "app/*",
+        "components/*",
+        "lib/*",
+        "scripts/*"
+      ],
+      "dependencies": [
+        "RF-043"
+      ],
       "acceptance_criteria": [
         "Group warnings by safe fix and behavior risk.",
         "Remove unused bindings and correct hook dependencies through separate scoped tasks. No blanket auto-fix or rule disable."
       ],
       "verification": [
-        ["npm", "run", "lint", "--", "--max-warnings", "0"],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "lint",
+          "--",
+          "--max-warnings",
+          "0"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "medium",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["docs/refactoring/LINT.md", "app/*", "components/*", "lib/*", "scripts/*"],
+      "allowed_paths": [
+        "docs/refactoring/LINT.md",
+        "app/*",
+        "components/*",
+        "lib/*",
+        "scripts/*"
+      ],
       "attempts": 0
     },
     {
@@ -1133,17 +1808,33 @@
       "title": "Assess the supported Expo SDK upgrade path",
       "description": "Assess the supported Expo SDK upgrade path",
       "rationale": "SDK55 stabilization is separate from current SDK57 adoption.",
-      "modules": ["docs/refactoring/decisions/0002-expo-upgrade.md", "docs/refactoring/TECH_STACK.md"],
-      "dependencies": ["RF-008", "RF-041", "RF-042"],
+      "modules": [
+        "docs/refactoring/decisions/0002-expo-upgrade.md",
+        "docs/refactoring/TECH_STACK.md"
+      ],
+      "dependencies": [
+        "RF-008",
+        "RF-041",
+        "RF-042"
+      ],
       "acceptance_criteria": [
         "Compare SDK56 then57 release/migration docs, current native modules, patches, store requirements and React/TS compatibility.",
         "Choose adoption or concrete defer rationale; create small upgrade tasks only if native gates exist."
       ],
-      "verification": [["git", "diff", "--check"]],
+      "verification": [
+        [
+          "git",
+          "diff",
+          "--check"
+        ]
+      ],
       "risk": "high",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["docs/refactoring/decisions/0002-expo-upgrade.md", "docs/refactoring/TECH_STACK.md"],
+      "allowed_paths": [
+        "docs/refactoring/decisions/0002-expo-upgrade.md",
+        "docs/refactoring/TECH_STACK.md"
+      ],
       "attempts": 0
     },
     {
@@ -1151,22 +1842,52 @@
       "title": "Repeat static and dependency audits after the first workstreams",
       "description": "Repeat static and dependency audits after the first workstreams",
       "rationale": "Initial findings do not exhaust the modernization scope.",
-      "modules": ["docs/refactoring/RE_AUDIT.md"],
-      "dependencies": ["RF-010", "RF-011", "RF-017", "RF-019", "RF-022", "RF-026", "RF-028", "RF-032", "RF-036"],
+      "modules": [
+        "docs/refactoring/RE_AUDIT.md"
+      ],
+      "dependencies": [
+        "RF-010",
+        "RF-011",
+        "RF-017",
+        "RF-019",
+        "RF-022",
+        "RF-026",
+        "RF-028",
+        "RF-032",
+        "RF-036"
+      ],
       "acceptance_criteria": [
         "Repeat identical clone/dead-code/native+web graph/security scopes.",
         "Compare measured counts and add actionable child tasks; document deliberate duplicates."
       ],
       "verification": [
-        ["npm", "run", "analyze:duplicates"],
-        ["npm", "run", "analyze:unused"],
-        ["npm", "run", "analyze:boundaries"],
-        ["npm", "run", "audit:dependencies"]
+        [
+          "npm",
+          "run",
+          "analyze:duplicates"
+        ],
+        [
+          "npm",
+          "run",
+          "analyze:unused"
+        ],
+        [
+          "npm",
+          "run",
+          "analyze:boundaries"
+        ],
+        [
+          "npm",
+          "run",
+          "audit:dependencies"
+        ]
       ],
       "risk": "medium",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["docs/refactoring/RE_AUDIT.md"],
+      "allowed_paths": [
+        "docs/refactoring/RE_AUDIT.md"
+      ],
       "attempts": 0
     },
     {
@@ -1174,20 +1895,38 @@
       "title": "Replace remaining brittle source tests where behavior can be exercised",
       "description": "Replace remaining brittle source tests where behavior can be exercised",
       "rationale": "Many source-text contracts constrain layout rather than behavior.",
-      "modules": ["tests/unit/*", "tests/rtl/*", "docs/refactoring/TEST_COVERAGE.md"],
-      "dependencies": ["RF-046"],
+      "modules": [
+        "tests/unit/*",
+        "tests/rtl/*",
+        "docs/refactoring/TEST_COVERAGE.md"
+      ],
+      "dependencies": [
+        "RF-046"
+      ],
       "acceptance_criteria": [
         "Map source contracts to runtime invariants. Replace one small group at a time with equal or stronger behavior coverage.",
         "Preserve protected data/token contracts that intentionally inspect generated invariants."
       ],
       "verification": [
-        ["npm", "run", "test:unit"],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "test:unit"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "medium",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["tests/unit/*", "tests/rtl/*", "docs/refactoring/TEST_COVERAGE.md"],
+      "allowed_paths": [
+        "tests/unit/*",
+        "tests/rtl/*",
+        "docs/refactoring/TEST_COVERAGE.md"
+      ],
       "attempts": 0
     },
     {
@@ -1195,17 +1934,36 @@
       "title": "Verify responsive and bilingual UI across changed features",
       "description": "Verify responsive and bilingual UI across changed features",
       "rationale": "Shared UI changes can regress width, themes, direction and input.",
-      "modules": ["docs/refactoring/UI_VERIFICATION.md", "tests/e2e/*", "tests/e2e/report-only/*"],
-      "dependencies": ["RF-038", "RF-047"],
+      "modules": [
+        "docs/refactoring/UI_VERIFICATION.md",
+        "tests/e2e/*",
+        "tests/e2e/report-only/*"
+      ],
+      "dependencies": [
+        "RF-038",
+        "RF-047"
+      ],
       "acceptance_criteria": [
         "Execute relevant phone/tablet/desktop, Arabic/English, five theme modes, keyboard/touch and reduced-height flows.",
         "Report report-only findings as findings, never as a passing acceptance gate."
       ],
-      "verification": [["npm", "run", "test:ui:phase", "--", "all"]],
+      "verification": [
+        [
+          "npm",
+          "run",
+          "test:ui:phase",
+          "--",
+          "all"
+        ]
+      ],
       "risk": "high",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["docs/refactoring/UI_VERIFICATION.md", "tests/e2e/*", "tests/e2e/report-only/*"],
+      "allowed_paths": [
+        "docs/refactoring/UI_VERIFICATION.md",
+        "tests/e2e/*",
+        "tests/e2e/report-only/*"
+      ],
       "attempts": 0
     },
     {
@@ -1213,7 +1971,9 @@
       "title": "Perform independent final architecture and repository review",
       "description": "Perform independent final architecture and repository review",
       "rationale": "Final acceptance belongs to the primary engineer and independent reviewer.",
-      "modules": ["docs/refactoring/FINAL_REVIEW.md"],
+      "modules": [
+        "docs/refactoring/FINAL_REVIEW.md"
+      ],
       "dependencies": [
         "RF-033",
         "RF-034",
@@ -1231,16 +1991,40 @@
         "Resolve in-scope high-severity findings or document exact external blockers. Add new actionable tasks and continue."
       ],
       "verification": [
-        ["npm", "run", "typecheck"],
-        ["npm", "run", "lint"],
-        ["npm", "run", "test:unit"],
-        ["npm", "run", "build:web"],
-        ["npx", "playwright", "test", "--project=smoke-chromium", "tests/e2e/smoke.spec.ts"]
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "lint"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "npx",
+          "playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts"
+        ]
       ],
       "risk": "high",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["docs/refactoring/FINAL_REVIEW.md"],
+      "allowed_paths": [
+        "docs/refactoring/FINAL_REVIEW.md"
+      ],
       "attempts": 0
     },
     {
@@ -1254,12 +2038,20 @@
         "docs/refactoring/ARCHITECTURE.md",
         "docs/refactoring/TECH_STACK.md"
       ],
-      "dependencies": ["RF-049"],
+      "dependencies": [
+        "RF-049"
+      ],
       "acceptance_criteria": [
         "List commits, stack decisions, before/after comparable metrics, actual checks, risks and blocked items.",
         "All required gates and independent final review satisfy completion criteria. Keep local; no push/merge/deploy."
       ],
-      "verification": [["git", "diff", "--check"]],
+      "verification": [
+        [
+          "git",
+          "diff",
+          "--check"
+        ]
+      ],
       "risk": "high",
       "approved": false,
       "status": "pending",
