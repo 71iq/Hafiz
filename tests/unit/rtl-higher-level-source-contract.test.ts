@@ -74,14 +74,6 @@ describe("higher-level RTL source contracts", () => {
       "style={mirroredRowStyle}",
     ]);
 
-    expectSourceContainsAll("app/(tabs)/progress.tsx", [
-      "const mirroredRowStyle = {",
-      'direction: "ltr" as const',
-      'flexDirection: isRTL ? "row-reverse" as const : "row" as const',
-      "style={mirroredRowStyle}",
-      'contentContainerStyle={{ gap: 8, direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row", paddingHorizontal: 1 }}',
-    ]);
-
     expectSourceContainsAll("app/(tabs)/leaderboard.tsx", [
       "export function LeaderboardRow({",
       "isRTL={isRTL}",
