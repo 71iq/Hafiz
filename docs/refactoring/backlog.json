@@ -157,11 +157,15 @@
       ],
       "risk": "low",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "docs/refactoring/duplication-triage.json"
       ],
-      "attempts": 0
+      "attempts": 1,
+      "started_at": "2026-10-15T13:24:57.823247+00:00",
+      "completed_at": "2026-10-15T13:27:40.561900+00:00",
+      "evidence": ".ralph/runs/RF-004-1-1792070697824558656",
+      "summary": "Published the primary-engineer clone triage unchanged to docs/refactoring/duplication-triage.json. All 31 groups have decisions, rationales, actionable follow-ups, and uniquely resolved tracked paths. No commits or pushes were made."
     },
     {
       "id": "RF-005",

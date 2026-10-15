@@ -27,3 +27,5 @@ The mission is active. This file records durable events; backlog.json owns task 
 - 2026-10-15T13:21:38.753286+00:00 `RF-003` verified. Reused withThemeOpacity in the review session, removed the duplicate helper, and added a focused alpha-0.95 contract assertion. No commit or push performed. Evidence `.ralph/runs/RF-003-1-1792070262806296850`.
 
 - 2026-10-15. RF-001, RF-002 and RF-003 passed controller checks and independent review, producing local commits ea90700, 831d76c and d26dcc9. No assets, native source, backend or original AppNavigation work changed. The primary engineer triaged all 31 measured groups and added 15 concrete follow-ups, expanding the backlog to 65 tasks. RF-004 will publish that reviewed input; RF-005 is narrowed to a test-only repair of the stale progress formatting contract.
+
+- 2026-10-15T13:27:40.562577+00:00 `RF-004` verified. Published the primary-engineer clone triage unchanged to docs/refactoring/duplication-triage.json. All 31 groups have decisions, rationales, actionable follow-ups, and uniquely resolved tracked paths. No commits or pushes were made. Evidence `.ralph/runs/RF-004-1-1792070697824558656`.
