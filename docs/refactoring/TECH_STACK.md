@@ -31,3 +31,11 @@ NativeWind v4 is the installed stable major; its current site advertises v5 as a
 React Native Reusables and gluestack both offer native-capable components. Hafiz already owns shared controls and modal behavior, so importing another complete kit would create two systems and put RTL/focus/safe-area behavior at risk. Keep the existing components and extend specific gaps. [React Native Reusables](https://reactnativereusables.com/docs), [gluestack introduction](https://gluestack.io/ui/docs/home/overview/introduction).
 
 See decisions/0001-preserve-expo-and-source-owned-ui.md for the consequential choice. Revisit a choice only with a concrete compatibility, behavior, maintenance or measurement need.
+
+## Lint compatibility findings
+
+The installed lint pair is ESLint 9.39.4 and eslint-config-expo 56.0.4. Expo's SDK 55 dependency check recommends eslint-config-expo ~55.0.1. An isolated install of 55.0.1 with the current ESLint version loaded the unchanged project config and reported zero errors and 71 warnings. It did not change the root manifest, lock or installed dependency tree. [Expo lint guide](https://docs.expo.dev/guides/using-eslint/), [SDK 55 preset changelog](https://github.com/expo/expo/blob/sdk-55/packages/eslint-config-expo/CHANGELOG.md).
+
+That successful run does not justify adopting the older preset. It resolves react-hooks plugin 5.2.0 instead of the installed 7.1.1. Effective-config comparisons for `app/_layout.tsx`, `lib/settings/context.tsx`, the dependency security check and `tests/unit/theme-color-swatch.test.tsx` found nine active rules missing. These include set-state-in-render, static-components and error-boundaries. Evidence is `.refactor-baseline/lint-sdk55-preflight/preflight.json`. RF-008 must preserve current lint coverage or document a reviewed alternative before any preset change. No preset downgrade is approved.
+
+ESLint 9 reached end of maintenance on 2026-08-06. RF-044 must split out a supported ESLint/preset/plugin compatibility task before individual warning fixes. Keep this debt visible while the supported dependency set is researched. Do not force incompatible peer dependencies, disable checks or buy commercial support through this mission. [ESLint version support](https://eslint.org/version-support/).

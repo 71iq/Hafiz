@@ -354,7 +354,8 @@
       "acceptance_criteria": [
         "Use Expo recommended SDK55 versions, inspect existing patches and preserve native APIs.",
         "Remove direct expo-modules-core only after confirming callers/autolinking.",
-        "Verify no duplicate native modules. Split native changes from major upgrades."
+        "Verify no duplicate native modules. Split native changes from major upgrades.",
+        "Keep current enabled lint rules. The isolated eslint-config-expo 55.0.1 preflight lost nine active React Hooks rules despite zero errors. Do not downgrade the preset or exclude a diagnostic merely to satisfy version matching. Primary engineer must choose and document a compatible toolchain or justified exception before this item is approved."
       ],
       "verification": [
         [
@@ -1821,7 +1822,7 @@
       "id": "RF-044",
       "title": "Resolve lint warnings through small behavioral checks",
       "description": "Resolve lint warnings through small behavioral checks",
-      "rationale": "The baseline has 71 warnings.",
+      "rationale": "The baseline has 71 warnings. Installed ESLint 9 is past upstream maintenance. SDK 55 preset alignment also drops nine currently active React Hooks rules in the isolated preflight.",
       "modules": [
         "docs/refactoring/LINT.md",
         "app/*",
@@ -1833,6 +1834,7 @@
         "RF-043"
       ],
       "acceptance_criteria": [
+        "Before readiness, split supported ESLint/preset/plugin compatibility into an exact separate task. Preserve existing enabled rules and verify effective configuration. Do not force peer dependencies or hide the maintenance issue with an unchecked preset downgrade.",
         "Group warnings by safe fix and behavior risk.",
         "Remove unused bindings and correct hook dependencies through separate scoped tasks. No blanket auto-fix or rule disable."
       ],
@@ -2290,20 +2292,21 @@
     {
       "id": "RF-054",
       "title": "Reuse the existing strings object for OAuthButtons",
-      "description": "Reuse the existing strings object for OAuthButtons",
-      "rationale": "Clone group 9 repeats mapping the same five properties despite an existing compatible strings object.",
+      "description": "Pass each auth route's existing UIStrings value directly to OAuthButtons, removing only the repeated five-property object construction.",
+      "rationale": "Both routes already resolve UIStrings as s and map its same five properties into OAuthButtons. The component only reads those properties, so the existing object satisfies its contract without a wrapper or translation change.",
       "modules": [
         "app/auth/login.tsx",
-        "app/auth/signup.tsx",
-        "tests/unit/oauth-buttons-contract.test.tsx"
+        "app/auth/signup.tsx"
       ],
       "dependencies": [
         "RF-004",
-        "RF-006"
+        "RF-007"
       ],
       "acceptance_criteria": [
-        "Confirm UIStrings structurally satisfies OAuthButtons strings. Pass the existing object and remove duplicate mapping.",
-        "Preserve footer conditions, callbacks and disabled auth behavior. No wrapper component or form migration."
+        "In app/auth/login.tsx and app/auth/signup.tsx, replace only the OAuthButtons five-property strings mapping with strings={s}. UIStrings already contains all five required properties in both locales. Do not add casts, helpers, wrappers or dependencies.",
+        "Keep each configured footer condition, onError callback, social/email flags, route links, direction, markup and all authentication/data behavior unchanged. Do not edit OAuthButtons, translations, forms, theme behavior, tests or protected inputs.",
+        "Reuse the existing OAuth component, disabled-auth and bilingual string contracts. Run the recorded focused suites, strict typecheck and ESLint on both routes. Existing lint warnings remain visible; do not weaken rules or assertions to pass.",
+        "Independent evaluator must inspect the exact two-route diff and confirm every removed mapping value was the corresponding s property. No manual browser/native check is required for this prop-only change because rendered component behavior and all visual code stay unchanged. Escalate any larger needed change to the primary engineer."
       ],
       "verification": [
         [
@@ -2313,21 +2316,26 @@
           "--",
           "--runTestsByPath",
           "tests/unit/oauth-buttons-contract.test.tsx",
-          "tests/unit/auth-disabled.test.ts"
+          "tests/unit/auth-disabled.test.ts",
+          "tests/unit/i18n-strings.test.ts"
         ],
         [
           "npm",
           "run",
           "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "app/auth/login.tsx",
+          "app/auth/signup.tsx"
         ]
       ],
       "risk": "low",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
         "app/auth/login.tsx",
-        "app/auth/signup.tsx",
-        "tests/unit/oauth-buttons-contract.test.tsx"
+        "app/auth/signup.tsx"
       ],
       "attempts": 0
     },

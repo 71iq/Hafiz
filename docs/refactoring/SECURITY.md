@@ -1,15 +1,15 @@
 # Dependency security decisions
 
-The primary engineer reviewed this scope on 2026-10-16. RF-007 owns implementation and acceptance. Its backlog record and controller logs own verification status.
+RF-007 passed controller verification and independent evaluation on 2026-10-16, local commit `e9598a8`. The primary engineer accepted the two-package lock diff. Evidence is under `.ralph/runs/RF-007-1-1792107834166140763`.
 
 ## Critical dependency paths
 
-Before RF-007, package-lock.json records these paths:
+Before RF-007, package-lock.json recorded these paths:
 
-| Parent                                          | Dependency  | Installed | Selected patch |
-| ----------------------------------------------- | ----------- | --------- | -------------- |
-| React Native 0.83.2 / react-devtools-core 6.1.5 | shell-quote | 1.8.4     | 1.12.0         |
-| Supabase CLI 2.98.2, a dev dependency           | tar         | 7.5.13    | 7.5.22         |
+| Parent                                          | Dependency  | Before | Installed now |
+| ----------------------------------------------- | ----------- | ------ | ------------- |
+| React Native 0.83.2 / react-devtools-core 6.1.5 | shell-quote | 1.8.4  | 1.12.0        |
+| Supabase CLI 2.98.2, a dev dependency           | tar         | 7.5.13 | 7.5.22        |
 
 The shell-quote advisory affects quoting a string containing a line terminator after a comment token. It identifies 1.11.0 as the patched minimum. The tar advisory covers unbounded archive decompression and identifies 7.5.19 as the patched minimum. [shell-quote advisory](https://github.com/advisories/GHSA-pqg4-j6r4-53mv), [tar advisory](https://github.com/advisories/GHSA-23hp-3jrh-7fpw).
 
@@ -27,10 +27,10 @@ Remove an override when a reviewed parent update requires a patched dependency m
 
 ## Reachability and verification limits
 
-The dependency graph establishes installation, not application exploitability. The inspected application code does not directly call shell-quote. This review has not demonstrated remote command execution in Hafiz. The CLI's archive dependency participates in development installation, and its selected patch still needs the recorded controller checks.
+The dependency graph establishes installation, not application exploitability. The inspected application code does not directly call shell-quote. This review has not demonstrated remote command execution in Hafiz. The CLI's archive dependency participates in development installation. Its selected patch passed the recorded installer API check.
 
 The quoting check calls the library with a fixed string and requires rejection. It never executes the result. The archive check uses a tiny fixture and never runs an exhaustion proof of concept.
 
-RF-007's first controller command runs local npm resolution with lifecycle scripts disabled. The generator must not hand-edit the lockfile. Review any changed package beyond the selected pair before accepting it. Critical audit, strict typecheck, the full unit suite and static web export must pass afterward.
+RF-007's controller ran local npm resolution with lifecycle scripts disabled. Only shell-quote and tar changed in the lockfile. Their versions and integrity values match the selected public registry metadata. Parent-resolved version/API checks, critical-level npm audit, strict typecheck, all 60 unit suites and 276 tests, and static web export passed. The audit reports zero critical findings and 77 remaining findings, comprising one low, 16 moderate and 60 high. Those findings still require triage and remediation.
 
 These checks do not prove every platform's CLI installation, browser interaction, native runtime behavior or absence of all security findings. Noncritical audit findings and Expo dependency alignment remain separate backlog work. No production system, database policy, migration or deployed function belongs to RF-007.
