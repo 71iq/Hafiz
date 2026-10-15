@@ -56,8 +56,8 @@ The initial first four ready items are intentionally small. The remaining workst
 
 ## Budget-aware continuation
 
-The active thread heartbeat `hafiz-modernization-supervisor` checks hourly at 45 minutes past the hour. It inspects account usage and writer locks first. It starts at most one bounded Ralph iteration only when five-hour usage is below 80 percent and weekly usage is below 90 percent. Unknown usage or an active writer prevents a new batch. Routine unchanged/budget-blocked checks remain quiet. No reset credits, purchases or provider switching are authorized.
+The active thread heartbeat `hafiz-modernization-supervisor` checks hourly at 45 minutes past the hour. It inspects account usage and writer locks first. It starts at most one bounded Ralph iteration only when five-hour usage is below 95 percent and weekly usage is below 90 percent. Unknown usage or an active writer prevents a new batch. Routine unchanged/budget-blocked checks remain quiet. No reset credits, purchases or provider switching are authorized.
 
 The supervisor reads current progress and scopes later work as primary engineer. It never replaces the Ralph implementation/evaluation loop. Pause the supervisor only when the mission actually meets its documented completion criteria or the user requests a stop.
 
-On 2026-10-15 the RF-005 generator finished its test patch, then the batch admission limit stopped further sessions before controller verification/evaluation. Its source remains uncommitted, status retry, with hashes in `.ralph/preserved-rf005.json`. At capture the account window was 96 percent used and reset at 20:40 Asia/Hebron. The next eligible hourly check after that reset is 20:45, subject to current account usage and the desktop remaining active.
+RF-005 is verified and committed. RF-006 is the current unfinished task; inspect backlog.json and the matching generation checkpoint before resuming. The user raised the five-hour threshold to 95 percent on 2026-10-16. The weekly threshold remains 90 percent.
