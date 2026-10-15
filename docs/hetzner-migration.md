@@ -1,9 +1,19 @@
 # Hafiz on the existing Hetzner VM
 
+## Current status, 15 October 2026
+
+The former Vercel project and Supabase Cloud project were deleted after the
+recorded migration signoff. Both inventories now return zero projects, and the
+Hetzner HTTPS endpoints still pass. Retained source exports and VM/local
+backups are the recovery source. The deleted projects cannot be resumed. Do
+not use the ignored Supabase CLI link or any linked-cloud command for
+production. Account and Supabase organization closure remains separate work.
+The migration acceptance records below describe the 14 October cutover.
+
 Production moved to this VM on 2026-10-14. `hafizquran.app`, `www.hafizquran.app`,
-`api.hafizquran.app` and `staging.hafizquran.app` use automatic HTTPS. The source
-Supabase project is paused, and Vercel automatic Git deployments are disabled.
-The source hosting, final export and original configuration remain recoverable.
+`api.hafizquran.app` and `staging.hafizquran.app` use automatic HTTPS. The
+former source hosting and cloud project were deleted after signoff. Their final
+export and original configuration remain in retained backups.
 
 ## Deployment
 
@@ -45,8 +55,8 @@ Local migration files live in
 inventories and credentials stay there, with mode 0600. On the VM, use
 `/etc/hafiz` and `/root/hafiz-migration`, also mode 0700.
 
-The source is Supabase project `frzewjaxijhtezfvcgll`. It was paused at the
-start of the migration and has been restored for export. The source backups
+The source was Supabase project `frzewjaxijhtezfvcgll`. It was paused and
+restored for export during the migration. The source backups
 include a full PostgreSQL custom dump, application schema and data, auth
 configuration, both deployed Edge Functions, all four storage downloads and
 their SHA-256 manifest. `source-dns.txt` is the original Cloudflare zone export.
@@ -227,10 +237,11 @@ starting the runtime. Restore Caddy's Hafiz import without replacing the
 other site's configuration.
 
 To roll back the web release, atomically point `/opt/hafiz/current` at a retained
-verified release and run the local health check. A rollback to Vercel also
-needs source data reconciliation for any post-cutover writes, source jobs
-disabled on one side, the original DNS record and restored Vercel deployment
-settings. Changing DNS alone can lose newer writes.
+verified release and run the local health check. Recovery from a wider failure
+uses the retained VM and local backups. Stop writers, restore the matched
+database, storage archive and private configuration on a replacement VM, then
+route traffic after health checks. The deleted Vercel and Supabase Cloud
+projects cannot be restored or resumed.
 
 The health timer runs every five minutes and reports failures through systemd
 and the journal. It checks static HTTP, the Auth endpoint, database readiness
@@ -327,13 +338,13 @@ failed tested flow resulted. These warnings remain separate application issues.
 No native build was tested because no installed native clients are in use.
 
 The apex A record is now `159.69.191.148`, with DNS proxying off. The www CNAME,
-five mail MX records and SPF TXT record were preserved. Vercel keeps its old
-deployments, but `git.deploymentEnabled=false`, its build-ignore command is
-`exit 0`, and `gitProviderOptions.createDeployments` is `disabled`. Rollback must
-restore those settings and reconcile any newer VM writes before resuming the
-source database. Its previous apex A record was `216.198.79.1`.
+five mail MX records and SPF TXT record were preserved. At cutover, Vercel
+retained its deployments with `git.deploymentEnabled=false`, build-ignore command
+`exit 0` and `gitProviderOptions.createDeployments=disabled`. Those projects
+were deleted on 15 October. Recovery uses retained VM and local backups.
+The previous apex A record was `216.198.79.1`.
 
-The ignored Supabase CLI link still names the source cloud project. Do not use
-`supabase db push --linked` for production. Apply reviewed migrations through
-Hafiz's private VM database connection. Do not rerun the private bootstrap
-credential generator against an existing stack.
+The ignored Supabase CLI link still names the deleted source cloud project. Do
+not use `supabase db push --linked` for production. Apply reviewed migrations
+through Hafiz's private VM database connection. Do not rerun the private
+bootstrap credential generator against an existing stack.
