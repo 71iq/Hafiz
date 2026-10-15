@@ -23,3 +23,5 @@ The mission is active. This file records durable events; backlog.json owns task 
 - 2026-10-15T13:12:04.837210+00:00 `RF-001` verified. Reused the existing startup-language helper in both profile routes and preserved their loading, error, and navigation behavior. The approved patch was already present in the worktree; I verified it without touching unrelated edits. Evidence `.ralph/runs/RF-001-1-1792069758983570846`.
 
 - 2026-10-15T13:14:45.803769+00:00 `RF-002` verified. Removed the unused chrome auto-hide API from lib/ui/chrome.tsx. No source callers remain; visible, immersive, and markActivity behavior is preserved. Reused the existing Chrome context/provider and added no abstractions. Evidence `.ralph/runs/RF-002-1-1792069964121611860`.
+
+- 2026-10-15T13:21:38.753286+00:00 `RF-003` verified. Reused withThemeOpacity in the review session, removed the duplicate helper, and added a focused alpha-0.95 contract assertion. No commit or push performed. Evidence `.ralph/runs/RF-003-1-1792070262806296850`.

@@ -13,7 +13,7 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import type { SQLiteDatabase } from "expo-sqlite";
 import { CalendarDays, ChevronLeft, ChevronRight, Clock3, EllipsisVertical, PauseCircle, Pencil, RotateCcw, Star, Trash2, Trophy, X } from "lucide-react-native";
 import { useDatabase, useDatabaseStatus } from "@/lib/database/provider";
-import { SettingsProvider, useSettings } from "@/lib/settings/context";
+import { SettingsProvider, useSettings, withThemeOpacity } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { interpolate } from "@/lib/i18n/useStrings";
 import type { UIStrings } from "@/lib/i18n/strings";
@@ -1012,7 +1012,7 @@ function FlashcardSessionScreen() {
       {/* Bottom action area */}
       <View
         className="px-6 pb-6 pt-4 items-center"
-        style={{ backgroundColor: withOpacity(themeSurface, 0.95) }}
+        style={{ backgroundColor: withThemeOpacity(themeSurface, 0.95) }}
       >
         <View style={{ width: "100%", maxWidth }}>
           {phase === "front" && (
@@ -1121,16 +1121,6 @@ function FlashcardSessionScreen() {
       />
     </SafeAreaView>
   );
-}
-
-function withOpacity(hexColor: string, opacity: number): string {
-  const match = /^#([0-9a-f]{6})$/i.exec(hexColor);
-  if (!match) return hexColor;
-  const value = match[1];
-  const r = parseInt(value.slice(0, 2), 16);
-  const g = parseInt(value.slice(2, 4), 16);
-  const b = parseInt(value.slice(4, 6), 16);
-  return `rgba(${r},${g},${b},${opacity})`;
 }
 
 function cardAnswerSettingKey(cardId: string, mode: ReviewMode): string {
