@@ -182,7 +182,8 @@
       "acceptance_criteria": [
         "The current progress source differs only in parentheses and line wrapping. Keep application source unchanged.",
         "Replace only the progress-route formatting-sensitive assertions with rendered RTL/LTR checks of the actual ProgressScreen, using isolated service/database fixtures. Assert direction ltr, mirrored row order and horizontal recent-achievement content.",
-        "Preserve all other source contracts. Demonstrate a wrong direction/order would fail the new test. Do not simply drop assertions or normalize inside string literals."
+        "Preserve all other source contracts. Demonstrate a wrong direction/order would fail the new test. Do not simply drop assertions or normalize inside string literals.",
+        "Identify the inner achievement title/icon row independently of its expected direction/order. Do not search for an ancestor by its expected flexDirection. The controller mutation check maps isolated copies with incorrect inner direction and inner order into the unchanged assertions; both must fail for the intended style assertions. Do not change application source or assertion expectations for negative proof."
       ],
       "verification": [
         [
@@ -198,6 +199,10 @@
           "npm",
           "run",
           "typecheck"
+        ],
+        [
+          "python3",
+          "scripts/ralph/check-progress-rtl.py"
         ]
       ],
       "risk": "medium",
@@ -207,9 +212,10 @@
         "tests/unit/rtl-higher-level-source-contract.test.ts",
         "tests/unit/progress-screen-rtl.test.tsx"
       ],
-      "attempts": 0,
-      "started_at": "2026-10-15T17:52:09.027915+00:00",
-      "failure": "Batch resource limit reached"
+      "attempts": 1,
+      "started_at": "2026-10-15T17:57:52.805834+00:00",
+      "failure": "Independent review failed: [P2] tests/unit/progress-screen-rtl.test.tsx:124-130,178,200 selects ancestors by the expected flexDirection. A wrongly ordered inner achievement row can be skipped in favor of the correctly ordered outer row, leaving the test green. Identify the intended rows independently of their expected styles, then assert direction and order on those rows.; [P2] The generation evidence only changes an expected direction value. Demonstrate that incorrect rendered direction and row order fail the unchanged assertions, then restore the candidate and rerun verification. Keep application source unchanged in the final diff.; Verification: fresh typecheck and git diff --check passed. Controller logs record seven passing tests against matching file hashes. Application source and other source contracts remain unchanged; fixtures isolate services and database access. No additional manual platform checks are mandatory for this test-only change. Review made no edits.",
+      "evidence": ".ralph/runs/RF-005-1-1792087072806443597"
     },
     {
       "id": "RF-006",
