@@ -116,6 +116,12 @@ export const rtlStyleAllowlist: RtlStyleAllowlistEntry[] = [
     reason: "Switch thumb position is internal control geometry, not page layout.",
   },
   {
+    file: "components/ui/ThemeColorSwatch.tsx",
+    pattern: /^\s*right:\s*5,\s*$/,
+    reason:
+      "The selected checkmark is decorative inside the color sample; its fixed right: 5 coordinate stays attached to that sample and does not encode reading order.",
+  },
+  {
     file: "components/ui/SyncIndicator.tsx",
     pattern: /-right-/,
     reason: "Sync status dot is icon-local and direction-neutral.",

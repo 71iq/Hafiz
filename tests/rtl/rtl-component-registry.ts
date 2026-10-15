@@ -92,6 +92,12 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
   entry("components/ui/Switch.tsx", "form-field", "source", "Thumb coordinate is internal control geometry."),
   entry("components/ui/SyncIndicator.tsx", "feedback", "source", "Status badge is icon-local and direction-neutral."),
   entry("components/ui/Text.tsx", "form-field", "rntl", "Generic text aligns to logical start by default."),
+  entry(
+    "components/ui/ThemeColorSwatch.tsx",
+    "direction-neutral",
+    "rntl",
+    "Decorative palette sample and checkmark stay direction-neutral; rendered RTL/LTR coverage is in tests/unit/theme-color-swatch.test.tsx."
+  ),
   entry("components/ui/Toast.tsx", "feedback", "source", "Centered toast is position-neutral; action order mirrors when present."),
   entry("components/ui/ToggleGroup.tsx", "tab-segmented", "rntl", "Segment order and active item placement mirror."),
   entry("components/zayt/ZaytRivePreview.native.tsx", "media-preview", "source", "Native animation asset is not mirrored by default."),

@@ -256,16 +256,18 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "retry",
+      "status": "verified",
       "allowed_paths": [
         "tests/rtl/rtl-component-registry.ts",
         "tests/rtl/rtl-style-allowlist.ts",
         "tests/unit/theme-color-swatch.test.tsx"
       ],
-      "attempts": 1,
-      "started_at": "2026-10-15T21:05:16.076602+00:00",
-      "failure": "Independent review failed: [P2] tests/unit/theme-color-swatch.test.tsx:55-62 omits the system-halves wrapper from assertions. Changing its flexDirection from row to column or row-reverse would alter rendering while these assertions remain satisfied. Locate the wrapper structurally and assert flex: 1, flexDirection: row, and its two ordered children in both RTL and LTR.; Fresh typecheck and git diff --check passed. Recorded verification reports seven passing tests against matching task-file hashes. ThemeColorSwatch.tsx remains unchanged; registry classification, exact allowlist exception, reuse, and typing are appropriate. No browser or native runtime checks ran; none are mandatory for this test-only patch. Review made no edits.",
-      "evidence": ".ralph/runs/RF-006-1-1792098316077335566"
+      "attempts": 2,
+      "started_at": "2026-10-15T22:53:26.655339+00:00",
+      "failure": "Batch resource limit reached",
+      "evidence": ".ralph/runs/RF-006-2-1792104806656134718",
+      "completed_at": "2026-10-15T22:54:24.337562+00:00",
+      "summary": "Implemented RF-006 within the three approved paths. ThemeColorSwatch remains unchanged. The test now structurally verifies the system wrapper and ordered halves in both RTL and LTR."
     },
     {
       "id": "RF-007",
