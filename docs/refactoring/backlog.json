@@ -3416,15 +3416,17 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "retry",
+      "status": "verified",
       "allowed_paths": [
         "tests/unit/session-due-date.test.tsx"
       ],
-      "attempts": 1,
-      "started_at": "2026-10-16T17:17:23.148624+00:00",
+      "attempts": 2,
+      "started_at": "2026-10-16T17:21:07.224260+00:00",
       "failure": "Independent review failed: [P2] tests/unit/session-due-date.test.tsx:483 selects the last Modal, which belongs to the hidden ConfirmDialog rendered after DueDateSheet. Its busy handler does nothing, so the assertion passes without testing the editor's dismissal guard. Select the Modal containing the date input, assert visible=true, then dispatch requestClose while persistence is pending.; All four verification commands passed freshly: 3 suites, 12 tests, no async warnings. No browser or device checks are required for this slice. No files were changed.",
-      "evidence": ".ralph/runs/RF-070-1-1792171043149498186",
-      "recovery_note": "First independent evaluation rejected a false-positive busy dismissal test: the last Modal is the hidden ConfirmDialog. Primary requires the visible date-input Modal ancestor. All four gates and12 tests passed but are insufficient without this correction. Final implementation attempt2 remains available."
+      "evidence": ".ralph/runs/RF-070-2-1792171267226235313",
+      "recovery_note": "First independent evaluation rejected a false-positive busy dismissal test: the last Modal is the hidden ConfirmDialog. Primary requires the visible date-input Modal ancestor. All four gates and12 tests passed but are insufficient without this correction. Final implementation attempt2 remains available.",
+      "completed_at": "2026-10-16T17:24:00.118911+00:00",
+      "summary": "Repaired RF-070\u2019s busy dismissal characterization. The test now finds the visible Modal containing the date input, asserts `visible=true`, and dispatches `requestClose` during deferred persistence. Only `tests/unit/session-due-date.test.tsx` was changed; backlog edits were preserved."
     },
     {
       "id": "RF-071",
