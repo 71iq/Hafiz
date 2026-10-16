@@ -2302,7 +2302,8 @@
         "No test edits are allowed. Existing RF068 actual-route contracts and original progress RTL assertions must pass unchanged. Do not touch query/session/data behavior or fix unrelated existing casts. No new any, suppression or unsafe cast.",
         "Add exactly one RTL registry entry for the new presenter using contract button and testLevel rntl, naming the existing two route fixtures. Preserve the rest of the registry. Do not create a redundant presenter test or broadly reformat legacy route/registry code. New component must satisfy Prettier; lint all four changed files.",
         "This is component-body extraction with identical emitted RN hierarchy/props, not a UI behavior or appearance migration. Existing real-route tests at390x844 in Arabic/light and English/dark are required rendered-state evidence. Also require production web export and all28 existing Chrome smoke tests. Browser checks use CI1, installed Chrome and a fresh explicit loopback server. No physical-device/iOS check is claimed. Any proposed layout, gesture, keyboard, accessibility, auth or cache behavior change must remain outside this task.",
-        "Fresh controller commands and independent evaluator must verify all unchanged behavior contracts and complete diff. Main engineer retains acceptance. Preserve failures and obey existing two-attempt and resource limits."
+        "Fresh controller commands and independent evaluator must verify all unchanged behavior contracts and complete diff. Main engineer retains acceptance. Preserve failures and obey existing two-attempt and resource limits.",
+        "Execution-boundary recovery: the first generator reported EPERM binding the smoke server because its sandbox disables networking. The primary ran the exact required Chrome command outside that sandbox on 2026-10-16: all28 tests passed in39.2s. Preserve the existing patch and inspect it against the same scope. The fresh generator must leave the mandatory browser server/check to the controller, which runs outside the restricted session. A completed implementation can return implemented with that sandbox restriction recorded; it cannot claim browser acceptance. All six frozen controller commands and separate evaluator remain mandatory. Do not change tests, loosen the sandbox, alter verification or reset the retained first failed attempt. Simplify the progress container parameter to a direct typed props argument if touching that wrapper; it does not need a rest-only destructuring object."
       ],
       "verification": [
         [
@@ -2351,14 +2352,17 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "pending",
+      "status": "retry",
       "allowed_paths": [
         "app/(tabs)/progress.tsx",
         "app/(tabs)/leaderboard.tsx",
         "components/auth/AccountSyncPrompt.tsx",
         "tests/rtl/rtl-component-registry.ts"
       ],
-      "attempts": 0
+      "attempts": 1,
+      "started_at": "2026-10-16T11:56:20.953919+00:00",
+      "failure": "Agent blocked: Implemented RF-053 within the approved paths. Required Chrome smoke verification is blocked because the fresh loopback server cannot bind 127.0.0.1:8193 (EPERM).",
+      "evidence": ".ralph/runs/RF-053-1-1792151780954842914"
     },
     {
       "id": "RF-054",
