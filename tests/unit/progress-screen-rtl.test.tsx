@@ -1,8 +1,9 @@
 import React from "react";
-import { render, waitFor } from "@testing-library/react-native";
+import { fireEvent, render, waitFor } from "@testing-library/react-native";
 import { ScrollView } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import ProgressScreen from "@/app/(tabs)/progress";
+import { isSupabaseConfigured } from "@/lib/supabase";
 import { getMemorizedAyahCardCount, getReviewStats, getTotalAyahCardCount, getWirdStatus } from "@/lib/fsrs/queries";
 import { getTotalScore } from "@/lib/fsrs/scoring";
 import { getAchievementDashboard } from "@/lib/achievements/queries";
@@ -28,11 +29,17 @@ const mockSettings: {
     surfaceBright: "#FFFFFF",
   },
 };
-const mockAuthState = {
+const mockAuthState: {
+  user: { id: string } | null;
+  isLoading: boolean;
+  isInitialized: boolean;
+} = {
   user: null,
   isLoading: false,
   isInitialized: true,
 };
+
+const mockRouterPush = jest.fn();
 
 jest.mock("@react-navigation/native", () => {
   const { useEffect } = jest.requireActual<typeof import("react")>("react");
@@ -42,8 +49,8 @@ jest.mock("@react-navigation/native", () => {
 });
 
 jest.mock("expo-router", () => ({
-  router: { push: jest.fn() },
-  useRouter: () => ({ push: jest.fn() }),
+  router: { push: (...args: unknown[]) => mockRouterPush(...args) },
+  useRouter: () => ({ push: (...args: unknown[]) => mockRouterPush(...args) }),
 }));
 
 jest.mock("@/lib/database/provider", () => ({
@@ -63,7 +70,7 @@ jest.mock("@/lib/auth/store", () => ({
 }));
 
 jest.mock("@/lib/supabase", () => ({
-  isSupabaseConfigured: () => false,
+  isSupabaseConfigured: jest.fn(),
 }));
 
 jest.mock("@/lib/fsrs/review-events", () => ({
@@ -121,6 +128,10 @@ const safeAreaMetrics = {
   insets: { top: 0, left: 0, right: 0, bottom: 0 },
 };
 
+function resolvePressableStyle(style: unknown) {
+  return flattenStyle(typeof style === "function" ? style({ pressed: false }) : style);
+}
+
 function renderProgress() {
   return render(
     <SafeAreaProvider initialMetrics={safeAreaMetrics}>
@@ -142,6 +153,12 @@ function getAchievementTitleIconRow(view: ReturnType<typeof render>, title: stri
 describe("ProgressScreen RTL behavior", () => {
   beforeEach(() => {
     mockSettings.isRTL = true;
+    mockSettings.uiLanguage = "ar";
+    mockSettings.isDark = false;
+    mockAuthState.user = null;
+    mockAuthState.isLoading = false;
+    mockAuthState.isInitialized = true;
+    jest.mocked(isSupabaseConfigured).mockReturnValue(false);
     jest.clearAllMocks();
     jest.mocked(getTotalAyahCardCount).mockResolvedValue(10);
     jest.mocked(getMemorizedAyahCardCount).mockResolvedValue(4);
@@ -163,6 +180,135 @@ describe("ProgressScreen RTL behavior", () => {
     jest.mocked(getAchievementDashboard).mockResolvedValue(achievementDashboardFixture);
     jest.mocked(getDefaultDeckProgress).mockResolvedValue([]);
     jest.mocked(getLocalSurahProgress).mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    mockSettings.isRTL = true;
+    mockSettings.uiLanguage = "ar";
+    mockSettings.isDark = false;
+    mockAuthState.user = null;
+    mockAuthState.isLoading = false;
+    mockAuthState.isInitialized = true;
+    jest.mocked(isSupabaseConfigured).mockReturnValue(false);
+    mockRouterPush.mockReset();
+  });
+
+  it("shows the configured signed-out prompt with localized LTR and RTL presentation", async () => {
+    jest.mocked(isSupabaseConfigured).mockReturnValue(true);
+    const arabic = renderProgress();
+
+    await waitFor(() => expect(arabic.getByText("سجّل الدخول لمزامنة نتائجك")).toBeTruthy());
+    await waitFor(() => expect(arabic.getByText("الإنجازات")).toBeTruthy());
+
+    const arabicLabel = arabic.getByText("سجّل الدخول لمزامنة نتائجك");
+    const arabicRow = findAncestorByClassName(arabicLabel, "items-center gap-3");
+    const arabicButton = arabic.getByRole("button", { name: "تسجيل الدخول" });
+    const arabicButtonText = arabic.getByText("تسجيل الدخول");
+    const arabicButtonRow = findAncestorByClassName(arabicButtonText, "flex-row items-center gap-2");
+    const arabicCard = findAncestorByClassName(arabicLabel, "mb-6");
+
+    expect(flattenStyle(arabicRow.props.style)).toMatchObject({
+      direction: "ltr",
+      flexDirection: "row-reverse",
+    });
+    expect(flattenStyle(arabicLabel.props.style)).toMatchObject({
+      textAlign: "right",
+      writingDirection: "rtl",
+    });
+    expect(arabicLabel.props.className).toContain("text-charcoal dark:text-neutral-100");
+    expect(flattenStyle(arabicButtonRow.props.style)).toMatchObject({
+      direction: "ltr",
+      flexDirection: "row-reverse",
+    });
+    const arabicButtonChildren = React.Children.toArray(arabicButtonRow.props.children);
+    expect(arabicButtonChildren).toHaveLength(2);
+    expect(arabicButtonChildren[1]).toEqual(
+      expect.objectContaining({ props: expect.objectContaining({ children: "تسجيل الدخول" }) }),
+    );
+    expect(arabicCard.props.className).toContain("mb-6 px-5 py-4");
+    expect(arabicCard.props.className).toContain("rounded-4xl overflow-hidden");
+    expect(arabicCard.props.className).toContain("bg-surface-low dark:bg-surface-dark-low");
+    expect(resolvePressableStyle(arabicButton.props.style)).toMatchObject({
+      backgroundColor: "#003638",
+    });
+    expect(flattenStyle(arabicButtonText.props.style)).toMatchObject({
+      color: "#FDDC91",
+      fontFamily: "Manrope_700Bold",
+      fontSize: 12,
+    });
+
+    await fireEvent.press(arabicButton);
+    expect(mockRouterPush).toHaveBeenCalledTimes(1);
+    expect(mockRouterPush).toHaveBeenCalledWith("/auth/login");
+
+    arabic.unmount();
+    mockSettings.isRTL = false;
+    mockSettings.uiLanguage = "en";
+    mockSettings.isDark = true;
+    mockRouterPush.mockReset();
+    const english = renderProgress();
+
+    await waitFor(() => expect(english.getByText("Sign in to sync your results")).toBeTruthy());
+    await waitFor(() => expect(english.getByText("Achievements")).toBeTruthy());
+
+    const englishLabel = english.getByText("Sign in to sync your results");
+    const englishRow = findAncestorByClassName(englishLabel, "items-center gap-3");
+    const englishButton = english.getByRole("button", { name: "Log In" });
+    const englishButtonText = english.getByText("Log In");
+    const englishButtonRow = findAncestorByClassName(englishButtonText, "flex-row items-center gap-2");
+    const englishCard = findAncestorByClassName(englishLabel, "mb-6");
+
+    expect(flattenStyle(englishRow.props.style)).toMatchObject({
+      direction: "ltr",
+      flexDirection: "row",
+    });
+    expect(flattenStyle(englishLabel.props.style)).toMatchObject({
+      textAlign: "left",
+      writingDirection: "ltr",
+    });
+    expect(englishLabel.props.className).toContain("text-charcoal dark:text-neutral-100");
+    expect(flattenStyle(englishButtonRow.props.style)).toMatchObject({
+      direction: "ltr",
+      flexDirection: "row",
+    });
+    const englishButtonChildren = React.Children.toArray(englishButtonRow.props.children);
+    expect(englishButtonChildren).toHaveLength(2);
+    expect(englishButtonChildren[1]).toEqual(
+      expect.objectContaining({ props: expect.objectContaining({ children: "Log In" }) }),
+    );
+    expect(englishCard.props.className).toContain("mb-6 px-5 py-4");
+    expect(englishCard.props.className).toContain("rounded-4xl overflow-hidden");
+    expect(englishCard.props.className).toContain("bg-surface-low dark:bg-surface-dark-low");
+    expect(resolvePressableStyle(englishButton.props.style)).toMatchObject({
+      backgroundColor: "#1B4D4F",
+    });
+    expect(flattenStyle(englishButtonText.props.style)).toMatchObject({
+      color: "#FDDC91",
+      fontFamily: "Manrope_700Bold",
+      fontSize: 12,
+    });
+
+    await fireEvent.press(englishButton);
+    expect(mockRouterPush).toHaveBeenCalledTimes(1);
+    expect(mockRouterPush).toHaveBeenCalledWith("/auth/login");
+  });
+
+  it.each([
+    ["configuration", { configured: false, initialized: true, loading: false, user: null }],
+    ["auth initialization", { configured: true, initialized: false, loading: false, user: null }],
+    ["auth loading", { configured: true, initialized: true, loading: true, user: null }],
+    ["signed-in state", { configured: true, initialized: true, loading: false, user: { id: "user-1" } }],
+  ] as const)("hides the prompt when the %s predicate is false", async (_case, state) => {
+    jest.mocked(isSupabaseConfigured).mockReturnValue(state.configured);
+    mockAuthState.isInitialized = state.initialized;
+    mockAuthState.isLoading = state.loading;
+    mockAuthState.user = state.user;
+    const view = renderProgress();
+
+    await waitFor(() => expect(view.getByText("الإنجازات")).toBeTruthy());
+
+    expect(view.queryByRole("button", { name: "Log In" })).toBeNull();
+    expect(view.queryByRole("button", { name: "تسجيل الدخول" })).toBeNull();
   });
 
   it("renders RTL achievement rows with explicit LTR layout direction, mirrored order, and horizontal recent content", async () => {

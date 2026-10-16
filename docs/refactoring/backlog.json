@@ -3156,7 +3156,9 @@
         "For both actual visible presenters, cover English/LTR and Arabic/RTL with light/dark palettes. Assert correct real localized label, a uniquely accessible login button, one /auth/login router.push per press, explicit LTR layout direction plus mirrored row/icon order and label alignment/writing direction. Observe stable imported mocks or deferred forwarding, avoiding Jest-hoisted undefined spies.",
         "Preserve the deliberate outer differences: progress Card mb6 px5 py4 versus leaderboard tinted/bordered mt4 rounded3xl px4 py4. Assert relevant original container/button/text styles from the rendered tree so an accidental wrapper or theme change fails. Reuse existing style/ancestor helpers; no source-text evaluation or snapshots that merely duplicate source.",
         "Reset settings language/theme, auth/config, service mocks and QueryClient state between cases. Settle/clean pending promises. No any, ts-ignore, unsafe casts, broad console suppression, disabled assertions or tests. Derive leaderboard fixture types from the existing API.",
-        "Report characterization evidence against unchanged production source. Focused behavior tests, strict typecheck, scoped lint and formatting must pass. Separate evaluator checks meaningful assertions, preserved old contracts and fixture isolation. Browser/native/device checks are not required for this test-only slice; RF053 stays unapproved until primary reviews this evidence and prepares its rendered UI verification."
+        "Report characterization evidence against unchanged production source. Focused behavior tests, strict typecheck, scoped lint and formatting must pass. Separate evaluator checks meaningful assertions, preserved old contracts and fixture isolation. Browser/native/device checks are not required for this test-only slice; RF053 stays unapproved until primary reviews this evidence and prepares its rendered UI verification.",
+        "Final allowed attempt addresses the actual independent-review findings, preserving this implemented patch and all existing assertions. In the isolated leaderboard test QueryClient, set queries.gcTime to Infinity alongside retry:false, as TanStack documents for Jest, and retain unmount/queryClient.clear cleanup. This is test-only; no production cache change, forceExit, open-handle warning suppression, fake-timer workaround or timeout increase. The focused normal command and the leaderboard detectOpenHandles command must finish normally without the unfinished-async warning. Read the failed review and preserve its evidence.",
+        "Close the exact style gaps in both actual-route fixtures: assert the progress Card rendered rounded-4xl/overflow-hidden and bg-surface-low/dark:bg-surface-dark-low classes, in addition to its existing spacing and elevation/appearance contract. Both presenters must assert the label text-charcoal/dark:text-neutral-100 classes and button text color #FDDC91, Manrope_700Bold, fontSize12. Keep existing direction, icon order, button/background, wrapper, callback and branch assertions. Do not weaken assertions or introduce production changes."
       ],
       "verification": [
         [
@@ -3183,16 +3185,31 @@
           "--check",
           "tests/unit/progress-screen-rtl.test.tsx",
           "tests/unit/leaderboard-sign-in-prompt.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/leaderboard-sign-in-prompt.test.tsx",
+          "--detectOpenHandles"
         ]
       ],
       "risk": "low",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "tests/unit/progress-screen-rtl.test.tsx",
         "tests/unit/leaderboard-sign-in-prompt.test.tsx"
       ],
-      "attempts": 0
+      "attempts": 2,
+      "started_at": "2026-10-16T11:47:36.668391+00:00",
+      "failure": "Batch resource limit reached",
+      "evidence": ".ralph/runs/RF-068-2-1792151256669477535",
+      "recovery_note": "First ordinary attempt rejected by independent Astra review: the twelve assertions pass but Jest waits on the default five-minute query GC timer; style coverage omitted Card shape/background, label classes and button typography. All failed evidence remains .ralph/runs/RF-068-1-1792150410819530688. Primary diagnosed the observed wait and selected TanStack documented test-only gcTime Infinity with existing cleanup retained, plus exact missing appearance checks. Added a focused detectOpenHandles gate. Attempts remains1of2, no refund; this is the final allowed implementation attempt. No application or dependency change.",
+      "completed_at": "2026-10-16T11:49:23.395135+00:00",
+      "summary": "Implemented RF-068 as a test-only characterization patch. Production code and controller-owned files were untouched; no commit or push performed."
     }
   ]
 }
