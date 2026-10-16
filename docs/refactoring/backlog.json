@@ -3489,7 +3489,7 @@
     {
       "id": "RF-072",
       "title": "Show session date-save failures inside the active editor",
-      "description": "Fix the observed date-save failure visibility gap without changing mutation or review semantics.",
+      "description": "Show rejected date writes in the visible session date editor, including before Reveal, and clear stale action errors on a fresh opening. Preserve existing persistence, validation, busy and review behavior.",
       "rationale": "RF-070 initial front-state fixture could not find cardActionFailed after a rejected write. runCardAction sets sessionError, which is rendered only in grading/summary; DueDateSheet receives only validation error. Revealing the card exposes the background error but does not make front-opened editor failures visible.",
       "modules": [
         "app/flashcards/session.tsx",
@@ -3500,10 +3500,13 @@
         "RF-070"
       ],
       "acceptance_criteria": [
-        "Before approval, finish RF-070 and preserve the actual failing front-state evidence. Scope remains one source file and its existing real-route fixture. Add a red regression for a date editor opened before Reveal, then fix it without mocking phase, editor or actions.",
-        "Primary candidate: clear stale sessionError when opening the current-card date editor and pass dueDateError before sessionError to its existing controlled error prop. Reuse the existing localized error presentation. Preserve validation priority, typed input, busy guards, haptics, identity/date persistence, successful advance and cancellation. No new error wrapper, strings, data/schema/network behavior or global error redesign.",
-        "Require error text within the visible date-editor modal for front and revealed flows, rather than a background grading label. Preserve the rejected input and retry; cancel/reopen clears stale failures. Update existing revealed-flow assertion to target the actual modal if both inline and background messages exist. Keep all prior assertions semantically intact.",
-        "All six frozen gates and separate independent review are required. Controller owns networking/browser verification outside the generator sandbox. No physical-device/native build is claimed for this local state/error-prop change. Primary must finalize exact scope before approval; remaining card-action error variants belong to RF-073."
+        "Own exactly app/flashcards/session.tsx and tests/unit/session-due-date.test.tsx. Read the accepted RF-070 fixture and real openDueDateSheet/handleSaveDueDate/runCardAction/DueDateSheet wiring. Reuse the existing controlled error presentation and strings. No new abstraction, component, dependency, schema, data access or global error system.",
+        "Write and run a real front-state regression before editing production source. Open the actual card-action/date editor without pressing Reveal and reject a deferred date write. The localized failure must be found within the actual visible date-input Modal, not a background grading label. The current source must fail this assertion; retain the red command/output in generator evidence. Do not mock phase, editor/menu/overlay/input/button, parent state, persistence handler or advance.",
+        "Primary selected source change: in openDueDateSheet, after the current-card guard, clear stale sessionError along with existing date-validation error. Pass dueDateError ?? sessionError into the existing DueDateSheet error prop, preserving validation precedence. Keep runCardAction, SQL call arguments/order, haptics, busy exclusion, parseDueDateInput, success close/advance and all other action handlers unchanged. No broad source formatting or raw control migration.",
+        "Add Arabic/light and English/dark front-state failure coverage at390by844. Preserve edited input, current card, enabled retry/cancel after rejection, exact service arguments, warning reporting, no grading/log/points/achievement/sync effects and no navigation. Cancel/reopen must reset stale failure while restoring the selected card date. Keep first-cue and Reveal landmarks so a revealed/grading fixture cannot silently replace the front flow.",
+        "Preserve all three existing RF-070 scenarios and meaningful assertions. Strengthen the revealed-failure lookup to the actual visible date-editor Modal because inline and background error labels may now coexist. Keep the accepted busy-modal ancestor check. Any fixture helper changes must make the chosen front/revealed phase explicit and retain validation lifetime, native options, typography/colors, cancel/reopen, busy guard and successful real advance. No edits to RF-069 or other tests.",
+        "Reuse typed synthetic service/font/provider fixtures, real controls/direction/locale strings, relative local dates, full warning call-list assertion with unexpected-warning forwarding, scoped restoration, reset queued service mocks and unconditional deferred settlement/React act draining. No real assets, SQLite, backend, font, production or protected inputs. No any, casts, skips, warning suppression, forceExit, timeouts or packages.",
+        "All six frozen controller commands and separate Astra evaluation must pass. Generator may run local tests/build but leaves the networking browser server to the controller outside its network-disabled sandbox; return implemented with browser acceptance pending rather than claiming a pass or treating that known sandbox restriction as a source blocker. Required rendered states are actual front/revealed modal regressions plus web export and28 installed-Chrome smoke tests. No physical-device/native build or iOS check is claimed for these state/error-prop changes. Primary retains final acceptance. RF-073 remains responsible for other action/phase/overlay errors."
       ],
       "verification": [
         [
@@ -3550,7 +3553,7 @@
         ]
       ],
       "risk": "medium",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
         "app/flashcards/session.tsx",
