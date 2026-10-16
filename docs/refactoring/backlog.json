@@ -3564,7 +3564,12 @@
       "failure": "Batch resource limit reached",
       "completed_at": "2026-10-16T17:34:40.524161+00:00",
       "evidence": ".ralph/runs/RF-072-1-1792171929485724456",
-      "summary": "Fixed session date-write error visibility. `openDueDateSheet` now clears stale action errors, and `DueDateSheet` receives validation errors before session action errors. Only the two approved files changed; no commit or push performed."
+      "summary": "Fixed session date-write error visibility. `openDueDateSheet` now clears stale action errors, and `DueDateSheet` receives validation errors before session action errors. Only the two approved files changed; no commit or push performed.",
+      "primary_acceptance": {
+        "accepted": true,
+        "commit": "369ea19",
+        "evidence": ".refactor-baseline/rf072-primary-acceptance.json"
+      }
     },
     {
       "id": "RF-073",

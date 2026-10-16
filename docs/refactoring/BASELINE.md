@@ -74,3 +74,7 @@ All64 unit suites and336 tests pass in a fresh full run, with normal process exi
 ## Session characterization after RF-070, 2026-10-16
 
 Four focused controller gates and independent Astra review pass, including12 tests in3 suites with normal open-handle detection exit. The corrected busy check targets the visible date-editor modal. Actual session tests preserve native input differences, haptics and current-card removal/advance; failure coverage uses the revealed state. Front-state error visibility remains a separate finding. The last full-suite measurement remains336 tests in64 suites after RF-069; no full/native/browser/duplicate scan was repeated here. Evidence .refactor-baseline/rf070-primary-acceptance.json.
+
+## Date failure visibility after RF-072, 2026-10-16
+
+The front-state date-save regression failed before the source edit and passes afterward in Arabic/light and English/dark. All six gates and independent evaluation pass, including14 focused tests and28 Chrome smoke tests. Scoped lint retains5 existing warnings. No full-unit/native/device/iOS or duplicate scan was repeated for the two-line state/error-prop repair. The last full-unit capture is336 tests after RF-069; the last duplication capture is28 groups/628 lines after RF-053. Evidence .refactor-baseline/rf072-primary-acceptance.json. Remaining non-date action visibility stays open in RF-073.
