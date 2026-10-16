@@ -1836,7 +1836,8 @@
       "acceptance_criteria": [
         "Before readiness, split supported ESLint/preset/plugin compatibility into an exact separate task. Preserve existing enabled rules and verify effective configuration. Do not force peer dependencies or hide the maintenance issue with an unchecked preset downgrade.",
         "Group warnings by safe fix and behavior risk.",
-        "Remove unused bindings and correct hook dependencies through separate scoped tasks. No blanket auto-fix or rule disable."
+        "Remove unused bindings and correct hook dependencies through separate scoped tasks. No blanket auto-fix or rule disable.",
+        "The 2026-10-16 registry snapshot shows stable eslint-plugin-react 7.37.5 and eslint-plugin-import 2.32.0 exclude ESLint 10 in their peers. Newer Expo preset metadata still depends on those plugin lines. Do not force peer resolution. Research supported alternatives or upstream support before selecting an ESLint 10 tuple; metadata alone does not prove runtime failure."
       ],
       "verification": [
         [
@@ -2440,14 +2441,14 @@
     },
     {
       "id": "RF-057",
-      "title": "Share auth startup dark-theme lookup",
-      "description": "Share auth startup dark-theme lookup",
-      "rationale": "Group 15 repeats pre-provider cached-theme interpretation, but OAuthButtons alone has a document-background fallback. RF-066 must characterize the distinct policies before a source change.",
+      "title": "Share characterized auth startup theme lookup",
+      "description": "Move the two characterized auth theme lookups into one provider-independent helper with an explicit OAuth document-fallback option.",
+      "rationale": "RF-066 now verifies the common cache policy and the intentional OAuth-only document fallback. A shared helper can remove the duplicate interpretation while preserving the two caller contracts.",
       "modules": [
         "components/auth/AuthScreenShell.tsx",
         "components/auth/OAuthButtons.tsx",
         "lib/settings/startup-theme.ts",
-        "tests/unit/startup-theme.test.ts"
+        "tests/unit/auth-startup-theme.test.tsx"
       ],
       "dependencies": [
         "RF-004",
@@ -2455,10 +2456,13 @@
         "RF-066"
       ],
       "acceptance_criteria": [
-        "Inspect existing settings cache helpers before selecting the owner.",
-        "Characterize all cached themes, system matchMedia result, unavailable window, native fallback and storage exceptions. Preserve existing outcomes.",
-        "RF-066 behavioral coverage must pass first. Preserve OAuthButtons-only document fallback, system early return, explicit override precedence, native/SSR guard behavior and existing storage error propagation. Settings readCachedThemeMode has different normalization/defaults and cannot replace the auth policy unchanged.",
-        "Keep this implementation unapproved until the primary engineer chooses a small auth-owned interface after reviewing the characterization evidence. Do not broaden this task into settings hydration or theme normalization."
+        "Create only lib/settings/startup-theme.ts as a small provider-independent module. Export getCachedAuthDarkMode returning boolean | null, with the named optional useDocumentFallback boolean defaulting to false. Reuse the existing private helper algorithms and their stored hafiz_theme key. No hook, class, provider, settings-context import, new state or general cache framework.",
+        "Preserve the native/absent-window null guard, dark/amoled true, beige/white false and cached system early return through the exact optional matchMedia query. Unknown, missing and legacy light remain unnormalized. Only a caller requesting useDocumentFallback may read the document background after those cases, using the existing two RGB comparisons. Preserve every existing read error and the absence of top-level browser reads.",
+        "AuthScreenShell imports the shared function and its useAuthDarkMode keeps the existing NativeWind fallback. OAuthButtons calls it with { useDocumentFallback: true }, preserving explicit isDark nullish precedence and its existing NativeWind fallback. Delete both obsolete private functions. Change no other component logic, markup, styles, callbacks, auth flags, navigation, strings or assets.",
+        "Before extracting, extend the existing RF-066 test with both light and dark NativeWind schemes for Android, iOS and absent-window guards. Assert actual hook return, OAuth border and skipped storage reads in each case. Run and record these tests against unchanged source first, then after extraction. Keep all other meaningful characterization assertions and actual component/hook imports intact. No source-string assertions or mocks of the code under test.",
+        "Keep the existing React Native test fixtures and style utilities. No any, suppression, unsafe casts, dependency/config changes, generated content changes, new test utilities or unrelated cleanup. The settings context and HTML bootstrap have different normalization/default contracts and remain unchanged.",
+        "Controller-run focused theme/OAuth tests, strict typecheck, scoped ESLint on all four paths and production web export must pass. RNTL exercises actual rendered buttons with emulated platform guards. Record browser/native runtime checks as not run; this task changes no markup or native APIs. Any behavioral discrepancy or mandatory missing platform check must block acceptance.",
+        "Independent evaluator must compare the complete shared function with both deleted bodies, inspect the explicit fallback option and verify that the test additions cover native/absent-window dark fallback. Report the concrete reuse decision and remaining verification limits. Main engineer owns interface choice and final acceptance."
       ],
       "verification": [
         [
@@ -2467,23 +2471,35 @@
           "test:unit",
           "--",
           "--runTestsByPath",
-          "tests/unit/startup-theme.test.ts",
+          "tests/unit/auth-startup-theme.test.tsx",
           "tests/unit/oauth-buttons-contract.test.tsx"
         ],
         [
           "npm",
           "run",
           "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "components/auth/AuthScreenShell.tsx",
+          "components/auth/OAuthButtons.tsx",
+          "lib/settings/startup-theme.ts",
+          "tests/unit/auth-startup-theme.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
         ]
       ],
-      "risk": "low",
-      "approved": false,
+      "risk": "medium",
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
         "components/auth/AuthScreenShell.tsx",
         "components/auth/OAuthButtons.tsx",
         "lib/settings/startup-theme.ts",
-        "tests/unit/startup-theme.test.ts"
+        "tests/unit/auth-startup-theme.test.tsx"
       ],
       "attempts": 0
     },

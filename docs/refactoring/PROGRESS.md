@@ -91,3 +91,11 @@ The mission is active. This file records durable events; backlog.json owns task 
 - 2026-10-16T01:52:54.333772+00:00 `RF-066` retry. Batch resource limit reached; preserved work will be reverified on resume.
 
 - 2026-10-16T02:06:19.079817+00:00 `RF-066` verified. Added RF-066 characterization tests in tests/unit/auth-startup-theme.test.tsx only. Preserved the unrelated backlog edit and did not commit or push. Evidence `.ralph/runs/RF-066-1-1792116273451544817`.
+
+- 2026-10-16. RF-066 resumed from its exact generation checkpoint and passed fresh controller verification plus independent evaluation, local commit a0629e6. Primary reviewed the committed test and accepted the distinct cache, system, document-background, override and error contracts against unchanged application code. Two focused suites with 33 tests, typecheck, scoped ESLint and diff checks passed. Evidence .ralph/runs/RF-066-1-1792116273451544817. No browser/manual/native runtime checks ran for this test-only task. Nine of 66 tasks are verified.
+
+- 2026-10-16. Prepared RF-057 with four exact paths. Reuse decision: move the two existing private theme algorithms into lib/settings/startup-theme.ts, leaving the settings context and HTML normalization alone. A named useDocumentFallback option preserves OAuthButtons' additional root-background check; the auth hook keeps the default behavior. Extend native/absent-window characterization to both NativeWind schemes before extraction. No new provider, state layer or cache framework is justified. Focused rendered tests, typecheck, scoped lint, web export and separate evaluation form acceptance. Source extraction has not started.
+
+- 2026-10-16. Recorded the current ESLint plugin peer-support gap in TECH_STACK.md and pending RF-044. Stable React/import plugin peers exclude ESLint 10 even through newer Expo preset metadata. No root dependency change or forced peer installation ran. Snapshot .refactor-baseline/lint-maintenance-registry.json.
+
+- 2026-10-16. Primary readiness checks pass for RF-057: four bounded paths, existing test/helper parent directories, acyclic dependencies and nine verified items. Documentation formatting and diff checks pass. No additional application checks ran for the documentation/backlog preparation.
