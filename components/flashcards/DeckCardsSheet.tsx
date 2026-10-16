@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, Text, TextInput, View, type ViewStyle } from "react-native";
 import { CalendarDays, Clock3, PauseCircle, RotateCcw, Search, Star, Trash2 } from "lucide-react-native";
-import { Button } from "@/components/ui/Button";
+import { DueDateSheet } from "@/components/flashcards/DueDateSheet";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { DropdownMenu, type DropdownMenuItem } from "@/components/ui/DropdownMenu";
-import { OverlayBody, OverlayFooter, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
+import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { useDatabase } from "@/lib/database/provider";
 import { useStrings } from "@/lib/i18n/useStrings";
 import type { UIStrings } from "@/lib/i18n/strings";
@@ -289,7 +289,7 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
         }}
       />
 
-      <DueDateEditor
+      <DueDateSheet
         visible={!!dueTarget}
         value={dueDateText}
         error={dueDateError}
@@ -469,73 +469,6 @@ function TableMessage({ text, isRTL }: { text: string; isRTL: boolean }) {
     >
       {text}
     </Text>
-  );
-}
-
-function DueDateEditor({
-  visible,
-  value,
-  error,
-  busy,
-  isDark,
-  isRTL,
-  s,
-  onChange,
-  onClose,
-  onSave,
-}: {
-  visible: boolean;
-  value: string;
-  error: string | null;
-  busy: boolean;
-  isDark: boolean;
-  isRTL: boolean;
-  s: UIStrings;
-  onChange: (value: string) => void;
-  onClose: () => void;
-  onSave: () => void;
-}) {
-  return (
-    <ResponsiveSheet
-      open={visible}
-      onClose={onClose}
-      maxWidth={420}
-      maxHeight={360}
-      avoidKeyboard
-    >
-      <OverlayHeader title={s.cardSetDueDate} subtitle={s.cardDueDateHint} onClose={onClose} isRTL={isRTL} showHandle />
-      <OverlayBody scrollEnabled={false} contentContainerClassName="px-5 py-5">
-        <TextInput
-          value={value}
-          onChangeText={onChange}
-          placeholder={s.cardDueDatePlaceholder}
-          placeholderTextColor={isDark ? "#737373" : "#b9a085"}
-          keyboardType="numbers-and-punctuation"
-          className="min-h-12 rounded-2xl bg-surface-low dark:bg-surface-dark-low px-4 py-3 text-charcoal dark:text-neutral-100"
-          style={{ fontFamily: "Manrope_500Medium", fontSize: 16, textAlign: isRTL ? "right" : "left", writingDirection: "ltr" }}
-        />
-        {error ? (
-          <Text
-            className="mt-3 text-red-600 dark:text-red-400"
-            style={{ fontFamily: "Manrope_500Medium", fontSize: 13, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
-          >
-            {error}
-          </Text>
-        ) : null}
-      </OverlayBody>
-      <OverlayFooter isRTL={isRTL}>
-        <Button variant="outline" onPress={onClose} disabled={busy} className="flex-1">
-          <Text className="text-charcoal dark:text-neutral-200" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>
-            {s.flashcardsCancel}
-          </Text>
-        </Button>
-        <Button onPress={onSave} disabled={busy} className="flex-1">
-          <Text className="text-white" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>
-            {s.cardSaveDueDate}
-          </Text>
-        </Button>
-      </OverlayFooter>
-    </ResponsiveSheet>
   );
 }
 

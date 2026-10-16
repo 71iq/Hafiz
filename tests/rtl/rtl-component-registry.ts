@@ -22,6 +22,7 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
   entry("components/auth/OAuthButtons.tsx", "button", "playwright", "Provider button row mirrors; provider logos remain unmirrored."),
   entry("components/flashcards/DeckCardsSheet.tsx", "overlay", "source", "Deck table sheet mirrors rows and actions; card text keeps natural direction."),
   entry("components/flashcards/DeckReviewSettingsSheet.tsx", "overlay", "source", "Review settings controls mirror inside sheet chrome."),
+  entry("components/flashcards/DueDateSheet.tsx", "overlay", "rntl", "Date editor overlay is covered by the session-due-date and deck-cards-due-date caller fixtures."),
   entry("components/flashcards/Qcf2AyahText.tsx", "quran-text", "source", "QCF glyph text keeps Quran layout invariants and is never horizontally mirrored."),
   entry("components/flashcards/SmartDeckFilterSheet.tsx", "overlay", "source", "Filter sheet controls and list rows mirror; Quran labels keep natural direction."),
   entry("components/mushaf/AyahBlock.tsx", "mushaf-reading", "source", "Controls mirror while Quran word layout keeps direction:ltr plus row-reverse."),

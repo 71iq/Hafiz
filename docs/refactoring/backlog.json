@@ -2518,14 +2518,19 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "app/flashcards/session.tsx",
         "components/flashcards/DeckCardsSheet.tsx",
         "components/flashcards/DueDateSheet.tsx",
         "tests/rtl/rtl-component-registry.ts"
       ],
-      "attempts": 0
+      "attempts": 1,
+      "started_at": "2026-10-16T17:50:43.942212+00:00",
+      "failure": "Batch resource limit reached",
+      "completed_at": "2026-10-16T17:53:16.804566+00:00",
+      "evidence": ".ralph/runs/RF-055-1-1792173043943366702",
+      "summary": "Extracted the shared controlled DueDateSheet presenter and updated both callers without changing state, parsing, mutation, busy guards, error priority, session advance, or deck reload behavior."
     },
     {
       "id": "RF-056",
