@@ -2436,14 +2436,21 @@
     {
       "id": "RF-055",
       "title": "Extract the duplicated DueDateSheet",
-      "description": "Share the date-editor presentation after both parent behaviors are characterized. Preserve distinct native input defaults and parent-owned actions.",
-      "rationale": "Duplication groups share presentation but session specifies autoCapitalize none/autoCorrect false while deck cards omit both. Session advances review; deck save reloads rows. Similarity does not authorize behavior consolidation.",
+      "description": "Replace both private controlled date-editor copies with one feature component composed from existing sheet, Input and Button primitives. Preserve per-caller native input options and all state/action ownership.",
+      "rationale": "RF-069/RF-070 characterize both actual callers; RF-072 fixes inline date-save failures. The sheet presentation is shared, while session input opts out of capitalization/autocorrect and its save advances review. Deck save retains defaults and reloads rows. Share presentation only, using the canonical Input with exact existing effective styles.",
       "modules": [
         "app/flashcards/session.tsx",
         "components/flashcards/DeckCardsSheet.tsx",
         "components/flashcards/DueDateSheet.tsx",
-        "tests/unit/due-date-sheet.test.tsx",
-        "tests/rtl/rtl-component-registry.ts"
+        "components/ui/Input.tsx",
+        "components/ui/Button.tsx",
+        "components/ui/Text.tsx",
+        "components/ui/ResponsiveOverlay.tsx",
+        "tests/rtl/rtl-component-registry.ts",
+        "tests/unit/session-due-date.test.tsx",
+        "tests/unit/deck-cards-due-date.test.tsx",
+        "tests/unit/deck-cards-sheet-contract.test.ts",
+        "tests/unit/date-utils.test.ts"
       ],
       "dependencies": [
         "RF-004",
@@ -2453,9 +2460,13 @@
         "RF-072"
       ],
       "acceptance_criteria": [
-        "Do not approve this extraction before RF-069 and a separately prepared rendered session-editor characterization pass. The two native TextInput option differences must remain caller-owned. Existing parent validation, busy guards, haptics and session-advance versus deck-reload behavior must stay separate.",
-        "Compare both full implementations and callers. Move one canonical controlled component and delete both private definitions.",
-        "Test value/change, busy disabled actions, errors, close/save callbacks, keyboard avoidance and RTL/LTR. Retain ResponsiveSheet primitives and exact labels/typography."
+        "Inspect both complete private components/call sites and accepted RF-069/RF-070/RF-072 evidence. Primary reuse choice: reuse existing ResponsiveSheet/Header/Body/Footer, Input and Button. Input without icons adds no host wrapper; its complete original class override resolves through cn/twMerge to the identical class string. Explicit placeholder color, direction and original inline font/size/alignment/fixed-LTR-writing style preserve effective input appearance. The existing Input editable=true matches installed RN default true; do not disable editing during busy. Canonical typography Text injects body sizing/leading/direction with no plain native-caption variant, so retain RN Text for existing control/error captions to preserve native line metrics. Record this exact reuse rationale.",
+        "Create only components/flashcards/DueDateSheet.tsx as a controlled feature presenter. Props retain visible,value,error,busy,isDark,isRTL,s:UIStrings,onChange,onClose,onSave, plus exactly optional autoCapitalize/autoCorrect derived from Pick<InputProps, those keys>. Keep props type internal unless a real caller needs an export. No hooks/state/services/parser/navigation, variants framework, new helpers/dependencies or generic input-props bag. No edits to the existing UI primitives.",
+        "Compose the existing sheet with open/onClose/maxWidth420/maxHeight360/avoidKeyboard and unchanged header/body/footer/labels/error/spacing/typography/buttons. Use canonical Input with the full original className and inline style overrides, explicit placeholderTextColor, dir from isRTL, value/onChangeText and numbers-and-punctuation keyboard. Forward the two optional native options without new defaults. Do not add invalid border, validation, editable/busy policy, loading UI, icons or changed line metrics.",
+        "Delete both complete private DueDateSheet/DueDateEditor copies. Import and use the shared component directly at the two existing call sites. Session alone passes autoCapitalize none and autoCorrect false; DeckCardsSheet omits both. Retain visible/value/error/busy/string/callback expressions exactly, including RF-072 validation-error priority and stale action-error clear. Parent parser, mutation arguments, haptics, busy close guards, successful advance versus reload/onChanged, and all other card-action handlers must remain unchanged. Remove only imports made truly unused; TextInput and other sheet parts still serve search/answer UI at callers. No broad legacy formatting or unrelated casts cleanup.",
+        "All existing tests are read-only. Do not change any fixture, assertion, test helper, test configuration or registry entries other than exactly one new sorted DueDateSheet overlay/rntl entry naming the two actual caller fixtures. No redundant new presenter test. Native option differences, styles, inline failure/retry, busy-modal guard, real parent advance and deck reload must pass unchanged. No any, suppression, unsafe cast, skipped test or package change.",
+        "Run all six frozen controller commands and require new independent Astra evaluation before completion. Scoped ESLint includes all four paths and must introduce no new warning; preserve pre-existing caller warnings. Prettier applies only to the new component, not broad legacy files. Actual RNTL caller states cover Arabic/light and English/dark at390by844; web export and28 Chrome smoke tests also remain required. Networking browser verification belongs to the controller outside the generator sandbox. Generator can return implemented while noting browser acceptance pending; it must not treat the known sandbox bind restriction as a source blocker. No additional native build, physical-device or iOS check is claimed. Primary retains final acceptance.",
+        "Repeat the same-scope duplication scan and the full unit suite after controller/evaluator acceptance as primary workstream verification. Do not edit scanner exclusions or metrics to improve a score. Any genuine behavior discrepancy or failed unchanged test must be diagnosed instead of weakening its contract."
       ],
       "verification": [
         [
@@ -2464,23 +2475,54 @@
           "test:unit",
           "--",
           "--runTestsByPath",
-          "tests/unit/due-date-sheet.test.tsx",
-          "tests/unit/deck-cards-sheet-contract.test.ts"
+          "tests/unit/session-due-date.test.tsx",
+          "tests/unit/deck-cards-due-date.test.tsx",
+          "tests/unit/deck-cards-sheet-contract.test.ts",
+          "tests/unit/date-utils.test.ts",
+          "tests/unit/rtl-component-registry-coverage.test.ts",
+          "--detectOpenHandles"
         ],
         [
           "npm",
           "run",
           "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "app/flashcards/session.tsx",
+          "components/flashcards/DeckCardsSheet.tsx",
+          "components/flashcards/DueDateSheet.tsx",
+          "tests/rtl/rtl-component-registry.ts"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "components/flashcards/DueDateSheet.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8193",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8193",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts"
         ]
       ],
       "risk": "medium",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
         "app/flashcards/session.tsx",
         "components/flashcards/DeckCardsSheet.tsx",
         "components/flashcards/DueDateSheet.tsx",
-        "tests/unit/due-date-sheet.test.tsx",
         "tests/rtl/rtl-component-registry.ts"
       ],
       "attempts": 0
