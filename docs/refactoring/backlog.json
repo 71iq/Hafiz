@@ -3081,15 +3081,15 @@
       ],
       "risk": "high",
       "approved": true,
-      "status": "retry",
+      "status": "verified",
       "allowed_paths": [
         "package.json",
         "package-lock.json"
       ],
-      "attempts": 1,
-      "started_at": "2026-10-16T06:24:09.248602+00:00",
+      "attempts": 2,
+      "started_at": "2026-10-16T10:55:37.863031+00:00",
       "failure": "review exited 1; see .ralph/runs/RF-067-2-1792131849249493778/review.jsonl",
-      "evidence": ".ralph/runs/RF-067-2-1792131849249493778",
+      "evidence": ".ralph/runs/RF-067-2-1792148137863851616",
       "recovery_note": "Attempt one implemented the exact selected manifest but returned blocked solely because controller-owned checks were pending. Primary compared the complete preserved manifest to the passing preflight and confirmed the lock is unchanged. Clarified handoff before the second and final allowed attempt. Original failure and evidence are retained; no retry reset. The subsequent controller run passed fourteen gates, then systemd recorded an OOM-kill at 6G during native compilation. Primary diagnosed unbounded Ninja concurrency using the installed AGP model and an actual Ninja probe. Refunded only that resource interruption, attempts2 to1, matching the documented resource policy. No implementation retry or raw evidence was erased; all gates will run fresh with bounded native concurrency. The concurrency-limited native pass then completed all four ABIs of Nitro Modules, Worklets and Reanimated without OOM, but hit the 900-second deadline during app compilation. A real subprocess test reproduced incorrect controller retry/checkpoint handling. The corrected controller counts resource_timeouts separately and blocks on the second timeout. Historical count is one, allowing one bounded continuation without changing verification scope, RAM or deadline. No invalidated checkpoint was restored; the changed controller/HEAD requires fresh generation and all gates. The next run passed all fifteen commands including all-ABI Android assembleDebug, then its evaluator hit the account usage limit with no verdict. Preserved the failure and refunded only that resource interruption after capacity returned. Resource_timeouts remains one, and the ordinary handoff failure remains counted. A regression through the actual agent wrapper now proves quota-stop accounting, generation preservation, unknown-usage exhaustion, fresh checks/review on resume and rejection of unrelated errors. No invalidated checkpoint is restored.",
       "resource_failures": [
         {
@@ -3120,7 +3120,9 @@
           "repair": "Recognize only the last terminal turn.failed with the exact observed account-limit prefix as BatchLimit. Preserve completed generation and implementation retry, retain unknown-usage exhaustion, rerun all checks and require fresh independent review. Ordinary failures and separate two-timeout cap remain. No invalidated checkpoint restored; new controller/HEAD requires fresh generation."
         }
       ],
-      "resource_timeouts": 1
+      "resource_timeouts": 1,
+      "completed_at": "2026-10-16T11:02:55.459087+00:00",
+      "summary": "Applied the approved SDK 55 manifest handoff in package.json. Reused the existing babel-preset-expo and NativeWind configuration. Controller-owned lock resolution and all verification gates remain pending."
     }
   ]
 }
