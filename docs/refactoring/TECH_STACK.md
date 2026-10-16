@@ -44,4 +44,4 @@ The 2026-10-16 maintenance check reports ESLint 10.12.0. Current stable eslint-p
 
 ## SDK 55 patch preparation
 
-[SDK55_ALIGNMENT.md](SDK55_ALIGNMENT.md) records the exact candidate versions, isolated resolver failures and the native graph gate. RF-008 remains unapproved. Existing application dependencies and native configuration stay fixed while the peer graph is diagnosed. Independent settings hydration work can proceed against the passing locked baseline.
+[SDK55_ALIGNMENT.md](SDK55_ALIGNMENT.md) records the exact candidate versions, isolated resolver failures and the native graph gate. RF-008 remains unapproved. The resolved-graph preflight now passes on installed npm, and RF-067 isolates the exact runtime patch set plus the already-used Babel preset declaration. Its actual installation and web/Android verification remain pending. Independent settings hydration is complete.

@@ -4,7 +4,8 @@ import fs from "node:fs";
 const port = Number(process.env.PLAYWRIGHT_PORT ?? 8099);
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? `http://localhost:${port}`;
 const chromiumChannel =
-  !process.env.CI && fs.existsSync("/usr/bin/google-chrome") ? "chrome" : undefined;
+  process.env.PLAYWRIGHT_CHROMIUM_CHANNEL ??
+  (!process.env.CI && fs.existsSync("/usr/bin/google-chrome") ? "chrome" : undefined);
 const chromiumUse = chromiumChannel ? { channel: chromiumChannel } : {};
 
 export default defineConfig({

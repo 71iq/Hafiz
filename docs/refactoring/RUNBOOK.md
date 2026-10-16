@@ -61,3 +61,11 @@ The active thread heartbeat `hafiz-modernization-supervisor` checks hourly at 45
 The supervisor reads current progress and scopes later work as primary engineer. It never replaces the Ralph implementation/evaluation loop. Pause the supervisor only when the mission actually meets its documented completion criteria or the user requests a stop.
 
 Read backlog.json and the matching generation checkpoint to identify unfinished work. Do not infer current task state from an older progress entry. The user raised the five-hour threshold to 95 percent on 2026-10-16. The weekly threshold remains 90 percent.
+
+## SDK 55 verification slice
+
+RF-067 changes only package.json; the controller resolves package-lock.json and runs 15 frozen commands. SDK55_ALIGNMENT.md records the selected versions and preflight. The default-resolution step is followed by strict installation and full npm graph validation. No force or legacy-peer option is used. Native fixes and the CSS interop patch run explicitly with lifecycle scripts disabled.
+
+This Ubuntu host uses the installed Chrome channel. The smoke command sets CI=1, PLAYWRIGHT_CHROMIUM_CHANNEL=chrome, PLAYWRIGHT_PORT=8193 and PLAYWRIGHT_BASE_URL=http://127.0.0.1:8193. CI requires a fresh server. PLAYWRIGHT_CHROMIUM_CHANNEL is optional; existing behavior stays unchanged when absent. A bundled Chromium download failed on ubuntu26.04-x64. Do not replace the user's Chrome installation.
+
+The Android command compiles debug only with JDK 21 and SDK 36. Keep existing time/retry limits and inspect real Gradle children and locks after any termination. iOS builds, device installation, production and deployment remain outside this slice. RF-008 still owns remaining full-project diagnostics.

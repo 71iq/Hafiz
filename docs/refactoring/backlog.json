@@ -341,7 +341,7 @@
       "id": "RF-008",
       "title": "Align SDK 55 patch dependencies",
       "description": "Align SDK 55 patch dependencies",
-      "rationale": "Expo reports 19 mismatches including ESLint config 56.",
+      "rationale": "RF-067 isolates the verified runtime/package alignment. This umbrella still owns full Expo diagnostics, lint coverage/maintenance and the committed-native configuration decision.",
       "modules": [
         "package.json",
         "package-lock.json",
@@ -349,14 +349,15 @@
         "docs/refactoring/TECH_STACK.md"
       ],
       "dependencies": [
-        "RF-007"
+        "RF-007",
+        "RF-067"
       ],
       "acceptance_criteria": [
         "Use Expo recommended SDK55 versions, inspect existing patches and preserve native APIs.",
         "Remove direct expo-modules-core only after confirming callers/autolinking.",
         "Verify no duplicate native modules. Split native changes from major upgrades.",
         "Keep current enabled lint rules. The isolated eslint-config-expo 55.0.1 preflight lost nine active React Hooks rules despite zero errors. Do not downgrade the preset or exclude a diagnostic merely to satisfy version matching. Primary engineer must choose and document a compatible toolchain or justified exception before this item is approved.",
-        "Before approval, diagnose the isolated peer-resolution failures recorded in SDK55_ALIGNMENT.md. The new check-expo-native.cjs rejects duplicate Android/iOS graph entries even though upstream verify exits zero. Candidate manifest constraints remain experimental; no forced peer installation is approved."
+        "RF-067 now has a proven standard-resolution, full graph and strict-idempotent-lock preflight in SDK55_ALIGNMENT.md. Keep the original failed experiments as evidence, not as a permanent upgrade blocker. After RF-067, review actual remaining full-project diagnostics without weakening lint rules or hiding native configuration debt."
       ],
       "verification": [
         [
@@ -2948,6 +2949,149 @@
       "completed_at": "2026-10-16T02:06:19.079113+00:00",
       "evidence": ".ralph/runs/RF-066-1-1792116273451544817",
       "summary": "Added RF-066 characterization tests in tests/unit/auth-startup-theme.test.tsx only. Preserved the unrelated backlog edit and did not commit or push."
+    },
+    {
+      "id": "RF-067",
+      "title": "Align verified SDK 55 runtime patches",
+      "description": "Apply the exact primary-selected SDK 55 manifest set, declare the already-used Babel preset and remove the direct core dependency. Resolve the lock through controller commands, then verify web and Android.",
+      "rationale": "Standard resolution followed by full graph validation and strict idempotent reinstall passes in isolation on installed npm 11.16. Initial strict exploration errors involve absent optional peers. The reviewed final graph keeps React 19.2.0, RN 0.83 and Expo 55, consolidates log-box, and requires an explicit Babel preset declaration used by babel.config.js.",
+      "modules": [
+        "package.json",
+        "package-lock.json",
+        "babel.config.js",
+        "patches/react-native-css-interop+0.2.2.patch"
+      ],
+      "dependencies": [
+        "RF-007",
+        "RF-013"
+      ],
+      "acceptance_criteria": [
+        "Read SDK55_ALIGNMENT.md. The primary engineer selects exactly its 18 manifest ranges: the original 17 candidate targets plus devDependency babel-preset-expo ~55.0.25. Remove dependencies.expo-modules-core, whose owner is Expo. No new Metro runtime declaration, DOM type dependency, renderer pin, peer override, npm version field, install exclusion or other manifest change. Keep all scripts, existing overrides and other direct dependency ranges unchanged.",
+        "Generator edits package.json only and never installs packages or edits package-lock.json. The controller owns lock resolution and native patch application. Existing native/app/test/config source, signing material, assets and backend stay unchanged. package-lock.json is an allowed controller output only.",
+        "Use the existing default npm resolution policy without force, legacy-peer-deps or an explicit disabling flag. Then run a strict reinstall and full installed npm dependency graph validation. Both must pass. The isolated preflight's resolved lock passes both with no subsequent lock changes. These gates inspect the actual selected graph rather than stopping at speculative absent optional-peer candidates.",
+        "Primary-reviewed lock movements include Expo/Metro/RN families, Router's existing Radix/vaul web dependencies and React Navigation 7.1.31 to 7.5.1 to satisfy the updated bottom-tabs/native-stack peer range. Other direct resolved versions, including React/DOM/renderer 19.2.0 and ESLint preset 56.0.4, stay unchanged. Preserve shell-quote 1.12.0 and tar 7.5.22 overrides. Escalate framework majors, RSC/DOM-type installation or unrelated direct changes.",
+        "Declare babel-preset-expo as a devDependency because the existing Babel config imports it directly and the 17-target lock would only keep it nested under Expo. Reuse that existing preset and NativeWind jsxImportSource configuration without editing babel.config.js. Do not add a new compiler or regenerate native projects.",
+        "With lifecycle scripts disabled, explicitly run the existing RN Gradle fix and patch-package --error-on-fail. The current CSS interop patch remains unchanged. Do not approve or run Supabase installation/deployment scripts or touch credentials. Never generate or replace a signing key; the isolated debug keystore already exists.",
+        "Require check-expo-native.cjs to pass on both Android and iOS dependency graphs with no direct core declaration or duplicate modules. Require the security dependency probe, critical audit and targeted Expo version check for all 18 selected packages. Full-project ESLint-preset and committed-native diagnostic debt remains RF-008 work, not an exclusion or a false success.",
+        "Require strict TypeScript, full ESLint with no errors, the full unit suite, production static export, all existing 28 browser smoke tests and Android assembleDebug using the documented JDK 21/SDK 36. Browser checks use installed Chrome, CI=1, an explicit loopback URL and a fresh test server. Do not install APKs, clear device data or claim native runtime/iOS build checks.",
+        "Independent evaluator must inspect the entire manifest/lock diff, actual controller output and reuse/preserved safety boundaries. No task is verified from the generator report alone. Main engineer retains package/security decisions and final acceptance. Preserve failed work and obey existing attempt, session, batch and writer limits."
+      ],
+      "verification": [
+        [
+          "npm",
+          "install",
+          "--ignore-scripts",
+          "--no-audit",
+          "--no-fund"
+        ],
+        [
+          "npm",
+          "install",
+          "--ignore-scripts",
+          "--no-audit",
+          "--no-fund",
+          "--strict-peer-deps"
+        ],
+        [
+          "node",
+          "-e",
+          "require('node:child_process').execFileSync('npm', ['ls', '--all'], {stdio: ['ignore', 'ignore', 'inherit']}); console.log('Installed dependency graph passed npm ls --all.');"
+        ],
+        [
+          "node",
+          "scripts/fix-rn-gradle-plugin.js"
+        ],
+        [
+          "node_modules/.bin/patch-package",
+          "--error-on-fail"
+        ],
+        [
+          "node",
+          "scripts/ralph/check-expo-native.cjs"
+        ],
+        [
+          "node",
+          "scripts/ralph/check-security-dependencies.cjs"
+        ],
+        [
+          "npm",
+          "audit",
+          "--audit-level=critical"
+        ],
+        [
+          "node_modules/.bin/expo",
+          "install",
+          "--check",
+          "expo",
+          "expo-asset",
+          "expo-audio",
+          "expo-clipboard",
+          "expo-constants",
+          "expo-dev-client",
+          "expo-haptics",
+          "expo-image-picker",
+          "expo-linking",
+          "expo-router",
+          "expo-sharing",
+          "expo-splash-screen",
+          "expo-sqlite",
+          "expo-status-bar",
+          "expo-web-browser",
+          "react-native",
+          "jest-expo",
+          "babel-preset-expo"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "lint"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8193",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8193",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts"
+        ],
+        [
+          "env",
+          "JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64",
+          "ANDROID_HOME=/home/ehab/Android/Sdk",
+          "./android/gradlew",
+          "-p",
+          "android",
+          ":app:assembleDebug",
+          "--no-daemon",
+          "--max-workers=2"
+        ]
+      ],
+      "risk": "high",
+      "approved": true,
+      "status": "pending",
+      "allowed_paths": [
+        "package.json",
+        "package-lock.json"
+      ],
+      "attempts": 0
     }
   ]
 }
