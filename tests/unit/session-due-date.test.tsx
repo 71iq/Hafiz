@@ -21,18 +21,24 @@ import {
   materializeSmartDeckCards,
 } from "@/lib/fsrs/smart-decks";
 import {
+  deleteStudyCard,
+  setStudyCardBuried,
   getNextEligibleReviewDate,
   getRemainingReviewLimit,
   getStudyStreak,
   getWirdStatus,
   insertStudyLog,
   readDeckReviewSettings,
+  resetStudyCardProgress,
   setStudyCardDueDate,
+  setStudyCardMarked,
+  setStudyCardSuspended,
   updateCard,
 } from "@/lib/fsrs/queries";
 import { hapticMedium } from "@/lib/haptics";
 import { recordAchievementEvent } from "@/lib/achievements/queries";
 import { syncDailyScore, updateProfileStats } from "@/lib/fsrs/leaderboard-sync";
+import { deleteUserSetting, writeUserSetting } from "@/lib/database/user-settings";
 import {
   isQuranPageFontLoaded,
   loadQuranPageFont,
@@ -386,6 +392,85 @@ async function openDueDateEditor(
   return view.getByPlaceholderText(s.cardDueDatePlaceholder);
 }
 
+type DirectCardAction = "suspend" | "bury" | "mark";
+type DirectCardActionCase = readonly [string, "ar" | "en", boolean, "front" | "revealed", DirectCardAction];
+
+const directCardActionCases: readonly DirectCardActionCase[] = [
+  ["Arabic light front Suspend", "ar", false, "front", "suspend"],
+  ["English dark revealed Suspend", "en", true, "revealed", "suspend"],
+  ["Arabic light front Bury", "ar", false, "front", "bury"],
+  ["English dark revealed Bury", "en", true, "revealed", "bury"],
+  ["Arabic light front Mark", "ar", false, "front", "mark"],
+  ["English dark revealed Mark", "en", true, "revealed", "mark"],
+];
+
+function directCardActionLabel(s: UIStrings, action: DirectCardAction): string {
+  if (action === "suspend") return s.cardSuspend;
+  if (action === "bury") return s.cardBury;
+  return s.cardMark;
+}
+
+async function openDirectCardAction(
+  view: ReturnType<typeof render>,
+  s: UIStrings,
+  phase: "front" | "revealed",
+  action: DirectCardAction,
+) {
+  await waitFor(() => {
+    expect(view.getByText(firstCue)).toBeTruthy();
+    expect(view.getByRole("button", { name: s.cardActionsTitle })).toBeTruthy();
+  });
+
+  if (phase === "revealed") {
+    fireEvent.press(getTextButton(view, s.flashcardsReveal));
+    await waitFor(() => expect(view.getAllByText(s.smartDeckTargetAyah).length).toBeGreaterThan(0));
+  }
+
+  fireEvent.press(view.getByRole("button", { name: s.cardActionsTitle }));
+  await waitFor(() => expect(view.getByText(s.cardActionsTitle)).toBeTruthy());
+  fireEvent.press(view.getByRole("button", { name: directCardActionLabel(s, action) }));
+}
+
+function configureRejectedDirectAction(
+  action: DirectCardAction,
+  deferred: Deferred<StudyCardRow>,
+  retryResult: StudyCardRow,
+) {
+  if (action === "suspend") {
+    jest.mocked(setStudyCardSuspended).mockReturnValueOnce(deferred.promise).mockResolvedValueOnce(retryResult);
+    return;
+  }
+  if (action === "bury") {
+    jest.mocked(setStudyCardBuried).mockReturnValueOnce(deferred.promise).mockResolvedValueOnce(retryResult);
+    return;
+  }
+  jest.mocked(setStudyCardMarked).mockReturnValueOnce(deferred.promise).mockResolvedValueOnce(retryResult);
+}
+
+function expectDirectCardActionCalls(action: DirectCardAction) {
+  if (action === "suspend") {
+    expect(setStudyCardSuspended).toHaveBeenCalledTimes(2);
+    expect(setStudyCardSuspended).toHaveBeenNthCalledWith(1, mockDatabase, firstCard.deck_id, firstCard.id, true);
+    expect(setStudyCardSuspended).toHaveBeenNthCalledWith(2, mockDatabase, firstCard.deck_id, firstCard.id, true);
+    expect(setStudyCardBuried).not.toHaveBeenCalled();
+    expect(setStudyCardMarked).not.toHaveBeenCalled();
+    return;
+  }
+  if (action === "bury") {
+    expect(setStudyCardBuried).toHaveBeenCalledTimes(2);
+    expect(setStudyCardBuried).toHaveBeenNthCalledWith(1, mockDatabase, firstCard.deck_id, firstCard.id, true);
+    expect(setStudyCardBuried).toHaveBeenNthCalledWith(2, mockDatabase, firstCard.deck_id, firstCard.id, true);
+    expect(setStudyCardSuspended).not.toHaveBeenCalled();
+    expect(setStudyCardMarked).not.toHaveBeenCalled();
+    return;
+  }
+  expect(setStudyCardMarked).toHaveBeenCalledTimes(2);
+  expect(setStudyCardMarked).toHaveBeenNthCalledWith(1, mockDatabase, firstCard.deck_id, firstCard.id, true);
+  expect(setStudyCardMarked).toHaveBeenNthCalledWith(2, mockDatabase, firstCard.deck_id, firstCard.id, true);
+  expect(setStudyCardSuspended).not.toHaveBeenCalled();
+  expect(setStudyCardBuried).not.toHaveBeenCalled();
+}
+
 describe("Flashcard session due-date editor characterization", () => {
   beforeEach(() => {
     jest.resetAllMocks();
@@ -655,4 +740,101 @@ describe("Flashcard session due-date editor characterization", () => {
       warnSpy.mockRestore();
     }
   });
+
+  it.each(directCardActionCases)(
+    "rejects and retries direct card actions through the real route for %s",
+    async (_label, language, isDark, phase, action) => {
+      configureSettings(language, isDark);
+      const s = language === "ar" ? strings.ar : strings.en;
+      const view = renderSession();
+      const failure = new Error(`${action} card action failed`);
+      const deferred = createDeferred<StudyCardRow>();
+      const retryResult = action === "mark" ? { ...firstCard, marked_at: new Date().toISOString() } : firstCard;
+      configureRejectedDirectAction(action, deferred, retryResult);
+      const expectedWarning: [string, Error] = ["[FlashcardSession] Card action failed:", failure];
+      const originalWarn = console.warn;
+      const warnSpy = jest.spyOn(console, "warn").mockImplementation((...args) => {
+        const isExpectedWarning =
+          args.length === expectedWarning.length && args.every((arg, index) => arg === expectedWarning[index]);
+        if (!isExpectedWarning) originalWarn(...args);
+      });
+
+      try {
+        try {
+          await openDirectCardAction(view, s, phase, action);
+          await waitFor(() =>
+            expect(view.getByRole("button", { name: s.cardActionsTitle }).props.accessibilityState.disabled).toBe(true),
+          );
+          fireEvent.press(view.getByRole("button", { name: s.cardActionsTitle }));
+          expect(setStudyCardSuspended).toHaveBeenCalledTimes(action === "suspend" ? 1 : 0);
+          expect(setStudyCardBuried).toHaveBeenCalledTimes(action === "bury" ? 1 : 0);
+          expect(setStudyCardMarked).toHaveBeenCalledTimes(action === "mark" ? 1 : 0);
+          deferred.reject(failure);
+          await act(async () => {
+            await deferred.promise.catch(() => undefined);
+          });
+
+          expect(view.queryByText(s.cardActionsTitle)).toBeNull();
+          expect(view.getByText(s.cardActionFailed)).toBeTruthy();
+          expect(view.getByText(firstCue)).toBeTruthy();
+          expect(view.queryByText(secondCue)).toBeNull();
+          if (phase === "front") {
+            expect(view.getByText(s.flashcardsReveal)).toBeTruthy();
+          } else {
+            expect(view.getAllByText(s.smartDeckTargetAyah).length).toBeGreaterThan(0);
+          }
+          expect(view.getByRole("button", { name: s.cardActionsTitle }).props.accessibilityState.disabled).toBe(false);
+          expect(hapticMedium).toHaveBeenCalledTimes(1);
+          expect(getDueCardsForReview).toHaveBeenCalledTimes(1);
+
+          fireEvent.press(view.getByRole("button", { name: s.cardActionsTitle }));
+          await waitFor(() => expect(view.getByText(s.cardActionsTitle)).toBeTruthy());
+          fireEvent.press(view.getByRole("button", { name: directCardActionLabel(s, action) }));
+          await waitFor(() => expect(view.queryByText(s.cardActionsTitle)).toBeNull());
+          await waitFor(() =>
+            expect(view.getByRole("button", { name: s.cardActionsTitle }).props.accessibilityState.disabled).toBe(
+              false,
+            ),
+          );
+          expectDirectCardActionCalls(action);
+          expect(hapticMedium).toHaveBeenCalledTimes(2);
+          expect(setStudyCardDueDate).not.toHaveBeenCalled();
+          expect(deleteStudyCard).not.toHaveBeenCalled();
+          expect(resetStudyCardProgress).not.toHaveBeenCalled();
+          expect(writeUserSetting).not.toHaveBeenCalled();
+          expect(deleteUserSetting).not.toHaveBeenCalled();
+          expect(computeReviewPoints).not.toHaveBeenCalled();
+          expect(insertStudyLog).not.toHaveBeenCalled();
+          expect(updateCard).not.toHaveBeenCalled();
+          expect(addTodayPoints).not.toHaveBeenCalled();
+          expect(recordAchievementEvent).not.toHaveBeenCalled();
+          expect(syncDailyScore).not.toHaveBeenCalled();
+          expect(updateProfileStats).not.toHaveBeenCalled();
+          expect(mockRouterReplace).not.toHaveBeenCalled();
+          expect(getNextEligibleReviewDate).not.toHaveBeenCalled();
+          expect(getWirdStatus).not.toHaveBeenCalled();
+          expect(view.queryByText(s.cardActionFailed)).toBeNull();
+
+          if (action === "mark") {
+            expect(view.getByText(firstCue)).toBeTruthy();
+            expect(view.queryByText(secondCue)).toBeNull();
+            fireEvent.press(view.getByRole("button", { name: s.cardActionsTitle }));
+            await waitFor(() => expect(view.getByText(s.cardActionsTitle)).toBeTruthy());
+            expect(view.getByRole("button", { name: s.cardUnmark })).toBeTruthy();
+          } else {
+            await waitFor(() => expect(view.getByText(secondCue)).toBeTruthy());
+            expect(view.queryByText(firstCue)).toBeNull();
+          }
+        } finally {
+          deferred.reject(failure);
+          await act(async () => {
+            await deferred.promise.catch(() => undefined);
+          });
+        }
+        expect(warnSpy.mock.calls).toEqual([expectedWarning]);
+      } finally {
+        warnSpy.mockRestore();
+      }
+    },
+  );
 });

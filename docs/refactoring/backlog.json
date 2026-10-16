@@ -3740,16 +3740,18 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "retry",
+      "status": "verified",
       "allowed_paths": [
         "app/flashcards/session.tsx",
         "tests/unit/session-due-date.test.tsx",
         "tests/e2e/session-action-errors.spec.ts"
       ],
-      "attempts": 1,
-      "started_at": "2026-10-16T22:53:15.142443+00:00",
-      "failure": "Independent review failed: [P2] tests/unit/session-due-date.test.tsx:798 omits required unrelated-action assertions. Add zero-call checks for deleteStudyCard, resetStudyCardProgress, writeUserSetting, deleteUserSetting and computeReviewPoints across all six cases. These mocked side effects could currently occur without failing the tests.; [P2] Changed-state visual acceptance is missing. verify-5.log covers route health and donor buttons, not card-action failures. RNTL dimensions do not verify visible layout. The controller should inspect a rejected-action state at 390x844 and record locale/theme, error visibility and unobstructed controls, as required by AGENTS.md for small UI changes.; The production relocation preserves handlers, styling, offline/native behavior and existing date tests. No untracked task files were found. Fresh typecheck, scoped ESLint, fixture Prettier and diff checks passed, with five existing lint warnings. Matching controller logs report 14 unit tests, web build and 30 browser tests passing. No files were changed; no manual or device verification was performed.",
-      "evidence": ".ralph/runs/RF-073-1-1792191195143410740"
+      "attempts": 2,
+      "started_at": "2026-10-16T23:05:38.354197+00:00",
+      "failure": "Batch resource limit reached",
+      "evidence": ".ralph/runs/RF-073-2-1792191938355128706",
+      "completed_at": "2026-10-16T23:08:49.614422+00:00",
+      "summary": "Implemented RF-073 within the three allowed files. Reused the existing sessionError/runCardAction/Text block and real route fixtures; no new abstraction or behavior source was added."
     },
     {
       "id": "RF-074",

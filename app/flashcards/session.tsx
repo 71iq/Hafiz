@@ -1017,6 +1017,15 @@ function FlashcardSessionScreen() {
         style={{ backgroundColor: withThemeOpacity(themeSurface, 0.95) }}
       >
         <View style={{ width: "100%", maxWidth }}>
+          {sessionError && (
+            <Text
+              className="mb-3 text-red-600 dark:text-red-400"
+              style={{ fontFamily: "Manrope_500Medium", fontSize: 13, textAlign: "center" }}
+            >
+              {sessionError}
+            </Text>
+          )}
+
           {phase === "front" && (
             <Button onPress={revealFirstSide} className="w-full">
               <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16, color: "#fff" }}>
@@ -1041,17 +1050,7 @@ function FlashcardSessionScreen() {
 
           {/* Grading: show directly after last side is revealed, or in grading phase */}
           {((phase === "side" && revealed && isLastSide) || phase === "grading") && (
-            <>
-              {sessionError && (
-                <Text
-                  className="mb-3 text-red-600 dark:text-red-400"
-                  style={{ fontFamily: "Manrope_500Medium", fontSize: 13, textAlign: "center" }}
-                >
-                  {sessionError}
-                </Text>
-              )}
-              <GradingButtons onGrade={handleGrade} previews={gradePreviews} isDark={isDark} s={s} disabled={gradingBusy} />
-            </>
+            <GradingButtons onGrade={handleGrade} previews={gradePreviews} isDark={isDark} s={s} disabled={gradingBusy} />
           )}
         </View>
       </View>
