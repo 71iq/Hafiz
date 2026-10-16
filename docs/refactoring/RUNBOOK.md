@@ -69,3 +69,11 @@ RF-067 changes only package.json; the controller resolves package-lock.json and 
 This Ubuntu host uses the installed Chrome channel. The smoke command sets CI=1, PLAYWRIGHT_CHROMIUM_CHANNEL=chrome, PLAYWRIGHT_PORT=8193 and PLAYWRIGHT_BASE_URL=http://127.0.0.1:8193. CI requires a fresh server. PLAYWRIGHT_CHROMIUM_CHANNEL is optional; existing behavior stays unchanged when absent. A bundled Chromium download failed on ubuntu26.04-x64. Do not replace the user's Chrome installation.
 
 The Android command compiles debug only with JDK 21 and SDK 36. Keep existing time/retry limits and inspect real Gradle children and locks after any termination. iOS builds, device installation, production and deployment remain outside this slice. RF-008 still owns remaining full-project diagnostics.
+
+## Android memory recovery
+
+The first RF-067 native pass reached the 6 GiB systemd limit and ended with oom-kill. It passed all fourteen earlier gates. Gradle's two-worker setting did not constrain Ninja's separate compiler jobs. The actual AGP 8.13 model invokes Ninja without a job flag. No source compile failure was reported.
+
+`python3 scripts/ralph/build-android-debug.py` now selects the first two CPUs allowed by Linux process affinity, uses one Gradle worker and execs the real assembleDebug command with JDK 21/SDK 36. All configured ABIs remain. The actual installed Ninja probe observed 12 parallel harmless jobs normally and three with two-CPU affinity. Evidence .refactor-baseline/ninja-affinity-probe/results.json. No native project, signing configuration, memory cap or deadline changed.
+
+The kernel resource interruption is retained under RF-067 resource_failures and does not spend an implementation retry. The earlier handoff failure still counts. A fresh generation is required because installation changed the lock; fresh controller gates and independent review remain mandatory. Inspect real locks and Gradle children before resuming.

@@ -2966,6 +2966,7 @@
         "RF-013"
       ],
       "acceptance_criteria": [
+        "Generator handoff: report status implemented once the selected manifest diff and static checks are complete, while explicitly listing controller-owned checks as pending. Implemented is not verified or accepted. Do not report blocked merely because installation, tests or Android checks must be run later by the controller. JDK 21, SDK 36, debug keystore and installed Chrome are already available; root installation is forbidden to the generator by design. Report blocked only for an actual unresolved implementation or infrastructure problem, with concrete evidence.",
         "Read SDK55_ALIGNMENT.md. The primary engineer selects exactly its 18 manifest ranges: the original 17 candidate targets plus devDependency babel-preset-expo ~55.0.25. Remove dependencies.expo-modules-core, whose owner is Expo. No new Metro runtime declaration, DOM type dependency, renderer pin, peer override, npm version field, install exclusion or other manifest change. Keep all scripts, existing overrides and other direct dependency ranges unchanged.",
         "Generator edits package.json only and never installs packages or edits package-lock.json. The controller owns lock resolution and native patch application. Existing native/app/test/config source, signing material, assets and backend stay unchanged. package-lock.json is an allowed controller output only.",
         "Use the existing default npm resolution policy without force, legacy-peer-deps or an explicit disabling flag. Then run a strict reinstall and full installed npm dependency graph validation. Both must pass. The isolated preflight's resolved lock passes both with no subsequent lock changes. These gates inspect the actual selected graph rather than stopping at speculative absent optional-peer candidates.",
@@ -2974,7 +2975,8 @@
         "With lifecycle scripts disabled, explicitly run the existing RN Gradle fix and patch-package --error-on-fail. The current CSS interop patch remains unchanged. Do not approve or run Supabase installation/deployment scripts or touch credentials. Never generate or replace a signing key; the isolated debug keystore already exists.",
         "Require check-expo-native.cjs to pass on both Android and iOS dependency graphs with no direct core declaration or duplicate modules. Require the security dependency probe, critical audit and targeted Expo version check for all 18 selected packages. Full-project ESLint-preset and committed-native diagnostic debt remains RF-008 work, not an exclusion or a false success.",
         "Require strict TypeScript, full ESLint with no errors, the full unit suite, production static export, all existing 28 browser smoke tests and Android assembleDebug using the documented JDK 21/SDK 36. Browser checks use installed Chrome, CI=1, an explicit loopback URL and a fresh test server. Do not install APKs, clear device data or claim native runtime/iOS build checks.",
-        "Independent evaluator must inspect the entire manifest/lock diff, actual controller output and reuse/preserved safety boundaries. No task is verified from the generator report alone. Main engineer retains package/security decisions and final acceptance. Preserve failed work and obey existing attempt, session, batch and writer limits."
+        "Independent evaluator must inspect the entire manifest/lock diff, actual controller output and reuse/preserved safety boundaries. No task is verified from the generator report alone. Main engineer retains package/security decisions and final acceptance. Preserve failed work and obey existing attempt, session, batch and writer limits.",
+        "Primary resource recovery: the first Android pass hit the enforced 6G OOM limit after fourteen successful gates. build-android-debug.py limits process affinity to two allowed CPUs and Gradle to one worker so installed Ninja also reduces jobs. It keeps all configured ABIs, JDK21/SDK36, debug-only compilation and existing RAM/time limits. Generator may not edit this helper. Resource termination is recorded separately from implementation retries; the earlier ordinary handoff failure still counts."
       ],
       "verification": [
         [
@@ -3073,25 +3075,33 @@
           "tests/e2e/smoke.spec.ts"
         ],
         [
-          "env",
-          "JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64",
-          "ANDROID_HOME=/home/ehab/Android/Sdk",
-          "./android/gradlew",
-          "-p",
-          "android",
-          ":app:assembleDebug",
-          "--no-daemon",
-          "--max-workers=2"
+          "python3",
+          "scripts/ralph/build-android-debug.py"
         ]
       ],
       "risk": "high",
       "approved": true,
-      "status": "pending",
+      "status": "retry",
       "allowed_paths": [
         "package.json",
         "package-lock.json"
       ],
-      "attempts": 0
+      "attempts": 1,
+      "started_at": "2026-10-16T05:43:55.371186+00:00",
+      "failure": "Process interrupted. Resume preserves the current task and diff.",
+      "evidence": ".ralph/runs/RF-067-2-1792129435372114039",
+      "recovery_note": "Attempt one implemented the exact selected manifest but returned blocked solely because controller-owned checks were pending. Primary compared the complete preserved manifest to the passing preflight and confirmed the lock is unchanged. Clarified handoff before the second and final allowed attempt. Original failure and evidence are retained; no retry reset. The subsequent controller run passed fourteen gates, then systemd recorded an OOM-kill at 6G during native compilation. Primary diagnosed unbounded Ninja concurrency using the installed AGP model and an actual Ninja probe. Refunded only that resource interruption, attempts2 to1, matching the documented resource policy. No implementation retry or raw evidence was erased; all gates will run fresh with bounded native concurrency.",
+      "resource_failures": [
+        {
+          "at": "2026-10-16T05:57:28.076462+00:00",
+          "evidence": ".ralph/runs/RF-067-2-1792129435372114039",
+          "controller_error": "Process interrupted. Resume preserves the current task and diff.",
+          "diagnosis": "systemd run-p2873476-i2891792.scope reported kernel oom-kill and 6G peak. All fourteen prior gates passed; native Ninja had no job limit. No source compile error or unsupported API was reported.",
+          "attempts_before": 2,
+          "attempts_after": 1,
+          "repair": "Two-CPU process affinity and one Gradle worker, preserving all ABIs, 6G RAM and 900-second command limits. Installed Ninja probe shows peak jobs 12 to 3."
+        }
+      ]
     }
   ]
 }

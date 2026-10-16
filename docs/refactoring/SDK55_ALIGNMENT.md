@@ -68,3 +68,7 @@ The bundled Chromium installer rejects this host as unsupported ubuntu26.04-x64.
 The pre-upgrade smoke command passed all 28 tests in 39 seconds at 390 by 844, including the Arabic dark-theme verse deep link. It used installed Chrome, CI=1 and the explicit loopback URL/port from RF-067. Evidence .refactor-baseline/rf067-browser-before-sdk.json. These are desktop browser checks with a phone viewport, not physical-device tests. RF-067 reruns them after installation and web export.
 
 Android verification uses the existing debug keystore, JDK 21 and SDK 36 with assembleDebug only. Never install the APK, clear device state, generate signing material or regenerate the native project. Keep the 900-second per-check limit. If a native timeout occurs, inspect actual Gradle/Java children and writer leases before resuming. iOS compilation remains unavailable on this Linux host.
+
+## Android memory recovery
+
+The first native gate reached the 6 GiB limit after fourteen passing gates. RF-067 records the kernel OOM failure and resource retry adjustment. [RUNBOOK.md](RUNBOOK.md#android-memory-recovery) owns the measured Ninja-concurrency diagnosis and the bounded build-android-debug.py command. All configured ABIs, original memory/time limits and independent acceptance gates remain. Native success is still pending.
