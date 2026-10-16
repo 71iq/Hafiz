@@ -601,7 +601,15 @@
       "failure": "Batch resource limit reached",
       "completed_at": "2026-10-16T05:22:39.287144+00:00",
       "evidence": ".ralph/runs/RF-013-1-1792128044892281805",
-      "summary": "Repaired ayah-marker hydration and added behavioral coverage. Persisted exact false/true values now hydrate correctly; absent or malformed values retain true. No commit or push performed."
+      "summary": "Repaired ayah-marker hydration and added behavioral coverage. Persisted exact false/true values now hydrate correctly; absent or malformed values retain true. No commit or push performed.",
+      "primary_acceptance": {
+        "accepted_at": "2026-10-16T05:26:30.746312+00:00",
+        "application_commit": "8cc5fea",
+        "verification": ".refactor-baseline/rf013-primary-verification.json",
+        "mock_wiring_controls": ".refactor-baseline/rf013-mock-wiring-results.json",
+        "supplemental_review": ".refactor-baseline/rf013-primary-review.json",
+        "platform_limits": "RNTL simulates web and Android. No browser, physical-device or iOS runtime check ran."
+      }
     },
     {
       "id": "RF-014",

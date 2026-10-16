@@ -21,7 +21,7 @@ type SettingsFixture = {
 };
 
 const mockSetColorScheme = jest.fn<void, [string]>();
-const mockImportTranslation = jest.fn<Promise<void>, [string, string]>(() => Promise.resolve());
+const mockImportTranslation = jest.fn<Promise<void>, [unknown, string]>(() => Promise.resolve());
 const mockEnqueueSync = jest.fn<Promise<void>, [unknown, ...unknown[]]>(() => Promise.resolve());
 const mockUseDatabase = jest.fn<SettingsFixture, []>();
 const originalWindowDescriptor = Object.getOwnPropertyDescriptor(globalThis, "window");
@@ -37,11 +37,11 @@ jest.mock("@/lib/database/provider", () => ({
 }));
 
 jest.mock("@/lib/translations/import", () => ({
-  importTranslation: mockImportTranslation,
+  importTranslation: (...args: Parameters<typeof mockImportTranslation>) => mockImportTranslation(...args),
 }));
 
 jest.mock("@/lib/database/sync-queue", () => ({
-  enqueueSync: mockEnqueueSync,
+  enqueueSync: (...args: Parameters<typeof mockEnqueueSync>) => mockEnqueueSync(...args),
 }));
 
 function createFixture(savedAyahMarkers?: string): SettingsFixture {
@@ -109,14 +109,17 @@ describe("settings ayah-marker hydration", () => {
     }
   });
 
-  it.each(["web", "android"] as const)("keeps the true default when the saved value is absent on %s", async (platform) => {
-    jest.replaceProperty(Platform, "OS", platform);
-    const fixture = createFixture();
-    const { result } = await renderLoadedSettings(fixture);
+  it.each(["web", "android"] as const)(
+    "keeps the true default when the saved value is absent on %s",
+    async (platform) => {
+      jest.replaceProperty(Platform, "OS", platform);
+      const fixture = createFixture();
+      const { result } = await renderLoadedSettings(fixture);
 
-    expect(result.current.showAyahMarkers).toBe(true);
-    expect(fixture.getAllAsync.mock.calls[0]?.[1]).toContain("show_ayah_markers");
-  });
+      expect(result.current.showAyahMarkers).toBe(true);
+      expect(fixture.getAllAsync.mock.calls[0]?.[1]).toContain("show_ayah_markers");
+    },
+  );
 
   it.each(["web", "android"] as const)("hydrates saved true on %s", async (platform) => {
     jest.replaceProperty(Platform, "OS", platform);
