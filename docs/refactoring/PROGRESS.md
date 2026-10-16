@@ -87,3 +87,7 @@ The mission is active. This file records durable events; backlog.json owns task 
 - 2026-10-16. Prepared RF-066 as a test-only prerequisite for RF-057. Reuse plan: test the actual useAuthDarkMode export and OAuthButtons component using existing RNTL, startup-language global fixtures and RTL style utilities. The two local theme helpers share cache interpretation, but only OAuthButtons checks dark document backgrounds on missing/unknown cache. Both bypass that fallback for cached system when matchMedia is absent. The settings cache helper normalizes legacy light to beige and defaults to system, so it has a different contract. No new production abstraction is selected yet. RF-057 remains unapproved until characterization and primary interface review. The backlog now has 66 items, eight verified.
 
 - 2026-10-16. Independent preparation review found no blocking findings in RF-054 acceptance or RF-066 readiness. Backlog identity/dependency/readiness checks, documentation formatting and git diff checks passed. No application checks were rerun for these two documentation/backlog updates. The bounded Ralph batch is finished and RF-066 awaits the next supervisor run.
+
+- 2026-10-16T01:52:54.333772+00:00 `RF-066` retry. Batch resource limit reached; preserved work will be reverified on resume.
+
+- 2026-10-16T02:06:19.079817+00:00 `RF-066` verified. Added RF-066 characterization tests in tests/unit/auth-startup-theme.test.tsx only. Preserved the unrelated backlog edit and did not commit or push. Evidence `.ralph/runs/RF-066-1-1792116273451544817`.

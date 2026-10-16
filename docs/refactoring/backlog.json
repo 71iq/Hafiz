@@ -2887,11 +2887,16 @@
       ],
       "risk": "low",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "tests/unit/auth-startup-theme.test.tsx"
       ],
-      "attempts": 0
+      "attempts": 1,
+      "started_at": "2026-10-16T02:04:33.450789+00:00",
+      "failure": "Batch resource limit reached",
+      "completed_at": "2026-10-16T02:06:19.079113+00:00",
+      "evidence": ".ralph/runs/RF-066-1-1792116273451544817",
+      "summary": "Added RF-066 characterization tests in tests/unit/auth-startup-theme.test.tsx only. Preserved the unrelated backlog edit and did not commit or push."
     }
   ]
 }
