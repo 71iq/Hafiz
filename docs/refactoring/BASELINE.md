@@ -62,3 +62,7 @@ The Android times compare different cache states, not runtime performance. The n
 ## Test isolation after RF-068, 2026-10-16
 
 The full unit suite passes63suites333tests with normal process exit, versus62suites322tests after RF-067. All five focused controller commands and separate evaluation pass. The six leaderboard open-handle diagnostic tests also exit normally. This test-only slice adds no application behavior, browser/native/device/iOS verification or new duplication measurement. Existing frozen captures above remain intact. Evidence .refactor-baseline/rf068-unit-full.json and rf068-primary-acceptance.json.
+
+## Comparison after RF-053, 2026-10-16
+
+The shared account-sync row passed all six controller checks, including15 unchanged route/registry tests, strict types, scoped lint, new-file format, web export and28 Chrome smoke tests. Independent Astra review and primary hash/diff acceptance pass. The same duplication configuration now reports28 groups,628 lines and1.1894percent across180 sources and52,798 lines. The immediately preceding RF-057 scan reported29 groups and669 lines. The original capture remains31 groups and707 lines. Snapshot .refactor-baseline/jscpd-after-rf053/jscpd-report.json. Acceptance .refactor-baseline/rf053-primary-acceptance.json. The full333-test suite was last run for RF-068; it was not repeated for this bounded extraction. No Android/iOS build or physical-device check ran for RF-053.

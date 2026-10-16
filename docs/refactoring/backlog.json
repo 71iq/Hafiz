@@ -2372,7 +2372,12 @@
         }
       ],
       "completed_at": "2026-10-16T16:33:10.762100+00:00",
-      "summary": "RF-053 is implemented in the approved four paths. The shared component owns only the identical controlled row; Progress retains its Card wrapper and Leaderboard retains its tinted wrapper. No tests, AuthGate, Button, or Card were changed. No commit or push performed."
+      "summary": "RF-053 is implemented in the approved four paths. The shared component owns only the identical controlled row; Progress retains its Card wrapper and Leaderboard retains its tinted wrapper. No tests, AuthGate, Button, or Card were changed. No commit or push performed.",
+      "primary_acceptance": {
+        "evidence": ".refactor-baseline/rf053-primary-acceptance.json",
+        "commit": "bb6e978089e56023692d42ad66fc8290b34224e6",
+        "accepted": true
+      }
     },
     {
       "id": "RF-054",
