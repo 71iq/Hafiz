@@ -3856,21 +3856,20 @@
     {
       "id": "RF-076",
       "title": "Stabilize the session fixture with a fresh Jest cache",
-      "description": "Diagnose the first session case exceeding its existing five-second deadline during cold native-module initialization, then make the smallest test-environment repair.",
-      "rationale": "The first session case timed out in initial RF-071 verification and again with a new primary Jest mapper during RF-073 negative verification. Warm runs pass. The cold failure remains evidence and needs diagnosis before extending this fixture further.",
+      "description": "Resolve the actual public Native Modal reference during fixture-module setup, keeping cold native initialization out of the individual asynchronous scenario deadline.",
+      "rationale": "Primary cold profiling reproduces the unchanged first-case deadline failure, with4165ms spent before initial render returns. Resolving the same Modal reference in module setup makes the targeted scenario finish in2667ms and all11 actual route cases pass in a fresh-cache proposal, first case2551ms. This is test-environment initialization, not an application performance claim.",
       "modules": [
         "tests/unit/session-due-date.test.tsx",
-        "tests/jest/setup.ts",
-        "jest.config.js",
-        "components/ui/ResponsiveOverlay.tsx"
+        ".refactor-baseline/rf076-readiness.json"
       ],
       "dependencies": [
         "RF-073"
       ],
       "acceptance_criteria": [
-        "Before approval profile a disposable cold-cache run and distinguish Babel/native-module initialization from actual asynchronous behavior. Reproduce without deleting existing caches or changing production source.",
-        "Prefer an exact public native-module setup correction when supported by measurements. Do not increase deadlines, skip assertions, replace the actual route/controls/overlays, suppress unexpected errors, change production behavior or weaken the accepted tests to obtain green output.",
-        "Primary must finalize the minimal file scope and fresh-cache commands from evidence. Require two distinct cold-cache verification runs plus normal focused/full tests as justified, independent review and final primary acceptance."
+        "Read .refactor-baseline/rf076-readiness.json and retained profile/proposal logs. Reuse the actual public ReactNative.Modal already required by getDateEditorModal. Add one module-scope const NativeModal = ReactNative.Modal after imports and use that value in the existing ancestor type comparison. A short comment may explain eager module setup. Do not render anything or change state at module scope.",
+        "The only tracked edit is that eager reference/comparator in tests/unit/session-due-date.test.tsx. Keep all11 test cases, assertions, native/provider/service mocks, warning/deferred cleanup, original5000ms default, source imports, direction/theme fixtures and actual route/controls/overlay behavior unchanged. No deadlines, timer changes, test skipping, UI replacement, new helpers/dependencies/config or production change. Do not copy instrumentation, CPU flags, temporary aliases, environment switches or filtered-test commands from the diagnostic artifacts into the real fixture.",
+        "Run both frozen no-cache commands in separate disposable cache directories, with every session case enabled and no deadline increase. --no-cache ensures every invocation transforms afresh even if a prior iteration used those directories; never delete user or existing caches. Both cold runs and the normal full unit suite must pass with normal exit and zero skipped tests. Run the remaining frozen type/lint/format commands.",
+        "Require new independent Astra review of the exact fixture-only diff and fresh cold-run evidence. Total CLI initialization time may remain similar; claim only stable complete verification under the existing deadline. Browser/build/native/device/iOS checks are unnecessary because no application code changes, and none may be claimed. Primary retains final acceptance."
       ],
       "verification": [
         [
@@ -3880,16 +3879,45 @@
           "--",
           "--runTestsByPath",
           "tests/unit/session-due-date.test.tsx",
+          "--detectOpenHandles",
+          "--no-cache",
+          "--cacheDirectory=.refactor-baseline/rf076-gate-cold-a"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/session-due-date.test.tsx",
+          "--detectOpenHandles",
+          "--no-cache",
+          "--cacheDirectory=.refactor-baseline/rf076-gate-cold-b"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
           "--detectOpenHandles"
         ],
         [
           "npm",
           "run",
           "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "tests/unit/session-due-date.test.tsx"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "tests/unit/session-due-date.test.tsx"
         ]
       ],
       "risk": "medium",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
         "tests/unit/session-due-date.test.tsx"
