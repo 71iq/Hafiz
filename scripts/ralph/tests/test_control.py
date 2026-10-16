@@ -164,6 +164,80 @@ class IterationTests(unittest.TestCase):
         self.assertEqual(self.current_task()['attempts'], 0)
         self.assertEqual((self.root / 'fixture.txt').read_text(), 'after\n')
 
+    def test_command_timeout_preserves_generation_and_reruns_checks_before_review(self):
+        config = control.read_json(self.config)
+        config['session_seconds'] = 0.3
+        control.write_json(self.config, config)
+        backlog = control.read_json(self.backlog)
+        backlog['tasks'][0]['verification'] = [
+            [sys.executable, '-c',
+             'from pathlib import Path; '
+             'p=Path(".ralph/check-runs"); '
+             'p.write_text((p.read_text() if p.exists() else "") + "ran\\n")'],
+            [sys.executable, '-c',
+             'from pathlib import Path; import time; '
+             'p=Path(".ralph/slow-once"); first=not p.exists(); '
+             'p.touch(); time.sleep(2 if first else 0)'],
+        ]
+        control.write_json(self.backlog, backlog)
+        self.git('add', '.')
+        self.git('commit', '-qm', 'timeout verification fixture')
+        head = self.git('rev-parse', 'HEAD')
+
+        def run_agent(*args, **kwargs):
+            return {'verdict': 'pass', 'findings': []} if kwargs.get('readonly') else self.generate()
+
+        with patch('sys.stdin.read', return_value='prompt'), patch.object(control, 'agent', side_effect=run_agent) as agent:
+            control.iteration()
+            self.assertEqual(agent.call_count, 1)
+            self.assertEqual(self.current_task()['status'], 'retry')
+            self.assertEqual(self.current_task()['attempts'], 0)
+            self.assertEqual(self.current_task()['resource_timeouts'], 1)
+            self.assertIn('Time limit 0.3s exceeded', self.current_task()['failure'])
+            self.assertEqual(self.git('rev-parse', 'HEAD'), head)
+            self.assertEqual((self.root / 'fixture.txt').read_text(), 'after\n')
+            self.assertIsNotNone(control.generation_checkpoint(self.current_task()))
+            self.assertIsNone(control.CHILD)
+            self.assertEqual((self.state / 'check-runs').read_text(), 'ran\n')
+            interrupted = next((self.state / 'runs').iterdir())
+            self.assertEqual([entry['exit'] for entry in control.read_json(interrupted / 'verification.json')], [0])
+
+            control.write_json(self.state / 'batch.json', {'started_epoch': control.time.time(), 'tokens': 0})
+            control.iteration()
+
+        self.assertEqual(agent.call_count, 2)
+        self.assertTrue(agent.call_args.kwargs['readonly'])
+        self.assertEqual((self.state / 'check-runs').read_text(), 'ran\nran\n')
+        self.assertEqual(self.current_task()['status'], 'verified')
+        evidence = self.root / self.current_task()['evidence']
+        self.assertEqual([entry['exit'] for entry in control.read_json(evidence / 'verification.json')], [0, 0])
+
+    def test_repeated_command_timeouts_block_without_spending_implementation_attempts(self):
+        config = control.read_json(self.config)
+        config.update({'session_seconds': 0.3, 'max_resource_timeouts': 2})
+        control.write_json(self.config, config)
+        backlog = control.read_json(self.backlog)
+        backlog['tasks'][0]['verification'] = [[sys.executable, '-c', 'import time; time.sleep(2)']]
+        control.write_json(self.backlog, backlog)
+        self.git('add', '.')
+        self.git('commit', '-qm', 'repeated timeout fixture')
+        head = self.git('rev-parse', 'HEAD')
+        with patch('sys.stdin.read', return_value='prompt'), patch.object(control, 'agent', side_effect=self.generate) as agent:
+            for count, expected in [(1, 'retry'), (2, 'blocked')]:
+                control.write_json(self.state / 'batch.json', {'started_epoch': control.time.time(), 'tokens': 0})
+                control.iteration()
+                self.assertEqual(self.current_task()['status'], expected)
+                self.assertEqual(self.current_task()['resource_timeouts'], count)
+                self.assertEqual(self.current_task()['attempts'], 0)
+                self.assertEqual(self.git('rev-parse', 'HEAD'), head)
+                self.assertTrue((self.state / 'generation-checkpoint.json').exists())
+                if expected == 'retry':
+                    self.assertIsNotNone(control.generation_checkpoint(self.current_task()))
+                else:
+                    self.assertIsNone(control.generation_checkpoint(self.current_task()))
+        self.assertEqual(agent.call_count, 1)
+        self.assertTrue(control.STOP.exists())
+
     def exhaust_after_generation(self):
         def generate(*_args, **_kwargs):
             result = self.generate()

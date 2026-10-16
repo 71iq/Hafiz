@@ -28,6 +28,10 @@ class BatchLimit(RuntimeError):
     pass
 
 
+class CommandTimeout(BatchLimit):
+    pass
+
+
 class InvariantError(RuntimeError):
     pass
 
@@ -107,7 +111,7 @@ def path_allowed(path, task):
 
 
 def generation_identity(task):
-    runtime = {'status', 'attempts', 'started_at', 'completed_at', 'failure', 'evidence', 'summary'}
+    runtime = {'status', 'attempts', 'resource_timeouts', 'started_at', 'completed_at', 'failure', 'evidence', 'summary'}
     specification = {k: v for k, v in task.items() if k not in runtime}
     owned = {'docs/refactoring/backlog.json', 'docs/refactoring/PROGRESS.md'}
     paths = [p for p in changed_paths() if p not in owned]
@@ -195,7 +199,7 @@ def run_process(argv, logfile, timeout, stdin=None, env=None):
             except subprocess.TimeoutExpired:
                 os.killpg(CHILD.pid, signal.SIGKILL)
                 CHILD.wait()
-            raise RuntimeError(f'Time limit {timeout}s exceeded; see {logfile.relative_to(ROOT)}')
+            raise CommandTimeout(f'Time limit {timeout}s exceeded; see {logfile.relative_to(ROOT)}')
         finally:
             CHILD = None
 
@@ -289,8 +293,8 @@ def verify_commands(task, directory, config):
         logfile = directory / f'verify-{index}.log'
         code = run_process(command, logfile, remaining_seconds(config))
         evidence.append({'argv': command, 'exit': code, 'log': str(logfile.relative_to(ROOT))})
+        write_json(directory / 'verification.json', evidence)
         if code:
-            write_json(directory / 'verification.json', evidence)
             raise RuntimeError(f'Verification failed: {command}; see {logfile.relative_to(ROOT)}')
     write_json(directory / 'verification.json', evidence)
 
@@ -422,9 +426,13 @@ def iteration():
     except BatchLimit as error:
         task['attempts'] -= 1
         task['status'] = 'retry'
+        if isinstance(error, CommandTimeout):
+            task['resource_timeouts'] = task.get('resource_timeouts', 0) + 1
+            if task['resource_timeouts'] >= config.get('max_resource_timeouts', 2):
+                task['status'] = 'blocked'
         task['failure'] = str(error)
         write_json(BACKLOG, backlog)
-        document_progress(task, 'Batch resource limit reached; preserved work will be reverified on resume.')
+        document_progress(task, f'{error}. Preserved work will be reverified on resume.')
         stop(str(error))
         print(str(error))
         return
