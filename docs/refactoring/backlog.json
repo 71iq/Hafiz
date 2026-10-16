@@ -3483,24 +3483,34 @@
     {
       "id": "RF-071",
       "title": "Restore default accessibility semantics in shared Button",
-      "description": "Investigate and repair missing default button role in the existing shared primitive, preserving caller overrides and asChild semantics.",
-      "rationale": "RF-069 real-tree tests could not select text buttons by button role and needed an ancestor helper. components/ui/Button.tsx forwards Pressable props without a default role. Record this existing accessibility gap as a separate source task instead of changing it during date-editor characterization.",
+      "description": "Give ordinary shared Button controls a default accessibilityRole while preserving explicit native role props and real Slot child ownership. Add native behavioral and actual web keyboard regressions.",
+      "rationale": "Primary native preflight fails only the missing default button role, while actual Slot child-link and child-before-parent handlers pass. The real settings donor footer likewise has tabindex but no role. Reuse the existing Button and installed Slot; avoid a new control or unrelated ref/style cleanup.",
       "modules": [
         "components/ui/Button.tsx",
+        "jest.config.js",
+        "tests/jest/setup.ts",
         "tests/unit/button-accessibility.test.tsx",
-        "tests/unit/rtl-higher-level-component-contracts.test.tsx",
-        "tests/unit/deck-cards-due-date.test.tsx",
-        "tests/jest/setup.ts"
+        "tests/e2e/button-accessibility.spec.ts",
+        "tests/e2e/helpers.ts",
+        "app/(tabs)/settings.tsx",
+        "lib/ui/direction.tsx",
+        "node_modules/@rn-primitives/slot/dist/index.js",
+        "node_modules/react-native/ReactCommon/react/renderer/components/view/AccessibilityProps.cpp",
+        "node_modules/react-native-web/dist/modules/AccessibilityUtil/propsToAriaRole.js"
       ],
       "dependencies": [
         "RF-006",
-        "RF-069"
+        "RF-069",
+        "RF-055"
       ],
       "acceptance_criteria": [
-        "Before approval, verify current native role/accessibilityRole and asChild prop precedence against installed RN/slot implementations and an actual rendered failing test. No current Button asChild consumer exists, but its public contract must be preserved. Primary chooses exact semantics and evidence.",
-        "Use the existing Button. Ordinary controls must expose the appropriate default button role and label, disabled state and press behavior. Preserve explicit caller role overrides, child/link semantics, refs, variants, layout, RTL and native/web interaction. Do not combine the existing forwardRef any cleanup or style casts from RF-043 with this semantic fix.",
-        "Add focused behavioral tests for label/children, disabled/press, explicit overrides and asChild. Keep unrelated source/tests/dependencies unchanged. Review actual Slot behavior rather than accepting the global test stand-in as proof of child prop merging.",
-        "Scoped tests/typecheck/lint, production web export, relevant route/RTL regressions and independent evaluation are required. Native/browser checks and exact allowed scope must be finalized before approval."
+        "Read primary preflight evidence .refactor-baseline/button-accessibility-preflight.json/.log and button-accessibility-browser-preflight.json. At HEAD268fb53 native ordinary Button role lookup fails, actual Slot child-link/handler ordering passes, and real donor footer has zero text-bearing button-role matches. Installed RN and RN web give role precedence over accessibilityRole; actual Slot gives child props precedence for matching keys and invokes child handler before parent. These are primary-approved semantics, not permission to redesign the primitive.",
+        "Reuse and extend only existing Button. Destructure accessibilityRole and pass accessibilityRole={accessibilityRole ?? (asChild ? undefined : \"button\")} before the unchanged remaining-props spread. Leave role in remaining props so explicit role retains native precedence. Add no default role for asChild. Preserve explicit accessibilityRole including none, all child-owned role/label/handlers, disabled and accessible behavior, refs, variants, RTL, styles, dimensions and children/label fallback. Do not touch existing forwardRef any or ViewStyle cast debt from RF-043; no new casts, any, suppressions or dependencies.",
+        "Add tests/unit/button-accessibility.test.tsx with actual Button/Pressable/Text/DirectionProvider. Explicitly jest.unmock the installed Slot in this file; never use the global View stand-in as Slot proof. Test default label and custom text children, Arabic RTL accessible naming, enabled and disabled presses/states, explicit accessibilityRole override, explicit role precedence when both props are provided, and actual asChild child link/label/child-before-parent callbacks. Also verify asChild with no role retains no default button role, and parent explicit accessibilityRole forwards when the child has none. Retain public child props. Do not add state, redundant test wrappers or snapshot/source-spelling tests.",
+        "The installed Slot package contains JSX in its distributed JS and current Expo preset ignores it. In jest.config.js derive transformIgnorePatterns from require(\"jest-expo/jest-preset\").transformIgnorePatterns, inserting only @rn-primitives/slot into the existing node_modules transform allowlist via each pattern.replace(\"react-native|\", \"@rn-primitives/slot|react-native|\"). Preserve every other preset regex and existing config field. No global setup mock edits, blanket node_modules transform or unrelated test/config change. Primary preflight verified this exact adaptation with the actual installed Slot.",
+        "Add tests/e2e/button-accessibility.spec.ts using existing Playwright config/helpers and actual static app. For Enter and Space, use a fresh default English browser context at the existing390x844 smoke project, waitForQaReady, visit /settings?category=about, open Become a Donor, select the footer by getByRole(\"button\", {name:\"Close\", exact:true}).filter({hasText:\"Close\"}), focus and activate with locator.press. Assert the footer and modal message disappear and the underlying settings remains healthy. Excluding the icon-only header close through hasText is required. No force clicks, synthetic dispatchEvent, QA route, component replacement, service credentials or production writes. Keep browser networking controller-owned outside generator sandbox.",
+        "Observe the new default-role native test failing before the minimal production change and passing afterward; preserve ordered red/green evidence. Existing tests remain read-only. The primary native/browser preflight is additional evidence and does not replace new regression tests. Run all six frozen controller commands. Full unit suite is required because Button and Jest transform configuration are shared. Scoped lint must add no warning. Prettier applies to new tests and the small Jest config, not legacy Button formatting.",
+        "New independent Astra evaluation must inspect actual Slot behavior, role precedence, disabled interactions, source scope, red/green and controller results. Main retains final acceptance. No physical-device, Android or iOS run is claimed for this semantic slice. Surface failures instead of weakening roles, test helpers or existing assertions."
       ],
       "verification": [
         [
@@ -3508,10 +3518,7 @@
           "run",
           "test:unit",
           "--",
-          "--runTestsByPath",
-          "tests/unit/button-accessibility.test.tsx",
-          "tests/unit/rtl-higher-level-component-contracts.test.tsx",
-          "tests/unit/deck-cards-due-date.test.tsx"
+          "--detectOpenHandles"
         ],
         [
           "npm",
@@ -3519,17 +3526,45 @@
           "typecheck"
         ],
         [
+          "node_modules/.bin/eslint",
+          "components/ui/Button.tsx",
+          "jest.config.js",
+          "tests/unit/button-accessibility.test.tsx",
+          "tests/e2e/button-accessibility.spec.ts"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "jest.config.js",
+          "tests/unit/button-accessibility.test.tsx",
+          "tests/e2e/button-accessibility.spec.ts"
+        ],
+        [
           "npm",
           "run",
           "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8193",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8193",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts",
+          "tests/e2e/button-accessibility.spec.ts"
         ]
       ],
       "risk": "medium",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
         "components/ui/Button.tsx",
-        "tests/unit/button-accessibility.test.tsx"
+        "jest.config.js",
+        "tests/unit/button-accessibility.test.tsx",
+        "tests/e2e/button-accessibility.spec.ts"
       ],
       "attempts": 0
     },
