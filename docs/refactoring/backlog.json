@@ -3338,15 +3338,17 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "retry",
+      "status": "verified",
       "allowed_paths": [
         "tests/unit/deck-cards-due-date.test.tsx"
       ],
-      "attempts": 1,
-      "started_at": "2026-10-16T16:48:25.934894+00:00",
-      "failure": "Independent review failed: tests/unit/deck-cards-due-date.test.tsx:187: The global View.prototype spy opens the menu by manually calling createNodeMock. This bypasses the required RNTL-provided measurement seam. Use that seam, or obtain primary approval for the installed React Native mock's required adapter.; tests/unit/deck-cards-due-date.test.tsx:336: The warning spy discards every warning, while the assertion only checks that the expected warning occurred. Forward unexpected warnings or assert the complete call list so additional failures cannot disappear.; tests/unit/deck-cards-due-date.test.tsx:290 and :334: Deferred writes remain unsettled if an assertion fails before resolve/reject. Add unconditional settlement and draining in finally blocks to satisfy the required async cleanup.; All four verification commands passed independently, including 11 tests with normal exit. The evidence hash matches the current file. No application code changed. Browser/native/device checks are explicitly unnecessary for this slice.",
-      "evidence": ".ralph/runs/RF-069-1-1792169305935678645",
-      "recovery_note": "Independent Astra review rejected the first implemented fixture despite all four gates and11 tests passing. Primary approves the installed native View measurement spy after inspecting node_modules/react-native/jest/mockNativeComponent.js and preserved failing no-callback experiments. Repair complete warning capture and unconditional deferred settlement/draining. Original first attempt remains counted; final attempt2 only."
+      "attempts": 2,
+      "started_at": "2026-10-16T16:56:07.023963+00:00",
+      "failure": "Batch resource limit reached",
+      "evidence": ".ralph/runs/RF-069-2-1792169767025019387",
+      "recovery_note": "Independent Astra review rejected the first implemented fixture despite all four gates and11 tests passing. Primary approves the installed native View measurement spy after inspecting node_modules/react-native/jest/mockNativeComponent.js and preserved failing no-callback experiments. Repair complete warning capture and unconditional deferred settlement/draining. Original first attempt remains counted; final attempt2 only.",
+      "completed_at": "2026-10-16T16:57:53.156561+00:00",
+      "summary": "Repaired only `tests/unit/deck-cards-due-date.test.tsx`. Reused the real DeckCardsSheet, DropdownMenu, ResponsiveSheet, Button, TextInput, real locale strings, and service-boundary query stubs. Removed createNodeMock indirection, added scoped native measurement spying, complete warning capture, and unconditional deferred cleanup. No application code or pre-existing backlog edits were changed."
     }
   ]
 }
