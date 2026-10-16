@@ -17,6 +17,7 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
   entry("components/achievements/AchievementProgressBar.tsx", "progress-chart", "source", "Fill direction is explicit and follows settings RTL state."),
   entry("components/achievements/AchievementUnlockToast.tsx", "feedback", "source", "Toast content mirrors; achievement art stays neutral."),
   entry("components/achievements/PublicBadgesGrid.tsx", "progress-chart", "source", "Public badge grid mirrors visual order."),
+  entry("components/auth/AccountSyncPrompt.tsx", "button", "rntl", "Controlled compact row is covered by the ProgressScreen and LeaderboardScreen route fixtures."),
   entry("components/auth/AuthScreenShell.tsx", "app-shell", "rntl", "Auth chrome mirrors; logo and decorative artwork do not mirror."),
   entry("components/auth/OAuthButtons.tsx", "button", "playwright", "Provider button row mirrors; provider logos remain unmirrored."),
   entry("components/flashcards/DeckCardsSheet.tsx", "overlay", "source", "Deck table sheet mirrors rows and actions; card text keeps natural direction."),
