@@ -39,3 +39,11 @@ The tafsir import/select transactions in settings and ReadingSettingsSheet match
 `analysis-summary.json` retains all 31 measured clone groups and Knip output. A scanner match is not permission to delete code. Platform files, Expo routes, generated require maps, side effects and runtime assets need native/web-aware checks. The current dependency graph favors web resolution, so a second native graph is a planned task.
 
 All high-risk changes require a bounded follow-up task, characterization tests and primary-engineer integration. The executable backlog distinguishes ready tasks from tasks still needing this preparation. Completion requires final architecture and behavioral review, not a zero scanner percentage obtained by exclusions.
+
+## Resolved findings and current follow-up, 2026-10-16
+
+RF-013 repaired the missing show_ayah_markers hydration key and exact boolean restoration. Rendered provider tests cover false/true, malformed/absent values and remounting. The initial finding above remains historical. RF-057 consolidated characterized auth startup-theme lookups while retaining OAuth's additional document-background fallback. The earlier test failures and decorative swatch classification were repaired without disabling their contracts.
+
+RF-067 aligned eighteen SDK 55 manifest ranges, removed direct expo-modules-core ownership and consolidated log-box. All fifteen controller commands, separate Astra evaluation and primary artifact/hash review pass. Full Expo diagnostics now leave one package mismatch and native/app-config ownership, 18 of 20 Doctor checks passing. The lint downgrade remains unapproved because the isolated older preset lost nine active checks. Security overrides still pass; 72 noncritical audit findings and 71 lint warnings remain visible. SDK55_ALIGNMENT.md records exact acceptance and platform limits.
+
+The sign-in callout copies in progress and leaderboard share their inner row but have deliberately different outer containers and visibility predicates. AuthGate also adds signup and full-screen gating, so it does not replace these presenters. RF-068 will characterize the actual unchanged routes first. RF-053 remains unapproved until those tests pass and the primary engineer fixes the extraction and rendered-verification scope.

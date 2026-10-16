@@ -2288,7 +2288,8 @@
       ],
       "dependencies": [
         "RF-004",
-        "RF-006"
+        "RF-006",
+        "RF-068"
       ],
       "acceptance_criteria": [
         "Inspect AuthGate and existing auth UI before selecting a presenter.",
@@ -3122,7 +3123,76 @@
       ],
       "resource_timeouts": 1,
       "completed_at": "2026-10-16T11:02:55.459087+00:00",
-      "summary": "Applied the approved SDK 55 manifest handoff in package.json. Reused the existing babel-preset-expo and NativeWind configuration. Controller-owned lock resolution and all verification gates remain pending."
+      "summary": "Applied the approved SDK 55 manifest handoff in package.json. Reused the existing babel-preset-expo and NativeWind configuration. Controller-owned lock resolution and all verification gates remain pending.",
+      "primary_acceptance": {
+        "accepted": true,
+        "at": "2026-10-16T11:08:59.643896+00:00",
+        "commit": "f863a2b",
+        "evidence": ".refactor-baseline/rf067-primary-acceptance.json"
+      }
+    },
+    {
+      "id": "RF-068",
+      "title": "Characterize route sign-in callouts before presentation reuse",
+      "description": "Extend the existing rendered ProgressScreen fixture and add a focused LeaderboardScreen fixture to record current callout visibility, localized content, callbacks, direction and deliberate outer styles. Production code stays unchanged.",
+      "rationale": "Clone group6 shares inner presentation but the callers use different visibility predicates and containers. AuthGate adds signup/full-screen gating and is not equivalent. Actual route behavior must be characterized before RF053 extraction.",
+      "modules": [
+        "app/(tabs)/progress.tsx",
+        "app/(tabs)/leaderboard.tsx",
+        "components/ui/AuthGate.tsx",
+        "components/ui/Card.tsx",
+        "tests/unit/progress-screen-rtl.test.tsx",
+        "tests/unit/leaderboard-sign-in-prompt.test.tsx"
+      ],
+      "dependencies": [
+        "RF-005",
+        "RF-067"
+      ],
+      "acceptance_criteria": [
+        "Read both complete private callout bodies and all three call sites, AuthGate, existing progress fixture, real useStrings and RTL helpers. Record reuse: extend the existing progress fixture and use feature-local leaderboard fixtures. Do not introduce a shared fixture framework or extract production code.",
+        "Write only the two allowed test files. Preserve the existing progress achievement/scroll RTL assertions. Do not modify application, services, dependencies, setup, registry, snapshots or source contracts. Do not create the shared presenter yet.",
+        "Render actual unchanged ProgressScreen and LeaderboardScreen with real RN primitives, shared UI and useStrings. Reuse SafeAreaProvider metrics390x844. Use real TanStack QueryClient/Provider for leaderboard, isolated per test with retries disabled and cleanup. Mock only database/session/configuration, network/service and necessary native boundaries. Never mock routes, the private callouts, useQuery or localized strings.",
+        "Progress: demonstrate a prompt only when configured, auth initialized, not loading and signed out. Exercise each negative predicate separately. Leaderboard: cover configured signed-out empty and populated results, signed-in absence, unconfigured absence, pending/loading absence and failed-query absence. Use synthetic typed entries and settled deferred results; no network, credentials or live Supabase. In every absence case, also assert a positive landmark for the intended loaded, unconfigured, pending or failed branch. An absence assertion during an accidental loading/early-return state is insufficient.",
+        "For both actual visible presenters, cover English/LTR and Arabic/RTL with light/dark palettes. Assert correct real localized label, a uniquely accessible login button, one /auth/login router.push per press, explicit LTR layout direction plus mirrored row/icon order and label alignment/writing direction. Observe stable imported mocks or deferred forwarding, avoiding Jest-hoisted undefined spies.",
+        "Preserve the deliberate outer differences: progress Card mb6 px5 py4 versus leaderboard tinted/bordered mt4 rounded3xl px4 py4. Assert relevant original container/button/text styles from the rendered tree so an accidental wrapper or theme change fails. Reuse existing style/ancestor helpers; no source-text evaluation or snapshots that merely duplicate source.",
+        "Reset settings language/theme, auth/config, service mocks and QueryClient state between cases. Settle/clean pending promises. No any, ts-ignore, unsafe casts, broad console suppression, disabled assertions or tests. Derive leaderboard fixture types from the existing API.",
+        "Report characterization evidence against unchanged production source. Focused behavior tests, strict typecheck, scoped lint and formatting must pass. Separate evaluator checks meaningful assertions, preserved old contracts and fixture isolation. Browser/native/device checks are not required for this test-only slice; RF053 stays unapproved until primary reviews this evidence and prepares its rendered UI verification."
+      ],
+      "verification": [
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/progress-screen-rtl.test.tsx",
+          "tests/unit/leaderboard-sign-in-prompt.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "tests/unit/progress-screen-rtl.test.tsx",
+          "tests/unit/leaderboard-sign-in-prompt.test.tsx"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "tests/unit/progress-screen-rtl.test.tsx",
+          "tests/unit/leaderboard-sign-in-prompt.test.tsx"
+        ]
+      ],
+      "risk": "low",
+      "approved": true,
+      "status": "pending",
+      "allowed_paths": [
+        "tests/unit/progress-screen-rtl.test.tsx",
+        "tests/unit/leaderboard-sign-in-prompt.test.tsx"
+      ],
+      "attempts": 0
     }
   ]
 }

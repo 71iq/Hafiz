@@ -14,6 +14,10 @@
 
 No task may delete a platform variant based on Knip alone. No duplicate block is merged solely to reduce a percentage. No SDK upgrade is combined with a UI migration or database change.
 
+## Current bounded step, 2026-10-16
+
+RF-067 is accepted after fifteen fresh gates, independent evaluation and primary artifact/hash review. RF-008 still owns the two remaining Expo diagnostics; neither a lint downgrade nor native regeneration is approved. RF-068 will characterize the unchanged progress and leaderboard sign-in callouts through actual rendered routes before RF-053 can extract presentation. Existing AuthGate adds signup and full-screen gating, while these callouts have distinct visibility and outer styling. The characterization changes tests only. It keeps those differences explicit and does not authorize a UI, auth, query-key or service change.
+
 ## Completion condition
 
 All in-scope items must be verified with evidence or have an exact documented external blocker. Required quality checks must pass, significant regressions and in-scope high-severity findings must be resolved, and an independent final architecture/behavior review must pass. Deliberate data/platform duplication must be documented. Literal zero text similarity is not a useful acceptance criterion for generated Quran inputs or platform adapters.

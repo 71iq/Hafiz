@@ -1,10 +1,10 @@
-# SDK 55 alignment preflight
+# SDK 55 runtime alignment
 
-Status on 2026-10-16: RF-067 has a preserved installed manifest/lock candidate and all fifteen controller gates pass, including Android assembleDebug for all configured ABIs. Independent evaluation stopped at the account usage limit and returned no verdict, so the candidate remains unaccepted. Earlier OOM and timeout failures remain recorded. RF-008 remains pending and unapproved for full-project diagnostics and lint/native configuration decisions. No native configuration, signing material, protected content or application source changed.
+Status on 2026-10-16: RF-067 is verified and accepted, local commit f863a2b. All fifteen controller gates and a fresh independent Astra evaluation pass. Primary confirmed generation hashes, manifest/lock content equality with the reviewed preflight and all four ABIs in the debug APK. Earlier OOM, timeout and account-limit failures remain recorded. RF-008 remains pending and unapproved for lint/native configuration decisions. No native configuration, signing material, protected content or application source changed.
 
-## Candidate patch set
+## Selected patch set
 
-Keep Expo SDK 55, RN 0.83 and React 19.2.0. Expo's SDK 55 matrix and public package metadata produced these candidate ranges. RF-067 owns exactly these manifest ranges and the existing Babel preset declaration below. Its controller gates must still verify the actual installed graph, web app and Android build. The isolated preflight does not establish application compatibility by itself.
+Keep Expo SDK 55, RN 0.83 and React 19.2.0. Expo's SDK 55 matrix and public package metadata produced these selected ranges. RF-067 owns exactly these manifest ranges and the existing Babel preset declaration below. The accepted root installation passed actual graph, web and Android checks in addition to the isolated preflight.
 
 | Package            | Previous lock version | Selected range |
 | ------------------ | --------------------- | -------------- |
@@ -27,7 +27,7 @@ Keep Expo SDK 55, RN 0.83 and React 19.2.0. Expo's SDK 55 matrix and public pack
 | jest-expo          | 55.0.18               | ~55.0.22       |
 | babel-preset-expo  | 55.0.22, transitive   | ~55.0.25       |
 
-Direct expo-modules-core has no authored caller in app, components, lib, scripts or tests. Expo 55.0.31 depends on exact core 55.0.26. RF-067 removes the direct declaration, subject to autolinking and native build verification. Keep the existing CSS interop patch and Gradle fix. Do not change Quran inputs or generate a new database.
+Direct expo-modules-core has no authored caller in app, components, lib, scripts or tests. Expo 55.0.31 depends on exact core 55.0.26. RF-067 removed the direct declaration and passed autolinking and native build verification. Keep the existing CSS interop patch and Gradle fix. Do not change Quran inputs or generate a new database.
 
 Sources: [SDK 55 compatibility](https://docs.expo.dev/versions/v55.0.0/), [official upgrade procedure](https://docs.expo.dev/workflow/upgrading-expo-sdk-walkthrough/), [Expo 55.0.31 metadata](https://registry.npmjs.org/expo/55.0.31), [Router 55.0.18 metadata](https://registry.npmjs.org/expo-router/55.0.18), [SQLite patch history](https://github.com/expo/expo/blob/sdk-55/packages/expo-sqlite/CHANGELOG.md). Exact package metadata and integrity values are saved in ignored .refactor-baseline/sdk55-selected-registry.json.
 
@@ -75,4 +75,10 @@ The first native gate reached the 6 GiB limit after fourteen passing gates. RF-0
 
 The next real run, .ralph/runs/RF-067-2-1792130380355314387, passed fourteen gates again, including 322 unit tests and 28 installed-Chrome smoke tests. It had no OOM event. Native compilation completed all four ABIs of Nitro Modules, Worklets and Reanimated, then hit the 900-second deadline during app arm64 compilation. Both locks and all compiler/Gradle children were clear before recovery. The preserved package files exactly match the reviewed preflight. The separate two-timeout limit leaves one bounded continuation.
 
-That continuation, .ralph/runs/RF-067-2-1792131849249493778, passed all fifteen commands. Android reported BUILD SUCCESSFUL in 14m 5s, with 564 tasks, 116 executed and 448 up-to-date. All configured ABIs remain. The separate evaluator then stopped with the installed CLI's account usage-limit error and no verdict. Unknown usage exhausted that batch; no credits were purchased or reset. After capacity returned, primary diagnosis found a missing resource-stop classification, reproduced it and added bounded event recognition. All 27 runner tests pass. RF-067 still requires fresh controller commands and independent review. iOS compilation and physical-device checks remain unexecuted.
+That continuation, .ralph/runs/RF-067-2-1792131849249493778, passed all fifteen commands. Android reported BUILD SUCCESSFUL in 14m 5s, with 564 tasks, 116 executed and 448 up-to-date. All configured ABIs remain. The separate evaluator then stopped with the installed CLI's account usage-limit error and no verdict. Unknown usage exhausted that batch; no credits were purchased or reset. After capacity returned, primary diagnosis found a missing resource-stop classification, reproduced it and added bounded event recognition. All 27 runner tests pass. That run remained unaccepted and required fresh controller commands and independent review. iOS compilation and physical-device checks remain unexecuted.
+
+## Acceptance and remaining diagnostics
+
+The final run, .ralph/runs/RF-067-2-1792148137863851616, passed all fifteen fresh controller commands and separate Astra evaluation. Android assembleDebug succeeded in 36 seconds with incremental output, 564 tasks, 65 executed and 499 up-to-date. Primary verified the committed scope, exact generation hashes, full manifest/lock equality with the reviewed preflight, and arm64-v8a, armeabi-v7a, x86 and x86_64 libraries in the 284,297,891-byte debug APK. No APK was installed. Evidence .refactor-baseline/rf067-primary-acceptance.json.
+
+The repeated full package check reports only eslint-config-expo 56.0.4 versus SDK 55's ~55.0.1 recommendation, down from 19 mismatches. Doctor passes 18 of 20 checks, up from 16. The other remaining finding is committed native folders versus app.json configuration ownership. No exclusions, native regeneration or lint downgrade hid either finding. RF-008 remains unapproved until these decisions preserve lint coverage and native behavior. Current lint has zero errors and 71 warnings. The accepted audit snapshot contains 72 noncritical findings, one low, 14 moderate and 57 high. iOS compilation and physical-device/runtime checks remain unexecuted.

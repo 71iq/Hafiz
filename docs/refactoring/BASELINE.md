@@ -45,3 +45,16 @@ Android SDK 36, ADB, and Java are available. No connected device was listed. And
 | Expo Doctor        | 16 of 20 pass                      | 16 of 20 pass, same four findings     |
 
 The duplication command used the same .jscpd.json thresholds and exclusions: datasets, generated require/font maps, translations and language-label tables. The new output is .refactor-baseline/jscpd-after-rf057/jscpd-report.json. Unit and package-check argv, exits and log paths are recorded in .refactor-baseline/checks-after-rf057.json. Doctor output is .refactor-baseline/expo-doctor-after-rf057.log. The frozen analysis-summary.json and initial failures above remain intact. This comparison includes no new browser, physical-device or iOS checks.
+
+## Comparison after RF-067, 2026-10-16
+
+| Check                   | Original capture                              | Accepted measurement                                 |
+| ----------------------- | --------------------------------------------- | ---------------------------------------------------- |
+| Full unit suite         | 248 pass, three fail in 57 suites             | 322 pass, zero fail in 62 suites                     |
+| Expo package check      | 19 mismatches                                 | One lint-preset mismatch                             |
+| Expo Doctor             | 16 of 20 pass                                 | 18 of 20 pass                                        |
+| Native dependency graph | Duplicate log-box and direct core declaration | Both Android/iOS graphs pass, zero duplicates        |
+| Browser smoke           | Not recorded in the initial table             | 28 installed-Chrome tests pass at 390 by 844         |
+| Android debug           | Initial build 15m55s                          | Accepted incremental build 36s, all four ABIs in APK |
+
+The Android times compare different cache states, not runtime performance. The native cold/incremental recovery history is retained in SDK55_ALIGNMENT.md. The final fifteen command records and independent review are .ralph/runs/RF-067-2-1792148137863851616. Primary artifact/hash acceptance is .refactor-baseline/rf067-primary-acceptance.json. Repeated diagnostic argv/exits are expo-install-after-rf067.json and expo-doctor-after-rf067.json under .refactor-baseline. The two remaining Doctor findings are lint-preset compatibility and native/app-config ownership. No diagnostic was excluded. No duplicate scan was repeated for this dependency-only slice; the last measured 29 groups and 669 duplicated lines remain RF-057's snapshot. No iOS build, device installation or native runtime verification ran.
