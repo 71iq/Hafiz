@@ -78,3 +78,9 @@ Four focused controller gates and independent Astra review pass, including12 tes
 ## Date failure visibility after RF-072, 2026-10-16
 
 The front-state date-save regression failed before the source edit and passes afterward in Arabic/light and English/dark. All six gates and independent evaluation pass, including14 focused tests and28 Chrome smoke tests. Scoped lint retains5 existing warnings. No full-unit/native/device/iOS or duplicate scan was repeated for the two-line state/error-prop repair. The last full-unit capture is336 tests after RF-069; the last duplication capture is28 groups/628 lines after RF-053. Evidence .refactor-baseline/rf072-primary-acceptance.json. Remaining non-date action visibility stays open in RF-073.
+
+## Shared date editor after RF-055, 2026-10-16
+
+Local commit9828164 replaces both private date-sheet presenters with components/flashcards/DueDateSheet.tsx. All existing caller tests remain unchanged. Six controller gates and independent Astra review pass, including19 focused tests, strict types, scoped lint with5 existing warnings, new-component formatting, web export and28 Chrome smoke tests. Primary reviewed exact file hashes, complete diff and commit scope. A fresh full unit run passes65 suites and341 tests with normal exit.
+
+The same .jscpd.json scope and exclusions now report26 groups,562 duplicated lines and1.0655percent across181 sources and52,747 lines. The previous RF-053 measurement was28 groups and628 lines; the original capture was31 groups and707 lines. One11-line footer match remains between DueDateSheet and the answer editor. This bounded extraction does not justify another generic overlay abstraction. Reports are .refactor-baseline/jscpd-after-rf055/jscpd-report.json and rf055-unit-full.json; primary acceptance is rf055-primary-acceptance.json. No scanner exclusion changed. No physical-device, Android or iOS verification ran for this slice.
