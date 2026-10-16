@@ -257,3 +257,7 @@ The mission is active. This file records durable events; backlog.json owns task 
 - 2026-10-16T18:01:00.939831+00:00 `RF-071` retry. Agent blocked: Implemented RF-071 within the four approved paths. Required Playwright verification is blocked because the environment cannot bind 127.0.0.1:8193 (EPERM). No commit or push performed.
 
 - 2026-10-17. Capacity returned through the ordinary five-hour reset; no credit or billing operation ran. Primary reproduced all 30 frozen Chrome tests outside the implementation sandbox, including both donor-footer keyboard cases. The prior bind EPERM was sandbox-only. RF-071 retains attempt1 and its exact failure. Fresh generation must preserve correct candidate work and original ordered red/green evidence, leave browser networking to the controller and require all six fresh gates plus separate evaluation. Evidence .refactor-baseline/rf071-primary-browser-preflight.log. No source or acceptance criteria were weakened.
+
+- 2026-10-16T22:43:53.175906+00:00 `RF-071` retry. Batch resource limit reached. Preserved work will be reverified on resume.
+
+- 2026-10-16T22:46:31.020124+00:00 `RF-071` verified. Preserved the approved RF-071 four-file candidate. Reused the existing Button and installed Slot; ordinary buttons now default to role button, while asChild ownership and explicit roles remain unchanged. No commit, push, package install, or disallowed edit was made. Evidence `.ralph/runs/RF-071-2-1792190642483378210`.
