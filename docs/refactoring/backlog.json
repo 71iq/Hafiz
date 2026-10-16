@@ -3661,24 +3661,29 @@
     },
     {
       "id": "RF-073",
-      "title": "Audit remaining session card-action failure visibility",
-      "description": "Characterize and repair remaining error-display variants across session phases and open action overlays.",
-      "rationale": "The shared runCardAction catches all action failures into sessionError, but the screen renders that string only during grading or summary. Due-date inline handling is isolated in RF-072. Suspend, bury, mark, delete/reset confirmation and answer editing require their own state/overlay audit.",
+      "title": "Expose direct session card-action failures before Reveal",
+      "description": "Move the existing session error label outside the grading-only condition and characterize Suspend, Bury and Mark failures through the actual session route.",
+      "rationale": "Primary mapped all six runCardAction call groups. Suspend/Bury/Mark close the action sheet before persistence and leave the current review screen as error owner; front and intermediate phases currently hide that label. Date failures already belong to the accepted date editor. Delete/reset and answer editing retain open overlays and are split into RF-074/RF-075.",
       "modules": [
         "app/flashcards/session.tsx",
-        "components/ui/ConfirmDialog.tsx",
         "tests/unit/session-due-date.test.tsx",
-        "tests/unit/session-card-action-errors.test.tsx"
+        "lib/fsrs/queries.ts",
+        "components/flashcards/DueDateSheet.tsx",
+        "components/ui/Button.tsx"
       ],
       "dependencies": [
         "RF-070",
-        "RF-072"
+        "RF-072",
+        "RF-055",
+        "RF-071"
       ],
       "acceptance_criteria": [
-        "Before approval map each real runCardAction caller, overlay lifecycle and visible error owner. Split into smaller tasks if necessary. Do not infer that moving a background label makes errors visible through an open modal.",
-        "Add rendered rejected-action regressions at the actual user entry points. Preserve SQL calls, stable IDs, haptics, busy exclusion, retry and successful review/advance behavior. Keep all service access isolated.",
-        "Prefer existing error text and owned overlay contracts. Avoid new global notification systems, multiple error sources or generic action frameworks. Primary chooses source ownership and exact approval evidence.",
-        "Exact file scope, commands and manual/platform verification must be prepared before any agent receives approval. Independent evaluation and final primary acceptance are required."
+        "Reuse the existing sessionError state, runCardAction and exact existing RN Text error block. Move that block to the immediate View with maxWidth in the bottom action area, before phase-specific controls. Remove its old grading-only occurrence and unnecessary fragment if empty. Preserve its text, classes, font, alignment and spacing. No new banner/component/state/error source, modal behavior, action hook or architecture. Grading and summary retain existing output; active-card front/intermediate phases gain the same error owner. Do not claim errors are visible through still-open dialogs.",
+        "Production scope is only this error-block relocation in app/flashcards/session.tsx. Keep every action handler, service call, card/deck ID, return type, haptic, busy guard, successful advance/card update, grading/points/logging/sync and RF-072 date-error priority/reset unchanged. Do not change ConfirmDialog, AnswerEditSheet or service/data behavior. No package/native/protected-input change or broad source formatting.",
+        "Extend the existing real route fixture in tests/unit/session-due-date.test.tsx rather than copying its typed settings/service setup into a second file. Add imports for the three already-isolated service mocks. All five accepted date scenarios and assertions remain unchanged. Use actual route/action sheet/buttons and localized strings; no private-component or runCardAction mocks, forced phase state, real database/font/dataset/network access, casts or any. The existing synthetic two-card mutashabihat branch is the approved fixture.",
+        "Add behavioral rejection/retry coverage for all three direct actions in front and revealed states. Include Arabic/light and English/dark across those six cases. Obtain meaningful red before the production relocation: front-state error assertions must fail while revealed-state behavior is retained. Use the real actions menu and exact service args mockDatabase/firstCard.deck_id/firstCard.id/true. During a deferred write the menu trigger is disabled and cannot launch another write. On rejection the menu is closed, exactly the localized failure is visible on the current review screen, first card/phase is retained, second card is not shown and the trigger is re-enabled.",
+        "Retry through the same actual menu after rejection. Check the exact second service call and two haptics, failure clears, and successful Suspend/Bury advances to the second synthetic card without recording a review or remote sync. Successful Mark retains first card and exposes Unmark from the returned row. Do not replace actual parent advance with a callback spy. Assert no grading/log/scoring/achievement/router or unrelated action call. Restore each console spy; forward unexpected warnings and assert its complete calls. Unconditionally settle/drain each deferred write in finally even if an assertion fails. No test-timeout increase or swallowed unexpected error.",
+        "Run all six frozen controller commands and require a fresh independent Astra pass. Existing five Session warnings may remain but no new warning is allowed; Prettier applies only to the changed fixture, not legacy Session formatting. Rendered fixture states use390x844. Browser networking is controller-owned outside implementation sandbox: do not attempt loopback in the generator, and return implemented with controller browser acceptance pending when source/non-browser work is complete. A genuine source or test discrepancy blocks. Primary retains final acceptance. No physical-device/Android/iOS verification is claimed."
       ],
       "verification": [
         [
@@ -3687,8 +3692,81 @@
           "test:unit",
           "--",
           "--runTestsByPath",
-          "tests/unit/session-card-action-errors.test.tsx",
+          "tests/unit/session-due-date.test.tsx",
+          "tests/unit/deck-cards-due-date.test.tsx",
+          "--detectOpenHandles"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "app/flashcards/session.tsx",
           "tests/unit/session-due-date.test.tsx"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "tests/unit/session-due-date.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8193",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8193",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts",
+          "tests/e2e/button-accessibility.spec.ts"
+        ]
+      ],
+      "risk": "medium",
+      "approved": true,
+      "status": "pending",
+      "allowed_paths": [
+        "app/flashcards/session.tsx",
+        "tests/unit/session-due-date.test.tsx"
+      ],
+      "attempts": 0
+    },
+    {
+      "id": "RF-074",
+      "title": "Show card confirmation failures inside the active dialog",
+      "description": "Characterize and repair rejected delete/reset actions that keep their confirmation dialog open.",
+      "rationale": "runCardAction stores sessionError, but ConfirmDialog owns the visible modal and receives no error. A background review label cannot prove visible feedback. This is separate from direct actions and the accepted date editor.",
+      "modules": [
+        "app/flashcards/session.tsx",
+        "components/ui/ConfirmDialog.tsx",
+        "components/ui/Field.tsx",
+        "tests/unit/session-due-date.test.tsx"
+      ],
+      "dependencies": [
+        "RF-073",
+        "RF-071"
+      ],
+      "acceptance_criteria": [
+        "Before approval choose the smallest optional controlled error contract in the existing ConfirmDialog, inspect FieldMessage reuse and all existing callers, and define exact red/green/modal evidence. No new global notification owner.",
+        "Cover rejected delete/reset in front and revealed states via actual menu, confirmation controls and the visible containing Modal. Preserve exact services, stable IDs, busy cancel/back guards, retry and successful advance/reset behavior. Clear stale errors on a fresh opening without hiding a current failure.",
+        "Reuse the existing typed route fixture and keep all accepted scenarios. Exact allowed source/test scope, commands and platform evidence require primary preparation, independent review and acceptance. No source task or live/database operation is approved by this placeholder."
+      ],
+      "verification": [
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/session-due-date.test.tsx",
+          "tests/unit/rtl-higher-level-component-contracts.test.tsx"
         ],
         [
           "npm",
@@ -3707,7 +3785,56 @@
       "allowed_paths": [
         "app/flashcards/session.tsx",
         "components/ui/ConfirmDialog.tsx",
-        "tests/unit/session-card-action-errors.test.tsx"
+        "tests/unit/session-due-date.test.tsx"
+      ],
+      "attempts": 0
+    },
+    {
+      "id": "RF-075",
+      "title": "Show answer-save failures inside the active editor",
+      "description": "Characterize failed write/delete of custom answers and show feedback in the open editor.",
+      "rationale": "AnswerEditSheet remains open on failure, has no error prop and does not clear stale action errors when opened. Its text and retry must survive rejected user-setting persistence.",
+      "modules": [
+        "app/flashcards/session.tsx",
+        "components/ui/Field.tsx",
+        "lib/database/user-settings.ts",
+        "tests/unit/session-due-date.test.tsx"
+      ],
+      "dependencies": [
+        "RF-073",
+        "RF-074"
+      ],
+      "acceptance_criteria": [
+        "Before approval inspect editable review modes, exact custom-answer key generation and synthetic fixture branch. Define the existing editor as visible error owner; compare FieldMessage reuse without creating a new form or notification system.",
+        "Use actual editor/service-boundary regressions for rejected nonempty writes and empty-answer deletions. Preserve entered text, prior answer/card/phase, exact setting keys, busy close guards, retry and success semantics. Fresh opening resets stale failures; no hidden background-label proof.",
+        "Reuse existing typed route fixture where appropriate, preserve all accepted assertions and isolate SQLite/fonts/network. Primary must finalize exact source/test paths, red/green, commands and native/web evidence before approval; independent review and final acceptance remain required."
+      ],
+      "verification": [
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/session-due-date.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ]
+      ],
+      "risk": "medium",
+      "approved": false,
+      "status": "pending",
+      "allowed_paths": [
+        "app/flashcards/session.tsx",
+        "tests/unit/session-due-date.test.tsx"
       ],
       "attempts": 0
     }
