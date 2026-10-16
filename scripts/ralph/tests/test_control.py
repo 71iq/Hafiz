@@ -164,6 +164,73 @@ class IterationTests(unittest.TestCase):
         self.assertEqual(self.current_task()['attempts'], 0)
         self.assertEqual((self.root / 'fixture.txt').read_text(), 'after\n')
 
+    def test_review_account_limit_preserves_generation_and_requires_fresh_checks_and_review(self):
+        config = control.read_json(self.config)
+        config.update({'model': 'fixture', 'reasoning_effort': 'low'})
+        control.write_json(self.config, config)
+        backlog = control.read_json(self.backlog)
+        backlog['tasks'][0]['verification'] = [[sys.executable, '-c',
+            'from pathlib import Path; p=Path(".ralph/check-runs"); '
+            'p.write_text((p.read_text() if p.exists() else "") + "ran\\n")']]
+        control.write_json(self.backlog, backlog)
+        self.git('add', '.')
+        self.git('commit', '-qm', 'account limit fixture')
+        head = self.git('rev-parse', 'HEAD')
+        original_run = control.run_process
+        roles = []
+
+        def run(argv, logfile, timeout, **kwargs):
+            if logfile.suffix != '.jsonl':
+                return original_run(argv, logfile, timeout, **kwargs)
+            role = logfile.stem
+            roles.append(role)
+            if role == 'review' and roles.count('review') == 1:
+                logfile.write_text(json.dumps({'type': 'turn.failed', 'error': {
+                    'message': "You\u2019ve hit your usage limit. Try again later."}}) + '\n')
+                return 1
+            result = self.generate() if role == 'generator' else {'verdict': 'pass', 'findings': []}
+            Path(argv[argv.index('--output-last-message') + 1]).write_text(json.dumps(result))
+            logfile.write_text(json.dumps({'type': 'turn.completed', 'usage': {'input_tokens': 1, 'output_tokens': 0}}) + '\n')
+            return 0
+
+        with patch('sys.stdin.read', return_value='prompt'), patch.object(control, 'run_process', side_effect=run):
+            control.iteration()
+            self.assertEqual(self.current_task()['status'], 'retry')
+            self.assertEqual(self.current_task()['attempts'], 0)
+            self.assertEqual(self.current_task().get('resource_timeouts', 0), 0)
+            self.assertIsNotNone(control.generation_checkpoint(self.current_task()))
+            self.assertEqual(self.git('rev-parse', 'HEAD'), head)
+            batch = control.read_json(self.state / 'batch.json')
+            self.assertTrue(batch['usage_unknown'])
+            self.assertEqual(batch['tokens'], config['batch_tokens'])
+            self.assertEqual((self.state / 'check-runs').read_text(), 'ran\n')
+            self.assertEqual((self.root / 'fixture.txt').read_text(), 'after\n')
+
+            control.write_json(self.state / 'batch.json', {'started_epoch': control.time.time(), 'tokens': 0})
+            control.iteration()
+
+        self.assertEqual(roles, ['generator', 'review', 'review'])
+        self.assertEqual((self.state / 'check-runs').read_text(), 'ran\nran\n')
+        self.assertEqual(self.current_task()['status'], 'verified')
+
+    def test_account_limit_requires_last_terminal_event_and_exact_observed_error(self):
+        logfile = self.state / 'events.jsonl'
+        limit = {'type': 'turn.failed', 'error': {'message': "You've hit your usage limit. Try later."}}
+        cases = [
+            ([limit], True),
+            ([{'type': 'error', 'message': limit['error']['message']}], False),
+            ([{'type': 'item.completed', 'item': {'output': json.dumps(limit)}}], False),
+            ([{'type': 'turn.failed', 'error': {'message': 'Required MCP server failed'}}], False),
+            ([{'type': 'turn.failed', 'error': 'unexpected error format'}], False),
+            ([limit, {'type': 'turn.completed', 'usage': {}}], False),
+            ([limit, {'type': 'turn.failed', 'error': {'message': 'Unrelated failure'}}], False),
+            ([None, [], {'type': 'turn.failed', 'error': {'message': None}}], False),
+        ]
+        for events, expected in cases:
+            with self.subTest(events=events):
+                logfile.write_text('not JSON\n' + '\n'.join(json.dumps(event) for event in events) + '\n')
+                self.assertEqual(control.account_limit_reached(logfile), expected)
+
     def test_command_timeout_preserves_generation_and_reruns_checks_before_review(self):
         config = control.read_json(self.config)
         config['session_seconds'] = 0.3

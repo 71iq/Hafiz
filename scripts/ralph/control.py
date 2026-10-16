@@ -232,6 +232,23 @@ def account_tokens(logfile):
     write_json(STATE / 'batch.json', batch)
 
 
+def account_limit_reached(logfile):
+    terminal = None
+    if logfile.exists():
+        for line in logfile.read_text().splitlines():
+            try:
+                event = json.loads(line)
+            except ValueError:
+                continue
+            if isinstance(event, dict) and event.get('type') in ('turn.failed', 'turn.completed'):
+                terminal = event
+    if terminal is None or terminal['type'] != 'turn.failed':
+        return False
+    error = terminal.get('error')
+    message = error.get('message') if isinstance(error, dict) else None
+    return isinstance(message, str) and message.replace('\u2019', "'").startswith("You've hit your usage limit.")
+
+
 def agent(prompt, schema, directory, role, config, readonly=False):
     schema_path = directory / f'{role}-schema.json'
     result_path = directory / f'{role}-result.json'
@@ -258,6 +275,8 @@ def agent(prompt, schema, directory, role, config, readonly=False):
             raise InvariantError('Batch state changed during agent session')
     batch = read_json(STATE / 'batch.json')
     if code or not result_path.exists():
+        if account_limit_reached(directory / f'{role}.jsonl'):
+            raise BatchLimit(f'{role} stopped at account usage limit; see {directory.relative_to(ROOT)}/{role}.jsonl')
         raise RuntimeError(f'{role} exited {code}; see {directory.relative_to(ROOT)}/{role}.jsonl')
     result = read_json(result_path)
     # Fail closed even if the CLI did not enforce its output schema.
