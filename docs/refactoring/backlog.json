@@ -2448,7 +2448,8 @@
       "dependencies": [
         "RF-004",
         "RF-006",
-        "RF-069"
+        "RF-069",
+        "RF-070"
       ],
       "acceptance_criteria": [
         "Do not approve this extraction before RF-069 and a separately prepared rendered session-editor characterization pass. The two native TextInput option differences must remain caller-owned. Existing parent validation, busy guards, haptics and session-advance versus deck-reload behavior must stay separate.",
@@ -3354,6 +3355,123 @@
         "commit": "9044125",
         "evidence": ".refactor-baseline/rf069-primary-acceptance.json"
       }
+    },
+    {
+      "id": "RF-070",
+      "title": "Characterize the session due-date editor before reuse",
+      "description": "Render the unchanged default session route and exercise its real due-date sheet through the real card-actions menu. Test session-owned validation, busy dismissal, persistence, haptics and removal/advance, preserving native input differences from deck cards.",
+      "rationale": "RF-069 covers the deck caller. The session caller explicitly disables capitalization/autocorrect and advances review after a successful date change. It needs its own rendered characterization before RF-055 can share presentation safely.",
+      "modules": [
+        "app/flashcards/session.tsx",
+        "lib/fsrs/types.ts",
+        "lib/fsrs/smart-decks.ts",
+        "lib/date.ts",
+        "components/ui/ResponsiveOverlay.tsx",
+        "components/ui/Button.tsx",
+        "tests/unit/deck-cards-due-date.test.tsx",
+        "tests/rtl/rtl-test-utils.tsx",
+        "tests/unit/session-due-date.test.tsx"
+      ],
+      "dependencies": [
+        "RF-006",
+        "RF-069"
+      ],
+      "acceptance_criteria": [
+        "Write only tests/unit/session-due-date.test.tsx. Render the actual default FlashcardSessionScreenWrapper, private screen, CardActionsSheet and DueDateSheet through actual RN Testing Library. Reuse RF-069 fixture/cleanup patterns, real localized useStrings, DirectionProvider, SafeAreaProvider and actual ResponsiveSheet/Header/Body/Footer, Button and TextInput. No production export, source edit, changed existing test, copied JSX/private function evaluation, mocked editor/menu/control/state, snapshot-only or source-string assertion.",
+        "Primary-selected minimal fixture seam: useDatabaseStatus reports ready; useDatabase returns an identity sentinel; SettingsProvider may be a typed passthrough and useSettings a stable fixture, leaving settings hydration covered by existing tests. Stub router parameters with a non-smart fixture deck and mock imported query/service modules. Supply two distinct typed StudyCardRow and SmartCardContent/SmartDeckRef fixtures, kind mutashabihat, ordinary synthetic prompt/cue strings and no prompt/context QCF2 fields. getSmartCardContent targetRef branch continues before direct SQL. Mock the imported font-loader module to prevent top-level bundled-font/native calls; assert no page-font loading. Do not mock Qcf2AyahText or any editor/UI component. Mock haptics and remote/scoring/achievement/user-setting adapters so no real SQLite, font asset, backend, sync or protected dataset is read or written. Read DeckReviewSettings actual type and supply all fields with stable valid settings. Initial streak0, remaining limit2 and two service rows establish a positive loaded front state.",
+        "Use390by844 dimensions/safe-area fixtures, Arabic RTL/light and English LTR/dark, restoring globals after unmount. Wait for the first distinct synthetic cue and real reveal/card-action landmarks before opening. Use real card-action press and localized Set Due Date action. Verify no date input before opening, menu closes as editor opens, date seeded from current card, numbers-and-punctuation keyboard, autoCapitalize none, autoCorrect false, fixed LTR numeric writing with locale alignment, placeholder/color/classes and input font family/size. Verify actual sheet maxWidth420/maxHeight360/avoidKeyboard and rendered keyboard-avoidance. These native options must remain different from the deck caller.",
+        "Drive controlled text changes. Invalid and past local dates show distinct localized errors, make no date write or haptic and retain existing error lifetime while editing. Cancel closes the editor without a mutation, router navigation or review-card advance; reopening restores the current-card value and clears validation error. Use relative past/future local dates without global fake timers or clock assumptions.",
+        "For a valid future date, use a deferred write to assert save/cancel disabled and native sheet close ignored during busy. One hapticMedium and one setStudyCardDueDate call use the exact database identity, current card deck/id and parsed Date. After resolution the editor closes and the second distinct cue replaces the first. Do not assert a newly invented progress-counter behavior. Date editing must not insert a study log, grade/update the scheduler card, award points/achievements or sync scores. Two-card fixtures avoid summary/backend behavior; the parent advance must run for real, never be mocked.",
+        "Rejected persistence displays actual cardActionFailed, keeps the first card and editor/input available, restores enabled actions, and does not advance or navigate. Scope warning capture to the expected reported error, forward unexpected warnings and assert the complete call list. Settle and React-act-drain every deferred promise in finally blocks even on assertion failure. Restore spies/dimensions and reset queued service implementations between cases. No broad warning suppression, forceExit, timeouts, skips, any, unsafe casts, new dependencies or test-configuration edits. Focused Jest must exit normally without unfinished-async/open-handle warnings.",
+        "All four frozen controller commands and a separate stronger read-only evaluator must pass. Generator implements only its one approved test path and cannot accept, commit or modify progress/backlog. This test-only slice requires no browser/native/device/iOS check and must not claim one. Primary retains final acceptance. If the selected fixture cannot reach the real session UI within the bounded task, report the exact blocker instead of weakening the seam. RF-055 remains unapproved until this characterization is accepted."
+      ],
+      "verification": [
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/session-due-date.test.tsx",
+          "tests/unit/deck-cards-due-date.test.tsx",
+          "tests/unit/date-utils.test.ts",
+          "--detectOpenHandles"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "tests/unit/session-due-date.test.tsx"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "tests/unit/session-due-date.test.tsx"
+        ]
+      ],
+      "risk": "medium",
+      "approved": true,
+      "status": "pending",
+      "allowed_paths": [
+        "tests/unit/session-due-date.test.tsx"
+      ],
+      "attempts": 0
+    },
+    {
+      "id": "RF-071",
+      "title": "Restore default accessibility semantics in shared Button",
+      "description": "Investigate and repair missing default button role in the existing shared primitive, preserving caller overrides and asChild semantics.",
+      "rationale": "RF-069 real-tree tests could not select text buttons by button role and needed an ancestor helper. components/ui/Button.tsx forwards Pressable props without a default role. Record this existing accessibility gap as a separate source task instead of changing it during date-editor characterization.",
+      "modules": [
+        "components/ui/Button.tsx",
+        "tests/unit/button-accessibility.test.tsx",
+        "tests/unit/rtl-higher-level-component-contracts.test.tsx",
+        "tests/unit/deck-cards-due-date.test.tsx",
+        "tests/jest/setup.ts"
+      ],
+      "dependencies": [
+        "RF-006",
+        "RF-069"
+      ],
+      "acceptance_criteria": [
+        "Before approval, verify current native role/accessibilityRole and asChild prop precedence against installed RN/slot implementations and an actual rendered failing test. No current Button asChild consumer exists, but its public contract must be preserved. Primary chooses exact semantics and evidence.",
+        "Use the existing Button. Ordinary controls must expose the appropriate default button role and label, disabled state and press behavior. Preserve explicit caller role overrides, child/link semantics, refs, variants, layout, RTL and native/web interaction. Do not combine the existing forwardRef any cleanup or style casts from RF-043 with this semantic fix.",
+        "Add focused behavioral tests for label/children, disabled/press, explicit overrides and asChild. Keep unrelated source/tests/dependencies unchanged. Review actual Slot behavior rather than accepting the global test stand-in as proof of child prop merging.",
+        "Scoped tests/typecheck/lint, production web export, relevant route/RTL regressions and independent evaluation are required. Native/browser checks and exact allowed scope must be finalized before approval."
+      ],
+      "verification": [
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/button-accessibility.test.tsx",
+          "tests/unit/rtl-higher-level-component-contracts.test.tsx",
+          "tests/unit/deck-cards-due-date.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ]
+      ],
+      "risk": "medium",
+      "approved": false,
+      "status": "pending",
+      "allowed_paths": [
+        "components/ui/Button.tsx",
+        "tests/unit/button-accessibility.test.tsx"
+      ],
+      "attempts": 0
     }
   ]
 }
