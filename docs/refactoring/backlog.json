@@ -2494,14 +2494,19 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "components/auth/AuthScreenShell.tsx",
         "components/auth/OAuthButtons.tsx",
         "lib/settings/startup-theme.ts",
         "tests/unit/auth-startup-theme.test.tsx"
       ],
-      "attempts": 0
+      "attempts": 1,
+      "started_at": "2026-10-16T02:18:56.783648+00:00",
+      "failure": "Batch resource limit reached",
+      "completed_at": "2026-10-16T02:20:33.471707+00:00",
+      "evidence": ".ralph/runs/RF-057-1-1792117136784361954",
+      "summary": "Extracted the shared auth startup theme lookup with OAuth-only document fallback. No commit or push performed."
     },
     {
       "id": "RF-058",

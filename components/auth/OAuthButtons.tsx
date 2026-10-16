@@ -18,6 +18,7 @@ import { useDatabaseStatus } from "@/lib/database/provider";
 import { isQfLoginEnabled } from "@/lib/quran-foundation/config";
 import { runInitialQfUserSync } from "@/lib/quran-foundation/user-sync";
 import { QF_OAUTH_PROVIDER } from "@/lib/quran-foundation/user-types";
+import { getCachedAuthDarkMode } from "@/lib/settings/startup-theme";
 import { useUIDirection } from "@/lib/ui/direction";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 
@@ -46,7 +47,7 @@ export function OAuthButtons({ strings: s, isDark, onError }: Props) {
   const { colorScheme } = useColorScheme();
   const { width } = useWindowDimensions();
   const isDesktop = width >= SIDEBAR_BREAKPOINT;
-  const resolvedIsDark = isDark ?? getCachedWebDarkMode() ?? colorScheme === "dark";
+  const resolvedIsDark = isDark ?? getCachedAuthDarkMode({ useDocumentFallback: true }) ?? colorScheme === "dark";
   const dir = useUIDirection();
   const [busyProvider, setBusyProvider] = useState<"google" | "apple" | "facebook" | "qf" | null>(null);
 
@@ -195,26 +196,6 @@ export function OAuthButtons({ strings: s, isDark, onError }: Props) {
       )}
     </View>
   );
-}
-
-function getCachedWebDarkMode(): boolean | null {
-  if (Platform.OS !== "web" || typeof window === "undefined") return null;
-
-  const theme = window.localStorage.getItem("hafiz_theme");
-  if (theme === "dark" || theme === "amoled") return true;
-  if (theme === "beige" || theme === "white") return false;
-  if (theme === "system") {
-    return window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? null;
-  }
-
-  if (typeof document !== "undefined") {
-    const rootBackground = window.getComputedStyle(document.documentElement).backgroundColor;
-    if (rootBackground === "rgb(10, 10, 10)" || rootBackground === "rgb(38, 38, 38)") {
-      return true;
-    }
-  }
-
-  return null;
 }
 
 function OAuthIconButton({

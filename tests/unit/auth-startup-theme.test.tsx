@@ -218,21 +218,28 @@ describe("auth startup theme resolution", () => {
     expectBothConsumersToResolve(nativeScheme === "dark", nativeScheme === "dark" ? "#E5E7EB" : "#DFD9D1");
   });
 
-  it.each(["android", "ios"] satisfies (typeof Platform.OS)[])("does not read browser storage on %s", (platform) => {
+  it.each([
+    ["android", "light"],
+    ["android", "dark"],
+    ["ios", "light"],
+    ["ios", "dark"],
+  ] as const)("does not read browser storage on %s with NativeWind %s", (platform, nativeScheme) => {
     jest.replaceProperty(Platform, "OS", platform);
+    mockColorScheme = nativeScheme;
     getItem.mockReturnValue("dark");
     installWindow({ localStorage: { getItem } });
 
-    expectBothConsumersToResolve(false, "#DFD9D1");
+    expectBothConsumersToResolve(nativeScheme === "dark", nativeScheme === "dark" ? "#E5E7EB" : "#DFD9D1");
     expect(getItem).not.toHaveBeenCalled();
   });
 
-  it("does not read browser storage without a window", () => {
+  it.each(["light", "dark"] as const)("does not read browser storage without a window in %s mode", (nativeScheme) => {
+    mockColorScheme = nativeScheme;
     getItem.mockReturnValue("dark");
     installWindow({ localStorage: { getItem } });
     Reflect.deleteProperty(globalThis, "window");
 
-    expectBothConsumersToResolve(false, "#DFD9D1");
+    expectBothConsumersToResolve(nativeScheme === "dark", nativeScheme === "dark" ? "#E5E7EB" : "#DFD9D1");
     expect(getItem).not.toHaveBeenCalled();
   });
 
