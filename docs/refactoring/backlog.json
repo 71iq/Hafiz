@@ -2436,8 +2436,8 @@
     {
       "id": "RF-055",
       "title": "Extract the duplicated DueDateSheet",
-      "description": "Extract the duplicated DueDateSheet",
-      "rationale": "Groups 10 and 11 are one identical feature component in session and deck-card list.",
+      "description": "Share the date-editor presentation after both parent behaviors are characterized. Preserve distinct native input defaults and parent-owned actions.",
+      "rationale": "Duplication groups share presentation but session specifies autoCapitalize none/autoCorrect false while deck cards omit both. Session advances review; deck save reloads rows. Similarity does not authorize behavior consolidation.",
       "modules": [
         "app/flashcards/session.tsx",
         "components/flashcards/DeckCardsSheet.tsx",
@@ -2447,9 +2447,11 @@
       ],
       "dependencies": [
         "RF-004",
-        "RF-006"
+        "RF-006",
+        "RF-069"
       ],
       "acceptance_criteria": [
+        "Do not approve this extraction before RF-069 and a separately prepared rendered session-editor characterization pass. The two native TextInput option differences must remain caller-owned. Existing parent validation, busy guards, haptics and session-advance versus deck-reload behavior must stay separate.",
         "Compare both full implementations and callers. Move one canonical controlled component and delete both private definitions.",
         "Test value/change, busy disabled actions, errors, close/save callbacks, keyboard avoidance and RTL/LTR. Retain ResponsiveSheet primitives and exact labels/typography."
       ],
@@ -3273,6 +3275,73 @@
         "commit": "efb82c9",
         "evidence": ".refactor-baseline/rf068-primary-acceptance.json"
       }
+    },
+    {
+      "id": "RF-069",
+      "title": "Characterize the deck-card due-date editor before reuse",
+      "description": "Test the existing exported DeckCardsSheet through its actual row menu and private due-date editor, without changing application code. Preserve the current deck-specific input defaults and parent-owned validation, busy, persistence, close and reload behavior.",
+      "rationale": "RF-055 contains two mostly duplicated editors with a real native-input difference. Session explicitly disables capitalization/autocorrect; deck cards retain defaults. Existing deck coverage checks source layout only. Establish behavioral deck-editor coverage before a separate session characterization and extraction.",
+      "modules": [
+        "components/flashcards/DeckCardsSheet.tsx",
+        "components/ui/DropdownMenu.tsx",
+        "components/ui/ResponsiveOverlay.tsx",
+        "components/ui/Button.tsx",
+        "lib/date.ts",
+        "lib/fsrs/types.ts",
+        "tests/unit/deck-cards-sheet-contract.test.ts",
+        "tests/unit/date-utils.test.ts",
+        "tests/unit/rtl-higher-level-component-contracts.test.tsx",
+        "tests/rtl/rtl-test-utils.tsx",
+        "tests/unit/deck-cards-due-date.test.tsx"
+      ],
+      "dependencies": [
+        "RF-004",
+        "RF-006",
+        "RF-053"
+      ],
+      "acceptance_criteria": [
+        "Read the actual exported DeckCardsSheet, private DueDateEditor, row menu items/callbacks, current date parser/types and existing RNTL/direction fixtures. Reuse those test patterns and real useStrings. This task adds only one test file; no application exports, source edits, changed tests, registry entries or production behavior.",
+        "Render the actual DeckCardsSheet and actual DropdownMenu, ResponsiveSheet/Header/Body/Footer, Button and TextInput. Use settings/database-hook and imported FSRS query stubs only at service boundaries. Use the installed RNTL createNodeMock native measureInWindow callback to open the real row menu. Do not mock the editor, overlay, menu, buttons, input or parent state, invoke private component functions, copy source/JSX into a test, or rely on source-string assertions. Synthetic typed DeckCardListItem fixtures must avoid all real database, service and protected dataset calls. Include at least two distinguishable cards and select the second in the successful-save flow.",
+        "At a representative390by844 safe-area/viewport fixture, cover Arabic RTL/light and English LTR/dark. Assert positive loaded-card landmarks before opening and actual editor presence only after the due-date menu action. Verify the value seeded from the selected card, numbers-and-punctuation keyboard, fixed LTR date writing with locale text alignment, existing placeholder/colors/classes, and both autoCapitalize and autoCorrect omitted at the TextInput component boundary. These omitted props differ from session and must remain characterized. Verify keyboard avoidance and existing maxWidth420/maxHeight360 sheet contract through the actual rendered component.",
+        "Drive controlled text changes and save presses. Invalid and past input show the distinct real localized messages and make no date-write call. Preserve current error lifetime while editing; cancel closes only the nested editor without a mutation or outer onClose. Reopening restores the selected card date and clears the prior validation error. Use relative future/past local dates without fragile timezone assumptions or global clock/timer mocking.",
+        "Use a settled deferred setStudyCardDueDate promise to assert both cancel/save buttons are disabled during a valid write and a nested sheet close request is ignored while busy. Successful save passes the exact database identity, deck ID, selected card ID and parsed local Date once, then closes the editor, reloads the card list and calls onChanged once. No review-session advance/haptics behavior belongs to this deck fixture.",
+        "Rejected date writes produce the real cardActionFailed state, retain the open editor/input for retry, restore enabled actions and never call onChanged. A scoped console.warn spy must assert the expected reported failure and be restored, never broadly hide warnings. All mocks, dimensions, mounted trees and deferred promises must clean up. The focused process must exit normally without unfinished-async/open-handle warnings. Do not use forceExit, suppressions, any, unsafe casts, timeout inflation, test skips or new dependencies.",
+        "All four frozen controller gates and a separate stronger read-only evaluator must pass before completion. Generator can run these local checks but cannot self-accept or commit. Browser/native/device/iOS checks are not required for this test-only slice, and no such verification is claimed. Primary retains final acceptance. RF-055 remains unapproved until session behavior also has an adequate characterization seam."
+      ],
+      "verification": [
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/deck-cards-due-date.test.tsx",
+          "tests/unit/deck-cards-sheet-contract.test.ts",
+          "tests/unit/date-utils.test.ts",
+          "--detectOpenHandles"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "tests/unit/deck-cards-due-date.test.tsx"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "tests/unit/deck-cards-due-date.test.tsx"
+        ]
+      ],
+      "risk": "medium",
+      "approved": true,
+      "status": "pending",
+      "allowed_paths": [
+        "tests/unit/deck-cards-due-date.test.tsx"
+      ],
+      "attempts": 0
     }
   ]
 }
