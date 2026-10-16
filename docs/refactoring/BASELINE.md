@@ -33,3 +33,15 @@ No tests or rules were disabled to establish this baseline. Source-text tests co
 Raw stdout, exit files, scanner JSON, Android output and browser reports live under ignored `.refactor-baseline/`. `analysis-summary.json`, `inventory.json`, and `registry-versions.json` retain scoped summaries in Git. Subsequent results must append to PROGRESS and update this table with dates rather than erase the initial failure record.
 
 Android SDK 36, ADB, and Java are available. No connected device was listed. Android debug compilation passed in 15m55s with 564 tasks executed. No APK was installed. See PROGRESS for evidence. Linux cannot run Xcode or an iOS simulator, and no iOS build passed here. No cloud build or paid service was started. Browser smoke and native runtime verification must have their own outcomes recorded, independently of the web export.
+
+## Comparison after RF-057, 2026-10-16
+
+| Check              | Original capture                   | Current measurement                   |
+| ------------------ | ---------------------------------- | ------------------------------------- |
+| Full unit suite    | 248 pass, three fail in 57 suites  | 310 pass, zero fail in 61 suites      |
+| Duplication        | 31 groups, 707 lines, 1.34 percent | 29 groups, 669 lines, 1.27 percent    |
+| Duplication scope  | 178 sources, 52,887 lines          | 179 sources, 52,833 lines             |
+| Expo package check | 19 mismatches                      | 19 mismatches, unchanged dependencies |
+| Expo Doctor        | 16 of 20 pass                      | 16 of 20 pass, same four findings     |
+
+The duplication command used the same .jscpd.json thresholds and exclusions: datasets, generated require/font maps, translations and language-label tables. The new output is .refactor-baseline/jscpd-after-rf057/jscpd-report.json. Unit and package-check argv, exits and log paths are recorded in .refactor-baseline/checks-after-rf057.json. Doctor output is .refactor-baseline/expo-doctor-after-rf057.log. The frozen analysis-summary.json and initial failures above remain intact. This comparison includes no new browser, physical-device or iOS checks.

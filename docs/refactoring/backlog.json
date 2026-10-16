@@ -355,7 +355,8 @@
         "Use Expo recommended SDK55 versions, inspect existing patches and preserve native APIs.",
         "Remove direct expo-modules-core only after confirming callers/autolinking.",
         "Verify no duplicate native modules. Split native changes from major upgrades.",
-        "Keep current enabled lint rules. The isolated eslint-config-expo 55.0.1 preflight lost nine active React Hooks rules despite zero errors. Do not downgrade the preset or exclude a diagnostic merely to satisfy version matching. Primary engineer must choose and document a compatible toolchain or justified exception before this item is approved."
+        "Keep current enabled lint rules. The isolated eslint-config-expo 55.0.1 preflight lost nine active React Hooks rules despite zero errors. Do not downgrade the preset or exclude a diagnostic merely to satisfy version matching. Primary engineer must choose and document a compatible toolchain or justified exception before this item is approved.",
+        "Before approval, diagnose the isolated peer-resolution failures recorded in SDK55_ALIGNMENT.md. The new check-expo-native.cjs rejects duplicate Android/iOS graph entries even though upstream verify exits zero. Candidate manifest constraints remain experimental; no forced peer installation is approved."
       ],
       "verification": [
         [
@@ -368,6 +369,10 @@
           "npm",
           "run",
           "diagnose:expo"
+        ],
+        [
+          "node",
+          "scripts/ralph/check-expo-native.cjs"
         ],
         [
           "npm",
@@ -543,37 +548,49 @@
     {
       "id": "RF-013",
       "title": "Repair ayah-marker preference hydration",
-      "description": "Repair ayah-marker preference hydration",
-      "rationale": "Settings writes show_ayah_markers but omits its load key.",
+      "description": "Restore the already-persisted ayah-marker visibility when SettingsProvider loads, using the existing local settings query and boolean state.",
+      "rationale": "The setter writes show_ayah_markers, but the hydration key list and state assignment omit it. This independent preference repair does not require a framework upgrade; the existing locked baseline has passing types and unit tests.",
       "modules": [
         "lib/settings/context.tsx",
         "tests/unit/settings-hydration.test.tsx"
       ],
       "dependencies": [
-        "RF-008"
+        "RF-006",
+        "RF-007"
       ],
       "acceptance_criteria": [
-        "Reproduce persisted false resetting on reload with an isolated database/provider fixture.",
-        "Load the preference with current validation/default semantics. Preserve offline boot."
+        "The primary engineer selects this exact behavior: persisted literal false hydrates false, literal true hydrates true, and absent or malformed values keep the existing true default. Do not coerce arbitrary strings, change initial state, normalize other settings or change the setter. Reuse readSettings, setShowAyahMarkersState and the existing writeUserSetting path. No helper, provider, schema or sync redesign.",
+        "Add tests/unit/settings-hydration.test.tsx using actual SettingsProvider and useSettings through RNTL renderHook and a wrapper. Isolate database/translation imports and NativeWind lifecycle using existing Jest patterns. Do not mock the provider/hook under test or write source-string assertions. Keep fixtures typed without any, suppression, unsafe casts or a fabricated full SQLiteDatabase cast.",
+        "Use a small in-memory user_settings fixture whose getAllAsync only returns rows for its bound key array, and whose runAsync persists the real writeUserSetting insert. Keep the actual user-settings module and mock only its sync-queue dependency. Seed translation language and active language consistently to avoid importing content. No actual SQLite file, Quran asset, service, network or remote sync may be touched.",
+        "Before changing application source, demonstrate that the persisted false and false-after-remount tests fail for the expected hydration omission. Record original test command and failure in generation evidence. Assert result.current.isLoaded before checking state, so assertions do not race hydration. Keep those regression expectations unchanged after the repair.",
+        "Cover existing true default, saved true, saved false, malformed values including empty string and nonboolean text, and a setter false followed by full unmount/remount against the same fixture. Exercise web and a native platform. Check that the query includes show_ayah_markers through bound parameters, that the real setter writes literal false, and that no sync enqueue or translation import occurs. Restore mocks, global descriptors and platform properties after each case.",
+        "Application diff is limited to adding show_ayah_markers to the existing hydration list and applying setShowAyahMarkersState only for exact true/false values beside the existing Quran marker hydration. Do not alter unrelated formatting, rendering, callbacks, themes, navigation, other setting semantics, database code, dependencies, patches or protected inputs.",
+        "Controller-run full unit suite, strict typecheck, scoped ESLint and production web export must pass. Independent review must verify the red-before/green-after evidence and realistic bound-key fixture, the tiny source diff, offline-only writes, invalid-value default and both platform cases. No new native API or markup changes occur; browser, device and iOS runtime verification must be recorded as not run. Primary engineer retains final acceptance."
       ],
       "verification": [
         [
           "npm",
           "run",
-          "test:unit",
-          "--",
-          "--runTestsByPath",
-          "tests/unit/settings-hydration.test.tsx",
-          "tests/unit/settings-contract.test.ts"
+          "test:unit"
         ],
         [
           "npm",
           "run",
           "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/settings/context.tsx",
+          "tests/unit/settings-hydration.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
         ]
       ],
       "risk": "medium",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
         "lib/settings/context.tsx",
