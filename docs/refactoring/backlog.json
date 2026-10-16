@@ -591,12 +591,17 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "lib/settings/context.tsx",
         "tests/unit/settings-hydration.test.tsx"
       ],
-      "attempts": 0
+      "attempts": 1,
+      "started_at": "2026-10-16T05:20:44.891454+00:00",
+      "failure": "Batch resource limit reached",
+      "completed_at": "2026-10-16T05:22:39.287144+00:00",
+      "evidence": ".ralph/runs/RF-013-1-1792128044892281805",
+      "summary": "Repaired ayah-marker hydration and added behavioral coverage. Persisted exact false/true values now hydrate correctly; absent or malformed values retain true. No commit or push performed."
     },
     {
       "id": "RF-014",

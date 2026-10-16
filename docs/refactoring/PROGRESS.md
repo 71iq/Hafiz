@@ -115,3 +115,7 @@ The mission is active. This file records durable events; backlog.json owns task 
 - 2026-10-16. Prepared RF-013 with two exact paths and retained the current dependency lock. Removing its artificial RF-008 ordering dependency allows an independent local preference repair while SDK resolution remains under diagnosis. Primary selected exact boolean hydration with the existing true default. The worker must first reproduce saved false resetting, then reuse the existing query/state/write path. No schema, sync policy, UI structure or production change is involved. Full unit tests, types, scoped lint, web export and independent evaluation remain mandatory.
 
 - 2026-10-16. Separate read-only preparation review found no blocking findings across the six changed files, current evidence, native gate and RF-013 test/write contract. Scoped ESLint, documentation/script formatting, backlog identity/dependency/readiness checks and diff checks pass. The native gate correctly fails the existing dependency defects. No application checks were repeated for this preparation. RF-013 is the only ready task.
+
+- 2026-10-16T05:19:16.790922+00:00 `RF-013` retry. Batch resource limit reached; preserved work will be reverified on resume.
+
+- 2026-10-16T05:22:39.287833+00:00 `RF-013` verified. Repaired ayah-marker hydration and added behavioral coverage. Persisted exact false/true values now hydrate correctly; absent or malformed values retain true. No commit or push performed. Evidence `.ralph/runs/RF-013-1-1792128044892281805`.
