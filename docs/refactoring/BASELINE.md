@@ -58,3 +58,7 @@ The duplication command used the same .jscpd.json thresholds and exclusions: dat
 | Android debug           | Initial build 15m55s                          | Accepted incremental build 36s, all four ABIs in APK |
 
 The Android times compare different cache states, not runtime performance. The native cold/incremental recovery history is retained in SDK55_ALIGNMENT.md. The final fifteen command records and independent review are .ralph/runs/RF-067-2-1792148137863851616. Primary artifact/hash acceptance is .refactor-baseline/rf067-primary-acceptance.json. Repeated diagnostic argv/exits are expo-install-after-rf067.json and expo-doctor-after-rf067.json under .refactor-baseline. The two remaining Doctor findings are lint-preset compatibility and native/app-config ownership. No diagnostic was excluded. No duplicate scan was repeated for this dependency-only slice; the last measured 29 groups and 669 duplicated lines remain RF-057's snapshot. No iOS build, device installation or native runtime verification ran.
+
+## Test isolation after RF-068, 2026-10-16
+
+The full unit suite passes63suites333tests with normal process exit, versus62suites322tests after RF-067. All five focused controller commands and separate evaluation pass. The six leaderboard open-handle diagnostic tests also exit normally. This test-only slice adds no application behavior, browser/native/device/iOS verification or new duplication measurement. Existing frozen captures above remain intact. Evidence .refactor-baseline/rf068-unit-full.json and rf068-primary-acceptance.json.

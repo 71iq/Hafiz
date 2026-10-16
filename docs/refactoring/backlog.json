@@ -2277,14 +2277,18 @@
     {
       "id": "RF-053",
       "title": "Share the account-sync callout presenter",
-      "description": "Share the account-sync callout presenter",
-      "rationale": "Clone group 6 duplicates a login callout between progress and leaderboard.",
+      "description": "Move only the identical controlled inner sign-in row into AccountSyncPrompt. Keep both existing private caller wrappers responsible for their distinct Card/tinted containers. Preserve all route predicates, callbacks and rendered styles.",
+      "rationale": "RF068 now characterizes both actual routes. AuthGate adds signup/full-screen gating; Button changes height/press feedback. Neither is equivalent to the existing compact callout. A stateless auth presenter can share the identical inner row while retaining real differences at the two callers.",
       "modules": [
         "app/(tabs)/progress.tsx",
         "app/(tabs)/leaderboard.tsx",
         "components/auth/AccountSyncPrompt.tsx",
-        "tests/unit/account-sync-prompt.test.tsx",
-        "tests/rtl/rtl-component-registry.ts"
+        "tests/rtl/rtl-component-registry.ts",
+        "components/ui/AuthGate.tsx",
+        "components/ui/Button.tsx",
+        "components/ui/Card.tsx",
+        "tests/unit/progress-screen-rtl.test.tsx",
+        "tests/unit/leaderboard-sign-in-prompt.test.tsx"
       ],
       "dependencies": [
         "RF-004",
@@ -2292,8 +2296,13 @@
         "RF-068"
       ],
       "acceptance_criteria": [
-        "Inspect AuthGate and existing auth UI before selecting a presenter.",
-        "Preserve caller visibility predicates and login callbacks. Render bilingual labels and RTL/LTR button order with existing styles/targets."
+        "Read RF068 evidence and both full private presenters/call sites before editing. Reuse decision: share the identical inner row only, retain existing progress Card and leaderboard tinted wrapper, keep AuthGate and Button unchanged because their signup/gating/height/feedback differ. Record this concrete choice before extraction.",
+        "Create components/auth/AccountSyncPrompt.tsx as a stateless controlled presenter with exported props label:string, buttonLabel:string, isDark:boolean, isRTL:boolean, onPress:()=>void. It owns only the current inner View/Text/Pressable/LogIn body. No hooks, services, auth state, routing, context, new primitives/dependencies, variant framework or new styles.",
+        "Retain ProgressSignInPrompt and LeaderboardSignInPrompt as the existing feature-specific container owners. Reuse the exported prop type and compose the shared presenter inside the unchanged Card/View wrappers. Keep all three call sites, visibility predicates, labels and callbacks semantically identical. Preserve exact classes, typography, colors, press opacity, role/label, direction and icon order. Delete the two obsolete inner copies and unused LogIn imports.",
+        "No test edits are allowed. Existing RF068 actual-route contracts and original progress RTL assertions must pass unchanged. Do not touch query/session/data behavior or fix unrelated existing casts. No new any, suppression or unsafe cast.",
+        "Add exactly one RTL registry entry for the new presenter using contract button and testLevel rntl, naming the existing two route fixtures. Preserve the rest of the registry. Do not create a redundant presenter test or broadly reformat legacy route/registry code. New component must satisfy Prettier; lint all four changed files.",
+        "This is component-body extraction with identical emitted RN hierarchy/props, not a UI behavior or appearance migration. Existing real-route tests at390x844 in Arabic/light and English/dark are required rendered-state evidence. Also require production web export and all28 existing Chrome smoke tests. Browser checks use CI1, installed Chrome and a fresh explicit loopback server. No physical-device/iOS check is claimed. Any proposed layout, gesture, keyboard, accessibility, auth or cache behavior change must remain outside this task.",
+        "Fresh controller commands and independent evaluator must verify all unchanged behavior contracts and complete diff. Main engineer retains acceptance. Preserve failures and obey existing two-attempt and resource limits."
       ],
       "verification": [
         [
@@ -2302,22 +2311,51 @@
           "test:unit",
           "--",
           "--runTestsByPath",
-          "tests/unit/account-sync-prompt.test.tsx"
+          "tests/unit/progress-screen-rtl.test.tsx",
+          "tests/unit/leaderboard-sign-in-prompt.test.tsx",
+          "tests/unit/rtl-component-registry-coverage.test.ts"
         ],
         [
           "npm",
           "run",
           "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "app/(tabs)/progress.tsx",
+          "app/(tabs)/leaderboard.tsx",
+          "components/auth/AccountSyncPrompt.tsx",
+          "tests/rtl/rtl-component-registry.ts"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "components/auth/AccountSyncPrompt.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8193",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8193",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts"
         ]
       ],
       "risk": "medium",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
         "app/(tabs)/progress.tsx",
         "app/(tabs)/leaderboard.tsx",
         "components/auth/AccountSyncPrompt.tsx",
-        "tests/unit/account-sync-prompt.test.tsx",
         "tests/rtl/rtl-component-registry.ts"
       ],
       "attempts": 0
@@ -3209,7 +3247,13 @@
       "evidence": ".ralph/runs/RF-068-2-1792151256669477535",
       "recovery_note": "First ordinary attempt rejected by independent Astra review: the twelve assertions pass but Jest waits on the default five-minute query GC timer; style coverage omitted Card shape/background, label classes and button typography. All failed evidence remains .ralph/runs/RF-068-1-1792150410819530688. Primary diagnosed the observed wait and selected TanStack documented test-only gcTime Infinity with existing cleanup retained, plus exact missing appearance checks. Added a focused detectOpenHandles gate. Attempts remains1of2, no refund; this is the final allowed implementation attempt. No application or dependency change.",
       "completed_at": "2026-10-16T11:49:23.395135+00:00",
-      "summary": "Implemented RF-068 as a test-only characterization patch. Production code and controller-owned files were untouched; no commit or push performed."
+      "summary": "Implemented RF-068 as a test-only characterization patch. Production code and controller-owned files were untouched; no commit or push performed.",
+      "primary_acceptance": {
+        "at": "2026-10-16T11:54:33.910918+00:00",
+        "accepted": true,
+        "commit": "efb82c9",
+        "evidence": ".refactor-baseline/rf068-primary-acceptance.json"
+      }
     }
   ]
 }

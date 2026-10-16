@@ -16,7 +16,7 @@ No task may delete a platform variant based on Knip alone. No duplicate block is
 
 ## Current bounded step, 2026-10-16
 
-RF-067 is accepted after fifteen fresh gates, independent evaluation and primary artifact/hash review. RF-008 still owns the two remaining Expo diagnostics; neither a lint downgrade nor native regeneration is approved. RF-068 will characterize the unchanged progress and leaderboard sign-in callouts through actual rendered routes before RF-053 can extract presentation. Existing AuthGate adds signup and full-screen gating, while these callouts have distinct visibility and outer styling. The characterization changes tests only. It keeps those differences explicit and does not authorize a UI, auth, query-key or service change.
+RF-067 is accepted after fifteen fresh gates, independent evaluation and primary artifact/hash review. RF-008 still owns the two remaining Expo diagnostics; neither a lint downgrade nor native regeneration is approved. RF-068 has characterized the unchanged progress and leaderboard sign-in callouts through actual rendered routes. RF-053 is now scoped to extract only their identical inner row, retaining both existing container owners. Existing AuthGate adds signup and full-screen gating, while these callouts have distinct visibility and outer styling. The characterization changed tests only. The extraction keeps those differences explicit and authorizes no appearance, interaction, auth, query-key or service change.
 
 ## Completion condition
 
