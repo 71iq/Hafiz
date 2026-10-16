@@ -70,3 +70,7 @@ The shared account-sync row passed all six controller checks, including15 unchan
 ## Test isolation after RF-069, 2026-10-16
 
 All64 unit suites and336 tests pass in a fresh full run, with normal process exit and no unfinished-async warning. Four focused gates and independent Astra review pass after the measurement/warning/deferred-cleanup repair. Native View and dimension fixture changes do not regress the wider suite. Evidence .refactor-baseline/rf069-unit-full.json and rf069-primary-acceptance.json. Application source, dependencies and datasets remain unchanged. No browser/native/device/iOS check or new duplication scan ran for this test-only slice.
+
+## Session characterization after RF-070, 2026-10-16
+
+Four focused controller gates and independent Astra review pass, including12 tests in3 suites with normal open-handle detection exit. The corrected busy check targets the visible date-editor modal. Actual session tests preserve native input differences, haptics and current-card removal/advance; failure coverage uses the revealed state. Front-state error visibility remains a separate finding. The last full-suite measurement remains336 tests in64 suites after RF-069; no full/native/browser/duplicate scan was repeated here. Evidence .refactor-baseline/rf070-primary-acceptance.json.
