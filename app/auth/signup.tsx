@@ -248,13 +248,7 @@ function SignupFormScreen() {
   const footer = configured ? (
     <>
       <OAuthButtons
-        strings={{
-          authOrContinueWith: s.authOrContinueWith,
-          authContinueWithQuranFoundation: s.authContinueWithQuranFoundation,
-          authContinueWithGoogle: s.authContinueWithGoogle,
-          authContinueWithApple: s.authContinueWithApple,
-          authContinueWithFacebook: s.authContinueWithFacebook,
-        }}
+        strings={s}
         onError={(msg) => setShowError(msg)}
       />
       <AuthRouteLink
