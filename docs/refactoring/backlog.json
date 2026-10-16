@@ -2449,7 +2449,8 @@
         "RF-004",
         "RF-006",
         "RF-069",
-        "RF-070"
+        "RF-070",
+        "RF-072"
       ],
       "acceptance_criteria": [
         "Do not approve this extraction before RF-069 and a separately prepared rendered session-editor characterization pass. The two native TextInput option differences must remain caller-owned. Existing parent validation, busy guards, haptics and session-advance versus deck-reload behavior must stay separate.",
@@ -3383,7 +3384,8 @@
         "Drive controlled text changes. Invalid and past local dates show distinct localized errors, make no date write or haptic and retain existing error lifetime while editing. Cancel closes the editor without a mutation, router navigation or review-card advance; reopening restores the current-card value and clears validation error. Use relative past/future local dates without global fake timers or clock assumptions.",
         "For a valid future date, use a deferred write to assert save/cancel disabled and native sheet close ignored during busy. One hapticMedium and one setStudyCardDueDate call use the exact database identity, current card deck/id and parsed Date. After resolution the editor closes and the second distinct cue replaces the first. Do not assert a newly invented progress-counter behavior. Date editing must not insert a study log, grade/update the scheduler card, award points/achievements or sync scores. Two-card fixtures avoid summary/backend behavior; the parent advance must run for real, never be mocked.",
         "Rejected persistence displays actual cardActionFailed, keeps the first card and editor/input available, restores enabled actions, and does not advance or navigate. Scope warning capture to the expected reported error, forward unexpected warnings and assert the complete call list. Settle and React-act-drain every deferred promise in finally blocks even on assertion failure. Restore spies/dimensions and reset queued service implementations between cases. No broad warning suppression, forceExit, timeouts, skips, any, unsafe casts, new dependencies or test-configuration edits. Focused Jest must exit normally without unfinished-async/open-handle warnings.",
-        "All four frozen controller commands and a separate stronger read-only evaluator must pass. Generator implements only its one approved test path and cannot accept, commit or modify progress/backlog. This test-only slice requires no browser/native/device/iOS check and must not claim one. Primary retains final acceptance. If the selected fixture cannot reach the real session UI within the bounded task, report the exact blocker instead of weakening the seam. RF-055 remains unapproved until this characterization is accepted."
+        "All four frozen controller commands and a separate stronger read-only evaluator must pass. Generator implements only its one approved test path and cannot accept, commit or modify progress/backlog. This test-only slice requires no browser/native/device/iOS check and must not claim one. Primary retains final acceptance. If the selected fixture cannot reach the real session UI within the bounded task, report the exact blocker instead of weakening the seam. RF-055 remains unapproved until this characterization is accepted.",
+        "Final allowed repair after independent rejection: preserve all three scenarios and every meaningful assertion. The busy requestClose test must find the actual Modal ancestor containing the date input, assert visible=true, and dispatch requestClose on that modal while the deferred write is pending. Never choose by list position or a hidden ConfirmDialog. Retain unconditional deferred settlement/draining and complete warning capture. Only the same test file may change. All four frozen commands and separate evaluator must pass. Attempt1 remains spent; no refund, retry-limit change, source edit or restored invalidated checkpoint."
       ],
       "verification": [
         [
@@ -3414,11 +3416,15 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "pending",
+      "status": "retry",
       "allowed_paths": [
         "tests/unit/session-due-date.test.tsx"
       ],
-      "attempts": 0
+      "attempts": 1,
+      "started_at": "2026-10-16T17:17:23.148624+00:00",
+      "failure": "Independent review failed: [P2] tests/unit/session-due-date.test.tsx:483 selects the last Modal, which belongs to the hidden ConfirmDialog rendered after DueDateSheet. Its busy handler does nothing, so the assertion passes without testing the editor's dismissal guard. Select the Modal containing the date input, assert visible=true, then dispatch requestClose while persistence is pending.; All four verification commands passed freshly: 3 suites, 12 tests, no async warnings. No browser or device checks are required for this slice. No files were changed.",
+      "evidence": ".ralph/runs/RF-070-1-1792171043149498186",
+      "recovery_note": "First independent evaluation rejected a false-positive busy dismissal test: the last Modal is the hidden ConfirmDialog. Primary requires the visible date-input Modal ancestor. All four gates and12 tests passed but are insufficient without this correction. Final implementation attempt2 remains available."
     },
     {
       "id": "RF-071",
@@ -3470,6 +3476,130 @@
       "allowed_paths": [
         "components/ui/Button.tsx",
         "tests/unit/button-accessibility.test.tsx"
+      ],
+      "attempts": 0
+    },
+    {
+      "id": "RF-072",
+      "title": "Show session date-save failures inside the active editor",
+      "description": "Fix the observed date-save failure visibility gap without changing mutation or review semantics.",
+      "rationale": "RF-070 initial front-state fixture could not find cardActionFailed after a rejected write. runCardAction sets sessionError, which is rendered only in grading/summary; DueDateSheet receives only validation error. Revealing the card exposes the background error but does not make front-opened editor failures visible.",
+      "modules": [
+        "app/flashcards/session.tsx",
+        "tests/unit/session-due-date.test.tsx",
+        "components/ui/ResponsiveOverlay.tsx"
+      ],
+      "dependencies": [
+        "RF-070"
+      ],
+      "acceptance_criteria": [
+        "Before approval, finish RF-070 and preserve the actual failing front-state evidence. Scope remains one source file and its existing real-route fixture. Add a red regression for a date editor opened before Reveal, then fix it without mocking phase, editor or actions.",
+        "Primary candidate: clear stale sessionError when opening the current-card date editor and pass dueDateError before sessionError to its existing controlled error prop. Reuse the existing localized error presentation. Preserve validation priority, typed input, busy guards, haptics, identity/date persistence, successful advance and cancellation. No new error wrapper, strings, data/schema/network behavior or global error redesign.",
+        "Require error text within the visible date-editor modal for front and revealed flows, rather than a background grading label. Preserve the rejected input and retry; cancel/reopen clears stale failures. Update existing revealed-flow assertion to target the actual modal if both inline and background messages exist. Keep all prior assertions semantically intact.",
+        "All six frozen gates and separate independent review are required. Controller owns networking/browser verification outside the generator sandbox. No physical-device/native build is claimed for this local state/error-prop change. Primary must finalize exact scope before approval; remaining card-action error variants belong to RF-073."
+      ],
+      "verification": [
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/session-due-date.test.tsx",
+          "tests/unit/deck-cards-due-date.test.tsx",
+          "tests/unit/date-utils.test.ts",
+          "--detectOpenHandles"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "app/flashcards/session.tsx",
+          "tests/unit/session-due-date.test.tsx"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "tests/unit/session-due-date.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8193",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8193",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts"
+        ]
+      ],
+      "risk": "medium",
+      "approved": false,
+      "status": "pending",
+      "allowed_paths": [
+        "app/flashcards/session.tsx",
+        "tests/unit/session-due-date.test.tsx"
+      ],
+      "attempts": 0
+    },
+    {
+      "id": "RF-073",
+      "title": "Audit remaining session card-action failure visibility",
+      "description": "Characterize and repair remaining error-display variants across session phases and open action overlays.",
+      "rationale": "The shared runCardAction catches all action failures into sessionError, but the screen renders that string only during grading or summary. Due-date inline handling is isolated in RF-072. Suspend, bury, mark, delete/reset confirmation and answer editing require their own state/overlay audit.",
+      "modules": [
+        "app/flashcards/session.tsx",
+        "components/ui/ConfirmDialog.tsx",
+        "tests/unit/session-due-date.test.tsx",
+        "tests/unit/session-card-action-errors.test.tsx"
+      ],
+      "dependencies": [
+        "RF-070",
+        "RF-072"
+      ],
+      "acceptance_criteria": [
+        "Before approval map each real runCardAction caller, overlay lifecycle and visible error owner. Split into smaller tasks if necessary. Do not infer that moving a background label makes errors visible through an open modal.",
+        "Add rendered rejected-action regressions at the actual user entry points. Preserve SQL calls, stable IDs, haptics, busy exclusion, retry and successful review/advance behavior. Keep all service access isolated.",
+        "Prefer existing error text and owned overlay contracts. Avoid new global notification systems, multiple error sources or generic action frameworks. Primary chooses source ownership and exact approval evidence.",
+        "Exact file scope, commands and manual/platform verification must be prepared before any agent receives approval. Independent evaluation and final primary acceptance are required."
+      ],
+      "verification": [
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/session-card-action-errors.test.tsx",
+          "tests/unit/session-due-date.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ]
+      ],
+      "risk": "medium",
+      "approved": false,
+      "status": "pending",
+      "allowed_paths": [
+        "app/flashcards/session.tsx",
+        "components/ui/ConfirmDialog.tsx",
+        "tests/unit/session-card-action-errors.test.tsx"
       ],
       "attempts": 0
     }
