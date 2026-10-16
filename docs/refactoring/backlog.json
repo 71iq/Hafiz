@@ -3510,7 +3510,8 @@
         "The installed Slot package contains JSX in its distributed JS and current Expo preset ignores it. In jest.config.js derive transformIgnorePatterns from require(\"jest-expo/jest-preset\").transformIgnorePatterns, inserting only @rn-primitives/slot into the existing node_modules transform allowlist via each pattern.replace(\"react-native|\", \"@rn-primitives/slot|react-native|\"). Preserve every other preset regex and existing config field. No global setup mock edits, blanket node_modules transform or unrelated test/config change. Primary preflight verified this exact adaptation with the actual installed Slot.",
         "Add tests/e2e/button-accessibility.spec.ts using existing Playwright config/helpers and actual static app. For Enter and Space, use a fresh default English browser context at the existing390x844 smoke project, waitForQaReady, visit /settings?category=about, open Become a Donor, select the footer by getByRole(\"button\", {name:\"Close\", exact:true}).filter({hasText:\"Close\"}), focus and activate with locator.press. Assert the footer and modal message disappear and the underlying settings remains healthy. Excluding the icon-only header close through hasText is required. No force clicks, synthetic dispatchEvent, QA route, component replacement, service credentials or production writes. Keep browser networking controller-owned outside generator sandbox.",
         "Observe the new default-role native test failing before the minimal production change and passing afterward; preserve ordered red/green evidence. Existing tests remain read-only. The primary native/browser preflight is additional evidence and does not replace new regression tests. Run all six frozen controller commands. Full unit suite is required because Button and Jest transform configuration are shared. Scoped lint must add no warning. Prettier applies to new tests and the small Jest config, not legacy Button formatting.",
-        "New independent Astra evaluation must inspect actual Slot behavior, role precedence, disabled interactions, source scope, red/green and controller results. Main retains final acceptance. No physical-device, Android or iOS run is claimed for this semantic slice. Surface failures instead of weakening roles, test helpers or existing assertions."
+        "New independent Astra evaluation must inspect actual Slot behavior, role precedence, disabled interactions, source scope, red/green and controller results. Main retains final acceptance. No physical-device, Android or iOS run is claimed for this semantic slice. Surface failures instead of weakening roles, test helpers or existing assertions.",
+        "Recovery note after attempt1: primary ran the exact frozen Chrome command outside the implementation sandbox and all30 tests passed, including both real donor-footer Enter/Space cases. Evidence .refactor-baseline/rf071-primary-browser-preflight.log. Preserve the four-path implemented candidate when correct. Ordered original native red/source/green evidence is generator.jsonl events30/33/39 in .ralph/runs/RF-071-1-1792173433551663227; no production revert is needed merely to repeat red. The known implementation-sandbox bind EPERM is not unavailable controller verification. Do not attempt browser networking in the implementation sandbox; return implemented with browser acceptance pending to the controller when source/non-browser work is complete. A genuine source/platform discrepancy still blocks. Controller must freshly run all six commands and separate Astra review. Attempt1 failure remains recorded; no refund, extra attempt or checkpoint restoration is approved."
       ],
       "verification": [
         [
@@ -3559,14 +3560,17 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "pending",
+      "status": "retry",
       "allowed_paths": [
         "components/ui/Button.tsx",
         "jest.config.js",
         "tests/unit/button-accessibility.test.tsx",
         "tests/e2e/button-accessibility.spec.ts"
       ],
-      "attempts": 0
+      "attempts": 1,
+      "started_at": "2026-10-16T17:57:13.550677+00:00",
+      "failure": "Agent blocked: Implemented RF-071 within the four approved paths. Required Playwright verification is blocked because the environment cannot bind 127.0.0.1:8193 (EPERM). No commit or push performed.",
+      "evidence": ".ralph/runs/RF-071-1-1792173433551663227"
     },
     {
       "id": "RF-072",
