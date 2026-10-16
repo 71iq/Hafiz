@@ -3918,9 +3918,150 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "tests/unit/session-due-date.test.tsx"
+      ],
+      "attempts": 1,
+      "started_at": "2026-10-16T23:19:22.175310+00:00",
+      "failure": "Batch resource limit reached",
+      "completed_at": "2026-10-16T23:21:23.609799+00:00",
+      "evidence": ".ralph/runs/RF-076-1-1792192762176262230",
+      "summary": "Implemented RF-076 in tests/unit/session-due-date.test.tsx. Eagerly captures the existing public ReactNative.Modal reference at module setup and reuses it in getDateEditorModal, moving only reference initialization outside the scenario deadline. No commit or push performed."
+    },
+    {
+      "id": "RF-077",
+      "title": "Expose deck date-save failures in the active editor",
+      "description": "Characterize the DeckCardsSheet date-save error owner and route persistence failures into the existing shared DueDateSheet.",
+      "rationale": "Variant check finds runAction sets error at DeckCardsSheet.tsx:122, while DueDateSheet still receives only dueDateError at:295. The background list label cannot prove visibility in the open date sheet. This is the remaining source analogue of RF-072.",
+      "modules": [
+        "components/flashcards/DeckCardsSheet.tsx",
+        "tests/unit/deck-cards-due-date.test.tsx",
+        "components/flashcards/DueDateSheet.tsx"
+      ],
+      "dependencies": [
+        "RF-069",
+        "RF-055",
+        "RF-072"
+      ],
+      "acceptance_criteria": [
+        "Before approval reproduce rejection inside the actual visible input Modal, rather than accepting the existing background getByText assertion. Preserve all accepted deck characterization and exact services/reload/onChanged behavior.",
+        "Primary should evaluate validation-before-action error priority and stale-error clearing on a fresh opening, reusing the shared controlled date sheet and existing error state. No source/data change is approved by this placeholder.",
+        "Finalize exact paths, ordered red/green, changed-state browser evidence, commands and review before approval. Severity medium, source-flow confidence high; new rendered reproduction remains pending."
+      ],
+      "verification": [
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/deck-cards-due-date.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ]
+      ],
+      "risk": "medium",
+      "approved": false,
+      "status": "pending",
+      "allowed_paths": [
+        "components/flashcards/DeckCardsSheet.tsx",
+        "tests/unit/deck-cards-due-date.test.tsx"
+      ],
+      "attempts": 0
+    },
+    {
+      "id": "RF-078",
+      "title": "Expose deck confirmation failures in the active dialog",
+      "description": "Characterize rejected deck delete/reset actions and reuse the optional ConfirmDialog error contract once RF-074 is accepted.",
+      "rationale": "Deck runAction catches into a list-level error while the failed await leaves confirmAction open. The ConfirmDialog call at:264 receives no error. This matches the session confirmation ownership defect without changing database actions.",
+      "modules": [
+        "components/flashcards/DeckCardsSheet.tsx",
+        "components/ui/ConfirmDialog.tsx",
+        "tests/unit/deck-cards-due-date.test.tsx"
+      ],
+      "dependencies": [
+        "RF-074",
+        "RF-077"
+      ],
+      "acceptance_criteria": [
+        "Before approval add real-parent rejected delete/reset cases inside the correct visible Modal. Inspect cancel/reopen, busy guards, exact service IDs and retry/reload semantics.",
+        "Reuse the proven optional shared dialog error contract and existing deck-owned error state. Preserve list loading and other callers. Finalize exact regression/native/web evidence and commands before approval.",
+        "Severity medium, source-flow confidence high; runtime rejection reproduction remains pending. No fixture cloning, generic action framework, backend change or source edit is approved by this placeholder."
+      ],
+      "verification": [
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/deck-cards-due-date.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ]
+      ],
+      "risk": "medium",
+      "approved": false,
+      "status": "pending",
+      "allowed_paths": [
+        "components/flashcards/DeckCardsSheet.tsx",
+        "tests/unit/deck-cards-due-date.test.tsx"
+      ],
+      "attempts": 0
+    },
+    {
+      "id": "RF-079",
+      "title": "Clarify implementation and evaluator ownership in Ralph prompts",
+      "description": "Primary-only runner preparation to prevent implementation sessions from starting redundant reviewers or treating documented sandbox-only browser restrictions as unavailable controller verification.",
+      "rationale": "RF-076 generation launched its own read-only reviewer before the mandatory controller evaluator. RF-053/RF-071 earlier spent normal attempts on known sandbox loopback restrictions. These are concrete ownership/admission costs; controlled independent evaluation must remain mandatory.",
+      "modules": [
+        "scripts/ralph/control.py",
+        "scripts/ralph/tests/test_control.py",
+        "docs/refactoring/RUNBOOK.md"
+      ],
+      "dependencies": [
+        "RF-076"
+      ],
+      "acceptance_criteria": [
+        "Primary owns this runner change. The normal generator path hard-denies scripts/ralph; do not approve this placeholder for a mechanical implementation session or bypass writer leases. Diagnose the exact prompt and preserve pinned vendor/config/resource/retry policies.",
+        "Clarify that the bounded implementation worker does not spawn subagents/reviewers and that the controller owns the stronger independent review. Follow task-specific verification ownership and report pending controller checks honestly. A documented implementation sandbox bind restriction alone does not make a controller-owned platform unavailable; genuine required infrastructure remains a blocker.",
+        "Keep fresh controller commands, independent evaluator, failure preservation and completion gates unchanged. Run the existing runner regression suite and harmless smoke appropriate to the final prompt-only adapter change, inspect diff and obtain independent review under the primary workflow. No source/task acceptance shortcut, retry refund, raised limit, model/provider change or extra spend authorization."
+      ],
+      "verification": [
+        [
+          "npm",
+          "run",
+          "test:refactor-runner"
+        ],
+        [
+          "python3",
+          "scripts/ralph/control.py",
+          "smoke"
+        ]
+      ],
+      "risk": "medium",
+      "approved": false,
+      "status": "pending",
+      "allowed_paths": [
+        "scripts/ralph/control.py",
+        "docs/refactoring/RUNBOOK.md"
       ],
       "attempts": 0
     }

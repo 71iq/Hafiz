@@ -48,6 +48,7 @@ import {
 } from "@/lib/fonts/loader";
 import { expectTextAlignStart, expectWritingDirection, flattenStyle } from "../rtl/rtl-test-utils";
 
+const NativeModal = ReactNative.Modal;
 const mockDatabase = Object.freeze({ identity: "session-due-date-database" });
 const mockRouterReplace = jest.fn();
 
@@ -357,7 +358,7 @@ function renderSession() {
 
 function getDateEditorModal(input: RenderedNode): RenderedNode {
   let editorModal: RenderedNode | null = input;
-  while (editorModal && editorModal.type !== ReactNative.Modal) {
+  while (editorModal && editorModal.type !== NativeModal) {
     editorModal = editorModal.parent;
   }
   if (!editorModal) throw new Error("The session due-date editor modal was not rendered");
