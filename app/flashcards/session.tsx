@@ -690,6 +690,7 @@ function FlashcardSessionScreen() {
     setCardMenuOpen(false);
     setDueDateText(formatLocalDateInput(new Date(currentCard.card.due)));
     setDueDateError(null);
+    setSessionError(null);
     setDueDateOpen(true);
   }, [currentCard]);
 
@@ -1093,7 +1094,7 @@ function FlashcardSessionScreen() {
       <DueDateSheet
         visible={dueDateOpen}
         value={dueDateText}
-        error={dueDateError}
+        error={dueDateError ?? sessionError}
         busy={cardActionBusy}
         isDark={isDark}
         isRTL={isRTL}
