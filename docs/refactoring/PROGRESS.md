@@ -195,3 +195,11 @@ The mission is active. This file records durable events; backlog.json owns task 
 - 2026-10-16T11:58:34.231329+00:00 `RF-053` retry. Agent blocked: Implemented RF-053 within the approved paths. Required Chrome smoke verification is blocked because the fresh loopback server cannot bind 127.0.0.1:8193 (EPERM).
 
 - 2026-10-16. RF-053 first generation preserved its four-path extraction but returned blocked after browser server listen EPERM in the network-disabled generator sandbox. Primary confirmed loopback binding succeeds in the controller environment and ran the identical Chrome smoke command: all28 tests passed in39.2s. Clarified task execution ownership so the generator leaves browser verification to the controller. All six frozen commands, unchanged tests, independent evaluation and the first failed attempt remain required. No source patch was altered or accepted. Evidence .refactor-baseline/rf053-execution-boundary.json.
+
+- 2026-10-16T16:08:19.482534+00:00 `RF-053` retry. Batch resource limit reached. Preserved work will be reverified on resume.
+
+- 2026-10-16T16:26:27.372381+00:00 `RF-053` blocked. Process interrupted. Resume preserves the current task and diff.
+
+- 2026-10-16. User removed the 10 percent weekly reserve. Updated the active supervisor through the app tool and confirmed the saved prompt. RUNBOOK now allows remaining weekly capacity while retaining the five-hour95percent stop, bounded batches and no credits/reset/provider changes.
+
+- 2026-10-16. A later RF-053 controller run reused generation, passed the first15-test gate, then received a process interruption during typecheck. It incorrectly consumed the last ordinary retry. Primary verified all four source hashes/modes and unchanged tests, preserved the interrupted run and invalidated checkpoint, and refunded only this interruption. The original generator failure remains attempt1of2. RF-053 is retry; fresh generation and all six checks plus independent evaluation are required. No checkpoint was restored and no source was accepted. Evidence .ralph/runs/RF-053-2-1792167975712181796.

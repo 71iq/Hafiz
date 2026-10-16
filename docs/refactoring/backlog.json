@@ -2360,9 +2360,17 @@
         "tests/rtl/rtl-component-registry.ts"
       ],
       "attempts": 1,
-      "started_at": "2026-10-16T11:56:20.953919+00:00",
-      "failure": "Agent blocked: Implemented RF-053 within the approved paths. Required Chrome smoke verification is blocked because the fresh loopback server cannot bind 127.0.0.1:8193 (EPERM).",
-      "evidence": ".ralph/runs/RF-053-1-1792151780954842914"
+      "started_at": "2026-10-16T16:26:15.711344+00:00",
+      "failure": "Process interrupted. Resume preserves the current task and diff.",
+      "evidence": ".ralph/runs/RF-053-2-1792167975712181796",
+      "resource_failures": [
+        {
+          "kind": "process_interruption",
+          "evidence": ".ralph/runs/RF-053-2-1792167975712181796",
+          "attempt_refund": 1,
+          "reason": "Controller interrupted during typecheck after focused test gate passed. Original ordinary generator failure still counts. No invalidated checkpoint was restored; fresh generation required."
+        }
+      ]
     },
     {
       "id": "RF-054",

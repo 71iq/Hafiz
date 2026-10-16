@@ -58,11 +58,11 @@ The initial first four ready items are intentionally small. The remaining workst
 
 ## Budget-aware continuation
 
-The active thread heartbeat `hafiz-modernization-supervisor` checks hourly at 45 minutes past the hour. It inspects account usage and writer locks first. It starts at most one bounded Ralph iteration only when five-hour usage is below 95 percent and weekly usage is below 90 percent. Unknown usage or an active writer prevents a new batch. Routine unchanged/budget-blocked checks remain quiet. No reset credits, purchases or provider switching are authorized.
+The active thread heartbeat `hafiz-modernization-supervisor` checks hourly at 45 minutes past the hour. It inspects account usage and writer locks first. It starts at most one bounded Ralph iteration when five-hour usage is below 95 percent and the provider still allows account usage. There is no reserved weekly percentage. Unknown usage, exhausted provider allowance or an active writer prevents a new batch. Routine unchanged/budget-blocked checks remain quiet. No reset credits, purchases or provider switching are authorized.
 
 The supervisor reads current progress and scopes later work as primary engineer. It never replaces the Ralph implementation/evaluation loop. Pause the supervisor only when the mission actually meets its documented completion criteria or the user requests a stop.
 
-Read backlog.json and the matching generation checkpoint to identify unfinished work. Do not infer current task state from an older progress entry. The user raised the five-hour threshold to 95 percent on 2026-10-16. The weekly threshold remains 90 percent.
+Read backlog.json and the matching generation checkpoint to identify unfinished work. Do not infer current task state from an older progress entry. The user raised the five-hour threshold to 95 percent and removed the 10 percent weekly reserve on 2026-10-16. Use remaining weekly capacity until the provider exhausts it. Keep the five-hour stop, bounded batches and existing prohibition on purchases, reset credits and provider switching.
 
 ## SDK 55 verification slice
 
