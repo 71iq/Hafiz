@@ -3348,7 +3348,12 @@
       "evidence": ".ralph/runs/RF-069-2-1792169767025019387",
       "recovery_note": "Independent Astra review rejected the first implemented fixture despite all four gates and11 tests passing. Primary approves the installed native View measurement spy after inspecting node_modules/react-native/jest/mockNativeComponent.js and preserved failing no-callback experiments. Repair complete warning capture and unconditional deferred settlement/draining. Original first attempt remains counted; final attempt2 only.",
       "completed_at": "2026-10-16T16:57:53.156561+00:00",
-      "summary": "Repaired only `tests/unit/deck-cards-due-date.test.tsx`. Reused the real DeckCardsSheet, DropdownMenu, ResponsiveSheet, Button, TextInput, real locale strings, and service-boundary query stubs. Removed createNodeMock indirection, added scoped native measurement spying, complete warning capture, and unconditional deferred cleanup. No application code or pre-existing backlog edits were changed."
+      "summary": "Repaired only `tests/unit/deck-cards-due-date.test.tsx`. Reused the real DeckCardsSheet, DropdownMenu, ResponsiveSheet, Button, TextInput, real locale strings, and service-boundary query stubs. Removed createNodeMock indirection, added scoped native measurement spying, complete warning capture, and unconditional deferred cleanup. No application code or pre-existing backlog edits were changed.",
+      "primary_acceptance": {
+        "accepted": true,
+        "commit": "9044125",
+        "evidence": ".refactor-baseline/rf069-primary-acceptance.json"
+      }
     }
   ]
 }

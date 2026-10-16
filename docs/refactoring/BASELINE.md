@@ -66,3 +66,7 @@ The full unit suite passes63suites333tests with normal process exit, versus62sui
 ## Comparison after RF-053, 2026-10-16
 
 The shared account-sync row passed all six controller checks, including15 unchanged route/registry tests, strict types, scoped lint, new-file format, web export and28 Chrome smoke tests. Independent Astra review and primary hash/diff acceptance pass. The same duplication configuration now reports28 groups,628 lines and1.1894percent across180 sources and52,798 lines. The immediately preceding RF-057 scan reported29 groups and669 lines. The original capture remains31 groups and707 lines. Snapshot .refactor-baseline/jscpd-after-rf053/jscpd-report.json. Acceptance .refactor-baseline/rf053-primary-acceptance.json. The full333-test suite was last run for RF-068; it was not repeated for this bounded extraction. No Android/iOS build or physical-device check ran for RF-053.
+
+## Test isolation after RF-069, 2026-10-16
+
+All64 unit suites and336 tests pass in a fresh full run, with normal process exit and no unfinished-async warning. Four focused gates and independent Astra review pass after the measurement/warning/deferred-cleanup repair. Native View and dimension fixture changes do not regress the wider suite. Evidence .refactor-baseline/rf069-unit-full.json and rf069-primary-acceptance.json. Application source, dependencies and datasets remain unchanged. No browser/native/device/iOS check or new duplication scan ran for this test-only slice.
