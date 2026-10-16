@@ -3669,7 +3669,10 @@
         "tests/unit/session-due-date.test.tsx",
         "lib/fsrs/queries.ts",
         "components/flashcards/DueDateSheet.tsx",
-        "components/ui/Button.tsx"
+        "components/ui/Button.tsx",
+        "tests/e2e/session-action-errors.spec.ts",
+        "lib/database/provider.tsx",
+        "lib/database/schema.ts"
       ],
       "dependencies": [
         "RF-070",
@@ -3683,7 +3686,10 @@
         "Extend the existing real route fixture in tests/unit/session-due-date.test.tsx rather than copying its typed settings/service setup into a second file. Add imports for the three already-isolated service mocks. All five accepted date scenarios and assertions remain unchanged. Use actual route/action sheet/buttons and localized strings; no private-component or runCardAction mocks, forced phase state, real database/font/dataset/network access, casts or any. The existing synthetic two-card mutashabihat branch is the approved fixture.",
         "Add behavioral rejection/retry coverage for all three direct actions in front and revealed states. Include Arabic/light and English/dark across those six cases. Obtain meaningful red before the production relocation: front-state error assertions must fail while revealed-state behavior is retained. Use the real actions menu and exact service args mockDatabase/firstCard.deck_id/firstCard.id/true. During a deferred write the menu trigger is disabled and cannot launch another write. On rejection the menu is closed, exactly the localized failure is visible on the current review screen, first card/phase is retained, second card is not shown and the trigger is re-enabled.",
         "Retry through the same actual menu after rejection. Check the exact second service call and two haptics, failure clears, and successful Suspend/Bury advances to the second synthetic card without recording a review or remote sync. Successful Mark retains first card and exposes Unmark from the returned row. Do not replace actual parent advance with a callback spy. Assert no grading/log/scoring/achievement/router or unrelated action call. Restore each console spy; forward unexpected warnings and assert its complete calls. Unconditionally settle/drain each deferred write in finally even if an assertion fails. No test-timeout increase or swallowed unexpected error.",
-        "Run all six frozen controller commands and require a fresh independent Astra pass. Existing five Session warnings may remain but no new warning is allowed; Prettier applies only to the changed fixture, not legacy Session formatting. Rendered fixture states use390x844. Browser networking is controller-owned outside implementation sandbox: do not attempt loopback in the generator, and return implemented with controller browser acceptance pending when source/non-browser work is complete. A genuine source or test discrepancy blocks. Primary retains final acceptance. No physical-device/Android/iOS verification is claimed."
+        "Run all six frozen controller commands and require a fresh independent Astra pass. Existing five Session warnings may remain but no new warning is allowed; Prettier applies only to the changed fixture, not legacy Session formatting. Rendered fixture states use390x844. Browser networking is controller-owned outside implementation sandbox: do not attempt loopback in the generator, and return implemented with controller browser acceptance pending when source/non-browser work is complete. A genuine source or test discrepancy blocks. Primary retains final acceptance. No physical-device/Android/iOS verification is claimed.",
+        "Independent review attempt1 requires explicit zero-call assertions for deleteStudyCard, resetStudyCardProgress, writeUserSetting, deleteUserSetting and computeReviewPoints in every direct-action case. Preserve all existing assertions and the primary counterfactual evidence; do not spend a source revert to repeat red. Attempt1 and both findings remain recorded, with no refund or increased limit.",
+        "Primary owns the new rendered acceptance fixture in tests/e2e/session-action-errors.spec.ts. It uses an empty isolated browser context and the existing local static server only. Assert local HTTP origin and zero existing study cards before inserting exactly two personal study rows, IDs2:10/2:11 and deckqa-rf073. Use the existing BroadcastChannel database bridge, without any application/debug API change. Read protected Quran content only through the existing runtime. Never write Quran/content/source data, reset a database, touch another profile, call live services or use credentials. A temporary trigger rejects only the fixture row suspension update in this disposable browser database. Existing production code, schemas and data remain unchanged.",
+        "The rendered fixture must activate the real menu/Suspend action on the front card, in English/dark at390x844, and inspect the localized failure and unobstructed Reveal control. Assert both elements visible/in viewport, no geometric overlap, unchanged fixture card and zero review logs. Capture a screenshot for primary visual inspection and record locale/theme/geometry. This actual changed-state evidence is required in addition to RNTL; route smoke alone is insufficient. Use existing page-health helpers and close the context unconditionally. Do not weaken failure-state or unrelated-action assertions. New fixture changes require primary review because main owns data-isolation decisions."
       ],
       "verification": [
         [
@@ -3704,12 +3710,14 @@
         [
           "node_modules/.bin/eslint",
           "app/flashcards/session.tsx",
-          "tests/unit/session-due-date.test.tsx"
+          "tests/unit/session-due-date.test.tsx",
+          "tests/e2e/session-action-errors.spec.ts"
         ],
         [
           "node_modules/.bin/prettier",
           "--check",
-          "tests/unit/session-due-date.test.tsx"
+          "tests/unit/session-due-date.test.tsx",
+          "tests/e2e/session-action-errors.spec.ts"
         ],
         [
           "npm",
@@ -3726,17 +3734,22 @@
           "test",
           "--project=smoke-chromium",
           "tests/e2e/smoke.spec.ts",
-          "tests/e2e/button-accessibility.spec.ts"
+          "tests/e2e/button-accessibility.spec.ts",
+          "tests/e2e/session-action-errors.spec.ts"
         ]
       ],
       "risk": "medium",
       "approved": true,
-      "status": "pending",
+      "status": "retry",
       "allowed_paths": [
         "app/flashcards/session.tsx",
-        "tests/unit/session-due-date.test.tsx"
+        "tests/unit/session-due-date.test.tsx",
+        "tests/e2e/session-action-errors.spec.ts"
       ],
-      "attempts": 0
+      "attempts": 1,
+      "started_at": "2026-10-16T22:53:15.142443+00:00",
+      "failure": "Independent review failed: [P2] tests/unit/session-due-date.test.tsx:798 omits required unrelated-action assertions. Add zero-call checks for deleteStudyCard, resetStudyCardProgress, writeUserSetting, deleteUserSetting and computeReviewPoints across all six cases. These mocked side effects could currently occur without failing the tests.; [P2] Changed-state visual acceptance is missing. verify-5.log covers route health and donor buttons, not card-action failures. RNTL dimensions do not verify visible layout. The controller should inspect a rejected-action state at 390x844 and record locale/theme, error visibility and unobstructed controls, as required by AGENTS.md for small UI changes.; The production relocation preserves handlers, styling, offline/native behavior and existing date tests. No untracked task files were found. Fresh typecheck, scoped ESLint, fixture Prettier and diff checks passed, with five existing lint warnings. Matching controller logs report 14 unit tests, web build and 30 browser tests passing. No files were changed; no manual or device verification was performed.",
+      "evidence": ".ralph/runs/RF-073-1-1792191195143410740"
     },
     {
       "id": "RF-074",
@@ -3834,6 +3847,49 @@
       "status": "pending",
       "allowed_paths": [
         "app/flashcards/session.tsx",
+        "tests/unit/session-due-date.test.tsx"
+      ],
+      "attempts": 0
+    },
+    {
+      "id": "RF-076",
+      "title": "Stabilize the session fixture with a fresh Jest cache",
+      "description": "Diagnose the first session case exceeding its existing five-second deadline during cold native-module initialization, then make the smallest test-environment repair.",
+      "rationale": "The first session case timed out in initial RF-071 verification and again with a new primary Jest mapper during RF-073 negative verification. Warm runs pass. The cold failure remains evidence and needs diagnosis before extending this fixture further.",
+      "modules": [
+        "tests/unit/session-due-date.test.tsx",
+        "tests/jest/setup.ts",
+        "jest.config.js",
+        "components/ui/ResponsiveOverlay.tsx"
+      ],
+      "dependencies": [
+        "RF-073"
+      ],
+      "acceptance_criteria": [
+        "Before approval profile a disposable cold-cache run and distinguish Babel/native-module initialization from actual asynchronous behavior. Reproduce without deleting existing caches or changing production source.",
+        "Prefer an exact public native-module setup correction when supported by measurements. Do not increase deadlines, skip assertions, replace the actual route/controls/overlays, suppress unexpected errors, change production behavior or weaken the accepted tests to obtain green output.",
+        "Primary must finalize the minimal file scope and fresh-cache commands from evidence. Require two distinct cold-cache verification runs plus normal focused/full tests as justified, independent review and final primary acceptance."
+      ],
+      "verification": [
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/session-due-date.test.tsx",
+          "--detectOpenHandles"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
+      ],
+      "risk": "medium",
+      "approved": false,
+      "status": "pending",
+      "allowed_paths": [
         "tests/unit/session-due-date.test.tsx"
       ],
       "attempts": 0
