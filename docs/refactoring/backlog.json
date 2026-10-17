@@ -4976,12 +4976,14 @@
         "docs/refactoring/DEPENDENCY_SECURITY.md"
       ],
       "dependencies": [
-        "RF-089"
+        "RF-089",
+        "RF-091"
       ],
       "acceptance_criteria": [
         "Primary deduplicates actual advisory URLs, inspects installed instances/consumers and distinguishes shipped app, optional remote and development paths. Use fresh official advisories and compatible-version evidence.",
         "Split independently verifiable package-family repairs. No broad npm audit fix, force, unsupported major jump, lint/test suppression, security-policy/production change or blanket exploitability claim.",
-        "Do not approve this umbrella as one huge implementation. Final security acceptance requires resolved in-scope high findings or exact documented genuine blockers, with independent review. Preserve residual findings and all attempted evidence."
+        "Do not approve this umbrella as one huge implementation. Final security acceptance requires resolved in-scope high findings or exact documented genuine blockers, with independent review. Preserve residual findings and all attempted evidence.",
+        "RF-091 is the first exact child slice, nanoid only. Track installed and virtual-lock audit scopes separately; no new advisory source is permitted by the child. Residual high findings still need smaller reviewed repairs."
       ],
       "verification": [
         [
@@ -5002,6 +5004,120 @@
       "allowed_paths": [
         "package.json",
         "package-lock.json",
+        "docs/refactoring/DEPENDENCY_SECURITY.md"
+      ],
+      "attempts": 0
+    },
+    {
+      "id": "RF-091",
+      "title": "Patch nanoid within the existing major and guard invalid sizes",
+      "description": "Upgrade only the existing nanoid3.3.12 lock entry to3.3.20 and add real bounded tests across all ten published variants.",
+      "rationale": "Official negative/zero-size fixes fit every existing parent range; navigation consumes the default non-secure API. Scope preserves runtime exports and native packages.",
+      "modules": [
+        "package.json",
+        "package-lock.json",
+        "scripts/tests/nanoid.test.cjs",
+        "docs/refactoring/DEPENDENCY_SECURITY.md"
+      ],
+      "dependencies": [
+        "RF-089"
+      ],
+      "acceptance_criteria": [
+        "Read .refactor-baseline/rf091-readiness.json, preflight.json and probe-note.json. Primary owns security/version/exposure decisions. Copy only three exact rf091-prescribed package/test/dependency-security artifacts to their paths. package-lock.json is controller-owned. Do not install, alter evidence/verifier/limits, spawn helpers/reviewers, run generators, change app/native/backend/protected inputs or commit/push.",
+        "Manifest only appends the nanoid test path to the existing dependency-security script. Existing brace guard and all other package/config/source bytes stay fixed. Named offline update changes exactly node_modules/nanoid3.3.12 to3.3.20, no new override or direct dependency and no unrelated lock entry. Runtime export conditions/order stay identical; only two async type-declaration targets change as recorded.",
+        "Preserve the complete exact test source. All44 fresh-process API/input probes per locked copy cover ten secure/nonsecure/CJS/ESM/browser/async files. Normal lengths/alphabets/custom RNG and guarded zero/negative cases must pass. Exact before1pass/2fail and isolated patched3pass/0fail, zero skips. Initial warmed-pool timeout is preserved and fixed by child isolation without relaxed5second/128MB limits, skipped assertion or vendor replacement.",
+        "All12 frozen controller commands pass. Fresh installed and lock-only audits remove nanoid and brace findings with no new advisory source. Keep different graph-scope counts explicit; no blanket security-clean claim. Knip retains zero unused files/exports/types/packages, two aliases/four unlisted/one binary and unchanged config.",
+        "Full existing Jest/types, web, both native dependency graphs, Android and iOS JavaScript exports,28Chrome smoke, format, actual installed graph/audits and all5security tests are mandatory. Native export does not prove APK/iOS native compilation or device behavior. Separate stronger evaluator passes full diff/evidence; primary accepts final hashes/scope after lease release. RF-086 stays open; preserve any failure without editing its tests here."
+      ],
+      "verification": [
+        [
+          "npm",
+          "update",
+          "nanoid",
+          "--ignore-scripts",
+          "--no-audit",
+          "--no-fund",
+          "--offline",
+          "--strict-peer-deps"
+        ],
+        [
+          "node",
+          "scripts/fix-rn-gradle-plugin.js"
+        ],
+        [
+          "node_modules/.bin/patch-package",
+          "--error-on-fail"
+        ],
+        [
+          "python3",
+          "-c",
+          "import hashlib,pathlib,runpy; p=pathlib.Path('.refactor-baseline/rf091-verify.py'); assert hashlib.sha256(p.read_bytes()).hexdigest() == '7abdd2e39b20d90a1a49ec318a0d057b6bb29e7aa7ce6716cb740ae5e70e7f49', 'Primary verifier changed'; runpy.run_path(str(p),run_name='__main__')"
+        ],
+        [
+          "npm",
+          "run",
+          "test:dependency-security"
+        ],
+        [
+          "node",
+          "scripts/ralph/check-expo-native.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "android",
+          "--platform",
+          "ios",
+          "--output-dir",
+          ".refactor-baseline/rf091-native-export",
+          "--no-bytecode",
+          "--max-workers",
+          "2"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8193",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8193",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "package.json",
+          "scripts/tests/nanoid.test.cjs",
+          "docs/refactoring/DEPENDENCY_SECURITY.md"
+        ]
+      ],
+      "risk": "medium",
+      "approved": true,
+      "status": "pending",
+      "allowed_paths": [
+        "package.json",
+        "package-lock.json",
+        "scripts/tests/nanoid.test.cjs",
         "docs/refactoring/DEPENDENCY_SECURITY.md"
       ],
       "attempts": 0
