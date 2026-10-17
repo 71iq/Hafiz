@@ -3886,7 +3886,8 @@
         "Test assertion reuse: the current expectNoUnrelatedCardActionCalls includes zero write/deleteUserSetting, which is inappropriate for this task. You may factor its identical non-setting zero-call assertions into a narrowly named shared local test helper, keeping both setting assertions in the original wrapper so every prior test retains identical meaning. New answer cases also assert zero delete/resetStudyCard services. No generic assertion framework or copied large settings/provider fixture. Preserve every earlier scenario and both browser cases byte-for-byte unless an explicitly allowed test-helper reuse has identical semantics.",
         "Add one browser case to existing session-action-errors.spec.ts, reusing fixtureQuery without changing either previous case/helper. Primary-approved isolated recipe: HTTP localhost/127.0.0.1 only, fresh empty English/dark390x844 context/storageState, waitForQaReady, zero initial study_cards. Insert only two personal study rows2:10/2:11 in deckqa-rf075 using existing columns, first due2000 and second due2999. Insert only personal setting key review_settings_deckqa-rf075 with value JSON {\"testModes\":[\"surahName\"],\"newCardSortOrder\":\"created\"}, updated_at timestamp/deleted_at NULL. This normalizes through existing readDeckReviewSettings and selects one deterministic existing native mode. Assert the two card IDs, exact setting and initially absent answer key card_answer_2:10:surahName. Create only trigger rf075_reject_fixture_answer BEFORE INSERT ON user_settings WHEN NEW.key='card_answer_2:10:surahName' BEGIN SELECT RAISE(ABORT,'RF075 isolated QA rejection'); END; verify it installed. No other SQL, app/debug API, source schema, protected input, live backend or production change.",
         "Browser uses actual Dark setting, session?deckId=deckqa-rf075, Card Actions -> Edit Answer, fills the real placeholder Write the answer shown after reveal... with a nonempty QA answer and presses Save Answer inside the editor dialog. Scope Could not update card to role alert inside the dialog containing that textarea, use text matching rather than alert accessible name. Assert entered value retained, modal open, error and enabled Cancel/Save Answer in viewport, both footer center hit tests unobstructed and no overlap. Exactly one action warning must have the existing prefix and Error finalizing statement as observed through this installed driver; avoid guessing the number of nested Error prefixes. Assert target answer key still absent, original study row unchanged/undeleted, zero study_log, healthy page. Save screenshot plus locale/theme/viewport/geometry attachment and always close context. Primary inspects the fresh final image; RNTL alone is insufficient visual evidence.",
-        "Worker runs focused red/green and types/lint/format, reports full/build/browser/controller review pending honestly, and does not bind a browser server when sandbox EPERM is documented. Do not duplicate full/build/browser gates in implementation. Controller must run all six frozen commands freshly and separate Astra review. Expected final counts are23 session cases,66 suites/365 tests and33 Chrome cases, all enabled; diagnose any difference instead of weakening tests. No physical-device/native/iOS verification claim. Primary retains final acceptance."
+        "Worker runs focused red/green and types/lint/format, reports full/build/browser/controller review pending honestly, and does not bind a browser server when sandbox EPERM is documented. Do not duplicate full/build/browser gates in implementation. Controller must run all six frozen commands freshly and separate Astra review. Expected final counts are23 session cases,66 suites/365 tests and33 Chrome cases, all enabled; diagnose any difference instead of weakening tests. No physical-device/native/iOS verification claim. Primary retains final acceptance.",
+        "Primary preverification is .refactor-baseline/rf075-primary-preverification.json: final23 cases pass, and exact pre-fix-source mapping fails only the six missing-alert cases with17 earlier passes. Preserve the new distinct write/delete case labels and final post-success zero-unrelated-effect checks. Browser counterfactual .refactor-baseline/rf075-primary-browser-counterfactual.json uses the exact prior RF074 export, verified by bundle hash and route HTML reference. All fixture/input/save steps reach the intended missing in-editor alert; entered value and background error remain. Do not fix this deliberate old-bundle result or duplicate browser/build gates. The actual new source still needs fresh controller export/33 Chrome cases and independent review. Candidate/spec changes must invalidate the earlier generation checkpoint normally; do not restore it manually."
       ],
       "verification": [
         [
@@ -3934,13 +3935,18 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "app/flashcards/session.tsx",
         "tests/unit/session-due-date.test.tsx",
         "tests/e2e/session-action-errors.spec.ts"
       ],
-      "attempts": 0
+      "attempts": 1,
+      "started_at": "2026-10-17T09:37:18.334468+00:00",
+      "failure": "review stopped at account usage limit; see .ralph/runs/RF-075-1-1792211693105827893/review.jsonl",
+      "completed_at": "2026-10-17T09:41:24.452536+00:00",
+      "evidence": ".ralph/runs/RF-075-1-1792229838335587466",
+      "summary": "Implemented RF-075 using the existing AnswerEditSheet and FieldMessage. Session errors now clear on opening and render inside the active editor; answer persistence and phase behavior remain unchanged."
     },
     {
       "id": "RF-076",

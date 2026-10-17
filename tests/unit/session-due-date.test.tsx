@@ -410,6 +410,42 @@ async function openDueDateEditor(
   return view.getByPlaceholderText(s.cardDueDatePlaceholder);
 }
 
+async function openAnswerEditor(
+  view: ReturnType<typeof render>,
+  s: UIStrings,
+  phase: "front" | "revealed",
+  reveal = phase === "revealed",
+  revealedAnswer: "default" | string = "default",
+): Promise<RenderedNode> {
+  await waitFor(() => {
+    expect(view.getByText(firstCue)).toBeTruthy();
+    expect(view.getByRole("button", { name: s.cardActionsTitle })).toBeTruthy();
+  });
+
+  if (phase === "revealed" && reveal) {
+    expect(view.getByText(s.flashcardsReveal)).toBeTruthy();
+    fireEvent.press(getTextButton(view, s.flashcardsReveal));
+    await waitFor(() => expect(view.getByText(`${s.smartDeckComparisonCue}: ${firstCue}`)).toBeTruthy());
+  }
+
+  if (phase === "front") {
+    expect(view.getByText(s.flashcardsReveal)).toBeTruthy();
+  } else {
+    if (revealedAnswer === "default") {
+      expect(view.getByText(`${s.smartDeckComparisonCue}: ${firstCue}`)).toBeTruthy();
+    } else {
+      expect(view.getByText(revealedAnswer)).toBeTruthy();
+    }
+    expect(view.queryByText(s.flashcardsReveal)).toBeNull();
+  }
+
+  fireEvent.press(view.getByRole("button", { name: s.cardActionsTitle }));
+  await waitFor(() => expect(view.getByText(s.cardActionsTitle)).toBeTruthy());
+  fireEvent.press(view.getByRole("button", { name: s.cardEditAnswer }));
+  await waitFor(() => expect(view.getByPlaceholderText(s.cardEditAnswerPlaceholder)).toBeTruthy());
+  return view.getByPlaceholderText(s.cardEditAnswerPlaceholder);
+}
+
 type DirectCardAction = "suspend" | "bury" | "mark";
 type DirectCardActionCase = readonly [string, "ar" | "en", boolean, "front" | "revealed", DirectCardAction];
 
@@ -539,12 +575,16 @@ function expectExactlyTwoEnabledDialogButtons(modal: RenderedNode): void {
 }
 
 function expectNoUnrelatedCardActionCalls(): void {
+  expectNoUnrelatedCardActionServiceCalls();
+  expect(writeUserSetting).not.toHaveBeenCalled();
+  expect(deleteUserSetting).not.toHaveBeenCalled();
+}
+
+function expectNoUnrelatedCardActionServiceCalls(): void {
   expect(setStudyCardSuspended).not.toHaveBeenCalled();
   expect(setStudyCardBuried).not.toHaveBeenCalled();
   expect(setStudyCardMarked).not.toHaveBeenCalled();
   expect(setStudyCardDueDate).not.toHaveBeenCalled();
-  expect(writeUserSetting).not.toHaveBeenCalled();
-  expect(deleteUserSetting).not.toHaveBeenCalled();
   expect(computeReviewPoints).not.toHaveBeenCalled();
   expect(insertStudyLog).not.toHaveBeenCalled();
   expect(updateCard).not.toHaveBeenCalled();
@@ -1072,6 +1112,272 @@ describe("Flashcard session due-date editor characterization", () => {
         fireEvent.press(within(reopenedModal).getByRole("button", { name: s.flashcardsCancel }));
         await waitFor(() => expect(findVisibleModalByText(view, s.cardResetTitle)).toBeNull());
         expectNoUnrelatedCardActionCalls();
+      } finally {
+        deferred.reject(failure);
+        await act(async () => {
+          await deferred.promise.catch(() => undefined);
+        });
+      }
+      expect(warnSpy.mock.calls).toEqual([expectedWarning]);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it.each([
+    ["Arabic light front write", "ar", false, "front", "write"],
+    ["English dark revealed write", "en", true, "revealed", "write"],
+    ["Arabic light front delete", "ar", false, "front", "delete"],
+    ["English dark revealed delete", "en", true, "revealed", "delete"],
+  ] as const)("shows and retries a rejected answer for %s", async (_label, language, isDark, phase, operation) => {
+    configureSettings(language, isDark);
+    const s = language === "ar" ? strings.ar : strings.en;
+    const view = renderSession();
+    const answerKey = `card_answer_${firstCard.id}:smartRefs`;
+    const seededAnswer = "Seeded custom answer";
+    const paddedAnswer = operation === "write" ? "  Retried custom answer  " : "   ";
+    const trimmedAnswer = paddedAnswer.trim();
+    let input = await openAnswerEditor(view, s, phase);
+    expect(input.props.value).toBe(firstRef.textUthmani);
+
+    if (operation === "delete") {
+      jest.mocked(writeUserSetting).mockResolvedValueOnce(undefined);
+      fireEvent.changeText(input, ` ${seededAnswer} `);
+      fireEvent.press(within(getVisibleModal(input)).getByRole("button", { name: s.cardSaveAnswer }));
+      await waitFor(() => expect(writeUserSetting).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(findVisibleModalByText(view, s.cardEditAnswerTitle)).toBeNull());
+      expect(writeUserSetting).toHaveBeenCalledTimes(1);
+      expect(writeUserSetting).toHaveBeenNthCalledWith(1, mockDatabase, answerKey, seededAnswer);
+      if (phase === "revealed") expect(view.getByText(seededAnswer)).toBeTruthy();
+
+      input = await openAnswerEditor(view, s, phase, false, seededAnswer);
+      expect(input.props.value).toBe(seededAnswer);
+    }
+
+    const failure = new Error(`${operation} answer action failed`);
+    const deferred = createDeferred<void>();
+    if (operation === "write") {
+      jest.mocked(writeUserSetting).mockReturnValueOnce(deferred.promise).mockResolvedValueOnce(undefined);
+    } else {
+      jest.mocked(deleteUserSetting).mockReturnValueOnce(deferred.promise).mockResolvedValueOnce(undefined);
+    }
+    const expectedWarning: [string, Error] = ["[FlashcardSession] Card action failed:", failure];
+    const originalWarn = console.warn;
+    const warnSpy = jest.spyOn(console, "warn").mockImplementation((...args) => {
+      const isExpectedWarning =
+        args.length === expectedWarning.length && args.every((arg, index) => arg === expectedWarning[index]);
+      if (!isExpectedWarning) originalWarn(...args);
+    });
+
+    try {
+      try {
+        fireEvent.changeText(input, paddedAnswer);
+        fireEvent.press(getTextButton(view, s.cardSaveAnswer));
+        await waitFor(() => expect(getTextButton(view, s.cardSaveAnswer).props.accessibilityState.disabled).toBe(true));
+        const busyModal = getVisibleModal(input);
+        expect(within(busyModal).getByText(s.flashcardsCancel)).toBeTruthy();
+        expect(within(busyModal).getByText(s.cardSaveAnswer)).toBeTruthy();
+        expect(getTextButton(view, s.flashcardsCancel).props.accessibilityState.disabled).toBe(true);
+        fireEvent(busyModal, "requestClose");
+        expect(view.getByPlaceholderText(s.cardEditAnswerPlaceholder)).toBeTruthy();
+
+        deferred.reject(failure);
+        await act(async () => {
+          await deferred.promise.catch(() => undefined);
+        });
+
+        const failedModal = getVisibleModal(input);
+        const error = within(failedModal).getByRole("alert");
+        expect(error).toHaveTextContent(s.cardActionFailed);
+        expectWritingDirection(error, language === "ar" ? "rtl" : "ltr");
+        expect(error.props.accessibilityLiveRegion).toBe("polite");
+        expect(input.props.value).toBe(paddedAnswer);
+        expectExactlyTwoEnabledDialogButtons(failedModal);
+        expect(view.getByText(firstCue)).toBeTruthy();
+        expect(view.queryByText(secondCue)).toBeNull();
+        if (phase === "front") {
+          expect(view.getByText(s.flashcardsReveal)).toBeTruthy();
+        } else if (operation === "delete") {
+          expect(view.getByText(seededAnswer)).toBeTruthy();
+          expect(view.queryByText(s.flashcardsReveal)).toBeNull();
+        } else {
+          expect(view.getByText(`${s.smartDeckComparisonCue}: ${firstCue}`)).toBeTruthy();
+          expect(view.queryByText(s.flashcardsReveal)).toBeNull();
+        }
+
+        expect(hapticMedium).not.toHaveBeenCalled();
+        expect(deleteStudyCard).not.toHaveBeenCalled();
+        expect(resetStudyCardProgress).not.toHaveBeenCalled();
+        expect(getDueCardsForReview).toHaveBeenCalledTimes(1);
+        expectNoUnrelatedCardActionServiceCalls();
+        if (operation === "write") {
+          expect(writeUserSetting).toHaveBeenCalledTimes(1);
+          expect(writeUserSetting).toHaveBeenNthCalledWith(1, mockDatabase, answerKey, trimmedAnswer);
+          expect(deleteUserSetting).not.toHaveBeenCalled();
+        } else {
+          expect(writeUserSetting).toHaveBeenCalledTimes(1);
+          expect(deleteUserSetting).toHaveBeenCalledTimes(1);
+          expect(deleteUserSetting).toHaveBeenNthCalledWith(1, mockDatabase, answerKey);
+        }
+
+        fireEvent.press(within(getVisibleModal(input)).getByRole("button", { name: s.cardSaveAnswer }));
+        await waitFor(() =>
+          expect(operation === "write" ? writeUserSetting : deleteUserSetting).toHaveBeenCalledTimes(2),
+        );
+        await waitFor(() => expect(findVisibleModalByText(view, s.cardEditAnswerTitle)).toBeNull());
+        if (operation === "write") {
+          expect(writeUserSetting).toHaveBeenCalledTimes(2);
+          expect(writeUserSetting).toHaveBeenNthCalledWith(2, mockDatabase, answerKey, trimmedAnswer);
+          expect(deleteUserSetting).not.toHaveBeenCalled();
+          if (phase === "revealed") expect(view.getByText(trimmedAnswer)).toBeTruthy();
+        } else {
+          expect(writeUserSetting).toHaveBeenCalledTimes(1);
+          expect(deleteUserSetting).toHaveBeenCalledTimes(2);
+          expect(deleteUserSetting).toHaveBeenNthCalledWith(2, mockDatabase, answerKey);
+          expect(view.queryByText(seededAnswer)).toBeNull();
+        }
+
+        input = await openAnswerEditor(view, s, phase, false, operation === "write" ? trimmedAnswer : "default");
+        expect(input.props.value).toBe(operation === "write" ? trimmedAnswer : firstRef.textUthmani);
+        expect(within(getVisibleModal(input)).queryByText(s.cardActionFailed)).toBeNull();
+        fireEvent.press(within(getVisibleModal(input)).getByRole("button", { name: s.flashcardsCancel }));
+        await waitFor(() => expect(findVisibleModalByText(view, s.cardEditAnswerTitle)).toBeNull());
+        expect(hapticMedium).not.toHaveBeenCalled();
+        expect(deleteStudyCard).not.toHaveBeenCalled();
+        expect(resetStudyCardProgress).not.toHaveBeenCalled();
+        expect(getDueCardsForReview).toHaveBeenCalledTimes(1);
+        expectNoUnrelatedCardActionServiceCalls();
+      } finally {
+        deferred.reject(failure);
+        await act(async () => {
+          await deferred.promise.catch(() => undefined);
+        });
+      }
+      expect(warnSpy.mock.calls).toEqual([expectedWarning]);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it("cancels and reopens a rejected front answer write without another persistence call", async () => {
+    const s = strings.ar;
+    const view = renderSession();
+    let input = await openAnswerEditor(view, s, "front");
+    const failure = new Error("front answer write failed");
+    const deferred = createDeferred<void>();
+    jest.mocked(writeUserSetting).mockReturnValueOnce(deferred.promise);
+    const expectedWarning: [string, Error] = ["[FlashcardSession] Card action failed:", failure];
+    const originalWarn = console.warn;
+    const warnSpy = jest.spyOn(console, "warn").mockImplementation((...args) => {
+      const isExpectedWarning =
+        args.length === expectedWarning.length && args.every((arg, index) => arg === expectedWarning[index]);
+      if (!isExpectedWarning) originalWarn(...args);
+    });
+
+    try {
+      try {
+        fireEvent.changeText(input, "  Canceled answer  ");
+        fireEvent.press(getTextButton(view, s.cardSaveAnswer));
+        await waitFor(() => expect(getTextButton(view, s.cardSaveAnswer).props.accessibilityState.disabled).toBe(true));
+        deferred.reject(failure);
+        await act(async () => {
+          await deferred.promise.catch(() => undefined);
+        });
+        const failedModal = getVisibleModal(input);
+        expect(within(failedModal).getByRole("alert")).toHaveTextContent(s.cardActionFailed);
+        expect(input.props.value).toBe("  Canceled answer  ");
+        expectExactlyTwoEnabledDialogButtons(failedModal);
+        fireEvent.press(within(failedModal).getByRole("button", { name: s.flashcardsCancel }));
+        await waitFor(() => expect(writeUserSetting).toHaveBeenCalledTimes(1));
+        await waitFor(() => expect(findVisibleModalByText(view, s.cardEditAnswerTitle)).toBeNull());
+        expect(view.getByText(s.flashcardsReveal)).toBeTruthy();
+
+        input = await openAnswerEditor(view, s, "front");
+        expect(input.props.value).toBe(firstRef.textUthmani);
+        expect(within(getVisibleModal(input)).queryByText(s.cardActionFailed)).toBeNull();
+        expect(writeUserSetting).toHaveBeenCalledTimes(1);
+        expect(writeUserSetting).toHaveBeenNthCalledWith(
+          1,
+          mockDatabase,
+          `card_answer_${firstCard.id}:smartRefs`,
+          "Canceled answer",
+        );
+        expect(deleteUserSetting).not.toHaveBeenCalled();
+        expect(hapticMedium).not.toHaveBeenCalled();
+        expect(deleteStudyCard).not.toHaveBeenCalled();
+        expect(resetStudyCardProgress).not.toHaveBeenCalled();
+        expectNoUnrelatedCardActionServiceCalls();
+        fireEvent.press(within(getVisibleModal(input)).getByRole("button", { name: s.flashcardsCancel }));
+        await waitFor(() => expect(findVisibleModalByText(view, s.cardEditAnswerTitle)).toBeNull());
+      } finally {
+        deferred.reject(failure);
+        await act(async () => {
+          await deferred.promise.catch(() => undefined);
+        });
+      }
+      expect(warnSpy.mock.calls).toEqual([expectedWarning]);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it("cancels and reopens a rejected front answer delete without another persistence call", async () => {
+    const s = strings.en;
+    configureSettings("en", true);
+    const view = renderSession();
+    let input = await openAnswerEditor(view, s, "front");
+    const answerKey = `card_answer_${firstCard.id}:smartRefs`;
+    const seededAnswer = "Seeded front answer";
+    jest.mocked(writeUserSetting).mockResolvedValueOnce(undefined);
+    fireEvent.changeText(input, ` ${seededAnswer} `);
+    fireEvent.press(within(getVisibleModal(input)).getByRole("button", { name: s.cardSaveAnswer }));
+    await waitFor(() => expect(writeUserSetting).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(findVisibleModalByText(view, s.cardEditAnswerTitle)).toBeNull());
+    expect(writeUserSetting).toHaveBeenCalledTimes(1);
+    expect(writeUserSetting).toHaveBeenNthCalledWith(1, mockDatabase, answerKey, seededAnswer);
+
+    input = await openAnswerEditor(view, s, "front", false, seededAnswer);
+    expect(input.props.value).toBe(seededAnswer);
+    const failure = new Error("front answer delete failed");
+    const deferred = createDeferred<void>();
+    jest.mocked(deleteUserSetting).mockReturnValueOnce(deferred.promise);
+    const expectedWarning: [string, Error] = ["[FlashcardSession] Card action failed:", failure];
+    const originalWarn = console.warn;
+    const warnSpy = jest.spyOn(console, "warn").mockImplementation((...args) => {
+      const isExpectedWarning =
+        args.length === expectedWarning.length && args.every((arg, index) => arg === expectedWarning[index]);
+      if (!isExpectedWarning) originalWarn(...args);
+    });
+
+    try {
+      try {
+        fireEvent.changeText(input, "   ");
+        fireEvent.press(getTextButton(view, s.cardSaveAnswer));
+        await waitFor(() => expect(getTextButton(view, s.cardSaveAnswer).props.accessibilityState.disabled).toBe(true));
+        deferred.reject(failure);
+        await act(async () => {
+          await deferred.promise.catch(() => undefined);
+        });
+        const failedModal = getVisibleModal(input);
+        expect(within(failedModal).getByRole("alert")).toHaveTextContent(s.cardActionFailed);
+        expect(input.props.value).toBe("   ");
+        expectExactlyTwoEnabledDialogButtons(failedModal);
+        fireEvent.press(within(failedModal).getByRole("button", { name: s.flashcardsCancel }));
+        await waitFor(() => expect(findVisibleModalByText(view, s.cardEditAnswerTitle)).toBeNull());
+        expect(view.getByText(s.flashcardsReveal)).toBeTruthy();
+
+        input = await openAnswerEditor(view, s, "front");
+        expect(input.props.value).toBe(seededAnswer);
+        expect(within(getVisibleModal(input)).queryByText(s.cardActionFailed)).toBeNull();
+        expect(writeUserSetting).toHaveBeenCalledTimes(1);
+        expect(deleteUserSetting).toHaveBeenCalledTimes(1);
+        expect(deleteUserSetting).toHaveBeenNthCalledWith(1, mockDatabase, answerKey);
+        expect(hapticMedium).not.toHaveBeenCalled();
+        expect(deleteStudyCard).not.toHaveBeenCalled();
+        expect(resetStudyCardProgress).not.toHaveBeenCalled();
+        expectNoUnrelatedCardActionServiceCalls();
+        fireEvent.press(within(getVisibleModal(input)).getByRole("button", { name: s.flashcardsCancel }));
+        await waitFor(() => expect(findVisibleModalByText(view, s.cardEditAnswerTitle)).toBeNull());
       } finally {
         deferred.reject(failure);
         await act(async () => {

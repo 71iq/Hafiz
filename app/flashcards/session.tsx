@@ -59,6 +59,7 @@ import { fetchWordMeaningAr, fetchWordText, fetchWordTranslation } from "@/lib/w
 import { Qcf2AyahText } from "@/components/flashcards/Qcf2AyahText";
 import { DueDateSheet } from "@/components/flashcards/DueDateSheet";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { FieldMessage } from "@/components/ui/Field";
 import { OverlayBody, OverlayFooter, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import {
   getDueCardsForReview,
@@ -715,6 +716,7 @@ function FlashcardSessionScreen() {
     if (!currentCard) return;
     const mode = currentMode ?? activeModes[currentSideIndex] ?? activeModes[0] ?? null;
     if (!mode) return;
+    setSessionError(null);
     setCardMenuOpen(false);
     setAnswerEditMode(mode);
     setAnswerEditText(getCardAnswerOverride(currentCard, mode) ?? getDefaultAnswerText(currentCard, mode, s));
@@ -1083,6 +1085,7 @@ function FlashcardSessionScreen() {
       <AnswerEditSheet
         visible={answerEditOpen}
         value={answerEditText}
+        error={sessionError}
         busy={cardActionBusy}
         isDark={isDark}
         isRTL={isRTL}
@@ -1331,6 +1334,7 @@ function CardActionRow({
 function AnswerEditSheet({
   visible,
   value,
+  error,
   busy,
   isDark,
   isRTL,
@@ -1341,6 +1345,7 @@ function AnswerEditSheet({
 }: {
   visible: boolean;
   value: string;
+  error: string | null;
   busy: boolean;
   isDark: boolean;
   isRTL: boolean;
@@ -1376,6 +1381,16 @@ function AnswerEditSheet({
             writingDirection: answerIsRTL ? "rtl" : "ltr",
           }}
         />
+        {error ? (
+          <FieldMessage
+            dir={isRTL ? "rtl" : "ltr"}
+            className="mt-3 w-full self-stretch text-red-600 dark:text-red-400"
+            accessibilityRole="alert"
+            accessibilityLiveRegion="polite"
+          >
+            {error}
+          </FieldMessage>
+        ) : null}
       </OverlayBody>
       <OverlayFooter isRTL={isRTL}>
         <Button variant="outline" onPress={onClose} disabled={busy} className="flex-1">
