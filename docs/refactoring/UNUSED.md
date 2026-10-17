@@ -126,3 +126,11 @@ The isolated preflight uses the actual installed package tree against the candid
 Fresh Knip must retain zero unused files, exports, types and package dependencies, two deliberate alias groups and one binary, while unlisted dependencies drop from five to four. The remaining names are `expo-updates`, `expo-system-ui`, `sharp` and `react-devtools-core`. RF-008 owns native/config diagnostics; RF-087 owns manual icon-tool dependency preparation; RF-088 owns parent-resolved devtools inspection. No extra runtime package is added just to silence the security diagnostic.
 
 Six fresh gates cover lock resolution, exact bytes/installed graph/actual analysis, strict types, unchanged full unit suite, web export and manifest/document formatting. Independent Astra and primary scope/hash acceptance follow. The resolved native packages are unchanged, so no native rebuild or device/iOS result is claimed. RF-086's intermittent Reset failure remains open; no test or timeout changes are authorized here.
+
+## RF-089 compatible brace-expansion security patches, 2026-10-18
+
+The dependency audit finds seven vulnerable installed brace-expansion copies and one already-patched control. Bounded child-process tests reproduce stack failure in all seven while normal patterns retain their outputs. Existing minimatch ranges permit 1.1.21 and 5.0.12 without a major upgrade or new override.
+
+RF-089 uses a named update, changing only those seven resolved entries, and adds `npm run test:dependency-security` for the real API regression. Preflight audit moves from 74 findings/59 high to 71 findings/56 high, with zero critical and no new advisory source. The remaining findings are RF-090 work. See [Dependency security](DEPENDENCY_SECURITY.md) for every copy, local reproduction, negative control, vendor sources and verification limits.
+
+Actual installation, native dependency graphs, source/lock/audit/Knip checks, Node tests, strict types, full lint, unchanged Jest, web export, Chrome smoke, formatting, separate Astra and primary acceptance remain mandatory. Knip stays at zero unused files/exports/types/packages, two aliases, four unlisted dependencies and one binary. No input, native source, application behavior, override or asset generation is changed here.

@@ -19,6 +19,7 @@
     "web": "EXPO_NO_DEV_TOOLS=1 expo start --web",
     "typecheck": "tsc --noEmit",
     "test:unit": "jest --runInBand",
+    "test:dependency-security": "node --test --test-reporter=tap scripts/tests/brace-expansion.test.cjs",
     "build:web:test": "npm run build:web",
     "test:e2e:smoke": "npm run build:web:test && playwright test --project=smoke-chromium tests/e2e/smoke.spec.ts",
     "test:ui:phase": "node scripts/run-ui-phase.mjs",

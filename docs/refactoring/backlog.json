@@ -4950,7 +4950,7 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "package.json",
         "package-lock.json",
@@ -4958,7 +4958,12 @@
         "docs/refactoring/DEPENDENCY_SECURITY.md",
         "docs/refactoring/UNUSED.md"
       ],
-      "attempts": 0
+      "attempts": 1,
+      "started_at": "2026-10-17T21:27:43.178870+00:00",
+      "failure": "Batch resource limit reached",
+      "completed_at": "2026-10-17T21:31:22.584489+00:00",
+      "evidence": ".ralph/runs/RF-089-1-1792272463180241981",
+      "summary": "Implemented RF-089\u2019s four worker-owned artifacts exactly. `package-lock.json` remains untouched for the controller."
     },
     {
       "id": "RF-090",
