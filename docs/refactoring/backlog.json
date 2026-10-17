@@ -4579,13 +4579,20 @@
         "docs/refactoring/UNUSED.md"
       ],
       "dependencies": [
-        "RF-082"
+        "RF-083"
       ],
       "acceptance_criteria": [
-        "Primary verifies no caller and freezes exact expression deletion while preserving the complete active registry array, types, helper and entries.",
-        "Use unchanged inventory tests and fresh analysis; no test weakening or broad registry formatting. Prepare exact expected hashes/counts before approval."
+        "Read .refactor-baseline/rf084-readiness.json and rf084-before-gate.log. Primary owns the caller/API decision. Edit only tests/rtl/rtl-component-registry.ts and docs/refactoring/UNUSED.md. No worker subagents/reviewers, package install or evidence/verifier edit. Controller runs five frozen gates and separate stronger review.",
+        "Delete only the complete final rtlComponentRegistryByPath declaration and its separating blank line, exactly four lines. Preserve every byte of the typed registry array, entries, entry helper and imports. No new cast or local unused lookup. Copy .refactor-baseline/rf084-prescribed-registry.ts and rf084-prescribed-unused.md exactly to their two task paths. No whole-file formatter, new abstraction, test edit, suppression, dependency or other source change.",
+        "Fresh real Knip must retain zero unused files/exports and only Locale as unused type, two deliberate alias groups, five unlisted dependencies and one external binary, no unresolved/unused-package finding. Keep config/exclusions/exceptions unchanged. Verifier and candidate hashes are frozen. Exit1 with findings is expected only for valid JSON and exact expected report; execution/configuration errors fail.",
+        "All five gates pass: pinned real-analysis/exact-hash verifier, unchanged nearest tests/unit/rtl-component-registry-coverage.test.ts, strict typecheck, scoped source lint and documentation format. Tests and all surviving source bytes remain identical. RF-083 existing full-suite baseline includes this contract. Separate Astra checks complete diff/callers/hashes/raw evidence; primary final acceptance follows controller completion. No browser/app/native build/device/iOS rerun is required or claimed."
       ],
       "verification": [
+        [
+          "python3",
+          "-c",
+          "import hashlib,pathlib,runpy; p=pathlib.Path('.refactor-baseline/rf084-verify.py'); assert hashlib.sha256(p.read_bytes()).hexdigest() == 'e87fe5876856fa5db4583cbb50f710a785b32b126f2a7523f7d3d76f5588ba27', 'Primary verifier changed'; runpy.run_path(str(p),run_name='__main__')"
+        ],
         [
           "npm",
           "run",
@@ -4598,10 +4605,19 @@
           "npm",
           "run",
           "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "tests/rtl/rtl-component-registry.ts"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "docs/refactoring/UNUSED.md"
         ]
       ],
       "risk": "low",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
         "tests/rtl/rtl-component-registry.ts",
@@ -4619,17 +4635,19 @@
         "docs/refactoring/UNUSED.md"
       ],
       "dependencies": [
-        "RF-082"
+        "RF-084"
       ],
       "acceptance_criteria": [
-        "Primary freezes deletion of only the unused type line, with exact preservation of Arabic/English dictionary bytes and all used type declarations.",
-        "No string translation, language behavior, Quran input or import change. Scope nearest existing contracts, strict types and expected analysis result before approval."
+        "Read .refactor-baseline/rf085-readiness.json and rf085-before-gate.log. Primary owns the caller/API decision. Edit only lib/i18n/strings.ts and docs/refactoring/UNUSED.md. No worker subagents/reviewers, package install or evidence/verifier edit. Controller runs five frozen gates and separate stronger review.",
+        "Delete only the one export type Locale line. Preserve every other byte, including both English/Arabic dictionaries, UIStringKey and UIStrings. No translation/content/Quran/behavior/import edit. Copy .refactor-baseline/rf085-prescribed-strings.ts and rf085-prescribed-unused.md exactly to their two task paths. No whole-file formatter, new abstraction, test edit, suppression, dependency or other source change.",
+        "Fresh real Knip must retain zero unused files/exports/types, two deliberate alias groups, five unlisted dependencies and one external binary, no unresolved/unused-package finding. Keep config/exclusions/exceptions unchanged. Verifier and candidate hashes are frozen. Exit1 with findings is expected only for valid JSON and exact expected report; execution/configuration errors fail.",
+        "All five gates pass: pinned real-analysis/exact-hash verifier, unchanged nearest tests/unit/ui-strings-contract.test.ts, strict typecheck, scoped source lint and documentation format. Tests and all surviving source bytes remain identical. RF-083 existing full-suite baseline includes this contract. Separate Astra checks complete diff/callers/hashes/raw evidence; primary final acceptance follows controller completion. No browser/app/native build/device/iOS rerun is required or claimed."
       ],
       "verification": [
         [
-          "npm",
-          "run",
-          "typecheck"
+          "python3",
+          "-c",
+          "import hashlib,pathlib,runpy; p=pathlib.Path('.refactor-baseline/rf085-verify.py'); assert hashlib.sha256(p.read_bytes()).hexdigest() == 'db021c849849e6f6336f505820d6c9e8bdc2ace67fb4493bb68578872d6ca36d', 'Primary verifier changed'; runpy.run_path(str(p),run_name='__main__')"
         ],
         [
           "npm",
@@ -4638,10 +4656,24 @@
           "--",
           "--runTestsByPath",
           "tests/unit/ui-strings-contract.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/i18n/strings.ts"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "docs/refactoring/UNUSED.md"
         ]
       ],
       "risk": "low",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
         "lib/i18n/strings.ts",
