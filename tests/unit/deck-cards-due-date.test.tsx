@@ -1,6 +1,6 @@
 import React from "react";
 import * as ReactNative from "react-native";
-import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react-native";
+import { act, cleanup, fireEvent, render, waitFor, within } from "@testing-library/react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { DirectionProvider } from "@/lib/ui/direction";
 import { DeckCardsSheet } from "@/components/flashcards/DeckCardsSheet";
@@ -35,6 +35,7 @@ const safeAreaMetrics = {
 };
 const originalWindowDimensions = ReactNative.Dimensions.get("window");
 const originalScreenDimensions = ReactNative.Dimensions.get("screen");
+const NativeModal = ReactNative.Modal;
 
 jest.mock("@/lib/database/provider", () => ({
   useDatabase: () => mockDatabase,
@@ -137,6 +138,16 @@ function renderDeckWithCallbacks(onClose: () => void, onChanged: () => void) {
 }
 
 type RenderedNode = ReturnType<ReturnType<typeof render>["getByText"]>;
+
+function getVisibleModalForInput(input: RenderedNode): RenderedNode {
+  let modal: RenderedNode | null = input;
+  while (modal && modal.type !== NativeModal) {
+    modal = modal.parent;
+  }
+  if (!modal) throw new Error("The expected visible due-date editor modal was not rendered");
+  expect(modal.props.visible).toBe(true);
+  return modal;
+}
 
 function getTextButton(view: ReturnType<typeof render>, label: string): RenderedNode {
   let current: RenderedNode | null = view.getByText(label);
@@ -334,11 +345,91 @@ describe("DeckCardsSheet due-date editor characterization", () => {
     mockSettings.themeSurface = "#0A0A0A";
     mockSettings.uiLanguage = "en";
     const s = strings.en;
+    const onClose = jest.fn();
     const onChanged = jest.fn();
-    const view = renderDeckWithCallbacks(jest.fn(), onChanged);
+    const view = renderDeckWithCallbacks(onClose, onChanged);
     await waitFor(() => expect(view.getByText(secondCard.title)).toBeTruthy());
     const input = await openSecondCardEditor(view, s);
     const failure = new Error("write failed");
+    const deferred = createDeferred<StudyCardRow>();
+    jest.mocked(setStudyCardDueDate).mockReturnValueOnce(deferred.promise);
+    jest.mocked(setStudyCardDueDate).mockResolvedValueOnce(secondCard);
+    const expectedWarning: [string, Error] = ["[DeckCardsSheet] Card action failed:", failure];
+    const originalWarn = console.warn;
+    const warnSpy = jest.spyOn(console, "warn").mockImplementation((...args) => {
+      const isExpectedWarning =
+        args.length === expectedWarning.length && args.every((arg, index) => arg === expectedWarning[index]);
+      if (!isExpectedWarning) originalWarn(...args);
+    });
+
+    try {
+      try {
+        const failedDateKey = formatLocalDateInput(new Date(secondCard.due));
+        const parsed = parseDueDateInput(failedDateKey);
+        if (!parsed.ok) throw new Error("The relative future fixture date must be valid");
+        fireEvent.press(getTextButton(view, s.cardSaveDueDate));
+        await waitFor(() => {
+          expect(getTextButton(view, s.cardSaveDueDate).props.accessibilityState.disabled).toBe(true);
+          expect(getTextButton(view, s.flashcardsCancel).props.accessibilityState.disabled).toBe(true);
+        });
+        fireEvent.press(getTextButton(view, s.cardSaveDueDate));
+        expect(setStudyCardDueDate).toHaveBeenCalledTimes(1);
+        expect(getDeckCardsForList).toHaveBeenCalledTimes(1);
+        expect(onChanged).not.toHaveBeenCalled();
+        const busyEditorModal = getVisibleModalForInput(input);
+        fireEvent(busyEditorModal, "requestClose");
+        expect(view.getByPlaceholderText(s.cardDueDatePlaceholder)).toBeTruthy();
+        deferred.reject(failure);
+
+        await act(async () => {
+          await deferred.promise.catch(() => undefined);
+        });
+        const editorModal = getVisibleModalForInput(input);
+        const error = within(editorModal).getByText(s.cardActionFailed);
+        expect(error).toBeTruthy();
+        expectWritingDirection(error, "ltr");
+        expect(input.props.value).toBe(formatLocalDateInput(new Date(secondCard.due)));
+        expectWritingDirection(input, "ltr");
+        expect(getTextButton(view, s.cardSaveDueDate).props.accessibilityState.disabled).toBe(false);
+        expect(getTextButton(view, s.flashcardsCancel).props.accessibilityState.disabled).toBe(false);
+        expect(getDeckCardsForList).toHaveBeenCalledTimes(1);
+        expect(onChanged).not.toHaveBeenCalled();
+        expect(setStudyCardDueDate).toHaveBeenCalledTimes(1);
+        expect(setStudyCardDueDate).toHaveBeenCalledWith(mockDatabase, "deck-1", secondCard.id, parsed.date);
+
+        fireEvent.press(within(editorModal).getByRole("button", { name: s.cardSaveDueDate }));
+        await waitFor(() => expect(view.queryByPlaceholderText(s.cardDueDatePlaceholder)).toBeNull());
+        expect(setStudyCardDueDate).toHaveBeenCalledTimes(2);
+        expect(setStudyCardDueDate).toHaveBeenNthCalledWith(2, mockDatabase, "deck-1", secondCard.id, parsed.date);
+        expect(getDeckCardsForList).toHaveBeenCalledTimes(2);
+        expect(getDeckCardsForList).toHaveBeenLastCalledWith(mockDatabase, "deck-1");
+        expect(onChanged).toHaveBeenCalledTimes(1);
+        expect(onClose).not.toHaveBeenCalled();
+        expect(view.getByText(firstCard.title)).toBeTruthy();
+        expect(view.getByText(secondCard.title)).toBeTruthy();
+      } finally {
+        deferred.reject(failure);
+        await act(async () => {
+          await deferred.promise.catch(() => undefined);
+        });
+      }
+      expect(warnSpy.mock.calls).toEqual([expectedWarning]);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it("keeps the Arabic light editor open after a rejected date write and clears errors on reopen", async () => {
+    const s = strings.ar;
+    const onClose = jest.fn();
+    const onChanged = jest.fn();
+    const view = renderDeckWithCallbacks(onClose, onChanged);
+    await waitFor(() => expect(view.getByText(secondCard.title)).toBeTruthy());
+    const input = await openSecondCardEditor(view, s);
+    const failedDateKey = formatLocalDateInput(localDateWithOffset(9));
+    const parsed = parseDueDateInput(failedDateKey);
+    if (!parsed.ok) throw new Error("The relative future fixture date must be valid");
+    const failure = new Error("Arabic date write failed");
     const deferred = createDeferred<StudyCardRow>();
     jest.mocked(setStudyCardDueDate).mockReturnValueOnce(deferred.promise);
     const expectedWarning: [string, Error] = ["[DeckCardsSheet] Card action failed:", failure];
@@ -351,21 +442,52 @@ describe("DeckCardsSheet due-date editor characterization", () => {
 
     try {
       try {
+        fireEvent.changeText(input, failedDateKey);
         fireEvent.press(getTextButton(view, s.cardSaveDueDate));
         await waitFor(() =>
           expect(getTextButton(view, s.cardSaveDueDate).props.accessibilityState.disabled).toBe(true),
         );
         deferred.reject(failure);
-
         await act(async () => {
           await deferred.promise.catch(() => undefined);
         });
-        await waitFor(() => expect(view.getByText(s.cardActionFailed)).toBeTruthy());
-        expect(input.props.value).toBe(formatLocalDateInput(new Date(secondCard.due)));
-        expect(getTextButton(view, s.cardSaveDueDate).props.accessibilityState.disabled).toBe(false);
-        expect(getTextButton(view, s.flashcardsCancel).props.accessibilityState.disabled).toBe(false);
+
+        const editorModal = getVisibleModalForInput(input);
+        const error = within(editorModal).getByText(s.cardActionFailed);
+        expect(error).toBeTruthy();
+        expectWritingDirection(error, "rtl");
+        expect(input.props.value).toBe(failedDateKey);
+        expectWritingDirection(input, "ltr");
+        expect(setStudyCardDueDate).toHaveBeenCalledTimes(1);
+        expect(setStudyCardDueDate).toHaveBeenCalledWith(mockDatabase, "deck-1", secondCard.id, parsed.date);
         expect(getDeckCardsForList).toHaveBeenCalledTimes(1);
         expect(onChanged).not.toHaveBeenCalled();
+        expect(onClose).not.toHaveBeenCalled();
+        expect(getTextButton(view, s.cardSaveDueDate).props.accessibilityState.disabled).toBe(false);
+        expect(getTextButton(view, s.flashcardsCancel).props.accessibilityState.disabled).toBe(false);
+
+        fireEvent.changeText(input, "not-a-date");
+        fireEvent.press(within(editorModal).getByRole("button", { name: s.cardSaveDueDate }));
+        await waitFor(() =>
+          expect(within(getVisibleModalForInput(input)).getByText(s.cardDueDateInvalid)).toBeTruthy(),
+        );
+        expect(within(getVisibleModalForInput(input)).queryByText(s.cardActionFailed)).toBeNull();
+        expect(setStudyCardDueDate).toHaveBeenCalledTimes(1);
+        expect(getDeckCardsForList).toHaveBeenCalledTimes(1);
+        expect(onChanged).not.toHaveBeenCalled();
+        expect(onClose).not.toHaveBeenCalled();
+
+        fireEvent.press(within(editorModal).getByRole("button", { name: s.flashcardsCancel }));
+        await waitFor(() => expect(view.queryByPlaceholderText(s.cardDueDatePlaceholder)).toBeNull());
+        const reopenedInput = await openSecondCardEditor(view, s);
+        const reopenedModal = getVisibleModalForInput(reopenedInput);
+        expect(reopenedInput.props.value).toBe(formatLocalDateInput(new Date(secondCard.due)));
+        expect(within(reopenedModal).queryByText(s.cardActionFailed)).toBeNull();
+        expect(within(reopenedModal).queryByText(s.cardDueDateInvalid)).toBeNull();
+        expect(setStudyCardDueDate).toHaveBeenCalledTimes(1);
+        expect(getDeckCardsForList).toHaveBeenCalledTimes(1);
+        expect(onChanged).not.toHaveBeenCalled();
+        expect(onClose).not.toHaveBeenCalled();
       } finally {
         deferred.reject(failure);
         await act(async () => {

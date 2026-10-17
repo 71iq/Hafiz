@@ -129,6 +129,7 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
     setDueTarget(card);
     setDueDateText(formatLocalDateInput(new Date(card.due)));
     setDueDateError(null);
+    setError(null);
   }, []);
 
   const saveDueDate = useCallback(() => {
@@ -292,7 +293,7 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
       <DueDateSheet
         visible={!!dueTarget}
         value={dueDateText}
-        error={dueDateError}
+        error={dueDateError ?? error}
         busy={!!dueTarget && busyId === dueTarget.id}
         isDark={isDark}
         isRTL={isRTL}
