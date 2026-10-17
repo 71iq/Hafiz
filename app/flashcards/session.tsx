@@ -703,6 +703,7 @@ function FlashcardSessionScreen() {
       setDueDateError(parsed.reason === "past" ? s.cardDueDatePast : s.cardDueDateInvalid);
       return;
     }
+    setDueDateError(null);
     runCardAction(async () => {
       hapticMedium();
       await setStudyCardDueDate(db, currentCard.card.deck_id, currentCard.card.id, parsed.date);

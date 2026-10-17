@@ -92,6 +92,13 @@ function localDateWithOffset(days: number): Date {
   return date;
 }
 
+type DueDateRetryCase = readonly [string, "ar" | "en", boolean, string, "invalid" | "past"];
+
+const dueDateRetryCases: readonly DueDateRetryCase[] = [
+  ["Arabic light invalid-format", "ar", false, "not-a-date", "invalid"],
+  ["English dark past-date", "en", true, formatLocalDateInput(localDateWithOffset(-2)), "past"],
+];
+
 function makeCard(id: string, title: string, due: Date): DeckCardListItem {
   const dueIso = due.toISOString();
   return {
@@ -135,6 +142,31 @@ function renderDeckWithCallbacks(onClose: () => void, onChanged: () => void) {
     </SafeAreaProvider>,
     { concurrentRoot: false },
   );
+}
+
+function configureSettings(language: "ar" | "en", isDark: boolean): void {
+  mockSettings.effectiveTheme = isDark ? "dark" : "beige";
+  mockSettings.isDark = isDark;
+  mockSettings.isRTL = language === "ar";
+  mockSettings.themeColors = isDark
+    ? {
+        surface: "#0A0A0A",
+        surfaceLow: "#141414",
+        surfaceMid: "#1A1A1A",
+        surfaceHigh: "#262626",
+        surfaceDim: "#0F0F0F",
+        surfaceBright: "#2D2D2D",
+      }
+    : {
+        surface: "#FFF8F1",
+        surfaceLow: "#F9F3EB",
+        surfaceMid: "#F0EBE3",
+        surfaceHigh: "#E8E1DA",
+        surfaceDim: "#DFD9D1",
+        surfaceBright: "#FFFFFF",
+      };
+  mockSettings.themeSurface = isDark ? "#0A0A0A" : "#FFF8F1";
+  mockSettings.uiLanguage = language;
 }
 
 type RenderedNode = ReturnType<ReturnType<typeof render>["getByText"]>;
@@ -499,4 +531,102 @@ describe("DeckCardsSheet due-date editor characterization", () => {
       warnSpy.mockRestore();
     }
   });
+
+  it.each(dueDateRetryCases)(
+    "clears stale validation before a rejected valid save for %s",
+    async (_label, language, isDark, invalidInput, validationKind) => {
+      configureSettings(language, isDark);
+      const s = language === "ar" ? strings.ar : strings.en;
+      const onClose = jest.fn();
+      const onChanged = jest.fn();
+      const view = renderDeckWithCallbacks(onClose, onChanged);
+      await waitFor(() => expect(view.getByText(secondCard.title)).toBeTruthy());
+      const input = await openSecondCardEditor(view, s);
+      const editorModal = getVisibleModalForInput(input);
+      const validationMessage = validationKind === "past" ? s.cardDueDatePast : s.cardDueDateInvalid;
+      const otherValidationMessage = validationKind === "past" ? s.cardDueDateInvalid : s.cardDueDatePast;
+
+      fireEvent.changeText(input, invalidInput);
+      fireEvent.press(within(editorModal).getByRole("button", { name: s.cardSaveDueDate }));
+      await waitFor(() => expect(within(editorModal).getByText(validationMessage)).toBeTruthy());
+      expect(within(editorModal).queryByText(otherValidationMessage)).toBeNull();
+      expect(setStudyCardDueDate).not.toHaveBeenCalled();
+
+      const validDateKey = formatLocalDateInput(localDateWithOffset(9));
+      const parsed = parseDueDateInput(validDateKey);
+      if (!parsed.ok) throw new Error("The relative future fixture date must be valid");
+      const deferred = createDeferred<StudyCardRow>();
+      jest.mocked(setStudyCardDueDate).mockReturnValueOnce(deferred.promise);
+      const failure = new Error("deck validation retry write failed");
+      const expectedWarning: [string, Error] = ["[DeckCardsSheet] Card action failed:", failure];
+      const originalWarn = console.warn;
+      const warnSpy = jest.spyOn(console, "warn").mockImplementation((...args) => {
+        const isExpectedWarning =
+          args.length === expectedWarning.length && args.every((arg, index) => arg === expectedWarning[index]);
+        if (!isExpectedWarning) originalWarn(...args);
+      });
+
+      try {
+        try {
+          fireEvent.changeText(input, validDateKey);
+          fireEvent.press(within(editorModal).getByRole("button", { name: s.cardSaveDueDate }));
+          await waitFor(() => {
+            expect(within(editorModal).queryByText(validationMessage)).toBeNull();
+            expect(within(editorModal).queryByText(otherValidationMessage)).toBeNull();
+            expect(within(editorModal).queryByText(s.cardActionFailed)).toBeNull();
+            expect(input.props.value).toBe(validDateKey);
+            expect(getTextButton(view, s.cardSaveDueDate).props.accessibilityState.disabled).toBe(true);
+            expect(getTextButton(view, s.flashcardsCancel).props.accessibilityState.disabled).toBe(true);
+          });
+          expect(setStudyCardDueDate).toHaveBeenCalledTimes(1);
+          expect(setStudyCardDueDate).toHaveBeenCalledWith(mockDatabase, "deck-1", secondCard.id, parsed.date);
+
+          fireEvent(editorModal, "requestClose");
+          expect(view.getByPlaceholderText(s.cardDueDatePlaceholder)).toBeTruthy();
+          fireEvent.press(within(editorModal).getByRole("button", { name: s.cardSaveDueDate }));
+          expect(setStudyCardDueDate).toHaveBeenCalledTimes(1);
+
+          deferred.reject(failure);
+          await act(async () => {
+            await deferred.promise.catch(() => undefined);
+          });
+
+          const failedModal = getVisibleModalForInput(input);
+          const error = within(failedModal).getByText(s.cardActionFailed);
+          expect(error).toBeTruthy();
+          expectWritingDirection(error, language === "ar" ? "rtl" : "ltr");
+          expect(within(failedModal).queryByText(s.cardDueDateInvalid)).toBeNull();
+          expect(within(failedModal).queryByText(s.cardDueDatePast)).toBeNull();
+          expect(input.props.value).toBe(validDateKey);
+          expect(getTextButton(view, s.cardSaveDueDate).props.accessibilityState.disabled).toBe(false);
+          expect(getTextButton(view, s.flashcardsCancel).props.accessibilityState.disabled).toBe(false);
+          expect(getDeckCardsForList).toHaveBeenCalledTimes(1);
+          expect(onChanged).not.toHaveBeenCalled();
+          expect(onClose).not.toHaveBeenCalled();
+          expect(setStudyCardDueDate).toHaveBeenCalledTimes(1);
+
+          fireEvent.press(within(failedModal).getByRole("button", { name: s.flashcardsCancel }));
+          await waitFor(() => expect(view.queryByPlaceholderText(s.cardDueDatePlaceholder)).toBeNull());
+          const reopenedInput = await openSecondCardEditor(view, s);
+          const reopenedModal = getVisibleModalForInput(reopenedInput);
+          expect(reopenedInput.props.value).toBe(formatLocalDateInput(new Date(secondCard.due)));
+          expect(within(reopenedModal).queryByText(s.cardActionFailed)).toBeNull();
+          expect(within(reopenedModal).queryByText(s.cardDueDateInvalid)).toBeNull();
+          expect(within(reopenedModal).queryByText(s.cardDueDatePast)).toBeNull();
+          expect(setStudyCardDueDate).toHaveBeenCalledTimes(1);
+          expect(getDeckCardsForList).toHaveBeenCalledTimes(1);
+          expect(onChanged).not.toHaveBeenCalled();
+          expect(onClose).not.toHaveBeenCalled();
+        } finally {
+          deferred.reject(failure);
+          await act(async () => {
+            await deferred.promise.catch(() => undefined);
+          });
+        }
+        expect(warnSpy.mock.calls).toEqual([expectedWarning]);
+      } finally {
+        warnSpy.mockRestore();
+      }
+    },
+  );
 });

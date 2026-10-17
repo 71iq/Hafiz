@@ -139,6 +139,7 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
       setDueDateError(parsed.reason === "past" ? s.cardDueDatePast : s.cardDueDateInvalid);
       return;
     }
+    setDueDateError(null);
     runAction(dueTarget, async () => {
       await setStudyCardDueDate(db, deckId, dueTarget.id, parsed.date);
       setDueTarget(null);

@@ -481,11 +481,15 @@ test("deck date-save failure stays inside the active date editor", async ({ brow
     const input = page.getByPlaceholder("YYYY-MM-DD", { exact: true });
     const editor = page.getByRole("dialog").filter({ has: input });
     await expect(editor).toBeVisible();
+    await input.fill("not-a-date");
+    await editor.getByRole("button", { name: "Save Date", exact: true }).click();
+    await expect(editor.getByText("Enter a valid date in YYYY-MM-DD format", { exact: true })).toBeVisible();
     await input.fill("2998-03-04");
     await editor.getByRole("button", { name: "Save Date", exact: true }).click();
 
     const error = editor.getByText("Could not update card", { exact: true });
     await expect(error).toBeVisible();
+    await expect(editor.getByText("Enter a valid date in YYYY-MM-DD format", { exact: true })).toHaveCount(0);
     await expect(error).toBeInViewport();
     await expect(input).toHaveValue("2998-03-04");
     await expect(editor).toBeVisible();
