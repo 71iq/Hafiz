@@ -3860,22 +3860,33 @@
     {
       "id": "RF-075",
       "title": "Show answer-save failures inside the active editor",
-      "description": "Characterize failed write/delete of custom answers and show feedback in the open editor.",
-      "rationale": "AnswerEditSheet remains open on failure, has no error prop and does not clear stale action errors when opened. Its text and retry must survive rejected user-setting persistence.",
+      "description": "Route existing session action errors into the actual answer editor and clear them on a new opening, preserving answer override persistence and phase.",
+      "rationale": "The private AnswerEditSheet owns the visible textarea but receives no sessionError. Primary inspected activeModes/editableAnswerMode, TestModeAnswer, default/override keys, write/delete services and SQLite schema. smartRefs is an actual editable mode, so existing typed route fixtures can exercise both operations without fabricating private state or SQL mocks.",
       "modules": [
         "app/flashcards/session.tsx",
         "components/ui/Field.tsx",
         "lib/database/user-settings.ts",
-        "tests/unit/session-due-date.test.tsx"
+        "lib/database/schema.ts",
+        "tests/unit/session-due-date.test.tsx",
+        "tests/e2e/session-action-errors.spec.ts"
       ],
       "dependencies": [
         "RF-073",
-        "RF-074"
+        "RF-074",
+        "RF-076",
+        "RF-079"
       ],
       "acceptance_criteria": [
-        "Before approval inspect editable review modes, exact custom-answer key generation and synthetic fixture branch. Define the existing editor as visible error owner; compare FieldMessage reuse without creating a new form or notification system.",
-        "Use actual editor/service-boundary regressions for rejected nonempty writes and empty-answer deletions. Preserve entered text, prior answer/card/phase, exact setting keys, busy close guards, retry and success semantics. Fresh opening resets stale failures; no hidden background-label proof.",
-        "Reuse existing typed route fixture where appropriate, preserve all accepted assertions and isolate SQLite/fonts/network. Primary must finalize exact source/test paths, red/green, commands and native/web evidence before approval; independent review and final acceptance remain required."
+        "Read .refactor-baseline/rf075-readiness.json. Reuse sessionError/runCardAction, the private AnswerEditSheet, existing FieldMessage, actual route/menu/textarea/Modal helpers and browser fixtureQuery. Add no component/hook/dependency/form framework/state/service/schema or private-state test mock. Only three allowed files may change. Do not spawn helpers/reviewers. Primary owns data/architecture; controller owns all frozen gates and separate Astra evaluation.",
+        "Session clears sessionError in openAnswerEditSheet after existing currentCard/mode guards and passes it as a controlled error prop into the private AnswerEditSheet. Add its typed string|null error prop and render existing FieldMessage only for a truthy error after the unchanged TextInput. Match accepted ConfirmDialog error presentation: mt-3 w-full self-stretch text-red-600 dark:text-red-400, dir from UI isRTL, accessibilityRole alert and accessibilityLiveRegion polite. Error direction follows the locale, not containsArabic(value). Keep every existing textarea style/prop, sizing, keyboard/overlay/focus/dismiss/busy behavior and typography. No Input/form migration, broad formatting or change to ConfirmDialog/Field/other primitives.",
+        "Keep handleSaveAnswerEdit, trim/write-versus-delete, exact card_answer_${cardId}:${mode} keys, setCards/customAnswers, close/reset fields, card/phase/side, haptics and all other handlers unchanged. smartRefs is editable for the synthetic mutashabihat card. A nonempty trimmed answer writes; a whitespace-only answer deletes. Existing account/DB/sync services stay unchanged and no protected content is written.",
+        "Extend existing session-due-date.test.tsx in place. Preserve all17 existing scenarios, assertions, mocks, helpers and 5000ms deadline/NativeModal preload. Add six actual route cases: four rejection/retry cases, write and delete each in Arabic/light front and English/dark revealed, plus two front cancel/reopen cases, one per operation. Use typed Promise<void> deferrals. The actual input placeholder and its containing visible NativeModal own assertions, never a background error or last-Modal shortcut. Reuse exact existing Modal traversal and enabled/disabled footer checks. Both Save Answer and Cancel labels remain rendered while busy, unlike the confirmation spinner. Keep input editability unchanged. Retain genuine red/green outputs in .refactor-baseline/rf075-*.log and diagnose any selector/setup failure before claiming semantic red.",
+        "Deletion must start from a meaningful existing override. Seed a stored synthetic answer through the actual editor and one successful mocked writeUserSetting call, without private state injection or mid-test mock clearing. Count and assert that seed write for delete cases. Then edit to whitespace and defer deleteUserSetting; write cases defer writeUserSetting with padded nonempty text. Assert exact db/key/trimmed value and targeted call counts, retained typed input on rejection, visible in-editor error, disabled busy footer and request-close guard, recovered enabled footer and retry success. No hapticMedium calls. All saves retain first card with no advance/router/summary, grading/log/points/achievement/sync/unrelated card actions. For delete cases write count remains exactly one seed; for write cases delete stays zero. Do not hide expected service calls by resetting mocks.",
+        "Prove actual phase before editor opening and after rejection: front retains Reveal. For revealed default smartRefs, use the actual comparison answer `${s.smartDeckComparisonCue}: ${firstCue}` and absence of Reveal. After seeding a custom override, use its actual CustomAnswerText content and absence of Reveal instead. Generic smartDeckTargetAyah also appears on the front and cannot prove phase. Successful write updates revealed custom answer; successful delete restores default answer, preserving the current front/revealed phase. Reopen editor to check normalized/default value and no stale error. Cancel/reopen failure cases restore the backing default/seeded answer without another persistence call. Forward unexpected warnings, assert the full exact expected warning list and unconditionally settle/drain deferrals and restore spies.",
+        "Test assertion reuse: the current expectNoUnrelatedCardActionCalls includes zero write/deleteUserSetting, which is inappropriate for this task. You may factor its identical non-setting zero-call assertions into a narrowly named shared local test helper, keeping both setting assertions in the original wrapper so every prior test retains identical meaning. New answer cases also assert zero delete/resetStudyCard services. No generic assertion framework or copied large settings/provider fixture. Preserve every earlier scenario and both browser cases byte-for-byte unless an explicitly allowed test-helper reuse has identical semantics.",
+        "Add one browser case to existing session-action-errors.spec.ts, reusing fixtureQuery without changing either previous case/helper. Primary-approved isolated recipe: HTTP localhost/127.0.0.1 only, fresh empty English/dark390x844 context/storageState, waitForQaReady, zero initial study_cards. Insert only two personal study rows2:10/2:11 in deckqa-rf075 using existing columns, first due2000 and second due2999. Insert only personal setting key review_settings_deckqa-rf075 with value JSON {\"testModes\":[\"surahName\"],\"newCardSortOrder\":\"created\"}, updated_at timestamp/deleted_at NULL. This normalizes through existing readDeckReviewSettings and selects one deterministic existing native mode. Assert the two card IDs, exact setting and initially absent answer key card_answer_2:10:surahName. Create only trigger rf075_reject_fixture_answer BEFORE INSERT ON user_settings WHEN NEW.key='card_answer_2:10:surahName' BEGIN SELECT RAISE(ABORT,'RF075 isolated QA rejection'); END; verify it installed. No other SQL, app/debug API, source schema, protected input, live backend or production change.",
+        "Browser uses actual Dark setting, session?deckId=deckqa-rf075, Card Actions -> Edit Answer, fills the real placeholder Write the answer shown after reveal... with a nonempty QA answer and presses Save Answer inside the editor dialog. Scope Could not update card to role alert inside the dialog containing that textarea, use text matching rather than alert accessible name. Assert entered value retained, modal open, error and enabled Cancel/Save Answer in viewport, both footer center hit tests unobstructed and no overlap. Exactly one action warning must have the existing prefix and Error finalizing statement as observed through this installed driver; avoid guessing the number of nested Error prefixes. Assert target answer key still absent, original study row unchanged/undeleted, zero study_log, healthy page. Save screenshot plus locale/theme/viewport/geometry attachment and always close context. Primary inspects the fresh final image; RNTL alone is insufficient visual evidence.",
+        "Worker runs focused red/green and types/lint/format, reports full/build/browser/controller review pending honestly, and does not bind a browser server when sandbox EPERM is documented. Do not duplicate full/build/browser gates in implementation. Controller must run all six frozen commands freshly and separate Astra review. Expected final counts are23 session cases,66 suites/365 tests and33 Chrome cases, all enabled; diagnose any difference instead of weakening tests. No physical-device/native/iOS verification claim. Primary retains final acceptance."
       ],
       "verification": [
         [
@@ -3883,8 +3894,7 @@
           "run",
           "test:unit",
           "--",
-          "--runTestsByPath",
-          "tests/unit/session-due-date.test.tsx"
+          "--detectOpenHandles"
         ],
         [
           "npm",
@@ -3892,17 +3902,43 @@
           "typecheck"
         ],
         [
+          "node_modules/.bin/eslint",
+          "app/flashcards/session.tsx",
+          "tests/unit/session-due-date.test.tsx",
+          "tests/e2e/session-action-errors.spec.ts"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "tests/unit/session-due-date.test.tsx",
+          "tests/e2e/session-action-errors.spec.ts"
+        ],
+        [
           "npm",
           "run",
           "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8193",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8193",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts",
+          "tests/e2e/button-accessibility.spec.ts",
+          "tests/e2e/session-action-errors.spec.ts"
         ]
       ],
       "risk": "medium",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
         "app/flashcards/session.tsx",
-        "tests/unit/session-due-date.test.tsx"
+        "tests/unit/session-due-date.test.tsx",
+        "tests/e2e/session-action-errors.spec.ts"
       ],
       "attempts": 0
     },
