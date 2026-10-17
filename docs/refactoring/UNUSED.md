@@ -102,3 +102,9 @@ All live queries remain byte-identical. This includes word saves, study-card mat
 Fresh Knip must retain zero unused files and reduce unused exports from three to one, `rtlComponentRegistryByPath`. `Locale` remains the one unused type. Two intentional alias groups, five unlisted dependencies and one external binary remain visible. No configuration or suppression changes. RF-084 and RF-085 own the remaining source declarations after separate primary preparation.
 
 Verification includes the unchanged full unit suite, strict types, scoped query-module lint, web export, documentation formatting and real analysis, followed by separate stronger review and primary acceptance. Existing unit callers mock several query operations; they do not prove database execution. The exact deletion-only byte comparison establishes that every live implementation is unchanged. No database command, native build, device or iOS check is run or claimed for this deletion.
+
+## RF-084 unused registry index, 2026-10-17
+
+`rtlComponentRegistryByPath` has no authored caller. RF-084 removes only its unused derived lookup allocation and unsafe cast. The typed registry array, entries, helper, imports and existing inventory suite stay byte-identical. No runtime UI or data changes.
+
+Current Knip must report zero unused files and exports, with `Locale` still the one unused exported type. The two deliberate alias groups, five unlisted dependencies and one external binary remain visible. Real analysis, the unchanged three-case registry suite, strict types, scoped lint and document format run, followed by independent review and primary acceptance. No new browser, app/native build or device/iOS check is claimed.

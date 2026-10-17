@@ -105,7 +105,3 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
   entry("components/zayt/ZaytRivePreview.tsx", "media-preview", "source", "Shared preview wrapper keeps artwork unmirrored."),
   entry("components/zayt/ZaytRivePreview.web.tsx", "media-preview", "source", "Web Rive/canvas coordinates are asset-local, not UI layout."),
 ];
-
-export const rtlComponentRegistryByPath = Object.fromEntries(
-  rtlComponentRegistry.map((item) => [item.path, item])
-) as Record<string, RtlComponentRegistryEntry>;

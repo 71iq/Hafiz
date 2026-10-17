@@ -4618,12 +4618,17 @@
       ],
       "risk": "low",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "tests/rtl/rtl-component-registry.ts",
         "docs/refactoring/UNUSED.md"
       ],
-      "attempts": 0
+      "attempts": 1,
+      "started_at": "2026-10-17T20:34:05.468744+00:00",
+      "failure": "Batch resource limit reached",
+      "completed_at": "2026-10-17T20:35:40.607444+00:00",
+      "evidence": ".ralph/runs/RF-084-1-1792269245469925178",
+      "summary": "Removed the unused rtlComponentRegistryByPath allocation and copied the prescribed UNUSED.md. The typed registry array and all entries remain unchanged. No commit, push, package install, or reviewer was used."
     },
     {
       "id": "RF-085",
