@@ -4117,21 +4117,29 @@
     {
       "id": "RF-078",
       "title": "Expose deck confirmation failures in the active dialog",
-      "description": "Characterize rejected deck delete/reset actions and reuse the optional ConfirmDialog error contract once RF-074 is accepted.",
-      "rationale": "Deck runAction catches into a list-level error while the failed await leaves confirmAction open. The ConfirmDialog call at:264 receives no error. This matches the session confirmation ownership defect without changing database actions.",
+      "description": "Render rejected deck Delete/Reset persistence errors inside the existing active confirmation dialog and clear them on reopening.",
+      "rationale": "Primary actual-message-ancestor NativeModal reproductions reach exact Delete/Reset services and warning but fail only missing in-dialog feedback. Real local Chrome Delete reproduction shows the same defect. Existing ConfirmDialog already has the required optional error contract.",
       "modules": [
         "components/flashcards/DeckCardsSheet.tsx",
-        "components/ui/ConfirmDialog.tsx",
-        "tests/unit/deck-cards-due-date.test.tsx"
+        "tests/unit/deck-cards-due-date.test.tsx",
+        "tests/e2e/session-action-errors.spec.ts"
       ],
       "dependencies": [
         "RF-074",
-        "RF-077"
+        "RF-077",
+        "RF-081",
+        "RF-079"
       ],
       "acceptance_criteria": [
-        "Before approval add real-parent rejected delete/reset cases inside the correct visible Modal. Inspect cancel/reopen, busy guards, exact service IDs and retry/reload semantics.",
-        "Reuse the proven optional shared dialog error contract and existing deck-owned error state. Preserve list loading and other callers. Finalize exact regression/native/web evidence and commands before approval.",
-        "Severity medium, source-flow confidence high; runtime rejection reproduction remains pending. No fixture cloning, generic action framework, backend change or source edit is approved by this placeholder."
+        "Read .refactor-baseline/rf078-readiness.json, corrected owner/browser results and initial setup-failure record. Primary owns behavior/data decisions. No subagents/reviewers from worker. Only three allowed paths. Controller owns six frozen commands and separate stronger evaluation.",
+        "Exactly three production call-site changes: existing inline onDelete and onReset each call setError(null) immediately before unchanged setConfirmAction; existing ConfirmDialog receives error={error}. Reuse optional shared dialog error. No ConfirmDialog edit, new state/helper/component/hook/dependency, or change to runAction, handlers, busy/close/virtual-card guards, service IDs, loadCards, onChanged, overlay/native props, table/filter or date editor. No schema, queue/sync, protected content or production write.",
+        "Preserve all six current deck cases, assertions, mocks, timeouts, NativeModal preload and cleanup. Add exactly four cases in the existing fixture: Delete and Reset each Arabic/light and English/dark. Typed rows reuse configureSettings, fixture, callbacks, measured second-row menu, NativeModal ancestry, deferred and complete warning tuple. Delete uses Deferred<void>, Reset Deferred<StudyCardRow>. No unsafe casts, common untyped service mock, fixture clone or generic action framework.",
+        "A private helper may open second-card menu/confirmation and locate its visible NativeModal from unique localized confirmation message. Await requestAnimationFrame menu transition. Reuse the existing ancestor walk by renaming getVisibleModalForInput to getVisibleModalForNode with only references/diagnostic text changed. Existing case bodies otherwise byte-for-byte. Extract only the measured menu-open portion from openSecondCardEditor if reused by confirmation helper; preserve every assertion and behavior.",
+        "Each case asserts correct message and zero initial action writes, submits a typed deferred action, checks exact target secondCard deck/card IDs, exactly two disabled footer buttons, requestClose guard, explicit duplicate confirm adds no write, and no premature reload/onChanged/onClose. Rejection shows localized error inside actual-message NativeModal with correct writing direction and alert/live-region semantics, exactly two enabled footers, same two original cards, one list read, no callbacks/other action-service calls. Use exact complete warning tuple and nested finally drain/spy restoration.",
+        "Each new case cancels after failure, reopens the same action through real menu, and checks clean error with no extra write/read/callback. Then retry successfully: exactly two correct target action calls, dialog closes, exactly one post-success reload/onChanged and parent stays open. Delete reload returns only firstCard; Reset returns both cards. Keep unrelated services uncalled. Do not invent deck queue/advance/navigation behavior.",
+        "Add four cases before production edits and retain genuine focused red: four missing actual-modal errors, six previous cases pass, zero skips. Separate setup/selector/promise/deadline failures. After exact three call-site changes require all ten green. If resuming a correct preserved patch, keep it and causal evidence rather than reverting production. Retain every output.",
+        "Append only the formatted case .refactor-baseline/rf078-browser-case.ts. Keep fixtureQuery and all four existing cases byte-for-byte. It uses loopback HTTP, empty English/dark390x844 context, existing two personal default-retention rows/filter, exact 2:11 deletion-rejection trigger, real Home/second-row Delete Card menu and Delete button. Require current error visible inside confirmation, enabled/unobstructed Cancel/Delete, unchanged nondeleted target/original due, zero study_log, exactly one warning and healthy page. Preserve screenshot/geometry. No helper/schema/service/protected/production changes.",
+        "All six fresh frozen commands pass, expected 66 suites/374 unit tests and 35 Chrome cases. Retain existing source warnings. Worker reports controller web/server commands pending if sandbox binding is unavailable. Separate Astra checks implementation, full diff, machine evidence and fresh rendered output. Primary final image/hash/diff acceptance happens after controller completion/lease release as distinct final mission acceptance. Do not reject independent implementation review solely because later primary acceptance is pending; controller verified alone is not final mission acceptance. No new native/device/iOS verification or duplication scan is claimed."
       ],
       "verification": [
         [
@@ -4139,8 +4147,7 @@
           "run",
           "test:unit",
           "--",
-          "--runTestsByPath",
-          "tests/unit/deck-cards-due-date.test.tsx"
+          "--detectOpenHandles"
         ],
         [
           "npm",
@@ -4148,17 +4155,43 @@
           "typecheck"
         ],
         [
+          "node_modules/.bin/eslint",
+          "components/flashcards/DeckCardsSheet.tsx",
+          "tests/unit/deck-cards-due-date.test.tsx",
+          "tests/e2e/session-action-errors.spec.ts"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "tests/unit/deck-cards-due-date.test.tsx",
+          "tests/e2e/session-action-errors.spec.ts"
+        ],
+        [
           "npm",
           "run",
           "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8193",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8193",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts",
+          "tests/e2e/button-accessibility.spec.ts",
+          "tests/e2e/session-action-errors.spec.ts"
         ]
       ],
       "risk": "medium",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
         "components/flashcards/DeckCardsSheet.tsx",
-        "tests/unit/deck-cards-due-date.test.tsx"
+        "tests/unit/deck-cards-due-date.test.tsx",
+        "tests/e2e/session-action-errors.spec.ts"
       ],
       "attempts": 0
     },
