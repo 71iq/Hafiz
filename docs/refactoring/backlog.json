@@ -2037,7 +2037,9 @@
         "RF-064",
         "RF-065",
         "RF-087",
-        "RF-088"
+        "RF-088",
+        "RF-089",
+        "RF-090"
       ],
       "acceptance_criteria": [
         "Repeat identical clone/dead-code/native+web graph/security scopes.",
@@ -2063,6 +2065,11 @@
           "npm",
           "run",
           "audit:dependencies"
+        ],
+        [
+          "npm",
+          "run",
+          "test:dependency-security"
         ]
       ],
       "risk": "medium",
@@ -4782,9 +4789,11 @@
         "docs/refactoring/UNUSED.md"
       ],
       "dependencies": [
-        "RF-011"
+        "RF-011",
+        "RF-089"
       ],
       "acceptance_criteria": [
+        "RF-089 has security priority. Refresh package/lock/audit preflight after that patch before any Sharp approval; the earlier rf087 metadata/baseline is historical. No Sharp package has been installed in the application by this preparation.",
         "Primary must inspect script side effects, official current sharp/Node/platform compatibility, audit and lock impacts before selecting an exact scope.",
         "Do not run the icon generator or modify protected assets. Keep runtime dependencies and native app behavior unchanged; verify any chosen development tool with harmless in-memory input.",
         "This placeholder authorizes no dependency installation, source change, asset generation or test weakening. Freeze acceptance commands and independent review after readiness."
@@ -4841,6 +4850,154 @@
       "allowed_paths": [
         "scripts/ralph/check-security-dependencies.cjs",
         "docs/refactoring/UNUSED.md"
+      ],
+      "attempts": 0
+    },
+    {
+      "id": "RF-089",
+      "title": "Patch compatible brace-expansion copies and guard nested input",
+      "description": "Update seven vulnerable copies within their existing major lines; preserve the patched control and every other resolved entry.",
+      "rationale": "Real bounded API probes find seven stack failures in eight installed copies. Vendor patches and all parent ranges allow 1.1.21/5.0.12. Named update reaches exactly the same fixed graph without new overrides.",
+      "modules": [
+        "package.json",
+        "package-lock.json",
+        "scripts/tests/brace-expansion.test.cjs",
+        "docs/refactoring/DEPENDENCY_SECURITY.md",
+        "docs/refactoring/UNUSED.md"
+      ],
+      "dependencies": [
+        "RF-011"
+      ],
+      "acceptance_criteria": [
+        "Read .refactor-baseline/rf089-readiness.json, rf089-preflight.json, rf089-reproduction.json and final before-tool log. Primary owns security/version/exposure decisions. Generator edits only package.json, scripts/tests/brace-expansion.test.cjs, docs/refactoring/DEPENDENCY_SECURITY.md and docs/refactoring/UNUSED.md. package-lock.json is a controller-owned output. Do not install, edit lock/evidence/verifier, run the icon/database generator, spawn helpers/reviewers or touch app/native/protected/backend/production inputs.",
+        "Copy the four exact rf089-prescribed artifacts to their corresponding source/doc paths. Manifest adds only test:dependency-security; existing dependencies/ranges/overrides/scripts remain byte-identical. No new override. Controller uses the frozen named update and lifecycle fixes. Exact generated lock changes six 1.1.15 copies to 1.1.21 and one 5.0.6 copy to 5.0.12; glob 1.1.21 and all other lock entries remain unchanged.",
+        "Preserve the entire proposed Node test and inputs. It discovers every locked installed copy, checks four valid patterns and the 3,200-level nested case in bounded Node children. It must pass both cases against actual controller-installed modules. Exact final test source already proves red, one pass and one failure on current modules and green, two passes and zero failures on the isolated patched fixture, zero skips. Reporter/formatting harness mistakes stay recorded. No skipped tests, retries inside tests, timeout relaxation or alternate mock implementation.",
+        "Fresh graph/actual audit must pass critical gate, remove brace-expansion entirely and introduce no advisory source beyond recorded baseline. Remaining preflight 71 findings/56 high remain RF-090 work, not a clean security claim. Real Knip keeps zero unused files/exports/types/packages, no unresolved imports, two aliases/four unlisted/one binary. No suppression or config edit.",
+        "All 12 fresh commands pass. They cover actual named installation and existing lifecycle fixes, pinned exact-source/lock/graph/audit/Knip verification, Node guard, both native dependency graphs, strict types, full lint, unchanged full Jest suite, web export, existing Chrome smoke and formatting. Separate Astra inspects all diff/evidence and legitimate residual risks. Primary final scope/hash review follows controller release. No native compile/device/iOS/production result is required or claimed for unchanged native package graph. Preserve RF-086 on any recurrence; never change its tests here."
+      ],
+      "verification": [
+        [
+          "npm",
+          "update",
+          "brace-expansion",
+          "--ignore-scripts",
+          "--no-audit",
+          "--no-fund",
+          "--offline",
+          "--strict-peer-deps"
+        ],
+        [
+          "node",
+          "scripts/fix-rn-gradle-plugin.js"
+        ],
+        [
+          "node_modules/.bin/patch-package",
+          "--error-on-fail"
+        ],
+        [
+          "python3",
+          "-c",
+          "import hashlib,pathlib,runpy; p=pathlib.Path('.refactor-baseline/rf089-verify.py'); assert hashlib.sha256(p.read_bytes()).hexdigest() == '695ad14f040166735020c4a384a5fcecfcc0ae812c6b5d254eaee9d11664c969', 'Primary verifier changed'; runpy.run_path(str(p),run_name='__main__')"
+        ],
+        [
+          "npm",
+          "run",
+          "test:dependency-security"
+        ],
+        [
+          "node",
+          "scripts/ralph/check-expo-native.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "lint"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8193",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8193",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "package.json",
+          "scripts/tests/brace-expansion.test.cjs",
+          "docs/refactoring/DEPENDENCY_SECURITY.md",
+          "docs/refactoring/UNUSED.md"
+        ]
+      ],
+      "risk": "medium",
+      "approved": true,
+      "status": "pending",
+      "allowed_paths": [
+        "package.json",
+        "package-lock.json",
+        "scripts/tests/brace-expansion.test.cjs",
+        "docs/refactoring/DEPENDENCY_SECURITY.md",
+        "docs/refactoring/UNUSED.md"
+      ],
+      "attempts": 0
+    },
+    {
+      "id": "RF-090",
+      "title": "Triage and resolve remaining dependency audit findings",
+      "description": "Classify remaining advisory families and split exact compatible repairs after the brace-expansion patch.",
+      "rationale": "Fresh baseline has 74 package findings including 59 high; the selected compatible patch leaves 71/56 high. These counts include propagated parents, and require explicit exposure and remediation decisions before final completion.",
+      "modules": [
+        "package.json",
+        "package-lock.json",
+        "docs/refactoring/DEPENDENCY_SECURITY.md"
+      ],
+      "dependencies": [
+        "RF-089"
+      ],
+      "acceptance_criteria": [
+        "Primary deduplicates actual advisory URLs, inspects installed instances/consumers and distinguishes shipped app, optional remote and development paths. Use fresh official advisories and compatible-version evidence.",
+        "Split independently verifiable package-family repairs. No broad npm audit fix, force, unsupported major jump, lint/test suppression, security-policy/production change or blanket exploitability claim.",
+        "Do not approve this umbrella as one huge implementation. Final security acceptance requires resolved in-scope high findings or exact documented genuine blockers, with independent review. Preserve residual findings and all attempted evidence."
+      ],
+      "verification": [
+        [
+          "npm",
+          "audit",
+          "--json",
+          "--audit-level=high"
+        ],
+        [
+          "npm",
+          "run",
+          "test:dependency-security"
+        ]
+      ],
+      "risk": "high",
+      "approved": false,
+      "status": "pending",
+      "allowed_paths": [
+        "package.json",
+        "package-lock.json",
+        "docs/refactoring/DEPENDENCY_SECURITY.md"
       ],
       "attempts": 0
     }
