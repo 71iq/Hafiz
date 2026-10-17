@@ -4824,6 +4824,7 @@
         "RF-011"
       ],
       "acceptance_criteria": [
+        "The existing controller path_allowed hard-denies scripts/ralph/ even when a task allow-list names a helper. Do not approve this item for a Ralph implementation worker or weaken that guard. This is primary-owned infrastructure maintenance requiring proportional real checks and separate stronger read-only review before primary acceptance. Keep approved false until that owner workflow is complete.",
         "Primary verifies React Native ownership, actual resolution paths, behavior under a harmless competing-root fixture, current override guarantees and unchanged Supabase CLI archive checks.",
         "Approve only a bounded parent-relative resolution repair after causal evidence. Do not install a new runtime devtools package or suppress the analysis finding.",
         "No production, backend, credential, package override/version or live system change. Freeze real analysis and existing probe verification before approval."
