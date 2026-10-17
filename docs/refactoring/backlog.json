@@ -4518,6 +4518,7 @@
       ],
       "acceptance_criteria": [
         "Read .refactor-baseline/rf083-readiness.json and rf083-before-gate.log. Primary owns the API/data/security decision. Only lib/fsrs/queries.ts and docs/refactoring/UNUSED.md may change. No worker subagents/reviewers, package installs or evidence/verifier edits. Controller runs the six frozen gates and separate stronger review.",
+        "Read .refactor-baseline/rf083-unit-failure-triage.json and the preserved failed full-suite run. One existing Arabic Reset retry case failed once, passed three isolated runs and two complete unchanged ten-case file runs. The query module is fully mocked there, so candidate deletion cannot execute in that test. Root cause is not established. Preserve the spent ordinary attempt, invalid checkpoint and all tests/gates/timeouts. The remaining normal retry requires fresh generation and all six frozen checks, with no source or test scope expansion. RF-086 tracks the unresolved intermittent fixture finding; reviewer must report it honestly.",
         "Delete only mutashabihatCardId, retentionCardId, isRetentionCardSaved and addRetentionCard, exactly 122 lines in the two prescribed contiguous spans. Copy .refactor-baseline/rf083-prescribed-queries.ts byte-for-byte. Preserve every import, live constant/type/function, whitespace and other byte. No whole-file formatter, wrapper, helper, replacement abstraction, dependency or test edit.",
         "All live word-save, study-card materialization/marking/soft-delete/scheduling, legacy migration and queue behavior remain unchanged. MUTASHABIHAT_DECK_ID still has a session consumer. Shared createEmptyCard/enqueueSync/migrateLegacyRetentionDecks/rowWithDefaultStatus/NON_SMART_CARD_SQL remain required. No database execution/schema/migration, ID, protected input, backend or production change.",
         "Copy .refactor-baseline/rf083-prescribed-unused.md exactly to docs/refactoring/UNUSED.md. Historical analysis snapshots remain. Real Knip retains zero unused files and only rtlComponentRegistryByPath as unused export, only Locale as unused type, two aliases, five unlisted dependencies and one binary, no unresolved or unused package findings. No config/suppression changes. Finding exit1 is allowed only after valid JSON and expected contents; execution/configuration failures fail.",
@@ -4556,12 +4557,15 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "pending",
+      "status": "retry",
       "allowed_paths": [
         "lib/fsrs/queries.ts",
         "docs/refactoring/UNUSED.md"
       ],
-      "attempts": 0
+      "attempts": 1,
+      "started_at": "2026-10-17T20:24:12.121906+00:00",
+      "failure": "Verification failed: ['npm', 'run', 'test:unit']; see .ralph/runs/RF-083-1-1792268652123252954/verify-1.log",
+      "evidence": ".ralph/runs/RF-083-1-1792268652123252954"
     },
     {
       "id": "RF-084",
@@ -4640,6 +4644,47 @@
       "allowed_paths": [
         "lib/i18n/strings.ts",
         "docs/refactoring/UNUSED.md"
+      ],
+      "attempts": 0
+    },
+    {
+      "id": "RF-086",
+      "title": "Diagnose the intermittent deck Reset retry fixture failure",
+      "description": "Reproduce and diagnose the unchanged Arabic Reset retry failure observed during RF-083 full-suite verification.",
+      "rationale": "The existing actual-modal test failed once after a successful mocked retry but passed three isolated-case and two complete file runs. The query-module deletion cannot execute through its full Jest mock. Root cause remains unknown, and repeated green output alone is not a repair.",
+      "modules": [
+        "tests/unit/deck-cards-due-date.test.tsx",
+        "components/flashcards/DeckCardsSheet.tsx",
+        "components/ui/ResponsiveOverlay.tsx"
+      ],
+      "dependencies": [
+        "RF-078"
+      ],
+      "acceptance_criteria": [
+        "Before approval primary reads .refactor-baseline/rf083-unit-failure-triage.json and original logs, establishes a repeatable failure or records the reproduction limit, and chooses the smallest causal seam.",
+        "Freeze a behavioral regression and exact bounded repair only after causality is demonstrated. Preserve actual NativeModal, guards, error/retry/negative assertions and meaningful timing behavior; no test skipping, blanket mocking, timeout increase or weakening to pass.",
+        "No production/data behavior change is authorized by this placeholder. Independent review and primary acceptance remain required."
+      ],
+      "verification": [
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/deck-cards-due-date.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit"
+        ]
+      ],
+      "risk": "medium",
+      "approved": false,
+      "status": "pending",
+      "allowed_paths": [
+        "tests/unit/deck-cards-due-date.test.tsx"
       ],
       "attempts": 0
     }
