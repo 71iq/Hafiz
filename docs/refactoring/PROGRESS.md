@@ -397,3 +397,5 @@ The mission is active. This file records durable events; backlog.json owns task 
 - 2026-10-17T20:10:31.264818+00:00 `RF-010` retry. Batch resource limit reached. Preserved work will be reverified on resume.
 
 - 2026-10-17T20:13:15.253145+00:00 `RF-010` verified. Removed the verified-unused AuthGate module and its RTL registry entry, then applied the prescribed UNUSED.md update. No commit, push, browser, native, or device checks performed. Evidence `.ralph/runs/RF-010-1-1792267887315834814`.
+
+- 2026-10-17. Primary accepts RF-010, local commit 01b5401, after five fresh gates and separate Astra. The exact unreachable 76-line module and one registry line are deleted; other registry/test contracts, live callouts, config, dependencies and protected inputs remain. Real Knip now reports zero unused files with other findings unchanged. Repeat duplication retains all 26 identical fragments/563 lines across 180 files and 52,712 lines, 1.06807 percent. Record .refactor-baseline/rf010-primary-acceptance.json. Thirty of 82 tasks verified. No new browser/full-unit/app/native/device/iOS verification. Next primary scopes internal-only exports from RF-082.
