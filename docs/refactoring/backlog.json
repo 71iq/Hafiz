@@ -4167,18 +4167,21 @@
     {
       "id": "RF-080",
       "title": "Strengthen existing revealed-phase regression evidence",
-      "description": "Prepare test-only correction for original session helpers and rejection checks that use a mode label also rendered on the front.",
-      "rationale": "RF074 independent review calibrated a real false proof: smartDeckTargetAyah appears in ModeTagsRow. The original date/direct-action characterization uses the same label. Audit those assertions without reopening accepted source fixes or weakening existing tests.",
+      "description": "Strengthen four original revealed-state regression cases so a phase-reset defect cannot pass their mode-label assertions.",
+      "rationale": "Primary exact-source mutation sets phase=front and revealed=false on rejected card actions. All seven selected older cases still pass, including revealed date/Suspend/Bury/Mark. The mode label is shared with the front; actual comparison answer content is revealed-only. This is a test gap, not an application regression.",
       "modules": [
         "tests/unit/session-due-date.test.tsx"
       ],
       "dependencies": [
-        "RF-074"
+        "RF-074",
+        "RF-075"
       ],
       "acceptance_criteria": [
-        "Primary must first enumerate actual original revealed-only scenarios and calibrate the exact bad pattern against a phase-reset mutant. Source-confirmed weak assertions are candidates until the behavior is demonstrated.",
-        "Keep all existing cases/assertions/mocks/deadlines and the NativeModal preload. Add actual revealed-only answer checks and absence of Reveal where the existing behavior requires it, using canonical rendered content rather than private phase state. No source/fixture copying or generic mode-label proof.",
-        "Before approval freeze exact current scope, focused commands and causal mutation evidence. Require fresh focused gates, independent evaluation and primary acceptance. No production change or claim that earlier source behavior regressed."
+        "Read .refactor-baseline/rf080-readiness.json and rf080-before-mutant.json. One-file test-only patch. Reuse current rendered fixture and RF074/RF075 comparison assertions. Do not spawn helpers/reviewers. Controller owns all five frozen commands and separate stronger evaluation; primary owns acceptance.",
+        "Preserve all 23 current cases, every existing assertion, mock, helper, deadline, NativeModal preload, service counts, deferred cleanup and test names. No application/source, browser, dependency or config edit. No new case, helper or fixture clone. Ignored primary-owned diagnostic source copy/config/script are read-only test evidence, not production changes.",
+        "Add exact actual revealed-only view.getByText(`${s.smartDeckComparisonCue}: ${firstCue}`) and absence of s.flashcardsReveal in precisely four existing locations: openDueDateEditor revealed branch after its current wait; original rejected date persistence case after rejection and busy recovery; openDirectCardAction revealed branch after its current wait; directCardActionCases rejection revealed branch after its current generic-label assertion. Retain generic-label checks as existing assertions, but do not rely on them as phase proof. Before-menu checks and post-rejection checks must both be present. Do not automatically reveal again after rejection.",
+        "Normal current-source fixture must pass all 23 scenarios with zero skips. The primary-owned mutant changes only an ignored exact current-source catch to reset phase/revealed. The frozen Python gate must reject exactly four original revealed date/Suspend/Bury/Mark cases only because Comparison cue: First synthetic cue is absent, while all three selected front cases pass and sixteen unrelated cases remain intentionally filtered. Do not edit the mutant/config/script, expect data, weaken assertions or treat its intentional Jest exit1 as an application failure.",
+        "Preserve causal outputs in .refactor-baseline/rf080-after-mutant.log and rf080-after-mutant-result.json. Run focused checks; all frozen commands and independent evaluation remain mandatory. Report actual checks and pending controller work honestly. No browser/native/device verification or new full-suite/duplication result is claimed for this test-only slice."
       ],
       "verification": [
         [
@@ -4203,10 +4206,14 @@
           "node_modules/.bin/prettier",
           "--check",
           "tests/unit/session-due-date.test.tsx"
+        ],
+        [
+          "python3",
+          ".refactor-baseline/rf080-verify-mutant.py"
         ]
       ],
       "risk": "low",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
         "tests/unit/session-due-date.test.tsx"
