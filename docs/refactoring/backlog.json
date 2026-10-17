@@ -4269,21 +4269,30 @@
     {
       "id": "RF-081",
       "title": "Clear outdated date validation when a valid save starts",
-      "description": "Reproduce invalid-input then valid-input rejected-save feedback in both date-editor owners before choosing a repair.",
-      "rationale": "Source inspection shows both save handlers retain dueDateError from an earlier invalid attempt while a valid action runs. With validation-priority error props this may mask the latest persistence failure. No runtime reproduction or source repair is yet accepted.",
+      "description": "Clear obsolete local date validation when a valid persistence attempt begins, so its failure becomes visible in both actual date editors.",
+      "rationale": "Primary actual-owner diagnostics prove both valid writes run and report their exact failure while the old invalid message remains in the active Modal. A real Chrome invalid-then-valid save reproduces the wrong label with 2998-03-04. Validation precedence stays correct for invalid attempts; valid attempts must retire prior local validation.",
       "modules": [
         "app/flashcards/session.tsx",
         "components/flashcards/DeckCardsSheet.tsx",
         "tests/unit/session-due-date.test.tsx",
-        "tests/unit/deck-cards-due-date.test.tsx"
+        "tests/unit/deck-cards-due-date.test.tsx",
+        "tests/e2e/session-action-errors.spec.ts"
       ],
       "dependencies": [
         "RF-072",
-        "RF-077"
+        "RF-077",
+        "RF-080",
+        "RF-079"
       ],
       "acceptance_criteria": [
-        "Primary must reproduce actual visible-modal feedback after invalid then valid/rejected save for both owners, preserve service/busy/input behavior, and freeze the smallest exact regression and source scope.",
-        "Do not approve from source inference alone. No change is approved by this placeholder. Existing canonical controlled sheet, local validation and owner errors remain the reuse candidates."
+        "Read .refactor-baseline/rf081-readiness.json, rf081-owner-repro.json and retained initial setup failure. Primary owns behavior/data decisions. Only five allowed paths. No subagents/reviewers from worker. Controller owns six frozen gates and separate stronger review; primary owns final acceptance.",
+        "Production change is exactly two added statements, one per owner: setDueDateError(null) immediately after the parsed.ok invalid/past-return guard and before the existing runCardAction in handleSaveDueDate or runAction in saveDueDate. Invalid and past branches remain unchanged. Preserve controlled error priority, runAction/runCardAction, current-card/deck guards, busy handling, parser, service calls/IDs, queue/sync, haptics, successful close/reset/reload/onChanged/advance and every native input/overlay prop. No helper, state, component, dependency, schema, database-content or shared UI change.",
+        "Preserve all current 23 session and 4 deck cases and every existing assertion, mock, timeout, helper, NativeModal preload and cleanup. Add exactly two cases per existing fixture using a typed parameter table: Arabic/light invalid-format and English/dark past-date. Reuse existing fixture, actual menu/input/visible-Modal helpers and typed Deferred<StudyCardRow>. Session reuses configureSettings. Deck may use a small private locale/theme configurator for these new rows, matching existing palettes, without changing old case bodies or creating an action framework/fixture clone.",
+        "Each new case first submits not-a-date or a relative past date, verifies the matching localized validation inside the actual input Modal and zero date writes. Then enter a relative valid future date and submit a deferred date write. While busy, assert both validation labels and action error absent inside that Modal, retained valid value, disabled Save/Cancel, requestClose guard and explicit duplicate Save cannot add another write. Assert exact mocked DB, owning deck/card ID and parsed Date. Never use a global error label, last-Modal shortcut or private state mock.",
+        "After rejecting, assert exactly the localized action failure inside the same visible Modal, correct locale writing direction, both validation labels absent, retained valid input and recovered Save/Cancel. Session stays on the same front card with Reveal, exactly one valid-attempt medium haptic and no extra card fetch/advance; deck does not reload, call onChanged or close its parent. Cancel and reopen through actual menus, asserting original persisted date, clean error state, no extra date write, fetch/reload or callbacks. Use exact complete warning tuple, nested finally drain for each deferred, and restore warning spy. Keep unrelated service behavior unchanged.",
+        "When starting without a source patch, add new regression cases and capture focused red before the two production statements. Expected genuine red is four stale-validation failures with all 27 prior cases passing, no skips. Diagnose selector/setup/deadline failures separately. Then apply the two statements and require all 31 focused cases green. If resuming a correct preserved patch, keep it and existing causal evidence rather than reverting production to manufacture red. Retain all outputs.",
+        "Replace only the last RF077 browser case with the formatted prescribed version in .refactor-baseline/rf081-browser-case.ts. Retain its existing title, all seed/filter/trigger/query/warning/state/geometry/health assertions, and the three earlier cases plus fixtureQuery byte-for-byte. The sole new path submits not-a-date, sees local validation, then submits valid 2998-03-04 and expects current action failure with old validation absent. No new browser case, context, SQL, helper, network credential or protected/production write. Primary already exercised this exact path against the hash-recorded RF077 export and inspected its wrong-label screenshot.",
+        "All six fresh frozen commands must pass, including 370 full unit tests and 34 Chrome cases if no unrelated work occurs. Scoped lint retains existing source warnings; do not disable rules or checks. Build and browser execution belong to the controller when sandbox binding is unavailable. Independent Astra and primary final image/hash/diff acceptance are mandatory. Native/device/iOS and duplication scans are outside this bounded repair and may not be claimed."
       ],
       "verification": [
         [
@@ -4291,20 +4300,57 @@
           "run",
           "test:unit",
           "--",
-          "--runTestsByPath",
-          "tests/unit/session-due-date.test.tsx",
-          "tests/unit/deck-cards-due-date.test.tsx"
+          "--detectOpenHandles"
         ],
         [
           "npm",
           "run",
           "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "app/flashcards/session.tsx",
+          "components/flashcards/DeckCardsSheet.tsx",
+          "tests/unit/session-due-date.test.tsx",
+          "tests/unit/deck-cards-due-date.test.tsx",
+          "tests/e2e/session-action-errors.spec.ts"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "tests/unit/session-due-date.test.tsx",
+          "tests/unit/deck-cards-due-date.test.tsx",
+          "tests/e2e/session-action-errors.spec.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8193",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8193",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts",
+          "tests/e2e/button-accessibility.spec.ts",
+          "tests/e2e/session-action-errors.spec.ts"
         ]
       ],
       "risk": "medium",
-      "approved": false,
+      "approved": true,
       "status": "pending",
-      "allowed_paths": [],
+      "allowed_paths": [
+        "app/flashcards/session.tsx",
+        "components/flashcards/DeckCardsSheet.tsx",
+        "tests/unit/session-due-date.test.tsx",
+        "tests/unit/deck-cards-due-date.test.tsx",
+        "tests/e2e/session-action-errors.spec.ts"
+      ],
       "attempts": 0
     }
   ]
