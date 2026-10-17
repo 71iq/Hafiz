@@ -3756,22 +3756,30 @@
     {
       "id": "RF-074",
       "title": "Show card confirmation failures inside the active dialog",
-      "description": "Characterize and repair rejected delete/reset actions that keep their confirmation dialog open.",
-      "rationale": "runCardAction stores sessionError, but ConfirmDialog owns the visible modal and receives no error. A background review label cannot prove visible feedback. This is separate from direct actions and the accepted date editor.",
+      "description": "Expose rejected session Delete/Reset writes inside their existing active confirmation dialog using its optional controlled error contract.",
+      "rationale": "Primary inspected all four ConfirmDialog callers. Session retains its confirmation after a rejected service, while runCardAction writes sessionError behind the modal. FieldMessage already owns directional error text. Extend that dialog, keep all persistence/advance/busy behavior, and leave other owners for separate tasks.",
       "modules": [
         "app/flashcards/session.tsx",
         "components/ui/ConfirmDialog.tsx",
         "components/ui/Field.tsx",
-        "tests/unit/session-due-date.test.tsx"
+        "tests/unit/session-due-date.test.tsx",
+        "tests/e2e/session-action-errors.spec.ts"
       ],
       "dependencies": [
         "RF-073",
-        "RF-071"
+        "RF-071",
+        "RF-076",
+        "RF-079"
       ],
       "acceptance_criteria": [
-        "Before approval choose the smallest optional controlled error contract in the existing ConfirmDialog, inspect FieldMessage reuse and all existing callers, and define exact red/green/modal evidence. No new global notification owner.",
-        "Cover rejected delete/reset in front and revealed states via actual menu, confirmation controls and the visible containing Modal. Preserve exact services, stable IDs, busy cancel/back guards, retry and successful advance/reset behavior. Clear stale errors on a fresh opening without hiding a current failure.",
-        "Reuse the existing typed route fixture and keep all accepted scenarios. Exact allowed source/test scope, commands and platform evidence require primary preparation, independent review and acceptance. No source task or live/database operation is approved by this placeholder."
+        "Read .refactor-baseline/rf074-readiness.json. Reuse existing sessionError/runCardAction, ConfirmDialog, FieldMessage, actual route/controls and existing typed test setup. Add no component, state owner, hook, dependency, service, schema or mock UI. Only four allowed tracked files may change; Field.tsx is read-only. Do not start subagents/reviewers. Controller owns the separate stronger evaluation.",
+        "ConfirmDialog gains only optional controlled error?: string | null, destructured with existing props. Render a FieldMessage only for a truthy error after the existing message inside the existing body View. Use explicit dir derived from isRTL when supplied, full width/self stretch with margin-top3 and text-red-600 dark:text-red-400. Reuse canonical caption typography, accessibilityRole=\"alert\" and accessibilityLiveRegion=\"polite\". Keep existing body/footer/header typography, spacing, modal focus/dismiss/backdrop/busy behavior and all no-error caller output unchanged. Other callers omit the prop. Do not edit Field/Text/Button/overlay primitives.",
+        "Session passes error={sessionError} to ConfirmDialog and clears stale sessionError when opening either Delete or Reset, beside existing menu-close/confirm setters. Keep every service/ID/argument, handleConfirmCardAction, runCardAction, haptic, busy exclusion, card/phase/advance/reset, due-date priority, answer editor and summary unchanged. Existing locale error string is reused. No source-wide formatting.",
+        "Extend tests/unit/session-due-date.test.tsx in place. Preserve the existing11 scenarios, every assertion/mock/timer/deadline and module-scope NativeModal preload. Renaming getDateEditorModal to getVisibleModal with its identical actual-parent traversal and visible=true assertion is allowed to reuse it for dialogs. No last-Modal shortcut or background getByText as proof. Use explicit typed delete Promise<void> and reset Promise<StudyCardRow> handling, no any/unsafe casts. Add four actual route rejection/retry cases: Delete/Reset each in Arabic/light front and English/dark revealed. Add two front-state cancel/reopen cases, one per action, verifying the failed error clears inside the newly opened dialog without a write. All six new tests must fail on missing in-dialog feedback before production edits; preserve red and green focused logs in .refactor-baseline/rf074-*.log.",
+        "New rejection/retry cases open the real action menu and confirmation, scope error inside its actual visible NativeModal, and preserve first card/phase on rejection. While deferred, assert exactly two disabled footer buttons and guard native request-close; confirm label is replaced by spinner so do not query it by name while busy. Check exact db/deck/card service arguments, one failed then one successful write, haptic counts, recovered enabled controls and closed dialog. Delete retry advances to second card; Reset retry keeps first and returns to front Reveal. Check no unrelated delete/reset sibling, suspend/bury/mark/due-date, user-setting, grading/log/points/achievement/sync/router/summary calls. Forward unexpected warnings, assert the complete expected warning list, settle/drain deferred promises unconditionally in finally, restore spies. Do not change existing case expectations to green.",
+        "Add one browser case to existing tests/e2e/session-action-errors.spec.ts, reusing its private fixtureQuery without changing the RF-073 test or helper. Primary-approved isolated data recipe: guard HTTP localhost/127.0.0.1, fresh empty context/storageState, English/dark390x844, waitForQaReady, assert zero initial study_cards. Insert only IDs2:10/2:11 in deckqa-rf074, same valid personal study columns as RF-073, first due2000 and second due2999. Assert exactly these two fixture rows. Create trigger rf074_reject_fixture_delete BEFORE UPDATE OF deleted_at ON study_cards WHEN OLD.id='2:10' AND OLD.deck_id='deckqa-rf074' AND NEW.deleted_at IS NOT NULL BEGIN SELECT RAISE(ABORT,'RF074 isolated QA rejection'); END. Verify trigger installed. No other SQL/data changes, no protected content/schema-source writes, existing fixture helper protocol only, no app/debug API.",
+        "Browser uses actual settings Dark, session?deckId=deckqa-rf074, Card Actions -> Delete Card -> dialog Delete. Scope localized Could not update card to the visible role=dialog and its role=alert using hasText, not alert accessible name. Assert error in viewport, dialog still open, Cancel/Delete enabled in viewport and both center hit-tests unobstructed, no error/button overlap, unchanged target undeleted row and zero study_log. Capture complete single expected action warning; installed driver may report Error finalizing statement instead of RAISE reason, so inspect trigger and state as RF-073 does. assertHealthyPage, screenshot and geometry attachment required; always close context. Primary must inspect fresh rendered failure before final acceptance. Other three ConfirmDialog owners stay unchanged, their data behavior is not part of this task.",
+        "Verification ownership: worker runs focused red/green and types/lint/format where available, but does not bind a browser server when its sandbox returns the documented EPERM. Report that controller gate pending, not blocked or passed. The controller runs every frozen command in its capable host, including full units, fresh web export and all32 expected Chrome cases. Separate Astra review must inspect full diff and fresh screenshot. No native/device/iOS verification is claimed. Do not repeat passing full gates inside the worker merely to duplicate controller evidence."
       ],
       "verification": [
         [
@@ -3779,9 +3787,7 @@
           "run",
           "test:unit",
           "--",
-          "--runTestsByPath",
-          "tests/unit/session-due-date.test.tsx",
-          "tests/unit/rtl-higher-level-component-contracts.test.tsx"
+          "--detectOpenHandles"
         ],
         [
           "npm",
@@ -3789,18 +3795,45 @@
           "typecheck"
         ],
         [
+          "node_modules/.bin/eslint",
+          "app/flashcards/session.tsx",
+          "components/ui/ConfirmDialog.tsx",
+          "tests/unit/session-due-date.test.tsx",
+          "tests/e2e/session-action-errors.spec.ts"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "tests/unit/session-due-date.test.tsx",
+          "tests/e2e/session-action-errors.spec.ts"
+        ],
+        [
           "npm",
           "run",
           "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8193",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8193",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts",
+          "tests/e2e/button-accessibility.spec.ts",
+          "tests/e2e/session-action-errors.spec.ts"
         ]
       ],
       "risk": "medium",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
         "app/flashcards/session.tsx",
         "components/ui/ConfirmDialog.tsx",
-        "tests/unit/session-due-date.test.tsx"
+        "tests/unit/session-due-date.test.tsx",
+        "tests/e2e/session-action-errors.spec.ts"
       ],
       "attempts": 0
     },
