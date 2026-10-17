@@ -4653,7 +4653,7 @@
       "id": "RF-086",
       "title": "Diagnose the intermittent deck Reset retry fixture failure",
       "description": "Reproduce and diagnose the unchanged Arabic Reset retry failure observed during RF-083 full-suite verification.",
-      "rationale": "The existing actual-modal test failed once after a successful mocked retry but passed three isolated-case and two complete file runs. The query-module deletion cannot execute through its full Jest mock. Root cause remains unknown, and repeated green output alone is not a repair.",
+      "rationale": "The existing actual-modal test failed once at the final mocked-retry step but passed three isolated-case and two complete file runs. The query-module deletion cannot execute through its full Jest mock. Root cause remains unknown, and repeated green output alone is not a repair.",
       "modules": [
         "tests/unit/deck-cards-due-date.test.tsx",
         "components/flashcards/DeckCardsSheet.tsx",
