@@ -339,8 +339,8 @@
     },
     {
       "id": "RF-008",
-      "title": "Align SDK 55 patch dependencies",
-      "description": "Align SDK 55 patch dependencies",
+      "title": "Resolve remaining Expo diagnostics",
+      "description": "Resolve the remaining lint-preset and native/app-config ownership findings after accepted SDK55 alignment.",
       "rationale": "RF-067 isolates the verified runtime/package alignment. This umbrella still owns full Expo diagnostics, lint coverage/maintenance and the committed-native configuration decision.",
       "modules": [
         "package.json",
@@ -405,28 +405,36 @@
     {
       "id": "RF-009",
       "title": "Calibrate native and web unused-code roots",
-      "description": "Calibrate native and web unused-code roots",
-      "rationale": "Knip reports platform variants as unused candidates.",
+      "description": "Calibrate four proven platform entries and nested CJS diagnostics, then publish the primary-reviewed unused-code dispositions.",
+      "rationale": "Actual installed Knip Metro roots cover src while Hafiz uses root-level components/lib. Two real preflight scans remove four live-file and four dependency false reports, retain AuthGate and reveal an additional unlisted diagnostic dependency. No code deletion follows from calibration alone.",
       "modules": [
         "knip.json",
         "docs/refactoring/UNUSED.md"
       ],
       "dependencies": [
-        "RF-008"
+        "RF-067"
       ],
       "acceptance_criteria": [
-        "Recognize Expo routes, platform resolution and runtime assets. Justify exclusions individually.",
-        "Produce actionable unused files/exports/dependencies without deleting protected inputs."
+        "Read .refactor-baseline/rf009-readiness.json, both actual preflight JSON/stderr files and rf009-before-gate.log. Primary owns all root/exclusion/disposition decisions. Only knip.json and docs/refactoring/UNUSED.md. No subagents or reviewers from worker. Keep existing source, dependencies, generated assets, production and original checkout untouched.",
+        "Copy .refactor-baseline/rf009-prescribed-knip.json exactly to knip.json. It adds four exact live platform entries and makes existing JS/MJS script entry/project roots recursive with CJS support. No additional entry/ignore/suppression, dependency, package script, tool install, automatic fix/removal or source edit. Existing exclusions and dependency exceptions stay identical.",
+        "Copy .refactor-baseline/rf009-prescribed-unused.md exactly to docs/refactoring/UNUSED.md. It records actual callers, each existing exclusion, before/after counts, remaining candidates and their reviewed disposition/task ownership, nonzero report exit semantics, recipe and platform limits. Do not invent execution or deletion claims. Primary already inspected alias/internal-use contexts and native peer ownership.",
+        "The frozen gate must run the actual current Knip command and preserve its full JSON/stderr. Expect one unused file AuthGate, zero reported unused dependencies/devDependencies, five exports, two types, two duplicate-export groups, five unlisted dependencies, one external binary and zero unresolved imports. Four proven platform entries must not be unused. AuthGate must remain reported as a negative control. Findings remain open; return1 from Knip with findings is expected, while execution/config errors and malformed JSON must fail.",
+        "Pre-fix gate genuinely fails because live platform modules are reported unused. After the prescribed calibration require the gate and canonical two-file formatting to pass, then separate Astra review. No application test/build/native/device/iOS or security rerun is required or claimed for this analysis/config/doc-only change. Independent review checks exact bytes, source-to-entry evidence, meaningful negative control, unresolved findings and scope. Primary accepts final report/config hashes after controller completion."
       ],
       "verification": [
         [
-          "npm",
-          "run",
-          "analyze:unused"
+          "python3",
+          ".refactor-baseline/rf009-verify.py"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "knip.json",
+          "docs/refactoring/UNUSED.md"
         ]
       ],
       "risk": "medium",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
         "knip.json",
@@ -475,9 +483,9 @@
     },
     {
       "id": "RF-011",
-      "title": "Remove verified unused dependencies",
-      "description": "Remove verified unused dependencies",
-      "rationale": "Avoid unused binary size and upgrade burden.",
+      "title": "Review dependency ownership and unlisted imports",
+      "description": "Use calibrated native/web/tool roots to inspect unlisted ownership and remove dependencies only when genuinely unused.",
+      "rationale": "RF-009 preflight reports no unused dependencies after platform and nested-tool calibration. Remaining unlisted imports need ownership decisions, not blanket removal or installation.",
       "modules": [
         "package.json",
         "package-lock.json",
@@ -4396,6 +4404,45 @@
       "evidence": ".ralph/runs/RF-081-2-1792248650693199433",
       "completed_at": "2026-10-17T14:56:13.141707+00:00",
       "summary": "Preserved the correct RF-081 patch already in the worktree. It adds exactly two `setDueDateError(null)` statements and the required regression coverage. Reused existing handlers, parser, Modal helpers, fixtures, settings, deferred writes, and warning spies. No files were edited, staged, committed, or pushed by this worker."
+    },
+    {
+      "id": "RF-082",
+      "title": "Triage remaining unused exports and exported types",
+      "description": "Inspect the seven remaining export/type reports and two alias groups, then prepare exact visibility/deletion tasks.",
+      "rationale": "Calibrated Knip still reports internally used exports as well as possible dead APIs. Primary must distinguish unnecessary export visibility from unused implementation before any removal.",
+      "modules": [
+        "lib/fsrs/smart-decks.ts",
+        "lib/fsrs/queries.ts",
+        "components/ui/MirroredRow.tsx",
+        "tests/rtl/rtl-component-registry.ts",
+        "lib/i18n/strings.ts",
+        "lib/fsrs/review-transition.ts",
+        "lib/tafsir/sources.ts",
+        "lib/quran-foundation/recitations.ts",
+        "docs/refactoring/UNUSED.md"
+      ],
+      "dependencies": [
+        "RF-009"
+      ],
+      "acceptance_criteria": [
+        "Primary rechecks direct/native/web/test callers and side effects of all five export/two type findings. Keep internal implementations when only export visibility is unused.",
+        "Retain deliberate tafsir registry and recitation aliases unless a separate behavior-preserving API decision justifies change. Never change Quran identifiers, content or mappings.",
+        "Before approval freeze exact small scope, evidence and expected report exits. This placeholder approves no source edit or deletion. Publish classifications and prepare separate verifiable implementation slices."
+      ],
+      "verification": [
+        [
+          "npm",
+          "run",
+          "analyze:unused"
+        ]
+      ],
+      "risk": "medium",
+      "approved": false,
+      "status": "pending",
+      "allowed_paths": [
+        "docs/refactoring/UNUSED.md"
+      ],
+      "attempts": 0
     }
   ]
 }
