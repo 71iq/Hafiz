@@ -449,39 +449,59 @@
     },
     {
       "id": "RF-010",
-      "title": "Remove one verified unused source group",
-      "description": "Remove one verified unused source group",
-      "rationale": "Deletion requires callers and platform evidence.",
+      "title": "Remove the verified unused AuthGate component",
+      "description": "Delete only the unused full-screen AuthGate module and its one RTL registry record, then update the measured unused-code disposition.",
+      "rationale": "Accepted calibrated platform/tool analysis reports AuthGate alone. Primary private-package/Expo route, Metro, caller and dynamic-discovery inspection finds only its implementation and registry string, with no native/web runtime caller. Live compact sign-in callouts remain unchanged.",
       "modules": [
         "components/ui/AuthGate.tsx",
-        "tests/rtl/*",
+        "tests/rtl/rtl-component-registry.ts",
         "docs/refactoring/UNUSED.md"
       ],
       "dependencies": [
         "RF-009"
       ],
       "acceptance_criteria": [
-        "Confirm AuthGate is unused across native/web and entry conventions.",
-        "Remove only verified dead files and matching registry records. Split any additional candidate into a new task."
+        "Read .refactor-baseline/rf010-readiness.json, rf010-callers.log and rf010-before-gate.log. Primary owns the deletion and compatibility decision. Only three exact paths. No subagents/reviewers from worker. Controller owns every frozen gate, independent stronger review and commit.",
+        "Delete the complete 76-line components/ui/AuthGate.tsx module. Do not replace it, move it, create a wrapper, redirect callers, change live sign-in callouts, routes, Button, Card, ScreenContent, settings, strings, dependencies or runtime behavior. No protected/generated/backend/production changes.",
+        "In tests/rtl/rtl-component-registry.ts remove only the single AuthGate entry line. The result must byte-match .refactor-baseline/rf010-prescribed-registry.ts. Preserve every other registry record, note, sorting/helper/export and all existing test files. Do not run broad formatting over the registry or weaken coverage tests.",
+        "Copy .refactor-baseline/rf010-prescribed-unused.md exactly to docs/refactoring/UNUSED.md. Preserve the historical RF009 snapshot while documenting zero current unused files, remaining findings and the retired historical negative control. Do not rerun the RF009 snapshot gate as a current-code gate. No clean-code/zero-findings or unexecuted UI/native claims.",
+        "Run the frozen current Knip verifier. It must execute the actual command, preserve JSON/stderr, accept a finding exit 1 rather than pretend the report is clean, require zero unused files and the unchanged five export/two type/two alias/five unlisted/one binary findings. Configuration and all platform roots/exclusions/dependency exceptions must stay at the frozen RF009 hash. Require absent target source and exact one-line registry removal. Pre-deletion gate genuinely fails on the one AuthGate finding; retain that causal evidence.",
+        "All five fresh frozen gates must pass: actual Knip validation, the unchanged three-case RTL inventory suite, strict typecheck, scoped registry lint and documentation format. No new tests are needed for an unreachable module; do not add a source-spelling test. No browser/app/native build/device/iOS rerun is required or claimed. Separate Astra reviews complete diff, no callers, preserved registry contracts and actual machine evidence. Primary final diff/hash acceptance follows controller completion. Keep retries/checkpoints/resource limits and 93-percent supervisor stop unchanged."
       ],
       "verification": [
+        [
+          "python3",
+          ".refactor-baseline/rf010-verify.py"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/rtl-component-registry-coverage.test.ts"
+        ],
         [
           "npm",
           "run",
           "typecheck"
         ],
         [
-          "npm",
-          "run",
-          "test:unit"
+          "node_modules/.bin/eslint",
+          "tests/rtl/rtl-component-registry.ts"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "docs/refactoring/UNUSED.md"
         ]
       ],
       "risk": "medium",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
         "components/ui/AuthGate.tsx",
-        "tests/rtl/*",
+        "tests/rtl/rtl-component-registry.ts",
         "docs/refactoring/UNUSED.md"
       ],
       "attempts": 0
