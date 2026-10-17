@@ -4705,6 +4705,7 @@
         "RF-078"
       ],
       "acceptance_criteria": [
+        "Primary bounded reproduction on 2026-10-17 is recorded in .refactor-baseline/rf086-reproduction.json. The unchanged cold full suite passes374 cases; five equivalent instrumented full-suite cold runs also pass374 each with no skipped cases or emitted diagnostic. Original failure is preserved; root cause and repair remain unknown. This is not approval to weaken tests or invent a fix. Resume causal diagnosis if it recurs in a fresh real gate.",
         "Before approval primary reads .refactor-baseline/rf083-unit-failure-triage.json and original logs, establishes a repeatable failure or records the reproduction limit, and chooses the smallest causal seam.",
         "Freeze a behavioral regression and exact bounded repair only after causality is demonstrated. Preserve actual NativeModal, guards, error/retry/negative assertions and meaningful timing behavior; no test skipping, blanket mocking, timeout increase or weakening to pass.",
         "No production/data behavior change is authorized by this placeholder. Independent review and primary acceptance remain required."
