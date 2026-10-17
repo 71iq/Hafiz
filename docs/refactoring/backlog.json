@@ -4214,11 +4214,16 @@
       ],
       "risk": "low",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "tests/unit/session-due-date.test.tsx"
       ],
-      "attempts": 0
+      "attempts": 1,
+      "started_at": "2026-10-17T09:45:44.273149+00:00",
+      "failure": "Batch resource limit reached",
+      "completed_at": "2026-10-17T09:47:06.407394+00:00",
+      "evidence": ".ralph/runs/RF-080-1-1792230344274278593",
+      "summary": "Added exact revealed-only comparison and Reveal-absence assertions at the four approved locations in tests/unit/session-due-date.test.tsx. Reused existing RF-074/RF-075 assertion patterns. No helpers, fixtures, cases, mocks, production files, commits, or pushes changed."
     }
   ]
 }

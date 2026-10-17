@@ -398,6 +398,8 @@ async function openDueDateEditor(
     expect(view.getByText(s.flashcardsReveal)).toBeTruthy();
     fireEvent.press(getTextButton(view, s.flashcardsReveal));
     await waitFor(() => expect(view.getAllByText(s.smartDeckTargetAyah).length).toBeGreaterThan(0));
+    expect(view.getByText(`${s.smartDeckComparisonCue}: ${firstCue}`)).toBeTruthy();
+    expect(view.queryByText(s.flashcardsReveal)).toBeNull();
   } else {
     expect(view.getByText(s.flashcardsReveal)).toBeTruthy();
   }
@@ -478,6 +480,8 @@ async function openDirectCardAction(
   if (phase === "revealed") {
     fireEvent.press(getTextButton(view, s.flashcardsReveal));
     await waitFor(() => expect(view.getAllByText(s.smartDeckTargetAyah).length).toBeGreaterThan(0));
+    expect(view.getByText(`${s.smartDeckComparisonCue}: ${firstCue}`)).toBeTruthy();
+    expect(view.queryByText(s.flashcardsReveal)).toBeNull();
   }
 
   fireEvent.press(view.getByRole("button", { name: s.cardActionsTitle }));
@@ -775,6 +779,8 @@ describe("Flashcard session due-date editor characterization", () => {
         expect(getTextButton(view, s.flashcardsCancel).props.accessibilityState.disabled).toBe(false);
         expect(view.getByText(firstCue)).toBeTruthy();
         expect(view.queryByText(secondCue)).toBeNull();
+        expect(view.getByText(`${s.smartDeckComparisonCue}: ${firstCue}`)).toBeTruthy();
+        expect(view.queryByText(s.flashcardsReveal)).toBeNull();
         expect(mockRouterReplace).not.toHaveBeenCalled();
         expect(setStudyCardDueDate).toHaveBeenCalledTimes(1);
         expect(hapticMedium).toHaveBeenCalledTimes(1);
@@ -1431,6 +1437,8 @@ describe("Flashcard session due-date editor characterization", () => {
             expect(view.getByText(s.flashcardsReveal)).toBeTruthy();
           } else {
             expect(view.getAllByText(s.smartDeckTargetAyah).length).toBeGreaterThan(0);
+            expect(view.getByText(`${s.smartDeckComparisonCue}: ${firstCue}`)).toBeTruthy();
+            expect(view.queryByText(s.flashcardsReveal)).toBeNull();
           }
           expect(view.getByRole("button", { name: s.cardActionsTitle }).props.accessibilityState.disabled).toBe(false);
           expect(hapticMedium).toHaveBeenCalledTimes(1);
