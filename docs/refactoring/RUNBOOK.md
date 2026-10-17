@@ -85,3 +85,9 @@ The bounded retry avoided OOM and compiled Nitro Modules, Worklets and Reanimate
 The next real run passed all fifteen commands. Android assembleDebug succeeded in 14m 5s with all configured ABIs. Its independent evaluator then received an account usage-limit failure and returned no verdict, leaving RF-067 unaccepted at that boundary. Evidence .ralph/runs/RF-067-2-1792131849249493778. The account-limit regression and existing safeguards pass all 27 runner tests. Recovery retained the ordinary handoff failure and the one command-timeout count; only the account resource interruption was refunded. The changed controller/HEAD required fresh generation, all checks and a separate review.
 
 The subsequent run passed all fifteen fresh commands and independent Astra evaluation, local commit f863a2b. Primary accepted exact hashes, reviewed scope and the debug APK's four ABIs. SDK55_ALIGNMENT.md records current diagnostics. RF-067 is verified; do not reopen it based on the older recovery entries. No iOS/device runtime check passed here.
+
+## Implementation and evaluation ownership
+
+The implementation worker edits one approved task and reports its own checks. It does not start subagents or reviewers. The controller runs every frozen verification command and starts the separate stronger evaluator. Primary retains architecture, security and final acceptance.
+
+Task-specific verification ownership applies when the implementation sandbox cannot bind a browser server. A documented sandbox restriction alone does not make controller verification unavailable. The worker reports the pending command and restriction without claiming a pass. Missing infrastructure at the assigned verifier remains a blocker. This changes no task gate, independent review, retry, checkpoint, admission limit, model or provider setting.

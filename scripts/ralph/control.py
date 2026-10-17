@@ -376,14 +376,19 @@ def iteration():
     write_json(directory / 'task.json', task)
     policy = BACKLOG.read_bytes()
     head = git('rev-parse', 'HEAD')
-    prompt = ('You own exactly this approved Hafiz task. You are not alone in the codebase. Preserve other edits.\n'
+    prompt = ('You are the bounded implementation worker for exactly this approved Hafiz task. '
+              'You are not alone in the codebase. Preserve other edits.\n'
+              'Do not spawn subagents or reviewers. The controller starts the separate stronger evaluator.\n'
               'Read AGENTS.md, docs/refactoring/ARCHITECTURE.md, CONVENTIONS.md, TECH_STACK.md and PROGRESS.md.\n'
               'Inspect callers and tests, record reuse choices in your response, implement the smallest coherent change.\n'
               'Only edit task allowed_paths. Do not edit the backlog, progress, runner, agents, protected data or infrastructure.\n'
               'Do not commit, push, merge, deploy, call live services or install packages. The controller verifies and commits.\n'
               'Use installed focused skills when relevant. For a lightweight model, use adaptive-coding engineering guided.\n'
               'Architecture, security choices and final acceptance belong to the primary engineer.\n'
-              'Return blocked if required platform verification is unavailable.\n'
+              'Follow task-specific verification ownership. Report checks you ran and pending controller checks honestly.\n'
+              'A documented implementation-sandbox bind restriction alone does not make controller-owned '
+              'verification unavailable. Do not claim those pending checks passed.\n'
+              'Return blocked when required infrastructure is genuinely unavailable to the assigned verifier.\n'
               f'TASK:\n{json.dumps(task, indent=2)}\n')
     try:
         checkpoint = generation_checkpoint(task)

@@ -4057,13 +4057,17 @@
         ]
       ],
       "risk": "medium",
-      "approved": false,
-      "status": "pending",
+      "approved": true,
+      "status": "verified",
       "allowed_paths": [
         "scripts/ralph/control.py",
         "docs/refactoring/RUNBOOK.md"
       ],
-      "attempts": 0
+      "attempts": 1,
+      "execution_owner": "primary",
+      "completed_at": "2026-10-17T03:49:01.435173+00:00",
+      "evidence": ".refactor-baseline/rf079-primary-acceptance.json",
+      "summary": "Primary-only prompt clarification with 27 runner regressions, real harmless fresh sessions and separate read-only Astra evaluation. No runtime gate or policy changes."
     }
   ]
 }
