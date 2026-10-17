@@ -4437,39 +4437,188 @@
     },
     {
       "id": "RF-082",
-      "title": "Triage remaining unused exports and exported types",
-      "description": "Inspect the seven remaining export/type reports and two alias groups, then prepare exact visibility/deletion tasks.",
-      "rationale": "Calibrated Knip still reports internally used exports as well as possible dead APIs. Primary must distinguish unnecessary export visibility from unused implementation before any removal.",
+      "title": "Keep implementation-only helpers and review type private",
+      "description": "Remove only three unnecessary export keywords from internally used declarations, preserving every implementation byte.",
+      "rationale": "Primary full caller inspection distinguishes unused export visibility from unused code. readDefaultDeckFilter has three internal consumers; MirroredPressableRow implements DisclosureRow; ReviewRecord types the public transition field. No authored external consumer exists. Other dead-code candidates are split into exact later scopes.",
       "modules": [
         "lib/fsrs/smart-decks.ts",
-        "lib/fsrs/queries.ts",
         "components/ui/MirroredRow.tsx",
-        "tests/rtl/rtl-component-registry.ts",
-        "lib/i18n/strings.ts",
         "lib/fsrs/review-transition.ts",
-        "lib/tafsir/sources.ts",
-        "lib/quran-foundation/recitations.ts",
         "docs/refactoring/UNUSED.md"
       ],
       "dependencies": [
-        "RF-009"
+        "RF-009",
+        "RF-010"
       ],
       "acceptance_criteria": [
-        "Primary rechecks direct/native/web/test callers and side effects of all five export/two type findings. Keep internal implementations when only export visibility is unused.",
-        "Retain deliberate tafsir registry and recitation aliases unless a separate behavior-preserving API decision justifies change. Never change Quran identifiers, content or mappings.",
-        "Before approval freeze exact small scope, evidence and expected report exits. This placeholder approves no source edit or deletion. Publish classifications and prepare separate verifiable implementation slices."
+        "Read .refactor-baseline/rf082-readiness.json, rf082-before-gate.log and the 20-case focused baseline. Primary owns module/API and remaining-candidate decisions. Only four allowed paths. No worker subagents/reviewers or package installs. Controller owns all frozen checks and separate stronger review. The first frozen command pins the primary verifier SHA256; do not modify the verifier or prescribed evidence.",
+        "In lib/fsrs/smart-decks.ts change only export async function readDefaultDeckFilter to async function readDefaultDeckFilter. In components/ui/MirroredRow.tsx change only export const MirroredPressableRow to const MirroredPressableRow. In lib/fsrs/review-transition.ts change only export type ReviewRecord to type ReviewRecord. Each full result must exactly match its rf082-prescribed-<basename> file in .refactor-baseline. Preserve bodies, types, bindings, JSX, styles, ref forwarding, displayName, imports, exports used by callers and all other whitespace. No whole-file formatter or behavior/data/schema/dependency change.",
+        "Copy .refactor-baseline/rf082-prescribed-unused.md exactly to docs/refactoring/UNUSED.md. It records the primary caller/alias classifications, measured visibility changes and separate RF083-085 candidates. Retain the historical snapshots. No new test, helper, wrapper, abstraction, module or suppression. Existing tests remain byte-for-byte unchanged.",
+        "Fresh actual Knip gate must retain zero unused files, reduce unused exports from 5 to 3 and unused exported types from 2 to 1, and preserve exact remaining export/type names. Two alias groups, five unlisted dependencies and one external binary remain visible, with no unresolved/unused dependency finding. Freeze Knip config and exact candidate source/doc hashes so this cannot pass by ignoring findings or modifying implementation. Knip exit 1 with remaining findings is expected; configuration/execution/JSON errors fail.",
+        "All five frozen gates pass: actual analysis verification, unchanged real RTL primitive and FSRS review-transition suites with 20 cases, strict typecheck, scoped lint over all three production files and document formatting. Preserve existing warnings and every assertion. No new test is required for export visibility. No browser/app/native build/device/iOS rerun is needed or claimed for unchanged implementation bodies. Separate Astra reviews no external consumers, exact three-token scope, source/hash/report evidence and preservation of runtime/RTL/offline/data semantics. Primary final diff/hash acceptance follows controller completion."
+      ],
+      "verification": [
+        [
+          "python3",
+          "-c",
+          "import hashlib,pathlib,runpy; p=pathlib.Path('.refactor-baseline/rf082-verify.py'); assert hashlib.sha256(p.read_bytes()).hexdigest() == 'cfff1557a59d8871f7f54d6f06e743b8a214d4dff1cac2478e4f11bba0defcd3', 'Primary verifier changed'; runpy.run_path(str(p),run_name='__main__')"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/rtl-component-contracts.test.tsx",
+          "tests/unit/fsrs-review-transition.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/fsrs/smart-decks.ts",
+          "components/ui/MirroredRow.tsx",
+          "lib/fsrs/review-transition.ts"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "docs/refactoring/UNUSED.md"
+        ]
+      ],
+      "risk": "medium",
+      "approved": true,
+      "status": "pending",
+      "allowed_paths": [
+        "lib/fsrs/smart-decks.ts",
+        "components/ui/MirroredRow.tsx",
+        "lib/fsrs/review-transition.ts",
+        "docs/refactoring/UNUSED.md"
+      ],
+      "attempts": 0
+    },
+    {
+      "id": "RF-083",
+      "title": "Remove the unreachable retention-card helper cluster",
+      "description": "Recheck the two unused retention functions and their two private ID builders, then remove only the proven unreachable cluster.",
+      "rationale": "Calibrated analysis reports isRetentionCardSaved/addRetentionCard with no authored caller. Their retentionCardId/mutashabihatCardId builders are used only in that cluster. Leaving those builders after deletion would create more dead code.",
+      "modules": [
+        "lib/fsrs/queries.ts",
+        "docs/refactoring/UNUSED.md"
+      ],
+      "dependencies": [
+        "RF-082"
+      ],
+      "acceptance_criteria": [
+        "Before approval primary rechecks complete source/callers and the four-function cluster, imports, SQLite/sync invariants and nearest verification evidence.",
+        "Do not alter any live query, ID format, migration, queue behavior, schema, protected input or production data. Approve only exact bounded deletion after readiness is recorded.",
+        "Freeze expected analysis counts and proportional shared-module tests/build commands before execution. This placeholder approves no source change."
       ],
       "verification": [
         [
           "npm",
           "run",
-          "analyze:unused"
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
         ]
       ],
       "risk": "medium",
       "approved": false,
       "status": "pending",
       "allowed_paths": [
+        "lib/fsrs/queries.ts",
+        "docs/refactoring/UNUSED.md"
+      ],
+      "attempts": 0
+    },
+    {
+      "id": "RF-084",
+      "title": "Remove the unused RTL registry lookup index",
+      "description": "Inspect and remove only the unused derived rtlComponentRegistryByPath index.",
+      "rationale": "The exported lookup has no consumers; active coverage uses the typed registry array. Removing only export visibility would leave an unused allocation and unsafe cast.",
+      "modules": [
+        "tests/rtl/rtl-component-registry.ts",
+        "docs/refactoring/UNUSED.md"
+      ],
+      "dependencies": [
+        "RF-082"
+      ],
+      "acceptance_criteria": [
+        "Primary verifies no caller and freezes exact expression deletion while preserving the complete active registry array, types, helper and entries.",
+        "Use unchanged inventory tests and fresh analysis; no test weakening or broad registry formatting. Prepare exact expected hashes/counts before approval."
+      ],
+      "verification": [
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/rtl-component-registry-coverage.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
+      ],
+      "risk": "low",
+      "approved": false,
+      "status": "pending",
+      "allowed_paths": [
+        "tests/rtl/rtl-component-registry.ts",
+        "docs/refactoring/UNUSED.md"
+      ],
+      "attempts": 0
+    },
+    {
+      "id": "RF-085",
+      "title": "Remove the unused Locale type alias",
+      "description": "Recheck callers and remove only the unused exported Locale alias.",
+      "rationale": "The alias has no internal or external consumer. UIStringKey/UIStrings and both dictionaries remain required.",
+      "modules": [
+        "lib/i18n/strings.ts",
+        "docs/refactoring/UNUSED.md"
+      ],
+      "dependencies": [
+        "RF-082"
+      ],
+      "acceptance_criteria": [
+        "Primary freezes deletion of only the unused type line, with exact preservation of Arabic/English dictionary bytes and all used type declarations.",
+        "No string translation, language behavior, Quran input or import change. Scope nearest existing contracts, strict types and expected analysis result before approval."
+      ],
+      "verification": [
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/ui-strings-contract.test.ts"
+        ]
+      ],
+      "risk": "low",
+      "approved": false,
+      "status": "pending",
+      "allowed_paths": [
+        "lib/i18n/strings.ts",
         "docs/refactoring/UNUSED.md"
       ],
       "attempts": 0
