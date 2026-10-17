@@ -387,3 +387,5 @@ The mission is active. This file records durable events; backlog.json owns task 
 - 2026-10-17T15:29:19.262642+00:00 `RF-009` retry. Batch resource limit reached. Preserved work will be reverified on resume.
 
 - 2026-10-17T15:31:12.909876+00:00 `RF-009` verified. Implemented RF-009 in the two allowed paths. Added four platform roots and recursive CJS script coverage, and published the prescribed unused-code dispositions. No source, dependency, generated-data, backlog, commit, or push changes were made. Evidence `.ralph/runs/RF-009-1-1792250991547736841`.
+
+- 2026-10-17. Primary accepts RF-009, local commit be56d6c, after both fresh gates and independent Astra. Prescribed config/document bytes and final report hashes match, live platform false reports disappear and AuthGate remains a negative control. Remaining findings stay visible and source/dependencies are unchanged. Read-only reviewer Metro cache restriction is recorded; no unexecuted application/native/security check is claimed. Record .refactor-baseline/rf009-primary-acceptance.json. Twenty-nine of 82 tasks verified. RF-010 still requires exact primary scope before approval.
