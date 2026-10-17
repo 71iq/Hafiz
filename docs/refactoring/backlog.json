@@ -435,12 +435,17 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "knip.json",
         "docs/refactoring/UNUSED.md"
       ],
-      "attempts": 0
+      "attempts": 1,
+      "started_at": "2026-10-17T15:29:51.546653+00:00",
+      "failure": "Batch resource limit reached",
+      "completed_at": "2026-10-17T15:31:12.908766+00:00",
+      "evidence": ".ralph/runs/RF-009-1-1792250991547736841",
+      "summary": "Implemented RF-009 in the two allowed paths. Added four platform roots and recursive CJS script coverage, and published the prescribed unused-code dispositions. No source, dependency, generated-data, backlog, commit, or push changes were made."
     },
     {
       "id": "RF-010",
