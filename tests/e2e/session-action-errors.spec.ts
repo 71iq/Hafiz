@@ -156,3 +156,123 @@ test("front-card action failure stays visible above Reveal", async ({ browser, b
     await context.close();
   }
 });
+
+test("delete-card failure stays inside the active confirmation dialog", async ({ browser, baseURL }, testInfo) => {
+  const origin = new URL(baseURL ?? "");
+  expect(origin.protocol).toBe("http:");
+  expect(origin.hostname).toMatch(/^(127\.0\.0\.1|localhost)$/);
+  const context = await browser.newContext({
+    locale: "en-US",
+    viewport: { width: 390, height: 844 },
+    storageState: { cookies: [], origins: [] },
+  });
+  try {
+    const page = await context.newPage();
+    const capture = captureConsole(page);
+    const actionWarnings: string[] = [];
+    page.on("console", (message) => {
+      if (message.type() === "warning" && message.text().includes("[FlashcardSession] Card action failed:")) {
+        actionWarnings.push(message.text());
+      }
+    });
+    await waitForQaReady(page);
+    await expect(await fixtureQuery(page, "getFirst", "SELECT COUNT(*) AS count FROM study_cards")).toEqual({
+      count: 0,
+    });
+    await fixtureQuery(
+      page,
+      "exec",
+      `
+      INSERT INTO study_cards (id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days, learning_steps, reps, lapses, state, created_at, updated_at)
+      VALUES ('2:10', 'deckqa-rf074', '2000-01-01T00:00:00.000Z', 0, 0, 0, 0, 0, 0, 0, 0, '2000-01-01T00:00:00.000Z', '2000-01-01T00:00:00.000Z'),
+             ('2:11', 'deckqa-rf074', '2999-01-01T00:00:00.000Z', 0, 0, 0, 0, 0, 0, 0, 0, '2000-01-02T00:00:00.000Z', '2000-01-02T00:00:00.000Z');
+      CREATE TRIGGER rf074_reject_fixture_delete BEFORE UPDATE OF deleted_at ON study_cards
+      WHEN OLD.id = '2:10' AND OLD.deck_id = 'deckqa-rf074' AND NEW.deleted_at IS NOT NULL
+      BEGIN SELECT RAISE(ABORT, 'RF074 isolated QA rejection'); END;
+    `,
+    );
+    await expect(
+      await fixtureQuery(
+        page,
+        "getFirst",
+        "SELECT COUNT(*) AS count, group_concat(id, ',') AS ids FROM (SELECT id FROM study_cards WHERE deck_id = 'deckqa-rf074' ORDER BY id)",
+      ),
+    ).toEqual({ count: 2, ids: "2:10,2:11" });
+    await page.goto("/settings", { waitUntil: "domcontentloaded" });
+    await page.getByRole("radio", { name: "Dark", exact: true }).click();
+    await expect(page.getByRole("radio", { name: "Dark", exact: true })).toBeChecked();
+    await page.goto("/flashcards/session?deckId=deckqa-rf074", { waitUntil: "domcontentloaded" });
+    const reveal = page.getByRole("button", { name: "Reveal", exact: true });
+    await expect(reveal).toBeVisible();
+    await expect(page.locator("html")).toHaveClass(/dark/);
+    expect(
+      await fixtureQuery(
+        page,
+        "getFirst",
+        "SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = 'rf074_reject_fixture_delete'",
+      ),
+    ).toMatchObject({ sql: expect.stringContaining("RAISE(ABORT, 'RF074 isolated QA rejection')") });
+
+    await page.getByRole("button", { name: "Card Actions", exact: true }).click();
+    await page.getByRole("button", { name: "Delete Card", exact: true }).click();
+    const dialog = page
+      .getByRole("dialog")
+      .filter({ hasText: "Delete this card from the deck? Past review logs will be kept." });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole("button", { name: "Delete", exact: true }).click();
+    const error = dialog.getByRole("alert").filter({ hasText: "Could not update card" });
+    await expect(error).toBeVisible();
+    await expect(error).toBeInViewport();
+    await expect(dialog).toBeVisible();
+    const cancel = dialog.getByRole("button", { name: "Cancel", exact: true });
+    const confirm = dialog.getByRole("button", { name: "Delete", exact: true });
+    await expect(cancel).toBeEnabled();
+    await expect(confirm).toBeEnabled();
+    await expect(cancel).toBeInViewport();
+    await expect(confirm).toBeInViewport();
+    const errorBox = await error.boundingBox();
+    const cancelBox = await cancel.boundingBox();
+    const confirmBox = await confirm.boundingBox();
+    if (!errorBox || !cancelBox || !confirmBox) throw new Error("Expected dialog error and footer geometry");
+    expect(errorBox.y + errorBox.height).toBeLessThanOrEqual(Math.min(cancelBox.y, confirmBox.y));
+    for (const button of [cancel, confirm]) {
+      expect(
+        await button.evaluate((element) => {
+          const rect = element.getBoundingClientRect();
+          const target = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2);
+          return target === element || element.contains(target);
+        }),
+      ).toBe(true);
+    }
+    expect(actionWarnings).toHaveLength(1);
+    expect(actionWarnings[0].split("\n")[0]).toBe(
+      "[FlashcardSession] Card action failed: Error: Error: Error finalizing statement",
+    );
+    expect(
+      await fixtureQuery(
+        page,
+        "getFirst",
+        "SELECT id, deleted_at FROM study_cards WHERE id = '2:10' AND deck_id = 'deckqa-rf074'",
+      ),
+    ).toEqual({ id: "2:10", deleted_at: null });
+    expect(await fixtureQuery(page, "getFirst", "SELECT COUNT(*) AS count FROM study_log")).toEqual({ count: 0 });
+    await assertHealthyPage(page, capture);
+    const screenshot = testInfo.outputPath("delete-card-action-error.png");
+    await page.screenshot({ path: screenshot, fullPage: true });
+    await testInfo.attach("delete-card-action-error", { path: screenshot, contentType: "image/png" });
+    await testInfo.attach("changed-state-geometry", {
+      body: JSON.stringify({
+        locale: "en-US",
+        theme: "dark",
+        viewport: { width: 390, height: 844 },
+        errorBox,
+        cancelBox,
+        confirmBox,
+        actionWarnings,
+      }),
+      contentType: "application/json",
+    });
+  } finally {
+    await context.close();
+  }
+});

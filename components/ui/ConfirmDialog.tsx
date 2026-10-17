@@ -1,6 +1,7 @@
 import { ActivityIndicator, Text, View } from "react-native";
 import { AlertTriangle } from "lucide-react-native";
 import { Button } from "@/components/ui/Button";
+import { FieldMessage } from "@/components/ui/Field";
 import { OverlayBody, OverlayFooter, OverlayHeader, ResponsiveModal } from "@/components/ui/ResponsiveOverlay";
 
 type Props = {
@@ -12,6 +13,7 @@ type Props = {
   destructive?: boolean;
   confirmLoading?: boolean;
   confirmDisabled?: boolean;
+  error?: string | null;
   isDark: boolean;
   isRTL?: boolean;
   onCancel: () => void;
@@ -27,6 +29,7 @@ export function ConfirmDialog({
   destructive,
   confirmLoading = false,
   confirmDisabled = false,
+  error,
   isDark,
   isRTL,
   onCancel,
@@ -64,6 +67,16 @@ export function ConfirmDialog({
           >
             {message}
           </Text>
+          {error ? (
+            <FieldMessage
+              dir={isRTL == null ? undefined : isRTL ? "rtl" : "ltr"}
+              className="mt-3 w-full self-stretch text-red-600 dark:text-red-400"
+              accessibilityRole="alert"
+              accessibilityLiveRegion="polite"
+            >
+              {error}
+            </FieldMessage>
+          ) : null}
         </View>
       </OverlayBody>
       <OverlayFooter isRTL={isRTL}>

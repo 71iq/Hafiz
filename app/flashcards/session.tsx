@@ -1065,6 +1065,7 @@ function FlashcardSessionScreen() {
         onClose={() => setCardMenuOpen(false)}
         onDelete={() => {
           setCardMenuOpen(false);
+          setSessionError(null);
           setConfirmCardAction("delete");
         }}
         onSuspend={handleSuspendCard}
@@ -1074,6 +1075,7 @@ function FlashcardSessionScreen() {
         canEditAnswer={!!editableAnswerMode}
         onReset={() => {
           setCardMenuOpen(false);
+          setSessionError(null);
           setConfirmCardAction("reset");
         }}
         onSetDueDate={openDueDateSheet}
@@ -1115,6 +1117,7 @@ function FlashcardSessionScreen() {
         confirmLabel={confirmCardAction === "delete" ? s.flashcardsDelete : s.cardResetProgress}
         destructive={confirmCardAction === "delete"}
         confirmLoading={cardActionBusy}
+        error={sessionError}
         isDark={isDark}
         isRTL={isRTL}
         onCancel={() => {

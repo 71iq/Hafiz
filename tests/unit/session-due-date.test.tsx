@@ -356,14 +356,31 @@ function renderSession() {
   );
 }
 
-function getDateEditorModal(input: RenderedNode): RenderedNode {
-  let editorModal: RenderedNode | null = input;
-  while (editorModal && editorModal.type !== NativeModal) {
-    editorModal = editorModal.parent;
+function getVisibleModal(node: RenderedNode): RenderedNode {
+  let modal: RenderedNode | null = node;
+  while (modal && modal.type !== NativeModal) {
+    modal = modal.parent;
   }
-  if (!editorModal) throw new Error("The session due-date editor modal was not rendered");
-  expect(editorModal.props.visible).toBe(true);
-  return editorModal;
+  if (!modal) throw new Error("The expected visible session modal was not rendered");
+  expect(modal.props.visible).toBe(true);
+  return modal;
+}
+
+function getVisibleModalByText(view: ReturnType<typeof render>, text: string): RenderedNode {
+  const modal = findVisibleModalByText(view, text);
+  if (modal) return modal;
+  throw new Error(`No visible modal contains ${text}`);
+}
+
+function findVisibleModalByText(view: ReturnType<typeof render>, text: string): RenderedNode | null {
+  for (const node of view.queryAllByText(text)) {
+    let modal: RenderedNode | null = node;
+    while (modal && modal.type !== NativeModal) {
+      modal = modal.parent;
+    }
+    if (modal?.props.visible === true) return modal;
+  }
+  return null;
 }
 
 async function openDueDateEditor(
@@ -470,6 +487,74 @@ function expectDirectCardActionCalls(action: DirectCardAction) {
   expect(setStudyCardMarked).toHaveBeenNthCalledWith(2, mockDatabase, firstCard.deck_id, firstCard.id, true);
   expect(setStudyCardSuspended).not.toHaveBeenCalled();
   expect(setStudyCardBuried).not.toHaveBeenCalled();
+}
+
+type ConfirmCardAction = "delete" | "reset";
+
+function confirmCardActionLabel(s: UIStrings, action: ConfirmCardAction): string {
+  return action === "delete" ? s.cardDelete : s.cardResetProgress;
+}
+
+function confirmCardActionTitle(s: UIStrings, action: ConfirmCardAction): string {
+  return action === "delete" ? s.cardDeleteTitle : s.cardResetTitle;
+}
+
+async function openConfirmCardAction(
+  view: ReturnType<typeof render>,
+  s: UIStrings,
+  phase: "front" | "revealed",
+  action: ConfirmCardAction,
+): Promise<RenderedNode> {
+  await waitFor(() => {
+    expect(view.getByText(firstCue)).toBeTruthy();
+    expect(view.getByRole("button", { name: s.cardActionsTitle })).toBeTruthy();
+  });
+
+  if (phase === "revealed") {
+    fireEvent.press(getTextButton(view, s.flashcardsReveal));
+    await waitFor(() => expect(view.getAllByText(s.smartDeckTargetAyah).length).toBeGreaterThan(0));
+    expect(view.getByText(`${s.smartDeckComparisonCue}: ${firstCue}`)).toBeTruthy();
+    expect(view.queryByText(s.flashcardsReveal)).toBeNull();
+  }
+
+  fireEvent.press(view.getByRole("button", { name: s.cardActionsTitle }));
+  await waitFor(() => expect(view.getByText(s.cardActionsTitle)).toBeTruthy());
+  fireEvent.press(view.getByRole("button", { name: confirmCardActionLabel(s, action) }));
+  return getVisibleModalByText(view, confirmCardActionTitle(s, action));
+}
+
+function expectExactlyTwoDisabledDialogButtons(modal: RenderedNode): void {
+  const disabledButtons = within(modal)
+    .getAllByRole("button")
+    .filter((button) => button.props.accessibilityState?.disabled === true);
+  expect(disabledButtons).toHaveLength(2);
+}
+
+function expectExactlyTwoEnabledDialogButtons(modal: RenderedNode): void {
+  const buttons = within(modal).getAllByRole("button");
+  expect(buttons).toHaveLength(2);
+  for (const button of buttons) {
+    expect(button.props.accessibilityState?.disabled).toBe(false);
+  }
+}
+
+function expectNoUnrelatedCardActionCalls(): void {
+  expect(setStudyCardSuspended).not.toHaveBeenCalled();
+  expect(setStudyCardBuried).not.toHaveBeenCalled();
+  expect(setStudyCardMarked).not.toHaveBeenCalled();
+  expect(setStudyCardDueDate).not.toHaveBeenCalled();
+  expect(writeUserSetting).not.toHaveBeenCalled();
+  expect(deleteUserSetting).not.toHaveBeenCalled();
+  expect(computeReviewPoints).not.toHaveBeenCalled();
+  expect(insertStudyLog).not.toHaveBeenCalled();
+  expect(updateCard).not.toHaveBeenCalled();
+  expect(addTodayPoints).not.toHaveBeenCalled();
+  expect(recordAchievementEvent).not.toHaveBeenCalled();
+  expect(syncDailyScore).not.toHaveBeenCalled();
+  expect(updateProfileStats).not.toHaveBeenCalled();
+  expect(mockRouterReplace).not.toHaveBeenCalled();
+  expect(getNextEligibleReviewDate).not.toHaveBeenCalled();
+  expect(getWirdStatus).not.toHaveBeenCalled();
 }
 
 describe("Flashcard session due-date editor characterization", () => {
@@ -583,7 +668,7 @@ describe("Flashcard session due-date editor characterization", () => {
       expect(getTextButton(view, s.flashcardsCancel).props.accessibilityState.disabled).toBe(true);
       expect(hapticMedium).toHaveBeenCalledTimes(1);
 
-      const editorModal = getDateEditorModal(input);
+      const editorModal = getVisibleModal(input);
       fireEvent(editorModal, "requestClose");
       expect(view.getByPlaceholderText(s.cardDueDatePlaceholder)).toBeTruthy();
 
@@ -642,7 +727,7 @@ describe("Flashcard session due-date editor characterization", () => {
         await act(async () => {
           await deferred.promise.catch(() => undefined);
         });
-        const editorModal = getDateEditorModal(input);
+        const editorModal = getVisibleModal(input);
         expect(within(editorModal).getByText(s.cardActionFailed)).toBeTruthy();
         expect(view.getByPlaceholderText(s.cardDueDatePlaceholder)).toBeTruthy();
         expect(input.props.value).toBe(failedDateKey);
@@ -700,7 +785,7 @@ describe("Flashcard session due-date editor characterization", () => {
           await deferred.promise.catch(() => undefined);
         });
         await waitFor(() => {
-          const editorModal = getDateEditorModal(input);
+          const editorModal = getVisibleModal(input);
           expect(within(editorModal).getByText(s.cardActionFailed)).toBeTruthy();
         });
         expect(input.props.value).toBe(failedDateKey);
@@ -727,9 +812,266 @@ describe("Flashcard session due-date editor characterization", () => {
         expect(view.getByText(s.flashcardsReveal)).toBeTruthy();
 
         const reopenedInput = await openDueDateEditor(view, s, "front");
-        const reopenedModal = getDateEditorModal(reopenedInput);
+        const reopenedModal = getVisibleModal(reopenedInput);
         expect(reopenedInput.props.value).toBe(formatLocalDateInput(new Date(firstCard.due)));
         expect(within(reopenedModal).queryByText(s.cardActionFailed)).toBeNull();
+      } finally {
+        deferred.reject(failure);
+        await act(async () => {
+          await deferred.promise.catch(() => undefined);
+        });
+      }
+      expect(warnSpy.mock.calls).toEqual([expectedWarning]);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it.each([
+    ["Arabic light front", "ar", false, "front"],
+    ["English dark revealed", "en", true, "revealed"],
+  ] as const)(
+    "keeps the Delete confirmation open for a rejected write and retries through the real route for %s",
+    async (_label, language, isDark, phase) => {
+      configureSettings(language, isDark);
+      const s = language === "ar" ? strings.ar : strings.en;
+      const view = renderSession();
+      const failure = new Error("delete card action failed");
+      const deferred = createDeferred<void>();
+      jest.mocked(deleteStudyCard).mockReturnValueOnce(deferred.promise).mockResolvedValueOnce(undefined);
+      const expectedWarning: [string, Error] = ["[FlashcardSession] Card action failed:", failure];
+      const originalWarn = console.warn;
+      const warnSpy = jest.spyOn(console, "warn").mockImplementation((...args) => {
+        const isExpectedWarning =
+          args.length === expectedWarning.length && args.every((arg, index) => arg === expectedWarning[index]);
+        if (isExpectedWarning) return;
+        originalWarn(...args);
+      });
+
+      try {
+        try {
+          const modal = await openConfirmCardAction(view, s, phase, "delete");
+          expect(within(modal).getByText(s.cardDeleteConfirm)).toBeTruthy();
+          fireEvent.press(within(modal).getByRole("button", { name: s.flashcardsDelete }));
+          await waitFor(() => expectExactlyTwoDisabledDialogButtons(getVisibleModalByText(view, s.cardDeleteTitle)));
+          const busyModal = getVisibleModalByText(view, s.cardDeleteTitle);
+          fireEvent(busyModal, "requestClose");
+          expect(within(getVisibleModalByText(view, s.cardDeleteTitle)).getByText(s.cardDeleteConfirm)).toBeTruthy();
+
+          deferred.reject(failure);
+          await act(async () => {
+            await deferred.promise.catch(() => undefined);
+          });
+
+          const failedModal = getVisibleModalByText(view, s.cardDeleteTitle);
+          expect(within(failedModal).getByText(s.cardActionFailed)).toBeTruthy();
+          expectExactlyTwoEnabledDialogButtons(failedModal);
+          expect(view.getByText(firstCue)).toBeTruthy();
+          expect(view.queryByText(secondCue)).toBeNull();
+          if (phase === "front") {
+            expect(view.getByText(s.flashcardsReveal)).toBeTruthy();
+          } else {
+            expect(view.getAllByText(s.smartDeckTargetAyah).length).toBeGreaterThan(0);
+            expect(view.getByText(`${s.smartDeckComparisonCue}: ${firstCue}`)).toBeTruthy();
+            expect(view.queryByText(s.flashcardsReveal)).toBeNull();
+          }
+          expect(view.getByRole("button", { name: s.cardActionsTitle }).props.accessibilityState.disabled).toBe(false);
+          expect(deleteStudyCard).toHaveBeenCalledTimes(1);
+          expect(deleteStudyCard).toHaveBeenNthCalledWith(1, mockDatabase, firstCard.deck_id, firstCard.id);
+          expect(resetStudyCardProgress).not.toHaveBeenCalled();
+          expect(hapticMedium).toHaveBeenCalledTimes(1);
+
+          fireEvent.press(within(failedModal).getByRole("button", { name: s.flashcardsDelete }));
+          await waitFor(() =>
+            expect(view.UNSAFE_getAllByType(NativeModal).filter((node) => node.props.visible)).toHaveLength(0),
+          );
+          await waitFor(() => expect(view.getByText(secondCue)).toBeTruthy());
+          expect(view.queryByText(firstCue)).toBeNull();
+          expect(deleteStudyCard).toHaveBeenCalledTimes(2);
+          expect(deleteStudyCard).toHaveBeenNthCalledWith(2, mockDatabase, firstCard.deck_id, firstCard.id);
+          expect(resetStudyCardProgress).not.toHaveBeenCalled();
+          expect(hapticMedium).toHaveBeenCalledTimes(2);
+          expect(view.getByRole("button", { name: s.cardActionsTitle }).props.accessibilityState.disabled).toBe(false);
+          expectNoUnrelatedCardActionCalls();
+        } finally {
+          deferred.reject(failure);
+          await act(async () => {
+            await deferred.promise.catch(() => undefined);
+          });
+        }
+        expect(warnSpy.mock.calls).toEqual([expectedWarning]);
+      } finally {
+        warnSpy.mockRestore();
+      }
+    },
+  );
+
+  it.each([
+    ["Arabic light front", "ar", false, "front"],
+    ["English dark revealed", "en", true, "revealed"],
+  ] as const)(
+    "keeps the Reset confirmation open for a rejected write and retries through the real route for %s",
+    async (_label, language, isDark, phase) => {
+      configureSettings(language, isDark);
+      const s = language === "ar" ? strings.ar : strings.en;
+      const view = renderSession();
+      const failure = new Error("reset card action failed");
+      const deferred = createDeferred<StudyCardRow>();
+      jest.mocked(resetStudyCardProgress).mockReturnValueOnce(deferred.promise).mockResolvedValueOnce(firstCard);
+      const expectedWarning: [string, Error] = ["[FlashcardSession] Card action failed:", failure];
+      const originalWarn = console.warn;
+      const warnSpy = jest.spyOn(console, "warn").mockImplementation((...args) => {
+        const isExpectedWarning =
+          args.length === expectedWarning.length && args.every((arg, index) => arg === expectedWarning[index]);
+        if (isExpectedWarning) return;
+        originalWarn(...args);
+      });
+
+      try {
+        try {
+          const modal = await openConfirmCardAction(view, s, phase, "reset");
+          expect(within(modal).getByText(s.cardResetConfirm)).toBeTruthy();
+          fireEvent.press(within(modal).getByRole("button", { name: s.cardResetProgress }));
+          await waitFor(() => expectExactlyTwoDisabledDialogButtons(getVisibleModalByText(view, s.cardResetTitle)));
+          const busyModal = getVisibleModalByText(view, s.cardResetTitle);
+          fireEvent(busyModal, "requestClose");
+          expect(within(getVisibleModalByText(view, s.cardResetTitle)).getByText(s.cardResetConfirm)).toBeTruthy();
+
+          deferred.reject(failure);
+          await act(async () => {
+            await deferred.promise.catch(() => undefined);
+          });
+
+          const failedModal = getVisibleModalByText(view, s.cardResetTitle);
+          expect(within(failedModal).getByText(s.cardActionFailed)).toBeTruthy();
+          expectExactlyTwoEnabledDialogButtons(failedModal);
+          expect(view.getByText(firstCue)).toBeTruthy();
+          expect(view.queryByText(secondCue)).toBeNull();
+          if (phase === "front") {
+            expect(view.getByText(s.flashcardsReveal)).toBeTruthy();
+          } else {
+            expect(view.getAllByText(s.smartDeckTargetAyah).length).toBeGreaterThan(0);
+            expect(view.getByText(`${s.smartDeckComparisonCue}: ${firstCue}`)).toBeTruthy();
+            expect(view.queryByText(s.flashcardsReveal)).toBeNull();
+          }
+          expect(view.getByRole("button", { name: s.cardActionsTitle }).props.accessibilityState.disabled).toBe(false);
+          expect(resetStudyCardProgress).toHaveBeenCalledTimes(1);
+          expect(resetStudyCardProgress).toHaveBeenNthCalledWith(1, mockDatabase, firstCard.deck_id, firstCard.id);
+          expect(deleteStudyCard).not.toHaveBeenCalled();
+          expect(hapticMedium).toHaveBeenCalledTimes(1);
+
+          fireEvent.press(within(failedModal).getByRole("button", { name: s.cardResetProgress }));
+          await waitFor(() =>
+            expect(view.UNSAFE_getAllByType(NativeModal).filter((node) => node.props.visible)).toHaveLength(0),
+          );
+          await waitFor(() => expect(view.getByText(s.flashcardsReveal)).toBeTruthy());
+          expect(view.getByText(firstCue)).toBeTruthy();
+          expect(view.queryByText(secondCue)).toBeNull();
+          expect(resetStudyCardProgress).toHaveBeenCalledTimes(2);
+          expect(resetStudyCardProgress).toHaveBeenNthCalledWith(2, mockDatabase, firstCard.deck_id, firstCard.id);
+          expect(deleteStudyCard).not.toHaveBeenCalled();
+          expect(hapticMedium).toHaveBeenCalledTimes(2);
+          expect(view.getByRole("button", { name: s.cardActionsTitle }).props.accessibilityState.disabled).toBe(false);
+          expectNoUnrelatedCardActionCalls();
+        } finally {
+          deferred.reject(failure);
+          await act(async () => {
+            await deferred.promise.catch(() => undefined);
+          });
+        }
+        expect(warnSpy.mock.calls).toEqual([expectedWarning]);
+      } finally {
+        warnSpy.mockRestore();
+      }
+    },
+  );
+
+  it("clears a failed Delete confirmation error when the front dialog is canceled and reopened", async () => {
+    const s = strings.ar;
+    const view = renderSession();
+    const failure = new Error("delete card action failed");
+    const deferred = createDeferred<void>();
+    jest.mocked(deleteStudyCard).mockReturnValueOnce(deferred.promise);
+    const expectedWarning: [string, Error] = ["[FlashcardSession] Card action failed:", failure];
+    const originalWarn = console.warn;
+    const warnSpy = jest.spyOn(console, "warn").mockImplementation((...args) => {
+      const isExpectedWarning =
+        args.length === expectedWarning.length && args.every((arg, index) => arg === expectedWarning[index]);
+      if (isExpectedWarning) return;
+      originalWarn(...args);
+    });
+
+    try {
+      try {
+        const modal = await openConfirmCardAction(view, s, "front", "delete");
+        fireEvent.press(within(modal).getByRole("button", { name: s.flashcardsDelete }));
+        await waitFor(() => expectExactlyTwoDisabledDialogButtons(getVisibleModalByText(view, s.cardDeleteTitle)));
+        deferred.reject(failure);
+        await act(async () => {
+          await deferred.promise.catch(() => undefined);
+        });
+        const failedModal = getVisibleModalByText(view, s.cardDeleteTitle);
+        expect(within(failedModal).getByText(s.cardActionFailed)).toBeTruthy();
+        expectExactlyTwoEnabledDialogButtons(failedModal);
+        fireEvent.press(within(failedModal).getByRole("button", { name: s.flashcardsCancel }));
+        await waitFor(() => expect(findVisibleModalByText(view, s.cardDeleteTitle)).toBeNull());
+
+        const reopenedModal = await openConfirmCardAction(view, s, "front", "delete");
+        expect(within(reopenedModal).queryByText(s.cardActionFailed)).toBeNull();
+        expect(deleteStudyCard).toHaveBeenCalledTimes(1);
+        expect(resetStudyCardProgress).not.toHaveBeenCalled();
+        fireEvent.press(within(reopenedModal).getByRole("button", { name: s.flashcardsCancel }));
+        await waitFor(() => expect(findVisibleModalByText(view, s.cardDeleteTitle)).toBeNull());
+        expectNoUnrelatedCardActionCalls();
+      } finally {
+        deferred.reject(failure);
+        await act(async () => {
+          await deferred.promise.catch(() => undefined);
+        });
+      }
+      expect(warnSpy.mock.calls).toEqual([expectedWarning]);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it("clears a failed Reset confirmation error when the front dialog is canceled and reopened", async () => {
+    const s = strings.ar;
+    const view = renderSession();
+    const failure = new Error("reset card action failed");
+    const deferred = createDeferred<StudyCardRow>();
+    jest.mocked(resetStudyCardProgress).mockReturnValueOnce(deferred.promise);
+    const expectedWarning: [string, Error] = ["[FlashcardSession] Card action failed:", failure];
+    const originalWarn = console.warn;
+    const warnSpy = jest.spyOn(console, "warn").mockImplementation((...args) => {
+      const isExpectedWarning =
+        args.length === expectedWarning.length && args.every((arg, index) => arg === expectedWarning[index]);
+      if (isExpectedWarning) return;
+      originalWarn(...args);
+    });
+
+    try {
+      try {
+        const modal = await openConfirmCardAction(view, s, "front", "reset");
+        fireEvent.press(within(modal).getByRole("button", { name: s.cardResetProgress }));
+        await waitFor(() => expectExactlyTwoDisabledDialogButtons(getVisibleModalByText(view, s.cardResetTitle)));
+        deferred.reject(failure);
+        await act(async () => {
+          await deferred.promise.catch(() => undefined);
+        });
+        const failedModal = getVisibleModalByText(view, s.cardResetTitle);
+        expect(within(failedModal).getByText(s.cardActionFailed)).toBeTruthy();
+        expectExactlyTwoEnabledDialogButtons(failedModal);
+        fireEvent.press(within(failedModal).getByRole("button", { name: s.flashcardsCancel }));
+        await waitFor(() => expect(findVisibleModalByText(view, s.cardResetTitle)).toBeNull());
+
+        const reopenedModal = await openConfirmCardAction(view, s, "front", "reset");
+        expect(within(reopenedModal).queryByText(s.cardActionFailed)).toBeNull();
+        expect(resetStudyCardProgress).toHaveBeenCalledTimes(1);
+        expect(deleteStudyCard).not.toHaveBeenCalled();
+        fireEvent.press(within(reopenedModal).getByRole("button", { name: s.flashcardsCancel }));
+        await waitFor(() => expect(findVisibleModalByText(view, s.cardResetTitle)).toBeNull());
+        expectNoUnrelatedCardActionCalls();
       } finally {
         deferred.reject(failure);
         await act(async () => {
