@@ -513,22 +513,41 @@
     },
     {
       "id": "RF-011",
-      "title": "Review dependency ownership and unlisted imports",
-      "description": "Use calibrated native/web/tool roots to inspect unlisted ownership and remove dependencies only when genuinely unused.",
-      "rationale": "RF-009 preflight reports no unused dependencies after platform and nested-tool calibration. Remaining unlisted imports need ownership decisions, not blanket removal or installation.",
+      "title": "Declare the already-used bottom-tabs dependency",
+      "description": "Declare exact installed bottom-tabs version 7.21.0 with no resolved-package or source movement.",
+      "rationale": "AppNavigation imports the package type while relying on Router transitive ownership. Strict isolated metadata-only resolution is stable and full installed graph passes. Remaining ownership findings get separate tasks.",
       "modules": [
         "package.json",
         "package-lock.json",
         "docs/refactoring/UNUSED.md"
       ],
       "dependencies": [
-        "RF-009"
+        "RF-009",
+        "RF-085"
       ],
       "acceptance_criteria": [
-        "Inspect side effects, scripts, Expo/native autolinking and web platform use before removal.",
-        "One coherent dependency removal per child task."
+        "Read .refactor-baseline/rf011-readiness.json and rf011-tabs-preflight.json. Primary owns dependency/security/native/API decisions. Generator edits only package.json and docs/refactoring/UNUSED.md. package-lock.json is allowed controller output only. Do not install packages, edit the lock, run scripts, spawn helpers/reviewers or change baseline/verifier evidence. Controller owns six frozen gates and separate stronger review.",
+        "Copy .refactor-baseline/rf011-prescribed-package.json exactly: add only dependencies.@react-navigation/bottom-tabs at exact 7.21.0. Keep every other range, script, override and byte. This is already resolved and used by the AppNavigation type import. Do not modify AppNavigation, native projects, signing/config, source, tests, protected inputs or production. No alternative type wrapper, architecture or new module.",
+        "Copy .refactor-baseline/rf011-prescribed-unused.md exactly. It records actual package ownership, compatible Router/native peer ranges, root-only lock preflight and remaining RF008/RF087/RF088 findings. Controller runs strict offline lock-only npm install with lifecycle disabled. Result must exactly match rf011-prescribed-package-lock.json, with only the root declaration added and every resolved package metadata entry unchanged. No force, legacy peers, dependency upgrade, actual reinstall or patch change.",
+        "Fresh installed npm ls --all must pass. Real Knip retains zero unused files/exports/types/packages and no unresolved imports, two intentional aliases, one binary and exactly four unlisted names: expo-updates, expo-system-ui, sharp, react-devtools-core. Keep analysis config/exceptions unchanged. Finding exit1 is expected only after valid JSON and exact report; tool/config failures fail.",
+        "All six fresh gates pass: strict offline metadata-only lock resolution; pinned exact-bytes/non-root-lock/installed-graph/real-analysis gate; strict types; unchanged full unit suite; web export; manifest/doc formatting. Separate Astra inspects full manifest/lock/doc diff and raw evidence. Primary final scope/hash acceptance follows controller release. No resolved native packages change, so no native rebuild/device/iOS check is needed or claimed. RF-086 remains unresolved: if it recurs preserve failure and diagnose, never modify tests/timeouts here."
       ],
       "verification": [
+        [
+          "npm",
+          "install",
+          "--package-lock-only",
+          "--ignore-scripts",
+          "--no-audit",
+          "--no-fund",
+          "--offline",
+          "--strict-peer-deps"
+        ],
+        [
+          "python3",
+          "-c",
+          "import hashlib,pathlib,runpy; p=pathlib.Path('.refactor-baseline/rf011-verify.py'); assert hashlib.sha256(p.read_bytes()).hexdigest() == 'ce00dadca8be47d67b92e113a8d64efa839120e242752e065c55c2e913d6cffa', 'Primary verifier changed'; runpy.run_path(str(p),run_name='__main__')"
+        ],
         [
           "npm",
           "run",
@@ -537,11 +556,22 @@
         [
           "npm",
           "run",
+          "test:unit"
+        ],
+        [
+          "npm",
+          "run",
           "build:web"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "package.json",
+          "docs/refactoring/UNUSED.md"
         ]
       ],
       "risk": "medium",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
         "package.json",
@@ -2001,7 +2031,9 @@
         "RF-062",
         "RF-063",
         "RF-064",
-        "RF-065"
+        "RF-065",
+        "RF-087",
+        "RF-088"
       ],
       "acceptance_criteria": [
         "Repeat identical clone/dead-code/native+web graph/security scopes.",
@@ -2131,7 +2163,8 @@
         "RF-044",
         "RF-045",
         "RF-046",
-        "RF-048"
+        "RF-048",
+        "RF-086"
       ],
       "acceptance_criteria": [
         "Review actual repository against stack, conventions, backlog and preserved behavior.",
@@ -4705,7 +4738,7 @@
         "RF-078"
       ],
       "acceptance_criteria": [
-        "Primary bounded reproduction on 2026-10-17 is recorded in .refactor-baseline/rf086-reproduction.json. The unchanged cold full suite passes374 cases; five equivalent instrumented full-suite cold runs also pass374 each with no skipped cases or emitted diagnostic. Original failure is preserved; root cause and repair remain unknown. This is not approval to weaken tests or invent a fix. Resume causal diagnosis if it recurs in a fresh real gate.",
+        "Primary bounded reproduction on 2026-10-17 is recorded in .refactor-baseline/rf086-reproduction.json. The unchanged cold full suite passes 374 cases; five equivalent instrumented full-suite cold runs also pass 374 each with no skipped cases or emitted diagnostic. Original failure is preserved; root cause and repair remain unknown. This is not approval to weaken tests or invent a fix. Resume causal diagnosis if it recurs in a fresh real gate.",
         "Before approval primary reads .refactor-baseline/rf083-unit-failure-triage.json and original logs, establishes a repeatable failure or records the reproduction limit, and chooses the smallest causal seam.",
         "Freeze a behavioral regression and exact bounded repair only after causality is demonstrated. Preserve actual NativeModal, guards, error/retry/negative assertions and meaningful timing behavior; no test skipping, blanket mocking, timeout increase or weakening to pass.",
         "No production/data behavior change is authorized by this placeholder. Independent review and primary acceptance remain required."
@@ -4730,6 +4763,79 @@
       "status": "pending",
       "allowed_paths": [
         "tests/unit/deck-cards-due-date.test.tsx"
+      ],
+      "attempts": 0
+    },
+    {
+      "id": "RF-087",
+      "title": "Resolve the manual icon generator tooling dependency",
+      "description": "Review and declare a compatible development-only sharp requirement for the maintained manual generator, or document a simpler verified supported invocation.",
+      "rationale": "The existing generator directly imports sharp, which is absent. This is tooling ownership, not an application runtime-library requirement or permission to regenerate protected icons.",
+      "modules": [
+        "package.json",
+        "package-lock.json",
+        "scripts/generate-icons.mjs",
+        "docs/refactoring/UNUSED.md"
+      ],
+      "dependencies": [
+        "RF-011"
+      ],
+      "acceptance_criteria": [
+        "Primary must inspect script side effects, official current sharp/Node/platform compatibility, audit and lock impacts before selecting an exact scope.",
+        "Do not run the icon generator or modify protected assets. Keep runtime dependencies and native app behavior unchanged; verify any chosen development tool with harmless in-memory input.",
+        "This placeholder authorizes no dependency installation, source change, asset generation or test weakening. Freeze acceptance commands and independent review after readiness."
+      ],
+      "verification": [
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ]
+      ],
+      "risk": "medium",
+      "approved": false,
+      "status": "pending",
+      "allowed_paths": [
+        "package.json",
+        "package-lock.json",
+        "docs/refactoring/UNUSED.md"
+      ],
+      "attempts": 0
+    },
+    {
+      "id": "RF-088",
+      "title": "Resolve the security probe through the React Native dependency owner",
+      "description": "Inspect the devtools probe and resolve its target from React Native rather than assuming root-level transitive hoisting.",
+      "rationale": "The security helper intentionally examines a transitive package. Adding a runtime dependency solely to silence Knip would misstate ownership. Parent-relative resolution should inspect the actual package used by RN.",
+      "modules": [
+        "scripts/ralph/check-security-dependencies.cjs",
+        "docs/refactoring/UNUSED.md"
+      ],
+      "dependencies": [
+        "RF-011"
+      ],
+      "acceptance_criteria": [
+        "Primary verifies React Native ownership, actual resolution paths, behavior under a harmless competing-root fixture, current override guarantees and unchanged Supabase CLI archive checks.",
+        "Approve only a bounded parent-relative resolution repair after causal evidence. Do not install a new runtime devtools package or suppress the analysis finding.",
+        "No production, backend, credential, package override/version or live system change. Freeze real analysis and existing probe verification before approval."
+      ],
+      "verification": [
+        [
+          "node",
+          "scripts/ralph/check-security-dependencies.cjs"
+        ]
+      ],
+      "risk": "low",
+      "approved": false,
+      "status": "pending",
+      "allowed_paths": [
+        "scripts/ralph/check-security-dependencies.cjs",
+        "docs/refactoring/UNUSED.md"
       ],
       "attempts": 0
     }
