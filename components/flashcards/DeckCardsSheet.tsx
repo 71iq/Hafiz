@@ -239,8 +239,14 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
                       isRTL={isRTL}
                       rowFlexStyle={rowFlexStyle}
                       s={s}
-                      onDelete={() => setConfirmAction({ type: "delete", card })}
-                      onReset={() => setConfirmAction({ type: "reset", card })}
+                      onDelete={() => {
+                        setError(null);
+                        setConfirmAction({ type: "delete", card });
+                      }}
+                      onReset={() => {
+                        setError(null);
+                        setConfirmAction({ type: "reset", card });
+                      }}
                       onToggleMark={() => runAction(card, async () => {
                         await setStudyCardMarked(db, card.deck_id, card.id, !card.marked_at);
                       })}
@@ -271,6 +277,7 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
         confirmLabel={confirmAction?.type === "delete" ? s.flashcardsDelete : s.cardResetProgress}
         destructive={confirmAction?.type === "delete"}
         confirmLoading={!!confirmAction && busyId === confirmAction.card.id}
+        error={error}
         isDark={isDark}
         isRTL={isRTL}
         onCancel={() => {

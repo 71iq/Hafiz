@@ -550,3 +550,132 @@ test("deck date-save failure stays inside the active date editor", async ({ brow
     await context.close();
   }
 });
+
+test("deck delete failure stays inside the active confirmation dialog", async ({ browser, baseURL }, testInfo) => {
+  const origin = new URL(baseURL ?? "");
+  expect(origin.protocol).toBe("http:");
+  expect(origin.hostname).toMatch(/^(127\.0\.0\.1|localhost)$/);
+  const context = await browser.newContext({
+    locale: "en-US",
+    viewport: { width: 390, height: 844 },
+    storageState: { cookies: [], origins: [] },
+  });
+  try {
+    const page = await context.newPage();
+    const capture = captureConsole(page);
+    const actionWarnings: string[] = [];
+    page.on("console", (message) => {
+      if (message.type() === "warning" && message.text().includes("[DeckCardsSheet] Card action failed:")) {
+        actionWarnings.push(message.text());
+      }
+    });
+    await waitForQaReady(page);
+    await expect(await fixtureQuery(page, "getFirst", "SELECT COUNT(*) AS count FROM study_cards")).toEqual({
+      count: 0,
+    });
+    await fixtureQuery(
+      page,
+      "exec",
+      `
+      INSERT INTO study_cards (id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days, learning_steps, reps, lapses, state, created_at, updated_at)
+      VALUES ('2:10', 'default-retention', '2000-01-01T00:00:00.000Z', 0, 0, 0, 0, 0, 0, 0, 0, '2000-01-01T00:00:00.000Z', '2000-01-01T00:00:00.000Z'),
+             ('2:11', 'default-retention', '2999-01-01T00:00:00.000Z', 0, 0, 0, 0, 0, 0, 0, 0, '2000-01-02T00:00:00.000Z', '2000-01-02T00:00:00.000Z');
+      INSERT INTO user_settings (key, value, updated_at, deleted_at)
+      VALUES ('smart_deck_filter_all_decks', '{"type":"surah","surahs":[2],"ranges":[{"surah":2,"ayahStart":10,"ayahEnd":11}]}', '2000-01-01T00:00:00.000Z', NULL);
+      CREATE TRIGGER rf078_reject_fixture_delete BEFORE UPDATE OF deleted_at ON study_cards
+      WHEN OLD.id = '2:11' AND OLD.deck_id = 'default-retention' AND NEW.deleted_at IS NOT NULL
+      BEGIN SELECT RAISE(ABORT, 'RF078 isolated QA rejection'); END;
+    `,
+    );
+    await expect(
+      await fixtureQuery(
+        page,
+        "getFirst",
+        "SELECT COUNT(*) AS count, group_concat(id, ',') AS ids FROM (SELECT id FROM study_cards WHERE deck_id = 'default-retention' ORDER BY id)",
+      ),
+    ).toEqual({ count: 2, ids: "2:10,2:11" });
+    await expect(
+      await fixtureQuery(page, "getFirst", "SELECT value FROM user_settings WHERE key = 'smart_deck_filter_all_decks'"),
+    ).toEqual({ value: '{"type":"surah","surahs":[2],"ranges":[{"surah":2,"ayahStart":10,"ayahEnd":11}]}' });
+
+    await page.goto("/settings", { waitUntil: "domcontentloaded" });
+    await page.getByRole("radio", { name: "Dark", exact: true }).click();
+    await expect(page.getByRole("radio", { name: "Dark", exact: true })).toBeChecked();
+    await page.goto("/home", { waitUntil: "domcontentloaded" });
+    await expect(page.locator("html")).toHaveClass(/dark/);
+    // Home renders Retention first in its fixed smart-deck definition order.
+    await page.getByRole("button", { name: "Deck Cards", exact: true }).first().click();
+    const deck = page.getByRole("dialog").filter({ has: page.getByPlaceholder("Search cards...", { exact: true }) });
+    await expect(deck).toBeVisible();
+    await expect(deck.getByText("Retention", { exact: true })).toBeVisible();
+    const actions = deck.getByRole("button", { name: "Card Actions", exact: true });
+    await expect(actions).toHaveCount(2);
+    await actions.nth(1).click();
+    await page.getByRole("menuitem", { name: "Delete Card", exact: true }).click();
+    const editor = page.getByRole("dialog").filter({
+      has: page.getByText("Delete this card from the deck? Past review logs will be kept.", { exact: true }),
+    });
+    await expect(editor).toBeVisible();
+    await editor.getByRole("button", { name: "Delete", exact: true }).click();
+
+    const error = editor.getByText("Could not update card", { exact: true });
+    await expect(error).toBeVisible();
+    await expect(error).toBeInViewport();
+    await expect(editor).toBeVisible();
+    const cancel = editor.getByRole("button", { name: "Cancel", exact: true });
+    const save = editor.getByRole("button", { name: "Delete", exact: true });
+    await expect(cancel).toBeEnabled();
+    await expect(save).toBeEnabled();
+    await expect(cancel).toBeInViewport();
+    await expect(save).toBeInViewport();
+    const errorBox = await error.boundingBox();
+    const cancelBox = await cancel.boundingBox();
+    const saveBox = await save.boundingBox();
+    if (!errorBox || !cancelBox || !saveBox) throw new Error("Expected deck confirmation error and footer geometry");
+    expect(errorBox.y + errorBox.height).toBeLessThanOrEqual(Math.min(cancelBox.y, saveBox.y));
+    for (const button of [cancel, save]) {
+      expect(
+        await button.evaluate((element) => {
+          const rect = element.getBoundingClientRect();
+          const target = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2);
+          return target === element || element.contains(target);
+        }),
+      ).toBe(true);
+    }
+    expect(actionWarnings).toHaveLength(1);
+    expect(actionWarnings[0]).toContain("[DeckCardsSheet] Card action failed:");
+    expect(actionWarnings[0]).toContain("Error finalizing statement");
+    await expect(
+      await fixtureQuery(
+        page,
+        "getFirst",
+        "SELECT id, deck_id, due, suspended_at, deleted_at FROM study_cards WHERE id = '2:11' AND deck_id = 'default-retention'",
+      ),
+    ).toEqual({
+      id: "2:11",
+      deck_id: "default-retention",
+      due: "2999-01-01T00:00:00.000Z",
+      suspended_at: null,
+      deleted_at: null,
+    });
+    await expect(await fixtureQuery(page, "getFirst", "SELECT COUNT(*) AS count FROM study_log")).toEqual({ count: 0 });
+    await assertHealthyPage(page, capture);
+    const screenshot = testInfo.outputPath("deck-delete-action-error.png");
+    await page.screenshot({ path: screenshot, fullPage: true });
+    await testInfo.attach("deck-delete-action-error", { path: screenshot, contentType: "image/png" });
+    await testInfo.attach("changed-state-geometry", {
+      body: JSON.stringify({
+        locale: "en-US",
+        theme: "dark",
+        viewport: { width: 390, height: 844 },
+        errorBox,
+        cancelBox,
+        saveBox,
+        actionWarnings,
+      }),
+      contentType: "application/json",
+    });
+  } finally {
+    await context.close();
+  }
+});

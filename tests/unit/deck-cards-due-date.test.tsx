@@ -5,7 +5,15 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { DirectionProvider } from "@/lib/ui/direction";
 import { DeckCardsSheet } from "@/components/flashcards/DeckCardsSheet";
 import { ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
-import { getDeckCardsForList, setStudyCardDueDate } from "@/lib/fsrs/queries";
+import {
+  deleteStudyCard,
+  getDeckCardsForList,
+  resetStudyCardProgress,
+  setStudyCardBuried,
+  setStudyCardDueDate,
+  setStudyCardMarked,
+  setStudyCardSuspended,
+} from "@/lib/fsrs/queries";
 import type { DeckCardListItem, StudyCardRow } from "@/lib/fsrs/types";
 import { formatLocalDateInput, parseDueDateInput } from "@/lib/date";
 import { strings, type UIStrings } from "@/lib/i18n/strings";
@@ -171,12 +179,12 @@ function configureSettings(language: "ar" | "en", isDark: boolean): void {
 
 type RenderedNode = ReturnType<ReturnType<typeof render>["getByText"]>;
 
-function getVisibleModalForInput(input: RenderedNode): RenderedNode {
-  let modal: RenderedNode | null = input;
+function getVisibleModalForNode(node: RenderedNode): RenderedNode {
+  let modal: RenderedNode | null = node;
   while (modal && modal.type !== NativeModal) {
     modal = modal.parent;
   }
-  if (!modal) throw new Error("The expected visible due-date editor modal was not rendered");
+  if (!modal) throw new Error("The expected visible NativeModal was not rendered");
   expect(modal.props.visible).toBe(true);
   return modal;
 }
@@ -190,16 +198,39 @@ function getTextButton(view: ReturnType<typeof render>, label: string): Rendered
   throw new Error(`No rendered button for ${label}`);
 }
 
-async function openSecondCardEditor(view: ReturnType<typeof render>, s: UIStrings) {
+async function openSecondCardMenu(view: ReturnType<typeof render>, s: UIStrings) {
   const triggers = view.getAllByRole("button", { name: s.cardActionsTitle });
   expect(triggers).toHaveLength(2);
   const measureCallsBeforeOpen = mockMeasureInWindow.mock.calls.length;
   fireEvent.press(triggers[1]);
   await waitFor(() => expect(mockMeasureInWindow.mock.calls.length).toBeGreaterThan(measureCallsBeforeOpen));
+  await act(async () => {
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  });
+}
+
+async function openSecondCardEditor(view: ReturnType<typeof render>, s: UIStrings) {
+  await openSecondCardMenu(view, s);
   await waitFor(() => expect(view.getByRole("menuitem", { name: s.cardSetDueDate })).toBeTruthy());
   fireEvent.press(view.getByRole("menuitem", { name: s.cardSetDueDate }));
   await waitFor(() => expect(view.getByPlaceholderText(s.cardDueDatePlaceholder)).toBeTruthy());
   return view.getByPlaceholderText(s.cardDueDatePlaceholder);
+}
+
+type ConfirmAction = "delete" | "reset";
+
+async function openSecondCardConfirmation(
+  view: ReturnType<typeof render>,
+  s: UIStrings,
+  action: ConfirmAction,
+): Promise<RenderedNode> {
+  await openSecondCardMenu(view, s);
+  const actionLabel = action === "delete" ? s.cardDelete : s.cardResetProgress;
+  const confirmationMessage = action === "delete" ? s.cardDeleteConfirm : s.cardResetConfirm;
+  await waitFor(() => expect(view.getByRole("menuitem", { name: actionLabel })).toBeTruthy());
+  fireEvent.press(view.getByRole("menuitem", { name: actionLabel }));
+  await waitFor(() => expect(view.getByText(confirmationMessage)).toBeTruthy());
+  return getVisibleModalForNode(view.getByText(confirmationMessage));
 }
 
 const firstCard = makeCard("card-1", "First card", localDateWithOffset(2));
@@ -408,7 +439,7 @@ describe("DeckCardsSheet due-date editor characterization", () => {
         expect(setStudyCardDueDate).toHaveBeenCalledTimes(1);
         expect(getDeckCardsForList).toHaveBeenCalledTimes(1);
         expect(onChanged).not.toHaveBeenCalled();
-        const busyEditorModal = getVisibleModalForInput(input);
+        const busyEditorModal = getVisibleModalForNode(input);
         fireEvent(busyEditorModal, "requestClose");
         expect(view.getByPlaceholderText(s.cardDueDatePlaceholder)).toBeTruthy();
         deferred.reject(failure);
@@ -416,7 +447,7 @@ describe("DeckCardsSheet due-date editor characterization", () => {
         await act(async () => {
           await deferred.promise.catch(() => undefined);
         });
-        const editorModal = getVisibleModalForInput(input);
+        const editorModal = getVisibleModalForNode(input);
         const error = within(editorModal).getByText(s.cardActionFailed);
         expect(error).toBeTruthy();
         expectWritingDirection(error, "ltr");
@@ -484,7 +515,7 @@ describe("DeckCardsSheet due-date editor characterization", () => {
           await deferred.promise.catch(() => undefined);
         });
 
-        const editorModal = getVisibleModalForInput(input);
+        const editorModal = getVisibleModalForNode(input);
         const error = within(editorModal).getByText(s.cardActionFailed);
         expect(error).toBeTruthy();
         expectWritingDirection(error, "rtl");
@@ -500,10 +531,8 @@ describe("DeckCardsSheet due-date editor characterization", () => {
 
         fireEvent.changeText(input, "not-a-date");
         fireEvent.press(within(editorModal).getByRole("button", { name: s.cardSaveDueDate }));
-        await waitFor(() =>
-          expect(within(getVisibleModalForInput(input)).getByText(s.cardDueDateInvalid)).toBeTruthy(),
-        );
-        expect(within(getVisibleModalForInput(input)).queryByText(s.cardActionFailed)).toBeNull();
+        await waitFor(() => expect(within(getVisibleModalForNode(input)).getByText(s.cardDueDateInvalid)).toBeTruthy());
+        expect(within(getVisibleModalForNode(input)).queryByText(s.cardActionFailed)).toBeNull();
         expect(setStudyCardDueDate).toHaveBeenCalledTimes(1);
         expect(getDeckCardsForList).toHaveBeenCalledTimes(1);
         expect(onChanged).not.toHaveBeenCalled();
@@ -512,7 +541,7 @@ describe("DeckCardsSheet due-date editor characterization", () => {
         fireEvent.press(within(editorModal).getByRole("button", { name: s.flashcardsCancel }));
         await waitFor(() => expect(view.queryByPlaceholderText(s.cardDueDatePlaceholder)).toBeNull());
         const reopenedInput = await openSecondCardEditor(view, s);
-        const reopenedModal = getVisibleModalForInput(reopenedInput);
+        const reopenedModal = getVisibleModalForNode(reopenedInput);
         expect(reopenedInput.props.value).toBe(formatLocalDateInput(new Date(secondCard.due)));
         expect(within(reopenedModal).queryByText(s.cardActionFailed)).toBeNull();
         expect(within(reopenedModal).queryByText(s.cardDueDateInvalid)).toBeNull();
@@ -542,7 +571,7 @@ describe("DeckCardsSheet due-date editor characterization", () => {
       const view = renderDeckWithCallbacks(onClose, onChanged);
       await waitFor(() => expect(view.getByText(secondCard.title)).toBeTruthy());
       const input = await openSecondCardEditor(view, s);
-      const editorModal = getVisibleModalForInput(input);
+      const editorModal = getVisibleModalForNode(input);
       const validationMessage = validationKind === "past" ? s.cardDueDatePast : s.cardDueDateInvalid;
       const otherValidationMessage = validationKind === "past" ? s.cardDueDateInvalid : s.cardDueDatePast;
 
@@ -591,7 +620,7 @@ describe("DeckCardsSheet due-date editor characterization", () => {
             await deferred.promise.catch(() => undefined);
           });
 
-          const failedModal = getVisibleModalForInput(input);
+          const failedModal = getVisibleModalForNode(input);
           const error = within(failedModal).getByText(s.cardActionFailed);
           expect(error).toBeTruthy();
           expectWritingDirection(error, language === "ar" ? "rtl" : "ltr");
@@ -608,7 +637,7 @@ describe("DeckCardsSheet due-date editor characterization", () => {
           fireEvent.press(within(failedModal).getByRole("button", { name: s.flashcardsCancel }));
           await waitFor(() => expect(view.queryByPlaceholderText(s.cardDueDatePlaceholder)).toBeNull());
           const reopenedInput = await openSecondCardEditor(view, s);
-          const reopenedModal = getVisibleModalForInput(reopenedInput);
+          const reopenedModal = getVisibleModalForNode(reopenedInput);
           expect(reopenedInput.props.value).toBe(formatLocalDateInput(new Date(secondCard.due)));
           expect(within(reopenedModal).queryByText(s.cardActionFailed)).toBeNull();
           expect(within(reopenedModal).queryByText(s.cardDueDateInvalid)).toBeNull();
@@ -617,6 +646,260 @@ describe("DeckCardsSheet due-date editor characterization", () => {
           expect(getDeckCardsForList).toHaveBeenCalledTimes(1);
           expect(onChanged).not.toHaveBeenCalled();
           expect(onClose).not.toHaveBeenCalled();
+        } finally {
+          deferred.reject(failure);
+          await act(async () => {
+            await deferred.promise.catch(() => undefined);
+          });
+        }
+        expect(warnSpy.mock.calls).toEqual([expectedWarning]);
+      } finally {
+        warnSpy.mockRestore();
+      }
+    },
+  );
+
+  it.each([
+    ["Arabic light", "ar", false],
+    ["English dark", "en", true],
+  ] as const)(
+    "keeps the Delete confirmation open for a rejected write and retries the second card for %s",
+    async (_label, language, isDark) => {
+      configureSettings(language, isDark);
+      const s = language === "ar" ? strings.ar : strings.en;
+      const onClose = jest.fn();
+      const onChanged = jest.fn();
+      const deferred = createDeferred<void>();
+      const failure = new Error("delete card action failed");
+      jest.mocked(deleteStudyCard).mockReturnValueOnce(deferred.promise).mockResolvedValueOnce(undefined);
+      jest.mocked(getDeckCardsForList).mockResolvedValueOnce(deckCards).mockResolvedValueOnce([firstCard]);
+      const expectedWarning: [string, Error] = ["[DeckCardsSheet] Card action failed:", failure];
+      const originalWarn = console.warn;
+      const warnSpy = jest.spyOn(console, "warn").mockImplementation((...args) => {
+        const isExpectedWarning =
+          args.length === expectedWarning.length && args.every((arg, index) => arg === expectedWarning[index]);
+        if (isExpectedWarning) return;
+        originalWarn(...args);
+      });
+
+      try {
+        try {
+          const view = renderDeckWithCallbacks(onClose, onChanged);
+          await waitFor(() => {
+            expect(view.getByText(firstCard.title)).toBeTruthy();
+            expect(view.getByText(secondCard.title)).toBeTruthy();
+          });
+          const modal = await openSecondCardConfirmation(view, s, "delete");
+          expect(within(modal).getByText(s.cardDeleteConfirm)).toBeTruthy();
+          expect(deleteStudyCard).not.toHaveBeenCalled();
+          expect(resetStudyCardProgress).not.toHaveBeenCalled();
+          expect(getDeckCardsForList).toHaveBeenCalledTimes(1);
+
+          fireEvent.press(within(modal).getByRole("button", { name: s.flashcardsDelete }));
+          await waitFor(() => {
+            const disabledButtons = within(getVisibleModalForNode(view.getByText(s.cardDeleteConfirm)))
+              .getAllByRole("button")
+              .filter((button) => button.props.accessibilityState?.disabled === true);
+            expect(disabledButtons).toHaveLength(2);
+          });
+          const busyModal = getVisibleModalForNode(view.getByText(s.cardDeleteConfirm));
+          fireEvent(busyModal, "requestClose");
+          const guardedModal = getVisibleModalForNode(view.getByText(s.cardDeleteConfirm));
+          expect(within(guardedModal).getByText(s.cardDeleteConfirm)).toBeTruthy();
+          fireEvent.press(within(guardedModal).getAllByRole("button")[1]);
+          expect(deleteStudyCard).toHaveBeenCalledTimes(1);
+          expect(deleteStudyCard).toHaveBeenCalledWith(mockDatabase, secondCard.deck_id, secondCard.id);
+          expect(getDeckCardsForList).toHaveBeenCalledTimes(1);
+          expect(onChanged).not.toHaveBeenCalled();
+          expect(onClose).not.toHaveBeenCalled();
+
+          deferred.reject(failure);
+          await act(async () => {
+            await deferred.promise.catch(() => undefined);
+          });
+
+          const failedModal = getVisibleModalForNode(view.getByText(s.cardDeleteConfirm));
+          const error = within(failedModal).getByText(s.cardActionFailed);
+          expect(error.props.accessibilityRole).toBe("alert");
+          expect(error.props.accessibilityLiveRegion).toBe("polite");
+          expectWritingDirection(error, language === "ar" ? "rtl" : "ltr");
+          expect(within(failedModal).getByText(s.cardDeleteConfirm)).toBeTruthy();
+          const enabledButtons = within(failedModal).getAllByRole("button");
+          expect(enabledButtons).toHaveLength(2);
+          for (const button of enabledButtons) expect(button.props.accessibilityState?.disabled).toBe(false);
+          expect(view.getByText(firstCard.title)).toBeTruthy();
+          expect(view.getByText(secondCard.title)).toBeTruthy();
+          expect(getDeckCardsForList).toHaveBeenCalledTimes(1);
+          expect(onChanged).not.toHaveBeenCalled();
+          expect(onClose).not.toHaveBeenCalled();
+          expect(deleteStudyCard).toHaveBeenCalledTimes(1);
+          expect(resetStudyCardProgress).not.toHaveBeenCalled();
+          expect(setStudyCardDueDate).not.toHaveBeenCalled();
+          expect(setStudyCardMarked).not.toHaveBeenCalled();
+          expect(setStudyCardSuspended).not.toHaveBeenCalled();
+          expect(setStudyCardBuried).not.toHaveBeenCalled();
+
+          fireEvent.press(within(failedModal).getByRole("button", { name: s.flashcardsCancel }));
+          await waitFor(() => expect(view.queryByText(s.cardDeleteConfirm)).toBeNull());
+          const reopenedModal = await openSecondCardConfirmation(view, s, "delete");
+          expect(within(reopenedModal).queryByText(s.cardActionFailed)).toBeNull();
+          expect(deleteStudyCard).toHaveBeenCalledTimes(1);
+          expect(resetStudyCardProgress).not.toHaveBeenCalled();
+          expect(setStudyCardDueDate).not.toHaveBeenCalled();
+          expect(setStudyCardMarked).not.toHaveBeenCalled();
+          expect(setStudyCardSuspended).not.toHaveBeenCalled();
+          expect(setStudyCardBuried).not.toHaveBeenCalled();
+          expect(getDeckCardsForList).toHaveBeenCalledTimes(1);
+          expect(onChanged).not.toHaveBeenCalled();
+          expect(onClose).not.toHaveBeenCalled();
+          fireEvent.press(within(reopenedModal).getByRole("button", { name: s.flashcardsCancel }));
+          await waitFor(() => expect(view.queryByText(s.cardDeleteConfirm)).toBeNull());
+
+          const retryModal = await openSecondCardConfirmation(view, s, "delete");
+          fireEvent.press(within(retryModal).getByRole("button", { name: s.flashcardsDelete }));
+          await waitFor(() => expect(view.queryByText(s.cardDeleteConfirm)).toBeNull());
+          await waitFor(() => expect(view.queryByText(secondCard.title)).toBeNull());
+          expect(view.getByText(firstCard.title)).toBeTruthy();
+          expect(deleteStudyCard).toHaveBeenCalledTimes(2);
+          expect(deleteStudyCard).toHaveBeenNthCalledWith(1, mockDatabase, secondCard.deck_id, secondCard.id);
+          expect(deleteStudyCard).toHaveBeenNthCalledWith(2, mockDatabase, secondCard.deck_id, secondCard.id);
+          expect(getDeckCardsForList).toHaveBeenCalledTimes(2);
+          expect(getDeckCardsForList).toHaveBeenLastCalledWith(mockDatabase, "deck-1");
+          expect(onChanged).toHaveBeenCalledTimes(1);
+          expect(onClose).not.toHaveBeenCalled();
+          expect(resetStudyCardProgress).not.toHaveBeenCalled();
+          expect(setStudyCardDueDate).not.toHaveBeenCalled();
+          expect(setStudyCardMarked).not.toHaveBeenCalled();
+          expect(setStudyCardSuspended).not.toHaveBeenCalled();
+          expect(setStudyCardBuried).not.toHaveBeenCalled();
+        } finally {
+          deferred.reject(failure);
+          await act(async () => {
+            await deferred.promise.catch(() => undefined);
+          });
+        }
+        expect(warnSpy.mock.calls).toEqual([expectedWarning]);
+      } finally {
+        warnSpy.mockRestore();
+      }
+    },
+  );
+
+  it.each([
+    ["Arabic light", "ar", false],
+    ["English dark", "en", true],
+  ] as const)(
+    "keeps the Reset confirmation open for a rejected write and retries the second card for %s",
+    async (_label, language, isDark) => {
+      configureSettings(language, isDark);
+      const s = language === "ar" ? strings.ar : strings.en;
+      const onClose = jest.fn();
+      const onChanged = jest.fn();
+      const deferred = createDeferred<StudyCardRow>();
+      const failure = new Error("reset card action failed");
+      jest.mocked(resetStudyCardProgress).mockReturnValueOnce(deferred.promise).mockResolvedValueOnce(secondCard);
+      jest.mocked(getDeckCardsForList).mockResolvedValueOnce(deckCards).mockResolvedValueOnce(deckCards);
+      const expectedWarning: [string, Error] = ["[DeckCardsSheet] Card action failed:", failure];
+      const originalWarn = console.warn;
+      const warnSpy = jest.spyOn(console, "warn").mockImplementation((...args) => {
+        const isExpectedWarning =
+          args.length === expectedWarning.length && args.every((arg, index) => arg === expectedWarning[index]);
+        if (isExpectedWarning) return;
+        originalWarn(...args);
+      });
+
+      try {
+        try {
+          const view = renderDeckWithCallbacks(onClose, onChanged);
+          await waitFor(() => {
+            expect(view.getByText(firstCard.title)).toBeTruthy();
+            expect(view.getByText(secondCard.title)).toBeTruthy();
+          });
+          const modal = await openSecondCardConfirmation(view, s, "reset");
+          expect(within(modal).getByText(s.cardResetConfirm)).toBeTruthy();
+          expect(resetStudyCardProgress).not.toHaveBeenCalled();
+          expect(deleteStudyCard).not.toHaveBeenCalled();
+          expect(getDeckCardsForList).toHaveBeenCalledTimes(1);
+
+          fireEvent.press(within(modal).getByRole("button", { name: s.cardResetProgress }));
+          await waitFor(() => {
+            const disabledButtons = within(getVisibleModalForNode(view.getByText(s.cardResetConfirm)))
+              .getAllByRole("button")
+              .filter((button) => button.props.accessibilityState?.disabled === true);
+            expect(disabledButtons).toHaveLength(2);
+          });
+          const busyModal = getVisibleModalForNode(view.getByText(s.cardResetConfirm));
+          fireEvent(busyModal, "requestClose");
+          const guardedModal = getVisibleModalForNode(view.getByText(s.cardResetConfirm));
+          expect(within(guardedModal).getByText(s.cardResetConfirm)).toBeTruthy();
+          fireEvent.press(within(guardedModal).getAllByRole("button")[1]);
+          expect(resetStudyCardProgress).toHaveBeenCalledTimes(1);
+          expect(resetStudyCardProgress).toHaveBeenCalledWith(mockDatabase, secondCard.deck_id, secondCard.id);
+          expect(getDeckCardsForList).toHaveBeenCalledTimes(1);
+          expect(onChanged).not.toHaveBeenCalled();
+          expect(onClose).not.toHaveBeenCalled();
+
+          deferred.reject(failure);
+          await act(async () => {
+            await deferred.promise.catch(() => undefined);
+          });
+
+          const failedModal = getVisibleModalForNode(view.getByText(s.cardResetConfirm));
+          const error = within(failedModal).getByText(s.cardActionFailed);
+          expect(error.props.accessibilityRole).toBe("alert");
+          expect(error.props.accessibilityLiveRegion).toBe("polite");
+          expectWritingDirection(error, language === "ar" ? "rtl" : "ltr");
+          expect(within(failedModal).getByText(s.cardResetConfirm)).toBeTruthy();
+          const enabledButtons = within(failedModal).getAllByRole("button");
+          expect(enabledButtons).toHaveLength(2);
+          for (const button of enabledButtons) expect(button.props.accessibilityState?.disabled).toBe(false);
+          expect(view.getByText(firstCard.title)).toBeTruthy();
+          expect(view.getByText(secondCard.title)).toBeTruthy();
+          expect(getDeckCardsForList).toHaveBeenCalledTimes(1);
+          expect(onChanged).not.toHaveBeenCalled();
+          expect(onClose).not.toHaveBeenCalled();
+          expect(resetStudyCardProgress).toHaveBeenCalledTimes(1);
+          expect(deleteStudyCard).not.toHaveBeenCalled();
+          expect(setStudyCardDueDate).not.toHaveBeenCalled();
+          expect(setStudyCardMarked).not.toHaveBeenCalled();
+          expect(setStudyCardSuspended).not.toHaveBeenCalled();
+          expect(setStudyCardBuried).not.toHaveBeenCalled();
+
+          fireEvent.press(within(failedModal).getByRole("button", { name: s.flashcardsCancel }));
+          await waitFor(() => expect(view.queryByText(s.cardResetConfirm)).toBeNull());
+          const reopenedModal = await openSecondCardConfirmation(view, s, "reset");
+          expect(within(reopenedModal).queryByText(s.cardActionFailed)).toBeNull();
+          expect(resetStudyCardProgress).toHaveBeenCalledTimes(1);
+          expect(deleteStudyCard).not.toHaveBeenCalled();
+          expect(setStudyCardDueDate).not.toHaveBeenCalled();
+          expect(setStudyCardMarked).not.toHaveBeenCalled();
+          expect(setStudyCardSuspended).not.toHaveBeenCalled();
+          expect(setStudyCardBuried).not.toHaveBeenCalled();
+          expect(getDeckCardsForList).toHaveBeenCalledTimes(1);
+          expect(onChanged).not.toHaveBeenCalled();
+          expect(onClose).not.toHaveBeenCalled();
+          fireEvent.press(within(reopenedModal).getByRole("button", { name: s.flashcardsCancel }));
+          await waitFor(() => expect(view.queryByText(s.cardResetConfirm)).toBeNull());
+
+          const retryModal = await openSecondCardConfirmation(view, s, "reset");
+          fireEvent.press(within(retryModal).getByRole("button", { name: s.cardResetProgress }));
+          await waitFor(() => expect(view.queryByText(s.cardResetConfirm)).toBeNull());
+          await waitFor(() => {
+            expect(view.getByText(firstCard.title)).toBeTruthy();
+            expect(view.getByText(secondCard.title)).toBeTruthy();
+          });
+          expect(resetStudyCardProgress).toHaveBeenCalledTimes(2);
+          expect(resetStudyCardProgress).toHaveBeenNthCalledWith(1, mockDatabase, secondCard.deck_id, secondCard.id);
+          expect(resetStudyCardProgress).toHaveBeenNthCalledWith(2, mockDatabase, secondCard.deck_id, secondCard.id);
+          expect(getDeckCardsForList).toHaveBeenCalledTimes(2);
+          expect(getDeckCardsForList).toHaveBeenLastCalledWith(mockDatabase, "deck-1");
+          expect(onChanged).toHaveBeenCalledTimes(1);
+          expect(onClose).not.toHaveBeenCalled();
+          expect(deleteStudyCard).not.toHaveBeenCalled();
+          expect(setStudyCardDueDate).not.toHaveBeenCalled();
+          expect(setStudyCardMarked).not.toHaveBeenCalled();
+          expect(setStudyCardSuspended).not.toHaveBeenCalled();
+          expect(setStudyCardBuried).not.toHaveBeenCalled();
         } finally {
           deferred.reject(failure);
           await act(async () => {
