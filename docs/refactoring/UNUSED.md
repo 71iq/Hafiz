@@ -108,3 +108,9 @@ Verification includes the unchanged full unit suite, strict types, scoped query-
 `rtlComponentRegistryByPath` has no authored caller. RF-084 removes only its unused derived lookup allocation and unsafe cast. The typed registry array, entries, helper, imports and existing inventory suite stay byte-identical. No runtime UI or data changes.
 
 Current Knip must report zero unused files and exports, with `Locale` still the one unused exported type. The two deliberate alias groups, five unlisted dependencies and one external binary remain visible. Real analysis, the unchanged three-case registry suite, strict types, scoped lint and document format run, followed by independent review and primary acceptance. No new browser, app/native build or device/iOS check is claimed.
+
+## RF-085 unused Locale alias, 2026-10-17
+
+RF-085 removes only `export type Locale = keyof typeof strings;`. No authored code consumes that alias. Both language dictionaries and the used `UIStringKey` and `UIStrings` declarations remain byte-identical. No translation, language behavior, content, dependency or runtime change.
+
+Current Knip must report zero unused files, exports and exported types. Two deliberate alias groups, five unlisted dependencies and one external binary remain open for their separate workstreams. Finding exit 1 remains expected and is not a clean overall analysis. The unchanged UI-string contract, strict types, scoped lint, document format and real analysis run with independent review and primary acceptance. No new browser, app/native build or device/iOS check is claimed.

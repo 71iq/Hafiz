@@ -1843,6 +1843,5 @@ export const strings = {
   },
 } as const;
 
-export type Locale = keyof typeof strings;
 export type UIStringKey = keyof typeof strings.en;
 export type UIStrings = { readonly [K in UIStringKey]: string };

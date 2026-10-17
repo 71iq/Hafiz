@@ -4679,12 +4679,17 @@
       ],
       "risk": "low",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "lib/i18n/strings.ts",
         "docs/refactoring/UNUSED.md"
       ],
-      "attempts": 0
+      "attempts": 1,
+      "started_at": "2026-10-17T20:44:50.071276+00:00",
+      "failure": "review stopped at account usage limit; see .ralph/runs/RF-085-1-1792269521539913853/review.jsonl",
+      "completed_at": "2026-10-17T20:46:10.549425+00:00",
+      "evidence": ".ralph/runs/RF-085-1-1792269890072399605",
+      "summary": "Removed only the unused exported Locale alias and copied the prescribed documentation snapshot. No commit, push, package install, or unrelated-file edits were made."
     },
     {
       "id": "RF-086",

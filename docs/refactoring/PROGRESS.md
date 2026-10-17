@@ -423,3 +423,9 @@ The mission is active. This file records durable events; backlog.json owns task 
 - 2026-10-17T20:35:40.608671+00:00 `RF-084` verified. Removed the unused rtlComponentRegistryByPath allocation and copied the prescribed UNUSED.md. The typed registry array and all entries remain unchanged. No commit, push, package install, or reviewer was used. Evidence `.ralph/runs/RF-084-1-1792269245469925178`.
 
 - 2026-10-17. Primary accepts RF-084, local commit 104c7c0. Exact four-line deletion, complete commit scope and all prescribed hashes match; typed registry and existing inventory tests remain unchanged. Checkpoint resumption still runs all five fresh gates and independent Astra. Three cases pass; real Knip now has zero unused files/exports and only Locale type. Record .refactor-baseline/rf084-primary-acceptance.json. Repeat unchanged-scope jscpd retains all 26 identical fragment/file pairs, 563 lines across 180 files/52,590 lines at 1.07055 percent. Thirty-three of 86 verified. No new full-unit/browser/app/native/device/iOS check. RF-085 is ready; after its source/hash primary acceptance, prepare RF-011 dependency ownership or diagnose RF-086 without relaxing tests.
+
+- 2026-10-17T20:38:16.483189+00:00 `RF-085` retry. Batch resource limit reached. Preserved work will be reverified on resume.
+
+- 2026-10-17T20:39:50.307832+00:00 `RF-085` retry. review stopped at account usage limit; see .ralph/runs/RF-085-1-1792269521539913853/review.jsonl. Preserved work will be reverified on resume.
+
+- 2026-10-17T20:46:10.550707+00:00 `RF-085` verified. Removed only the unused exported Locale alias and copied the prescribed documentation snapshot. No commit, push, package install, or unrelated-file edits were made. Evidence `.ralph/runs/RF-085-1-1792269890072399605`.
