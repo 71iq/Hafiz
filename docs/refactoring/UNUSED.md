@@ -114,3 +114,15 @@ Current Knip must report zero unused files and exports, with `Locale` still the 
 RF-085 removes only `export type Locale = keyof typeof strings;`. No authored code consumes that alias. Both language dictionaries and the used `UIStringKey` and `UIStrings` declarations remain byte-identical. No translation, language behavior, content, dependency or runtime change.
 
 Current Knip must report zero unused files, exports and exported types. Two deliberate alias groups, five unlisted dependencies and one external binary remain open for their separate workstreams. Finding exit 1 remains expected and is not a clean overall analysis. The unchanged UI-string contract, strict types, scoped lint, document format and real analysis run with independent review and primary acceptance. No new browser, app/native build or device/iOS check is claimed.
+
+## RF-011 explicit navigation dependency, 2026-10-17
+
+`AppNavigation.tsx` imports `BottomTabBarProps` from `@react-navigation/bottom-tabs`, but the app does not declare that package. RF-011 declares exact version 7.21.0 beside the existing React Navigation dependency. This is the version already installed through Expo Router 55.0.18, whose range is `^7.15.5`. Its native peer range `^7.5.1` matches the installed React Navigation 7.5.1.
+
+Keep the existing type import and navigation implementation. Inferring this public type through Router component props would add coupling without removing the dependency. The declaration records the app's existing dependency in the current navigation family. No SDK, navigation architecture, package version, native module or runtime behavior changes. [npm dependency guidance](https://docs.npmjs.com/specifying-dependencies-and-devdependencies-in-a-package-json-file/), [Expo JavaScript tabs](https://docs.expo.dev/router/advanced/tabs/).
+
+The isolated preflight uses the actual installed package tree against the candidate manifest. Strict offline lock-only resolution passes twice with an identical lock, and `npm ls --all` passes. Every resolved package entry stays identical; only the manifest and lock root gain the declaration. No lifecycle script or icon/database generator runs. The controller owns lock resolution with the same flags.
+
+Fresh Knip must retain zero unused files, exports, types and package dependencies, two deliberate alias groups and one binary, while unlisted dependencies drop from five to four. The remaining names are `expo-updates`, `expo-system-ui`, `sharp` and `react-devtools-core`. RF-008 owns native/config diagnostics; RF-087 owns manual icon-tool dependency preparation; RF-088 owns parent-resolved devtools inspection. No extra runtime package is added just to silence the security diagnostic.
+
+Six fresh gates cover lock resolution, exact bytes/installed graph/actual analysis, strict types, unchanged full unit suite, web export and manifest/document formatting. Independent Astra and primary scope/hash acceptance follow. The resolved native packages are unchanged, so no native rebuild or device/iOS result is claimed. RF-086's intermittent Reset failure remains open; no test or timeout changes are authorized here.

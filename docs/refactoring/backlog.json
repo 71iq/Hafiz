@@ -572,13 +572,17 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "package.json",
         "package-lock.json",
         "docs/refactoring/UNUSED.md"
       ],
-      "attempts": 0
+      "attempts": 1,
+      "started_at": "2026-10-17T20:58:12.710552+00:00",
+      "completed_at": "2026-10-17T21:01:42.169537+00:00",
+      "evidence": ".ralph/runs/RF-011-1-1792270692711855117",
+      "summary": "Implemented RF-011 with the prescribed manifest and documentation changes. package-lock.json remains unchanged for controller-owned resolution."
     },
     {
       "id": "RF-012",
