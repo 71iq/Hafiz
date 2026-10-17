@@ -4507,8 +4507,8 @@
     {
       "id": "RF-083",
       "title": "Remove the unreachable retention-card helper cluster",
-      "description": "Recheck the two unused retention functions and their two private ID builders, then remove only the proven unreachable cluster.",
-      "rationale": "Calibrated analysis reports isRetentionCardSaved/addRetentionCard with no authored caller. Their retentionCardId/mutashabihatCardId builders are used only in that cluster. Leaving those builders after deletion would create more dead code.",
+      "description": "Delete the proven unreachable four-function retention cluster and no other source bytes.",
+      "rationale": "Complete caller/import/SQLite/sync inspection proves the two exported helpers and their two private ID builders have no callers. All live functions retain shared imports and stable behavior; leaving builders would create dead code.",
       "modules": [
         "lib/fsrs/queries.ts",
         "docs/refactoring/UNUSED.md"
@@ -4517,15 +4517,17 @@
         "RF-082"
       ],
       "acceptance_criteria": [
-        "Before approval primary rechecks complete source/callers and the four-function cluster, imports, SQLite/sync invariants and nearest verification evidence.",
-        "Do not alter any live query, ID format, migration, queue behavior, schema, protected input or production data. Approve only exact bounded deletion after readiness is recorded.",
-        "Freeze expected analysis counts and proportional shared-module tests/build commands before execution. This placeholder approves no source change."
+        "Read .refactor-baseline/rf083-readiness.json and rf083-before-gate.log. Primary owns the API/data/security decision. Only lib/fsrs/queries.ts and docs/refactoring/UNUSED.md may change. No worker subagents/reviewers, package installs or evidence/verifier edits. Controller runs the six frozen gates and separate stronger review.",
+        "Delete only mutashabihatCardId, retentionCardId, isRetentionCardSaved and addRetentionCard, exactly 122 lines in the two prescribed contiguous spans. Copy .refactor-baseline/rf083-prescribed-queries.ts byte-for-byte. Preserve every import, live constant/type/function, whitespace and other byte. No whole-file formatter, wrapper, helper, replacement abstraction, dependency or test edit.",
+        "All live word-save, study-card materialization/marking/soft-delete/scheduling, legacy migration and queue behavior remain unchanged. MUTASHABIHAT_DECK_ID still has a session consumer. Shared createEmptyCard/enqueueSync/migrateLegacyRetentionDecks/rowWithDefaultStatus/NON_SMART_CARD_SQL remain required. No database execution/schema/migration, ID, protected input, backend or production change.",
+        "Copy .refactor-baseline/rf083-prescribed-unused.md exactly to docs/refactoring/UNUSED.md. Historical analysis snapshots remain. Real Knip retains zero unused files and only rtlComponentRegistryByPath as unused export, only Locale as unused type, two aliases, five unlisted dependencies and one binary, no unresolved or unused package findings. No config/suppression changes. Finding exit1 is allowed only after valid JSON and expected contents; execution/configuration failures fail.",
+        "All six fresh gates pass: pinned exact-hash/real-analysis verifier, unchanged full unit suite, strict types, scoped query ESLint, web export and doc format. Existing tests remain byte-identical; several UI tests mock query operations and do not prove live database execution. Exact deletion-only comparison preserves surviving semantics. Separate Astra inspects source/callers/imports, report and verification evidence. Primary final full diff/hash acceptance follows controller release. No new native/device/iOS/production check is required or claimed."
       ],
       "verification": [
         [
-          "npm",
-          "run",
-          "typecheck"
+          "python3",
+          "-c",
+          "import hashlib,pathlib,runpy; p=pathlib.Path('.refactor-baseline/rf083-verify.py'); assert hashlib.sha256(p.read_bytes()).hexdigest() == '47a536524a3eda1e06fdb16b0d4cb03961c7ca6df3b7957acac9f51daf053e9b', 'Primary verifier changed'; runpy.run_path(str(p),run_name='__main__')"
         ],
         [
           "npm",
@@ -4535,11 +4537,25 @@
         [
           "npm",
           "run",
+          "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/fsrs/queries.ts"
+        ],
+        [
+          "npm",
+          "run",
           "build:web"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "docs/refactoring/UNUSED.md"
         ]
       ],
       "risk": "medium",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
         "lib/fsrs/queries.ts",
