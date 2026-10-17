@@ -2,7 +2,7 @@ import { localStartOfTomorrow } from "@/lib/date";
 import { gradeCard, State, type Card, type Grade } from "@/lib/fsrs/scheduler";
 import type { DeckReviewSettings, StudyCardRow } from "@/lib/fsrs/types";
 
-export type ReviewRecord = Readonly<{
+type ReviewRecord = Readonly<{
   rating: Grade;
   state: State;
   due: string;

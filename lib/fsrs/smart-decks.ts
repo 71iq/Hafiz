@@ -222,7 +222,7 @@ export async function writeSmartDeckFilter(
   await writeUserSetting(db, smartDeckFilterKey(deckId), JSON.stringify(normalized));
 }
 
-export async function readDefaultDeckFilter(db: SQLiteDatabase): Promise<BuiltInDeckFilter> {
+async function readDefaultDeckFilter(db: SQLiteDatabase): Promise<BuiltInDeckFilter> {
   return await readFilterSetting(db, ALL_DECKS_FILTER_KEY)
     ?? await readFilterSetting(db, smartDeckFilterKey(SMART_DECK_IDS.retention))
     ?? { type: "all" };

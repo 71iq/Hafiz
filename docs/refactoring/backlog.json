@@ -4491,14 +4491,18 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "lib/fsrs/smart-decks.ts",
         "components/ui/MirroredRow.tsx",
         "lib/fsrs/review-transition.ts",
         "docs/refactoring/UNUSED.md"
       ],
-      "attempts": 0
+      "attempts": 1,
+      "started_at": "2026-10-17T20:19:43.628144+00:00",
+      "completed_at": "2026-10-17T20:22:21.735683+00:00",
+      "evidence": ".ralph/runs/RF-082-1-1792268383629640141",
+      "summary": "Implemented RF-082 within the four allowed paths. Removed only the three unnecessary export keywords and copied the prescribed UNUSED.md exactly. No commit, push, package install, or reviewer was used."
     },
     {
       "id": "RF-083",
