@@ -498,13 +498,18 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "components/ui/AuthGate.tsx",
         "tests/rtl/rtl-component-registry.ts",
         "docs/refactoring/UNUSED.md"
       ],
-      "attempts": 0
+      "attempts": 1,
+      "started_at": "2026-10-17T20:11:27.313527+00:00",
+      "failure": "Batch resource limit reached",
+      "completed_at": "2026-10-17T20:13:15.251910+00:00",
+      "evidence": ".ralph/runs/RF-010-1-1792267887315834814",
+      "summary": "Removed the verified-unused AuthGate module and its RTL registry entry, then applied the prescribed UNUSED.md update. No commit, push, browser, native, or device checks performed."
     },
     {
       "id": "RF-011",

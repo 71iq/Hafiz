@@ -48,18 +48,18 @@ Rive's two packages and its required Nitro peer become reachable through platfor
 
 ## Disposition
 
-| Finding                                                                            | Next action                                                                                                                                            |
-| ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `components/ui/AuthGate.tsx`                                                       | RF-010 must confirm no native/web caller and remove only this file plus its RTL registry record. It is not approved for deletion by this report alone. |
-| `readDefaultDeckFilter`, `MirroredPressableRow`, `ReviewRecord`                    | Used inside their own files. RF-082 must assess removing unnecessary exports, preserving implementations.                                              |
-| `isRetentionCardSaved`, `addRetentionCard`, `rtlComponentRegistryByPath`, `Locale` | RF-082 must inspect callers and side effects before preparing exact deletion or visibility tasks.                                                      |
-| `TAFSIR_SOURCES`/`AVAILABLE_TAFSIR_SOURCES`                                        | Same registry object with consumers of both names. Retain pending contextual API review; do not duplicate or alter content.                            |
-| Husary/default recitation constants                                                | Intentional semantic alias covered by `recitations-contract.test.ts`. Retain both names and recitation IDs.                                            |
-| `expo-updates`, `expo-system-ui` in `app.json`                                     | RF-008 owns native/app-config alignment. No dependency install or native regeneration follows from this finding.                                       |
-| `@react-navigation/bottom-tabs` in AppNavigation                                   | RF-011 must inspect direct versus transitive ownership before manifest changes. The original checkout's user edit remains outside this worktree.       |
-| `sharp` in the manual icon generator                                               | RF-011 must document or declare the development requirement after inspecting its use. Do not run the protected asset generator.                        |
-| `react-devtools-core` in security diagnostics                                      | RF-011 must review this intentional inspection of the installed transitive package. Do not add a runtime dependency to silence the report.             |
-| `sqlite3` in the Quran database builder                                            | External tool requirement, not an npm dependency. Keep visible; do not regenerate the database.                                                        |
+| Finding                                                                            | Next action                                                                                                                                                          |
+| ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `components/ui/AuthGate.tsx`                                                       | RF-010 removes the unused component and its RTL registry entry after caller, route and platform analysis. The RF-009 snapshot retains its original negative control. |
+| `readDefaultDeckFilter`, `MirroredPressableRow`, `ReviewRecord`                    | Used inside their own files. RF-082 must assess removing unnecessary exports, preserving implementations.                                                            |
+| `isRetentionCardSaved`, `addRetentionCard`, `rtlComponentRegistryByPath`, `Locale` | RF-082 must inspect callers and side effects before preparing exact deletion or visibility tasks.                                                                    |
+| `TAFSIR_SOURCES`/`AVAILABLE_TAFSIR_SOURCES`                                        | Same registry object with consumers of both names. Retain pending contextual API review; do not duplicate or alter content.                                          |
+| Husary/default recitation constants                                                | Intentional semantic alias covered by `recitations-contract.test.ts`. Retain both names and recitation IDs.                                                          |
+| `expo-updates`, `expo-system-ui` in `app.json`                                     | RF-008 owns native/app-config alignment. No dependency install or native regeneration follows from this finding.                                                     |
+| `@react-navigation/bottom-tabs` in AppNavigation                                   | RF-011 must inspect direct versus transitive ownership before manifest changes. The original checkout's user edit remains outside this worktree.                     |
+| `sharp` in the manual icon generator                                               | RF-011 must document or declare the development requirement after inspecting its use. Do not run the protected asset generator.                                      |
+| `react-devtools-core` in security diagnostics                                      | RF-011 must review this intentional inspection of the installed transitive package. Do not add a runtime dependency to silence the report.                           |
+| `sqlite3` in the Quran database builder                                            | External tool requirement, not an npm dependency. Keep visible; do not regenerate the database.                                                                      |
 
 RF-009 depends on accepted SDK alignment RF-067, not the unresolved RF-008 lint/native-ownership decisions. Static root calibration does not require a lint downgrade or native regeneration.
 
@@ -68,3 +68,13 @@ RF-009 depends on accepted SDK alignment RF-067, not the unresolved RF-008 lint/
 Run `npm run analyze:unused` from the modernization worktree. It remains a report with a nonzero finding exit. Preserve its JSON and stderr before deciding on removals. The two primary preflight reports are `.refactor-baseline/rf009-current-knip.json` and `rf009-candidate-knip.json`; the frozen task gate writes `rf009-fresh-knip.json`. These ignored files persist in this worktree. No blanket ignore, issue threshold or automatic fix option was introduced.
 
 Application tests/builds, native/device checks and dependency/security scans are not rerun for this configuration/documentation task. Latest application evidence remains RF-078's 374 unit tests and 35 Chrome cases. A calibrated analysis cannot establish behavior on a device.
+
+## RF-010 source cleanup, 2026-10-17
+
+The calibrated report identified only `components/ui/AuthGate.tsx` as an unused file. The private Expo Router app discovers routes under `app/`; it does not discover components as routes. AuthGate has no authored import, re-export, dynamic-module or platform-specific caller. Its only non-documentation reference was the RTL registry entry. The live compact sign-in callouts remain unchanged.
+
+RF-010 removes that complete unused module and its single registry entry. Fresh Knip analysis must report zero unused files with the same four live platform entries, exclusions and dependency exceptions. The five export, two type, two duplicate-export, five unlisted-dependency and one external-binary findings remain open. No package, runtime UI, content or generated data changes.
+
+The focused three-case RTL registry suite checks complete coverage, uniqueness, ordering and existing paths. Strict typecheck checks remaining imports; scoped registry lint and this document's formatting also run. No new browser, native build, device or iOS verification is needed for an unreachable module deletion or claimed here.
+
+The RF-009 gate is a historical calibration check and intentionally expects its original AuthGate negative control. Keep its evidence unchanged. RF-010 uses `.refactor-baseline/rf010-verify.py` and writes `rf010-fresh-knip.json`; do not rerun the old task gate and treat its changed snapshot as a regression. Current general analysis remains `npm run analyze:unused`, which still exits 1 for the other open findings.

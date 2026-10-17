@@ -74,7 +74,6 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
   entry("components/settings/TafsirSourcePicker.tsx", "picker-menu", "source", "Tafsir picker rows and selected-state affordances mirror."),
   entry("components/settings/TranslationLanguagePicker.tsx", "picker-menu", "source", "Language picker rows and selected-state affordances mirror."),
   entry("components/ui/AppNavigation.tsx", "app-shell", "source", "Sidebar and bottom nav order/active affordances mirror."),
-  entry("components/ui/AuthGate.tsx", "direction-neutral", "source", "Gate state is mostly centered/neutral; CTA row should inherit direction."),
   entry("components/ui/Button.tsx", "button", "rntl", "Icon/text order uses logical row direction."),
   entry("components/ui/Card.tsx", "card", "source", "Container is direction-neutral; child rows own mirroring."),
   entry("components/ui/ConfirmDialog.tsx", "overlay", "rntl", "Dialog title, close, and action row mirror."),
