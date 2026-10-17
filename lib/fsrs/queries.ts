@@ -320,14 +320,6 @@ function meaningCardId(surah: number, ayah: number, wordPos: number): string {
   return `word:${surah}:${ayah}:${wordPos}`;
 }
 
-function mutashabihatCardId(surah: number, ayah: number): string {
-  return `${MUTASHABIHAT_DECK_ID}:${surah}:${ayah}`;
-}
-
-function retentionCardId(surah: number, ayah: number): string {
-  return `${surah}:${ayah}`;
-}
-
 export async function isMeaningCardSaved(
   db: SQLiteDatabase,
   surah: number,
@@ -431,120 +423,6 @@ export async function addMeaningCard(
       ayah,
       wordPos,
       createdAt: now,
-    }).catch(console.warn);
-  }
-
-  return { created };
-}
-
-export async function isRetentionCardSaved(
-  db: SQLiteDatabase,
-  surah: number,
-  ayah: number
-): Promise<boolean> {
-  const cardId = retentionCardId(surah, ayah);
-  const legacyCardId = mutashabihatCardId(surah, ayah);
-  const row = await db.getFirstAsync<{ c: number }>(
-    `SELECT COUNT(*) as c
-       FROM study_cards
-      WHERE deleted_at IS NULL
-        AND ((id = ? AND deck_id = ? AND marked_at IS NOT NULL)
-         OR (id = ? AND deck_id != ? AND ${NON_SMART_CARD_SQL})
-         OR (id = ? AND deck_id = ?))`,
-    [cardId, SMART_DECK_IDS.retention, cardId, MEANINGS_DECK_ID, legacyCardId, MUTASHABIHAT_DECK_ID]
-  );
-  return (row?.c ?? 0) > 0;
-}
-
-export async function addRetentionCard(
-  db: SQLiteDatabase,
-  surah: number,
-  ayah: number
-): Promise<{ created: boolean }> {
-  await migrateLegacyRetentionDecks(db);
-  const now = new Date().toISOString();
-  const emptyCard = createEmptyCard();
-  const cardId = retentionCardId(surah, ayah);
-
-  const existing = await db.getFirstAsync<StudyCardRow>(
-    "SELECT * FROM study_cards WHERE id = ? AND deck_id = ? AND deleted_at IS NULL",
-    [cardId, SMART_DECK_IDS.retention]
-  );
-  if (existing?.id) {
-    if (existing.marked_at) return { created: false };
-    await updateCard(db, rowWithDefaultStatus({
-      ...existing,
-      marked_at: now,
-      updated_at: now,
-    }));
-    return { created: true };
-  }
-
-  const result = await db.runAsync(
-    `INSERT INTO study_cards
-      (id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days, learning_steps, reps, lapses, state, last_review, suspended_at, buried_until, marked_at, created_at, updated_at, deleted_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
-     ON CONFLICT(id) DO UPDATE SET
-      deck_id = excluded.deck_id,
-      due = excluded.due,
-      stability = excluded.stability,
-      difficulty = excluded.difficulty,
-      elapsed_days = excluded.elapsed_days,
-      scheduled_days = excluded.scheduled_days,
-      learning_steps = excluded.learning_steps,
-      reps = excluded.reps,
-      lapses = excluded.lapses,
-      state = excluded.state,
-      last_review = excluded.last_review,
-      suspended_at = excluded.suspended_at,
-      buried_until = excluded.buried_until,
-      marked_at = excluded.marked_at,
-      created_at = excluded.created_at,
-      updated_at = excluded.updated_at,
-      deleted_at = NULL
-     WHERE study_cards.deleted_at IS NOT NULL`,
-    [
-      cardId,
-      SMART_DECK_IDS.retention,
-      emptyCard.due.toISOString(),
-      emptyCard.stability,
-      emptyCard.difficulty,
-      emptyCard.elapsed_days,
-      emptyCard.scheduled_days,
-      emptyCard.learning_steps,
-      emptyCard.reps,
-      emptyCard.lapses,
-      emptyCard.state,
-      null,
-      null,
-      null,
-      now,
-      now,
-      now,
-    ]
-  );
-
-  const created = (result.changes ?? 0) > 0;
-  if (created) {
-    enqueueSync(db, "study_cards", "INSERT", cardId, {
-      id: cardId,
-      deck_id: SMART_DECK_IDS.retention,
-      due: emptyCard.due.toISOString(),
-      stability: emptyCard.stability,
-      difficulty: emptyCard.difficulty,
-      elapsed_days: emptyCard.elapsed_days,
-      scheduled_days: emptyCard.scheduled_days,
-      learning_steps: emptyCard.learning_steps,
-      reps: emptyCard.reps,
-      lapses: emptyCard.lapses,
-      state: emptyCard.state,
-      last_review: null,
-      suspended_at: null,
-      buried_until: null,
-      marked_at: now,
-      created_at: now,
-      updated_at: now,
-      deleted_at: null,
     }).catch(console.warn);
   }
 

@@ -92,3 +92,13 @@ The two unchanged nearest suites cover real RTL primitives and review transition
 Further source candidates stay separate. RF-083 must recheck the two unused retention functions and their two private ID builders before removal, preserving all live query, migration and synchronization behavior. RF-084 concerns only an unused test-registry lookup map. RF-085 concerns only the unused Locale type declaration and cannot change either language dictionary. Retain both tafsir registry names and both recitation constants with their current values and consumers.
 
 Completed task gates describe their own historical snapshots. Use `npm run analyze:unused` for current general analysis and the selected task's gate for its acceptance. A deliberate later cleanup can change an earlier snapshot without reopening that completed task.
+
+## RF-083 unreachable retention cluster, 2026-10-17
+
+Primary inspection finds no authored caller, re-export or dynamic discovery of `isRetentionCardSaved` or `addRetentionCard`. Their private `retentionCardId` and `mutashabihatCardId` builders have no other consumers. RF-083 deletes exactly those four functions, 122 lines. It adds no replacement abstraction.
+
+All live queries remain byte-identical. This includes word saves, study-card materialization, marking, soft deletion, review scheduling, legacy retention migration and sync queue writes. `MUTASHABIHAT_DECK_ID` remains in use by session parsing. The shared creation, normalization, migration and sync imports remain needed by live functions. Schema, migration, queue, IDs, datasets and production state are unchanged.
+
+Fresh Knip must retain zero unused files and reduce unused exports from three to one, `rtlComponentRegistryByPath`. `Locale` remains the one unused type. Two intentional alias groups, five unlisted dependencies and one external binary remain visible. No configuration or suppression changes. RF-084 and RF-085 own the remaining source declarations after separate primary preparation.
+
+Verification includes the unchanged full unit suite, strict types, scoped query-module lint, web export, documentation formatting and real analysis, followed by separate stronger review and primary acceptance. Existing unit callers mock several query operations; they do not prove database execution. The exact deletion-only byte comparison establishes that every live implementation is unchanged. No database command, native build, device or iOS check is run or claimed for this deletion.

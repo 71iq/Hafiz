@@ -4557,15 +4557,17 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "retry",
+      "status": "verified",
       "allowed_paths": [
         "lib/fsrs/queries.ts",
         "docs/refactoring/UNUSED.md"
       ],
-      "attempts": 1,
-      "started_at": "2026-10-17T20:24:12.121906+00:00",
+      "attempts": 2,
+      "started_at": "2026-10-17T20:28:00.532283+00:00",
       "failure": "Verification failed: ['npm', 'run', 'test:unit']; see .ralph/runs/RF-083-1-1792268652123252954/verify-1.log",
-      "evidence": ".ralph/runs/RF-083-1-1792268652123252954"
+      "evidence": ".ralph/runs/RF-083-2-1792268880533855681",
+      "completed_at": "2026-10-17T20:31:05.345368+00:00",
+      "summary": "RF-083 candidate was already present exactly as prescribed. No additional edits were needed; unrelated backlog changes were preserved. No commit or push performed."
     },
     {
       "id": "RF-084",
