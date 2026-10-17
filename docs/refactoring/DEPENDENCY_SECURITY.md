@@ -56,3 +56,7 @@ This directly tests the nested-input issue. Coverage of other advisories uses ve
 Actual acceptance requires named installation, existing Gradle/CSS-interop fixes, full installed graph and source/lock checks, fresh audit and Knip, the Node suite, both native dependency graphs, strict types, full lint, the unchanged Jest suite, web export, Chrome smoke and formatting. No native compilation, iOS build, physical-device or production operation is claimed for this JavaScript tooling patch. RF-086's intermittent Reset fixture remains open.
 
 Future dependency verification must run `npm run test:dependency-security` along with fresh audit. RF-090 must triage remaining findings into compatible small scopes. Remove or change a security guard only after its replacement proves the same input and installed-copy coverage.
+
+## RF-089 acceptance, 2026-10-18
+
+The controller-installed graph matches the exact seven-entry preflight, and its fresh audit confirms 71 package findings, including 56 high and zero critical. No brace-expansion finding or new advisory source remains. Both Node cases, all 374 Jest cases, strict types, full lint, both native dependency graphs, web export and all 28 Chrome smoke cases pass. All 12 frozen commands and separate Astra review pass. Primary accepts the final hashes and scope after lease release, local commit `9cb438a`. The 71 remaining audit findings and RF-086 remain open. No native compilation, physical-device, iOS build or production check ran.

@@ -18,7 +18,7 @@ No task may delete a platform variant based on Knip alone. No duplicate block is
 
 RF-067 is accepted after fifteen fresh gates, independent evaluation and primary artifact/hash review. RF-008 still owns the two remaining Expo diagnostics; neither a lint downgrade nor native regeneration is approved. RF-068 characterized both actual account callouts before RF-053 extracted their shared inner row while retaining distinct containers. RF-069 and RF-070 characterized both date-editor callers. RF-072 repaired inline session date-save failure visibility with ordered red/green evidence. RF-055 then extracted the controlled sheet using existing Input/Button/overlay primitives and caller-owned native options. All six gates, independent Astra review and primary acceptance pass, local commit9828164. Existing caller tests are unchanged.
 
-The latest full controller gate is RF-011's 66 suites and 374 tests, with its six fresh gates passing. Primary RF-086 diagnosis also reruns the unchanged cold full suite with all 374 cases passing. The latest 35 Chrome cases and rendered UI acceptance remain RF-078's run. Subsequent small deletions use their focused suites, strict types, scoped lint, real analysis and separate Astra review. Thirty-five of 90 items are verified.
+The latest full controller gate is RF-089's 66 suites and 374 tests, with all 12 fresh gates passing, including 28 Chrome smoke cases. Primary RF-086 diagnosis also reruns the unchanged cold full suite with all 374 cases passing. The latest 35 Chrome cases and rendered UI acceptance remain RF-078's run. Subsequent small deletions use their focused suites, strict types, scoped lint, real analysis and separate Astra review. Thirty-six of 90 items are verified.
 
 RF-009 calibrates platform roots. RF-010 removes the unused AuthGate. RF-082 keeps internally used helpers/types private. RF-083 deletes the unreachable retention cluster and RF-084 removes the unused registry index. RF-085 removes the unused Locale line. The current report has zero unused files, exports and exported types. RF-011 declares the existing bottom-tabs dependency without resolved-package changes. Two deliberate aliases, four unlisted dependency findings and one external binary remain visible. No dependency removal is justified by the report.
 
@@ -26,7 +26,7 @@ The repeat duplicate scan reports the same 26 fragment/file pairs and 563 duplic
 
 Session and deck error ownership/recovery repairs are accepted. RF-080's causal test gate detects four original revealed failures while three front cases pass. RF-086 remains open after bounded reproduction of an intermittent existing Reset retry test failure. The original cold suite and five instrumented cold suites pass, but no cause or repair is established. The original failed verification and spent retry remain preserved.
 
-RF-089 is approved for compatible brace-expansion patches after actual local red/green proof. The fresh audit baseline has 74 package findings, 59 high and zero critical; candidate lock has 71/56/zero. RF-090 owns remaining audit families before final completion. No new Sharp dependency is approved.
+RF-089 is accepted after actual local red/green proof, all 12 controller checks, separate Astra and primary final scope/hash inspection. The fresh audit drops from 74 package findings/59 high/zero critical to 71/56/zero, with no remaining brace-expansion finding. RF-090 owns remaining audit families before final completion. No new Sharp dependency is approved.
 
 ## Completion condition
 
