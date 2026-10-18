@@ -5145,7 +5145,7 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "retry",
+      "status": "verified",
       "allowed_paths": [
         "package.json",
         "package-lock.json",
@@ -5154,10 +5154,10 @@
         "metro.config.js",
         "scripts/tests/metro-unicode.test.cjs"
       ],
-      "attempts": 1,
-      "started_at": "2026-10-17T21:44:25.530662+00:00",
-      "failure": "Diagnosed native ASCII expansion after 2 GB heap failure; Unicode preflight passes both targets. Attempt 1 remains spent; awaiting fresh 15-command remaining attempt.",
-      "evidence": ".ralph/runs/RF-091-1-1792273465531985389",
+      "attempts": 2,
+      "started_at": "2026-10-18T02:16:53.939686+00:00",
+      "failure": "Batch resource limit reached",
+      "evidence": ".ralph/runs/RF-091-2-1792289813941047173",
       "resource_failures": [
         {
           "kind": "systemd-oom",
@@ -5173,7 +5173,9 @@
           "evidence": ".refactor-baseline/rf091-unicode-recovery.json",
           "ordinary_attempt_refunded": 0
         }
-      ]
+      ],
+      "completed_at": "2026-10-18T02:22:21.143620+00:00",
+      "summary": "Implemented RF-091 in the five worker-owned artifacts. Preserved the exact prescribed hashes, added Metro Unicode output protection and its regression, retained the nanoid patch/tests, and left package-lock/controller files untouched."
     }
   ]
 }
