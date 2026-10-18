@@ -5333,11 +5333,15 @@
       ],
       "risk": "low",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "jest.config.js"
       ],
-      "attempts": 0
+      "attempts": 1,
+      "started_at": "2026-10-18T06:50:49.273911+00:00",
+      "completed_at": "2026-10-18T06:53:15.110535+00:00",
+      "evidence": ".ralph/runs/RF-093-1-1792306249275326302",
+      "summary": "Implemented RF-093 by adding the exact prescribed Jest module ignore patterns. No commit or push performed."
     }
   ]
 }

@@ -6,6 +6,7 @@ module.exports = {
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/$1",
   },
+  modulePathIgnorePatterns: ["<rootDir>/.refactor-baseline/", "<rootDir>/.ralph/"],
   setupFilesAfterEnv: ["<rootDir>/tests/jest/setup.ts"],
   testMatch: ["<rootDir>/tests/**/*.test.ts", "<rootDir>/tests/**/*.test.tsx"],
   testPathIgnorePatterns: ["/node_modules/", "/tests/e2e/"],
