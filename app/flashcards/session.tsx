@@ -19,6 +19,7 @@ import { interpolate } from "@/lib/i18n/useStrings";
 import type { UIStrings } from "@/lib/i18n/strings";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { DatabaseErrorState } from "@/components/ui/DatabaseErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { Rating, State } from "@/lib/fsrs/scheduler";
 import type { Grade } from "@/lib/fsrs/scheduler";
@@ -162,22 +163,7 @@ export default function FlashcardSessionScreenWrapper() {
   const s = useStrings();
 
   if (error) {
-    return (
-      <View className="flex-1 items-center justify-center bg-surface dark:bg-surface-dark px-6">
-        <Text
-          className="text-red-600 mb-4"
-          style={{ fontFamily: "Manrope_700Bold", fontSize: 18 }}
-        >
-          {s.databaseError}
-        </Text>
-        <Text
-          className="text-red-500 text-center"
-          style={{ fontFamily: "Manrope_400Regular", fontSize: 15 }}
-        >
-          {error}
-        </Text>
-      </View>
-    );
+    return <DatabaseErrorState title={s.databaseError} message={error} />;
   }
 
   if (!isReady) {

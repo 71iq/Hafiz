@@ -1,4 +1,4 @@
-import { Text, View } from "react-native";
+import { DatabaseErrorState } from "@/components/ui/DatabaseErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { ProfileModalContent } from "@/components/profile/ProfileModalContent";
 import { useDatabaseStatus } from "@/lib/database/provider";
@@ -23,14 +23,5 @@ function RouteDatabaseError({ message }: { message: string }) {
   const uiLanguage = getStartupLanguage();
   const s = strings[uiLanguage];
 
-  return (
-    <View className="flex-1 items-center justify-center bg-surface px-6 dark:bg-surface-dark">
-      <Text className="mb-2 text-red-600" style={{ fontFamily: "Manrope_700Bold", fontSize: 18 }}>
-        {s.databaseError}
-      </Text>
-      <Text className="text-center text-red-500" style={{ fontFamily: "Manrope_400Regular", fontSize: 14 }}>
-        {message}
-      </Text>
-    </View>
-  );
+  return <DatabaseErrorState title={s.databaseError} message={message} variant="profile" />;
 }

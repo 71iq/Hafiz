@@ -379,6 +379,12 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
   entry("components/ui/Card.tsx", "card", "source", "Container is direction-neutral; child rows own mirroring."),
   entry("components/ui/ConfirmDialog.tsx", "overlay", "rntl", "Dialog title, close, and action row mirror."),
   entry(
+    "components/ui/DatabaseErrorState.tsx",
+    "feedback",
+    "rntl",
+    "Startup error typography, locale owner and readiness precedence are covered through all six real routes.",
+  ),
+  entry(
     "components/ui/DropdownMenu.tsx",
     "picker-menu",
     "source",

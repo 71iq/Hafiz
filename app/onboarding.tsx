@@ -1,3 +1,4 @@
+import { DatabaseErrorState } from "@/components/ui/DatabaseErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { useDatabase, useDatabaseStatus } from "@/lib/database/provider";
 import { writeUserSetting } from "@/lib/database/user-settings";
@@ -1044,16 +1045,7 @@ export default function OnboardingScreen() {
   const s = useStrings();
 
   if (error) {
-    return (
-      <View className="flex-1 items-center justify-center bg-surface dark:bg-surface-dark px-6">
-        <Text className="text-red-600 mb-4" style={{ fontFamily: "Manrope_700Bold", fontSize: 18 }}>
-          {s.databaseError}
-        </Text>
-        <Text className="text-red-500 text-center" style={{ fontFamily: "Manrope_400Regular", fontSize: 15 }}>
-          {error}
-        </Text>
-      </View>
-    );
+    return <DatabaseErrorState title={s.databaseError} message={error} />;
   }
 
   if (!isReady) {
