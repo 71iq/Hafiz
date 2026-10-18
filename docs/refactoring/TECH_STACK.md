@@ -45,3 +45,9 @@ The 2026-10-16 maintenance check reports ESLint 10.12.0. Current stable eslint-p
 ## SDK 55 runtime alignment
 
 [SDK55_ALIGNMENT.md](SDK55_ALIGNMENT.md) records the accepted patch set, isolated resolver failures, native graph gate and recovery history. RF-067 is verified and accepted, local commit f863a2b. The installed stack uses Expo 55.0.31, React Native 0.83.10, Router 55.0.18 and React/DOM/renderer 19.2.0. The already-used Babel preset is now declared directly. All fifteen fresh controller commands and independent Astra evaluation pass, including web export, 28 browser smoke tests, 322 unit tests and Android debug compilation with all configured ABIs. No iOS/device runtime check ran. Full Doctor still reports the lint-preset mismatch and native/app-config ownership warning, so RF-008 remains unapproved. Independent settings hydration is complete.
+
+## Native Unicode output
+
+RF-091 keeps the existing Expo Metro minifier and changes only `output.ascii_only` to `false`. The old ASCII escapes expanded protected Arabic data past Node's JavaScript string limit. The configured-minifier regression verifies string semantics and complete parsed-value hashes for Quran, glyph and Zilal data. All 2,421 protected input hashes and loader mappings remain identical. Fifteen controller gates, independent Astra and primary acceptance pass, local commit 68f526a.
+
+Both Android/iOS JavaScript exports now pass with one worker and a 4 GB V8 heap under the unchanged 6 GB group cap. Their payloads remain about 530 MB. Preflight reached the cap with pressure and zero OOM; no spare memory is claimed. RF-039 must profile startup and runtime memory on an isolated native target while preserving offline content. JavaScript export does not verify bytecode compilation, APK/iOS native compilation or device behavior.
