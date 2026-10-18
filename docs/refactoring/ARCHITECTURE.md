@@ -38,3 +38,9 @@ No task changes production infrastructure, server RLS, deployed functions, signi
 ## Evaluation
 
 A task is verified only when its controller-run commands pass and a separate read-only agent passes its specification and complete diff. Behavior-sensitive tasks also require recorded rendered/native checks. Missing infrastructure is a blocker with a recovery command. A task cannot certify itself by writing a completion marker.
+
+## Dependency analysis
+
+`npm run analyze:boundaries` checks web source dependencies. `npm run analyze:boundaries:android` and `npm run analyze:boundaries:ios` check each native target. All three use the same rules and installed Expo source-extension order, with platform-specific and native fallbacks. Opposite-platform entry files stay outside that target graph. Protected directories remain excluded; authored files containing words such as public or supabase remain visible.
+
+Routes may compose domain and shared UI code. Domain modules and components/ui cannot import app routes. `npm run check:boundaries` fails on forbidden imports, cycles and unresolved modules across all three targets. The current graphs have none. Reports and checks run without caches or ignored-violation baselines. JSON analysis is report-only because dependency-cruiser 18.6.0 does not propagate violations through that reporter exit code. `npm run test:boundaries` exercises these rules and actual file resolution in isolated fixtures. Reports cover authored source relationships. They do not execute platform branches, traverse external packages, validate RLS or replace Metro exports, native compilation or device checks.

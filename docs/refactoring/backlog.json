@@ -682,7 +682,7 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "scripts/analysis/dependency-cruiser-config.cjs",
         ".dependency-cruiser.cjs",
@@ -692,8 +692,12 @@
         "package.json",
         "docs/refactoring/ARCHITECTURE.md"
       ],
-      "attempts": 0,
-      "readiness_evidence": ".refactor-baseline/rf012-platform-preflight-v1/readiness.json"
+      "attempts": 1,
+      "readiness_evidence": ".refactor-baseline/rf012-platform-preflight-v1/readiness.json",
+      "started_at": "2026-10-18T18:28:08.148242+00:00",
+      "completed_at": "2026-10-18T18:32:37.713356+00:00",
+      "evidence": ".ralph/runs/RF-012-1-1792348088150842301",
+      "summary": "Copied the seven RF-012 readiness artifacts exactly into the approved paths. No commit, push, package install, controller check, or unrelated edit was performed."
     },
     {
       "id": "RF-013",

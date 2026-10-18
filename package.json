@@ -38,7 +38,7 @@
     "format": "prettier . --write --ignore-unknown",
     "analyze:unused": "knip --reporter json",
     "analyze:duplicates": "jscpd --config .jscpd.json",
-    "analyze:boundaries": "depcruise app components lib --config .dependency-cruiser.cjs --output-type json",
+    "analyze:boundaries": "depcruise app components lib --config .dependency-cruiser.cjs --output-type json --no-ignore-known --no-cache",
     "diagnose:expo": "expo-doctor",
     "audit:dependencies": "npm audit --json",
     "format:check": "prettier . --check --ignore-unknown",
@@ -46,7 +46,14 @@
     "refactor:start": "python3 scripts/ralph/control.py start",
     "refactor:resume": "python3 scripts/ralph/control.py resume",
     "refactor:stop": "python3 scripts/ralph/control.py stop",
-    "refactor:status": "python3 scripts/ralph/control.py status"
+    "refactor:status": "python3 scripts/ralph/control.py status",
+    "analyze:boundaries:android": "depcruise app components lib --config .dependency-cruiser.android.cjs --output-type json --no-ignore-known --no-cache",
+    "analyze:boundaries:ios": "depcruise app components lib --config .dependency-cruiser.ios.cjs --output-type json --no-ignore-known --no-cache",
+    "test:boundaries": "node --test --test-reporter=tap scripts/tests/dependency-boundaries.test.cjs",
+    "check:boundaries:web": "depcruise app components lib --config .dependency-cruiser.cjs --output-type err --no-ignore-known --no-cache",
+    "check:boundaries:android": "depcruise app components lib --config .dependency-cruiser.android.cjs --output-type err --no-ignore-known --no-cache",
+    "check:boundaries:ios": "depcruise app components lib --config .dependency-cruiser.ios.cjs --output-type err --no-ignore-known --no-cache",
+    "check:boundaries": "npm run check:boundaries:web && npm run check:boundaries:android && npm run check:boundaries:ios"
   },
   "dependencies": {
     "@expo-google-fonts/manrope": "^0.4.2",
