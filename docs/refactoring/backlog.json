@@ -1776,7 +1776,8 @@
       ],
       "acceptance_criteria": [
         "Record reproducible devices/fixtures, frame/render/interaction metrics and bottlenecks.",
-        "Add only measured actionable follow-up tasks, not blanket memoization."
+        "Add only measured actionable follow-up tasks, not blanket memoization.",
+        "RF-091 measures roughly 530 MB native JavaScript payloads and successful cold exports reaching the 6 GB build cap. Profile native release/cold-start/runtime memory on an isolated device before deciding whether a packaging migration is needed. Preserve all offline content and protected input/mapping hashes; do not delete datasets merely to improve a size metric."
       ],
       "verification": [
         [
@@ -5010,25 +5011,28 @@
     },
     {
       "id": "RF-091",
-      "title": "Patch nanoid within the existing major and guard invalid sizes",
-      "description": "Upgrade only the existing nanoid3.3.12 lock entry to3.3.20 and add real bounded tests across all ten published variants.",
-      "rationale": "Official negative/zero-size fixes fit every existing parent range; navigation consumes the default non-secure API. Scope preserves runtime exports and native packages.",
+      "title": "Patch nanoid and preserve Unicode in native bundles",
+      "description": "Apply the compatible nanoid patch and fix the native export format failure found by its verification, without changing protected inputs.",
+      "rationale": "The existing parent ranges accept 3.3.20. Native verification also reveals ASCII expansion beyond Node string limits; a single format option preserves string values and allows both full platform exports.",
       "modules": [
         "package.json",
         "package-lock.json",
         "scripts/tests/nanoid.test.cjs",
-        "docs/refactoring/DEPENDENCY_SECURITY.md"
+        "docs/refactoring/DEPENDENCY_SECURITY.md",
+        "metro.config.js",
+        "scripts/tests/metro-unicode.test.cjs"
       ],
       "dependencies": [
         "RF-089"
       ],
       "acceptance_criteria": [
-        "Read .refactor-baseline/rf091-readiness.json, preflight.json and probe-note.json. Primary owns security/version/exposure decisions. Copy only three exact rf091-prescribed package/test/dependency-security artifacts to their paths. package-lock.json is controller-owned. Do not install, alter evidence/verifier/limits, spawn helpers/reviewers, run generators, change app/native/backend/protected inputs or commit/push.",
-        "Manifest only appends the nanoid test path to the existing dependency-security script. Existing brace guard and all other package/config/source bytes stay fixed. Named offline update changes exactly node_modules/nanoid3.3.12 to3.3.20, no new override or direct dependency and no unrelated lock entry. Runtime export conditions/order stay identical; only two async type-declaration targets change as recorded.",
+        "Read .refactor-baseline/rf091-readiness.json, rf091-unicode-readiness.json and rf091-unicode-recovery.json plus the original preflight/probe/oom records. Primary owns security, data and format decisions. Copy exactly the five prescribed worker artifacts: package.json, scripts/tests/nanoid.test.cjs, docs/refactoring/DEPENDENCY_SECURITY.md, metro.config.js and scripts/tests/metro-unicode.test.cjs. package-lock.json is controller-owned. Do not install, run heavy frozen checks, spawn helpers/reviewers, modify evidence/verifier/limits, commit/push or touch application/native/backend/protected sources. Report heavy checks pending for the controller.",
+        "Retain the earlier nanoid exact patch and test inputs. Controller named update changes only node_modules/nanoid3.3.12 to3.3.20, no new override or dependency. Existing package/scripts/ranges remain except the prescribed security test path and new test:metro-unicode script. Runtime export paths/order remain, only two upstream async type paths change. Existing brace guard stays byte-identical.",
+        "The only Metro change is the prescribed comment and ascii_only=false setting; no minification bypass, other transform option, resolver, source data, require-map or data-loading change. Preserve all 2,421 protected input hashes in the pinned manifest. Add the exact configured-minifier regression: edge strings and three complete real datasets preserve parsed values; literal Unicode prevents ASCII expansion. Final test is red2pass/1fail before and green3pass/0fail after, zero skips. No assertion/time-limit relaxation.",
         "Preserve the complete exact test source. All44 fresh-process API/input probes per locked copy cover ten secure/nonsecure/CJS/ESM/browser/async files. Normal lengths/alphabets/custom RNG and guarded zero/negative cases must pass. Exact before1pass/2fail and isolated patched3pass/0fail, zero skips. Initial warmed-pool timeout is preserved and fixed by child isolation without relaxed5second/128MB limits, skipped assertion or vendor replacement.",
-        "All13 frozen controller commands pass. Fresh installed and lock-only audits remove nanoid and brace findings with no new advisory source. Keep different graph-scope counts explicit; no blanket security-clean claim. Knip retains zero unused files/exports/types/packages, two aliases/four unlisted/one binary and unchanged config.",
-        "Full existing Jest/types, web, both native dependency graphs, Android and iOS JavaScript exports,28Chrome smoke, format, actual installed graph/audits and all5security tests are mandatory. Native export does not prove APK/iOS native compilation or device behavior. Separate stronger evaluator passes full diff/evidence; primary accepts final hashes/scope after lease release. RF-086 stays open; preserve any failure without editing its tests here.",
-        "Read .refactor-baseline/rf091-native-oom-recovery.json. Prior nine gates passed then the6GB scope OOM stopped simultaneous native export. Primary records one resource failure and refunds only that interrupted attempt. Preserve history. New13command spec needs fresh generation, all fresh gates and stronger review. Sequential one-worker platform exports retain both targets,2GB Node heaps,6GB scope and900s deadlines. A second memory interruption needs primary diagnosis, not another automatic refund. Fresh installed/lock audit snapshots can vary in propagated parent counts; report both and compare source identities, not assumed option causality."
+        "All 15 frozen commands pass, including exact bytes/lock/installed graph/both audits/Knip/protected hashes, five dependency-security cases, three minifier cases, native dependency graphs, strict types, full lint and all existing Jest cases, web export, sequential Android/iOS JavaScript exports,28Chrome smoke cases and format. Fresh audits remove nanoid/brace findings and add no advisory source; parent counts can vary and are not a security-clean claim. Keep calibrated findings visible, no configuration suppression.",
+        "Retain attempt 1 as spent; no second refund. Preserved 2 GB heap failure and 4 GB ASCII serialization failures stay documented. Remaining attempt requires fresh generation/all 15 gates/separate stronger evaluation. No checkpoint editing. Sequential one-worker 4 GB-heap exports retain the original 6 GB group cap, 900s command and all retry/batch/account limits. Preflight passes at cap with memory pressure and 530 MB outputs; RF-039 owns profiling. Native JavaScript export is not bytecode/native build/device verification. Primary final scope/hash acceptance follows lease release; RF-086 stays open.",
+        "Do not print or parse entire generated native bundles or large protected inputs during implementation. Use the exact artifacts, pinned hashes and structured primary metrics. Independent review still examines the complete source diff and actual controller evidence. No production/live-service, asset generation or signing action."
       ],
       "verification": [
         [
@@ -5052,12 +5056,19 @@
         [
           "python3",
           "-c",
-          "import hashlib,pathlib,runpy; p=pathlib.Path('.refactor-baseline/rf091-verify.py'); assert hashlib.sha256(p.read_bytes()).hexdigest() == '8f42b2d7e5deac44d74a4e1c274d04ce42558ddb5f81baf802872719fdac6256', 'Primary verifier changed'; runpy.run_path(str(p),run_name='__main__')"
+          "import hashlib,pathlib,runpy; p=pathlib.Path('.refactor-baseline/rf091-verify.py'); assert hashlib.sha256(p.read_bytes()).hexdigest() == '2cf0e543dc9aece4788ce5b99647d3af72489c9dbf437ad9e04096e510740d0a', 'Primary verifier changed'; runpy.run_path(str(p),run_name='__main__')"
         ],
         [
           "npm",
           "run",
           "test:dependency-security"
+        ],
+        [
+          "env",
+          "NODE_OPTIONS=--max-old-space-size=4096",
+          "npm",
+          "run",
+          "test:metro-unicode"
         ],
         [
           "node",
@@ -5067,6 +5078,11 @@
           "npm",
           "run",
           "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "lint"
         ],
         [
           "npm",
@@ -5081,7 +5097,7 @@
         [
           "env",
           "CI=1",
-          "NODE_OPTIONS=--max-old-space-size=2048",
+          "NODE_OPTIONS=--max-old-space-size=4096",
           "node_modules/.bin/expo",
           "export",
           "--platform",
@@ -5095,7 +5111,7 @@
         [
           "env",
           "CI=1",
-          "NODE_OPTIONS=--max-old-space-size=2048",
+          "NODE_OPTIONS=--max-old-space-size=4096",
           "node_modules/.bin/expo",
           "export",
           "--platform",
@@ -5122,7 +5138,9 @@
           "--check",
           "package.json",
           "scripts/tests/nanoid.test.cjs",
-          "docs/refactoring/DEPENDENCY_SECURITY.md"
+          "docs/refactoring/DEPENDENCY_SECURITY.md",
+          "metro.config.js",
+          "scripts/tests/metro-unicode.test.cjs"
         ]
       ],
       "risk": "medium",
@@ -5132,12 +5150,14 @@
         "package.json",
         "package-lock.json",
         "scripts/tests/nanoid.test.cjs",
-        "docs/refactoring/DEPENDENCY_SECURITY.md"
+        "docs/refactoring/DEPENDENCY_SECURITY.md",
+        "metro.config.js",
+        "scripts/tests/metro-unicode.test.cjs"
       ],
-      "attempts": 0,
-      "started_at": "2026-10-17T21:36:26.218808+00:00",
-      "failure": "Confirmed6GB OOM during simultaneous native export; preserved candidate awaits fresh13-gate sequential-platform recovery.",
-      "evidence": ".ralph/runs/RF-091-1-1792272986220171155",
+      "attempts": 1,
+      "started_at": "2026-10-17T21:44:25.530662+00:00",
+      "failure": "Diagnosed native ASCII expansion after 2 GB heap failure; Unicode preflight passes both targets. Attempt 1 remains spent; awaiting fresh 15-command remaining attempt.",
+      "evidence": ".ralph/runs/RF-091-1-1792273465531985389",
       "resource_failures": [
         {
           "kind": "systemd-oom",
@@ -5145,6 +5165,13 @@
           "scope": "run-p541436-i4744470.scope",
           "evidence": ".refactor-baseline/rf091-native-oom-recovery.json",
           "ordinary_attempt_refunded": 1
+        }
+      ],
+      "diagnoses": [
+        {
+          "at": "2026-10-18T02:13:25.771068+00:00",
+          "evidence": ".refactor-baseline/rf091-unicode-recovery.json",
+          "ordinary_attempt_refunded": 0
         }
       ]
     }
