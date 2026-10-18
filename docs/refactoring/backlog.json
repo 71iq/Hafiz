@@ -5478,7 +5478,7 @@
       ],
       "risk": "low",
       "approved": true,
-      "status": "ready",
+      "status": "pending",
       "allowed_paths": [
         "tests/unit/deck-cards-due-date.test.tsx",
         "tests/unit/session-due-date.test.tsx"
