@@ -19,6 +19,7 @@
     "web": "EXPO_NO_DEV_TOOLS=1 expo start --web",
     "typecheck": "tsc --noEmit",
     "test:unit": "jest --runInBand",
+    "test:jest-config": "node --test --test-reporter=tap scripts/tests/jest-config.test.cjs",
     "test:dependency-security": "node --test --test-reporter=tap scripts/tests/brace-expansion.test.cjs scripts/tests/nanoid.test.cjs scripts/tests/js-yaml.test.cjs",
     "test:metro-unicode": "node --test --test-reporter=tap scripts/tests/metro-unicode.test.cjs",
     "build:web:test": "npm run build:web",

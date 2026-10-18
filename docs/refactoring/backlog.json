@@ -5384,14 +5384,14 @@
       ],
       "risk": "low",
       "approved": true,
-      "status": "retry",
+      "status": "verified",
       "allowed_paths": [
         "package.json",
         "scripts/tests/jest-config.test.cjs"
       ],
-      "attempts": 1,
-      "started_at": "2026-10-18T06:56:47.198360+00:00",
-      "evidence": ".ralph/runs/RF-093-2-1792306607199962627",
+      "attempts": 2,
+      "started_at": "2026-10-18T08:47:59.343768+00:00",
+      "evidence": ".ralph/runs/RF-093-2-1792313279345154767",
       "failure": "Primary diagnosed and credited only the RF-086 external verification blocker after its acceptance. First wildcard specification attempt stays spent. Fresh permanent regression scope, six controller gates and new independent review required. Original second failure remains in primary recovery history.",
       "primary_reviews": [
         {
@@ -5414,7 +5414,9 @@
         "automatic_retry_refund": false,
         "no_checkpoint_edit": true
       },
-      "readiness_evidence": ".refactor-baseline/rf093-primary-recovery.json"
+      "readiness_evidence": ".refactor-baseline/rf093-primary-recovery.json",
+      "completed_at": "2026-10-18T08:50:40.619669+00:00",
+      "summary": "Implemented RF-093 within the two allowed paths. Added the exact Jest-config test script and permanent Node regression. No commit, push, install, or controller-owned verification was performed."
     },
     {
       "id": "RF-094",
