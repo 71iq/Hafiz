@@ -2780,14 +2780,16 @@
     {
       "id": "RF-059",
       "title": "Share the review-setting help sheet",
-      "description": "Share the review-setting help sheet",
-      "rationale": "Group 20 repeats the same feature help overlay in both editors.",
+      "description": "Copy the seven exact prescribed artifacts: share only the identical help overlay through a feature-local component and characterize both real editors. Add one renderer type-only dev package because RNTL public types require its missing declaration. Parent form/service code and every existing registry entry remain unchanged.",
+      "rationale": "One exact 30-line clone is repeated by the two help overlays. The canonical overlay owns lifecycle; parents retain activeInfo and drafts. Twelve real caller cases pass before and after extraction. A real framework declaration is necessary for strict fixture typing; no ambient any or cast workaround.",
       "modules": [
-        "components/flashcards/DeckReviewSettingsSheet.tsx",
-        "components/flashcards/SmartDeckFilterSheet.tsx",
         "components/flashcards/ReviewSettingInfoSheet.tsx",
         "tests/unit/review-setting-info.test.tsx",
-        "tests/rtl/rtl-component-registry.ts"
+        "components/flashcards/DeckReviewSettingsSheet.tsx",
+        "components/flashcards/SmartDeckFilterSheet.tsx",
+        "tests/rtl/rtl-component-registry.ts",
+        "package.json",
+        "package-lock.json"
       ],
       "dependencies": [
         "RF-004",
@@ -2795,36 +2797,95 @@
         "RF-095"
       ],
       "acceptance_criteria": [
-        "Inspect existing overlay patterns. Extract presentation using ResponsiveSheet/header/body with the same open/close conditions.",
-        "Test phone/desktop sizing, title/body, RTL/LTR and dismiss behavior without changing form state.",
-        "RF-095 first isolates existing formatting debt in both callers and the RTL registry. Primary must then freeze the exact shared-overlay scope and rendered characterization before RF-059 approval. Tafsir selection remains a separate RF-014 workstream with concurrency characterization."
+        "Read AGENTS, architecture, conventions, progress, .refactor-baseline/rf059-help-preflight-v1/readiness-with-types.json and the adjacent reuse-map.json/types-readiness.json. Primary owns architecture, dependency choice and acceptance. You are not alone; preserve others edits. No helpers, controller state, policy, resource/retry/provider changes. Copy artifacts only; do not dump the full lock or run installs/full suites as generator. Controller owns installation, checks, review, source commit.",
+        "Copy exactly each readiness artifacts.candidate_path to its corresponding target key. SHA256 {\"components/flashcards/ReviewSettingInfoSheet.tsx\": \"5b2072a0000c5258e5295d56ddacaa4d99c702dfc9c64796cc09e1aaf326b299\", \"tests/unit/review-setting-info.test.tsx\": \"d0f91daa0e059ee16a74b688a482e6576b5a0d761ef6f5001cbaa9246bd5a6d6\", \"components/flashcards/DeckReviewSettingsSheet.tsx\": \"1fa743a774eebd4aff81b9cdea36af18b8ef0a2fda66b3af1006b0ae16d9abb0\", \"components/flashcards/SmartDeckFilterSheet.tsx\": \"0c72a1db1c0cb4cbbd83794c933a35ee2680ab4fb4df689eaf396e2ca2efaadc\", \"tests/rtl/rtl-component-registry.ts\": \"2fa194d6bf23b039a38aeae0ba2bba21d6ad4b44e214fdc104f528febb274614\", \"package.json\": \"2f749c2975353748697174bf5f07c4fbcf28ec242937104f3c74d58b41503952\", \"package-lock.json\": \"acf30de90b12ff380d3607674e6aac1e40e788ba0c20e17ad0b1e7bfa5103cc3\"}. Do not modify any other source/test/config. New component reuses ResponsiveSheet/Header/Body without wrapper views or new overlay behavior; both actual callers import and compose it. Keep parent activeInfo, draft/load/save/error/SQL/callback bytes unchanged outside the single import/help-JSX replacement. Keep every old registry entry and existing test unchanged.",
+        "The exact same 12 RNTL caller tests pass against originals and candidate: two real editors, widths 390/768/1280, Arabic/beige RTL and English/dark LTR, original title/body typography, real native modal geometry/handle, header/backdrop/native-back dismissal, unsaved draft preservation, hidden-parent reset/reopen, and no persistence/materialization/parent-close/save callbacks. Only domain database/service interfaces are mocked. Canonical overlays remain real. Preserve all assertions and owned-mock isolation; no framework mock reset, fake timers, timeout inflation, skip or brittle source-only substitute.",
+        "Installed RNTL declarations import ReactTestInstance from an undeclared type package. Add only exact dev @types/react-test-renderer 19.3.0, supporting TS 5.6 with @types/react*. Current React/renderer 19.2.0 and React types 19.2.14 stay. Original baseline type failure and role-query fixture repair are preserved. Registry package has no scripts/runtime JS. Isolated strict resolution adds one type entry and root dev declaration, with all earlier resolved entries unchanged. Real published types were temporarily linked only for preflight and that link is removed. Actual offline controller install and full installed graph checks are still pending, mandatory, and must not be claimed passed early.",
+        "Run all ten frozen controller commands and a separate stronger evaluator, then primary final scope checks after lease release. Preflight has 67 suites/388 cases, zero skips, strict types, scoped format/lint with two existing warnings and web export. The unchanged scan profile reports 26 groups/562 duplicate lines before and 25/532 after, with the intended help clone removed. Report remaining clones; never shrink scanner scope or claim zero duplication. Fresh scanner/graph output must persist in unique evidence folders.",
+        "The recorded RNTL matrix is rendered native-tree verification, not physical device or manual browser evidence. Wrapper lifecycle, Escape/focus/keyboard code is unchanged and frozen. Later broad UI/device workstreams remain open. No Quran/assets/fonts/data/loaders, backend/native/signing, runtime dependency changes, push/merge/deployment or production operation."
       ],
       "verification": [
         [
+          "python3",
+          "-c",
+          "import hashlib; from pathlib import Path; expected={'components/flashcards/ReviewSettingInfoSheet.tsx': '5b2072a0000c5258e5295d56ddacaa4d99c702dfc9c64796cc09e1aaf326b299', 'tests/unit/review-setting-info.test.tsx': 'd0f91daa0e059ee16a74b688a482e6576b5a0d761ef6f5001cbaa9246bd5a6d6', 'components/flashcards/DeckReviewSettingsSheet.tsx': '1fa743a774eebd4aff81b9cdea36af18b8ef0a2fda66b3af1006b0ae16d9abb0', '.refactor-baseline/rf059-help-preflight-v1/original/components/flashcards/DeckReviewSettingsSheet.tsx': 'bbd9f88cab1effd69898f0d377dd51a1f13e04efd48516d9e4723cc1362e003a', 'components/flashcards/SmartDeckFilterSheet.tsx': '0c72a1db1c0cb4cbbd83794c933a35ee2680ab4fb4df689eaf396e2ca2efaadc', '.refactor-baseline/rf059-help-preflight-v1/original/components/flashcards/SmartDeckFilterSheet.tsx': '069bfb8e5e76a407267db43f9b226a5570d8918195c0ed8c487578de633aad81', 'tests/rtl/rtl-component-registry.ts': '2fa194d6bf23b039a38aeae0ba2bba21d6ad4b44e214fdc104f528febb274614', '.refactor-baseline/rf059-help-preflight-v1/original/tests/rtl/rtl-component-registry.ts': '37000ca2568ae557f9bad7bbfd6643e55153a29fd3bd087eed49e3c41bd9a6ab', 'package.json': '2f749c2975353748697174bf5f07c4fbcf28ec242937104f3c74d58b41503952', '.refactor-baseline/rf059-help-preflight-v1/original/package.json': '5bdf36721f13d9bb710b1ff01dec67af2dd500418a0f996e1aca470639d88aea', 'package-lock.json': 'acf30de90b12ff380d3607674e6aac1e40e788ba0c20e17ad0b1e7bfa5103cc3', '.refactor-baseline/rf059-help-preflight-v1/original/package-lock.json': '63ffd477c21a97003e23b3d2d18d7ee17400cd49b3b1d3f70101b65fa1d7a2f7', '.jscpd.json': '697d52958516d9fad563b5e0a5d98297bab1f801ef0c99dd83e9f6ada20db678', 'jest.config.js': '667b89e890b39a19d3dd10719a854cf2db0d8268f4af99cacf56b77a2653f20b', 'components/ui/ResponsiveOverlay.tsx': '7d9979495d7fcb680743a7d0687cbe94bd3be77fce2e83296b800eecfb829532', 'lib/ui/viewport.ts': '0f43eac8327f99d8c819e05b3efcd3aee84601d9f96216fbc0c2cbe0e672ace8', '.refactor-baseline/rf059-help-preflight-v1/readiness-with-types.json': '3e40f37bb54146127852d7e438c6d4aac81d4e0799b27f7a0440edfaf274f8ac', '.refactor-baseline/rf059-help-preflight-v1/types-readiness.json': 'faf28171acc744e39858e0dafa1adc931bf98626836114de5878419df0405712', '.refactor-baseline/rf059-help-preflight-v1/duplicates-before/jscpd-report.json': 'c8d8bc2fdac780c4e4058ad6d820f8c21f7528f68e7482d9a282202edd35ad78'}; bad=[p for p,h in expected.items() if hashlib.sha256(Path(p).read_bytes()).hexdigest()!=h]; assert not bad,bad; print('Seven prescribed files and unchanged originals/overlay/viewport/config/readiness hashes match')"
+        ],
+        [
           "npm",
-          "run",
-          "test:unit",
-          "--",
+          "install",
+          "--offline",
+          "--ignore-scripts",
+          "--strict-peer-deps",
+          "--no-audit",
+          "--no-fund"
+        ],
+        [
+          "python3",
+          "-c",
+          "import pathlib,json,hashlib,subprocess,time\nb=pathlib.Path('.refactor-baseline/rf059-help-preflight-v1');r=json.loads((b/'readiness-with-types.json').read_text())\nfor p in ['package.json','package-lock.json']:\n assert hashlib.sha256(pathlib.Path(p).read_bytes()).hexdigest()==r['artifacts'][p]['candidate_sha256'],p\nold=json.loads(pathlib.Path(r['artifacts']['package-lock.json']['original_path']).read_text());new=json.loads(pathlib.Path('package-lock.json').read_text());a=old['packages'];z=new['packages']\nassert sorted(set(z)-set(a))==['node_modules/@types/react-test-renderer'] and not set(a)-set(z)\nassert [k for k in a.keys()&z.keys() if a[k]!=z[k]]==['']\nroot=json.loads(json.dumps(z['']));assert root['devDependencies'].pop('@types/react-test-renderer')=='19.3.0';assert root==a['']\nassert {k:v for k,v in old.items() if k!='packages'}=={k:v for k,v in new.items() if k!='packages'}\npkg=pathlib.Path('node_modules/@types/react-test-renderer');assert pkg.is_dir() and not pkg.is_symlink(),'Actual controller installation required'\nmeta=json.loads((pkg/'package.json').read_text());assert meta['version']=='19.3.0' and meta['dependencies']=={'@types/react':'*'} and not meta.get('scripts')\nassert hashlib.sha256((pkg/'index.d.ts').read_bytes()).hexdigest()=='df508df6a1aadae4499d327c2360816978e28839560c044099e4acffcde5489d'\nfor p in ['components/flashcards/DeckReviewSettingsSheet.tsx','components/flashcards/SmartDeckFilterSheet.tsx']:\n restored=pathlib.Path(p).read_text().replace(r['caller_import'],'',1).replace(r['caller_replacement'],r['caller_inline_block'],1)\n assert restored==pathlib.Path(r['artifacts'][p]['original_path']).read_text(),'Parent state/service drift: '+p\np='tests/rtl/rtl-component-registry.ts';assert pathlib.Path(p).read_text().replace(r['registry_insert'],'',1)==pathlib.Path(r['artifacts'][p]['original_path']).read_text()\nq=subprocess.run(['npm','ls','--all','--json'],capture_output=True,text=True);d=pathlib.Path('.refactor-baseline/rf059-controller-graph')/str(time.time_ns());d.mkdir(parents=True);(d/'graph.json').write_text(q.stdout);(d/'graph.stderr').write_text(q.stderr);assert q.returncode==0,'Full installed graph invalid; see '+str(d)\nprint('Actual exact renderer types installed, all previous resolved entries unchanged, full peer graph valid, caller state/service bytes and registry entries preserved. Evidence',d)\n"
+        ],
+        [
+          "node_modules/.bin/jest",
+          "--runInBand",
+          "--no-cache",
           "--runTestsByPath",
           "tests/unit/review-setting-info.test.tsx"
         ],
         [
           "npm",
           "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "npm",
+          "run",
           "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "components/flashcards/ReviewSettingInfoSheet.tsx",
+          "tests/unit/review-setting-info.test.tsx",
+          "components/flashcards/DeckReviewSettingsSheet.tsx",
+          "components/flashcards/SmartDeckFilterSheet.tsx",
+          "tests/rtl/rtl-component-registry.ts"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "components/flashcards/ReviewSettingInfoSheet.tsx",
+          "tests/unit/review-setting-info.test.tsx",
+          "components/flashcards/DeckReviewSettingsSheet.tsx",
+          "components/flashcards/SmartDeckFilterSheet.tsx",
+          "tests/rtl/rtl-component-registry.ts",
+          "package.json"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "python3",
+          "-c",
+          "import pathlib,json,hashlib,subprocess,time\nb=pathlib.Path('.refactor-baseline/rf059-help-preflight-v1');before_path=b/'duplicates-before/jscpd-report.json'\nassert hashlib.sha256(pathlib.Path('.jscpd.json').read_bytes()).hexdigest()=='697d52958516d9fad563b5e0a5d98297bab1f801ef0c99dd83e9f6ada20db678'\nassert hashlib.sha256(before_path.read_bytes()).hexdigest()=='c8d8bc2fdac780c4e4058ad6d820f8c21f7528f68e7482d9a282202edd35ad78'\nbefore=json.loads(before_path.read_text());out=pathlib.Path('.refactor-baseline/rf059-controller-duplicates')/str(time.time_ns());out.mkdir(parents=True)\nq=subprocess.run(['node_modules/.bin/jscpd','--config','.jscpd.json','--output',str(out)],capture_output=True,text=True);(out/'scanner.log').write_text(q.stdout+q.stderr);assert q.returncode==0\nreport=json.loads((out/'jscpd-report.json').read_text())\ndef help_clone(d):\n names=[d['firstFile']['name'],d['secondFile']['name']]\n return any('DeckReviewSettingsSheet.tsx' in n for n in names) and any('SmartDeckFilterSheet.tsx' in n for n in names) and 'open={visible && activeInfo !== null}' in d['fragment']\nassert sum(help_clone(d) for d in before['duplicates'])==1\nassert not any(help_clone(d) for d in report['duplicates']),'Duplicated help overlay remains'\nassert report['statistics']['total']['sources']>=before['statistics']['total']['sources'],'Analysis source coverage shrank'\nprint('Same scanner profile; intended help clone removed. Before',before['statistics']['total'],'After',report['statistics']['total'],'Evidence',out)\n"
         ]
       ],
       "risk": "medium",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
-        "components/flashcards/DeckReviewSettingsSheet.tsx",
-        "components/flashcards/SmartDeckFilterSheet.tsx",
         "components/flashcards/ReviewSettingInfoSheet.tsx",
         "tests/unit/review-setting-info.test.tsx",
-        "tests/rtl/rtl-component-registry.ts"
+        "components/flashcards/DeckReviewSettingsSheet.tsx",
+        "components/flashcards/SmartDeckFilterSheet.tsx",
+        "tests/rtl/rtl-component-registry.ts",
+        "package.json",
+        "package-lock.json"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "readiness_evidence": ".refactor-baseline/rf059-help-preflight-v1/readiness-with-types.json"
     },
     {
       "id": "RF-060",
