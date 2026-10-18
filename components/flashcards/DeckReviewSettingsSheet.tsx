@@ -8,10 +8,7 @@ import { Switch } from "@/components/ui/Switch";
 import { useDatabase } from "@/lib/database/provider";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { toArabicNumber } from "@/lib/arabic";
-import {
-  readDeckReviewSettings,
-  writeDeckReviewSettings,
-} from "@/lib/fsrs/queries";
+import { readDeckReviewSettings, writeDeckReviewSettings } from "@/lib/fsrs/queries";
 import {
   ALL_NEW_CARD_SORT_ORDERS,
   ALL_NEW_REVIEW_ORDERS,
@@ -77,7 +74,9 @@ export function DeckReviewSettingsSheet({ visible, deckId, deckTitle, mode, onCl
   const [enableFuzz, setEnableFuzz] = useState(DEFAULT_DECK_ENABLE_FUZZ);
   const [enableShortTerm, setEnableShortTerm] = useState(DEFAULT_DECK_ENABLE_SHORT_TERM);
   const [learningStepsText, setLearningStepsText] = useState(() => formatStepText(DEFAULT_DECK_LEARNING_STEPS, isRTL));
-  const [relearningStepsText, setRelearningStepsText] = useState(() => formatStepText(DEFAULT_DECK_RELEARNING_STEPS, isRTL));
+  const [relearningStepsText, setRelearningStepsText] = useState(() =>
+    formatStepText(DEFAULT_DECK_RELEARNING_STEPS, isRTL),
+  );
   const [newReviewOrder, setNewReviewOrder] = useState<NewReviewOrder>(DEFAULT_NEW_REVIEW_ORDER);
   const [reviewSortOrder, setReviewSortOrder] = useState<ReviewSortOrder>(DEFAULT_REVIEW_SORT_ORDER);
   const [newCardSortOrder, setNewCardSortOrder] = useState<NewCardSortOrder>(DEFAULT_NEW_CARD_SORT_ORDER);
@@ -113,26 +112,28 @@ export function DeckReviewSettingsSheet({ visible, deckId, deckTitle, mode, onCl
   useEffect(() => {
     if (!visible || !deckId) return;
     let cancelled = false;
-    readDeckReviewSettings(db, deckId).then((settings) => {
-      if (cancelled) return;
-      setError(null);
-      setDailyLimit(settings.dailyReviewLimit);
-      setNewCardsLimit(settings.newCardsLimit);
-      setRequestRetention(settings.requestRetention);
-      setMaximumInterval(settings.maximumInterval);
-      setEnableFuzz(settings.enableFuzz);
-      setEnableShortTerm(settings.enableShortTerm);
-      setLearningStepsText(formatStepText(settings.learningSteps, isRTL));
-      setRelearningStepsText(formatStepText(settings.relearningSteps, isRTL));
-      setNewReviewOrder(settings.newReviewOrder);
-      setReviewSortOrder(settings.reviewSortOrder);
-      setNewCardSortOrder(settings.newCardSortOrder);
-      setTestModes(settings.testModes);
-      setWordTestModes(settings.wordTestModes);
-    }).catch((e) => {
-      console.warn("[DeckReviewSettingsSheet] Failed to load settings:", e);
-      if (!cancelled) setError(s.genericActionFailed);
-    });
+    readDeckReviewSettings(db, deckId)
+      .then((settings) => {
+        if (cancelled) return;
+        setError(null);
+        setDailyLimit(settings.dailyReviewLimit);
+        setNewCardsLimit(settings.newCardsLimit);
+        setRequestRetention(settings.requestRetention);
+        setMaximumInterval(settings.maximumInterval);
+        setEnableFuzz(settings.enableFuzz);
+        setEnableShortTerm(settings.enableShortTerm);
+        setLearningStepsText(formatStepText(settings.learningSteps, isRTL));
+        setRelearningStepsText(formatStepText(settings.relearningSteps, isRTL));
+        setNewReviewOrder(settings.newReviewOrder);
+        setReviewSortOrder(settings.reviewSortOrder);
+        setNewCardSortOrder(settings.newCardSortOrder);
+        setTestModes(settings.testModes);
+        setWordTestModes(settings.wordTestModes);
+      })
+      .catch((e) => {
+        console.warn("[DeckReviewSettingsSheet] Failed to load settings:", e);
+        if (!cancelled) setError(s.genericActionFailed);
+      });
     return () => {
       cancelled = true;
     };
@@ -227,63 +228,47 @@ export function DeckReviewSettingsSheet({ visible, deckId, deckTitle, mode, onCl
           flexWrap: compact ? "wrap" : "nowrap",
         }}
       >
-        {mode === "word" ? (
-          ALL_WORD_TEST_MODES.map((item) => (
-            <ReviewSwitchRow
-              key={item}
-              label={wordModeLabels[item]}
-              value={wordTestModes.includes(item)}
-              onValueChange={() => toggleWordMode(item)}
-              info={wordModeInfo[item]}
-              infoAccessibilityLabel={s.deckReviewSettingsInfoButton}
-              onInfoPress={() => openSettingInfo(wordModeLabels[item], wordModeInfo[item])}
-              compact={compact}
-              isDark={isDark}
-              isRTL={isRTL}
-              quiet
-            />
-          ))
-        ) : (
-          ALL_TEST_MODES.map((item) => (
-            <ReviewSwitchRow
-              key={item}
-              label={testModeLabels[item]}
-              value={testModes.includes(item)}
-              onValueChange={() => toggleTestMode(item)}
-              info={testModeInfo[item]}
-              infoAccessibilityLabel={s.deckReviewSettingsInfoButton}
-              onInfoPress={() => openSettingInfo(testModeLabels[item], testModeInfo[item])}
-              compact={compact}
-              isDark={isDark}
-              isRTL={isRTL}
-              quiet={false}
-            />
-          ))
-        )}
+        {mode === "word"
+          ? ALL_WORD_TEST_MODES.map((item) => (
+              <ReviewSwitchRow
+                key={item}
+                label={wordModeLabels[item]}
+                value={wordTestModes.includes(item)}
+                onValueChange={() => toggleWordMode(item)}
+                info={wordModeInfo[item]}
+                infoAccessibilityLabel={s.deckReviewSettingsInfoButton}
+                onInfoPress={() => openSettingInfo(wordModeLabels[item], wordModeInfo[item])}
+                compact={compact}
+                isDark={isDark}
+                isRTL={isRTL}
+                quiet
+              />
+            ))
+          : ALL_TEST_MODES.map((item) => (
+              <ReviewSwitchRow
+                key={item}
+                label={testModeLabels[item]}
+                value={testModes.includes(item)}
+                onValueChange={() => toggleTestMode(item)}
+                info={testModeInfo[item]}
+                infoAccessibilityLabel={s.deckReviewSettingsInfoButton}
+                onInfoPress={() => openSettingInfo(testModeLabels[item], testModeInfo[item])}
+                compact={compact}
+                isDark={isDark}
+                isRTL={isRTL}
+                quiet={false}
+              />
+            ))}
       </View>
     </SettingsSection>
   );
 
   return (
     <>
-      <ResponsiveSheet
-        open={visible}
-        onClose={onClose}
-        maxWidth={680}
-        maxHeight="92%"
-        dir={isRTL ? "rtl" : "ltr"}
-      >
-        <OverlayHeader
-          title={s.deckReviewSettingsTitle}
-          onClose={onClose}
-          isRTL={isRTL}
-          showHandle={isPhone}
-        />
+      <ResponsiveSheet open={visible} onClose={onClose} maxWidth={680} maxHeight="92%" dir={isRTL ? "rtl" : "ltr"}>
+        <OverlayHeader title={s.deckReviewSettingsTitle} onClose={onClose} isRTL={isRTL} showHandle={isPhone} />
 
-        <OverlayBody
-          contentContainerClassName="px-5 pb-8"
-          contentContainerStyle={{ direction: isRTL ? "rtl" : "ltr" }}
-        >
+        <OverlayBody contentContainerClassName="px-5 pb-8" contentContainerStyle={{ direction: isRTL ? "rtl" : "ltr" }}>
           <Text
             className="mb-4 text-charcoal dark:text-neutral-100"
             style={{
@@ -366,10 +351,7 @@ export function DeckReviewSettingsSheet({ visible, deckId, deckTitle, mode, onCl
           isRTL={isRTL}
           showHandle={isPhone}
         />
-        <OverlayBody
-          contentContainerClassName="px-5 py-5"
-          contentContainerStyle={{ direction: isRTL ? "rtl" : "ltr" }}
-        >
+        <OverlayBody contentContainerClassName="px-5 py-5" contentContainerStyle={{ direction: isRTL ? "rtl" : "ltr" }}>
           <Text
             className="text-charcoal dark:text-neutral-200"
             style={{
@@ -404,7 +386,18 @@ function formatArabicStep(step: SchedulerStep): string {
   const match = step.match(STEP_TEXT_RE);
   if (!match) return step;
   const value = Number(match[1]);
-  const unit = match[2] === "m" ? (value === 1 ? "دقيقة" : "دقائق") : match[2] === "h" ? (value === 1 ? "ساعة" : "ساعات") : (value === 1 ? "يوم" : "أيام");
+  const unit =
+    match[2] === "m"
+      ? value === 1
+        ? "دقيقة"
+        : "دقائق"
+      : match[2] === "h"
+        ? value === 1
+          ? "ساعة"
+          : "ساعات"
+        : value === 1
+          ? "يوم"
+          : "أيام";
   return `${toArabicNumber(value)} ${unit}`;
 }
 
@@ -796,9 +789,7 @@ function SettingsRow({
           {subtitle}
         </Text>
       </View>
-      <View style={{ alignSelf: compact ? "center" : isRTL ? "flex-end" : "flex-start" }}>
-        {children}
-      </View>
+      <View style={{ alignSelf: compact ? "center" : isRTL ? "flex-end" : "flex-start" }}>{children}</View>
     </View>
   );
 }
@@ -1032,10 +1023,7 @@ function ReviewStepper({
         <Minus size={17} color={iconColor} />
       </Pressable>
       <View className="min-w-16 items-center justify-center px-3">
-        <Text
-          className="text-charcoal dark:text-neutral-100"
-          style={{ fontFamily: "Manrope_700Bold", fontSize: 14 }}
-        >
+        <Text className="text-charcoal dark:text-neutral-100" style={{ fontFamily: "Manrope_700Bold", fontSize: 14 }}>
           {value}
         </Text>
       </View>
@@ -1146,7 +1134,11 @@ function SettingTitle({
   return (
     <View
       className="min-w-0 items-center gap-1.5"
-      style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row", alignSelf: isRTL ? "flex-end" : "flex-start" }}
+      style={{
+        direction: "ltr",
+        flexDirection: isRTL ? "row-reverse" : "row",
+        alignSelf: isRTL ? "flex-end" : "flex-start",
+      }}
     >
       <Text
         className="text-charcoal dark:text-neutral-200"
