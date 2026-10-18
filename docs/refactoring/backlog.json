@@ -2260,37 +2260,59 @@
     },
     {
       "id": "RF-051",
-      "title": "Characterize and consolidate route database-error presentation",
-      "description": "Characterize and consolidate route database-error presentation",
-      "rationale": "Clone groups 0,1,2 and 14 repeat readiness/error presentation; locale and provider placement differ.",
+      "title": "Share startup database-error presentation",
+      "description": "Copy nine exact prepared artifacts: one controlled error presenter with existing startup/profile typography variants, six presentation-only route substitutions, one real-route regression and the sorted RTL registry entry. Preserve all readiness, language and provider ownership.",
+      "rationale": "Four repeated error-presentation clone groups contribute 108 duplicated lines. Actual six-route characterization proves two different title-language owners, error-before-ready behavior, loading progress passthrough and exact native typography/classes. A controlled presenter replaces only markup; no readiness hook, error recovery or database abstraction.",
       "modules": [
+        "components/ui/DatabaseErrorState.tsx",
+        "tests/unit/database-error-state.test.tsx",
         "app/(tabs)/_layout.tsx",
         "app/flashcards/session.tsx",
         "app/flashcards/vocab.tsx",
         "app/onboarding.tsx",
         "app/profile/index.tsx",
         "app/profile/[userId].tsx",
-        "components/ui/DatabaseErrorState.tsx",
-        "tests/unit/database-error-state.test.tsx",
         "tests/rtl/rtl-component-registry.ts"
       ],
       "dependencies": [
         "RF-004",
-        "RF-006"
+        "RF-006",
+        "RF-059"
       ],
       "acceptance_criteria": [
-        "Inspect existing ErrorBoundary, EmptyState and complete readiness branches before creating a presenter.",
-        "Characterize current typography, titles, error text and provider/language placement. Reuse a presentation-only owner, with explicit existing variants.",
-        "Keep readiness gating and language lookup in their current owners. Split migration if more than two callers make one session too broad."
+        "Read project instructions, architecture, conventions, progress, .refactor-baseline/rf051-startup-errors-preflight-v1/readiness.json and reuse-map.json. Primary owns architecture and final acceptance. You are not alone; preserve others edits. No helpers, controller/status/resource/retry/provider changes. Generator copies prescribed artifacts only, reports hashes and diff scope, and leaves all checks/review/commits to controller. No installs, full file dumps, protected inputs or production work.",
+        "Copy exactly each readiness artifacts.candidate_path to its target key. SHA256 {\"app/(tabs)/_layout.tsx\": \"93eeff5c7299f373ed839ef6b6e1cdd7ae2121aac19afc13aa45e6404eb70ac4\", \"app/flashcards/session.tsx\": \"b3cd2999fb723e05e1c7a093e8f59a749a9161b0824b728f619c55db58439351\", \"app/flashcards/vocab.tsx\": \"497242201a7bb6664d967b03bf3a58d9a11c9245ff43576079a2be2ab17346bc\", \"app/onboarding.tsx\": \"bfc260f8939ad5337a016eefecffe8b399b55bc273f0d4f748466dcdcdceaa03\", \"app/profile/[userId].tsx\": \"c5143ee5d4a4c9385af4663ad300eab9177be93c7d6f6b97c22f23dc9cad9aa4\", \"app/profile/index.tsx\": \"7b38844d268fc2242d1a581ba8fcdc43c83316ebe852e104d16dc1ae3af6b7cd\", \"components/ui/DatabaseErrorState.tsx\": \"959577e3e0211de9a0054d60b02589a4c37e304ebbfdf479e19e410c45f1b3ff\", \"tests/rtl/rtl-component-registry.ts\": \"2ffcd4ad20cf4cd5807862460ed59268a0a64c46945f4a79098fac1d875f48ea\", \"tests/unit/database-error-state.test.tsx\": \"4d04a9e590755fa1831e211ab710db10683696f80649b74505e0a13c38435b11\"}. The nine-file scope is bounded mechanical copying; primary already inspected all six wrappers and full rendered matrix. Do not refactor other route content or change imports beyond prescribed exact removals/additions.",
+        "DatabaseErrorState is a controlled RN Text/View presenter, with default startup and explicit profile variant. Keep existing classes, font families, title 18, body startup 15/profile 14, title mb-4/mb-2. Shared Text adds default direction/leading/theme styles; its inspected contract does not preserve these startup bytes. EmptyState and ErrorBoundary have different icon/provider/reset semantics. No new primitive, state, provider, behavior or data access.",
+        "Keep each existing useStrings/startup-language lookup, error truthiness and precedence, LoadingScreen/progress, SettingsProvider placement, public-profile parameter and all ready content in the current route. Two private profile locale helpers remain intentional owners. Reversing only exact readiness.edits must reproduce all original route and registry bytes. Remove only now-unused native Text/View imports. Existing tests/entries remain unchanged.",
+        "The identical 12 real-route cases pass before/after on all six original/default exports. Arabic/English startup language deliberately differs from settings context to prove ownership; 390/1280 widths, error when ready false/true, literal message/newline, two typography variants, root with exactly two native text children, loading/progress and provider exclusion, zero database/remote/navigation access. Actual startup lookup/useStrings/LoadingScreen/error UI remain real. Only domain service boundaries and unmounted native Worklets AppNavigation are stubbed. No global mock reset/fake timers, skip, assertion weakening, timeout inflation or new package.",
+        "Final primary preflight passes all 68 suites/400 cold cases without skips, 12 focused cases, strict types, scoped lint and web export. Five pre-existing session import/hooks warnings remain with identical messages and zero new warnings. New presenter/test and already formatted registry pass Prettier; six route files retain existing formatting debt outside exact import/error substitutions. No broad formatter rewrite or rule suppression. Fresh controller runs all nine frozen gates and a separate stronger evaluator; primary then checks final scope after lease release.",
+        "The unchanged jscpd profile removes four intended markup clones: 25 groups/532 lines before, 21/424 after, sources 181 to 182. Persist a fresh uniquely named report. Do not reduce scan scope, generalize readiness/language policy to chase similarity, or claim zero duplication. Prior Worklets/storage fixture import failures, interop-wrapper selector correction, registry ordering failure and unused-import cleanup remain preserved in evidence.",
+        "RNTL is native-tree verification, not physical-device, manual browser, native compilation or full ready-content verification. Full route byte proofs preserve those untouched branches. Later broad UI/native workstreams remain open. No backend, auth, sync, assets/Quran/fonts/data/loaders, native/signing, runtime dependency, push/merge/deploy or production change."
       ],
       "verification": [
+        [
+          "python3",
+          "-c",
+          "import hashlib;from pathlib import Path;expected={'components/ui/DatabaseErrorState.tsx': '959577e3e0211de9a0054d60b02589a4c37e304ebbfdf479e19e410c45f1b3ff', 'tests/unit/database-error-state.test.tsx': '4d04a9e590755fa1831e211ab710db10683696f80649b74505e0a13c38435b11', 'app/(tabs)/_layout.tsx': '93eeff5c7299f373ed839ef6b6e1cdd7ae2121aac19afc13aa45e6404eb70ac4', 'app/flashcards/session.tsx': 'b3cd2999fb723e05e1c7a093e8f59a749a9161b0824b728f619c55db58439351', 'app/flashcards/vocab.tsx': '497242201a7bb6664d967b03bf3a58d9a11c9245ff43576079a2be2ab17346bc', 'app/onboarding.tsx': 'bfc260f8939ad5337a016eefecffe8b399b55bc273f0d4f748466dcdcdceaa03', 'app/profile/index.tsx': '7b38844d268fc2242d1a581ba8fcdc43c83316ebe852e104d16dc1ae3af6b7cd', 'app/profile/[userId].tsx': 'c5143ee5d4a4c9385af4663ad300eab9177be93c7d6f6b97c22f23dc9cad9aa4', 'tests/rtl/rtl-component-registry.ts': '2ffcd4ad20cf4cd5807862460ed59268a0a64c46945f4a79098fac1d875f48ea', '.refactor-baseline/rf051-startup-errors-preflight-v1/original/app/(tabs)/_layout.tsx': '03b26593640ba522a711b0cadfabe6af8400da3a843616a56c81ec9f0fa1297f', '.refactor-baseline/rf051-startup-errors-preflight-v1/original/app/flashcards/session.tsx': 'c6c40bdcd71cbbf8d26906b81724bb18521df9c3948afa4e9e873b16385a3e4b', '.refactor-baseline/rf051-startup-errors-preflight-v1/original/app/flashcards/vocab.tsx': '70689625290313b830c7061fd77804641de69760a407faac553d59ecf26f7b87', '.refactor-baseline/rf051-startup-errors-preflight-v1/original/app/onboarding.tsx': '49e7baae098dd8984e27840228dabbe35fb863f12af73baf0a602371b820fb72', '.refactor-baseline/rf051-startup-errors-preflight-v1/original/app/profile/index.tsx': '254a975a7a9cd19cf631f0cffed5929149217fc9c1e2aee464662b6b35d2d702', '.refactor-baseline/rf051-startup-errors-preflight-v1/original/app/profile/[userId].tsx': 'dabbdd2187cb99f94630e1a5e7063cc0491104294d75a362ec8a89533227e270', '.refactor-baseline/rf051-startup-errors-preflight-v1/original/tests/rtl/rtl-component-registry.ts': '2fa194d6bf23b039a38aeae0ba2bba21d6ad4b44e214fdc104f528febb274614', 'package.json': '2f749c2975353748697174bf5f07c4fbcf28ec242937104f3c74d58b41503952', 'package-lock.json': 'acf30de90b12ff380d3607674e6aac1e40e788ba0c20e17ad0b1e7bfa5103cc3', 'jest.config.js': '667b89e890b39a19d3dd10719a854cf2db0d8268f4af99cacf56b77a2653f20b', '.jscpd.json': '697d52958516d9fad563b5e0a5d98297bab1f801ef0c99dd83e9f6ada20db678', 'components/LoadingScreen.tsx': '9937afb1369f4ac9f55f6313893b89fda176bc63c073eb446a642479f65cdeff', 'components/ui/Text.tsx': '6c15a1e116da7ea6a276942a78cb4d873056708b2069d51914cd530789073ecf', 'components/ui/EmptyState.tsx': '9ea66d098e76e770c5e2bc3e2e4a4de8408ad6c304126ec8f3cafea3d31d4d63', 'components/ui/ErrorBoundary.tsx': 'aa73e879b483c253a4f314f1881374ca6de5500df2ad0a57d219ee19b50d8346', 'lib/i18n/startup-language.ts': '24793050d6ea5306aa6bf389a677f7eda9f9db002894e7e65c4f8452020ff16b', 'lib/i18n/useStrings.ts': '8a8a774869368c0a96600a09201eb69aef4cd8b5ea0e7afda6dba17f2aed4504', 'lib/settings/context.tsx': '0b68f394c7f3ffd2c67ef7fa27c20e2243ddbf4e021f38465b33cc567d261bde', 'lib/database/provider.tsx': 'a557f63d858a03a7682588a3e836a3caa3ae3198cf3446dce9d1f373776bc4df', '.refactor-baseline/rf051-startup-errors-preflight-v1/readiness.json': 'ce17495fee3427a6ace09d12679a1e2b8b98633e98f20b6d0e54e713480a8729', '.refactor-baseline/rf051-startup-errors-preflight-v1/reuse-map.json': '9c8f2642bc3b4ce8846f060869b1e77fee6c1f7f0529d51fe75be963a410c6b9', '.refactor-baseline/rf051-startup-errors-preflight-v1/duplicates-before/jscpd-report.json': '5fd2f673a19347938759e013dfac008f4b96471deae56c44d1af11eedbdaa90e'};bad=[p for p,h in expected.items() if hashlib.sha256(Path(p).read_bytes()).hexdigest()!=h];assert not bad,bad;print(\"Nine exact artifacts, originals, canonical UI/locale/data/config/package inputs and preparation evidence match\")"
+        ],
+        [
+          "python3",
+          "-c",
+          "import json,pathlib\nb=pathlib.Path('.refactor-baseline/rf051-startup-errors-preflight-v1');r=json.loads((b/'readiness.json').read_text())\nfor p,edits in r['edits'].items():\n restored=pathlib.Path(p).read_text()\n for edit in reversed(edits):\n  if not edit['new']: restored=edit['old']+restored\n  else:\n   assert restored.count(edit['new'])==1,(p,edit)\n   restored=restored.replace(edit['new'],edit['old'],1)\n assert restored==pathlib.Path(r['artifacts'][p]['original_path']).read_text(),'Caller state/provider/language/ready-content or old registry drift: '+p\nprint('All six complete routes and all previous registry entries reproduce original bytes after reversing only exact import/presentation edits')\n"
+        ],
+        [
+          "node_modules/.bin/jest",
+          "--runInBand",
+          "--no-cache",
+          "--runTestsByPath",
+          "tests/unit/database-error-state.test.tsx"
+        ],
         [
           "npm",
           "run",
           "test:unit",
           "--",
-          "--runTestsByPath",
-          "tests/unit/database-error-state.test.tsx"
+          "--no-cache"
         ],
         [
           "npm",
@@ -2298,26 +2320,51 @@
           "typecheck"
         ],
         [
+          "node_modules/.bin/eslint",
+          "components/ui/DatabaseErrorState.tsx",
+          "tests/unit/database-error-state.test.tsx",
+          "app/(tabs)/_layout.tsx",
+          "app/flashcards/session.tsx",
+          "app/flashcards/vocab.tsx",
+          "app/onboarding.tsx",
+          "app/profile/index.tsx",
+          "app/profile/[userId].tsx",
+          "tests/rtl/rtl-component-registry.ts"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "components/ui/DatabaseErrorState.tsx",
+          "tests/unit/database-error-state.test.tsx",
+          "tests/rtl/rtl-component-registry.ts"
+        ],
+        [
           "npm",
           "run",
           "build:web"
+        ],
+        [
+          "python3",
+          "-c",
+          "import json,pathlib,hashlib,subprocess,time\nb=pathlib.Path('.refactor-baseline/rf051-startup-errors-preflight-v1');r=json.loads((b/'readiness.json').read_text());before_path=b/'duplicates-before/jscpd-report.json'\nassert hashlib.sha256(pathlib.Path('.jscpd.json').read_bytes()).hexdigest()==r['frozen_input_hashes']['.jscpd.json']\nbefore=json.loads(before_path.read_text());out=pathlib.Path('.refactor-baseline/rf051-controller-duplicates')/str(time.time_ns());out.mkdir(parents=True)\nq=subprocess.run(['node_modules/.bin/jscpd','--config','.jscpd.json','--output',str(out)],capture_output=True,text=True);(out/'scanner.log').write_text(q.stdout+q.stderr);assert q.returncode==0\nreport=json.loads((out/'jscpd-report.json').read_text())\ndef startup_markup(d):\n return 'databaseError' in d['fragment'] and '<View className=\"flex-1 items-center justify-center bg-surface' in d['fragment']\nassert sum(startup_markup(d) for d in before['duplicates'])==4\nassert not any(startup_markup(d) for d in report['duplicates']),'Legacy duplicated startup error presentation remains'\nassert report['statistics']['total']['sources']>=before['statistics']['total']['sources']\nprint('Same scanner profile; four startup-presentation clone groups removed. Before',before['statistics']['total'],'After',report['statistics']['total'],'Evidence',out)\n"
         ]
       ],
       "risk": "medium",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
+        "components/ui/DatabaseErrorState.tsx",
+        "tests/unit/database-error-state.test.tsx",
         "app/(tabs)/_layout.tsx",
         "app/flashcards/session.tsx",
         "app/flashcards/vocab.tsx",
         "app/onboarding.tsx",
         "app/profile/index.tsx",
         "app/profile/[userId].tsx",
-        "components/ui/DatabaseErrorState.tsx",
-        "tests/unit/database-error-state.test.tsx",
         "tests/rtl/rtl-component-registry.ts"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "readiness_evidence": ".refactor-baseline/rf051-startup-errors-preflight-v1/readiness.json"
     },
     {
       "id": "RF-052",
