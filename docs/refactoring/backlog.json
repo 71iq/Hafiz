@@ -5421,27 +5421,33 @@
     {
       "id": "RF-094",
       "title": "Preserve the React Native clock during due-date fixture resets",
-      "description": "Diagnose and narrowly repair the framework clock erased by resetAllMocks in both due-date fixtures.",
+      "description": "Copy the two exact prescribed fixture candidates. Restore the RN preset clock after each existing resetAllMocks and add one finite-clock regression per suite. Preserve every existing assertion and isolation hook.",
       "rationale": "RN preset defines performance.now as jest.fn(Date.now). Both fixture beforeEach hooks reset its implementation to undefined. A finite-clock regression is red before and green after restoring the preset implementation. This is separate from the intermittent dismissal, which reproduces with a valid clock too.",
       "modules": [
         "tests/unit/deck-cards-due-date.test.tsx",
         "tests/unit/session-due-date.test.tsx"
       ],
       "dependencies": [
-        "RF-086"
+        "RF-086",
+        "RF-093"
       ],
       "acceptance_criteria": [
-        "Before approval inspect .refactor-baseline/rf086-confirmation-diagnosis/clock-red-green.json and clock-render-red-green.json. The clock contract fails deterministically but the small callback/render probes still pass; do not claim that clock restoration fixes the modal bug.",
-        "Primary chooses and freezes a minimal fixture-only repair that preserves valid framework clocks and per-test owned-mock/once-queue isolation. Compare restoring the RN preset mock with resetting only owned mocks; do not blindly change resetAllMocks to clearAllMocks.",
-        "Add a meaningful finite-clock regression for both fixture setup paths and show actual red/green behavior. Preserve all existing interactions, negative assertions, timers, mocks and cleanup. No global app clock change, fake-timer workaround, timeout increase, new dependency or broad assertion weakening.",
-        "Freeze exact paths, candidate hashes, full-suite commands and independent review before marking ready. This placeholder is unapproved."
+        "Read AGENTS, architecture, conventions, progress and .refactor-baseline/rf094-clock-preflight/1792313565016609854/continued-readiness.json. Primary owns the repair choice and final acceptance. You are not alone; preserve others edits. No helpers, state, runner, resource, retry or provider changes.",
+        "Copy only the two artifact candidate_path files to their corresponding keys in the readiness artifacts map. Exact target SHA256 {\"tests/unit/deck-cards-due-date.test.tsx\": \"226b0efef038829cc7928d606556ece6187623d47479d493e6d34c06e9f57922\", \"tests/unit/session-due-date.test.tsx\": \"86afaeb6b1d44378ccf6a266b9f0372d6ecb2e441c18e5782f8e2a2a9dc24e89\"}. Controller owns checks, review, status and commit. Do not run expensive suites as generator.",
+        "Keep resetAllMocks, owned-mock and once-queue isolation, real native modals, cleanup, timers and every existing assertion byte-identical. Only the clock restoration comment/line and one finite-clock case per fixture are added. No clearAllMocks, fake timers, timeout increases, app clock/source, dependency, protected data, backend, native, signing, push/merge/deployment change.",
+        "Both new clock cases fail before restoration; 35 existing cases are deliberately not selected in that red probe. With the exact candidate, all 37 focused and 376 cold cases across 66 suites pass, along with types, scoped lint and format. All temporary source is restored. This is preflight, not acceptance. Run six fresh controller gates and a separate stronger evaluator; primary checks exact scope after lease release.",
+        "Restore only the installed RN preset jest.fn(Date.now) implementation. Resetting only owned mocks would require a broad fragile inventory; clearAllMocks retains implementations and once queues. Do not claim that this fixes the separate modal dismissal cause. No extra helper for two explicit fixture setup lines."
       ],
       "verification": [
         [
-          "npm",
-          "run",
-          "test:unit",
-          "--",
+          "python3",
+          "-c",
+          "import hashlib; from pathlib import Path; expected={'tests/unit/deck-cards-due-date.test.tsx': '226b0efef038829cc7928d606556ece6187623d47479d493e6d34c06e9f57922', 'tests/unit/session-due-date.test.tsx': '86afaeb6b1d44378ccf6a266b9f0372d6ecb2e441c18e5782f8e2a2a9dc24e89', 'jest.config.js': '667b89e890b39a19d3dd10719a854cf2db0d8268f4af99cacf56b77a2653f20b', 'package.json': '5bdf36721f13d9bb710b1ff01dec67af2dd500418a0f996e1aca470639d88aea', 'package-lock.json': '63ffd477c21a97003e23b3d2d18d7ee17400cd49b3b1d3f70101b65fa1d7a2f7', 'scripts/tests/jest-config.test.cjs': '2bf6bde6bc722302ee5d372ca69684587800d140786a838471fc6b1c0e5c092c'}; bad=[p for p,h in expected.items() if hashlib.sha256(Path(p).read_bytes()).hexdigest()!=h]; assert not bad,bad; print('Two exact clock fixtures and unchanged config/manifest/lock/regression hashes match')"
+        ],
+        [
+          "node_modules/.bin/jest",
+          "--runInBand",
+          "--no-cache",
           "--runTestsByPath",
           "tests/unit/deck-cards-due-date.test.tsx",
           "tests/unit/session-due-date.test.tsx"
@@ -5457,16 +5463,28 @@
           "npm",
           "run",
           "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "tests/unit/deck-cards-due-date.test.tsx",
+          "tests/unit/session-due-date.test.tsx"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "tests/unit/deck-cards-due-date.test.tsx",
+          "tests/unit/session-due-date.test.tsx"
         ]
       ],
       "risk": "low",
-      "approved": false,
-      "status": "pending",
+      "approved": true,
+      "status": "ready",
       "allowed_paths": [
         "tests/unit/deck-cards-due-date.test.tsx",
         "tests/unit/session-due-date.test.tsx"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "readiness_evidence": ".refactor-baseline/rf094-clock-preflight/1792313565016609854/continued-readiness.json"
     }
   ]
 }
