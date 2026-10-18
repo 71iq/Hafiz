@@ -17,6 +17,8 @@ Hafiz has two data paths. Offline reading, study scheduling and private local co
 
 The existing folders already carry useful ownership. Move a file when it crosses a demonstrated boundary, not to impose a new src/features tree. Keep route files cohesive; a private extraction can improve a test seam without creating a shared library. Do not replace large screens with equally large hooks.
 
+Database startup gates remain in their routes. `components/ui/DatabaseErrorState.tsx` owns only title/message presentation and the existing startup/profile typography variants. Routes retain language lookup, loading progress and provider placement.
+
 ## State and data flow
 
 SQLite is authoritative for offline personal data. Sync restores account state before upload and preserves queue ordering, timestamps and soft deletion. TanStack Query owns remote response caching; it must not become a second durable store for local review state. Zustand owns session state. Feature UI state stays near its interaction.
