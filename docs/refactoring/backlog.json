@@ -2122,7 +2122,8 @@
         "RF-088",
         "RF-089",
         "RF-090",
-        "RF-012"
+        "RF-012",
+        "RF-096"
       ],
       "acceptance_criteria": [
         "Repeat identical clone/dead-code/native+web graph/security scopes.",
@@ -2756,49 +2757,111 @@
     {
       "id": "RF-056",
       "title": "Share Qiraat block rendering",
-      "description": "Share Qiraat block rendering",
-      "rationale": "Group 13 repeats already-parsed Arabic Qiraat block display.",
+      "description": "Copy six exact artifacts to share only Qiraat heading/body row presentation. Both callers retain all parsing, state, loading, empty/group/header/scroll behavior. Preserve the known repeated-marker parser issue separately as RF096.",
+      "rationale": "Two real callers have the same 19-line row mapping. One controlled feature component removes that clone without taking over lifecycle or content ownership.",
       "modules": [
         "app/flashcards/session.tsx",
         "components/mushaf/word-tabs/QiraatTab.tsx",
+        "tests/rtl/rtl-component-registry.ts",
         "components/mushaf/QiraatBlocks.tsx",
         "tests/unit/qiraat-blocks.test.tsx",
-        "tests/rtl/rtl-component-registry.ts"
+        "tests/unit/qiraat-block-presentation.test.tsx"
       ],
       "dependencies": [
         "RF-004",
-        "RF-006"
+        "RF-006",
+        "RF-012"
       ],
       "acceptance_criteria": [
-        "Inspect the existing QiraatBlock type and both full rendering branches.",
-        "Share only heading/body mapping. Preserve wrapper scrolling, direction, font size and exact supplied content. Do not modify datasets or parsers."
+        "Read AGENTS, architecture, conventions, progress, .refactor-baseline/rf056-qiraat-blocks-preflight-v1/readiness.json and reuse-map.json. Primary owns architecture, content/parser decisions and acceptance. You are not alone; preserve others edits. No helpers, full source dumps, installations, controller/status/retry/resource/provider edits or extra checks by the generator. Copy exact artifacts only; controller owns verification, separate review and commit.",
+        "Use one bounded Python copy: from pathlib import Path; import json; r=json.loads(Path(\".refactor-baseline/rf056-qiraat-blocks-preflight-v1/readiness.json\").read_text()); [(Path(p).parent.mkdir(parents=True,exist_ok=True), Path(p).write_bytes(Path(a[\"candidate_path\"]).read_bytes())) for p,a in r[\"artifacts\"].items()]. All six bytes must match candidate_sha256; touch no other source path. Frozen gates pin all artifacts, originals, parser/query/package/lock/Jest/duplication/resource inputs, immutable preparation and baseline lint/Knip reports.",
+        "QiraatBlocks is a controlled feature presenter over the existing readonly QiraatBlock array. It returns only a Fragment and the same row Views and native Text. Preserve order, position keys, nullable/empty headings, literal body text, classes, RTL/right alignment, font weight and spacing. No data access, hooks, parsing, mutation, extra wrapper, generic abstraction or new dependency. Semantic Text would change default typography/direction, so preserve the proven RN Text contract here.",
+        "Replace only the two exact maps and corresponding imports. Whole session and QiraatTab files reverse to original bytes; the new map equals the old row map. Keep session maxHeight/nested scrolling, card parsing, empty/group/header behavior and Tab request/cancellation/loading/group/header logic unchanged. Add exactly one sorted RTL registry entry.",
+        "Ten real QiraatTab native-tree cases pass on original and candidate callers in Arabic/390 and English/1280. They exercise headed/unheaded literal multiline bodies, header presence, Arabic group labels, no-data and late old-request suppression with real strings/parser/UI and a mocked local fetch boundary. Two additional direct component cases cover every supplied row, literal markers/newlines, empty heading/body, immutable inputs and empty list without a host wrapper. No full ready-session, pixel/theme, manual browser, native build or device claim.",
+        "The first fixture had four failures because the existing parser drops a final body after consecutive markers. Preserve its run and standalone actual-parser reproduction. Correct the fixture to current valid single-marker inputs; keep multi-block presentation coverage in direct component tests. RF096 owns primary corpus-format investigation and a separately verified correction. Never modify or mock the parser, weaken a live assertion, skip tests or silently call that issue fixed.",
+        "Final preflight passes 14 commands, 12 focused cases, 70 suites/412 cold cases, strict types, scoped lint/format, three real boundary checks and web export. Exactly the same five old session lint warnings remain, zero errors. Knip retains exit 1 and the same six issue records with zero unused files/exports/types. Same duplication profile improves 21 groups/424 lines/182 sources to 20/405/183; do not narrow scope or chase other duplicates.",
+        "All eleven frozen controller gates, fresh stronger read-only review and primary post-lease acceptance are mandatory. All temporary source is restored before the real batch. No package/lock, parser/query/schema/data/assets/fonts/loaders/Metro/Jest/backend/signing change, push/merge/deploy/production action or credit/reset/provider/resource change. No second Ralph work item starts in this preparation heartbeat."
       ],
       "verification": [
+        [
+          "python3",
+          "-c",
+          "import hashlib,json;from pathlib import Path;pinned={'.refactor-baseline/rf056-qiraat-blocks-preflight-v1/readiness.json': '77fd2de5f76bd09c51351ef6e7a46ade01ccd4f5d58ceb7158d1fc49c7b9c9b5', '.refactor-baseline/rf056-qiraat-blocks-preflight-v1/reuse-map.json': 'fdb96ce43743559bbcac4d23afaced361441b0c8ff8bc5e385e66e28dc60fbfa', '.refactor-baseline/rf056-qiraat-blocks-preflight-v1/repeated-marker-probe.json': '7850de06e9dc6d0d8d78d02e3a358a070de76afee2e1496b0023161826f2938b', '.refactor-baseline/rf056-qiraat-blocks-preflight-v1/preflight-1792348847134985574/original-knip.log': 'f3c3d1ae8d2565cfc1692cf2497a9741cb6ef69ed2738150fe7f46ce6823268e', '.refactor-baseline/rf056-qiraat-blocks-preflight-v1/preflight-1792348847134985574/original-lint.log': 'ba7e9ebe73f2fd8aca39b06409e1b3abb789f77c6172b4777122623db5a942ee'};assert all(hashlib.sha256(Path(p).read_bytes()).hexdigest()==h for p,h in pinned.items())\nr=json.loads(Path('.refactor-baseline/rf056-qiraat-blocks-preflight-v1/readiness.json').read_text())\nfor p,a in r[\"artifacts\"].items():\n assert hashlib.sha256(Path(p).read_bytes()).hexdigest()==a[\"candidate_sha256\"],p\n if \"original_path\" in a:assert hashlib.sha256(Path(a[\"original_path\"]).read_bytes()).hexdigest()==a[\"original_sha256\"],p\nfor p,h in r[\"frozen_inputs\"].items():assert hashlib.sha256(Path(p).read_bytes()).hexdigest()==h,p\nprint(\"Six exact artifacts, originals, parser/query/package/lock/Jest/duplication/resource inputs and preparation records match\")\n"
+        ],
+        [
+          "python3",
+          "-c",
+          "import json;from pathlib import Path\nr=json.loads(Path('.refactor-baseline/rf056-qiraat-blocks-preflight-v1/readiness.json').read_text())\nfor name,e in r['edits'].items():\n source=Path(name).read_text();back=source.replace(e['after_map'],e['before_map'])\n if name.startswith('app/'):\n  back=back.replace('import { parseQiraatText } from \"@/lib/qiraat/parse\";\\nimport { QiraatBlocks } from \"@/components/mushaf/QiraatBlocks\";','import { parseQiraatText, type QiraatBlock } from \"@/lib/qiraat/parse\";')\n else:back=back.replace('\\nimport { QiraatBlocks } from \"@/components/mushaf/QiraatBlocks\";','')\n assert back==Path(r['artifacts'][name]['original_path']).read_text(),name\ns=Path('components/mushaf/QiraatBlocks.tsx').read_text();start=s.index('      {blocks.map(');end=s.index('      ))}',start)+len('      ))}')\nassert s[start:end]==r['edits']['components/mushaf/word-tabs/QiraatTab.tsx']['before_map']\np='tests/rtl/rtl-component-registry.ts';assert Path(p).read_text().replace(r['registry_added_entry'],'',1)==Path(r['artifacts'][p]['original_path']).read_text()\nprint('Both whole callers reverse exactly; controlled row mapping and sole sorted registry entry match')\n"
+        ],
         [
           "npm",
           "run",
           "test:unit",
           "--",
           "--runTestsByPath",
-          "tests/unit/qiraat-blocks.test.tsx"
+          "tests/unit/qiraat-blocks.test.tsx",
+          "tests/unit/qiraat-block-presentation.test.tsx",
+          "--no-cache"
         ],
         [
           "npm",
           "run",
           "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "python3",
+          "-c",
+          "import pathlib,json,subprocess,time\nr=json.loads(pathlib.Path('.refactor-baseline/rf056-qiraat-blocks-preflight-v1/readiness.json').read_text());out=pathlib.Path('.refactor-baseline/rf056-controller-lint')/str(time.time_ns());out.mkdir(parents=True)\nq=subprocess.run(['node_modules/.bin/eslint',*r['artifacts'],'--format','json'],capture_output=True,text=True,timeout=180);(out/'report.json').write_text(q.stdout);(out/'stderr').write_text(q.stderr);assert q.returncode==0\nactual=json.loads(q.stdout);expected=json.loads(pathlib.Path('.refactor-baseline/rf056-qiraat-blocks-preflight-v1/preflight-1792348847134985574/original-lint.log').read_text());root=pathlib.Path.cwd()\ndef sig(report):return sorted((str(pathlib.Path(x['filePath']).relative_to(root)),m['ruleId'],m['message'],m['severity']) for x in report for m in x['messages'])\nassert sum(x['errorCount'] for x in actual)==0;assert sum(x['warningCount'] for x in actual)==5;assert sig(actual)==sig(expected)\nprint('Zero lint errors and exactly the same five session warnings. Evidence',out)\n"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "components/mushaf/QiraatBlocks.tsx",
+          "tests/unit/qiraat-blocks.test.tsx",
+          "tests/unit/qiraat-block-presentation.test.tsx",
+          "tests/rtl/rtl-component-registry.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "python3",
+          "-c",
+          "import pathlib,json,subprocess,time\nr=json.loads(pathlib.Path('.refactor-baseline/rf056-qiraat-blocks-preflight-v1/readiness.json').read_text());out=pathlib.Path('.refactor-baseline/rf056-controller-knip')/str(time.time_ns());out.mkdir(parents=True)\nq=subprocess.run(['node_modules/.bin/knip','--reporter','json'],capture_output=True,text=True,timeout=180);(out/'report.json').write_text(q.stdout);(out/'stderr').write_text(q.stderr);assert q.returncode==1\nactual=json.loads(q.stdout);assert actual==json.loads(pathlib.Path(r['knip_baseline_path']).read_text());assert actual.get('files',[])==[]\nprint('Knip retains exit 1 and the same six baseline issue records; no unused files. Not a clean Knip result. Evidence',out)\n"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "python3",
+          "-c",
+          "import pathlib,json,subprocess,time\nr=json.loads(pathlib.Path('.refactor-baseline/rf056-qiraat-blocks-preflight-v1/readiness.json').read_text());out=pathlib.Path('.refactor-baseline/rf056-controller-duplicates')/str(time.time_ns());out.mkdir(parents=True)\nq=subprocess.run(['node_modules/.bin/jscpd','--config','.jscpd.json','--output',str(out)],capture_output=True,text=True,timeout=180);(out/'scanner.log').write_text(q.stdout+q.stderr);assert q.returncode==0\ns=json.loads((out/'jscpd-report.json').read_text())['statistics']['total'];assert s['sources']>=183 and s['clones']<21 and s['duplicatedLines']<424,s\nprint('Unchanged scan scope', {k:s[k] for k in ['sources','clones','duplicatedLines']},'Evidence',out)\n"
         ]
       ],
       "risk": "medium",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
         "app/flashcards/session.tsx",
         "components/mushaf/word-tabs/QiraatTab.tsx",
+        "tests/rtl/rtl-component-registry.ts",
         "components/mushaf/QiraatBlocks.tsx",
         "tests/unit/qiraat-blocks.test.tsx",
-        "tests/rtl/rtl-component-registry.ts"
+        "tests/unit/qiraat-block-presentation.test.tsx"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "readiness_evidence": ".refactor-baseline/rf056-qiraat-blocks-preflight-v1/readiness.json"
     },
     {
       "id": "RF-057",
@@ -3761,7 +3824,7 @@
       "evidence": ".ralph/runs/RF-070-2-1792171267226235313",
       "recovery_note": "First independent evaluation rejected a false-positive busy dismissal test: the last Modal is the hidden ConfirmDialog. Primary requires the visible date-input Modal ancestor. All four gates and12 tests passed but are insufficient without this correction. Final implementation attempt2 remains available.",
       "completed_at": "2026-10-16T17:24:00.118911+00:00",
-      "summary": "Repaired RF-070\u2019s busy dismissal characterization. The test now finds the visible Modal containing the date input, asserts `visible=true`, and dispatches `requestClose` during deferred persistence. Only `tests/unit/session-due-date.test.tsx` was changed; backlog edits were preserved.",
+      "summary": "Repaired RF-070’s busy dismissal characterization. The test now finds the visible Modal containing the date input, asserts `visible=true`, and dispatches `requestClose` during deferred persistence. Only `tests/unit/session-due-date.test.tsx` was changed; backlog edits were preserved.",
       "primary_acceptance": {
         "accepted": true,
         "commit": "6e21066",
@@ -5202,7 +5265,7 @@
       "failure": "Batch resource limit reached",
       "completed_at": "2026-10-17T21:31:22.584489+00:00",
       "evidence": ".ralph/runs/RF-089-1-1792272463180241981",
-      "summary": "Implemented RF-089\u2019s four worker-owned artifacts exactly. `package-lock.json` remains untouched for the controller."
+      "summary": "Implemented RF-089’s four worker-owned artifacts exactly. `package-lock.json` remains untouched for the controller."
     },
     {
       "id": "RF-090",
@@ -5770,6 +5833,51 @@
       "completed_at": "2026-10-18T13:51:12.039534+00:00",
       "evidence": ".ralph/runs/RF-095-1-1792331292640125069",
       "summary": "Copied the three exact pinned Prettier artifacts for RF-095. Existing behavior and the unrelated backlog edit were preserved. No commit or push was performed."
+    },
+    {
+      "id": "RF-096",
+      "title": "Investigate and correct repeated-marker Qiraat body loss",
+      "description": "The existing parser drops the final body in a synthetic two-marker input. Primary must inspect actual source-format semantics and define a small lossless correction before approving implementation. Do not change protected source content.",
+      "rationale": "A real QiraatTab baseline and direct execution of the unchanged parser reproduce lost trailing text. split yields alternating marker/body pairs while the loop advances by three. Impact on bundled source formats is not yet measured.",
+      "modules": [
+        "lib/qiraat/parse.ts",
+        "tests/unit/qiraat-parse.test.ts",
+        "docs/refactoring/AUDIT.md"
+      ],
+      "dependencies": [
+        "RF-006"
+      ],
+      "acceptance_criteria": [
+        "Keep approved false until primary read-only corpus-format inspection establishes which text fragments are headings, markers and bodies. Report aggregate format/impact evidence without copying Quran source text into logs. Preserve all datasets, databases, mappings, fonts and attribution.",
+        "Retain .refactor-baseline/rf056-qiraat-blocks-preflight-v1/repeated-marker-probe.json and the first failed caller fixture. The single-marker control passes; adding a second marker currently loses its final body. Verify this against the actual parser, without a parser mock.",
+        "Primary defines a bounded lossless parsing rule and exact files after inspecting real source grammar. Characterize zero/one/multiple markers, heading/no-heading and existing line formatting before correction. Preserve all currently valid outputs unless the documented correction requires a specific change.",
+        "Add focused red/green parser and rendered-consumer regression tests, run appropriate types/unit/web/boundary checks and obtain separate stronger review plus primary acceptance. Do not reset or regenerate content, alter unrelated UI or deploy."
+      ],
+      "verification": [
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/qiraat-parse.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
+      ],
+      "risk": "high",
+      "approved": false,
+      "status": "pending",
+      "allowed_paths": [
+        "lib/qiraat/parse.ts",
+        "tests/unit/qiraat-parse.test.ts",
+        "docs/refactoring/AUDIT.md"
+      ],
+      "attempts": 0,
+      "discovery_evidence": ".refactor-baseline/rf056-qiraat-blocks-preflight-v1/repeated-marker-probe.json"
     }
   ]
 }
