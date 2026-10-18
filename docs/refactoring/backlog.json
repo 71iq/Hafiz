@@ -587,36 +587,113 @@
     {
       "id": "RF-012",
       "title": "Establish native dependency-boundary analysis",
-      "description": "Establish native dependency-boundary analysis",
-      "rationale": "Current cruise prefers web and cannot certify native resolution.",
+      "description": "Copy seven exact artifacts: one shared analyzer factory, concrete web/Android/iOS configs, actual CLI regression tests, report/check scripts and an appended architecture section. No app, dependency or native-project change.",
+      "rationale": "The old check prefers web files, includes opposite-platform roots, stops at source stems containing public/supabase, and JSON output cannot enforce failures. Accepted SDK alignment supplies this independent static-analysis prerequisite; RF008 lint/native ownership decisions stay open.",
       "modules": [
+        "scripts/analysis/dependency-cruiser-config.cjs",
         ".dependency-cruiser.cjs",
+        ".dependency-cruiser.android.cjs",
+        ".dependency-cruiser.ios.cjs",
+        "scripts/tests/dependency-boundaries.test.cjs",
         "package.json",
         "docs/refactoring/ARCHITECTURE.md"
       ],
       "dependencies": [
-        "RF-008"
+        "RF-004",
+        "RF-006",
+        "RF-067"
       ],
       "acceptance_criteria": [
-        "Run separate native and web graph configurations.",
-        "Enforce no route imports from domain/shared UI and no newly introduced cycles."
+        "Read AGENTS, architecture, conventions, progress, .refactor-baseline/rf012-platform-preflight-v1/readiness.json and reuse-map.json. Primary owns architecture, rule/dependency decisions and acceptance. You are not alone; preserve others edits. No helpers, controller/status/retry/resource/provider edits, installations or full-source dumps. Generator copies exact artifacts only; controller owns checks, separate review and commit.",
+        "Use one bounded Python copy operation rather than reconstructing patches or running controller checks: from pathlib import Path; import json; r=json.loads(Path(\".refactor-baseline/rf012-platform-preflight-v1/readiness.json\").read_text()); [(Path(p).parent.mkdir(parents=True,exist_ok=True), Path(p).write_bytes(Path(a[\"candidate_path\"]).read_bytes())) for p,a in r[\"artifacts\"].items()]. All target bytes must match readiness artifacts candidate_sha256. The frozen first gate pins all seven exact source/package/document hashes and unchanged original/lock/Metro/native inputs. Touch no other source path.",
+        "One shared configuration factory supplies all three profiles. Reuse installed dependency-cruiser 18.6.0 and the JS/TS/JSON subset of installed Expo extension order. Resolve platform, native fallback and generic per extension. Exclude genuine protected/reference directories and opposite-platform source entries. Keep public/supabase-named files and quranXcom lookalikes; the reference-directory dot is literal. No runtime abstraction, dependency, native generation or bundler config change.",
+        "Preserve both existing domain/shared-UI-to-route error rules. The current three graphs have no cycles or unresolved imports; make both fail checks. JSON remains report-only. The separate err reporter enforces nonzero error counts, with no cache or ignored-violation baseline. Add seven commands, and only add freshness flags to the old JSON command. Every dependency/runtime manifest field, lock and original architecture text remains exact.",
+        "Twelve real CLI fixture cases pass without skips across web/Android/iOS: platform and native fallback, TS versus platform TSX extension ordering, MJS, legitimate stems and directory lookalikes, protected roots, forbidden domain/UI route imports, new cycles and missing modules. Negative cases check actual err exits and both forbidden-rule identities. JSON exits zero; two intentional errors give err status 2. Original web passes the existing boundary case and fails three desired checks; the same final literal-filter cases fail on all three targets before dot repair. No simulated analyzer, weakened assertions or skipped cases.",
+        "Final preflight passes all 12 Node cases, three source reports and aggregate err check, strict types, all 68 suites/400 cold Jest cases, CJS lint, code/manifest format and web export. Web has 206 modules/865 dependencies, Android/iOS 205/866 each, zero violations and correct SQLite/Rive bindings. These are source graphs, not conditional-code, external-package, bundling, native compilation or device certification. Architecture only appends a section and preserves old formatting.",
+        "Knip still exits 1 with exactly the same six issue-bearing records before/after: existing unlisted modules/tooling, sqlite3 binary and two deliberate aliases. Zero unused files/exports/types remain. Require fresh report parity, preserve nonzero debt and never call it a clean Knip result. No dead-code exclusion is added.",
+        "All eleven frozen controller commands, fresh stronger read-only review and primary post-lease acceptance are mandatory. Preserve the CLI filename, JSON-status, numeric-exit, optional-empty-field and literal-regexp preflight failures. No app/native/data/assets/fonts/loaders/Metro/Jest/lock/backend/signing change, push/merge/deploy/production action or resource/credit/reset/provider change. RF008 remains unresolved; source analysis does not waive its diagnostics."
       ],
       "verification": [
         [
+          "python3",
+          "-c",
+          "import hashlib;from pathlib import Path;expected={'scripts/analysis/dependency-cruiser-config.cjs': '20561778430eebce6d9f94098326d593def1a05a18fd85e72ff096f568227d34', '.dependency-cruiser.cjs': 'bf0700c6d2cf5451908b3cb2e589d288a5965cf7796daa6d48c0bb038b1d4051', '.dependency-cruiser.android.cjs': 'be896f7b2db9be2b54786c0b0ad8e85adb17c0c12372f8ea6d1e82dfa596affd', '.dependency-cruiser.ios.cjs': '27907ec97c126a4b3ddaa361e9c569042aeef3010bb00d173499024dda5e1d14', 'scripts/tests/dependency-boundaries.test.cjs': '908f5fee833bb8b615b6b99e9a39f74635fab6bc6c7e1b005fbd9b4e0de84de6', 'package.json': 'c152bdc0ae33743d9889f7f8ecc7271a8a8a7ed40b4254e23bebd1c95b363394', 'docs/refactoring/ARCHITECTURE.md': 'e3ee929b5acc57e893b175937e55d309b0d465c0c1139e07229705184d3712ab', '.refactor-baseline/rf012-platform-preflight-v1/original/.dependency-cruiser.cjs': '3306693b0b6706e72630ca24c18d0c5f94e0508ecbc66b22ef09d9152ca1b43d', '.refactor-baseline/rf012-platform-preflight-v1/original/package.json': '2f749c2975353748697174bf5f07c4fbcf28ec242937104f3c74d58b41503952', '.refactor-baseline/rf012-platform-preflight-v1/original/docs/refactoring/ARCHITECTURE.md': 'c3a743f3bf129b784617a895f59624710fc2db067a2a0f9f2f38f721e1ff1bce', 'package-lock.json': 'acf30de90b12ff380d3607674e6aac1e40e788ba0c20e17ad0b1e7bfa5103cc3', 'tsconfig.json': '17dc522bd806e6966eb1f572dd2157fc32fa61ea571ef1bb8e3471b5eb1b7792', 'metro.config.js': '8fea82a7fa3e12e31f9cdd2585590663d859b84d4ddb1f08850d9a259428a22d', 'jest.config.js': '667b89e890b39a19d3dd10719a854cf2db0d8268f4af99cacf56b77a2653f20b', 'lib/database/native-loaders.native.ts': '23b45e7e5643819876432165ca0608dbd8a9c9aff8db8dde7f13ca233071ccfb', 'lib/database/native-loaders.web.ts': '85d786b75f17b33dd35d253ce79d209e5f76ec1a03035c373ccdd369d6ada0a9', 'components/zayt/ZaytRivePreview.native.tsx': '23acffa49f2ad3a7568b0b639d41c3823211218bdc2424a1bf145871156a0f97', 'components/zayt/ZaytRivePreview.web.tsx': 'aacb084125c1b055386c15977be01845e5d4d2e0c2f8ed144b1de63ac3f1af0b', 'lib/fonts/qpc-v4-tajweed-fonts.web.ts': '080b0f42e33caa8ab21e6c5517a5bf127664ee988c03119feb87cee8fff29d33', 'scripts/ralph/config.json': '1c93dfa0ab3d5855a3e0a595cdfa22ab15ac0578e0e1fc0cb1501b1fb2ca9fb8', '.refactor-baseline/rf012-platform-preflight-v1/readiness.json': 'f17978bff408570261cc23a2d0179460c3604b3c3f62e1e2dc887e1f6efe6b14', '.refactor-baseline/rf012-platform-preflight-v1/reuse-map.json': 'a3ccc30f21c6b46d5b8b78b20369edf6035d4658f210ca76db79207d8241049a', '.refactor-baseline/rf012-platform-preflight-v1/knip-1792347378185799038/before.json': 'f3c3d1ae8d2565cfc1692cf2497a9741cb6ef69ed2738150fe7f46ce6823268e'};bad=[p for p,h in expected.items() if hashlib.sha256(Path(p).read_bytes()).hexdigest()!=h];assert not bad,bad;print(\"Seven exact artifacts, originals, lock/Metro/native inputs and preparation records match\")"
+        ],
+        [
+          "python3",
+          "-c",
+          "import pathlib,json\nb=pathlib.Path('.refactor-baseline/rf012-platform-preflight-v1');r=json.loads((b/'readiness.json').read_text());old=json.loads((b/'original/package.json').read_text());new=json.loads(pathlib.Path('package.json').read_text());a=old.pop('scripts');z=new.pop('scripts');assert old==new\nassert sorted(set(z)-set(a))==r['scripts_added'] and not set(a)-set(z)\nassert [k for k in a if a[k]!=z[k]]==['analyze:boundaries'];assert z['analyze:boundaries']==a['analyze:boundaries']+' --no-ignore-known --no-cache'\nassert pathlib.Path('docs/refactoring/ARCHITECTURE.md').read_text().startswith((b/'original/docs/refactoring/ARCHITECTURE.md').read_text())\nprint('Seven commands added, legacy JSON made fresh; all dependency/runtime manifest fields and original architecture text preserved')\n"
+        ],
+        [
           "npm",
           "run",
-          "analyze:boundaries"
+          "test:boundaries"
+        ],
+        [
+          "python3",
+          "-c",
+          "import pathlib,json,subprocess,time\nr=json.loads(pathlib.Path('.refactor-baseline/rf012-platform-preflight-v1/readiness.json').read_text());out=pathlib.Path('.refactor-baseline/rf012-controller-graphs')/str(time.time_ns());out.mkdir(parents=True)\nfor platform in ['web','android','ios']:\n config='.dependency-cruiser.cjs' if platform=='web' else '.dependency-cruiser.'+platform+'.cjs'\n q=subprocess.run(['node_modules/.bin/depcruise','app','components','lib','--config',config,'--output-type','json','--no-ignore-known','--no-cache'],capture_output=True,text=True,timeout=180);(out/(platform+'.json')).write_text(q.stdout);(out/(platform+'.stderr')).write_text(q.stderr);assert q.returncode==0\n graph=json.loads(q.stdout);s=graph['summary'];assert not s['violations'] and s['error']==0 and s['warn']==0\n assert s['environment']['version']=='18.6.0';assert s['totalCruised']>=r['graphs'][platform]['totalCruised'],'Source coverage shrank'\n native=platform!='web'\n for source,requested,target in [('lib/database/init.ts','./native-loaders','lib/database/native-loaders.'+('native' if native else 'web')+'.ts'),('app/zayt-preview.tsx','@/components/zayt/ZaytRivePreview','components/zayt/ZaytRivePreview.'+('native' if native else 'web')+'.tsx')]:\n  module=next(x for x in graph['modules'] if x['source']==source);dependency=next(x for x in module['dependencies'] if x['module']==requested);assert dependency['resolved']==target and not dependency['couldNotResolve'],(platform,source,dependency)\n print(platform,{k:s[k] for k in ['totalCruised','totalDependenciesCruised','error','warn']},'SQLite/Rive bindings verified')\nprint('Fresh static graphs at',out,'No native compilation/runtime claim')\n"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "python3",
+          "-c",
+          "import pathlib,json,subprocess,time\nr=json.loads(pathlib.Path('.refactor-baseline/rf012-platform-preflight-v1/readiness.json').read_text());expected=json.loads(pathlib.Path(r['knip']['baseline_path']).read_text());out=pathlib.Path('.refactor-baseline/rf012-controller-knip')/str(time.time_ns());out.mkdir(parents=True)\nq=subprocess.run(['node_modules/.bin/knip','--reporter','json'],capture_output=True,text=True,timeout=180);(out/'report.json').write_text(q.stdout);(out/'stderr').write_text(q.stderr);assert q.returncode==r['knip']['baseline_exit']==1\nactual=json.loads(q.stdout);assert actual==expected,'Knip findings changed; inspect '+str(out);assert actual.get('files',[])==[]\nprint('Knip exits 1 with the same six baseline records and no unused files. This is parity, not clean Knip. Evidence',out)\n"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "scripts/analysis/dependency-cruiser-config.cjs",
+          ".dependency-cruiser.cjs",
+          ".dependency-cruiser.android.cjs",
+          ".dependency-cruiser.ios.cjs",
+          "scripts/tests/dependency-boundaries.test.cjs"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "scripts/analysis/dependency-cruiser-config.cjs",
+          ".dependency-cruiser.cjs",
+          ".dependency-cruiser.android.cjs",
+          ".dependency-cruiser.ios.cjs",
+          "scripts/tests/dependency-boundaries.test.cjs",
+          "package.json"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
         ]
       ],
       "risk": "medium",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
+        "scripts/analysis/dependency-cruiser-config.cjs",
         ".dependency-cruiser.cjs",
+        ".dependency-cruiser.android.cjs",
+        ".dependency-cruiser.ios.cjs",
+        "scripts/tests/dependency-boundaries.test.cjs",
         "package.json",
         "docs/refactoring/ARCHITECTURE.md"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "readiness_evidence": ".refactor-baseline/rf012-platform-preflight-v1/readiness.json"
     },
     {
       "id": "RF-013",
@@ -2040,11 +2117,13 @@
         "RF-087",
         "RF-088",
         "RF-089",
-        "RF-090"
+        "RF-090",
+        "RF-012"
       ],
       "acceptance_criteria": [
         "Repeat identical clone/dead-code/native+web graph/security scopes.",
-        "Compare measured counts and add actionable child tasks; document deliberate duplicates."
+        "Compare measured counts and add actionable child tasks; document deliberate duplicates.",
+        "Repeat web, Android and iOS source reports and run check:boundaries. JSON report exit status cannot enforce failures. Keep open RF008/native runtime diagnostics and actual native/device verification requirements."
       ],
       "verification": [
         [
