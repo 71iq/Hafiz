@@ -253,6 +253,8 @@ describe("DeckCardsSheet due-date editor characterization", () => {
     mockSettings.themeSurface = "#FFF8F1";
     mockSettings.uiLanguage = "ar";
     jest.resetAllMocks();
+    // Restore the React Native preset clock cleared by the fixture mock reset.
+    jest.mocked(performance.now).mockImplementation(Date.now);
     mockMeasureInWindow.mockImplementation((callback) => {
       callback(24, 120, 32, 32);
     });
@@ -270,6 +272,10 @@ describe("DeckCardsSheet due-date editor characterization", () => {
     cleanup();
     ReactNative.Dimensions.set({ window: originalWindowDimensions, screen: originalScreenDimensions });
     jest.restoreAllMocks();
+  });
+
+  it("keeps a finite React Native clock after fixture mock reset", () => {
+    expect(Number.isFinite(performance.now())).toBe(true);
   });
 
   it("characterizes Arabic light validation, fixed date writing, cancel, and reopen", async () => {

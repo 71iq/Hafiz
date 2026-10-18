@@ -611,6 +611,8 @@ function expectNoUnrelatedCardActionServiceCalls(): void {
 describe("Flashcard session due-date editor characterization", () => {
   beforeEach(() => {
     jest.resetAllMocks();
+    // Restore the React Native preset clock cleared by the fixture mock reset.
+    jest.mocked(performance.now).mockImplementation(Date.now);
     configureSettings("ar", false);
     ReactNative.Dimensions.set({
       window: { width: 390, height: 844, scale: 1, fontScale: 1 },
@@ -636,6 +638,10 @@ describe("Flashcard session due-date editor characterization", () => {
     cleanup();
     ReactNative.Dimensions.set({ window: originalWindowDimensions, screen: originalScreenDimensions });
     jest.restoreAllMocks();
+  });
+
+  it("keeps a finite React Native clock after fixture mock reset", () => {
+    expect(Number.isFinite(performance.now())).toBe(true);
   });
 
   it("characterizes Arabic light validation, native input options, cancel, and reopen", async () => {

@@ -5478,13 +5478,17 @@
       ],
       "risk": "low",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "tests/unit/deck-cards-due-date.test.tsx",
         "tests/unit/session-due-date.test.tsx"
       ],
-      "attempts": 0,
-      "readiness_evidence": ".refactor-baseline/rf094-clock-preflight/1792313565016609854/continued-readiness.json"
+      "attempts": 1,
+      "readiness_evidence": ".refactor-baseline/rf094-clock-preflight/1792313565016609854/continued-readiness.json",
+      "started_at": "2026-10-18T12:47:17.683581+00:00",
+      "completed_at": "2026-10-18T12:50:15.465182+00:00",
+      "evidence": ".ralph/runs/RF-094-1-1792327637685172684",
+      "summary": "Copied the two exact RF-094 candidates. Each fixture now restores the React Native preset clock after resetAllMocks and adds one finite-clock regression. Existing assertions and isolation hooks are unchanged."
     }
   ]
 }
