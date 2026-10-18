@@ -4803,12 +4803,16 @@
       ],
       "risk": "low",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "tests/unit/deck-cards-due-date.test.tsx"
       ],
-      "attempts": 0,
-      "readiness_evidence": ".refactor-baseline/rf086-causal-readiness.json"
+      "attempts": 1,
+      "readiness_evidence": ".refactor-baseline/rf086-causal-readiness.json",
+      "started_at": "2026-10-18T07:49:27.629929+00:00",
+      "completed_at": "2026-10-18T07:53:05.891315+00:00",
+      "evidence": ".ralph/runs/RF-086-1-1792309767631889865",
+      "summary": "Copied the exact approved RF-086 candidate into the sole allowed file. Added fireEventAsync import and awaited only the successful due-date, Delete, and Reset persistence presses."
     },
     {
       "id": "RF-087",

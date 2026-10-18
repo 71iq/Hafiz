@@ -1,6 +1,6 @@
 import React from "react";
 import * as ReactNative from "react-native";
-import { act, cleanup, fireEvent, render, waitFor, within } from "@testing-library/react-native";
+import { act, cleanup, fireEvent, fireEventAsync, render, waitFor, within } from "@testing-library/react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { DirectionProvider } from "@/lib/ui/direction";
 import { DeckCardsSheet } from "@/components/flashcards/DeckCardsSheet";
@@ -460,7 +460,7 @@ describe("DeckCardsSheet due-date editor characterization", () => {
         expect(setStudyCardDueDate).toHaveBeenCalledTimes(1);
         expect(setStudyCardDueDate).toHaveBeenCalledWith(mockDatabase, "deck-1", secondCard.id, parsed.date);
 
-        fireEvent.press(within(editorModal).getByRole("button", { name: s.cardSaveDueDate }));
+        await fireEventAsync.press(within(editorModal).getByRole("button", { name: s.cardSaveDueDate }));
         await waitFor(() => expect(view.queryByPlaceholderText(s.cardDueDatePlaceholder)).toBeNull());
         expect(setStudyCardDueDate).toHaveBeenCalledTimes(2);
         expect(setStudyCardDueDate).toHaveBeenNthCalledWith(2, mockDatabase, "deck-1", secondCard.id, parsed.date);
@@ -756,7 +756,7 @@ describe("DeckCardsSheet due-date editor characterization", () => {
           await waitFor(() => expect(view.queryByText(s.cardDeleteConfirm)).toBeNull());
 
           const retryModal = await openSecondCardConfirmation(view, s, "delete");
-          fireEvent.press(within(retryModal).getByRole("button", { name: s.flashcardsDelete }));
+          await fireEventAsync.press(within(retryModal).getByRole("button", { name: s.flashcardsDelete }));
           await waitFor(() => expect(view.queryByText(s.cardDeleteConfirm)).toBeNull());
           await waitFor(() => expect(view.queryByText(secondCard.title)).toBeNull());
           expect(view.getByText(firstCard.title)).toBeTruthy();
@@ -882,7 +882,7 @@ describe("DeckCardsSheet due-date editor characterization", () => {
           await waitFor(() => expect(view.queryByText(s.cardResetConfirm)).toBeNull());
 
           const retryModal = await openSecondCardConfirmation(view, s, "reset");
-          fireEvent.press(within(retryModal).getByRole("button", { name: s.cardResetProgress }));
+          await fireEventAsync.press(within(retryModal).getByRole("button", { name: s.cardResetProgress }));
           await waitFor(() => expect(view.queryByText(s.cardResetConfirm)).toBeNull());
           await waitFor(() => {
             expect(view.getByText(firstCard.title)).toBeTruthy();
