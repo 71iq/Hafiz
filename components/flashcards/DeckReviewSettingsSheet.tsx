@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, Text, TextInput, View, useWindowDimension
 import { Info, Minus, Plus } from "lucide-react-native";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { ReviewSettingInfoSheet } from "@/components/flashcards/ReviewSettingInfoSheet";
 import { OverlayBody, OverlayFooter, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { Switch } from "@/components/ui/Switch";
 import { useDatabase } from "@/lib/database/provider";
@@ -338,34 +339,13 @@ export function DeckReviewSettingsSheet({ visible, deckId, deckTitle, mode, onCl
         </OverlayFooter>
       </ResponsiveSheet>
 
-      <ResponsiveSheet
-        open={visible && activeInfo !== null}
+      <ReviewSettingInfoSheet
+        visible={visible}
+        info={activeInfo}
         onClose={() => setActiveInfo(null)}
-        maxWidth={440}
-        maxHeight={isPhone ? "70%" : 360}
-        dir={isRTL ? "rtl" : "ltr"}
-      >
-        <OverlayHeader
-          title={activeInfo?.title ?? ""}
-          onClose={() => setActiveInfo(null)}
-          isRTL={isRTL}
-          showHandle={isPhone}
-        />
-        <OverlayBody contentContainerClassName="px-5 py-5" contentContainerStyle={{ direction: isRTL ? "rtl" : "ltr" }}>
-          <Text
-            className="text-charcoal dark:text-neutral-200"
-            style={{
-              fontFamily: "Manrope_400Regular",
-              fontSize: 14,
-              lineHeight: 23,
-              textAlign: isRTL ? "right" : "left",
-              writingDirection: isRTL ? "rtl" : "ltr",
-            }}
-          >
-            {activeInfo?.body ?? ""}
-          </Text>
-        </OverlayBody>
-      </ResponsiveSheet>
+        isPhone={isPhone}
+        isRTL={isRTL}
+      />
     </>
   );
 }

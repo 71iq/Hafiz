@@ -95,6 +95,12 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "QCF glyph text keeps Quran layout invariants and is never horizontally mirrored.",
   ),
   entry(
+    "components/flashcards/ReviewSettingInfoSheet.tsx",
+    "overlay",
+    "rntl",
+    "Shared review-help overlay is covered through both editors at phone, tablet and desktop widths in Arabic and English.",
+  ),
+  entry(
     "components/flashcards/SmartDeckFilterSheet.tsx",
     "overlay",
     "source",

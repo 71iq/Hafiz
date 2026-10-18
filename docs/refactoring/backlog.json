@@ -2874,7 +2874,7 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "components/flashcards/ReviewSettingInfoSheet.tsx",
         "tests/unit/review-setting-info.test.tsx",
@@ -2884,8 +2884,12 @@
         "package.json",
         "package-lock.json"
       ],
-      "attempts": 0,
-      "readiness_evidence": ".refactor-baseline/rf059-help-preflight-v1/readiness-with-types.json"
+      "attempts": 1,
+      "readiness_evidence": ".refactor-baseline/rf059-help-preflight-v1/readiness-with-types.json",
+      "started_at": "2026-10-18T14:47:36.162534+00:00",
+      "completed_at": "2026-10-18T14:52:40.096648+00:00",
+      "evidence": ".ralph/runs/RF-059-1-1792334856164092979",
+      "summary": "Copied the seven approved RF-059 artifacts exactly. Reused ResponsiveSheet, OverlayHeader, and OverlayBody through a feature-local ReviewSettingInfoSheet; both parents retain their state and persistence logic. No commit, push, install, or controller-owned verification was performed."
     },
     {
       "id": "RF-060",
