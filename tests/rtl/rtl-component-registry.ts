@@ -175,6 +175,12 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "Page-view menu uses measured coordinates; internal rows mirror.",
   ),
   entry(
+    "components/mushaf/QiraatBlocks.tsx",
+    "quran-text",
+    "rntl",
+    "Supplied Arabic headings and bodies retain RTL alignment and order in both Qiraat callers.",
+  ),
+  entry(
     "components/mushaf/ReadingSettingsSheet.tsx",
     "overlay",
     "source",

@@ -70,7 +70,8 @@ import {
   type SmartCardKind,
   type SmartDeckRef,
 } from "@/lib/fsrs/smart-decks";
-import { parseQiraatText, type QiraatBlock } from "@/lib/qiraat/parse";
+import { parseQiraatText } from "@/lib/qiraat/parse";
+import { QiraatBlocks } from "@/components/mushaf/QiraatBlocks";
 import { recordAchievementEvent } from "@/lib/achievements/queries";
 import { deleteUserSetting, writeUserSetting } from "@/lib/database/user-settings";
 
@@ -1802,24 +1803,7 @@ function QiraatAnswer({ card, s }: { card: CardData; s: UIStrings }) {
         </View>
       )}
 
-      {blocks.map((block: QiraatBlock, i: number) => (
-        <View key={i} className="mb-4">
-          {block.heading && (
-            <Text
-              className="text-lg text-primary-accent dark:text-primary-bright mb-1.5"
-              style={{ writingDirection: "rtl", textAlign: "right", fontWeight: "700" }}
-            >
-              {block.heading}
-            </Text>
-          )}
-          <Text
-            className="text-base text-charcoal dark:text-neutral-200 leading-8"
-            style={{ writingDirection: "rtl", textAlign: "right" }}
-          >
-            {block.body}
-          </Text>
-        </View>
-      ))}
+      <QiraatBlocks blocks={blocks} />
     </ScrollView>
   );
 }

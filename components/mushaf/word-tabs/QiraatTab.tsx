@@ -4,6 +4,7 @@ import { useDatabase } from "@/lib/database/provider";
 import { fetchQiraat } from "@/lib/word/queries";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { parseQiraatText, type QiraatBlock } from "@/lib/qiraat/parse";
+import { QiraatBlocks } from "@/components/mushaf/QiraatBlocks";
 
 type Props = {
   surah: number;
@@ -114,24 +115,7 @@ export function QiraatTab({ surah, ayah, showHeader = true }: Props) {
         </View>
       )}
 
-      {blocks.map((block, i) => (
-        <View key={i} className="mb-4">
-          {block.heading && (
-            <Text
-              className="text-lg text-primary-accent dark:text-primary-bright mb-1.5"
-              style={{ writingDirection: "rtl", textAlign: "right", fontWeight: "700" }}
-            >
-              {block.heading}
-            </Text>
-          )}
-          <Text
-            className="text-base text-charcoal dark:text-neutral-200 leading-8"
-            style={{ writingDirection: "rtl", textAlign: "right" }}
-          >
-            {block.body}
-          </Text>
-        </View>
-      ))}
+      <QiraatBlocks blocks={blocks} />
     </View>
   );
 }
