@@ -23,8 +23,19 @@
         "Keep LoadingScreen, settings defaults and Quran data unchanged."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--runTestsByPath", "tests/unit/startup-language.test.ts"],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/startup-language.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "low",
       "approved": true,
@@ -48,17 +59,29 @@
       "title": "Remove unused chrome auto-hide API",
       "description": "Remove unused chrome auto-hide API",
       "rationale": "No caller uses the setAutoHideEnabled no-op.",
-      "modules": ["lib/ui/chrome.tsx"],
-      "dependencies": ["RF-001"],
+      "modules": [
+        "lib/ui/chrome.tsx"
+      ],
+      "dependencies": [
+        "RF-001"
+      ],
       "acceptance_criteria": [
         "Remove the unused context member, default no-op, implementation and provider property.",
         "Preserve markActivity, visible, immersive and their existing behavior. Confirm no callers before deletion."
       ],
-      "verification": [["npm", "run", "typecheck"]],
+      "verification": [
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
+      ],
       "risk": "low",
       "approved": true,
       "status": "verified",
-      "allowed_paths": ["lib/ui/chrome.tsx"],
+      "allowed_paths": [
+        "lib/ui/chrome.tsx"
+      ],
       "attempts": 1,
       "started_at": "2026-10-15T13:12:44.121117+00:00",
       "completed_at": "2026-10-15T13:14:45.803200+00:00",
@@ -70,21 +93,40 @@
       "title": "Reuse the shared theme opacity helper in review session",
       "description": "Reuse the shared theme opacity helper in review session",
       "rationale": "The sole local helper caller uses a six-digit palette color supported by withThemeOpacity.",
-      "modules": ["app/flashcards/session.tsx", "tests/unit/settings-contract.test.ts"],
-      "dependencies": ["RF-002"],
+      "modules": [
+        "app/flashcards/session.tsx",
+        "tests/unit/settings-contract.test.ts"
+      ],
+      "dependencies": [
+        "RF-002"
+      ],
       "acceptance_criteria": [
         "Replace the local withOpacity call with existing withThemeOpacity.",
         "Delete the duplicate helper and preserve the exact color result for themeSurface at alpha 0.95.",
         "Extend meaningful helper behavior tests only if missing. No broader session formatting."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--runTestsByPath", "tests/unit/settings-contract.test.ts"],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/settings-contract.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "low",
       "approved": true,
       "status": "verified",
-      "allowed_paths": ["app/flashcards/session.tsx", "tests/unit/settings-contract.test.ts"],
+      "allowed_paths": [
+        "app/flashcards/session.tsx",
+        "tests/unit/settings-contract.test.ts"
+      ],
       "attempts": 1,
       "started_at": "2026-10-15T13:17:42.805758+00:00",
       "completed_at": "2026-10-15T13:21:38.752616+00:00",
@@ -96,18 +138,29 @@
       "title": "Triage every measured clone group",
       "description": "Mechanically publish the primary engineer clone triage from .refactor-baseline/primary-clone-triage.json to docs/refactoring/duplication-triage.json. Preserve all decisions and rationales. This is report production; architecture remains with the primary engineer.",
       "rationale": "Source similarity needs a semantic reuse decision before merging code.",
-      "modules": ["docs/refactoring/duplication-triage.json"],
-      "dependencies": ["RF-003"],
+      "modules": [
+        "docs/refactoring/duplication-triage.json"
+      ],
+      "dependencies": [
+        "RF-003"
+      ],
       "acceptance_criteria": [
         "Classify every clone in analysis-summary.json as refactor, intentional, or needs-characterization with paths and concrete rationale.",
         "Name a small follow-up task for each actionable clone. Preserve all platform/data semantics.",
         "Use the primary-engineer draft as input. Add resolved_files by matching each scanner path suffix to exactly one tracked source file. Do not make new architectural choices or edit source."
       ],
-      "verification": [["python3", "scripts/ralph/check-triage.py"]],
+      "verification": [
+        [
+          "python3",
+          "scripts/ralph/check-triage.py"
+        ]
+      ],
       "risk": "low",
       "approved": true,
       "status": "verified",
-      "allowed_paths": ["docs/refactoring/duplication-triage.json"],
+      "allowed_paths": [
+        "docs/refactoring/duplication-triage.json"
+      ],
       "attempts": 1,
       "started_at": "2026-10-15T13:24:57.823247+00:00",
       "completed_at": "2026-10-15T13:27:40.561900+00:00",
@@ -119,8 +172,13 @@
       "title": "Replace the brittle progress RTL source assertion",
       "description": "Replace the brittle progress RTL source assertion",
       "rationale": "The baseline asserts a spelling rather than direction behavior.",
-      "modules": ["tests/unit/rtl-higher-level-source-contract.test.ts", "tests/unit/progress-screen-rtl.test.tsx"],
-      "dependencies": ["RF-004"],
+      "modules": [
+        "tests/unit/rtl-higher-level-source-contract.test.ts",
+        "tests/unit/progress-screen-rtl.test.tsx"
+      ],
+      "dependencies": [
+        "RF-004"
+      ],
       "acceptance_criteria": [
         "The current progress source differs only in parentheses and line wrapping. Keep application source unchanged.",
         "Replace only the progress-route formatting-sensitive assertions with rendered RTL/LTR checks of the actual ProgressScreen, using isolated service/database fixtures. Assert direction ltr, mirrored row order and horizontal recent-achievement content.",
@@ -137,8 +195,15 @@
           "tests/unit/rtl-higher-level-source-contract.test.ts",
           "tests/unit/progress-screen-rtl.test.tsx"
         ],
-        ["npm", "run", "typecheck"],
-        ["python3", "scripts/ralph/check-progress-rtl.py"]
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "python3",
+          "scripts/ralph/check-progress-rtl.py"
+        ]
       ],
       "risk": "medium",
       "approved": true,
@@ -164,7 +229,9 @@
         "tests/rtl/rtl-style-allowlist.ts",
         "tests/unit/theme-color-swatch.test.tsx"
       ],
-      "dependencies": ["RF-005"],
+      "dependencies": [
+        "RF-005"
+      ],
       "acceptance_criteria": [
         "Leave components/ui/ThemeColorSwatch.tsx unchanged. Its checkmark decorates the color sample and does not encode reading order.",
         "Add the correct direction-neutral registry entry, linked to rendered component coverage. Add one exact physical-right allowlist entry with the concrete decorative-coordinate rationale. Do not broaden regexes or silence other styles.",
@@ -181,7 +248,11 @@
           "tests/unit/rtl-style-contract.test.ts",
           "tests/unit/rtl-component-registry-coverage.test.ts"
         ],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "medium",
       "approved": true,
@@ -203,8 +274,14 @@
       "title": "Patch critical transitive tool dependencies",
       "description": "Apply the primary-reviewed transitive patches for shell-quote and tar without upgrading the framework or Supabase CLI.",
       "rationale": "The lock has shell-quote 1.8.4 through react-devtools-core and tar 7.5.13 pinned by Supabase CLI 2.98.2. Official advisories identify patched releases, and current stable same-major versions are 1.12.0 and 7.5.22.",
-      "modules": ["package.json", "package-lock.json", "docs/refactoring/SECURITY.md"],
-      "dependencies": ["RF-006"],
+      "modules": [
+        "package.json",
+        "package-lock.json",
+        "docs/refactoring/SECURITY.md"
+      ],
+      "dependencies": [
+        "RF-006"
+      ],
       "acceptance_criteria": [
         "Keep all direct dependency versions and application source unchanged. Add exactly scoped overrides: react-devtools-core -> shell-quote 1.12.0 and supabase -> tar 7.5.22. The primary engineer owns this choice; do not select broader upgrades.",
         "The generator edits package.json and docs/refactoring/SECURITY.md only. Do not hand-edit package-lock.json or install packages. The first controller verification command resolves and installs the overrides locally with lifecycle scripts disabled. The lockfile is an allowed controller output.",
@@ -214,17 +291,46 @@
         "Critical-level npm audit, strict typecheck, full unit suite and web export must pass after installation. Noncritical findings remain visible and are separate work. No backend command, production connection, deployment, protected-input change or native dependency upgrade is part of this task."
       ],
       "verification": [
-        ["npm", "install", "--ignore-scripts", "--no-audit", "--no-fund"],
-        ["node", "scripts/ralph/check-security-dependencies.cjs"],
-        ["npm", "audit", "--audit-level=critical"],
-        ["npm", "run", "typecheck"],
-        ["npm", "run", "test:unit"],
-        ["npm", "run", "build:web"]
+        [
+          "npm",
+          "install",
+          "--ignore-scripts",
+          "--no-audit",
+          "--no-fund"
+        ],
+        [
+          "node",
+          "scripts/ralph/check-security-dependencies.cjs"
+        ],
+        [
+          "npm",
+          "audit",
+          "--audit-level=critical"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ]
       ],
       "risk": "high",
       "approved": true,
       "status": "verified",
-      "allowed_paths": ["package.json", "package-lock.json", "docs/refactoring/SECURITY.md"],
+      "allowed_paths": [
+        "package.json",
+        "package-lock.json",
+        "docs/refactoring/SECURITY.md"
+      ],
       "attempts": 1,
       "started_at": "2026-10-15T23:43:54.165332+00:00",
       "completed_at": "2026-10-15T23:47:14.249628+00:00",
@@ -236,8 +342,16 @@
       "title": "Resolve remaining Expo diagnostics",
       "description": "Resolve the remaining lint-preset and native/app-config ownership findings after accepted SDK55 alignment.",
       "rationale": "RF-067 isolates the verified runtime/package alignment. This umbrella still owns full Expo diagnostics, lint coverage/maintenance and the committed-native configuration decision.",
-      "modules": ["package.json", "package-lock.json", "patches/*", "docs/refactoring/TECH_STACK.md"],
-      "dependencies": ["RF-007", "RF-067"],
+      "modules": [
+        "package.json",
+        "package-lock.json",
+        "patches/*",
+        "docs/refactoring/TECH_STACK.md"
+      ],
+      "dependencies": [
+        "RF-007",
+        "RF-067"
+      ],
       "acceptance_criteria": [
         "Use Expo recommended SDK55 versions, inspect existing patches and preserve native APIs.",
         "Remove direct expo-modules-core only after confirming callers/autolinking.",
@@ -246,17 +360,46 @@
         "RF-067 now has a proven standard-resolution, full graph and strict-idempotent-lock preflight in SDK55_ALIGNMENT.md. Keep the original failed experiments as evidence, not as a permanent upgrade blocker. After RF-067, review actual remaining full-project diagnostics without weakening lint rules or hiding native configuration debt."
       ],
       "verification": [
-        ["npx", "expo", "install", "--check"],
-        ["npm", "run", "diagnose:expo"],
-        ["node", "scripts/ralph/check-expo-native.cjs"],
-        ["npm", "run", "typecheck"],
-        ["npm", "run", "test:unit"],
-        ["npm", "run", "build:web"]
+        [
+          "npx",
+          "expo",
+          "install",
+          "--check"
+        ],
+        [
+          "npm",
+          "run",
+          "diagnose:expo"
+        ],
+        [
+          "node",
+          "scripts/ralph/check-expo-native.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ]
       ],
       "risk": "high",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["package.json", "package-lock.json", "patches/*", "docs/refactoring/TECH_STACK.md"],
+      "allowed_paths": [
+        "package.json",
+        "package-lock.json",
+        "patches/*",
+        "docs/refactoring/TECH_STACK.md"
+      ],
       "attempts": 0
     },
     {
@@ -264,8 +407,13 @@
       "title": "Calibrate native and web unused-code roots",
       "description": "Calibrate four proven platform entries and nested CJS diagnostics, then publish the primary-reviewed unused-code dispositions.",
       "rationale": "Actual installed Knip Metro roots cover src while Hafiz uses root-level components/lib. Two real preflight scans remove four live-file and four dependency false reports, retain AuthGate and reveal an additional unlisted diagnostic dependency. No code deletion follows from calibration alone.",
-      "modules": ["knip.json", "docs/refactoring/UNUSED.md"],
-      "dependencies": ["RF-067"],
+      "modules": [
+        "knip.json",
+        "docs/refactoring/UNUSED.md"
+      ],
+      "dependencies": [
+        "RF-067"
+      ],
       "acceptance_criteria": [
         "Read .refactor-baseline/rf009-readiness.json, both actual preflight JSON/stderr files and rf009-before-gate.log. Primary owns all root/exclusion/disposition decisions. Only knip.json and docs/refactoring/UNUSED.md. No subagents or reviewers from worker. Keep existing source, dependencies, generated assets, production and original checkout untouched.",
         "Copy .refactor-baseline/rf009-prescribed-knip.json exactly to knip.json. It adds four exact live platform entries and makes existing JS/MJS script entry/project roots recursive with CJS support. No additional entry/ignore/suppression, dependency, package script, tool install, automatic fix/removal or source edit. Existing exclusions and dependency exceptions stay identical.",
@@ -274,13 +422,24 @@
         "Pre-fix gate genuinely fails because live platform modules are reported unused. After the prescribed calibration require the gate and canonical two-file formatting to pass, then separate Astra review. No application test/build/native/device/iOS or security rerun is required or claimed for this analysis/config/doc-only change. Independent review checks exact bytes, source-to-entry evidence, meaningful negative control, unresolved findings and scope. Primary accepts final report/config hashes after controller completion."
       ],
       "verification": [
-        ["python3", ".refactor-baseline/rf009-verify.py"],
-        ["node_modules/.bin/prettier", "--check", "knip.json", "docs/refactoring/UNUSED.md"]
+        [
+          "python3",
+          ".refactor-baseline/rf009-verify.py"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "knip.json",
+          "docs/refactoring/UNUSED.md"
+        ]
       ],
       "risk": "medium",
       "approved": true,
       "status": "verified",
-      "allowed_paths": ["knip.json", "docs/refactoring/UNUSED.md"],
+      "allowed_paths": [
+        "knip.json",
+        "docs/refactoring/UNUSED.md"
+      ],
       "attempts": 1,
       "started_at": "2026-10-17T15:29:51.546653+00:00",
       "failure": "Batch resource limit reached",
@@ -293,8 +452,14 @@
       "title": "Remove the verified unused AuthGate component",
       "description": "Delete only the unused full-screen AuthGate module and its one RTL registry record, then update the measured unused-code disposition.",
       "rationale": "Accepted calibrated platform/tool analysis reports AuthGate alone. Primary private-package/Expo route, Metro, caller and dynamic-discovery inspection finds only its implementation and registry string, with no native/web runtime caller. Live compact sign-in callouts remain unchanged.",
-      "modules": ["components/ui/AuthGate.tsx", "tests/rtl/rtl-component-registry.ts", "docs/refactoring/UNUSED.md"],
-      "dependencies": ["RF-009"],
+      "modules": [
+        "components/ui/AuthGate.tsx",
+        "tests/rtl/rtl-component-registry.ts",
+        "docs/refactoring/UNUSED.md"
+      ],
+      "dependencies": [
+        "RF-009"
+      ],
       "acceptance_criteria": [
         "Read .refactor-baseline/rf010-readiness.json, rf010-callers.log and rf010-before-gate.log. Primary owns the deletion and compatibility decision. Only three exact paths. No subagents/reviewers from worker. Controller owns every frozen gate, independent stronger review and commit.",
         "Delete the complete 76-line components/ui/AuthGate.tsx module. Do not replace it, move it, create a wrapper, redirect callers, change live sign-in callouts, routes, Button, Card, ScreenContent, settings, strings, dependencies or runtime behavior. No protected/generated/backend/production changes.",
@@ -304,11 +469,32 @@
         "All five fresh frozen gates must pass: actual Knip validation, the unchanged three-case RTL inventory suite, strict typecheck, scoped registry lint and documentation format. No new tests are needed for an unreachable module; do not add a source-spelling test. No browser/app/native build/device/iOS rerun is required or claimed. Separate Astra reviews complete diff, no callers, preserved registry contracts and actual machine evidence. Primary final diff/hash acceptance follows controller completion. Keep retries/checkpoints/resource limits and 93-percent supervisor stop unchanged."
       ],
       "verification": [
-        ["python3", ".refactor-baseline/rf010-verify.py"],
-        ["npm", "run", "test:unit", "--", "--runTestsByPath", "tests/unit/rtl-component-registry-coverage.test.ts"],
-        ["npm", "run", "typecheck"],
-        ["node_modules/.bin/eslint", "tests/rtl/rtl-component-registry.ts"],
-        ["node_modules/.bin/prettier", "--check", "docs/refactoring/UNUSED.md"]
+        [
+          "python3",
+          ".refactor-baseline/rf010-verify.py"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/rtl-component-registry-coverage.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "tests/rtl/rtl-component-registry.ts"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "docs/refactoring/UNUSED.md"
+        ]
       ],
       "risk": "medium",
       "approved": true,
@@ -330,8 +516,15 @@
       "title": "Declare the already-used bottom-tabs dependency",
       "description": "Declare exact installed bottom-tabs version 7.21.0 with no resolved-package or source movement.",
       "rationale": "AppNavigation imports the package type while relying on Router transitive ownership. Strict isolated metadata-only resolution is stable and full installed graph passes. Remaining ownership findings get separate tasks.",
-      "modules": ["package.json", "package-lock.json", "docs/refactoring/UNUSED.md"],
-      "dependencies": ["RF-009", "RF-085"],
+      "modules": [
+        "package.json",
+        "package-lock.json",
+        "docs/refactoring/UNUSED.md"
+      ],
+      "dependencies": [
+        "RF-009",
+        "RF-085"
+      ],
       "acceptance_criteria": [
         "Read .refactor-baseline/rf011-readiness.json and rf011-tabs-preflight.json. Primary owns dependency/security/native/API decisions. Generator edits only package.json and docs/refactoring/UNUSED.md. package-lock.json is allowed controller output only. Do not install packages, edit the lock, run scripts, spawn helpers/reviewers or change baseline/verifier evidence. Controller owns six frozen gates and separate stronger review.",
         "Copy .refactor-baseline/rf011-prescribed-package.json exactly: add only dependencies.@react-navigation/bottom-tabs at exact 7.21.0. Keep every other range, script, override and byte. This is already resolved and used by the AppNavigation type import. Do not modify AppNavigation, native projects, signing/config, source, tests, protected inputs or production. No alternative type wrapper, architecture or new module.",
@@ -355,15 +548,36 @@
           "-c",
           "import hashlib,pathlib,runpy; p=pathlib.Path('.refactor-baseline/rf011-verify.py'); assert hashlib.sha256(p.read_bytes()).hexdigest() == 'ce00dadca8be47d67b92e113a8d64efa839120e242752e065c55c2e913d6cffa', 'Primary verifier changed'; runpy.run_path(str(p),run_name='__main__')"
         ],
-        ["npm", "run", "typecheck"],
-        ["npm", "run", "test:unit"],
-        ["npm", "run", "build:web"],
-        ["node_modules/.bin/prettier", "--check", "package.json", "docs/refactoring/UNUSED.md"]
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "package.json",
+          "docs/refactoring/UNUSED.md"
+        ]
       ],
       "risk": "medium",
       "approved": true,
       "status": "verified",
-      "allowed_paths": ["package.json", "package-lock.json", "docs/refactoring/UNUSED.md"],
+      "allowed_paths": [
+        "package.json",
+        "package-lock.json",
+        "docs/refactoring/UNUSED.md"
+      ],
       "attempts": 1,
       "started_at": "2026-10-17T20:58:12.710552+00:00",
       "completed_at": "2026-10-17T21:01:42.169537+00:00",
@@ -375,17 +589,33 @@
       "title": "Establish native dependency-boundary analysis",
       "description": "Establish native dependency-boundary analysis",
       "rationale": "Current cruise prefers web and cannot certify native resolution.",
-      "modules": [".dependency-cruiser.cjs", "package.json", "docs/refactoring/ARCHITECTURE.md"],
-      "dependencies": ["RF-008"],
+      "modules": [
+        ".dependency-cruiser.cjs",
+        "package.json",
+        "docs/refactoring/ARCHITECTURE.md"
+      ],
+      "dependencies": [
+        "RF-008"
+      ],
       "acceptance_criteria": [
         "Run separate native and web graph configurations.",
         "Enforce no route imports from domain/shared UI and no newly introduced cycles."
       ],
-      "verification": [["npm", "run", "analyze:boundaries"]],
+      "verification": [
+        [
+          "npm",
+          "run",
+          "analyze:boundaries"
+        ]
+      ],
       "risk": "medium",
       "approved": false,
       "status": "pending",
-      "allowed_paths": [".dependency-cruiser.cjs", "package.json", "docs/refactoring/ARCHITECTURE.md"],
+      "allowed_paths": [
+        ".dependency-cruiser.cjs",
+        "package.json",
+        "docs/refactoring/ARCHITECTURE.md"
+      ],
       "attempts": 0
     },
     {
@@ -393,8 +623,14 @@
       "title": "Repair ayah-marker preference hydration",
       "description": "Restore the already-persisted ayah-marker visibility when SettingsProvider loads, using the existing local settings query and boolean state.",
       "rationale": "The setter writes show_ayah_markers, but the hydration key list and state assignment omit it. This independent preference repair does not require a framework upgrade; the existing locked baseline has passing types and unit tests.",
-      "modules": ["lib/settings/context.tsx", "tests/unit/settings-hydration.test.tsx"],
-      "dependencies": ["RF-006", "RF-007"],
+      "modules": [
+        "lib/settings/context.tsx",
+        "tests/unit/settings-hydration.test.tsx"
+      ],
+      "dependencies": [
+        "RF-006",
+        "RF-007"
+      ],
       "acceptance_criteria": [
         "The primary engineer selects this exact behavior: persisted literal false hydrates false, literal true hydrates true, and absent or malformed values keep the existing true default. Do not coerce arbitrary strings, change initial state, normalize other settings or change the setter. Reuse readSettings, setShowAyahMarkersState and the existing writeUserSetting path. No helper, provider, schema or sync redesign.",
         "Add tests/unit/settings-hydration.test.tsx using actual SettingsProvider and useSettings through RNTL renderHook and a wrapper. Isolate database/translation imports and NativeWind lifecycle using existing Jest patterns. Do not mock the provider/hook under test or write source-string assertions. Keep fixtures typed without any, suppression, unsafe casts or a fabricated full SQLiteDatabase cast.",
@@ -405,15 +641,34 @@
         "Controller-run full unit suite, strict typecheck, scoped ESLint and production web export must pass. Independent review must verify the red-before/green-after evidence and realistic bound-key fixture, the tiny source diff, offline-only writes, invalid-value default and both platform cases. No new native API or markup changes occur; browser, device and iOS runtime verification must be recorded as not run. Primary engineer retains final acceptance."
       ],
       "verification": [
-        ["npm", "run", "test:unit"],
-        ["npm", "run", "typecheck"],
-        ["node_modules/.bin/eslint", "lib/settings/context.tsx", "tests/unit/settings-hydration.test.tsx"],
-        ["npm", "run", "build:web"]
+        [
+          "npm",
+          "run",
+          "test:unit"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/settings/context.tsx",
+          "tests/unit/settings-hydration.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ]
       ],
       "risk": "medium",
       "approved": true,
       "status": "verified",
-      "allowed_paths": ["lib/settings/context.tsx", "tests/unit/settings-hydration.test.tsx"],
+      "allowed_paths": [
+        "lib/settings/context.tsx",
+        "tests/unit/settings-hydration.test.tsx"
+      ],
       "attempts": 1,
       "started_at": "2026-10-16T05:20:44.891454+00:00",
       "failure": "Batch resource limit reached",
@@ -440,15 +695,28 @@
         "lib/settings/*",
         "tests/unit/tafsir-selection.test.tsx"
       ],
-      "dependencies": ["RF-013"],
+      "dependencies": [
+        "RF-013"
+      ],
       "acceptance_criteria": [
         "Cover import success, failure and simultaneous selection.",
         "Share only matching two callbacks. Keep AyahDetailModal refresh semantics explicit.",
         "Verify relevant rendered picker state."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--runTestsByPath", "tests/unit/tafsir-selection.test.tsx"],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/tafsir-selection.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "medium",
       "approved": false,
@@ -466,21 +734,46 @@
       "title": "Characterize Hifz progress transitions",
       "description": "Characterize Hifz progress transitions",
       "rationale": "Reader orchestration lacks direct transition tests.",
-      "modules": ["lib/mushaf/*", "app/(tabs)/mushaf.tsx", "tests/unit/hifz-transitions.test.ts"],
-      "dependencies": ["RF-014"],
+      "modules": [
+        "lib/mushaf/*",
+        "app/(tabs)/mushaf.tsx",
+        "tests/unit/hifz-transitions.test.ts"
+      ],
+      "dependencies": [
+        "RF-014"
+      ],
       "acceptance_criteria": [
         "Cover zero-word ayahs, partial/previous/next reveal, page reset/completion and the existing final timer tick.",
         "Extract pure policy without modifying data, glyph/page mapping or gestures."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--runTestsByPath", "tests/unit/hifz-transitions.test.ts"],
-        ["npm", "run", "typecheck"],
-        ["npm", "run", "build:web"]
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/hifz-transitions.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ]
       ],
       "risk": "high",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["lib/mushaf/*", "app/(tabs)/mushaf.tsx", "tests/unit/hifz-transitions.test.ts"],
+      "allowed_paths": [
+        "lib/mushaf/*",
+        "app/(tabs)/mushaf.tsx",
+        "tests/unit/hifz-transitions.test.ts"
+      ],
       "attempts": 0
     },
     {
@@ -488,8 +781,14 @@
       "title": "Extract tested Mushaf geometry calculations",
       "description": "Extract tested Mushaf geometry calculations",
       "rationale": "Geometry, loading and gestures currently share a large component.",
-      "modules": ["components/mushaf/PageMushaf.tsx", "lib/mushaf/*", "tests/unit/mushaf-geometry.test.ts"],
-      "dependencies": ["RF-015"],
+      "modules": [
+        "components/mushaf/PageMushaf.tsx",
+        "lib/mushaf/*",
+        "tests/unit/mushaf-geometry.test.ts"
+      ],
+      "dependencies": [
+        "RF-015"
+      ],
       "acceptance_criteria": [
         "Characterize structural lines, font fitting, offsets and page bounds before extraction.",
         "Verify representative phone/tablet/desktop, Arabic/English and themes in rendered output."
@@ -504,13 +803,25 @@
           "tests/unit/mushaf-geometry.test.ts",
           "tests/unit/mushaf-page-tokens.test.ts"
         ],
-        ["npm", "run", "typecheck"],
-        ["npm", "run", "build:web"]
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ]
       ],
       "risk": "high",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["components/mushaf/PageMushaf.tsx", "lib/mushaf/*", "tests/unit/mushaf-geometry.test.ts"],
+      "allowed_paths": [
+        "components/mushaf/PageMushaf.tsx",
+        "lib/mushaf/*",
+        "tests/unit/mushaf-geometry.test.ts"
+      ],
       "attempts": 0
     },
     {
@@ -524,14 +835,27 @@
         "app/(tabs)/reflection-feed.tsx",
         "tests/unit/mushaf-position.test.ts"
       ],
-      "dependencies": ["RF-016"],
+      "dependencies": [
+        "RF-016"
+      ],
       "acceptance_criteria": [
         "Test missing and overlapping ranges before selecting a common interface.",
         "Keep caller-specific nullable/fallback outcomes. Do not alter Quran mappings."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--runTestsByPath", "tests/unit/mushaf-position.test.ts"],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/mushaf-position.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "medium",
       "approved": false,
@@ -549,20 +873,39 @@
       "title": "Test stale search completion and cancellation",
       "description": "Test stale search completion and cancellation",
       "rationale": "Search can receive responses in a different order from requests.",
-      "modules": ["components/SearchCommand.tsx", "tests/unit/search-results.test.tsx"],
-      "dependencies": ["RF-008"],
+      "modules": [
+        "components/SearchCommand.tsx",
+        "tests/unit/search-results.test.tsx"
+      ],
+      "dependencies": [
+        "RF-008"
+      ],
       "acceptance_criteria": [
         "Use deferred responses to reproduce any actual stale-result bug.",
         "Guard request ownership and unmount if reproduced. Preserve grouping/root resolution and offline SQL."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--runTestsByPath", "tests/unit/search-results.test.tsx"],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/search-results.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "medium",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["components/SearchCommand.tsx", "tests/unit/search-results.test.tsx"],
+      "allowed_paths": [
+        "components/SearchCommand.tsx",
+        "tests/unit/search-results.test.tsx"
+      ],
       "attempts": 0
     },
     {
@@ -570,21 +913,46 @@
       "title": "Extract search query and grouping policy",
       "description": "Extract search query and grouping policy",
       "rationale": "Search mixes data work and rendering.",
-      "modules": ["components/SearchCommand.tsx", "lib/search/*", "tests/unit/search-results.test.tsx"],
-      "dependencies": ["RF-018"],
+      "modules": [
+        "components/SearchCommand.tsx",
+        "lib/search/*",
+        "tests/unit/search-results.test.tsx"
+      ],
+      "dependencies": [
+        "RF-018"
+      ],
       "acceptance_criteria": [
         "Move only independently tested query/group rules. Keep keyboard, focus, selection and navigation behavior.",
         "Verify search on representative web and native input when available."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--runTestsByPath", "tests/unit/search-results.test.tsx"],
-        ["npm", "run", "typecheck"],
-        ["npm", "run", "build:web"]
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/search-results.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ]
       ],
       "risk": "medium",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["components/SearchCommand.tsx", "lib/search/*", "tests/unit/search-results.test.tsx"],
+      "allowed_paths": [
+        "components/SearchCommand.tsx",
+        "lib/search/*",
+        "tests/unit/search-results.test.tsx"
+      ],
       "attempts": 0
     },
     {
@@ -592,8 +960,14 @@
       "title": "Characterize review-session orchestration",
       "description": "Characterize review-session orchestration",
       "rationale": "Transition extraction already exists; remaining orchestration needs direct regression tests.",
-      "modules": ["app/flashcards/session.tsx", "lib/fsrs/*", "tests/unit/review-session.test.tsx"],
-      "dependencies": ["RF-008"],
+      "modules": [
+        "app/flashcards/session.tsx",
+        "lib/fsrs/*",
+        "tests/unit/review-session.test.tsx"
+      ],
+      "dependencies": [
+        "RF-008"
+      ],
       "acceptance_criteria": [
         "Cover persistence order, same-day requeue, score inputs, cancellation and failures.",
         "Keep review-transition as the existing domain owner. Identify the next smallest extraction."
@@ -609,12 +983,20 @@
           "tests/unit/fsrs-review-transition.test.ts",
           "tests/unit/fsrs-scoring.test.ts"
         ],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "high",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["app/flashcards/session.tsx", "lib/fsrs/*", "tests/unit/review-session.test.tsx"],
+      "allowed_paths": [
+        "app/flashcards/session.tsx",
+        "lib/fsrs/*",
+        "tests/unit/review-session.test.tsx"
+      ],
       "attempts": 0
     },
     {
@@ -628,7 +1010,9 @@
         "lib/fsrs/*",
         "tests/unit/review-session.test.tsx"
       ],
-      "dependencies": ["RF-020"],
+      "dependencies": [
+        "RF-020"
+      ],
       "acceptance_criteria": [
         "One independently named extraction, with current persistence/error/session behavior.",
         "No mega-hook replacement or changed scheduling policy."
@@ -643,8 +1027,16 @@
           "tests/unit/review-session.test.tsx",
           "tests/unit/fsrs-review-transition.test.ts"
         ],
-        ["npm", "run", "typecheck"],
-        ["npm", "run", "build:web"]
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ]
       ],
       "risk": "high",
       "approved": false,
@@ -662,20 +1054,41 @@
       "title": "Characterize smart-deck and queue query invariants",
       "description": "Characterize smart-deck and queue query invariants",
       "rationale": "Large query modules encode deck membership, limits and scheduling.",
-      "modules": ["lib/fsrs/queries.ts", "lib/fsrs/smart-decks.ts", "tests/unit/smart-decks.test.ts"],
-      "dependencies": ["RF-020"],
+      "modules": [
+        "lib/fsrs/queries.ts",
+        "lib/fsrs/smart-decks.ts",
+        "tests/unit/smart-decks.test.ts"
+      ],
+      "dependencies": [
+        "RF-020"
+      ],
       "acceptance_criteria": [
         "Test uniqueness, limits, ordering, empty decks, soft deletion and stable timestamps in isolated SQLite-equivalent fixtures.",
         "Split follow-up refactors by actual invariant ownership."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--runTestsByPath", "tests/unit/smart-decks.test.ts"],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/smart-decks.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "high",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["lib/fsrs/queries.ts", "lib/fsrs/smart-decks.ts", "tests/unit/smart-decks.test.ts"],
+      "allowed_paths": [
+        "lib/fsrs/queries.ts",
+        "lib/fsrs/smart-decks.ts",
+        "tests/unit/smart-decks.test.ts"
+      ],
       "attempts": 0
     },
     {
@@ -690,12 +1103,20 @@
         "components/profile/*",
         "components/reflections/*"
       ],
-      "dependencies": ["RF-008"],
+      "dependencies": [
+        "RF-008"
+      ],
       "acceptance_criteria": [
         "Inventory keys, viewer-dependent fields, stale data, cancellation, identity changes and invalidation owners.",
         "Reproduce any cache leak with isolated fixtures before repair. No live accounts."
       ],
-      "verification": [["npm", "run", "typecheck"]],
+      "verification": [
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
+      ],
       "risk": "high",
       "approved": false,
       "status": "pending",
@@ -719,14 +1140,27 @@
         "app/(tabs)/reflection-feed.tsx",
         "tests/unit/reflection-query-keys.test.ts"
       ],
-      "dependencies": ["RF-023"],
+      "dependencies": [
+        "RF-023"
+      ],
       "acceptance_criteria": [
         "Include all result inputs and viewer identity. Preserve public/private cache separation.",
         "Migrate matching callers and invalidations together, with pagination tests."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--runTestsByPath", "tests/unit/reflection-query-keys.test.ts"],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/reflection-query-keys.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "high",
       "approved": false,
@@ -744,8 +1178,15 @@
       "title": "Verify auth cache isolation and late requests",
       "description": "Verify auth cache isolation and late requests",
       "rationale": "Account switches must not receive previous user results.",
-      "modules": ["app/_layout.tsx", "lib/auth/*", "lib/query/*", "tests/unit/auth-query-lifecycle.test.tsx"],
-      "dependencies": ["RF-024"],
+      "modules": [
+        "app/_layout.tsx",
+        "lib/auth/*",
+        "lib/query/*",
+        "tests/unit/auth-query-lifecycle.test.tsx"
+      ],
+      "dependencies": [
+        "RF-024"
+      ],
       "acceptance_criteria": [
         "Test sign-in, sign-out, account switch, late responses, subscription cleanup and offline restore.",
         "Cancel/remove private cache at the correct lifecycle point with no new auth behavior."
@@ -760,12 +1201,21 @@
           "tests/unit/auth-query-lifecycle.test.tsx",
           "tests/unit/auth-disabled.test.ts"
         ],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "high",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["app/_layout.tsx", "lib/auth/*", "lib/query/*", "tests/unit/auth-query-lifecycle.test.tsx"],
+      "allowed_paths": [
+        "app/_layout.tsx",
+        "lib/auth/*",
+        "lib/query/*",
+        "tests/unit/auth-query-lifecycle.test.tsx"
+      ],
       "attempts": 0
     },
     {
@@ -779,14 +1229,27 @@
         "lib/reflections/*",
         "tests/unit/reflection-mutations.test.tsx"
       ],
-      "dependencies": ["RF-024"],
+      "dependencies": [
+        "RF-024"
+      ],
       "acceptance_criteria": [
         "Test failed and concurrent likes/comments, page boundaries and targeted invalidation.",
         "Preserve compatibility handling for missing server columns without hiding unrelated errors."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--runTestsByPath", "tests/unit/reflection-mutations.test.tsx"],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/reflection-mutations.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "high",
       "approved": false,
@@ -804,13 +1267,26 @@
       "title": "Audit remaining manual remote fetches for Query ownership",
       "description": "Audit remaining manual remote fetches for Query ownership",
       "rationale": "Only remote server state should migrate to Query.",
-      "modules": ["docs/refactoring/QUERY_AUDIT.md", "lib/profile/*", "lib/leaderboard/*", "lib/quran-foundation/*"],
-      "dependencies": ["RF-023"],
+      "modules": [
+        "docs/refactoring/QUERY_AUDIT.md",
+        "lib/profile/*",
+        "lib/leaderboard/*",
+        "lib/quran-foundation/*"
+      ],
+      "dependencies": [
+        "RF-023"
+      ],
       "acceptance_criteria": [
         "Classify every manual remote fetch by cache/lifecycle needs.",
         "Prepare small migrations only where they remove duplicate state. Keep local SQLite and queue writes outside Query."
       ],
-      "verification": [["npm", "run", "typecheck"]],
+      "verification": [
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
+      ],
       "risk": "medium",
       "approved": false,
       "status": "pending",
@@ -827,20 +1303,41 @@
       "title": "Integrate native Query online and focus lifecycle",
       "description": "Integrate native Query online and focus lifecycle",
       "rationale": "Query native reconnection needs explicit lifecycle handling.",
-      "modules": ["app/_layout.tsx", "lib/query/*", "tests/unit/query-native-lifecycle.test.tsx"],
-      "dependencies": ["RF-025"],
+      "modules": [
+        "app/_layout.tsx",
+        "lib/query/*",
+        "tests/unit/query-native-lifecycle.test.tsx"
+      ],
+      "dependencies": [
+        "RF-025"
+      ],
       "acceptance_criteria": [
         "Use existing NetInfo and AppState with listener cleanup.",
         "Test offline boot, reconnect, background/foreground, auth and strict remount. Do not automatically replay writes."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--runTestsByPath", "tests/unit/query-native-lifecycle.test.tsx"],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/query-native-lifecycle.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "high",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["app/_layout.tsx", "lib/query/*", "tests/unit/query-native-lifecycle.test.tsx"],
+      "allowed_paths": [
+        "app/_layout.tsx",
+        "lib/query/*",
+        "tests/unit/query-native-lifecycle.test.tsx"
+      ],
       "attempts": 0
     },
     {
@@ -848,8 +1345,14 @@
       "title": "Characterize sync partial failure and status",
       "description": "Characterize sync partial failure and status",
       "rationale": "Pull catches failures while callers may report synced.",
-      "modules": ["lib/database/sync.ts", "lib/sync/useSync.ts", "tests/unit/sync-partial-failure.test.tsx"],
-      "dependencies": ["RF-025"],
+      "modules": [
+        "lib/database/sync.ts",
+        "lib/sync/useSync.ts",
+        "tests/unit/sync-partial-failure.test.tsx"
+      ],
+      "dependencies": [
+        "RF-025"
+      ],
       "acceptance_criteria": [
         "Test partial pulls, failed upload, lost connectivity, watermark advancement and retry.",
         "Separate successful/partial/failed outcomes without changing restore-before-upload or queue semantics."
@@ -865,12 +1368,20 @@
           "tests/unit/sync-concurrency.test.tsx",
           "tests/unit/sync-restore-contract.test.ts"
         ],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "high",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["lib/database/sync.ts", "lib/sync/useSync.ts", "tests/unit/sync-partial-failure.test.tsx"],
+      "allowed_paths": [
+        "lib/database/sync.ts",
+        "lib/sync/useSync.ts",
+        "tests/unit/sync-partial-failure.test.tsx"
+      ],
       "attempts": 0
     },
     {
@@ -878,21 +1389,46 @@
       "title": "Validate web database bridge messages and SQL values",
       "description": "Validate web database bridge messages and SQL values",
       "rationale": "Bridge wire values currently pass through any casts.",
-      "modules": ["lib/database/provider.tsx", "lib/database/bridge*", "tests/unit/database-bridge.test.ts"],
-      "dependencies": ["RF-029"],
+      "modules": [
+        "lib/database/provider.tsx",
+        "lib/database/bridge*",
+        "tests/unit/database-bridge.test.ts"
+      ],
+      "dependencies": [
+        "RF-029"
+      ],
       "acceptance_criteria": [
         "Test malformed/unknown messages, bind-value validation, host changes, stale replies, timeouts and cancellation.",
         "Preserve native/web initialization and one-writer OPFS behavior."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--runTestsByPath", "tests/unit/database-bridge.test.ts"],
-        ["npm", "run", "typecheck"],
-        ["npm", "run", "build:web"]
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/database-bridge.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ]
       ],
       "risk": "high",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["lib/database/provider.tsx", "lib/database/bridge*", "tests/unit/database-bridge.test.ts"],
+      "allowed_paths": [
+        "lib/database/provider.tsx",
+        "lib/database/bridge*",
+        "tests/unit/database-bridge.test.ts"
+      ],
       "attempts": 0
     },
     {
@@ -906,7 +1442,9 @@
         "lib/database/user-settings.ts",
         "tests/unit/sync-payloads.test.ts"
       ],
-      "dependencies": ["RF-030"],
+      "dependencies": [
+        "RF-030"
+      ],
       "acceptance_criteria": [
         "Define validated per-table payloads with stable IDs/timestamps/deletes.",
         "Use isolated fixtures and preserve unknown-version handling. No production migration or data rewrite."
@@ -921,7 +1459,11 @@
           "tests/unit/sync-payloads.test.ts",
           "tests/unit/sync-restore-contract.test.ts"
         ],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "high",
       "approved": false,
@@ -946,14 +1488,27 @@
         "lib/quran-foundation/user-sync.ts",
         "tests/unit/local-write-contracts.test.ts"
       ],
-      "dependencies": ["RF-031"],
+      "dependencies": [
+        "RF-031"
+      ],
       "acceptance_criteria": [
         "Characterize privacy, IDs, timestamps, queue operations and failure order before shared helpers.",
         "Move one matching repeated rule per follow-up task."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--runTestsByPath", "tests/unit/local-write-contracts.test.ts"],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/local-write-contracts.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "high",
       "approved": false,
@@ -972,17 +1527,29 @@
       "title": "Audit local schema and remote migration parity offline",
       "description": "Audit local schema and remote migration parity offline",
       "rationale": "Production policy changes are outside authorization.",
-      "modules": ["docs/refactoring/DATA_AUDIT.md"],
-      "dependencies": ["RF-031"],
+      "modules": [
+        "docs/refactoring/DATA_AUDIT.md"
+      ],
+      "dependencies": [
+        "RF-031"
+      ],
       "acceptance_criteria": [
         "Inspect schema.sql, every migration, RLS ownership, SQLite sync columns and Edge Function auth.",
         "Record concrete gaps and separate authorization needs. Never apply SQL or contact production."
       ],
-      "verification": [["git", "diff", "--check"]],
+      "verification": [
+        [
+          "git",
+          "diff",
+          "--check"
+        ]
+      ],
       "risk": "high",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["docs/refactoring/DATA_AUDIT.md"],
+      "allowed_paths": [
+        "docs/refactoring/DATA_AUDIT.md"
+      ],
       "attempts": 0
     },
     {
@@ -990,8 +1557,14 @@
       "title": "Standardize one inconsistent multi-field form",
       "description": "Standardize one inconsistent multi-field form",
       "rationale": "RHF and Zod already exist and should own complex validation.",
-      "modules": ["app/auth/*", "components/profile/*", "tests/unit/form-validation.test.tsx"],
-      "dependencies": ["RF-025"],
+      "modules": [
+        "app/auth/*",
+        "components/profile/*",
+        "tests/unit/form-validation.test.tsx"
+      ],
+      "dependencies": [
+        "RF-025"
+      ],
       "acceptance_criteria": [
         "Inventory current validation and preserve messages, trimming, disabled auth flows and submit/error state.",
         "Migrate one form only after selecting an exact bounded path set."
@@ -1006,12 +1579,20 @@
           "tests/unit/form-validation.test.tsx",
           "tests/unit/auth-disabled.test.ts"
         ],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "medium",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["app/auth/*", "components/profile/*", "tests/unit/form-validation.test.tsx"],
+      "allowed_paths": [
+        "app/auth/*",
+        "components/profile/*",
+        "tests/unit/form-validation.test.tsx"
+      ],
       "attempts": 0
     },
     {
@@ -1025,14 +1606,27 @@
         "lib/i18n/strings.ts",
         "tests/unit/reading-stepper.test.tsx"
       ],
-      "dependencies": ["RF-014"],
+      "dependencies": [
+        "RF-014"
+      ],
       "acceptance_criteria": [
         "Use bilingual labels, disabled state and accessible role. Preserve font size, range, touch targets and RTL order.",
         "Render representative phone RTL/LTR and check keyboard/touch."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--runTestsByPath", "tests/unit/reading-stepper.test.tsx"],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/reading-stepper.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "medium",
       "approved": false,
@@ -1056,15 +1650,32 @@
         "app/(tabs)/settings.tsx",
         "tests/unit/reading-stepper.test.tsx"
       ],
-      "dependencies": ["RF-035"],
+      "dependencies": [
+        "RF-035"
+      ],
       "acceptance_criteria": [
         "Share semantics only when range/disabled/accessibility contracts match. Keep legitimate layout variants.",
         "Verify all relevant themes and viewport dimensions."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--runTestsByPath", "tests/unit/reading-stepper.test.tsx"],
-        ["npm", "run", "typecheck"],
-        ["npm", "run", "build:web"]
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/reading-stepper.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ]
       ],
       "risk": "medium",
       "approved": false,
@@ -1082,17 +1693,31 @@
       "title": "Measure settings render subscriptions",
       "description": "Measure settings render subscriptions",
       "rationale": "Settings context has many consumers; splitting needs evidence.",
-      "modules": ["docs/refactoring/PERFORMANCE.md", "lib/settings/context.tsx"],
-      "dependencies": ["RF-013"],
+      "modules": [
+        "docs/refactoring/PERFORMANCE.md",
+        "lib/settings/context.tsx"
+      ],
+      "dependencies": [
+        "RF-013"
+      ],
       "acceptance_criteria": [
         "Measure representative setting updates and reader renders before/after any proposed selector/context split.",
         "Do not introduce Zustand duplication of persisted settings without an ADR."
       ],
-      "verification": [["npm", "run", "typecheck"]],
+      "verification": [
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
+      ],
       "risk": "medium",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["docs/refactoring/PERFORMANCE.md", "lib/settings/context.tsx"],
+      "allowed_paths": [
+        "docs/refactoring/PERFORMANCE.md",
+        "lib/settings/context.tsx"
+      ],
       "attempts": 0
     },
     {
@@ -1100,20 +1725,41 @@
       "title": "Add reduced-motion behavior where animation warrants it",
       "description": "Add reduced-motion behavior where animation warrants it",
       "rationale": "Searched UI modules lack explicit reduced-motion handling.",
-      "modules": ["components/ui/*", "lib/ui/*", "tests/unit/reduced-motion.test.tsx"],
-      "dependencies": ["RF-036"],
+      "modules": [
+        "components/ui/*",
+        "lib/ui/*",
+        "tests/unit/reduced-motion.test.tsx"
+      ],
+      "dependencies": [
+        "RF-036"
+      ],
       "acceptance_criteria": [
         "Inventory animated controls and preserve useful state feedback with motion disabled.",
         "Use platform-aware preference with cleanup and fallback; verify web/native where available."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--runTestsByPath", "tests/unit/reduced-motion.test.tsx"],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/reduced-motion.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "medium",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["components/ui/*", "lib/ui/*", "tests/unit/reduced-motion.test.tsx"],
+      "allowed_paths": [
+        "components/ui/*",
+        "lib/ui/*",
+        "tests/unit/reduced-motion.test.tsx"
+      ],
       "attempts": 0
     },
     {
@@ -1121,18 +1767,31 @@
       "title": "Profile reader and review performance before optimizing",
       "description": "Profile reader and review performance before optimizing",
       "rationale": "Large lists already use measured/virtualized behavior.",
-      "modules": ["docs/refactoring/PERFORMANCE.md"],
-      "dependencies": ["RF-016", "RF-021"],
+      "modules": [
+        "docs/refactoring/PERFORMANCE.md"
+      ],
+      "dependencies": [
+        "RF-016",
+        "RF-021"
+      ],
       "acceptance_criteria": [
         "Record reproducible devices/fixtures, frame/render/interaction metrics and bottlenecks.",
         "Add only measured actionable follow-up tasks, not blanket memoization.",
         "RF-091 measures roughly 530 MB native JavaScript payloads and successful cold exports reaching the 6 GB build cap. Profile native release/cold-start/runtime memory on an isolated device before deciding whether a packaging migration is needed. Preserve all offline content and protected input/mapping hashes; do not delete datasets merely to improve a size metric."
       ],
-      "verification": [["git", "diff", "--check"]],
+      "verification": [
+        [
+          "git",
+          "diff",
+          "--check"
+        ]
+      ],
       "risk": "medium",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["docs/refactoring/PERFORMANCE.md"],
+      "allowed_paths": [
+        "docs/refactoring/PERFORMANCE.md"
+      ],
       "attempts": 0
     },
     {
@@ -1140,18 +1799,36 @@
       "title": "Prepare an isolated Android QA package and Maestro flow",
       "description": "Prepare an isolated Android QA package and Maestro flow",
       "rationale": "Native E2E must avoid production app data.",
-      "modules": ["docs/refactoring/NATIVE_TESTING.md", "scripts/qa/*", ".maestro/*", "package.json"],
-      "dependencies": ["RF-008"],
+      "modules": [
+        "docs/refactoring/NATIVE_TESTING.md",
+        "scripts/qa/*",
+        ".maestro/*",
+        "package.json"
+      ],
+      "dependencies": [
+        "RF-008"
+      ],
       "acceptance_criteria": [
         "Create reversible QA configuration using a distinct applicationId and sanitized local fixtures.",
         "No uninstall, data clearing, signing-key replacement or writes to the production app.",
         "Only install Maestro following current official docs and record device availability."
       ],
-      "verification": [["npm", "run", "build:web"]],
+      "verification": [
+        [
+          "npm",
+          "run",
+          "build:web"
+        ]
+      ],
       "risk": "high",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["docs/refactoring/NATIVE_TESTING.md", "scripts/qa/*", ".maestro/*", "package.json"],
+      "allowed_paths": [
+        "docs/refactoring/NATIVE_TESTING.md",
+        "scripts/qa/*",
+        ".maestro/*",
+        "package.json"
+      ],
       "attempts": 0
     },
     {
@@ -1159,17 +1836,29 @@
       "title": "Run Android regression verification",
       "description": "Run Android regression verification",
       "rationale": "A web result cannot certify native behavior.",
-      "modules": ["docs/refactoring/NATIVE_TESTING.md"],
-      "dependencies": ["RF-040"],
+      "modules": [
+        "docs/refactoring/NATIVE_TESTING.md"
+      ],
+      "dependencies": [
+        "RF-040"
+      ],
       "acceptance_criteria": [
         "Build Android and run isolated QA smoke covering offline reading, navigation, settings and review.",
         "Record exact emulator/device/build IDs, accessibility and data preservation. Block if no device."
       ],
-      "verification": [["bash", "-c", "cd android && ./gradlew :app:assembleDebug --no-daemon --max-workers=2"]],
+      "verification": [
+        [
+          "bash",
+          "-c",
+          "cd android && ./gradlew :app:assembleDebug --no-daemon --max-workers=2"
+        ]
+      ],
       "risk": "high",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["docs/refactoring/NATIVE_TESTING.md"],
+      "allowed_paths": [
+        "docs/refactoring/NATIVE_TESTING.md"
+      ],
       "attempts": 0
     },
     {
@@ -1177,8 +1866,12 @@
       "title": "Run iOS regression verification on supported infrastructure",
       "description": "Run iOS regression verification on supported infrastructure",
       "rationale": "This Linux environment cannot execute Xcode.",
-      "modules": ["docs/refactoring/NATIVE_TESTING.md"],
-      "dependencies": ["RF-040"],
+      "modules": [
+        "docs/refactoring/NATIVE_TESTING.md"
+      ],
+      "dependencies": [
+        "RF-040"
+      ],
       "acceptance_criteria": [
         "Use authorized macOS/Xcode or approved cloud environment with isolated QA target.",
         "Record actual build/runtime evidence or exact blocker and recovery command. Never mark passed from web."
@@ -1193,7 +1886,9 @@
       "risk": "high",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["docs/refactoring/NATIVE_TESTING.md"],
+      "allowed_paths": [
+        "docs/refactoring/NATIVE_TESTING.md"
+      ],
       "attempts": 0
     },
     {
@@ -1201,17 +1896,30 @@
       "title": "Audit remaining TypeScript escapes by boundary",
       "description": "Audit remaining TypeScript escapes by boundary",
       "rationale": "Any/suppressions should be removed by real validation.",
-      "modules": ["docs/refactoring/TYPES.md"],
-      "dependencies": ["RF-030", "RF-031"],
+      "modules": [
+        "docs/refactoring/TYPES.md"
+      ],
+      "dependencies": [
+        "RF-030",
+        "RF-031"
+      ],
       "acceptance_criteria": [
         "Inventory any, assertions and suppressions with ownership and priority.",
         "Prepare bounded tasks at remote/storage boundaries first. Preserve deliberate platform typings until tested."
       ],
-      "verification": [["git", "diff", "--check"]],
+      "verification": [
+        [
+          "git",
+          "diff",
+          "--check"
+        ]
+      ],
       "risk": "medium",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["docs/refactoring/TYPES.md"],
+      "allowed_paths": [
+        "docs/refactoring/TYPES.md"
+      ],
       "attempts": 0
     },
     {
@@ -1219,8 +1927,16 @@
       "title": "Resolve lint warnings through small behavioral checks",
       "description": "Resolve lint warnings through small behavioral checks",
       "rationale": "The baseline has 71 warnings. Installed ESLint 9 is past upstream maintenance. SDK 55 preset alignment also drops nine currently active React Hooks rules in the isolated preflight.",
-      "modules": ["docs/refactoring/LINT.md", "app/*", "components/*", "lib/*", "scripts/*"],
-      "dependencies": ["RF-043"],
+      "modules": [
+        "docs/refactoring/LINT.md",
+        "app/*",
+        "components/*",
+        "lib/*",
+        "scripts/*"
+      ],
+      "dependencies": [
+        "RF-043"
+      ],
       "acceptance_criteria": [
         "Before readiness, split supported ESLint/preset/plugin compatibility into an exact separate task. Preserve existing enabled rules and verify effective configuration. Do not force peer dependencies or hide the maintenance issue with an unchecked preset downgrade.",
         "Group warnings by safe fix and behavior risk.",
@@ -1228,13 +1944,30 @@
         "The 2026-10-16 registry snapshot shows stable eslint-plugin-react 7.37.5 and eslint-plugin-import 2.32.0 exclude ESLint 10 in their peers. Newer Expo preset metadata still depends on those plugin lines. Do not force peer resolution. Research supported alternatives or upstream support before selecting an ESLint 10 tuple; metadata alone does not prove runtime failure."
       ],
       "verification": [
-        ["npm", "run", "lint", "--", "--max-warnings", "0"],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "lint",
+          "--",
+          "--max-warnings",
+          "0"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "medium",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["docs/refactoring/LINT.md", "app/*", "components/*", "lib/*", "scripts/*"],
+      "allowed_paths": [
+        "docs/refactoring/LINT.md",
+        "app/*",
+        "components/*",
+        "lib/*",
+        "scripts/*"
+      ],
       "attempts": 0
     },
     {
@@ -1242,17 +1975,33 @@
       "title": "Assess the supported Expo SDK upgrade path",
       "description": "Assess the supported Expo SDK upgrade path",
       "rationale": "SDK55 stabilization is separate from current SDK57 adoption.",
-      "modules": ["docs/refactoring/decisions/0002-expo-upgrade.md", "docs/refactoring/TECH_STACK.md"],
-      "dependencies": ["RF-008", "RF-041", "RF-042"],
+      "modules": [
+        "docs/refactoring/decisions/0002-expo-upgrade.md",
+        "docs/refactoring/TECH_STACK.md"
+      ],
+      "dependencies": [
+        "RF-008",
+        "RF-041",
+        "RF-042"
+      ],
       "acceptance_criteria": [
         "Compare SDK56 then57 release/migration docs, current native modules, patches, store requirements and React/TS compatibility.",
         "Choose adoption or concrete defer rationale; create small upgrade tasks only if native gates exist."
       ],
-      "verification": [["git", "diff", "--check"]],
+      "verification": [
+        [
+          "git",
+          "diff",
+          "--check"
+        ]
+      ],
       "risk": "high",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["docs/refactoring/decisions/0002-expo-upgrade.md", "docs/refactoring/TECH_STACK.md"],
+      "allowed_paths": [
+        "docs/refactoring/decisions/0002-expo-upgrade.md",
+        "docs/refactoring/TECH_STACK.md"
+      ],
       "attempts": 0
     },
     {
@@ -1260,7 +2009,9 @@
       "title": "Repeat static and dependency audits after the first workstreams",
       "description": "Repeat static and dependency audits after the first workstreams",
       "rationale": "Initial findings do not exhaust the modernization scope.",
-      "modules": ["docs/refactoring/RE_AUDIT.md"],
+      "modules": [
+        "docs/refactoring/RE_AUDIT.md"
+      ],
       "dependencies": [
         "RF-010",
         "RF-011",
@@ -1296,16 +2047,38 @@
         "Compare measured counts and add actionable child tasks; document deliberate duplicates."
       ],
       "verification": [
-        ["npm", "run", "analyze:duplicates"],
-        ["npm", "run", "analyze:unused"],
-        ["npm", "run", "analyze:boundaries"],
-        ["npm", "run", "audit:dependencies"],
-        ["npm", "run", "test:dependency-security"]
+        [
+          "npm",
+          "run",
+          "analyze:duplicates"
+        ],
+        [
+          "npm",
+          "run",
+          "analyze:unused"
+        ],
+        [
+          "npm",
+          "run",
+          "analyze:boundaries"
+        ],
+        [
+          "npm",
+          "run",
+          "audit:dependencies"
+        ],
+        [
+          "npm",
+          "run",
+          "test:dependency-security"
+        ]
       ],
       "risk": "medium",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["docs/refactoring/RE_AUDIT.md"],
+      "allowed_paths": [
+        "docs/refactoring/RE_AUDIT.md"
+      ],
       "attempts": 0
     },
     {
@@ -1313,20 +2086,38 @@
       "title": "Replace remaining brittle source tests where behavior can be exercised",
       "description": "Replace remaining brittle source tests where behavior can be exercised",
       "rationale": "Many source-text contracts constrain layout rather than behavior.",
-      "modules": ["tests/unit/*", "tests/rtl/*", "docs/refactoring/TEST_COVERAGE.md"],
-      "dependencies": ["RF-046"],
+      "modules": [
+        "tests/unit/*",
+        "tests/rtl/*",
+        "docs/refactoring/TEST_COVERAGE.md"
+      ],
+      "dependencies": [
+        "RF-046"
+      ],
       "acceptance_criteria": [
         "Map source contracts to runtime invariants. Replace one small group at a time with equal or stronger behavior coverage.",
         "Preserve protected data/token contracts that intentionally inspect generated invariants."
       ],
       "verification": [
-        ["npm", "run", "test:unit"],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "test:unit"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "medium",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["tests/unit/*", "tests/rtl/*", "docs/refactoring/TEST_COVERAGE.md"],
+      "allowed_paths": [
+        "tests/unit/*",
+        "tests/rtl/*",
+        "docs/refactoring/TEST_COVERAGE.md"
+      ],
       "attempts": 0
     },
     {
@@ -1334,17 +2125,36 @@
       "title": "Verify responsive and bilingual UI across changed features",
       "description": "Verify responsive and bilingual UI across changed features",
       "rationale": "Shared UI changes can regress width, themes, direction and input.",
-      "modules": ["docs/refactoring/UI_VERIFICATION.md", "tests/e2e/*", "tests/e2e/report-only/*"],
-      "dependencies": ["RF-038", "RF-047"],
+      "modules": [
+        "docs/refactoring/UI_VERIFICATION.md",
+        "tests/e2e/*",
+        "tests/e2e/report-only/*"
+      ],
+      "dependencies": [
+        "RF-038",
+        "RF-047"
+      ],
       "acceptance_criteria": [
         "Execute relevant phone/tablet/desktop, Arabic/English, five theme modes, keyboard/touch and reduced-height flows.",
         "Report report-only findings as findings, never as a passing acceptance gate."
       ],
-      "verification": [["npm", "run", "test:ui:phase", "--", "all"]],
+      "verification": [
+        [
+          "npm",
+          "run",
+          "test:ui:phase",
+          "--",
+          "all"
+        ]
+      ],
       "risk": "high",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["docs/refactoring/UI_VERIFICATION.md", "tests/e2e/*", "tests/e2e/report-only/*"],
+      "allowed_paths": [
+        "docs/refactoring/UI_VERIFICATION.md",
+        "tests/e2e/*",
+        "tests/e2e/report-only/*"
+      ],
       "attempts": 0
     },
     {
@@ -1352,7 +2162,9 @@
       "title": "Perform independent final architecture and repository review",
       "description": "Perform independent final architecture and repository review",
       "rationale": "Final acceptance belongs to the primary engineer and independent reviewer.",
-      "modules": ["docs/refactoring/FINAL_REVIEW.md"],
+      "modules": [
+        "docs/refactoring/FINAL_REVIEW.md"
+      ],
       "dependencies": [
         "RF-033",
         "RF-034",
@@ -1372,16 +2184,40 @@
         "Resolve in-scope high-severity findings or document exact external blockers. Add new actionable tasks and continue."
       ],
       "verification": [
-        ["npm", "run", "typecheck"],
-        ["npm", "run", "lint"],
-        ["npm", "run", "test:unit"],
-        ["npm", "run", "build:web"],
-        ["npx", "playwright", "test", "--project=smoke-chromium", "tests/e2e/smoke.spec.ts"]
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "lint"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "npx",
+          "playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts"
+        ]
       ],
       "risk": "high",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["docs/refactoring/FINAL_REVIEW.md"],
+      "allowed_paths": [
+        "docs/refactoring/FINAL_REVIEW.md"
+      ],
       "attempts": 0
     },
     {
@@ -1395,12 +2231,20 @@
         "docs/refactoring/ARCHITECTURE.md",
         "docs/refactoring/TECH_STACK.md"
       ],
-      "dependencies": ["RF-049"],
+      "dependencies": [
+        "RF-049"
+      ],
       "acceptance_criteria": [
         "List commits, stack decisions, before/after comparable metrics, actual checks, risks and blocked items.",
         "All required gates and independent final review satisfy completion criteria. Keep local; no push/merge/deploy."
       ],
-      "verification": [["git", "diff", "--check"]],
+      "verification": [
+        [
+          "git",
+          "diff",
+          "--check"
+        ]
+      ],
       "risk": "high",
       "approved": false,
       "status": "pending",
@@ -1428,16 +2272,34 @@
         "tests/unit/database-error-state.test.tsx",
         "tests/rtl/rtl-component-registry.ts"
       ],
-      "dependencies": ["RF-004", "RF-006"],
+      "dependencies": [
+        "RF-004",
+        "RF-006"
+      ],
       "acceptance_criteria": [
         "Inspect existing ErrorBoundary, EmptyState and complete readiness branches before creating a presenter.",
         "Characterize current typography, titles, error text and provider/language placement. Reuse a presentation-only owner, with explicit existing variants.",
         "Keep readiness gating and language lookup in their current owners. Split migration if more than two callers make one session too broad."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--runTestsByPath", "tests/unit/database-error-state.test.tsx"],
-        ["npm", "run", "typecheck"],
-        ["npm", "run", "build:web"]
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/database-error-state.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ]
       ],
       "risk": "medium",
       "approved": false,
@@ -1460,20 +2322,40 @@
       "title": "Characterize home deck-card presentation differences",
       "description": "Characterize home deck-card presentation differences",
       "rationale": "Clone groups 3-5 repeat SmartDeckCard and VocabularyDeckCard layout, with different policy.",
-      "modules": ["app/(tabs)/home.tsx", "tests/unit/home-deck-cards.test.tsx"],
-      "dependencies": ["RF-004", "RF-006"],
+      "modules": [
+        "app/(tabs)/home.tsx",
+        "tests/unit/home-deck-cards.test.tsx"
+      ],
+      "dependencies": [
+        "RF-004",
+        "RF-006"
+      ],
       "acceptance_criteria": [
         "Test compact/expanded layout, disabled start, cards/settings actions and stopPropagation.",
         "Choose the smallest private presentation extraction after comparing existing DeckStats and Card. Preserve distinct deck/filter behavior."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--runTestsByPath", "tests/unit/home-deck-cards.test.tsx"],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/home-deck-cards.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "medium",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["app/(tabs)/home.tsx", "tests/unit/home-deck-cards.test.tsx"],
+      "allowed_paths": [
+        "app/(tabs)/home.tsx",
+        "tests/unit/home-deck-cards.test.tsx"
+      ],
       "attempts": 0
     },
     {
@@ -1492,7 +2374,11 @@
         "tests/unit/progress-screen-rtl.test.tsx",
         "tests/unit/leaderboard-sign-in-prompt.test.tsx"
       ],
-      "dependencies": ["RF-004", "RF-006", "RF-068"],
+      "dependencies": [
+        "RF-004",
+        "RF-006",
+        "RF-068"
+      ],
       "acceptance_criteria": [
         "Read RF068 evidence and both full private presenters/call sites before editing. Reuse decision: share the identical inner row only, retain existing progress Card and leaderboard tinted wrapper, keep AuthGate and Button unchanged because their signup/gating/height/feedback differ. Record this concrete choice before extraction.",
         "Create components/auth/AccountSyncPrompt.tsx as a stateless controlled presenter with exported props label:string, buttonLabel:string, isDark:boolean, isRTL:boolean, onPress:()=>void. It owns only the current inner View/Text/Pressable/LogIn body. No hooks, services, auth state, routing, context, new primitives/dependencies, variant framework or new styles.",
@@ -1514,7 +2400,11 @@
           "tests/unit/leaderboard-sign-in-prompt.test.tsx",
           "tests/unit/rtl-component-registry-coverage.test.ts"
         ],
-        ["npm", "run", "typecheck"],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
         [
           "node_modules/.bin/eslint",
           "app/(tabs)/progress.tsx",
@@ -1522,8 +2412,16 @@
           "components/auth/AccountSyncPrompt.tsx",
           "tests/rtl/rtl-component-registry.ts"
         ],
-        ["node_modules/.bin/prettier", "--check", "components/auth/AccountSyncPrompt.tsx"],
-        ["npm", "run", "build:web"],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "components/auth/AccountSyncPrompt.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ],
         [
           "env",
           "CI=1",
@@ -1570,8 +2468,14 @@
       "title": "Reuse the existing strings object for OAuthButtons",
       "description": "Pass each auth route's existing UIStrings value directly to OAuthButtons, removing only the repeated five-property object construction.",
       "rationale": "Both routes already resolve UIStrings as s and map its same five properties into OAuthButtons. The component only reads those properties, so the existing object satisfies its contract without a wrapper or translation change.",
-      "modules": ["app/auth/login.tsx", "app/auth/signup.tsx"],
-      "dependencies": ["RF-004", "RF-007"],
+      "modules": [
+        "app/auth/login.tsx",
+        "app/auth/signup.tsx"
+      ],
+      "dependencies": [
+        "RF-004",
+        "RF-007"
+      ],
       "acceptance_criteria": [
         "In app/auth/login.tsx and app/auth/signup.tsx, replace only the OAuthButtons five-property strings mapping with strings={s}. UIStrings already contains all five required properties in both locales. Do not add casts, helpers, wrappers or dependencies.",
         "Keep each configured footer condition, onError callback, social/email flags, route links, direction, markup and all authentication/data behavior unchanged. Do not edit OAuthButtons, translations, forms, theme behavior, tests or protected inputs.",
@@ -1589,13 +2493,24 @@
           "tests/unit/auth-disabled.test.ts",
           "tests/unit/i18n-strings.test.ts"
         ],
-        ["npm", "run", "typecheck"],
-        ["node_modules/.bin/eslint", "app/auth/login.tsx", "app/auth/signup.tsx"]
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "app/auth/login.tsx",
+          "app/auth/signup.tsx"
+        ]
       ],
       "risk": "low",
       "approved": true,
       "status": "verified",
-      "allowed_paths": ["app/auth/login.tsx", "app/auth/signup.tsx"],
+      "allowed_paths": [
+        "app/auth/login.tsx",
+        "app/auth/signup.tsx"
+      ],
       "attempts": 1,
       "started_at": "2026-10-16T00:47:32.401998+00:00",
       "completed_at": "2026-10-16T00:49:35.474749+00:00",
@@ -1621,7 +2536,13 @@
         "tests/unit/deck-cards-sheet-contract.test.ts",
         "tests/unit/date-utils.test.ts"
       ],
-      "dependencies": ["RF-004", "RF-006", "RF-069", "RF-070", "RF-072"],
+      "dependencies": [
+        "RF-004",
+        "RF-006",
+        "RF-069",
+        "RF-070",
+        "RF-072"
+      ],
       "acceptance_criteria": [
         "Inspect both complete private components/call sites and accepted RF-069/RF-070/RF-072 evidence. Primary reuse choice: reuse existing ResponsiveSheet/Header/Body/Footer, Input and Button. Input without icons adds no host wrapper; its complete original class override resolves through cn/twMerge to the identical class string. Explicit placeholder color, direction and original inline font/size/alignment/fixed-LTR-writing style preserve effective input appearance. The existing Input editable=true matches installed RN default true; do not disable editing during busy. Canonical typography Text injects body sizing/leading/direction with no plain native-caption variant, so retain RN Text for existing control/error captions to preserve native line metrics. Record this exact reuse rationale.",
         "Create only components/flashcards/DueDateSheet.tsx as a controlled feature presenter. Props retain visible,value,error,busy,isDark,isRTL,s:UIStrings,onChange,onClose,onSave, plus exactly optional autoCapitalize/autoCorrect derived from Pick<InputProps, those keys>. Keep props type internal unless a real caller needs an export. No hooks/state/services/parser/navigation, variants framework, new helpers/dependencies or generic input-props bag. No edits to the existing UI primitives.",
@@ -1645,7 +2566,11 @@
           "tests/unit/rtl-component-registry-coverage.test.ts",
           "--detectOpenHandles"
         ],
-        ["npm", "run", "typecheck"],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
         [
           "node_modules/.bin/eslint",
           "app/flashcards/session.tsx",
@@ -1653,8 +2578,16 @@
           "components/flashcards/DueDateSheet.tsx",
           "tests/rtl/rtl-component-registry.ts"
         ],
-        ["node_modules/.bin/prettier", "--check", "components/flashcards/DueDateSheet.tsx"],
-        ["npm", "run", "build:web"],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "components/flashcards/DueDateSheet.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ],
         [
           "env",
           "CI=1",
@@ -1695,14 +2628,28 @@
         "tests/unit/qiraat-blocks.test.tsx",
         "tests/rtl/rtl-component-registry.ts"
       ],
-      "dependencies": ["RF-004", "RF-006"],
+      "dependencies": [
+        "RF-004",
+        "RF-006"
+      ],
       "acceptance_criteria": [
         "Inspect the existing QiraatBlock type and both full rendering branches.",
         "Share only heading/body mapping. Preserve wrapper scrolling, direction, font size and exact supplied content. Do not modify datasets or parsers."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--runTestsByPath", "tests/unit/qiraat-blocks.test.tsx"],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/qiraat-blocks.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "medium",
       "approved": false,
@@ -1727,7 +2674,11 @@
         "lib/settings/startup-theme.ts",
         "tests/unit/auth-startup-theme.test.tsx"
       ],
-      "dependencies": ["RF-004", "RF-054", "RF-066"],
+      "dependencies": [
+        "RF-004",
+        "RF-054",
+        "RF-066"
+      ],
       "acceptance_criteria": [
         "Create only lib/settings/startup-theme.ts as a small provider-independent module. Export getCachedAuthDarkMode returning boolean | null, with the named optional useDocumentFallback boolean defaulting to false. Reuse the existing private helper algorithms and their stored hafiz_theme key. No hook, class, provider, settings-context import, new state or general cache framework.",
         "Preserve the native/absent-window null guard, dark/amoled true, beige/white false and cached system early return through the exact optional matchMedia query. Unknown, missing and legacy light remain unnormalized. Only a caller requesting useDocumentFallback may read the document background after those cases, using the existing two RGB comparisons. Preserve every existing read error and the absence of top-level browser reads.",
@@ -1747,7 +2698,11 @@
           "tests/unit/auth-startup-theme.test.tsx",
           "tests/unit/oauth-buttons-contract.test.tsx"
         ],
-        ["npm", "run", "typecheck"],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
         [
           "node_modules/.bin/eslint",
           "components/auth/AuthScreenShell.tsx",
@@ -1755,7 +2710,11 @@
           "lib/settings/startup-theme.ts",
           "tests/unit/auth-startup-theme.test.tsx"
         ],
-        ["npm", "run", "build:web"]
+        [
+          "npm",
+          "run",
+          "build:web"
+        ]
       ],
       "risk": "medium",
       "approved": true,
@@ -1783,14 +2742,28 @@
         "components/flashcards/SmartDeckFilterSheet.tsx",
         "tests/unit/deck-review-draft.test.tsx"
       ],
-      "dependencies": ["RF-004", "RF-022"],
+      "dependencies": [
+        "RF-004",
+        "RF-022"
+      ],
       "acceptance_criteria": [
         "Test locale-specific step text, hydration/reset, clamps, mode toggles, save/error and filter differences.",
         "Choose a shared form/state interface only after those tests. Keep smart-filter ownership separate and split implementation into smaller follow-ups."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--runTestsByPath", "tests/unit/deck-review-draft.test.tsx"],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/deck-review-draft.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "high",
       "approved": false,
@@ -1814,14 +2787,28 @@
         "tests/unit/review-setting-info.test.tsx",
         "tests/rtl/rtl-component-registry.ts"
       ],
-      "dependencies": ["RF-004", "RF-006"],
+      "dependencies": [
+        "RF-004",
+        "RF-006"
+      ],
       "acceptance_criteria": [
         "Inspect existing overlay patterns. Extract presentation using ResponsiveSheet/header/body with the same open/close conditions.",
         "Test phone/desktop sizing, title/body, RTL/LTR and dismiss behavior without changing form state."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--runTestsByPath", "tests/unit/review-setting-info.test.tsx"],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/review-setting-info.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "medium",
       "approved": false,
@@ -1846,15 +2833,29 @@
         "lib/fonts/use-surah-name-font.ts",
         "tests/unit/surah-name-font-readiness.test.tsx"
       ],
-      "dependencies": ["RF-004", "RF-006"],
+      "dependencies": [
+        "RF-004",
+        "RF-006"
+      ],
       "acceptance_criteria": [
         "Inspect loader and any existing readiness hook before extraction.",
         "Test already-loaded, delayed resolve, failure, needed flag changes and unmount. Preserve established behavior; separate any discovered lifecycle defect.",
         "Edit no font assets, require maps or glyph/page mappings."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--runTestsByPath", "tests/unit/surah-name-font-readiness.test.tsx"],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/surah-name-font-readiness.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "medium",
       "approved": false,
@@ -1872,15 +2873,32 @@
       "title": "Characterize repeated journey ayah previews",
       "description": "Characterize repeated journey ayah previews",
       "rationale": "Group 23 matches prefixes in two different journey rendering branches.",
-      "modules": ["components/reflection-journey/JourneyAyahCard.tsx", "tests/unit/journey-ayah-preview.test.tsx"],
-      "dependencies": ["RF-004", "RF-006"],
+      "modules": [
+        "components/reflection-journey/JourneyAyahCard.tsx",
+        "tests/unit/journey-ayah-preview.test.tsx"
+      ],
+      "dependencies": [
+        "RF-004",
+        "RF-006"
+      ],
       "acceptance_criteria": [
         "Compare complete branches and fixtures. Test font loading, ayah targets, tap behavior and each content variant.",
         "Share only a proven matching feature presenter and preserve Unicode copying/content."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--runTestsByPath", "tests/unit/journey-ayah-preview.test.tsx"],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/journey-ayah-preview.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "medium",
       "approved": false,
@@ -1902,14 +2920,28 @@
         "lib/serialization/json-record.ts",
         "tests/unit/json-record.test.ts"
       ],
-      "dependencies": ["RF-004", "RF-043"],
+      "dependencies": [
+        "RF-004",
+        "RF-043"
+      ],
       "acceptance_criteria": [
         "Inspect both parser implementations and consumers. Test object input, JSON objects, null, arrays, primitives and malformed strings.",
         "Use one pure owner with unknown input and accurate output. No unchecked any/casts or changed fallback policy."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--runTestsByPath", "tests/unit/json-record.test.ts"],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/json-record.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "medium",
       "approved": false,
@@ -1933,7 +2965,10 @@
         "lib/fsrs/review-activity.ts",
         "tests/unit/review-activity.test.ts"
       ],
-      "dependencies": ["RF-004", "RF-022"],
+      "dependencies": [
+        "RF-004",
+        "RF-022"
+      ],
       "acceptance_criteria": [
         "Compare full functions and callers. Characterize invalid dates, duplicate days, ordering, gaps, timezone and DST boundaries.",
         "Share only the pure rule. Keep data access, achievements and wird policy separate."
@@ -1948,7 +2983,11 @@
           "tests/unit/review-activity.test.ts",
           "tests/unit/fsrs-scoring.test.ts"
         ],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "high",
       "approved": false,
@@ -1972,14 +3011,28 @@
         "lib/leaderboard/errors.ts",
         "tests/unit/public-review-errors.test.ts"
       ],
-      "dependencies": ["RF-004", "RF-023"],
+      "dependencies": [
+        "RF-004",
+        "RF-023"
+      ],
       "acceptance_criteria": [
         "Test matching table names/codes, schema-cache messages, null and unrelated errors.",
         "Share a pure classifier and preserve both fallback paths. No client initialization side effects, schema or production change."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--runTestsByPath", "tests/unit/public-review-errors.test.ts"],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/public-review-errors.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "high",
       "approved": false,
@@ -1997,16 +3050,34 @@
       "title": "Share typed weekly/monthly leaderboard reduction",
       "description": "Share typed weekly/monthly leaderboard reduction",
       "rationale": "Group 29 repeats per-user score aggregation, ranking and top-50 mapping.",
-      "modules": ["lib/leaderboard/api.ts", "lib/leaderboard/ranking.ts", "tests/unit/leaderboard-ranking.test.ts"],
-      "dependencies": ["RF-004", "RF-023"],
+      "modules": [
+        "lib/leaderboard/api.ts",
+        "lib/leaderboard/ranking.ts",
+        "tests/unit/leaderboard-ranking.test.ts"
+      ],
+      "dependencies": [
+        "RF-004",
+        "RF-023"
+      ],
       "acceptance_criteria": [
         "Inspect existing summarizeDailyScores and both complete query responses before choosing a helper.",
         "Test multiple rows/user, ties, missing profiles, ordering and limit. Preserve separate date filters and visible ranking.",
         "Validate boundary rows instead of copying the existing any cast."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--runTestsByPath", "tests/unit/leaderboard-ranking.test.ts"],
-        ["npm", "run", "typecheck"]
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/leaderboard-ranking.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
       ],
       "risk": "high",
       "approved": false,
@@ -2023,8 +3094,13 @@
       "title": "Characterize auth startup theme fallbacks",
       "description": "Add behavioral characterization of the existing useAuthDarkMode hook and OAuthButtons theme resolution before consolidating their similar cached-theme code.",
       "rationale": "AuthScreenShell only consults NativeWind after an unknown cached theme. OAuthButtons additionally recognizes two dark document backgrounds for unknown or missing cache. Cached system with unavailable matchMedia returns to NativeWind without that document fallback. A shared implementation could erase these distinctions.",
-      "modules": ["tests/unit/auth-startup-theme.test.tsx"],
-      "dependencies": ["RF-004", "RF-054"],
+      "modules": [
+        "tests/unit/auth-startup-theme.test.tsx"
+      ],
+      "dependencies": [
+        "RF-004",
+        "RF-054"
+      ],
       "acceptance_criteria": [
         "Write only tests/unit/auth-startup-theme.test.tsx. Import the actual useAuthDarkMode hook from AuthScreenShell and render it with React Native Testing Library renderHook. Render the actual OAuthButtons for its observable resolved button border color, selected by the existing provider accessibility label. Do not copy/evaluate private helper bodies, mock the hook/components under test, or use source-string assertions.",
         "Reuse existing test patterns from startup-language.test.ts and oauth-buttons-contract.test.tsx, real UI strings, DirectionProvider when needed and rtl-test-utils flattenStyle. Isolate NativeWind colorScheme, auth/config flags, database and network services. Never call a real OAuth, sync, database or backend operation. Leave application code, existing tests, translations, dependencies, data and test configuration unchanged.",
@@ -2044,13 +3120,22 @@
           "tests/unit/auth-startup-theme.test.tsx",
           "tests/unit/oauth-buttons-contract.test.tsx"
         ],
-        ["npm", "run", "typecheck"],
-        ["node_modules/.bin/eslint", "tests/unit/auth-startup-theme.test.tsx"]
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "tests/unit/auth-startup-theme.test.tsx"
+        ]
       ],
       "risk": "low",
       "approved": true,
       "status": "verified",
-      "allowed_paths": ["tests/unit/auth-startup-theme.test.tsx"],
+      "allowed_paths": [
+        "tests/unit/auth-startup-theme.test.tsx"
+      ],
       "attempts": 1,
       "started_at": "2026-10-16T02:04:33.450789+00:00",
       "failure": "Batch resource limit reached",
@@ -2069,7 +3154,10 @@
         "babel.config.js",
         "patches/react-native-css-interop+0.2.2.patch"
       ],
-      "dependencies": ["RF-007", "RF-013"],
+      "dependencies": [
+        "RF-007",
+        "RF-013"
+      ],
       "acceptance_criteria": [
         "Generator handoff: report status implemented once the selected manifest diff and static checks are complete, while explicitly listing controller-owned checks as pending. Implemented is not verified or accepted. Do not report blocked merely because installation, tests or Android checks must be run later by the controller. JDK 21, SDK 36, debug keystore and installed Chrome are already available; root installation is forbidden to the generator by design. Report blocked only for an actual unresolved implementation or infrastructure problem, with concrete evidence.",
         "Read SDK55_ALIGNMENT.md. The primary engineer selects exactly its 18 manifest ranges: the original 17 candidate targets plus devDependency babel-preset-expo ~55.0.25. Remove dependencies.expo-modules-core, whose owner is Expo. No new Metro runtime declaration, DOM type dependency, renderer pin, peer override, npm version field, install exclusion or other manifest change. Keep all scripts, existing overrides and other direct dependency ranges unchanged.",
@@ -2084,18 +3172,47 @@
         "Primary resource recovery: the first Android pass hit the enforced 6G OOM limit after fourteen successful gates. build-android-debug.py limits process affinity to two allowed CPUs and Gradle to one worker so installed Ninja also reduces jobs. It keeps all configured ABIs, JDK21/SDK36, debug-only compilation and existing RAM/time limits. Generator may not edit this helper. Resource termination is recorded separately from implementation retries; the earlier ordinary handoff failure still counts."
       ],
       "verification": [
-        ["npm", "install", "--ignore-scripts", "--no-audit", "--no-fund"],
-        ["npm", "install", "--ignore-scripts", "--no-audit", "--no-fund", "--strict-peer-deps"],
+        [
+          "npm",
+          "install",
+          "--ignore-scripts",
+          "--no-audit",
+          "--no-fund"
+        ],
+        [
+          "npm",
+          "install",
+          "--ignore-scripts",
+          "--no-audit",
+          "--no-fund",
+          "--strict-peer-deps"
+        ],
         [
           "node",
           "-e",
           "require('node:child_process').execFileSync('npm', ['ls', '--all'], {stdio: ['ignore', 'ignore', 'inherit']}); console.log('Installed dependency graph passed npm ls --all.');"
         ],
-        ["node", "scripts/fix-rn-gradle-plugin.js"],
-        ["node_modules/.bin/patch-package", "--error-on-fail"],
-        ["node", "scripts/ralph/check-expo-native.cjs"],
-        ["node", "scripts/ralph/check-security-dependencies.cjs"],
-        ["npm", "audit", "--audit-level=critical"],
+        [
+          "node",
+          "scripts/fix-rn-gradle-plugin.js"
+        ],
+        [
+          "node_modules/.bin/patch-package",
+          "--error-on-fail"
+        ],
+        [
+          "node",
+          "scripts/ralph/check-expo-native.cjs"
+        ],
+        [
+          "node",
+          "scripts/ralph/check-security-dependencies.cjs"
+        ],
+        [
+          "npm",
+          "audit",
+          "--audit-level=critical"
+        ],
         [
           "node_modules/.bin/expo",
           "install",
@@ -2119,10 +3236,26 @@
           "jest-expo",
           "babel-preset-expo"
         ],
-        ["npm", "run", "typecheck"],
-        ["npm", "run", "lint"],
-        ["npm", "run", "test:unit"],
-        ["npm", "run", "build:web"],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "lint"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ],
         [
           "env",
           "CI=1",
@@ -2134,12 +3267,18 @@
           "--project=smoke-chromium",
           "tests/e2e/smoke.spec.ts"
         ],
-        ["python3", "scripts/ralph/build-android-debug.py"]
+        [
+          "python3",
+          "scripts/ralph/build-android-debug.py"
+        ]
       ],
       "risk": "high",
       "approved": true,
       "status": "verified",
-      "allowed_paths": ["package.json", "package-lock.json"],
+      "allowed_paths": [
+        "package.json",
+        "package-lock.json"
+      ],
       "attempts": 2,
       "started_at": "2026-10-16T10:55:37.863031+00:00",
       "failure": "review exited 1; see .ralph/runs/RF-067-2-1792131849249493778/review.jsonl",
@@ -2197,7 +3336,10 @@
         "tests/unit/progress-screen-rtl.test.tsx",
         "tests/unit/leaderboard-sign-in-prompt.test.tsx"
       ],
-      "dependencies": ["RF-005", "RF-067"],
+      "dependencies": [
+        "RF-005",
+        "RF-067"
+      ],
       "acceptance_criteria": [
         "Read both complete private callout bodies and all three call sites, AuthGate, existing progress fixture, real useStrings and RTL helpers. Record reuse: extend the existing progress fixture and use feature-local leaderboard fixtures. Do not introduce a shared fixture framework or extract production code.",
         "Write only the two allowed test files. Preserve the existing progress achievement/scroll RTL assertions. Do not modify application, services, dependencies, setup, registry, snapshots or source contracts. Do not create the shared presenter yet.",
@@ -2220,7 +3362,11 @@
           "tests/unit/progress-screen-rtl.test.tsx",
           "tests/unit/leaderboard-sign-in-prompt.test.tsx"
         ],
-        ["npm", "run", "typecheck"],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
         [
           "node_modules/.bin/eslint",
           "tests/unit/progress-screen-rtl.test.tsx",
@@ -2245,7 +3391,10 @@
       "risk": "low",
       "approved": true,
       "status": "verified",
-      "allowed_paths": ["tests/unit/progress-screen-rtl.test.tsx", "tests/unit/leaderboard-sign-in-prompt.test.tsx"],
+      "allowed_paths": [
+        "tests/unit/progress-screen-rtl.test.tsx",
+        "tests/unit/leaderboard-sign-in-prompt.test.tsx"
+      ],
       "attempts": 2,
       "started_at": "2026-10-16T11:47:36.668391+00:00",
       "failure": "Batch resource limit reached",
@@ -2278,7 +3427,11 @@
         "tests/rtl/rtl-test-utils.tsx",
         "tests/unit/deck-cards-due-date.test.tsx"
       ],
-      "dependencies": ["RF-004", "RF-006", "RF-053"],
+      "dependencies": [
+        "RF-004",
+        "RF-006",
+        "RF-053"
+      ],
       "acceptance_criteria": [
         "Read the actual exported DeckCardsSheet, private DueDateEditor, row menu items/callbacks, current date parser/types and existing RNTL/direction fixtures. Reuse those test patterns and real useStrings. This task adds only one test file; no application exports, source edits, changed tests, registry entries or production behavior.",
         "Render the actual DeckCardsSheet and actual DropdownMenu, ResponsiveSheet/Header/Body/Footer, Button and TextInput. Use settings/database-hook and imported FSRS query stubs only at service boundaries. Primary-approved installed-platform adapter: the React Native Jest View measurement stub does not invoke its callback. In this one test file, a scoped spy on ReactNative.View.prototype.measureInWindow may provide deterministic coordinates to the callback, installed per test and restored after cleanup. Drive the actual row menu through fireEvent.press. Do not route that spy through a manually invoked createNodeMock helper or claim RNTL supplied the measurement. Do not mock the editor, overlay, menu, buttons, input or parent state, invoke private component functions, copy source/JSX into a test, or rely on source-string assertions. Synthetic typed DeckCardListItem fixtures must avoid all real database, service and protected dataset calls. Include at least two distinguishable cards and select the second in the successful-save flow.",
@@ -2301,14 +3454,27 @@
           "tests/unit/date-utils.test.ts",
           "--detectOpenHandles"
         ],
-        ["npm", "run", "typecheck"],
-        ["node_modules/.bin/eslint", "tests/unit/deck-cards-due-date.test.tsx"],
-        ["node_modules/.bin/prettier", "--check", "tests/unit/deck-cards-due-date.test.tsx"]
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "tests/unit/deck-cards-due-date.test.tsx"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "tests/unit/deck-cards-due-date.test.tsx"
+        ]
       ],
       "risk": "medium",
       "approved": true,
       "status": "verified",
-      "allowed_paths": ["tests/unit/deck-cards-due-date.test.tsx"],
+      "allowed_paths": [
+        "tests/unit/deck-cards-due-date.test.tsx"
+      ],
       "attempts": 2,
       "started_at": "2026-10-16T16:56:07.023963+00:00",
       "failure": "Batch resource limit reached",
@@ -2338,7 +3504,10 @@
         "tests/rtl/rtl-test-utils.tsx",
         "tests/unit/session-due-date.test.tsx"
       ],
-      "dependencies": ["RF-006", "RF-069"],
+      "dependencies": [
+        "RF-006",
+        "RF-069"
+      ],
       "acceptance_criteria": [
         "Write only tests/unit/session-due-date.test.tsx. Render the actual default FlashcardSessionScreenWrapper, private screen, CardActionsSheet and DueDateSheet through actual RN Testing Library. Reuse RF-069 fixture/cleanup patterns, real localized useStrings, DirectionProvider, SafeAreaProvider and actual ResponsiveSheet/Header/Body/Footer, Button and TextInput. No production export, source edit, changed existing test, copied JSX/private function evaluation, mocked editor/menu/control/state, snapshot-only or source-string assertion.",
         "Primary-selected minimal fixture seam: useDatabaseStatus reports ready; useDatabase returns an identity sentinel; SettingsProvider may be a typed passthrough and useSettings a stable fixture, leaving settings hydration covered by existing tests. Stub router parameters with a non-smart fixture deck and mock imported query/service modules. Supply two distinct typed StudyCardRow and SmartCardContent/SmartDeckRef fixtures, kind mutashabihat, ordinary synthetic prompt/cue strings and no prompt/context QCF2 fields. getSmartCardContent targetRef branch continues before direct SQL. Mock the imported font-loader module to prevent top-level bundled-font/native calls; assert no page-font loading. Do not mock Qcf2AyahText or any editor/UI component. Mock haptics and remote/scoring/achievement/user-setting adapters so no real SQLite, font asset, backend, sync or protected dataset is read or written. Read DeckReviewSettings actual type and supply all fields with stable valid settings. Initial streak0, remaining limit2 and two service rows establish a positive loaded front state.",
@@ -2361,14 +3530,27 @@
           "tests/unit/date-utils.test.ts",
           "--detectOpenHandles"
         ],
-        ["npm", "run", "typecheck"],
-        ["node_modules/.bin/eslint", "tests/unit/session-due-date.test.tsx"],
-        ["node_modules/.bin/prettier", "--check", "tests/unit/session-due-date.test.tsx"]
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "tests/unit/session-due-date.test.tsx"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "tests/unit/session-due-date.test.tsx"
+        ]
       ],
       "risk": "medium",
       "approved": true,
       "status": "verified",
-      "allowed_paths": ["tests/unit/session-due-date.test.tsx"],
+      "allowed_paths": [
+        "tests/unit/session-due-date.test.tsx"
+      ],
       "attempts": 2,
       "started_at": "2026-10-16T17:21:07.224260+00:00",
       "failure": "Independent review failed: [P2] tests/unit/session-due-date.test.tsx:483 selects the last Modal, which belongs to the hidden ConfirmDialog rendered after DueDateSheet. Its busy handler does nothing, so the assertion passes without testing the editor's dismissal guard. Select the Modal containing the date input, assert visible=true, then dispatch requestClose while persistence is pending.; All four verification commands passed freshly: 3 suites, 12 tests, no async warnings. No browser or device checks are required for this slice. No files were changed.",
@@ -2400,7 +3582,11 @@
         "node_modules/react-native/ReactCommon/react/renderer/components/view/AccessibilityProps.cpp",
         "node_modules/react-native-web/dist/modules/AccessibilityUtil/propsToAriaRole.js"
       ],
-      "dependencies": ["RF-006", "RF-069", "RF-055"],
+      "dependencies": [
+        "RF-006",
+        "RF-069",
+        "RF-055"
+      ],
       "acceptance_criteria": [
         "Read primary preflight evidence .refactor-baseline/button-accessibility-preflight.json/.log and button-accessibility-browser-preflight.json. At HEAD268fb53 native ordinary Button role lookup fails, actual Slot child-link/handler ordering passes, and real donor footer has zero text-bearing button-role matches. Installed RN and RN web give role precedence over accessibilityRole; actual Slot gives child props precedence for matching keys and invokes child handler before parent. These are primary-approved semantics, not permission to redesign the primitive.",
         "Reuse and extend only existing Button. Destructure accessibilityRole and pass accessibilityRole={accessibilityRole ?? (asChild ? undefined : \"button\")} before the unchanged remaining-props spread. Leave role in remaining props so explicit role retains native precedence. Add no default role for asChild. Preserve explicit accessibilityRole including none, all child-owned role/label/handlers, disabled and accessible behavior, refs, variants, RTL, styles, dimensions and children/label fallback. Do not touch existing forwardRef any or ViewStyle cast debt from RF-043; no new casts, any, suppressions or dependencies.",
@@ -2412,8 +3598,18 @@
         "Recovery note after attempt1: primary ran the exact frozen Chrome command outside the implementation sandbox and all30 tests passed, including both real donor-footer Enter/Space cases. Evidence .refactor-baseline/rf071-primary-browser-preflight.log. Preserve the four-path implemented candidate when correct. Ordered original native red/source/green evidence is generator.jsonl events30/33/39 in .ralph/runs/RF-071-1-1792173433551663227; no production revert is needed merely to repeat red. The known implementation-sandbox bind EPERM is not unavailable controller verification. Do not attempt browser networking in the implementation sandbox; return implemented with browser acceptance pending to the controller when source/non-browser work is complete. A genuine source/platform discrepancy still blocks. Controller must freshly run all six commands and separate Astra review. Attempt1 failure remains recorded; no refund, extra attempt or checkpoint restoration is approved."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--detectOpenHandles"],
-        ["npm", "run", "typecheck"],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--detectOpenHandles"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
         [
           "node_modules/.bin/eslint",
           "components/ui/Button.tsx",
@@ -2428,7 +3624,11 @@
           "tests/unit/button-accessibility.test.tsx",
           "tests/e2e/button-accessibility.spec.ts"
         ],
-        ["npm", "run", "build:web"],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ],
         [
           "env",
           "CI=1",
@@ -2468,7 +3668,9 @@
         "tests/unit/session-due-date.test.tsx",
         "components/ui/ResponsiveOverlay.tsx"
       ],
-      "dependencies": ["RF-070"],
+      "dependencies": [
+        "RF-070"
+      ],
       "acceptance_criteria": [
         "Own exactly app/flashcards/session.tsx and tests/unit/session-due-date.test.tsx. Read the accepted RF-070 fixture and real openDueDateSheet/handleSaveDueDate/runCardAction/DueDateSheet wiring. Reuse the existing controlled error presentation and strings. No new abstraction, component, dependency, schema, data access or global error system.",
         "Write and run a real front-state regression before editing production source. Open the actual card-action/date editor without pressing Reveal and reject a deferred date write. The localized failure must be found within the actual visible date-input Modal, not a background grading label. The current source must fail this assertion; retain the red command/output in generator evidence. Do not mock phase, editor/menu/overlay/input/button, parent state, persistence handler or advance.",
@@ -2490,10 +3692,26 @@
           "tests/unit/date-utils.test.ts",
           "--detectOpenHandles"
         ],
-        ["npm", "run", "typecheck"],
-        ["node_modules/.bin/eslint", "app/flashcards/session.tsx", "tests/unit/session-due-date.test.tsx"],
-        ["node_modules/.bin/prettier", "--check", "tests/unit/session-due-date.test.tsx"],
-        ["npm", "run", "build:web"],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "app/flashcards/session.tsx",
+          "tests/unit/session-due-date.test.tsx"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "tests/unit/session-due-date.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ],
         [
           "env",
           "CI=1",
@@ -2509,7 +3727,10 @@
       "risk": "medium",
       "approved": true,
       "status": "verified",
-      "allowed_paths": ["app/flashcards/session.tsx", "tests/unit/session-due-date.test.tsx"],
+      "allowed_paths": [
+        "app/flashcards/session.tsx",
+        "tests/unit/session-due-date.test.tsx"
+      ],
       "attempts": 1,
       "started_at": "2026-10-16T17:32:09.484690+00:00",
       "failure": "Batch resource limit reached",
@@ -2537,7 +3758,12 @@
         "lib/database/provider.tsx",
         "lib/database/schema.ts"
       ],
-      "dependencies": ["RF-070", "RF-072", "RF-055", "RF-071"],
+      "dependencies": [
+        "RF-070",
+        "RF-072",
+        "RF-055",
+        "RF-071"
+      ],
       "acceptance_criteria": [
         "Reuse the existing sessionError state, runCardAction and exact existing RN Text error block. Move that block to the immediate View with maxWidth in the bottom action area, before phase-specific controls. Remove its old grading-only occurrence and unnecessary fragment if empty. Preserve its text, classes, font, alignment and spacing. No new banner/component/state/error source, modal behavior, action hook or architecture. Grading and summary retain existing output; active-card front/intermediate phases gain the same error owner. Do not claim errors are visible through still-open dialogs.",
         "Production scope is only this error-block relocation in app/flashcards/session.tsx. Keep every action handler, service call, card/deck ID, return type, haptic, busy guard, successful advance/card update, grading/points/logging/sync and RF-072 date-error priority/reset unchanged. Do not change ConfirmDialog, AnswerEditSheet or service/data behavior. No package/native/protected-input change or broad source formatting.",
@@ -2560,7 +3786,11 @@
           "tests/unit/deck-cards-due-date.test.tsx",
           "--detectOpenHandles"
         ],
-        ["npm", "run", "typecheck"],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
         [
           "node_modules/.bin/eslint",
           "app/flashcards/session.tsx",
@@ -2573,7 +3803,11 @@
           "tests/unit/session-due-date.test.tsx",
           "tests/e2e/session-action-errors.spec.ts"
         ],
-        ["npm", "run", "build:web"],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ],
         [
           "env",
           "CI=1",
@@ -2615,7 +3849,12 @@
         "tests/unit/session-due-date.test.tsx",
         "tests/e2e/session-action-errors.spec.ts"
       ],
-      "dependencies": ["RF-073", "RF-071", "RF-076", "RF-079"],
+      "dependencies": [
+        "RF-073",
+        "RF-071",
+        "RF-076",
+        "RF-079"
+      ],
       "acceptance_criteria": [
         "Read .refactor-baseline/rf074-readiness.json. Reuse existing sessionError/runCardAction, ConfirmDialog, FieldMessage, actual route/controls and existing typed test setup. Add no component, state owner, hook, dependency, service, schema or mock UI. Only four allowed tracked files may change; Field.tsx is read-only. Do not start subagents/reviewers. Controller owns the separate stronger evaluation.",
         "ConfirmDialog gains only optional controlled error?: string | null, destructured with existing props. Render a FieldMessage only for a truthy error after the existing message inside the existing body View. Use explicit dir derived from isRTL when supplied, full width/self stretch with margin-top3 and text-red-600 dark:text-red-400. Reuse canonical caption typography, accessibilityRole=\"alert\" and accessibilityLiveRegion=\"polite\". Keep existing body/footer/header typography, spacing, modal focus/dismiss/backdrop/busy behavior and all no-error caller output unchanged. Other callers omit the prop. Do not edit Field/Text/Button/overlay primitives.",
@@ -2629,8 +3868,18 @@
         "Primary escalated recovery is test-only: actual revealed-only comparison text `${s.smartDeckComparisonCue}: ${firstCue}` plus absence of Reveal now proves phase before confirmation and after rejected Delete/Reset. Preserve these new assertions and every existing case.17 cases pass normally; an ignored exact-source mutant resetting phase makes only the two revealed cases fail among four targeted cases. The final fixture still fails exactly six missing-modal-feedback checks against pre-fix sources while11 old cases pass. Read current recovery evidence. Source and browser remain unchanged. Do not start helpers, alter retry/status/history or broaden implementation. One additional ordinary attempt is authorized by primary diagnosis under RUNBOOK; any further ordinary failure requires a new escalation, not an automatic reset."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--detectOpenHandles"],
-        ["npm", "run", "typecheck"],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--detectOpenHandles"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
         [
           "node_modules/.bin/eslint",
           "app/flashcards/session.tsx",
@@ -2644,7 +3893,11 @@
           "tests/unit/session-due-date.test.tsx",
           "tests/e2e/session-action-errors.spec.ts"
         ],
-        ["npm", "run", "build:web"],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ],
         [
           "env",
           "CI=1",
@@ -2701,7 +3954,12 @@
         "tests/unit/session-due-date.test.tsx",
         "tests/e2e/session-action-errors.spec.ts"
       ],
-      "dependencies": ["RF-073", "RF-074", "RF-076", "RF-079"],
+      "dependencies": [
+        "RF-073",
+        "RF-074",
+        "RF-076",
+        "RF-079"
+      ],
       "acceptance_criteria": [
         "Read .refactor-baseline/rf075-readiness.json. Reuse sessionError/runCardAction, the private AnswerEditSheet, existing FieldMessage, actual route/menu/textarea/Modal helpers and browser fixtureQuery. Add no component/hook/dependency/form framework/state/service/schema or private-state test mock. Only three allowed files may change. Do not spawn helpers/reviewers. Primary owns data/architecture; controller owns all frozen gates and separate Astra evaluation.",
         "Session clears sessionError in openAnswerEditSheet after existing currentCard/mode guards and passes it as a controlled error prop into the private AnswerEditSheet. Add its typed string|null error prop and render existing FieldMessage only for a truthy error after the unchanged TextInput. Match accepted ConfirmDialog error presentation: mt-3 w-full self-stretch text-red-600 dark:text-red-400, dir from UI isRTL, accessibilityRole alert and accessibilityLiveRegion polite. Error direction follows the locale, not containsArabic(value). Keep every existing textarea style/prop, sizing, keyboard/overlay/focus/dismiss/busy behavior and typography. No Input/form migration, broad formatting or change to ConfirmDialog/Field/other primitives.",
@@ -2716,8 +3974,18 @@
         "Primary preverification is .refactor-baseline/rf075-primary-preverification.json: final23 cases pass, and exact pre-fix-source mapping fails only the six missing-alert cases with17 earlier passes. Preserve the new distinct write/delete case labels and final post-success zero-unrelated-effect checks. Browser counterfactual .refactor-baseline/rf075-primary-browser-counterfactual.json uses the exact prior RF074 export, verified by bundle hash and route HTML reference. All fixture/input/save steps reach the intended missing in-editor alert; entered value and background error remain. Do not fix this deliberate old-bundle result or duplicate browser/build gates. The actual new source still needs fresh controller export/33 Chrome cases and independent review. Candidate/spec changes must invalidate the earlier generation checkpoint normally; do not restore it manually."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--detectOpenHandles"],
-        ["npm", "run", "typecheck"],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--detectOpenHandles"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
         [
           "node_modules/.bin/eslint",
           "app/flashcards/session.tsx",
@@ -2730,7 +3998,11 @@
           "tests/unit/session-due-date.test.tsx",
           "tests/e2e/session-action-errors.spec.ts"
         ],
-        ["npm", "run", "build:web"],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ],
         [
           "env",
           "CI=1",
@@ -2765,8 +4037,13 @@
       "title": "Stabilize the session fixture with a fresh Jest cache",
       "description": "Resolve the actual public Native Modal reference during fixture-module setup, keeping cold native initialization out of the individual asynchronous scenario deadline.",
       "rationale": "Primary cold profiling reproduces the unchanged first-case deadline failure, with4165ms spent before initial render returns. Resolving the same Modal reference in module setup makes the targeted scenario finish in2667ms and all11 actual route cases pass in a fresh-cache proposal, first case2551ms. This is test-environment initialization, not an application performance claim.",
-      "modules": ["tests/unit/session-due-date.test.tsx", ".refactor-baseline/rf076-readiness.json"],
-      "dependencies": ["RF-073"],
+      "modules": [
+        "tests/unit/session-due-date.test.tsx",
+        ".refactor-baseline/rf076-readiness.json"
+      ],
+      "dependencies": [
+        "RF-073"
+      ],
       "acceptance_criteria": [
         "Read .refactor-baseline/rf076-readiness.json and retained profile/proposal logs. Reuse the actual public ReactNative.Modal already required by getDateEditorModal. Add one module-scope const NativeModal = ReactNative.Modal after imports and use that value in the existing ancestor type comparison. A short comment may explain eager module setup. Do not render anything or change state at module scope.",
         "The only tracked edit is that eager reference/comparator in tests/unit/session-due-date.test.tsx. Keep all11 test cases, assertions, native/provider/service mocks, warning/deferred cleanup, original5000ms default, source imports, direction/theme fixtures and actual route/controls/overlay behavior unchanged. No deadlines, timer changes, test skipping, UI replacement, new helpers/dependencies/config or production change. Do not copy instrumentation, CPU flags, temporary aliases, environment switches or filtered-test commands from the diagnostic artifacts into the real fixture.",
@@ -2796,15 +4073,34 @@
           "--no-cache",
           "--cacheDirectory=.refactor-baseline/rf076-gate-cold-b"
         ],
-        ["npm", "run", "test:unit", "--", "--detectOpenHandles"],
-        ["npm", "run", "typecheck"],
-        ["node_modules/.bin/eslint", "tests/unit/session-due-date.test.tsx"],
-        ["node_modules/.bin/prettier", "--check", "tests/unit/session-due-date.test.tsx"]
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--detectOpenHandles"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "tests/unit/session-due-date.test.tsx"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "tests/unit/session-due-date.test.tsx"
+        ]
       ],
       "risk": "medium",
       "approved": true,
       "status": "verified",
-      "allowed_paths": ["tests/unit/session-due-date.test.tsx"],
+      "allowed_paths": [
+        "tests/unit/session-due-date.test.tsx"
+      ],
       "attempts": 1,
       "started_at": "2026-10-16T23:19:22.175310+00:00",
       "failure": "Batch resource limit reached",
@@ -2823,7 +4119,14 @@
         "tests/unit/deck-cards-due-date.test.tsx",
         "tests/e2e/session-action-errors.spec.ts"
       ],
-      "dependencies": ["RF-069", "RF-055", "RF-072", "RF-075", "RF-080", "RF-079"],
+      "dependencies": [
+        "RF-069",
+        "RF-055",
+        "RF-072",
+        "RF-075",
+        "RF-080",
+        "RF-079"
+      ],
       "acceptance_criteria": [
         "Read .refactor-baseline/rf077-readiness.json and rf077-owner-repro.json. Primary owns architecture/data/browser seeding decisions. One exact three-file repair. Do not spawn helpers/reviewers. Controller runs every frozen gate and separate Astra review; worker may report pending controller commands honestly.",
         "Production diff is exactly two lines: add setError(null) in existing openDueDate after setDueDateError(null); pass error={dueDateError ?? error} to existing DueDateSheet. Keep validation priority, all action handlers, runAction, busy guards, loadCards/onChanged, date parser, database services, IDs, native input options and shared DueDateSheet unchanged. No new component/hook/state/helper/service/schema/dependency or broad formatting.",
@@ -2837,8 +4140,18 @@
         "Read .refactor-baseline/rf077-primary-generation-diagnosis.json. Preserve current correct production patch, original-prefix-preserving formatted browser addition and genuine two-case red/green logs. Finish the explicit busy duplicate and error-direction assertions. Keep every earlier failure. Specification changes require a fresh generation followed by all frozen gates and independent review; no manual checkpoint restoration or retry reset."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--detectOpenHandles"],
-        ["npm", "run", "typecheck"],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--detectOpenHandles"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
         [
           "node_modules/.bin/eslint",
           "components/flashcards/DeckCardsSheet.tsx",
@@ -2851,7 +4164,11 @@
           "tests/unit/deck-cards-due-date.test.tsx",
           "tests/e2e/session-action-errors.spec.ts"
         ],
-        ["npm", "run", "build:web"],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ],
         [
           "env",
           "CI=1",
@@ -2891,7 +4208,12 @@
         "tests/unit/deck-cards-due-date.test.tsx",
         "tests/e2e/session-action-errors.spec.ts"
       ],
-      "dependencies": ["RF-074", "RF-077", "RF-081", "RF-079"],
+      "dependencies": [
+        "RF-074",
+        "RF-077",
+        "RF-081",
+        "RF-079"
+      ],
       "acceptance_criteria": [
         "Read .refactor-baseline/rf078-readiness.json, corrected owner/browser results and initial setup-failure record. Primary owns behavior/data decisions. No subagents/reviewers from worker. Only three allowed paths. Controller owns six frozen commands and separate stronger evaluation.",
         "Exactly three production call-site changes: existing inline onDelete and onReset each call setError(null) immediately before unchanged setConfirmAction; existing ConfirmDialog receives error={error}. Reuse optional shared dialog error. No ConfirmDialog edit, new state/helper/component/hook/dependency, or change to runAction, handlers, busy/close/virtual-card guards, service IDs, loadCards, onChanged, overlay/native props, table/filter or date editor. No schema, queue/sync, protected content or production write.",
@@ -2905,8 +4227,18 @@
         "Primary escalation after exhausted attempts is in .refactor-baseline/rf078-primary-recovery.json. Preserve the correct production/browser files at its exact hashes. Modify only the current unit fixture by adding exactly twenty unrelated-service negative assertions: five after clean reopen and five after final successful retry in each Delete/Reset parameterized body. Delete negatives check resetStudyCardProgress, setStudyCardDueDate, setStudyCardMarked, setStudyCardSuspended, setStudyCardBuried. Reset negatives check deleteStudyCard and the same four setters. No new cases/helper/mock, source/browser edits or weakened assertion. Existing causal red remains applicable; do not revert production. Canonical formatting only. One additional ordinary attempt has been granted after primary diagnosis; failure remains blocked for primary disposition. Run every frozen gate and separate review."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--detectOpenHandles"],
-        ["npm", "run", "typecheck"],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--detectOpenHandles"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
         [
           "node_modules/.bin/eslint",
           "components/flashcards/DeckCardsSheet.tsx",
@@ -2919,7 +4251,11 @@
           "tests/unit/deck-cards-due-date.test.tsx",
           "tests/e2e/session-action-errors.spec.ts"
         ],
-        ["npm", "run", "build:web"],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ],
         [
           "env",
           "CI=1",
@@ -2954,21 +4290,38 @@
       "title": "Clarify implementation and evaluator ownership in Ralph prompts",
       "description": "Primary-only runner preparation to prevent implementation sessions from starting redundant reviewers or treating documented sandbox-only browser restrictions as unavailable controller verification.",
       "rationale": "RF-076 generation launched its own read-only reviewer before the mandatory controller evaluator. RF-053/RF-071 earlier spent normal attempts on known sandbox loopback restrictions. These are concrete ownership/admission costs; controlled independent evaluation must remain mandatory.",
-      "modules": ["scripts/ralph/control.py", "scripts/ralph/tests/test_control.py", "docs/refactoring/RUNBOOK.md"],
-      "dependencies": ["RF-076"],
+      "modules": [
+        "scripts/ralph/control.py",
+        "scripts/ralph/tests/test_control.py",
+        "docs/refactoring/RUNBOOK.md"
+      ],
+      "dependencies": [
+        "RF-076"
+      ],
       "acceptance_criteria": [
         "Primary owns this runner change. The normal generator path hard-denies scripts/ralph; do not approve this placeholder for a mechanical implementation session or bypass writer leases. Diagnose the exact prompt and preserve pinned vendor/config/resource/retry policies.",
         "Clarify that the bounded implementation worker does not spawn subagents/reviewers and that the controller owns the stronger independent review. Follow task-specific verification ownership and report pending controller checks honestly. A documented implementation sandbox bind restriction alone does not make a controller-owned platform unavailable; genuine required infrastructure remains a blocker.",
         "Keep fresh controller commands, independent evaluator, failure preservation and completion gates unchanged. Run the existing runner regression suite and harmless smoke appropriate to the final prompt-only adapter change, inspect diff and obtain independent review under the primary workflow. No source/task acceptance shortcut, retry refund, raised limit, model/provider change or extra spend authorization."
       ],
       "verification": [
-        ["npm", "run", "test:refactor-runner"],
-        ["python3", "scripts/ralph/control.py", "smoke"]
+        [
+          "npm",
+          "run",
+          "test:refactor-runner"
+        ],
+        [
+          "python3",
+          "scripts/ralph/control.py",
+          "smoke"
+        ]
       ],
       "risk": "medium",
       "approved": true,
       "status": "verified",
-      "allowed_paths": ["scripts/ralph/control.py", "docs/refactoring/RUNBOOK.md"],
+      "allowed_paths": [
+        "scripts/ralph/control.py",
+        "docs/refactoring/RUNBOOK.md"
+      ],
       "attempts": 1,
       "execution_owner": "primary",
       "completed_at": "2026-10-17T03:49:01.435173+00:00",
@@ -2980,8 +4333,13 @@
       "title": "Strengthen existing revealed-phase regression evidence",
       "description": "Strengthen four original revealed-state regression cases so a phase-reset defect cannot pass their mode-label assertions.",
       "rationale": "Primary exact-source mutation sets phase=front and revealed=false on rejected card actions. All seven selected older cases still pass, including revealed date/Suspend/Bury/Mark. The mode label is shared with the front; actual comparison answer content is revealed-only. This is a test gap, not an application regression.",
-      "modules": ["tests/unit/session-due-date.test.tsx"],
-      "dependencies": ["RF-074", "RF-075"],
+      "modules": [
+        "tests/unit/session-due-date.test.tsx"
+      ],
+      "dependencies": [
+        "RF-074",
+        "RF-075"
+      ],
       "acceptance_criteria": [
         "Read .refactor-baseline/rf080-readiness.json and rf080-before-mutant.json. One-file test-only patch. Reuse current rendered fixture and RF074/RF075 comparison assertions. Do not spawn helpers/reviewers. Controller owns all five frozen commands and separate stronger evaluation; primary owns acceptance.",
         "Preserve all 23 current cases, every existing assertion, mock, helper, deadline, NativeModal preload, service counts, deferred cleanup and test names. No application/source, browser, dependency or config edit. No new case, helper or fixture clone. Ignored primary-owned diagnostic source copy/config/script are read-only test evidence, not production changes.",
@@ -2999,15 +4357,31 @@
           "tests/unit/session-due-date.test.tsx",
           "--detectOpenHandles"
         ],
-        ["npm", "run", "typecheck"],
-        ["node_modules/.bin/eslint", "tests/unit/session-due-date.test.tsx"],
-        ["node_modules/.bin/prettier", "--check", "tests/unit/session-due-date.test.tsx"],
-        ["python3", ".refactor-baseline/rf080-verify-mutant.py"]
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "tests/unit/session-due-date.test.tsx"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "tests/unit/session-due-date.test.tsx"
+        ],
+        [
+          "python3",
+          ".refactor-baseline/rf080-verify-mutant.py"
+        ]
       ],
       "risk": "low",
       "approved": true,
       "status": "verified",
-      "allowed_paths": ["tests/unit/session-due-date.test.tsx"],
+      "allowed_paths": [
+        "tests/unit/session-due-date.test.tsx"
+      ],
       "attempts": 1,
       "started_at": "2026-10-17T09:45:44.273149+00:00",
       "failure": "Batch resource limit reached",
@@ -3027,7 +4401,12 @@
         "tests/unit/deck-cards-due-date.test.tsx",
         "tests/e2e/session-action-errors.spec.ts"
       ],
-      "dependencies": ["RF-072", "RF-077", "RF-080", "RF-079"],
+      "dependencies": [
+        "RF-072",
+        "RF-077",
+        "RF-080",
+        "RF-079"
+      ],
       "acceptance_criteria": [
         "Read .refactor-baseline/rf081-readiness.json, rf081-owner-repro.json and retained initial setup failure. Primary owns behavior/data decisions. Only five allowed paths. No subagents/reviewers from worker. Controller owns six frozen gates and separate stronger review; primary owns final acceptance.",
         "Production change is exactly two added statements, one per owner: setDueDateError(null) immediately after the parsed.ok invalid/past-return guard and before the existing runCardAction in handleSaveDueDate or runAction in saveDueDate. Invalid and past branches remain unchanged. Preserve controlled error priority, runAction/runCardAction, current-card/deck guards, busy handling, parser, service calls/IDs, queue/sync, haptics, successful close/reset/reload/onChanged/advance and every native input/overlay prop. No helper, state, component, dependency, schema, database-content or shared UI change.",
@@ -3039,8 +4418,18 @@
         "All six fresh frozen commands must pass, including 370 full unit tests and 34 Chrome cases if no unrelated work occurs. Scoped lint retains existing source warnings; do not disable rules or checks. Build and browser execution belong to the controller when sandbox binding is unavailable. Independent Astra and primary final image/hash/diff acceptance are mandatory. Native/device/iOS and duplication scans are outside this bounded repair and may not be claimed."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--detectOpenHandles"],
-        ["npm", "run", "typecheck"],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--detectOpenHandles"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
         [
           "node_modules/.bin/eslint",
           "app/flashcards/session.tsx",
@@ -3056,7 +4445,11 @@
           "tests/unit/deck-cards-due-date.test.tsx",
           "tests/e2e/session-action-errors.spec.ts"
         ],
-        ["npm", "run", "build:web"],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ],
         [
           "env",
           "CI=1",
@@ -3099,7 +4492,10 @@
         "lib/fsrs/review-transition.ts",
         "docs/refactoring/UNUSED.md"
       ],
-      "dependencies": ["RF-009", "RF-010"],
+      "dependencies": [
+        "RF-009",
+        "RF-010"
+      ],
       "acceptance_criteria": [
         "Read .refactor-baseline/rf082-readiness.json, rf082-before-gate.log and the 20-case focused baseline. Primary owns module/API and remaining-candidate decisions. Only four allowed paths. No worker subagents/reviewers or package installs. Controller owns all frozen checks and separate stronger review. The first frozen command pins the primary verifier SHA256; do not modify the verifier or prescribed evidence.",
         "In lib/fsrs/smart-decks.ts change only export async function readDefaultDeckFilter to async function readDefaultDeckFilter. In components/ui/MirroredRow.tsx change only export const MirroredPressableRow to const MirroredPressableRow. In lib/fsrs/review-transition.ts change only export type ReviewRecord to type ReviewRecord. Each full result must exactly match its rf082-prescribed-<basename> file in .refactor-baseline. Preserve bodies, types, bindings, JSX, styles, ref forwarding, displayName, imports, exports used by callers and all other whitespace. No whole-file formatter or behavior/data/schema/dependency change.",
@@ -3122,14 +4518,22 @@
           "tests/unit/rtl-component-contracts.test.tsx",
           "tests/unit/fsrs-review-transition.test.ts"
         ],
-        ["npm", "run", "typecheck"],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
         [
           "node_modules/.bin/eslint",
           "lib/fsrs/smart-decks.ts",
           "components/ui/MirroredRow.tsx",
           "lib/fsrs/review-transition.ts"
         ],
-        ["node_modules/.bin/prettier", "--check", "docs/refactoring/UNUSED.md"]
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "docs/refactoring/UNUSED.md"
+        ]
       ],
       "risk": "medium",
       "approved": true,
@@ -3151,8 +4555,13 @@
       "title": "Remove the unreachable retention-card helper cluster",
       "description": "Delete the proven unreachable four-function retention cluster and no other source bytes.",
       "rationale": "Complete caller/import/SQLite/sync inspection proves the two exported helpers and their two private ID builders have no callers. All live functions retain shared imports and stable behavior; leaving builders would create dead code.",
-      "modules": ["lib/fsrs/queries.ts", "docs/refactoring/UNUSED.md"],
-      "dependencies": ["RF-082"],
+      "modules": [
+        "lib/fsrs/queries.ts",
+        "docs/refactoring/UNUSED.md"
+      ],
+      "dependencies": [
+        "RF-082"
+      ],
       "acceptance_criteria": [
         "Read .refactor-baseline/rf083-readiness.json and rf083-before-gate.log. Primary owns the API/data/security decision. Only lib/fsrs/queries.ts and docs/refactoring/UNUSED.md may change. No worker subagents/reviewers, package installs or evidence/verifier edits. Controller runs the six frozen gates and separate stronger review.",
         "Read .refactor-baseline/rf083-unit-failure-triage.json and the preserved failed full-suite run. One existing Arabic Reset retry case failed once, passed three isolated runs and two complete unchanged ten-case file runs. The query module is fully mocked there, so candidate deletion cannot execute in that test. Root cause is not established. Preserve the spent ordinary attempt, invalid checkpoint and all tests/gates/timeouts. The remaining normal retry requires fresh generation and all six frozen checks, with no source or test scope expansion. RF-086 tracks the unresolved intermittent fixture finding; reviewer must report it honestly.",
@@ -3167,16 +4576,38 @@
           "-c",
           "import hashlib,pathlib,runpy; p=pathlib.Path('.refactor-baseline/rf083-verify.py'); assert hashlib.sha256(p.read_bytes()).hexdigest() == '47a536524a3eda1e06fdb16b0d4cb03961c7ca6df3b7957acac9f51daf053e9b', 'Primary verifier changed'; runpy.run_path(str(p),run_name='__main__')"
         ],
-        ["npm", "run", "test:unit"],
-        ["npm", "run", "typecheck"],
-        ["node_modules/.bin/eslint", "lib/fsrs/queries.ts"],
-        ["npm", "run", "build:web"],
-        ["node_modules/.bin/prettier", "--check", "docs/refactoring/UNUSED.md"]
+        [
+          "npm",
+          "run",
+          "test:unit"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/fsrs/queries.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "docs/refactoring/UNUSED.md"
+        ]
       ],
       "risk": "medium",
       "approved": true,
       "status": "verified",
-      "allowed_paths": ["lib/fsrs/queries.ts", "docs/refactoring/UNUSED.md"],
+      "allowed_paths": [
+        "lib/fsrs/queries.ts",
+        "docs/refactoring/UNUSED.md"
+      ],
       "attempts": 2,
       "started_at": "2026-10-17T20:28:00.532283+00:00",
       "failure": "Verification failed: ['npm', 'run', 'test:unit']; see .ralph/runs/RF-083-1-1792268652123252954/verify-1.log",
@@ -3189,8 +4620,13 @@
       "title": "Remove the unused RTL registry lookup index",
       "description": "Inspect and remove only the unused derived rtlComponentRegistryByPath index.",
       "rationale": "The exported lookup has no consumers; active coverage uses the typed registry array. Removing only export visibility would leave an unused allocation and unsafe cast.",
-      "modules": ["tests/rtl/rtl-component-registry.ts", "docs/refactoring/UNUSED.md"],
-      "dependencies": ["RF-083"],
+      "modules": [
+        "tests/rtl/rtl-component-registry.ts",
+        "docs/refactoring/UNUSED.md"
+      ],
+      "dependencies": [
+        "RF-083"
+      ],
       "acceptance_criteria": [
         "Read .refactor-baseline/rf084-readiness.json and rf084-before-gate.log. Primary owns the caller/API decision. Edit only tests/rtl/rtl-component-registry.ts and docs/refactoring/UNUSED.md. No worker subagents/reviewers, package install or evidence/verifier edit. Controller runs five frozen gates and separate stronger review.",
         "Delete only the complete final rtlComponentRegistryByPath declaration and its separating blank line, exactly four lines. Preserve every byte of the typed registry array, entries, entry helper and imports. No new cast or local unused lookup. Copy .refactor-baseline/rf084-prescribed-registry.ts and rf084-prescribed-unused.md exactly to their two task paths. No whole-file formatter, new abstraction, test edit, suppression, dependency or other source change.",
@@ -3203,15 +4639,36 @@
           "-c",
           "import hashlib,pathlib,runpy; p=pathlib.Path('.refactor-baseline/rf084-verify.py'); assert hashlib.sha256(p.read_bytes()).hexdigest() == 'e87fe5876856fa5db4583cbb50f710a785b32b126f2a7523f7d3d76f5588ba27', 'Primary verifier changed'; runpy.run_path(str(p),run_name='__main__')"
         ],
-        ["npm", "run", "test:unit", "--", "--runTestsByPath", "tests/unit/rtl-component-registry-coverage.test.ts"],
-        ["npm", "run", "typecheck"],
-        ["node_modules/.bin/eslint", "tests/rtl/rtl-component-registry.ts"],
-        ["node_modules/.bin/prettier", "--check", "docs/refactoring/UNUSED.md"]
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/rtl-component-registry-coverage.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "tests/rtl/rtl-component-registry.ts"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "docs/refactoring/UNUSED.md"
+        ]
       ],
       "risk": "low",
       "approved": true,
       "status": "verified",
-      "allowed_paths": ["tests/rtl/rtl-component-registry.ts", "docs/refactoring/UNUSED.md"],
+      "allowed_paths": [
+        "tests/rtl/rtl-component-registry.ts",
+        "docs/refactoring/UNUSED.md"
+      ],
       "attempts": 1,
       "started_at": "2026-10-17T20:34:05.468744+00:00",
       "failure": "Batch resource limit reached",
@@ -3224,8 +4681,13 @@
       "title": "Remove the unused Locale type alias",
       "description": "Recheck callers and remove only the unused exported Locale alias.",
       "rationale": "The alias has no internal or external consumer. UIStringKey/UIStrings and both dictionaries remain required.",
-      "modules": ["lib/i18n/strings.ts", "docs/refactoring/UNUSED.md"],
-      "dependencies": ["RF-084"],
+      "modules": [
+        "lib/i18n/strings.ts",
+        "docs/refactoring/UNUSED.md"
+      ],
+      "dependencies": [
+        "RF-084"
+      ],
       "acceptance_criteria": [
         "Read .refactor-baseline/rf085-readiness.json and rf085-before-gate.log. Primary owns the caller/API decision. Edit only lib/i18n/strings.ts and docs/refactoring/UNUSED.md. No worker subagents/reviewers, package install or evidence/verifier edit. Controller runs five frozen gates and separate stronger review.",
         "Delete only the one export type Locale line. Preserve every other byte, including both English/Arabic dictionaries, UIStringKey and UIStrings. No translation/content/Quran/behavior/import edit. Copy .refactor-baseline/rf085-prescribed-strings.ts and rf085-prescribed-unused.md exactly to their two task paths. No whole-file formatter, new abstraction, test edit, suppression, dependency or other source change.",
@@ -3238,15 +4700,36 @@
           "-c",
           "import hashlib,pathlib,runpy; p=pathlib.Path('.refactor-baseline/rf085-verify.py'); assert hashlib.sha256(p.read_bytes()).hexdigest() == 'db021c849849e6f6336f505820d6c9e8bdc2ace67fb4493bb68578872d6ca36d', 'Primary verifier changed'; runpy.run_path(str(p),run_name='__main__')"
         ],
-        ["npm", "run", "test:unit", "--", "--runTestsByPath", "tests/unit/ui-strings-contract.test.ts"],
-        ["npm", "run", "typecheck"],
-        ["node_modules/.bin/eslint", "lib/i18n/strings.ts"],
-        ["node_modules/.bin/prettier", "--check", "docs/refactoring/UNUSED.md"]
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/ui-strings-contract.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/i18n/strings.ts"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "docs/refactoring/UNUSED.md"
+        ]
       ],
       "risk": "low",
       "approved": true,
       "status": "verified",
-      "allowed_paths": ["lib/i18n/strings.ts", "docs/refactoring/UNUSED.md"],
+      "allowed_paths": [
+        "lib/i18n/strings.ts",
+        "docs/refactoring/UNUSED.md"
+      ],
       "attempts": 1,
       "started_at": "2026-10-17T20:44:50.071276+00:00",
       "failure": "review stopped at account usage limit; see .ralph/runs/RF-085-1-1792269521539913853/review.jsonl",
@@ -3264,7 +4747,9 @@
         "components/flashcards/DeckCardsSheet.tsx",
         "components/ui/ResponsiveOverlay.tsx"
       ],
-      "dependencies": ["RF-078"],
+      "dependencies": [
+        "RF-078"
+      ],
       "acceptance_criteria": [
         "Primary bounded reproduction on 2026-10-17 is recorded in .refactor-baseline/rf086-reproduction.json. The unchanged cold full suite passes 374 cases; five equivalent instrumented full-suite cold runs also pass 374 each with no skipped cases or emitted diagnostic. Original failure is preserved; root cause and repair remain unknown. This is not approval to weaken tests or invent a fix. Resume causal diagnosis if it recurs in a fresh real gate.",
         "Before approval primary reads .refactor-baseline/rf083-unit-failure-triage.json and original logs, establishes a repeatable failure or records the reproduction limit, and chooses the smallest causal seam.",
@@ -3272,13 +4757,26 @@
         "No production/data behavior change is authorized by this placeholder. Independent review and primary acceptance remain required."
       ],
       "verification": [
-        ["npm", "run", "test:unit", "--", "--runTestsByPath", "tests/unit/deck-cards-due-date.test.tsx"],
-        ["npm", "run", "test:unit"]
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/deck-cards-due-date.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit"
+        ]
       ],
       "risk": "medium",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["tests/unit/deck-cards-due-date.test.tsx"],
+      "allowed_paths": [
+        "tests/unit/deck-cards-due-date.test.tsx"
+      ],
       "attempts": 0
     },
     {
@@ -3286,8 +4784,16 @@
       "title": "Resolve the manual icon generator tooling dependency",
       "description": "Review and declare a compatible development-only sharp requirement for the maintained manual generator, or document a simpler verified supported invocation.",
       "rationale": "The existing generator directly imports sharp, which is absent. This is tooling ownership, not an application runtime-library requirement or permission to regenerate protected icons.",
-      "modules": ["package.json", "package-lock.json", "scripts/generate-icons.mjs", "docs/refactoring/UNUSED.md"],
-      "dependencies": ["RF-011", "RF-089"],
+      "modules": [
+        "package.json",
+        "package-lock.json",
+        "scripts/generate-icons.mjs",
+        "docs/refactoring/UNUSED.md"
+      ],
+      "dependencies": [
+        "RF-011",
+        "RF-089"
+      ],
       "acceptance_criteria": [
         "RF-089 has security priority. Refresh package/lock/audit preflight after that patch before any Sharp approval; the earlier rf087 metadata/baseline is historical. No Sharp package has been installed in the application by this preparation.",
         "Primary must inspect script side effects, official current sharp/Node/platform compatibility, audit and lock impacts before selecting an exact scope.",
@@ -3295,13 +4801,25 @@
         "This placeholder authorizes no dependency installation, source change, asset generation or test weakening. Freeze acceptance commands and independent review after readiness."
       ],
       "verification": [
-        ["npm", "run", "typecheck"],
-        ["npm", "run", "build:web"]
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ]
       ],
       "risk": "medium",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["package.json", "package-lock.json", "docs/refactoring/UNUSED.md"],
+      "allowed_paths": [
+        "package.json",
+        "package-lock.json",
+        "docs/refactoring/UNUSED.md"
+      ],
       "attempts": 0
     },
     {
@@ -3309,19 +4827,32 @@
       "title": "Resolve the security probe through the React Native dependency owner",
       "description": "Inspect the devtools probe and resolve its target from React Native rather than assuming root-level transitive hoisting.",
       "rationale": "The security helper intentionally examines a transitive package. Adding a runtime dependency solely to silence Knip would misstate ownership. Parent-relative resolution should inspect the actual package used by RN.",
-      "modules": ["scripts/ralph/check-security-dependencies.cjs", "docs/refactoring/UNUSED.md"],
-      "dependencies": ["RF-011"],
+      "modules": [
+        "scripts/ralph/check-security-dependencies.cjs",
+        "docs/refactoring/UNUSED.md"
+      ],
+      "dependencies": [
+        "RF-011"
+      ],
       "acceptance_criteria": [
         "The existing controller path_allowed hard-denies scripts/ralph/ even when a task allow-list names a helper. Do not approve this item for a Ralph implementation worker or weaken that guard. This is primary-owned infrastructure maintenance requiring proportional real checks and separate stronger read-only review before primary acceptance. Keep approved false until that owner workflow is complete.",
         "Primary verifies React Native ownership, actual resolution paths, behavior under a harmless competing-root fixture, current override guarantees and unchanged Supabase CLI archive checks.",
         "Approve only a bounded parent-relative resolution repair after causal evidence. Do not install a new runtime devtools package or suppress the analysis finding.",
         "No production, backend, credential, package override/version or live system change. Freeze real analysis and existing probe verification before approval."
       ],
-      "verification": [["node", "scripts/ralph/check-security-dependencies.cjs"]],
+      "verification": [
+        [
+          "node",
+          "scripts/ralph/check-security-dependencies.cjs"
+        ]
+      ],
       "risk": "low",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["scripts/ralph/check-security-dependencies.cjs", "docs/refactoring/UNUSED.md"],
+      "allowed_paths": [
+        "scripts/ralph/check-security-dependencies.cjs",
+        "docs/refactoring/UNUSED.md"
+      ],
       "attempts": 0
     },
     {
@@ -3336,7 +4867,9 @@
         "docs/refactoring/DEPENDENCY_SECURITY.md",
         "docs/refactoring/UNUSED.md"
       ],
-      "dependencies": ["RF-011"],
+      "dependencies": [
+        "RF-011"
+      ],
       "acceptance_criteria": [
         "Read .refactor-baseline/rf089-readiness.json, rf089-preflight.json, rf089-reproduction.json and final before-tool log. Primary owns security/version/exposure decisions. Generator edits only package.json, scripts/tests/brace-expansion.test.cjs, docs/refactoring/DEPENDENCY_SECURITY.md and docs/refactoring/UNUSED.md. package-lock.json is a controller-owned output. Do not install, edit lock/evidence/verifier, run the icon/database generator, spawn helpers/reviewers or touch app/native/protected/backend/production inputs.",
         "Copy the four exact rf089-prescribed artifacts to their corresponding source/doc paths. Manifest adds only test:dependency-security; existing dependencies/ranges/overrides/scripts remain byte-identical. No new override. Controller uses the frozen named update and lifecycle fixes. Exact generated lock changes six 1.1.15 copies to 1.1.21 and one 5.0.6 copy to 5.0.12; glob 1.1.21 and all other lock entries remain unchanged.",
@@ -3355,19 +4888,48 @@
           "--offline",
           "--strict-peer-deps"
         ],
-        ["node", "scripts/fix-rn-gradle-plugin.js"],
-        ["node_modules/.bin/patch-package", "--error-on-fail"],
+        [
+          "node",
+          "scripts/fix-rn-gradle-plugin.js"
+        ],
+        [
+          "node_modules/.bin/patch-package",
+          "--error-on-fail"
+        ],
         [
           "python3",
           "-c",
           "import hashlib,pathlib,runpy; p=pathlib.Path('.refactor-baseline/rf089-verify.py'); assert hashlib.sha256(p.read_bytes()).hexdigest() == '695ad14f040166735020c4a384a5fcecfcc0ae812c6b5d254eaee9d11664c969', 'Primary verifier changed'; runpy.run_path(str(p),run_name='__main__')"
         ],
-        ["npm", "run", "test:dependency-security"],
-        ["node", "scripts/ralph/check-expo-native.cjs"],
-        ["npm", "run", "typecheck"],
-        ["npm", "run", "lint"],
-        ["npm", "run", "test:unit"],
-        ["npm", "run", "build:web"],
+        [
+          "npm",
+          "run",
+          "test:dependency-security"
+        ],
+        [
+          "node",
+          "scripts/ralph/check-expo-native.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "lint"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ],
         [
           "env",
           "CI=1",
@@ -3410,8 +4972,16 @@
       "title": "Triage and resolve remaining dependency audit findings",
       "description": "Classify remaining advisory families and split exact compatible repairs after the brace-expansion patch.",
       "rationale": "Fresh baseline has 74 package findings including 59 high; the selected compatible patch leaves 71/56 high. These counts include propagated parents, and require explicit exposure and remediation decisions before final completion.",
-      "modules": ["package.json", "package-lock.json", "docs/refactoring/DEPENDENCY_SECURITY.md"],
-      "dependencies": ["RF-089", "RF-091", "RF-092"],
+      "modules": [
+        "package.json",
+        "package-lock.json",
+        "docs/refactoring/DEPENDENCY_SECURITY.md"
+      ],
+      "dependencies": [
+        "RF-089",
+        "RF-091",
+        "RF-092"
+      ],
       "acceptance_criteria": [
         "Primary deduplicates actual advisory URLs, inspects installed instances/consumers and distinguishes shipped app, optional remote and development paths. Use fresh official advisories and compatible-version evidence.",
         "Split independently verifiable package-family repairs. No broad npm audit fix, force, unsupported major jump, lint/test suppression, security-policy/production change or blanket exploitability claim.",
@@ -3420,13 +4990,26 @@
         "RF-092 is the exact YAML child, two installed legacy-line updates with existing xcpretty control. Seven direct advisory records must disappear; inherited argparse/sprintf debt and both audit scopes stay visible. Other families remain unapproved until separate preflight."
       ],
       "verification": [
-        ["npm", "audit", "--json", "--audit-level=high"],
-        ["npm", "run", "test:dependency-security"]
+        [
+          "npm",
+          "audit",
+          "--json",
+          "--audit-level=high"
+        ],
+        [
+          "npm",
+          "run",
+          "test:dependency-security"
+        ]
       ],
       "risk": "high",
       "approved": false,
       "status": "pending",
-      "allowed_paths": ["package.json", "package-lock.json", "docs/refactoring/DEPENDENCY_SECURITY.md"],
+      "allowed_paths": [
+        "package.json",
+        "package-lock.json",
+        "docs/refactoring/DEPENDENCY_SECURITY.md"
+      ],
       "attempts": 0
     },
     {
@@ -3442,7 +5025,9 @@
         "metro.config.js",
         "scripts/tests/metro-unicode.test.cjs"
       ],
-      "dependencies": ["RF-089"],
+      "dependencies": [
+        "RF-089"
+      ],
       "acceptance_criteria": [
         "Read .refactor-baseline/rf091-readiness.json, rf091-unicode-readiness.json and rf091-unicode-recovery.json plus the original preflight/probe/oom records. Primary owns security, data and format decisions. Copy exactly the five prescribed worker artifacts: package.json, scripts/tests/nanoid.test.cjs, docs/refactoring/DEPENDENCY_SECURITY.md, metro.config.js and scripts/tests/metro-unicode.test.cjs. package-lock.json is controller-owned. Do not install, run heavy frozen checks, spawn helpers/reviewers, modify evidence/verifier/limits, commit/push or touch application/native/backend/protected sources. Report heavy checks pending for the controller.",
         "Retain the earlier nanoid exact patch and test inputs. Controller named update changes only node_modules/nanoid3.3.12 to3.3.20, no new override or dependency. Existing package/scripts/ranges remain except the prescribed security test path and new test:metro-unicode script. Runtime export paths/order remain, only two upstream async type paths change. Existing brace guard stays byte-identical.",
@@ -3453,21 +5038,65 @@
         "Do not print or parse entire generated native bundles or large protected inputs during implementation. Use the exact artifacts, pinned hashes and structured primary metrics. Independent review still examines the complete source diff and actual controller evidence. No production/live-service, asset generation or signing action."
       ],
       "verification": [
-        ["npm", "update", "nanoid", "--ignore-scripts", "--no-audit", "--no-fund", "--offline", "--strict-peer-deps"],
-        ["node", "scripts/fix-rn-gradle-plugin.js"],
-        ["node_modules/.bin/patch-package", "--error-on-fail"],
+        [
+          "npm",
+          "update",
+          "nanoid",
+          "--ignore-scripts",
+          "--no-audit",
+          "--no-fund",
+          "--offline",
+          "--strict-peer-deps"
+        ],
+        [
+          "node",
+          "scripts/fix-rn-gradle-plugin.js"
+        ],
+        [
+          "node_modules/.bin/patch-package",
+          "--error-on-fail"
+        ],
         [
           "python3",
           "-c",
           "import hashlib,pathlib,runpy; p=pathlib.Path('.refactor-baseline/rf091-verify.py'); assert hashlib.sha256(p.read_bytes()).hexdigest() == '2cf0e543dc9aece4788ce5b99647d3af72489c9dbf437ad9e04096e510740d0a', 'Primary verifier changed'; runpy.run_path(str(p),run_name='__main__')"
         ],
-        ["npm", "run", "test:dependency-security"],
-        ["env", "NODE_OPTIONS=--max-old-space-size=4096", "npm", "run", "test:metro-unicode"],
-        ["node", "scripts/ralph/check-expo-native.cjs"],
-        ["npm", "run", "typecheck"],
-        ["npm", "run", "lint"],
-        ["npm", "run", "test:unit"],
-        ["npm", "run", "build:web"],
+        [
+          "npm",
+          "run",
+          "test:dependency-security"
+        ],
+        [
+          "env",
+          "NODE_OPTIONS=--max-old-space-size=4096",
+          "npm",
+          "run",
+          "test:metro-unicode"
+        ],
+        [
+          "node",
+          "scripts/ralph/check-expo-native.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "lint"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ],
         [
           "env",
           "CI=1",
@@ -3562,30 +5191,70 @@
         "scripts/tests/js-yaml.test.cjs",
         "docs/refactoring/DEPENDENCY_SECURITY.md"
       ],
-      "dependencies": ["RF-091"],
+      "dependencies": [
+        "RF-091"
+      ],
       "acceptance_criteria": [
         "Read AGENTS, architecture, conventions, progress and this selected task. Primary owns security decisions and acceptance. You are not alone in the codebase; preserve every unrelated edit. No worker helper/reviewer. Only copy the three exact prescribed artifacts. Use hashes/structured evidence, do not read unrelated large files or all generated bundles.",
-        "Exact expected SHA256 {\"docs/refactoring/DEPENDENCY_SECURITY.md\": \"ec7068db544db0bf262efa6d38a9c4e92040ab83aebe8c52bf00ea2e80c118e3\", \"package-lock.json\": \"63ffd477c21a97003e23b3d2d18d7ee17400cd49b3b1d3f70101b65fa1d7a2f7\", \"package.json\": \"cabaf425aec8d3150f255c5ab1805fd58bf5c0d4b0ed4018e7bda85b0601d013\", \"scripts/tests/js-yaml.test.cjs\": \"3b052425d7dc0d223e3bfd7535d426478cd4f3a4ccdf93e56f37d61846088a0b\"}. The controller owns lock resolution, all frozen commands, task status, progress, review and commit. Do not install packages, edit the lock, evidence, verifier, runner, limits, old tests or source configuration, or run expensive build/browser/audit checks as the implementation worker.",
+        "Exact expected SHA256 {\"docs/refactoring/DEPENDENCY_SECURITY.md\": \"3bd776a88b9b6f545842fcc0107bca38656d11a3ca421851c4e647734feec8bc\", \"package-lock.json\": \"63ffd477c21a97003e23b3d2d18d7ee17400cd49b3b1d3f70101b65fa1d7a2f7\", \"package.json\": \"cabaf425aec8d3150f255c5ab1805fd58bf5c0d4b0ed4018e7bda85b0601d013\", \"scripts/tests/js-yaml.test.cjs\": \"892c279fd38500baf44f9df87a395bef9abbc48e979957b4a000e31ee12e5a84\"}. The controller owns lock resolution, all frozen commands, task status, progress, review and commit. Do not install packages, edit the lock, evidence, verifier, runner, limits, old tests or source configuration, or run expensive build/browser/audit checks as the implementation worker.",
         "Exactly two resolved entries change: root YAML 3.14.2 to 3.15.2 and nested @eslint/eslintrc YAML 4.2.0 to 4.3.2. Preserve xcpretty 4.3.2, all other entries, metadata conditions/ranges and current overrides. No peer bypass, new dependency, major migration or audit-fix command.",
         "The exact guard is red with one pass and three failures on old copies, then green with four passes and zero failures on isolated real archives, zero skips. Eleven fresh children and 67 API checks cover CJS/UMD/minified/ESM and legacy safe APIs. Retain 128 MB and five-second bounds, real API behavior, semantic controls, empty/keyed merge quotas and measured resolver operation guard. No assertion weakening, wall-clock thresholds, vendor replacement or fabricated pass.",
         "All 12 controller gates and separate stronger review must pass. Fresh installed and lock-only audits remove all seven direct YAML source records and add no source. Inherited moderate YAML through argparse and count propagation remain visible. Preserve current Knip counts, all 2,421 protected hashes and prior guards/Metro config. All nine security cases, 374 Jest cases and 28 Chrome cases remain real acceptance, not worker claims.",
         "Primary final scope/hash acceptance follows lease release. RF-086 remains unresolved; RF-090 owns residual advisories. No fresh native export/bytecode/APK/iOS compilation/device verification is claimed. No protected inputs, app/native/backend behavior, production system, signing, push/merge/deployment or resource/retry changes. Preserve failures."
       ],
       "verification": [
-        ["npm", "update", "js-yaml", "--ignore-scripts", "--no-audit", "--no-fund", "--offline", "--strict-peer-deps"],
-        ["node", "scripts/fix-rn-gradle-plugin.js"],
-        ["node_modules/.bin/patch-package", "--error-on-fail"],
+        [
+          "npm",
+          "update",
+          "js-yaml",
+          "--ignore-scripts",
+          "--no-audit",
+          "--no-fund",
+          "--offline",
+          "--strict-peer-deps"
+        ],
+        [
+          "node",
+          "scripts/fix-rn-gradle-plugin.js"
+        ],
+        [
+          "node_modules/.bin/patch-package",
+          "--error-on-fail"
+        ],
         [
           "python3",
           "-c",
-          "import hashlib,pathlib,runpy; p=pathlib.Path('.refactor-baseline/rf092-verify.py'); assert hashlib.sha256(p.read_bytes()).hexdigest() == 'b9499195760b85a1490a66ede936388e596638c30f5a62eadebf0f492f8c78db', 'Primary verifier changed'; runpy.run_path(str(p),run_name='__main__')"
+          "import hashlib,pathlib,runpy; p=pathlib.Path('.refactor-baseline/rf092-verify.py'); assert hashlib.sha256(p.read_bytes()).hexdigest() == 'ab9f7cbbbd7265b1b793c94e3b2617d64061184c94ba14d82e7f6d71e888323e', 'Primary verifier changed'; runpy.run_path(str(p),run_name='__main__')"
         ],
-        ["npm", "run", "test:dependency-security"],
-        ["node", "scripts/ralph/check-expo-native.cjs"],
-        ["npm", "run", "typecheck"],
-        ["npm", "run", "lint"],
-        ["npm", "run", "test:unit"],
-        ["npm", "run", "build:web"],
+        [
+          "npm",
+          "run",
+          "test:dependency-security"
+        ],
+        [
+          "node",
+          "scripts/ralph/check-expo-native.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "lint"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ],
         [
           "env",
           "CI=1",
