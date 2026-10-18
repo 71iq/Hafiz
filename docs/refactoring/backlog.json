@@ -5293,7 +5293,7 @@
     {
       "id": "RF-093",
       "title": "Keep generated loop evidence out of Jest module discovery",
-      "description": "Copy only .refactor-baseline/rf093-preflight/jest.config.js to jest.config.js. Add exactly modulePathIgnorePatterns for <rootDir>/.refactor-baseline/ and <rootDir>/.ralph/. Preserve all other source bytes and existing tests.",
+      "description": "Copy only .refactor-baseline/rf093-preflight/jest-literal.config.js to jest.config.js. Escape the leading directory dots in modulePathIgnorePatterns so only the two generated directories match. Preserve every other configuration field and all tests.",
       "rationale": "Cold verification finds a Haste module naming collision between the real hafiz package and an older copied SDK-resolution fixture. Generated evidence is not application source. Candidate discovery preserves all 66 source test files and full cold preflight passes 374 cases without a collision.",
       "modules": [
         "jest.config.js"
@@ -5303,16 +5303,21 @@
       ],
       "acceptance_criteria": [
         "Read AGENTS, architecture, conventions, progress and selected task. Primary owns final acceptance. You are not alone in the codebase. Do not revert unrelated edits or start helpers/reviewers. Copy only the exact prescribed one-file artifact; the controller owns all gates, status, progress, review and commit.",
-        "Exact jest.config.js SHA256 d935f161663abaa1165623a850780aaa9af0cc9679a5dd34b027af89e7339815. The only change is one modulePathIgnorePatterns property naming the two generated directories. Keep testMatch, testPathIgnorePatterns, setup, transforms, aliases and native/RTL behavior unchanged. Never disable Haste diagnostics or add a broad source/test ignore. No dependency, lock, application source or old assertion change.",
+        "Exact jest.config.js SHA256 667b89e890b39a19d3dd10719a854cf2db0d8268f4af99cacf56b77a2653f20b. Only the same one property changes, with literal dots for the two generated directories. Four generated-path controls must match and ten source/lookalike controls must remain visible. Keep testMatch, testPathIgnorePatterns, setup, transforms, aliases and native/RTL behavior unchanged. Never disable Haste diagnostics or add a broad source/test ignore. No dependency, lock, application source or assertion change.",
         "The pinned inventory SHA256 is faf24857500bcb9aaa90e863602c6649ff1e2c16721a5e5b907e9c7aa35c34f1. The frozen actual cold Jest inventory must have the same 66 source test files and no module collision. All 374 cold cases must pass without skipped cases or assertion changes. Existing local fixture contents and failure logs remain preserved. No cache wipe or evidence deletion.",
-        "Primary preflight already reproduces the default warning and proves exact candidate configuration equivalence, identical test inventory and full cold 374 pass without warning. Actual source is still unchanged before this task. Four fresh controller commands and independent stronger evaluation remain mandatory; no worker self-certification. No full application/browser/native checks are claimed or required for this isolated module-discovery setting.",
+        "The first exact source passed four commands and independent review but primary rejected its wildcard-dot behavior. Boundary probe is red on that committed first attempt and green on the exact corrected artifact. Preserve first-attempt code, logs, verdict and normal attempt count. Five fresh controller commands, including literal-boundary controls, unchanged 66-file inventory and full cold 374 cases, plus separate stronger review remain mandatory. No worker self-certification. No application/browser/native behavior change is claimed.",
         "Do not run expensive full suites as implementation worker; controller runs frozen commands. Primary final hash/scope review follows lease release. RF-086 and remaining security families stay open. No resource/retry/account limit, runner/provider, protected input, backend, production, push/merge/deployment or signing change."
       ],
       "verification": [
         [
           "python3",
           "-c",
-          "import hashlib,pathlib,json,subprocess; r=pathlib.Path.cwd(); p=r/'jest.config.js'; assert hashlib.sha256(p.read_bytes()).hexdigest()=='d935f161663abaa1165623a850780aaa9af0cc9679a5dd34b027af89e7339815','Unexpected Jest configuration'; inv=r/'.refactor-baseline/rf093-preflight/expected-tests.json'; assert hashlib.sha256(inv.read_bytes()).hexdigest()=='faf24857500bcb9aaa90e863602c6649ff1e2c16721a5e5b907e9c7aa35c34f1','Pinned inventory changed'; q=subprocess.run(['node_modules/.bin/jest','--listTests','--json','--runInBand','--no-cache'],text=True,capture_output=True); (r/'.refactor-baseline/rf093-fresh-inventory.json').write_text(q.stdout); (r/'.refactor-baseline/rf093-fresh-inventory.stderr').write_text(q.stderr); assert q.returncode==0 and 'Haste module naming collision' not in q.stderr,'Module discovery failure/collision'; found=sorted(str(pathlib.Path(n).relative_to(r)) for n in json.loads(q.stdout)); assert found==json.loads(inv.read_text()),'Source test inventory changed'; print('All66 source test files remain identical; cold actual Jest module discovery has no collision.')"
+          "import hashlib,pathlib,subprocess; p=pathlib.Path('.refactor-baseline/rf093-boundary-probe.cjs'); assert hashlib.sha256(p.read_bytes()).hexdigest()=='1520e917a937a88ad699e6f85ee7a72b7475a06c40022a3e705c5b08edb0ae70','Boundary probe changed'; subprocess.run(['node',str(p),'jest.config.js'],check=True)"
+        ],
+        [
+          "python3",
+          "-c",
+          "import hashlib,pathlib,json,subprocess; r=pathlib.Path.cwd(); p=r/'jest.config.js'; assert hashlib.sha256(p.read_bytes()).hexdigest()=='667b89e890b39a19d3dd10719a854cf2db0d8268f4af99cacf56b77a2653f20b','Unexpected Jest configuration'; inv=r/'.refactor-baseline/rf093-preflight/expected-tests.json'; assert hashlib.sha256(inv.read_bytes()).hexdigest()=='faf24857500bcb9aaa90e863602c6649ff1e2c16721a5e5b907e9c7aa35c34f1','Pinned inventory changed'; q=subprocess.run(['node_modules/.bin/jest','--listTests','--json','--runInBand','--no-cache'],text=True,capture_output=True); (r/'.refactor-baseline/rf093-fresh-inventory.json').write_text(q.stdout); (r/'.refactor-baseline/rf093-fresh-inventory.stderr').write_text(q.stderr); assert q.returncode==0 and 'Haste module naming collision' not in q.stderr,'Module discovery failure/collision'; found=sorted(str(pathlib.Path(n).relative_to(r)) for n in json.loads(q.stdout)); assert found==json.loads(inv.read_text()),'Source test inventory changed'; print('All66 source test files remain identical; cold actual Jest module discovery has no collision.')"
         ],
         [
           "npm",
@@ -5333,15 +5338,26 @@
       ],
       "risk": "low",
       "approved": true,
-      "status": "verified",
+      "status": "retry",
       "allowed_paths": [
         "jest.config.js"
       ],
       "attempts": 1,
       "started_at": "2026-10-18T06:50:49.273911+00:00",
-      "completed_at": "2026-10-18T06:53:15.110535+00:00",
       "evidence": ".ralph/runs/RF-093-1-1792306249275326302",
-      "summary": "Implemented RF-093 by adding the exact prescribed Jest module ignore patterns. No commit or push performed."
+      "failure": "Primary rejects first specification: unescaped directory dots. Fresh literal-boundary generation and all five checks plus stronger review required. Attempt 1 remains spent.",
+      "primary_reviews": [
+        {
+          "status": "verified",
+          "completed_at": "2026-10-18T06:53:15.110535+00:00",
+          "summary": "Implemented RF-093 by adding the exact prescribed Jest module ignore patterns. No commit or push performed.",
+          "source_commit": "2ae2a81cfbb211c48cda500c68edadd6e92323c7",
+          "independent_verdict": "pass",
+          "primary_verdict": "rejected",
+          "reason": "Unescaped dots also match xrefactor-baseline/xralph; violates exact-directory scope. Primary specification error, not worker deviation.",
+          "evidence": ".ralph/runs/RF-093-1-1792306249275326302"
+        }
+      ]
     }
   ]
 }
