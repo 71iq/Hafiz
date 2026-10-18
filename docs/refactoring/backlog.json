@@ -2178,7 +2178,8 @@
         "RF-048",
         "RF-086",
         "RF-090",
-        "RF-093"
+        "RF-093",
+        "RF-094"
       ],
       "acceptance_criteria": [
         "Review actual repository against stack, conventions, backlog and preserved behavior.",
@@ -4740,45 +4741,74 @@
     },
     {
       "id": "RF-086",
-      "title": "Diagnose the intermittent deck Reset retry fixture failure",
-      "description": "Reproduce and diagnose the unchanged Arabic Reset retry failure observed during RF-083 full-suite verification.",
-      "rationale": "The existing actual-modal test failed once at the final mocked-retry step but passed three isolated-case and two complete file runs. The query-module deletion cannot execute through its full Jest mock. Root cause remains unknown, and repeated green output alone is not a repair.",
+      "title": "Await completed persistence in the deck-card modal fixture",
+      "description": "Copy the exact prescribed test candidate. Add fireEventAsync to the existing import and await only the successful due-date, Delete and Reset retry presses. Every assertion, busy/error guard, fixture, real NativeModal, timer and application module remains unchanged.",
+      "rationale": "Real stress replays reproduce both confirmations after their mocked writes and reloads finish; awaited act then commits dismissal without extra calls. A confirmation-only candidate exposes the identical due-date retry symptom in the full gate. The final bounded candidate fixes all three observed async test boundaries and passes full verification.",
       "modules": [
         "tests/unit/deck-cards-due-date.test.tsx",
         "components/flashcards/DeckCardsSheet.tsx",
+        "components/flashcards/DueDateSheet.tsx",
+        "components/ui/ConfirmDialog.tsx",
         "components/ui/ResponsiveOverlay.tsx"
       ],
       "dependencies": [
         "RF-078"
       ],
       "acceptance_criteria": [
-        "Primary bounded reproduction on 2026-10-17 is recorded in .refactor-baseline/rf086-reproduction.json. The unchanged cold full suite passes 374 cases; five equivalent instrumented full-suite cold runs also pass 374 each with no skipped cases or emitted diagnostic. Original failure is preserved; root cause and repair remain unknown. This is not approval to weaken tests or invent a fix. Resume causal diagnosis if it recurs in a fresh real gate.",
-        "Before approval primary reads .refactor-baseline/rf083-unit-failure-triage.json and original logs, establishes a repeatable failure or records the reproduction limit, and chooses the smallest causal seam.",
-        "Freeze a behavioral regression and exact bounded repair only after causality is demonstrated. Preserve actual NativeModal, guards, error/retry/negative assertions and meaningful timing behavior; no test skipping, blanket mocking, timeout increase or weakening to pass.",
-        "No production/data behavior change is authorized by this placeholder. Independent review and primary acceptance remain required."
+        "Copy only .refactor-baseline/rf086-await-preflight-v2/deck-cards-due-date.test.tsx to tests/unit/deck-cards-due-date.test.tsx. Final SHA256 e9c9e77178b1ee317878d62d685fe9077ed017cd19c2cd2a415250c7f0a85240. The entire diff is one import and three awaited successful persistence presses. Do not add wrappers, alter application source, or touch controller/progress files.",
+        "Read .refactor-baseline/rf086-causal-readiness.json and original failures. Preserve every old assertion, NativeModal, disabled/back/cancel/error/negative/retry check, locale/theme case, mocked call count, fixture and cleanup. No timeout increase, timer-mode change, skip or broader mocking is authorized.",
+        "The pinned stress helper repeats the four confirmation cases and one date-retry case 25 times each, all 125 selected cases must pass. Its five unselected cases must still pass in the real ten-case file. The complete default cold suite must retain 66 files/374 cases, zero skips or Haste collision. Do not present selected runs as complete-suite verification.",
+        "Primary preflight passes all six commands then restores the exact original test. That is readiness, not task completion. Fresh controller source/hash, stress, real ten-case file, full cold suite, typecheck, scoped lint/format and separate stronger review remain required.",
+        "The invalid React Native performance.now mock is a separate RF-094 finding. Clock-only restoration does not repair the reproduced dismissal. Do not combine that fix here or claim it is resolved. No new app/browser/native/device/production behavior change is authorized."
       ],
       "verification": [
         [
-          "npm",
-          "run",
-          "test:unit",
-          "--",
+          "python3",
+          "-c",
+          "import hashlib; from pathlib import Path; expected={'tests/unit/deck-cards-due-date.test.tsx': 'e9c9e77178b1ee317878d62d685fe9077ed017cd19c2cd2a415250c7f0a85240', 'components/flashcards/DeckCardsSheet.tsx': '71930e42d08aac21b5893711c1fa0c5e142f7a046f0c91189f18c1cc0d13082a', 'components/ui/ResponsiveOverlay.tsx': '7d9979495d7fcb680743a7d0687cbe94bd3be77fce2e83296b800eecfb829532', 'components/ui/ConfirmDialog.tsx': '5218a6f3c63afc5c88a8942b6c9982b567060abe1c40daaadbb8b5c5e6172eb5', 'components/ui/DropdownMenu.tsx': '76534526f6dc11b2c4747a10a209a043793c5e13d180e6f5cf90ef5e1883704c', 'components/flashcards/DueDateSheet.tsx': '3ce51da0163e558c7aa8685bd01b45ce125f70596b110c3d2987515812816868', 'tests/unit/session-due-date.test.tsx': 'c73e9146aaf1c27f7bf15b975b9615c41e861deadfb7504b913c2c2104611906', 'jest.config.js': '667b89e890b39a19d3dd10719a854cf2db0d8268f4af99cacf56b77a2653f20b'}; mismatches=[p for p,h in expected.items() if hashlib.sha256(Path(p).read_bytes()).hexdigest()!=h]; assert not mismatches,mismatches; print(\"RF086 exact four-line fixture repair and seven protected source/config hashes match\")"
+        ],
+        [
+          "python3",
+          "-c",
+          "import hashlib; from pathlib import Path; p=Path('.refactor-baseline/rf086-await-stress-v2.py'); assert hashlib.sha256(p.read_bytes()).hexdigest()=='b3cae3878d48b65ba0f0bc8c3416eec95ee761b8c8c5b521677f8ec3d7acf42f'; exec(compile(p.read_text(),str(p),\"exec\"))"
+        ],
+        [
+          "node_modules/.bin/jest",
+          "--runInBand",
+          "--no-cache",
           "--runTestsByPath",
           "tests/unit/deck-cards-due-date.test.tsx"
         ],
         [
           "npm",
           "run",
-          "test:unit"
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "tests/unit/deck-cards-due-date.test.tsx"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "tests/unit/deck-cards-due-date.test.tsx"
         ]
       ],
-      "risk": "medium",
-      "approved": false,
+      "risk": "low",
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
         "tests/unit/deck-cards-due-date.test.tsx"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "readiness_evidence": ".refactor-baseline/rf086-causal-readiness.json"
     },
     {
       "id": "RF-087",
@@ -5299,7 +5329,8 @@
         "jest.config.js"
       ],
       "dependencies": [
-        "RF-092"
+        "RF-092",
+        "RF-086"
       ],
       "acceptance_criteria": [
         "Read AGENTS, architecture, conventions, progress and selected task. Primary owns final acceptance. You are not alone in the codebase. Do not revert unrelated edits or start helpers/reviewers. Copy only the exact prescribed one-file artifact; the controller owns all gates, status, progress, review and commit.",
@@ -5338,14 +5369,14 @@
       ],
       "risk": "low",
       "approved": true,
-      "status": "retry",
+      "status": "blocked",
       "allowed_paths": [
         "jest.config.js"
       ],
-      "attempts": 1,
-      "started_at": "2026-10-18T06:50:49.273911+00:00",
-      "evidence": ".ralph/runs/RF-093-1-1792306249275326302",
-      "failure": "Primary rejects first specification: unescaped directory dots. Fresh literal-boundary generation and all five checks plus stronger review required. Attempt 1 remains spent.",
+      "attempts": 2,
+      "started_at": "2026-10-18T06:56:47.198360+00:00",
+      "evidence": ".ralph/runs/RF-093-2-1792306607199962627",
+      "failure": "Verification failed: ['npm', 'run', 'test:unit', '--', '--no-cache']; see .ralph/runs/RF-093-2-1792306607199962627/verify-2.log",
       "primary_reviews": [
         {
           "status": "verified",
@@ -5357,7 +5388,65 @@
           "reason": "Unescaped dots also match xrefactor-baseline/xralph; violates exact-directory scope. Primary specification error, not worker deviation.",
           "evidence": ".ralph/runs/RF-093-1-1792306249275326302"
         }
-      ]
+      ],
+      "recovery": {
+        "status": "waiting_for_RF-086_and_primary_rescope",
+        "reason": "Second attempt passed boundary/inventory then failed on reproduced pre-existing async modal fixture. Correct source remains a checkpoint, not accepted. Primary must inspect accepted RF-086 results and prepare a permanent boundary regression before a justified recovery.",
+        "attempts_preserved": 2,
+        "retry_reset": false,
+        "source_sha256": "667b89e890b39a19d3dd10719a854cf2db0d8268f4af99cacf56b77a2653f20b",
+        "diagnosis_evidence": ".refactor-baseline/rf086-causal-readiness.json"
+      }
+    },
+    {
+      "id": "RF-094",
+      "title": "Preserve the React Native clock during due-date fixture resets",
+      "description": "Diagnose and narrowly repair the framework clock erased by resetAllMocks in both due-date fixtures.",
+      "rationale": "RN preset defines performance.now as jest.fn(Date.now). Both fixture beforeEach hooks reset its implementation to undefined. A finite-clock regression is red before and green after restoring the preset implementation. This is separate from the intermittent dismissal, which reproduces with a valid clock too.",
+      "modules": [
+        "tests/unit/deck-cards-due-date.test.tsx",
+        "tests/unit/session-due-date.test.tsx"
+      ],
+      "dependencies": [
+        "RF-086"
+      ],
+      "acceptance_criteria": [
+        "Before approval inspect .refactor-baseline/rf086-confirmation-diagnosis/clock-red-green.json and clock-render-red-green.json. The clock contract fails deterministically but the small callback/render probes still pass; do not claim that clock restoration fixes the modal bug.",
+        "Primary chooses and freezes a minimal fixture-only repair that preserves valid framework clocks and per-test owned-mock/once-queue isolation. Compare restoring the RN preset mock with resetting only owned mocks; do not blindly change resetAllMocks to clearAllMocks.",
+        "Add a meaningful finite-clock regression for both fixture setup paths and show actual red/green behavior. Preserve all existing interactions, negative assertions, timers, mocks and cleanup. No global app clock change, fake-timer workaround, timeout increase, new dependency or broad assertion weakening.",
+        "Freeze exact paths, candidate hashes, full-suite commands and independent review before marking ready. This placeholder is unapproved."
+      ],
+      "verification": [
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/deck-cards-due-date.test.tsx",
+          "tests/unit/session-due-date.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
+      ],
+      "risk": "low",
+      "approved": false,
+      "status": "pending",
+      "allowed_paths": [
+        "tests/unit/deck-cards-due-date.test.tsx",
+        "tests/unit/session-due-date.test.tsx"
+      ],
+      "attempts": 0
     }
   ]
 }
