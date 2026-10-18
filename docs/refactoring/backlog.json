@@ -2791,11 +2791,13 @@
       ],
       "dependencies": [
         "RF-004",
-        "RF-006"
+        "RF-006",
+        "RF-095"
       ],
       "acceptance_criteria": [
         "Inspect existing overlay patterns. Extract presentation using ResponsiveSheet/header/body with the same open/close conditions.",
-        "Test phone/desktop sizing, title/body, RTL/LTR and dismiss behavior without changing form state."
+        "Test phone/desktop sizing, title/body, RTL/LTR and dismiss behavior without changing form state.",
+        "RF-095 first isolates existing formatting debt in both callers and the RTL registry. Primary must then freeze the exact shared-overlay scope and rendered characterization before RF-059 approval. Tafsir selection remains a separate RF-014 workstream with concurrency characterization."
       ],
       "verification": [
         [
@@ -5489,6 +5491,81 @@
       "completed_at": "2026-10-18T12:50:15.465182+00:00",
       "evidence": ".ralph/runs/RF-094-1-1792327637685172684",
       "summary": "Copied the two exact RF-094 candidates. Each fixture now restores the React Native preset clock after resetAllMocks and adds one finite-clock regression. Existing assertions and isolation hooks are unchanged."
+    },
+    {
+      "id": "RF-095",
+      "title": "Format review-setting editors and their RTL registry before extraction",
+      "description": "Copy only the three exact pinned Prettier artifacts. This isolates existing formatting debt before RF-059 shares the identical help overlay. No source logic, type contract, comment meaning, data or runtime behavior change.",
+      "rationale": "Both real help-sheet callers and the existing registry fail the installed formatter. Mixing their broad whitespace changes with a UI extraction would obscure review. All formatted candidates retain identical TypeScript and JSX runtime trees.",
+      "modules": [
+        "components/flashcards/DeckReviewSettingsSheet.tsx",
+        "components/flashcards/SmartDeckFilterSheet.tsx",
+        "tests/rtl/rtl-component-registry.ts"
+      ],
+      "dependencies": [
+        "RF-004",
+        "RF-006",
+        "RF-094"
+      ],
+      "acceptance_criteria": [
+        "Read AGENTS, architecture, conventions, progress, .refactor-baseline/rf095-format-preflight/1792328004422480029/readiness.json and semantic-check.json beside it. Primary owns final scope and acceptance. You are not alone; preserve others edits. Copy exact artifacts only, do not start helpers or edit controller/policies/state. The controller runs all checks, independent review and source commit.",
+        "Copy each artifacts.candidate_path from the frozen readiness record to its corresponding target key. Exact SHA256 {\"components/flashcards/DeckReviewSettingsSheet.tsx\": \"bbd9f88cab1effd69898f0d377dd51a1f13e04efd48516d9e4723cc1362e003a\", \"components/flashcards/SmartDeckFilterSheet.tsx\": \"069bfb8e5e76a407267db43f9b226a5570d8918195c0ed8c487578de633aad81\", \"tests/rtl/rtl-component-registry.ts\": \"37000ca2568ae557f9bad7bbfd6643e55153a29fd3bd087eed49e3c41bd9a6ab\"}. These are complete outputs from the installed Prettier 3.8.4. No manual code cleanup, hook fixes, UI extraction, import/type/API changes, new assertions, dependency or source beyond the three paths.",
+        "Preserve every form draft, reset/save callback, picker, help-sheet state, RTL/theme/size value, SQL, import, exported entry and registry entry. The seven frozen controller gates include exact source/original/package/config hashes, unchanged TypeScript plus JSX runtime trees, format, strict types, all 376 cold cases, scoped lint and web export. Never weaken tests/rules to pass. Existing scoped lint warnings remain visible.",
+        "Preflight passes all five application/tooling commands after baseline formatter failure. Actual sources are restored. This does not accept the task: seven fresh controller commands, separate stronger evaluator and primary final scope review remain mandatory. No rendered/native/device check is required for exact formatter-only bytes and unchanged syntax trees; none is claimed.",
+        "Reuse discovery inspects the two identical help overlays and canonical ResponsiveSheet/OverlayHeader/OverlayBody. RF-059 owns their later feature-local extraction. No abstraction is introduced here. Do not change Quran/assets/data/fonts/loaders, backend/native/signing, runner/resources/retries/provider, or push/merge/deploy."
+      ],
+      "verification": [
+        [
+          "python3",
+          "-c",
+          "import hashlib; from pathlib import Path; expected={'components/flashcards/DeckReviewSettingsSheet.tsx': 'bbd9f88cab1effd69898f0d377dd51a1f13e04efd48516d9e4723cc1362e003a', '.refactor-baseline/rf095-format-preflight/1792328004422480029/components/flashcards/original-DeckReviewSettingsSheet.tsx': '4be2980fe7b2305fcc233e0274d598b36bfc12697cb1804ec30ebf344cedcf6b', 'components/flashcards/SmartDeckFilterSheet.tsx': '069bfb8e5e76a407267db43f9b226a5570d8918195c0ed8c487578de633aad81', '.refactor-baseline/rf095-format-preflight/1792328004422480029/components/flashcards/original-SmartDeckFilterSheet.tsx': '49aa16302d47c19aff6aa26266791d592fc5947daabd3cf53e5a6d7f7bcf8c1d', 'tests/rtl/rtl-component-registry.ts': '37000ca2568ae557f9bad7bbfd6643e55153a29fd3bd087eed49e3c41bd9a6ab', '.refactor-baseline/rf095-format-preflight/1792328004422480029/tests/rtl/original-rtl-component-registry.ts': '84842f1309777cd8a9a04f35421b272cbd834ddb2c39868cb881853188b6385c', 'package.json': '5bdf36721f13d9bb710b1ff01dec67af2dd500418a0f996e1aca470639d88aea', 'package-lock.json': '63ffd477c21a97003e23b3d2d18d7ee17400cd49b3b1d3f70101b65fa1d7a2f7', 'jest.config.js': '667b89e890b39a19d3dd10719a854cf2db0d8268f4af99cacf56b77a2653f20b', '.refactor-baseline/rf095-format-preflight/1792328004422480029/readiness.json': '54d2a912956238143c7dd5766598e25c7b21b16528f1727ca3d2ce92488cab95'}; bad=[p for p,h in expected.items() if hashlib.sha256(Path(p).read_bytes()).hexdigest()!=h]; assert not bad,bad; print('Exact three formatted files, preserved originals, package/config and readiness hashes match')"
+        ],
+        [
+          "node",
+          "-e",
+          "const fs=require('node:fs');\nconst {createRequire}=require('node:module');\nconst presetRequire=createRequire(require.resolve('babel-preset-expo/package.json'));\nconst coreRequire=createRequire(presetRequire.resolve('@babel/core/package.json'));\nconst babel=coreRequire('@babel/core');\nconst jsx=presetRequire.resolve('@babel/plugin-transform-react-jsx');\nconst ready=JSON.parse(fs.readFileSync('.refactor-baseline/rf095-format-preflight/1792328004422480029/readiness.json','utf8'));\nconst omit=new Set(['start','end','loc','extra','comments','leadingComments','innerComments','trailingComments','tokens','errors']);\nfunction normalized(value){\n if(Array.isArray(value))return value.map(normalized);\n if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).filter(([k])=>!omit.has(k)).map(([k,v])=>[k,normalized(v)]));\n return value;\n}\nfunction tree(file){return normalized(babel.transformSync(fs.readFileSync(file,'utf8'),{filename:file,babelrc:false,configFile:false,ast:true,code:false,parserOpts:{sourceType:'module',plugins:['typescript','jsx']},plugins:[jsx]}).ast);}\nfor(const[source,a]of Object.entries(ready.artifacts)){\n const before=JSON.stringify(tree(a.original_path));\n for(const target of [a.candidate_path,source])if(JSON.stringify(tree(target))!==before)throw new Error('Changed type or runtime tree: '+target);\n console.log('Unchanged type and JSX runtime tree:',source);\n}\n"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "components/flashcards/DeckReviewSettingsSheet.tsx",
+          "components/flashcards/SmartDeckFilterSheet.tsx",
+          "tests/rtl/rtl-component-registry.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "components/flashcards/DeckReviewSettingsSheet.tsx",
+          "components/flashcards/SmartDeckFilterSheet.tsx",
+          "tests/rtl/rtl-component-registry.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ]
+      ],
+      "risk": "low",
+      "approved": true,
+      "status": "pending",
+      "allowed_paths": [
+        "components/flashcards/DeckReviewSettingsSheet.tsx",
+        "components/flashcards/SmartDeckFilterSheet.tsx",
+        "tests/rtl/rtl-component-registry.ts"
+      ],
+      "attempts": 0,
+      "readiness_evidence": ".refactor-baseline/rf095-format-preflight/1792328004422480029/readiness.json"
     }
   ]
 }
