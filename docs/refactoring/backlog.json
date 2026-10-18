@@ -5327,32 +5327,40 @@
     {
       "id": "RF-093",
       "title": "Keep generated loop evidence out of Jest module discovery",
-      "description": "Copy only .refactor-baseline/rf093-preflight/jest-literal.config.js to jest.config.js. Escape the leading directory dots in modulePathIgnorePatterns so only the two generated directories match. Preserve every other configuration field and all tests.",
-      "rationale": "Cold verification finds a Haste module naming collision between the real hafiz package and an older copied SDK-resolution fixture. Generated evidence is not application source. Candidate discovery preserves all 66 source test files and full cold preflight passes 374 cases without a collision.",
+      "description": "Copy exactly the two prescribed package.json and scripts/tests/jest-config.test.cjs artifacts. Add only the test:jest-config command and permanent Node boundary regression. The already checkpointed literal Jest config, lock, dependencies, application source and accepted RF-086 fixture remain unchanged.",
+      "rationale": "The literal correction is checkpointed but unaccepted after its second gate was blocked by the pre-existing fixture. RF-086 now fixes that causal blocker and is independently accepted. Permanent actual-regex tests detect the original wildcard mistake and protect generated-only boundaries without excluding real tests.",
       "modules": [
-        "jest.config.js"
+        "jest.config.js",
+        "package.json",
+        "scripts/tests/jest-config.test.cjs"
       ],
       "dependencies": [
         "RF-092",
         "RF-086"
       ],
       "acceptance_criteria": [
-        "Read AGENTS, architecture, conventions, progress and selected task. Primary owns final acceptance. You are not alone in the codebase. Do not revert unrelated edits or start helpers/reviewers. Copy only the exact prescribed one-file artifact; the controller owns all gates, status, progress, review and commit.",
-        "Exact jest.config.js SHA256 667b89e890b39a19d3dd10719a854cf2db0d8268f4af99cacf56b77a2653f20b. Only the same one property changes, with literal dots for the two generated directories. Four generated-path controls must match and ten source/lookalike controls must remain visible. Keep testMatch, testPathIgnorePatterns, setup, transforms, aliases and native/RTL behavior unchanged. Never disable Haste diagnostics or add a broad source/test ignore. No dependency, lock, application source or assertion change.",
-        "The pinned inventory SHA256 is faf24857500bcb9aaa90e863602c6649ff1e2c16721a5e5b907e9c7aa35c34f1. The frozen actual cold Jest inventory must have the same 66 source test files and no module collision. All 374 cold cases must pass without skipped cases or assertion changes. Existing local fixture contents and failure logs remain preserved. No cache wipe or evidence deletion.",
-        "The first exact source passed four commands and independent review but primary rejected its wildcard-dot behavior. Boundary probe is red on that committed first attempt and green on the exact corrected artifact. Preserve first-attempt code, logs, verdict and normal attempt count. Five fresh controller commands, including literal-boundary controls, unchanged 66-file inventory and full cold 374 cases, plus separate stronger review remain mandatory. No worker self-certification. No application/browser/native behavior change is claimed.",
-        "Do not run expensive full suites as implementation worker; controller runs frozen commands. Primary final hash/scope review follows lease release. RF-086 and remaining security families stay open. No resource/retry/account limit, runner/provider, protected input, backend, production, push/merge/deployment or signing change."
+        "Read AGENTS, architecture, conventions, progress, selected task, .refactor-baseline/rf093-primary-recovery.json and .refactor-baseline/rf093-permanent-preflight/readiness.json. Primary owns acceptance and the single documented verification-blocker attempt credit. You are not alone; preserve others edits and do not edit state, runner, policies or start helpers.",
+        "Copy only .refactor-baseline/rf093-permanent-preflight/package.json to package.json and .refactor-baseline/rf093-permanent-preflight/jest-config.test.cjs to scripts/tests/jest-config.test.cjs. Exact respective SHA256 5bdf36721f13d9bb710b1ff01dec67af2dd500418a0f996e1aca470639d88aea and 2bf6bde6bc722302ee5d372ca69684587800d140786a838471fc6b1c0e5c092c. Manifest semantics change only one test:jest-config script. No install, dependency/version, lock, native/backend, app, protected-input, signing, push/merge/deploy change.",
+        "The source configuration is already checkpointed at SHA256 667b89e890b39a19d3dd10719a854cf2db0d8268f4af99cacf56b77a2653f20b. Read only; keep every field and byte unchanged. Permanent Node tests exercise its actual exported regex: four generated-path controls ignored and ten source/lookalike controls visible. This exact test is red with one pass/one failure on original commit 2ae2a81 and green with two passes/zero failures on the corrected config, zero skips. Do not replace behavior checks with source text spelling or disable diagnostics.",
+        "The actual npm run test:jest-config command, scoped lint/format and cold real discovery pass in preflight, then all temporary source is restored. That is readiness, not acceptance. Run all six fresh controller commands and obtain a new independent stronger review. All 66 source test files, 374 cold cases with zero skips/collision, original assertions and accepted RF-086 bytes must remain unchanged.",
+        "Copy prescribed files only. The controller owns all actual gates, statuses, progress and source commit. Do not run expensive full suites as generator or self-certify. The initial wildcard failure remains spent; one attempt is credited only for the independently diagnosed and repaired external verification blocker. No further attempt adjustment or checkpoint restoration is authorized. The next non-resource failure exhausts ordinary retry and requires primary diagnosis.",
+        "Primary final scope/hash and history review follows lease release. RF-094 and remaining security/architecture work stay open. No application/browser/native behavior change or manual rendered/device verification is claimed."
       ],
       "verification": [
         [
           "python3",
           "-c",
-          "import hashlib,pathlib,subprocess; p=pathlib.Path('.refactor-baseline/rf093-boundary-probe.cjs'); assert hashlib.sha256(p.read_bytes()).hexdigest()=='1520e917a937a88ad699e6f85ee7a72b7475a06c40022a3e705c5b08edb0ae70','Boundary probe changed'; subprocess.run(['node',str(p),'jest.config.js'],check=True)"
+          "import hashlib; from pathlib import Path; expected={'package.json': '5bdf36721f13d9bb710b1ff01dec67af2dd500418a0f996e1aca470639d88aea', 'scripts/tests/jest-config.test.cjs': '2bf6bde6bc722302ee5d372ca69684587800d140786a838471fc6b1c0e5c092c', 'jest.config.js': '667b89e890b39a19d3dd10719a854cf2db0d8268f4af99cacf56b77a2653f20b', 'package-lock.json': '63ffd477c21a97003e23b3d2d18d7ee17400cd49b3b1d3f70101b65fa1d7a2f7', 'tests/unit/deck-cards-due-date.test.tsx': 'e9c9e77178b1ee317878d62d685fe9077ed017cd19c2cd2a415250c7f0a85240'}; mismatches=[p for p,h in expected.items() if hashlib.sha256(Path(p).read_bytes()).hexdigest()!=h]; assert not mismatches,mismatches; print('Two prescribed artifacts and unchanged Jest/lock/fixture hashes match')"
+        ],
+        [
+          "npm",
+          "run",
+          "test:jest-config"
         ],
         [
           "python3",
           "-c",
-          "import hashlib,pathlib,json,subprocess; r=pathlib.Path.cwd(); p=r/'jest.config.js'; assert hashlib.sha256(p.read_bytes()).hexdigest()=='667b89e890b39a19d3dd10719a854cf2db0d8268f4af99cacf56b77a2653f20b','Unexpected Jest configuration'; inv=r/'.refactor-baseline/rf093-preflight/expected-tests.json'; assert hashlib.sha256(inv.read_bytes()).hexdigest()=='faf24857500bcb9aaa90e863602c6649ff1e2c16721a5e5b907e9c7aa35c34f1','Pinned inventory changed'; q=subprocess.run(['node_modules/.bin/jest','--listTests','--json','--runInBand','--no-cache'],text=True,capture_output=True); (r/'.refactor-baseline/rf093-fresh-inventory.json').write_text(q.stdout); (r/'.refactor-baseline/rf093-fresh-inventory.stderr').write_text(q.stderr); assert q.returncode==0 and 'Haste module naming collision' not in q.stderr,'Module discovery failure/collision'; found=sorted(str(pathlib.Path(n).relative_to(r)) for n in json.loads(q.stdout)); assert found==json.loads(inv.read_text()),'Source test inventory changed'; print('All66 source test files remain identical; cold actual Jest module discovery has no collision.')"
+          "import hashlib,pathlib,json,subprocess,time\nr=pathlib.Path.cwd(); inv=r/'.refactor-baseline/rf093-preflight/expected-tests.json'\nassert hashlib.sha256(inv.read_bytes()).hexdigest()=='faf24857500bcb9aaa90e863602c6649ff1e2c16721a5e5b907e9c7aa35c34f1','Pinned inventory changed'\nq=subprocess.run(['node_modules/.bin/jest','--listTests','--json','--runInBand','--no-cache'],text=True,capture_output=True)\nd=r/'.refactor-baseline/rf093-permanent-verification'/str(time.time_ns());d.mkdir(parents=True)\n(d/'inventory.json').write_text(q.stdout);(d/'inventory.stderr').write_text(q.stderr)\nassert q.returncode==0 and 'Haste module naming collision' not in q.stderr,'Module discovery failure/collision'\nfound=sorted(str(pathlib.Path(n).relative_to(r)) for n in json.loads(q.stdout))\nassert found==json.loads(inv.read_text()),'Source test inventory changed'\nprint('All 66 source test files preserved; cold actual discovery has no collision. Evidence',d)\n"
         ],
         [
           "npm",
@@ -5363,24 +5371,28 @@
         ],
         [
           "node_modules/.bin/eslint",
+          "scripts/tests/jest-config.test.cjs",
           "jest.config.js"
         ],
         [
           "node_modules/.bin/prettier",
           "--check",
+          "package.json",
+          "scripts/tests/jest-config.test.cjs",
           "jest.config.js"
         ]
       ],
       "risk": "low",
       "approved": true,
-      "status": "blocked",
+      "status": "retry",
       "allowed_paths": [
-        "jest.config.js"
+        "package.json",
+        "scripts/tests/jest-config.test.cjs"
       ],
-      "attempts": 2,
+      "attempts": 1,
       "started_at": "2026-10-18T06:56:47.198360+00:00",
       "evidence": ".ralph/runs/RF-093-2-1792306607199962627",
-      "failure": "Verification failed: ['npm', 'run', 'test:unit', '--', '--no-cache']; see .ralph/runs/RF-093-2-1792306607199962627/verify-2.log",
+      "failure": "Primary diagnosed and credited only the RF-086 external verification blocker after its acceptance. First wildcard specification attempt stays spent. Fresh permanent regression scope, six controller gates and new independent review required. Original second failure remains in primary recovery history.",
       "primary_reviews": [
         {
           "status": "verified",
@@ -5394,13 +5406,15 @@
         }
       ],
       "recovery": {
-        "status": "waiting_for_RF-086_and_primary_rescope",
-        "reason": "Second attempt passed boundary/inventory then failed on reproduced pre-existing async modal fixture. Correct source remains a checkpoint, not accepted. Primary must inspect accepted RF-086 results and prepare a permanent boundary regression before a justified recovery.",
-        "attempts_preserved": 2,
-        "retry_reset": false,
-        "source_sha256": "667b89e890b39a19d3dd10719a854cf2db0d8268f4af99cacf56b77a2653f20b",
-        "diagnosis_evidence": ".refactor-baseline/rf086-causal-readiness.json"
-      }
+        "status": "ready_for_fresh_generation",
+        "evidence": ".refactor-baseline/rf093-primary-recovery.json",
+        "credited_external_verification_attempts": 1,
+        "first_ordinary_attempt_spent": true,
+        "max_attempts": 2,
+        "automatic_retry_refund": false,
+        "no_checkpoint_edit": true
+      },
+      "readiness_evidence": ".refactor-baseline/rf093-primary-recovery.json"
     },
     {
       "id": "RF-094",
