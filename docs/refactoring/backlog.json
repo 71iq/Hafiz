@@ -5276,14 +5276,18 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "package.json",
         "package-lock.json",
         "scripts/tests/js-yaml.test.cjs",
         "docs/refactoring/DEPENDENCY_SECURITY.md"
       ],
-      "attempts": 0
+      "attempts": 1,
+      "started_at": "2026-10-18T02:54:44.958188+00:00",
+      "completed_at": "2026-10-18T02:59:46.472532+00:00",
+      "evidence": ".ralph/runs/RF-092-1-1792292084959592199",
+      "summary": "Copied the three exact RF-092 preflight artifacts. The existing Node security-test pattern was reused; no new parser abstraction was needed. package-lock.json remains untouched for the controller."
     }
   ]
 }
