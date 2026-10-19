@@ -92,6 +92,14 @@ The implementation worker edits one approved task and reports its own checks. It
 
 Task-specific verification ownership applies when the implementation sandbox cannot bind a browser server. A documented sandbox restriction alone does not make controller verification unavailable. The worker reports the pending command and restriction without claiming a pass. Missing infrastructure at the assigned verifier remains a blocker. This changes no task gate, independent review, retry, checkpoint, admission limit, model or provider setting.
 
+## Copy-only artifact handoffs
+
+RF-100 adds an explicit `implementation_mode: copy-only` for primary-prepared exact artifacts. The worker receives installation instructions and a verification-command count. The actual argv remain in the backlog and run fresh in the controller. No mode, or explicit `implementation`, retains the previous full implementation prompt. Unknown modes fail before attempt/status changes. Normal workers still cannot edit scripts/ralph.
+
+Name all required document reads in the task, including AGENTS.md, ARCHITECTURE.md, CONVENTIONS.md, TECH_STACK.md and PROGRESS.md. Copy-only mode does not waive those reads. Supply exact artifact paths, allowed paths, the copy command and readiness/reuse evidence. The worker must not run source inspection, verification, hashes, transforms, case counts, full source/test dumps, helpers or guided implementation workflows. It reports installed paths and pending checks.
+
+The independent evaluator must inspect the original generation command log, including after checkpoint reuse, and reject prohibited worker work even when bytes match. Primary inspects that log after both leases release. RF100 passed a real pinned-loop probe at ea0163a with four fresh gates, 32 runner tests and independent source/compliance review. Its first missing-read rejection and both resource stops remain preserved. Receipt .refactor-baseline/rf100-primary-acceptance.json and RUNNER_COMPLIANCE.md record the outcome. Prompts do not guarantee compliance; repeated allowed reads occurred and no general token saving is established. Models, resource limits, retries, verification and checkpoint mechanics remain unchanged.
+
 ## Native JavaScript export memory
 
 RF-091 first ran both platforms together with two Metro workers. Its systemd scope reached 6 GB and reported oom-kill after nine successful gates. The candidate and failure remain preserved. Primary records that resource interruption and refunds only its ordinary attempt. That recovery required fresh generation and all 13 commands. Android and iOS exports ran in separate processes with one worker and NODE_OPTIONS=--max-old-space-size=2048. Both platforms, the 6 GB scope and 900-second command deadline remain. A second memory failure needs primary diagnosis before another refund. JavaScript export is separate from native compilation and device verification. Evidence .refactor-baseline/rf091-native-oom-recovery.json.

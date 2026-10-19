@@ -1,6 +1,8 @@
 # Refactoring conventions
 
-Read AGENTS.md, the selected task, architecture and progress before editing. Inspect implementation, callers and nearest tests before choosing a seam. Search components/ui and the owning feature for reusable behavior. Record whether the change reuses, extends or introduces a feature-local implementation, with the concrete reason.
+Read AGENTS.md, the selected task, ARCHITECTURE.md, CONVENTIONS.md, TECH_STACK.md and PROGRESS.md before editing. For implementation tasks, inspect implementation, callers and nearest tests before choosing a seam. Search components/ui and the owning feature for reusable behavior. Record whether the change reuses, extends or introduces a feature-local implementation, with the concrete reason.
+
+An approved task may use `implementation_mode: copy-only` when the primary engineer has frozen exact artifacts and reuse choices. That worker installs only those artifacts and reports verification pending. Required instruction and readiness/reuse reads remain mandatory. Caller/source/test inspection, full source/test dumps, implementation workflows and verification belong to the primary engineer, controller and evaluator for that handoff. The controller retains every task command and the evaluator must inspect the original generator command log. Missing mode keeps normal implementation guidance; unknown modes are rejected.
 
 ## Source and types
 

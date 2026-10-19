@@ -8,7 +8,7 @@ The generic prompt told the worker to inspect callers and tests and use adaptive
 
 ## Change and ownership
 
-The primary engineer prepared `scripts/ralph/control.py` and its runner regressions under both leases, following RF-079's primary-only workflow. That patch is committed as ab5c28c582d5297a7696890f001dac1d04a926c1. It remains subject to review with this task. Normal Ralph workers still cannot edit the hard-denied runner paths.
+The primary engineer prepared `scripts/ralph/control.py` and its runner regressions under both leases, following RF-079's primary-only workflow. That patch is committed as ab5c28c582d5297a7696890f001dac1d04a926c1. The live probe and complete primary-source review are recorded below. Normal Ralph workers still cannot edit the hard-denied runner paths.
 
 Tasks may now declare `implementation_mode` as `copy-only`. The worker receives only installation instructions and a verification-command count. The full argv remain unchanged in the backlog and are executed by the controller. Project instructions and readiness/reuse metadata reads remain allowed. Verification, source inspection, full source/test dumps, redesign and self-certification are excluded from this installation role. The worker reports installed paths and pending controller verification.
 
@@ -22,9 +22,17 @@ The 27 original runner tests pass. Five new regressions fail against the origina
 
 All existing adapter function ASTs except `iteration` remain identical, with one new prompt renderer. Evaluating the default prompt against the frozen original expression produces identical bytes. The existing normal implementation path, protected paths, resource stop/recovery and independent verification tests remain in the suite.
 
-## Required live probe
+## Observed live outcome
 
-This report is the harmless artifact for the real pinned Ralph copy-only iteration. Its worker may install only this supplied document. The controller must rerun the frozen hash/ownership checks, all runner tests, actual task prompt rendering and whitespace validation. A fresh stronger evaluator must inspect the complete primary patch diff from its parent through ab5c28c582d5297a7696890f001dac1d04a926c1, the task diff, fresh logs and the original generator command log. It must reject prohibited generator checks or full dumps. Primary acceptance will record the observed command list, result and limits in `.refactor-baseline/rf100-primary-acceptance.json`. This candidate report does not certify that the live probe has passed.
+RF-100 is accepted on 2026-10-20 local date. Primary source preparation is ab5c28c; the real pinned Ralph probe is ea0163a. All four exact fresh controller commands pass, including all 32 runner tests, hash/ownership checks, actual prompt rendering and whitespace validation. A fresh Astra evaluator reviewed both complete Python files, the full primary patch, all five regressions, preparation evidence, current diff and original generator transcript. Primary acceptance after lease release confirms exact source/artifact/protected hashes, argv and task lifecycles. The receipt is `.refactor-baseline/rf100-primary-acceptance.json`.
+
+The first live attempt failed independent review because the worker omitted the four required project documents. Its exact copy and controller gates passed, but that did not satisfy instruction compliance. The retry names those existing requirements explicitly and keeps the spent ordinary attempt. The accepted transcript contains 19 successful commands: 17 instruction/metadata reads, including size and repeated reads, one status/branch command and one exact copy. It includes every required document and all 585 pre-copy progress lines. No prohibited checks, source/test dumps, helpers or unrelated mutation occurred.
+
+The retry generator crossed the unchanged 600000 reported-token admission threshold at 975039 tokens. A checkpoint continuation reran all four checks but its evaluator stopped at the provider account limit without a verdict. Both stops preserved generation and spent no additional ordinary attempt. After capacity returned, the matching checkpoint was reused, all four checks ran fresh again and a new evaluator passed. The final review batch reports 1511972 tokens. Turn totals arrive after completion, so this threshold is not a hard per-turn cap. The earlier provider-stop usage remains unknown, not zero. No purchase, reset credit or provider change occurred.
+
+Review logs preserve a failed JSONL parser probe and an incorrect 20-command expectation. Primary exact-output checks confirm 19 commands. The first primary receipt probe also wrongly expected checkpoint deletion; it stopped before writing a receipt. The retained checkpoint matches the parent HEAD and cannot match the accepted commit. It was preserved. These evidence-probe corrections did not change source, tests or gates.
+
+The accepted report bytes remain recorded at ea0163a. This observed-outcome section and the operational/convention notes are primary documentation updates after source acceptance. No future worker compliance or general token reduction is claimed.
 
 Application unit tests, web/native builds, browser/device tests and production checks were not run for this runner-only change. No application source, data or dependency changed.
 
