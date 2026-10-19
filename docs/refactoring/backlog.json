@@ -3188,15 +3188,19 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "components/mushaf/MushafPage.tsx",
         "components/mushaf/SurahHeader.tsx",
         "lib/fonts/use-surah-name-font.ts",
         "tests/unit/surah-name-font-readiness.test.tsx"
       ],
-      "attempts": 0,
-      "readiness_evidence": ".refactor-baseline/rf060-font-readiness-preflight-v1/readiness.json"
+      "attempts": 1,
+      "readiness_evidence": ".refactor-baseline/rf060-font-readiness-preflight-v1/readiness.json",
+      "started_at": "2026-10-19T01:57:05.517250+00:00",
+      "completed_at": "2026-10-19T02:00:02.418928+00:00",
+      "evidence": ".ralph/runs/RF-060-1-1792375025518643476",
+      "summary": "Copied the four approved RF-060 artifacts exactly. The shared hook owns only the existing surah-name font readiness lifecycle; both callers retain their predicates, markup, state, glyph, geometry, and loading behavior."
     },
     {
       "id": "RF-061",
@@ -3887,7 +3891,7 @@
       "evidence": ".ralph/runs/RF-070-2-1792171267226235313",
       "recovery_note": "First independent evaluation rejected a false-positive busy dismissal test: the last Modal is the hidden ConfirmDialog. Primary requires the visible date-input Modal ancestor. All four gates and12 tests passed but are insufficient without this correction. Final implementation attempt2 remains available.",
       "completed_at": "2026-10-16T17:24:00.118911+00:00",
-      "summary": "Repaired RF-070’s busy dismissal characterization. The test now finds the visible Modal containing the date input, asserts `visible=true`, and dispatches `requestClose` during deferred persistence. Only `tests/unit/session-due-date.test.tsx` was changed; backlog edits were preserved.",
+      "summary": "Repaired RF-070\u2019s busy dismissal characterization. The test now finds the visible Modal containing the date input, asserts `visible=true`, and dispatches `requestClose` during deferred persistence. Only `tests/unit/session-due-date.test.tsx` was changed; backlog edits were preserved.",
       "primary_acceptance": {
         "accepted": true,
         "commit": "6e21066",
@@ -5328,7 +5332,7 @@
       "failure": "Batch resource limit reached",
       "completed_at": "2026-10-17T21:31:22.584489+00:00",
       "evidence": ".ralph/runs/RF-089-1-1792272463180241981",
-      "summary": "Implemented RF-089’s four worker-owned artifacts exactly. `package-lock.json` remains untouched for the controller."
+      "summary": "Implemented RF-089\u2019s four worker-owned artifacts exactly. `package-lock.json` remains untouched for the controller."
     },
     {
       "id": "RF-090",
