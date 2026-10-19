@@ -6363,9 +6363,9 @@
     },
     {
       "id": "RF-100",
-      "title": "Audit copy-only generator handoff compliance",
-      "description": "Investigate the observed RF099 worker process deviation and prepare a bounded remedy for copy-only handoffs.",
-      "rationale": "The independent reviewer found prohibited redundant generator checks and full test dumps despite an exact-artifact handoff. Runtime source and all independent gates pass, but copy-only compliance did not.",
+      "title": "Separate copy-only Ralph handoffs from implementation",
+      "description": "Verify the primary-prepared prompt-mode patch and perform one harmless exact-document handoff through the real pinned Ralph controller.",
+      "rationale": "RF099 exposed conflicting generic inspection/guided-workflow instructions inside an exact-artifact handoff. Explicit copy-only mode removes that conflict while default implementation guidance and all controller verification remain intact. Five red regressions and 32 passing runner tests establish preparation, but real command-log compliance and independent primary-code review remain mandatory.",
       "modules": [
         "scripts/ralph/control.py",
         "scripts/ralph/tests/test_control.py",
@@ -6377,16 +6377,28 @@
         "RF-099"
       ],
       "acceptance_criteria": [
-        "Unapproved process investigation. Inspect RF099 generator/reviewer logs, the exact generated prompt, applicable skill precedence and RF079 ownership policy. Distinguish prohibited redundant checking from required instruction reads and normal implementation work. Record exact evidence without claiming a runtime regression.",
-        "Primary must resolve prompt contradictions and freeze the smallest supported remedy before approval. Do not bypass runner hard-denied paths. If a controller change is required, prepare a separate exact primary-owned execution/verification scope before implementing it. Current allowed paths are documentation only.",
-        "Preserve independent controller verification/review, normal-task meaningful checks, error logs, retry/account/token/time/memory limits, protected paths, existing agent/provider choices and pinned vendor. No blanket disabling of tests or verification, purchases, reset credits, provider switch, push or production action.",
-        "Use actual runner regression tests and a future harmless bounded handoff probe to verify any proposed remedy. Do not spend an implementation retry or mark this investigation complete based only on stronger wording. Verification commands are prospective and have not been run for this finding."
+        "This is a frozen artifact installation, not source/prose implementation. Read AGENTS/project instructions and .refactor-baseline/rf100-copy-handoff-v1/readiness.json and reuse-map.json. Primary owns the already-prepared adapter patch. You are not alone; preserve other changes. Required instruction/metadata reads and git status/branch are allowed. No helper agents, engineering-guided workflow, source/test inspection, full source/test dumps or generator-side checks, including hashes, transforms, case counts and git diff --check. Report all verification pending with the controller.",
+        "Use exactly one bounded copy command: from pathlib import Path; import json; r=json.loads(Path(\".refactor-baseline/rf100-copy-handoff-v1/readiness.json\").read_text()); [(Path(p).parent.mkdir(parents=True,exist_ok=True), Path(p).write_bytes(Path(a[\"candidate_path\"]).read_bytes())) for p,a in r[\"artifacts\"].items()]. Install only docs/refactoring/RUNNER_COMPLIANCE.md. Do not rewrite the supplied prose, run writing/implementation workflows, modify backlog/progress or check copied hashes/diffs. Frozen controller commands own those checks.",
+        "Primary-only adapter/test preparation is committed at ab5c28c582d5297a7696890f001dac1d04a926c1. The normal worker still cannot edit hard-denied scripts/ralph paths. The independent evaluator must read the complete primary patch diff from its parent through that commit, both current source files, five new regressions and preparation evidence. No source acceptance based only on a new prompt or this documentation artifact.",
+        "Every one of the four frozen controller argv must run fresh. The original 27 runner tests pass, five new tests fail on the old adapter and all 32 pass after the primary patch. Actual task rendering must omit only worker-facing verification argv, preserve the controller list and keep the default implementation prompt identical to the original expression. Unknown modes reject before task-state mutation. All old helper ASTs except iteration remain exact, with only generator_prompt added.",
+        "The fresh stronger evaluator must inspect the original generator.jsonl command log and reject prohibited redundant checks or full source/test dumps even if installed bytes are correct. Required instruction and readiness/reuse reads are allowed. Primary must also inspect observed commands after leases release. A live probe without a compliance verdict is not success. Record model nondeterminism and the absence of a sandbox guarantee; do not claim a general token reduction from different tasks.",
+        "Preserve models/provider/billing, pinned vendor, all account/token/time/memory/retry limits, protected paths, leases, checkpoints, controller commands, normal implementation checks and independent review. No app source/dependency/data/native/backend changes, push/merge/deploy/production operation, purchase or reset credits. Preserve original RF099 logs and RF100 preparation failures. No app unit/build/browser/device checks are claimed for this runner-only change. One work item this heartbeat and primary final acceptance remains required."
       ],
       "verification": [
+        [
+          "python3",
+          "-c",
+          "import hashlib,json,subprocess;from pathlib import Path\npins={'.refactor-baseline/rf100-copy-handoff-v1/readiness.json': 'e481ebf941211c98c640962b2067cd1e9bbca13903dd1406b0c8535574c0a452', '.refactor-baseline/rf100-copy-handoff-v1/primary-scope.json': 'f4f8ab7719a18b72b40e10fda9d7aca1947cd38c20ba8e2c6dda2ed6d4e81a15', '.refactor-baseline/rf100-copy-handoff-v1/primary-patch-state.json': '82ccb4104ce3dc850dcd35f3552050275d33d0ee48cafbd5cd77f4a72d549307', '.refactor-baseline/rf100-copy-handoff-v1/reuse-map.json': 'f2e5cd36ff929edd54066e2c5206e3ade6d7500774fdf779a81dd8f4e9d00915', '.refactor-baseline/rf100-copy-handoff-v1/preparation-errors.json': 'c6b14bfe896c8fd9771c7c2dab7130dc1d5fe0cbd4cb443931d2855a8e251b35', '.refactor-baseline/rf100-copy-handoff-v1/primary-installed-runner.log': 'c12f62b014c3f3a1933e80d7be5b0a08c2b21c2a226e38afe2f013510fd4d6fa', '.refactor-baseline/rf100-copy-handoff-v1/original/scripts/ralph/control.py': '13e5d8b905529c0ef7914cbc8ba43bbd6aea83981d6850f1f8fde14530f80687', '.refactor-baseline/rf100-copy-handoff-v1/original/scripts/ralph/tests/test_control.py': 'ca294def6732a7cf6cef21c445cf2eeed8e5114b5cd80135ee151925e3983f90', '.refactor-baseline/rf100-copy-handoff-v1/preflight-1792436036198983685/state.json': '8de1f145852134a97053496fece7c89d59371e9fd530eb4dac20afeeb746126a', '.refactor-baseline/rf100-copy-handoff-v1/preflight-1792436036198983685/runner-before.log': '801f6c2191b7424e72b2421d2b0c4538a283dd47318ed61793ffd1f173c75b41', '.refactor-baseline/rf100-copy-handoff-v1/preflight-1792436036198983685/runner-red.log': 'c9ae922e4833023226484b33ba1bf584e51ba231a1fe1068b8a30b5b46c670e8', '.refactor-baseline/rf100-copy-handoff-v1/preflight-1792436036198983685/runner-green.log': '07eb95f4342d61f83882a3feb8f353b926128ff291d97c4f6c6f611e9b4bbdee'}\nassert all(hashlib.sha256(Path(p).read_bytes()).hexdigest()==h for p,h in pins.items())\nr=json.loads(Path('.refactor-baseline/rf100-copy-handoff-v1/readiness.json').read_text())\nfor p,a in r[\"artifacts\"].items():assert hashlib.sha256(Path(p).read_bytes()).hexdigest()==a[\"candidate_sha256\"]\nfor p,h in {**r[\"primary_patch_paths\"],**r[\"protected_hashes\"]}.items():assert hashlib.sha256(Path(p).read_bytes()).hexdigest()==h,p\nassert subprocess.check_output([\"git\",\"rev-parse\",r[\"primary_patch_commit\"]+\"^\"],text=True).strip()==r[\"primary_patch_parent\"]\nassert set(subprocess.check_output([\"git\",\"diff-tree\",\"--no-commit-id\",\"--name-only\",\"-r\",r[\"primary_patch_commit\"]],text=True).splitlines())==set(r[\"primary_patch_paths\"])\nprint(\"Exact document and reviewed-primary-patch inputs match; original failures, protected policies/config/vendor and runner evidence preserved\")\n"
+        ],
         [
           "npm",
           "run",
           "test:refactor-runner"
+        ],
+        [
+          "python3",
+          "-c",
+          "import ast,json;from pathlib import Path\nr=json.loads(Path('.refactor-baseline/rf100-copy-handoff-v1/readiness.json').read_text());tree=ast.parse(Path(\"scripts/ralph/control.py\").read_text());old=ast.parse(Path(r[\"original_functions_path\"]).read_text());ns={\"json\":json,\"InvariantError\":RuntimeError};helper=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name==\"generator_prompt\");exec(compile(ast.Module(body=[helper],type_ignores=[]),\"prompt-renderer\",\"exec\"),ns)\ntask=next(t for t in json.loads(Path(\"docs/refactoring/backlog.json\").read_text())[\"tasks\"] if t[\"id\"]==\"RF-100\");assert task[\"implementation_mode\"]==\"copy-only\";rendered=ns[\"generator_prompt\"](task);payload=json.loads(rendered.split(\"TASK:\\n\",1)[1]);assert \"verification\" not in payload and payload[\"controller_verification_command_count\"]==len(task[\"verification\"])\nregular={k:v for k,v in task.items() if k!=\"implementation_mode\"};oldit=next(n for n in old.body if isinstance(n,ast.FunctionDef) and n.name==\"iteration\");expr=next(n.value for n in oldit.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id==\"prompt\" for t in n.targets));assert ns[\"generator_prompt\"](regular)==eval(compile(ast.Expression(expr),\"original-prompt\",\"eval\"),{\"json\":json,\"task\":regular})\na={n.name:ast.dump(n,include_attributes=False) for n in old.body if isinstance(n,(ast.FunctionDef,ast.ClassDef))};z={n.name:ast.dump(n,include_attributes=False) for n in tree.body if isinstance(n,(ast.FunctionDef,ast.ClassDef))};assert set(z)-set(a)=={\"generator_prompt\"};assert [k for k in a if a[k]!=z[k]]==[\"iteration\"]\nprint(\"Actual copy-only task omits worker argv without mutating controller commands; normal prompt bytes and all existing helper ASTs remain exact\")\n"
         ],
         [
           "git",
@@ -6394,15 +6406,18 @@
           "--check"
         ]
       ],
-      "risk": "low",
-      "approved": false,
+      "risk": "medium",
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
-        "docs/refactoring/RUNNER_COMPLIANCE.md",
-        "docs/refactoring/RUNBOOK.md"
+        "docs/refactoring/RUNNER_COMPLIANCE.md"
       ],
       "attempts": 0,
-      "discovery_evidence": ".ralph/runs/RF-099-1-1792432503673389735/review-result.json"
+      "discovery_evidence": ".ralph/runs/RF-099-1-1792432503673389735/review-result.json",
+      "implementation_mode": "copy-only",
+      "primary_patch_commit": "ab5c28c582d5297a7696890f001dac1d04a926c1",
+      "execution_owner": "primary-prepared adapter; controller-owned documentation-only handoff probe",
+      "readiness_evidence": ".refactor-baseline/rf100-copy-handoff-v1/readiness.json"
     }
   ]
 }
