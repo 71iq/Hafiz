@@ -60,6 +60,39 @@ class SelectionTests(unittest.TestCase):
         self.assertTrue(control.path_allowed('lib/new.ts', candidate))
 
 
+class GeneratorPromptTests(unittest.TestCase):
+    def test_default_prompt_keeps_full_implementation_guidance_and_commands(self):
+        candidate = task()
+        candidate['verification'] = [['fixture-verification-sentinel']]
+        prompt = control.generator_prompt(candidate)
+        self.assertIn('Inspect callers and tests', prompt)
+        self.assertIn('adaptive-coding engineering guided', prompt)
+        self.assertIn('fixture-verification-sentinel', prompt)
+        self.assertNotIn('Frozen artifact copy-only handoff', prompt)
+
+    def test_copy_only_prompt_delegates_checks_without_engineering_guided_work(self):
+        candidate = task()
+        candidate['implementation_mode'] = 'copy-only'
+        candidate['verification'] = [['fixture-verification-sentinel']]
+        original = json.loads(json.dumps(candidate))
+        prompt = control.generator_prompt(candidate)
+        self.assertIn('Frozen artifact copy-only handoff', prompt)
+        self.assertIn('Do not run verification, hash, transform or case-count checks', prompt)
+        self.assertIn('Do not dump source or test files', prompt)
+        self.assertIn('All verification remains pending with the controller', prompt)
+        self.assertIn('controller_verification_command_count', prompt)
+        self.assertNotIn('fixture-verification-sentinel', prompt)
+        self.assertNotIn('Inspect callers and tests', prompt)
+        self.assertNotIn('adaptive-coding engineering guided', prompt)
+        self.assertEqual(candidate, original)
+
+    def test_unknown_mode_does_not_silently_fall_back(self):
+        candidate = task()
+        candidate['implementation_mode'] = 'copy-and-test'
+        with self.assertRaisesRegex(control.InvariantError, 'Unsupported implementation mode'):
+            control.generator_prompt(candidate)
+
+
 class IterationTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -98,6 +131,36 @@ class IterationTests(unittest.TestCase):
     def generate(self, *_args, **_kwargs):
         (self.root / 'fixture.txt').write_text('after\n')
         return {'status': 'implemented', 'summary': 'Fixture simplified', 'evidence': []}
+
+    def test_copy_only_review_requires_original_generator_log_compliance(self):
+        data = control.read_json(self.backlog)
+        data['tasks'][0]['implementation_mode'] = 'copy-only'
+        control.write_json(self.backlog, data)
+        self.git('add', '.')
+        self.git('commit', '-qm', 'copy-only fixture')
+        prompts = []
+        def run_agent(*args, **kwargs):
+            prompts.append((args[0], kwargs.get('readonly', False)))
+            return {'verdict': 'pass', 'findings': []} if kwargs.get('readonly') else self.generate()
+        with patch('sys.stdin.read', return_value='prompt'), patch.object(control, 'agent', side_effect=run_agent):
+            control.iteration()
+        self.assertEqual(self.current_task()['status'], 'verified')
+        self.assertIn('Frozen artifact copy-only handoff', prompts[0][0])
+        review = next(prompt for prompt, readonly in prompts if readonly)
+        self.assertIn('generator.jsonl', review)
+        self.assertIn('Reject prohibited generator-side checks or full source/test dumps', review)
+        self.assertIn('Required instruction and readiness/reuse reads are allowed', review)
+
+    def test_unknown_mode_is_rejected_before_task_state_changes(self):
+        data = control.read_json(self.backlog)
+        data['tasks'][0]['implementation_mode'] = 'copy-and-test'
+        control.write_json(self.backlog, data)
+        before = self.backlog.read_bytes()
+        with patch('sys.stdin.read', return_value='prompt'), patch.object(control, 'agent') as agent:
+            with self.assertRaisesRegex(control.InvariantError, 'Unsupported implementation mode'):
+                control.iteration()
+        self.assertEqual(self.backlog.read_bytes(), before)
+        agent.assert_not_called()
 
     def test_success_requires_commands_and_review_before_commit(self):
         def run_agent(*args, **kwargs):

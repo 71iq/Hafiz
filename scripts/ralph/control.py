@@ -318,6 +318,43 @@ def verify_commands(task, directory, config):
     write_json(directory / 'verification.json', evidence)
 
 
+def generator_prompt(task):
+    mode = task.get('implementation_mode', 'implementation')
+    if mode == 'copy-only':
+        payload = {k: v for k, v in task.items() if k != 'verification'}
+        payload['controller_verification_command_count'] = len(task['verification'])
+        prompt = ('Frozen artifact copy-only handoff. The primary engineer already inspected source, tests and reuse choices.\n'
+                  'You are not alone. Preserve other edits. Read project instructions and the supplied readiness/reuse metadata.\n'
+                  'Install only the exact primary-supplied artifacts using the task copy command. Do not design, refactor, '
+                  'inspect callers or start an engineering-guided workflow.\n'
+                  'Do not run verification, hash, transform or case-count checks. Do not dump source or test files. '
+                  'Git status/branch and required instruction/metadata reads are allowed.\n'
+                  'Do not spawn agents or reviewers, edit controller state, commit, push, merge, deploy, install packages '
+                  'or contact live services. Edit only task allowed_paths.\n'
+                  'Report the installed paths without claiming tests, hashes or acceptance passed. '
+                  'All verification remains pending with the controller and independent evaluator. '
+                  'Architecture, security and acceptance stay with the primary engineer.\n'
+                  f'TASK:\n{json.dumps(payload, indent=2)}\n')
+    elif mode == 'implementation':
+        prompt = ('You are the bounded implementation worker for exactly this approved Hafiz task. '
+                      'You are not alone in the codebase. Preserve other edits.\n'
+                      'Do not spawn subagents or reviewers. The controller starts the separate stronger evaluator.\n'
+                      'Read AGENTS.md, docs/refactoring/ARCHITECTURE.md, CONVENTIONS.md, TECH_STACK.md and PROGRESS.md.\n'
+                      'Inspect callers and tests, record reuse choices in your response, implement the smallest coherent change.\n'
+                      'Only edit task allowed_paths. Do not edit the backlog, progress, runner, agents, protected data or infrastructure.\n'
+                      'Do not commit, push, merge, deploy, call live services or install packages. The controller verifies and commits.\n'
+                      'Use installed focused skills when relevant. For a lightweight model, use adaptive-coding engineering guided.\n'
+                      'Architecture, security choices and final acceptance belong to the primary engineer.\n'
+                      'Follow task-specific verification ownership. Report checks you ran and pending controller checks honestly.\n'
+                      'A documented implementation-sandbox bind restriction alone does not make controller-owned '
+                      'verification unavailable. Do not claim those pending checks passed.\n'
+                      'Return blocked when required infrastructure is genuinely unavailable to the assigned verifier.\n'
+                      f'TASK:\n{json.dumps(task, indent=2)}\n')
+    else:
+        raise InvariantError(f'Unsupported implementation mode: {mode!r}')
+    return prompt
+
+
 def iteration():
     sys.stdin.read()  # Upstream supplies PROMPT.md; task prompts are constructed below.
     config = read_json(CONFIG)
@@ -356,6 +393,9 @@ def iteration():
         stop(reason)
         print(reason)
         return
+    mode = task.get('implementation_mode', 'implementation')
+    if mode not in ('implementation', 'copy-only'):
+        raise InvariantError(f'Unsupported implementation mode: {mode!r}')
     if task.get('attempts', 0) >= config['max_attempts']:
         task['status'] = 'blocked'
         write_json(BACKLOG, backlog)
@@ -376,20 +416,7 @@ def iteration():
     write_json(directory / 'task.json', task)
     policy = BACKLOG.read_bytes()
     head = git('rev-parse', 'HEAD')
-    prompt = ('You are the bounded implementation worker for exactly this approved Hafiz task. '
-              'You are not alone in the codebase. Preserve other edits.\n'
-              'Do not spawn subagents or reviewers. The controller starts the separate stronger evaluator.\n'
-              'Read AGENTS.md, docs/refactoring/ARCHITECTURE.md, CONVENTIONS.md, TECH_STACK.md and PROGRESS.md.\n'
-              'Inspect callers and tests, record reuse choices in your response, implement the smallest coherent change.\n'
-              'Only edit task allowed_paths. Do not edit the backlog, progress, runner, agents, protected data or infrastructure.\n'
-              'Do not commit, push, merge, deploy, call live services or install packages. The controller verifies and commits.\n'
-              'Use installed focused skills when relevant. For a lightweight model, use adaptive-coding engineering guided.\n'
-              'Architecture, security choices and final acceptance belong to the primary engineer.\n'
-              'Follow task-specific verification ownership. Report checks you ran and pending controller checks honestly.\n'
-              'A documented implementation-sandbox bind restriction alone does not make controller-owned '
-              'verification unavailable. Do not claim those pending checks passed.\n'
-              'Return blocked when required infrastructure is genuinely unavailable to the assigned verifier.\n'
-              f'TASK:\n{json.dumps(task, indent=2)}\n')
+    prompt = generator_prompt(task)
     try:
         checkpoint = generation_checkpoint(task)
         result = checkpoint['result'] if checkpoint else agent(prompt, GENERATOR_SCHEMA, directory, 'generator', config)
@@ -418,10 +445,16 @@ def iteration():
             raise InvariantError('Verification changed out-of-scope files')
         diff_before = git('diff', 'HEAD')
         untracked_before = {p: (ROOT / p).read_bytes() for p in edits if p in git('ls-files', '--others', '--exclude-standard').splitlines()}
+        copy_review = (
+            'For this copy-only handoff, inspect the original generator command log at '
+            f'{checkpoint["evidence"]}/generator.jsonl. '
+            'Reject prohibited generator-side checks or full source/test dumps, even if the artifacts are correct. '
+            'Required instruction and readiness/reuse reads are allowed. '
+        ) if mode == 'copy-only' else ''
         review = agent('Independent reviewer. Read the specification and inspect the entire current Git diff, '
                        'including untracked task files. Verify behavior preservation, tests, reuse, typing, '
                        'offline/native/RTL compatibility and acceptance evidence. Review only. Do not edit, commit, '
-                       'push, deploy or modify state. Reject meaningful gaps and missing mandatory manual checks. '
+                       'push, deploy or modify state. Reject meaningful gaps and missing mandatory manual checks. ' + copy_review +
                        f'Task: {json.dumps(task)}. Verification logs: {directory.relative_to(ROOT)}/verification.json. '
                        f'Generation result and original evidence: {directory.relative_to(ROOT)}/generation.json. '
                        'Return pass or fail with actionable findings.', REVIEW_SCHEMA, directory, 'review', config, readonly=True)
