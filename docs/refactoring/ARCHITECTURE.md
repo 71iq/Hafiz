@@ -27,7 +27,7 @@ Database startup gates remain in their routes. `components/ui/DatabaseErrorState
 
 SQLite is authoritative for offline personal data. Sync restores account state before upload and preserves queue ordering, timestamps and soft deletion. TanStack Query owns remote response caching; it must not become a second durable store for local review state. Zustand owns session state. Feature UI state stays near its interaction.
 
-Tafsir selection in SettingsScreen and ReadingSettingsSheet uses a per-instance ref to reject overlapping callbacks before React renders busy state. Each owner retains import, selected-setting and error handling. Busy state controls the picker rows; finally releases both state and ref. This guard does not serialize database work between different owners.
+`lib/settings/use-tafsir-source-selection.ts` owns the shared import/selection lifecycle for SettingsScreen and ReadingSettingsSheet. Explicit db, onSelected and onError inputs preserve each caller's settings subscription, setter and warning/toast handling. The hook rejects overlapping callbacks with a per-instance ref before React renders busy state, then releases state and ref in finally. The existing importer still owns data access. This guard does not serialize database work between different owners; AyahDetailModal retains its distinct local selection and reload behavior.
 
 Each remote query key includes every result-changing input, including viewer identity for personalized output. Feature-local key factories belong beside their service only after multiple consumers need the same keys. Public data can share cache only when its output is truly viewer-independent. Account switch must cancel old work and remove private cached data before another account can see it.
 

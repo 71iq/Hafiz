@@ -77,3 +77,5 @@ RF-014 preparation exposed overlapping same-render imports in both settings owne
 RF-097 is accepted at 6113e52, bringing the current total to 49 of 99 verified items. Next prepare the modal characterization, isolated incomplete-source importer investigation or callback extraction with exact regression and ownership boundaries. Those items remain unapproved. PROGRESS.md and .refactor-baseline/rf097-primary-acceptance.json record the accepted repair and checks.
 
 RF-014 is now the sole approved pending item after RF097. Its three exact source files introduce one feature-specific selection hook, preserving parent reporting and the unchanged real-owner regression suite. No importer/modal or UI migration is included. Forty-nine of 99 tasks remain verified until fresh controller verification, independent review and primary acceptance complete.
+
+RF-014 is now verified and accepted at 17b30d3, bringing the current total to 50 of 99 verified items. Its shared selection lifecycle preserves RF097 guards and caller ownership. RF098 incomplete-source safety and RF099 modal characterization still need exact isolated preparation before approval. The mission remains active.
