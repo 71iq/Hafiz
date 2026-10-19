@@ -3828,7 +3828,7 @@
       "evidence": ".ralph/runs/RF-070-2-1792171267226235313",
       "recovery_note": "First independent evaluation rejected a false-positive busy dismissal test: the last Modal is the hidden ConfirmDialog. Primary requires the visible date-input Modal ancestor. All four gates and12 tests passed but are insufficient without this correction. Final implementation attempt2 remains available.",
       "completed_at": "2026-10-16T17:24:00.118911+00:00",
-      "summary": "Repaired RF-070’s busy dismissal characterization. The test now finds the visible Modal containing the date input, asserts `visible=true`, and dispatches `requestClose` during deferred persistence. Only `tests/unit/session-due-date.test.tsx` was changed; backlog edits were preserved.",
+      "summary": "Repaired RF-070\u2019s busy dismissal characterization. The test now finds the visible Modal containing the date input, asserts `visible=true`, and dispatches `requestClose` during deferred persistence. Only `tests/unit/session-due-date.test.tsx` was changed; backlog edits were preserved.",
       "primary_acceptance": {
         "accepted": true,
         "commit": "6e21066",
@@ -5269,7 +5269,7 @@
       "failure": "Batch resource limit reached",
       "completed_at": "2026-10-17T21:31:22.584489+00:00",
       "evidence": ".ralph/runs/RF-089-1-1792272463180241981",
-      "summary": "Implemented RF-089’s four worker-owned artifacts exactly. `package-lock.json` remains untouched for the controller."
+      "summary": "Implemented RF-089\u2019s four worker-owned artifacts exactly. `package-lock.json` remains untouched for the controller."
     },
     {
       "id": "RF-090",
@@ -5951,7 +5951,7 @@
       ],
       "risk": "high",
       "approved": true,
-      "status": "retry",
+      "status": "verified",
       "allowed_paths": [
         "lib/qiraat/parse.ts",
         "tests/unit/qiraat-parse.test.ts",
@@ -5961,13 +5961,15 @@
         "docs/refactoring/AUDIT.md",
         "package-lock.json"
       ],
-      "attempts": 1,
+      "attempts": 2,
       "discovery_evidence": ".refactor-baseline/rf056-qiraat-blocks-preflight-v1/repeated-marker-probe.json",
       "readiness_evidence": ".refactor-baseline/rf096-review-repair-v2/readiness.json",
-      "started_at": "2026-10-19T00:40:58.095257+00:00",
+      "started_at": "2026-10-19T00:47:49.551728+00:00",
       "failure": "Independent review failed: [P2] tests/unit/qiraat-parse.test.ts:3 uses a default fast-check import that produces nine import/no-named-as-default-member warnings. Both controller verify-6.log and my fresh scoped ESLint run confirm this. Exit 0 masks the failure to meet the required zero-warning acceptance criterion. Have the primary replace it with a namespace or named import, refresh the approved candidate and frozen hashes while preserving original evidence, then rerun controller verification with zero warnings enforced. Parser preservation, protected hashes, dependency isolation and recorded test/corpus evidence otherwise support the repair. No files were changed during review.",
-      "evidence": ".ralph/runs/RF-096-1-1792370458096672530",
-      "review_repair_evidence": ".refactor-baseline/rf096-review-repair-v2/repair-checks.json"
+      "evidence": ".ralph/runs/RF-096-2-1792370869553127090",
+      "review_repair_evidence": ".refactor-baseline/rf096-review-repair-v2/repair-checks.json",
+      "completed_at": "2026-10-19T00:51:56.035390+00:00",
+      "summary": "Copied the seven approved RF-096 artifacts exactly. The parser now uses the repaired two-slot marker/body traversal; no new helper or UI change was added. The unrelated backlog edit remains untouched."
     }
   ]
 }

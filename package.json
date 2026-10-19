@@ -127,7 +127,8 @@
     "prettier": "^3.8.4",
     "react-test-renderer": "^19.2.0",
     "supabase": "^2.98.2",
-    "typescript": "~5.9.2"
+    "typescript": "~5.9.2",
+    "fast-check": "4.10.2"
   },
   "overrides": {
     "react-devtools-core": {

@@ -106,6 +106,24 @@ describe.each(locales)("Qiraat content in $language at $width", ({ language, wid
     expect(view.queryByText(heading)).toBeNull();
   });
 
+  it("renders every reading after consecutive markers", async () => {
+    const secondBody = "متن تجريبي ثان";
+    jest
+      .mocked(fetchQiraat)
+      .mockResolvedValue({ text: `${heading} قرئ: ${firstBody} وقرئ: ${secondBody}`, ayah_group: row.ayah_group });
+    const view = render(<QiraatTab surah={2} ayah={3} />);
+    expect(await view.findByText(heading)).toBeTruthy();
+    expect(view.getByText(firstBody, { normalizer: (value) => value }).props.children).toBe(firstBody);
+    expect(view.getByText(secondBody).props.children).toBe(secondBody);
+    expect(view.getAllByText(heading)).toHaveLength(1);
+    const tree = view.toJSON();
+    if (!tree || Array.isArray(tree)) throw new Error("Expected original Qiraat root");
+    const rows = tree.children?.filter((child) => typeof child !== "string" && child.props.className === "mb-4");
+    expect(rows).toHaveLength(2);
+    expect(rows?.map((child) => (typeof child === "string" ? null : child.children?.length))).toEqual([2, 1]);
+    expect(view.getByText(`${strings[language].qiraatCoversAyahs}: ٢:٣، ٢:٤`)).toBeTruthy();
+  });
+
   it("ignores an old result after changing the selected ayah", async () => {
     const old = deferred();
     jest
