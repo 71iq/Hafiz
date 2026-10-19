@@ -24,6 +24,6 @@ Query keys, identity, mutations and offline behavior follow ARCHITECTURE.md. Do 
 
 Add characterization tests before extracting nontrivial behavior. Prefer actual function/component behavior over source-string spelling. Keep existing meaningful contracts while replacing brittle text assertions with equivalent behavioral coverage. Never skip a test, weaken an assertion or disable a rule to obtain green output.
 
-Use each task's argv verification commands. Full-suite baseline failures remain visible until separately fixed. UI/native checks must record what ran, platform/viewport/locale/theme and observed result. A web build does not verify Android or iOS.
+Use each task's argv verification commands. Full-suite baseline failures remain visible until separately fixed. If a task requires zero ESLint warnings, enforce `--max-warnings=0`. Exit zero alone permits warnings. When existing warnings must remain, record and compare the exact baseline diagnostics instead of describing the run as warning-free. UI/native checks must record what ran, platform/viewport/locale/theme and observed result. A web build does not verify Android or iOS.
 
 The controller alone changes backlog statuses, appends progress and commits. Each implementation session edits only its approved paths. Failed work remains available for diagnosis and retries; it cannot enter another task. All commits stay on the local modernization branch.
