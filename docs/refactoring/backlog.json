@@ -3096,8 +3096,8 @@
     {
       "id": "RF-060",
       "title": "Share surah-name font readiness lifecycle",
-      "description": "Share surah-name font readiness lifecycle",
-      "rationale": "Group 22 repeats loaded checks and cancellation around font loading.",
+      "description": "Copy four exact primary-designed artifacts to share the two existing surah-name readiness lifecycles through one boolean hook. Preserve both whole callers outside the prescribed imports/state/effect replacements.",
+      "rationale": "The same optional-font effect is repeated in MushafPage and SurahHeader. Existing loader ownership and 36 real-caller lifecycle cases establish a narrow shared contract. The unchanged clone profile removes one group and 19 duplicate lines.",
       "modules": [
         "components/mushaf/MushafPage.tsx",
         "components/mushaf/SurahHeader.tsx",
@@ -3109,27 +3109,85 @@
         "RF-006"
       ],
       "acceptance_criteria": [
-        "Inspect loader and any existing readiness hook before extraction.",
-        "Test already-loaded, delayed resolve, failure, needed flag changes and unmount. Preserve established behavior; separate any discovered lifecycle defect.",
-        "Edit no font assets, require maps or glyph/page mappings."
+        "Read AGENTS, architecture, conventions, progress and .refactor-baseline/rf060-font-readiness-preflight-v1/readiness.json plus reuse-map.json. Primary owns design, behavior and final acceptance. You are not alone; preserve other edits. No helpers, full source dumps, installations, resource/provider/controller/status edits, extra implementation or generator-run checks.",
+        "Use one bounded Python copy: from pathlib import Path; import json; r=json.loads(Path(\".refactor-baseline/rf060-font-readiness-preflight-v1/readiness.json\").read_text()); [(Path(p).parent.mkdir(parents=True,exist_ok=True), Path(p).write_bytes(Path(a[\"candidate_path\"]).read_bytes())) for p,a in r[\"artifacts\"].items()]. Copy the four exact artifacts only. Frozen gates enforce candidate/original hashes, loader/font/layout/config/manifest/lock ownership and immutable preparation records. Preserve the controller backlog edit.",
+        "Reuse the actual loadSurahNameFont and isSurahNameFontLoaded exports. Keep their native/web cache, in-flight deduplication and asset ownership unchanged. The single feature-specific hook returns a boolean and preserves the original cache initializer and token-identical effect after local renames. Preserve the needed guard, cached path, false reset, promise resolution, RAF scheduling, cleanup flag and console.warn. No new frame-cancellation guarantee or unrelated lifecycle repair.",
+        "The same 36 real-caller cases pass before and after extraction across compact/regular SurahHeader and MushafPage, with Arabic/390/beige and English/1280/dark inputs. Cover cached, delayed promise plus next-frame visibility, rejection reporting/fallback, newly needed, disabled/late completion/cache recheck and unmount-before-resolution. Only native font exports, unrelated nested children and provider inputs are mocked. Do not claim actual native font/FontFace, browser/pixel/theme, tablet geometry or physical-device verification.",
+        "Both complete callers must reverse to exact original bytes via the prescribed edits. Keep all markup, info-modal state, decorative/fallback choice, parent needed predicates, page-font and word loading, selection/geometry/glyph behavior in their existing owners. Add no dependency, generic font framework or UI wrapper. Format the two new files only; preserve existing caller formatting. Four-file lint enforces --max-warnings=0. Do not weaken tests, rules or limits.",
+        "Final preflight passes 46 focused cases, 72 suites/465 cold cases with zero skips, strict types, zero-warning lint, new-file formatting, all three platform dependency checks and web export. Temporary source is restored. Same-profile duplication changes 20 groups/405 lines/183 sources to 19/386/184; remaining duplication is not claimed absent. Knip remains exit 1 with exactly the same six issue records and zero unused files/exports/types, not clean Knip. Existing dependency/security and lint-maintenance debt remains separately owned.",
+        "All eleven exact fresh controller argv, a new stronger read-only evaluator and primary post-lease acceptance remain required. A generator assertion or preflight does not verify the task. No loader, font, asset, Quran input, page/glyph mapping, native require map, package/lock, native/Jest/Metro/backend/security-policy change, push/merge/deploy/production operation, credit/reset purchase or provider switch. One work item per heartbeat and all existing retry, batch, account and resource limits remain."
       ],
       "verification": [
+        [
+          "python3",
+          "-c",
+          "import hashlib,json;from pathlib import Path\npins={'.refactor-baseline/rf060-font-readiness-preflight-v1/readiness.json': 'e6edcb4150fd76e1ed59055014a836cb98adcec9a9a529b73173b0ee81a68b83', '.refactor-baseline/rf060-font-readiness-preflight-v1/reuse-map.json': '947aa8013f457ab6cea82de139c373e6b4dfd2c4c53e006d764ab46ad6cd684d', '.refactor-baseline/rf060-font-readiness-preflight-v1/transforms.json': 'eec5481f65f1cdf2a8e0717ad7d291347ccb1288a403532239403e906c49d8bb', '.refactor-baseline/rf060-font-readiness-preflight-v1/original-effect.txt': '15ba01e322d045d17884d49a3875d76f306121e33e215d540796f369c385c8b4', '.refactor-baseline/rf060-font-readiness-preflight-v1/preflight-1792374729855332748/knip-before.json': 'f2869fa8270ce0d6531a0561ee29f3215afae5f4c649068edb4ec7bcdf36d741', '.refactor-baseline/rf060-font-readiness-preflight-v1/characterization-before.json': '9be19aee8ff727ada9bf9e0b213ab73fc4a7f27e187d99167388ebfe012010d8', '.refactor-baseline/rf060-font-readiness-preflight-v1/preflight-1792374729855332748/state.json': '66737044bb2b2e8670241b119a36a024d349ddd978f21ef07fec74c3ce7b6c7b'}\nassert all(hashlib.sha256(Path(p).read_bytes()).hexdigest()==h for p,h in pins.items())\nr=json.loads(Path('.refactor-baseline/rf060-font-readiness-preflight-v1/readiness.json').read_text())\nfor p,a in r[\"artifacts\"].items():\n assert hashlib.sha256(Path(p).read_bytes()).hexdigest()==a[\"candidate_sha256\"],p\n if \"original_path\" in a:assert hashlib.sha256(Path(a[\"original_path\"]).read_bytes()).hexdigest()==a[\"original_sha256\"],p\nfor p,h in r[\"frozen_inputs\"].items():assert hashlib.sha256(Path(p).read_bytes()).hexdigest()==h,p\nprint(\"Four exact artifacts, original callers, protected font/layout inputs and unchanged loaders/config/manifest/lock match\")\n"
+        ],
+        [
+          "python3",
+          "-c",
+          "import json,re;from pathlib import Path\nr=json.loads(Path('.refactor-baseline/rf060-font-readiness-preflight-v1/readiness.json').read_text());transforms=json.loads(Path(r[\"transforms_path\"]).read_text())\nfor p,steps in transforms.items():\n original=Path(r[\"artifacts\"][p][\"original_path\"]).read_text();expected=original;positions=[]\n for step in steps:\n  assert expected.count(step[\"old\"])==1\n  at=expected.index(step[\"old\"]);positions.append(at);expected=expected[:at]+step[\"new\"]+expected[at+len(step[\"old\"]):]\n candidate=Path(p).read_text();assert candidate==expected,p\n for at,step in reversed(list(zip(positions,steps))):\n  assert candidate[at:at+len(step[\"new\"])]==step[\"new\"]\n  candidate=candidate[:at]+step[\"old\"]+candidate[at+len(step[\"new\"]):]\n assert candidate==original,p\ntext=Path(\"lib/fonts/use-surah-name-font.ts\").read_text();expected=Path(r[\"original_effect_path\"]).read_text().replace(\"needsSurahNameFont\",\"needed\").replace(\"setSurahNameFontReady\",\"setReady\")\nactual=text[text.index(\"  useEffect(() => {\"):text.index(\"  }, [needed]);\")+len(\"  }, [needed]);\")]\nassert re.sub(r\"\\s+\",\"\",actual)==re.sub(r\"\\s+\",\"\",expected)\nassert \"useState(() => isSurahNameFontLoaded())\" in text and \"return ready;\" in text\nprint(\"Both whole callers reverse exactly; all rendering, parent predicates and unrelated state remain; the shared effect is token-identical after local renames\")\n"
+        ],
         [
           "npm",
           "run",
           "test:unit",
           "--",
           "--runTestsByPath",
-          "tests/unit/surah-name-font-readiness.test.tsx"
+          "tests/unit/surah-name-font-readiness.test.tsx",
+          "tests/unit/font-and-viewport-contract.test.ts",
+          "tests/unit/rtl-quran-source-contract.test.ts",
+          "--no-cache"
         ],
         [
           "npm",
           "run",
           "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "components/mushaf/MushafPage.tsx",
+          "components/mushaf/SurahHeader.tsx",
+          "lib/fonts/use-surah-name-font.ts",
+          "tests/unit/surah-name-font-readiness.test.tsx",
+          "--max-warnings=0"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "lib/fonts/use-surah-name-font.ts",
+          "tests/unit/surah-name-font-readiness.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "python3",
+          "-c",
+          "import json,subprocess,time;from pathlib import Path\nr=json.loads(Path('.refactor-baseline/rf060-font-readiness-preflight-v1/readiness.json').read_text());p=Path(\".refactor-baseline/rf060-controller-knip\")/str(time.time_ns());p.mkdir(parents=True)\nz=subprocess.run([\"node_modules/.bin/knip\",\"--reporter\",\"json\"],capture_output=True,text=True);(p/\"report.json\").write_text(z.stdout);(p/\"stderr\").write_text(z.stderr);assert z.returncode==1\nreport=json.loads(z.stdout);assert report==json.loads(Path(r[\"knip_baseline_path\"]).read_text())\nassert len(report[\"issues\"])==6 and not report.get(\"files\") and all(not x.get(\"exports\") and not x.get(\"types\") for x in report[\"issues\"])\nprint(\"Knip remains exit 1 with the same six issue records and zero unused files/exports/types. This is parity, not clean Knip. Evidence\",p)\n"
+        ],
+        [
+          "python3",
+          "-c",
+          "import json,subprocess,time;from pathlib import Path\nr=json.loads(Path('.refactor-baseline/rf060-font-readiness-preflight-v1/readiness.json').read_text());p=Path(\".refactor-baseline/rf060-controller-duplicates\")/str(time.time_ns());p.mkdir(parents=True)\nz=subprocess.run([\"node_modules/.bin/jscpd\",\"--config\",\".jscpd.json\",\"--output\",str(p)],capture_output=True,text=True);(p/\"scan.log\").write_text(z.stdout+z.stderr);assert z.returncode==0\nstats=json.loads((p/\"jscpd-report.json\").read_text())[\"statistics\"][\"total\"];actual={k:stats[k] for k in [\"clones\",\"duplicatedLines\",\"sources\"]};assert actual==r[\"duplication_after\"]\nprint(\"Unchanged profile:\",r[\"duplication_before\"],\"to\",actual,\". Remaining deliberate duplication is not claimed absent. Evidence\",p)\n"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
         ]
       ],
       "risk": "medium",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
         "components/mushaf/MushafPage.tsx",
@@ -3137,7 +3195,8 @@
         "lib/fonts/use-surah-name-font.ts",
         "tests/unit/surah-name-font-readiness.test.tsx"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "readiness_evidence": ".refactor-baseline/rf060-font-readiness-preflight-v1/readiness.json"
     },
     {
       "id": "RF-061",
@@ -3828,7 +3887,7 @@
       "evidence": ".ralph/runs/RF-070-2-1792171267226235313",
       "recovery_note": "First independent evaluation rejected a false-positive busy dismissal test: the last Modal is the hidden ConfirmDialog. Primary requires the visible date-input Modal ancestor. All four gates and12 tests passed but are insufficient without this correction. Final implementation attempt2 remains available.",
       "completed_at": "2026-10-16T17:24:00.118911+00:00",
-      "summary": "Repaired RF-070\u2019s busy dismissal characterization. The test now finds the visible Modal containing the date input, asserts `visible=true`, and dispatches `requestClose` during deferred persistence. Only `tests/unit/session-due-date.test.tsx` was changed; backlog edits were preserved.",
+      "summary": "Repaired RF-070’s busy dismissal characterization. The test now finds the visible Modal containing the date input, asserts `visible=true`, and dispatches `requestClose` during deferred persistence. Only `tests/unit/session-due-date.test.tsx` was changed; backlog edits were preserved.",
       "primary_acceptance": {
         "accepted": true,
         "commit": "6e21066",
@@ -5269,7 +5328,7 @@
       "failure": "Batch resource limit reached",
       "completed_at": "2026-10-17T21:31:22.584489+00:00",
       "evidence": ".ralph/runs/RF-089-1-1792272463180241981",
-      "summary": "Implemented RF-089\u2019s four worker-owned artifacts exactly. `package-lock.json` remains untouched for the controller."
+      "summary": "Implemented RF-089’s four worker-owned artifacts exactly. `package-lock.json` remains untouched for the controller."
     },
     {
       "id": "RF-090",
