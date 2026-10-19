@@ -19,7 +19,7 @@ The existing folders already carry useful ownership. Move a file when it crosses
 
 Database startup gates remain in their routes. `components/ui/DatabaseErrorState.tsx` owns only title/message presentation and the existing startup/profile typography variants. Routes retain language lookup, loading progress and provider placement.
 
-`components/mushaf/QiraatBlocks.tsx` renders supplied heading/body rows only. QiraatTab and the session QiraatAnswer retain parsing, loading, group labels, headers and scrolling. The presenter does not interpret source content.
+`components/mushaf/QiraatBlocks.tsx` renders supplied heading/body rows only. QiraatTab and the session QiraatAnswer retain parsing, loading, group labels, headers and scrolling. The presenter does not interpret source content. `lib/qiraat/parse.ts` owns the established marker and line-formatting rules. It preserves ordered reading bodies and applies the initial heading to the first retained body. It does not infer later headings after the source pipeline removes HTML boundaries.
 
 ## State and data flow
 
