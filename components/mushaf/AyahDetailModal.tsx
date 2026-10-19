@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ActivityIndicator, Platform, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { BookOpenText, Bookmark, ChevronLeft, ChevronRight, MessageCircle, NotebookPen, Pause, Play, Share2 } from "lucide-react-native";
@@ -89,6 +89,7 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
   const [selectedTafsirSource, setSelectedTafsirSource] = useState<TafsirSourceId>(tafseerSource);
   const [tafsirPickerVisible, setTafsirPickerVisible] = useState(false);
   const [importingTafsirSource, setImportingTafsirSource] = useState<TafsirSourceId | null>(null);
+  const importingTafsirSourceRef = useRef<TafsirSourceId | null>(null);
   const [tafsirReloadKey, setTafsirReloadKey] = useState(0);
   const [activeTab, setActiveTab] = useState<AyahDetailTabKey>(initialTab);
   const [bookmarkBusy, setBookmarkBusy] = useState(false);
@@ -321,9 +322,10 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
 
   const handleTafsirSourceSelect = useCallback(
     async (sourceId: TafsirSourceId) => {
-      if (importingTafsirSource) return false;
+      if (importingTafsirSourceRef.current !== null) return false;
       if (sourceId === selectedTafsirSource && tafsirRows?.some((row) => row.source === sourceId)) return true;
 
+      importingTafsirSourceRef.current = sourceId;
       setImportingTafsirSource(sourceId);
       try {
         await ensureTafsirSourceImported(db, sourceId);
@@ -336,12 +338,12 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
         showToast(s.tafseerSourceImportFailed);
         return false;
       } finally {
+        importingTafsirSourceRef.current = null;
         setImportingTafsirSource(null);
       }
     },
     [
       db,
-      importingTafsirSource,
       s.tafseerSourceImportFailed,
       selectedTafsirSource,
       setTafseerSource,

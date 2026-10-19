@@ -6340,14 +6340,18 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "components/mushaf/AyahDetailModal.tsx",
         "tests/unit/ayah-tafsir-selection.test.tsx"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "discovery_evidence": ".refactor-baseline/rf097-tafsir-selection-guard-preflight-v1/variant-report.md",
-      "readiness_evidence": ".refactor-baseline/rf099-ayah-tafsir-guard-preflight-v1/readiness.json"
+      "readiness_evidence": ".refactor-baseline/rf099-ayah-tafsir-guard-preflight-v1/readiness.json",
+      "started_at": "2026-10-19T17:55:03.671376+00:00",
+      "completed_at": "2026-10-19T17:59:18.877525+00:00",
+      "evidence": ".ralph/runs/RF-099-1-1792432503673389735",
+      "summary": "Applied RF-099 exactly within the two allowed paths. Added the modal's synchronous per-instance tafsir import guard and copied the 24-case Arabic/English regression suite. No commit or push performed."
     }
   ]
 }
