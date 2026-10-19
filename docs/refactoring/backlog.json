@@ -768,12 +768,12 @@
     {
       "id": "RF-014",
       "title": "Characterize and share tafsir-selection transaction",
-      "description": "Characterize and share tafsir-selection transaction",
-      "rationale": "Two selection callbacks share busy/import/error semantics. RF097 repairs the proven state-guard race first. Reuse its 32 real-owner picker cases for later extraction; fresh exact scope and controller verification must precede approval.",
+      "description": "Copy three exact primary-designed artifacts to consolidate the matching settings tafsir-selection lifecycles in a single domain-specific hook. Keep parent reporting, persisted settings ownership and all rendering unchanged.",
+      "rationale": "After RF097 repairs the synchronous guard, the two actual callers have identical import/busy/ref/result/finally bodies apart from their warning prefixes. One shared lifecycle prevents contract drift. The existing scanner does not report these callbacks; no jscpd count reduction is claimed.",
       "modules": [
         "app/(tabs)/settings.tsx",
         "components/mushaf/ReadingSettingsSheet.tsx",
-        "lib/settings/*",
+        "lib/settings/use-tafsir-source-selection.ts",
         "tests/unit/tafsir-selection.test.tsx"
       ],
       "dependencies": [
@@ -781,36 +781,93 @@
         "RF-097"
       ],
       "acceptance_criteria": [
-        "Cover import success, failure and simultaneous selection.",
-        "Share only matching two callbacks. Keep AyahDetailModal refresh semantics explicit.",
-        "Verify relevant rendered picker state."
+        "Read AGENTS, architecture, conventions, progress and .refactor-baseline/rf014-tafsir-selection-extraction-v2/readiness.json, reuse-map.json and shared-contract.json. Primary owns design, behavior and acceptance. You are not alone; preserve other edits. No helpers, full source dumps, installs, extra implementation, generator-run checks, status/controller/resource/billing/provider changes.",
+        "Use one bounded Python copy: from pathlib import Path; import json; r=json.loads(Path(\".refactor-baseline/rf014-tafsir-selection-extraction-v2/readiness.json\").read_text()); [(Path(p).parent.mkdir(parents=True,exist_ok=True), Path(p).write_bytes(Path(a[\"candidate_path\"]).read_bytes())) for p,a in r[\"artifacts\"].items()]. Copy the three exact source artifacts only. Preserve the controller backlog edit. The existing regression suite is hash-frozen and must not change.",
+        "One lib/settings/use-tafsir-source-selection.ts hook receives db, onSelected and onError. It reuses the unchanged importer and derives its DB type from that function. Keep the synchronous per-instance guard, busy-state display, import-before-synchronous-selection, true/false return and finally cleanup exactly. Do not add a generic transaction layer, provider subscription, shared global lock, cancellation or persistence behavior.",
+        "Both whole callers reverse to original bytes outside prescribed imports, state/ref removal and callback replacement. Error callbacks retain exact owner warning prefixes and localized toast. They remain stable against the same language dependency. Parents retain settings subscription/setter, picker rendering, close behavior and every JSX byte. The hook callback must equal each original after precise local renames and error delegation.",
+        "The unchanged 32 actual-owner/picker cases and 45 focused checks pass both before and after. Preserve Arabic/390 and English/1280 default-white inputs, busy rows, success, import failure/retry, synchronous setter failure/retry, same-stack/stale callback rejection, selected-source fast close and completion after picker close/owner unmount. Unexpected remote calls, SQL writes, warnings and React console errors remain forbidden/asserted. Do not weaken or rewrite tests.",
+        "Final isolated preflight passes 73 suites/497 cold tests without skips, strict types, three-file lint with --max-warnings=0, new-hook-only formatting, three platform boundaries and web export. Both leases are inherited under the 6 GB cap, and source is restored. Preserve earlier preparation failures. Knip keeps exact six records and exit 1. jscpd records remain exactly equal, 19 groups/386 lines with source count 184 to 185. The first expected-decrease assumption was disproved and recorded; project thresholds remain unchanged.",
+        "All eleven frozen fresh controller argv, a new stronger read-only evaluator and primary post-lease acceptance are required. Preflight and generator judgment cannot complete the task. Keep AyahDetailModal, importer, settings context/schema, content/fonts/maps, package/lock/config/native/backend unchanged. RF098/RF099 remain separate unapproved investigations. Actual database/font loading, remote behavior, manual browser/pixel/theme/tablet checks, native compilation/device behavior are not verified here. No push, merge, deploy, production operation, purchases, reset credits or provider switch. One work item this heartbeat; retain all existing retry/account/batch/resource limits."
       ],
       "verification": [
+        [
+          "python3",
+          "-c",
+          "import hashlib,json;from pathlib import Path\npins={'.refactor-baseline/rf014-tafsir-selection-extraction-v2/readiness.json': 'd940cee731c89ba9bfdc1f4d9812ee7da76f5221a94173cbd58cff31f21f7202', '.refactor-baseline/rf014-tafsir-selection-extraction-v2/reuse-map.json': '05ee85b76bcf5b00850ffa988ce5603f059fb2dc4736609b8414514819e88f2a', '.refactor-baseline/rf014-tafsir-selection-extraction-v2/transforms.json': '41469adee32ce5190fa915dbc62e2ed0498d27f97ad02a9d0e65d7853baa1991', '.refactor-baseline/rf014-tafsir-selection-extraction-v2/shared-contract.json': 'cdb8c582b909244444cc787599d0564ea8a1a02f55ce80a949dc073c04a994bb', '.refactor-baseline/rf014-tafsir-selection-extraction-v2/preparation-errors.json': 'b95b5b67139d94d7c81d7e966ad455098a1d500ce8d203117d23b187680b2527', '.refactor-baseline/rf014-tafsir-selection-extraction-v2/preflight-1792389092795208861/state.json': '9c0ee527d95369088fbc6cf86e6bc2913a0c0bf6192f317ef092be9a3d31c8b0', '.refactor-baseline/rf014-tafsir-selection-extraction-v2/preflight-1792389092795208861/before-results.json': '0f68099e5aa767e1902cb1800c3dbd647e9c16781586e490c828e0d24f16b823', '.refactor-baseline/rf014-tafsir-selection-extraction-v2/preflight-1792389092795208861/after-results.json': '0fcd63a3afbaa077b14d4cffa5bacdf05355d1e3aba30126f354d2bdd7889820', '.refactor-baseline/rf014-tafsir-selection-extraction-v2/preflight-1792389092795208861/cold-results.json': 'd776e856fe9f3ac309dbee26e6db417be1d0a9ffdda040853113c9f593936918', '.refactor-baseline/rf014-tafsir-selection-extraction-v2/preflight-1792389092795208861/knip-before.json': 'f2869fa8270ce0d6531a0561ee29f3215afae5f4c649068edb4ec7bcdf36d741', '.refactor-baseline/rf014-tafsir-selection-extraction-v2/preflight-1792389092795208861/duplicates-before/jscpd-report.json': '524024c760adb7a5ddb091bffd25d5feb3294bd692167083cc0c3d70725a3cfd'}\nassert all(hashlib.sha256(Path(p).read_bytes()).hexdigest()==h for p,h in pins.items())\nr=json.loads(Path('.refactor-baseline/rf014-tafsir-selection-extraction-v2/readiness.json').read_text())\nfor p,a in r[\"artifacts\"].items():\n assert hashlib.sha256(Path(p).read_bytes()).hexdigest()==a[\"candidate_sha256\"],p\n if \"original_path\" in a:assert hashlib.sha256(Path(a[\"original_path\"]).read_bytes()).hexdigest()==a[\"original_sha256\"],p\nfor p,h in r[\"frozen_inputs\"].items():assert hashlib.sha256(Path(p).read_bytes()).hexdigest()==h,p\noutcomes=[]\nfor p in [r[\"before_result_path\"],r[\"after_result_path\"]]:\n d=json.loads(Path(p).read_text());assert (d[\"numPassedTests\"],d[\"numFailedTests\"],d[\"numPendingTests\"])==(45,0,0)\n outcomes.append(sorted((a[\"fullName\"],a[\"status\"]) for f in d[\"testResults\"] for a in f[\"assertionResults\"]))\nassert outcomes[0]==outcomes[1]\nprint(\"Three exact source artifacts, whole originals, unchanged 32-case suite, matching 45-case baseline/results and frozen owners/config/inputs match\")\n"
+        ],
+        [
+          "python3",
+          "-c",
+          "import json,re;from pathlib import Path\nr=json.loads(Path('.refactor-baseline/rf014-tafsir-selection-extraction-v2/readiness.json').read_text());transforms=json.loads(Path(r[\"transforms_path\"]).read_text());hook=Path(\"lib/settings/use-tafsir-source-selection.ts\").read_text();shared=re.search(r\"    async .*?^    },\",hook,re.S|re.M).group()\nfor p,steps in transforms.items():\n original=Path(r[\"artifacts\"][p][\"original_path\"]).read_text();expected=original;positions=[]\n for step in steps:\n  assert expected.count(step[\"old\"])==1;at=expected.index(step[\"old\"]);positions.append(at);expected=expected[:at]+step[\"new\"]+expected[at+len(step[\"old\"]):]\n candidate=Path(p).read_text();assert candidate==expected,p\n assert \"useTafsirSourceSelection({ db, onSelected: setTafseerSource, onError: handleTafsirSelectionError })\" in candidate\n assert \"importingTafseerSourceRef\" not in candidate and \"await ensureTafsirSourceImported\" not in candidate\n body=re.search(r\"    async .*?^    },\",steps[-1][\"old\"],re.S|re.M).group()\n body=body.replace(\"importingTafseerSourceRef\",\"activeSourceRef\").replace(\"setImportingTafseerSource\",\"setImportingSource\").replace(\"setTafseerSource\",\"onSelected\").replace(\"async (sourceId: TafsirSourceId) =>\",\"async (sourceId: TafsirSourceId): Promise<boolean> =>\")\n body=re.sub(r'      } catch \\(err\\) {.*?^        setToast\\(s.tafseerSourceImportFailed\\);','      } catch (error) {\\n        onError(error);',body,flags=re.S|re.M)\n assert body==shared,p\n for at,step in reversed(list(zip(positions,steps))):\n  assert candidate[at:at+len(step[\"new\"])]==step[\"new\"];candidate=candidate[:at]+step[\"old\"]+candidate[at+len(step[\"new\"]):]\n assert candidate==original,p\nassert \"useSettings(\" not in hook and \"useDatabase(\" not in hook\nprint(\"Whole callers reverse exactly; shared callback equals each original after precise local renames and caller error delegation. No extra provider subscription or markup change\")\n"
+        ],
         [
           "npm",
           "run",
           "test:unit",
           "--",
           "--runTestsByPath",
-          "tests/unit/tafsir-selection.test.tsx"
+          "tests/unit/tafsir-selection.test.tsx",
+          "tests/unit/reading-settings-ui-contract.test.ts",
+          "tests/unit/rtl-higher-level-source-contract.test.ts",
+          "tests/unit/rtl-disclosure-chevron-contract.test.ts",
+          "--no-cache"
         ],
         [
           "npm",
           "run",
           "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "app/(tabs)/settings.tsx",
+          "components/mushaf/ReadingSettingsSheet.tsx",
+          "lib/settings/use-tafsir-source-selection.ts",
+          "--max-warnings=0"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "lib/settings/use-tafsir-source-selection.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "python3",
+          "-c",
+          "import json,subprocess,time;from pathlib import Path\nr=json.loads(Path('.refactor-baseline/rf014-tafsir-selection-extraction-v2/readiness.json').read_text());p=Path(\".refactor-baseline/rf014-controller-knip\")/str(time.time_ns());p.mkdir(parents=True)\nz=subprocess.run([\"node_modules/.bin/knip\",\"--reporter\",\"json\"],capture_output=True,text=True);(p/\"report.json\").write_text(z.stdout);(p/\"stderr\").write_text(z.stderr);assert z.returncode==1\nreport=json.loads(z.stdout);assert report==json.loads(Path(r[\"knip_baseline_path\"]).read_text());assert len(report[\"issues\"])==6 and not report.get(\"files\") and all(not x.get(\"exports\") and not x.get(\"types\") for x in report[\"issues\"])\nprint(\"Knip keeps exit 1 and six exact issue records, zero unused files/exports/types. This is baseline parity, not clean Knip. Evidence\",p)\n"
+        ],
+        [
+          "python3",
+          "-c",
+          "import json,subprocess,time;from pathlib import Path\nr=json.loads(Path('.refactor-baseline/rf014-tafsir-selection-extraction-v2/readiness.json').read_text());p=Path(\".refactor-baseline/rf014-controller-duplicates\")/str(time.time_ns());p.mkdir(parents=True)\nz=subprocess.run([\"node_modules/.bin/jscpd\",\"--config\",\".jscpd.json\",\"--output\",str(p)],capture_output=True,text=True);(p/\"scan.log\").write_text(z.stdout+z.stderr);assert z.returncode==0\nz=json.loads((p/\"jscpd-report.json\").read_text())[\"statistics\"][\"total\"];actual={k:z[k] for k in [\"clones\",\"duplicatedLines\",\"sources\"]};assert actual==r[\"duplication_after\"]\nassert json.loads((p/\"jscpd-report.json\").read_text())[\"duplicates\"]==json.loads(Path(r[\"clone_baseline_path\"]).read_text())[\"duplicates\"]\nprint(\"Same-profile clone records remain exact, counts\",actual,\"; no measured clone reduction claimed. Evidence\",p)\n"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
         ]
       ],
       "risk": "medium",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
         "app/(tabs)/settings.tsx",
         "components/mushaf/ReadingSettingsSheet.tsx",
-        "lib/settings/*",
-        "tests/unit/tafsir-selection.test.tsx"
+        "lib/settings/use-tafsir-source-selection.ts"
       ],
       "attempts": 0,
-      "discovery_evidence": ".refactor-baseline/rf097-tafsir-selection-guard-preflight-v1/variant-report.md"
+      "discovery_evidence": ".refactor-baseline/rf097-tafsir-selection-guard-preflight-v1/variant-report.md",
+      "readiness_evidence": ".refactor-baseline/rf014-tafsir-selection-extraction-v2/readiness.json"
     },
     {
       "id": "RF-015",
