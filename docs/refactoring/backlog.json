@@ -6252,9 +6252,9 @@
     },
     {
       "id": "RF-099",
-      "title": "Characterize the ayah modal tafsir selection guard",
-      "description": "Characterize the ayah modal tafsir selection guard",
-      "rationale": "The modal uses the same captured-state guard but also owns local selected source and reload semantics. It needs a separate real-modal fixture before a repair.",
+      "title": "Block overlapping ayah tafsir selections",
+      "description": "Copy two exact primary-designed artifacts to add a synchronous guard to the modal and 24 real-modal/picker regression cases. Preserve cached-source, local selection, reload and reporting behavior.",
+      "rationale": "Runtime characterization confirms four regressions across Arabic and English: same-render calls start overlapping imports, and the cached-source shortcut can report success during an active import. The modal owns different local reload/short-circuit behavior from the shared settings hook, so a six-edit local guard repair is narrower.",
       "modules": [
         "components/mushaf/AyahDetailModal.tsx",
         "tests/unit/ayah-tafsir-selection.test.tsx"
@@ -6264,11 +6264,25 @@
         "RF-097"
       ],
       "acceptance_criteria": [
-        "Unapproved investigation. First characterize the actual modal with synthetic importer/DB inputs, reproduce overlapping same-render selection and freeze exact implementation and regression scope for primary approval.",
-        "Preserve already-selected-row short circuit, local selected source, reload key, import/error/open/close/unmount behavior, Arabic/English and existing overlay/accessibility contracts. Prove guard release after failure and successful retry. Keep importer and protected inputs unchanged.",
-        "The current variant is high-confidence source evidence only. Do not claim runtime proof, a repaired modal or cross-owner serialization. Prospective commands have not run. No live SQL, source data changes, dependencies, backend operation or deployment."
+        "Read AGENTS, architecture, conventions, progress and .refactor-baseline/rf099-ayah-tafsir-guard-preflight-v1/readiness.json and reuse-map.json. Primary owns behavior, design and final acceptance. You are not alone; preserve other edits. No helpers, full source dumps, installations, extra implementation, generator-run checks or status/controller/resource/provider/billing changes.",
+        "Use one bounded Python copy: from pathlib import Path; import json; r=json.loads(Path(\".refactor-baseline/rf099-ayah-tafsir-guard-preflight-v1/readiness.json\").read_text()); [(Path(p).parent.mkdir(parents=True,exist_ok=True), Path(p).write_bytes(Path(a[\"candidate_path\"]).read_bytes())) for p,a in r[\"artifacts\"].items()]. Copy only the two exact artifacts. Preserve the controller backlog edit. Frozen commands enforce original/candidate hashes and all untouched settings/importer/config/content owners.",
+        "The per-instance ref guard must run before the existing already-selected available-row shortcut. Latch after that shortcut and before import. Keep React state for displayed busy rows and release ref/state in finally. Preserve persistent setter, local selected source, reload-key ordering, boolean returns, warning prefix, localized toast and successful retry. Do not add a global lock, cancellation, transaction framework or shared-hook policy.",
+        "The entire modal must reverse to original bytes outside the six import/ref/guard/dependency edits. Preserve every JSX byte and all other effects/callbacks, source pills, tabs, overlay, navigation, bookmark/audio/share, font/content paths and settings/importer ownership. The shared settings hook remains unchanged because its always-import contract does not own this modal cached-row shortcut.",
+        "All 24 real-modal/actual-picker cases run in Arabic/390 and English/1280 with the default white theme. Cover import-before-save, local selected source and observable reload/read/display, failure/no save/no reload plus retry, synchronous setter failure/retry, current available row fast path, selected missing-row import, busy rows/current-source rejection, same-render/stale overlap, same-render cached shortcut, picker close, owner unmount and local-only source pills. Synthetic read rows and deferred importer forbid real writes/remote calls. Expected warnings/toasts and zero React console errors must remain asserted. Originals fail four targeted cases with 20 passing, no skips.",
+        "Final isolated preflight passes 58 focused cases and 74 suites/521 cold tests with zero skips, strict types, test ESLint --max-warnings=0, formatting of the new test only, all three platform boundaries and web export. The modal retains exactly eight pre-existing hook-dependency warnings and zero errors; compare exact rule/severity/message diagnostics rather than claiming zero warnings or fixing unrelated dependencies. Preserve first fixture act failure and its correction without weakening assertions. Both leases are inherited inside the unchanged 6 GB scope and source is restored.",
+        "Knip retains exit 1 and the same six issue records. Identical jscpd scope retains 19 groups/386 lines/185 sources, with exact file-pair/fragment fingerprints allowing shifted line positions. No clean Knip or duplication-reduction claim. All eleven fresh controller argv, a separate stronger read-only review and primary post-lease acceptance remain mandatory. No test weakening, rule suppression, new packages, importer/shared-hook/settings/context/schema/content/font/map/native/backend change, push, merge, deploy, production operation, purchase, reset credit or provider switch. Actual SQLite/import, remote/audio, Quran/font/glyph rendering, manual browser/pixel/theme/tablet/native/device checks are not verified. One work item this heartbeat and every existing resource/retry/account limit remain."
       ],
       "verification": [
+        [
+          "python3",
+          "-c",
+          "import hashlib,json;from pathlib import Path\npins={'.refactor-baseline/rf099-ayah-tafsir-guard-preflight-v1/readiness.json': '740210b6af7485630707d3ac6d68c5a286c4a9e12ae8f462ce4b1026d21dc720', '.refactor-baseline/rf099-ayah-tafsir-guard-preflight-v1/reuse-map.json': 'e06e7aa2d05c767d457c59bd2e7592feee280ac7e33553e32aad6792375d93e9', '.refactor-baseline/rf099-ayah-tafsir-guard-preflight-v1/transforms.json': 'c43735b69f68f7ef7c776d1b62427167ede9ba57b5eb2d31f07d97223d378f6a', '.refactor-baseline/rf099-ayah-tafsir-guard-preflight-v1/preparation-errors.json': 'b954a96139a5c1fa4235b2b91d503d2ecf5cc02c977239b2382a92bd9c12463d', '.refactor-baseline/rf099-ayah-tafsir-guard-preflight-v1/lint-baseline-diagnostics.json': '452bd576c4ba9d0aac9e842030a40f51be89c762081a82a60a871539c181580d', '.refactor-baseline/rf099-ayah-tafsir-guard-preflight-v1/before-act-repair.test.tsx': '51d5ed7b2332751b03963c55e2cb946a945d2ad9dd14a27f18f29d0644d8ef6c', '.refactor-baseline/rf099-ayah-tafsir-guard-preflight-v1/preflight-1792432233254513148/state.json': '476adc524367bdc8d01ec750ab50f86128eb609be69662425f15eae0de178cca', '.refactor-baseline/rf099-ayah-tafsir-guard-preflight-v1/preflight-1792432233254513148/red-results.json': '7b86f74512fb72a0f9b46e32c78e05b468cdc0549410ef08f4883fa1e6f095d7', '.refactor-baseline/rf099-ayah-tafsir-guard-preflight-v1/preflight-1792432233254513148/focused-results.json': '59d387b3f73a75f304bc453b24398134c09c7ce134e19ac70c0ba09729caab82', '.refactor-baseline/rf099-ayah-tafsir-guard-preflight-v1/preflight-1792432233254513148/cold-results.json': '5dac95d27d18a50341c892623b2282323450755d9e37bb0b3a7a434438f7bde8', '.refactor-baseline/rf099-ayah-tafsir-guard-preflight-v1/preflight-1792432233254513148/knip-before.json': 'f2869fa8270ce0d6531a0561ee29f3215afae5f4c649068edb4ec7bcdf36d741', '.refactor-baseline/rf099-ayah-tafsir-guard-preflight-v1/preflight-1792432233254513148/duplicates-before/jscpd-report.json': '965d6ffedcaa212961d30110fe9686ef4543f8dc383d662059781398fe51e33c', '.refactor-baseline/rf099-ayah-tafsir-guard-preflight-v1/preflight-1792432169616156025/state.json': '40a0995389573d51f8f78d51d723bb95e7b1aadb7ee0697d9a7a274340879be6', '.refactor-baseline/rf099-ayah-tafsir-guard-preflight-v1/preflight-1792432169616156025/red-results.json': 'b3ebabbafe186e3ff09c5275d7fa81100a2d0d7a33ef97af37fbd50ddaa704f2'}\nassert all(hashlib.sha256(Path(p).read_bytes()).hexdigest()==h for p,h in pins.items())\nr=json.loads(Path('.refactor-baseline/rf099-ayah-tafsir-guard-preflight-v1/readiness.json').read_text())\nfor p,a in r[\"artifacts\"].items():\n assert hashlib.sha256(Path(p).read_bytes()).hexdigest()==a[\"candidate_sha256\"],p\n if \"original_path\" in a:assert hashlib.sha256(Path(a[\"original_path\"]).read_bytes()).hexdigest()==a[\"original_sha256\"],p\nfor p,h in r[\"frozen_inputs\"].items():assert hashlib.sha256(Path(p).read_bytes()).hexdigest()==h,p\nred=json.loads(Path(r[\"red_result_path\"]).read_text());assert (red[\"numFailedTests\"],red[\"numPassedTests\"],red[\"numPendingTests\"])==(4,20,0)\nassert all(\"same-render\" in a[\"title\"] or \"same render\" in a[\"title\"] for f in red[\"testResults\"] for a in f[\"assertionResults\"] if a[\"status\"]==\"failed\")\nprint(\"Two exact artifacts, whole original, four original regressions, preserved preparation failures and unchanged settings/importer/package/config/content owners match\")\n"
+        ],
+        [
+          "python3",
+          "-c",
+          "import json;from pathlib import Path\nr=json.loads(Path('.refactor-baseline/rf099-ayah-tafsir-guard-preflight-v1/readiness.json').read_text());transforms=json.loads(Path(r[\"transforms_path\"]).read_text())\nfor p,steps in transforms.items():\n original=Path(r[\"artifacts\"][p][\"original_path\"]).read_text();expected=original;positions=[]\n for step in steps:\n  assert expected.count(step[\"old\"])==1;at=expected.index(step[\"old\"]);positions.append(at);expected=expected[:at]+step[\"new\"]+expected[at+len(step[\"old\"]):]\n candidate=Path(p).read_text();assert candidate==expected,p\n ordered=[\"if (importingTafsirSourceRef.current !== null) return false;\",\"if (sourceId === selectedTafsirSource && tafsirRows?.some((row) => row.source === sourceId)) return true;\",\"importingTafsirSourceRef.current = sourceId;\",\"await ensureTafsirSourceImported(db, sourceId);\",\"setTafseerSource(sourceId);\",\"setSelectedTafsirSource(sourceId);\",\"setTafsirReloadKey((value) => value + 1);\"]\n assert [candidate.index(x) for x in ordered]==sorted(candidate.index(x) for x in ordered)\n assert 'finally {\\n        importingTafsirSourceRef.current = null;\\n        setImportingTafsirSource(null);' in candidate\n for at,step in reversed(list(zip(positions,steps))):\n  assert candidate[at:at+len(step[\"new\"])]==step[\"new\"];candidate=candidate[:at]+step[\"old\"]+candidate[at+len(step[\"new\"]):]\n assert candidate==original,p\nprint(\"Entire modal reverses exactly outside six ref/guard/dependency edits. Cached fast path, local selection/reload, error reporting and every JSX byte remain in order\")\n"
+        ],
         [
           "npm",
           "run",
@@ -6276,23 +6290,64 @@
           "--",
           "--runTestsByPath",
           "tests/unit/ayah-tafsir-selection.test.tsx",
+          "tests/unit/tafsir-selection.test.tsx",
+          "tests/unit/ayah-detail-tab-row-contract.test.ts",
+          "tests/unit/ayah-detail-tafsir-source-rtl-contract.test.ts",
           "--no-cache"
         ],
         [
           "npm",
           "run",
           "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "python3",
+          "-c",
+          "import json,subprocess,time;from pathlib import Path\nr=json.loads(Path('.refactor-baseline/rf099-ayah-tafsir-guard-preflight-v1/readiness.json').read_text());p=Path(\".refactor-baseline/rf099-controller-lint\")/str(time.time_ns());p.mkdir(parents=True)\nz=subprocess.run([\"node_modules/.bin/eslint\",\"components/mushaf/AyahDetailModal.tsx\",\"--format\",\"json\"],capture_output=True,text=True);(p/\"modal.json\").write_text(z.stdout);(p/\"modal.stderr\").write_text(z.stderr);assert z.returncode==0;d=json.loads(z.stdout);assert sum(x[\"errorCount\"] for x in d)==0\nmessages=[{\"ruleId\":m[\"ruleId\"],\"severity\":m[\"severity\"],\"message\":m[\"message\"]} for x in d for m in x[\"messages\"]];assert len(messages)==8 and messages==json.loads(Path(r[\"lint_baseline_path\"]).read_text())\nz=subprocess.run([\"node_modules/.bin/eslint\",\"tests/unit/ayah-tafsir-selection.test.tsx\",\"--max-warnings=0\"],capture_output=True,text=True);(p/\"test.log\").write_text(z.stdout+z.stderr);assert z.returncode==0\nprint(\"Modal retains the same eight pre-existing hook-dependency warnings and zero errors; new test has zero warnings. No rules disabled. Evidence\",p)\n"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "tests/unit/ayah-tafsir-selection.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "python3",
+          "-c",
+          "import json,subprocess,time;from pathlib import Path\nr=json.loads(Path('.refactor-baseline/rf099-ayah-tafsir-guard-preflight-v1/readiness.json').read_text());p=Path(\".refactor-baseline/rf099-controller-knip\")/str(time.time_ns());p.mkdir(parents=True)\nz=subprocess.run([\"node_modules/.bin/knip\",\"--reporter\",\"json\"],capture_output=True,text=True);(p/\"report.json\").write_text(z.stdout);(p/\"stderr\").write_text(z.stderr);assert z.returncode==1\nreport=json.loads(z.stdout);assert report==json.loads(Path(r[\"knip_baseline_path\"]).read_text());assert len(report[\"issues\"])==6 and not report.get(\"files\") and all(not x.get(\"exports\") and not x.get(\"types\") for x in report[\"issues\"])\nprint(\"Knip keeps exit 1 and six exact issue records, zero unused files/exports/types. This is baseline parity, not clean Knip. Evidence\",p)\n"
+        ],
+        [
+          "python3",
+          "-c",
+          "import hashlib\nimport json,subprocess,time;from pathlib import Path\nr=json.loads(Path('.refactor-baseline/rf099-ayah-tafsir-guard-preflight-v1/readiness.json').read_text());p=Path(\".refactor-baseline/rf099-controller-duplicates\")/str(time.time_ns());p.mkdir(parents=True)\nz=subprocess.run([\"node_modules/.bin/jscpd\",\"--config\",\".jscpd.json\",\"--output\",str(p)],capture_output=True,text=True);(p/\"scan.log\").write_text(z.stdout+z.stderr);assert z.returncode==0\nz=json.loads((p/\"jscpd-report.json\").read_text())[\"statistics\"][\"total\"];actual={k:z[k] for k in [\"clones\",\"duplicatedLines\",\"sources\"]};assert actual==r[\"duplication_after\"]\ndef pairs(q):\n return sorted((tuple(sorted([d[\"firstFile\"][\"name\"],d[\"secondFile\"][\"name\"]])),d[\"lines\"],hashlib.sha256(d[\"fragment\"].encode()).hexdigest()) for d in json.loads(q.read_text())[\"duplicates\"])\nassert pairs(p/\"jscpd-report.json\")==pairs(Path(r[\"clone_baseline_path\"]))\nprint(\"Same-profile clone pairs and fragments remain exact, counts\",actual,\"; no measured clone reduction claimed. Evidence\",p)\n"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
         ]
       ],
       "risk": "medium",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
         "components/mushaf/AyahDetailModal.tsx",
         "tests/unit/ayah-tafsir-selection.test.tsx"
       ],
       "attempts": 0,
-      "discovery_evidence": ".refactor-baseline/rf097-tafsir-selection-guard-preflight-v1/variant-report.md"
+      "discovery_evidence": ".refactor-baseline/rf097-tafsir-selection-guard-preflight-v1/variant-report.md",
+      "readiness_evidence": ".refactor-baseline/rf099-ayah-tafsir-guard-preflight-v1/readiness.json"
     }
   ]
 }
