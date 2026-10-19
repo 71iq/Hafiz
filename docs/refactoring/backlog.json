@@ -859,15 +859,20 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "app/(tabs)/settings.tsx",
         "components/mushaf/ReadingSettingsSheet.tsx",
         "lib/settings/use-tafsir-source-selection.ts"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "discovery_evidence": ".refactor-baseline/rf097-tafsir-selection-guard-preflight-v1/variant-report.md",
-      "readiness_evidence": ".refactor-baseline/rf014-tafsir-selection-extraction-v2/readiness.json"
+      "readiness_evidence": ".refactor-baseline/rf014-tafsir-selection-extraction-v2/readiness.json",
+      "started_at": "2026-10-19T17:23:52.995029+00:00",
+      "failure": "review stopped at account usage limit; see .ralph/runs/RF-014-1-1792389324196298589/review.jsonl",
+      "completed_at": "2026-10-19T17:26:47.596975+00:00",
+      "evidence": ".ralph/runs/RF-014-1-1792430632997318038",
+      "summary": "Copied the three exact RF-014 artifacts. The shared hook now owns the matching tafsir-selection lifecycle while callers retain warning prefixes, toast handling, settings ownership, and rendering."
     },
     {
       "id": "RF-015",

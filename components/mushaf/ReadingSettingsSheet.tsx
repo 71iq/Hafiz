@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { ActivityIndicator, Platform, Pressable, Text, View, useWindowDimensions } from "react-native";
 import { Check, ChevronLeft, ChevronRight, Minus, Plus, X } from "lucide-react-native";
 import { TafsirSourcePicker } from "@/components/settings/TafsirSourcePicker";
@@ -6,7 +6,7 @@ import { OverlayBody, ResponsiveOverlay } from "@/components/ui/ResponsiveOverla
 import { Switch } from "@/components/ui/Switch";
 import { Toast } from "@/components/ui/Toast";
 import { ThemeColorSwatch } from "@/components/ui/ThemeColorSwatch";
-import { ensureTafsirSourceImported } from "@/lib/database/init";
+import { useTafsirSourceSelection } from "@/lib/settings/use-tafsir-source-selection";
 import { useDatabase } from "@/lib/database/provider";
 import { toArabicNumber } from "@/lib/arabic";
 import { stringByKey, useStrings } from "@/lib/i18n/useStrings";
@@ -17,7 +17,7 @@ import {
   type QuranMarkerStyle,
   type ThemeMode,
 } from "@/lib/settings/context";
-import { AVAILABLE_TAFSIR_SOURCES, type TafsirSourceId } from "@/lib/tafsir/sources";
+import { AVAILABLE_TAFSIR_SOURCES } from "@/lib/tafsir/sources";
 
 type Props = {
   visible: boolean;
@@ -63,8 +63,6 @@ export function ReadingSettingsSheet({
   const [fontPickerVisible, setFontPickerVisible] = useState(false);
   const [markerStylePickerVisible, setMarkerStylePickerVisible] = useState(false);
   const [tafseerPickerVisible, setTafseerPickerVisible] = useState(false);
-  const [importingTafseerSource, setImportingTafseerSource] = useState<TafsirSourceId | null>(null);
-  const importingTafseerSourceRef = useRef<TafsirSourceId | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const Chevron = isRTL ? ChevronLeft : ChevronRight;
   const controlColor = isDark ? "#a3a3a3" : "#7C6A58";
@@ -128,26 +126,17 @@ export function ReadingSettingsSheet({
     [fontSizeLocked, onFontSizeChangeStart, setFontSizeIndex]
   );
 
-  const handleTafseerSourceSelect = useCallback(
-    async (sourceId: TafsirSourceId) => {
-      if (importingTafseerSourceRef.current !== null) return false;
-      importingTafseerSourceRef.current = sourceId;
-      setImportingTafseerSource(sourceId);
-      try {
-        await ensureTafsirSourceImported(db, sourceId);
-        setTafseerSource(sourceId);
-        return true;
-      } catch (err) {
-        console.warn("[ReadingSettingsSheet] Failed to import tafsir source:", err);
-        setToast(s.tafseerSourceImportFailed);
-        return false;
-      } finally {
-        importingTafseerSourceRef.current = null;
-        setImportingTafseerSource(null);
-      }
+  const handleTafsirSelectionError = useCallback(
+    (error: unknown) => {
+      console.warn("[ReadingSettingsSheet] Failed to import tafsir source:", error);
+      setToast(s.tafseerSourceImportFailed);
     },
-    [db, s.tafseerSourceImportFailed, setTafseerSource]
+    [s.tafseerSourceImportFailed],
   );
+  const {
+    importingSource: importingTafseerSource,
+    selectSource: handleTafseerSourceSelect,
+  } = useTafsirSourceSelection({ db, onSelected: setTafseerSource, onError: handleTafsirSelectionError });
 
   return (
     <>

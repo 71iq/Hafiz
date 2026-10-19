@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
+import { useState, useEffect, useCallback, type ReactNode } from "react";
 import { View, Text, Pressable, ActivityIndicator, Linking, ScrollView, StyleSheet } from "react-native";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -41,8 +41,8 @@ import {
 } from "@/lib/settings/context";
 import { useDatabase } from "@/lib/database/provider";
 import { getLanguageByCode } from "@/lib/translations/languages";
-import { AVAILABLE_TAFSIR_SOURCES, type TafsirSourceId } from "@/lib/tafsir/sources";
-import { ensureTafsirSourceImported } from "@/lib/database/init";
+import { AVAILABLE_TAFSIR_SOURCES } from "@/lib/tafsir/sources";
+import { useTafsirSourceSelection } from "@/lib/settings/use-tafsir-source-selection";
 import { TafsirSourcePicker } from "@/components/settings/TafsirSourcePicker";
 import { TranslationLanguagePicker } from "@/components/settings/TranslationLanguagePicker";
 import { ReciterPicker } from "@/components/settings/ReciterPicker";
@@ -133,8 +133,6 @@ export default function SettingsScreen() {
   const [qfStatus, setQfStatus] = useState<QfConnectionStatus>("disconnected");
   const [qfBusy, setQfBusy] = useState(false);
   const [qfMessage, setQfMessage] = useState<string | null>(null);
-  const [importingTafseerSource, setImportingTafseerSource] = useState<TafsirSourceId | null>(null);
-  const importingTafseerSourceRef = useRef<TafsirSourceId | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const currentLang = getLanguageByCode(translationLanguage);
   const currentTafseerSource =
@@ -349,26 +347,17 @@ export default function SettingsScreen() {
     [router],
   );
 
-  const handleTafseerSourceSelect = useCallback(
-    async (sourceId: TafsirSourceId) => {
-      if (importingTafseerSourceRef.current !== null) return false;
-      importingTafseerSourceRef.current = sourceId;
-      setImportingTafseerSource(sourceId);
-      try {
-        await ensureTafsirSourceImported(db, sourceId);
-        setTafseerSource(sourceId);
-        return true;
-      } catch (err) {
-        console.warn("[Settings] Failed to import tafsir source:", err);
-        setToast(s.tafseerSourceImportFailed);
-        return false;
-      } finally {
-        importingTafseerSourceRef.current = null;
-        setImportingTafseerSource(null);
-      }
+  const handleTafsirSelectionError = useCallback(
+    (error: unknown) => {
+      console.warn("[Settings] Failed to import tafsir source:", error);
+      setToast(s.tafseerSourceImportFailed);
     },
-    [db, s.tafseerSourceImportFailed, setTafseerSource],
+    [s.tafseerSourceImportFailed],
   );
+  const {
+    importingSource: importingTafseerSource,
+    selectSource: handleTafseerSourceSelect,
+  } = useTafsirSourceSelection({ db, onSelected: setTafseerSource, onError: handleTafsirSelectionError });
 
   const categoryPanels = (
     <>
