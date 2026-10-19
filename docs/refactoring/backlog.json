@@ -2190,7 +2190,8 @@
         "RF-096",
         "RF-097",
         "RF-098",
-        "RF-099"
+        "RF-099",
+        "RF-100"
       ],
       "acceptance_criteria": [
         "Repeat identical clone/dead-code/native+web graph/security scopes.",
@@ -6351,7 +6352,57 @@
       "started_at": "2026-10-19T17:55:03.671376+00:00",
       "completed_at": "2026-10-19T17:59:18.877525+00:00",
       "evidence": ".ralph/runs/RF-099-1-1792432503673389735",
-      "summary": "Applied RF-099 exactly within the two allowed paths. Added the modal's synchronous per-instance tafsir import guard and copied the 24-case Arabic/English regression suite. No commit or push performed."
+      "summary": "Applied RF-099 exactly within the two allowed paths. Added the modal's synchronous per-instance tafsir import guard and copied the 24-case Arabic/English regression suite. No commit or push performed.",
+      "acceptance_notes": {
+        "source_controller_and_independent_review": "pass",
+        "generator_copy_only_compliance": false,
+        "primary_disposition": "Accept independently verified runtime change with a nonblocking process exception. Do not claim complete worker-process compliance. Keep all original logs and track RF-100 before final mission acceptance.",
+        "process_followup": "RF-100",
+        "evidence": ".refactor-baseline/rf099-primary-acceptance.json"
+      }
+    },
+    {
+      "id": "RF-100",
+      "title": "Audit copy-only generator handoff compliance",
+      "description": "Investigate the observed RF099 worker process deviation and prepare a bounded remedy for copy-only handoffs.",
+      "rationale": "The independent reviewer found prohibited redundant generator checks and full test dumps despite an exact-artifact handoff. Runtime source and all independent gates pass, but copy-only compliance did not.",
+      "modules": [
+        "scripts/ralph/control.py",
+        "scripts/ralph/tests/test_control.py",
+        "docs/refactoring/RUNNER_COMPLIANCE.md",
+        "docs/refactoring/RUNBOOK.md"
+      ],
+      "dependencies": [
+        "RF-079",
+        "RF-099"
+      ],
+      "acceptance_criteria": [
+        "Unapproved process investigation. Inspect RF099 generator/reviewer logs, the exact generated prompt, applicable skill precedence and RF079 ownership policy. Distinguish prohibited redundant checking from required instruction reads and normal implementation work. Record exact evidence without claiming a runtime regression.",
+        "Primary must resolve prompt contradictions and freeze the smallest supported remedy before approval. Do not bypass runner hard-denied paths. If a controller change is required, prepare a separate exact primary-owned execution/verification scope before implementing it. Current allowed paths are documentation only.",
+        "Preserve independent controller verification/review, normal-task meaningful checks, error logs, retry/account/token/time/memory limits, protected paths, existing agent/provider choices and pinned vendor. No blanket disabling of tests or verification, purchases, reset credits, provider switch, push or production action.",
+        "Use actual runner regression tests and a future harmless bounded handoff probe to verify any proposed remedy. Do not spend an implementation retry or mark this investigation complete based only on stronger wording. Verification commands are prospective and have not been run for this finding."
+      ],
+      "verification": [
+        [
+          "npm",
+          "run",
+          "test:refactor-runner"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
+        ]
+      ],
+      "risk": "low",
+      "approved": false,
+      "status": "pending",
+      "allowed_paths": [
+        "docs/refactoring/RUNNER_COMPLIANCE.md",
+        "docs/refactoring/RUNBOOK.md"
+      ],
+      "attempts": 0,
+      "discovery_evidence": ".ralph/runs/RF-099-1-1792432503673389735/review-result.json"
     }
   ]
 }
