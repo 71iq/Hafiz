@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Platform, Pressable, Text, View, useWindowDimensions } from "react-native";
 import { Check, ChevronLeft, ChevronRight, Minus, Plus, X } from "lucide-react-native";
 import { TafsirSourcePicker } from "@/components/settings/TafsirSourcePicker";
@@ -14,7 +14,6 @@ import type { UIStrings } from "@/lib/i18n/strings";
 import {
   FONT_SIZE_STEPS,
   useSettings,
-  type QuranFontStyle,
   type QuranMarkerStyle,
   type ThemeMode,
 } from "@/lib/settings/context";
@@ -65,6 +64,7 @@ export function ReadingSettingsSheet({
   const [markerStylePickerVisible, setMarkerStylePickerVisible] = useState(false);
   const [tafseerPickerVisible, setTafseerPickerVisible] = useState(false);
   const [importingTafseerSource, setImportingTafseerSource] = useState<TafsirSourceId | null>(null);
+  const importingTafseerSourceRef = useRef<TafsirSourceId | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const Chevron = isRTL ? ChevronLeft : ChevronRight;
   const controlColor = isDark ? "#a3a3a3" : "#7C6A58";
@@ -130,7 +130,8 @@ export function ReadingSettingsSheet({
 
   const handleTafseerSourceSelect = useCallback(
     async (sourceId: TafsirSourceId) => {
-      if (importingTafseerSource) return false;
+      if (importingTafseerSourceRef.current !== null) return false;
+      importingTafseerSourceRef.current = sourceId;
       setImportingTafseerSource(sourceId);
       try {
         await ensureTafsirSourceImported(db, sourceId);
@@ -141,10 +142,11 @@ export function ReadingSettingsSheet({
         setToast(s.tafseerSourceImportFailed);
         return false;
       } finally {
+        importingTafseerSourceRef.current = null;
         setImportingTafseerSource(null);
       }
     },
-    [db, importingTafseerSource, s.tafseerSourceImportFailed, setTafseerSource]
+    [db, s.tafseerSourceImportFailed, setTafseerSource]
   );
 
   return (

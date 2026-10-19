@@ -6132,14 +6132,18 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "app/(tabs)/settings.tsx",
         "components/mushaf/ReadingSettingsSheet.tsx",
         "tests/unit/tafsir-selection.test.tsx"
       ],
-      "attempts": 0,
-      "readiness_evidence": ".refactor-baseline/rf097-tafsir-selection-guard-preflight-v1/readiness.json"
+      "attempts": 1,
+      "readiness_evidence": ".refactor-baseline/rf097-tafsir-selection-guard-preflight-v1/readiness.json",
+      "started_at": "2026-10-19T05:19:52.103086+00:00",
+      "completed_at": "2026-10-19T05:23:51.561844+00:00",
+      "evidence": ".ralph/runs/RF-097-1-1792387192105338446",
+      "summary": "Copied the three approved RF-097 artifacts exactly. Added synchronous per-instance ref guards to both settings owners while preserving busy-state UI and existing import behavior. The test artifact covers both owners and picker regressions. Reused the existing importer, picker, toast, callbacks, and state; added no helper or abstraction."
     },
     {
       "id": "RF-098",

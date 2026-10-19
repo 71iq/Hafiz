@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, type ReactNode } from "react";
+import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 import { View, Text, Pressable, ActivityIndicator, Linking, ScrollView, StyleSheet } from "react-native";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -134,6 +134,7 @@ export default function SettingsScreen() {
   const [qfBusy, setQfBusy] = useState(false);
   const [qfMessage, setQfMessage] = useState<string | null>(null);
   const [importingTafseerSource, setImportingTafseerSource] = useState<TafsirSourceId | null>(null);
+  const importingTafseerSourceRef = useRef<TafsirSourceId | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const currentLang = getLanguageByCode(translationLanguage);
   const currentTafseerSource =
@@ -350,7 +351,8 @@ export default function SettingsScreen() {
 
   const handleTafseerSourceSelect = useCallback(
     async (sourceId: TafsirSourceId) => {
-      if (importingTafseerSource) return false;
+      if (importingTafseerSourceRef.current !== null) return false;
+      importingTafseerSourceRef.current = sourceId;
       setImportingTafseerSource(sourceId);
       try {
         await ensureTafsirSourceImported(db, sourceId);
@@ -361,10 +363,11 @@ export default function SettingsScreen() {
         setToast(s.tafseerSourceImportFailed);
         return false;
       } finally {
+        importingTafseerSourceRef.current = null;
         setImportingTafseerSource(null);
       }
     },
-    [db, importingTafseerSource, s.tafseerSourceImportFailed, setTafseerSource],
+    [db, s.tafseerSourceImportFailed, setTafseerSource],
   );
 
   const categoryPanels = (
