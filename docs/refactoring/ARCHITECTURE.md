@@ -21,6 +21,8 @@ Database startup gates remain in their routes. `components/ui/DatabaseErrorState
 
 `components/mushaf/QiraatBlocks.tsx` renders supplied heading/body rows only. QiraatTab and the session QiraatAnswer retain parsing, loading, group labels, headers and scrolling. The presenter does not interpret source content. `lib/qiraat/parse.ts` owns the established marker and line-formatting rules. It preserves ordered reading bodies and applies the initial heading to the first retained body. It does not infer later headings after the source pipeline removes HTML boundaries.
 
+`lib/fonts/use-surah-name-font.ts` owns only the shared boolean readiness lifecycle for SurahHeader and MushafPage. The existing font loader owns assets, native/web loading, cache and in-flight deduplication. Parents retain their needed predicates, rendering and page/word loading.
+
 ## State and data flow
 
 SQLite is authoritative for offline personal data. Sync restores account state before upload and preserves queue ordering, timestamps and soft deletion. TanStack Query owns remote response caching; it must not become a second durable store for local review state. Zustand owns session state. Feature UI state stays near its interaction.
