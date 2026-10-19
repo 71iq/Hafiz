@@ -6377,7 +6377,7 @@
         "RF-099"
       ],
       "acceptance_criteria": [
-        "This is a frozen artifact installation, not source/prose implementation. Read AGENTS/project instructions and .refactor-baseline/rf100-copy-handoff-v1/readiness.json and reuse-map.json. Primary owns the already-prepared adapter patch. You are not alone; preserve other changes. Required instruction/metadata reads and git status/branch are allowed. No helper agents, engineering-guided workflow, source/test inspection, full source/test dumps or generator-side checks, including hashes, transforms, case counts and git diff --check. Report all verification pending with the controller.",
+        "Before the copy, read all four required project documents completely: docs/refactoring/ARCHITECTURE.md, docs/refactoring/CONVENTIONS.md, docs/refactoring/TECH_STACK.md and docs/refactoring/PROGRESS.md. This repeats AGENTS.md:128 explicitly after the first independent review found those reads missing. Read them in bounded chunks if needed so output is not truncated. These are permitted instruction reads, not forbidden source/test dumps. Read the selected task in this prompt. This is a frozen artifact installation, not source/prose implementation. Read AGENTS/project instructions and .refactor-baseline/rf100-copy-handoff-v1/readiness.json and reuse-map.json. Primary owns the already-prepared adapter patch. You are not alone; preserve other changes. Required instruction/metadata reads and git status/branch are allowed. No helper agents, engineering-guided workflow, source/test inspection, full source/test dumps or generator-side checks, including hashes, transforms, case counts and git diff --check. Report all verification pending with the controller.",
         "Use exactly one bounded copy command: from pathlib import Path; import json; r=json.loads(Path(\".refactor-baseline/rf100-copy-handoff-v1/readiness.json\").read_text()); [(Path(p).parent.mkdir(parents=True,exist_ok=True), Path(p).write_bytes(Path(a[\"candidate_path\"]).read_bytes())) for p,a in r[\"artifacts\"].items()]. Install only docs/refactoring/RUNNER_COMPLIANCE.md. Do not rewrite the supplied prose, run writing/implementation workflows, modify backlog/progress or check copied hashes/diffs. Frozen controller commands own those checks.",
         "Primary-only adapter/test preparation is committed at ab5c28c582d5297a7696890f001dac1d04a926c1. The normal worker still cannot edit hard-denied scripts/ralph paths. The independent evaluator must read the complete primary patch diff from its parent through that commit, both current source files, five new regressions and preparation evidence. No source acceptance based only on a new prompt or this documentation artifact.",
         "Every one of the four frozen controller argv must run fresh. The original 27 runner tests pass, five new tests fail on the old adapter and all 32 pass after the primary patch. Actual task rendering must omit only worker-facing verification argv, preserve the controller list and keep the default implementation prompt identical to the original expression. Unknown modes reject before task-state mutation. All old helper ASTs except iteration remain exact, with only generator_prompt added.",
@@ -6408,16 +6408,19 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "pending",
+      "status": "retry",
       "allowed_paths": [
         "docs/refactoring/RUNNER_COMPLIANCE.md"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "discovery_evidence": ".ralph/runs/RF-099-1-1792432503673389735/review-result.json",
       "implementation_mode": "copy-only",
       "primary_patch_commit": "ab5c28c582d5297a7696890f001dac1d04a926c1",
       "execution_owner": "primary-prepared adapter; controller-owned documentation-only handoff probe",
-      "readiness_evidence": ".refactor-baseline/rf100-copy-handoff-v1/readiness.json"
+      "readiness_evidence": ".refactor-baseline/rf100-copy-handoff-v1/readiness.json",
+      "started_at": "2026-10-19T18:59:03.686361+00:00",
+      "failure": "Independent review failed: Required instruction reads are missing. AGENTS.md:128 requires ARCHITECTURE.md, CONVENTIONS.md, TECH_STACK.md and PROGRESS.md. The original generator.jsonl:9 reads only AGENTS.md and readiness/reuse metadata. Copy-only mode permits required instruction reads and does not waive them. Repeat the bounded handoff with those reads, preserving the prohibition on generator-side checks.; Otherwise, the complete primary patch and current diff show no identified behavioral regression. The generator executed exactly one prescribed copy and no prohibited checks or source/test dumps. Controller evidence records all four commands passing, including 32 runner tests; independent read-only hash, AST and whitespace checks also passed.; No files were changed during review. Application tests, builds and device checks were not run. Primary inspection after lease release and final acceptance remain pending. Prompt compliance remains nondeterministic, without a sandbox guarantee or demonstrated general token reduction.",
+      "evidence": ".ralph/runs/RF-100-1-1792436343688404430"
     }
   ]
 }
