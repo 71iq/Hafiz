@@ -27,6 +27,8 @@ Database startup gates remain in their routes. `components/ui/DatabaseErrorState
 
 SQLite is authoritative for offline personal data. Sync restores account state before upload and preserves queue ordering, timestamps and soft deletion. TanStack Query owns remote response caching; it must not become a second durable store for local review state. Zustand owns session state. Feature UI state stays near its interaction.
 
+Tafsir selection in SettingsScreen and ReadingSettingsSheet uses a per-instance ref to reject overlapping callbacks before React renders busy state. Each owner retains import, selected-setting and error handling. Busy state controls the picker rows; finally releases both state and ref. This guard does not serialize database work between different owners.
+
 Each remote query key includes every result-changing input, including viewer identity for personalized output. Feature-local key factories belong beside their service only after multiple consumers need the same keys. Public data can share cache only when its output is truly viewer-independent. Account switch must cancel old work and remove private cached data before another account can see it.
 
 Mutations preserve existing server semantics. Use item-local optimistic updates only where rollback and concurrent writes are defined. Invalidate the smallest correct key family after success. Do not retry writes automatically unless the operation has a proven idempotency contract.
