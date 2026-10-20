@@ -21,6 +21,8 @@ import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { useWordInteraction } from "@/lib/word/context";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 
+import { groupRootResults, groupTextResults, type TextResult, type RootOccurrence, type LemmaGroup } from "@/lib/search/results";
+
 // ─── Arabic diacritics stripping ───
 const ARABIC_DIACRITICS_RE =
   /[\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E4\u06E7\u06E8\u06EA-\u06ED\u0640]/g;
@@ -30,32 +32,6 @@ function stripDiacritics(text: string): string {
 }
 
 // ─── Types ───
-type TextResult = {
-  surah: number;
-  ayah: number;
-  text_uthmani: string;
-  text_en: string | null;
-  name_arabic: string;
-  name_english: string;
-};
-
-type RootOccurrence = {
-  surah: number;
-  ayah: number;
-  word_pos: number;
-  word_text: string;
-  root: string;
-  lemma: string;
-  text_uthmani: string;
-  name_arabic: string;
-  name_english: string;
-};
-
-type LemmaGroup = {
-  lemma: string;
-  occurrences: RootOccurrence[];
-};
-
 type HistoryEntry = {
   id: number;
   query: string;
@@ -359,18 +335,7 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
             : [];
 
           if (!isCurrentSearch()) return;
-          const lemmaMap = new Map<string, RootOccurrence[]>();
-          for (const row of rows) {
-            const key = row.lemma || row.word_text;
-            if (!lemmaMap.has(key)) lemmaMap.set(key, []);
-            lemmaMap.get(key)!.push(row);
-          }
-
-          const groups: LemmaGroup[] = [];
-          for (const [lemma, occurrences] of lemmaMap) {
-            groups.push({ lemma, occurrences });
-          }
-          groups.sort((a, b) => b.occurrences.length - a.occurrences.length);
+          const groups = groupRootResults(rows);
 
           setRootResults(groups);
           setTextResults([]);
@@ -458,25 +423,7 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
     });
   }, []);
 
-  const groupedTextResults = useMemo(() => {
-    const groups: { surah: number; nameArabic: string; nameEnglish: string; results: TextResult[] }[] = [];
-    let currentSurah = -1;
-
-    for (const r of textResults) {
-      if (r.surah !== currentSurah) {
-        currentSurah = r.surah;
-        groups.push({
-          surah: r.surah,
-          nameArabic: r.name_arabic,
-          nameEnglish: r.name_english,
-          results: [],
-        });
-      }
-      groups[groups.length - 1].results.push(r);
-    }
-
-    return groups;
-  }, [textResults]);
+  const groupedTextResults = useMemo(() => groupTextResults(textResults), [textResults]);
 
   const totalTextCount = textResults.length;
   const totalRootCount = useMemo(

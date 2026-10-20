@@ -1354,15 +1354,20 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "components/SearchCommand.tsx",
         "lib/search/results.ts",
         "tests/unit/search-grouping.test.ts"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "implementation_mode": "copy-only",
-      "readiness_evidence": ".refactor-baseline/rf019-search-grouping-v1/readiness.json"
+      "readiness_evidence": ".refactor-baseline/rf019-search-grouping-v1/readiness.json",
+      "started_at": "2026-10-20T19:51:30.403392+00:00",
+      "failure": "Batch resource limit reached",
+      "completed_at": "2026-10-20T19:57:04.742522+00:00",
+      "evidence": ".ralph/runs/RF-019-1-1792525890405502740",
+      "summary": "Installed the three frozen RF-019 artifacts with the supplied exact copy command. Controller and independent-evaluator verification remain pending."
     },
     {
       "id": "RF-101",
