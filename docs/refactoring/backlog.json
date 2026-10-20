@@ -1155,7 +1155,7 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "retry",
+      "status": "verified",
       "allowed_paths": [
         "lib/mushaf/position.ts",
         "components/mushaf/PageMushaf.tsx",
@@ -1163,12 +1163,14 @@
         "tests/unit/mushaf-position.test.ts",
         "tests/unit/reflection-feed-juz-policy.test.tsx"
       ],
-      "attempts": 1,
+      "attempts": 2,
       "implementation_mode": "copy-only",
       "readiness_evidence": ".refactor-baseline/rf017-juz-policy-v1/readiness.json",
-      "started_at": "2026-10-20T07:05:52.211682+00:00",
-      "failure": "Independent review failed: [P2] .ralph/runs/RF-017-1-1792479815408423344/generator.jsonl:59 and :61 record cua.getState() and cua.getState({emit:false}). These inspect browser/UI state outside the permitted instruction/metadata reads, Git status/branch, and exact artifact copy. This violates the copy-only acceptance criteria despite correct artifacts. Preserve this evidence and repeat the handoff without UI inspection, followed by fresh controller gates and independent review.; No implementation defect found in the complete three-source/two-test diff or controller metadata changes. Fresh read-only checks confirm exact artifacts, 92 unchanged tests, 2417 protected inputs, whole-source projection, 19527 policy comparisons and 13018 metadata entries. Reader fallback, nullable page metadata, reflection group ownership, typing and offline/platform boundaries remain preserved.; Controller logs record all eleven prescribed commands passing, including 33 focused cases and 78 suites/626 cold cases. Original/candidate label evidence, five mutation results, corrected metadata mutation, existing warnings and unchanged analysis findings were inspected. Tests/builds were not rerun during review. No browser, native/device or live-service verification is claimed. Review changed no files or state.",
-      "evidence": ".ralph/runs/RF-017-1-1792479952213592089"
+      "started_at": "2026-10-20T07:14:25.402875+00:00",
+      "failure": "Batch resource limit reached",
+      "evidence": ".ralph/runs/RF-017-2-1792480465404855073",
+      "completed_at": "2026-10-20T07:19:40.482313+00:00",
+      "summary": "Installed the five frozen RF-017 artifacts. Controller and independent verification remain pending; no tests, hashes, or acceptance were run or claimed."
     },
     {
       "id": "RF-018",

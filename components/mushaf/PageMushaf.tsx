@@ -45,6 +45,7 @@ import {
   getRenderedLineCount,
   buildLayoutOffsets,
 } from "@/lib/mushaf/page-layout";
+import { findJuzRangeForAyah } from "@/lib/mushaf/position";
 import { AyahDetailModal } from "./AyahDetailModal";
 import { JuzNameText } from "./JuzNameText";
 import { toArabicNumber } from "@/lib/arabic";
@@ -229,18 +230,6 @@ const HORIZONTAL_FLICK_MIN_DISTANCE = 12;
 const HORIZONTAL_FLICK_VELOCITY = 0.26;
 const HORIZONTAL_EASING = Easing.out(Easing.cubic);
 const FOCUS_BASE_SECONDS_PER_PAGE = 90;
-
-function findJuzForPageAyah(
-  ranges: JuzRangeRow[],
-  surah: number,
-  ayah: number
-): number | null {
-  for (const r of ranges) {
-    if (r.surah !== surah) continue;
-    if (ayah >= r.ayah_start && ayah <= r.ayah_end) return r.juz;
-  }
-  return null;
-}
 
 function PageSeparator({
   page,
@@ -533,7 +522,8 @@ export function PageMushaf({
       const surahName = uiLanguage === "ar"
         ? surahMap.get(p.surah_start)?.name_arabic ?? null
         : surahMap.get(p.surah_start)?.name_english ?? null;
-      const juz = findJuzForPageAyah(juzRangeRows, p.surah_start, p.ayah_start);
+      const range = findJuzRangeForAyah(juzRangeRows, p.surah_start, p.ayah_start);
+      const juz = range ? range.juz : null;
       meta.set(p.page, { surahNumber: p.surah_start, surahName, juz });
     }
     setPageMetaMap(meta);

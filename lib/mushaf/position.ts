@@ -66,12 +66,16 @@ export async function loadMushafIndex(db: SQLiteDatabase): Promise<MushafIndex> 
   return cachedIndex;
 }
 
+/** Return the first inclusive match in the supplied order. Callers own fallback policy. */
+export function findJuzRangeForAyah(ranges: readonly JuzRow[], surah: number, ayah: number): JuzRow | undefined {
+  return ranges.find((range) => range.surah === surah && ayah >= range.ayah_start && ayah <= range.ayah_end);
+}
+
 export function findJuzForAyah(index: MushafIndex, surah: number, ayah: number): number {
   // juzRows are ordered by juz then surah/ayah_start. A juz is the row where
   // surah matches and ayah is in [start, end].
-  for (const r of index.juzRows) {
-    if (r.surah === surah && ayah >= r.ayah_start && ayah <= r.ayah_end) return r.juz;
-  }
+  const range = findJuzRangeForAyah(index.juzRows, surah, ayah);
+  if (range) return range.juz;
   // Fallback: pick the latest juz whose first row precedes (surah, ayah).
   let best = 1;
   for (const r of index.juzRows) {

@@ -22,6 +22,7 @@ import { isSupabaseConfigured } from "@/lib/supabase";
 import { setPendingDeepLink } from "@/lib/deep-link";
 import { toArabicNumber } from "@/lib/arabic";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
+import { findJuzRangeForAyah } from "@/lib/mushaf/position";
 
 type SurahOption = {
   number: number;
@@ -185,9 +186,7 @@ export default function ReflectionFeedScreen() {
   const findJuzForAyah = useCallback(
     (surah: number, ayah: number): number | null => {
       for (const juz of options.juz) {
-        for (const range of juz.ranges) {
-          if (range.surah === surah && ayah >= range.ayah_start && ayah <= range.ayah_end) return juz.juz;
-        }
+        if (findJuzRangeForAyah(juz.ranges, surah, ayah)) return juz.juz;
       }
       return null;
     },
