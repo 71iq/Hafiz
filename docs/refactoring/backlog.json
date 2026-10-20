@@ -1069,47 +1069,103 @@
     },
     {
       "id": "RF-017",
-      "title": "Preserve nullable and fallback juz lookup policies",
-      "description": "Preserve nullable and fallback juz lookup policies",
-      "rationale": "Similar lookup copies differ when no match exists.",
+      "title": "Share juz range matching while preserving fallback policies",
+      "description": "Share inclusive first-match search in the existing position module. Retain reader fallback, nullable page metadata and ordered reflection group ownership.",
+      "rationale": "Three actual owners scan the same range shape but intentionally differ when no match exists. Returning the original matching row shares only common policy without flattening groups, sentinel collisions, generic helpers or data-flow changes.",
       "modules": [
         "lib/mushaf/position.ts",
         "components/mushaf/PageMushaf.tsx",
         "app/(tabs)/reflection-feed.tsx",
-        "tests/unit/mushaf-position.test.ts"
+        "tests/unit/mushaf-position.test.ts",
+        "tests/unit/reflection-feed-juz-policy.test.tsx"
       ],
       "dependencies": [
         "RF-016"
       ],
       "acceptance_criteria": [
-        "Test missing and overlapping ranges before selecting a common interface.",
-        "Keep caller-specific nullable/fallback outcomes. Do not alter Quran mappings."
+        "Read AGENTS.md and docs/refactoring/ARCHITECTURE.md, CONVENTIONS.md, TECH_STACK.md and PROGRESS.md completely, using bounded chunks. Read the selected task and .refactor-baseline/rf017-juz-policy-v1/readiness.json and reuse-map.json completely. You are not alone; preserve other edits. Required instruction/metadata reads and git status/branch are allowed. No helpers, source/caller/test inspection or dumps, guided implementation/writing workflows, checks, hashes, transforms or case-count probes. Verification stays pending with the controller.",
+        "Install exactly the five frozen artifacts with this one copy-command body: from pathlib import Path; import json; r=json.loads(Path(\".refactor-baseline/rf017-juz-policy-v1/readiness.json\").read_text()); [(Path(p).parent.mkdir(parents=True,exist_ok=True), Path(p).write_bytes(Path(a[\"candidate_path\"]).read_bytes())) for p,a in r[\"artifacts\"].items()]. No redesign, reformat or other edit. Do not edit backlog/progress/runner/evidence, install packages, commit/push/merge/deploy or contact live services. Report installed paths and pending controller/independent checks.",
+        "Extend lib/mushaf/position.ts with one non-generic findJuzRangeForAyah returning the first inclusive matching row in input order, or undefined. Reuse existing private JuzRow, with readonly array input and no new type/module/runtime dependency. Reader exact match uses the row; its default-one and last-preceding-input-row fallback loop remains byte-exact. Page metadata converts missing to null. Reflections retain outer group order and parent juz even when a matching row payload differs or is zero. Preserve every unrelated caller byte, all SQL/cache/loading, geometry/glyphs, effects/dependencies, auth/query keys, stored finite labels, navigation and markup.",
+        "All eleven exact frozen commands run fresh. Require 33 focused cases and 78 suites/626 cold cases without skips, strict types, two-new-test zero-warning lint and formatting, the three platform boundaries and web export. Source lint retains exactly three old PageMushaf warnings with no new warning or suppression. The same twelve actual ReflectionFeedScreen label cases pass against original and candidate source in Arabic/English; query/card/list/database/navigation boundaries are isolated and no live calls execute. This is headless behavior coverage, not rendered browser/native evidence.",
+        "Inspect the compiler behavior proof comparing actual original/candidate reader functions, PageMushaf metadata effects and grouped reflection callbacks across all 6236 verses, outside-range queries, empty/missing rows, inclusive boundaries, overlaps and group ordering/payload differences. Require 19527 policy comparisons and 13018 metadata entries across both locales. Whole-source forward projection must match exact approved edits. Retain five Jest counterfactual results with 4/2/5/1/6 failures and all 33 cases restored passing. The first page mutation stopped at byte checking and is not semantic proof; the corrected behavior-only mutation must fail at actual metadata and restored normal proof must pass. Preserve both preparation corrections and all original evidence. No source-data correction is authorized.",
+        "All 2417 protected inputs, existing 92 test files and frozen sibling/config/package/runner inputs remain exact. Knip retains six issue records and exit 1, not clean. jscpd retains all nineteen exact clone fragments, 386 lines, 2523 tokens and 186 sources with the unchanged scan profile. Shared short lookup scans have no measured jscpd reduction. Do not broaden scope or suppress findings.",
+        "Independent stronger evaluator must inspect the complete three-source/two-test diff, actual owner/data boundaries, literal behavior/projection proof, original/after component evidence, corrected mutation evidence, lint/analysis and protected-input pins. Inspect the original generator command log after any checkpoint reuse; reject missing required reads, prohibited worker work, source drift or overstated verification. Primary owns scope/lifecycle/final acceptance after leases release. Preserve models/vendor/account/token/time/memory/retry/lease/checkpoint limits. No browser/font/pixel, native/device or live remote-service verification is claimed. One work item this heartbeat; local commits only."
       ],
       "verification": [
+        [
+          "python3",
+          "-c",
+          "import hashlib;from pathlib import Path;p=Path('.refactor-baseline/rf017-juz-policy-v1/verify-inputs.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='00faa7fc7d54a9b1fd44cbe41fb4f01c10c6ba6dbaa10143e34a64f9928c511f';exec(compile(p.read_text(),str(p),\"exec\"))"
+        ],
+        [
+          "node",
+          ".refactor-baseline/rf017-juz-policy-v1/behavior-proof.cjs"
+        ],
         [
           "npm",
           "run",
           "test:unit",
           "--",
           "--runTestsByPath",
-          "tests/unit/mushaf-position.test.ts"
+          "tests/unit/mushaf-position.test.ts",
+          "tests/unit/reflection-feed-juz-policy.test.tsx",
+          "--no-cache"
         ],
         [
           "npm",
           "run",
           "typecheck"
+        ],
+        [
+          "python3",
+          ".refactor-baseline/rf017-juz-policy-v1/lint.py"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "tests/unit/mushaf-position.test.ts",
+          "tests/unit/reflection-feed-juz-policy.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "python3",
+          ".refactor-baseline/rf017-juz-policy-v1/analysis.py"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
         ]
       ],
       "risk": "medium",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
         "lib/mushaf/position.ts",
         "components/mushaf/PageMushaf.tsx",
         "app/(tabs)/reflection-feed.tsx",
-        "tests/unit/mushaf-position.test.ts"
+        "tests/unit/mushaf-position.test.ts",
+        "tests/unit/reflection-feed-juz-policy.test.tsx"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "implementation_mode": "copy-only",
+      "readiness_evidence": ".refactor-baseline/rf017-juz-policy-v1/readiness.json"
     },
     {
       "id": "RF-018",
