@@ -877,28 +877,39 @@
     {
       "id": "RF-015",
       "title": "Characterize Hifz progress transitions",
-      "description": "Characterize Hifz progress transitions",
-      "rationale": "Reader orchestration lacks direct transition tests.",
+      "description": "Characterize the existing Mushaf screen Hifz lifecycle through real controls and synthetic page/database boundaries, without application-source extraction.",
+      "rationale": "The primary engineer narrows the unapproved extraction placeholder to real-owner characterization first. Timer, navigation, ref and reveal ownership already meet in the screen; extracting a pure helper before these contracts are covered would add risk without a proven boundary. RF016 geometry remains a separate dependent scope.",
       "modules": [
-        "lib/mushaf/*",
         "app/(tabs)/mushaf.tsx",
-        "tests/unit/hifz-transitions.test.ts"
+        "components/mushaf/HifzControls.tsx",
+        "tests/unit/hifz-transitions.test.tsx"
       ],
       "dependencies": [
         "RF-014"
       ],
       "acceptance_criteria": [
-        "Cover zero-word ayahs, partial/previous/next reveal, page reset/completion and the existing final timer tick.",
-        "Extract pure policy without modifying data, glyph/page mapping or gestures."
+        "Read AGENTS.md and docs/refactoring/ARCHITECTURE.md, CONVENTIONS.md, TECH_STACK.md and PROGRESS.md completely before copying; use bounded chunks if needed. Read the selected task here, .refactor-baseline/rf015-hifz-characterization-v1/readiness.json and reuse-map.json. These required instruction/metadata reads and git status/branch are allowed. You are not alone; preserve other edits. No helpers, caller/source/test inspection or dumps, guided implementation/writing workflow, verification, hashes, transforms or case-count checks. All tests/checks remain pending with the controller.",
+        "Install exactly the one frozen test artifact, with this single copy command body: from pathlib import Path; import json; r=json.loads(Path(\".refactor-baseline/rf015-hifz-characterization-v1/readiness.json\").read_text()); [(Path(p).parent.mkdir(parents=True,exist_ok=True), Path(p).write_bytes(Path(a[\"candidate_path\"]).read_bytes())) for p,a in r[\"artifacts\"].items()]. Do not rewrite the supplied tests, edit application source or controller backlog/progress, stage/commit/push/install packages or contact live services. Report the installed path and pending verification.",
+        "The task is characterization only. Primary explicitly defers the old placeholder pure-policy extraction until actual-owner tests justify a seam. Keep all application code, timer ownership, navigation, final tick, glyph/page/word mappings, data/fonts, packages and configs unchanged. The TSX extension is required for real rendered controls. No assertion/rule weakening or hidden source repair is permitted.",
+        "The actual screen and HifzControls must execute with synthetic isolated database/index/persistence, page-renderer and animation boundaries. Cover blank/empty/zero-word cases, whole/partial next and previous, pause/resume, manual page reset, Hifz disable/re-enable, unmount cleanup, page 604 and the existing final fully-revealed tick before auto page advancement. Arabic/390 and English/1280 use real strings and default white theme inputs. These are headless callback/state checks, not rendered browser, native gesture or glyph evidence.",
+        "All eight frozen commands must run fresh. Require 26 focused cases and 75 suites/547 cold cases with no skips, strict types, exact-file --max-warnings=0 lint/format and web export. Preserve preparation evidence where each of four temporary source mutations causes exactly two failures and 24 passes, then unchanged source passes again. No production mutation or persisted application source change is authorized.",
+        "Independent evaluator must inspect the complete new suite, actual Hifz owner callbacks/effects and actual controls, mocked boundary limits, preparation/counterfactual logs and original generator command log. Reject missing required reads, prohibited worker checks/dumps, source drift, untested copied behavior, weakened assertions or overstated UI/native coverage. The exact artifact is not self-certifying. Primary inspects commands and frozen inputs after leases release.",
+        "Preserve preparation failures: Worklets-native initialization in the stock animation mock, the React act queued microtask in global timer counts, and optional navigation-prop type errors. The final fixture uses immediate animation boundaries, runAllTicks before the unchanged zero-timer assertion, and explicit prop guards. No application bug fix, new dependency, remote/database write, browser/device/native-build claim or source duplication reduction is made. Existing runner/vendor, account/resource/retry/checkpoint limits remain. One work item this heartbeat, local commits only."
       ],
       "verification": [
+        [
+          "python3",
+          "-c",
+          "import json,hashlib;from pathlib import Path\npins={'.refactor-baseline/rf015-hifz-characterization-v1/readiness.json': '3277ef3be0b7901880777039f7f5ad96566f7a3565594ba76195ce94b7b4917a', '.refactor-baseline/rf015-hifz-characterization-v1/plan.json': 'aaf94107122774c7f5f75dd4726c53e83d7a11ae148ab02cb89d644f5b16a34a', '.refactor-baseline/rf015-hifz-characterization-v1/reuse-map.json': '43e02d82537ff01d636341e9784111bc91ec21d506a630254f2210c28c290004', '.refactor-baseline/rf015-hifz-characterization-v1/preparation-errors.json': 'e7c9652a9f2c583815a94e09a780534b617db6cffde2486807de47b444cc259b', '.refactor-baseline/rf015-hifz-characterization-v1/probe.py': '3de6c96151dfaa9fb63fe92e145a046b550e289edd42acb5061f9f00352d9a3b', '.refactor-baseline/rf015-hifz-characterization-v1/probe-1792454222494342318/state.json': '7f38f93750aec1a6c1c30b1e6d3d25023234d203dfb7e88a9fb483ee2052b2ec', '.refactor-baseline/rf015-hifz-characterization-v1/probe-1792454222494342318/focused.log': '421a5f0d8f63a75006c1c4affadb6e1484ea80e164b30601ba3acfba8c96a739', '.refactor-baseline/rf015-hifz-characterization-v1/probe-1792454222494342318/focused-restored.log': 'aad0d8a61b0dc2211d4590db4514789ad7984a735e82e1c6cee2b5ad5ffbd271', '.refactor-baseline/rf015-hifz-characterization-v1/probe-1792454222494342318/mutation-final-tick.log': 'f2c750a436fcaf420b958fa083d48c757d9ea867f7d31e3c70944d4280b10c48', '.refactor-baseline/rf015-hifz-characterization-v1/probe-1792454222494342318/mutation-zero-word.log': '0cfea9311c4f4809b2196b00d60167b14508ce0ff1ad41ad28ee0f6e23c3a6e4', '.refactor-baseline/rf015-hifz-characterization-v1/probe-1792454222494342318/mutation-partial-previous.log': 'd9f86a5165b37be56cb1f89895d92bd0214bfc71277ce01b55f86078ae80a0e1', '.refactor-baseline/rf015-hifz-characterization-v1/probe-1792454222494342318/mutation-page-reset.log': '8545f1d395c22bf59a0f04ef0912c8905f7ea04c0ebb37ae1a091fed472ca6fa', '.refactor-baseline/rf015-hifz-characterization-v1/probe-1792454222494342318/typecheck.log': '94c17861d4d0665d9938efb41f898a1f5db8bf7f18561e1e45c40e46d7006c30', '.refactor-baseline/rf015-hifz-characterization-v1/probe-1792454222494342318/lint.log': 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', '.refactor-baseline/rf015-hifz-characterization-v1/probe-1792454222494342318/format-check.log': '17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20', '.refactor-baseline/rf015-hifz-characterization-v1/probe-1792454222494342318/unit.log': 'af4f4a51532b5a071e3276591b6af7f24204afb5eb7b0489417d762774ffc0bb', '.refactor-baseline/rf015-hifz-characterization-v1/probe-1792454222494342318/web.log': '9e6446143f17e38aadba87ef4436a3942e537b95e17d8a8758413aa42e2c1784'}\nassert all(hashlib.sha256(Path(p).read_bytes()).hexdigest()==h for p,h in pins.items())\nr=json.loads(Path('.refactor-baseline/rf015-hifz-characterization-v1/readiness.json').read_text())\nfor p,a in r[\"artifacts\"].items():assert hashlib.sha256(Path(p).read_bytes()).hexdigest()==a[\"candidate_sha256\"],p\nfor p,h in r[\"protected_hashes\"].items():assert hashlib.sha256(Path(p).read_bytes()).hexdigest()==h,p\ns=json.loads(Path(r[\"preflight_state\"]).read_text());assert s[\"status\"]==\"passed\" and s[\"source_restored\"] and s[\"frozen_inputs_preserved\"]\nassert all(x[\"exit\"]==(1 if x[\"name\"].startswith(\"mutation-\") else 0) for x in s[\"results\"])\nprint(\"Exact test artifact, unchanged application/data-boundary inputs, original failures and full preparation evidence match\")\n"
+        ],
         [
           "npm",
           "run",
           "test:unit",
           "--",
           "--runTestsByPath",
-          "tests/unit/hifz-transitions.test.ts"
+          "tests/unit/hifz-transitions.test.tsx",
+          "--no-cache"
         ],
         [
           "npm",
@@ -906,20 +917,42 @@
           "typecheck"
         ],
         [
+          "node_modules/.bin/eslint",
+          "tests/unit/hifz-transitions.test.tsx",
+          "--max-warnings=0"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "tests/unit/hifz-transitions.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
           "npm",
           "run",
           "build:web"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
         ]
       ],
-      "risk": "high",
-      "approved": false,
+      "risk": "medium",
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
-        "lib/mushaf/*",
-        "app/(tabs)/mushaf.tsx",
-        "tests/unit/hifz-transitions.test.ts"
+        "tests/unit/hifz-transitions.test.tsx"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "implementation_mode": "copy-only",
+      "readiness_evidence": ".refactor-baseline/rf015-hifz-characterization-v1/readiness.json"
     },
     {
       "id": "RF-016",
