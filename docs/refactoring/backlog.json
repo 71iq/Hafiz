@@ -946,13 +946,18 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "tests/unit/hifz-transitions.test.tsx"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "implementation_mode": "copy-only",
-      "readiness_evidence": ".refactor-baseline/rf015-hifz-characterization-v1/readiness.json"
+      "readiness_evidence": ".refactor-baseline/rf015-hifz-characterization-v1/readiness.json",
+      "started_at": "2026-10-20T00:02:59.674403+00:00",
+      "failure": "Batch resource limit reached",
+      "completed_at": "2026-10-20T00:06:35.694706+00:00",
+      "evidence": ".ralph/runs/RF-015-1-1792454579676443457",
+      "summary": "Installed the single frozen RF-015 artifact. Verification remains pending with the controller and independent evaluator."
     },
     {
       "id": "RF-016",
