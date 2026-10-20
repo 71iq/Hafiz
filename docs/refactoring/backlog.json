@@ -1266,20 +1266,121 @@
     },
     {
       "id": "RF-019",
-      "title": "Extract search query and grouping policy",
-      "description": "Extract search query and grouping policy",
-      "rationale": "Search mixes data work and rendering.",
+      "title": "Extract text-surah and root-lemma result grouping",
+      "description": "Move only the independently characterized result grouping policies into one feature-local pure module.",
+      "rationale": "These transforms own consecutive-surah grouping, lemma fallback, stable count ordering and row identity. SearchCommand retains SQL, root-candidate matching and every interaction/lifecycle owner. RF101 preserves the remaining query-policy scope.",
       "modules": [
         "components/SearchCommand.tsx",
-        "lib/search/*",
-        "tests/unit/search-results.test.tsx"
+        "lib/search/results.ts",
+        "tests/unit/search-grouping.test.ts"
       ],
       "dependencies": [
         "RF-018"
       ],
       "acceptance_criteria": [
-        "Move only independently tested query/group rules. Keep keyboard, focus, selection and navigation behavior.",
-        "Verify search on representative web and native input when available."
+        "Read AGENTS.md and docs/refactoring/ARCHITECTURE.md, CONVENTIONS.md, TECH_STACK.md and PROGRESS.md completely in bounded chunks. Read the selected task and .refactor-baseline/rf019-search-grouping-v1/readiness.json and reuse-map.json completely. You are not alone; preserve other edits. Only required instruction/metadata reads and git status/branch are allowed before the copy. No helpers, source/caller/test inspection or dumps, implementation workflows, verification, hashes, transforms or case counts. Do not call MCP, browser, UI, app, computer-use, REPL or collaboration tools, even for inventory/discovery. Use shell commands only for permitted reads/status and one exact copy. Controller verification remains pending.",
+        "Install exactly three frozen artifacts with this one copy-command body: from pathlib import Path; import json; r=json.loads(Path(\".refactor-baseline/rf019-search-grouping-v1/readiness.json\").read_text()); [(Path(p).parent.mkdir(parents=True,exist_ok=True), Path(p).write_bytes(Path(a[\"candidate_path\"]).read_bytes())) for p,a in r[\"artifacts\"].items()]. No redesign, formatting or other edit. Do not edit backlog/progress/runner/evidence, install packages, commit/push/merge/deploy or contact live services. Report installed paths and pending controller/independent checks.",
+        "Four exact caller edits move two grouping rules and their existing row/group types into lib/search/results.ts. Preserve consecutive text surah grouping, first-row metadata, root lemma-or-word fallback, descending counts with stable ties, input occurrence order, duplicate positions/row references and no input mutation. Narrow the existing Map lookup instead of carrying its non-null assertion. Do not change normalization/root cache/candidate policy, SQL or parameters, RF018 request/timer ownership including every short-input mode reset, history, keyboard/focus/selection, delayed navigation or any JSX. RF101 remains unapproved for query policy.",
+        "All twelve exact frozen commands run fresh. Require 74 focused cases, including all 52 unchanged real SearchCommand cases and 22 new domain cases, plus 80 suites/700 cold cases without skips. Retain two 500-run properties. Types, new-library/test zero-warning lint/format, all three platform boundaries and web export pass. SearchCommand retains exactly one old loadHistory dependency warning, with no suppression or broad formatting. Original callback characterization and restored final characterization must each record 74 passes; three semantic mutations cause 10/3/2 domain failures. The literal compiler proof compares 4000 original/candidate input cases and 97094 row visits, with exact values/order/identity and whole-caller projection.",
+        "Fresh Chrome verification after fresh web export uses isolated contexts with real local browser SQLite, ar/390/white and en/1280/white text/root input, Enter submit, Escape dismissal and clean reopen. All remote requests are blocked. Compare all four actual result transcripts and sheet geometries to preserved original build. Primary inspected Arabic root before/after and English root. Three screenshots are exact; the fourth differs in three mode-button-corner pixels at x26..27/y176..177, with all result pixels exact. Do not claim blanket screenshot hash equality. Preserve the initial failed literal-{{n}} waiter and corrected fixture evidence. adb reports no attached devices; do not claim native/device/touch or all-theme verification.",
+        "Preserve all 95 old test files, sibling/caller/config/package/runner pins and 2417 protected inputs. Knip retains six exact issues and exit 1. jscpd retains nineteen exact fragments, 386 lines and 2523 tokens, with source coverage 186 to 187 from the new module. No measured duplication reduction. Independent stronger evaluator inspects the complete three-file diff, actual caller/Map/row ownership, all before/after/mutation/browser/correction evidence and every started/completed original generator tool-item type, including after checkpoint reuse. Reject prohibited worker actions even with correct artifacts. Primary owns final scope/evidence/lifecycle acceptance after both leases release. Keep every model/vendor/account/retry/resource/lease/checkpoint limit unchanged; local commits only. This specification follows deferred RF018 acceptance. Run only RF019 in its next eligible heartbeat."
+      ],
+      "verification": [
+        [
+          "python3",
+          "-c",
+          "import hashlib;from pathlib import Path;p=Path(\".refactor-baseline/rf019-search-grouping-v1/verify-inputs.py\");assert hashlib.sha256(p.read_bytes()).hexdigest()==\"9bc2bed80118cbbb366dbc1547183df9ae97f4cc2997b60340d44ab949dc7ef5\";exec(compile(p.read_text(),str(p),\"exec\"))"
+        ],
+        [
+          "node",
+          ".refactor-baseline/rf019-search-grouping-v1/behavior-proof.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/search-results.test.tsx",
+          "tests/unit/search-grouping.test.ts",
+          "--no-cache"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "python3",
+          ".refactor-baseline/rf019-search-grouping-v1/lint.py"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "lib/search/results.ts",
+          "tests/unit/search-grouping.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "node",
+          ".refactor-baseline/rf019-search-grouping-v1/browser.cjs",
+          "controller"
+        ],
+        [
+          "python3",
+          ".refactor-baseline/rf019-search-grouping-v1/analysis.py"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
+        ]
+      ],
+      "risk": "medium",
+      "approved": true,
+      "status": "pending",
+      "allowed_paths": [
+        "components/SearchCommand.tsx",
+        "lib/search/results.ts",
+        "tests/unit/search-grouping.test.ts"
+      ],
+      "attempts": 0,
+      "implementation_mode": "copy-only",
+      "readiness_evidence": ".refactor-baseline/rf019-search-grouping-v1/readiness.json"
+    },
+    {
+      "id": "RF-101",
+      "title": "Characterize and extract root-candidate query matching",
+      "description": "Preserve the remaining query-policy scope split from RF019 grouping.",
+      "rationale": "Canonical roots, stripped lemma/word matches, prefix fallback and ordered candidates need their own tests before moving. General Arabic normalizers change letter semantics and cannot replace search stripping blindly.",
+      "modules": [
+        "components/SearchCommand.tsx",
+        "lib/search/root-candidates.ts",
+        "tests/unit/search-root-candidates.test.ts"
+      ],
+      "dependencies": [
+        "RF-019"
+      ],
+      "acceptance_criteria": [
+        "Primary must prepare exact small artifacts after reading RF019 acceptance and actual current source. Characterize canonical/direct/lemma/word/prefix matches, diacritics, null/empty rows, duplicate candidates and insertion ordering first.",
+        "Keep SQLite query text/parameter order, lazy root-index cache ownership, RF018 generations/timers, history, highlights and all UI/navigation behavior. Reuse existing semantic owners only when behavior matches; do not apply normalizeArabicWord letter folding to search.",
+        "Narrow the pure matching interface before approval. No cache/service/hook redesign, dataset correction, dependency or production change is authorized. Require independent review and actual platform-appropriate evidence before acceptance."
       ],
       "verification": [
         [
@@ -1288,6 +1389,7 @@
           "test:unit",
           "--",
           "--runTestsByPath",
+          "tests/unit/search-root-candidates.test.ts",
           "tests/unit/search-results.test.tsx"
         ],
         [
@@ -1306,8 +1408,8 @@
       "status": "pending",
       "allowed_paths": [
         "components/SearchCommand.tsx",
-        "lib/search/*",
-        "tests/unit/search-results.test.tsx"
+        "lib/search/root-candidates.ts",
+        "tests/unit/search-root-candidates.test.ts"
       ],
       "attempts": 0
     },
