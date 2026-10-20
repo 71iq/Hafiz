@@ -23,6 +23,8 @@ Database startup gates remain in their routes. `components/ui/DatabaseErrorState
 
 `lib/fonts/use-surah-name-font.ts` owns only the shared boolean readiness lifecycle for SurahHeader and MushafPage. The existing font loader owns assets, native/web loading, cache and in-flight deduplication. Parents retain their needed predicates, rendering and page/word loading.
 
+`lib/mushaf/page-layout.ts` owns the existing pure page clamping, typography fitting, line widths, rendered-line counts and cumulative page heights/offsets. Its private structural input contains only layout rows, page-word line numbers and the word-mode flag. It imports no UI or data loader. PageMushaf retains data/font loading, gestures, Hifz/timers, navigation, hooks and rendering. RF016 preserves all seven moved function bodies and six constants.
+
 ## State and data flow
 
 SQLite is authoritative for offline personal data. Sync restores account state before upload and preserves queue ordering, timestamps and soft deletion. TanStack Query owns remote response caching; it must not become a second durable store for local review state. Zustand owns session state. Feature UI state stays near its interaction.
