@@ -22,6 +22,7 @@ import { useWordInteraction } from "@/lib/word/context";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 
 import { groupRootResults, groupTextResults, type TextResult, type RootOccurrence, type LemmaGroup } from "@/lib/search/results";
+import { resolveRootCandidates } from "@/lib/search/root-candidates";
 
 // ─── Arabic diacritics stripping ───
 const ARABIC_DIACRITICS_RE =
@@ -293,33 +294,9 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
           // direct root match + diacritic-stripped lemma/word_text lookups.
           const trimmed = term.trim();
           const strippedTerm = stripDiacritics(trimmed);
-          const rootCandidates = new Set<string>();
-          rootCandidates.add(trimmed);
-          rootCandidates.add(strippedTerm);
-
           const index = await loadRootIndex();
           if (!isCurrentSearch()) return;
-          if (index.lemmaMap.has(strippedTerm)) {
-            for (const r of index.lemmaMap.get(strippedTerm)!) rootCandidates.add(r);
-          }
-          if (index.wordMap.has(strippedTerm)) {
-            for (const r of index.wordMap.get(strippedTerm)!) rootCandidates.add(r);
-          }
-          // Prefix fallback for partial words
-          if (strippedTerm.length >= 3) {
-            for (const [key, roots] of index.lemmaMap) {
-              if (key.startsWith(strippedTerm)) {
-                for (const r of roots) rootCandidates.add(r);
-              }
-            }
-            for (const [key, roots] of index.wordMap) {
-              if (key.startsWith(strippedTerm)) {
-                for (const r of roots) rootCandidates.add(r);
-              }
-            }
-          }
-
-          const candidateList = Array.from(rootCandidates).filter(Boolean);
+          const candidateList = resolveRootCandidates({ trimmedTerm: trimmed, strippedTerm, index });
           const placeholders = candidateList.map(() => "?").join(",");
           const rows = candidateList.length
             ? await db.getAllAsync<RootOccurrence>(

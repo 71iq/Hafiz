@@ -1459,14 +1459,19 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "components/SearchCommand.tsx",
         "lib/search/root-candidates.ts",
         "tests/unit/search-root-candidates.test.ts"
       ],
-      "attempts": 0,
-      "implementation_mode": "copy-only"
+      "attempts": 1,
+      "implementation_mode": "copy-only",
+      "started_at": "2026-10-20T23:49:58.971347+00:00",
+      "failure": "review stopped at account usage limit; see .ralph/runs/RF-101-1-1792530143722589990/review.jsonl",
+      "completed_at": "2026-10-20T23:55:03.328099+00:00",
+      "evidence": ".ralph/runs/RF-101-1-1792540198973311451",
+      "summary": "Installed the three frozen RF-101 artifacts. Controller and independent-evaluator verification remain pending; no tests, hashes, or acceptance were run or claimed."
     },
     {
       "id": "RF-020",
