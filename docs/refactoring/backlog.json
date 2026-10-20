@@ -1185,18 +1185,18 @@
         "RF-067"
       ],
       "acceptance_criteria": [
-        "Read AGENTS.md and docs/refactoring/ARCHITECTURE.md, CONVENTIONS.md, TECH_STACK.md and PROGRESS.md completely in bounded chunks. Read the selected task and .refactor-baseline/rf018-search-lifecycle-v1/readiness.json and reuse-map.json completely. You are not alone; preserve other edits. Only required instruction/metadata reads and git status/branch are allowed before copying. No helpers, source/caller/test inspection or dumps, guided implementation/writing workflows, verification, hashes, transforms or case counts. Do not call any MCP, browser, UI, app, computer-use, REPL or collaboration tool, even for inventory/discovery. Use shell commands only for the permitted reads/status and one exact copy. Controller verification remains pending.",
-        "Install exactly two frozen artifacts with this one copy-command body: from pathlib import Path; import json; r=json.loads(Path(\".refactor-baseline/rf018-search-lifecycle-v1/readiness.json\").read_text()); [(Path(p).parent.mkdir(parents=True,exist_ok=True), Path(p).write_bytes(Path(a[\"candidate_path\"]).read_bytes())) for p,a in r[\"artifacts\"].items()]. No redesign/reformat/other edits. Do not edit backlog/progress/runner/evidence, install packages, commit/push/merge/deploy or contact live services. Report installed paths and pending controller/independent checks.",
-        "Add only the 18 frozen lifecycle edits. Query edit invalidates pending ownership immediately; performSearch cancels queued debounce and owns its generation. Guard text completion, root index continuation, root rows, error state and finally/loading. Clear, close and unmount cancel debounce and invalidate results. Short input clears busy state. Keep existing logging of SQL errors. Preserve every SQL byte/parameter, root cache/resolution/group/order, highlights, history SQL/write order, result navigation including intentional delayed 150ms callback and all JSX. No physical SQLite abort or cancellation of already-started history writes is claimed. No new hook/service/package/runtime dependency.",
-        "All ten exact frozen commands must run fresh. Require 46 focused ar/en real-component cases and 79 suites/672 cold cases without skips, strict types, zero-warning new-test lint and formatting, all three platform boundaries and web export. Retain exactly one existing SearchCommand loadHistory dependency warning. Review preserved baseline 38 failures/8 passes and candidate 46 passes, exact current history SQL assertions, root candidates/group/expansion and delegated/fallback delayed navigation. The first baseline had two fixture initialization errors, corrected and preserved separately, not app regressions.",
+        "Read AGENTS.md and docs/refactoring/ARCHITECTURE.md, CONVENTIONS.md, TECH_STACK.md and PROGRESS.md completely in bounded chunks. Read the selected task and .refactor-baseline/rf018-short-query-recovery-v2/readiness.json and reuse-map.json completely. You are not alone; preserve other edits. Only required instruction/metadata reads and git status/branch are allowed before copying. No helpers, source/caller/test inspection or dumps, guided implementation/writing workflows, verification, hashes, transforms or case counts. Do not call any MCP, browser, UI, app, computer-use, REPL or collaboration tool, even for inventory/discovery. Use shell commands only for the permitted reads/status and one exact copy. Controller verification remains pending. Read .refactor-baseline/rf018-short-query-recovery-v2/recovery.json completely.",
+        "Install exactly two frozen artifacts with this one copy-command body: from pathlib import Path; import json; r=json.loads(Path(\".refactor-baseline/rf018-short-query-recovery-v2/readiness.json\").read_text()); [(Path(p).parent.mkdir(parents=True,exist_ok=True), Path(p).write_bytes(Path(a[\"candidate_path\"]).read_bytes())) for p,a in r[\"artifacts\"].items()]. No redesign/reformat/other edits. Do not edit backlog/progress/runner/evidence, install packages, commit/push/merge/deploy or contact live services. Report installed paths and pending controller/independent checks.",
+        "Add only the 16 frozen lifecycle edits. Query edit invalidates pending ownership immediately; performSearch cancels queued debounce and owns its generation. Guard text completion, root index continuation, root rows, error state and finally/loading. Clear, close and unmount cancel debounce and invalidate results. Short input clears busy state. Keep existing logging of SQL errors. Preserve every SQL byte/parameter, root cache/resolution/group/order, highlights, history SQL/write order, result navigation including intentional delayed 150ms callback and all JSX. No physical SQLite abort or cancellation of already-started history writes is claimed. No new hook/service/package/runtime dependency. Every mode change must call performSearch, including short input, so cancellation cannot prevent its existing result/error reset. Do not reintroduce the rejected conditional mode path.",
+        "All ten exact frozen commands must run fresh. Require 52 focused ar/en real-component cases and 79 suites/678 cold cases without skips, strict types, zero-warning new-test lint and formatting, all three platform boundaries and web export. Retain exactly one existing SearchCommand loadHistory dependency warning. Review preserved baseline 38 failures/8 passes and initial candidate 46 passes, six added cases failing on that candidate and corrected candidate 52 passes, exact current history SQL assertions, root candidates/group/expansion and delegated/fallback delayed navigation. The first baseline had two fixture initialization errors, corrected and preserved separately, not app regressions.",
         "Whole-source forward projection and all 94 existing test files, frozen package/config/runner/callers and 2417 protected inputs stay exact. Knip retains six exact issue records/exit 1; jscpd retains 19 exact clone fragments/386 lines/2523 tokens/186 sources under unchanged profile. No measured clone reduction. Explicit primary prerequisite correction replaces RF008 umbrella with accepted RF067 SDK alignment after successful toolchain preflight. RF008 stays open for lint/native ownership diagnostics, with no setting/rule suppression.",
-        "Independent stronger evaluator reviews complete source/test diff, actual callers, ownership timing, all preserved red/green evidence, projection/pins, lint/analysis and every original generator started/completed tool-item type, including MCP/browser/REPL/collaboration after checkpoint reuse. Reject prohibited worker work even if source is correct. Required full docs/readiness/reuse reads and the single exact copy only. Controller gates never waive compliance. Primary owns final scope/lifecycle/evidence acceptance after both leases release. Preserve all models/vendor/account/retry/token/time/memory/lease/checkpoint limits. Headless fixtures are not browser/native/device/live-service verification. One RF018 work item only this heartbeat; local commits only."
+        "Independent stronger evaluator reviews complete source/test diff, actual callers, ownership timing, all preserved red/green evidence, projection/pins, lint/analysis and every original generator started/completed tool-item type, including MCP/browser/REPL/collaboration after checkpoint reuse. Reject prohibited worker work even if source is correct. Required full docs/readiness/reuse reads and the single exact copy only. Controller gates never waive compliance. Primary owns final scope/lifecycle/evidence acceptance after both leases release. Preserve all models/vendor/account/retry/token/time/memory/lease/checkpoint limits. Headless fixtures are not browser/native/device/live-service verification. One RF018 work item only this heartbeat; local commits only. The first independent review correctly rejected a primary-prepared short-input mode regression. Preserve that rejection and the one spent ordinary attempt, with no refund. Inspect six deterministic recovery regressions failing against rejected source and passing against corrected source."
       ],
       "verification": [
         [
           "python3",
           "-c",
-          "import hashlib;from pathlib import Path;p=Path(\".refactor-baseline/rf018-search-lifecycle-v1/verify-inputs.py\");assert hashlib.sha256(p.read_bytes()).hexdigest()==\"96cf13aac4136b4f990be54ba042d9d37854a4b46087e09cdd7967887f27d9c5\";exec(compile(p.read_text(),str(p),\"exec\"))"
+          "import hashlib;from pathlib import Path;p=Path(\".refactor-baseline/rf018-short-query-recovery-v2/verify-inputs.py\");assert hashlib.sha256(p.read_bytes()).hexdigest()==\"19bb666db1e2789074f29f77e3c907ef6e741edf4fd58542fd5dd3548f11b736\";exec(compile(p.read_text(),str(p),\"exec\"))"
         ],
         [
           "npm",
@@ -1214,7 +1214,7 @@
         ],
         [
           "python3",
-          ".refactor-baseline/rf018-search-lifecycle-v1/lint.py"
+          ".refactor-baseline/rf018-short-query-recovery-v2/lint.py"
         ],
         [
           "node_modules/.bin/prettier",
@@ -1240,7 +1240,7 @@
         ],
         [
           "python3",
-          ".refactor-baseline/rf018-search-lifecycle-v1/analysis.py"
+          ".refactor-baseline/rf018-short-query-recovery-v2/analysis.py"
         ],
         [
           "git",
@@ -1250,14 +1250,17 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "pending",
+      "status": "retry",
       "allowed_paths": [
         "components/SearchCommand.tsx",
         "tests/unit/search-results.test.tsx"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "implementation_mode": "copy-only",
-      "readiness_evidence": ".refactor-baseline/rf018-search-lifecycle-v1/readiness.json"
+      "readiness_evidence": ".refactor-baseline/rf018-short-query-recovery-v2/readiness.json",
+      "started_at": "2026-10-20T13:02:55.124249+00:00",
+      "failure": "Independent review failed: [P2] components/SearchCommand.tsx:409-415 cancels the short-input reset without clearing results. After a successful text search, type one character and tap Text before 350ms. The debounce is cancelled, but old rows and hasSearched remain indefinitely. A read-only probe using the actual callbacks reproduced this regression; the original clears both. Have the primary refresh the frozen artifact to reuse performSearch's short-input reset, add Arabic/English regression coverage, and rerun the required gates.; Generator compliance passes: all required reads were complete, with 34 shell commands, one exact copy, and no prohibited checks, source/test dumps or MCP/browser/REPL/collaboration calls.; Reviewed the complete diff, untracked test and both callers. Fresh read-only verification confirms exact artifacts, 18-edit projection, 94 unchanged tests and 2417 protected inputs. Controller logs record all ten gates passing, including 46 focused cases and 79 suites/672 cold cases. Preserved red/green evidence, lint warning and analysis parity match.; Review changed no files or state. Tests/builds were not rerun. Browser, native/device and live-service behavior remain unverified; headless component evidence does not establish those results. Primary final acceptance remains pending.",
+      "evidence": ".ralph/runs/RF-018-1-1792501375126233538"
     },
     {
       "id": "RF-019",
