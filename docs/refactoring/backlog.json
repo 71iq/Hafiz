@@ -973,19 +973,19 @@
         "RF-015"
       ],
       "acceptance_criteria": [
-        "Read AGENTS.md and docs/refactoring/ARCHITECTURE.md, CONVENTIONS.md, TECH_STACK.md and PROGRESS.md completely before copying. Use bounded chunks. Read this selected task and .refactor-baseline/rf016-mushaf-geometry-v1/readiness.json and reuse-map.json. Required instruction/metadata reads and git status/branch are allowed. You are not alone; preserve other edits. No helpers, caller/source/test inspection or dumps, guided implementation/writing workflow, verification, hashes, transforms or case-count checks. Verification stays pending with the controller.",
+        "Read AGENTS.md and docs/refactoring/ARCHITECTURE.md, CONVENTIONS.md, TECH_STACK.md and PROGRESS.md completely before copying. Use bounded chunks. Read this selected task and .refactor-baseline/rf016-mushaf-geometry-v1/readiness.json and reuse-map.json. Also read .refactor-baseline/rf016-glyph-review-recovery-v2/readiness.json and recovery.json completely. Required instruction/metadata reads and git status/branch are allowed. You are not alone; preserve other edits. No helpers, caller/source/test inspection or dumps, guided implementation/writing workflow, verification, hashes, transforms or case-count checks. Verification stays pending with the controller.",
         "Install exactly three frozen artifacts with this one copy command body: from pathlib import Path; import json; r=json.loads(Path(\".refactor-baseline/rf016-mushaf-geometry-v1/readiness.json\").read_text()); [(Path(p).parent.mkdir(parents=True,exist_ok=True), Path(p).write_bytes(Path(a[\"candidate_path\"]).read_bytes())) for p,a in r[\"artifacts\"].items()]. No source redesign or reformat beyond supplied bytes. Do not edit backlog/progress/runner/evidence, commit/push/merge/deploy/install packages or contact live services. Report paths and pending controller verification.",
         "Keep seven moved runtime function ASTs and six constant values exact. Preserve the existing justification helper and every unrelated PageMushaf byte, including data/word/glyph mapping, font loading, hooks, gestures, Hifz, timers, navigation and JSX. A private minimal structural PageGeometry input removes the UI type dependency; no new runtime dependency or shared framework. Preserve all protected inputs. Caller shrinks 1443 to 1321 lines; no algorithm rewrite is authorized.",
         "All twelve frozen commands must run fresh. Require 51 focused cases before/after and 76 suites/593 cold cases without skips, including 46 new geometry cases and three 500-run properties. Preserve the original three owner hook warnings exactly; the layout module and new test need zero-warning lint and formatting. All three platform dependency checks, web export and 604-page token validation must pass.",
-        "Require twelve fresh real-Chrome cases matching the valid before snapshots, with active vertical/horizontal mode assertions, widths 390/768/1440, Arabic/English and white/beige/dark/AMOLED/system-light represented. Compare visible glyph rects rounded to 0.001px and computed font/color styles exactly. Use ephemeral local profiles and block external requests. The original invalid no-scroll-assertion baseline stays preserved and must not be counted as acceptance. Browser baseline/after and primary visual sample evidence are in readiness. No all-604-page pixel, V4 rendered, system-dark, native-gesture/build or physical-device claim.",
+        "Require twelve fresh real-Chrome cases matching the corrected v2 before snapshots, with active vertical/horizontal assertions, widths 390/768/1440, Arabic/English and white/beige/dark/AMOLED/system-light represented. Measure actual glyph Text-element and text-Range bounds plus wrapper bounds, computed font/size/line-height/color/palette and loaded FontFace. Assert bundled QCF2 page fonts and expected theme background, persisted theme choice and text colors. Compare all metrics exactly at recorded 0.001px bounds precision. All twelve new records pass and 84 fallback/default-font/wrong-color/unloaded-font/empty-bound/wrong-theme/old-wrapper counterfactuals must reject. Use ephemeral local profiles and block external requests. Preserve both superseded no-scroll-assertion evidence and the later wrapper-style matrix; old screenshots establish parity, but wrapper styles cannot establish glyph typography. V2 readiness/recovery record the correction. No all-604-page pixel, V4 rendered, system-dark, native-gesture/build or physical-device claim.",
         "Knip must retain its exact six issue records and exit 1, not be called clean. jscpd must retain the same nineteen clone fragments, 386 lines and 2523 tokens. Sources rise 185 to 186 because the previously tiny existing layout module now qualifies for the scan. No new application source file, suppression or scan-scope change is involved and no duplication reduction is claimed.",
-        "Independent evaluator must inspect complete source/test diff, actual caller/data boundaries, AST/projection proof, before/after unit/browser evidence, lint/analysis logs, protected-input pins and original generator command log. Reject missing required reads, prohibited worker work, source drift, weakened rules/assertions or overstated UI/native verification. Hash copying alone is not acceptance. Primary owns final visual/scope/lifecycle acceptance after leases release. Preserve models/vendor/account/time/token/memory/retry/checkpoint limits. One work item this heartbeat; local commits only."
+        "Independent evaluator must inspect complete source/test diff, actual caller/data boundaries, AST/projection proof, before/after unit/browser evidence, lint/analysis logs, protected-input pins and original generator command log. Reject missing required reads, prohibited worker work, source drift, weakened rules/assertions or overstated UI/native verification. Hash copying alone is not acceptance. Primary owns final visual/scope/lifecycle acceptance after leases release. Preserve models/vendor/account/time/token/memory/retry/checkpoint limits. One work item this heartbeat; local commits only. The first independent review correctly rejected wrapper-style measurements. Keep its one spent ordinary attempt and all failure evidence. Inspect the corrected browser selection/assertions, original-source and extracted-source build hashes and fresh v2 glyph comparisons; no attempt refund, source-artifact or resource-limit change is authorized."
       ],
       "verification": [
         [
           "python3",
           "-c",
-          "import hashlib;from pathlib import Path;p=Path('.refactor-baseline/rf016-mushaf-geometry-v1/verify-inputs.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='3935ef12cead4ba8777c867aa95014629bfeb51da0a8140cc606ff83fa821423';exec(compile(p.read_text(),str(p),\"exec\"))"
+          "import hashlib;from pathlib import Path;p=Path('.refactor-baseline/rf016-glyph-review-recovery-v2/verify-inputs.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='87c8a6166c60e2f11b8deabfdf13fa3e811a539a4a6fc9cb0d078d47f2c8a2cf';exec(compile(p.read_text(),str(p),\"exec\"))"
         ],
         [
           "node",
@@ -1037,7 +1037,7 @@
         ],
         [
           "node",
-          ".refactor-baseline/rf016-mushaf-geometry-v1/browser.cjs",
+          ".refactor-baseline/rf016-glyph-review-recovery-v2/browser.cjs",
           "after"
         ],
         [
@@ -1052,15 +1052,18 @@
       ],
       "risk": "high",
       "approved": true,
-      "status": "pending",
+      "status": "retry",
       "allowed_paths": [
         "components/mushaf/PageMushaf.tsx",
         "lib/mushaf/page-layout.ts",
         "tests/unit/mushaf-geometry.test.ts"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "implementation_mode": "copy-only",
-      "readiness_evidence": ".refactor-baseline/rf016-mushaf-geometry-v1/readiness.json"
+      "readiness_evidence": ".refactor-baseline/rf016-glyph-review-recovery-v2/readiness.json",
+      "started_at": "2026-10-20T03:47:41.283181+00:00",
+      "failure": "Independent review failed: [P2] .refactor-baseline/rf016-mushaf-geometry-v1/browser.cjs:50 measures token Pressable wrappers, while Quran typography and colors belong to their child Text elements. All twelve snapshots record 16px sans-serif and black text, including dark mode. Capture actual glyph-element bounds and computed styles, assert the intended font/theme, and refresh before/after evidence and frozen verification inputs while preserving existing evidence.; The complete diff, including the untracked test, shows no identified implementation regression. Fresh read-only checks confirm seven unchanged runtime functions, six constants, unrelated caller bytes and all 2,417 protected inputs. Controller logs record 51 focused cases and 593 cold cases across 76 suites, plus the other required commands. Generator reads and its single copy command comply with the handoff restrictions.; Inspected three representative screenshots and confirmed all twelve screenshot files match their baselines. This supports visual parity but does not satisfy the missing glyph-style comparison. No files changed. Application tests and browsers were not rerun during review; native/device verification remains unclaimed. Primary acceptance after lease release remains pending.",
+      "evidence": ".ralph/runs/RF-016-1-1792468061285060166"
     },
     {
       "id": "RF-017",
