@@ -1174,43 +1174,90 @@
     },
     {
       "id": "RF-018",
-      "title": "Test stale search completion and cancellation",
-      "description": "Test stale search completion and cancellation",
-      "rationale": "Search can receive responses in a different order from requests.",
+      "title": "Cancel obsolete search results and pending debounce work",
+      "description": "Repair proven SQL-result ownership and debounce lifecycle in the existing SearchCommand.",
+      "rationale": "Deferred real-component tests reproduce stale success/error, loading, clear/close/unmount, mode/root continuation and duplicate-submit defects. A local generation counter and existing timer ownership repair them without a new abstraction or SQL change.",
       "modules": [
         "components/SearchCommand.tsx",
         "tests/unit/search-results.test.tsx"
       ],
       "dependencies": [
-        "RF-008"
+        "RF-067"
       ],
       "acceptance_criteria": [
-        "Use deferred responses to reproduce any actual stale-result bug.",
-        "Guard request ownership and unmount if reproduced. Preserve grouping/root resolution and offline SQL."
+        "Read AGENTS.md and docs/refactoring/ARCHITECTURE.md, CONVENTIONS.md, TECH_STACK.md and PROGRESS.md completely in bounded chunks. Read the selected task and .refactor-baseline/rf018-search-lifecycle-v1/readiness.json and reuse-map.json completely. You are not alone; preserve other edits. Only required instruction/metadata reads and git status/branch are allowed before copying. No helpers, source/caller/test inspection or dumps, guided implementation/writing workflows, verification, hashes, transforms or case counts. Do not call any MCP, browser, UI, app, computer-use, REPL or collaboration tool, even for inventory/discovery. Use shell commands only for the permitted reads/status and one exact copy. Controller verification remains pending.",
+        "Install exactly two frozen artifacts with this one copy-command body: from pathlib import Path; import json; r=json.loads(Path(\".refactor-baseline/rf018-search-lifecycle-v1/readiness.json\").read_text()); [(Path(p).parent.mkdir(parents=True,exist_ok=True), Path(p).write_bytes(Path(a[\"candidate_path\"]).read_bytes())) for p,a in r[\"artifacts\"].items()]. No redesign/reformat/other edits. Do not edit backlog/progress/runner/evidence, install packages, commit/push/merge/deploy or contact live services. Report installed paths and pending controller/independent checks.",
+        "Add only the 18 frozen lifecycle edits. Query edit invalidates pending ownership immediately; performSearch cancels queued debounce and owns its generation. Guard text completion, root index continuation, root rows, error state and finally/loading. Clear, close and unmount cancel debounce and invalidate results. Short input clears busy state. Keep existing logging of SQL errors. Preserve every SQL byte/parameter, root cache/resolution/group/order, highlights, history SQL/write order, result navigation including intentional delayed 150ms callback and all JSX. No physical SQLite abort or cancellation of already-started history writes is claimed. No new hook/service/package/runtime dependency.",
+        "All ten exact frozen commands must run fresh. Require 46 focused ar/en real-component cases and 79 suites/672 cold cases without skips, strict types, zero-warning new-test lint and formatting, all three platform boundaries and web export. Retain exactly one existing SearchCommand loadHistory dependency warning. Review preserved baseline 38 failures/8 passes and candidate 46 passes, exact current history SQL assertions, root candidates/group/expansion and delegated/fallback delayed navigation. The first baseline had two fixture initialization errors, corrected and preserved separately, not app regressions.",
+        "Whole-source forward projection and all 94 existing test files, frozen package/config/runner/callers and 2417 protected inputs stay exact. Knip retains six exact issue records/exit 1; jscpd retains 19 exact clone fragments/386 lines/2523 tokens/186 sources under unchanged profile. No measured clone reduction. Explicit primary prerequisite correction replaces RF008 umbrella with accepted RF067 SDK alignment after successful toolchain preflight. RF008 stays open for lint/native ownership diagnostics, with no setting/rule suppression.",
+        "Independent stronger evaluator reviews complete source/test diff, actual callers, ownership timing, all preserved red/green evidence, projection/pins, lint/analysis and every original generator started/completed tool-item type, including MCP/browser/REPL/collaboration after checkpoint reuse. Reject prohibited worker work even if source is correct. Required full docs/readiness/reuse reads and the single exact copy only. Controller gates never waive compliance. Primary owns final scope/lifecycle/evidence acceptance after both leases release. Preserve all models/vendor/account/retry/token/time/memory/lease/checkpoint limits. Headless fixtures are not browser/native/device/live-service verification. One RF018 work item only this heartbeat; local commits only."
       ],
       "verification": [
+        [
+          "python3",
+          "-c",
+          "import hashlib;from pathlib import Path;p=Path(\".refactor-baseline/rf018-search-lifecycle-v1/verify-inputs.py\");assert hashlib.sha256(p.read_bytes()).hexdigest()==\"96cf13aac4136b4f990be54ba042d9d37854a4b46087e09cdd7967887f27d9c5\";exec(compile(p.read_text(),str(p),\"exec\"))"
+        ],
         [
           "npm",
           "run",
           "test:unit",
           "--",
           "--runTestsByPath",
-          "tests/unit/search-results.test.tsx"
+          "tests/unit/search-results.test.tsx",
+          "--no-cache"
         ],
         [
           "npm",
           "run",
           "typecheck"
+        ],
+        [
+          "python3",
+          ".refactor-baseline/rf018-search-lifecycle-v1/lint.py"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "tests/unit/search-results.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "python3",
+          ".refactor-baseline/rf018-search-lifecycle-v1/analysis.py"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
         ]
       ],
       "risk": "medium",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
         "components/SearchCommand.tsx",
         "tests/unit/search-results.test.tsx"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "implementation_mode": "copy-only",
+      "readiness_evidence": ".refactor-baseline/rf018-search-lifecycle-v1/readiness.json"
     },
     {
       "id": "RF-019",
