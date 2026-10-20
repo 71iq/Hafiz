@@ -27,7 +27,9 @@ Database startup gates remain in their routes. `components/ui/DatabaseErrorState
 
 `lib/mushaf/position.ts` shares inclusive first-match juz range selection. It returns the original row in input order. The reader retains default-one and last-preceding-row fallback; PageMushaf retains null metadata for no match. ReflectionFeedScreen retains ordered parent groups and uses their juz value. The shared search does not sort, flatten groups, load data or choose a fallback.
 
-`lib/search/results.ts` owns consecutive-surah text grouping and root-lemma result grouping. It preserves row references, duplicate occurrences, input order and stable descending root counts. SearchCommand retains normalization, root-index cache and candidate matching, SQL execution, request generations/debounce, history, keyboard/focus, selection and delayed navigation.
+`lib/search/results.ts` owns consecutive-surah text grouping and root-lemma result grouping. It preserves row references, duplicate occurrences, input order and stable descending root counts. SearchCommand retains normalization, root-index cache, SQL execution, request generations/debounce, history, keyboard/focus, selection and delayed navigation.
+
+`lib/search/root-candidates.ts` owns ordered direct, exact lemma/word and prefix root matching. It takes the already-trimmed and diacritic-stripped terms plus a read-only index, preserves insertion order and removes duplicate or empty roots. SearchCommand owns stripping, index construction/cache, SQL and request lifecycle. The helper does not fold Arabic letters or load data.
 
 ## State and data flow
 
