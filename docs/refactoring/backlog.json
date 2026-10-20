@@ -962,21 +962,35 @@
     {
       "id": "RF-016",
       "title": "Extract tested Mushaf geometry calculations",
-      "description": "Extract tested Mushaf geometry calculations",
-      "rationale": "Geometry, loading and gestures currently share a large component.",
+      "description": "Move seven unchanged pure geometry functions and six existing constants into the existing page-layout module, with numeric and real-browser parity evidence.",
+      "rationale": "Separate arithmetic from the large reader while preserving all function runtime ASTs, constant values and unrelated caller bytes. Reuse the existing pure layout module; no new UI wrapper, data abstraction or package.",
       "modules": [
         "components/mushaf/PageMushaf.tsx",
-        "lib/mushaf/*",
+        "lib/mushaf/page-layout.ts",
         "tests/unit/mushaf-geometry.test.ts"
       ],
       "dependencies": [
         "RF-015"
       ],
       "acceptance_criteria": [
-        "Characterize structural lines, font fitting, offsets and page bounds before extraction.",
-        "Verify representative phone/tablet/desktop, Arabic/English and themes in rendered output."
+        "Read AGENTS.md and docs/refactoring/ARCHITECTURE.md, CONVENTIONS.md, TECH_STACK.md and PROGRESS.md completely before copying. Use bounded chunks. Read this selected task and .refactor-baseline/rf016-mushaf-geometry-v1/readiness.json and reuse-map.json. Required instruction/metadata reads and git status/branch are allowed. You are not alone; preserve other edits. No helpers, caller/source/test inspection or dumps, guided implementation/writing workflow, verification, hashes, transforms or case-count checks. Verification stays pending with the controller.",
+        "Install exactly three frozen artifacts with this one copy command body: from pathlib import Path; import json; r=json.loads(Path(\".refactor-baseline/rf016-mushaf-geometry-v1/readiness.json\").read_text()); [(Path(p).parent.mkdir(parents=True,exist_ok=True), Path(p).write_bytes(Path(a[\"candidate_path\"]).read_bytes())) for p,a in r[\"artifacts\"].items()]. No source redesign or reformat beyond supplied bytes. Do not edit backlog/progress/runner/evidence, commit/push/merge/deploy/install packages or contact live services. Report paths and pending controller verification.",
+        "Keep seven moved runtime function ASTs and six constant values exact. Preserve the existing justification helper and every unrelated PageMushaf byte, including data/word/glyph mapping, font loading, hooks, gestures, Hifz, timers, navigation and JSX. A private minimal structural PageGeometry input removes the UI type dependency; no new runtime dependency or shared framework. Preserve all protected inputs. Caller shrinks 1443 to 1321 lines; no algorithm rewrite is authorized.",
+        "All twelve frozen commands must run fresh. Require 51 focused cases before/after and 76 suites/593 cold cases without skips, including 46 new geometry cases and three 500-run properties. Preserve the original three owner hook warnings exactly; the layout module and new test need zero-warning lint and formatting. All three platform dependency checks, web export and 604-page token validation must pass.",
+        "Require twelve fresh real-Chrome cases matching the valid before snapshots, with active vertical/horizontal mode assertions, widths 390/768/1440, Arabic/English and white/beige/dark/AMOLED/system-light represented. Compare visible glyph rects rounded to 0.001px and computed font/color styles exactly. Use ephemeral local profiles and block external requests. The original invalid no-scroll-assertion baseline stays preserved and must not be counted as acceptance. Browser baseline/after and primary visual sample evidence are in readiness. No all-604-page pixel, V4 rendered, system-dark, native-gesture/build or physical-device claim.",
+        "Knip must retain its exact six issue records and exit 1, not be called clean. jscpd must retain the same nineteen clone fragments, 386 lines and 2523 tokens. Sources rise 185 to 186 because the previously tiny existing layout module now qualifies for the scan. No new application source file, suppression or scan-scope change is involved and no duplication reduction is claimed.",
+        "Independent evaluator must inspect complete source/test diff, actual caller/data boundaries, AST/projection proof, before/after unit/browser evidence, lint/analysis logs, protected-input pins and original generator command log. Reject missing required reads, prohibited worker work, source drift, weakened rules/assertions or overstated UI/native verification. Hash copying alone is not acceptance. Primary owns final visual/scope/lifecycle acceptance after leases release. Preserve models/vendor/account/time/token/memory/retry/checkpoint limits. One work item this heartbeat; local commits only."
       ],
       "verification": [
+        [
+          "python3",
+          "-c",
+          "import hashlib;from pathlib import Path;p=Path('.refactor-baseline/rf016-mushaf-geometry-v1/verify-inputs.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='3935ef12cead4ba8777c867aa95014629bfeb51da0a8140cc606ff83fa821423';exec(compile(p.read_text(),str(p),\"exec\"))"
+        ],
+        [
+          "node",
+          ".refactor-baseline/rf016-mushaf-geometry-v1/proof.cjs"
+        ],
         [
           "npm",
           "run",
@@ -984,7 +998,10 @@
           "--",
           "--runTestsByPath",
           "tests/unit/mushaf-geometry.test.ts",
-          "tests/unit/mushaf-page-tokens.test.ts"
+          "tests/unit/mushaf-page-tokens.test.ts",
+          "tests/unit/mushaf-page-line-spacing.test.ts",
+          "tests/unit/mushaf-page-vertical-layout-contract.test.ts",
+          "--no-cache"
         ],
         [
           "npm",
@@ -992,20 +1009,58 @@
           "typecheck"
         ],
         [
+          "python3",
+          ".refactor-baseline/rf016-mushaf-geometry-v1/lint.py"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "lib/mushaf/page-layout.ts",
+          "tests/unit/mushaf-geometry.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
           "npm",
           "run",
           "build:web"
+        ],
+        [
+          "node",
+          ".refactor-baseline/rf016-mushaf-geometry-v1/browser.cjs",
+          "after"
+        ],
+        [
+          "python3",
+          ".refactor-baseline/rf016-mushaf-geometry-v1/analysis.py"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
         ]
       ],
       "risk": "high",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
         "components/mushaf/PageMushaf.tsx",
-        "lib/mushaf/*",
+        "lib/mushaf/page-layout.ts",
         "tests/unit/mushaf-geometry.test.ts"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "implementation_mode": "copy-only",
+      "readiness_evidence": ".refactor-baseline/rf016-mushaf-geometry-v1/readiness.json"
     },
     {
       "id": "RF-017",
