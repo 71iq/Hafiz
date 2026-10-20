@@ -25,6 +25,8 @@ Database startup gates remain in their routes. `components/ui/DatabaseErrorState
 
 `lib/mushaf/page-layout.ts` owns the existing pure page clamping, typography fitting, line widths, rendered-line counts and cumulative page heights/offsets. Its private structural input contains only layout rows, page-word line numbers and the word-mode flag. It imports no UI or data loader. PageMushaf retains data/font loading, gestures, Hifz/timers, navigation, hooks and rendering. RF016 preserves all seven moved function bodies and six constants.
 
+`lib/mushaf/position.ts` shares inclusive first-match juz range selection. It returns the original row in input order. The reader retains default-one and last-preceding-row fallback; PageMushaf retains null metadata for no match. ReflectionFeedScreen retains ordered parent groups and uses their juz value. The shared search does not sort, flatten groups, load data or choose a fallback.
+
 ## State and data flow
 
 SQLite is authoritative for offline personal data. Sync restores account state before upload and preserves queue ordering, timestamps and soft deletion. TanStack Query owns remote response caching; it must not become a second durable store for local review state. Zustand owns session state. Feature UI state stays near its interaction.

@@ -28,4 +28,6 @@ Add characterization tests before extracting nontrivial behavior. Prefer actual 
 
 Use each task's argv verification commands. Full-suite baseline failures remain visible until separately fixed. If a task requires zero ESLint warnings, enforce `--max-warnings=0`. Exit zero alone permits warnings. When existing warnings must remain, record and compare the exact baseline diagnostics instead of describing the run as warning-free. UI/native checks must record what ran, platform/viewport/locale/theme and observed result. A web build does not verify Android or iOS.
 
+Audit every started and completed generator tool-item type, including MCP, browser, REPL and collaboration calls. A shell-command-only audit can miss work outside the task scope.
+
 The controller alone changes backlog statuses, appends progress and commits. Each implementation session edits only its approved paths. Failed work remains available for diagnosis and retries; it cannot enter another task. All commits stay on the local modernization branch.
