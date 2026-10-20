@@ -1250,17 +1250,19 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "retry",
+      "status": "verified",
       "allowed_paths": [
         "components/SearchCommand.tsx",
         "tests/unit/search-results.test.tsx"
       ],
-      "attempts": 1,
+      "attempts": 2,
       "implementation_mode": "copy-only",
       "readiness_evidence": ".refactor-baseline/rf018-short-query-recovery-v2/readiness.json",
-      "started_at": "2026-10-20T13:02:55.124249+00:00",
-      "failure": "Independent review failed: [P2] components/SearchCommand.tsx:409-415 cancels the short-input reset without clearing results. After a successful text search, type one character and tap Text before 350ms. The debounce is cancelled, but old rows and hasSearched remain indefinitely. A read-only probe using the actual callbacks reproduced this regression; the original clears both. Have the primary refresh the frozen artifact to reuse performSearch's short-input reset, add Arabic/English regression coverage, and rerun the required gates.; Generator compliance passes: all required reads were complete, with 34 shell commands, one exact copy, and no prohibited checks, source/test dumps or MCP/browser/REPL/collaboration calls.; Reviewed the complete diff, untracked test and both callers. Fresh read-only verification confirms exact artifacts, 18-edit projection, 94 unchanged tests and 2417 protected inputs. Controller logs record all ten gates passing, including 46 focused cases and 79 suites/672 cold cases. Preserved red/green evidence, lint warning and analysis parity match.; Review changed no files or state. Tests/builds were not rerun. Browser, native/device and live-service behavior remain unverified; headless component evidence does not establish those results. Primary final acceptance remains pending.",
-      "evidence": ".ralph/runs/RF-018-1-1792501375126233538"
+      "started_at": "2026-10-20T13:15:24.855283+00:00",
+      "failure": "Batch resource limit reached",
+      "evidence": ".ralph/runs/RF-018-2-1792502124857165374",
+      "completed_at": "2026-10-20T13:20:46.354524+00:00",
+      "summary": "Installed the two frozen RF-018 artifacts. Controller and independent verification remain pending."
     },
     {
       "id": "RF-019",

@@ -174,6 +174,14 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<TextInput>(null);
+  const searchGenerationRef = useRef(0);
+  const cancelPendingSearch = useCallback(() => {
+    searchGenerationRef.current += 1;
+    if (debounceRef.current !== null) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+  }, []);
   // Cache of diacritic-stripped lemma/word_text → root, for resolving a typed
   // word like "جاء" to canonical root "جيأ" in root-mode search.
   const rootIndexRef = useRef<{
@@ -218,6 +226,7 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
       loadHistory();
     } else {
       // Reset state when closed
+      setSearching(false);
       setQuery("");
       setTextResults([]);
       setRootResults([]);
@@ -227,8 +236,9 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
     }
     return () => {
       if (focusTimer) clearTimeout(focusTimer);
+      cancelPendingSearch();
     };
-  }, [visible, clearTooltip, closeDetail]);
+  }, [visible, clearTooltip, closeDetail, cancelPendingSearch]);
 
   const loadHistory = useCallback(async () => {
     try {
@@ -268,8 +278,12 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
 
   const performSearch = useCallback(
     async (term: string, searchMode: "text" | "root") => {
+      cancelPendingSearch();
+      const generation = searchGenerationRef.current;
+      const isCurrentSearch = () => generation === searchGenerationRef.current;
       const stripped = stripDiacritics(term.trim());
       if (stripped.length < 2) {
+        setSearching(false);
         setTextResults([]);
         setRootResults([]);
         setHasSearched(false);
@@ -294,6 +308,7 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
              LIMIT 200`,
             [stripped, term.trim()]
           );
+          if (!isCurrentSearch()) return;
           setTextResults(rows);
           setRootResults([]);
         } else {
@@ -307,6 +322,7 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
           rootCandidates.add(strippedTerm);
 
           const index = await loadRootIndex();
+          if (!isCurrentSearch()) return;
           if (index.lemmaMap.has(strippedTerm)) {
             for (const r of index.lemmaMap.get(strippedTerm)!) rootCandidates.add(r);
           }
@@ -342,6 +358,7 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
               )
             : [];
 
+          if (!isCurrentSearch()) return;
           const lemmaMap = new Map<string, RootOccurrence[]>();
           for (const row of rows) {
             const key = row.lemma || row.word_text;
@@ -365,46 +382,47 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
         saveToHistory(term.trim(), searchMode);
       } catch (err) {
         console.error("[Search] Error:", err);
+        if (!isCurrentSearch()) return;
         setTextResults([]);
         setRootResults([]);
         setSearchError(s.searchFailed);
       } finally {
-        setSearching(false);
+        if (isCurrentSearch()) setSearching(false);
       }
     },
-    [db, saveToHistory, loadRootIndex, s.searchFailed]
+    [db, saveToHistory, loadRootIndex, s.searchFailed, cancelPendingSearch]
   );
 
   const handleQueryChange = useCallback(
     (text: string) => {
       setQuery(text);
-      if (debounceRef.current) clearTimeout(debounceRef.current);
+      cancelPendingSearch();
       debounceRef.current = setTimeout(() => {
         performSearch(text, mode);
       }, 350);
     },
-    [mode, performSearch]
+    [mode, performSearch, cancelPendingSearch]
   );
 
   const handleModeChange = useCallback(
     (newMode: "text" | "root") => {
       setMode(newMode);
       setExpandedLemmas(new Set());
-      if (query.trim().length >= 2) {
-        performSearch(query, newMode);
-      }
+      performSearch(query, newMode);
     },
     [query, performSearch]
   );
 
   const handleClear = useCallback(() => {
+    cancelPendingSearch();
+    setSearching(false);
     setQuery("");
     setTextResults([]);
     setRootResults([]);
     setHasSearched(false);
     setSearchError(null);
     inputRef.current?.focus();
-  }, []);
+  }, [cancelPendingSearch]);
 
   const handleResultTap = useCallback((surah: number, ayah: number, wordPos?: number) => {
     const target = { surah, ayah, wordPos };
