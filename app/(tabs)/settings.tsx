@@ -488,6 +488,8 @@ export default function SettingsScreen() {
                   )}
                 </View>
                 <SettingsStepper
+                  decrementLabel={s.decreaseArabicFontSize}
+                  incrementLabel={s.increaseArabicFontSize}
                   value={`${fontSizeLevelLabel}/${fontSizeTotalLabel}`}
                   onDecrement={() => setFontSizeIndex(fontSizeIndex - 1)}
                   onIncrement={() => setFontSizeIndex(fontSizeIndex + 1)}
@@ -1184,6 +1186,8 @@ function getInlineValueDirection(value: string): "rtl" | "ltr" {
 }
 
 function SettingsStepper({
+  decrementLabel,
+  incrementLabel,
   value,
   onDecrement,
   onIncrement,
@@ -1193,6 +1197,8 @@ function SettingsStepper({
   isRTL,
   compact = false,
 }: {
+  decrementLabel: string;
+  incrementLabel: string;
   value: string;
   onDecrement: () => void;
   onIncrement: () => void;
@@ -1212,6 +1218,9 @@ function SettingsStepper({
       style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
     >
       <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={decrementLabel}
+        accessibilityState={{ disabled: decrementDisabled }}
         onPress={onDecrement}
         disabled={decrementDisabled}
         className="items-center justify-center rounded-full"
@@ -1236,6 +1245,9 @@ function SettingsStepper({
         </Text>
       </View>
       <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={incrementLabel}
+        accessibilityState={{ disabled: incrementDisabled }}
         onPress={onIncrement}
         disabled={incrementDisabled}
         className="items-center justify-center rounded-full"

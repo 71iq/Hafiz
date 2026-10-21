@@ -2202,15 +2202,20 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "app/(tabs)/settings.tsx",
         "components/mushaf/ReadingSettingsSheet.tsx",
         "lib/i18n/strings.ts",
         "tests/unit/reading-stepper.test.tsx"
       ],
-      "attempts": 0,
-      "implementation_mode": "copy-only"
+      "attempts": 1,
+      "implementation_mode": "copy-only",
+      "started_at": "2026-10-21T01:14:58.426120+00:00",
+      "failure": "Batch resource limit reached",
+      "completed_at": "2026-10-21T01:21:35.386196+00:00",
+      "evidence": ".ralph/runs/RF-035-1-1792545298428218528",
+      "summary": "Installed the four frozen RF-035 artifacts by the supplied copy-only command. Controller and independent verification remain pending."
     },
     {
       "id": "RF-036",
