@@ -2116,7 +2116,7 @@
     {
       "id": "RF-035",
       "title": "Label and test reading settings steppers",
-      "description": "Label and test reading settings steppers",
+      "description": "Add explicit bilingual button names, roles and disabled states to the two existing private reading steppers, with real-owner regression tests.",
       "rationale": "Icon-only Pressables lack accessible names/roles.",
       "modules": [
         "app/(tabs)/settings.tsx",
@@ -2128,26 +2128,80 @@
         "RF-014"
       ],
       "acceptance_criteria": [
-        "Use bilingual labels, disabled state and accessible role. Preserve font size, range, touch targets and RTL order.",
-        "Render representative phone RTL/LTR and check keyboard/touch."
+        "Read AGENTS.md and docs/refactoring/ARCHITECTURE.md, CONVENTIONS.md, TECH_STACK.md and PROGRESS.md completely in bounded chunks. Read the selected task and .refactor-baseline/rf035-reading-stepper-v1/readiness.json and reuse-map.json completely. You are not alone; preserve other edits. Only required instruction/metadata reads and git status/branch are allowed before the copy. No helpers, source/caller/test inspection or dumps, implementation workflows, verification, hashes, transforms or case counts. Do not call MCP, browser, UI, app, computer-use, REPL or collaboration tools, even for inventory/discovery. Use shell commands only for permitted reads/status and one exact copy. Controller verification remains pending.",
+        "Install exactly four frozen artifacts with this one copy-command body: from pathlib import Path; import json; r=json.loads(Path(\".refactor-baseline/rf035-reading-stepper-v1/readiness.json\").read_text()); [(Path(p).parent.mkdir(parents=True,exist_ok=True), Path(p).write_bytes(Path(a[\"candidate_path\"]).read_bytes())) for p,a in r[\"artifacts\"].items()]. No redesign, formatting or other edit. Do not edit backlog/progress/runner/evidence, install packages, commit/push/merge/deploy or contact live services. Report installed paths and pending controller/independent checks.",
+        "Only twelve exact edits add required decrement/increment label props, button role and disabled accessibility state to the existing private SettingsStepper in SettingsScreen and ReadingSettingsSheet, plus two new label keys in each existing locale. No presenter extraction. Preserve every callback/range/locked predicate, settings persistence, import lifecycle, font/preview/loading, touch geometry, value spacing, RTL order, styles and markup outside the projection. Both entire owners and the full string catalog reverse to original bytes. Do not use generic Button variants that change their geometry. RF036 remains separate and unapproved.",
+        "All eleven frozen commands run fresh. The actual original owners produce 28 missing-role/name failures and retain eight all-level display passes. Candidate/restored tests pass 36 cases over both owners, ar/en and 390/1280 headless widths, including both boundaries, all ten values, callback ordering and locked sheet suppression. Missing-label, swapped-label and enabled-boundary mutations cause 12/16/4 failures. Require 82 suites/755 cold tests without skips, strict types, all four files zero-warning ESLint enforced with --max-warnings=0, formatting of the new test only, all three platform checks and fresh web export. No broad formatting, skipped tests or weaker assertions.",
+        "Fresh real installed Chrome after the export uses new isolated contexts, actual local SQLite and the existing loopback-only fixtureQuery helper. Seed only disposable user_settings and block every remote request. Four phone white-theme cases cover both actual owners in ar/en, genuine taps through all ten values, disabled outward actions, persisted final index, candidate role/labels and Enter/Space callbacks. Open the reading sheet with actual keyboard focus/Enter. Do not claim toolbar pointer-open: its original center hits reader content. Wait five stable overlay frames and retain raw geometry, comparing all boxes/order/text at 0.001px. Measured original settings controls are 17x19, sheet 32x32; preserve these observed sizes rather than assuming source intent. Prepared comparisons have three exact row screenshots and 25 Arabic-sheet button-corner pixel differences, with label/value pixels exact. Primary inspected original/candidate rows. Inspect and record the fresh controller images too; do not claim blanket full-pixel hash equality. Preserve failed async helper, selector/geometry, toolbar-pointer and opening-animation probes and corrections. No native/device/touch-device, all-theme/tablet or full responsive claim; adb has no device.",
+        "Preserve all 97 old tests, current caller/provider/config/package/runner pins and 2417 protected inputs. Knip retains six exact issues/exit1. Same-profile duplication grows 19 groups/386 lines/2523 tokens to 20/413/2611 with 188 sources. All nineteen old fragments remain exact; one additional private stepper signature crosses the threshold after required label props. Do not claim cleanup or hide this debt. RF036 must inspect distinct styles and the 17x19 web-size discrepancy; RF048 must inspect preserved toolbar interception. Separate stronger reviewer inspects all four source/test diffs, entire-file reversal, native/headless versus browser limits, original red/mutations/corrections/pixels and every started/completed original generator tool item including after checkpoint reuse. Reject prohibited worker work even with matching bytes. Primary owns final acceptance after both leases release. Keep models/vendor/account/resource/retry/lease/checkpoint rules unchanged, local commits only. This heartbeat handles RF035 only."
       ],
       "verification": [
+        [
+          "python3",
+          "-c",
+          "import hashlib;from pathlib import Path;p=Path(\".refactor-baseline/rf035-reading-stepper-v1/verify-inputs.py\");assert hashlib.sha256(p.read_bytes()).hexdigest()==\"2a04ec81ee1d690b1f98fc4b3bff584179d632820b15a3fc6a72e4ebbe6c7a0d\";exec(compile(p.read_text(),str(p),\"exec\"))"
+        ],
         [
           "npm",
           "run",
           "test:unit",
           "--",
           "--runTestsByPath",
-          "tests/unit/reading-stepper.test.tsx"
+          "tests/unit/reading-stepper.test.tsx",
+          "--no-cache"
         ],
         [
           "npm",
           "run",
           "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "app/(tabs)/settings.tsx",
+          "components/mushaf/ReadingSettingsSheet.tsx",
+          "lib/i18n/strings.ts",
+          "tests/unit/reading-stepper.test.tsx",
+          "--max-warnings=0"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "tests/unit/reading-stepper.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "node",
+          ".refactor-baseline/rf035-reading-stepper-v1/browser.cjs",
+          "controller"
+        ],
+        [
+          "python3",
+          ".refactor-baseline/rf035-reading-stepper-v1/analysis.py"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
         ]
       ],
       "risk": "medium",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
         "app/(tabs)/settings.tsx",
@@ -2155,7 +2209,8 @@
         "lib/i18n/strings.ts",
         "tests/unit/reading-stepper.test.tsx"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "implementation_mode": "copy-only"
     },
     {
       "id": "RF-036",
