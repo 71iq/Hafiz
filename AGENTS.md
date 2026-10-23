@@ -125,7 +125,7 @@ Build and data:
 
 ## Autonomous modernization branch
 
-For modernization work, read `docs/refactoring/ARCHITECTURE.md`, `CONVENTIONS.md`, `TECH_STACK.md`, `PROGRESS.md` and the selected item in `backlog.json`. Use `.agents/skills/reuse-first-authoring/SKILL.md` before a nontrivial extraction. Native UI work can consult `.agents/skills/react-native-skills/SKILL.md`; project behavior and verified compatibility take precedence over generic library recommendations.
+For modernization work, read `docs/refactoring/ARCHITECTURE.md`, `CONVENTIONS.md`, `TECH_STACK.md`, `PROGRESS.md` and the selected item in `backlog.json`. Use the personal `reuse-first-authoring` skill under `$CODEX_HOME/skills` or `~/.codex/skills` before a nontrivial extraction. Native UI work can consult `react-native-skills`, and component contract changes can consult `composition-patterns` in the same directory. The old repository paths resolve to those canonical skills on this workstation. Project behavior and verified compatibility take precedence over generic library recommendations.
 
 The current mission overrides the default push rule. Keep commits local on `codex/hafiz-modernization`. Push, merge, deployment, production operations, live policy changes and destructive data operations require separate user authorization. The original checkout's AppNavigation change belongs to the user.
 
