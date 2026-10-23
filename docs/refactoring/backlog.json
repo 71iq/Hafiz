@@ -1387,7 +1387,7 @@
         "Install exactly three frozen artifacts with this one copy-command body: from pathlib import Path; import json; r=json.loads(Path(\".refactor-baseline/rf101-root-candidates-v1/readiness.json\").read_text()); [(Path(p).parent.mkdir(parents=True,exist_ok=True), Path(p).write_bytes(Path(a[\"candidate_path\"]).read_bytes())) for p,a in r[\"artifacts\"].items()]. No redesign, formatting or other edit. Do not edit backlog/progress/runner/evidence, install packages, commit/push/merge/deploy or contact live services. Report installed paths and pending controller/independent checks.",
         "Three exact caller edits move only ordered root-candidate matching to lib/search/root-candidates.ts. Preserve raw trimmed then supplied stripped terms, exact lemma then exact word roots, lemma prefixes then word prefixes in insertion order, deduplication, empty filtering and UTF-16 length >=3. Maps/sets remain unmodified. The caller still computes stripping, lazily builds/caches the index, awaits it and checks the RF018 generation before matching. Keep SQL text and parameter ordering, grouping, history, all timers/generations, short-query mode resets, highlights, focus/keyboard, navigation and JSX byte-identical outside the projection. No general Arabic letter folding, index/cache/hook/service redesign, dependency, data or production change.",
         "All twelve frozen commands run fresh. Require all 52 unchanged SearchCommand component cases and 19 new matcher cases, 71 focused and 81 suites/719 cold cases without skips. Keep the 500-run priority/deduplication property. Original literal matcher and final matcher each pass the same 71 characterization cases. Mutations reversing initial terms, changing prefix threshold and dropping exact word lookup cause 3/2/6 direct-test failures, followed by 71 restored passes. Literal compiler proof matches 2000 cases and 29880 raw row visits including null/empty rows, with ordered values, map contents and three-edit whole-caller reversal exact. Strict types, new-file zero-warning lint/format, all three platform boundaries and web export pass. Owner retains exactly one old loadHistory warning; do not suppress rules or broadly format it.",
-        "Fresh installed Chrome after fresh web export uses isolated real local browser SQLite, ar/390/white and en/1280/white. Eight cases cover text plus root terms \u0631\u062d\u0645, \u062c\u064e\u0627\u0621\u064e and \u062c\u064a\u0623, Enter, Escape and clean reopen. Block every remote request. Compare all eight actual result transcripts and sheet geometries with the original build. Primary inspected Arabic word-root and English direct-root screenshots before/after. Six full images are exact; two Arabic images differ in 3/4 top-control corner pixels only, with every pixel below y210 exact. Do not claim full hash equality, native/device/touch or all-theme verification. adb has no device.",
+        "Fresh installed Chrome after fresh web export uses isolated real local browser SQLite, ar/390/white and en/1280/white. Eight cases cover text plus root terms رحم, جَاءَ and جيأ, Enter, Escape and clean reopen. Block every remote request. Compare all eight actual result transcripts and sheet geometries with the original build. Primary inspected Arabic word-root and English direct-root screenshots before/after. Six full images are exact; two Arabic images differ in 3/4 top-control corner pixels only, with every pixel below y210 exact. Do not claim full hash equality, native/device/touch or all-theme verification. adb has no device.",
         "Preserve all 96 existing test files, input/caller/config/package/runner pins and 2417 protected inputs. Knip keeps six exact issue records and exit1. Same-profile jscpd keeps nineteen exact clone fragments/386 lines/2523 tokens with 187 to 188 sources, no measured reduction. Independent stronger evaluator inspects full three-file diff, actual caller normalization/cache/await/generation/SQL/Map ownership, all preparation and browser evidence, and every started/completed tool-item type from the original generator including after checkpoint reuse. Reject prohibited actions even when artifacts match. Primary retains post-lease final acceptance. Models/vendor/account/retry/resource/lease/checkpoint settings remain unchanged. Local commits only. This heartbeat handles RF101 only."
       ],
       "verification": [
@@ -2219,30 +2219,42 @@
     },
     {
       "id": "RF-036",
-      "title": "Consolidate matching reading controls",
-      "description": "Consolidate matching reading controls",
-      "rationale": "Repeated markup differs in dimensions and locked-font policy.",
+      "title": "Share reading stepper presentation without changing behavior",
+      "description": "Replace two private controlled steppers with one feature presenter and explicit pill/sheet variants. Parent policies and both presentations stay unchanged.",
+      "rationale": "Both owners share action, label and disabled semantics while retaining distinct styles and font-size policy.",
       "modules": [
-        "components/ui/*",
-        "components/mushaf/ReadingSettingsSheet.tsx",
         "app/(tabs)/settings.tsx",
-        "tests/unit/reading-stepper.test.tsx"
+        "components/mushaf/ReadingSettingsSheet.tsx",
+        "components/settings/ReadingStepper.tsx",
+        "tests/unit/reading-stepper-presentation.test.tsx",
+        "tests/rtl/rtl-component-registry.ts"
       ],
       "dependencies": [
         "RF-035"
       ],
       "acceptance_criteria": [
-        "Share semantics only when range/disabled/accessibility contracts match. Keep legitimate layout variants.",
-        "Verify all relevant themes and viewport dimensions."
+        "Read AGENTS.md and docs/refactoring/ARCHITECTURE.md, CONVENTIONS.md, TECH_STACK.md and PROGRESS.md completely in bounded chunks. Read this task and .refactor-baseline/rf036-reading-stepper-v1/readiness.json and reuse-map.json completely. You are not alone; preserve other edits. Only those required instruction/metadata reads and git status/branch are permitted before copying. No helpers, caller/source/test inspection or dumps, implementation workflows, verification, hashes, transforms or case counts. Do not call MCP, browser, UI, app, computer-use, REPL or collaboration tools, even for inventory/discovery. Use shell commands only for permitted reads/status and one exact copy. Controller verification remains pending.",
+        "Install exactly five frozen artifacts with this one copy-command body: from pathlib import Path; import json; r=json.loads(Path(\".refactor-baseline/rf036-reading-stepper-v1/readiness.json\").read_text()); [(Path(p).parent.mkdir(parents=True,exist_ok=True), Path(p).write_bytes(Path(a[\"candidate_path\"]).read_bytes())) for p,a in r[\"artifacts\"].items()]. No redesign, formatting or other edit. Do not edit backlog/progress/runner/evidence, install packages, commit/push/merge/deploy or contact live services. Report installed paths and pending controller/independent checks.",
+        "Share only the two existing controlled reading-size presenters through components/settings/ReadingStepper.tsx with required pill/sheet variant. Preserve labels/roles/states, colors, typography, dimensions, spacing, style callbacks, direction and both native-intended and actual web presentation. Parents retain ranges, fitted-page/locked-font policy, callback ordering, settings persistence and every other lifecycle/markup. Both whole owners reverse exactly outside prescribed imports/call/removal edits. Registry changes only one sorted classification entry and reverses exactly. No generic Button rewrite or new subscription/hook/data access. Keep all 97 other old test files and 2417 protected inputs exact.",
+        "All thirteen frozen commands run fresh. Original-body and shared presenters plus real owners pass the same 84 focused cases, including 48 new presentation cases and 16 exact native-tree comparisons. Callback swap, lost disabled opacity and wrong sheet typeface mutations produce 16/32/8 failures, then restored focused passes. Require 83 suites/803 cold tests without skips, strict types, all five files zero-warning lint with --max-warnings=0, scoped formatting of new module/test and registry, all three dependency checks and fresh web export. Keep the failed ignored-path formatting and RTL registry preflights and the externally interrupted browser run; no Ralph attempt was spent by preparation. No weakened assertion, disabled rule, broad formatting or dependency change.",
+        "Fresh installed Chrome runs 72 isolated actual-local-SQLite cases in ar/en at 390/820/1280, with white/beige/dark/amoled/system-light/system-dark environments. Block every remote request and seed only disposable user_settings through the existing loopback-only helper. Genuine browser taps cover all ten levels, disabled outward actions and persisted final index; Enter/Space callbacks pass. Sheet entry uses real keyboard focus/Enter; existing toolbar pointer interception remains, no pointer-open claim. Geometry/order/text/computed styles match before/after. Preserve original 17x19 settings web targets and 32x32 sheet targets, no size fix. Of 72 prepared row screenshots, 68 are exact; four differ only by 10/14/11/14 button-corner pixels. Primary reviewed all six contact sheets. Inspect fresh controller images too; do not claim blanket pixel equality or native/device execution. No attached adb device.",
+        "Knip keeps six exact issue records/exit1. Same-profile duplication drops 20 groups/413 lines/2611 tokens/188 sources to 19/386/2523/189. This removes one group, not all duplication debt. Keep every package/provider/runner/config/protected input pin. The user separately authorized skill migration commit 0520c7e; only the AGENTS instruction input pin was updated. Separate stronger reviewer checks all five source/test diffs, exact entire-file projections, original-body parity, mutation failures, browser/style/pixel/native limits and every started/completed original generator tool item, including after checkpoint reuse. Reject prohibited worker work even with matching bytes. Primary owns final acceptance after both leases release. Models/vendor/account/retry/resource/checkpoint limits stay unchanged. This heartbeat handles RF036 only; all commits local."
       ],
       "verification": [
+        [
+          "python3",
+          "-c",
+          "import hashlib;from pathlib import Path;p=Path('.refactor-baseline/rf036-reading-stepper-v1/verify-inputs.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='b36d3caa2b552454d5c9f7a3b04f8ef5c61a7a395dd78313f15de6f80fe563fc';exec(compile(p.read_text(),str(p),\"exec\"))"
+        ],
         [
           "npm",
           "run",
           "test:unit",
           "--",
           "--runTestsByPath",
-          "tests/unit/reading-stepper.test.tsx"
+          "tests/unit/reading-stepper-presentation.test.tsx",
+          "tests/unit/reading-stepper.test.tsx",
+          "--no-cache"
         ],
         [
           "npm",
@@ -2250,21 +2262,78 @@
           "typecheck"
         ],
         [
+          "node_modules/.bin/eslint",
+          "app/(tabs)/settings.tsx",
+          "components/mushaf/ReadingSettingsSheet.tsx",
+          "components/settings/ReadingStepper.tsx",
+          "tests/unit/reading-stepper-presentation.test.tsx",
+          "tests/rtl/rtl-component-registry.ts",
+          "--max-warnings=0"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "components/settings/ReadingStepper.tsx",
+          "tests/unit/reading-stepper-presentation.test.tsx",
+          "tests/rtl/rtl-component-registry.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
           "npm",
           "run",
           "build:web"
+        ],
+        [
+          "node",
+          ".refactor-baseline/rf036-reading-stepper-v1/browser.cjs",
+          "controller",
+          "390"
+        ],
+        [
+          "node",
+          ".refactor-baseline/rf036-reading-stepper-v1/browser.cjs",
+          "controller",
+          "820"
+        ],
+        [
+          "node",
+          ".refactor-baseline/rf036-reading-stepper-v1/browser.cjs",
+          "controller",
+          "1280"
+        ],
+        [
+          "python3",
+          ".refactor-baseline/rf036-reading-stepper-v1/analysis.py"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
         ]
       ],
       "risk": "medium",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
-        "components/ui/*",
-        "components/mushaf/ReadingSettingsSheet.tsx",
         "app/(tabs)/settings.tsx",
-        "tests/unit/reading-stepper.test.tsx"
+        "components/mushaf/ReadingSettingsSheet.tsx",
+        "components/settings/ReadingStepper.tsx",
+        "tests/unit/reading-stepper-presentation.test.tsx",
+        "tests/rtl/rtl-component-registry.ts"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "implementation_mode": "copy-only"
     },
     {
       "id": "RF-037",
@@ -4392,7 +4461,7 @@
       "evidence": ".ralph/runs/RF-070-2-1792171267226235313",
       "recovery_note": "First independent evaluation rejected a false-positive busy dismissal test: the last Modal is the hidden ConfirmDialog. Primary requires the visible date-input Modal ancestor. All four gates and12 tests passed but are insufficient without this correction. Final implementation attempt2 remains available.",
       "completed_at": "2026-10-16T17:24:00.118911+00:00",
-      "summary": "Repaired RF-070\u2019s busy dismissal characterization. The test now finds the visible Modal containing the date input, asserts `visible=true`, and dispatches `requestClose` during deferred persistence. Only `tests/unit/session-due-date.test.tsx` was changed; backlog edits were preserved.",
+      "summary": "Repaired RF-070’s busy dismissal characterization. The test now finds the visible Modal containing the date input, asserts `visible=true`, and dispatches `requestClose` during deferred persistence. Only `tests/unit/session-due-date.test.tsx` was changed; backlog edits were preserved.",
       "primary_acceptance": {
         "accepted": true,
         "commit": "6e21066",
@@ -5833,7 +5902,7 @@
       "failure": "Batch resource limit reached",
       "completed_at": "2026-10-17T21:31:22.584489+00:00",
       "evidence": ".ralph/runs/RF-089-1-1792272463180241981",
-      "summary": "Implemented RF-089\u2019s four worker-owned artifacts exactly. `package-lock.json` remains untouched for the controller."
+      "summary": "Implemented RF-089’s four worker-owned artifacts exactly. `package-lock.json` remains untouched for the controller."
     },
     {
       "id": "RF-090",
