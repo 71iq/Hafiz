@@ -358,6 +358,12 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "Composer sheet chrome and actions mirror; text input can auto-direct.",
   ),
   entry(
+    "components/settings/ReadingStepper.tsx",
+    "button",
+    "rntl",
+    "Reading-size actions mirror with explicit LTR base; supplied text, labels and per-owner presentation stay controlled.",
+  ),
+  entry(
     "components/settings/ReciterPicker.tsx",
     "picker-menu",
     "source",

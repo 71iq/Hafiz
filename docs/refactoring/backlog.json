@@ -1387,7 +1387,7 @@
         "Install exactly three frozen artifacts with this one copy-command body: from pathlib import Path; import json; r=json.loads(Path(\".refactor-baseline/rf101-root-candidates-v1/readiness.json\").read_text()); [(Path(p).parent.mkdir(parents=True,exist_ok=True), Path(p).write_bytes(Path(a[\"candidate_path\"]).read_bytes())) for p,a in r[\"artifacts\"].items()]. No redesign, formatting or other edit. Do not edit backlog/progress/runner/evidence, install packages, commit/push/merge/deploy or contact live services. Report installed paths and pending controller/independent checks.",
         "Three exact caller edits move only ordered root-candidate matching to lib/search/root-candidates.ts. Preserve raw trimmed then supplied stripped terms, exact lemma then exact word roots, lemma prefixes then word prefixes in insertion order, deduplication, empty filtering and UTF-16 length >=3. Maps/sets remain unmodified. The caller still computes stripping, lazily builds/caches the index, awaits it and checks the RF018 generation before matching. Keep SQL text and parameter ordering, grouping, history, all timers/generations, short-query mode resets, highlights, focus/keyboard, navigation and JSX byte-identical outside the projection. No general Arabic letter folding, index/cache/hook/service redesign, dependency, data or production change.",
         "All twelve frozen commands run fresh. Require all 52 unchanged SearchCommand component cases and 19 new matcher cases, 71 focused and 81 suites/719 cold cases without skips. Keep the 500-run priority/deduplication property. Original literal matcher and final matcher each pass the same 71 characterization cases. Mutations reversing initial terms, changing prefix threshold and dropping exact word lookup cause 3/2/6 direct-test failures, followed by 71 restored passes. Literal compiler proof matches 2000 cases and 29880 raw row visits including null/empty rows, with ordered values, map contents and three-edit whole-caller reversal exact. Strict types, new-file zero-warning lint/format, all three platform boundaries and web export pass. Owner retains exactly one old loadHistory warning; do not suppress rules or broadly format it.",
-        "Fresh installed Chrome after fresh web export uses isolated real local browser SQLite, ar/390/white and en/1280/white. Eight cases cover text plus root terms رحم, جَاءَ and جيأ, Enter, Escape and clean reopen. Block every remote request. Compare all eight actual result transcripts and sheet geometries with the original build. Primary inspected Arabic word-root and English direct-root screenshots before/after. Six full images are exact; two Arabic images differ in 3/4 top-control corner pixels only, with every pixel below y210 exact. Do not claim full hash equality, native/device/touch or all-theme verification. adb has no device.",
+        "Fresh installed Chrome after fresh web export uses isolated real local browser SQLite, ar/390/white and en/1280/white. Eight cases cover text plus root terms \u0631\u062d\u0645, \u062c\u064e\u0627\u0621\u064e and \u062c\u064a\u0623, Enter, Escape and clean reopen. Block every remote request. Compare all eight actual result transcripts and sheet geometries with the original build. Primary inspected Arabic word-root and English direct-root screenshots before/after. Six full images are exact; two Arabic images differ in 3/4 top-control corner pixels only, with every pixel below y210 exact. Do not claim full hash equality, native/device/touch or all-theme verification. adb has no device.",
         "Preserve all 96 existing test files, input/caller/config/package/runner pins and 2417 protected inputs. Knip keeps six exact issue records and exit1. Same-profile jscpd keeps nineteen exact clone fragments/386 lines/2523 tokens with 187 to 188 sources, no measured reduction. Independent stronger evaluator inspects full three-file diff, actual caller normalization/cache/await/generation/SQL/Map ownership, all preparation and browser evidence, and every started/completed tool-item type from the original generator including after checkpoint reuse. Reject prohibited actions even when artifacts match. Primary retains post-lease final acceptance. Models/vendor/account/retry/resource/lease/checkpoint settings remain unchanged. Local commits only. This heartbeat handles RF101 only."
       ],
       "verification": [
@@ -2324,7 +2324,7 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "app/(tabs)/settings.tsx",
         "components/mushaf/ReadingSettingsSheet.tsx",
@@ -2332,8 +2332,13 @@
         "tests/unit/reading-stepper-presentation.test.tsx",
         "tests/rtl/rtl-component-registry.ts"
       ],
-      "attempts": 0,
-      "implementation_mode": "copy-only"
+      "attempts": 1,
+      "implementation_mode": "copy-only",
+      "started_at": "2026-10-23T16:41:45.939463+00:00",
+      "failure": "review stopped at account usage limit; see .ralph/runs/RF-036-1-1792767407056283313/review.jsonl",
+      "completed_at": "2026-10-23T16:57:10.863504+00:00",
+      "evidence": ".ralph/runs/RF-036-1-1792773705941460269",
+      "summary": "Installed the five frozen RF-036 artifacts using the supplied copy command. Verification remains pending with the controller and independent evaluator."
     },
     {
       "id": "RF-037",
@@ -4461,7 +4466,7 @@
       "evidence": ".ralph/runs/RF-070-2-1792171267226235313",
       "recovery_note": "First independent evaluation rejected a false-positive busy dismissal test: the last Modal is the hidden ConfirmDialog. Primary requires the visible date-input Modal ancestor. All four gates and12 tests passed but are insufficient without this correction. Final implementation attempt2 remains available.",
       "completed_at": "2026-10-16T17:24:00.118911+00:00",
-      "summary": "Repaired RF-070’s busy dismissal characterization. The test now finds the visible Modal containing the date input, asserts `visible=true`, and dispatches `requestClose` during deferred persistence. Only `tests/unit/session-due-date.test.tsx` was changed; backlog edits were preserved.",
+      "summary": "Repaired RF-070\u2019s busy dismissal characterization. The test now finds the visible Modal containing the date input, asserts `visible=true`, and dispatches `requestClose` during deferred persistence. Only `tests/unit/session-due-date.test.tsx` was changed; backlog edits were preserved.",
       "primary_acceptance": {
         "accepted": true,
         "commit": "6e21066",
@@ -5902,7 +5907,7 @@
       "failure": "Batch resource limit reached",
       "completed_at": "2026-10-17T21:31:22.584489+00:00",
       "evidence": ".ralph/runs/RF-089-1-1792272463180241981",
-      "summary": "Implemented RF-089’s four worker-owned artifacts exactly. `package-lock.json` remains untouched for the controller."
+      "summary": "Implemented RF-089\u2019s four worker-owned artifacts exactly. `package-lock.json` remains untouched for the controller."
     },
     {
       "id": "RF-090",

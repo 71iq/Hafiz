@@ -1,9 +1,10 @@
 import { useCallback, useMemo, useState } from "react";
 import { ActivityIndicator, Platform, Pressable, Text, View, useWindowDimensions } from "react-native";
-import { Check, ChevronLeft, ChevronRight, Minus, Plus, X } from "lucide-react-native";
+import { Check, ChevronLeft, ChevronRight, X } from "lucide-react-native";
 import { TafsirSourcePicker } from "@/components/settings/TafsirSourcePicker";
 import { OverlayBody, ResponsiveOverlay } from "@/components/ui/ResponsiveOverlay";
 import { Switch } from "@/components/ui/Switch";
+import { ReadingStepper } from "@/components/settings/ReadingStepper";
 import { Toast } from "@/components/ui/Toast";
 import { ThemeColorSwatch } from "@/components/ui/ThemeColorSwatch";
 import { useTafsirSourceSelection } from "@/lib/settings/use-tafsir-source-selection";
@@ -228,7 +229,8 @@ export function ReadingSettingsSheet({
               isRTL={isRTL}
               compact={compactRows}
               trailing={
-                <SettingsStepper
+                <ReadingStepper
+                  variant="sheet"
                   decrementLabel={s.decreaseArabicFontSize}
                   incrementLabel={s.increaseArabicFontSize}
                   value={`${fontSizeLevelLabel} / ${fontSizeTotalLabel}`}
@@ -479,78 +481,6 @@ function SettingsActionRow({
 
 function Divider() {
   return <View className="h-px bg-warm-200/45 dark:bg-neutral-800/80" />;
-}
-
-function SettingsStepper({
-  decrementLabel,
-  incrementLabel,
-  value,
-  onDecrement,
-  onIncrement,
-  decrementDisabled,
-  incrementDisabled,
-  isDark,
-  isRTL,
-  compact = false,
-}: {
-  decrementLabel: string;
-  incrementLabel: string;
-  value: string;
-  onDecrement: () => void;
-  onIncrement: () => void;
-  decrementDisabled: boolean;
-  incrementDisabled: boolean;
-  isDark: boolean;
-  isRTL: boolean;
-  compact?: boolean;
-}) {
-  const iconColor = isDark ? "#d4d4d4" : "#6E6258";
-  const buttonSizeClass = compact ? "h-8 w-8" : "h-8 w-8";
-  return (
-    <View
-      className="rounded-lg border border-warm-200/40 bg-surface-low/60 p-0.5 dark:border-neutral-800 dark:bg-surface-dark-high/70"
-      style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
-    >
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={decrementLabel}
-        accessibilityState={{ disabled: decrementDisabled }}
-        onPress={onDecrement}
-        disabled={decrementDisabled}
-        className={`${buttonSizeClass} items-center justify-center rounded-full`}
-        style={({ pressed }) => ({
-          opacity: decrementDisabled ? 0.35 : pressed ? 0.68 : 1,
-          transform: [{ scale: pressed && !decrementDisabled ? 0.96 : 1 }],
-          cursor: Platform.OS === "web" ? (decrementDisabled ? "auto" : "pointer") : undefined,
-        })}
-      >
-        <Minus size={15} color={iconColor} />
-      </Pressable>
-      <View className={`${compact ? "min-w-11" : "min-w-12"} items-center justify-center px-1`}>
-        <Text
-          className="text-charcoal dark:text-neutral-100"
-          style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12.5 }}
-        >
-          {value}
-        </Text>
-      </View>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={incrementLabel}
-        accessibilityState={{ disabled: incrementDisabled }}
-        onPress={onIncrement}
-        disabled={incrementDisabled}
-        className={`${buttonSizeClass} items-center justify-center rounded-full`}
-        style={({ pressed }) => ({
-          opacity: incrementDisabled ? 0.35 : pressed ? 0.68 : 1,
-          transform: [{ scale: pressed && !incrementDisabled ? 0.96 : 1 }],
-          cursor: Platform.OS === "web" ? (incrementDisabled ? "auto" : "pointer") : undefined,
-        })}
-      >
-        <Plus size={15} color={iconColor} />
-      </Pressable>
-    </View>
-  );
 }
 
 function ChoiceDialog<T extends string>({

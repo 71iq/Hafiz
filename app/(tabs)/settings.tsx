@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ToggleGroup } from "@/components/ui/ToggleGroup";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { ReadingStepper } from "@/components/settings/ReadingStepper";
 import { Toast } from "@/components/ui/Toast";
 import { ThemeColorSwatch } from "@/components/ui/ThemeColorSwatch";
 import {
@@ -13,8 +14,6 @@ import {
   useScreenContentLayout,
 } from "@/components/ui/ScreenContent";
 import {
-  Minus,
-  Plus,
   ChevronRight,
   ChevronLeft,
   User,
@@ -487,7 +486,8 @@ export default function SettingsScreen() {
                     </Text>
                   )}
                 </View>
-                <SettingsStepper
+                <ReadingStepper
+                  variant="pill"
                   decrementLabel={s.decreaseArabicFontSize}
                   incrementLabel={s.increaseArabicFontSize}
                   value={`${fontSizeLevelLabel}/${fontSizeTotalLabel}`}
@@ -1183,85 +1183,6 @@ function ContentSettingsRow({
 
 function getInlineValueDirection(value: string): "rtl" | "ltr" {
   return /[\u0600-\u06FF]/.test(value) ? "rtl" : "ltr";
-}
-
-function SettingsStepper({
-  decrementLabel,
-  incrementLabel,
-  value,
-  onDecrement,
-  onIncrement,
-  decrementDisabled,
-  incrementDisabled,
-  isDark,
-  isRTL,
-  compact = false,
-}: {
-  decrementLabel: string;
-  incrementLabel: string;
-  value: string;
-  onDecrement: () => void;
-  onIncrement: () => void;
-  decrementDisabled: boolean;
-  incrementDisabled: boolean;
-  isDark: boolean;
-  isRTL: boolean;
-  compact?: boolean;
-}) {
-  const iconColor = isDark ? "#d4d4d4" : "#6e5a47";
-  const buttonSize = compact ? 30 : 36;
-  const valueMinWidth = compact ? 42 : 64;
-  const iconSize = compact ? 15 : 17;
-  return (
-    <View
-      className="self-start rounded-full bg-surface-high dark:bg-surface-dark-high p-1"
-      style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
-    >
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={decrementLabel}
-        accessibilityState={{ disabled: decrementDisabled }}
-        onPress={onDecrement}
-        disabled={decrementDisabled}
-        className="items-center justify-center rounded-full"
-        style={({ pressed }) => ({
-          height: buttonSize,
-          opacity: decrementDisabled ? 0.35 : pressed ? 0.68 : 1,
-          transform: [{ scale: pressed && !decrementDisabled ? 0.96 : 1 }],
-          width: buttonSize,
-        })}
-      >
-        <Minus size={iconSize} color={iconColor} />
-      </Pressable>
-      <View
-        className="items-center justify-center"
-        style={{ minWidth: valueMinWidth, paddingHorizontal: compact ? 8 : 12 }}
-      >
-        <Text
-          className="text-charcoal dark:text-neutral-100"
-          style={{ fontFamily: "Manrope_700Bold", fontSize: compact ? 13 : 14 }}
-        >
-          {value}
-        </Text>
-      </View>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={incrementLabel}
-        accessibilityState={{ disabled: incrementDisabled }}
-        onPress={onIncrement}
-        disabled={incrementDisabled}
-        className="items-center justify-center rounded-full"
-        style={({ pressed }) => ({
-          height: buttonSize,
-          opacity: incrementDisabled ? 0.35 : pressed ? 0.68 : 1,
-          transform: [{ scale: pressed && !incrementDisabled ? 0.96 : 1 }],
-          width: buttonSize,
-        })}
-      >
-        <Plus size={iconSize} color={iconColor} />
-      </Pressable>
-    </View>
-  );
 }
 
 function SectionLabel({ children }: { children: string }) {
