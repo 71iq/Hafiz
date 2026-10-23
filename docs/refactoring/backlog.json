@@ -2386,19 +2386,20 @@
         "RF-036"
       ],
       "acceptance_criteria": [
-        "Read AGENTS.md and docs/refactoring/ARCHITECTURE.md, CONVENTIONS.md, TECH_STACK.md and PROGRESS.md completely in bounded chunks with no truncated output. Read this task, .refactor-baseline/rf038-skeleton-motion-v1/readiness.json, .refactor-baseline/rf038-skeleton-motion-v1/plan.json and .refactor-baseline/rf038-skeleton-motion-v1/reuse-map.json. Required instructions, selected metadata and git status/branch are the only reads allowed. You are not alone; preserve all other work. This is a primary-prepared exact-artifact installation. No helper agents, caller/source/test inspection or dumps, implementation workflows, checks/hashes/transforms/case counts, MCP/browser/UI/app/computer-use/REPL/collaboration tools even for inventory. Use shell only for these permitted reads/status and one copy. Report verification pending with the controller.",
-        "Install exactly the three artifacts using this one copy-command body: from pathlib import Path; import json; r=json.loads(Path(\".refactor-baseline/rf038-skeleton-motion-v1/readiness.json\").read_text()); [(Path(p).parent.mkdir(parents=True,exist_ok=True), Path(p).write_bytes(Path(a[\"candidate_path\"]).read_bytes())) for p,a in r[\"artifacts\"].items()]. No redesign, formatting, extra edit, packages, backlog/progress/runner/evidence change, commit/push/merge/deploy or live service. Report installed paths and pending checks.",
+        "Read AGENTS.md and docs/refactoring/ARCHITECTURE.md, CONVENTIONS.md, TECH_STACK.md and PROGRESS.md completely in bounded chunks with no truncated output. Read this task, .refactor-baseline/rf038-review-repair-v2/readiness.json, .refactor-baseline/rf038-review-repair-v2/plan.json and .refactor-baseline/rf038-review-repair-v2/reuse-map.json. Required instructions, selected metadata and git status/branch are the only reads allowed. You are not alone; preserve all other work. This is a primary-prepared exact-artifact installation. No helper agents, caller/source/test inspection or dumps, implementation workflows, checks/hashes/transforms/case counts, MCP/browser/UI/app/computer-use/REPL/collaboration tools even for inventory. Use shell only for these permitted reads/status and one copy. Report verification pending with the controller.",
+        "Install exactly the three artifacts using this one copy-command body: from pathlib import Path; import json; r=json.loads(Path(\".refactor-baseline/rf038-review-repair-v2/readiness.json\").read_text()); [(Path(p).parent.mkdir(parents=True,exist_ok=True), Path(p).write_bytes(Path(a[\"candidate_path\"]).read_bytes())) for p,a in r[\"artifacts\"].items()]. No redesign, formatting, extra edit, packages, backlog/progress/runner/evidence change, commit/push/merge/deploy or live service. Report installed paths and pending checks.",
         "Only Skeleton imports the new lib/ui/reduced-motion hook. useSyncExternalStore shares one AccessibilityInfo observer/query across real placeholder instances. Start/server/unknown is true, subscribe before querying, ignore stale initial results after a live event, invalidate callbacks after final unmount and reset the unknown snapshot. Unsupported/rejected API uses the conservative fallback. Reuse RN Web system media behavior; no dependency/provider/persisted setting or data write.",
         "Reduced or unknown preference displays static opacity 0.5 from the first frame. Explicit no-preference retains the original 0.3 to 0.7 range, 1200ms timing and native driver. Live changes stop/resume existing loops with cleanup. Every whole-Skeleton byte outside four prescribed import/lifecycle edits reverses to the original. Preserve all existing test inputs, protected content/fonts/mappings, metadata/config/runner/model/limit pins, all markup/geometry/theme/props/callers and unrelated animations.",
         "Every one of eleven frozen commands runs fresh. Require 19 focused cases and 84 suites/822 cold cases without skips, strict types, all three changed files zero-warning ESLint with --max-warnings=0, new hook/test formatting, all three dependency checks and web export. Original Skeleton fails five new pulse regressions; stale-query, listener-leak and retained-cache mutations fail 2/3/4 cases and restore to green. Preserve fixture-history/overload/SSR-declaration failures, QA readiness failure and the original first-frame finding. No disabled rule, weakened assertion or broad formatting.",
-        "Eight fresh installed-Chrome cases use actual Expo/NativeWind/components/settings with a temporary SQLite-readiness-gated QA route. Block all remote requests. Cover ar/en, 390/1280 and representative beige/dark/AMOLED/white inputs, both initial media values, live changes, final-unmount listener removal and remount. All 32 state checks require 20 static reduced checks and 12 original pulse checks. Match prepared before geometry/styles; opacity change is intentional. Keep QA route absent after export; no permanent route or deployed artifact. Primary inspects fresh rendered images. Native component tests mock system/animation scheduling; no native runtime/device claim.",
-        "Knip retains six exact issue records/exit1, not clean. Clone fragments remain the same 19 groups/386 lines/2523 tokens, source coverage 189 to 190. Other animation owners are unapproved RF102, and RF048 depends on it. A passing RF038 slice does not finish reduced-motion migration or the modernization mission. A separate stronger evaluator inspects complete diffs, lifecycle/race/fallback behavior and every started/completed original generator tool item including checkpoint reuse; reject prohibited worker actions even if bytes match. Primary owns final acceptance after both leases release. Keep pinned vendor, memory/time/token/retry/account limits and all original failure logs. One work item this heartbeat, all commits local."
+        "Eight fresh installed-Chrome cases retain the exact v1 browser behavior assertions, real Expo/NativeWind/SQLite-gated fixture, remote blocking, both locales, two widths, four themes, both initial preferences, live changes and unmount/remount. All 32 state checks still require 20 static and 12 pulse results. The v2 gate additionally requires all eight new screenshots to match their primary-inspected keyed references in decoded RGBA pixels, geometry and styles, with zero pixel tolerance. Primary directly inspected all eight first-controller images after both leases released. Receipt .refactor-baseline/rf038-review-repair-v2/primary-visual-reference.json freezes them and the unchanged source hashes. A separate primary preflight repeats all browser cases and passes the new exact-image gate. The ar/beige initial-preference pair differs by four pixels, so every keyed image was inspected independently; do not claim universal pair equality. AMOLED retains existing low contrast for RF048. No contrast/native/device/production claim. Final primary post-lease source/lifecycle/image acceptance remains mandatory after the new independent verdict. It is a separate final stage, not a prerequisite of that verdict; the evaluator now has concrete recorded primary inspection and enforced fresh image identity.",
+        "Knip retains six exact issue records/exit1, not clean. Clone fragments remain the same 19 groups/386 lines/2523 tokens, source coverage 189 to 190. Other animation owners are unapproved RF102, and RF048 depends on it. A passing RF038 slice does not finish reduced-motion migration or the modernization mission. A separate stronger evaluator inspects complete diffs, lifecycle/race/fallback behavior and every started/completed original generator tool item including checkpoint reuse; reject prohibited worker actions even if bytes match. Primary owns final acceptance after both leases release. Keep pinned vendor, memory/time/token/retry/account limits and all original failure logs. One work item this heartbeat, all commits local.",
+        "Preserve the first independent rejection and its one spent ordinary attempt. Its otherwise passing source/eleven gates are not an acceptance override. Recovery corrects evidence sequencing only and adds the exact-image gate; source/tests/visual tolerances/models/limits are unchanged. No refund/reset. New generation, every fresh gate and a new independent verdict are required. Original v1 evidence remains immutable."
       ],
       "verification": [
         [
           "python3",
           "-c",
-          "import hashlib;from pathlib import Path;p=Path(\".refactor-baseline/rf038-skeleton-motion-v1/verify-inputs.py\");assert hashlib.sha256(p.read_bytes()).hexdigest()==\"a1ad1e5fdb37ce9669cb565c8d172a6e6d2f98e25ab1a34063feecb53c73fe6f\";exec(compile(p.read_text(),str(p),\"exec\"))"
+          "import hashlib;from pathlib import Path;p=Path(\".refactor-baseline/rf038-review-repair-v2/verify-inputs.py\");assert hashlib.sha256(p.read_bytes()).hexdigest()==\"ed7f218c25c98f2ca81aa581d7ba6d2926796f0226fc640544581f9305dccce0\";exec(compile(p.read_text(),str(p),\"exec\"))"
         ],
         [
           "npm",
@@ -2444,9 +2445,8 @@
           ".refactor-baseline/rf038-skeleton-motion-v1/build-fixture.py"
         ],
         [
-          "node",
-          ".refactor-baseline/rf038-skeleton-motion-v1/browser.cjs",
-          "controller"
+          "python3",
+          ".refactor-baseline/rf038-review-repair-v2/visual-gate.py"
         ],
         [
           "python3",
@@ -2460,15 +2460,18 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "pending",
+      "status": "retry",
       "allowed_paths": [
         "lib/ui/reduced-motion.ts",
         "components/ui/Skeleton.tsx",
         "tests/unit/reduced-motion.test.tsx"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "implementation_mode": "copy-only",
-      "readiness_evidence": ".refactor-baseline/rf038-skeleton-motion-v1/readiness.json"
+      "readiness_evidence": ".refactor-baseline/rf038-review-repair-v2/readiness.json",
+      "started_at": "2026-10-23T18:28:11.062790+00:00",
+      "failure": "Independent review failed: Required fresh primary visual inspection is not evidenced. readiness.json and PROGRESS.md record prepared-image inspection, while the fresh images are in .refactor-baseline/rf038-skeleton-motion-v1/controller-browser-1792780192030/. The primary must inspect those images and record acceptance after both leases release. No source change is needed for this gap.; Otherwise, the complete diff and untracked task files match the frozen artifacts. Generator audit found 25 permitted commands with matching completions and no prohibited checks or source dumps. Controller logs support all eleven gates, 19 focused tests, 822 cold tests and eight Chrome cases. Read-only integrity checks passed; inspected phone/desktop images showed no layout defect. Native runtime remains unverified, as specified.",
+      "evidence": ".ralph/runs/RF-038-1-1792780091064691529"
     },
     {
       "id": "RF-039",
