@@ -57,10 +57,18 @@ Checks and tests:
 Build and data:
 
 - `npm run build:web` — production static Expo export to `dist/`; `prebuild:web` prepares runtime data in ignored `public/data/`.
-- `bash scripts/vercel-build.sh` — deployment-equivalent web build with Vercel/Supabase environment mapping.
+- `bash scripts/vercel-build.sh` — retained compatibility wrapper for older environment names. Current production CI uses `npm run build:web` in `.github/workflows/hetzner-deploy.yml`.
 - `npm run validate:reflection-journey` — validate the reflection journey dataset.
 - `npm run build:db` — regenerate `assets/data/quran.db`; do not run unless the task explicitly concerns the data pipeline and the resulting database change is intended.
 - No repository-defined Supabase start/reset/push/deploy command or checked-in `supabase/config.toml` is present. Do not invent a Supabase workflow; follow an explicitly provided project procedure.
+
+## Production and deployment
+
+Read `docs/hetzner-migration.md` and the relevant `deploy/hetzner/` files before infrastructure or database work. Production is a static Expo export served by Caddy and a separate self-hosted Supabase stack on Hetzner. `.github/workflows/hetzner-deploy.yml` builds and verifies `main`, then deploys the export over SSH. Infrastructure and database changes use the administrator procedure rather than the web deploy key.
+
+The former Vercel and Supabase Cloud projects are retired. Do not use the ignored cloud CLI link or linked-cloud commands for production. Apply reviewed SQL through Hafiz's private database procedure, keeping its database, storage, keys, and service configuration isolated from ElPsyCongroo. Configuration comes from GitHub Actions variables or secrets and protected VM environment files. Use the documented Hafiz health script for operational checks.
+
+Reusable authoring, React Native, composition, and UI verification guidance lives in the personal skills directory under `$CODEX_HOME/skills` or `~/.codex/skills`. Use `reuse-first-authoring` for nontrivial extractions, `react-native-skills` for relevant native behavior, and `composition-patterns` when changing component contracts. Use `ui-visual-verification` or `full-stack-verification` when the changed behavior needs that coverage. Existing project wrappers, installed library versions, and the targeted verification rules below take precedence over generic recommendations.
 
 ## Engineering workflow
 
