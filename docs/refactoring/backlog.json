@@ -2374,45 +2374,101 @@
     },
     {
       "id": "RF-038",
-      "title": "Add reduced-motion behavior where animation warrants it",
-      "description": "Add reduced-motion behavior where animation warrants it",
-      "rationale": "Searched UI modules lack explicit reduced-motion handling.",
+      "title": "Respect live reduced motion in repeating loading placeholders",
+      "description": "Install a live, reference-counted system-preference hook and extend only the existing Skeleton pulse. Other shared UI transitions remain RF102.",
+      "rationale": "Skeleton always pulses. Repeated placeholders need one coherent live preference, conservative fallback and cleanup; installed Reanimated only captures startup preference. The larger original RF038 is split before implementation.",
       "modules": [
-        "components/ui/*",
-        "lib/ui/*",
+        "lib/ui/reduced-motion.ts",
+        "components/ui/Skeleton.tsx",
         "tests/unit/reduced-motion.test.tsx"
       ],
       "dependencies": [
         "RF-036"
       ],
       "acceptance_criteria": [
-        "Inventory animated controls and preserve useful state feedback with motion disabled.",
-        "Use platform-aware preference with cleanup and fallback; verify web/native where available."
+        "Read AGENTS.md and docs/refactoring/ARCHITECTURE.md, CONVENTIONS.md, TECH_STACK.md and PROGRESS.md completely in bounded chunks with no truncated output. Read this task, .refactor-baseline/rf038-skeleton-motion-v1/readiness.json, .refactor-baseline/rf038-skeleton-motion-v1/plan.json and .refactor-baseline/rf038-skeleton-motion-v1/reuse-map.json. Required instructions, selected metadata and git status/branch are the only reads allowed. You are not alone; preserve all other work. This is a primary-prepared exact-artifact installation. No helper agents, caller/source/test inspection or dumps, implementation workflows, checks/hashes/transforms/case counts, MCP/browser/UI/app/computer-use/REPL/collaboration tools even for inventory. Use shell only for these permitted reads/status and one copy. Report verification pending with the controller.",
+        "Install exactly the three artifacts using this one copy-command body: from pathlib import Path; import json; r=json.loads(Path(\".refactor-baseline/rf038-skeleton-motion-v1/readiness.json\").read_text()); [(Path(p).parent.mkdir(parents=True,exist_ok=True), Path(p).write_bytes(Path(a[\"candidate_path\"]).read_bytes())) for p,a in r[\"artifacts\"].items()]. No redesign, formatting, extra edit, packages, backlog/progress/runner/evidence change, commit/push/merge/deploy or live service. Report installed paths and pending checks.",
+        "Only Skeleton imports the new lib/ui/reduced-motion hook. useSyncExternalStore shares one AccessibilityInfo observer/query across real placeholder instances. Start/server/unknown is true, subscribe before querying, ignore stale initial results after a live event, invalidate callbacks after final unmount and reset the unknown snapshot. Unsupported/rejected API uses the conservative fallback. Reuse RN Web system media behavior; no dependency/provider/persisted setting or data write.",
+        "Reduced or unknown preference displays static opacity 0.5 from the first frame. Explicit no-preference retains the original 0.3 to 0.7 range, 1200ms timing and native driver. Live changes stop/resume existing loops with cleanup. Every whole-Skeleton byte outside four prescribed import/lifecycle edits reverses to the original. Preserve all existing test inputs, protected content/fonts/mappings, metadata/config/runner/model/limit pins, all markup/geometry/theme/props/callers and unrelated animations.",
+        "Every one of eleven frozen commands runs fresh. Require 19 focused cases and 84 suites/822 cold cases without skips, strict types, all three changed files zero-warning ESLint with --max-warnings=0, new hook/test formatting, all three dependency checks and web export. Original Skeleton fails five new pulse regressions; stale-query, listener-leak and retained-cache mutations fail 2/3/4 cases and restore to green. Preserve fixture-history/overload/SSR-declaration failures, QA readiness failure and the original first-frame finding. No disabled rule, weakened assertion or broad formatting.",
+        "Eight fresh installed-Chrome cases use actual Expo/NativeWind/components/settings with a temporary SQLite-readiness-gated QA route. Block all remote requests. Cover ar/en, 390/1280 and representative beige/dark/AMOLED/white inputs, both initial media values, live changes, final-unmount listener removal and remount. All 32 state checks require 20 static reduced checks and 12 original pulse checks. Match prepared before geometry/styles; opacity change is intentional. Keep QA route absent after export; no permanent route or deployed artifact. Primary inspects fresh rendered images. Native component tests mock system/animation scheduling; no native runtime/device claim.",
+        "Knip retains six exact issue records/exit1, not clean. Clone fragments remain the same 19 groups/386 lines/2523 tokens, source coverage 189 to 190. Other animation owners are unapproved RF102, and RF048 depends on it. A passing RF038 slice does not finish reduced-motion migration or the modernization mission. A separate stronger evaluator inspects complete diffs, lifecycle/race/fallback behavior and every started/completed original generator tool item including checkpoint reuse; reject prohibited worker actions even if bytes match. Primary owns final acceptance after both leases release. Keep pinned vendor, memory/time/token/retry/account limits and all original failure logs. One work item this heartbeat, all commits local."
       ],
       "verification": [
+        [
+          "python3",
+          "-c",
+          "import hashlib;from pathlib import Path;p=Path(\".refactor-baseline/rf038-skeleton-motion-v1/verify-inputs.py\");assert hashlib.sha256(p.read_bytes()).hexdigest()==\"a1ad1e5fdb37ce9669cb565c8d172a6e6d2f98e25ab1a34063feecb53c73fe6f\";exec(compile(p.read_text(),str(p),\"exec\"))"
+        ],
         [
           "npm",
           "run",
           "test:unit",
           "--",
           "--runTestsByPath",
-          "tests/unit/reduced-motion.test.tsx"
+          "tests/unit/reduced-motion.test.tsx",
+          "--no-cache"
         ],
         [
           "npm",
           "run",
           "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/ui/reduced-motion.ts",
+          "components/ui/Skeleton.tsx",
+          "tests/unit/reduced-motion.test.tsx",
+          "--max-warnings=0"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "lib/ui/reduced-motion.ts",
+          "tests/unit/reduced-motion.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "python3",
+          ".refactor-baseline/rf038-skeleton-motion-v1/build-fixture.py"
+        ],
+        [
+          "node",
+          ".refactor-baseline/rf038-skeleton-motion-v1/browser.cjs",
+          "controller"
+        ],
+        [
+          "python3",
+          ".refactor-baseline/rf038-skeleton-motion-v1/analysis.py"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
         ]
       ],
       "risk": "medium",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
-        "components/ui/*",
-        "lib/ui/*",
+        "lib/ui/reduced-motion.ts",
+        "components/ui/Skeleton.tsx",
         "tests/unit/reduced-motion.test.tsx"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "implementation_mode": "copy-only",
+      "readiness_evidence": ".refactor-baseline/rf038-skeleton-motion-v1/readiness.json"
     },
     {
       "id": "RF-039",
@@ -2791,7 +2847,8 @@
       ],
       "dependencies": [
         "RF-038",
-        "RF-047"
+        "RF-047",
+        "RF-102"
       ],
       "acceptance_criteria": [
         "Execute relevant phone/tablet/desktop, Arabic/English, five theme modes, keyboard/touch and reduced-height flows.",
@@ -6930,6 +6987,50 @@
       "evidence": ".ralph/runs/RF-100-2-1792449826575586840",
       "completed_at": "2026-10-19T22:46:09.375744+00:00",
       "summary": "Installed the frozen RF-100 artifact using the exact prescribed copy command."
+    },
+    {
+      "id": "RF-102",
+      "title": "Respect live reduced motion in remaining shared UI transitions",
+      "description": "Prepare bounded transition scopes from the RF038 inventory before approval. Cover ResponsiveOverlay, legacy Sheet, Switch, Toast, OfflineBanner, DropdownMenu and AppNavigation; inspect instantaneous press feedback and actual ReadingStepper use too.",
+      "rationale": "Repeating placeholders and transition lifecycles are separate changes. RF038 establishes the shared live preference without silently certifying modal, visibility, callback or worklet behavior.",
+      "modules": [
+        "docs/refactoring/REDUCED_MOTION.md",
+        "components/ui/ResponsiveOverlay.tsx",
+        "components/ui/Sheet.tsx",
+        "components/ui/Switch.tsx",
+        "components/ui/Toast.tsx",
+        "components/ui/OfflineBanner.tsx",
+        "components/ui/DropdownMenu.tsx",
+        "components/ui/AppNavigation.tsx"
+      ],
+      "dependencies": [
+        "RF-038"
+      ],
+      "acceptance_criteria": [
+        "Primary must inspect real callers/tests and prepare exact small artifact sets and meaningful before/after/race/rendered checks before approving; split further if needed. Preserve useful state feedback, focus/dismissal/safe areas/geometry, toast lifetime, banner visibility callbacks, native worklets and the original checkout.",
+        "Observe live preference changes including active transitions. Installed Reanimated default System is not proof of live changes. Record web/native evidence separately and carry unavailable native runtime/device checks. No configuration/dependency/data/runner/production change."
+      ],
+      "verification": [
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
+      ],
+      "risk": "medium",
+      "approved": false,
+      "status": "pending",
+      "allowed_paths": [
+        "components/ui/ResponsiveOverlay.tsx",
+        "components/ui/Sheet.tsx",
+        "components/ui/Switch.tsx",
+        "components/ui/Toast.tsx",
+        "components/ui/OfflineBanner.tsx",
+        "components/ui/DropdownMenu.tsx",
+        "components/ui/AppNavigation.tsx",
+        "docs/refactoring/REDUCED_MOTION.md"
+      ],
+      "attempts": 0
     }
   ]
 }

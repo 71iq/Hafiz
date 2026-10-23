@@ -1,0 +1,24 @@
+# Reduced motion inventory
+
+RF038 covers the system preference and the repeating Skeleton pulse. The shared API starts with motion disabled, queries the existing React Native AccessibilityInfo API and observes live changes through one reference-counted listener. React Native Web supplies the browser media-query implementation. A late initial query cannot overwrite a newer event. The last unsubscribe removes the listener, invalidates pending callbacks and restores the conservative unknown snapshot.
+
+Skeleton keeps its existing loading shapes and theme colors. Reduced or unknown preference uses static opacity 0.5, including the first frame. An explicit no-preference retains the original 0.3 to 0.7 pulse and 1200 ms native-driver timing. No setting, database write, provider or dependency is added. Existing composed placeholders reuse the same lifecycle.
+
+| Owner | Current mechanism | Scope |
+| --- | --- | --- |
+| components/ui/Skeleton.tsx | Repeating RN Animated opacity loop | RF038 exact three-file slice. Acceptance still requires the controller and independent review. |
+| components/ui/ResponsiveOverlay.tsx | 220/180 ms opacity and sheet translation or dialog scale | RF102, unapproved. Preserve focus, dismissal, body locking and geometry. |
+| components/ui/Sheet.tsx | Legacy RN Animated spring | RF102, unapproved. Inspect real callers before changing or retiring it. |
+| components/ui/Switch.tsx | RN Animated thumb spring | RF102, unapproved. Preserve immediate checked/color/disabled feedback. |
+| components/ui/Toast.tsx | RN Animated fades plus dismissal timer | RF102, unapproved. Keep the message lifetime and callback ownership separate from motion. |
+| components/ui/OfflineBanner.tsx | RN Animated show/hide parallel transitions | RF102, unapproved. Verify interrupted transitions and visibility callbacks. |
+| components/ui/DropdownMenu.tsx | RN Modal fade | RF102, unapproved. Preserve selection, focus and close ordering. |
+| components/ui/AppNavigation.tsx | Reanimated press springs, bottom-bar timing and sidebar timing | RF102, unapproved. Installed Reanimated defaults to its system manager, whose initial value is a startup snapshot. Live preference and active worklets need a separate decision and verification. Only the modernization copy is a target. |
+
+Button, ToggleGroup, EmptyState, ErrorBoundary and several navigation controls use instantaneous pressed scale feedback. They have no timed animation in that feedback. RF102 must decide which feedback needs adjustment and retain a visible pressed state. The new ReadingStepper uses the existing instantaneous sheet feedback outside the original shared-UI inventory. RF102 must account for that actual caller before declaring the inventory complete. The global CSS background transition is an autofill workaround, not a loading or navigation animation. No CSS change is included.
+
+The installed Reanimated useReducedMotion hook reads the app-start preference and does not rerender on changes. It cannot own this live preference. The installed RN Web AccessibilityInfo adapter keys event handlers by their string representation. One shared observer avoids collisions between repeated identical placeholder callbacks. The project has no existing live system-preference hook. useSyncExternalStore supplies the installed React subscription contract and conservative server snapshot.
+
+RF048 now also depends on RF102. Completing this Skeleton slice does not certify all animations, native runtime behavior or the final accessibility review. Native component tests mock the system API and animation scheduling. They do not replace device evidence. Browser checks use real Expo, NativeWind, settings providers and components through a temporary QA route gated by actual local SQLite readiness. They block remote requests and use browser media emulation. The QA route is removed after export and never committed or deployed.
+
+Preparation evidence is .refactor-baseline/rf038-skeleton-motion-v1/readiness.json. It retains the mock-history/type/SSR declaration fixture failures, the missing QA readiness gate and the first-frame opacity finding. Nineteen focused cases and 822 cold cases pass. Eight before/after browser cases cover both locales, phone and desktop, beige/dark/AMOLED/white inputs and live preference/remount transitions. Geometry and styles match outside the intended opacity change. Primary inspected phone before/after and desktop images. Knip retains six exact issues and exit 1. Duplication retains 19 groups, 386 lines and 2523 tokens, with source coverage increasing from 189 to 190. No clean-analysis or native/device claim.
