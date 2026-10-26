@@ -3842,44 +3842,80 @@
     },
     {
       "id": "RF-061",
-      "title": "Characterize repeated journey ayah previews",
-      "description": "Characterize repeated journey ayah previews",
-      "rationale": "Group 23 matches prefixes in two different journey rendering branches.",
+      "title": "Characterize journey ayah preview branches",
+      "description": "Install exact real-owner characterization tests and the documented decision to retain inline preview branches. Production source remains unchanged.",
+      "rationale": "Complete branches share a small Pressable/reference prefix but different font/content rules. Their existing feature owner already shares detail state; a wrapper would add forwarding without independent policy. Freeze current behavior before any future change.",
       "modules": [
-        "components/reflection-journey/JourneyAyahCard.tsx",
-        "tests/unit/journey-ayah-preview.test.tsx"
+        "tests/unit/journey-ayah-preview.test.tsx",
+        "docs/refactoring/JOURNEY_PREVIEWS.md"
       ],
       "dependencies": [
         "RF-004",
         "RF-006"
       ],
       "acceptance_criteria": [
-        "Compare complete branches and fixtures. Test font loading, ayah targets, tap behavior and each content variant.",
-        "Share only a proven matching feature presenter and preserve Unicode copying/content."
+        "Read the selected task in this prompt and all of AGENTS.md, docs/refactoring/ARCHITECTURE.md, CONVENTIONS.md, TECH_STACK.md and PROGRESS.md in bounded chunks of at most 80 lines with complete output. Also read .refactor-baseline/rf061-journey-preview-v1/readiness.json, plan.json and reuse-map.json. These eight documents, git status/branch and one exact copy are the only allowed shell operations. Use wc -l and sed -n for those reads. Do not read the whole backlog. This is primary-prepared copy-only installation. Do not inspect/dump caller/source/test files, count cases, hash, transform, run checks, start helpers/reviewers or guided implementation workflows. No MCP, browser, UI/computer-use, REPL, collaboration or inventory tools. No package/config/evidence/runner/progress/task/commit/push/merge/deploy/production operation. Report verification pending with the controller.",
+        "Install exactly the two supplied test/document artifacts using this single copy-command body: from pathlib import Path; import json; r=json.loads(Path(\".refactor-baseline/rf061-journey-preview-v1/readiness.json\").read_text()); [(Path(p).parent.mkdir(parents=True,exist_ok=True), Path(p).write_bytes(Path(a[\"candidate_path\"]).read_bytes())) for p,a in r[\"artifacts\"].items()]. No other edit or formatting change. Do not modify JourneyAyahCard, its route, fonts, queries, modal, settings, strings, existing tests or any other production source. The primary owns ownership/extraction decisions and final acceptance. The controller runs all seven frozen argv and starts a separate stronger evaluator.",
+        "Keep the inline Quran and translation/tafsir row branches in the existing feature owner. Primary compared both complete branches, the actual route, Card, font loader, settings/localization and detail wiring. The matching prefix owns no independent policy; a children/reference/callback wrapper would add an API without removing state or lifecycle complexity. No new presenter, hook, abstraction or dependency. No duplication or performance improvement claim.",
+        "Characterize the actual JourneyAyahCard in 36 English/Arabic cases, retaining real Card, localization/schema/strings and translation catalog. Use controlled settings/I18nManager and a manual frame queue. Substitute database/font APIs and the detail modal. Cover every content variant, English/active translation and RTL direction independent of UI language, explicit/settings tafsir source, all three font-style arguments, marker palette, cached/pending pages, deduplication, loading/fallback titles, literal Unicode/whitespace, targets/tab/close, pressed styles, query/font rejection, late query and completion after unmount. Forbid writes and remote calls. Preserve the existing font-rejection and already-queued-frame behavior; introduce no source fix.",
+        "Require all seven commands fresh. Exact-input gate freezes all 3563 previous tracked inputs, including 85 existing Jest test files, all 101 files under tests, and 2417 protected inputs, plus all 102 other task records and root metadata. Require 36 focused cases and 86 suites/875 cold cases without skips, strict types, new-test zero-warning ESLint, formatting of both artifacts and git diff --check. Four preserved real-owner mutations fail 14 wrong-target, eight missing-font-wait, two wrong-translation-direction and four ignored-explicit-source cases, then the original owner and 36 green cases restore. Never weaken assertions, a rule, inventory, evidence or verification.",
+        "This test/document slice changes no production source. No browser/theme/geometry/native/device/real-font/SQLite/full-journey/clipboard execution is claimed. The actual modal and copying/sharing code remain hash-frozen; mock target wiring does not verify Unicode copying. No new clean Knip/audit or clone decrease is claimed. Keep all preflight logs and original source. Existing wider performance/motion/accessibility/native tasks remain open.",
+        "A separate stronger read-only evaluator must inspect the complete new test/document diff, the unchanged production owner and meaningful preflight/gate evidence. Audit every original generation started/completed tool item, including original generation after resource checkpoint reuse, all eight required complete reads and exactly one copy. Reject prohibited worker activity even if bytes match. A checkpoint never bypasses fresh commands or a new verdict. Final primary source/scope/lifecycle acceptance follows verdict and lease release. Keep all existing vendor/model, 93 percent account stop, resource/retry/time/token/path/lease/checkpoint settings unchanged. This heartbeat handles RF061 only. All commits local."
       ],
       "verification": [
+        [
+          "python3",
+          "-c",
+          "import hashlib;from pathlib import Path;p=Path(\".refactor-baseline/rf061-journey-preview-v1/verify-inputs.py\");assert hashlib.sha256(p.read_bytes()).hexdigest()==\"76ca603b4df36e809e0f393e7275d5d6dd884ec94dd7f0d2fa0bba7b77c59c97\";exec(compile(p.read_text(),str(p),\"exec\"))"
+        ],
         [
           "npm",
           "run",
           "test:unit",
           "--",
           "--runTestsByPath",
-          "tests/unit/journey-ayah-preview.test.tsx"
+          "tests/unit/journey-ayah-preview.test.tsx",
+          "--no-cache"
         ],
         [
           "npm",
           "run",
           "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "tests/unit/journey-ayah-preview.test.tsx",
+          "--max-warnings=0"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "tests/unit/journey-ayah-preview.test.tsx",
+          "docs/refactoring/JOURNEY_PREVIEWS.md"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
         ]
       ],
       "risk": "medium",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
-        "components/reflection-journey/JourneyAyahCard.tsx",
-        "tests/unit/journey-ayah-preview.test.tsx"
+        "tests/unit/journey-ayah-preview.test.tsx",
+        "docs/refactoring/JOURNEY_PREVIEWS.md"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "implementation_mode": "copy-only",
+      "readiness_evidence": ".refactor-baseline/rf061-journey-preview-v1/readiness.json"
     },
     {
       "id": "RF-062",
