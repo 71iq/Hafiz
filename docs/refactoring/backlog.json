@@ -3212,23 +3212,26 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "retry",
+      "status": "blocked",
       "allowed_paths": [
         "tests/unit/home-deck-cards.test.tsx",
         "docs/refactoring/HOME_DECK_CARDS.md"
       ],
-      "attempts": 1,
+      "attempts": 2,
       "implementation_mode": "copy-only",
       "readiness_evidence": ".refactor-baseline/rf052-authorized-recovery-v4/readiness.json",
-      "started_at": "2026-10-26T18:12:55.242990+00:00",
-      "failure": "Independent review failed: Blocking copy-only violation: .ralph/runs/RF-052-2-1793038375244917485/generator.jsonl:15-16 stops PROGRESS.md reads at 721,800p. Line 13 reports 809 lines, but the mandatory 801,880p read never occurs. Line 19 incorrectly claims complete reads. Reject this checkpoint and preserve the spent attempt. Any authorized recovery must complete every required range, repeat all seven controller gates, and receive fresh independent review without refunding attempts or relaxing limits.; Otherwise, the complete tracked/untracked diff, unchanged HomeScreen/Card/DeckStats, reuse decision, preparation failures and seven assertion-failing mutants check out. All seven controller gates passed with 24 tests and no skips. Independent integrity verification and git diff --check passed. No prohibited generator checks, source/test dumps or additional tool types were found. Accessibility debt and browser/native/offline verification limits remain explicit; manual device checks are excluded for this unchanged-source task. No files or Git state were changed during review.",
-      "evidence": ".ralph/runs/RF-052-2-1793038375244917485",
+      "started_at": "2026-10-26T20:52:13.392132+00:00",
+      "failure": "Verification failed: ['python3', '-B', '-c', \"import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf052-home-cards-v1/verify.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='1d290cfd5bc6275ebfdfa689cc178f81befb850d733eb439469ddb068f473dca';runpy.run_path(str(p),run_name='__main__');p=Path('.refactor-baseline/rf052-authorized-recovery-v4/audit.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='9293628c0affddec3338b192433ff05ec6909239e946dbda5d1bbcd436eb857b';runpy.run_path(str(p),run_name='__main__')\"]; see .ralph/runs/RF-052-2-1793047933394124455/verify-0.log",
+      "evidence": ".ralph/runs/RF-052-2-1793047933394124455",
       "protocol_recovery_evidence": ".refactor-baseline/rf052-read-range-recovery.json",
       "primary_blocked_evidence": ".refactor-baseline/rf052-primary-blocked.json",
       "historical_ordinary_attempts_spent_before_extension": 2,
       "additional_attempt_authorization": ".refactor-baseline/rf052-authorized-recovery-v4/authorization.json",
       "additional_attempt_controller_counter_base": 1,
-      "additional_attempt_historical_offset": 1
+      "additional_attempt_historical_offset": 1,
+      "authorized_recovery_outcome": ".refactor-baseline/rf052-authorized-recovery-outcome.json",
+      "authorized_additional_attempts_used": 1,
+      "historical_total_ordinary_attempts_spent": 3
     },
     {
       "id": "RF-053",
