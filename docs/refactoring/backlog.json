@@ -3147,43 +3147,79 @@
     {
       "id": "RF-052",
       "title": "Characterize home deck-card presentation differences",
-      "description": "Characterize home deck-card presentation differences",
+      "description": "Characterize real home-route smart and vocabulary card presentation/actions without changing application source. Retain existing Card/DeckStats composition and distinct settings/filter policy.",
       "rationale": "Clone groups 3-5 repeat SmartDeckCard and VocabularyDeckCard layout, with different policy.",
       "modules": [
-        "app/(tabs)/home.tsx",
-        "tests/unit/home-deck-cards.test.tsx"
+        "tests/unit/home-deck-cards.test.tsx",
+        "docs/refactoring/HOME_DECK_CARDS.md"
       ],
       "dependencies": [
         "RF-004",
         "RF-006"
       ],
       "acceptance_criteria": [
-        "Test compact/expanded layout, disabled start, cards/settings actions and stopPropagation.",
-        "Choose the smallest private presentation extraction after comparing existing DeckStats and Card. Preserve distinct deck/filter behavior."
+        "Read all eight required documents named by plan.json with wc -l and bounded sed -n chunks of at most 80 lines, retaining complete output. These reads, git status/branch and the one exact artifact copy are the only worker operations. No whole-backlog, source/test/helper/package/log inspection, verification, hash, transform, case-count, guided implementation workflow, MCP/browser/REPL/collaboration, inventory or reviewer work. Primary already owns scope, reuse, architecture and acceptance.",
+        "Install exactly the two supplied artifacts with the single copy body in plan.json. Do not change application source, private cards, Card/DeckStats, route exports, settings copy, accessibility behavior, dependencies, existing tests, protected inputs, runner, evidence, task/progress metadata or Git state. Report verification pending with the controller. No extraction is authorized. Existing shared presentation already uses Card and DeckStats; retain distinct smart title/filter and vocabulary settings policy.",
+        "The controller's focused test must run the actual HomeScreen and real Card/DeckStats/locale strings in the existing RNTL/Jest setup. Require all 24 cases without skips for English/Arabic, LTR/RTL, light/dark branches, compact/expanded JSX, inclusive phoneLarge resize, count/colors, empty totals, six filter cases, distinct cards/settings/review targets and stopPropagation present/absent. Mock service/navigation/focus/settings/native-sheet boundaries only. No source slicing, copied component implementation or test-only production export.",
+        "Preserve seven actual temporary regression sources and full raw failures: smart review target, vocabulary mode, propagation, start eligibility, filter copy, breakpoint and count ownership. Every mutant must fail real assertions with no skipped tests or runtime-error suite. Final restored-source 24-case green, strict types, zero-warning new-test lint and formatting must remain pinned. Preserve all preparation failures and fixture diagnoses, with no application assertion or retry refund.",
+        "All seven frozen controller commands run fresh, including exact integrity before and after checks, focused uncached Jest, typecheck, zero-warning lint, artifact formatting and git diff --check. Preserve 3569 prior tracked inputs, 103 old test/support files, 2417 independently protected hashes, 102 other task records and root metadata. No existing test or assertion changes.",
+        "A new separate stronger read-only evaluator must inspect the entire source/test/document diff, primary reuse decision, actual unchanged home callers/Card/DeckStats, all preflight/raw regression evidence and every started/completed tool-item type in the original generator log. Reject any prohibited worker work even when copied bytes match. Checkpoint reuse requires all seven fresh controller gates and a new evaluator; primary final scope/acceptance follows released leases.",
+        "Keep the existing smart settings missing role/label visible as accessibility debt. Real RNTL props and invoked callbacks do not prove DOM/native bubbling, measured pixels, device touch, scheduling/persistence/auth isolation or all themes. No full Jest, app build, browser/native/device check is repeated or claimed for unchanged application source. No package/data/backend/production operation, push, deployment, paid/reset-credit/provider action or model/vendor/guard/retry/resource-limit change. One work item this heartbeat."
       ],
       "verification": [
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf052-home-cards-v1/verify.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='1d290cfd5bc6275ebfdfa689cc178f81befb850d733eb439469ddb068f473dca';runpy.run_path(str(p),run_name='__main__')"
+        ],
         [
           "npm",
           "run",
           "test:unit",
           "--",
           "--runTestsByPath",
-          "tests/unit/home-deck-cards.test.tsx"
+          "tests/unit/home-deck-cards.test.tsx",
+          "--no-cache"
         ],
         [
           "npm",
           "run",
           "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "tests/unit/home-deck-cards.test.tsx",
+          "--max-warnings=0"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "tests/unit/home-deck-cards.test.tsx",
+          "docs/refactoring/HOME_DECK_CARDS.md"
+        ],
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf052-home-cards-v1/verify.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='1d290cfd5bc6275ebfdfa689cc178f81befb850d733eb439469ddb068f473dca';runpy.run_path(str(p),run_name='__main__')"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
         ]
       ],
       "risk": "medium",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
-        "app/(tabs)/home.tsx",
-        "tests/unit/home-deck-cards.test.tsx"
+        "tests/unit/home-deck-cards.test.tsx",
+        "docs/refactoring/HOME_DECK_CARDS.md"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "implementation_mode": "copy-only",
+      "readiness_evidence": ".refactor-baseline/rf052-home-cards-v1/readiness.json"
     },
     {
       "id": "RF-053",
