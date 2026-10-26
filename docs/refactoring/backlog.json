@@ -3158,7 +3158,7 @@
         "RF-006"
       ],
       "acceptance_criteria": [
-        "Read all eight required documents named by plan.json with wc -l and bounded sed -n chunks of at most 80 lines, retaining complete output. These reads, git status/branch and the one exact artifact copy are the only worker operations. No whole-backlog, source/test/helper/package/log inspection, verification, hash, transform, case-count, guided implementation workflow, MCP/browser/REPL/collaboration, inventory or reviewer work. Primary already owns scope, reuse, architecture and acceptance.",
+        "Read all eight required documents named by plan.json using wc -l and these exact sed -n ranges. AGENTS.md uses 1,80p and 81,160p. ARCHITECTURE.md, CONVENTIONS.md, TECH_STACK.md, readiness.json, plan.json and reuse-map.json each use 1,80p. PROGRESS.md uses 1,80p; 81,160p; 161,240p; 241,320p; 321,400p; 401,480p; 481,560p; 561,640p; 641,720p; 721,800p; 801,880p. All requested ranges have at most 80 lines, even if the file ends earlier. Never use 721,801p. Sed endpoints are inclusive and that requests 81 lines. The prior two oversized reads were independently rejected and that ordinary attempt remains spent. These complete reads, git status/branch and one exact artifact copy are the only worker operations. No whole-backlog, source/test/helper/package/log inspection, verification, hash, transform, case-count, guided workflow, MCP/browser/REPL/collaboration, inventory or reviewer work. Primary already owns scope, reuse, architecture and acceptance.",
         "Install exactly the two supplied artifacts with the single copy body in plan.json. Do not change application source, private cards, Card/DeckStats, route exports, settings copy, accessibility behavior, dependencies, existing tests, protected inputs, runner, evidence, task/progress metadata or Git state. Report verification pending with the controller. No extraction is authorized. Existing shared presentation already uses Card and DeckStats; retain distinct smart title/filter and vocabulary settings policy.",
         "The controller's focused test must run the actual HomeScreen and real Card/DeckStats/locale strings in the existing RNTL/Jest setup. Require all 24 cases without skips for English/Arabic, LTR/RTL, light/dark branches, compact/expanded JSX, inclusive phoneLarge resize, count/colors, empty totals, six filter cases, distinct cards/settings/review targets and stopPropagation present/absent. Mock service/navigation/focus/settings/native-sheet boundaries only. No source slicing, copied component implementation or test-only production export.",
         "Preserve seven actual temporary regression sources and full raw failures: smart review target, vocabulary mode, propagation, start eligibility, filter copy, breakpoint and count ownership. Every mutant must fail real assertions with no skipped tests or runtime-error suite. Final restored-source 24-case green, strict types, zero-warning new-test lint and formatting must remain pinned. Preserve all preparation failures and fixture diagnoses, with no application assertion or retry refund.",
@@ -3212,14 +3212,18 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "pending",
+      "status": "retry",
       "allowed_paths": [
         "tests/unit/home-deck-cards.test.tsx",
         "docs/refactoring/HOME_DECK_CARDS.md"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "implementation_mode": "copy-only",
-      "readiness_evidence": ".refactor-baseline/rf052-home-cards-v1/readiness.json"
+      "readiness_evidence": ".refactor-baseline/rf052-home-cards-v1/readiness.json",
+      "started_at": "2026-10-26T18:06:44.697139+00:00",
+      "failure": "Independent review failed: Copy-only acceptance violation: .ralph/runs/RF-052-1-1793037852403633219/generator.jsonl:23 and :72 record `sed -n '721,801p' docs/refactoring/PROGRESS.md`. Each reads 81 lines, exceeding the mandatory 80-line maximum. Both completed successfully. Preserve this evidence and reject the checkpoint; a compliant handoff must split that range, repeat all seven controller gates, and receive fresh independent review. Artifact integrity, unchanged application source, 24 passing cases and seven assertion-failing mutants otherwise check out. No prohibited worker verification or source/test dumps were found. Browser/native checks were explicitly excluded for this unchanged-source task.",
+      "evidence": ".ralph/runs/RF-052-1-1793038004699129444",
+      "protocol_recovery_evidence": ".refactor-baseline/rf052-read-range-recovery.json"
     },
     {
       "id": "RF-053",
