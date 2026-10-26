@@ -3908,14 +3908,19 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "tests/unit/journey-ayah-preview.test.tsx",
         "docs/refactoring/JOURNEY_PREVIEWS.md"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "implementation_mode": "copy-only",
-      "readiness_evidence": ".refactor-baseline/rf061-journey-preview-v1/readiness.json"
+      "readiness_evidence": ".refactor-baseline/rf061-journey-preview-v1/readiness.json",
+      "started_at": "2026-10-26T08:51:49.919028+00:00",
+      "failure": "Batch resource limit reached",
+      "completed_at": "2026-10-26T08:58:03.976730+00:00",
+      "evidence": ".ralph/runs/RF-061-1-1793004709920825567",
+      "summary": "Installed the two supplied RF-061 artifacts. Verification and acceptance remain pending with the controller and independent evaluator."
     },
     {
       "id": "RF-062",
