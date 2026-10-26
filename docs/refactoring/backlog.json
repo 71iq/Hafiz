@@ -5996,6 +5996,7 @@
       "rationale": "The security helper intentionally examines a transitive package. Adding a runtime dependency solely to silence Knip would misstate ownership. Parent-relative resolution should inspect the actual package used by RN.",
       "modules": [
         "scripts/ralph/check-security-dependencies.cjs",
+        "scripts/tests/security-dependency-owner.test.cjs",
         "docs/refactoring/UNUSED.md"
       ],
       "dependencies": [
@@ -6005,7 +6006,8 @@
         "The existing controller path_allowed hard-denies scripts/ralph/ even when a task allow-list names a helper. Do not approve this item for a Ralph implementation worker or weaken that guard. This is primary-owned infrastructure maintenance requiring proportional real checks and separate stronger read-only review before primary acceptance. Keep approved false until that owner workflow is complete.",
         "Primary verifies React Native ownership, actual resolution paths, behavior under a harmless competing-root fixture, current override guarantees and unchanged Supabase CLI archive checks.",
         "Approve only a bounded parent-relative resolution repair after causal evidence. Do not install a new runtime devtools package or suppress the analysis finding.",
-        "No production, backend, credential, package override/version or live system change. Freeze real analysis and existing probe verification before approval."
+        "No production, backend, credential, package override/version or live system change. Freeze real analysis and existing probe verification before approval.",
+        "The bounded primary candidate changes only the two createRequire owner lines, adds four actual-probe child-process owner cases and appends UNUSED.md. All 3566 other tracked inputs, packages/overrides, 2417 protected inputs and other task records remain frozen. Three original failing ownership cases plus one passing control become four passes. Repeat the real installed probe, Node cases, zero-warning scoped lint/format, exact Knip delta and semantic worker-guard check. Require new separate stronger read-only review of this entire primary diff before acceptance; never grant an ordinary Ralph implementation worker access to this protected path."
       ],
       "verification": [
         [
@@ -6015,12 +6017,31 @@
       ],
       "risk": "low",
       "approved": false,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "scripts/ralph/check-security-dependencies.cjs",
+        "scripts/tests/security-dependency-owner.test.cjs",
         "docs/refactoring/UNUSED.md"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "readiness_evidence": ".refactor-baseline/rf088-parent-owner-v1/readiness.json",
+      "maintenance_workflow": {
+        "owner": "primary",
+        "state": "accepted after separate stronger read-only review and primary verification",
+        "ordinary_ralph_worker_allowed": false,
+        "primary_candidate_applied": true,
+        "source_head": "f77e4d3a1d169473150fac93124fed7678b98ced",
+        "evidence": ".refactor-baseline/rf088-parent-owner-v1",
+        "preflight_run": ".refactor-baseline/rf088-parent-owner-v1/preflight-1793022710681118619",
+        "meaningful_cases": 4,
+        "red_failures": 3,
+        "red_passing_control": 1,
+        "independent_review": ".refactor-baseline/rf088-parent-owner-v1/independent-review-resumed.txt",
+        "acceptance_receipt": ".refactor-baseline/rf088-primary-acceptance.json"
+      },
+      "completed_at": "2026-10-26T16:57:08.978485+00:00",
+      "evidence": ".refactor-baseline/rf088-primary-acceptance.json",
+      "summary": "Primary-maintained dependency probe now resolves devtools through React Native; four causal owner cases, fresh focused checks, separate Astra review and primary acceptance pass."
     },
     {
       "id": "RF-089",

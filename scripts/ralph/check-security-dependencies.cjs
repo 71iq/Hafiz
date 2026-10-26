@@ -8,7 +8,8 @@ const { pipeline } = require("node:stream/promises");
 const { createGunzip } = require("node:zlib");
 
 async function main() {
-  const devtools = createRequire(require.resolve("react-devtools-core/package.json"));
+  const reactNative = createRequire(require.resolve("react-native/package.json"));
+  const devtools = createRequire(reactNative.resolve("react-devtools-core/package.json"));
   const cli = createRequire(require.resolve("supabase/package.json"));
   assert.equal(devtools("shell-quote/package.json").version, "1.12.0");
   const tarMetadata = cli("tar/package.json");
