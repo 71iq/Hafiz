@@ -128,7 +128,8 @@
     "react-test-renderer": "^19.2.0",
     "supabase": "^2.98.2",
     "typescript": "~5.9.2",
-    "fast-check": "4.10.2"
+    "fast-check": "4.10.2",
+    "sharp": "0.35.5"
   },
   "overrides": {
     "react-devtools-core": {
