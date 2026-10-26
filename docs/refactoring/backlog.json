@@ -2853,7 +2853,8 @@
       "dependencies": [
         "RF-038",
         "RF-047",
-        "RF-102"
+        "RF-102",
+        "RF-103"
       ],
       "acceptance_criteria": [
         "Execute relevant phone/tablet/desktop, Arabic/English, five theme modes, keyboard/touch and reduced-height flows.",
@@ -6995,21 +6996,116 @@
     },
     {
       "id": "RF-102",
+      "title": "Respect live reduced motion in Switch thumb movement",
+      "description": "Install two exact primary-prepared artifacts. Extend only the shared controlled Switch with the existing live preference. All other transitions remain unapproved RF103.",
+      "rationale": "Switch always springs. Reuse the accepted preference, snap reduced/unknown state through the installed public Animated.Value cancellation API and preserve allowed-motion spring handoff. No manual animation manager or physics rewrite.",
+      "modules": [
+        "components/ui/Switch.tsx",
+        "tests/unit/switch-reduced-motion.test.tsx"
+      ],
+      "dependencies": [
+        "RF-038"
+      ],
+      "acceptance_criteria": [
+        "Read the selected task supplied in this prompt and all of AGENTS.md, docs/refactoring/ARCHITECTURE.md, CONVENTIONS.md, TECH_STACK.md and PROGRESS.md in bounded chunks of at most 80 lines with complete output. Read .refactor-baseline/rf102-switch-motion-v1/readiness.json, plan.json and reuse-map.json. These eight documents, git status/branch and one exact copy are the only allowed shell operations. Use wc -l and sed -n for permitted reads. Do not read the whole backlog. This is primary-prepared copy-only installation. No helper agents, workflows, caller/source/test inspection or dumps, hashes, transforms, case counts, redundant checks or other reads. No MCP, browser, app/UI/computer-use, REPL, collaboration or inventory tools. No package, config, evidence, runner, task/progress, commit/push/merge/deploy or production operation. Report verification pending with the controller.",
+        "Install exactly the two supplied artifacts using this single copy-command body: from pathlib import Path; import json; r=json.loads(Path(\".refactor-baseline/rf102-switch-motion-v1/readiness.json\").read_text()); [(Path(p).parent.mkdir(parents=True,exist_ok=True), Path(p).write_bytes(Path(a[\"candidate_path\"]).read_bytes())) for p,a in r[\"artifacts\"].items()]. Make no other edit or formatting change. The primary owns architecture, framework choices and final acceptance. The controller runs every frozen argv and starts a separate stronger evaluator.",
+        "Reuse the accepted useReducedMotionPreference hook without editing it. Unknown/reduced preference keeps the existing 2/22 endpoint static, including first render and controlled value changes. Live reduction snaps the latest value with Animated.Value.setValue, which cancels its current spring through the installed public API. Explicit no-preference keeps the entire original spring branch, useNativeDriver false and bounciness 4. Do not add manual stop/cleanup between successive allowed springs, which clears inherited velocity. Existing Animated.View unmount ownership stays unchanged. Keep controlled callbacks, checked/disabled/color feedback, props, all markup/styles, every caller and all other animation owners exact through whole-file reversal.",
+        "Every one of eleven frozen commands runs fresh. Require 17 focused tests and 85 suites/839 cold tests with no skips, strict types, both files linted with --max-warnings=0, both files formatted, all three platform dependency checks and web export. Original Switch fails ten cases. Manual cancellation of allowed spring velocity, ignored live preference and wrong static endpoint mutations fail 1/5/10 cases, then final source restores to 17 green. Freeze all 100 previous test files, 2417 protected inputs, all other tracked input paths and installed native/web animation implementations. No weakened assertion, rule, broad formatting or dependency change.",
+        "Twelve real installed-Chrome cases cover both languages, 390/768/1280 widths, beige/dark/AMOLED/white and both initial motion values. Keep real Expo/NativeWind, SettingsProvider, SQLite readiness gating, actual Switch plus Skeleton, remote blocking, controlled/disabled callback counts, actual motion interior samples, live mid-spring cancellation, later opt-in, shared listener removal/remount and exact original geometry/styles. Two exact pre-existing React hydration #418 messages per fixture navigation case remain recorded and must match baseline, with no new error. This is a controlled shared-component fixture, not a claim about full reading/deck settings flows. Temporary QA source route must be removed after export.",
+        "Primary directly inspected all twelve final prepared references after both leases were observed free. .refactor-baseline/rf102-switch-motion-v1/primary-visual-reference.json records keyed image/source hashes. A primary preflight of the added visual gate repeats all twelve cases and requires exact decoded RGBA pixels, geometry and styles with zero tolerance. The controller must repeat that gate fresh, and the independent evaluator must inspect the fresh results. This concrete primary reference review and fresh identity evidence precede its verdict. Final primary source/lifecycle/fresh-image acceptance follows the new independent verdict and lease release; that later final stage is not a prerequisite of the verdict.",
+        "Preserve original mock-host/sibling-key/type fixture failures, the synthetic RTL-row correction and its images, and the rejected proposed manual-stop design. Primary found the installed spring velocity handoff and corrected the design before approval. Keep all earlier green and red logs as historical preparation, not final readiness. Final source/tests and final-candidate preflight are explicitly named in readiness. Knip retains six exact issue records and exit 1, not clean. Same clone fragments remain 19 groups/386 lines/2523 tokens, 190 source files, not a duplication reduction.",
+        "Existing 44x24 control geometry, hardcoded colors, disabled/AMOLED low contrast and framework unmount ownership remain unchanged. No native/device execution, contrast/touch-target approval, full parent-flow, deployment or production claim. Unapproved RF103 retains every other transition/instant feedback owner and blocks RF048. A passing RF102 does not complete the motion workstream or mission. Keep vendor, models, account 93 percent stop, memory/time/token/retry/path/lease/checkpoint safeguards unchanged. One work item this heartbeat. All commits local.",
+        "A separate stronger read-only evaluator must inspect the complete source/test diff, all gate logs and every original generator started/completed tool item, including original generation after checkpoint reuse. Reject prohibited worker actions even if candidate bytes match. A resource checkpoint never bypasses fresh commands or a new verdict. Primary owns final acceptance after lease release."
+      ],
+      "verification": [
+        [
+          "python3",
+          "-c",
+          "import hashlib;from pathlib import Path;p=Path(\".refactor-baseline/rf102-switch-motion-v1/verify-inputs.py\");assert hashlib.sha256(p.read_bytes()).hexdigest()==\"7c42938500b0d572b0914cd6baddb0e6f429870a62e4b8961a43c9f642bd9e02\";exec(compile(p.read_text(),str(p),\"exec\"))"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/switch-reduced-motion.test.tsx",
+          "--no-cache"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "components/ui/Switch.tsx",
+          "tests/unit/switch-reduced-motion.test.tsx",
+          "--max-warnings=0"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "components/ui/Switch.tsx",
+          "tests/unit/switch-reduced-motion.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "python3",
+          ".refactor-baseline/rf102-switch-motion-v1/build-fixture.py"
+        ],
+        [
+          "python3",
+          ".refactor-baseline/rf102-switch-motion-v1/visual-gate.py"
+        ],
+        [
+          "python3",
+          ".refactor-baseline/rf102-switch-motion-v1/analysis.py"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
+        ]
+      ],
+      "risk": "medium",
+      "approved": true,
+      "status": "pending",
+      "allowed_paths": [
+        "components/ui/Switch.tsx",
+        "tests/unit/switch-reduced-motion.test.tsx"
+      ],
+      "attempts": 0,
+      "implementation_mode": "copy-only",
+      "readiness_evidence": ".refactor-baseline/rf102-switch-motion-v1/readiness.json"
+    },
+    {
+      "id": "RF-103",
       "title": "Respect live reduced motion in remaining shared UI transitions",
-      "description": "Prepare bounded transition scopes from the RF038 inventory before approval. Cover ResponsiveOverlay, legacy Sheet, Switch, Toast, OfflineBanner, DropdownMenu and AppNavigation; inspect instantaneous press feedback and actual ReadingStepper use too.",
-      "rationale": "Repeating placeholders and transition lifecycles are separate changes. RF038 establishes the shared live preference without silently certifying modal, visibility, callback or worklet behavior.",
+      "description": "Prepare exact bounded transition scopes for ResponsiveOverlay, legacy Sheet, Toast, OfflineBanner, DropdownMenu and AppNavigation. Inspect instantaneous press feedback and actual ReadingStepper use before claiming inventory completion. Switch is the separate RF102 slice.",
+      "rationale": "Transition visibility/focus/callback/worklet owners need separate primary decisions and evidence. Repeating placeholders and controlled Switch thumb motion do not certify them.",
       "modules": [
         "docs/refactoring/REDUCED_MOTION.md",
         "components/ui/ResponsiveOverlay.tsx",
         "components/ui/Sheet.tsx",
-        "components/ui/Switch.tsx",
         "components/ui/Toast.tsx",
         "components/ui/OfflineBanner.tsx",
         "components/ui/DropdownMenu.tsx",
         "components/ui/AppNavigation.tsx"
       ],
       "dependencies": [
-        "RF-038"
+        "RF-102"
       ],
       "acceptance_criteria": [
         "Primary must inspect real callers/tests and prepare exact small artifact sets and meaningful before/after/race/rendered checks before approving; split further if needed. Preserve useful state feedback, focus/dismissal/safe areas/geometry, toast lifetime, banner visibility callbacks, native worklets and the original checkout.",
@@ -7028,7 +7124,6 @@
       "allowed_paths": [
         "components/ui/ResponsiveOverlay.tsx",
         "components/ui/Sheet.tsx",
-        "components/ui/Switch.tsx",
         "components/ui/Toast.tsx",
         "components/ui/OfflineBanner.tsx",
         "components/ui/DropdownMenu.tsx",
