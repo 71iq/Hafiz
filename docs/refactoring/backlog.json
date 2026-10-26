@@ -2342,35 +2342,80 @@
     },
     {
       "id": "RF-037",
-      "title": "Measure settings render subscriptions",
-      "description": "Measure settings render subscriptions",
-      "rationale": "Settings context has many consumers; splitting needs evidence.",
+      "title": "Measure settings subscription commit effects",
+      "description": "Install a calibrated real-provider subscription test and its measurement report. Preserve production settings and reader code.",
+      "rationale": "Broad settings context updates need measured subscriber evidence before any selector or state split. Count committed hook effects with explicit controls; do not infer runtime cost or migrate persisted state.",
       "modules": [
-        "docs/refactoring/PERFORMANCE.md",
-        "lib/settings/context.tsx"
+        "tests/unit/settings-render-subscriptions.test.tsx",
+        "docs/refactoring/PERFORMANCE.md"
       ],
       "dependencies": [
         "RF-013"
       ],
       "acceptance_criteria": [
-        "Measure representative setting updates and reader renders before/after any proposed selector/context split.",
-        "Do not introduce Zustand duplication of persisted settings without an ADR."
+        "Read the selected task supplied in this prompt and all of AGENTS.md, docs/refactoring/ARCHITECTURE.md, CONVENTIONS.md, TECH_STACK.md and PROGRESS.md in bounded chunks of at most 80 lines with complete output. Also read .refactor-baseline/rf037-settings-renders-v1/readiness.json, plan.json and reuse-map.json. These eight documents, git status/branch and one exact copy are the only allowed shell operations. Use wc -l and sed -n for those reads. Do not read the whole backlog. Primary-prepared copy-only installation means no caller/source/test inspection or dumps, hashes, transforms, case counts, verification, helpers/reviewers or guided implementation workflows. No MCP, browser/UI/computer-use, REPL, collaboration or inventory tools. No package/config/evidence/runner/task/progress/commit/push/merge/deploy/production operation. Report verification pending with the controller.",
+        "Install exactly the two supplied test/report artifacts using this single copy-command body: from pathlib import Path; import json; r=json.loads(Path(\".refactor-baseline/rf037-settings-renders-v1/readiness.json\").read_text()); [(Path(p).parent.mkdir(parents=True,exist_ok=True), Path(p).write_bytes(Path(a[\"candidate_path\"]).read_bytes())) for p,a in r[\"artifacts\"].items()]. Make no other edit or formatting change. Do not change SettingsProvider, useSettings, reader components, persistence, existing tests, dependencies or any production source. The primary owns architecture and final acceptance. The controller runs all seven frozen argv and starts a separate stronger evaluator.",
+        "Measure the real provider and original useSettings return value, real writeUserSetting decisions, SurahHeader and memoized MushafPage with fixed structural fixtures. The test-only wrapper adds layout effects to each original hook call and returns its context value unchanged. Raw units are committed hook effects, not unique components, timings or frames. Header has two calls through useStrings and its own read; page has one in the one-line/no-ayah fixture. Font/theme/setter probes are memoized. The no-context control has its own layout effect. Mount observations and parent/control updates calibrate nonzero effects; no all-zero observation is accepted as performance evidence.",
+        "Require 14 English/Arabic cases after real hydration and controlled frame settlement. Five changed settings produce raw font/theme/actions/header/page/control counts 1/1/1/2/1/0. Repeating the current value produces zero new effects but another in-memory persistence write; daily limit also produces another mocked sync intent. Invalid font indices cause neither effects nor writes. Parent/control prop change causes 1/1/1/2/1/1 with new provider-value identity, unchanged sampled fields, stable setter identity and no persistence. Preserve actual state and persistence behavior; no optimization is implemented.",
+        "Keep the failed Profiler fixture and its control evidence: mount callbacks work, while tested context-only updates produce zero callbacks despite changed displayed font state. Do not infer disabled profiling or zero reader renders. Retain the initial react-hooks/globals rejection and effect-based capture repair with no disabled rule. Both real-provider missing-state mutations fail two cases each, then restore exact source and 14 passes. All diagnostic sources/logs, framework/version pins and final preflight evidence remain frozen.",
+        "All seven commands run fresh. Require 14 focused cases and 87 suites/889 cold cases without skips, strict types, new-test ESLint --max-warnings=0, both-artifact formatting and git diff --check. Freeze all 3565 previous tracked inputs, all 102 prior files under tests including 86 Jest files, 2417 independently hashed protected inputs, all 102 other task records and root metadata. No weakened assertion, rule, inventory, evidence, source, resource or retry change.",
+        "Performance report must distinguish cached-font/native-branch Jest fixtures from real SQLite/fonts, NativeWind theme effects, selection, WordToken, SurahInfoModal, browser/device/full settings/reader/review/runtime or network sync. No duration/FPS/memory/startup or improvement claim. Keep current context and persisted state owner, with no secondary Zustand store or selector/context API. RF039 retains full reader/review runtime profiling; a later optimization needs its own before/after scope. No new clean Knip/audit or duplication claim. No manual UI/build/device check is required for unchanged production source.",
+        "A separate stronger read-only evaluator must review the full new test/report diff, actual unchanged provider/hook/caller contracts, raw-unit calibration and all fresh gate logs. Verify frozen manifest entries through complete read-only hash comparison without printing thousands of hash entries. Inspect every original generation started/completed tool item, including after checkpoint reuse, exact complete generation-time output for all eight required documents and one prescribed copy. Reject prohibited worker actions even if bytes match. Checkpoints never waive fresh commands or a new verdict. Final primary scope/lifecycle acceptance follows verdict and lease release. Keep vendor, models, 93 percent account stop and all time/memory/token/retry/path/lease/checkpoint safeguards unchanged. One task this heartbeat. All commits local."
       ],
       "verification": [
+        [
+          "python3",
+          "-c",
+          "import hashlib;from pathlib import Path;p=Path(\".refactor-baseline/rf037-settings-renders-v1/verify-inputs.py\");assert hashlib.sha256(p.read_bytes()).hexdigest()==\"7e3a3fb39f13530190180ae303efe83faf1d924aa5fe52277576810dc8859b1f\";exec(compile(p.read_text(),str(p),\"exec\"))"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/settings-render-subscriptions.test.tsx",
+          "--no-cache"
+        ],
         [
           "npm",
           "run",
           "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "tests/unit/settings-render-subscriptions.test.tsx",
+          "--max-warnings=0"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "tests/unit/settings-render-subscriptions.test.tsx",
+          "docs/refactoring/PERFORMANCE.md"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
         ]
       ],
       "risk": "medium",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
-        "docs/refactoring/PERFORMANCE.md",
-        "lib/settings/context.tsx"
+        "tests/unit/settings-render-subscriptions.test.tsx",
+        "docs/refactoring/PERFORMANCE.md"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "implementation_mode": "copy-only",
+      "readiness_evidence": ".refactor-baseline/rf037-settings-renders-v1/readiness.json"
     },
     {
       "id": "RF-038",
