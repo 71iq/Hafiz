@@ -5879,12 +5879,12 @@
     {
       "id": "RF-087",
       "title": "Resolve the manual icon generator tooling dependency",
-      "description": "Review and declare a compatible development-only sharp requirement for the maintained manual generator, or document a simpler verified supported invocation.",
-      "rationale": "The existing generator directly imports sharp, which is absent. This is tooling ownership, not an application runtime-library requirement or permission to regenerate protected icons.",
+      "description": "Declare the manual generator's exact development-only Sharp dependency, preserve every old package, add safe real-API buffer tests and document the bounded tool ownership.",
+      "rationale": "The maintained script directly imports absent Sharp and a root import fails. Exact dev ownership fixes that tool without running its six protected writes or adding an application dependency.",
       "modules": [
         "package.json",
         "package-lock.json",
-        "scripts/generate-icons.mjs",
+        "scripts/tests/icon-tool.test.cjs",
         "docs/refactoring/UNUSED.md"
       ],
       "dependencies": [
@@ -5892,32 +5892,97 @@
         "RF-089"
       ],
       "acceptance_criteria": [
-        "RF-089 has security priority. Refresh package/lock/audit preflight after that patch before any Sharp approval; the earlier rf087 metadata/baseline is historical. No Sharp package has been installed in the application by this preparation.",
-        "Primary must inspect script side effects, official current sharp/Node/platform compatibility, audit and lock impacts before selecting an exact scope.",
-        "Do not run the icon generator or modify protected assets. Keep runtime dependencies and native app behavior unchanged; verify any chosen development tool with harmless in-memory input.",
-        "This placeholder authorizes no dependency installation, source change, asset generation or test weakening. Freeze acceptance commands and independent review after readiness."
+        "Read the supplied selected task and all of AGENTS.md, docs/refactoring/ARCHITECTURE.md, CONVENTIONS.md, TECH_STACK.md and PROGRESS.md in bounded chunks of at most 80 lines with complete output. Also read .refactor-baseline/rf087-icon-tool-v1/readiness.json, plan.json and reuse-map.json. These eight documents, git status/branch and one exact artifact copy are the only allowed shell operations. Use wc -l and sed -n. Do not read the whole backlog, implementation/callers, source/test bodies, helper code, package metadata or diagnostic logs. Primary already made these choices. No worker verification, hash, transform, case-count, package installation, live service, guided implementation workflow, MCP/browser/UI/REPL/collaboration/inventory or helper/reviewer action. Report verification pending with the controller.",
+        "Install exactly four supplied artifacts using one copy-command body: from pathlib import Path; import json; r=json.loads(Path(\".refactor-baseline/rf087-icon-tool-v1/readiness.json\").read_text()); [(Path(p).parent.mkdir(parents=True,exist_ok=True), Path(p).write_bytes(Path(a[\"candidate_path\"]).read_bytes())) for p,a in r[\"artifacts\"].items()]. Copying the exact supplied package.json and package-lock.json bytes is allowed; package resolution and installation belong only to controller checks. No other source, manifest, lock, test, configuration, evidence, runner, task/progress, asset or Git-state mutation. Do not import or execute scripts/generate-icons.mjs. Its top-level generate call writes six protected PNGs. No icon generation is authorized.",
+        "Only add exact development dependency sharp 0.35.5. Keep manifest ordering and every other field byte-identical. Keep every old resolved lock entry exact and add only the 30 frozen development-only entries. Preserve old lock-root key relative ordering, old root semver 6.3.1 and new nested Sharp semver 7.8.5. Runtime dependencies, old package versions, native app project, patches and all application/reader/data behavior remain unchanged. Primary owns security and architecture decisions.",
+        "Use the existing Node test runner and real Sharp APIs. Require three meaningful in-memory cases for SVG-to-PNG signature/dimensions/exact RGBA, transparent monochrome shape pixels and invalid-input rejection. No image/file output, protected asset read/write, real content, generator import, new framework, skipped case or weakened assertion. Existing manual generator stays byte-identical. This verifies its required APIs with synthetic buffers, not its protected icon designs or generated output.",
+        "The controller must run real strict offline application lock resolution and installation, with ignore-scripts, no-audit, no-fund, strict-peer-deps and dev/optional inclusion, then npm ls --all --json. Manifest and lock must remain exact after every step. Verify actual Linux x64 Sharp 0.35.5/libvips 8.18.7 and both semver owners. Isolated fixture, temporary-link preflight and logical lock validation do not replace the real installed graph. Do not force resolution, use legacy peers, skip optional binaries, run lifecycle/image/database generators or add another runtime dependency.",
+        "All twelve controller argv run fresh. Require three Node cases, unchanged 87 suites/889 cold Jest cases without skips, strict types, new-test zero-warning ESLint, four-artifact formatting, all three platform dependency checks, web export, installed graph, complete post-command frozen-input comparison and git diff --check. The final integrity repetition detects package-install/build side effects after the initial check. Every 3564 other tracked input, 103 old test/support files including 87 Jest files, 2417 independently hashed protected inputs, 102 other task records and root metadata stays unchanged. UNUSED.md is append-only.",
+        "Fresh current baseline/candidate audits must have identical direct advisory sources and vulnerable package ownership. Preparation snapshots each have 18 findings with 10 high, seven moderate, one low and zero critical, from 22 direct sources. Preserve all raw current and historical reports; the older 74-count snapshot is not attributed as a fix here. Record fresh counts honestly. New Knip removes only scripts/generate-icons.mjs unlisted sharp and retains the exact other five issue records, with nonzero finding exit. No new advisory, blanket ignore, suppression, automatic fix, clean-audit or overall clean-Knip claim.",
+        "Preserve the initial failed preparation recipe and order-diagnosis.json. Its append-at-end expectation for the lock-root Sharp key was wrong; npm inserts that key alphabetically. Full old package objects, exact root values and old relative key order remain enforced. This corrects only a preparation premise, never an app assertion or retry cap. The root missing-Sharp import, harmless isolated probe, all preflight sources/logs and exact restored-source evidence remain preserved.",
+        "A separate stronger read-only evaluator must inspect the full task diff, real manual-generator import/write behavior without executing it, candidate package/lock ownership, native-tool platform compatibility, all frozen manifest hashes, all fresh logs and each original generation started/completed tool-item type. Require complete exact generation-time output for all eight allowed documents and exactly one prescribed copy. Reject prohibited generator actions even when bytes match. Checkpoint reuse still requires all fresh commands and a new independent verdict. No manual browser/UI/native-build/device run is needed for this dev-tool/test/document scope, and no such result or icon-generation/design proof may be claimed.",
+        "Final primary scope, security, source/hash and lifecycle acceptance follows the new verdict and lease release. Preserve vendor/models, 93 percent account stop, and all time/memory/token/retry/path/lease/checkpoint safeguards. One task this heartbeat, local commits only, no push/merge/deployment/production or protected-input operation."
       ],
       "verification": [
+        [
+          "python3",
+          "-c",
+          "import hashlib;from pathlib import Path;p=Path(\".refactor-baseline/rf087-icon-tool-v1/verify-integrity.py\");assert hashlib.sha256(p.read_bytes()).hexdigest()==\"cbd7f19dc601644322244e9780689c6fbe15db5d0ac255a63e857ef851a9739e\";exec(compile(p.read_text(),str(p),\"exec\"))"
+        ],
+        [
+          "python3",
+          "-c",
+          "import hashlib;from pathlib import Path;p=Path(\".refactor-baseline/rf087-icon-tool-v1/controller-install.py\");assert hashlib.sha256(p.read_bytes()).hexdigest()==\"d4c377f025058df30834002d664b36be04610249c9f4ce55b7b4fb0fe1154344\";exec(compile(p.read_text(),str(p),\"exec\"))"
+        ],
+        [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "scripts/tests/icon-tool.test.cjs"
+        ],
         [
           "npm",
           "run",
           "typecheck"
         ],
         [
+          "node_modules/.bin/eslint",
+          "scripts/tests/icon-tool.test.cjs",
+          "--max-warnings=0"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "package.json",
+          "package-lock.json",
+          "scripts/tests/icon-tool.test.cjs",
+          "docs/refactoring/UNUSED.md"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
           "npm",
           "run",
           "build:web"
+        ],
+        [
+          "python3",
+          "-c",
+          "import hashlib;from pathlib import Path;p=Path(\".refactor-baseline/rf087-icon-tool-v1/controller-analysis.py\");assert hashlib.sha256(p.read_bytes()).hexdigest()==\"f145206a01d7fbc0bf2b6a199183c60436b82b564f891777369183595186a075\";exec(compile(p.read_text(),str(p),\"exec\"))"
+        ],
+        [
+          "python3",
+          "-c",
+          "import hashlib;from pathlib import Path;p=Path(\".refactor-baseline/rf087-icon-tool-v1/verify-integrity.py\");assert hashlib.sha256(p.read_bytes()).hexdigest()==\"cbd7f19dc601644322244e9780689c6fbe15db5d0ac255a63e857ef851a9739e\";exec(compile(p.read_text(),str(p),\"exec\"))"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
         ]
       ],
       "risk": "medium",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
         "package.json",
         "package-lock.json",
+        "scripts/tests/icon-tool.test.cjs",
         "docs/refactoring/UNUSED.md"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "implementation_mode": "copy-only",
+      "readiness_evidence": ".refactor-baseline/rf087-icon-tool-v1/readiness.json"
     },
     {
       "id": "RF-088",
