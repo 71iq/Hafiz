@@ -2409,17 +2409,19 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "retry",
+      "status": "verified",
       "allowed_paths": [
         "tests/unit/settings-render-subscriptions.test.tsx",
         "docs/refactoring/PERFORMANCE.md"
       ],
-      "attempts": 1,
+      "attempts": 2,
       "implementation_mode": "copy-only",
       "readiness_evidence": ".refactor-baseline/rf037-settings-renders-review-v2/readiness.json",
-      "started_at": "2026-10-26T10:25:02.213604+00:00",
-      "failure": "Independent review failed: Missing mandatory diagnostic source. .refactor-baseline/rf037-settings-renders-v1/profiler-diagnosis-1793009272725198607/output.log:63 records RF037-PROBE instrumentation absent from every preserved test source. pins.json:20 freezes only its output log. Recover and freeze the exact instrumented source with provenance through primary review, then repeat the required gates and independent evaluation. The current evidence does not satisfy the requirement to preserve all diagnostic sources.; Otherwise, both artifacts match, production inputs remain unchanged, and generator actions comply. Reviewed all seven fresh passing gates, including 14 focused cases and 87 suites/889 cold cases. Independent hash comparisons and git diff --check passed. No manual UI/build/device check is required for this unchanged production scope. No files were modified.",
-      "evidence": ".ralph/runs/RF-037-1-1793010302215630697"
+      "started_at": "2026-10-26T11:52:40.721283+00:00",
+      "failure": "Batch resource limit reached",
+      "evidence": ".ralph/runs/RF-037-2-1793015560723260355",
+      "completed_at": "2026-10-26T11:59:00.075123+00:00",
+      "summary": "Installed the two supplied RF037 artifacts using the prescribed copy command. Verification and acceptance remain pending with the controller and independent evaluator."
     },
     {
       "id": "RF-038",
