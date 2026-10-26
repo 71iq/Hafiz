@@ -3212,18 +3212,19 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "retry",
+      "status": "blocked",
       "allowed_paths": [
         "tests/unit/home-deck-cards.test.tsx",
         "docs/refactoring/HOME_DECK_CARDS.md"
       ],
-      "attempts": 1,
+      "attempts": 2,
       "implementation_mode": "copy-only",
       "readiness_evidence": ".refactor-baseline/rf052-home-cards-v1/readiness.json",
-      "started_at": "2026-10-26T18:06:44.697139+00:00",
-      "failure": "Independent review failed: Copy-only acceptance violation: .ralph/runs/RF-052-1-1793037852403633219/generator.jsonl:23 and :72 record `sed -n '721,801p' docs/refactoring/PROGRESS.md`. Each reads 81 lines, exceeding the mandatory 80-line maximum. Both completed successfully. Preserve this evidence and reject the checkpoint; a compliant handoff must split that range, repeat all seven controller gates, and receive fresh independent review. Artifact integrity, unchanged application source, 24 passing cases and seven assertion-failing mutants otherwise check out. No prohibited worker verification or source/test dumps were found. Browser/native checks were explicitly excluded for this unchanged-source task.",
-      "evidence": ".ralph/runs/RF-052-1-1793038004699129444",
-      "protocol_recovery_evidence": ".refactor-baseline/rf052-read-range-recovery.json"
+      "started_at": "2026-10-26T18:12:55.242990+00:00",
+      "failure": "Independent review failed: Blocking copy-only violation: .ralph/runs/RF-052-2-1793038375244917485/generator.jsonl:15-16 stops PROGRESS.md reads at 721,800p. Line 13 reports 809 lines, but the mandatory 801,880p read never occurs. Line 19 incorrectly claims complete reads. Reject this checkpoint and preserve the spent attempt. Any authorized recovery must complete every required range, repeat all seven controller gates, and receive fresh independent review without refunding attempts or relaxing limits.; Otherwise, the complete tracked/untracked diff, unchanged HomeScreen/Card/DeckStats, reuse decision, preparation failures and seven assertion-failing mutants check out. All seven controller gates passed with 24 tests and no skips. Independent integrity verification and git diff --check passed. No prohibited generator checks, source/test dumps or additional tool types were found. Accessibility debt and browser/native/offline verification limits remain explicit; manual device checks are excluded for this unchanged-source task. No files or Git state were changed during review.",
+      "evidence": ".ralph/runs/RF-052-2-1793038375244917485",
+      "protocol_recovery_evidence": ".refactor-baseline/rf052-read-range-recovery.json",
+      "primary_blocked_evidence": ".refactor-baseline/rf052-primary-blocked.json"
     },
     {
       "id": "RF-053",
