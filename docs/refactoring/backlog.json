@@ -3158,20 +3158,20 @@
         "RF-006"
       ],
       "acceptance_criteria": [
-        "Read all eight required documents named by plan.json using wc -l and these exact sed -n ranges. AGENTS.md uses 1,80p and 81,160p. ARCHITECTURE.md, CONVENTIONS.md, TECH_STACK.md, readiness.json, plan.json and reuse-map.json each use 1,80p. PROGRESS.md uses 1,80p; 81,160p; 161,240p; 241,320p; 321,400p; 401,480p; 481,560p; 561,640p; 641,720p; 721,800p; 801,880p. All requested ranges have at most 80 lines, even if the file ends earlier. Never use 721,801p. Sed endpoints are inclusive and that requests 81 lines. The prior two oversized reads were independently rejected and that ordinary attempt remains spent. These complete reads, git status/branch and one exact artifact copy are the only worker operations. No whole-backlog, source/test/helper/package/log inspection, verification, hash, transform, case-count, guided workflow, MCP/browser/REPL/collaboration, inventory or reviewer work. Primary already owns scope, reuse, architecture and acceptance.",
-        "Install exactly the two supplied artifacts with the single copy body in plan.json. Do not change application source, private cards, Card/DeckStats, route exports, settings copy, accessibility behavior, dependencies, existing tests, protected inputs, runner, evidence, task/progress metadata or Git state. Report verification pending with the controller. No extraction is authorized. Existing shared presentation already uses Card and DeckStats; retain distinct smart title/filter and vocabulary settings policy.",
+        "The user authorizes exactly one additional ordinary attempt. Both prior failures remain spent. Read every required document using exactly python3 -B .refactor-baseline/rf052-authorized-recovery-v4/read.py SECTION_ID for each ID from 1 through 19 inclusive. Run each section in its own shell tool call with max_output_tokens at least 20000. Each emits at most 80 source lines, and every exact section output, including section 19, is required before copying. Do not manually choose ranges, combine commands or use whole-stream output. This pinned read-only reader execution is the sole helper exception. Optional git status/branch and the single exact artifact copy are the only other operations. No source/test/helper/package/log inspection, verification, hashes, transforms, guided workflows, MCP/browser/REPL/collaboration, inventory, reviewer, evidence/metadata or Git writes. Primary owns architecture and acceptance.",
+        "After the complete reader returns, install exactly the same two supplied artifacts using the single install body in .refactor-baseline/rf052-authorized-recovery-v4/plan.json. No application source, private card, Card/DeckStats, route export, behavior/accessibility, package, old test, protected input, runner, evidence/task/progress or Git-state changes. Report verification pending with the controller. No extraction is authorized.",
         "The controller's focused test must run the actual HomeScreen and real Card/DeckStats/locale strings in the existing RNTL/Jest setup. Require all 24 cases without skips for English/Arabic, LTR/RTL, light/dark branches, compact/expanded JSX, inclusive phoneLarge resize, count/colors, empty totals, six filter cases, distinct cards/settings/review targets and stopPropagation present/absent. Mock service/navigation/focus/settings/native-sheet boundaries only. No source slicing, copied component implementation or test-only production export.",
         "Preserve seven actual temporary regression sources and full raw failures: smart review target, vocabulary mode, propagation, start eligibility, filter copy, breakpoint and count ownership. Every mutant must fail real assertions with no skipped tests or runtime-error suite. Final restored-source 24-case green, strict types, zero-warning new-test lint and formatting must remain pinned. Preserve all preparation failures and fixture diagnoses, with no application assertion or retry refund.",
-        "All seven frozen controller commands run fresh, including exact integrity before and after checks, focused uncached Jest, typecheck, zero-warning lint, artifact formatting and git diff --check. Preserve 3569 prior tracked inputs, 103 old test/support files, 2417 independently protected hashes, 102 other task records and root metadata. No existing test or assertion changes.",
-        "A new separate stronger read-only evaluator must inspect the entire source/test/document diff, primary reuse decision, actual unchanged home callers/Card/DeckStats, all preflight/raw regression evidence and every started/completed tool-item type in the original generator log. Reject any prohibited worker work even when copied bytes match. Checkpoint reuse requires all seven fresh controller gates and a new evaluator; primary final scope/acceptance follows released leases.",
-        "Keep the existing smart settings missing role/label visible as accessibility debt. Real RNTL props and invoked callbacks do not prove DOM/native bubbling, measured pixels, device touch, scheduling/persistence/auth isolation or all themes. No full Jest, app build, browser/native/device check is repeated or claimed for unchanged application source. No package/data/backend/production operation, push, deployment, paid/reset-credit/provider action or model/vendor/guard/retry/resource-limit change. One work item this heartbeat."
+        "All seven frozen controller commands run fresh, including exact integrity before and after checks, focused uncached Jest, typecheck, zero-warning lint, artifact formatting and git diff --check. Preserve 3569 prior tracked inputs, 103 old test/support files, 2417 independently protected hashes, 102 other task records and root metadata. No existing test or assertion changes. Initial and final integrity commands also run the pinned document-output audit against the actual original generation checkpoint log. Missing/altered/truncated section output, a missing reader invocation, copy before complete reading, unexpected tools or extra copies fail. Preserve the complete packet, read-only reader and audit preflight positive/negative evidence for separate review.",
+        "A new separate stronger read-only evaluator must inspect the entire source/test/document diff, primary reuse decision, actual unchanged home callers/Card/DeckStats, all preflight/raw regression evidence and every started/completed tool-item type in the original generator log. Reject any prohibited worker work even when copied bytes match. Checkpoint reuse requires all seven fresh controller gates and a new evaluator; primary final scope/acceptance follows released leases. The new evaluator must also review the new read-only reader, manifest, packet-output audit, every raw generator output and the explicit one-attempt user authorization. The historical counter offset retains both prior failures and permits total ordinary attempt three only. No fourth attempt is authorized.",
+        "Keep the existing smart settings missing role/label visible as accessibility debt. Real RNTL props and invoked callbacks do not prove DOM/native bubbling, measured pixels, device touch, scheduling/persistence/auth isolation or all themes. No full Jest, app build, browser/native/device check is repeated or claimed for unchanged application source. No package/data/backend/production operation, push, deployment, paid/reset-credit/provider action or global model/vendor/guard/retry/resource-limit change. One work item this heartbeat."
       ],
       "verification": [
         [
           "python3",
           "-B",
           "-c",
-          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf052-home-cards-v1/verify.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='1d290cfd5bc6275ebfdfa689cc178f81befb850d733eb439469ddb068f473dca';runpy.run_path(str(p),run_name='__main__')"
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf052-home-cards-v1/verify.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='1d290cfd5bc6275ebfdfa689cc178f81befb850d733eb439469ddb068f473dca';runpy.run_path(str(p),run_name='__main__');p=Path('.refactor-baseline/rf052-authorized-recovery-v4/audit.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='9293628c0affddec3338b192433ff05ec6909239e946dbda5d1bbcd436eb857b';runpy.run_path(str(p),run_name='__main__')"
         ],
         [
           "npm",
@@ -3202,7 +3202,7 @@
           "python3",
           "-B",
           "-c",
-          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf052-home-cards-v1/verify.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='1d290cfd5bc6275ebfdfa689cc178f81befb850d733eb439469ddb068f473dca';runpy.run_path(str(p),run_name='__main__')"
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf052-home-cards-v1/verify.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='1d290cfd5bc6275ebfdfa689cc178f81befb850d733eb439469ddb068f473dca';runpy.run_path(str(p),run_name='__main__');p=Path('.refactor-baseline/rf052-authorized-recovery-v4/audit.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='9293628c0affddec3338b192433ff05ec6909239e946dbda5d1bbcd436eb857b';runpy.run_path(str(p),run_name='__main__')"
         ],
         [
           "git",
@@ -3212,19 +3212,23 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "blocked",
+      "status": "retry",
       "allowed_paths": [
         "tests/unit/home-deck-cards.test.tsx",
         "docs/refactoring/HOME_DECK_CARDS.md"
       ],
-      "attempts": 2,
+      "attempts": 1,
       "implementation_mode": "copy-only",
-      "readiness_evidence": ".refactor-baseline/rf052-home-cards-v1/readiness.json",
+      "readiness_evidence": ".refactor-baseline/rf052-authorized-recovery-v4/readiness.json",
       "started_at": "2026-10-26T18:12:55.242990+00:00",
       "failure": "Independent review failed: Blocking copy-only violation: .ralph/runs/RF-052-2-1793038375244917485/generator.jsonl:15-16 stops PROGRESS.md reads at 721,800p. Line 13 reports 809 lines, but the mandatory 801,880p read never occurs. Line 19 incorrectly claims complete reads. Reject this checkpoint and preserve the spent attempt. Any authorized recovery must complete every required range, repeat all seven controller gates, and receive fresh independent review without refunding attempts or relaxing limits.; Otherwise, the complete tracked/untracked diff, unchanged HomeScreen/Card/DeckStats, reuse decision, preparation failures and seven assertion-failing mutants check out. All seven controller gates passed with 24 tests and no skips. Independent integrity verification and git diff --check passed. No prohibited generator checks, source/test dumps or additional tool types were found. Accessibility debt and browser/native/offline verification limits remain explicit; manual device checks are excluded for this unchanged-source task. No files or Git state were changed during review.",
       "evidence": ".ralph/runs/RF-052-2-1793038375244917485",
       "protocol_recovery_evidence": ".refactor-baseline/rf052-read-range-recovery.json",
-      "primary_blocked_evidence": ".refactor-baseline/rf052-primary-blocked.json"
+      "primary_blocked_evidence": ".refactor-baseline/rf052-primary-blocked.json",
+      "historical_ordinary_attempts_spent_before_extension": 2,
+      "additional_attempt_authorization": ".refactor-baseline/rf052-authorized-recovery-v4/authorization.json",
+      "additional_attempt_controller_counter_base": 1,
+      "additional_attempt_historical_offset": 1
     },
     {
       "id": "RF-053",
