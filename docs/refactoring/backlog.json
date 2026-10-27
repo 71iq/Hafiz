@@ -7358,7 +7358,7 @@
     {
       "id": "RF-103",
       "title": "Respect live reduced motion in remaining shared UI transitions",
-      "description": "Prepare exact bounded transition scopes for ResponsiveOverlay, legacy Sheet, Toast, OfflineBanner, DropdownMenu and AppNavigation. Inspect instantaneous press feedback and actual ReadingStepper use before claiming inventory completion. Switch is the separate RF102 slice. OfflineBanner is now the separate exact RF105 slice; this umbrella retains all other owners.",
+      "description": "Prepare exact bounded transition scopes for ResponsiveOverlay, legacy Sheet, Toast, OfflineBanner, DropdownMenu and AppNavigation. Inspect instantaneous press feedback and actual ReadingStepper use before claiming inventory completion. Switch is the separate RF102 slice. OfflineBanner is now the separate exact RF105 slice; this umbrella retains all other owners. Toast is the separate exact RF106 session/motion slice.",
       "rationale": "Transition visibility/focus/callback/worklet owners need separate primary decisions and evidence. Repeating placeholders and controlled Switch thumb motion do not certify them.",
       "modules": [
         "docs/refactoring/REDUCED_MOTION.md",
@@ -7371,7 +7371,8 @@
       ],
       "dependencies": [
         "RF-102",
-        "RF-105"
+        "RF-105",
+        "RF-106"
       ],
       "acceptance_criteria": [
         "Primary must inspect real callers/tests and prepare exact small artifact sets and meaningful before/after/race/rendered checks before approving; split further if needed. Preserve useful state feedback, focus/dismissal/safe areas/geometry, toast lifetime, banner visibility callbacks, native worklets and the original checkout.",
@@ -7546,6 +7547,91 @@
       "primary_accepted": true,
       "primary_acceptance_evidence": ".refactor-baseline/rf105-primary-acceptance.json",
       "last_preacceptance_resource_stop": "review stopped at account usage limit; see .ralph/runs/RF-105-1-1793077220988256985/review.jsonl"
+    },
+    {
+      "id": "RF-106",
+      "title": "Respect live reduced motion and session lifetime in Toast",
+      "description": "Exact Toast slice split from RF103. Preserve hold plus200ms dismissal tail while cancelling/snap transitions and guarding old callbacks.",
+      "rationale": "Four actual Chrome cases lose the replacement when an old fade is stopped and still animate under reduce. Primary owns timer and phase design.",
+      "modules": [
+        "components/ui/Toast.tsx",
+        "tests/unit/toast-reduced-motion.test.tsx",
+        "docs/refactoring/REDUCED_MOTION.md"
+      ],
+      "dependencies": [
+        "RF-105"
+      ],
+      "acceptance_criteria": [
+        "Read .refactor-baseline/rf106-toast-motion-v1/plan.md, reuse-map.md and readiness.json. Primary design is fixed: reuse shared useReducedMotionPreference, existing opacity Value, local phase/animation/preference refs and at most one stable local opacity callback. No new API/shared abstraction/dependency/provider/caller change. Keep original styles, text, pointer behavior, default2000 and caller durations. Preserve session reset dependencies message/duration/onDismiss identity, not reduceMotion. No ref reads/writes during render. Effect ordering makes latest preference available before session setup.",
+        "Use the detailed primary two-effect/session algorithm in plan.md. Preference updates never restart or clear hold/dismissal timers. Show phase targets1 with200ms deadline; actual hold-timer firing begins hide target0 with200ms deadline and schedules one separate200ms tail callback. The active session guard alone can dismiss. Reduced/unknown snaps current target, including hidden0 at hold end, but retains callback deadline. Allowed initial phases retain200ms/native driver; live opt-in uses clamped remaining phase time, and after entry completion stays static. Native animation starts with no dismissal callback. Cleanup marks inactive before stop, clears both timers/phase and stops owned animation; stale callbacks cannot clear a later message. Falsy message renders null and resets0. Zero/negative duration retains normal JS hold timer semantics plus full200ms tail. Truthy replacement retains current opacity before new entry rather than forced hidden flash.",
+        "Inspect actual Toast callers, shared preference and nearest motion tests/installed RN animation lifecycle. Add focused actual component/hook tests before source fix and save red output under supplied evidence directory, then green. Assert default/custom/zero/negative hold+200 deadline exactly with controlled timers; initial unknown/reduced/allowed behavior; 200/native driver; live changes during entry/hold/exit do not restart lifetime; live opt-in remaining time not replay; replacement/onDismiss identity/duration reset; one current callback only; unmount/null/empty cleanup; captured real old hold and tail timer callbacks manually invoked after cleanup must exist and cannot dismiss; no callback from animation cancellation; exact existing text/styles. No optional nonexistent callback invocations, source-string tests, weakened old tests or snapshots. Use native scheduling/system boundaries only. Worker may run scoped Jest/typecheck/lint/format; do not run/edit QA helpers/routes, full app checks, package installs or live services. Do not edit controller/backlog/progress or other task files.",
+        "Update only Toast ownership row and one bounded scope/limitations paragraph in REDUCED_MOTION.md. Refer to backlog/PROGRESS for actual acceptance status, without freezing a claim that future controller verification remains pending. Other owners remain RF103. Fresh controller gates require source/test/protected/helper/other-task integrity, focused Toast and shared preference suites, typecheck, scoped zero-warning lint/format, actual fixture web export and four Chrome cases, followed by integrity/whitespace. Browser must preserve exact settled geometry/styles/error arrays versus original, zero reduced/interior allowed entry, live entry/exit snaps, hold+200 callback lifetime, and replacement survival for its own full lifetime. Real Expo/Animated with actual SQLite readiness; remote requests blocked; temporary QA route removed after export. Native/device, whole parent flows, contrast and touch-target approval remain unclaimed.",
+        "Separate stronger evaluator inspects complete source/test/doc diff plus every original generator started/completed tool item type and all fresh gate logs. Review owned timer guards, actual stopped callbacks, remaining-time math, session dependency/cancellation semantics and meaningful red/green evidence, rather than file text. No acceptance from a self report or resource checkpoint. Primary direct source/image acceptance after independent verdict and released leases. Preserve every failed/resource log and obey unchanged batch/retry/timeout/account93% safeguards; RF052 waiver not used. No original checkout/protected Quran/font/data/map, provider/model/vendor/config/production changes. Local commits only; no push/merge/deploy."
+      ],
+      "verification": [
+        [
+          "python3",
+          "-B",
+          ".refactor-baseline/rf106-toast-motion-v1/verify-inputs.py"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/toast-reduced-motion.test.tsx",
+          "tests/unit/reduced-motion.test.tsx",
+          "--no-cache"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "components/ui/Toast.tsx",
+          "tests/unit/toast-reduced-motion.test.tsx",
+          "--max-warnings=0"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "components/ui/Toast.tsx",
+          "tests/unit/toast-reduced-motion.test.tsx"
+        ],
+        [
+          "python3",
+          "-B",
+          ".refactor-baseline/rf106-toast-motion-v1/build-fixture.py"
+        ],
+        [
+          "node",
+          ".refactor-baseline/rf106-toast-motion-v1/browser.cjs",
+          "controller"
+        ],
+        [
+          "python3",
+          "-B",
+          ".refactor-baseline/rf106-toast-motion-v1/verify-inputs.py"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
+        ]
+      ],
+      "risk": "medium",
+      "approved": true,
+      "status": "pending",
+      "allowed_paths": [
+        "components/ui/Toast.tsx",
+        "tests/unit/toast-reduced-motion.test.tsx",
+        "docs/refactoring/REDUCED_MOTION.md"
+      ],
+      "attempts": 0,
+      "readiness_evidence": ".refactor-baseline/rf106-toast-motion-v1/readiness.json"
     }
   ]
 }
