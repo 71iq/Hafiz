@@ -7372,7 +7372,8 @@
       "dependencies": [
         "RF-102",
         "RF-105",
-        "RF-106"
+        "RF-106",
+        "RF-107"
       ],
       "acceptance_criteria": [
         "Primary must inspect real callers/tests and prepare exact small artifact sets and meaningful before/after/race/rendered checks before approving; split further if needed. Preserve useful state feedback, focus/dismissal/safe areas/geometry, toast lifetime, banner visibility callbacks, native worklets and the original checkout.",
@@ -7647,6 +7648,98 @@
       "primary_accepted": true,
       "primary_acceptance_evidence": ".refactor-baseline/rf106-primary-acceptance.json",
       "last_preacceptance_resource_stop": "Batch resource limit reached"
+    },
+    {
+      "id": "RF-107",
+      "title": "Respect live reduced motion in the existing Sheet",
+      "description": "Exact live Sheet slice split from RF103. Preserve existing Modal and allowed spring handoff.",
+      "rationale": "SelectionActionBar still uses Sheet. Original browser animates under reduce; reuse the shared live preference.",
+      "modules": [
+        "components/ui/Sheet.tsx",
+        "tests/unit/sheet-reduced-motion.test.tsx",
+        "docs/refactoring/REDUCED_MOTION.md"
+      ],
+      "dependencies": [
+        "RF-106"
+      ],
+      "acceptance_criteria": [
+        "Read AGENTS.md, docs/refactoring/ARCHITECTURE.md, CONVENTIONS.md, TECH_STACK.md, PROGRESS.md and supplied readiness.md, plan.md, reuse-map.md, artifacts.json. Primary owns source and tests. Copy only: cp .refactor-baseline/rf107-sheet-motion-v1/Sheet.tsx components/ui/Sheet.tsx; cp .refactor-baseline/rf107-sheet-motion-v1/sheet-reduced-motion.test.tsx tests/unit/sheet-reduced-motion.test.tsx; cp .refactor-baseline/rf107-sheet-motion-v1/REDUCED_MOTION.md docs/refactoring/REDUCED_MOTION.md. Required instruction/metadata reads and git status/branch allowed. No source/test/helper dumps, hashes, checks, transformations, engineering, packages, agents, services, controller edits or commits. Report installed paths and pending verification/acceptance.",
+        "Reuse useReducedMotionPreference with conservative unknown. Original Animated.Value initial0. Reduced/unknown setValue(open?1:0) and return; allowed original spring native driver/damping25/stiffness200. Dependencies open/reduceMotion/slideAnim. No manual stop/cleanup altering allowed velocity handoff. Preserve Modal props/spread priority, visible/open, animationType none, close callbacks, refs, SheetContent, theme/layout/viewport interpolation. No callers, selection/clipboard/Quran changes or new abstractions.",
+        "Final14 behavior tests execute actual Sheet and hook: both unknown/reduced/allowed open values, controlled snaps, live reduction/opt-in, allowed handoff, callback counts from actual rendered backdrop and Modal request, prop override order, content and shared listener teardown. Final original source fails8/passes6, candidate plus shared preference passes33. Preserve initial NativeWind identity lookup failure and original logs. No old tests weakened/modified or source-string approval.",
+        "Ten fresh controller commands check exact artifacts/red-green, all old tracked/helper/protected inputs and other task records, focused tests/types/scoped zero-warning lint/format, actual fixture export and four installed Chrome cases, then integrity/diff. Browser uses real Expo/Animated/Modal and SQLite readiness with remote blocked. English beige390 and Arabic AMOLED1280 each initial media preference: reduced zero interior frames, allowed motion, live snap, exact focus/closed/shown/geometry/style/error baseline parity. Temporary QA route removed. Compare decoded pixels at primary acceptance. No native/device/full selection/clipboard/contrast/touch-target claim.",
+        "Fresh separate stronger evaluator inspects complete diff, actual evidence and every started/completed generator item type. Copy-only generation may only read required instructions/metadata, status/branch and exact copies; no checks or source dumps. PASS plus released-lease primary source/image review required. Preserve failures, no retry refunds/reset or RF052 waiver/global/provider/model/config/vendor/resource guard changes. Other RF103 owners remain pending; local commits only, never push/merge/deploy/production/original-checkout/protected inputs."
+      ],
+      "verification": [
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf107-sheet-motion-v1/verify-candidate.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='0bbe081cf284fa32526e23e6b63f5fdcf31d355949b9a40f84862c5126140d4d';runpy.run_path(str(p),run_name='__main__')"
+        ],
+        [
+          "python3",
+          "-B",
+          ".refactor-baseline/rf107-sheet-motion-v1/verify-inputs.py"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/sheet-reduced-motion.test.tsx",
+          "tests/unit/reduced-motion.test.tsx",
+          "--no-cache"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "components/ui/Sheet.tsx",
+          "tests/unit/sheet-reduced-motion.test.tsx",
+          "--max-warnings=0"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "components/ui/Sheet.tsx",
+          "tests/unit/sheet-reduced-motion.test.tsx"
+        ],
+        [
+          "python3",
+          "-B",
+          ".refactor-baseline/rf107-sheet-motion-v1/build-fixture.py"
+        ],
+        [
+          "node",
+          ".refactor-baseline/rf107-sheet-motion-v1/browser.cjs",
+          "controller"
+        ],
+        [
+          "python3",
+          "-B",
+          ".refactor-baseline/rf107-sheet-motion-v1/verify-inputs.py"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
+        ]
+      ],
+      "risk": "medium",
+      "approved": true,
+      "status": "pending",
+      "allowed_paths": [
+        "components/ui/Sheet.tsx",
+        "tests/unit/sheet-reduced-motion.test.tsx",
+        "docs/refactoring/REDUCED_MOTION.md"
+      ],
+      "attempts": 0,
+      "readiness_evidence": ".refactor-baseline/rf107-sheet-motion-v1/readiness.md",
+      "implementation_mode": "copy-only"
     }
   ]
 }
