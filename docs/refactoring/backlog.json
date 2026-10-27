@@ -7842,7 +7842,9 @@
       "started_at": "2026-10-27T14:55:20.575270+00:00",
       "completed_at": "2026-10-27T14:59:35.320542+00:00",
       "evidence": ".ralph/runs/RF-108-1-1793112920578119412",
-      "summary": "Installed the exact RF-108 artifacts. Controller verification, independent evaluation, and primary acceptance remain pending."
+      "summary": "Accepted DropdownMenu live reduced motion and framework activation repair. Ten fresh gates, 35 focused tests, four actual Chrome cases, independent Astra PASS and released-lease primary source/image acceptance. Selection order, anchor, presentation and settled focus preserved. Native/device/full deck mutations unverified.",
+      "primary_accepted": true,
+      "primary_acceptance_evidence": ".refactor-baseline/rf108-primary-acceptance.json"
     }
   ]
 }
