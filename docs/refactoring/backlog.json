@@ -3235,7 +3235,9 @@
       "continuation_authorization": ".refactor-baseline/rf052-continuation-v6/authorization.json",
       "attempt_count_stop_waived_by_user": true,
       "completed_at": "2026-10-27T03:43:28.487873+00:00",
-      "summary": "Installed the two supplied RF-052 artifacts. Verification and acceptance remain pending with the controller and independent evaluator."
+      "summary": "Characterized real home smart/vocabulary deck cards with 24 cases. All seven fresh controller gates and independent Astra review pass; primary accepts exact scope after lease release.",
+      "primary_acceptance_evidence": ".refactor-baseline/rf052-primary-acceptance.json",
+      "primary_accepted": true
     },
     {
       "id": "RF-053",
