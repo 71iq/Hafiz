@@ -7639,12 +7639,14 @@
       "attempts": 1,
       "readiness_evidence": ".refactor-baseline/rf106-toast-motion-v1/test-strengthening-v2/readiness.md",
       "started_at": "2026-10-27T10:04:54.247267+00:00",
-      "failure": "Batch resource limit reached",
       "implementation_mode": "copy-only",
       "primary_recovery_evidence": ".refactor-baseline/rf106-toast-motion-v1/test-strengthening-v2/diagnosis.json",
       "completed_at": "2026-10-27T10:09:32.621722+00:00",
       "evidence": ".ralph/runs/RF-106-1-1793095494249508764",
-      "summary": "Installed the frozen RF-106 artifacts. Verification and acceptance remain pending with the controller and independent evaluator."
+      "summary": "Accepted Toast live reduced-motion and session-lifetime repair. Ten fresh controller gates, 42 focused tests, four real Chrome cases and independent Astra PASS. Primary source/image review complete after lease release. Replacements survive old fades; hold plus 200 ms callback lifetime preserved. Native/device and full parent flows unverified.",
+      "primary_accepted": true,
+      "primary_acceptance_evidence": ".refactor-baseline/rf106-primary-acceptance.json",
+      "last_preacceptance_resource_stop": "Batch resource limit reached"
     }
   ]
 }
