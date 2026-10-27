@@ -7039,7 +7039,7 @@
           "python3",
           "-B",
           "-c",
-          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf098-atomic-import-investigation-v8/verify.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='c4d198e73b1682a21a712b1ffe06a8ba0f3878a1b9c50e5b8a039275657790e0';runpy.run_path(str(p),run_name='__main__');p=Path('.refactor-baseline/rf098-atomic-import-investigation-v8/audit.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='646929c23c0d9ce248c92956629449488e436c8e360d62411deb626a4df80880';runpy.run_path(str(p),run_name='__main__');"
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf098-atomic-import-investigation-v8/verify.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='c4d198e73b1682a21a712b1ffe06a8ba0f3878a1b9c50e5b8a039275657790e0';runpy.run_path(str(p),run_name='__main__');p=Path('.refactor-baseline/rf098-atomic-import-investigation-v8/audit.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='808a659f594769ac307e5a8014c9e9044345f4d3187de0cfa4c169b8da802995';runpy.run_path(str(p),run_name='__main__');"
         ],
         [
           "node",
@@ -7054,7 +7054,7 @@
           "python3",
           "-B",
           "-c",
-          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf098-atomic-import-investigation-v8/verify.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='c4d198e73b1682a21a712b1ffe06a8ba0f3878a1b9c50e5b8a039275657790e0';runpy.run_path(str(p),run_name='__main__');p=Path('.refactor-baseline/rf098-atomic-import-investigation-v8/audit.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='646929c23c0d9ce248c92956629449488e436c8e360d62411deb626a4df80880';runpy.run_path(str(p),run_name='__main__');"
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf098-atomic-import-investigation-v8/verify.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='c4d198e73b1682a21a712b1ffe06a8ba0f3878a1b9c50e5b8a039275657790e0';runpy.run_path(str(p),run_name='__main__');p=Path('.refactor-baseline/rf098-atomic-import-investigation-v8/audit.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='808a659f594769ac307e5a8014c9e9044345f4d3187de0cfa4c169b8da802995';runpy.run_path(str(p),run_name='__main__');"
         ],
         [
           "git",
