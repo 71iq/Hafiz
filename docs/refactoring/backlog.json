@@ -7984,13 +7984,17 @@
       ],
       "risk": "low",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "docs/refactoring/NAVIGATION_MOTION.md"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "readiness_evidence": ".refactor-baseline/rf110-navigation-motion-audit-v1/readiness.md",
-      "implementation_mode": "copy-only"
+      "implementation_mode": "copy-only",
+      "started_at": "2026-10-27T16:51:26.072544+00:00",
+      "completed_at": "2026-10-27T16:53:30.927742+00:00",
+      "evidence": ".ralph/runs/RF-110-1-1793119886075263734",
+      "summary": "Installed the frozen RF110 document at `docs/refactoring/NAVIGATION_MOTION.md` using the exact copy command. The pre-existing backlog edit was preserved."
     }
   ]
 }
