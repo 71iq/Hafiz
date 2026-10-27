@@ -7538,12 +7538,14 @@
       "attempts": 1,
       "readiness_evidence": ".refactor-baseline/rf105-offline-banner-v1/test-recovery-v2/readiness.md",
       "started_at": "2026-10-27T08:53:36.477416+00:00",
-      "failure": "review stopped at account usage limit; see .ralph/runs/RF-105-1-1793077220988256985/review.jsonl",
       "implementation_mode": "copy-only",
       "primary_recovery_evidence": ".refactor-baseline/rf105-offline-banner-v1/test-recovery-v2/diagnosis.json",
       "completed_at": "2026-10-27T08:59:28.183621+00:00",
       "evidence": ".ralph/runs/RF-105-1-1793091216479588126",
-      "summary": "Installed the three frozen RF-105 artifacts. Acceptance and verification remain pending with the controller and independent evaluator."
+      "summary": "Accepted OfflineBanner live reduced-motion and reconnect interruption fix. Ten fresh controller gates, 51 motion tests, eight real Chrome cases and independent Astra PASS. Primary released-lease source/image review complete; native/device and full parent flows unverified.",
+      "primary_accepted": true,
+      "primary_acceptance_evidence": ".refactor-baseline/rf105-primary-acceptance.json",
+      "last_preacceptance_resource_stop": "review stopped at account usage limit; see .ralph/runs/RF-105-1-1793077220988256985/review.jsonl"
     }
   ]
 }
