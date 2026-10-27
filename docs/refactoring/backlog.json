@@ -7946,7 +7946,9 @@
       "started_at": "2026-10-27T15:59:51.255508+00:00",
       "completed_at": "2026-10-27T16:04:52.133136+00:00",
       "evidence": ".ralph/runs/RF-109-1-1793116791257915514",
-      "summary": "Installed the three RF-109 supplied artifacts. Verification, controller acceptance, and independent review remain pending. No tests, hashes, checks, commits, or pushes were run."
+      "summary": "Accepted ResponsiveOverlay live reduced motion. Eleven fresh gates, 36 focused/contract tests, ten actual Chrome cases, independent Astra PASS and released-lease primary source/image acceptance. Existing one source lint warning retained exactly; focus/body-lock/dismissal/geometry unchanged. Native/device/full callers/stacked overlays unverified.",
+      "primary_accepted": true,
+      "primary_acceptance_evidence": ".refactor-baseline/rf109-primary-acceptance.json"
     }
   ]
 }
