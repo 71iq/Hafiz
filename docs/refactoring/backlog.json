@@ -7830,15 +7830,19 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "components/ui/DropdownMenu.tsx",
         "tests/unit/dropdown-reduced-motion.test.tsx",
         "docs/refactoring/REDUCED_MOTION.md"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "readiness_evidence": ".refactor-baseline/rf108-dropdown-motion-v1/readiness.md",
-      "implementation_mode": "copy-only"
+      "implementation_mode": "copy-only",
+      "started_at": "2026-10-27T14:55:20.575270+00:00",
+      "completed_at": "2026-10-27T14:59:35.320542+00:00",
+      "evidence": ".ralph/runs/RF-108-1-1793112920578119412",
+      "summary": "Installed the exact RF-108 artifacts. Controller verification, independent evaluation, and primary acceptance remain pending."
     }
   ]
 }
