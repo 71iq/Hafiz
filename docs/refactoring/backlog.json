@@ -7073,11 +7073,13 @@
       "implementation_mode": "copy-only",
       "readiness_evidence": ".refactor-baseline/rf098-atomic-import-investigation-v10/readiness.json",
       "started_at": "2026-10-27T04:41:11.904752+00:00",
-      "failure": "Batch resource limit reached",
       "evidence": ".ralph/runs/RF-098-2-1793076071906808645",
       "verifier_recovery_evidence": ".refactor-baseline/rf098-atomic-import-investigation-v10/recovery.json",
       "completed_at": "2026-10-27T04:42:59.022894+00:00",
-      "summary": "Installed the frozen RF-098 artifact copy-only handoff. Verification and acceptance remain pending."
+      "summary": "Investigation accepted after five fresh controller checks and independent Astra PASS. Ten isolated SQLite cases reproduce five failure modes. No importer repair; RF-104 remains unapproved and blocks final mission acceptance.",
+      "primary_accepted": true,
+      "primary_acceptance_evidence": ".refactor-baseline/rf098-primary-acceptance.json",
+      "last_preacceptance_resource_stop": "Batch resource limit reached"
     },
     {
       "id": "RF-099",
