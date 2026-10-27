@@ -7375,7 +7375,8 @@
         "RF-106",
         "RF-107",
         "RF-108",
-        "RF-109"
+        "RF-109",
+        "RF-110"
       ],
       "acceptance_criteria": [
         "Primary must inspect real callers/tests and prepare exact small artifact sets and meaningful before/after/race/rendered checks before approving; split further if needed. Preserve useful state feedback, focus/dismissal/safe areas/geometry, toast lifetime, banner visibility callbacks, native worklets and the original checkout.",
@@ -7949,6 +7950,47 @@
       "summary": "Accepted ResponsiveOverlay live reduced motion. Eleven fresh gates, 36 focused/contract tests, ten actual Chrome cases, independent Astra PASS and released-lease primary source/image acceptance. Existing one source lint warning retained exactly; focus/body-lock/dismissal/geometry unchanged. Native/device/full callers/stacked overlays unverified.",
       "primary_accepted": true,
       "primary_acceptance_evidence": ".refactor-baseline/rf109-primary-acceptance.json"
+    },
+    {
+      "id": "RF-110",
+      "title": "Audit AppNavigation motion ownership and prepare three exact repairs",
+      "description": "Documentation-only installed-source audit. No navigation implementation or runtime acceptance.",
+      "rationale": "Remaining RF103 owner uses separate press/visibility/panel animations and startup-snapshot Reanimated defaults. Primary must choose live preference ownership before source work.",
+      "modules": [
+        "docs/refactoring/NAVIGATION_MOTION.md"
+      ],
+      "dependencies": [
+        "RF-109"
+      ],
+      "acceptance_criteria": [
+        "Read AGENTS, architecture, conventions, TECH_STACK, supplied readiness.md and artifacts.json. Read PROGRESS mission statement and RF110 preparation entry with targeted reads; historical entries unnecessary for this copy. Copy exactly: cp .refactor-baseline/rf110-navigation-motion-audit-v1/NAVIGATION_MOTION.md docs/refactoring/NAVIGATION_MOTION.md. No source/test/helper dumps, checks/hashes, transformations, implementation, agents, packages, services, controller writes or commits. Git status/branch and required instruction/metadata reads allowed. Report installed document and pending verification/review/acceptance.",
+        "Exact primary audit covers BottomTabItem0.98/1 spring15/400, BottomBar200ms hidden0/1 and120px, FloatingPanel180ms progress with distinct180ms hover delay and RTL24px offset. Preserve route/events, pointer timing, profile/auth, immediate SidebarItem/Profile feedback, breakpoints768/1024, immersive and wide Mushaf branch. Prepare three bounded future scopes in the document; none approved or implemented by this item.",
+        "Installed4.2.1 sources show snapshot hook/manager, config setter, absent/System resolution, explicit Never/Always and previous-animation cancellation before new assignment. App has no observed config/manager override. Use existing live hook in proposed designs, explicit Never only when shared preference allows, desired endpoint under reduced/unknown, no global manager mutation. Audit distinguishes asynchronous native scheduling and source observations from runtime evidence.",
+        "Controller verifies exact document and all old tracked source/test/protected/installed/helper hashes and other task/root integrity, then whitespace. Application tests/typecheck/build/browser/native intentionally not run for docs-only work. All future source slices require fresh meaningful owner tests, actual browser/native limits, event/geometry/focus/hover evidence, independent review and primary acceptance. No runtime fix/completion claims.",
+        "Fresh separate stronger evaluator inspects whole document against current cited application/library sources and every started/completed generator item type, rejecting prohibited commands. Primary retains architecture and released-lease acceptance. No source/package/dependency/production/original checkout/protected inputs or global retry/resource/provider/model/vendor/config change. Local commits only. RF103 and full mission incomplete."
+      ],
+      "verification": [
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf110-navigation-motion-audit-v1/verify.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='46a09fd000ded33490a7044296c89ec59a2cfe254183a78dd90e4edfc96893a0';runpy.run_path(str(p),run_name='__main__')"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
+        ]
+      ],
+      "risk": "low",
+      "approved": true,
+      "status": "pending",
+      "allowed_paths": [
+        "docs/refactoring/NAVIGATION_MOTION.md"
+      ],
+      "attempts": 0,
+      "readiness_evidence": ".refactor-baseline/rf110-navigation-motion-audit-v1/readiness.md",
+      "implementation_mode": "copy-only"
     }
   ]
 }
