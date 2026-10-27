@@ -7039,11 +7039,11 @@
           "python3",
           "-B",
           "-c",
-          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf098-atomic-import-investigation-v7/verify.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='ba2c54234d25588913575aaae5965125496978ee30bd53af1f421c09c223dae7';runpy.run_path(str(p),run_name='__main__');p=Path('.refactor-baseline/rf098-atomic-import-investigation-v7/audit.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='ccf23a8b3a84a116524f34a575c454d18b2338dcfeefd4a0214dbaa0243b5c4f';runpy.run_path(str(p),run_name='__main__');"
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf098-atomic-import-investigation-v8/verify.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='c4d198e73b1682a21a712b1ffe06a8ba0f3878a1b9c50e5b8a039275657790e0';runpy.run_path(str(p),run_name='__main__');p=Path('.refactor-baseline/rf098-atomic-import-investigation-v8/audit.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='646929c23c0d9ce248c92956629449488e436c8e360d62411deb626a4df80880';runpy.run_path(str(p),run_name='__main__');"
         ],
         [
           "node",
-          ".refactor-baseline/rf098-atomic-import-investigation-v7/reproduce.cjs"
+          ".refactor-baseline/rf098-atomic-import-investigation-v8/reproduce.cjs"
         ],
         [
           "node_modules/.bin/prettier",
@@ -7054,7 +7054,7 @@
           "python3",
           "-B",
           "-c",
-          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf098-atomic-import-investigation-v7/verify.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='ba2c54234d25588913575aaae5965125496978ee30bd53af1f421c09c223dae7';runpy.run_path(str(p),run_name='__main__');p=Path('.refactor-baseline/rf098-atomic-import-investigation-v7/audit.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='ccf23a8b3a84a116524f34a575c454d18b2338dcfeefd4a0214dbaa0243b5c4f';runpy.run_path(str(p),run_name='__main__');"
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf098-atomic-import-investigation-v8/verify.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='c4d198e73b1682a21a712b1ffe06a8ba0f3878a1b9c50e5b8a039275657790e0';runpy.run_path(str(p),run_name='__main__');p=Path('.refactor-baseline/rf098-atomic-import-investigation-v8/audit.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='646929c23c0d9ce248c92956629449488e436c8e360d62411deb626a4df80880';runpy.run_path(str(p),run_name='__main__');"
         ],
         [
           "git",
@@ -7071,11 +7071,11 @@
       "attempts": 1,
       "discovery_evidence": ".refactor-baseline/rf098-atomic-import-investigation-v1/result.json",
       "implementation_mode": "copy-only",
-      "readiness_evidence": ".refactor-baseline/rf098-atomic-import-investigation-v7/readiness.json",
-      "started_at": "2026-10-27T04:14:41.554214+00:00",
-      "failure": "Verification failed: ['python3', '-B', '-c', \"import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf098-atomic-import-investigation-v6/verify.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='988bd0aa72126122d777cd284149ac74532d3f45c8cecd25498a1ed02b166153';runpy.run_path(str(p),run_name='__main__');p=Path('.refactor-baseline/rf098-atomic-import-investigation-v6/audit.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='4255f72bb0219fc428ed285e14cc52ef754a6852d8732e7a9d4d1ca28b29359c';runpy.run_path(str(p),run_name='__main__');\"]; see .ralph/runs/RF-098-2-1793074481556541411/verify-0.log",
-      "evidence": ".ralph/runs/RF-098-2-1793074481556541411",
-      "verifier_recovery_evidence": ".refactor-baseline/rf098-atomic-import-investigation-v7/recovery.json"
+      "readiness_evidence": ".refactor-baseline/rf098-atomic-import-investigation-v8/readiness.json",
+      "started_at": "2026-10-27T04:21:06.227651+00:00",
+      "failure": "Verification failed: ['python3', '-B', '-c', \"import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf098-atomic-import-investigation-v7/verify.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='ba2c54234d25588913575aaae5965125496978ee30bd53af1f421c09c223dae7';runpy.run_path(str(p),run_name='__main__');p=Path('.refactor-baseline/rf098-atomic-import-investigation-v7/audit.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='ccf23a8b3a84a116524f34a575c454d18b2338dcfeefd4a0214dbaa0243b5c4f';runpy.run_path(str(p),run_name='__main__');\"]; see .ralph/runs/RF-098-2-1793074866229647765/verify-0.log",
+      "evidence": ".ralph/runs/RF-098-2-1793074866229647765",
+      "verifier_recovery_evidence": ".refactor-baseline/rf098-atomic-import-investigation-v8/recovery.json"
     },
     {
       "id": "RF-099",
