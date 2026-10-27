@@ -7358,7 +7358,7 @@
     {
       "id": "RF-103",
       "title": "Respect live reduced motion in remaining shared UI transitions",
-      "description": "Prepare exact bounded transition scopes for ResponsiveOverlay, legacy Sheet, Toast, OfflineBanner, DropdownMenu and AppNavigation. Inspect instantaneous press feedback and actual ReadingStepper use before claiming inventory completion. Switch is the separate RF102 slice.",
+      "description": "Prepare exact bounded transition scopes for ResponsiveOverlay, legacy Sheet, Toast, OfflineBanner, DropdownMenu and AppNavigation. Inspect instantaneous press feedback and actual ReadingStepper use before claiming inventory completion. Switch is the separate RF102 slice. OfflineBanner is now the separate exact RF105 slice; this umbrella retains all other owners.",
       "rationale": "Transition visibility/focus/callback/worklet owners need separate primary decisions and evidence. Repeating placeholders and controlled Switch thumb motion do not certify them.",
       "modules": [
         "docs/refactoring/REDUCED_MOTION.md",
@@ -7370,7 +7370,8 @@
         "components/ui/AppNavigation.tsx"
       ],
       "dependencies": [
-        "RF-102"
+        "RF-102",
+        "RF-105"
       ],
       "acceptance_criteria": [
         "Primary must inspect real callers/tests and prepare exact small artifact sets and meaningful before/after/race/rendered checks before approving; split further if needed. Preserve useful state feedback, focus/dismissal/safe areas/geometry, toast lifetime, banner visibility callbacks, native worklets and the original checkout.",
@@ -7444,6 +7445,92 @@
       ],
       "attempts": 0,
       "discovery_evidence": ".refactor-baseline/rf098-atomic-import-investigation-v1/result.json"
+    },
+    {
+      "id": "RF-105",
+      "title": "Respect live reduced motion and interruption in OfflineBanner",
+      "description": "Bounded OfflineBanner follow-up split from RF103. Fix the reproduced reconnect race while honoring the existing live preference.",
+      "rationale": "All eight real Chrome baseline cases animate under reduce and lose newest offline state during interrupted hide. Preserve established presentation and use the shared live preference.",
+      "modules": [
+        "components/ui/OfflineBanner.tsx",
+        "tests/unit/offline-banner-reduced-motion.test.tsx",
+        "docs/refactoring/REDUCED_MOTION.md"
+      ],
+      "dependencies": [
+        "RF-102"
+      ],
+      "acceptance_criteria": [
+        "Read .refactor-baseline/rf105-offline-banner-v1/plan.md, reuse-map.md and readiness.json. Primary chose the design, implementation worker only performs this bounded mechanical change. Reuse useReducedMotionPreference, existing values and Animated.parallel/timing; add no new exported API, package, settings, source of connectivity or shared abstraction. Keep initial Animated values -80/0. Reduced or unknown snaps both current endpoints, cancelling current work. Allowed show/hide keep 300/250 ms and native driver true. Replace isVisible completion bookkeeping with current-target effect and exact parallel-group cleanup. Remove stale completion callback ownership. Superseding connectivity/preference/unmount must stop that effect-owned group. No new state triggered by delayed completions.",
+        "Inspect actual caller in app/(tabs)/_layout.tsx, real shared preference/Switch and installed RN Animated lifecycle. Preserve null connectivity no-render, exact bilingual text, pointerEvents none, theme colors/styles/geometry and uiLanguage props. Only update OfflineBanner row plus one bounded evidence/limitations paragraph in REDUCED_MOTION.md. Other motion owners stay RF103 and final review remains pending.",
+        "Add focused behavior tests using actual OfflineBanner and real shared preference hook. Mock only NetInfo, settings and native animation scheduling boundaries. Cover unknown/reduced/current endpoints; both allowed durations/native driver; live reductions during show/hide; later opt-in; rapid connectivity reversal and delayed stopped-group callbacks; cleanup/unmount; null readiness and bilingual text/styles. Tests must fail against original source before implementation, save the actual red output under the supplied evidence directory, then pass candidate. No source-string tests, weakened assertions, other old tests or snapshots. Worker may run focused Jest, lint, typecheck or format only scoped files. Controller repeats all final checks. Do not edit/run fixture helpers or temporary QA routes, package/runtime install, controller/backlog/progress, protected inputs or production.",
+        "Fresh controller commands require focused tests plus existing motion hook/Switch tests, typecheck, zero-warning scoped lint and Prettier, unchanged tracked/test/protected inventory and pinned helpers, actual web fixture export, all eight Chrome behavior cases, then integrity/whitespace. Browser uses real NetInfo offline events, actual Animated and live shared preference after real SQLite readiness, remote requests blocked. Four locale/theme/width pairs with both initial preferences, exact settled geometry/style and page-error arrays versus original. Observe actual interior frames for allowed motion, zero reduced interior, live show/hide cancellation and newest offline target after reconnect race. Preserve old eight failing originals and exactly two hydration #418 errors per case. Controller fixture route removed after export. No native/device/whole-parent-flow or general contrast/touch-target acceptance claimed.",
+        "Separate stronger evaluator must inspect entire source/test/document diff and all started/completed original generator tool item types, including MCP/collaboration/browser items if present, against this scope. Review actual RN setValue cancellation, parallel stop and effect cleanup, red/green evidence and fresh browser results. A resource checkpoint requires fresh commands and new evaluator. Primary final acceptance after released leases and direct screenshot inspection. No push/deploy, original checkout, protected input, config, vendor/model or guard/retry/resource change."
+      ],
+      "verification": [
+        [
+          "python3",
+          "-B",
+          ".refactor-baseline/rf105-offline-banner-v1/verify-inputs.py"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/offline-banner-reduced-motion.test.tsx",
+          "tests/unit/reduced-motion.test.tsx",
+          "tests/unit/switch-reduced-motion.test.tsx",
+          "--no-cache"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "components/ui/OfflineBanner.tsx",
+          "tests/unit/offline-banner-reduced-motion.test.tsx",
+          "--max-warnings=0"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "components/ui/OfflineBanner.tsx",
+          "tests/unit/offline-banner-reduced-motion.test.tsx"
+        ],
+        [
+          "python3",
+          "-B",
+          ".refactor-baseline/rf105-offline-banner-v1/build-fixture.py"
+        ],
+        [
+          "node",
+          ".refactor-baseline/rf105-offline-banner-v1/browser.cjs",
+          "controller"
+        ],
+        [
+          "python3",
+          "-B",
+          ".refactor-baseline/rf105-offline-banner-v1/verify-inputs.py"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
+        ]
+      ],
+      "risk": "medium",
+      "approved": true,
+      "status": "pending",
+      "allowed_paths": [
+        "components/ui/OfflineBanner.tsx",
+        "tests/unit/offline-banner-reduced-motion.test.tsx",
+        "docs/refactoring/REDUCED_MOTION.md"
+      ],
+      "attempts": 0,
+      "readiness_evidence": ".refactor-baseline/rf105-offline-banner-v1/readiness.json"
     }
   ]
 }
