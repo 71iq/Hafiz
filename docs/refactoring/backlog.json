@@ -3212,17 +3212,17 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "retry",
+      "status": "verified",
       "allowed_paths": [
         "tests/unit/home-deck-cards.test.tsx",
         "docs/refactoring/HOME_DECK_CARDS.md"
       ],
-      "attempts": 1,
+      "attempts": 2,
       "implementation_mode": "copy-only",
       "readiness_evidence": ".refactor-baseline/rf052-continuation-v6/readiness.json",
-      "started_at": "2026-10-27T03:37:30.457870+00:00",
-      "failure": "Verification failed: ['python3', '-B', '-c', \"import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf052-home-cards-v1/verify.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='1d290cfd5bc6275ebfdfa689cc178f81befb850d733eb439469ddb068f473dca';runpy.run_path(str(p),run_name='__main__');p=Path('.refactor-baseline/rf052-continuation-v5/audit.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='ae0a59f9d2adf2b523699f73ace758c29c4a9aeab4a0b20be60593cc19b99953';runpy.run_path(str(p),run_name='__main__')\"]; see .ralph/runs/RF-052-1-1793072250460253180/verify-0.log",
-      "evidence": ".ralph/runs/RF-052-1-1793072250460253180",
+      "started_at": "2026-10-27T03:40:27.395415+00:00",
+      "failure": "Batch resource limit reached",
+      "evidence": ".ralph/runs/RF-052-2-1793072427397416277",
       "protocol_recovery_evidence": ".refactor-baseline/rf052-read-range-recovery.json",
       "primary_blocked_evidence": ".refactor-baseline/rf052-primary-blocked.json",
       "historical_ordinary_attempts_spent_before_extension": 2,
@@ -3233,7 +3233,9 @@
       "authorized_additional_attempts_used": 1,
       "historical_total_ordinary_attempts_spent": 3,
       "continuation_authorization": ".refactor-baseline/rf052-continuation-v6/authorization.json",
-      "attempt_count_stop_waived_by_user": true
+      "attempt_count_stop_waived_by_user": true,
+      "completed_at": "2026-10-27T03:43:28.487873+00:00",
+      "summary": "Installed the two supplied RF-052 artifacts. Verification and acceptance remain pending with the controller and independent evaluator."
     },
     {
       "id": "RF-053",
