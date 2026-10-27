@@ -4,6 +4,7 @@ import { useColorScheme } from "nativewind";
 import { useNetInfo } from "@react-native-community/netinfo";
 import { WifiOff } from "lucide-react-native";
 import { useSettings, withThemeOpacity } from "@/lib/settings/context";
+import { useReducedMotionPreference } from "@/lib/ui/reduced-motion";
 
 const OFFLINE_TEXT = {
   en: "You\u2019re offline \u2014 study features work, community features will sync when connected",
@@ -26,43 +27,37 @@ export function OfflineBanner({ uiLanguage }: Props) {
 
   const netInfo = useNetInfo();
   const isOffline = netInfo.isConnected === false;
+  const reduceMotion = useReducedMotionPreference();
 
   const translateY = useRef(new Animated.Value(-80)).current;
   const opacity = useRef(new Animated.Value(0)).current;
-  const isVisible = useRef(false);
 
   useEffect(() => {
-    if (isOffline && !isVisible.current) {
-      isVisible.current = true;
-      Animated.parallel([
-        Animated.timing(translateY, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(opacity, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    } else if (!isOffline && isVisible.current) {
-      Animated.parallel([
-        Animated.timing(translateY, {
-          toValue: -80,
-          duration: 250,
-          useNativeDriver: true,
-        }),
-        Animated.timing(opacity, {
-          toValue: 0,
-          duration: 250,
-          useNativeDriver: true,
-        }),
-      ]).start(() => {
-        isVisible.current = false;
-      });
+    const target = isOffline
+      ? { translateY: 0, opacity: 1, duration: 300 }
+      : { translateY: -80, opacity: 0, duration: 250 };
+
+    if (reduceMotion) {
+      translateY.setValue(target.translateY);
+      opacity.setValue(target.opacity);
+      return;
     }
-  }, [isOffline, translateY, opacity]);
+
+    const transition = Animated.parallel([
+      Animated.timing(translateY, {
+        toValue: target.translateY,
+        duration: target.duration,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacity, {
+        toValue: target.opacity,
+        duration: target.duration,
+        useNativeDriver: true,
+      }),
+    ]);
+    transition.start();
+    return () => transition.stop();
+  }, [isOffline, opacity, reduceMotion, translateY]);
 
   // Don't render anything until netInfo has resolved (isConnected is null initially)
   if (netInfo.isConnected === null) return null;

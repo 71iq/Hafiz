@@ -7460,13 +7460,19 @@
         "RF-102"
       ],
       "acceptance_criteria": [
-        "Read .refactor-baseline/rf105-offline-banner-v1/plan.md, reuse-map.md and readiness.json. Primary chose the design, implementation worker only performs this bounded mechanical change. Reuse useReducedMotionPreference, existing values and Animated.parallel/timing; add no new exported API, package, settings, source of connectivity or shared abstraction. Keep initial Animated values -80/0. Reduced or unknown snaps both current endpoints, cancelling current work. Allowed show/hide keep 300/250 ms and native driver true. Replace isVisible completion bookkeeping with current-target effect and exact parallel-group cleanup. Remove stale completion callback ownership. Superseding connectivity/preference/unmount must stop that effect-owned group. No new state triggered by delayed completions.",
-        "Inspect actual caller in app/(tabs)/_layout.tsx, real shared preference/Switch and installed RN Animated lifecycle. Preserve null connectivity no-render, exact bilingual text, pointerEvents none, theme colors/styles/geometry and uiLanguage props. Only update OfflineBanner row plus one bounded evidence/limitations paragraph in REDUCED_MOTION.md. Other motion owners stay RF103 and final review remains pending.",
-        "Add focused behavior tests using actual OfflineBanner and real shared preference hook. Mock only NetInfo, settings and native animation scheduling boundaries. Cover unknown/reduced/current endpoints; both allowed durations/native driver; live reductions during show/hide; later opt-in; rapid connectivity reversal and delayed stopped-group callbacks; cleanup/unmount; null readiness and bilingual text/styles. Tests must fail against original source before implementation, save the actual red output under the supplied evidence directory, then pass candidate. No source-string tests, weakened assertions, other old tests or snapshots. Worker may run focused Jest, lint, typecheck or format only scoped files. Controller repeats all final checks. Do not edit/run fixture helpers or temporary QA routes, package/runtime install, controller/backlog/progress, protected inputs or production.",
-        "Fresh controller commands require focused tests plus existing motion hook/Switch tests, typecheck, zero-warning scoped lint and Prettier, unchanged tracked/test/protected inventory and pinned helpers, actual web fixture export, all eight Chrome behavior cases, then integrity/whitespace. Browser uses real NetInfo offline events, actual Animated and live shared preference after real SQLite readiness, remote requests blocked. Four locale/theme/width pairs with both initial preferences, exact settled geometry/style and page-error arrays versus original. Observe actual interior frames for allowed motion, zero reduced interior, live show/hide cancellation and newest offline target after reconnect race. Preserve old eight failing originals and exactly two hydration #418 errors per case. Controller fixture route removed after export. No native/device/whole-parent-flow or general contrast/touch-target acceptance claimed.",
-        "Separate stronger evaluator must inspect entire source/test/document diff and all started/completed original generator tool item types, including MCP/collaboration/browser items if present, against this scope. Review actual RN setValue cancellation, parallel stop and effect cleanup, red/green evidence and fresh browser results. A resource checkpoint requires fresh commands and new evaluator. Primary final acceptance after released leases and direct screenshot inspection. No push/deploy, original checkout, protected input, config, vendor/model or guard/retry/resource change."
+        "Read AGENTS.md, docs/refactoring/ARCHITECTURE.md, CONVENTIONS.md, TECH_STACK.md, PROGRESS.md, and supplied test-recovery-v2 readiness.md, diagnosis.json and artifacts.json. Primary owns design and final acceptance. Copy only the three frozen artifacts with this command: cp .refactor-baseline/rf105-offline-banner-v1/test-recovery-v2/artifacts/OfflineBanner.tsx components/ui/OfflineBanner.tsx; cp .refactor-baseline/rf105-offline-banner-v1/test-recovery-v2/artifacts/offline-banner-reduced-motion.test.tsx tests/unit/offline-banner-reduced-motion.test.tsx; cp .refactor-baseline/rf105-offline-banner-v1/test-recovery-v2/artifacts/REDUCED_MOTION.md docs/refactoring/REDUCED_MOTION.md. Required instruction/metadata reads and git status/branch are permitted. Do not inspect source, tests or executable helper content, run verification/hashes/engineering workflows, transform artifacts, spawn agents/reviewers, install packages, call services, change task/controller state or commit. All verification is controller-owned. Report installed paths with acceptance pending.",
+        "Exact frozen source reuses useReducedMotionPreference, existing Animated values and parallel timings. Unknown/reduced preference snaps the current endpoints; allowed show/hide retains 300/250 ms/native driver. Effect cleanup stops the exact parallel group and no delayed callback owns visibility state. Preserve null connectivity, text, colors, direction, geometry, pointer events and API. Only one inventory row plus one bounded scope paragraph changes. All other animation owners remain unapproved RF103.",
+        "Exact final fifteen-test fixture wraps actual RN Animated.parallel and mocks only native timing scheduling, connectivity/settings/native appearance. Delayed callbacks of both stopped-hide timing children must exist and execute. Assert further online target [-80,0], then final offline [0,1], old group stop ownership and current group still active. Exact unknown/initial-reduced endpoints and reduced connectivity reversals remain explicit. Current final tests fail twelve cases against original source and pass all fifteen on candidate. Preserve all prior fixture failures, primary red/green logs, original resource checkpoint and interrupted stronger review. No counters or global retry/resource settings change.",
+        "Fresh controller gates require exact candidate/regression evidence, old source/test/protected/helper integrity, focused motion suites, typecheck, scoped zero-warning lint/format, actual Expo fixture web export, eight actual installed Chrome cases, then integrity/whitespace. Browser baseline has all eight failed reconnect races and reduced-motion interior frames. Final browser must retain exact settled geometry/style/error arrays, zero reduced interior, actual allowed interior and live show/hide cancellation with final offline [0,1]. Exactly two existing hydration #418 errors per case remain explicit. Remote requests blocked, real NetInfo and SQLite readiness. Temporary fixture source removed after export. No native/device, full parent flow, contrast or touch target acceptance.",
+        "New separate stronger reviewer must inspect complete diff and every started/completed original tool-item type. Normal original generation .ralph/runs/RF-105-1-1793076845023354501 allowed source/test inspection and local checks. New generation is copy-only and must obey that scope. Review both histories, previous partial review .ralph/runs/RF-105-1-1793077220988256985/review.jsonl and corrected final tests. The earlier review ended at account usage limit without verdict; do not call it PASS or erase its useful finding. Fresh commands and new independent PASS plus released-lease primary source/image review are mandatory. No protected input/original checkout/provider/config/vendor/guard/resource/production changes; no push or deploy."
       ],
       "verification": [
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf105-offline-banner-v1/test-recovery-v2/verify-candidate.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='26bcb8c0868110369bea3bbae9b7e6c69a2805926f0e9e72f47203686465d48f';runpy.run_path(str(p),run_name='__main__')"
+        ],
         [
           "python3",
           "-B",
@@ -7523,14 +7529,21 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "components/ui/OfflineBanner.tsx",
         "tests/unit/offline-banner-reduced-motion.test.tsx",
         "docs/refactoring/REDUCED_MOTION.md"
       ],
-      "attempts": 0,
-      "readiness_evidence": ".refactor-baseline/rf105-offline-banner-v1/readiness.json"
+      "attempts": 1,
+      "readiness_evidence": ".refactor-baseline/rf105-offline-banner-v1/test-recovery-v2/readiness.md",
+      "started_at": "2026-10-27T08:53:36.477416+00:00",
+      "failure": "review stopped at account usage limit; see .ralph/runs/RF-105-1-1793077220988256985/review.jsonl",
+      "implementation_mode": "copy-only",
+      "primary_recovery_evidence": ".refactor-baseline/rf105-offline-banner-v1/test-recovery-v2/diagnosis.json",
+      "completed_at": "2026-10-27T08:59:28.183621+00:00",
+      "evidence": ".ralph/runs/RF-105-1-1793091216479588126",
+      "summary": "Installed the three frozen RF-105 artifacts. Acceptance and verification remain pending with the controller and independent evaluator."
     }
   ]
 }
