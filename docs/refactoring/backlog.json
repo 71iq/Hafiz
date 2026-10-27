@@ -7028,7 +7028,7 @@
         "RF-006"
       ],
       "acceptance_criteria": [
-        "Read every section ID 1 through 19 using the pinned reader, each in a separate tool call with max_output_tokens at least 20000. Then perform the one exact install. Supplemental named instruction/metadata content reads via cat/sed/wc and read-only repository file-name discovery via pwd, git status/branch, rg --files, find without exec/delete or symlink following, and ls are allowed. Discovery may use hidden/glob/depth/name/type filters, sort or bounded sed/head output and stderr suppression to /dev/null. Newline, && or semicolon command separation is allowed for supplemental operations only. No source/test/helper content inspection, verification, hashes, package/runtime operations, external paths, other tools or writes beyond exact copy. Supplemental operations never replace required reader outputs. The supplied result.json is readiness evidence, so its read-only inspection is permitted. Supplied JSON metadata and candidate.md are supplemental documents; these reads do not execute verification or satisfy the mandatory reader sections. Primary retains architecture and acceptance.",
+        "Read every section ID 1 through 19 using the pinned reader, each in a separate tool call with max_output_tokens at least 20000. Then perform the one exact install. Supplemental named instruction/metadata content reads via cat/sed/wc and read-only repository file-name discovery via pwd, git status/branch, rg --files, find without exec/delete or symlink following, and ls are allowed. Discovery may use hidden/glob/depth/name/type filters, sort or bounded sed/head output and stderr suppression to /dev/null. Newline, && or semicolon command separation is allowed for supplemental operations only. No source/test/helper content inspection, verification, hashes, package/runtime operations, external paths, other tools or writes beyond exact copy. Supplemental operations never replace required reader outputs. The supplied result.json is readiness evidence, so its read-only inspection is permitted. Supplied JSON metadata and candidate.md are supplemental documents; these reads do not execute verification or satisfy the mandatory reader sections. Static JSON, Markdown, text packets and evidence log documents under this RF098 investigation evidence family are readable metadata, including complete-packet.txt and prior-version receipts. This grants no access to executable helper/source/test code and never replaces the nineteen exact reader calls. Primary retains architecture and acceptance.",
         "Report only the ten actual isolated reproduction cases and their limitations. Preserve the three correct complete-source count fast paths, all five reproduced failure modes, retry and unrelated-source controls. No live-data corruption or Expo/native/web-runtime claim. Do not claim an importer repair.",
         "The actual whole init/source modules execute through installed TypeScript transpilation, not source slicing or a copied importer. SQLite SQL, batch BEGIN/COMMIT/ROLLBACK and rows are real and in-memory. Native-loader/platform boundaries are injected. Record all protected/source/test inputs unchanged and every prior task except the planned RF049 dependency unchanged.",
         "RF104 stays unapproved and owns the retained-content/atomic-generation invariant, native/web transaction-owner decision, concurrency and permanent repair tests. Final mission review depends on RF104. No protected input, data, schema, config, production, deployment, package or runner change.",
@@ -7039,11 +7039,11 @@
           "python3",
           "-B",
           "-c",
-          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf098-atomic-import-investigation-v4/verify.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='65c9c077ee271fe3423ce9a99bfb907096cf060af34006ae7e17ec58378a3dd7';runpy.run_path(str(p),run_name='__main__');p=Path('.refactor-baseline/rf098-atomic-import-investigation-v4/audit.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='d89e54a296195020498feca3b5ba04d5d379dafa9dcbd48c95a08e527b3dab71';runpy.run_path(str(p),run_name='__main__');"
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf098-atomic-import-investigation-v5/verify.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='62db0098fc0b8b1ddb0a42a5ce2290886eff2ce56297fff3dbd79155bbe856eb';runpy.run_path(str(p),run_name='__main__');p=Path('.refactor-baseline/rf098-atomic-import-investigation-v5/audit.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='4985eee4254b032bb1889e0224bf1dbb7fb76c96a3e19c5aabb07b7985e9347a';runpy.run_path(str(p),run_name='__main__');"
         ],
         [
           "node",
-          ".refactor-baseline/rf098-atomic-import-investigation-v4/reproduce.cjs"
+          ".refactor-baseline/rf098-atomic-import-investigation-v5/reproduce.cjs"
         ],
         [
           "node_modules/.bin/prettier",
@@ -7054,7 +7054,7 @@
           "python3",
           "-B",
           "-c",
-          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf098-atomic-import-investigation-v4/verify.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='65c9c077ee271fe3423ce9a99bfb907096cf060af34006ae7e17ec58378a3dd7';runpy.run_path(str(p),run_name='__main__');p=Path('.refactor-baseline/rf098-atomic-import-investigation-v4/audit.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='d89e54a296195020498feca3b5ba04d5d379dafa9dcbd48c95a08e527b3dab71';runpy.run_path(str(p),run_name='__main__');"
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf098-atomic-import-investigation-v5/verify.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='62db0098fc0b8b1ddb0a42a5ce2290886eff2ce56297fff3dbd79155bbe856eb';runpy.run_path(str(p),run_name='__main__');p=Path('.refactor-baseline/rf098-atomic-import-investigation-v5/audit.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='4985eee4254b032bb1889e0224bf1dbb7fb76c96a3e19c5aabb07b7985e9347a';runpy.run_path(str(p),run_name='__main__');"
         ],
         [
           "git",
@@ -7071,8 +7071,8 @@
       "attempts": 1,
       "discovery_evidence": ".refactor-baseline/rf098-atomic-import-investigation-v1/result.json",
       "implementation_mode": "copy-only",
-      "readiness_evidence": ".refactor-baseline/rf098-atomic-import-investigation-v4/readiness.json",
-      "started_at": "2026-10-27T04:02:11.270712+00:00",
+      "readiness_evidence": ".refactor-baseline/rf098-atomic-import-investigation-v5/readiness.json",
+      "started_at": "2026-10-27T04:06:21.041617+00:00",
       "failure": "Batch resource limit reached",
       "evidence": ".ralph/runs/RF-098-1-1793073343535738023"
     },
