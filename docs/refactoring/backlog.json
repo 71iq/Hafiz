@@ -7028,7 +7028,7 @@
         "RF-006"
       ],
       "acceptance_criteria": [
-        "Read all required instruction/readiness/reuse documents using the pinned section reader in plan.json, one section per tool call with max_output_tokens at least 20000. Supplemental cat/sed reads of named instruction/metadata documents and file-name-only project discovery through rg --files with -g glob filters and shallow handoff-directory names-only discovery are allowed as described in the plan. Install exactly the one supplied document with the exact install body. No source/test/helper inspection, verification, hashes, additional writes, agents, live services or Git mutations.",
+        "Read every section ID 1 through 19 using the pinned reader, each in a separate tool call with max_output_tokens at least 20000. Then perform the one exact install. Supplemental named instruction/metadata content reads via cat/sed/wc and read-only repository file-name discovery via pwd, git status/branch, rg --files, find without exec/delete or symlink following, and ls are allowed. Discovery may use hidden/glob/depth/name/type filters, sort or bounded sed/head output and stderr suppression to /dev/null. Newline, && or semicolon command separation is allowed for supplemental operations only. No source/test/helper content inspection, verification, hashes, package/runtime operations, external paths, other tools or writes beyond exact copy. Supplemental operations never replace required reader outputs. Primary retains architecture and acceptance.",
         "Report only the ten actual isolated reproduction cases and their limitations. Preserve the three correct complete-source count fast paths, all five reproduced failure modes, retry and unrelated-source controls. No live-data corruption or Expo/native/web-runtime claim. Do not claim an importer repair.",
         "The actual whole init/source modules execute through installed TypeScript transpilation, not source slicing or a copied importer. SQLite SQL, batch BEGIN/COMMIT/ROLLBACK and rows are real and in-memory. Native-loader/platform boundaries are injected. Record all protected/source/test inputs unchanged and every prior task except the planned RF049 dependency unchanged.",
         "RF104 stays unapproved and owns the retained-content/atomic-generation invariant, native/web transaction-owner decision, concurrency and permanent repair tests. Final mission review depends on RF104. No protected input, data, schema, config, production, deployment, package or runner change.",
@@ -7039,11 +7039,11 @@
           "python3",
           "-B",
           "-c",
-          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf098-atomic-import-investigation-v2/verify.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='80fff5345d7b5e8599300dcdb4f754b315cbae78227754d28ddc42ee70307eac';runpy.run_path(str(p),run_name='__main__');p=Path('.refactor-baseline/rf098-atomic-import-investigation-v2/audit.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='5a56a79845456ad6793afa6fe894f7a9e8d68da8bd11ef79bdde4335f98264be';runpy.run_path(str(p),run_name='__main__');"
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf098-atomic-import-investigation-v3/verify.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='94435fe15351e37a0ab0389293a2d8c3b62ee2f4a258b3e95cd4e0ed6d96fda2';runpy.run_path(str(p),run_name='__main__');p=Path('.refactor-baseline/rf098-atomic-import-investigation-v3/audit.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='4e372a552e3197f088b3808f9baa2df7af7e3cf57a7b5e19a2915effab34fa73';runpy.run_path(str(p),run_name='__main__');"
         ],
         [
           "node",
-          ".refactor-baseline/rf098-atomic-import-investigation-v2/reproduce.cjs"
+          ".refactor-baseline/rf098-atomic-import-investigation-v3/reproduce.cjs"
         ],
         [
           "node_modules/.bin/prettier",
@@ -7054,7 +7054,7 @@
           "python3",
           "-B",
           "-c",
-          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf098-atomic-import-investigation-v2/verify.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='80fff5345d7b5e8599300dcdb4f754b315cbae78227754d28ddc42ee70307eac';runpy.run_path(str(p),run_name='__main__');p=Path('.refactor-baseline/rf098-atomic-import-investigation-v2/audit.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='5a56a79845456ad6793afa6fe894f7a9e8d68da8bd11ef79bdde4335f98264be';runpy.run_path(str(p),run_name='__main__');"
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf098-atomic-import-investigation-v3/verify.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='94435fe15351e37a0ab0389293a2d8c3b62ee2f4a258b3e95cd4e0ed6d96fda2';runpy.run_path(str(p),run_name='__main__');p=Path('.refactor-baseline/rf098-atomic-import-investigation-v3/audit.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='4e372a552e3197f088b3808f9baa2df7af7e3cf57a7b5e19a2915effab34fa73';runpy.run_path(str(p),run_name='__main__');"
         ],
         [
           "git",
@@ -7071,9 +7071,9 @@
       "attempts": 1,
       "discovery_evidence": ".refactor-baseline/rf098-atomic-import-investigation-v1/result.json",
       "implementation_mode": "copy-only",
-      "readiness_evidence": ".refactor-baseline/rf098-atomic-import-investigation-v2/readiness.json",
-      "started_at": "2026-10-27T03:55:43.533416+00:00",
-      "failure": "Verification failed: ['python3', '-B', '-c', \"import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf098-atomic-import-investigation-v1/verify.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='863e66aa92d4a2bc4da851e40cc4e4a7d328a53a12f2afa98945b30aff04fbef';runpy.run_path(str(p),run_name='__main__');p=Path('.refactor-baseline/rf098-atomic-import-investigation-v1/audit.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='cba4538ce038f8ac399af497f8ba88b1cb844b61118eeb1d3edd1ef61f48ed90';runpy.run_path(str(p),run_name='__main__');\"]; see .ralph/runs/RF-098-1-1793073343535738023/verify-0.log",
+      "readiness_evidence": ".refactor-baseline/rf098-atomic-import-investigation-v3/readiness.json",
+      "started_at": "2026-10-27T03:57:20.117450+00:00",
+      "failure": "Batch resource limit reached",
       "evidence": ".ralph/runs/RF-098-1-1793073343535738023"
     },
     {
