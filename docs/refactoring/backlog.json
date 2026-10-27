@@ -7374,7 +7374,8 @@
         "RF-105",
         "RF-106",
         "RF-107",
-        "RF-108"
+        "RF-108",
+        "RF-109"
       ],
       "acceptance_criteria": [
         "Primary must inspect real callers/tests and prepare exact small artifact sets and meaningful before/after/race/rendered checks before approving; split further if needed. Preserve useful state feedback, focus/dismissal/safe areas/geometry, toast lifetime, banner visibility callbacks, native worklets and the original checkout.",
@@ -7845,6 +7846,103 @@
       "summary": "Accepted DropdownMenu live reduced motion and framework activation repair. Ten fresh gates, 35 focused tests, four actual Chrome cases, independent Astra PASS and released-lease primary source/image acceptance. Selection order, anchor, presentation and settled focus preserved. Native/device/full deck mutations unverified.",
       "primary_accepted": true,
       "primary_acceptance_evidence": ".refactor-baseline/rf108-primary-acceptance.json"
+    },
+    {
+      "id": "RF-109",
+      "title": "Respect live reduced motion in ResponsiveOverlay",
+      "description": "Exact effect-only slice split from RF103; retain all overlay lifecycle and presentation ownership.",
+      "rationale": "Original10 actual Chrome cases animate under reduce; reuse existing live preference without changing focus/dismissal.",
+      "modules": [
+        "components/ui/ResponsiveOverlay.tsx",
+        "tests/unit/overlay-reduced-motion.test.tsx",
+        "docs/refactoring/REDUCED_MOTION.md"
+      ],
+      "dependencies": [
+        "RF-108"
+      ],
+      "acceptance_criteria": [
+        "Read AGENTS.md, docs/refactoring/ARCHITECTURE.md, CONVENTIONS.md, TECH_STACK.md, PROGRESS.md and supplied readiness.md/plan.md/reuse-map.md/artifacts.json. Copy only: cp .refactor-baseline/rf109-overlay-motion-v1/ResponsiveOverlay.tsx components/ui/ResponsiveOverlay.tsx; cp .refactor-baseline/rf109-overlay-motion-v1/overlay-reduced-motion.test.tsx tests/unit/overlay-reduced-motion.test.tsx; cp .refactor-baseline/rf109-overlay-motion-v1/REDUCED_MOTION.md docs/refactoring/REDUCED_MOTION.md. Required instruction/metadata reads and git status/branch allowed. No source/test/helper dumps, checks/hashes, transformations, engineering, agents, packages, services, controller edits or commits. Report installed paths and pending controller/review/acceptance.",
+        "Primary chooses only live hook import/read, reduced branch setValue(open?1:0) and timing dependency. Allowed original220/180ms native timing unchanged. Preserve all other source after formatting: API/wrappers, focus refs/body lock/stack, Modal none, safe areas/keyboard, callbacks, direction/themes and geometry. No new cleanup, state, helper, dependency or caller changes. Exact scope in plan.md.",
+        "Final16 actual component/hook cases original red8/green16, combined35; native system/timing scheduling controlled. Controller also runs unchanged height contract for36. Exact one old source restoreFocusRef warning by diagnostic parity, zero source errors and zero new-test warnings; no rule suppression/focus repair. Preserve original failed lint preparation and10-case invalid settled live probe. Corrected live baseline requires original interior>=2 from a fresh fixture owner. Exact artifact/evidence, old source/test/protected/helper and other task/root integrity mandatory.",
+        "Eleven fresh controller gates run all checks, actual Expo fixture export and10 installed Chrome cases across five presentation/locale/theme/viewport configurations and both media values. Require zero reduced entry/interior and live opacity/transform target, retained allowed motion, exact settled geometry/styles/errors/focus and callback counts. Actual input initial focus, trigger restoration, Escape/backdrop or fullscreen close and body overflow/touch locks. Real SQLite ready, remote blocked, temporary QA route removed. Primary decoded-pixel/image review required. Native/device/full caller/stacked overlay/contrast/touch targets unverified.",
+        "Separate stronger evaluator audits complete diff/evidence and every started/completed generator item type, rejecting prohibited checks/dumps. Fresh PASS plus released-lease primary source/image acceptance required. Preserve failures. No attempt refund/reset/RF052 waiver/global retry/resource/model/provider/vendor/config/guard changes. Local commits only; no push/merge/deploy/production/original checkout/protected inputs. Other RF103 owners and mission remain pending."
+      ],
+      "verification": [
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf109-overlay-motion-v1/verify-candidate.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='30e3608a0cc91f57c355229945a7ec957b96403a772a6033e7e7f01b11abce70';runpy.run_path(str(p),run_name='__main__')"
+        ],
+        [
+          "python3",
+          "-B",
+          ".refactor-baseline/rf109-overlay-motion-v1/verify-inputs.py"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/overlay-reduced-motion.test.tsx",
+          "tests/unit/reduced-motion.test.tsx",
+          "tests/unit/responsive-overlay-sheet-height-contract.test.ts",
+          "--no-cache"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "python3",
+          "-B",
+          ".refactor-baseline/rf109-overlay-motion-v1/verify-source-lint.py"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "tests/unit/overlay-reduced-motion.test.tsx",
+          "--max-warnings=0"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "components/ui/ResponsiveOverlay.tsx",
+          "tests/unit/overlay-reduced-motion.test.tsx"
+        ],
+        [
+          "python3",
+          "-B",
+          ".refactor-baseline/rf109-overlay-motion-v1/build-fixture.py"
+        ],
+        [
+          "node",
+          ".refactor-baseline/rf109-overlay-motion-v1/browser.cjs",
+          "controller"
+        ],
+        [
+          "python3",
+          "-B",
+          ".refactor-baseline/rf109-overlay-motion-v1/verify-inputs.py"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
+        ]
+      ],
+      "risk": "medium",
+      "approved": true,
+      "status": "pending",
+      "allowed_paths": [
+        "components/ui/ResponsiveOverlay.tsx",
+        "tests/unit/overlay-reduced-motion.test.tsx",
+        "docs/refactoring/REDUCED_MOTION.md"
+      ],
+      "attempts": 0,
+      "readiness_evidence": ".refactor-baseline/rf109-overlay-motion-v1/readiness.md",
+      "implementation_mode": "copy-only"
     }
   ]
 }
