@@ -7743,7 +7743,9 @@
       "started_at": "2026-10-27T10:58:58.694282+00:00",
       "completed_at": "2026-10-27T11:02:20.709003+00:00",
       "evidence": ".ralph/runs/RF-107-1-1793098738696764328",
-      "summary": "Installed the three exact RF-107 artifacts. Verification and acceptance remain pending with the controller and independent evaluator."
+      "summary": "Accepted Sheet live reduced motion. Ten controller gates, 33 focused tests, four actual Chrome cases and independent Astra PASS. Primary released-lease source/image review and fresh checks complete. Original Modal, spring handoff, callbacks and presentation preserved. Native/device and full selection/clipboard flows unverified.",
+      "primary_accepted": true,
+      "primary_acceptance_evidence": ".refactor-baseline/rf107-primary-acceptance.json"
     }
   ]
 }
