@@ -1,12 +1,6 @@
-import {
-  Modal,
-  View,
-  Pressable,
-  type ModalProps,
-  Animated,
-  useWindowDimensions,
-} from "react-native";
+import { Modal, View, Pressable, type ModalProps, Animated, useWindowDimensions } from "react-native";
 import { useSettings } from "@/lib/settings/context";
+import { useReducedMotionPreference } from "@/lib/ui/reduced-motion";
 import { cn } from "@/lib/utils";
 import { forwardRef, useEffect, useRef } from "react";
 
@@ -21,63 +15,54 @@ type SheetProps = Omit<ModalProps, "animationType"> & {
  * Bottom sheet with tonal layering (no border).
  * Slides up from bottom with backdrop overlay.
  */
-export const Sheet = forwardRef<View, SheetProps>(
-  ({ open, onClose, children, className, ...props }, ref) => {
-    const slideAnim = useRef(new Animated.Value(0)).current;
-    const { height } = useWindowDimensions();
-    const { themeSurface } = useSettings();
+export const Sheet = forwardRef<View, SheetProps>(({ open, onClose, children, className, ...props }, ref) => {
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const { height } = useWindowDimensions();
+  const { themeSurface } = useSettings();
 
-    useEffect(() => {
-      Animated.spring(slideAnim, {
-        toValue: open ? 1 : 0,
-        useNativeDriver: true,
-        damping: 25,
-        stiffness: 200,
-      }).start();
-    }, [open]);
+  const reduceMotion = useReducedMotionPreference();
 
-    return (
-      <Modal
-        ref={ref}
-        visible={open}
-        transparent
-        animationType="none"
-        onRequestClose={onClose}
-        {...props}
+  useEffect(() => {
+    if (reduceMotion) {
+      slideAnim.setValue(open ? 1 : 0);
+      return;
+    }
+    Animated.spring(slideAnim, {
+      toValue: open ? 1 : 0,
+      useNativeDriver: true,
+      damping: 25,
+      stiffness: 200,
+    }).start();
+  }, [open, reduceMotion, slideAnim]);
+
+  return (
+    <Modal ref={ref} visible={open} transparent animationType="none" onRequestClose={onClose} {...props}>
+      <Pressable className="flex-1" style={{ backgroundColor: "rgba(0,0,0,0.3)" }} onPress={onClose}>
+        <View className="flex-1" />
+      </Pressable>
+      <Animated.View
+        className={cn("rounded-t-4xl", className)}
+        style={{
+          backgroundColor: themeSurface,
+          transform: [
+            {
+              translateY: slideAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [height * 0.5, 0],
+              }),
+            },
+          ],
+        }}
       >
-        <Pressable
-          className="flex-1"
-          style={{ backgroundColor: "rgba(0,0,0,0.3)" }}
-          onPress={onClose}
-        >
-          <View className="flex-1" />
-        </Pressable>
-        <Animated.View
-          className={cn("rounded-t-4xl", className)}
-          style={{
-            backgroundColor: themeSurface,
-            transform: [
-              {
-                translateY: slideAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [height * 0.5, 0],
-                }),
-              },
-            ],
-          }}
-        >
-          {children}
-        </Animated.View>
-      </Modal>
-    );
-  }
-);
+        {children}
+      </Animated.View>
+    </Modal>
+  );
+});
 
 Sheet.displayName = "Sheet";
 
 export const SheetContent = forwardRef<View, { className?: string; children: React.ReactNode }>(
-  ({ className, ...props }, ref) => (
-    <View ref={ref} className={cn("px-6 pb-8", className)} {...props} />
-  )
+  ({ className, ...props }, ref) => <View ref={ref} className={cn("px-6 pb-8", className)} {...props} />,
 );
 SheetContent.displayName = "SheetContent";
