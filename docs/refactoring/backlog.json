@@ -7373,7 +7373,8 @@
         "RF-102",
         "RF-105",
         "RF-106",
-        "RF-107"
+        "RF-107",
+        "RF-108"
       ],
       "acceptance_criteria": [
         "Primary must inspect real callers/tests and prepare exact small artifact sets and meaningful before/after/race/rendered checks before approving; split further if needed. Preserve useful state feedback, focus/dismissal/safe areas/geometry, toast lifetime, banner visibility callbacks, native worklets and the original checkout.",
@@ -7746,6 +7747,98 @@
       "summary": "Accepted Sheet live reduced motion. Ten controller gates, 33 focused tests, four actual Chrome cases and independent Astra PASS. Primary released-lease source/image review and fresh checks complete. Original Modal, spring handoff, callbacks and presentation preserved. Native/device and full selection/clipboard flows unverified.",
       "primary_accepted": true,
       "primary_acceptance_evidence": ".refactor-baseline/rf107-primary-acceptance.json"
+    },
+    {
+      "id": "RF-108",
+      "title": "Respect live reduced motion and Modal activation in DropdownMenu",
+      "description": "Exact DropdownMenu slice from RF103; reuse live hook and key framework lifecycle while retaining anchor/selection.",
+      "rationale": "Original fades ignore reduced motion. Actual plain dynamic-type probe loses active dialog after cancelling entrance.",
+      "modules": [
+        "components/ui/DropdownMenu.tsx",
+        "tests/unit/dropdown-reduced-motion.test.tsx",
+        "docs/refactoring/REDUCED_MOTION.md"
+      ],
+      "dependencies": [
+        "RF-107"
+      ],
+      "acceptance_criteria": [
+        "Read AGENTS.md, docs/refactoring/ARCHITECTURE.md, CONVENTIONS.md, TECH_STACK.md, PROGRESS.md and supplied readiness.md, plan.md, reuse-map.md, artifacts.json. Copy only: cp .refactor-baseline/rf108-dropdown-motion-v1/DropdownMenu.tsx components/ui/DropdownMenu.tsx; cp .refactor-baseline/rf108-dropdown-motion-v1/dropdown-reduced-motion.test.tsx tests/unit/dropdown-reduced-motion.test.tsx; cp .refactor-baseline/rf108-dropdown-motion-v1/REDUCED_MOTION.md docs/refactoring/REDUCED_MOTION.md. Required instruction/metadata reads and git status/branch allowed. No source/test/helper dumps, checks/hashes, transformations, engineering, packages, agents, services, controller edits or commits. Report installed paths and pending verification/acceptance.",
+        "Primary owns exact hook/key/type design in plan.md. Reduced/unknown animationType none, allowed original fade. Preference-keyed Modal restarts framework activation/exit lifetime while existing anchor survives. Closed Modal still rendered as before. Preserve public API, measurement/open guard, positioning/clamps/above fallback, styles/themes, item callbacks and disabled state, directions and requestAnimationFrame selection ordering. No caller/data/Quran or dependency changes. No closed-only conditional.",
+        "Final16 actual owner/hook tests cover all preference states and changes, existing Modal defaults, anchor/no remeasure, close-before-frame selection under both modes, disabled/empty, actual backdrop, RTL and final shared listener. Final actual original source fails6/passes10, candidate plus shared hook35 pass. Preserve all preflight failures and invalid initial zero motion samples; corrected baseline samples menuitem ancestor animations. Plain dynamic prop without key fails actual live entrance activation. Exact source/test/doc and all old tracked/protected/helper/other-task integrity are required.",
+        "Ten fresh controller commands run exact evidence checks, focused35 tests/types/scoped zero-warning lint/format, actual Expo fixture export and four real installed Chrome cases then integrity/diff. English beige390/Arabic AMOLED1280 both media values: zero reduced animation, allowed fade, live entry/exit changes, active dialog/Escape/backdrop, no stranded portal, disabled state, one actual item callback, exact settled focus/geometry/styles/errors. Actual local SQLite readiness, remote blocked, temporary route removed. Primary compares decoded images. Native/device/full deck mutations/contrast/touch targets unverified.",
+        "Separate stronger evaluator audits complete diff, actual controller/baseline/plain-probe evidence and every started/completed generator item type; reject prohibited checks/dumps. Fresh PASS and released-lease primary source/image acceptance required. Preserve all failures, no attempt refund/reset or RF052 waiver/global policy change. Models/provider/vendor/config/limits/protected inputs/original checkout/production untouched. Local commits only, no push/merge/deploy. Other RF103 owners and mission remain pending."
+      ],
+      "verification": [
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf108-dropdown-motion-v1/verify-candidate.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='abeca830f434de7c0d42b749a7943660b7ded0f3c3c5822baae57be9ef37474d';runpy.run_path(str(p),run_name='__main__')"
+        ],
+        [
+          "python3",
+          "-B",
+          ".refactor-baseline/rf108-dropdown-motion-v1/verify-inputs.py"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/dropdown-reduced-motion.test.tsx",
+          "tests/unit/reduced-motion.test.tsx",
+          "--no-cache"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "components/ui/DropdownMenu.tsx",
+          "tests/unit/dropdown-reduced-motion.test.tsx",
+          "--max-warnings=0"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "components/ui/DropdownMenu.tsx",
+          "tests/unit/dropdown-reduced-motion.test.tsx"
+        ],
+        [
+          "python3",
+          "-B",
+          ".refactor-baseline/rf108-dropdown-motion-v1/build-fixture.py"
+        ],
+        [
+          "node",
+          ".refactor-baseline/rf108-dropdown-motion-v1/browser.cjs",
+          "controller"
+        ],
+        [
+          "python3",
+          "-B",
+          ".refactor-baseline/rf108-dropdown-motion-v1/verify-inputs.py"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
+        ]
+      ],
+      "risk": "medium",
+      "approved": true,
+      "status": "pending",
+      "allowed_paths": [
+        "components/ui/DropdownMenu.tsx",
+        "tests/unit/dropdown-reduced-motion.test.tsx",
+        "docs/refactoring/REDUCED_MOTION.md"
+      ],
+      "attempts": 0,
+      "readiness_evidence": ".refactor-baseline/rf108-dropdown-motion-v1/readiness.md",
+      "implementation_mode": "copy-only"
     }
   ]
 }
