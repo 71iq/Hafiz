@@ -2952,7 +2952,8 @@
         "RF-086",
         "RF-090",
         "RF-093",
-        "RF-094"
+        "RF-094",
+        "RF-104"
       ],
       "acceptance_criteria": [
         "Review actual repository against stack, conventions, backlog and preserved behavior.",
@@ -7017,46 +7018,60 @@
     },
     {
       "id": "RF-098",
-      "title": "Investigate atomic replacement of incomplete tafsir sources",
-      "description": "Investigate atomic replacement of incomplete tafsir sources",
-      "rationale": "Source inspection shows DELETE before replacement loading for incomplete sources. Complete sources have a count-based early return. No database failure has yet been reproduced.",
+      "title": "Investigate incomplete tafsir replacement atomicity",
+      "description": "Record the reproduced actual-importer/SQLite failures and required repair invariant. RF104 owns the separately reviewed production repair.",
+      "rationale": "Actual whole-module execution with isolated SQLite now reproduces loss after deletion, committed replacement prefixes and mixed concurrent generations. Preserve evidence and hand off the production repair to RF104.",
       "modules": [
-        "lib/database/init.ts",
-        "tests/unit/tafsir-import-safety.test.ts"
+        "docs/refactoring/TAFSIR_IMPORT_ATOMICITY.md"
       ],
       "dependencies": [
         "RF-006"
       ],
       "acceptance_criteria": [
-        "Unapproved investigation. Primary must inspect schema, source counts, importer and platform transaction contracts, reproduce failures in an isolated synthetic database fixture, and freeze a small reviewed scope before approval.",
-        "Preserve complete-source count fast paths and per-source expected-count semantics. Characterize zero/partial sources, replacement load failure, SQL failure, concurrent callers and retry. Establish the atomicity and retained-content invariant before selecting a repair.",
-        "Never query or modify live data, reset databases, lower completeness thresholds, change source content, regenerate assets/database/maps, deploy or alter production policies. Current evidence establishes source ordering only, not reproduced data loss. Verification argv here are prospective and have not run."
+        "Read all required instruction/readiness/reuse documents using the pinned section reader in plan.json, one section per tool call with max_output_tokens at least 20000. Supplemental cat/sed reads of named instruction/metadata documents and shallow handoff-directory names-only discovery are allowed as described in the plan. Install exactly the one supplied document with the exact install body. No source/test/helper inspection, verification, hashes, additional writes, agents, live services or Git mutations.",
+        "Report only the ten actual isolated reproduction cases and their limitations. Preserve the three correct complete-source count fast paths, all five reproduced failure modes, retry and unrelated-source controls. No live-data corruption or Expo/native/web-runtime claim. Do not claim an importer repair.",
+        "The actual whole init/source modules execute through installed TypeScript transpilation, not source slicing or a copied importer. SQLite SQL, batch BEGIN/COMMIT/ROLLBACK and rows are real and in-memory. Native-loader/platform boundaries are injected. Record all protected/source/test inputs unchanged and every prior task except the planned RF049 dependency unchanged.",
+        "RF104 stays unapproved and owns the retained-content/atomic-generation invariant, native/web transaction-owner decision, concurrency and permanent repair tests. Final mission review depends on RF104. No protected input, data, schema, config, production, deployment, package or runner change.",
+        "Fresh controller commands must recheck actual reproduction assertions, exact document/source/inventory integrity, complete document handoff and whitespace/formatting; separate stronger read-only review inspects actual importer/schema/proxy, SQL traces and the entire original generator log. Primary acceptance follows released leases."
       ],
       "verification": [
         [
-          "npm",
-          "run",
-          "test:unit",
-          "--",
-          "--runTestsByPath",
-          "tests/unit/tafsir-import-safety.test.ts",
-          "--no-cache"
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf098-atomic-import-investigation-v1/verify.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='863e66aa92d4a2bc4da851e40cc4e4a7d328a53a12f2afa98945b30aff04fbef';runpy.run_path(str(p),run_name='__main__');p=Path('.refactor-baseline/rf098-atomic-import-investigation-v1/audit.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='cba4538ce038f8ac399af497f8ba88b1cb844b61118eeb1d3edd1ef61f48ed90';runpy.run_path(str(p),run_name='__main__');"
         ],
         [
-          "npm",
-          "run",
-          "typecheck"
+          "node",
+          ".refactor-baseline/rf098-atomic-import-investigation-v1/reproduce.cjs"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "docs/refactoring/TAFSIR_IMPORT_ATOMICITY.md"
+        ],
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf098-atomic-import-investigation-v1/verify.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='863e66aa92d4a2bc4da851e40cc4e4a7d328a53a12f2afa98945b30aff04fbef';runpy.run_path(str(p),run_name='__main__');p=Path('.refactor-baseline/rf098-atomic-import-investigation-v1/audit.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='cba4538ce038f8ac399af497f8ba88b1cb844b61118eeb1d3edd1ef61f48ed90';runpy.run_path(str(p),run_name='__main__');"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
         ]
       ],
       "risk": "high",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
-        "lib/database/init.ts",
-        "tests/unit/tafsir-import-safety.test.ts"
+        "docs/refactoring/TAFSIR_IMPORT_ATOMICITY.md"
       ],
       "attempts": 0,
-      "discovery_evidence": ".refactor-baseline/rf097-tafsir-selection-guard-preflight-v1/variant-report.md"
+      "discovery_evidence": ".refactor-baseline/rf098-atomic-import-investigation-v1/result.json",
+      "implementation_mode": "copy-only",
+      "readiness_evidence": ".refactor-baseline/rf098-atomic-import-investigation-v1/readiness.json"
     },
     {
       "id": "RF-099",
@@ -7373,6 +7388,54 @@
         "docs/refactoring/REDUCED_MOTION.md"
       ],
       "attempts": 0
+    },
+    {
+      "id": "RF-104",
+      "title": "Make incomplete tafsir-source replacement atomic",
+      "description": "Repair the RF098 reproduced retained-content and concurrent-generation failures after choosing native/web transaction ownership.",
+      "rationale": "Actual importer deletes before loading and commits per batch. Synthetic SQLite reproductions show content loss on load/SQL failure and mixed concurrent generations.",
+      "modules": [
+        "lib/database/init.ts",
+        "lib/database/provider.tsx",
+        "tests/unit/tafsir-import-safety.test.ts",
+        "docs/refactoring/TAFSIR_IMPORT_ATOMICITY.md"
+      ],
+      "dependencies": [
+        "RF-098"
+      ],
+      "acceptance_criteria": [
+        "Unapproved repair. Primary must inspect native and web SQLite transaction/exclusivity, nested batch transactions, host/proxy serialization and representative callers before preparing exact small scopes. Split transaction-owner changes if needed.",
+        "A failed replacement leaves previous source rows unchanged; successful replacement is one internally consistent generation and preserves unrelated sources. Loading/validation must precede destructive writes. Preserve count fast paths, source-specific expected counts, identifiers and content parsing. Decide partial/unavailable candidate and retry semantics explicitly without lowering thresholds.",
+        "Exercise load failure at first/later files, SQL execution/commit failure, empty/partial/complete sources, retry, same/different-source concurrency and interleaved web host/proxy requests. Real isolated SQLite plus platform-specific evidence must support atomicity; no fake transaction-only proof.",
+        "No live data access, destructive database operations, schema resets, protected-content changes, regenerated maps/database, threshold reduction, production or deployment. Carry unavailable native/device checks honestly. Separate stronger review and primary acceptance required."
+      ],
+      "verification": [
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/tafsir-import-safety.test.ts",
+          "--no-cache"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
+      ],
+      "risk": "high",
+      "approved": false,
+      "status": "pending",
+      "allowed_paths": [
+        "lib/database/init.ts",
+        "lib/database/provider.tsx",
+        "tests/unit/tafsir-import-safety.test.ts",
+        "docs/refactoring/TAFSIR_IMPORT_ATOMICITY.md"
+      ],
+      "attempts": 0,
+      "discovery_evidence": ".refactor-baseline/rf098-atomic-import-investigation-v1/result.json"
     }
   ]
 }
