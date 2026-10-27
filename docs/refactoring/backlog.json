@@ -7934,15 +7934,19 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "components/ui/ResponsiveOverlay.tsx",
         "tests/unit/overlay-reduced-motion.test.tsx",
         "docs/refactoring/REDUCED_MOTION.md"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "readiness_evidence": ".refactor-baseline/rf109-overlay-motion-v1/readiness.md",
-      "implementation_mode": "copy-only"
+      "implementation_mode": "copy-only",
+      "started_at": "2026-10-27T15:59:51.255508+00:00",
+      "completed_at": "2026-10-27T16:04:52.133136+00:00",
+      "evidence": ".ralph/runs/RF-109-1-1793116791257915514",
+      "summary": "Installed the three RF-109 supplied artifacts. Verification, controller acceptance, and independent review remain pending. No tests, hashes, checks, commits, or pushes were run."
     }
   ]
 }
