@@ -8013,18 +8013,18 @@
         "RF-110"
       ],
       "acceptance_criteria": [
-        "Read AGENTS, architecture, conventions, TECH_STACK and supplied readiness.md/plan.md/reuse-map.md/artifacts.json. Read PROGRESS mission and RF111 preparation entry with targeted reads. Copy only: cp .refactor-baseline/rf111-bottom-bar-motion-v1/AppNavigation.tsx components/ui/AppNavigation.tsx; cp .refactor-baseline/rf111-bottom-bar-motion-v1/bottom-bar-reduced-motion.test.tsx tests/unit/bottom-bar-reduced-motion.test.tsx; cp .refactor-baseline/rf111-bottom-bar-motion-v1/REDUCED_MOTION.md docs/refactoring/REDUCED_MOTION.md. Required instruction/metadata and git status/branch permitted. No source/test/helper dumps, checks/hashes, transformations, engineering, agents, packages, services, controller edits or commits. Report installed paths and pending controller/review/acceptance.",
+        "Before copying execute the dedicated standalone tool command: sed -n '1,8p' docs/refactoring/PROGRESS.md . Read its mission paragraph. Then Read AGENTS, architecture, conventions, TECH_STACK and supplied readiness.md/plan.md/reuse-map.md/artifacts.json. Read PROGRESS mission and RF111 preparation entry with targeted reads. Copy only: cp .refactor-baseline/rf111-bottom-bar-motion-v1/AppNavigation.tsx components/ui/AppNavigation.tsx; cp .refactor-baseline/rf111-bottom-bar-motion-v1/bottom-bar-reduced-motion.test.tsx tests/unit/bottom-bar-reduced-motion.test.tsx; cp .refactor-baseline/rf111-bottom-bar-motion-v1/REDUCED_MOTION.md docs/refactoring/REDUCED_MOTION.md. Required instruction/metadata and git status/branch permitted. No source/test/helper dumps, checks/hashes, transformations, engineering, agents, packages, services, controller edits or commits. Report installed paths and pending controller/review/acceptance. Also read supplied mission-read-recovery-v2/diagnosis.md. Prior attempt omitted this mandatory read and was rejected. New controller gate checks successful fresh command/output; do not run it yourself.",
         "Primary owns exact BottomBar hook/import/enum/effect design. Reduced/unknown assign current0/1 hidden target; allowed original200ms timing with explicit Never. Keep all other AppNavigation bytes unchanged, verified by complete reversal. Do not format owner. Preserve120px/opacity math, chrome/immersive precedence, immediate pointer handling, safe areas/themes, navigation prevention/selected/long press, routes/widths/profile/auth. Tab springs/floating panel remain unapproved RF103 work.",
         "Final11 actual owner/ChromeProvider/TabRouter cases original red9/green11, combined30. Mock only native scheduling/render-context/system boundaries, stable shared refs and actual installed ReduceMotion enum. Native Worklets mock initialization, safe-area wrapper/missed patch and weak screen/aria route probes remain preserved fixture failures. Actual router state and native selected props prove prevention; both screen nodes mounted is not routing proof. Source baseline diagnostics0/0 preserved; new-test lint0. No old tests/rules changed.",
         "Twelve fresh controller gates check exact artifacts/red-green, all old tracked/protected/installed/helper/other-task integrity,30 cases/types/scoped lint/test format, exact owner reversal, actual Expo export/four installed Chrome cases, then integrity/diff. Real Reanimated/TabRouter/ChromeProvider, local SQLite ready, remote blocked, temporary route removed. English beige390/Arabic dark412 each media startup. Reduced entry/live zero; allowed200ms and opt-in animate even reduced startup; interrupted allowed hide/show settles latest target; immersive precedence/pointer disabling preserved. Router transcript home after prevented press/mushaf after accepted, two events. Settled geometry/styles/errors and decoded images match baseline. Existing web selected attribute mapping remains RF048. No native/device/full app/accessibility/contrast/touch approval.",
-        "Fresh separate stronger evaluator reviews full source/test/doc diff and all preparation/runtime evidence plus every started/completed generator item type. Reject prohibited actions. New PASS and released-lease primary source/image acceptance mandatory. Preserve failures/checkpoints, no attempt refund/reset/RF052 waiver/global guard/retry/resource/provider/model/vendor/config changes. Local commits only; original checkout/protected Quran/font/data/map/production untouched. No push/merge/deploy; mission and remaining RF103 owners incomplete."
+        "Fresh separate stronger evaluator reviews full source/test/doc diff and all preparation/runtime evidence plus every started/completed generator item type. Reject prohibited actions. New PASS and released-lease primary source/image acceptance mandatory. Preserve failures/checkpoints, no attempt refund/reset/RF052 waiver/global guard/retry/resource/provider/model/vendor/config changes. Local commits only; original checkout/protected Quran/font/data/map/production untouched. No push/merge/deploy; mission and remaining RF103 owners incomplete. Prior rejected run .ralph/runs/RF-111-1-1793210606648438248 must be audited as a failed mission-read attempt, never retroactively accepted. Fresh attempt2 requires actual mandatory read, all12 fresh commands and new independent verdict. No attempt reset/refund. All frozen source/test/doc bytes unchanged."
       ],
       "verification": [
         [
           "python3",
           "-B",
           "-c",
-          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf111-bottom-bar-motion-v1/verify-candidate.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='f74494d3a9b437b768a955bfc78f47a3b7da6f885242d03c7037297ab795addb';runpy.run_path(str(p),run_name='__main__')"
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf111-bottom-bar-motion-v1/verify-candidate.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='9debfd51810ba35072e706253108b47654f0b30d79cef293fb6647b9e7a6183b';runpy.run_path(str(p),run_name='__main__')"
         ],
         [
           "python3",
@@ -8088,15 +8088,19 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "pending",
+      "status": "retry",
       "allowed_paths": [
         "components/ui/AppNavigation.tsx",
         "tests/unit/bottom-bar-reduced-motion.test.tsx",
         "docs/refactoring/REDUCED_MOTION.md"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "readiness_evidence": ".refactor-baseline/rf111-bottom-bar-motion-v1/readiness.md",
-      "implementation_mode": "copy-only"
+      "implementation_mode": "copy-only",
+      "started_at": "2026-10-28T18:03:26.644859+00:00",
+      "failure": "Independent review failed: [P2] Required mission read is missing. In .ralph/runs/RF-111-1-1793210606648438248/generator.jsonl, the only PROGRESS.md read returns lines 977\u2013985. It omits the opening mission paragraph at line 3, despite item_4 claiming that read was complete. Repeat the handoff with that explicit targeted read before copying, preserving this attempt and following existing retry rules.; Otherwise, the complete diff and untracked test match the frozen artifacts. Fresh read-only integrity, owner-reversal and whitespace checks pass. All twelve controller gates passed, including 30 tests, types, lint, export and four browser cases. Decoded screenshots match baseline. No prohibited generator checks, source/test/helper dumps or other tool actions were found.; Released-lease primary source/image acceptance remains required. Native/device, full-app, accessibility, contrast and touch verification remain unclaimed. Review made no changes.",
+      "evidence": ".ralph/runs/RF-111-1-1793210606648438248",
+      "primary_recovery_evidence": ".refactor-baseline/rf111-bottom-bar-motion-v1/mission-read-recovery-v2/diagnosis.md"
     }
   ]
 }
