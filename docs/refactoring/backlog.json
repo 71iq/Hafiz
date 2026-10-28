@@ -7376,7 +7376,8 @@
         "RF-107",
         "RF-108",
         "RF-109",
-        "RF-110"
+        "RF-110",
+        "RF-111"
       ],
       "acceptance_criteria": [
         "Primary must inspect real callers/tests and prepare exact small artifact sets and meaningful before/after/race/rendered checks before approving; split further if needed. Preserve useful state feedback, focus/dismissal/safe areas/geometry, toast lifetime, banner visibility callbacks, native worklets and the original checkout.",
@@ -7997,6 +7998,105 @@
       "summary": "Accepted documentation-only AppNavigation motion audit. Two controller gates, independent Astra PASS and released-lease primary source/document review. Three future repair designs documented; no application code/runtime checks or repair claimed. All source tasks and RF103 completion remain pending.",
       "primary_accepted": true,
       "primary_acceptance_evidence": ".refactor-baseline/rf110-primary-acceptance.json"
+    },
+    {
+      "id": "RF-111",
+      "title": "Respect live reduced motion in bottom navigation visibility",
+      "description": "Exact BottomBar visibility effect from RF110 design. Other AppNavigation animation owners unchanged.",
+      "rationale": "Real Reanimated baseline reproduces stale reduced-start opt-in and ignored live reduction after allowed startup.",
+      "modules": [
+        "components/ui/AppNavigation.tsx",
+        "tests/unit/bottom-bar-reduced-motion.test.tsx",
+        "docs/refactoring/REDUCED_MOTION.md"
+      ],
+      "dependencies": [
+        "RF-110"
+      ],
+      "acceptance_criteria": [
+        "Read AGENTS, architecture, conventions, TECH_STACK and supplied readiness.md/plan.md/reuse-map.md/artifacts.json. Read PROGRESS mission and RF111 preparation entry with targeted reads. Copy only: cp .refactor-baseline/rf111-bottom-bar-motion-v1/AppNavigation.tsx components/ui/AppNavigation.tsx; cp .refactor-baseline/rf111-bottom-bar-motion-v1/bottom-bar-reduced-motion.test.tsx tests/unit/bottom-bar-reduced-motion.test.tsx; cp .refactor-baseline/rf111-bottom-bar-motion-v1/REDUCED_MOTION.md docs/refactoring/REDUCED_MOTION.md. Required instruction/metadata and git status/branch permitted. No source/test/helper dumps, checks/hashes, transformations, engineering, agents, packages, services, controller edits or commits. Report installed paths and pending controller/review/acceptance.",
+        "Primary owns exact BottomBar hook/import/enum/effect design. Reduced/unknown assign current0/1 hidden target; allowed original200ms timing with explicit Never. Keep all other AppNavigation bytes unchanged, verified by complete reversal. Do not format owner. Preserve120px/opacity math, chrome/immersive precedence, immediate pointer handling, safe areas/themes, navigation prevention/selected/long press, routes/widths/profile/auth. Tab springs/floating panel remain unapproved RF103 work.",
+        "Final11 actual owner/ChromeProvider/TabRouter cases original red9/green11, combined30. Mock only native scheduling/render-context/system boundaries, stable shared refs and actual installed ReduceMotion enum. Native Worklets mock initialization, safe-area wrapper/missed patch and weak screen/aria route probes remain preserved fixture failures. Actual router state and native selected props prove prevention; both screen nodes mounted is not routing proof. Source baseline diagnostics0/0 preserved; new-test lint0. No old tests/rules changed.",
+        "Twelve fresh controller gates check exact artifacts/red-green, all old tracked/protected/installed/helper/other-task integrity,30 cases/types/scoped lint/test format, exact owner reversal, actual Expo export/four installed Chrome cases, then integrity/diff. Real Reanimated/TabRouter/ChromeProvider, local SQLite ready, remote blocked, temporary route removed. English beige390/Arabic dark412 each media startup. Reduced entry/live zero; allowed200ms and opt-in animate even reduced startup; interrupted allowed hide/show settles latest target; immersive precedence/pointer disabling preserved. Router transcript home after prevented press/mushaf after accepted, two events. Settled geometry/styles/errors and decoded images match baseline. Existing web selected attribute mapping remains RF048. No native/device/full app/accessibility/contrast/touch approval.",
+        "Fresh separate stronger evaluator reviews full source/test/doc diff and all preparation/runtime evidence plus every started/completed generator item type. Reject prohibited actions. New PASS and released-lease primary source/image acceptance mandatory. Preserve failures/checkpoints, no attempt refund/reset/RF052 waiver/global guard/retry/resource/provider/model/vendor/config changes. Local commits only; original checkout/protected Quran/font/data/map/production untouched. No push/merge/deploy; mission and remaining RF103 owners incomplete."
+      ],
+      "verification": [
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf111-bottom-bar-motion-v1/verify-candidate.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='f74494d3a9b437b768a955bfc78f47a3b7da6f885242d03c7037297ab795addb';runpy.run_path(str(p),run_name='__main__')"
+        ],
+        [
+          "python3",
+          "-B",
+          ".refactor-baseline/rf111-bottom-bar-motion-v1/verify-inputs.py"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/bottom-bar-reduced-motion.test.tsx",
+          "tests/unit/reduced-motion.test.tsx",
+          "--no-cache"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "python3",
+          "-B",
+          ".refactor-baseline/rf111-bottom-bar-motion-v1/verify-source-lint.py"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "tests/unit/bottom-bar-reduced-motion.test.tsx",
+          "--max-warnings=0"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "tests/unit/bottom-bar-reduced-motion.test.tsx"
+        ],
+        [
+          "node",
+          ".refactor-baseline/rf111-bottom-bar-motion-v1/verify-owner.cjs"
+        ],
+        [
+          "python3",
+          "-B",
+          ".refactor-baseline/rf111-bottom-bar-motion-v1/build-fixture.py"
+        ],
+        [
+          "node",
+          ".refactor-baseline/rf111-bottom-bar-motion-v1/browser.cjs",
+          "controller"
+        ],
+        [
+          "python3",
+          "-B",
+          ".refactor-baseline/rf111-bottom-bar-motion-v1/verify-inputs.py"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
+        ]
+      ],
+      "risk": "medium",
+      "approved": true,
+      "status": "pending",
+      "allowed_paths": [
+        "components/ui/AppNavigation.tsx",
+        "tests/unit/bottom-bar-reduced-motion.test.tsx",
+        "docs/refactoring/REDUCED_MOTION.md"
+      ],
+      "attempts": 0,
+      "readiness_evidence": ".refactor-baseline/rf111-bottom-bar-motion-v1/readiness.md",
+      "implementation_mode": "copy-only"
     }
   ]
 }
