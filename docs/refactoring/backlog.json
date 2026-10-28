@@ -8102,7 +8102,9 @@
       "evidence": ".ralph/runs/RF-111-2-1793211027441817827",
       "primary_recovery_evidence": ".refactor-baseline/rf111-bottom-bar-motion-v1/mission-read-recovery-v2/diagnosis.md",
       "completed_at": "2026-10-28T18:14:57.368431+00:00",
-      "summary": "Copied the three exact RF111 artifacts. Verification, controller review, independent evaluation, and acceptance remain pending."
+      "summary": "Accepted BottomBar live reduced motion after explicit mission-read recovery on ordinary attempt2. Twelve fresh gates,30 tests,four real Reanimated/TabRouter cases,new independent Astra PASS and released-lease primary source/image review. First rejection remains preserved/spent. Other AppNavigation owners unchanged. Native/device/full app/accessibility unverified.",
+      "primary_accepted": true,
+      "primary_acceptance_evidence": ".refactor-baseline/rf111-primary-acceptance.json"
     }
   ]
 }
