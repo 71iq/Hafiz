@@ -15,8 +15,10 @@ import Animated, {
   useSharedValue,
   withSpring,
   withTiming,
+  ReduceMotion,
 } from "react-native-reanimated";
 import { useEffect, useState, useCallback, useRef } from "react";
+import { useReducedMotionPreference } from "@/lib/ui/reduced-motion";
 import { useChrome } from "@/lib/ui/chrome";
 import { useSettings, withThemeOpacity } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -128,10 +130,15 @@ function BottomBar(props: BottomTabBarProps) {
   const barBackground = withThemeOpacity(themeSurface, 0.8);
   const nativeBarBackground = withThemeOpacity(themeSurface, 0.95);
 
+  const reduceMotion = useReducedMotionPreference();
   const hidden = useSharedValue(0);
   useEffect(() => {
-    hidden.value = withTiming(chromeVisible ? 0 : 1, { duration: 200 });
-  }, [chromeVisible, hidden]);
+    if (reduceMotion) {
+      hidden.value = chromeVisible ? 0 : 1;
+      return;
+    }
+    hidden.value = withTiming(chromeVisible ? 0 : 1, { duration: 200, reduceMotion: ReduceMotion.Never });
+  }, [chromeVisible, hidden, reduceMotion]);
   const barAnimStyle = useAnimatedStyle(() => {
     const slide = hidden.value * 120;
     return {
