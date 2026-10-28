@@ -7994,7 +7994,9 @@
       "started_at": "2026-10-27T16:51:26.072544+00:00",
       "completed_at": "2026-10-27T16:53:30.927742+00:00",
       "evidence": ".ralph/runs/RF-110-1-1793119886075263734",
-      "summary": "Installed the frozen RF110 document at `docs/refactoring/NAVIGATION_MOTION.md` using the exact copy command. The pre-existing backlog edit was preserved."
+      "summary": "Accepted documentation-only AppNavigation motion audit. Two controller gates, independent Astra PASS and released-lease primary source/document review. Three future repair designs documented; no application code/runtime checks or repair claimed. All source tasks and RF103 completion remain pending.",
+      "primary_accepted": true,
+      "primary_acceptance_evidence": ".refactor-baseline/rf110-primary-acceptance.json"
     }
   ]
 }
