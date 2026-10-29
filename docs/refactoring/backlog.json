@@ -8122,18 +8122,18 @@
         "RF-111"
       ],
       "acceptance_criteria": [
-        "Read readiness.md and required instructions/metadata. Before copying execute standalone sed -n '1,8p' docs/refactoring/PROGRESS.md in its own tool call, and read the opening mission paragraph. Read targeted latest RF112 progress, AGENTS, architecture, conventions, TECH_STACK, plan/reuse/artifact metadata. Then copy only: cp .refactor-baseline/rf112-floating-panel-motion-v1/AppNavigation.tsx components/ui/AppNavigation.tsx; cp .refactor-baseline/rf112-floating-panel-motion-v1/floating-panel-reduced-motion.test.tsx tests/unit/floating-panel-reduced-motion.test.tsx; cp .refactor-baseline/rf112-floating-panel-motion-v1/REDUCED_MOTION.md docs/refactoring/REDUCED_MOTION.md. No source/test/helper dumps, transforms, checks/hashes, guided engineering, packages/services/agents, controller edits or commits. Report installed paths and pending checks/review/acceptance.",
+        "Read pixel-review-recovery-v2/readiness.md and diagnosis.md in addition to original plan/reuse/artifact metadata. Read readiness.md and required instructions/metadata. Before copying execute standalone sed -n '1,8p' docs/refactoring/PROGRESS.md in its own tool call, and read the opening mission paragraph. Read targeted latest RF112 progress, AGENTS, architecture, conventions, TECH_STACK, plan/reuse/artifact metadata. Then copy only: cp .refactor-baseline/rf112-floating-panel-motion-v1/AppNavigation.tsx components/ui/AppNavigation.tsx; cp .refactor-baseline/rf112-floating-panel-motion-v1/floating-panel-reduced-motion.test.tsx tests/unit/floating-panel-reduced-motion.test.tsx; cp .refactor-baseline/rf112-floating-panel-motion-v1/REDUCED_MOTION.md docs/refactoring/REDUCED_MOTION.md. No source/test/helper dumps, transforms, checks/hashes, guided engineering, packages/services/agents, controller edits or commits. Report installed paths and pending checks/review/acceptance.",
         "Primary owns exact FloatingPanel design. Unknown/reduced assign current open0/1 endpoint; allowed retains180ms with explicit Never. Exact whole-owner reversal protects BottomBar, tab springs, profile/auth, all markup/styles,180ms hover/blur hide timer/cancellation/cleanup, focus/click/hover, immersive/navigation close, pointer disabling, RTL24px offset and768/1024/wide Mushaf branches. No broad source format, global manager/config/provider or dependency.",
         "Final17 real exported owner/ChromeProvider/TabRouter cases fail11 on original and pass on candidate; combined preference36, types/scoped zero-warning lint/test format pass. Correct actual RN viewport module is mocked; native scheduling/render-context/system boundaries only. Preserve all fixture failures, including wrong evidence slug, NativeWind node identity, namespace viewport and missing event/unrelated timer assumptions. No old tests weakened. No native/worklet proof from Jest.",
-        "Twelve fresh controller gates verify candidate, all old tracked/installed/helper/other-task inputs,36 cases/types/lint/test format, exact owner reversal, actual Expo export and four real Chrome/Reanimated/TabRouter comparisons, integrity and whitespace. English beige800/Arabic dark900, both cold preferences, SQLite ready and remote blocked. Reduced initial/live entry/exit zero motion; allowed180ms and opt-in animate even reduced startup; rapid reversal latest endpoint. Preserve distinct blur hide delay, edge-hover cancellation/re-entry, immediate pointer disable, immersive close, prevented then accepted real router events and wide Mushaf null,1024 persistent branch. Match settled geometry/styles/transcripts/errors and all four decoded images. Temporary route removed.",
-        "Fresh separate stronger Astra reviews full diff/evidence and every started/completed generator item type, rejects prohibited actions and missing required reads. Released-lease primary source/pixel/hash review and acceptance required after PASS. Preserve failures/checkpoints and unchanged ordinary retry/resource/account/memory/token/deadline/model/provider/vendor/config limits. Native/device/full application/accessibility/contrast/touch targets unverified. All commits local; original checkout/protected Quran/font/data/map/production untouched; no push/merge/deploy. RF103/mission remain incomplete."
+        "Twelve fresh controller gates verify candidate, all old tracked/installed/helper/other-task inputs,36 cases/types/lint/test format, exact owner reversal, actual Expo export and four real Chrome/Reanimated/TabRouter comparisons, integrity and whitespace. English beige800/Arabic dark900, both cold preferences, SQLite ready and remote blocked. Reduced initial/live entry/exit zero motion; allowed180ms and opt-in animate even reduced startup; rapid reversal latest endpoint. Preserve distinct blur hide delay, edge-hover cancellation/re-entry, immediate pointer disable, immersive close, prevented then accepted real router events and wide Mushaf null,1024 persistent branch. Match settled geometry/styles/transcripts/errors and all four decoded images. Temporary route removed. V2 controller browser wrapper must run the full real browser gate and then compare all RGBA channels with alpha_only=False, including color-only and alpha-only negative controls. V1 alpha-only checker remains preserved, not sufficient evidence by itself.",
+        "Fresh separate stronger Astra reviews full diff/evidence and every started/completed generator item type, rejects prohibited actions and missing required reads. Released-lease primary source/pixel/hash review and acceptance required after PASS. Preserve failures/checkpoints and unchanged ordinary retry/resource/account/memory/token/deadline/model/provider/vendor/config limits. Native/device/full application/accessibility/contrast/touch targets unverified. All commits local; original checkout/protected Quran/font/data/map/production untouched; no push/merge/deploy. RF103/mission remain incomplete. Preserve original interrupted review and audit both generator histories. No verdict is not PASS. Attempt1 stays spent, no checkpoint or attempt reset/refund."
       ],
       "verification": [
         [
           "python3",
           "-B",
           "-c",
-          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf112-floating-panel-motion-v1/verify-candidate.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='0f828777d68805238b9feaf0729d0d75ee443a91c122c16fe3385b1c4e586e94';runpy.run_path(str(p),run_name='__main__')"
+          "import json,hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf112-floating-panel-motion-v1/pixel-review-recovery-v2/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='0740461e2052faed7a53ead6187d0a7a9234dbb519f36e1ee173ae9d4db77bdd';[(None if hashlib.sha256(Path(n).read_bytes()).hexdigest()==h else (_ for _ in ()).throw(AssertionError(n))) for n,h in json.loads(p.read_text()).items()];q=Path('.refactor-baseline/rf112-floating-panel-motion-v1/verify-candidate.py');assert hashlib.sha256(q.read_bytes()).hexdigest()=='0f828777d68805238b9feaf0729d0d75ee443a91c122c16fe3385b1c4e586e94';runpy.run_path(str(q),run_name='__main__')"
         ],
         [
           "python3",
@@ -8180,9 +8180,9 @@
           ".refactor-baseline/rf112-floating-panel-motion-v1/build-fixture.py"
         ],
         [
-          "node",
-          ".refactor-baseline/rf112-floating-panel-motion-v1/browser.cjs",
-          "controller"
+          "python3",
+          "-B",
+          ".refactor-baseline/rf112-floating-panel-motion-v1/pixel-review-recovery-v2/verify-browser.py"
         ],
         [
           "python3",
@@ -8197,15 +8197,18 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "pending",
+      "status": "retry",
       "allowed_paths": [
         "components/ui/AppNavigation.tsx",
         "tests/unit/floating-panel-reduced-motion.test.tsx",
         "docs/refactoring/REDUCED_MOTION.md"
       ],
-      "attempts": 0,
-      "readiness_evidence": ".refactor-baseline/rf112-floating-panel-motion-v1/readiness.md",
-      "implementation_mode": "copy-only"
+      "attempts": 1,
+      "readiness_evidence": ".refactor-baseline/rf112-floating-panel-motion-v1/pixel-review-recovery-v2/readiness.md",
+      "implementation_mode": "copy-only",
+      "started_at": "2026-10-29T18:54:41.951631+00:00",
+      "failure": "Attempt1 independent review interrupted without verdict; all12 original gates passed but primary diagnosed alpha-only RGBA comparison blind spot. Preserve original run/checkpoint; v2 wrapper checks all channels plus color/alpha negative controls. Attempt1 remains spent. Fresh generation/all12 gates/new independent review required.",
+      "primary_recovery_evidence": ".refactor-baseline/rf112-floating-panel-motion-v1/pixel-review-recovery-v2/diagnosis.md"
     }
   ]
 }
