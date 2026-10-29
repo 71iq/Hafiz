@@ -8211,7 +8211,9 @@
       "primary_recovery_evidence": ".refactor-baseline/rf112-floating-panel-motion-v1/pixel-review-recovery-v2/diagnosis.md",
       "completed_at": "2026-10-29T19:14:03.219844+00:00",
       "evidence": ".ralph/runs/RF-112-2-1793300826339410349",
-      "summary": "Installed the three exact RF112 artifacts. Verification, independent review, primary acceptance, hashes, tests, commits, and pushes remain pending."
+      "summary": "Accepted FloatingPanel live reduced motion after corrected all-RGBA pixel gate. Ordinary attempt2 passes12 fresh gates,36 focused cases,four real Chrome/router cases,new independent Astra and released-lease primary scope/hash/image review. Interrupted first review/checker defect preserved; tab springs/RF103 and native/device/full app/accessibility remain pending.",
+      "primary_accepted": true,
+      "primary_acceptance_evidence": ".refactor-baseline/rf112-primary-acceptance.json"
     }
   ]
 }
