@@ -408,14 +408,19 @@ function FloatingPanel(props: BottomTabBarProps & { isRTL?: boolean }) {
   const [open, setOpen] = useState(false);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const progress = useSharedValue(0);
+  const reduceMotion = useReducedMotionPreference();
 
   useEffect(() => () => {
     if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
   }, []);
 
   useEffect(() => {
-    progress.value = withTiming(open ? 1 : 0, { duration: 180 });
-  }, [open, progress]);
+    if (reduceMotion) {
+      progress.value = open ? 1 : 0;
+      return;
+    }
+    progress.value = withTiming(open ? 1 : 0, { duration: 180, reduceMotion: ReduceMotion.Never });
+  }, [open, progress, reduceMotion]);
 
   useEffect(() => {
     if (immersive) setOpen(false);

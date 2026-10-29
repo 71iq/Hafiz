@@ -8197,18 +8197,21 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "retry",
+      "status": "verified",
       "allowed_paths": [
         "components/ui/AppNavigation.tsx",
         "tests/unit/floating-panel-reduced-motion.test.tsx",
         "docs/refactoring/REDUCED_MOTION.md"
       ],
-      "attempts": 1,
+      "attempts": 2,
       "readiness_evidence": ".refactor-baseline/rf112-floating-panel-motion-v1/pixel-review-recovery-v2/readiness.md",
       "implementation_mode": "copy-only",
-      "started_at": "2026-10-29T18:54:41.951631+00:00",
+      "started_at": "2026-10-29T19:07:06.335786+00:00",
       "failure": "Attempt1 independent review interrupted without verdict; all12 original gates passed but primary diagnosed alpha-only RGBA comparison blind spot. Preserve original run/checkpoint; v2 wrapper checks all channels plus color/alpha negative controls. Attempt1 remains spent. Fresh generation/all12 gates/new independent review required.",
-      "primary_recovery_evidence": ".refactor-baseline/rf112-floating-panel-motion-v1/pixel-review-recovery-v2/diagnosis.md"
+      "primary_recovery_evidence": ".refactor-baseline/rf112-floating-panel-motion-v1/pixel-review-recovery-v2/diagnosis.md",
+      "completed_at": "2026-10-29T19:14:03.219844+00:00",
+      "evidence": ".ralph/runs/RF-112-2-1793300826339410349",
+      "summary": "Installed the three exact RF112 artifacts. Verification, independent review, primary acceptance, hashes, tests, commits, and pushes remain pending."
     }
   ]
 }
