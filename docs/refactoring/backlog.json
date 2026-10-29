@@ -7377,7 +7377,8 @@
         "RF-108",
         "RF-109",
         "RF-110",
-        "RF-111"
+        "RF-111",
+        "RF-112"
       ],
       "acceptance_criteria": [
         "Primary must inspect real callers/tests and prepare exact small artifact sets and meaningful before/after/race/rendered checks before approving; split further if needed. Preserve useful state feedback, focus/dismissal/safe areas/geometry, toast lifetime, banner visibility callbacks, native worklets and the original checkout.",
@@ -8105,6 +8106,106 @@
       "summary": "Accepted BottomBar live reduced motion after explicit mission-read recovery on ordinary attempt2. Twelve fresh gates,30 tests,four real Reanimated/TabRouter cases,new independent Astra PASS and released-lease primary source/image review. First rejection remains preserved/spent. Other AppNavigation owners unchanged. Native/device/full app/accessibility unverified.",
       "primary_accepted": true,
       "primary_acceptance_evidence": ".refactor-baseline/rf111-primary-acceptance.json"
+    },
+    {
+      "id": "RF-112",
+      "title": "Respect live reduced motion in floating navigation progress",
+      "description": "FloatingPanel effect only from RF110. Reuse live preference, existing open state and progress. All other owner bytes unchanged.",
+      "rationale": "Real installed Reanimated reproduces ignored live reduction at allowed startup and stale System suppressing later opt-in after reduced startup.",
+      "modules": [
+        "components/ui/AppNavigation.tsx",
+        "tests/unit/floating-panel-reduced-motion.test.tsx",
+        "docs/refactoring/REDUCED_MOTION.md"
+      ],
+      "dependencies": [
+        "RF-110",
+        "RF-111"
+      ],
+      "acceptance_criteria": [
+        "Read readiness.md and required instructions/metadata. Before copying execute standalone sed -n '1,8p' docs/refactoring/PROGRESS.md in its own tool call, and read the opening mission paragraph. Read targeted latest RF112 progress, AGENTS, architecture, conventions, TECH_STACK, plan/reuse/artifact metadata. Then copy only: cp .refactor-baseline/rf112-floating-panel-motion-v1/AppNavigation.tsx components/ui/AppNavigation.tsx; cp .refactor-baseline/rf112-floating-panel-motion-v1/floating-panel-reduced-motion.test.tsx tests/unit/floating-panel-reduced-motion.test.tsx; cp .refactor-baseline/rf112-floating-panel-motion-v1/REDUCED_MOTION.md docs/refactoring/REDUCED_MOTION.md. No source/test/helper dumps, transforms, checks/hashes, guided engineering, packages/services/agents, controller edits or commits. Report installed paths and pending checks/review/acceptance.",
+        "Primary owns exact FloatingPanel design. Unknown/reduced assign current open0/1 endpoint; allowed retains180ms with explicit Never. Exact whole-owner reversal protects BottomBar, tab springs, profile/auth, all markup/styles,180ms hover/blur hide timer/cancellation/cleanup, focus/click/hover, immersive/navigation close, pointer disabling, RTL24px offset and768/1024/wide Mushaf branches. No broad source format, global manager/config/provider or dependency.",
+        "Final17 real exported owner/ChromeProvider/TabRouter cases fail11 on original and pass on candidate; combined preference36, types/scoped zero-warning lint/test format pass. Correct actual RN viewport module is mocked; native scheduling/render-context/system boundaries only. Preserve all fixture failures, including wrong evidence slug, NativeWind node identity, namespace viewport and missing event/unrelated timer assumptions. No old tests weakened. No native/worklet proof from Jest.",
+        "Twelve fresh controller gates verify candidate, all old tracked/installed/helper/other-task inputs,36 cases/types/lint/test format, exact owner reversal, actual Expo export and four real Chrome/Reanimated/TabRouter comparisons, integrity and whitespace. English beige800/Arabic dark900, both cold preferences, SQLite ready and remote blocked. Reduced initial/live entry/exit zero motion; allowed180ms and opt-in animate even reduced startup; rapid reversal latest endpoint. Preserve distinct blur hide delay, edge-hover cancellation/re-entry, immediate pointer disable, immersive close, prevented then accepted real router events and wide Mushaf null,1024 persistent branch. Match settled geometry/styles/transcripts/errors and all four decoded images. Temporary route removed.",
+        "Fresh separate stronger Astra reviews full diff/evidence and every started/completed generator item type, rejects prohibited actions and missing required reads. Released-lease primary source/pixel/hash review and acceptance required after PASS. Preserve failures/checkpoints and unchanged ordinary retry/resource/account/memory/token/deadline/model/provider/vendor/config limits. Native/device/full application/accessibility/contrast/touch targets unverified. All commits local; original checkout/protected Quran/font/data/map/production untouched; no push/merge/deploy. RF103/mission remain incomplete."
+      ],
+      "verification": [
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf112-floating-panel-motion-v1/verify-candidate.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='0f828777d68805238b9feaf0729d0d75ee443a91c122c16fe3385b1c4e586e94';runpy.run_path(str(p),run_name='__main__')"
+        ],
+        [
+          "python3",
+          "-B",
+          ".refactor-baseline/rf112-floating-panel-motion-v1/verify-inputs.py"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/floating-panel-reduced-motion.test.tsx",
+          "tests/unit/reduced-motion.test.tsx",
+          "--no-cache"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "python3",
+          "-B",
+          ".refactor-baseline/rf112-floating-panel-motion-v1/verify-source-lint.py"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "tests/unit/floating-panel-reduced-motion.test.tsx",
+          "--max-warnings=0"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "tests/unit/floating-panel-reduced-motion.test.tsx"
+        ],
+        [
+          "node",
+          ".refactor-baseline/rf112-floating-panel-motion-v1/verify-owner.cjs"
+        ],
+        [
+          "python3",
+          "-B",
+          ".refactor-baseline/rf112-floating-panel-motion-v1/build-fixture.py"
+        ],
+        [
+          "node",
+          ".refactor-baseline/rf112-floating-panel-motion-v1/browser.cjs",
+          "controller"
+        ],
+        [
+          "python3",
+          "-B",
+          ".refactor-baseline/rf112-floating-panel-motion-v1/verify-inputs.py"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
+        ]
+      ],
+      "risk": "medium",
+      "approved": true,
+      "status": "pending",
+      "allowed_paths": [
+        "components/ui/AppNavigation.tsx",
+        "tests/unit/floating-panel-reduced-motion.test.tsx",
+        "docs/refactoring/REDUCED_MOTION.md"
+      ],
+      "attempts": 0,
+      "readiness_evidence": ".refactor-baseline/rf112-floating-panel-motion-v1/readiness.md",
+      "implementation_mode": "copy-only"
     }
   ]
 }
