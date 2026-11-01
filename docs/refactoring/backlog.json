@@ -8733,19 +8733,20 @@
       ],
       "risk": "high",
       "approved": true,
-      "status": "retry",
+      "status": "blocked",
       "allowed_paths": [
         "package.json",
         "package-lock.json",
         "docs/refactoring/TECH_STACK.md",
         "tests/rtl/rtl-component-registry.ts"
       ],
-      "attempts": 1,
+      "attempts": 2,
       "implementation_mode": "copy-only",
       "readiness_evidence": ".refactor-baseline/rf116-expo-patches-v1/registry-recovery-v2/readiness.md",
-      "started_at": "2026-11-01T20:52:19.823289+00:00",
-      "failure": "Verification failed: ['npm', 'run', 'test:unit']; see .ralph/runs/RF-116-1-1793566339825863247/verify-11.log",
-      "evidence": ".ralph/runs/RF-116-1-1793566339825863247"
+      "started_at": "2026-11-01T20:58:07.047239+00:00",
+      "failure": "Verification failed: ['python3', '-B', '-c', \"import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf116-expo-patches-v1/registry-recovery-v2/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='b415e3df29f8594eaf5232c058c35167aa3733a03329ed2d6e7559f900b2ae80';runpy.run_path('.refactor-baseline/rf116-expo-patches-v1/registry-recovery-v2/verify.py',run_name='__main__')\"]; see .ralph/runs/RF-116-2-1793566687051615284/verify-0.log",
+      "evidence": ".ralph/runs/RF-116-2-1793566687051615284",
+      "primary_recovery_evidence": ".refactor-baseline/rf116-expo-patches-v1/copy-parser-recovery-v3/diagnosis.md"
     }
   ]
 }
