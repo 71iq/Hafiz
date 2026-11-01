@@ -7358,7 +7358,7 @@
     {
       "id": "RF-103",
       "title": "Respect live reduced motion in remaining shared UI transitions",
-      "description": "Prepare exact bounded transition scopes for ResponsiveOverlay, legacy Sheet, Toast, OfflineBanner, DropdownMenu and AppNavigation. Inspect instantaneous press feedback and actual ReadingStepper use before claiming inventory completion. Switch is the separate RF102 slice. OfflineBanner is now the separate exact RF105 slice; this umbrella retains all other owners. Toast is the separate exact RF106 session/motion slice.",
+      "description": "Prepare exact bounded transition scopes for ResponsiveOverlay, legacy Sheet, Toast, OfflineBanner, DropdownMenu and AppNavigation. Inspect instantaneous press feedback and actual ReadingStepper use before claiming inventory completion. Switch is the separate RF102 slice. OfflineBanner is now the separate exact RF105 slice; this umbrella retains all other owners. Toast is the separate exact RF106 session/motion slice. Final source inventory after RF113 also finds repeating ActivityIndicator in SyncIndicator and ConfirmDialog. Installed Android hides animating=false regardless of web hidesWhenStopped behavior. RF103 remains unapproved until a visible static busy fallback and exact caller/browser regressions are prepared. Immediate endpoint press feedback is retained by primary source decision; no rendered/accessibility claim.",
       "rationale": "Transition visibility/focus/callback/worklet owners need separate primary decisions and evidence. Repeating placeholders and controlled Switch thumb motion do not certify them.",
       "modules": [
         "docs/refactoring/REDUCED_MOTION.md",
@@ -7367,7 +7367,10 @@
         "components/ui/Toast.tsx",
         "components/ui/OfflineBanner.tsx",
         "components/ui/DropdownMenu.tsx",
-        "components/ui/AppNavigation.tsx"
+        "components/ui/AppNavigation.tsx",
+        "components/ui/SyncIndicator.tsx",
+        "components/ui/ConfirmDialog.tsx",
+        "components/settings/ReadingStepper.tsx"
       ],
       "dependencies": [
         "RF-102",
@@ -7383,7 +7386,8 @@
       ],
       "acceptance_criteria": [
         "Primary must inspect real callers/tests and prepare exact small artifact sets and meaningful before/after/race/rendered checks before approving; split further if needed. Preserve useful state feedback, focus/dismissal/safe areas/geometry, toast lifetime, banner visibility callbacks, native worklets and the original checkout.",
-        "Observe live preference changes including active transitions. Installed Reanimated default System is not proof of live changes. Record web/native evidence separately and carry unavailable native runtime/device checks. No configuration/dependency/data/runner/production change."
+        "Observe live preference changes including active transitions. Installed Reanimated default System is not proof of live changes. Record web/native evidence separately and carry unavailable native runtime/device checks. No configuration/dependency/data/runner/production change.",
+        "Account for actual shared SyncIndicator and ConfirmDialog ActivityIndicator instances before inventory closure. Preserve a visible busy state under unknown/reduced preference across platform contracts; web pause behavior does not establish Android visibility. Primary plan .refactor-baseline/rf103-progress-indicator-preparation-v1/plan.md requires exact artifact, red/green, status/callback/disabled/lifecycle and rendered geometry evidence before approval. No source edits authorized to workers by this preparation."
       ],
       "verification": [
         [
@@ -7404,7 +7408,8 @@
         "components/ui/AppNavigation.tsx",
         "docs/refactoring/REDUCED_MOTION.md"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "primary_preparation_evidence": ".refactor-baseline/rf103-progress-indicator-preparation-v1/plan.md"
     },
     {
       "id": "RF-104",
