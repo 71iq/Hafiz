@@ -351,7 +351,8 @@
       "dependencies": [
         "RF-007",
         "RF-067",
-        "RF-114"
+        "RF-114",
+        "RF-115"
       ],
       "acceptance_criteria": [
         "Use Expo recommended SDK55 versions, inspect existing patches and preserve native APIs.",
@@ -402,7 +403,7 @@
         "docs/refactoring/TECH_STACK.md"
       ],
       "attempts": 0,
-      "primary_preparation_evidence": ".refactor-baseline/rf008-diagnostic-refresh-v1/readiness.md"
+      "primary_preparation_evidence": ".refactor-baseline/rf115-router-range-v1/readiness.md"
     },
     {
       "id": "RF-009",
@@ -8504,6 +8505,101 @@
       "summary": "SDK55 preset55.0.1 with explicit Hooks7.1.1 preserves all362 effective old configurations and exact68 warnings/zero errors. All12 fresh controller gates and independent Astra pass; released-lease primary acceptance complete. RF008 remaining SDK/native ownership, RF044 maintenance and RF090 security debt stay open.",
       "primary_accepted": true,
       "primary_acceptance_evidence": ".refactor-baseline/rf114-primary-acceptance.json"
+    },
+    {
+      "id": "RF-115",
+      "title": "Correct Router dependency declaration without changing installed packages",
+      "description": "Use installed Router recommended ^7.15.5 declaration while preserving locked bottom-tabs7.21.0 and all resolved packages. Document subset-check root cause, not an installed compatibility fix.",
+      "rationale": "Router doctor tests allowed range subset against declared range; an exact pin excludes its older supported versions. No downgrade or runtime update is needed.",
+      "modules": [
+        "package.json",
+        "package-lock.json",
+        "scripts/tests/router-dependency-range.test.cjs",
+        "docs/refactoring/TECH_STACK.md"
+      ],
+      "dependencies": [
+        "RF-067",
+        "RF-114"
+      ],
+      "acceptance_criteria": [
+        "Read AGENTS, ARCHITECTURE, CONVENTIONS, TECH_STACK, .refactor-baseline/rf115-router-range-v1/readiness.md and artifacts.json. In separate successful tool calls execute/read sed -n '1,8p' docs/refactoring/PROGRESS.md and sed -n '1051,1051p' docs/refactoring/PROGRESS.md before any copy. Actual opening mission and latest Primary prepares RF115 Router declaration subset correction reads are mandatory.",
+        "Copy-only. Allowed actions are required instruction/metadata/git-status reads and four exact cp commands from artifacts.json to their keys. No source/test/helper dumps, transforms, engineering, hashes/checks/tests, agents/packages/services, state/controller edits or commits. Report copies and fresh controller checks/independent review/primary acceptance pending.",
+        "Change exactly one bottom-tabs declaration string in each manifest and root lock metadata,7.21.0 to ^7.15.5. Keep every resolved package entry, installed7.21.0 and all other bytes unchanged. No exclusions, overrides, checker edits, peer relaxation or unrelated package update. Four actual installed Router doctor regressions must preserve original1fail/candidate4pass including exact installed-version negative control.",
+        "Fresh controller strict npm ci without peer relaxation, unchanged lock, existing patches/full graph and native graph pass. Run focused tests,format,zero-warning new-test lint,types,web export. Raw Expo diagnostics must remove only bottom-tabs finding, retain three specified Expo patch recommendations and Doctor18/20 non-CNG ownership. Do not hide failures or claim parentRF008/maintenanceRF044/securityRF090 resolved.",
+        "Separate stronger Astra reviews entire four-file diff and every original generator event type, mandatory actual reads before copies, exact artifact/input hashes, strict-install/log evidence and all fresh gates. Primary acceptance after both leases release remains mandatory. No app/native/protected data mutation or native compilation/browser/device/full app certification. Preserve all failure evidence and global limits. Local commits only, no push/merge/deploy."
+      ],
+      "verification": [
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf115-router-range-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='a4487786247fe090a8fffbac239e3d0f1d232cf0445ab48b91fe6c74ea37f0aa';runpy.run_path('.refactor-baseline/rf115-router-range-v1/verify.py',run_name='__main__')"
+        ],
+        [
+          "python3",
+          "-B",
+          ".refactor-baseline/rf008-diagnostic-refresh-v1/install.py"
+        ],
+        [
+          "node",
+          "scripts/ralph/check-expo-native.cjs"
+        ],
+        [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "scripts/tests/router-dependency-range.test.cjs"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "scripts/tests/router-dependency-range.test.cjs",
+          "package.json"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "scripts/tests/router-dependency-range.test.cjs",
+          "--max-warnings=0"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "python3",
+          "-B",
+          ".refactor-baseline/rf115-router-range-v1/diagnostics.py"
+        ],
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf115-router-range-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='a4487786247fe090a8fffbac239e3d0f1d232cf0445ab48b91fe6c74ea37f0aa';runpy.run_path('.refactor-baseline/rf115-router-range-v1/verify.py',run_name='__main__')"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
+        ]
+      ],
+      "risk": "medium",
+      "approved": true,
+      "status": "pending",
+      "allowed_paths": [
+        "package.json",
+        "package-lock.json",
+        "scripts/tests/router-dependency-range.test.cjs",
+        "docs/refactoring/TECH_STACK.md"
+      ],
+      "attempts": 0,
+      "implementation_mode": "copy-only",
+      "readiness_evidence": ".refactor-baseline/rf115-router-range-v1/readiness.md"
     }
   ]
 }
