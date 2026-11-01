@@ -1,4 +1,5 @@
-import { View, ActivityIndicator } from "react-native";
+import { BusyIndicator } from "@/components/ui/BusyIndicator";
+import { View } from "react-native";
 import { Cloud, CloudOff, Check, AlertCircle } from "lucide-react-native";
 import type { SyncStatus } from "@/lib/database/sync";
 
@@ -25,7 +26,7 @@ export function SyncIndicator({ status, isDark }: Props) {
         <View className="relative">
           <Cloud size={size} color={iconColor} />
           <View className="absolute -bottom-0.5 -right-0.5">
-            <ActivityIndicator size={8} color={successColor} />
+            <BusyIndicator size={8} color={successColor} />
           </View>
         </View>
       )}

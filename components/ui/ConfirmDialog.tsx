@@ -1,4 +1,5 @@
-import { ActivityIndicator, Text, View } from "react-native";
+import { BusyIndicator } from "@/components/ui/BusyIndicator";
+import { Text, View } from "react-native";
 import { AlertTriangle } from "lucide-react-native";
 import { Button } from "@/components/ui/Button";
 import { FieldMessage } from "@/components/ui/Field";
@@ -92,7 +93,7 @@ export function ConfirmDialog({
           className="flex-1"
         >
           {confirmLoading ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
+            <BusyIndicator size="small" color="#FFFFFF" />
           ) : (
             <Text className="text-white" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>
               {confirmLabel}

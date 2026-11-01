@@ -7450,7 +7450,7 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "components/ui/BusyIndicator.tsx",
         "components/ui/SyncIndicator.tsx",
@@ -7458,10 +7458,14 @@
         "tests/unit/busy-indicator-reduced-motion.test.tsx",
         "docs/refactoring/REDUCED_MOTION.md"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "primary_preparation_evidence": ".refactor-baseline/rf103-progress-indicator-preparation-v1/plan.md",
       "implementation_mode": "copy-only",
-      "readiness_evidence": ".refactor-baseline/rf103-shared-busy-motion-v1/readiness.md"
+      "readiness_evidence": ".refactor-baseline/rf103-shared-busy-motion-v1/readiness.md",
+      "started_at": "2026-11-01T14:55:11.904637+00:00",
+      "completed_at": "2026-11-01T14:59:40.689840+00:00",
+      "evidence": ".ralph/runs/RF-103-1-1793544911907146547",
+      "summary": "Installed the five exact RF-103 frozen artifacts into the approved paths. Controller verification, independent review, and primary acceptance remain pending."
     },
     {
       "id": "RF-104",
