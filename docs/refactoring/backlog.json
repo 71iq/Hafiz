@@ -8610,13 +8610,14 @@
     },
     {
       "id": "RF-116",
-      "title": "Align remaining SDK55 patch dependencies with explicit transitive review",
+      "title": "Align SDK55 patches and repair BusyIndicator registry integration",
       "description": "Install exact primary-selected Expo55.0.32,dev-client55.0.41,sharing55.0.25 set and finite reviewed lock delta. Keep app/native/config/protected inputs unchanged.",
       "rationale": "Three package-version findings remain after RF114/RF115. Actual resolver changes native/build/security transitives, requiring real Android/web and independent review rather than version-output acceptance.",
       "modules": [
         "package.json",
         "package-lock.json",
-        "docs/refactoring/TECH_STACK.md"
+        "docs/refactoring/TECH_STACK.md",
+        "tests/rtl/rtl-component-registry.ts"
       ],
       "dependencies": [
         "RF-067",
@@ -8624,19 +8625,25 @@
         "RF-115"
       ],
       "acceptance_criteria": [
-        "Read AGENTS,ARCHITECTURE,CONVENTIONS,TECH_STACK,.refactor-baseline/rf116-expo-patches-v1/readiness.md and artifacts.json. In separate successful calls execute/read sed -n '1,8p' docs/refactoring/PROGRESS.md and sed -n '1057,1057p' docs/refactoring/PROGRESS.md before any copy. Actual opening mission and latest Primary prepares RF116 SDK55 follow-up patches reads mandatory.",
-        "Copy-only. Only required instruction/metadata/status reads and three exact cp commands from artifacts.json values to keys. No source/test/helper dumps,engineering,transforms,hashes/tests/checks,packages/services/agents,state/controller edits or commits. Report copies and fresh controller checks/independent review/primary acceptance pending.",
+        "Read AGENTS,ARCHITECTURE,CONVENTIONS,TECH_STACK,.refactor-baseline/rf116-expo-patches-v1/readiness.md and artifacts.json. In separate successful calls execute/read sed -n '1,8p' docs/refactoring/PROGRESS.md and sed -n '1057,1057p' docs/refactoring/PROGRESS.md before any copy. Actual opening mission and latest Primary prepares RF116 SDK55 follow-up patches reads mandatory. Also read recovery readiness.md,diagnosis.md and artifacts.json and execute/read sed -n '1061,1061p' docs/refactoring/PROGRESS.md in its own successful call before copying. Actual RF116 registry recovery after first full-suite failure entry mandatory.",
+        "Copy-only: four exact cp actions from registry-recovery-v2/artifacts.json to their keys. Required instruction/metadata/status reads only; no source/test/helper dumps,engineering,transforms,hashes/tests/checks,packages/services/agents,state/controller edits or commits. Report controller checks/new independent review/primary acceptance pending.",
         "Only three direct declarations plus frozen exact lock diff and TECH_STACK append. Preserve all other manifest fields/overrides and every old package entry outside lock-differences.json. No new package paths.12 updated nonroot records include explicit xcode4/core logging/autolinking/CLI/ws/node-forge; uuid7 removed. Archive integrity/source differences and isolated strict install/full graph are evidence, not complete upstream security or iOS certification.",
         "Fresh strict npm ci with unchanged lock/no peer relaxation, existing RN/CSS patches, full graph and selected installed source pins. Native graphs no duplicates/direct core. Existing dependency-security/lint-coverage/Router cases pass unchanged. Exact current364-file68-warning/zero-error CLI parity,types,full unit suite,web export,real installed-Chrome28-case smoke and bounded Android debug allconfigured ABIs mandatory. No weakening/skips/exclusions.",
         "Raw audit remains nonclean; preserve all output, no newly listed vulnerable package names or criticals relative to frozen candidate. Current baseline69/11high and candidate66/10high are snapshots, not full security acceptance. Package check exits0; raw Doctor exits1 with19/20 and only non-CNG ownership. RF008 native ownership,RF044 maintenance,RF090 security acceptance remain open.",
-        "New stronger Astra inspects full manifest/lock/doc diff, actual17 gate logs, frozen old inputs, archive/transitive scope and every original generator event type including required document reads before copies. Released-lease primary final acceptance mandatory. No iOS/device/native-log runtime claim, no prebuild/native/config/protected input/production changes. Preserve failures and all global retry/resource/account/model/provider limits. Local commits only, no push/merge/deploy."
+        "New stronger Astra inspects full manifest/lock/doc diff, actual17 gate logs, frozen old inputs, archive/transitive scope and every original generator event type including required document reads before copies. Released-lease primary final acceptance mandatory. No iOS/device/native-log runtime claim, no prebuild/native/config/protected input/production changes. Preserve failures and all global retry/resource/account/model/provider limits. Local commits only, no push/merge/deploy.",
+        "Attempt1 full-suite failure and all evidence remain spent/preserved. Fourth source artifact adds exactly one sorted feedback/rntl BusyIndicator registry entry. No existing registry assertions or application component changes. Verify registry reversal and old failed run hashes. Full unit log may contain console/act warnings; retain them, no clean-console claim. Ordinary remaining attempt2 only; no reset/refund/waiver."
       ],
       "verification": [
         [
           "python3",
           "-B",
           "-c",
-          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf116-expo-patches-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='c0ef1f12fa76155f79fc872243b0247ec80c2c1ce67f0625c691b0264942627f';runpy.run_path('.refactor-baseline/rf116-expo-patches-v1/verify.py',run_name='__main__')"
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf116-expo-patches-v1/registry-recovery-v2/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='b415e3df29f8594eaf5232c058c35167aa3733a03329ed2d6e7559f900b2ae80';runpy.run_path('.refactor-baseline/rf116-expo-patches-v1/registry-recovery-v2/verify.py',run_name='__main__')"
+        ],
+        [
+          "python3",
+          "-B",
+          ".refactor-baseline/rf116-expo-patches-v1/registry-recovery-v2/registry-check.py"
         ],
         [
           "python3",
@@ -8716,7 +8723,7 @@
           "python3",
           "-B",
           "-c",
-          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf116-expo-patches-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='c0ef1f12fa76155f79fc872243b0247ec80c2c1ce67f0625c691b0264942627f';runpy.run_path('.refactor-baseline/rf116-expo-patches-v1/verify.py',run_name='__main__')"
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf116-expo-patches-v1/registry-recovery-v2/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='b415e3df29f8594eaf5232c058c35167aa3733a03329ed2d6e7559f900b2ae80';runpy.run_path('.refactor-baseline/rf116-expo-patches-v1/registry-recovery-v2/verify.py',run_name='__main__')"
         ],
         [
           "git",
@@ -8726,15 +8733,19 @@
       ],
       "risk": "high",
       "approved": true,
-      "status": "pending",
+      "status": "retry",
       "allowed_paths": [
         "package.json",
         "package-lock.json",
-        "docs/refactoring/TECH_STACK.md"
+        "docs/refactoring/TECH_STACK.md",
+        "tests/rtl/rtl-component-registry.ts"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "implementation_mode": "copy-only",
-      "readiness_evidence": ".refactor-baseline/rf116-expo-patches-v1/readiness.md"
+      "readiness_evidence": ".refactor-baseline/rf116-expo-patches-v1/registry-recovery-v2/readiness.md",
+      "started_at": "2026-11-01T20:52:19.823289+00:00",
+      "failure": "Verification failed: ['npm', 'run', 'test:unit']; see .ralph/runs/RF-116-1-1793566339825863247/verify-11.log",
+      "evidence": ".ralph/runs/RF-116-1-1793566339825863247"
     }
   ]
 }
