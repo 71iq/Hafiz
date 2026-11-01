@@ -8603,7 +8603,9 @@
       "started_at": "2026-11-01T19:50:31.861267+00:00",
       "completed_at": "2026-11-01T19:53:45.914166+00:00",
       "evidence": ".ralph/runs/RF-115-1-1793562631863885545",
-      "summary": "Copied the four primary-supplied RF-115 artifacts only. Verification, review, and acceptance remain pending."
+      "summary": "Corrected only direct bottom-tabs declaration to Router recommended ^7.15.5, retaining locked/installed7.21.0 and all resolved packages. All11 controller gates, independent Astra and released-lease primary acceptance pass. Remaining three Expo patches/native ownership stayRF008.",
+      "primary_accepted": true,
+      "primary_acceptance_evidence": ".refactor-baseline/rf115-primary-acceptance.json"
     }
   ]
 }
