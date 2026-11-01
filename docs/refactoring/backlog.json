@@ -7465,7 +7465,9 @@
       "started_at": "2026-11-01T14:55:11.904637+00:00",
       "completed_at": "2026-11-01T14:59:40.689840+00:00",
       "evidence": ".ralph/runs/RF-103-1-1793544911907146547",
-      "summary": "Installed the five exact RF-103 frozen artifacts into the approved paths. Controller verification, independent review, and primary acceptance remain pending."
+      "summary": "Shared SyncIndicator and ConfirmDialog busy feedback now respects live reduced motion while preserving visible status, original allowed spinner and callbacks. All10 fresh gates, separate Astra and primary source/image/hash acceptance pass; bounded shared-UI inventory accounted for, broader native/accessibility/feature-local checks remain open.",
+      "primary_accepted": true,
+      "primary_acceptance_evidence": ".refactor-baseline/rf103-primary-acceptance.json"
     },
     {
       "id": "RF-104",
