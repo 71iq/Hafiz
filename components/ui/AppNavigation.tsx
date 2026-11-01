@@ -91,6 +91,11 @@ function BottomTabItem({
   isDark: boolean;
 }) {
   const scale = useSharedValue(1);
+  const reduceMotion = useReducedMotionPreference();
+  const scaleTarget = useRef(1);
+  useEffect(() => {
+    if (reduceMotion) scale.value = scaleTarget.current;
+  }, [reduceMotion, scale]);
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
@@ -103,8 +108,14 @@ function BottomTabItem({
     <AnimatedPressable
       onPress={onPress}
       onLongPress={onLongPress}
-      onPressIn={() => { scale.value = withSpring(0.98, { damping: 15, stiffness: 400 }); }}
-      onPressOut={() => { scale.value = withSpring(1, { damping: 15, stiffness: 400 }); }}
+      onPressIn={() => {
+        scaleTarget.current = 0.98;
+        scale.value = reduceMotion ? 0.98 : withSpring(0.98, { damping: 15, stiffness: 400, reduceMotion: ReduceMotion.Never });
+      }}
+      onPressOut={() => {
+        scaleTarget.current = 1;
+        scale.value = reduceMotion ? 1 : withSpring(1, { damping: 15, stiffness: 400, reduceMotion: ReduceMotion.Never });
+      }}
       accessibilityRole="button"
       accessibilityState={isFocused ? { selected: true } : {}}
       style={[

@@ -8308,25 +8308,27 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "retry",
+      "status": "verified",
       "allowed_paths": [
         "components/ui/AppNavigation.tsx",
         "tests/unit/tab-press-reduced-motion.test.tsx",
         "docs/refactoring/REDUCED_MOTION.md"
       ],
-      "attempts": 1,
+      "attempts": 2,
       "readiness_evidence": ".refactor-baseline/rf113-authorized-continuation-v4/readiness.md",
       "implementation_mode": "copy-only",
-      "started_at": "2026-11-01T08:20:19.719831+00:00",
+      "started_at": "2026-11-01T13:30:43.291216+00:00",
       "failure": "Independent review failed: [P2] Browser activation evidence remains ambiguous. activation-recovery-v2/browser.cjs:18-22 waits for a single target crossing before starting another press. active() can then detect residual oscillation before the new press activates. The controller records activeIn=1.00001 for English allowed-start. Establish a stable starting state or independently witness the new callback before measuring departure, then retain the strict live-reduction assertions. Also verify sustained reversal settlement before changing preference.; [P2] Both generator histories omit the mandatory targeted latest RF113 PROGRESS read. Attempt 2 reads only PROGRESS lines 1-8 before copying; it never reads the preparation/recovery entries at lines 1017 and 1021. activation-recovery-v2/readiness.md explicitly requires that additional read. Resolve this through the primary/controller recovery process without resetting attempts or treating a later read as prior compliance.; Review evidence: inspected the full tracked diff and untracked test. No product-code defect found. Exact artifact hashes, owner reversal, protected-input checks, whitespace, and eight decoded RGBA image comparisons pass; all eight images were visually inspected. Controller logs record 32 passing tests, typecheck, lint parity, formatting, export, and four browser cases. No prohibited generator checks or full source/test dumps found. Review changed nothing. Native/device, full-app, accessibility/contrast/touch, RF103 inventory, and released-lease primary acceptance remain unverified or pending.",
-      "evidence": ".ralph/runs/RF-113-2-1793521219722200578",
+      "evidence": ".ralph/runs/RF-113-2-1793539843293705455",
       "primary_recovery_evidence": ".refactor-baseline/rf113-tab-press-motion-v1/review-recovery-v3/diagnosis.md",
       "historical_ordinary_attempts_spent_before_extension": 2,
       "continuation_authorization": ".refactor-baseline/rf113-authorized-continuation-v4/authorization.json",
       "attempt_count_stop_waived_by_user": true,
       "additional_attempt_controller_counter_base": 1,
       "additional_attempt_historical_offset": 1,
-      "historical_total_ordinary_attempts_spent": 2
+      "historical_total_ordinary_attempts_spent": 2,
+      "completed_at": "2026-11-01T13:38:10.398575+00:00",
+      "summary": "Installed the three frozen RF-113 artifacts. Controller verification, independent review, and primary acceptance remain pending."
     }
   ]
 }
