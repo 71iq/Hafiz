@@ -7357,20 +7357,15 @@
     },
     {
       "id": "RF-103",
-      "title": "Respect live reduced motion in remaining shared UI transitions",
-      "description": "Prepare exact bounded transition scopes for ResponsiveOverlay, legacy Sheet, Toast, OfflineBanner, DropdownMenu and AppNavigation. Inspect instantaneous press feedback and actual ReadingStepper use before claiming inventory completion. Switch is the separate RF102 slice. OfflineBanner is now the separate exact RF105 slice; this umbrella retains all other owners. Toast is the separate exact RF106 session/motion slice. Final source inventory after RF113 also finds repeating ActivityIndicator in SyncIndicator and ConfirmDialog. Installed Android hides animating=false regardless of web hidesWhenStopped behavior. RF103 remains unapproved until a visible static busy fallback and exact caller/browser regressions are prepared. Immediate endpoint press feedback is retained by primary source decision; no rendered/accessibility claim.",
-      "rationale": "Transition visibility/focus/callback/worklet owners need separate primary decisions and evidence. Repeating placeholders and controlled Switch thumb motion do not certify them.",
+      "title": "Respect reduced motion in shared busy indicators and close bounded UI inventory",
+      "description": "Final RF103 slice reuses a shared BusyIndicator only in SyncIndicator and ConfirmDialog. Earlier timed owners are separately accepted; immediate endpoint press feedback stays unchanged. No feature-local/global motion compliance claim.",
+      "rationale": "Both original shared ActivityIndicators keep rotating after live reduction. Android hides animating=false, requiring a visible static busy glyph that retains original dimensions and allowed-motion behavior.",
       "modules": [
-        "docs/refactoring/REDUCED_MOTION.md",
-        "components/ui/ResponsiveOverlay.tsx",
-        "components/ui/Sheet.tsx",
-        "components/ui/Toast.tsx",
-        "components/ui/OfflineBanner.tsx",
-        "components/ui/DropdownMenu.tsx",
-        "components/ui/AppNavigation.tsx",
+        "components/ui/BusyIndicator.tsx",
         "components/ui/SyncIndicator.tsx",
         "components/ui/ConfirmDialog.tsx",
-        "components/settings/ReadingStepper.tsx"
+        "tests/unit/busy-indicator-reduced-motion.test.tsx",
+        "docs/refactoring/REDUCED_MOTION.md"
       ],
       "dependencies": [
         "RF-102",
@@ -7385,31 +7380,88 @@
         "RF-113"
       ],
       "acceptance_criteria": [
-        "Primary must inspect real callers/tests and prepare exact small artifact sets and meaningful before/after/race/rendered checks before approving; split further if needed. Preserve useful state feedback, focus/dismissal/safe areas/geometry, toast lifetime, banner visibility callbacks, native worklets and the original checkout.",
-        "Observe live preference changes including active transitions. Installed Reanimated default System is not proof of live changes. Record web/native evidence separately and carry unavailable native runtime/device checks. No configuration/dependency/data/runner/production change.",
-        "Account for actual shared SyncIndicator and ConfirmDialog ActivityIndicator instances before inventory closure. Preserve a visible busy state under unknown/reduced preference across platform contracts; web pause behavior does not establish Android visibility. Primary plan .refactor-baseline/rf103-progress-indicator-preparation-v1/plan.md requires exact artifact, red/green, status/callback/disabled/lifecycle and rendered geometry evidence before approval. No source edits authorized to workers by this preparation."
+        "Read AGENTS, ARCHITECTURE, CONVENTIONS, TECH_STACK and .refactor-baseline/rf103-shared-busy-motion-v1/readiness.md, reuse-map.md and artifacts.json. Execute/read sed -n '1,8p' docs/refactoring/PROGRESS.md and sed -n '1031,1035p' docs/refactoring/PROGRESS.md in separate tool calls before copying. Both latest final-inventory finding and Primary prepares RF103 shared busy feedback entry must be read. Copy-only worker performs only required metadata/instruction reads and exact cp commands; no source/test/helper dumps, checks/hashes/transforms, engineering, extra agents, installs/services, controller/state edits or commits. Report copies and all controller verification/new stronger review/primary acceptance pending.",
+        "Copy each exact artifact using: cp .refactor-baseline/rf103-shared-busy-motion-v1/BusyIndicator.tsx components/ui/BusyIndicator.tsx; cp .refactor-baseline/rf103-shared-busy-motion-v1/SyncIndicator.tsx components/ui/SyncIndicator.tsx; cp .refactor-baseline/rf103-shared-busy-motion-v1/ConfirmDialog.tsx components/ui/ConfirmDialog.tsx; cp .refactor-baseline/rf103-shared-busy-motion-v1/busy-indicator-reduced-motion.test.tsx tests/unit/busy-indicator-reduced-motion.test.tsx; cp .refactor-baseline/rf103-shared-busy-motion-v1/REDUCED_MOTION.md docs/refactoring/REDUCED_MOTION.md. Do not broad-format callers. Reuse shared live conservative preference; allowed returns original ActivityIndicator size/color, unknown/reduced returns a visible static LoaderCircle within matching8/20 geometry. Avoid animating=false on Android. Whole SyncIndicator and ConfirmDialog reversal protects all other bytes, including status, disabled, close/callback and operation ownership. No provider/helper/global manager/dependency/data/config changes outside these three source owners.",
+        "Final14 actual-owner cases fail7 on original and pass on candidate; combined shared preference33 pass without console errors. Preserve initial7-failure role-query fixture and diagnosis; native renderer structural tests do not claim native visibility or accessibility. ConfirmDialog actual overlay/Button remain real; only settings/direction/safe-area/platform scheduling boundaries are controlled. Check unknown/reduced/allowed/live/late query/opt-in,status transitions,independent instances/listener release,loading disabled/dismissal/callbacks and confirmDisabled.",
+        "Eight actual installed Chrome/Expo cases in English beige390 and Arabic dark412 under both cold preferences compare before/after8/20 geometry, visibility, SVG/static/clock state, live reduction, later opt-in, actual dialog busy disable/Escape and completion callbacks plus sync completion. Fresh controller static images must match all8 frozen candidate reference images in decoded RGBA with no tolerance and reject RGB-only/alpha-only differences. Baseline errors/transcripts unchanged. Hidden fixture finish action is programmatic only to control test loading state; product buttons are tested with actual clicks. No native/device/full app/accessibility/contrast/touch certification.",
+        "All10 fresh frozen controller commands plus a new independent stronger Astra evaluation of complete source/test/doc diff, all generator tool-item types and preparation failures are mandatory. Primary source/image/hash acceptance after leases release remains required. Include accepted prior transition tasks/receipts and immediate-feedback source decision before bounded RF103 inventory closure. Do not claim feature-local spinner or app-wide motion compliance. No push/merge/deploy/production/original-checkout/protected Quran/font/data/map change; all resource/account/retry/global runner settings stay unchanged."
       ],
       "verification": [
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf103-shared-busy-motion-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='cc5bed8d74b6aff3bd7feca83229853b36220262d61f5b9f7ede0734780693ef';runpy.run_path('.refactor-baseline/rf103-shared-busy-motion-v1/verify.py',run_name='__main__')"
+        ],
+        [
+          "python3",
+          "-B",
+          ".refactor-baseline/rf103-shared-busy-motion-v1/verify-inputs.py"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/busy-indicator-reduced-motion.test.tsx",
+          "tests/unit/reduced-motion.test.tsx",
+          "--no-cache"
+        ],
         [
           "npm",
           "run",
           "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "components/ui/BusyIndicator.tsx",
+          "components/ui/SyncIndicator.tsx",
+          "components/ui/ConfirmDialog.tsx",
+          "tests/unit/busy-indicator-reduced-motion.test.tsx",
+          "--max-warnings=0"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "components/ui/BusyIndicator.tsx",
+          "tests/unit/busy-indicator-reduced-motion.test.tsx"
+        ],
+        [
+          "python3",
+          "-B",
+          ".refactor-baseline/rf103-shared-busy-motion-v1/build-fixture.py"
+        ],
+        [
+          "node",
+          ".refactor-baseline/rf103-shared-busy-motion-v1/browser.cjs",
+          "controller"
+        ],
+        [
+          "python3",
+          "-B",
+          ".refactor-baseline/rf103-shared-busy-motion-v1/verify-inputs.py"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
         ]
       ],
       "risk": "medium",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
-        "components/ui/ResponsiveOverlay.tsx",
-        "components/ui/Sheet.tsx",
-        "components/ui/Toast.tsx",
-        "components/ui/OfflineBanner.tsx",
-        "components/ui/DropdownMenu.tsx",
-        "components/ui/AppNavigation.tsx",
+        "components/ui/BusyIndicator.tsx",
+        "components/ui/SyncIndicator.tsx",
+        "components/ui/ConfirmDialog.tsx",
+        "tests/unit/busy-indicator-reduced-motion.test.tsx",
         "docs/refactoring/REDUCED_MOTION.md"
       ],
       "attempts": 0,
-      "primary_preparation_evidence": ".refactor-baseline/rf103-progress-indicator-preparation-v1/plan.md"
+      "primary_preparation_evidence": ".refactor-baseline/rf103-progress-indicator-preparation-v1/plan.md",
+      "implementation_mode": "copy-only",
+      "readiness_evidence": ".refactor-baseline/rf103-shared-busy-motion-v1/readiness.md"
     },
     {
       "id": "RF-104",
