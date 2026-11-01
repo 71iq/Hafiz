@@ -340,7 +340,7 @@
     {
       "id": "RF-008",
       "title": "Resolve remaining Expo diagnostics",
-      "description": "Resolve the remaining lint-preset and native/app-config ownership findings after accepted SDK55 alignment.",
+      "description": "Resolve the remaining lint-preset and native/app-config ownership findings after accepted SDK55 alignment. Fresh 2026-11-01 metadata reports five SDK package recommendations, including three additional patch recommendations and bottom-tabs minor preference. RF114 isolates lint-preset alignment while preserving all active rules; this umbrella retains native ownership, remaining recommendations and maintenance decisions.",
       "rationale": "RF-067 isolates the verified runtime/package alignment. This umbrella still owns full Expo diagnostics, lint coverage/maintenance and the committed-native configuration decision.",
       "modules": [
         "package.json",
@@ -350,7 +350,8 @@
       ],
       "dependencies": [
         "RF-007",
-        "RF-067"
+        "RF-067",
+        "RF-114"
       ],
       "acceptance_criteria": [
         "Use Expo recommended SDK55 versions, inspect existing patches and preserve native APIs.",
@@ -400,7 +401,8 @@
         "patches/*",
         "docs/refactoring/TECH_STACK.md"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "primary_preparation_evidence": ".refactor-baseline/rf008-diagnostic-refresh-v1/readiness.md"
     },
     {
       "id": "RF-009",
@@ -8395,6 +8397,106 @@
       "primary_accepted": true,
       "primary_acceptance_evidence": ".refactor-baseline/rf113-primary-acceptance.json",
       "authorized_additional_attempts_used": 1
+    },
+    {
+      "id": "RF-114",
+      "title": "Align SDK55 lint preset while preserving current React Hooks coverage",
+      "description": "Declare the already installed Hooks7.1.1 plugin explicitly and select its recommended rules in the SDK55 preset registration. Keep every existing rule/setting/parser/global and exact current diagnostics. This is a bounded child of RF008, with no runtime package update.",
+      "rationale": "Plain55.0.1 loses nine active rules. The primary adapter preserves all362 effective configurations and68 existing warnings while satisfying the SDK55 preset recommendation. ESLint9 maintenance remains open separately.",
+      "modules": [
+        "package.json",
+        "package-lock.json",
+        "eslint.config.js",
+        "scripts/tests/lint-coverage.test.cjs",
+        "docs/refactoring/TECH_STACK.md"
+      ],
+      "dependencies": [
+        "RF-007",
+        "RF-067"
+      ],
+      "acceptance_criteria": [
+        "Read AGENTS, ARCHITECTURE, CONVENTIONS, TECH_STACK and .refactor-baseline/rf008-diagnostic-refresh-v1/readiness.md, reuse-map.md and artifacts.json. Execute/read sed -n '1,8p' docs/refactoring/PROGRESS.md and sed -n '1039,1041p' docs/refactoring/PROGRESS.md in separate tool calls before copying. The actual latest entry Primary prepares RF114 SDK55 lint coverage preservation is mandatory. Copy-only: required metadata/instruction/git-status reads and exact copies only; no source/test/helper dumps, tests/checks/hashes/transforms, engineering, agents/packages/services, controller/state edits or commits. Report copies and all fresh controller checks/new independent review/primary acceptance pending.",
+        "Copy exactly: cp .refactor-baseline/rf008-diagnostic-refresh-v1/resolution/package.json package.json; cp .refactor-baseline/rf008-diagnostic-refresh-v1/resolution/package-lock.json package-lock.json; cp .refactor-baseline/rf008-diagnostic-refresh-v1/resolution/eslint.config.js eslint.config.js; cp .refactor-baseline/rf008-diagnostic-refresh-v1/lint-coverage.test.cjs scripts/tests/lint-coverage.test.cjs; cp .refactor-baseline/rf008-diagnostic-refresh-v1/TECH_STACK.md docs/refactoring/TECH_STACK.md. Existing manifest order stays outside exact script/declaration edits. Root hook7.1.1 version/integrity stays; license MIT metadata addition is documented. Lock adds only nested Hooks5.2 required by preset55, changes preset/root direct metadata, and retains every other package entry/runtime dependency/override. No force/legacy-peer/ignore diagnostic workaround or package upgrade outside this exact dev-tooling scope.",
+        "Use the existing Expo flat entries and replace only entries actually registering react-hooks with declared7.1.1 and its recommended rules. Later project overrides remain exact. Preserve all362 active old-file configurations plus both existing Edge Function exclusions, every rule/severity/setting/global/parser option and exact68-warning/zero-error existing CLI messages. New regression source has zero warnings. Seven Node cases check existing representative paths, conditional hooks, render updates and valid control; unmapped55 must retain five red failures. Preserve order-sensitive comparator/path-assumption mistakes and all their artifacts/logs.",
+        "Controller performs real strict npm ci without peer relaxation, verifies unchanged lock, reapplies existing RN Gradle/CSS interop patches and validates full npm graph/selected installed source pins. Repeat actual native module graph check, complete lint parity,7 cases,formatting,types,existing dependency-security controls and web export. Expo raw checks must retain the remaining4 version recommendations and non-CNG ownership finding with18/20, without hiding anything or claiming RF008 complete. Primary offline sharp-cache miss followed by strict normal installation is preserved.",
+        "Raw audit reports retain69 findings/11high/37 direct advisory objects. Exact report equality failed on fix suggestions/one propagated range/effects; preserve raw differences and refuse clean-audit or exploitation claims. No auto-fix suggestion executed. RF090 owns security acceptance, RF044 maintenance, RF008 native ownership/remaining SDK decisions. No native compilation/device/browser/full app certification for this lint-only slice. Independent stronger Astra must inspect all generator item types, full manifest/lock/config/test/doc diff, actual gates and failures. Released-lease primary acceptance required. All limits unchanged. No protected input/original-checkout/production changes; local commits only, no push/merge/deploy."
+      ],
+      "verification": [
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf008-diagnostic-refresh-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='dbe5f8e0747f89430e095df637c37a22d5a821b634969ca20dbd97d01c069db8';runpy.run_path('.refactor-baseline/rf008-diagnostic-refresh-v1/verify.py',run_name='__main__')"
+        ],
+        [
+          "python3",
+          "-B",
+          ".refactor-baseline/rf008-diagnostic-refresh-v1/install.py"
+        ],
+        [
+          "node",
+          "scripts/ralph/check-expo-native.cjs"
+        ],
+        [
+          "node",
+          ".refactor-baseline/rf008-diagnostic-refresh-v1/verify-lint.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "test:lint-coverage"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "eslint.config.js",
+          "scripts/tests/lint-coverage.test.cjs",
+          "package.json"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "test:dependency-security"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "python3",
+          "-B",
+          ".refactor-baseline/rf008-diagnostic-refresh-v1/diagnostics.py"
+        ],
+        [
+          "python3",
+          "-B",
+          ".refactor-baseline/rf008-diagnostic-refresh-v1/verify-inputs.py"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
+        ]
+      ],
+      "risk": "medium",
+      "approved": true,
+      "status": "pending",
+      "allowed_paths": [
+        "package.json",
+        "package-lock.json",
+        "eslint.config.js",
+        "scripts/tests/lint-coverage.test.cjs",
+        "docs/refactoring/TECH_STACK.md"
+      ],
+      "attempts": 0,
+      "implementation_mode": "copy-only",
+      "readiness_evidence": ".refactor-baseline/rf008-diagnostic-refresh-v1/readiness.md"
     }
   ]
 }
