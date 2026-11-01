@@ -8590,16 +8590,20 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "package.json",
         "package-lock.json",
         "scripts/tests/router-dependency-range.test.cjs",
         "docs/refactoring/TECH_STACK.md"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "implementation_mode": "copy-only",
-      "readiness_evidence": ".refactor-baseline/rf115-router-range-v1/readiness.md"
+      "readiness_evidence": ".refactor-baseline/rf115-router-range-v1/readiness.md",
+      "started_at": "2026-11-01T19:50:31.861267+00:00",
+      "completed_at": "2026-11-01T19:53:45.914166+00:00",
+      "evidence": ".ralph/runs/RF-115-1-1793562631863885545",
+      "summary": "Copied the four primary-supplied RF-115 artifacts only. Verification, review, and acceptance remain pending."
     }
   ]
 }

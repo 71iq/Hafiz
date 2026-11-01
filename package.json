@@ -62,7 +62,7 @@
     "@hookform/resolvers": "^5.2.2",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/netinfo": "11.5.2",
-    "@react-navigation/bottom-tabs": "7.21.0",
+    "@react-navigation/bottom-tabs": "^7.15.5",
     "@react-navigation/native": "^7.1.28",
     "@rive-app/react-native": "^0.4.6",
     "@rive-app/react-webgl2": "^4.28.5",
