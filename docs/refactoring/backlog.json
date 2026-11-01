@@ -8486,7 +8486,7 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "package.json",
         "package-lock.json",
@@ -8494,9 +8494,14 @@
         "scripts/tests/lint-coverage.test.cjs",
         "docs/refactoring/TECH_STACK.md"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "implementation_mode": "copy-only",
-      "readiness_evidence": ".refactor-baseline/rf008-diagnostic-refresh-v1/readiness.md"
+      "readiness_evidence": ".refactor-baseline/rf008-diagnostic-refresh-v1/readiness.md",
+      "started_at": "2026-11-01T18:49:43.980901+00:00",
+      "failure": "review stopped at account usage limit; see .ralph/runs/RF-114-1-1793549575676789786/review.jsonl",
+      "completed_at": "2026-11-01T18:52:46.415937+00:00",
+      "evidence": ".ralph/runs/RF-114-1-1793558983983481513",
+      "summary": "Installed the five exact RF-114 artifacts. No verification, hashes, tests, commits, or pushes were performed."
     }
   ]
 }

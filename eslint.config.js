@@ -1,5 +1,6 @@
 const { defineConfig } = require("eslint/config");
 const expoConfig = require("eslint-config-expo/flat");
+const reactHooks = require("eslint-plugin-react-hooks");
 
 const nodeGlobals = {
   __dirname: "readonly",
@@ -27,7 +28,15 @@ module.exports = defineConfig([
       "web-build/**",
     ],
   },
-  ...expoConfig,
+  ...expoConfig.map((config) =>
+    config.plugins?.["react-hooks"]
+      ? {
+          ...config,
+          plugins: { ...config.plugins, "react-hooks": reactHooks },
+          rules: { ...config.rules, ...reactHooks.configs.recommended.rules },
+        }
+      : config,
+  ),
   {
     rules: {
       "@typescript-eslint/array-type": "off",
