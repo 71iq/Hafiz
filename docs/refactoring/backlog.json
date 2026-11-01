@@ -352,7 +352,8 @@
         "RF-007",
         "RF-067",
         "RF-114",
-        "RF-115"
+        "RF-115",
+        "RF-116"
       ],
       "acceptance_criteria": [
         "Use Expo recommended SDK55 versions, inspect existing patches and preserve native APIs.",
@@ -403,7 +404,7 @@
         "docs/refactoring/TECH_STACK.md"
       ],
       "attempts": 0,
-      "primary_preparation_evidence": ".refactor-baseline/rf115-router-range-v1/readiness.md"
+      "primary_preparation_evidence": ".refactor-baseline/rf116-expo-patches-v1/readiness.md"
     },
     {
       "id": "RF-009",
@@ -8606,6 +8607,134 @@
       "summary": "Corrected only direct bottom-tabs declaration to Router recommended ^7.15.5, retaining locked/installed7.21.0 and all resolved packages. All11 controller gates, independent Astra and released-lease primary acceptance pass. Remaining three Expo patches/native ownership stayRF008.",
       "primary_accepted": true,
       "primary_acceptance_evidence": ".refactor-baseline/rf115-primary-acceptance.json"
+    },
+    {
+      "id": "RF-116",
+      "title": "Align remaining SDK55 patch dependencies with explicit transitive review",
+      "description": "Install exact primary-selected Expo55.0.32,dev-client55.0.41,sharing55.0.25 set and finite reviewed lock delta. Keep app/native/config/protected inputs unchanged.",
+      "rationale": "Three package-version findings remain after RF114/RF115. Actual resolver changes native/build/security transitives, requiring real Android/web and independent review rather than version-output acceptance.",
+      "modules": [
+        "package.json",
+        "package-lock.json",
+        "docs/refactoring/TECH_STACK.md"
+      ],
+      "dependencies": [
+        "RF-067",
+        "RF-114",
+        "RF-115"
+      ],
+      "acceptance_criteria": [
+        "Read AGENTS,ARCHITECTURE,CONVENTIONS,TECH_STACK,.refactor-baseline/rf116-expo-patches-v1/readiness.md and artifacts.json. In separate successful calls execute/read sed -n '1,8p' docs/refactoring/PROGRESS.md and sed -n '1057,1057p' docs/refactoring/PROGRESS.md before any copy. Actual opening mission and latest Primary prepares RF116 SDK55 follow-up patches reads mandatory.",
+        "Copy-only. Only required instruction/metadata/status reads and three exact cp commands from artifacts.json values to keys. No source/test/helper dumps,engineering,transforms,hashes/tests/checks,packages/services/agents,state/controller edits or commits. Report copies and fresh controller checks/independent review/primary acceptance pending.",
+        "Only three direct declarations plus frozen exact lock diff and TECH_STACK append. Preserve all other manifest fields/overrides and every old package entry outside lock-differences.json. No new package paths.12 updated nonroot records include explicit xcode4/core logging/autolinking/CLI/ws/node-forge; uuid7 removed. Archive integrity/source differences and isolated strict install/full graph are evidence, not complete upstream security or iOS certification.",
+        "Fresh strict npm ci with unchanged lock/no peer relaxation, existing RN/CSS patches, full graph and selected installed source pins. Native graphs no duplicates/direct core. Existing dependency-security/lint-coverage/Router cases pass unchanged. Exact current364-file68-warning/zero-error CLI parity,types,full unit suite,web export,real installed-Chrome28-case smoke and bounded Android debug allconfigured ABIs mandatory. No weakening/skips/exclusions.",
+        "Raw audit remains nonclean; preserve all output, no newly listed vulnerable package names or criticals relative to frozen candidate. Current baseline69/11high and candidate66/10high are snapshots, not full security acceptance. Package check exits0; raw Doctor exits1 with19/20 and only non-CNG ownership. RF008 native ownership,RF044 maintenance,RF090 security acceptance remain open.",
+        "New stronger Astra inspects full manifest/lock/doc diff, actual17 gate logs, frozen old inputs, archive/transitive scope and every original generator event type including required document reads before copies. Released-lease primary final acceptance mandatory. No iOS/device/native-log runtime claim, no prebuild/native/config/protected input/production changes. Preserve failures and all global retry/resource/account/model/provider limits. Local commits only, no push/merge/deploy."
+      ],
+      "verification": [
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf116-expo-patches-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='c0ef1f12fa76155f79fc872243b0247ec80c2c1ce67f0625c691b0264942627f';runpy.run_path('.refactor-baseline/rf116-expo-patches-v1/verify.py',run_name='__main__')"
+        ],
+        [
+          "python3",
+          "-B",
+          ".refactor-baseline/rf116-expo-patches-v1/install.py"
+        ],
+        [
+          "node",
+          "scripts/ralph/check-expo-native.cjs"
+        ],
+        [
+          "node",
+          "scripts/ralph/check-security-dependencies.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "test:dependency-security"
+        ],
+        [
+          "npm",
+          "run",
+          "test:lint-coverage"
+        ],
+        [
+          "node",
+          "--test",
+          "--test-reporter=tap",
+          "scripts/tests/router-dependency-range.test.cjs"
+        ],
+        [
+          "python3",
+          "-B",
+          ".refactor-baseline/rf116-expo-patches-v1/audit.py"
+        ],
+        [
+          "python3",
+          "-B",
+          ".refactor-baseline/rf116-expo-patches-v1/diagnostics.py"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "python3",
+          "-B",
+          ".refactor-baseline/rf116-expo-patches-v1/lint.py"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8193",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8193",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts"
+        ],
+        [
+          "python3",
+          "scripts/ralph/build-android-debug.py"
+        ],
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf116-expo-patches-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='c0ef1f12fa76155f79fc872243b0247ec80c2c1ce67f0625c691b0264942627f';runpy.run_path('.refactor-baseline/rf116-expo-patches-v1/verify.py',run_name='__main__')"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
+        ]
+      ],
+      "risk": "high",
+      "approved": true,
+      "status": "pending",
+      "allowed_paths": [
+        "package.json",
+        "package-lock.json",
+        "docs/refactoring/TECH_STACK.md"
+      ],
+      "attempts": 0,
+      "implementation_mode": "copy-only",
+      "readiness_evidence": ".refactor-baseline/rf116-expo-patches-v1/readiness.md"
     }
   ]
 }
