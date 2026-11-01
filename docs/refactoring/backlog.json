@@ -8501,7 +8501,9 @@
       "failure": "review stopped at account usage limit; see .ralph/runs/RF-114-1-1793549575676789786/review.jsonl",
       "completed_at": "2026-11-01T18:52:46.415937+00:00",
       "evidence": ".ralph/runs/RF-114-1-1793558983983481513",
-      "summary": "Installed the five exact RF-114 artifacts. No verification, hashes, tests, commits, or pushes were performed."
+      "summary": "SDK55 preset55.0.1 with explicit Hooks7.1.1 preserves all362 effective old configurations and exact68 warnings/zero errors. All12 fresh controller gates and independent Astra pass; released-lease primary acceptance complete. RF008 remaining SDK/native ownership, RF044 maintenance and RF090 security debt stay open.",
+      "primary_accepted": true,
+      "primary_acceptance_evidence": ".refactor-baseline/rf114-primary-acceptance.json"
     }
   ]
 }
