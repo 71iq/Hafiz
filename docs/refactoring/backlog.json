@@ -8326,9 +8326,12 @@
       "attempt_count_stop_waived_by_user": true,
       "additional_attempt_controller_counter_base": 1,
       "additional_attempt_historical_offset": 1,
-      "historical_total_ordinary_attempts_spent": 2,
+      "historical_total_ordinary_attempts_spent": 3,
       "completed_at": "2026-11-01T13:38:10.398575+00:00",
-      "summary": "Installed the three frozen RF-113 artifacts. Controller verification, independent review, and primary acceptance remain pending."
+      "summary": "Live reduced motion now snaps bottom-tab press feedback to its latest endpoint. All12 fresh controller gates, separate Astra and released-lease primary acceptance pass; both historical failed attempts remain preserved.",
+      "primary_accepted": true,
+      "primary_acceptance_evidence": ".refactor-baseline/rf113-primary-acceptance.json",
+      "authorized_additional_attempts_used": 1
     }
   ]
 }
