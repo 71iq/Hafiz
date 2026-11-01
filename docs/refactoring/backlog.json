@@ -8232,18 +8232,18 @@
         "RF-112"
       ],
       "acceptance_criteria": [
-        "Read readiness.md and required AGENTS/architecture/conventions/TECH_STACK plus plan/reuse/artifact metadata. Before copying execute standalone sed -n '1,8p' docs/refactoring/PROGRESS.md in its own tool call and read the opening mission paragraph. Read targeted latest RF113 preparation; no historical dump needed. Copy only: cp .refactor-baseline/rf113-tab-press-motion-v1/AppNavigation.tsx components/ui/AppNavigation.tsx; cp .refactor-baseline/rf113-tab-press-motion-v1/tab-press-reduced-motion.test.tsx tests/unit/tab-press-reduced-motion.test.tsx; cp .refactor-baseline/rf113-tab-press-motion-v1/REDUCED_MOTION.md docs/refactoring/REDUCED_MOTION.md. No source/test/helper dumps, checks/hashes/transforms, guided engineering, agents/packages/services, controller edits or commits. Report installed paths and pending verification/review/acceptance.",
+        "Read activation-recovery-v2/readiness.md and diagnosis.md in addition to original plan/reuse/artifact metadata. Read readiness.md and required AGENTS/architecture/conventions/TECH_STACK plus plan/reuse/artifact metadata. Before copying execute standalone sed -n '1,8p' docs/refactoring/PROGRESS.md in its own tool call and read the opening mission paragraph. Read targeted latest RF113 preparation; no historical dump needed. Copy only: cp .refactor-baseline/rf113-tab-press-motion-v1/AppNavigation.tsx components/ui/AppNavigation.tsx; cp .refactor-baseline/rf113-tab-press-motion-v1/tab-press-reduced-motion.test.tsx tests/unit/tab-press-reduced-motion.test.tsx; cp .refactor-baseline/rf113-tab-press-motion-v1/REDUCED_MOTION.md docs/refactoring/REDUCED_MOTION.md. No source/test/helper dumps, checks/hashes/transforms, guided engineering, agents/packages/services, controller edits or commits. Report installed paths and pending verification/review/acceptance.",
         "Primary owns exact BottomTabItem design. Reuse live preference, current shared scale and one local requested-target ref. Unknown/reduced press assigns0.98/1; allowed retains damping15/stiffness400 spring with explicit Never. Reduction effect assigns current ref only under reduced, preserving allowed handoff and no restart on opt-in. Whole-owner reversal protects BottomBar/FloatingPanel, every markup/style/callback/navigation/selected/theme/geometry/profile/width branch byte. No manual unmount assignment/global manager/config/helper/provider/dependency or broad format.",
         "Final13 actual AppNavigation/ChromeProvider/TabRouter cases fail8 on original/pass on candidate; combined shared hook32. Test actual RN viewport module, stable shared refs and installed enum; scheduling mock is explicit. Inject plausible in-flight values before live reduction to prove effect/current-target ownership, retaining prior weaker4-red evidence. Preserve unknown/reduced/allowed feedback, rapid reversals, independent tabs, opt-in without restart, prevented/accepted real navigation and longPress/callback counts, one shared listener/unmount release. Types/source diagnostic parity/new-test zero-warning lint/test format pass. No old tests weakened or native worklet claim. The primary freeze path failure is preserved and corrected to actual installed spring directory.",
-        "Twelve fresh controller gates verify artifacts/red-green, all old tracked/installed/helper/other-task inputs,32 focused cases/types/lint/test format, exact owner reversal, actual Expo export and four real Chrome/Reanimated/TabRouter cases, then integrity/whitespace. English beige390/Arabic dark412, each cold preference, actual SQLite ready/remote blocked/temporary QA route removed. Reduced press in/out and live in/out have zero interior frames/current0.98 or1; allowed spring and opt-in animate even reduced startup; rapid reversal settles latest rest target. Preserve longPress1 without tabPress, prevented then accepted Mushaf presses2 and actual router selection. Match rest/pressed geometry/styles/errors/transcripts and all8 decoded images using all RGBA channels with color-only/alpha-only negative controls. Do not use alpha-only getbbox default.",
-        "Fresh separate stronger Astra reviews full diff/source/tests/preparation/runtime evidence and every started/completed generator item type; reject prohibited actions/missing reads. New PASS and released-lease primary source/image/hash acceptance required. Preserve all failures/checkpoints, unchanged ordinary retry/resource/account/memory/token/deadline/model/provider/vendor/config limits. No reset/refund/RF052 waiver. Native/device/full app/accessibility/contrast/touch and RF103 final inventory remain unverified. All commits local; no original checkout/protected Quran/font/data/map/production change or push/merge/deploy."
+        "Twelve fresh controller gates verify artifacts/red-green, all old tracked/installed/helper/other-task inputs,32 focused cases/types/lint/test format, exact owner reversal, actual Expo export and four real Chrome/Reanimated/TabRouter cases, then integrity/whitespace. English beige390/Arabic dark412, each cold preference, actual SQLite ready/remote blocked/temporary QA route removed. Reduced press in/out and live in/out have zero interior frames/current0.98 or1; allowed spring and opt-in animate even reduced startup; rapid reversal settles latest rest target. Preserve longPress1 without tabPress, prevented then accepted Mushaf presses2 and actual router selection. Match rest/pressed geometry/styles/errors/transcripts and all8 decoded images using all RGBA channels with color-only/alpha-only negative controls. Do not use alpha-only getbbox default. V2 observes actual scale departure before live changes, waits for the committed existing shared hook through an isolated sibling MotionMarker, then retains strict endpoints after two frames. Record active interior values; no arbitrary sleep or endpoint polling replaces live assertions. Rapid reversals use80ms above installed50ms activation. Snapshot-only witnesses require unchanged exact raw transform/target matrix for1000ms before all8 exact decoded image comparisons; this avoids target crossings during spring oscillation. QA marker must not rerender Body/navigation parent.",
+        "Fresh separate stronger Astra reviews full diff/source/tests/preparation/runtime evidence and every started/completed generator item type; reject prohibited actions/missing reads. New PASS and released-lease primary source/image/hash acceptance required. Preserve all failures/checkpoints, unchanged ordinary retry/resource/account/memory/token/deadline/model/provider/vendor/config limits. No reset/refund/RF052 waiver. Native/device/full app/accessibility/contrast/touch and RF103 final inventory remain unverified. All commits local; no original checkout/protected Quran/font/data/map/production change or push/merge/deploy. Audit both original and fresh generator histories, preserved original failure and every v2 probe failure/success. All source/test/doc artifact bytes stay identical; no first-attempt refund/reset. Final final4-case original/candidate preflights and eight exact images pass; all12 commands and new verdict still required."
       ],
       "verification": [
         [
           "python3",
           "-B",
           "-c",
-          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf113-tab-press-motion-v1/verify-candidate.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='5c4685e8117baf5e6dd110f846941ff4d96535bc8b8f48879a59358eabc9ec54';runpy.run_path(str(p),run_name='__main__')"
+          "import json,hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf113-tab-press-motion-v1/activation-recovery-v2/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='9b96664ac25668f45192ce75f7ea848da39633e27a0f36f4fafeae39beb9dabb';[(None if hashlib.sha256(Path(n).read_bytes()).hexdigest()==h else (_ for _ in ()).throw(AssertionError(n))) for n,h in json.loads(p.read_text()).items()];q=Path('.refactor-baseline/rf113-tab-press-motion-v1/verify-candidate.py');assert hashlib.sha256(q.read_bytes()).hexdigest()=='5c4685e8117baf5e6dd110f846941ff4d96535bc8b8f48879a59358eabc9ec54';runpy.run_path(str(q),run_name='__main__')"
         ],
         [
           "python3",
@@ -8288,11 +8288,11 @@
         [
           "python3",
           "-B",
-          ".refactor-baseline/rf113-tab-press-motion-v1/build-fixture.py"
+          ".refactor-baseline/rf113-tab-press-motion-v1/activation-recovery-v2/build-fixture.py"
         ],
         [
           "node",
-          ".refactor-baseline/rf113-tab-press-motion-v1/browser.cjs",
+          ".refactor-baseline/rf113-tab-press-motion-v1/activation-recovery-v2/browser.cjs",
           "controller"
         ],
         [
@@ -8308,15 +8308,19 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "pending",
+      "status": "retry",
       "allowed_paths": [
         "components/ui/AppNavigation.tsx",
         "tests/unit/tab-press-reduced-motion.test.tsx",
         "docs/refactoring/REDUCED_MOTION.md"
       ],
-      "attempts": 0,
-      "readiness_evidence": ".refactor-baseline/rf113-tab-press-motion-v1/readiness.md",
-      "implementation_mode": "copy-only"
+      "attempts": 1,
+      "readiness_evidence": ".refactor-baseline/rf113-tab-press-motion-v1/activation-recovery-v2/readiness.md",
+      "implementation_mode": "copy-only",
+      "started_at": "2026-11-01T07:54:55.209141+00:00",
+      "failure": "Verification failed: ['node', '.refactor-baseline/rf113-tab-press-motion-v1/browser.cjs', 'controller']; see .ralph/runs/RF-113-1-1793519695211962895/verify-9.log",
+      "evidence": ".ralph/runs/RF-113-1-1793519695211962895",
+      "primary_recovery_evidence": ".refactor-baseline/rf113-tab-press-motion-v1/activation-recovery-v2/diagnosis.md"
     }
   ]
 }
