@@ -1791,40 +1791,60 @@
     {
       "id": "RF-023",
       "title": "Audit account-dependent query keys and auth lifecycle",
-      "description": "Audit account-dependent query keys and auth lifecycle",
+      "description": "Publish the primary-designed offline query/auth audit only. Inventory current ownership and preserved isolated reproductions; runtime repairs remain separate.",
       "rationale": "A shared QueryClient spans account transitions.",
       "modules": [
-        "docs/refactoring/QUERY_AUDIT.md",
-        "lib/auth/store.ts",
-        "app/_layout.tsx",
-        "components/profile/*",
-        "components/reflections/*"
+        "docs/refactoring/QUERY_AUDIT.md"
       ],
       "dependencies": [
         "RF-008"
       ],
       "acceptance_criteria": [
-        "Inventory keys, viewer-dependent fields, stale data, cancellation, identity changes and invalidation owners.",
-        "Reproduce any cache leak with isolated fixtures before repair. No live accounts."
+        "Read required project docs/current task/.refactor-baseline/rf023-account-audit-v2/readiness.md/reuse.md/preparation-correction.md/artifacts.json. Actual separate progress reads 1,8p and 1159,1159p before exact copy. Latest marker: Primary prepares RF023 offline query and auth audit.",
+        "Copy-only one successful command cp -- .refactor-baseline/rf023-account-audit-v2/QUERY_AUDIT.md docs/refactoring/QUERY_AUDIT.md. Only required instruction/metadata/status reads and copy. No source/test/helper/artifact dumps, engineering, checks, hashes, services, packages, agents, state edits or commits. Verification/review/primary acceptance remain pending.",
+        "Document all11 key families/12 declarations with inputs, viewer/public/local field ownership, stale/cancel/auth and invalidation ownership. Existing reflection/comment viewer keys are present. Distinguish real auth-store and rendered mirrored-state findings from retained cache/static risks. No runtime fix or permanent unsafe-behavior tests. Reproduce four unwanted behaviors with isolated actual-store/actual-component/real-QueryClient fixtures only; no live accounts/network/production.",
+        "Preserve v1 partial diagnosis and v2 hoisted-mock preparation failure/correction. Five fresh gates cover exact document/old inputs/links/inventory/read-copy evidence, four isolated probes, formatting and whitespace. Separate stronger Astra reviews complete document/source evidence/synthetic boundaries/all generator item types/actual required reads and copy. Primary acceptance mandatory. Typecheck/build/full-suite/manual UI/device/native not claimed or required for document-only change. RF024/RF025/RF026/RF027 keep separate repair ownership. No push/merge/deploy/original/protected/production changes."
       ],
       "verification": [
         [
-          "npm",
-          "run",
-          "typecheck"
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf023-account-audit-v2/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='636f999271247455aa8e426ecc4607d8bdf709a398d9a275567127c396698fa5';runpy.run_path('.refactor-baseline/rf023-account-audit-v2/verify.py',run_name='__main__')"
+        ],
+        [
+          "node_modules/.bin/jest",
+          "--runInBand",
+          "--config",
+          ".refactor-baseline/rf023-account-audit-v2/probe-jest-config.json"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "docs/refactoring/QUERY_AUDIT.md"
+        ],
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf023-account-audit-v2/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='636f999271247455aa8e426ecc4607d8bdf709a398d9a275567127c396698fa5';runpy.run_path('.refactor-baseline/rf023-account-audit-v2/verify.py',run_name='__main__')"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
         ]
       ],
       "risk": "high",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
-        "docs/refactoring/QUERY_AUDIT.md",
-        "lib/auth/store.ts",
-        "app/_layout.tsx",
-        "components/profile/*",
-        "components/reflections/*"
+        "docs/refactoring/QUERY_AUDIT.md"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "implementation_mode": "copy-only",
+      "readiness_evidence": ".refactor-baseline/rf023-account-audit-v2/readiness.md",
+      "primary_preparation_evidence": ".refactor-baseline/rf023-account-audit-v2/readiness.md"
     },
     {
       "id": "RF-024",
