@@ -9067,7 +9067,7 @@
     {
       "id": "RF-118",
       "title": "Share the four tested review-setting numeric clamps",
-      "description": "Extract only matching numeric clamp calculations, retaining caller error clearing and local state setters.",
+      "description": "Move only four matching numeric draft clamp calculations to a pure feature-domain module; preserve exact numeric behavior and caller ownership.",
       "rationale": "RF058 actual-sheet characterization identifies this bounded pure ownership boundary.",
       "modules": [
         "components/flashcards/DeckReviewSettingsSheet.tsx",
@@ -9080,18 +9080,28 @@
         "RF-117"
       ],
       "acceptance_criteria": [
-        "Use current min/max constants and exact retention rounding. Characterize finite/boundary/nonfinite behavior before changes; preserve existing semantics, including unusual inputs.",
-        "Keep setError/local setters and all effects/filter/modes/save ordering in callers. No shared state hook or payload builder. Primary freezes exact small artifacts and mutation/reversal evidence before approval."
+        "Read AGENTS/ARCHITECTURE/CONVENTIONS/TECH_STACK/RUNBOOK/current task, .refactor-baseline/rf118-review-clamps-v1/readiness.md, reuse.md and artifacts.json. Actually read separate progress commands sed -n 1,8p and sed -n 1153,1153p docs/refactoring/PROGRESS.md before copies. Latest marker is Primary prepares RF118 pure numeric clamp extraction.",
+        "cp -- .refactor-baseline/rf118-review-clamps-v1/DeckReviewSettingsSheet.tsx components/flashcards/DeckReviewSettingsSheet.tsx\ncp -- .refactor-baseline/rf118-review-clamps-v1/SmartDeckFilterSheet.tsx components/flashcards/SmartDeckFilterSheet.tsx\ncp -- .refactor-baseline/rf118-review-clamps-v1/review-settings-draft.ts lib/fsrs/review-settings-draft.ts\ncp -- .refactor-baseline/rf118-review-clamps-v1/review-settings-clamps.test.ts tests/unit/review-settings-clamps.test.ts\n\nOnly required instruction/metadata/status reads and these four copies. No engineering, source/test/helper dumps, tests/checks/hashes, packages/services/agents, state edits or commits. Report verification, independent review and primary acceptance pending.\n",
+        "Four pure number-to-number functions reuse exact old calculations/constants and retention toFixed(2). Whole Deck/Smart callers reverse byte-for-byte after prescribed imports/expressions/unused Smart constants restoration. Keep caller error clearing/local setters, hooks/effects/filter/modes/save and Deck panel predicates. Persistence normalizers intentionally separate. No grammar/state/payload/validation/dependency/data/native changes.",
+        "55 hardcoded golden cases pass against isolated original arithmetic wrappers and new module. Explicit NaN/infinity/signed-zero/fraction/boundary/current binary rounding behavior preserved. Existing30 actual-sheet and15 codec cases unchanged, total100. Four direct mutations fail and helper daily-limit mutation fails four actual caller cases. Exact two old hook diagnostics, new-file zero-warning lint/format, three platform graphs/web export pass.",
+        "All nine fresh controller gates, separate stronger Astra all-event/read/copy/full-diff/constants/formula/baseline/mutation/reuse/frozen-input review and released-lease primary acceptance required. No manual UI/device/native compilation/full-suite claim. Local only, no push/merge/deploy/production/original/protected inputs."
       ],
       "verification": [
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf118-review-clamps-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='18ea43d12b71557ddbe747aa65bf5fb3a25806131d9f2d319448d22f341575cb';runpy.run_path('.refactor-baseline/rf118-review-clamps-v1/verify.py',run_name='__main__')"
+        ],
         [
           "npm",
           "run",
           "test:unit",
           "--",
           "--runTestsByPath",
+          "tests/unit/review-settings-clamps.test.ts",
           "tests/unit/review-setting-info.test.tsx",
-          "tests/unit/review-settings-clamps.test.ts"
+          "tests/unit/review-step-text.test.ts"
         ],
         [
           "npm",
@@ -9099,13 +9109,40 @@
           "typecheck"
         ],
         [
+          "python3",
+          "-B",
+          ".refactor-baseline/rf118-review-clamps-v1/lint.py"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "lib/fsrs/review-settings-draft.ts",
+          "tests/unit/review-settings-clamps.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
           "npm",
           "run",
           "build:web"
+        ],
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf118-review-clamps-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='18ea43d12b71557ddbe747aa65bf5fb3a25806131d9f2d319448d22f341575cb';runpy.run_path('.refactor-baseline/rf118-review-clamps-v1/verify.py',run_name='__main__')"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
         ]
       ],
       "risk": "high",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
         "components/flashcards/DeckReviewSettingsSheet.tsx",
@@ -9113,7 +9150,10 @@
         "lib/fsrs/review-settings-draft.ts",
         "tests/unit/review-settings-clamps.test.ts"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "implementation_mode": "copy-only",
+      "readiness_evidence": ".refactor-baseline/rf118-review-clamps-v1/readiness.md",
+      "primary_preparation_evidence": ".refactor-baseline/rf118-review-clamps-v1/readiness.md"
     }
   ]
 }
