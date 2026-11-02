@@ -1615,8 +1615,8 @@
       "historical_ordinary_attempts_spent_before_extension": 2,
       "additional_attempt_controller_counter_base": 0,
       "additional_attempt_historical_offset": 2,
-      "historical_total_ordinary_attempts_spent": 2,
-      "authorized_additional_attempts_used": 0,
+      "historical_total_ordinary_attempts_spent": 3,
+      "authorized_additional_attempts_used": 1,
       "completed_at": "2026-11-02T07:11:45.916523+00:00",
       "summary": "Installed the exact RF-020 artifact by copy-only handoff."
     },
