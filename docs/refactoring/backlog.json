@@ -357,19 +357,20 @@
         "RF-116"
       ],
       "acceptance_criteria": [
-        "Read AGENTS,ARCHITECTURE,CONVENTIONS,TECH_STACK,RUNBOOK,current task,.refactor-baseline/rf008-native-ownership-v1/readiness.md and artifacts.json. Separately execute/read sed -n '1,8p' docs/refactoring/PROGRESS.md and sed -n '1097,1097p' docs/refactoring/PROGRESS.md before copies. Actual opening mission/latest Primary prepares RF008 committed native ownership policy entry required.",
-        "Copy-only: each exact command once in its own successful tool call: cp -- .refactor-baseline/rf008-native-ownership-v1/package.json package.json; cp -- .refactor-baseline/rf008-native-ownership-v1/check-native-config.py scripts/check-native-config.py; cp -- .refactor-baseline/rf008-native-ownership-v1/test_native_config.py scripts/tests/test_native_config.py; cp -- .refactor-baseline/rf008-native-ownership-v1/NATIVE_OWNERSHIP.md docs/refactoring/NATIVE_OWNERSHIP.md; cp -- .refactor-baseline/rf008-native-ownership-v1/TECH_STACK.md docs/refactoring/TECH_STACK.md. Only required instruction/metadata/status reads besides five copies. No source/test/helper dumps,engineering,checks/hashes/tests,packages/services/agents,state edits or commits. Report fresh controller verification,new independent review and primary acceptance pending.",
+        "Read AGENTS,ARCHITECTURE,CONVENTIONS,TECH_STACK,RUNBOOK,current task,.refactor-baseline/rf008-native-ownership-v1/resource-reference-recovery-v2/readiness.md and artifacts.json. Separately execute/read sed -n '1,8p' docs/refactoring/PROGRESS.md and sed -n '1103,1103p' docs/refactoring/PROGRESS.md before copies. Actual opening mission/latest Primary repairs RF008 actual native resource references entry required.",
+        "Copy-only: each exact command once in its own successful tool call: cp -- .refactor-baseline/rf008-native-ownership-v1/resource-reference-recovery-v2/package.json package.json; cp -- .refactor-baseline/rf008-native-ownership-v1/resource-reference-recovery-v2/check-native-config.py scripts/check-native-config.py; cp -- .refactor-baseline/rf008-native-ownership-v1/resource-reference-recovery-v2/test_native_config.py scripts/tests/test_native_config.py; cp -- .refactor-baseline/rf008-native-ownership-v1/resource-reference-recovery-v2/NATIVE_OWNERSHIP.md docs/refactoring/NATIVE_OWNERSHIP.md; cp -- .refactor-baseline/rf008-native-ownership-v1/resource-reference-recovery-v2/TECH_STACK.md docs/refactoring/TECH_STACK.md. Only required instruction/metadata/status reads besides five copies. No source/test/helper dumps,engineering,checks/hashes/tests,packages/services/agents,state edits or commits. Report fresh controller verification,new independent review and primary acceptance pending.",
         "Primary decision keeps committed Android owner,app.json Expo/web metadata plus explicitly mirrored subset. New document maps every non-CNG field and guard limits. Preserve all app.json/native/resources/assets/lock/runtime dependencies/overrides bytes. Manifest adds only check:native-config script. No prebuild,exclusions,suppression,SDK major upgrade or native project regeneration.",
-        "Guard validates current identity/version,orientation,browsable activity scheme,predictive back/RTL,automatic-DayNight declaration,splash/adaptive colors/resource references,source existence,current plugin list and absent iOS project. Nine unittest methods with independent fixture mutations and malformed-XML CLI failure must pass. It is deliberately not full config synchronization,bitmap equivalence,plugin effects or native runtime certification.",
+        "Guard validates current identity/version,orientation,browsable activity scheme,predictive back/RTL,automatic-DayNight declaration,splash/adaptive colors/resource references,source existence,current plugin list and absent iOS project. Ten unittest methods with independent fixture mutations and malformed-XML CLI failure must pass. It is deliberately not full config synchronization,bitmap equivalence,plugin effects or native runtime certification.",
         "Raw package check must exit0; raw Doctor exits1 with19/20 and exactly known non-CNG ownership finding kept visible. This task accepts reviewed ownership policy/guard, not20/20 or removal of manual maintenance. Fresh native graphs/types/full unit/web export pass. Existing lint68/security/maintenance debt remainsRF044/RF090. RF040/041/042/048 retain native/device/UI acceptance; existing RF116 compile evidence not claimed as new runtime proof.",
-        "New stronger Astra independently inspects full five-file diff,new CLI/fixtures/limits,known Doctor exception,package/lock/input pins and every generator event type/actual reads/copies. Reject native or config mutation,unverified parity claims,ignored diagnostics or weakened tests. All11 fresh controller gates and released-lease primary acceptance required. Standing continuation permission applies; resource/usage/lease limits unchanged. Local commits only,no push/merge/deploy/production/protected/original checkout changes."
+        "New stronger Astra independently inspects full five-file diff,new CLI/fixtures/limits,known Doctor exception,package/lock/input pins and every generator event type/actual reads/copies. Reject native or config mutation,unverified parity claims,ignored diagnostics or weakened tests. All11 fresh controller gates and released-lease primary acceptance required. Standing continuation permission applies; resource/usage/lease limits unchanged. Local commits only,no push/merge/deploy/production/protected/original checkout changes.",
+        "Recovery preserves first generation/rejected review hashes and red/green regression evidence. Actual splash icon/post-splash AppTheme and both adaptive foreground/monochrome references validated; independent reset/baseline assertions prevent masking. No retry count reset."
       ],
       "verification": [
         [
           "python3",
           "-B",
           "-c",
-          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf008-native-ownership-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='f255c9c22265222645e3e2100c07ac6e12675605f07bdc52d56084504179ae39';runpy.run_path('.refactor-baseline/rf008-native-ownership-v1/verify.py',run_name='__main__')"
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf008-native-ownership-v1/resource-reference-recovery-v2/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='099b8c80890a974c398deb109ce4201a7f885be736648b484691dca2a5124d37';runpy.run_path('.refactor-baseline/rf008-native-ownership-v1/resource-reference-recovery-v2/verify.py',run_name='__main__')"
         ],
         [
           "npm",
@@ -421,7 +422,7 @@
           "python3",
           "-B",
           "-c",
-          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf008-native-ownership-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='f255c9c22265222645e3e2100c07ac6e12675605f07bdc52d56084504179ae39';runpy.run_path('.refactor-baseline/rf008-native-ownership-v1/verify.py',run_name='__main__')"
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf008-native-ownership-v1/resource-reference-recovery-v2/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='099b8c80890a974c398deb109ce4201a7f885be736648b484691dca2a5124d37';runpy.run_path('.refactor-baseline/rf008-native-ownership-v1/resource-reference-recovery-v2/verify.py',run_name='__main__')"
         ],
         [
           "git",
@@ -431,7 +432,7 @@
       ],
       "risk": "high",
       "approved": true,
-      "status": "pending",
+      "status": "retry",
       "allowed_paths": [
         "package.json",
         "scripts/check-native-config.py",
@@ -439,10 +440,13 @@
         "docs/refactoring/NATIVE_OWNERSHIP.md",
         "docs/refactoring/TECH_STACK.md"
       ],
-      "attempts": 0,
-      "primary_preparation_evidence": ".refactor-baseline/rf008-native-ownership-v1/readiness.md",
+      "attempts": 1,
+      "primary_preparation_evidence": ".refactor-baseline/rf008-native-ownership-v1/resource-reference-recovery-v2/readiness.md",
       "implementation_mode": "copy-only",
-      "readiness_evidence": ".refactor-baseline/rf008-native-ownership-v1/readiness.md"
+      "readiness_evidence": ".refactor-baseline/rf008-native-ownership-v1/resource-reference-recovery-v2/readiness.md",
+      "started_at": "2026-11-02T01:59:45.586625+00:00",
+      "failure": "Independent review failed: [P2] scripts/check-native-config.py:51\u201363 checks resource-file existence without validating splash icon/post-splash theme or adaptive foreground/monochrome references. Four independent in-memory mutations pointing these references to nonexistent resources all returned no errors. This violates the promised resource-reference guard and can falsely approve broken native configuration. Validate each reference and add independent regression cases, then refresh frozen artifacts and repeat controller verification and independent review.; Generator copy-only compliance passed. All 11 controller gates have passing evidence, and current artifact/input pins and git diff --check pass. Native/device/UI checks remain explicitly deferred; no runtime certification is implied. No files were modified.",
+      "evidence": ".ralph/runs/RF-008-1-1793584785590784743"
     },
     {
       "id": "RF-009",
