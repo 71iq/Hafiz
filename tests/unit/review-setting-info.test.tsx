@@ -3,7 +3,11 @@ import * as ReactNative from "react-native";
 import { act, cleanup, fireEvent, fireEventAsync, render, waitFor, within } from "@testing-library/react-native";
 import type { ReactTestInstance } from "react-test-renderer";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { DeckReviewSettingsSheet, formatStepText } from "@/components/flashcards/DeckReviewSettingsSheet";
+import {
+  DeckReviewSettingsSheet,
+  formatStepText,
+  SchedulerOptionsPanel,
+} from "@/components/flashcards/DeckReviewSettingsSheet";
 import { SmartDeckFilterSheet } from "@/components/flashcards/SmartDeckFilterSheet";
 import { OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { DirectionProvider } from "@/lib/ui/direction";
@@ -74,6 +78,7 @@ function editor(
   onClose: () => void,
   onSaved: () => void,
   visible = true,
+  mode: "ayah" | "word" = "ayah",
 ) {
   return (
     <SafeAreaProvider
@@ -85,7 +90,7 @@ function editor(
             visible={visible}
             deckId="isolated-review-help"
             deckTitle="Isolated review help"
-            mode="ayah"
+            mode={mode}
             onClose={onClose}
             onSaved={onSaved}
           />
@@ -242,4 +247,298 @@ describe("review-setting help caller characterization", () => {
       expect(materializeSmartDeckCards).not.toHaveBeenCalled();
     },
   );
+  describe("review settings draft behavior", () => {
+    const draftCases = (["deck", "smart"] as const).flatMap((kind) =>
+      (["en", "ar"] as const).map((language) => ({ kind, language })),
+    );
+
+    beforeEach(() => {
+      Object.assign(mockSettings, {
+        uiLanguage: "en",
+        isRTL: false,
+        isDark: false,
+        effectiveTheme: "beige",
+        themeSurface: THEME_COLORS.beige.surface,
+        themeColors: THEME_COLORS.beige,
+      });
+      ReactNative.Dimensions.set({
+        window: { width: 390, height: 844, scale: 1, fontScale: 1 },
+        screen: { width: 390, height: 844, scale: 1, fontScale: 1 },
+      });
+      jest.mocked(writeDeckReviewSettings).mockResolvedValue(undefined);
+      jest.mocked(writeSmartDeckFilter).mockResolvedValue(undefined);
+      jest.mocked(materializeSmartDeckCards).mockResolvedValue(0);
+    });
+
+    function panel(view: ReturnType<typeof render>): React.ComponentProps<typeof SchedulerOptionsPanel> {
+      // ReactTestInstance erases props; selecting the actual typed component establishes this test boundary.
+      return view.UNSAFE_getByType(SchedulerOptionsPanel).props as React.ComponentProps<typeof SchedulerOptionsPanel>;
+    }
+
+    function deferred() {
+      let finish: (() => void) | undefined;
+      const promise = new Promise<void>((resolve) => {
+        finish = resolve;
+      });
+      return {
+        promise,
+        resolve: () => {
+          if (!finish) throw new Error("Missing resolver");
+          finish();
+        },
+      };
+    }
+
+    function save(view: ReturnType<typeof render>, kind: EditorKind, language: Locale = "en") {
+      return view.getByRole("button", {
+        name: kind === "deck" ? strings[language].deckReviewSettingsSave : strings[language].smartDeckApplyFilter,
+      });
+    }
+
+    it.each(draftCases)(
+      "$kind $language hydrates, clamps and serializes the common scheduler draft",
+      async ({ kind, language }) => {
+        Object.assign(mockSettings, { uiLanguage: language, isRTL: language === "ar" });
+        const close = jest.fn();
+        const saved = jest.fn();
+        const view = render(editor(kind, 390, language, close, saved));
+        const initial = language === "ar" ? "٣ دقائق، ١٧ دقائق" : "3m, 17m";
+        await waitFor(() => expect(view.getByDisplayValue(initial)).toBeTruthy());
+        expect(panel(view)).toMatchObject({
+          dailyLimit: 20,
+          newCardsLimit: 10,
+          requestRetention: 0.9,
+          maximumInterval: 36500,
+        });
+        act(() => {
+          panel(view).onRequestRetentionChange(9);
+          panel(view).onMaximumIntervalChange(99999);
+        });
+        expect(panel(view)).toMatchObject({ requestRetention: 0.99, maximumInterval: 3650 });
+        act(() => {
+          panel(view).onDailyLimitChange(-99);
+          panel(view).onNewCardsLimitChange(-99);
+          panel(view).onRequestRetentionChange(-99);
+          panel(view).onMaximumIntervalChange(-99);
+          panel(view).onEnableFuzzChange(false);
+          panel(view).onEnableShortTermChange(false);
+          panel(view).onNewReviewOrderChange("reviewsFirst");
+          panel(view).onReviewSortOrderChange("newest");
+          panel(view).onNewCardSortOrderChange("created");
+        });
+        expect(panel(view)).toMatchObject({
+          dailyLimit: 10,
+          newCardsLimit: 0,
+          requestRetention: 0.8,
+          maximumInterval: 30,
+        });
+        fireEvent.changeText(view.getByDisplayValue(initial), language === "ar" ? "١ دقيقة، ٢ ساعات" : "1m, 2h");
+        fireEvent.changeText(view.getByDisplayValue(language === "ar" ? "٤١ دقائق" : "41m"), "");
+        fireEvent.press(save(view, kind, language));
+        await waitFor(() => expect(saved).toHaveBeenCalledTimes(1));
+        expect(writeDeckReviewSettings).toHaveBeenCalledWith(
+          mockDatabase,
+          kind === "deck" ? "isolated-review-help" : "default-retention",
+          {
+            ...settings,
+            dailyReviewLimit: 10,
+            newCardsLimit: 0,
+            requestRetention: 0.8,
+            maximumInterval: 30,
+            enableFuzz: false,
+            enableShortTerm: false,
+            learningSteps: ["1m", "2h"],
+            relearningSteps: [],
+            newReviewOrder: "reviewsFirst",
+            reviewSortOrder: "newest",
+            newCardSortOrder: "created",
+          },
+        );
+        expect(close).toHaveBeenCalledTimes(1);
+        if (kind === "smart") {
+          expect(writeSmartDeckFilter).toHaveBeenCalledWith(mockDatabase, "default-retention", { type: "all" });
+          expect(materializeSmartDeckCards).toHaveBeenCalledWith(mockDatabase, "default-retention", 10, 0);
+        } else {
+          expect(writeSmartDeckFilter).not.toHaveBeenCalled();
+          expect(materializeSmartDeckCards).not.toHaveBeenCalled();
+        }
+      },
+    );
+
+    it.each(draftCases)(
+      "$kind $language discards an unsaved draft and rehydrates after reopening",
+      async ({ kind, language }) => {
+        Object.assign(mockSettings, { uiLanguage: language, isRTL: language === "ar" });
+        const close = jest.fn();
+        const saved = jest.fn();
+        const view = render(editor(kind, 390, language, close, saved));
+        await waitFor(() =>
+          expect(view.getByDisplayValue(language === "ar" ? "٣ دقائق، ١٧ دقائق" : "3m, 17m")).toBeTruthy(),
+        );
+        fireEvent.changeText(view.getByDisplayValue(language === "ar" ? "٣ دقائق، ١٧ دقائق" : "3m, 17m"), "unsaved");
+        jest
+          .mocked(readDeckReviewSettings)
+          .mockResolvedValue({ ...settings, dailyReviewLimit: 42, learningSteps: ["1h"] });
+        view.rerender(editor(kind, 390, language, close, saved, false));
+        view.rerender(editor(kind, 390, language, close, saved));
+        await waitFor(() => expect(view.getByDisplayValue(language === "ar" ? "١ ساعة" : "1h")).toBeTruthy());
+        expect(panel(view).dailyLimit).toBe(42);
+        expect(view.queryByDisplayValue("unsaved")).toBeNull();
+        expect(writeDeckReviewSettings).not.toHaveBeenCalled();
+        expect(saved).not.toHaveBeenCalled();
+      },
+    );
+
+    function toggle(view: ReturnType<typeof render>, label: string) {
+      let node = view.getByText(label).parent;
+      while (node) {
+        const controls = within(node).queryAllByRole("switch");
+        if (controls.length === 1) {
+          fireEvent.press(controls[0]);
+          return;
+        }
+        node = node.parent;
+      }
+      throw new Error("No unique mode switch beside label");
+    }
+
+    it.each(["ayah", "word"] as const)("keeps at least one %s mode and saves the selected mode list", async (mode) => {
+      const saved = jest.fn();
+      const view = render(editor("deck", 390, "en", jest.fn(), saved, true, mode));
+      await waitFor(() => expect(view.getByDisplayValue("3m, 17m")).toBeTruthy());
+      const first = mode === "ayah" ? strings.en.flashcardsModeNextAyah : strings.en.flashcardsModeWordMeaningArabic;
+      const second =
+        mode === "ayah" ? strings.en.flashcardsModeTranslation : strings.en.flashcardsModeWordMeaningTranslation;
+      toggle(view, first);
+      fireEvent.press(save(view, "deck"));
+      await waitFor(() => expect(saved).toHaveBeenCalledTimes(1));
+      expect(jest.mocked(writeDeckReviewSettings).mock.calls[0][2]).toMatchObject({
+        testModes: ["nextAyah"],
+        wordTestModes: ["wordMeaningArabic"],
+      });
+      toggle(view, second);
+      toggle(view, first);
+      fireEvent.press(save(view, "deck"));
+      await waitFor(() => expect(saved).toHaveBeenCalledTimes(2));
+      expect(jest.mocked(writeDeckReviewSettings).mock.calls[1][2]).toMatchObject(
+        mode === "ayah"
+          ? { testModes: ["translation"], wordTestModes: ["wordMeaningArabic"] }
+          : { testModes: ["nextAyah"], wordTestModes: ["wordMeaningTranslation"] },
+      );
+    });
+
+    it.each(["deck", "smart"] as const)(
+      "%s reports a failed initial write, retains draft and retries without closing early",
+      async (kind) => {
+        const failure = new Error("synthetic settings write failure");
+        jest.spyOn(console, "warn").mockImplementation(() => undefined);
+        if (kind === "deck") jest.mocked(writeDeckReviewSettings).mockRejectedValueOnce(failure);
+        else jest.mocked(writeSmartDeckFilter).mockRejectedValueOnce(failure);
+        const close = jest.fn();
+        const saved = jest.fn();
+        const view = render(editor(kind, 390, "en", close, saved));
+        await waitFor(() => expect(view.getByDisplayValue("3m, 17m")).toBeTruthy());
+        fireEvent.changeText(view.getByDisplayValue("3m, 17m"), "19m");
+        fireEvent.press(save(view, kind));
+        const message = kind === "deck" ? strings.en.deckSettingsSaveFailed : strings.en.deckFilterSaveFailed;
+        await waitFor(() => expect(view.getByText(message)).toBeTruthy());
+        expect(view.getByDisplayValue("19m")).toBeTruthy();
+        expect(close).not.toHaveBeenCalled();
+        expect(saved).not.toHaveBeenCalled();
+        if (kind === "smart") {
+          expect(writeDeckReviewSettings).not.toHaveBeenCalled();
+          expect(materializeSmartDeckCards).not.toHaveBeenCalled();
+        }
+        fireEvent.press(save(view, kind));
+        await waitFor(() => expect(saved).toHaveBeenCalledTimes(1));
+        expect(view.queryByText(message)).toBeNull();
+        expect(close).toHaveBeenCalledTimes(1);
+        expect(jest.mocked(writeDeckReviewSettings).mock.calls.at(-1)?.[2].learningSteps).toEqual(["19m"]);
+      },
+    );
+
+    it.each(["settings", "materialization"] as const)(
+      "preserves partial smart writes and retries a failed %s stage",
+      async (stage) => {
+        jest.spyOn(console, "warn").mockImplementation(() => undefined);
+        const failure = new Error("synthetic later stage failure");
+        if (stage === "settings") jest.mocked(writeDeckReviewSettings).mockRejectedValueOnce(failure);
+        else jest.mocked(materializeSmartDeckCards).mockRejectedValueOnce(failure);
+        const close = jest.fn();
+        const saved = jest.fn();
+        const view = render(editor("smart", 390, "en", close, saved));
+        await waitFor(() => expect(view.getByDisplayValue("3m, 17m")).toBeTruthy());
+        fireEvent.press(save(view, "smart"));
+        await waitFor(() => expect(view.getByText(strings.en.deckFilterSaveFailed)).toBeTruthy());
+        expect(writeSmartDeckFilter).toHaveBeenCalledTimes(1);
+        expect(writeDeckReviewSettings).toHaveBeenCalledTimes(1);
+        expect(materializeSmartDeckCards).toHaveBeenCalledTimes(stage === "settings" ? 0 : 1);
+        expect(saved).not.toHaveBeenCalled();
+        expect(close).not.toHaveBeenCalled();
+        fireEvent.press(save(view, "smart"));
+        await waitFor(() => expect(saved).toHaveBeenCalledTimes(1));
+        expect(writeSmartDeckFilter).toHaveBeenCalledTimes(2);
+        expect(writeDeckReviewSettings).toHaveBeenCalledTimes(2);
+      },
+    );
+
+    it("awaits smart filter, settings and materialization before callbacks while preserving modes", async () => {
+      const filter = deferred();
+      const write = deferred();
+      const materialize = deferred();
+      jest.mocked(readSmartDeckFilter).mockResolvedValue({ type: "juz", juzNumbers: [3, 1] });
+      jest.mocked(writeSmartDeckFilter).mockReturnValueOnce(filter.promise);
+      jest.mocked(writeDeckReviewSettings).mockReturnValueOnce(write.promise);
+      jest.mocked(materializeSmartDeckCards).mockImplementationOnce(async () => {
+        await materialize.promise;
+        return 0;
+      });
+      const close = jest.fn();
+      const saved = jest.fn();
+      const view = render(editor("smart", 390, "en", close, saved));
+      await waitFor(() => expect(view.getByDisplayValue("3m, 17m")).toBeTruthy());
+      fireEvent.press(save(view, "smart"));
+      expect(writeSmartDeckFilter).toHaveBeenCalledWith(mockDatabase, "default-retention", {
+        type: "juz",
+        juzNumbers: [3, 1],
+      });
+      expect(writeDeckReviewSettings).not.toHaveBeenCalled();
+      expect(saved).not.toHaveBeenCalled();
+      await act(async () => filter.resolve());
+      expect(writeDeckReviewSettings).toHaveBeenCalledWith(mockDatabase, "default-retention", settings);
+      expect(materializeSmartDeckCards).not.toHaveBeenCalled();
+      expect(saved).not.toHaveBeenCalled();
+      await act(async () => write.resolve());
+      expect(materializeSmartDeckCards).toHaveBeenCalledTimes(1);
+      expect(saved).not.toHaveBeenCalled();
+      expect(close).not.toHaveBeenCalled();
+      await act(async () => materialize.resolve());
+      expect(saved).toHaveBeenCalledTimes(1);
+      expect(close).toHaveBeenCalledTimes(1);
+    });
+
+    it("disables smart saving for an empty surah selection without writing", async () => {
+      jest.mocked(readSmartDeckFilter).mockResolvedValue({ type: "surah", surahs: [] });
+      const view = render(editor("smart", 390, "en", jest.fn(), jest.fn()));
+      await waitFor(() => expect(view.getByDisplayValue("3m, 17m")).toBeTruthy());
+      expect(save(view, "smart").props.accessibilityState.disabled).toBe(true);
+      fireEvent.press(save(view, "smart"));
+      expect(writeSmartDeckFilter).not.toHaveBeenCalled();
+    });
+    it.each(["deck", "smart"] as const)("%s shows a load error and clears it after successful reopen", async (kind) => {
+      jest.spyOn(console, "warn").mockImplementation(() => undefined);
+      jest.mocked(readDeckReviewSettings).mockRejectedValueOnce(new Error("synthetic load failure"));
+      const close = jest.fn();
+      const saved = jest.fn();
+      const view = render(editor(kind, 390, "en", close, saved));
+      await waitFor(() => expect(view.getByText(strings.en.genericActionFailed)).toBeTruthy());
+      expect(writeDeckReviewSettings).not.toHaveBeenCalled();
+      expect(saved).not.toHaveBeenCalled();
+      expect(close).not.toHaveBeenCalled();
+      view.rerender(editor(kind, 390, "en", close, saved, false));
+      view.rerender(editor(kind, 390, "en", close, saved));
+      await waitFor(() => expect(view.getByDisplayValue("3m, 17m")).toBeTruthy());
+      expect(view.queryByText(strings.en.genericActionFailed)).toBeNull();
+    });
+  });
 });
