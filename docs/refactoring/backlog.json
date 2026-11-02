@@ -8625,8 +8625,8 @@
         "RF-115"
       ],
       "acceptance_criteria": [
-        "Read AGENTS,ARCHITECTURE,CONVENTIONS,TECH_STACK,.refactor-baseline/rf116-expo-patches-v1/readiness.md and artifacts.json. In separate successful calls execute/read sed -n '1,8p' docs/refactoring/PROGRESS.md and sed -n '1057,1057p' docs/refactoring/PROGRESS.md before any copy. Actual opening mission and latest Primary prepares RF116 SDK55 follow-up patches reads mandatory. Also read recovery readiness.md,diagnosis.md and artifacts.json and execute/read sed -n '1061,1061p' docs/refactoring/PROGRESS.md in its own successful call before copying. Actual RF116 registry recovery after first full-suite failure entry mandatory. Standing authorization supersedes historical approval-wait notes. Read updated RUNBOOK,authorized-continuation-v4/readiness.md and artifacts.json; separately execute/read sed -n '1067,1067p' docs/refactoring/PROGRESS.md before copying. Actual Standing user authorization permits continued modernization recovery entry mandatory. Read native-cache-recovery-v5/readiness.md/artifacts.json and in its own successful call execute/read sed -n '1073,1073p' docs/refactoring/PROGRESS.md before copying. Actual RF116 native-install recovery preserves valid build output entry mandatory. Mandatory standalone successful reads before copies: sed -n '1,120p' .refactor-baseline/rf116-expo-patches-v1/copy-parser-recovery-v3/diagnosis.md then cat .refactor-baseline/rf116-expo-patches-v1/copy-parser-recovery-v3/parser-proofs.json. Read document-read-recovery-v6/readiness.md/diagnosis.md/artifacts.json and execute/read sed -n '1081,1081p' docs/refactoring/PROGRESS.md separately. Actual document contents and RF116 document-read recovery after independent rejection marker required; path inventory insufficient.",
-        "Copy-only: four exact cp actions from document-read-recovery-v6/artifacts.json to their keys. Required instruction/metadata/status reads only; no source/test/helper dumps,engineering,transforms,hashes/tests/checks,packages/services/agents,state/controller edits or commits. Report controller checks/new independent review/primary acceptance pending.",
+        "Current canonical handoff supersedes all historical readiness/read lists. Read AGENTS,ARCHITECTURE,CONVENTIONS,TECH_STACK,RUNBOOK,current task,canonical-handoff-v7/readiness.md/diagnosis.md/artifacts.json. Separately execute/read sed -n '1,120p' .refactor-baseline/rf116-expo-patches-v1/copy-parser-recovery-v3/diagnosis.md and cat .refactor-baseline/rf116-expo-patches-v1/copy-parser-recovery-v3/parser-proofs.json. In separate successful calls read sed -n '1,8p' docs/refactoring/PROGRESS.md and sed -n '1087,1087p' docs/refactoring/PROGRESS.md before any copy. Actual mission/current canonical entry/diagnosis/proof contents required, filename inventory insufficient. Do not load historical readiness files as new instructions.",
+        "Copy-only. Execute each following exact command once in its own successful tool call, with no path substitutions: cp -- .refactor-baseline/rf116-expo-patches-v1/resolution/package.json package.json; cp -- .refactor-baseline/rf116-expo-patches-v1/resolution/package-lock.json package-lock.json; cp -- .refactor-baseline/rf116-expo-patches-v1/native-cache-recovery-v5/TECH_STACK.md docs/refactoring/TECH_STACK.md; cp -- .refactor-baseline/rf116-expo-patches-v1/registry-recovery-v2/rtl-component-registry.ts tests/rtl/rtl-component-registry.ts. Only required instruction/metadata/status reads besides those four actions. No source/test/helper dumps,engineering,checks/hashes/tests,packages/services/agents,state edits or commits. Report controller verification/new independent review/primary acceptance pending.",
         "Only three direct declarations plus frozen exact lock diff and TECH_STACK append. Preserve all other manifest fields/overrides and every old package entry outside lock-differences.json. No new package paths.12 updated nonroot records include explicit xcode4/core logging/autolinking/CLI/ws/node-forge; uuid7 removed. Archive integrity/source differences and isolated strict install/full graph are evidence, not complete upstream security or iOS certification.",
         "Fresh isolated clean npm ci with unchanged lock/no peer relaxation; strict-peer locked root npm install preserves valid native outputs. Both full dependency-version trees must match; unchanged root lock,existing RN/CSS patches and selected source pins mandatory. This is the exact diagnosed installation recovery after resource timeout1; do not delete root build caches through ci again. Native graphs no duplicates/direct core. Existing dependency-security/lint-coverage/Router cases pass unchanged. Exact current364-file68-warning/zero-error CLI parity,types,full unit suite,web export,real installed-Chrome28-case smoke and bounded Android debug allconfigured ABIs mandatory. No weakening/skips/exclusions.",
         "Raw audit remains nonclean; preserve all output, no newly listed vulnerable package names or criticals relative to frozen candidate. Current baseline69/11high and candidate66/10high are snapshots, not full security acceptance. Package check exits0; raw Doctor exits1 with19/20 and only non-CNG ownership. RF008 native ownership,RF044 maintenance,RF090 security acceptance remain open.",
@@ -8638,7 +8638,7 @@
           "python3",
           "-B",
           "-c",
-          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf116-expo-patches-v1/document-read-recovery-v6/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='f1bc030743a217dffbdc67c4beec4598a67c87bc4c47d2340ec5b725cf837e52';runpy.run_path('.refactor-baseline/rf116-expo-patches-v1/document-read-recovery-v6/verify.py',run_name='__main__')"
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf116-expo-patches-v1/canonical-handoff-v7/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='98f8ee520cf8ae6f157d258bf98af082191e3bd2f1bdc853ba296fdf7fe48d55';runpy.run_path('.refactor-baseline/rf116-expo-patches-v1/canonical-handoff-v7/verify.py',run_name='__main__')"
         ],
         [
           "python3",
@@ -8723,7 +8723,7 @@
           "python3",
           "-B",
           "-c",
-          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf116-expo-patches-v1/document-read-recovery-v6/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='f1bc030743a217dffbdc67c4beec4598a67c87bc4c47d2340ec5b725cf837e52';runpy.run_path('.refactor-baseline/rf116-expo-patches-v1/document-read-recovery-v6/verify.py',run_name='__main__')"
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf116-expo-patches-v1/canonical-handoff-v7/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='98f8ee520cf8ae6f157d258bf98af082191e3bd2f1bdc853ba296fdf7fe48d55';runpy.run_path('.refactor-baseline/rf116-expo-patches-v1/canonical-handoff-v7/verify.py',run_name='__main__')"
         ],
         [
           "git",
@@ -8742,18 +8742,18 @@
       ],
       "attempts": 1,
       "implementation_mode": "copy-only",
-      "readiness_evidence": ".refactor-baseline/rf116-expo-patches-v1/document-read-recovery-v6/readiness.md",
-      "started_at": "2026-11-02T00:43:26.517246+00:00",
-      "failure": "Independent review failed: Required generator reads are missing. authorized-continuation-v4/readiness.md:5 explicitly requires copy-parser-recovery-v3/diagnosis.md and parser-proofs.json before copying. The original generator.jsonl reads that instruction at line 37, but only lists those filenames before performing copies at lines 63\u201364. Preserve this run and repeat the handoff with both reads recorded before copying, followed by fresh controller gates and independent review. Add explicit read checks to prevent another false acceptance.; Otherwise, the reviewed artifacts match their frozen hashes, registry reversal succeeds, and all 18 logged gates pass, including 1,052 unit tests, 28 Chrome cases and Android compilation across four ABIs. No prohibited generator checks or source/test dumps were found. Review remained read-only. Released-lease primary acceptance remains pending; iOS, device and native-log runtime behavior remain unverified.",
-      "evidence": ".ralph/runs/RF-116-2-1793580206519813816",
+      "readiness_evidence": ".refactor-baseline/rf116-expo-patches-v1/canonical-handoff-v7/readiness.md",
+      "started_at": "2026-11-02T00:51:14.255718+00:00",
+      "failure": "Verification failed: ['python3', '-B', '-c', \"import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf116-expo-patches-v1/document-read-recovery-v6/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='f1bc030743a217dffbdc67c4beec4598a67c87bc4c47d2340ec5b725cf837e52';runpy.run_path('.refactor-baseline/rf116-expo-patches-v1/document-read-recovery-v6/verify.py',run_name='__main__')\"]; see .ralph/runs/RF-116-2-1793580674258042787/verify-0.log",
+      "evidence": ".ralph/runs/RF-116-2-1793580674258042787",
       "primary_recovery_evidence": ".refactor-baseline/rf116-expo-patches-v1/copy-parser-recovery-v3/diagnosis.md",
       "historical_ordinary_attempts_spent_before_extension": 2,
       "continuation_authorization": ".refactor-baseline/modernization-standing-continuation-2026-11-01.json",
       "attempt_count_stop_waived_by_user": true,
       "additional_attempt_controller_counter_base": 1,
-      "additional_attempt_historical_offset": 2,
-      "historical_total_ordinary_attempts_spent": 3,
-      "authorized_additional_attempts_used": 1,
+      "additional_attempt_historical_offset": 3,
+      "historical_total_ordinary_attempts_spent": 4,
+      "authorized_additional_attempts_used": 2,
       "resource_timeouts": 1
     }
   ]
