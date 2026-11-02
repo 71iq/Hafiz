@@ -1,3 +1,4 @@
+import { reflectionQueryKeys } from "@/lib/reflections/query-keys";
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { View, Text, Pressable, ActivityIndicator } from "react-native";
 import { ChevronDown, Heart, Send } from "lucide-react-native";
@@ -74,7 +75,7 @@ export function CommentsSheet({
   const selectedSortLabel = sortOptions.find((option) => option.value === sort)?.label ?? s.commentSortOldest;
 
   const commentsQuery = useInfiniteQuery({
-    queryKey: ["reflectionComments", reflectionId, sort, user?.id],
+    queryKey: reflectionQueryKeys.comments.list({ reflectionId, sort, viewerId: user?.id }),
     queryFn: ({ pageParam }) => fetchComments(reflectionId ?? "", pageParam, sort, user?.id),
     initialPageParam: 0,
     getNextPageParam: (lastPage, allPages) => (lastPage.hasMore ? allPages.length : undefined),

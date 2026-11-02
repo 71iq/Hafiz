@@ -1,3 +1,4 @@
+import { reflectionQueryKeys } from "@/lib/reflections/query-keys";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 import { useRouter } from "expo-router";
@@ -385,9 +386,9 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
 
   const invalidateProfileSurfaces = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ["publicProfile"] });
-    queryClient.invalidateQueries({ queryKey: ["reflectionFeed"] });
-    queryClient.invalidateQueries({ queryKey: ["reflections"] });
-    queryClient.invalidateQueries({ queryKey: ["reflectionComments"] });
+    queryClient.invalidateQueries({ queryKey: reflectionQueryKeys.feed.all });
+    queryClient.invalidateQueries({ queryKey: reflectionQueryKeys.reflections.all });
+    queryClient.invalidateQueries({ queryKey: reflectionQueryKeys.comments.all });
     queryClient.invalidateQueries({ queryKey: ["leaderboard"] });
   }, [queryClient]);
 

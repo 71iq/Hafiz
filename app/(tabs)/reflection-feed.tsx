@@ -1,3 +1,4 @@
+import { reflectionQueryKeys } from "@/lib/reflections/query-keys";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, RefreshControl, Text, TextInput, View, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -153,7 +154,7 @@ export default function ReflectionFeedScreen() {
   );
 
   const feedQuery = useInfiniteQuery({
-    queryKey: ["reflectionFeed", filter, sort, user?.id, selectedJuzRanges, normalizedSearchQuery],
+    queryKey: reflectionQueryKeys.feed.list({ filter, sort, viewerId: user?.id, juzRanges: selectedJuzRanges, searchTerm: normalizedSearchQuery }),
     queryFn: ({ pageParam }) =>
       fetchReflectionFeed({
         filter,
@@ -230,7 +231,7 @@ export default function ReflectionFeedScreen() {
   const handleCommentAdded = useCallback(
     (reflectionId: string) => {
       setCommentDeltas((prev) => ({ ...prev, [reflectionId]: (prev[reflectionId] ?? 0) + 1 }));
-      queryClient.invalidateQueries({ queryKey: ["reflectionFeed"] });
+      queryClient.invalidateQueries({ queryKey: reflectionQueryKeys.feed.all });
     },
     [queryClient]
   );

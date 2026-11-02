@@ -1,3 +1,4 @@
+import { reflectionQueryKeys } from "@/lib/reflections/query-keys";
 import { useState, useCallback } from "react";
 import { View, Text, Pressable, ActivityIndicator, useWindowDimensions } from "react-native";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
@@ -76,10 +77,10 @@ export function WriteReflectionSheet({
       }).catch(console.warn);
       // Invalidate reflection queries for this ayah range
       for (let a = ayahStart; a <= ayahEnd; a++) {
-        queryClient.invalidateQueries({ queryKey: ["reflections", surah, a] });
-        queryClient.invalidateQueries({ queryKey: ["reflectionCount", surah, a] });
+        queryClient.invalidateQueries({ queryKey: reflectionQueryKeys.reflections.ayah({ surah, ayah: a }) });
+        queryClient.invalidateQueries({ queryKey: reflectionQueryKeys.count({ surah, ayah: a }) });
       }
-      queryClient.invalidateQueries({ queryKey: ["reflectionFeed"] });
+      queryClient.invalidateQueries({ queryKey: reflectionQueryKeys.feed.all });
       setContent("");
       onClose();
       onSuccess?.();

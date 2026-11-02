@@ -1,3 +1,4 @@
+import { reflectionQueryKeys } from "@/lib/reflections/query-keys";
 import { useState, useCallback } from "react";
 import { ActivityIndicator, View, Text, Pressable } from "react-native";
 import { ChevronDown, ChevronUp, PenLine, MessageSquare } from "lucide-react-native";
@@ -41,7 +42,7 @@ export function ReflectionsSection({ surah, ayah, initiallyExpanded = false, sho
 
   // Fetch count (always, for badge)
   const { data: count = 0 } = useQuery({
-    queryKey: ["reflectionCount", surah, ayah],
+    queryKey: reflectionQueryKeys.count({ surah, ayah }),
     queryFn: () => fetchReflectionCount(surah, ayah),
     enabled: supabaseConfigured,
     staleTime: 1000 * 60 * 5,
@@ -53,7 +54,7 @@ export function ReflectionsSection({ surah, ayah, initiallyExpanded = false, sho
     error: reflectionsError,
     refetch: refetchReflections,
   } = useQuery({
-    queryKey: ["reflections", surah, ayah, 0, user?.id],
+    queryKey: reflectionQueryKeys.reflections.firstPage({ surah, ayah, viewerId: user?.id }),
     queryFn: async () => {
       const result = await fetchReflections(surah, ayah, 0, user?.id);
       setError(null);
@@ -100,8 +101,8 @@ export function ReflectionsSection({ surah, ayah, initiallyExpanded = false, sho
 
   const handleWriteSuccess = useCallback(() => {
     // Invalidate and refetch
-    queryClient.invalidateQueries({ queryKey: ["reflections", surah, ayah] });
-    queryClient.invalidateQueries({ queryKey: ["reflectionCount", surah, ayah] });
+    queryClient.invalidateQueries({ queryKey: reflectionQueryKeys.reflections.ayah({ surah, ayah }) });
+    queryClient.invalidateQueries({ queryKey: reflectionQueryKeys.count({ surah, ayah }) });
   }, [queryClient, surah, ayah]);
 
   if (!supabaseConfigured) return null;
