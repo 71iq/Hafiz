@@ -1775,14 +1775,18 @@
       ],
       "risk": "high",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "tests/unit/smart-decks.test.ts"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "implementation_mode": "copy-only",
       "readiness_evidence": ".refactor-baseline/rf022-smart-queue-v1/readiness.md",
-      "primary_preparation_evidence": ".refactor-baseline/rf022-smart-queue-v1/readiness.md"
+      "primary_preparation_evidence": ".refactor-baseline/rf022-smart-queue-v1/readiness.md",
+      "started_at": "2026-11-02T08:55:25.192843+00:00",
+      "completed_at": "2026-11-02T08:58:31.328636+00:00",
+      "evidence": ".ralph/runs/RF-022-1-1793609725196659365",
+      "summary": "Installed the supplied RF-022 artifact by the exact copy command."
     },
     {
       "id": "RF-023",
