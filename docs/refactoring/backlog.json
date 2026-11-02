@@ -9048,17 +9048,21 @@
       ],
       "risk": "high",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "components/flashcards/DeckReviewSettingsSheet.tsx",
         "components/flashcards/SmartDeckFilterSheet.tsx",
         "lib/fsrs/review-step-text.ts",
         "tests/unit/review-step-text.test.ts"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "implementation_mode": "copy-only",
       "readiness_evidence": ".refactor-baseline/rf117-review-step-codec-v1/readiness.md",
-      "primary_preparation_evidence": ".refactor-baseline/rf117-review-step-codec-v1/readiness.md"
+      "primary_preparation_evidence": ".refactor-baseline/rf117-review-step-codec-v1/readiness.md",
+      "started_at": "2026-11-02T17:13:34.851215+00:00",
+      "completed_at": "2026-11-02T17:17:57.968596+00:00",
+      "evidence": ".ralph/runs/RF-117-1-1793639614853733691",
+      "summary": "Installed the four frozen RF117 artifacts by exact copy-only commands. Verification, independent review, and primary acceptance remain pending with the controller."
     },
     {
       "id": "RF-118",

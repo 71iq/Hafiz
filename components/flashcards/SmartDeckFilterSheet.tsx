@@ -10,7 +10,8 @@ import { interpolate, useStrings } from "@/lib/i18n/useStrings";
 import type { UIStrings } from "@/lib/i18n/strings";
 import { useSettings } from "@/lib/settings/context";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
-import { SchedulerOptionsPanel, formatStepText, parseStepText } from "@/components/flashcards/DeckReviewSettingsSheet";
+import { SchedulerOptionsPanel } from "@/components/flashcards/DeckReviewSettingsSheet";
+import { formatStepText, parseStepText } from "@/lib/fsrs/review-step-text";
 import {
   DEFAULT_DECK_ENABLE_FUZZ,
   DEFAULT_DECK_ENABLE_SHORT_TERM,
