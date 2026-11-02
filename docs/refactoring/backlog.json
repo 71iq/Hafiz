@@ -1696,16 +1696,21 @@
       ],
       "risk": "high",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "app/flashcards/session.tsx",
         "lib/fsrs/persist-review.ts",
         "docs/refactoring/ARCHITECTURE.md"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "implementation_mode": "copy-only",
       "readiness_evidence": ".refactor-baseline/rf021-review-persistence-v1/readiness.md",
-      "primary_preparation_evidence": ".refactor-baseline/rf021-review-persistence-v1/readiness.md"
+      "primary_preparation_evidence": ".refactor-baseline/rf021-review-persistence-v1/readiness.md",
+      "started_at": "2026-11-02T07:55:17.286703+00:00",
+      "failure": "Batch resource limit reached",
+      "completed_at": "2026-11-02T07:57:54.571889+00:00",
+      "evidence": ".ralph/runs/RF-021-1-1793606117289055294",
+      "summary": "Installed the three RF-021 frozen artifacts only. Verification, independent review, and primary acceptance remain pending."
     },
     {
       "id": "RF-022",

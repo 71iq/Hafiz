@@ -24,9 +24,8 @@ import { LoadingScreen } from "@/components/LoadingScreen";
 import { Rating, State } from "@/lib/fsrs/scheduler";
 import type { Grade } from "@/lib/fsrs/scheduler";
 import { calculateReviewTransition } from "@/lib/fsrs/review-transition";
+import { persistReviewTransition } from "@/lib/fsrs/persist-review";
 import {
-  updateCard,
-  insertStudyLog,
   getStudyStreak,
   getWirdStatus,
   MUTASHABIHAT_DECK_ID,
@@ -749,24 +748,12 @@ function FlashcardSessionScreen() {
         reviewPolicy: reviewSettings ?? undefined,
       });
 
-      await updateCard(db, transition.updatedCard);
+      await persistReviewTransition({ db, cardId: currentCard.card.id, transition });
       const requeuedCard = transition.shouldRequeueToday
         ? { ...currentCard, card: transition.updatedCard }
         : null;
 
       const { reviewRecord } = transition;
-      await insertStudyLog(
-        db,
-        currentCard.card.id,
-        reviewRecord.rating,
-        reviewRecord.state,
-        reviewRecord.due,
-        reviewRecord.stability,
-        reviewRecord.difficulty,
-        reviewRecord.elapsedDays,
-        reviewRecord.scheduledDays,
-        reviewRecord.reviewedAt
-      );
       recordReviewedCard(currentCard.card.state);
 
       if (currentCard.card.id.startsWith("mutashabihat:") || currentCard.card.id.startsWith("similar-tail:")) {
