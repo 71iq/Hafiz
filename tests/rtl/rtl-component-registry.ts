@@ -387,6 +387,12 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "source",
     "Sidebar and bottom nav order/active affordances mirror.",
   ),
+  entry(
+    "components/ui/BusyIndicator.tsx",
+    "feedback",
+    "rntl",
+    "Centered icon-only feedback has no row order; reduced-motion owner tests cover both render branches.",
+  ),
   entry("components/ui/Button.tsx", "button", "rntl", "Icon/text order uses logical row direction."),
   entry("components/ui/Card.tsx", "card", "source", "Container is direction-neutral; child rows own mirroring."),
   entry("components/ui/ConfirmDialog.tsx", "overlay", "rntl", "Dialog title, close, and action row mirror."),

@@ -8733,19 +8733,19 @@
       ],
       "risk": "high",
       "approved": true,
-      "status": "retry",
+      "status": "verified",
       "allowed_paths": [
         "package.json",
         "package-lock.json",
         "docs/refactoring/TECH_STACK.md",
         "tests/rtl/rtl-component-registry.ts"
       ],
-      "attempts": 1,
+      "attempts": 2,
       "implementation_mode": "copy-only",
       "readiness_evidence": ".refactor-baseline/rf116-expo-patches-v1/canonical-handoff-v7/readiness.md",
-      "started_at": "2026-11-02T00:51:14.255718+00:00",
-      "failure": "Verification failed: ['python3', '-B', '-c', \"import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf116-expo-patches-v1/document-read-recovery-v6/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='f1bc030743a217dffbdc67c4beec4598a67c87bc4c47d2340ec5b725cf837e52';runpy.run_path('.refactor-baseline/rf116-expo-patches-v1/document-read-recovery-v6/verify.py',run_name='__main__')\"]; see .ralph/runs/RF-116-2-1793580674258042787/verify-0.log",
-      "evidence": ".ralph/runs/RF-116-2-1793580674258042787",
+      "started_at": "2026-11-02T00:54:32.941302+00:00",
+      "failure": "Batch resource limit reached",
+      "evidence": ".ralph/runs/RF-116-2-1793580872945267688",
       "primary_recovery_evidence": ".refactor-baseline/rf116-expo-patches-v1/copy-parser-recovery-v3/diagnosis.md",
       "historical_ordinary_attempts_spent_before_extension": 2,
       "continuation_authorization": ".refactor-baseline/modernization-standing-continuation-2026-11-01.json",
@@ -8754,7 +8754,9 @@
       "additional_attempt_historical_offset": 3,
       "historical_total_ordinary_attempts_spent": 4,
       "authorized_additional_attempts_used": 2,
-      "resource_timeouts": 1
+      "resource_timeouts": 1,
+      "completed_at": "2026-11-02T01:00:18.315282+00:00",
+      "summary": "Installed the four frozen artifacts. Controller verification, independent review, and primary acceptance remain pending."
     }
   ]
 }
