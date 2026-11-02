@@ -8974,7 +8974,7 @@
     {
       "id": "RF-117",
       "title": "Move the existing review step-text codec to a domain module",
-      "description": "Move existing format/parse/digit/unit helpers without semantic change; preserve component exports and actual caller behavior.",
+      "description": "Move exact existing step-text codec bodies into a pure domain module, retaining public exports and both caller behavior. Golden/property and actual-sheet tests enforce compatibility.",
       "rationale": "RF058 actual-sheet characterization identifies this bounded pure ownership boundary.",
       "modules": [
         "components/flashcards/DeckReviewSettingsSheet.tsx",
@@ -8986,18 +8986,27 @@
         "RF-058"
       ],
       "acceptance_criteria": [
-        "Reuse exact current codec bodies and SchedulerStep type. Keep Arabic/English digits/units, invalid-token filtering, empty/fallback semantics and current public exports. No state or persistence extraction.",
-        "Characterize actual helper behavior and valid-domain round trips before extraction; preserve thirty sheet cases. Primary must freeze exact artifacts and prove caller reversals before approval."
+        "Read AGENTS, ARCHITECTURE, CONVENTIONS, TECH_STACK, RUNBOOK, current task, .refactor-baseline/rf117-review-step-codec-v1/readiness.md, reuse.md, preparation-correction.md and artifacts.json. Separately actually read sed -n '1,8p' docs/refactoring/PROGRESS.md and sed -n '1147,1147p' docs/refactoring/PROGRESS.md. Mission/current Primary prepares RF117 pure review step-text codec extraction marker precedes copies.",
+        "Copy-only four exact commands each in its own successful tool call: cp -- .refactor-baseline/rf117-review-step-codec-v1/DeckReviewSettingsSheet.tsx components/flashcards/DeckReviewSettingsSheet.tsx; cp -- .refactor-baseline/rf117-review-step-codec-v1/SmartDeckFilterSheet.tsx components/flashcards/SmartDeckFilterSheet.tsx; cp -- .refactor-baseline/rf117-review-step-codec-v1/review-step-text.ts lib/fsrs/review-step-text.ts; cp -- .refactor-baseline/rf117-review-step-codec-v1/review-step-text.test.ts tests/unit/review-step-text.test.ts. Only required instruction/metadata/status reads beyond copies. No engineering, source/test/helper dumps, tests/checks/hashes, packages/services/agents, state edits or commits. Report verification/review/primary acceptance pending.",
+        "Move exact old codec block with existing Arabic helper and SchedulerStep imports only. Whole callers restore exactly after prescribed import/re-export/block changes. Deck keeps public exports below all imports. Preserve grammar/digits/units/empty/fallback semantics, array copying and invalid-token filtering. No new algorithm, grammar, state, hydration, filter, mode, save or persistence abstraction/dependency.",
+        "Fifteen golden/immutability/property cases pass against isolated frozen exact old block and new module. Two500-run fixed-seed properties cover canonical nonnegative tenths through both locales and mixed-token retention/order without discards. Existing30 actual sheet cases unchanged; three codec mutations fail new or rendered caller assertions. New files lint/format clean, old sheet diagnostics exact parity. Preserve/correct first re-export import-order warning candidate/report.",
+        "All nine fresh controller gates required:45 focused tests/types/diagnostic parity/new-file lint/format/three platform graphs/web export/frozen integrity/whitespace. Separate stronger Astra reviews full four-file diff, public compatibility/pure imports/caller and body reversals, old tests/protected hashes, property domain/goldens/mutations/baseline/preparation correction and every generator item type/actual reads/four exact copies. Released-lease primary acceptance mandatory. No manual UI/device/native compile claim. Local only, no push/merge/deploy/production/original/protected-input changes."
       ],
       "verification": [
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf117-review-step-codec-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='0a594696b681838495b4d9a197415454ec4b2d165123e183afaa6232ae4dd527';runpy.run_path('.refactor-baseline/rf117-review-step-codec-v1/verify.py',run_name='__main__')"
+        ],
         [
           "npm",
           "run",
           "test:unit",
           "--",
           "--runTestsByPath",
-          "tests/unit/review-setting-info.test.tsx",
-          "tests/unit/review-step-text.test.ts"
+          "tests/unit/review-step-text.test.ts",
+          "tests/unit/review-setting-info.test.tsx"
         ],
         [
           "npm",
@@ -9005,13 +9014,40 @@
           "typecheck"
         ],
         [
+          "python3",
+          "-B",
+          ".refactor-baseline/rf117-review-step-codec-v1/lint.py"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "lib/fsrs/review-step-text.ts",
+          "tests/unit/review-step-text.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
           "npm",
           "run",
           "build:web"
+        ],
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf117-review-step-codec-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='0a594696b681838495b4d9a197415454ec4b2d165123e183afaa6232ae4dd527';runpy.run_path('.refactor-baseline/rf117-review-step-codec-v1/verify.py',run_name='__main__')"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
         ]
       ],
       "risk": "high",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
         "components/flashcards/DeckReviewSettingsSheet.tsx",
@@ -9019,7 +9055,10 @@
         "lib/fsrs/review-step-text.ts",
         "tests/unit/review-step-text.test.ts"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "implementation_mode": "copy-only",
+      "readiness_evidence": ".refactor-baseline/rf117-review-step-codec-v1/readiness.md",
+      "primary_preparation_evidence": ".refactor-baseline/rf117-review-step-codec-v1/readiness.md"
     },
     {
       "id": "RF-118",
