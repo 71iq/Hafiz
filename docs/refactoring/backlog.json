@@ -2989,7 +2989,9 @@
         "RF-097",
         "RF-098",
         "RF-099",
-        "RF-100"
+        "RF-100",
+        "RF-117",
+        "RF-118"
       ],
       "acceptance_criteria": [
         "Repeat identical clone/dead-code/native+web graph/security scopes.",
@@ -3862,45 +3864,75 @@
     {
       "id": "RF-058",
       "title": "Characterize shared deck-review settings drafts",
-      "description": "Characterize shared deck-review settings drafts",
+      "description": "Characterize actual deck/smart review-setting draft behavior inside the existing both-sheet fixture. Keep distinct filter, mode and asynchronous save ownership.",
       "rationale": "Groups 16-18 repeat state, hydration and clamping across two editors.",
       "modules": [
-        "components/flashcards/DeckReviewSettingsSheet.tsx",
-        "components/flashcards/SmartDeckFilterSheet.tsx",
-        "tests/unit/deck-review-draft.test.tsx"
+        "tests/unit/review-setting-info.test.tsx"
       ],
       "dependencies": [
         "RF-004",
         "RF-022"
       ],
       "acceptance_criteria": [
-        "Test locale-specific step text, hydration/reset, clamps, mode toggles, save/error and filter differences.",
-        "Choose a shared form/state interface only after those tests. Keep smart-filter ownership separate and split implementation into smaller follow-ups."
+        "Read AGENTS, ARCHITECTURE, CONVENTIONS, TECH_STACK, RUNBOOK, current task, .refactor-baseline/rf058-review-draft-v1/readiness.md, reuse.md and artifacts.json. Separately actually read sed -n '1,8p' docs/refactoring/PROGRESS.md and sed -n '1141,1141p' docs/refactoring/PROGRESS.md. Opening mission/current Primary prepares RF058 actual review-settings draft characterization marker precedes copy.",
+        "Copy-only exact command in its own successful tool call: cp -- .refactor-baseline/rf058-review-draft-v1/review-setting-info.test.tsx tests/unit/review-setting-info.test.tsx. Only required instruction/metadata/status reads beyond copy. No engineering, source/test/helper dumps, tests/checks/hashes, packages/services/agents, state edits or commits. Report controller verification, independent review and primary acceptance pending.",
+        "Reuse actual sheets, existing fixture and common SchedulerOptionsPanel contract. Retain12 old help cases/assertions exactly after prescribed imports/helper restoration. Eighteen new cases cover English/Arabic step formatting/parsing/empty lists, hydration/reopen reset, scalar clamps, boolean/order setters, ayah/word mode lists/last-mode guard, read/write errors/retry, smart partial-save stage failures, awaited write ordering/preserved modes and invalid selection guard. Public panel callbacks exercise caller clamp contract, actual rendered inputs/switches/save exercise persistence. One documented renderer prop-type assertion only at selected typed component boundary.",
+        "Preserve initial fixture typing error and four actual source mutation classes: clamp, last-mode guard, smart await and preserved mode list. Final production/old-test/query/config/native/assets/lock bytes unchanged. No weakened assertions or skipped cases. Existing partial smart writes remain; no atomicity/new concurrency claim.",
+        "Primary chooses existing SchedulerOptionsPanel props as common control interface. Keep hydration/filter/mode/error/save ownership separate. Two unapproved follow-ups RF117 pure step codec and RF118 numeric clamp extraction are exact small scopes; worker must not implement them or create a shared state hook/payload builder.",
+        "All seven fresh controller gates and separate stronger Astra review required. Reviewer checks full diff/old-test restoration, actual callers/common callback contract, locale/error/await assertions, frozen inputs/failures/mutations, every generator item type/actual reads/exact copy and no prohibited work. Released-lease primary acceptance required. No manual browser/device/build/new UI parity claim. Local only, no push/merge/deploy/production/original/protected-input changes."
       ],
       "verification": [
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf058-review-draft-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='149e9c3779110180d743a9182c60e575acf6747f4fed8a112d2bf23598314d1a';runpy.run_path('.refactor-baseline/rf058-review-draft-v1/verify.py',run_name='__main__')"
+        ],
         [
           "npm",
           "run",
           "test:unit",
           "--",
           "--runTestsByPath",
-          "tests/unit/deck-review-draft.test.tsx"
+          "tests/unit/review-setting-info.test.tsx"
         ],
         [
           "npm",
           "run",
           "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "tests/unit/review-setting-info.test.tsx",
+          "--max-warnings=0"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "tests/unit/review-setting-info.test.tsx"
+        ],
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf058-review-draft-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='149e9c3779110180d743a9182c60e575acf6747f4fed8a112d2bf23598314d1a';runpy.run_path('.refactor-baseline/rf058-review-draft-v1/verify.py',run_name='__main__')"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
         ]
       ],
       "risk": "high",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
-        "components/flashcards/DeckReviewSettingsSheet.tsx",
-        "components/flashcards/SmartDeckFilterSheet.tsx",
-        "tests/unit/deck-review-draft.test.tsx"
+        "tests/unit/review-setting-info.test.tsx"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "implementation_mode": "copy-only",
+      "readiness_evidence": ".refactor-baseline/rf058-review-draft-v1/readiness.md",
+      "primary_preparation_evidence": ".refactor-baseline/rf058-review-draft-v1/readiness.md"
     },
     {
       "id": "RF-059",
@@ -8934,6 +8966,107 @@
       "summary": "SDK55 patches and one BusyIndicator RTL registry entry accepted. All18 fresh controller gates,1052 unit cases,28 Chrome cases,Android all4 ABI debug build,new independent Astra and released-lease primary review pass. Doctor19/20 retains native ownership; audit/lint/maintenance debt remains. All failed/resource histories preserved; standing recovery authorization active.",
       "primary_accepted": true,
       "primary_acceptance_evidence": ".refactor-baseline/rf116-primary-acceptance.json"
+    },
+    {
+      "id": "RF-117",
+      "title": "Move the existing review step-text codec to a domain module",
+      "description": "Move existing format/parse/digit/unit helpers without semantic change; preserve component exports and actual caller behavior.",
+      "rationale": "RF058 actual-sheet characterization identifies this bounded pure ownership boundary.",
+      "modules": [
+        "components/flashcards/DeckReviewSettingsSheet.tsx",
+        "components/flashcards/SmartDeckFilterSheet.tsx",
+        "lib/fsrs/review-step-text.ts",
+        "tests/unit/review-step-text.test.ts"
+      ],
+      "dependencies": [
+        "RF-058"
+      ],
+      "acceptance_criteria": [
+        "Reuse exact current codec bodies and SchedulerStep type. Keep Arabic/English digits/units, invalid-token filtering, empty/fallback semantics and current public exports. No state or persistence extraction.",
+        "Characterize actual helper behavior and valid-domain round trips before extraction; preserve thirty sheet cases. Primary must freeze exact artifacts and prove caller reversals before approval."
+      ],
+      "verification": [
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/review-setting-info.test.tsx",
+          "tests/unit/review-step-text.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ]
+      ],
+      "risk": "high",
+      "approved": false,
+      "status": "pending",
+      "allowed_paths": [
+        "components/flashcards/DeckReviewSettingsSheet.tsx",
+        "components/flashcards/SmartDeckFilterSheet.tsx",
+        "lib/fsrs/review-step-text.ts",
+        "tests/unit/review-step-text.test.ts"
+      ],
+      "attempts": 0
+    },
+    {
+      "id": "RF-118",
+      "title": "Share the four tested review-setting numeric clamps",
+      "description": "Extract only matching numeric clamp calculations, retaining caller error clearing and local state setters.",
+      "rationale": "RF058 actual-sheet characterization identifies this bounded pure ownership boundary.",
+      "modules": [
+        "components/flashcards/DeckReviewSettingsSheet.tsx",
+        "components/flashcards/SmartDeckFilterSheet.tsx",
+        "lib/fsrs/review-settings-draft.ts",
+        "tests/unit/review-settings-clamps.test.ts"
+      ],
+      "dependencies": [
+        "RF-058",
+        "RF-117"
+      ],
+      "acceptance_criteria": [
+        "Use current min/max constants and exact retention rounding. Characterize finite/boundary/nonfinite behavior before changes; preserve existing semantics, including unusual inputs.",
+        "Keep setError/local setters and all effects/filter/modes/save ordering in callers. No shared state hook or payload builder. Primary freezes exact small artifacts and mutation/reversal evidence before approval."
+      ],
+      "verification": [
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/review-setting-info.test.tsx",
+          "tests/unit/review-settings-clamps.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ]
+      ],
+      "risk": "high",
+      "approved": false,
+      "status": "pending",
+      "allowed_paths": [
+        "components/flashcards/DeckReviewSettingsSheet.tsx",
+        "components/flashcards/SmartDeckFilterSheet.tsx",
+        "lib/fsrs/review-settings-draft.ts",
+        "tests/unit/review-settings-clamps.test.ts"
+      ],
+      "attempts": 0
     }
   ]
 }
