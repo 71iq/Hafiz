@@ -3,12 +3,14 @@ import * as ReactNative from "react-native";
 import { act, cleanup, fireEvent, render, waitFor, within } from "@testing-library/react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import FlashcardSessionScreenWrapper from "@/app/flashcards/session";
+import { Card } from "@/components/ui/Card";
 import { ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { DirectionProvider } from "@/lib/ui/direction";
 import { useSettings } from "@/lib/settings/context";
 import { strings, type UIStrings } from "@/lib/i18n/strings";
 import { formatLocalDateInput, parseDueDateInput } from "@/lib/date";
-import { State } from "@/lib/fsrs/scheduler";
+import { Rating, State } from "@/lib/fsrs/scheduler";
+import { calculateReviewTransition } from "@/lib/fsrs/review-transition";
 import type { DeckReviewSettings, StudyCardRow } from "@/lib/fsrs/types";
 import type { SmartCardContent, SmartDeckRef } from "@/lib/fsrs/smart-decks";
 import { DEFAULT_RECITATION_ID } from "@/lib/quran-foundation/recitations";
@@ -1603,4 +1605,201 @@ describe("Flashcard session due-date editor characterization", () => {
       }
     },
   );
+
+  describe("review-session persistence orchestration", () => {
+    const s = strings.en;
+
+    beforeEach(() => {
+      configureSettings("en", false);
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date(2026, 10, 2, 12, 0, 0));
+      jest.mocked(updateCard).mockResolvedValue(undefined);
+      jest.mocked(insertStudyLog).mockResolvedValue(undefined);
+      jest.mocked(addTodayPoints).mockResolvedValue(undefined);
+      jest.mocked(recordAchievementEvent).mockResolvedValue(undefined);
+      jest.mocked(syncDailyScore).mockResolvedValue(undefined);
+      jest.mocked(updateProfileStats).mockResolvedValue(undefined);
+      jest.mocked(getNextEligibleReviewDate).mockResolvedValue(null);
+      jest.mocked(getWirdStatus).mockResolvedValue({
+        currentDays: 3,
+        maintainedToday: true,
+        longestDays: 3,
+        lastReviewDate: null,
+        state: "maintained_today",
+      });
+    });
+
+    afterEach(() => {
+      cleanup();
+      jest.useRealTimers();
+    });
+
+    async function reveal(view: ReturnType<typeof render>, cue = firstCue) {
+      await waitFor(() => expect(view.getByText(cue)).toBeTruthy());
+      fireEvent.press(getTextButton(view, s.flashcardsReveal));
+      await waitFor(() => expect(view.getByText(s.flashcardsEasy)).toBeTruthy());
+    }
+
+    it("awaits card then log persistence, rejects duplicate grades, and scores the original card", async () => {
+      const card = { ...firstCard, state: State.Review, reps: 5, stability: 12, difficulty: 6 };
+      jest.mocked(getDueCardsForReview).mockResolvedValue([card, secondCard]);
+      jest.mocked(getStudyStreak).mockResolvedValue(7);
+      jest.mocked(computeReviewPoints).mockReturnValue(9);
+      const cardWrite = createDeferred<void>();
+      const logWrite = createDeferred<void>();
+      jest.mocked(updateCard).mockReturnValueOnce(cardWrite.promise);
+      jest.mocked(insertStudyLog).mockReturnValueOnce(logWrite.promise);
+      const view = renderSession();
+      await reveal(view);
+      const gradeButton = getTextButton(view, s.flashcardsEasy);
+      act(() => {
+        fireEvent.press(gradeButton);
+        fireEvent.press(gradeButton);
+      });
+      expect(updateCard).toHaveBeenCalledTimes(1);
+      expect(insertStudyLog).not.toHaveBeenCalled();
+      expect(computeReviewPoints).not.toHaveBeenCalled();
+      expect(view.queryByText(secondCue)).toBeNull();
+      await act(async () => cardWrite.resolve());
+      expect(insertStudyLog).toHaveBeenCalledTimes(1);
+      expect(computeReviewPoints).not.toHaveBeenCalled();
+      expect(view.queryByText(secondCue)).toBeNull();
+      const reviewedAt = jest.mocked(insertStudyLog).mock.calls[0][9];
+      const transition = calculateReviewTransition({
+        card,
+        rating: Rating.Easy,
+        reviewedAt: new Date(reviewedAt),
+        reviewPolicy: reviewSettings,
+      });
+      expect(updateCard).toHaveBeenCalledWith(mockDatabase, transition.updatedCard);
+      const record = transition.reviewRecord;
+      expect(insertStudyLog).toHaveBeenCalledWith(
+        mockDatabase,
+        card.id,
+        Rating.Easy,
+        record.state,
+        record.due,
+        record.stability,
+        record.difficulty,
+        record.elapsedDays,
+        record.scheduledDays,
+        record.reviewedAt,
+      );
+      await act(async () => logWrite.resolve());
+      await waitFor(() => expect(view.getByText(secondCue)).toBeTruthy());
+      expect(computeReviewPoints).toHaveBeenCalledWith(Rating.Easy, 7, 6, 12);
+      expect(addTodayPoints).toHaveBeenCalledWith(mockDatabase, 9);
+      expect(recordAchievementEvent).toHaveBeenCalledWith(mockDatabase, {
+        type: "mutashabih_pair_reviewed",
+        pairId: card.id,
+        reviewedAt,
+      });
+      expect(syncDailyScore).not.toHaveBeenCalled();
+      expect(updateProfileStats).not.toHaveBeenCalled();
+      expect(updateCard).toHaveBeenCalledTimes(1);
+    });
+
+    it("requeues a same-day card with its updated row then finishes and syncs once", async () => {
+      jest.mocked(getDueCardsForReview).mockResolvedValue([firstCard]);
+      const view = renderSession();
+      await reveal(view);
+      fireEvent.press(getTextButton(view, s.flashcardsAgain));
+      await waitFor(() => expect(view.getByText(s.flashcardsReveal)).toBeTruthy());
+      expect(view.getByText(firstCue)).toBeTruthy();
+      expect(view.queryByText(s.flashcardsSummaryTitle)).toBeNull();
+      expect(syncDailyScore).not.toHaveBeenCalled();
+      const updated = jest.mocked(updateCard).mock.calls[0][1];
+      expect(updated.reps).toBe(firstCard.reps + 1);
+      expect(updated.state).toBe(State.Learning);
+      await reveal(view);
+      fireEvent.press(getTextButton(view, s.flashcardsEasy));
+      await waitFor(() => expect(view.getByText(s.flashcardsSummaryTitle)).toBeTruthy());
+      const row = view.UNSAFE_getAllByType(Card).find((card) => within(card).queryByText(s.flashcardsSummaryReviewed));
+      if (!row) throw new Error("Missing summary row");
+      expect(within(row).getByText("2")).toBeTruthy();
+      expect(jest.mocked(updateCard).mock.calls[1][1].reps).toBe(updated.reps + 1);
+      expect(jest.mocked(insertStudyLog).mock.calls[1][3]).toBe(State.Learning);
+      expect(computeReviewPoints).toHaveBeenCalledTimes(2);
+      expect(addTodayPoints).not.toHaveBeenCalled();
+      expect(syncDailyScore).toHaveBeenCalledTimes(1);
+      expect(updateProfileStats).toHaveBeenCalledTimes(1);
+      fireEvent.press(getTextButton(view, s.flashcardsSummaryDone));
+      expect(mockRouterReplace).toHaveBeenCalledWith("/(tabs)/home");
+    });
+
+    it.each(["card", "log"] as const)(
+      "keeps the current card and allows retry after a rejected %s write",
+      async (stage) => {
+        const failure = new Error("synthetic " + stage + " failure");
+        const warning = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+        if (stage === "card") jest.mocked(updateCard).mockRejectedValueOnce(failure);
+        else jest.mocked(insertStudyLog).mockRejectedValueOnce(failure);
+        const view = renderSession();
+        await reveal(view);
+        fireEvent.press(getTextButton(view, s.flashcardsEasy));
+        await waitFor(() => expect(view.getByText(s.flashcardsReviewSaveFailed)).toBeTruthy());
+        expect(view.queryByText(secondCue)).toBeNull();
+        expect(computeReviewPoints).not.toHaveBeenCalled();
+        expect(recordAchievementEvent).not.toHaveBeenCalled();
+        expect(insertStudyLog).toHaveBeenCalledTimes(stage === "card" ? 0 : 1);
+        expect(warning).toHaveBeenCalledWith("[FlashcardSession] Failed to grade card:", failure);
+        fireEvent.press(getTextButton(view, s.flashcardsEasy));
+        await waitFor(() => expect(view.getByText(secondCue)).toBeTruthy());
+        expect(view.queryByText(s.flashcardsReviewSaveFailed)).toBeNull();
+        expect(updateCard).toHaveBeenCalledTimes(2);
+        expect(computeReviewPoints).toHaveBeenCalledTimes(1);
+      },
+    );
+
+    it("reports optional score and achievement failures while advancing after durable writes", async () => {
+      const failure = new Error("synthetic optional failure");
+      const warning = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+      jest.mocked(computeReviewPoints).mockReturnValue(4);
+      jest.mocked(addTodayPoints).mockRejectedValueOnce(failure);
+      jest.mocked(recordAchievementEvent).mockRejectedValueOnce(failure);
+      const view = renderSession();
+      await reveal(view);
+      fireEvent.press(getTextButton(view, s.flashcardsEasy));
+      await waitFor(() => expect(view.getByText(secondCue)).toBeTruthy());
+      expect(insertStudyLog).toHaveBeenCalledTimes(1);
+      expect(warning).toHaveBeenCalledWith(failure);
+      expect(view.queryByText(s.flashcardsReviewSaveFailed)).toBeNull();
+    });
+
+    it("cancels pending settings on unmount before starting queue loading", async () => {
+      const settings = createDeferred<DeckReviewSettings>();
+      jest.mocked(readDeckReviewSettings).mockReturnValueOnce(settings.promise);
+      const view = renderSession();
+      expect(readDeckReviewSettings).toHaveBeenCalledTimes(1);
+      view.unmount();
+      await act(async () => settings.resolve(reviewSettings));
+      expect(getStudyStreak).not.toHaveBeenCalled();
+      expect(getDueCardsForReview).not.toHaveBeenCalled();
+    });
+
+    it("cancels pending queue loading before fetching card content after unmount", async () => {
+      const queue = createDeferred<StudyCardRow[]>();
+      jest.mocked(getDueCardsForReview).mockReturnValueOnce(queue.promise);
+      const view = renderSession();
+      await waitFor(() => expect(getDueCardsForReview).toHaveBeenCalledTimes(1));
+      view.unmount();
+      await act(async () => queue.resolve([firstCard]));
+      expect(getSmartCardContent).not.toHaveBeenCalled();
+      expect(updateCard).not.toHaveBeenCalled();
+      expect(mockRouterReplace).not.toHaveBeenCalled();
+    });
+
+    it("shows a failed queue load as an empty summary with an error and no review side effects", async () => {
+      const failure = new Error("synthetic queue failure");
+      const warning = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+      jest.mocked(getDueCardsForReview).mockRejectedValueOnce(failure);
+      const view = renderSession();
+      await waitFor(() => expect(view.getByText(s.genericActionFailed)).toBeTruthy());
+      expect(view.getByText(s.flashcardsSummaryTitle)).toBeTruthy();
+      expect(warning).toHaveBeenCalledWith("[FlashcardSession] Failed to load session:", failure);
+      expect(updateCard).not.toHaveBeenCalled();
+      expect(insertStudyLog).not.toHaveBeenCalled();
+      expect(syncDailyScore).not.toHaveBeenCalled();
+    });
+  });
 });

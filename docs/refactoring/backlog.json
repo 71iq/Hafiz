@@ -1598,17 +1598,17 @@
       ],
       "risk": "high",
       "approved": true,
-      "status": "retry",
+      "status": "verified",
       "allowed_paths": [
         "tests/unit/session-due-date.test.tsx"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "implementation_mode": "copy-only",
       "readiness_evidence": ".refactor-baseline/rf020-session-orchestration-v1/integrity-helper-recovery-v3/readiness.md",
       "primary_preparation_evidence": ".refactor-baseline/rf020-session-orchestration-v1/integrity-helper-recovery-v3/readiness.md",
-      "started_at": "2026-11-02T07:05:31.748259+00:00",
-      "failure": "Verification failed: ['python3', '-B', '-c', \"import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf020-session-orchestration-v1/daytime-clock-recovery-v2/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='4d564c5ee617c505dfe3c21797bd68627f6de47c89b9d8b1d45cc90bbe1f54f9';runpy.run_path('.refactor-baseline/rf020-session-orchestration-v1/daytime-clock-recovery-v2/verify.py',run_name='__main__')\"]; see .ralph/runs/RF-020-2-1793603131750667058/verify-0.log",
-      "evidence": ".ralph/runs/RF-020-2-1793603131750667058",
+      "started_at": "2026-11-02T07:08:43.733463+00:00",
+      "failure": "Batch resource limit reached",
+      "evidence": ".ralph/runs/RF-020-1-1793603323735732714",
       "primary_recovery_evidence": ".refactor-baseline/rf020-session-orchestration-v1/integrity-helper-recovery-v3/diagnosis.md",
       "continuation_authorization": ".refactor-baseline/modernization-standing-continuation-2026-11-01.json",
       "attempt_count_stop_waived_by_user": true,
@@ -1616,7 +1616,9 @@
       "additional_attempt_controller_counter_base": 0,
       "additional_attempt_historical_offset": 2,
       "historical_total_ordinary_attempts_spent": 2,
-      "authorized_additional_attempts_used": 0
+      "authorized_additional_attempts_used": 0,
+      "completed_at": "2026-11-02T07:11:45.916523+00:00",
+      "summary": "Installed the exact RF-020 artifact by copy-only handoff."
     },
     {
       "id": "RF-021",
