@@ -1622,31 +1622,40 @@
     },
     {
       "id": "RF-021",
-      "title": "Simplify review-session state through tested boundaries",
-      "description": "Simplify review-session state through tested boundaries",
+      "title": "Extract ordered review persistence behind the tested session boundary",
+      "description": "Move the existing awaited card/log write sequence into a feature-local typed persistence operation. Preserve scheduling, query side effects, partial failure and all route state/UI behavior.",
       "rationale": "Reduce coupled state only where tests show an ownership boundary.",
       "modules": [
         "app/flashcards/session.tsx",
-        "components/flashcards/*",
-        "lib/fsrs/*",
-        "tests/unit/review-session.test.tsx"
+        "lib/fsrs/persist-review.ts",
+        "docs/refactoring/ARCHITECTURE.md"
       ],
       "dependencies": [
         "RF-020"
       ],
       "acceptance_criteria": [
-        "One independently named extraction, with current persistence/error/session behavior.",
-        "No mega-hook replacement or changed scheduling policy."
+        "Read AGENTS, ARCHITECTURE, CONVENTIONS, TECH_STACK, RUNBOOK, current task, .refactor-baseline/rf021-review-persistence-v1/readiness.md, reuse.md and artifacts.json. Separately actually read sed -n '1,8p' docs/refactoring/PROGRESS.md and sed -n '1127,1127p' docs/refactoring/PROGRESS.md. Opening mission/current Primary prepares RF021 ordered review persistence extraction marker must precede copies.",
+        "Copy-only three exact commands, each once in its own successful tool call: cp -- .refactor-baseline/rf021-review-persistence-v1/session.tsx app/flashcards/session.tsx; cp -- .refactor-baseline/rf021-review-persistence-v1/persist-review.ts lib/fsrs/persist-review.ts; cp -- .refactor-baseline/rf021-review-persistence-v1/ARCHITECTURE.md docs/refactoring/ARCHITECTURE.md. Only required instruction/metadata/status reads beyond copies. No engineering, source/test/helper dumps, tests/checks/hashes, packages/services/agents, state edits or commits. Report verification/review/primary acceptance pending.",
+        "Reuse pure ReviewTransition and existing updateCard/insertStudyLog without query/SQL/policy changes. Single feature-local operation awaits card then log and propagates failures. No transaction, retry, changed sync semantics or altered partial-save contract. Route retains guard/refs/state/requeue/counters/scoring/achievements/sync/errors/UI. Requeue construction after successful writes is pure and uses unchanged captured immutable data.",
+        "Whole route must reverse exactly after prescribed block/import restoration. Every old test, query, source/native/config/asset/lock input outside three allowed paths stays byte-identical. No broad formatting or mega-hook. Preserve two actual helper mutation failures, unchanged49 route/domain/score cases and existing five warning parity. New helper lint --max-warnings=0 and format pass.",
+        "All nine fresh controller gates, including49 focused tests/types/diagnostic parity/three platform graphs/web export/integrity/whitespace, required. New stronger Astra inspects three-file diff, actual query/scheduler callers, typed API, unchanged test inputs, mutation proofs, every generator item type/actual reads/three copies and no prohibited work. Released-lease primary acceptance required. No manual UI/device/native compile claim. Local only, no push/merge/deploy/production/original/protected-input changes."
       ],
       "verification": [
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf021-review-persistence-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='b93912c6124f22f2cfa52b21ee0a837bc6c4dd9b4ee5b67766b0e103b059603e';runpy.run_path('.refactor-baseline/rf021-review-persistence-v1/verify.py',run_name='__main__')"
+        ],
         [
           "npm",
           "run",
           "test:unit",
           "--",
           "--runTestsByPath",
-          "tests/unit/review-session.test.tsx",
-          "tests/unit/fsrs-review-transition.test.ts"
+          "tests/unit/session-due-date.test.tsx",
+          "tests/unit/fsrs-review-transition.test.ts",
+          "tests/unit/fsrs-scoring.test.ts"
         ],
         [
           "npm",
@@ -1654,21 +1663,49 @@
           "typecheck"
         ],
         [
+          "python3",
+          "-B",
+          ".refactor-baseline/rf021-review-persistence-v1/lint.py"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "lib/fsrs/persist-review.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
           "npm",
           "run",
           "build:web"
+        ],
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf021-review-persistence-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='b93912c6124f22f2cfa52b21ee0a837bc6c4dd9b4ee5b67766b0e103b059603e';runpy.run_path('.refactor-baseline/rf021-review-persistence-v1/verify.py',run_name='__main__')"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
         ]
       ],
       "risk": "high",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
         "app/flashcards/session.tsx",
-        "components/flashcards/*",
-        "lib/fsrs/*",
-        "tests/unit/review-session.test.tsx"
+        "lib/fsrs/persist-review.ts",
+        "docs/refactoring/ARCHITECTURE.md"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "implementation_mode": "copy-only",
+      "readiness_evidence": ".refactor-baseline/rf021-review-persistence-v1/readiness.md",
+      "primary_preparation_evidence": ".refactor-baseline/rf021-review-persistence-v1/readiness.md"
     },
     {
       "id": "RF-022",
