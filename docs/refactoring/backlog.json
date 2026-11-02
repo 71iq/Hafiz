@@ -1524,28 +1524,36 @@
     {
       "id": "RF-020",
       "title": "Characterize review-session orchestration",
-      "description": "Characterize review-session orchestration",
+      "description": "Add direct actual-route orchestration characterization inside the existing session fixture, without changing production code or duplicating the fixture.",
       "rationale": "Transition extraction already exists; remaining orchestration needs direct regression tests.",
       "modules": [
-        "app/flashcards/session.tsx",
-        "lib/fsrs/*",
-        "tests/unit/review-session.test.tsx"
+        "tests/unit/session-due-date.test.tsx"
       ],
       "dependencies": [
         "RF-008"
       ],
       "acceptance_criteria": [
-        "Cover persistence order, same-day requeue, score inputs, cancellation and failures.",
-        "Keep review-transition as the existing domain owner. Identify the next smallest extraction."
+        "Read AGENTS, ARCHITECTURE, CONVENTIONS, TECH_STACK, RUNBOOK, current task, .refactor-baseline/rf020-session-orchestration-v1/readiness.md, reuse.md and artifacts.json. Separately actually read sed -n '1,8p' docs/refactoring/PROGRESS.md and sed -n '1111,1111p' docs/refactoring/PROGRESS.md. Opening mission/current Primary prepares RF020 session orchestration characterization marker must precede copy.",
+        "Copy-only one exact command in its own successful tool call: cp -- .refactor-baseline/rf020-session-orchestration-v1/session-due-date.test.tsx tests/unit/session-due-date.test.tsx. Only required instruction/metadata/status reads beyond copy. No source/test/helper dumps, engineering, tests/checks/hashes, packages/services/agents, state edits or commits. Report controller verification, independent review and primary acceptance pending.",
+        "Extend existing actual route fixture. All old test sections must reverse to original bytes. Eight new cases cover awaited card then log before scoring/advance, duplicate-grade gate, original difficulty/stability/streak scoring, updated-row same-day requeue and final summary, card/log failures and retry, optional achievement/score failures, settings and queue cancellation, failed queue load. Use real review-transition/scheduler and real route controls; do not mock the orchestration under test.",
+        "Keep every application/domain/helper/native/config/asset/lock input unchanged. Preserve initial fixture failures, formatting failure and redundant guard probe. Four real source mutation classes must fail unchanged assertions; no assertions weakened. Tests characterize current partial persistence and load cancellation, not atomicity, aborting grading, visual parity or device behavior.",
+        "Reuse fixture/services/domain transition, no new production helper or parallel coordinator. RF021 next smallest candidate is durable grade persistence, leaving route-owned queue/error/ref/state orchestration intact; no extraction in RF020.",
+        "All seven fresh controller gates must pass. Separate stronger Astra inspects full test diff, all old test/input/frozen hashes, failure/mutation evidence and every generator item type/actual reads/copy for prohibited work. Released-lease primary acceptance required. No manual UI/device/build claim. Local commits only, no push/merge/deploy/production/original checkout/protected-input change."
       ],
       "verification": [
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf020-session-orchestration-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='3a2be234a8ba3dcea4b1734f35594a2f6459c7088b944cd29f85ad1045162db0';runpy.run_path('.refactor-baseline/rf020-session-orchestration-v1/verify.py',run_name='__main__')"
+        ],
         [
           "npm",
           "run",
           "test:unit",
           "--",
           "--runTestsByPath",
-          "tests/unit/review-session.test.tsx",
+          "tests/unit/session-due-date.test.tsx",
           "tests/unit/fsrs-review-transition.test.ts",
           "tests/unit/fsrs-scoring.test.ts"
         ],
@@ -1553,17 +1561,39 @@
           "npm",
           "run",
           "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "tests/unit/session-due-date.test.tsx",
+          "--max-warnings=0"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "tests/unit/session-due-date.test.tsx"
+        ],
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf020-session-orchestration-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='3a2be234a8ba3dcea4b1734f35594a2f6459c7088b944cd29f85ad1045162db0';runpy.run_path('.refactor-baseline/rf020-session-orchestration-v1/verify.py',run_name='__main__')"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
         ]
       ],
       "risk": "high",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
-        "app/flashcards/session.tsx",
-        "lib/fsrs/*",
-        "tests/unit/review-session.test.tsx"
+        "tests/unit/session-due-date.test.tsx"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "implementation_mode": "copy-only",
+      "readiness_evidence": ".refactor-baseline/rf020-session-orchestration-v1/readiness.md",
+      "primary_preparation_evidence": ".refactor-baseline/rf020-session-orchestration-v1/readiness.md"
     },
     {
       "id": "RF-021",
