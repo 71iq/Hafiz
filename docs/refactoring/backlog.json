@@ -339,13 +339,14 @@
     },
     {
       "id": "RF-008",
-      "title": "Resolve remaining Expo diagnostics",
-      "description": "Resolve the remaining lint-preset and native/app-config ownership findings after accepted SDK55 alignment. Fresh 2026-11-01 metadata reports five SDK package recommendations, including three additional patch recommendations and bottom-tabs minor preference. RF114 isolates lint-preset alignment while preserving all active rules; this umbrella retains native ownership, remaining recommendations and maintenance decisions.",
-      "rationale": "RF-067 isolates the verified runtime/package alignment. This umbrella still owns full Expo diagnostics, lint coverage/maintenance and the committed-native configuration decision.",
+      "title": "Resolve native configuration ownership with explicit policy and drift checks",
+      "description": "Retain committed Android as native owner and document every Doctor field plus explicit verification limits. Add bounded mirrored-metadata/resource guard; preserve raw Doctor19/20 warning without exclusions or regeneration. Accepted prerequisite slices own package/lint/runtime alignment.",
+      "rationale": "The remaining non-CNG diagnostic identifies ownership ambiguity. An explicit committed-native policy with drift checks resolves that decision while keeping manual native maintenance and verification limits visible.",
       "modules": [
         "package.json",
-        "package-lock.json",
-        "patches/*",
+        "scripts/check-native-config.py",
+        "scripts/tests/test_native_config.py",
+        "docs/refactoring/NATIVE_OWNERSHIP.md",
         "docs/refactoring/TECH_STACK.md"
       ],
       "dependencies": [
@@ -356,23 +357,46 @@
         "RF-116"
       ],
       "acceptance_criteria": [
-        "Use Expo recommended SDK55 versions, inspect existing patches and preserve native APIs.",
-        "Remove direct expo-modules-core only after confirming callers/autolinking.",
-        "Verify no duplicate native modules. Split native changes from major upgrades.",
-        "Keep current enabled lint rules. The isolated eslint-config-expo 55.0.1 preflight lost nine active React Hooks rules despite zero errors. Do not downgrade the preset or exclude a diagnostic merely to satisfy version matching. Primary engineer must choose and document a compatible toolchain or justified exception before this item is approved.",
-        "RF-067 now has a proven standard-resolution, full graph and strict-idempotent-lock preflight in SDK55_ALIGNMENT.md. Keep the original failed experiments as evidence, not as a permanent upgrade blocker. After RF-067, review actual remaining full-project diagnostics without weakening lint rules or hiding native configuration debt."
+        "Read AGENTS,ARCHITECTURE,CONVENTIONS,TECH_STACK,RUNBOOK,current task,.refactor-baseline/rf008-native-ownership-v1/readiness.md and artifacts.json. Separately execute/read sed -n '1,8p' docs/refactoring/PROGRESS.md and sed -n '1097,1097p' docs/refactoring/PROGRESS.md before copies. Actual opening mission/latest Primary prepares RF008 committed native ownership policy entry required.",
+        "Copy-only: each exact command once in its own successful tool call: cp -- .refactor-baseline/rf008-native-ownership-v1/package.json package.json; cp -- .refactor-baseline/rf008-native-ownership-v1/check-native-config.py scripts/check-native-config.py; cp -- .refactor-baseline/rf008-native-ownership-v1/test_native_config.py scripts/tests/test_native_config.py; cp -- .refactor-baseline/rf008-native-ownership-v1/NATIVE_OWNERSHIP.md docs/refactoring/NATIVE_OWNERSHIP.md; cp -- .refactor-baseline/rf008-native-ownership-v1/TECH_STACK.md docs/refactoring/TECH_STACK.md. Only required instruction/metadata/status reads besides five copies. No source/test/helper dumps,engineering,checks/hashes/tests,packages/services/agents,state edits or commits. Report fresh controller verification,new independent review and primary acceptance pending.",
+        "Primary decision keeps committed Android owner,app.json Expo/web metadata plus explicitly mirrored subset. New document maps every non-CNG field and guard limits. Preserve all app.json/native/resources/assets/lock/runtime dependencies/overrides bytes. Manifest adds only check:native-config script. No prebuild,exclusions,suppression,SDK major upgrade or native project regeneration.",
+        "Guard validates current identity/version,orientation,browsable activity scheme,predictive back/RTL,automatic-DayNight declaration,splash/adaptive colors/resource references,source existence,current plugin list and absent iOS project. Nine unittest methods with independent fixture mutations and malformed-XML CLI failure must pass. It is deliberately not full config synchronization,bitmap equivalence,plugin effects or native runtime certification.",
+        "Raw package check must exit0; raw Doctor exits1 with19/20 and exactly known non-CNG ownership finding kept visible. This task accepts reviewed ownership policy/guard, not20/20 or removal of manual maintenance. Fresh native graphs/types/full unit/web export pass. Existing lint68/security/maintenance debt remainsRF044/RF090. RF040/041/042/048 retain native/device/UI acceptance; existing RF116 compile evidence not claimed as new runtime proof.",
+        "New stronger Astra independently inspects full five-file diff,new CLI/fixtures/limits,known Doctor exception,package/lock/input pins and every generator event type/actual reads/copies. Reject native or config mutation,unverified parity claims,ignored diagnostics or weakened tests. All11 fresh controller gates and released-lease primary acceptance required. Standing continuation permission applies; resource/usage/lease limits unchanged. Local commits only,no push/merge/deploy/production/protected/original checkout changes."
       ],
       "verification": [
         [
-          "npx",
-          "expo",
-          "install",
-          "--check"
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf008-native-ownership-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='f255c9c22265222645e3e2100c07ac6e12675605f07bdc52d56084504179ae39';runpy.run_path('.refactor-baseline/rf008-native-ownership-v1/verify.py',run_name='__main__')"
         ],
         [
           "npm",
           "run",
-          "diagnose:expo"
+          "check:native-config"
+        ],
+        [
+          "python3",
+          "-B",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "scripts/tests",
+          "-p",
+          "test_native_config.py",
+          "-v"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "package.json"
+        ],
+        [
+          "python3",
+          "-B",
+          ".refactor-baseline/rf008-native-ownership-v1/diagnostics.py"
         ],
         [
           "node",
@@ -392,19 +416,33 @@
           "npm",
           "run",
           "build:web"
+        ],
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf008-native-ownership-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='f255c9c22265222645e3e2100c07ac6e12675605f07bdc52d56084504179ae39';runpy.run_path('.refactor-baseline/rf008-native-ownership-v1/verify.py',run_name='__main__')"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
         ]
       ],
       "risk": "high",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
         "package.json",
-        "package-lock.json",
-        "patches/*",
+        "scripts/check-native-config.py",
+        "scripts/tests/test_native_config.py",
+        "docs/refactoring/NATIVE_OWNERSHIP.md",
         "docs/refactoring/TECH_STACK.md"
       ],
       "attempts": 0,
-      "primary_preparation_evidence": ".refactor-baseline/rf116-expo-patches-v1/readiness.md"
+      "primary_preparation_evidence": ".refactor-baseline/rf008-native-ownership-v1/readiness.md",
+      "implementation_mode": "copy-only",
+      "readiness_evidence": ".refactor-baseline/rf008-native-ownership-v1/readiness.md"
     },
     {
       "id": "RF-009",
