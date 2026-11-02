@@ -1855,46 +1855,103 @@
     {
       "id": "RF-024",
       "title": "Introduce feature-local query keys where shared callers need them",
-      "description": "Introduce feature-local query keys where shared callers need them",
+      "description": "Centralize exact existing reflection query keys and their matching invalidation prefixes through one pure feature-local factory. Preserve cache and caller behavior, with real pagination tests.",
       "rationale": "Key construction/invalidation is repeated in community/profile UI.",
       "modules": [
-        "lib/reflections/*",
-        "components/reflections/*",
         "app/(tabs)/reflection-feed.tsx",
+        "components/reflections/ReflectionsSection.tsx",
+        "components/reflections/CommentsSheet.tsx",
+        "components/reflections/WriteReflectionSheet.tsx",
+        "components/profile/ProfileModalContent.tsx",
+        "lib/reflections/query-keys.ts",
         "tests/unit/reflection-query-keys.test.ts"
       ],
       "dependencies": [
         "RF-023"
       ],
       "acceptance_criteria": [
-        "Include all result inputs and viewer identity. Preserve public/private cache separation.",
-        "Migrate matching callers and invalidations together, with pagination tests."
+        "Actually read AGENTS, ARCHITECTURE, CONVENTIONS, TECH_STACK, RUNBOOK, current task, .refactor-baseline/rf024-reflection-keys-v1/readiness.md, reuse.md, react-review.md and artifacts.json. Actual separate progress reads1,8p and 1169,1169p before all copies; marker Primary prepares RF024 exact reflection query-key factories.",
+        "Copy-only seven exact cp -- commands from readiness, each in its own successful tool call. Only required instruction/metadata/status reads beyond copies. No engineering/source/test/helper/artifact dumps, tests/checks/hashes, packages/services/agents, state edits or commits. Controller verification/review/primary acceptance pending.",
+        "Pure feature-local keys import existing domain types only. Preserve exact tuple positions/values/undefined/null/references, result inputs and viewer identity. Match all family/ayah invalidations in feed/section/writer/profile. Whole five callers reverse exactly; no fetch/enabled/staleness/pageParam/state/mutation/UI/auth/sync policy change. Public profile/leaderboard/options/local keys remain separate. RF025 identity defects remain open.",
+        "25 literal/hash/cache/infinite-page tests pass against isolated old-literal adapter and factory.37 focused including12 existing feed cases, types, exact three caller-warning parity, new-file zero-warning lint/format, three graphs/web export and unchanged four RF023 current-failure probes required. Three lost-key-field/prefix mutations fail. No permanent unsafe expectations, new dependency/protected/native change or manual UI/device/native/full-suite claim.",
+        "All ten fresh controller gates and separate stronger Astra full seven-file/tuple/prefix/caller reversal/old input/frozen baseline/mutation/real pagination/all-event/read/seven-copy review required, followed by released-lease primary acceptance. Preserve all evidence. Local only, no push/merge/deploy/production/original/protected-input change."
       ],
       "verification": [
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf024-reflection-keys-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='ee54f23093687e475574d15b9181aadc0f52e518947c78b87d197b0bd1001799';runpy.run_path('.refactor-baseline/rf024-reflection-keys-v1/verify.py',run_name='__main__')"
+        ],
         [
           "npm",
           "run",
           "test:unit",
           "--",
           "--runTestsByPath",
-          "tests/unit/reflection-query-keys.test.ts"
+          "tests/unit/reflection-query-keys.test.ts",
+          "tests/unit/reflection-feed-juz-policy.test.tsx"
         ],
         [
           "npm",
           "run",
           "typecheck"
+        ],
+        [
+          "python3",
+          "-B",
+          ".refactor-baseline/rf024-reflection-keys-v1/lint.py"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "lib/reflections/query-keys.ts",
+          "tests/unit/reflection-query-keys.test.ts"
+        ],
+        [
+          "node_modules/.bin/jest",
+          "--runInBand",
+          "--config",
+          ".refactor-baseline/rf023-account-audit-v3/probe-jest-config.json"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf024-reflection-keys-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='ee54f23093687e475574d15b9181aadc0f52e518947c78b87d197b0bd1001799';runpy.run_path('.refactor-baseline/rf024-reflection-keys-v1/verify.py',run_name='__main__')"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
         ]
       ],
       "risk": "high",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
-        "lib/reflections/*",
-        "components/reflections/*",
         "app/(tabs)/reflection-feed.tsx",
+        "components/reflections/ReflectionsSection.tsx",
+        "components/reflections/CommentsSheet.tsx",
+        "components/reflections/WriteReflectionSheet.tsx",
+        "components/profile/ProfileModalContent.tsx",
+        "lib/reflections/query-keys.ts",
         "tests/unit/reflection-query-keys.test.ts"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "implementation_mode": "copy-only",
+      "readiness_evidence": ".refactor-baseline/rf024-reflection-keys-v1/readiness.md",
+      "primary_preparation_evidence": ".refactor-baseline/rf024-reflection-keys-v1/readiness.md"
     },
     {
       "id": "RF-025",
