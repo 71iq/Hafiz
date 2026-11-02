@@ -1533,19 +1533,20 @@
         "RF-008"
       ],
       "acceptance_criteria": [
-        "Read AGENTS, ARCHITECTURE, CONVENTIONS, TECH_STACK, RUNBOOK, current task, .refactor-baseline/rf020-session-orchestration-v1/readiness.md, reuse.md and artifacts.json. Separately actually read sed -n '1,8p' docs/refactoring/PROGRESS.md and sed -n '1111,1111p' docs/refactoring/PROGRESS.md. Opening mission/current Primary prepares RF020 session orchestration characterization marker must precede copy.",
-        "Copy-only one exact command in its own successful tool call: cp -- .refactor-baseline/rf020-session-orchestration-v1/session-due-date.test.tsx tests/unit/session-due-date.test.tsx. Only required instruction/metadata/status reads beyond copy. No source/test/helper dumps, engineering, tests/checks/hashes, packages/services/agents, state edits or commits. Report controller verification, independent review and primary acceptance pending.",
+        "Read AGENTS, ARCHITECTURE, CONVENTIONS, TECH_STACK, RUNBOOK, current task, .refactor-baseline/rf020-session-orchestration-v1/daytime-clock-recovery-v2/readiness.md, reuse.md and artifacts.json. Separately actually read sed -n '1,8p' docs/refactoring/PROGRESS.md and sed -n '1115,1115p' docs/refactoring/PROGRESS.md. Opening mission/current Primary repairs RF020 deterministic review clock marker must precede copy.",
+        "Copy-only one exact command in its own successful tool call: cp -- .refactor-baseline/rf020-session-orchestration-v1/daytime-clock-recovery-v2/session-due-date.test.tsx tests/unit/session-due-date.test.tsx. Only required instruction/metadata/status reads beyond copy. No source/test/helper dumps, engineering, tests/checks/hashes, packages/services/agents, state edits or commits. Report controller verification, independent review and primary acceptance pending.",
         "Extend existing actual route fixture. All old test sections must reverse to original bytes. Eight new cases cover awaited card then log before scoring/advance, duplicate-grade gate, original difficulty/stability/streak scoring, updated-row same-day requeue and final summary, card/log failures and retry, optional achievement/score failures, settings and queue cancellation, failed queue load. Use real review-transition/scheduler and real route controls; do not mock the orchestration under test.",
         "Keep every application/domain/helper/native/config/asset/lock input unchanged. Preserve initial fixture failures, formatting failure and redundant guard probe. Four real source mutation classes must fail unchanged assertions; no assertions weakened. Tests characterize current partial persistence and load cancellation, not atomicity, aborting grading, visual parity or device behavior.",
         "Reuse fixture/services/domain transition, no new production helper or parallel coordinator. RF021 next smallest candidate is durable grade persistence, leaving route-owned queue/error/ref/state orchestration intact; no extraction in RF020.",
-        "All seven fresh controller gates must pass. Separate stronger Astra inspects full test diff, all old test/input/frozen hashes, failure/mutation evidence and every generator item type/actual reads/copy for prohibited work. Released-lease primary acceptance required. No manual UI/device/build claim. Local commits only, no push/merge/deploy/production/original checkout/protected-input change."
+        "All eight fresh controller gates must pass. Separate stronger Astra inspects full test diff, all old test/input/frozen hashes, failure/mutation evidence and every generator item type/actual reads/copy for prohibited work. Released-lease primary acceptance required. No manual UI/device/build claim. Local commits only, no push/merge/deploy/production/original checkout/protected-input change.",
+        "Actually read .refactor-baseline/rf020-session-orchestration-v1/daytime-clock-recovery-v2/correction.md before copy. Freeze local noon only in the new nested describe and restore timers after cleanup. Preserve first failed attempt and original evidence unchanged. Correct claim: cleanup mutation fails only queue cancellation; settings guard is not mutation-certified. All old test sections reverse exactly; four mutation classes still fail, UTC49 and New York8 pass. Do not reset attempt count."
       ],
       "verification": [
         [
           "python3",
           "-B",
           "-c",
-          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf020-session-orchestration-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='3a2be234a8ba3dcea4b1734f35594a2f6459c7088b944cd29f85ad1045162db0';runpy.run_path('.refactor-baseline/rf020-session-orchestration-v1/verify.py',run_name='__main__')"
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf020-session-orchestration-v1/daytime-clock-recovery-v2/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='4d564c5ee617c505dfe3c21797bd68627f6de47c89b9d8b1d45cc90bbe1f54f9';runpy.run_path('.refactor-baseline/rf020-session-orchestration-v1/daytime-clock-recovery-v2/verify.py',run_name='__main__')"
         ],
         [
           "npm",
@@ -1573,10 +1574,20 @@
           "tests/unit/session-due-date.test.tsx"
         ],
         [
+          "env",
+          "TZ=America/New_York",
+          "node_modules/.bin/jest",
+          "--runInBand",
+          "--runTestsByPath",
+          "tests/unit/session-due-date.test.tsx",
+          "-t",
+          "review-session persistence orchestration"
+        ],
+        [
           "python3",
           "-B",
           "-c",
-          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf020-session-orchestration-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='3a2be234a8ba3dcea4b1734f35594a2f6459c7088b944cd29f85ad1045162db0';runpy.run_path('.refactor-baseline/rf020-session-orchestration-v1/verify.py',run_name='__main__')"
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf020-session-orchestration-v1/daytime-clock-recovery-v2/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='4d564c5ee617c505dfe3c21797bd68627f6de47c89b9d8b1d45cc90bbe1f54f9';runpy.run_path('.refactor-baseline/rf020-session-orchestration-v1/daytime-clock-recovery-v2/verify.py',run_name='__main__')"
         ],
         [
           "git",
@@ -1586,14 +1597,17 @@
       ],
       "risk": "high",
       "approved": true,
-      "status": "pending",
+      "status": "retry",
       "allowed_paths": [
         "tests/unit/session-due-date.test.tsx"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "implementation_mode": "copy-only",
-      "readiness_evidence": ".refactor-baseline/rf020-session-orchestration-v1/readiness.md",
-      "primary_preparation_evidence": ".refactor-baseline/rf020-session-orchestration-v1/readiness.md"
+      "readiness_evidence": ".refactor-baseline/rf020-session-orchestration-v1/daytime-clock-recovery-v2/readiness.md",
+      "primary_preparation_evidence": ".refactor-baseline/rf020-session-orchestration-v1/daytime-clock-recovery-v2/readiness.md",
+      "started_at": "2026-11-02T06:58:40.012052+00:00",
+      "failure": "Independent review failed: [P2] tests/unit/session-due-date.test.tsx:1695 uses the live clock for same-day requeue. At 23:59:30, the real scheduler schedules Again at 00:00:30, so the route correctly finishes instead of showing Reveal. A read-only scheduler probe confirmed this. Freeze a daytime clock within the new tests, restore it afterward, and regenerate the frozen artifact before repeating acceptance gates.; [P2] .refactor-baseline/rf020-session-orchestration-v1/mutations.json:8 and docs/refactoring/PROGRESS.md:1111 claim both cancellation tests failed. mutation-cancel-lifecycle.log:30-31 shows settings cancellation passed and only queue cancellation failed. Correct the evidence claims while preserving the original logs.; Otherwise, all seven recorded controller gates passed, including 49 tests. Independent hash/reversal verification and git diff --check passed. The generator performed permitted reads and exactly one copy, without prohibited checks or dumps. Production inputs remain unchanged; no untracked task files exist. No manual UI/device/build verification was performed or required for this test-only scope. Released-lease primary acceptance remains pending.",
+      "evidence": ".ralph/runs/RF-020-1-1793602720014154123"
     },
     {
       "id": "RF-021",
