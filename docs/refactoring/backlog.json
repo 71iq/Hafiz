@@ -1715,21 +1715,29 @@
     {
       "id": "RF-022",
       "title": "Characterize smart-deck and queue query invariants",
-      "description": "Characterize smart-deck and queue query invariants",
+      "description": "Characterize common review queue and Qiraat-backed smart membership/materialization using actual isolated in-memory SQLite. Preserve production behavior.",
       "rationale": "Large query modules encode deck membership, limits and scheduling.",
       "modules": [
-        "lib/fsrs/queries.ts",
-        "lib/fsrs/smart-decks.ts",
         "tests/unit/smart-decks.test.ts"
       ],
       "dependencies": [
         "RF-020"
       ],
       "acceptance_criteria": [
-        "Test uniqueness, limits, ordering, empty decks, soft deletion and stable timestamps in isolated SQLite-equivalent fixtures.",
-        "Split follow-up refactors by actual invariant ownership."
+        "Read AGENTS, ARCHITECTURE, CONVENTIONS, TECH_STACK, RUNBOOK, current task, .refactor-baseline/rf022-smart-queue-v1/readiness.md, reuse.md and artifacts.json. Separately actually read sed -n '1,8p' docs/refactoring/PROGRESS.md and sed -n '1135,1135p' docs/refactoring/PROGRESS.md. Opening mission/current Primary prepares RF022 actual SQLite queue characterization marker precedes copy.",
+        "Copy-only exact command in one successful tool call: cp -- .refactor-baseline/rf022-smart-queue-v1/smart-decks.test.ts tests/unit/smart-decks.test.ts. Only required instruction/metadata/status reads beyond copy. No engineering, source/test/helper dumps, tests/checks/hashes, packages/services/agents, state edits or commits. Report fresh controller verification, independent review and primary acceptance pending.",
+        "Thirteen tests execute actual smart-deck public functions/SQL and real scheduler against isolated Node24 in-memory SQLite. Relevant study-card and Qiraat schema match canonical definitions. Synthetic rows only; no protected dataset/DB access. One documented test-only adapter cast covers exercised Expo methods; sync enqueue mocked, no SQL matcher or copied queue algorithm.",
+        "Cover due/deck/active/burial boundaries, bound query input, three new/review orders, total/new limits, due/oldest/newest/random ordering, empty decks, Qiraat membership/ranges/blank exclusion, caps/unique batching/idempotence/timestamps/deleted revival and transactional rollback/no sync after later batch failure. Preserve initial default-random fixture failures and selector correction; three final source mutations must fail unchanged assertions. No production or old-test changes, weakened assertions or disabled tests.",
+        "Scope is common queue plus Qiraat candidate/materialization paths. Other candidate kinds/all-decks/retention migration/native SQLite are not certified. Ownership stays candidate/queue functions in smart-decks, settings drafts RF058, date/streak RF063 and broad audits RF046; no source extraction here. Node24 matches current CI, no dependency addition.",
+        "All seven fresh controller gates and new separate stronger Astra review required. Reviewer inspects full test diff/adapter/actual SQL/functions/canonical schema/defaults, frozen inputs and failure/mutation evidence, all generator item types/actual required reads/exact copy and no prohibited work. Released-lease primary acceptance required. No manual UI/device/build/production claim. Local only, no push/merge/deploy/original/protected-input changes."
       ],
       "verification": [
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf022-smart-queue-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='66384d177cbab401cc6492d5ab88de52924bd820e69564816eba1daa2ae35f8e';runpy.run_path('.refactor-baseline/rf022-smart-queue-v1/verify.py',run_name='__main__')"
+        ],
         [
           "npm",
           "run",
@@ -1742,17 +1750,39 @@
           "npm",
           "run",
           "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "tests/unit/smart-decks.test.ts",
+          "--max-warnings=0"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "tests/unit/smart-decks.test.ts"
+        ],
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf022-smart-queue-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='66384d177cbab401cc6492d5ab88de52924bd820e69564816eba1daa2ae35f8e';runpy.run_path('.refactor-baseline/rf022-smart-queue-v1/verify.py',run_name='__main__')"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
         ]
       ],
       "risk": "high",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
-        "lib/fsrs/queries.ts",
-        "lib/fsrs/smart-decks.ts",
         "tests/unit/smart-decks.test.ts"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "implementation_mode": "copy-only",
+      "readiness_evidence": ".refactor-baseline/rf022-smart-queue-v1/readiness.md",
+      "primary_preparation_evidence": ".refactor-baseline/rf022-smart-queue-v1/readiness.md"
     },
     {
       "id": "RF-023",
