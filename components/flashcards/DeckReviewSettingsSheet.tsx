@@ -9,6 +9,12 @@ import { Switch } from "@/components/ui/Switch";
 import { useDatabase } from "@/lib/database/provider";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { toArabicNumber } from "@/lib/arabic";
+import {
+  clampDailyReviewLimit,
+  clampNewCardsLimit,
+  clampRequestRetention,
+  clampMaximumInterval,
+} from "@/lib/fsrs/review-settings-draft";
 import { formatStepText, parseStepText } from "@/lib/fsrs/review-step-text";
 import { readDeckReviewSettings, writeDeckReviewSettings } from "@/lib/fsrs/queries";
 import {
@@ -151,23 +157,22 @@ export function DeckReviewSettingsSheet({ visible, deckId, deckTitle, mode, onCl
 
   const setNextDailyLimit = useCallback((value: number) => {
     setError(null);
-    setDailyLimit(Math.max(MIN_DECK_DAILY_REVIEW_LIMIT, value));
+    setDailyLimit(clampDailyReviewLimit(value));
   }, []);
 
   const setNextNewCardsLimit = useCallback((value: number) => {
     setError(null);
-    setNewCardsLimit(Math.max(MIN_DECK_NEW_CARD_LIMIT, value));
+    setNewCardsLimit(clampNewCardsLimit(value));
   }, []);
 
   const setNextRetention = useCallback((value: number) => {
     setError(null);
-    const clamped = Math.max(MIN_DECK_REQUEST_RETENTION, Math.min(MAX_DECK_REQUEST_RETENTION, value));
-    setRequestRetention(Number(clamped.toFixed(2)));
+    setRequestRetention(clampRequestRetention(value));
   }, []);
 
   const setNextMaximumInterval = useCallback((value: number) => {
     setError(null);
-    setMaximumInterval(Math.max(MIN_DECK_MAXIMUM_INTERVAL, Math.min(MAX_DECK_MAXIMUM_INTERVAL, value)));
+    setMaximumInterval(clampMaximumInterval(value));
   }, []);
 
   const toggleTestMode = useCallback((value: TestMode) => {

@@ -11,6 +11,12 @@ import type { UIStrings } from "@/lib/i18n/strings";
 import { useSettings } from "@/lib/settings/context";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { SchedulerOptionsPanel } from "@/components/flashcards/DeckReviewSettingsSheet";
+import {
+  clampDailyReviewLimit,
+  clampNewCardsLimit,
+  clampRequestRetention,
+  clampMaximumInterval,
+} from "@/lib/fsrs/review-settings-draft";
 import { formatStepText, parseStepText } from "@/lib/fsrs/review-step-text";
 import {
   DEFAULT_DECK_ENABLE_FUZZ,
@@ -26,12 +32,6 @@ import {
   DEFAULT_NEW_REVIEW_ORDER,
   DEFAULT_REVIEW_SORT_ORDER,
   DEFAULT_WORD_TEST_MODES,
-  MAX_DECK_MAXIMUM_INTERVAL,
-  MAX_DECK_REQUEST_RETENTION,
-  MIN_DECK_MAXIMUM_INTERVAL,
-  MIN_DECK_DAILY_REVIEW_LIMIT,
-  MIN_DECK_NEW_CARD_LIMIT,
-  MIN_DECK_REQUEST_RETENTION,
   type DeckReviewSettings,
   type NewCardSortOrder,
   type NewReviewOrder,
@@ -190,23 +190,22 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
 
   const setNextDailyLimit = useCallback((value: number) => {
     setError(null);
-    setDailyLimit(Math.max(MIN_DECK_DAILY_REVIEW_LIMIT, value));
+    setDailyLimit(clampDailyReviewLimit(value));
   }, []);
 
   const setNextNewCardsLimit = useCallback((value: number) => {
     setError(null);
-    setNewCardsLimit(Math.max(MIN_DECK_NEW_CARD_LIMIT, value));
+    setNewCardsLimit(clampNewCardsLimit(value));
   }, []);
 
   const setNextRetention = useCallback((value: number) => {
     setError(null);
-    const clamped = Math.max(MIN_DECK_REQUEST_RETENTION, Math.min(MAX_DECK_REQUEST_RETENTION, value));
-    setRequestRetention(Number(clamped.toFixed(2)));
+    setRequestRetention(clampRequestRetention(value));
   }, []);
 
   const setNextMaximumInterval = useCallback((value: number) => {
     setError(null);
-    setMaximumInterval(Math.max(MIN_DECK_MAXIMUM_INTERVAL, Math.min(MAX_DECK_MAXIMUM_INTERVAL, value)));
+    setMaximumInterval(clampMaximumInterval(value));
   }, []);
 
   const getSurahFilter = (): BuiltInDeckFilter | null => {
