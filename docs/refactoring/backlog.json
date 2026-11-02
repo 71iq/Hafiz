@@ -1970,7 +1970,8 @@
         "tests/unit/auth-query-lifecycle.test.tsx"
       ],
       "dependencies": [
-        "RF-024"
+        "RF-024",
+        "RF-119"
       ],
       "acceptance_criteria": [
         "Test sign-in, sign-out, account switch, late responses, subscription cleanup and offline restore.",
@@ -3079,7 +3080,8 @@
         "RF-099",
         "RF-100",
         "RF-117",
-        "RF-118"
+        "RF-118",
+        "RF-119"
       ],
       "acceptance_criteria": [
         "Repeat identical clone/dead-code/native+web graph/security scopes.",
@@ -9246,6 +9248,92 @@
       "completed_at": "2026-11-02T17:52:56.179936+00:00",
       "evidence": ".ralph/runs/RF-118-1-1793641774411576921",
       "summary": "Installed the four RF-118 frozen artifacts by exact copy-only commands. Verification, independent review, and primary acceptance remain pending."
+    },
+    {
+      "id": "RF-119",
+      "title": "Isolate reflection section state by viewer and ayah",
+      "description": "Repair the reproduced fresh-cache and late-response reflection-state failures using a private keyed content owner and cached-page fallback. Broader auth lifecycle remains RF025.",
+      "rationale": "RF023 reproduced stale mirrored rows despite correct viewer keys; RF024 preserves exact query/cache contracts.",
+      "modules": [
+        "components/reflections/ReflectionsSection.tsx",
+        "tests/unit/reflection-owner.test.tsx"
+      ],
+      "dependencies": [
+        "RF-024"
+      ],
+      "acceptance_criteria": [
+        "Actually read AGENTS/ARCHITECTURE/CONVENTIONS/TECH_STACK/RUNBOOK/current task/.refactor-baseline/rf119-reflection-owner-v1/readiness.md/reuse.md/scope.md/artifacts.json. Actual separate progress1,8p and 1177,1177p before two copies. Marker Primary prepares RF119 reflection viewer ownership repair.",
+        "Copy-only two exact successful cp -- commands from readiness, each in own tool call. Only required instruction/metadata/status reads. No engineering/source/test/helper/artifact dumps, checks/tests/hashes, packages/services/agents, state edits or commits. Verification/review/primary acceptance pending.",
+        "Keep public Props. Private keyed content owner uses viewer ID and surah/ayah; deliberately reset expansion/open sub-sheets on owner change. Cached query data supplies rows/hasMore until local overrides; row callbacks keep cached base. Whole original section reverses after prescribed edits, preserving markup/query shape/fetch/staleness/refetch/manual-page retry. No promise-cancellation/backend-write/global auth/cache-eviction guarantee; same-ID session and other RF025 defects remain open.",
+        "Final10 permanent safety cases use real auth store/QueryClient/actual section with synthetic service/child boundaries. Preserve old8 failures/two controls and separately refined late-pagination red case. Final47 cases include25 key/12 feed. Four final removed-key/fallback/base mutations fail. Types/two-file zero-warning lint/new-test format/three graphs/web export and exact source/frozen integrity required. No unsafe product assertions, dependency/protected/native changes or manual browser/device/native/full-suite claim.",
+        "Nine fresh controller gates, separate stronger Astra whole diff/security scope/real cache/auth fixture/baseline/refined failures/mutations/old markup/all generator item types/required reads/two-copy review and released-lease primary acceptance mandatory. All local, no push/merge/deploy/production/original/protected changes."
+      ],
+      "verification": [
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf119-reflection-owner-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='a8ec8a59dbb303fa80e6e72dc5206857a662536d3e07be7a679b02d584435c86';runpy.run_path('.refactor-baseline/rf119-reflection-owner-v1/verify.py',run_name='__main__')"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/reflection-owner.test.tsx",
+          "tests/unit/reflection-query-keys.test.ts",
+          "tests/unit/reflection-feed-juz-policy.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "components/reflections/ReflectionsSection.tsx",
+          "tests/unit/reflection-owner.test.tsx",
+          "--max-warnings=0"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "tests/unit/reflection-owner.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf119-reflection-owner-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='a8ec8a59dbb303fa80e6e72dc5206857a662536d3e07be7a679b02d584435c86';runpy.run_path('.refactor-baseline/rf119-reflection-owner-v1/verify.py',run_name='__main__')"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
+        ]
+      ],
+      "risk": "high",
+      "approved": true,
+      "status": "pending",
+      "allowed_paths": [
+        "components/reflections/ReflectionsSection.tsx",
+        "tests/unit/reflection-owner.test.tsx"
+      ],
+      "attempts": 0,
+      "implementation_mode": "copy-only",
+      "readiness_evidence": ".refactor-baseline/rf119-reflection-owner-v1/readiness.md",
+      "primary_preparation_evidence": ".refactor-baseline/rf119-reflection-owner-v1/readiness.md"
     }
   ]
 }
