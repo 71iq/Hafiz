@@ -1800,23 +1800,24 @@
         "RF-008"
       ],
       "acceptance_criteria": [
-        "Read required project docs/current task/.refactor-baseline/rf023-account-audit-v2/readiness.md/reuse.md/preparation-correction.md/artifacts.json. Actual separate progress reads 1,8p and 1159,1159p before exact copy. Latest marker: Primary prepares RF023 offline query and auth audit.",
-        "Copy-only one successful command cp -- .refactor-baseline/rf023-account-audit-v2/QUERY_AUDIT.md docs/refactoring/QUERY_AUDIT.md. Only required instruction/metadata/status reads and copy. No source/test/helper/artifact dumps, engineering, checks, hashes, services, packages, agents, state edits or commits. Verification/review/primary acceptance remain pending.",
+        "Read required project docs/current task/.refactor-baseline/rf023-account-audit-v3/readiness.md/reuse.md/correction.md/artifacts.json. Actual separate progress reads 1,8p and 1163,1163p before exact copy. Latest marker: Primary corrects RF023 query freshness audit.",
+        "Copy-only one successful command cp -- .refactor-baseline/rf023-account-audit-v3/QUERY_AUDIT.md docs/refactoring/QUERY_AUDIT.md. Only required instruction/metadata/status reads and copy. No source/test/helper/artifact dumps, engineering, checks, hashes, services, packages, agents, state edits or commits. Verification/review/primary acceptance remain pending.",
         "Document all11 key families/12 declarations with inputs, viewer/public/local field ownership, stale/cancel/auth and invalidation ownership. Existing reflection/comment viewer keys are present. Distinguish real auth-store and rendered mirrored-state findings from retained cache/static risks. No runtime fix or permanent unsafe-behavior tests. Reproduce four unwanted behaviors with isolated actual-store/actual-component/real-QueryClient fixtures only; no live accounts/network/production.",
-        "Preserve v1 partial diagnosis and v2 hoisted-mock preparation failure/correction. Five fresh gates cover exact document/old inputs/links/inventory/read-copy evidence, four isolated probes, formatting and whitespace. Separate stronger Astra reviews complete document/source evidence/synthetic boundaries/all generator item types/actual required reads and copy. Primary acceptance mandatory. Typecheck/build/full-suite/manual UI/device/native not claimed or required for document-only change. RF024/RF025/RF026/RF027 keep separate repair ownership. No push/merge/deploy/original/protected/production changes."
+        "Preserve v1 partial diagnosis and v2 hoisted-mock preparation failure/correction. Five fresh gates cover exact document/old inputs/links/inventory/read-copy evidence, four isolated probes, formatting and whitespace. Separate stronger Astra reviews complete document/source evidence/synthetic boundaries/all generator item types/actual required reads and copy. Primary acceptance mandatory. Typecheck/build/full-suite/manual UI/device/native not claimed or required for document-only change. RF024/RF025/RF026/RF027 keep separate repair ownership. No push/merge/deploy/original/protected/production changes.",
+        "Correct explicit feed-options staleTime Infinity and database-age risk. Fresh installed TypeScript-AST inventory compares all12 actual declaration keys/staleness. Rendered probes mock auth selector and rerender; separate auth probes use real store. Preserve first independent rejection and every v1/v2 artifact/run plus ordinary attempt1. Four unwanted behaviors remain open, no runtime repair."
       ],
       "verification": [
         [
           "python3",
           "-B",
           "-c",
-          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf023-account-audit-v2/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='636f999271247455aa8e426ecc4607d8bdf709a398d9a275567127c396698fa5';runpy.run_path('.refactor-baseline/rf023-account-audit-v2/verify.py',run_name='__main__')"
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf023-account-audit-v3/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='6294c5eea0d278ce372332e063fb86edc203090d10c12dcc3506a97ef348ffc8';runpy.run_path('.refactor-baseline/rf023-account-audit-v3/verify.py',run_name='__main__')"
         ],
         [
           "node_modules/.bin/jest",
           "--runInBand",
           "--config",
-          ".refactor-baseline/rf023-account-audit-v2/probe-jest-config.json"
+          ".refactor-baseline/rf023-account-audit-v3/probe-jest-config.json"
         ],
         [
           "node_modules/.bin/prettier",
@@ -1827,7 +1828,7 @@
           "python3",
           "-B",
           "-c",
-          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf023-account-audit-v2/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='636f999271247455aa8e426ecc4607d8bdf709a398d9a275567127c396698fa5';runpy.run_path('.refactor-baseline/rf023-account-audit-v2/verify.py',run_name='__main__')"
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf023-account-audit-v3/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='6294c5eea0d278ce372332e063fb86edc203090d10c12dcc3506a97ef348ffc8';runpy.run_path('.refactor-baseline/rf023-account-audit-v3/verify.py',run_name='__main__')"
         ],
         [
           "git",
@@ -1837,14 +1838,17 @@
       ],
       "risk": "high",
       "approved": true,
-      "status": "pending",
+      "status": "retry",
       "allowed_paths": [
         "docs/refactoring/QUERY_AUDIT.md"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "implementation_mode": "copy-only",
-      "readiness_evidence": ".refactor-baseline/rf023-account-audit-v2/readiness.md",
-      "primary_preparation_evidence": ".refactor-baseline/rf023-account-audit-v2/readiness.md"
+      "readiness_evidence": ".refactor-baseline/rf023-account-audit-v3/readiness.md",
+      "primary_preparation_evidence": ".refactor-baseline/rf023-account-audit-v3/readiness.md",
+      "started_at": "2026-11-02T21:47:19.756751+00:00",
+      "failure": "Independent review failed: [P2] docs/refactoring/QUERY_AUDIT.md:15 incorrectly says reflectionFeedOptions inherits five-minute freshness. app/(tabs)/reflection-feed.tsx:138 explicitly sets staleTime: Infinity. This misstates the database-lifecycle risk: elapsed time will not make this cached result stale. Have primary correct and refreeze the artifact, preserve existing evidence, and repeat verification and review before acceptance. Generator copy-only compliance passed; all five recorded gates passed, but they missed this factual error. No runtime changes or mandatory manual-check gaps were found.",
+      "evidence": ".ralph/runs/RF-023-1-1793656039759318995"
     },
     {
       "id": "RF-024",
