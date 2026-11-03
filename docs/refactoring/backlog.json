@@ -9498,49 +9498,151 @@
       "rationale": "Local midnight epoch milliseconds divided/floored by86400000 can repeat or skip indexes when timezone offset crosses zero. Remote UTC summaries have different ownership.",
       "modules": [
         "lib/date.ts",
-        "lib/fsrs/review-activity.ts",
-        "lib/fsrs/queries.ts",
-        "lib/leaderboard/api.ts",
         "tests/unit/review-activity.test.ts",
-        "tests/unit/date-utils.test.ts"
+        "tests/unit/local-calendar-streak.test.ts"
       ],
       "dependencies": [
         "RF-063"
       ],
       "acceptance_criteria": [
-        "Pending primary design. Inspect all local-date index consumers and characterize full FSRS current-streak/wird and public streak outputs before selecting exact changes. Keep preserved RF063 old London evidence and hardcoded pre-repair expectations in ignored evidence.",
-        "Choose stable local calendar adjacency across UTC, New_York, Hebron, London spring/autumn and historical timezone/date normalization boundaries. Keep local today choice, remote UTC day indexes, sorting, duplicate/invalid input policies and all offline personal data. No data rewrite, schema/backend or auth change.",
-        "Separate semantic fix requires focused real caller regressions, all four TZ processes, types, relevant graphs/web and fresh stronger review/primary acceptance. Do not mark repaired from extraction or pure-only characterization."
+        "Actually read AGENTS/ARCHITECTURE/CONVENTIONS/TECH_STACK/RUNBOOK/whole RF120 task JSON/.refactor-baseline/rf120-calendar-index-v1/readiness.md/reuse.md/artifacts.json. Separate actual progress1,8p and 1205,1205p before copies, marker Primary prepares RF120 stable local calendar indexes.",
+        "Copy-only three exact successful cp -- commands each in own tool call. Required metadata/instruction/status reads only, no source/test/helper/artifact dumps, engineering/checks/tests/hashes/packages/services/agents/state edits/commits. Verification/review/primary acceptance pending.",
+        "Only production edit local calendar index: preserve local Date normalization then Date.UTC of local components. Preserve rollover/defaults/invalid/year0..99 and Apia skipped date normalization; keep remote UTC helper and all actual consumers byte-identical. No persisted index/data rewrite, auth/backend/dependency/protected changes.",
+        "New15 cases use actual Node24 SQLite study/wird/stats functions and actual public streak service with synthetic external response. One documented partial Expo adapter assertion follows existing fixture, not a complete native implementation. Preserve full old fixture and London12 failures/26 controls; change only two unsafe old expectations/title to four-day safety. No assertion weakening/skips.",
+        "Combined38 pass in UTC/NY/Hebron/London/Apia,190 executions plus40 nearby cases. Existing two500-run properties each zone unchanged,5000 samples. Three semantic mutations fail. Types/scoped zero-warning lint/two-test format/graphs/web/whitespace required. No live DB/network/manual UI/device/native/full-suite claim.",
+        "14 fresh controller gates, separate stronger whole diff/calendar normalization/actual callers/SQLite boundary/old safety failures/mutations/all generator event/read/three-copy review and primary acceptance mandatory. Keep local; no push/merge/deploy/production/original/protected changes."
       ],
       "verification": [
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf120-calendar-index-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='409e8a3cde9c8ed51787ced374c69d71b1d633e7ff9d69107b37368d2ac7d280';runpy.run_path('.refactor-baseline/rf120-calendar-index-v1/verify.py',run_name='__main__')"
+        ],
+        [
+          "env",
+          "TZ=UTC",
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/local-calendar-streak.test.ts",
+          "tests/unit/review-activity.test.ts",
+          "--no-cache"
+        ],
+        [
+          "env",
+          "TZ=America/New_York",
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/local-calendar-streak.test.ts",
+          "tests/unit/review-activity.test.ts",
+          "--no-cache"
+        ],
+        [
+          "env",
+          "TZ=Asia/Hebron",
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/local-calendar-streak.test.ts",
+          "tests/unit/review-activity.test.ts",
+          "--no-cache"
+        ],
+        [
+          "env",
+          "TZ=Europe/London",
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/local-calendar-streak.test.ts",
+          "tests/unit/review-activity.test.ts",
+          "--no-cache"
+        ],
+        [
+          "env",
+          "TZ=Pacific/Apia",
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/local-calendar-streak.test.ts",
+          "tests/unit/review-activity.test.ts",
+          "--no-cache"
+        ],
         [
           "npm",
           "run",
           "test:unit",
           "--",
           "--runTestsByPath",
-          "tests/unit/review-activity.test.ts",
-          "tests/unit/date-utils.test.ts"
+          "tests/unit/date-utils.test.ts",
+          "tests/unit/fsrs-scoring.test.ts",
+          "tests/unit/public-review-errors.test.ts",
+          "--no-cache"
         ],
         [
           "npm",
           "run",
           "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/date.ts",
+          "tests/unit/review-activity.test.ts",
+          "tests/unit/local-calendar-streak.test.ts",
+          "--max-warnings=0"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "tests/unit/review-activity.test.ts",
+          "tests/unit/local-calendar-streak.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf120-calendar-index-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='409e8a3cde9c8ed51787ced374c69d71b1d633e7ff9d69107b37368d2ac7d280';runpy.run_path('.refactor-baseline/rf120-calendar-index-v1/verify.py',run_name='__main__')"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
         ]
       ],
       "risk": "high",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
         "lib/date.ts",
-        "lib/fsrs/review-activity.ts",
-        "lib/fsrs/queries.ts",
-        "lib/leaderboard/api.ts",
         "tests/unit/review-activity.test.ts",
-        "tests/unit/date-utils.test.ts"
+        "tests/unit/local-calendar-streak.test.ts"
       ],
       "attempts": 0,
-      "discovery_evidence": ".refactor-baseline/rf063-review-activity-v1/dst-variants.md"
+      "discovery_evidence": ".refactor-baseline/rf063-review-activity-v1/dst-variants.md",
+      "implementation_mode": "copy-only",
+      "readiness_evidence": ".refactor-baseline/rf120-calendar-index-v1/readiness.md",
+      "primary_preparation_evidence": ".refactor-baseline/rf120-calendar-index-v1/readiness.md"
     }
   ]
 }
