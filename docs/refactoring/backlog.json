@@ -2068,7 +2068,7 @@
         "RF-023"
       ],
       "acceptance_criteria": [
-        "Actually read AGENTS/ARCHITECTURE/CONVENTIONS/TECH_STACK/RUNBOOK; full selected RF027 via jq .tasks[] | select(.id == \"RF-027\"); .refactor-baseline/rf027-manual-fetch-v1/readiness.md,reuse.md,artifacts.json. Mission sed -n 1,8p and latest sed -n 1273,1273p on docs/refactoring/PROGRESS.md each sole command in separate successful call. Marker Primary prepares RF027 manual remote fetch classification.",
+        "Actually read AGENTS/ARCHITECTURE/CONVENTIONS/TECH_STACK/RUNBOOK; full selected RF027 via jq .tasks[] | select(.id == \"RF-027\"); .refactor-baseline/rf027-manual-fetch-v2/readiness.md,reuse.md,artifacts.json. Mission sed -n 1,8p and latest sed -n 1279,1279p on docs/refactoring/PROGRESS.md each sole command in separate successful call. Marker Primary corrects RF027 Markdown link verification. Also actually read correction.md. Preserve V1 failed gate and spent ordinary attempt1; identical document artifacts, parser-only verification correction.",
         "Copy exactly two frozen artifacts via separate cp -- calls. Required instruction/metadata reads only; no artifact/source/test/helper/inventory dumps, engineering/workflows/checks/tests/hashes/helpers/packages/services/agents/state edits/commits. Five gates/review/primary acceptance pending.",
         "Audit only. Distinguish direct entry calls from requests/reads; include actual method alias and scanner boundary/limitations. Trace all13 entry files and wrappers/callers. Existing Query remains; SQLite/offline content and reconciliation/auth/upload/OAuth writes stay owned outside Query. Prepare exact small catalog/hadith-owner/connection-read scopes without approving implementation.",
         "Separate stronger reviewer inspects whole docs, actual source/callers/inventory coverage and all started/completed generator event types, actual required reads/two copies. Primary acceptance mandatory. Current findings static, no reproduced failure/security/native/browser/live-network claim. Preserve RF124 rejected repair and all other inputs. RF025/RF125 and other repairs remain pending.",
@@ -2079,12 +2079,12 @@
           "python3",
           "-B",
           "-c",
-          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf027-manual-fetch-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='6ff3a81cd8409806896c9d1ca93bb9fb2d2d978262f1b2e79323979d92d4062d';runpy.run_path('.refactor-baseline/rf027-manual-fetch-v1/verify.py',run_name='__main__')"
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf027-manual-fetch-v2/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='7d6d6d8ccef13cca8076b0ff71cd2410b151e57e4cc72ea7658329f5b9013392';runpy.run_path('.refactor-baseline/rf027-manual-fetch-v2/verify.py',run_name='__main__')"
         ],
         [
           "python3",
           "-B",
-          ".refactor-baseline/rf027-manual-fetch-v1/verify-inventory.py"
+          ".refactor-baseline/rf027-manual-fetch-v2/verify-inventory.py"
         ],
         [
           "node_modules/.bin/prettier",
@@ -2096,7 +2096,7 @@
           "python3",
           "-B",
           "-c",
-          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf027-manual-fetch-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='6ff3a81cd8409806896c9d1ca93bb9fb2d2d978262f1b2e79323979d92d4062d';runpy.run_path('.refactor-baseline/rf027-manual-fetch-v1/verify.py',run_name='__main__')"
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf027-manual-fetch-v2/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='7d6d6d8ccef13cca8076b0ff71cd2410b151e57e4cc72ea7658329f5b9013392';runpy.run_path('.refactor-baseline/rf027-manual-fetch-v2/verify.py',run_name='__main__')"
         ],
         [
           "git",
@@ -2106,15 +2106,18 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "pending",
+      "status": "retry",
       "allowed_paths": [
         "docs/refactoring/MANUAL_FETCH_OWNERSHIP.md",
         "docs/refactoring/QUERY_AUDIT.md"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "implementation_mode": "copy-only",
-      "readiness_evidence": ".refactor-baseline/rf027-manual-fetch-v1/readiness.md",
-      "primary_preparation_evidence": ".refactor-baseline/rf027-manual-fetch-v1/readiness.md"
+      "readiness_evidence": ".refactor-baseline/rf027-manual-fetch-v2/readiness.md",
+      "primary_preparation_evidence": ".refactor-baseline/rf027-manual-fetch-v2/readiness.md",
+      "started_at": "2026-11-03T20:55:40.691421+00:00",
+      "failure": "Verification failed: ['python3', '-B', '.refactor-baseline/rf027-manual-fetch-v1/verify-inventory.py']; see .ralph/runs/RF-027-1-1793739340694058347/verify-1.log",
+      "evidence": ".ralph/runs/RF-027-1-1793739340694058347"
     },
     {
       "id": "RF-028",
