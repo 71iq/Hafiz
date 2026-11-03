@@ -9717,27 +9717,73 @@
         "RF-065"
       ],
       "acceptance_criteria": [
-        "Pending primary design. Inspect daily query, profile join shape, numeric UI consumers and RF065 row schema before choosing reusable validation. Preserve server date/order/limit50, input order/ranks, optional profile defaults, unconfigured/null data and service error identity.",
-        "Normalize legitimate null score to numeric0 using existing summary policy, reject malformed data without partial output and test actual service numeric operation. Do not reroute through aggregate ranking or change server/top50/tie policy. Preserve ignored unsafe daily probe and add permanent safety assertions only.",
-        "Fresh focused tests/types/graphs/web as appropriate, stronger independent review and primary acceptance required. No live data/network/backend/schema/production/data rewrite or deployment."
+        "Actually read AGENTS/ARCHITECTURE/CONVENTIONS/TECH_STACK/RUNBOOK/whole current RF121 JSON/.refactor-baseline/rf121-daily-response-v1/readiness.md/reuse.md/artifacts.json. Separate actual progress1,8p and 1227,1227p before copies, marker Primary prepares RF121 validated daily leaderboard mapping.",
+        "Copy-only three exact successful cp -- commands, each in own tool call. Required instruction/metadata/status reads only. No source/test/helper/artifact dumps, engineering/workflows/tests/checks/hashes/packages/services/agents/state edits/commits. Verification/review/primary acceptance pending.",
+        "Reuse exact RF065 schema and parse through exported same-module parseDailyScoreRows. Aggregate reducer/schema otherwise byte-identical; whole API restores after import/daily mapping change. Daily numeric null=>0 and malformed reject reuse existing boundary. Preserve UTC date, selection/server order/limit50, response order/duplicates/per-row ranks, defaults, config/absent data and error identity. No aggregation/client sorting/trimming, dependency/casts/any/type cycle/backend/data/auth change.",
+        "21 new plus78 unchanged cases pass,1000 property samples across new async mapping/old grouping. Old11fail/10controls plus eight selected valid controls retained. Four aggregate/rank/limit/null mutations fail. Earlier ignored unsafe daily probe preserved; no permanent unsafe assertions or skips. Types/three-file zero-warning lint/helper/test format/graphs/web/whitespace required.",
+        "Nine fresh controller gates, stronger full diff/schema/reducer/server contract/callers/baseline/oracle/mutation/all generator event/read/three-copy review and primary acceptance mandatory. No manual UI/browser/device/native/live data/network/full-suite claim; no protected/original/production changes or push/merge/deploy."
       ],
       "verification": [
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf121-daily-response-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='a3009f72c446cdbf499c7352999f31c0f1e61ea0817af9eb5754f4deb6a548b6';runpy.run_path('.refactor-baseline/rf121-daily-response-v1/verify.py',run_name='__main__')"
+        ],
         [
           "npm",
           "run",
           "test:unit",
           "--",
           "--runTestsByPath",
-          "tests/unit/leaderboard-daily-response.test.ts"
+          "tests/unit/leaderboard-daily-response.test.ts",
+          "tests/unit/leaderboard-ranking.test.ts",
+          "tests/unit/public-review-errors.test.ts",
+          "tests/unit/local-calendar-streak.test.ts",
+          "--no-cache"
         ],
         [
           "npm",
           "run",
           "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/leaderboard/api.ts",
+          "lib/leaderboard/ranking.ts",
+          "tests/unit/leaderboard-daily-response.test.ts",
+          "--max-warnings=0"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "lib/leaderboard/ranking.ts",
+          "tests/unit/leaderboard-daily-response.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf121-daily-response-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='a3009f72c446cdbf499c7352999f31c0f1e61ea0817af9eb5754f4deb6a548b6';runpy.run_path('.refactor-baseline/rf121-daily-response-v1/verify.py',run_name='__main__')"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
         ]
       ],
       "risk": "high",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
         "lib/leaderboard/api.ts",
@@ -9745,7 +9791,10 @@
         "tests/unit/leaderboard-daily-response.test.ts"
       ],
       "attempts": 0,
-      "discovery_evidence": ".refactor-baseline/rf065-leaderboard-ranking-v1/nullable-score-variants.md"
+      "discovery_evidence": ".refactor-baseline/rf065-leaderboard-ranking-v1/nullable-score-variants.md",
+      "implementation_mode": "copy-only",
+      "readiness_evidence": ".refactor-baseline/rf121-daily-response-v1/readiness.md",
+      "primary_preparation_evidence": ".refactor-baseline/rf121-daily-response-v1/readiness.md"
     }
   ]
 }
