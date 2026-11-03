@@ -4395,9 +4395,9 @@
         "RF-022"
       ],
       "acceptance_criteria": [
-        "Actually read AGENTS/ARCHITECTURE/CONVENTIONS/TECH_STACK/RUNBOOK/current RF063/.refactor-baseline/rf063-review-activity-v1/readiness.md/reuse.md/dst-variants.md/artifacts.json. Separate actual progress1,8p and 1193,1193p before copies, marker Primary prepares RF063 local review activity extraction.",
+        "Actually read AGENTS/ARCHITECTURE/CONVENTIONS/TECH_STACK/RUNBOOK/current RF063/.refactor-baseline/rf063-review-activity-v2/readiness.md/reuse.md/dst-variants.md/artifacts.json. Separate actual progress1,8p and 1199,1199p before copies, marker Primary corrects RF063 extraction EOF whitespace. Actually print the whole current task object from JSON before copies; no partial task line slice. Corrected v2 marker/readiness, not old v1.",
         "Copy-only four exact successful cp -- commands, each in own tool call. Required instruction/metadata/status reads only; no source/test/helper/artifact dumps, engineering/checks/tests/hashes/packages/services/agents/state edits/commits. Verification/review/primary acceptance pending.",
-        "Share only two exact pure function bodies/signatures using unchanged date helpers. Whole achievements/FSRS callers reverse after prescribed imports/removals. Keep input order, duplicate/invalid semantics, SQL/current-streak/wird/achievements/auth/remote policies unchanged. No dependencies/casts/any/protected changes.",
+        "Share only two exact pure function bodies/signatures using unchanged date helpers. Whole achievements/FSRS callers reverse after prescribed imports/removals. Keep input order, duplicate/invalid semantics, SQL/current-streak/wird/achievements/auth/remote policies unchanged. No dependencies/casts/any/protected changes. Only additional normalization is achievements trailing newlines after removing its last two functions, keeping one terminal newline. Preserve v1 and first real failed whitespace run; no ordinary attempt reset.",
         "23 hardcoded/property cases against each old body and candidate in four TZ processes.92 final zone executions plus9 unchanged date/scoring tests. Two500-run seeded properties each zone, five semantic mutation failures. Initial eight lint warnings/fixture preserved; namespace import only correction. Types/four-file zero-warning lint/test format/three graphs/web pass.",
         "Existing London DST wrong result is deliberately characterized, not fixed or accepted as correct semantics. RF120 pending/unapproved and required for final audit. Variant report distinguishes actual pure repro from static current-streak/wird/leaderboard candidates and excluded UTC/difference owners. No actual SQL/network/manual UI/device/native/full-suite claim.",
         "13 fresh controller gates, separate stronger whole-diff/all-generator-event/read/four-copy/timezone/property/old-body/mutation/debt review and primary acceptance required. Keep local, no push/merge/deploy/production/original/protected changes."
@@ -4407,7 +4407,7 @@
           "python3",
           "-B",
           "-c",
-          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf063-review-activity-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='46f7a1961ec81bb13dfcd6e565a2976272fe1399a0c268478ee0e02848bc6970';runpy.run_path('.refactor-baseline/rf063-review-activity-v1/verify.py',run_name='__main__')"
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf063-review-activity-v2/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='4602509b146a63849b5e64342768f543cfb7debe11fdfaf6a6820b0f80d2790e';runpy.run_path('.refactor-baseline/rf063-review-activity-v2/verify.py',run_name='__main__')"
         ],
         [
           "env",
@@ -4495,7 +4495,7 @@
           "python3",
           "-B",
           "-c",
-          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf063-review-activity-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='46f7a1961ec81bb13dfcd6e565a2976272fe1399a0c268478ee0e02848bc6970';runpy.run_path('.refactor-baseline/rf063-review-activity-v1/verify.py',run_name='__main__')"
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf063-review-activity-v2/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='4602509b146a63849b5e64342768f543cfb7debe11fdfaf6a6820b0f80d2790e';runpy.run_path('.refactor-baseline/rf063-review-activity-v2/verify.py',run_name='__main__')"
         ],
         [
           "git",
@@ -4505,17 +4505,20 @@
       ],
       "risk": "high",
       "approved": true,
-      "status": "pending",
+      "status": "retry",
       "allowed_paths": [
         "lib/achievements/queries.ts",
         "lib/fsrs/queries.ts",
         "lib/fsrs/review-activity.ts",
         "tests/unit/review-activity.test.ts"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "implementation_mode": "copy-only",
-      "readiness_evidence": ".refactor-baseline/rf063-review-activity-v1/readiness.md",
-      "primary_preparation_evidence": ".refactor-baseline/rf063-review-activity-v1/readiness.md"
+      "readiness_evidence": ".refactor-baseline/rf063-review-activity-v2/readiness.md",
+      "primary_preparation_evidence": ".refactor-baseline/rf063-review-activity-v2/readiness.md",
+      "started_at": "2026-11-03T04:55:44.455662+00:00",
+      "failure": "Verification failed: ['git', 'diff', '--check']; see .ralph/runs/RF-063-1-1793681744457928297/verify-12.log",
+      "evidence": ".ralph/runs/RF-063-1-1793681744457928297"
     },
     {
       "id": "RF-064",
