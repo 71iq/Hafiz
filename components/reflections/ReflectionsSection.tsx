@@ -23,15 +23,31 @@ type Props = {
   showHeader?: boolean;
 };
 
-export function ReflectionsSection({ surah, ayah, initiallyExpanded = false, showHeader = true }: Props) {
+export function ReflectionsSection(props: Props) {
+  const user = useAuthStore((s) => s.user);
+  return (
+    <ReflectionsSectionContent
+      key={JSON.stringify([props.surah, props.ayah, user?.id])}
+      {...props}
+      user={user}
+    />
+  );
+}
+
+function ReflectionsSectionContent({
+  surah,
+  ayah,
+  initiallyExpanded = false,
+  showHeader = true,
+  user,
+}: Props & { user: ReturnType<typeof useAuthStore.getState>["user"] }) {
   const { isDark, themeColors } = useSettings();
   const s = useStrings();
-  const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
   const [expanded, setExpanded] = useState(initiallyExpanded);
   const [page, setPage] = useState(0);
-  const [allReflections, setAllReflections] = useState<Reflection[]>([]);
-  const [hasMore, setHasMore] = useState(false);
+  const [loadedReflections, setAllReflections] = useState<Reflection[] | null>(null);
+  const [loadedHasMore, setHasMore] = useState<boolean | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [commentsReflectionId, setCommentsReflectionId] = useState<string | null>(null);
@@ -50,6 +66,7 @@ export function ReflectionsSection({ surah, ayah, initiallyExpanded = false, sho
 
   // Fetch first page when expanded
   const {
+    data: firstPage,
     isLoading,
     error: reflectionsError,
     refetch: refetchReflections,
@@ -67,6 +84,9 @@ export function ReflectionsSection({ surah, ayah, initiallyExpanded = false, sho
     staleTime: 1000 * 60 * 5,
   });
 
+  const allReflections = loadedReflections ?? firstPage?.data ?? [];
+  const hasMore = loadedHasMore ?? firstPage?.hasMore ?? false;
+
   const handleLoadMore = useCallback(async () => {
     if (loadingMore || !hasMore) return;
     const nextPage = page + 1;
@@ -74,7 +94,7 @@ export function ReflectionsSection({ surah, ayah, initiallyExpanded = false, sho
     setError(null);
     try {
       const result = await fetchReflections(surah, ayah, nextPage, user?.id);
-      setAllReflections((prev) => [...prev, ...result.data]);
+      setAllReflections((prev) => [...(prev ?? firstPage?.data ?? []), ...result.data]);
       setHasMore(result.hasMore);
       setPage(nextPage);
     } catch (e) {
@@ -83,21 +103,21 @@ export function ReflectionsSection({ surah, ayah, initiallyExpanded = false, sho
     } finally {
       setLoadingMore(false);
     }
-  }, [surah, ayah, page, user?.id, hasMore, loadingMore, s.reflectionLoadFailed]);
+  }, [surah, ayah, page, user?.id, hasMore, loadingMore, s.reflectionLoadFailed, firstPage?.data]);
 
   const handleLikeToggled = useCallback((reflectionId: string, liked: boolean, delta: number) => {
     setAllReflections((prev) =>
-      prev.map((r) =>
+      (prev ?? firstPage?.data ?? []).map((r) =>
         r.id === reflectionId ? { ...r, user_has_liked: liked, likes_count: r.likes_count + delta } : r,
       ),
     );
-  }, []);
+  }, [firstPage?.data]);
 
   const handleCommentAdded = useCallback((reflectionId: string) => {
     setAllReflections((prev) =>
-      prev.map((r) => (r.id === reflectionId ? { ...r, comments_count: r.comments_count + 1 } : r)),
+      (prev ?? firstPage?.data ?? []).map((r) => (r.id === reflectionId ? { ...r, comments_count: r.comments_count + 1 } : r)),
     );
-  }, []);
+  }, [firstPage?.data]);
 
   const handleWriteSuccess = useCallback(() => {
     // Invalidate and refetch
