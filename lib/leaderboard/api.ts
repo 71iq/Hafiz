@@ -1,3 +1,4 @@
+import { rankDailyScores } from "@/lib/leaderboard/ranking";
 import { isMissingPublicReviewAggregateError } from "@/lib/leaderboard/errors";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import type { AchievementUnlock } from "@/lib/achievements/types";
@@ -246,32 +247,7 @@ export async function fetchWeeklyLeaderboard(): Promise<LeaderboardEntry[]> {
   if (error) throw error;
 
   // Aggregate by user
-  const userMap = new Map<string, { username: string; display_name: string | null; avatar_url: string | null; score: number }>();
-  for (const row of data ?? []) {
-    const existing = userMap.get(row.user_id);
-    if (existing) {
-      existing.score += row.score;
-    } else {
-      userMap.set(row.user_id, {
-        username: (row as any).profiles?.username ?? "unknown",
-        display_name: (row as any).profiles?.display_name ?? null,
-        avatar_url: (row as any).profiles?.avatar_url ?? null,
-        score: row.score,
-      });
-    }
-  }
-
-  return Array.from(userMap.entries())
-    .sort((a, b) => b[1].score - a[1].score)
-    .slice(0, 50)
-    .map(([user_id, info], i) => ({
-      user_id,
-      username: info.username,
-      display_name: info.display_name,
-      avatar_url: info.avatar_url,
-      score: info.score,
-      rank: i + 1,
-    }));
+  return rankDailyScores({ rows: data ?? [] });
 }
 
 /** All-time leaderboard: by total_score from profiles */
@@ -285,32 +261,7 @@ export async function fetchAllTimeLeaderboard(): Promise<LeaderboardEntry[]> {
 
   if (error) throw error;
 
-  const userMap = new Map<string, { username: string; display_name: string | null; avatar_url: string | null; score: number }>();
-  for (const row of data ?? []) {
-    const existing = userMap.get(row.user_id);
-    if (existing) {
-      existing.score += row.score;
-    } else {
-      userMap.set(row.user_id, {
-        username: (row as any).profiles?.username ?? "unknown",
-        display_name: (row as any).profiles?.display_name ?? null,
-        avatar_url: (row as any).profiles?.avatar_url ?? null,
-        score: row.score,
-      });
-    }
-  }
-
-  return Array.from(userMap.entries())
-    .sort((a, b) => b[1].score - a[1].score)
-    .slice(0, 50)
-    .map(([user_id, info], i) => ({
-      user_id,
-      username: info.username,
-      display_name: info.display_name,
-      avatar_url: info.avatar_url,
-      score: info.score,
-      rank: i + 1,
-    }));
+  return rankDailyScores({ rows: data ?? [] });
 }
 
 /** Streak leaderboard: by current_streak from profiles */
