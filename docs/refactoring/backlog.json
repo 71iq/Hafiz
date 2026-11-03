@@ -9939,18 +9939,20 @@
       ],
       "risk": "high",
       "approved": true,
-      "status": "retry",
+      "status": "verified",
       "allowed_paths": [
         "lib/auth/store.ts",
         "tests/unit/auth-profile-owner.test.ts"
       ],
-      "attempts": 1,
+      "attempts": 2,
       "implementation_mode": "copy-only",
       "readiness_evidence": ".refactor-baseline/rf122-profile-read-owner-v3/readiness.md",
       "primary_preparation_evidence": ".refactor-baseline/rf122-profile-read-owner-v3/readiness.md",
-      "started_at": "2026-11-03T14:44:07.099855+00:00",
-      "failure": "Verification failed: ['python3', '-B', '-c', \"import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf122-profile-read-owner-v2/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='8118938eb5dec8c9a7035c2473227622ee68aa9c8c9fc5b3507fb0fb48bfb217';runpy.run_path('.refactor-baseline/rf122-profile-read-owner-v2/verify.py',run_name='__main__')\"]; see .ralph/runs/RF-122-1-1793717047102484749/verify-0.log",
-      "evidence": ".ralph/runs/RF-122-1-1793717047102484749"
+      "started_at": "2026-11-03T14:46:45.305681+00:00",
+      "failure": "Batch resource limit reached",
+      "evidence": ".ralph/runs/RF-122-2-1793717205308284186",
+      "completed_at": "2026-11-03T14:49:22.190469+00:00",
+      "summary": "Installed the two exact RF-122 v3 artifacts by the required separate copy commands."
     }
   ]
 }

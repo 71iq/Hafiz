@@ -10,6 +10,8 @@ import type { AuthState, AuthActions, Profile } from "./types";
 
 type AuthStore = AuthState & AuthActions;
 
+let profileOwnerGeneration = 0;
+
 function buildFallbackProfile(user: NonNullable<AuthState["user"]>): Profile {
   const metadata = user.user_metadata ?? {};
   const emailName = user.email?.split("@")[0];
@@ -279,6 +281,9 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     const user = get().user;
     if (!user) return;
 
+    const generation = profileOwnerGeneration;
+    const isCurrentOwner = () => generation === profileOwnerGeneration && get().user?.id === user.id;
+
     try {
       const { data, error } = await supabase
         .from("profiles")
@@ -286,9 +291,12 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         .eq("id", user.id)
         .single();
 
+      if (!isCurrentOwner()) return;
+
       if (error) throw error;
       set({ profile: data as Profile });
     } catch (err: any) {
+      if (!isCurrentOwner()) return;
       console.warn("[Auth] Failed to fetch profile:", err.message);
       set({ profile: buildFallbackProfile(user) });
     }
@@ -330,6 +338,9 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     const user = get().user;
     if (!user) return null;
 
+    const generation = profileOwnerGeneration;
+    const isCurrentOwner = () => generation === profileOwnerGeneration && get().user?.id === user.id;
+
     const fallback = buildFallbackProfile(user);
 
     try {
@@ -338,6 +349,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         .select("*")
         .eq("id", user.id)
         .maybeSingle();
+
+      if (!isCurrentOwner()) return null;
 
       if (existingError) throw existingError;
       if (existingProfile) {
@@ -352,11 +365,14 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         .select("*")
         .single();
 
+      if (!isCurrentOwner()) return null;
+
       if (error) throw error;
       const profile = (data as Profile) ?? fallback;
       set({ profile });
       return profile;
     } catch (err: any) {
+      if (!isCurrentOwner()) return null;
       console.warn("[Auth] Failed to ensure profile:", err.message);
       set({ profile: fallback });
       return fallback;
@@ -365,3 +381,11 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
   clearError: () => set({ error: null }),
 }));
+
+// This observer shares the singleton store lifetime. It never writes state or
+// registers another Supabase auth listener.
+useAuthStore.subscribe((state, previous) => {
+  if (state.user?.id !== previous.user?.id || state.session !== previous.session) {
+    profileOwnerGeneration += 1;
+  }
+});
