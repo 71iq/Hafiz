@@ -9632,19 +9632,22 @@
       ],
       "risk": "high",
       "approved": true,
-      "status": "retry",
+      "status": "verified",
       "allowed_paths": [
         "lib/date.ts",
         "tests/unit/review-activity.test.ts",
         "tests/unit/local-calendar-streak.test.ts"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "discovery_evidence": ".refactor-baseline/rf063-review-activity-v1/dst-variants.md",
       "implementation_mode": "copy-only",
       "readiness_evidence": ".refactor-baseline/rf120-calendar-index-v2/readiness.md",
       "primary_preparation_evidence": ".refactor-baseline/rf120-calendar-index-v2/readiness.md",
-      "started_at": "2026-11-03T05:53:11.807322+00:00",
-      "failure": "review stopped at account usage limit; see .ralph/runs/RF-120-1-1793685191809673813/review.jsonl"
+      "started_at": "2026-11-03T08:56:03.150997+00:00",
+      "failure": "Batch resource limit reached",
+      "completed_at": "2026-11-03T08:59:06.089544+00:00",
+      "evidence": ".ralph/runs/RF-120-1-1793696163153256825",
+      "summary": "Installed the three exact RF-120 V2 artifacts. Verification, review, and primary acceptance remain pending."
     }
   ]
 }

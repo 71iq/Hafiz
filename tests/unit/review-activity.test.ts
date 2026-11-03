@@ -112,10 +112,8 @@ describe("ordered longest local-date streak", () => {
   it.each([
     ["2026-03-28", "2026-03-29", "2026-03-30", "2026-03-31"],
     ["2026-10-24", "2026-10-25", "2026-10-26", "2026-10-27"],
-  ])("characterizes the existing DST behavior for %j", (...keys) => {
-    // London crosses UTC offset zero. Existing floored local-midnight indexes
-    // split this run; changing that policy belongs to the separate repair.
-    expect(calculateLongestStreak(keys)).toBe(zone === "Europe/London" ? 2 : 4);
+  ])("keeps consecutive calendar dates across DST for %j", (...keys) => {
+    expect(calculateLongestStreak(keys)).toBe(4);
   });
 
   it("matches an independent longest-run oracle for arbitrary January gaps", () => {
