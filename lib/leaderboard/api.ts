@@ -1,3 +1,4 @@
+import { isMissingPublicReviewAggregateError } from "@/lib/leaderboard/errors";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import type { AchievementUnlock } from "@/lib/achievements/types";
 import {
@@ -103,18 +104,6 @@ function emptyScoreSummary(): PublicScoreSummary {
   return { totalScore: 0, cardsReviewed: 0, currentStreak: 0, longestStreak: 0, lastReviewDate: null };
 }
 
-function isMissingPublicReviewAggregateError(error: { code?: string; message?: string; details?: string } | null): boolean {
-  const message = `${error?.code ?? ""} ${error?.message ?? ""} ${error?.details ?? ""}`.toLowerCase();
-  return (
-    message.includes("public_review_activity") ||
-    message.includes("public_review_stats")
-  ) && (
-    message.includes("does not exist") ||
-    message.includes("schema cache") ||
-    message.includes("pgrst205") ||
-    message.includes("42p01")
-  );
-}
 
 function mergePublicProfileStats(
   profile: PublicProfile,

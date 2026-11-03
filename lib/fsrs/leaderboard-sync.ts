@@ -1,3 +1,4 @@
+import { isMissingPublicReviewAggregateError } from "@/lib/leaderboard/errors";
 import type { SQLiteDatabase } from "expo-sqlite";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { useAuthStore } from "@/lib/auth/store";
@@ -132,18 +133,6 @@ async function fetchDailyScoreSummary(userId: string): Promise<DailyScoreSummary
   return summarizeDailyScores((data ?? []) as DailyScoreRow[]);
 }
 
-function isMissingPublicReviewAggregateError(error: { code?: string; message?: string; details?: string } | null): boolean {
-  const message = `${error?.code ?? ""} ${error?.message ?? ""} ${error?.details ?? ""}`.toLowerCase();
-  return (
-    message.includes("public_review_activity") ||
-    message.includes("public_review_stats")
-  ) && (
-    message.includes("does not exist") ||
-    message.includes("schema cache") ||
-    message.includes("pgrst205") ||
-    message.includes("42p01")
-  );
-}
 
 async function getLocalReviewSummary(db: SQLiteDatabase): Promise<PublicReviewSummary> {
   const rows = await db.getAllAsync<{ reviewed_at: string }>("SELECT reviewed_at FROM study_log ORDER BY reviewed_at ASC");

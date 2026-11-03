@@ -4505,17 +4505,22 @@
       ],
       "risk": "high",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "lib/fsrs/leaderboard-sync.ts",
         "lib/leaderboard/api.ts",
         "lib/leaderboard/errors.ts",
         "tests/unit/public-review-errors.test.ts"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "implementation_mode": "copy-only",
       "readiness_evidence": ".refactor-baseline/rf064-public-review-errors-v1/readiness.md",
-      "primary_preparation_evidence": ".refactor-baseline/rf064-public-review-errors-v1/readiness.md"
+      "primary_preparation_evidence": ".refactor-baseline/rf064-public-review-errors-v1/readiness.md",
+      "started_at": "2026-11-03T03:52:49.204193+00:00",
+      "failure": "Batch resource limit reached",
+      "completed_at": "2026-11-03T03:55:20.860906+00:00",
+      "evidence": ".ralph/runs/RF-064-1-1793677969206547402",
+      "summary": "Installed the four supplied RF-064 artifacts by the exact copy-only commands."
     },
     {
       "id": "RF-065",
