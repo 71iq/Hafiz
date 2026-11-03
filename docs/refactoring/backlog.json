@@ -3082,7 +3082,8 @@
         "RF-117",
         "RF-118",
         "RF-119",
-        "RF-120"
+        "RF-120",
+        "RF-121"
       ],
       "acceptance_criteria": [
         "Repeat identical clone/dead-code/native+web graph/security scopes.",
@@ -4622,8 +4623,8 @@
     },
     {
       "id": "RF-065",
-      "title": "Share typed weekly/monthly leaderboard reduction",
-      "description": "Share typed weekly/monthly leaderboard reduction",
+      "title": "Share validated weekly and all-time leaderboard reduction",
+      "description": "Share exact cross-user reduction and validate nullable daily-score response rows for weekly/all-time queries.",
       "rationale": "Group 29 repeats per-user score aggregation, ranking and top-50 mapping.",
       "modules": [
         "lib/leaderboard/api.ts",
@@ -4635,34 +4636,82 @@
         "RF-023"
       ],
       "acceptance_criteria": [
-        "Inspect existing summarizeDailyScores and both complete query responses before choosing a helper.",
-        "Test multiple rows/user, ties, missing profiles, ordering and limit. Preserve separate date filters and visible ranking.",
-        "Validate boundary rows instead of copying the existing any cast."
+        "Actually read AGENTS/ARCHITECTURE/CONVENTIONS/TECH_STACK/RUNBOOK/whole current RF065 task JSON/.refactor-baseline/rf065-leaderboard-ranking-v1/readiness.md/reuse.md/nullable-score-variants.md/artifacts.json. Separate actual progress1,8p and 1219,1219p before copies, marker Primary prepares RF065 validated weekly and all-time ranking.",
+        "Copy-only three exact successful cp -- commands, each in own tool call. Required instructions/metadata/status reads only. No source/test/helper/artifact dumps, engineering/checks/tests/hashes/workflows/packages/services/agents/state edits/commits. Verification/review/primary acceptance pending.",
+        "Weekly/all-time not monthly. Exact duplicate reduction moves behind installed Zod unknown boundary without API type relocation/casts/any/client imports/cycles. Null score =>0 follows checked-in nullable schema and existing summaries; malformed rows raise validation errors without coercion/partial output. Preserve finite fractions/negatives/empty strings, nullish profile fallback/first metadata, input addition order, stable ties/top50/rank and whole API after only calls/import. All other APIs unchanged.",
+        "31 new plus47 nearby cases pass,500-run seeded grouping oracle. Old baseline15fail/16controls and13 selected valid controls retained; no permanent skip. Four null/tie/limit/sum mutations fail. Actual service query/config/null/error identity/normalization tested. Daily null variant separately reproduced only in ignored probe, pending RF121/final audit dependency, not fixed here.",
+        "Nine fresh gates, stronger complete diff/boundary/null policy/real caller/baseline/oracle/mutation/all generator event/read/three-copy review and primary acceptance mandatory. Types/zero-warning scoped lint/new-file format/three graphs/web/whitespace required. No manual UI/browser/device/native/live data/network/full-suite claim; no dependency/backend/schema/auth/protected/original changes or push/merge/deploy."
       ],
       "verification": [
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf065-leaderboard-ranking-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='341b94e6d41c8ff47f82650aebd159655e8ce5ac50ed5b9ab6132bef3c2a4b53';runpy.run_path('.refactor-baseline/rf065-leaderboard-ranking-v1/verify.py',run_name='__main__')"
+        ],
         [
           "npm",
           "run",
           "test:unit",
           "--",
           "--runTestsByPath",
-          "tests/unit/leaderboard-ranking.test.ts"
+          "tests/unit/leaderboard-ranking.test.ts",
+          "tests/unit/public-review-errors.test.ts",
+          "tests/unit/local-calendar-streak.test.ts",
+          "--no-cache"
         ],
         [
           "npm",
           "run",
           "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/leaderboard/api.ts",
+          "lib/leaderboard/ranking.ts",
+          "tests/unit/leaderboard-ranking.test.ts",
+          "--max-warnings=0"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "lib/leaderboard/ranking.ts",
+          "tests/unit/leaderboard-ranking.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf065-leaderboard-ranking-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='341b94e6d41c8ff47f82650aebd159655e8ce5ac50ed5b9ab6132bef3c2a4b53';runpy.run_path('.refactor-baseline/rf065-leaderboard-ranking-v1/verify.py',run_name='__main__')"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
         ]
       ],
       "risk": "high",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
         "lib/leaderboard/api.ts",
         "lib/leaderboard/ranking.ts",
         "tests/unit/leaderboard-ranking.test.ts"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "implementation_mode": "copy-only",
+      "readiness_evidence": ".refactor-baseline/rf065-leaderboard-ranking-v1/readiness.md",
+      "primary_preparation_evidence": ".refactor-baseline/rf065-leaderboard-ranking-v1/readiness.md"
     },
     {
       "id": "RF-066",
@@ -9648,6 +9697,50 @@
       "completed_at": "2026-11-03T08:59:06.089544+00:00",
       "evidence": ".ralph/runs/RF-120-1-1793696163153256825",
       "summary": "Installed the three exact RF-120 V2 artifacts. Verification, review, and primary acceptance remain pending."
+    },
+    {
+      "id": "RF-121",
+      "title": "Validate daily leaderboard rows and normalize nullable scores",
+      "description": "Actual fetchDailyLeaderboard returns nullable score into score.toLocaleString, reproduced in RF065 ignored probe. Prepare a separate bounded daily mapping repair.",
+      "rationale": "Daily uses server eq/order/limit50 and must not silently adopt aggregate sorting/reduction semantics.",
+      "modules": [
+        "lib/leaderboard/api.ts",
+        "lib/leaderboard/ranking.ts",
+        "tests/unit/leaderboard-daily-response.test.ts"
+      ],
+      "dependencies": [
+        "RF-065"
+      ],
+      "acceptance_criteria": [
+        "Pending primary design. Inspect daily query, profile join shape, numeric UI consumers and RF065 row schema before choosing reusable validation. Preserve server date/order/limit50, input order/ranks, optional profile defaults, unconfigured/null data and service error identity.",
+        "Normalize legitimate null score to numeric0 using existing summary policy, reject malformed data without partial output and test actual service numeric operation. Do not reroute through aggregate ranking or change server/top50/tie policy. Preserve ignored unsafe daily probe and add permanent safety assertions only.",
+        "Fresh focused tests/types/graphs/web as appropriate, stronger independent review and primary acceptance required. No live data/network/backend/schema/production/data rewrite or deployment."
+      ],
+      "verification": [
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/leaderboard-daily-response.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
+      ],
+      "risk": "high",
+      "approved": false,
+      "status": "pending",
+      "allowed_paths": [
+        "lib/leaderboard/api.ts",
+        "lib/leaderboard/ranking.ts",
+        "tests/unit/leaderboard-daily-response.test.ts"
+      ],
+      "attempts": 0,
+      "discovery_evidence": ".refactor-baseline/rf065-leaderboard-ranking-v1/nullable-score-variants.md"
     }
   ]
 }
