@@ -16,8 +16,12 @@ const dailyScoreRowSchema = z.object({
     .nullish(),
 });
 
+export function parseDailyScoreRows({ rows }: { rows: unknown }) {
+  return z.array(dailyScoreRowSchema).parse(rows);
+}
+
 export function rankDailyScores({ rows: input }: { rows: unknown }) {
-  const rows = z.array(dailyScoreRowSchema).parse(input);
+  const rows = parseDailyScoreRows({ rows: input });
   const userMap = new Map<
     string,
     { username: string; display_name: string | null; avatar_url: string | null; score: number }

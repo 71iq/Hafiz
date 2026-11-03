@@ -9784,17 +9784,22 @@
       ],
       "risk": "high",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "lib/leaderboard/api.ts",
         "lib/leaderboard/ranking.ts",
         "tests/unit/leaderboard-daily-response.test.ts"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "discovery_evidence": ".refactor-baseline/rf065-leaderboard-ranking-v1/nullable-score-variants.md",
       "implementation_mode": "copy-only",
       "readiness_evidence": ".refactor-baseline/rf121-daily-response-v1/readiness.md",
-      "primary_preparation_evidence": ".refactor-baseline/rf121-daily-response-v1/readiness.md"
+      "primary_preparation_evidence": ".refactor-baseline/rf121-daily-response-v1/readiness.md",
+      "started_at": "2026-11-03T10:51:48.905494+00:00",
+      "failure": "Batch resource limit reached",
+      "completed_at": "2026-11-03T10:54:53.062919+00:00",
+      "evidence": ".ralph/runs/RF-121-1-1793703108907987135",
+      "summary": "Installed the three supplied RF121 artifacts. Verification, review, and primary acceptance remain pending."
     }
   ]
 }

@@ -1,4 +1,4 @@
-import { rankDailyScores } from "@/lib/leaderboard/ranking";
+import { parseDailyScoreRows, rankDailyScores } from "@/lib/leaderboard/ranking";
 import { isMissingPublicReviewAggregateError } from "@/lib/leaderboard/errors";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import type { AchievementUnlock } from "@/lib/achievements/types";
@@ -219,7 +219,7 @@ export async function fetchDailyLeaderboard(): Promise<LeaderboardEntry[]> {
     .limit(50);
 
   if (error) throw error;
-  return (data ?? []).map((row: any, i: number) => ({
+  return parseDailyScoreRows({ rows: data ?? [] }).map((row, i) => ({
     user_id: row.user_id,
     username: row.profiles?.username ?? "unknown",
     display_name: row.profiles?.display_name ?? null,
