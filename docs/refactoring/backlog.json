@@ -9505,11 +9505,11 @@
         "RF-063"
       ],
       "acceptance_criteria": [
-        "Actually read AGENTS/ARCHITECTURE/CONVENTIONS/TECH_STACK/RUNBOOK/whole RF120 task JSON/.refactor-baseline/rf120-calendar-index-v1/readiness.md/reuse.md/artifacts.json. Separate actual progress1,8p and 1205,1205p before copies, marker Primary prepares RF120 stable local calendar indexes.",
+        "Actually read AGENTS/ARCHITECTURE/CONVENTIONS/TECH_STACK/RUNBOOK/whole RF120 task JSON/.refactor-baseline/rf120-calendar-index-v2/readiness.md/reuse.md/artifacts.json. Separate actual progress1,8p and 1211,1211p before copies, marker Primary corrects RF120 normalized-year remapping. Actually read correction.md. V2 fresh generation mandatory; earlier Date.UTC candidate is not accepted.",
         "Copy-only three exact successful cp -- commands each in own tool call. Required metadata/instruction/status reads only, no source/test/helper/artifact dumps, engineering/checks/tests/hashes/packages/services/agents/state edits/commits. Verification/review/primary acceptance pending.",
-        "Only production edit local calendar index: preserve local Date normalization then Date.UTC of local components. Preserve rollover/defaults/invalid/year0..99 and Apia skipped date normalization; keep remote UTC helper and all actual consumers byte-identical. No persisted index/data rewrite, auth/backend/dependency/protected changes.",
-        "New15 cases use actual Node24 SQLite study/wird/stats functions and actual public streak service with synthetic external response. One documented partial Expo adapter assertion follows existing fixture, not a complete native implementation. Preserve full old fixture and London12 failures/26 controls; change only two unsafe old expectations/title to four-day safety. No assertion weakening/skips.",
-        "Combined38 pass in UTC/NY/Hebron/London/Apia,190 executions plus40 nearby cases. Existing two500-run properties each zone unchanged,5000 samples. Three semantic mutations fail. Types/scoped zero-warning lint/two-test format/graphs/web/whitespace required. No live DB/network/manual UI/device/native/full-suite claim.",
+        "Only production edit local calendar index: preserve local Date normalization then setUTCFullYear of normalized local components on UTC epoch midnight. Preserve rollover/defaults/invalid/year0..99 and Apia skipped date normalization; keep remote UTC helper and all actual consumers byte-identical. No persisted index/data rewrite, auth/backend/dependency/protected changes.",
+        "New16 cases use actual Node24 SQLite study/wird/stats functions and actual public streak service with synthetic external response. One documented partial Expo adapter assertion follows existing fixture, not a complete native implementation. Preserve full old fixture and London12 failures/26 controls; change only two unsafe old expectations/title to four-day safety. No assertion weakening/skips. Add normalized-year99 ordinal regression, year100/direct99 controls. V1 fails this edge and is preserved; no ordinary attempt reset or discarded failure.",
+        "Combined39 pass in UTC/NY/Hebron/London/Apia,195 executions plus40 nearby cases. Existing two500-run properties each zone unchanged,5000 samples. Three semantic mutations fail. Types/scoped zero-warning lint/two-test format/graphs/web/whitespace required. No live DB/network/manual UI/device/native/full-suite claim. Final three mutants are old floor index, v1 normalized-year Date.UTC remap and raw parsed components. Targeted initial edge red skips via testNamePattern only, all final39 run. Final235 case executions.",
         "14 fresh controller gates, separate stronger whole diff/calendar normalization/actual callers/SQLite boundary/old safety failures/mutations/all generator event/read/three-copy review and primary acceptance mandatory. Keep local; no push/merge/deploy/production/original/protected changes."
       ],
       "verification": [
@@ -9517,7 +9517,7 @@
           "python3",
           "-B",
           "-c",
-          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf120-calendar-index-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='409e8a3cde9c8ed51787ced374c69d71b1d633e7ff9d69107b37368d2ac7d280';runpy.run_path('.refactor-baseline/rf120-calendar-index-v1/verify.py',run_name='__main__')"
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf120-calendar-index-v2/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='e14683ccd82bc8cf1d6fa5d5a250782504a3b1c32e371f4c79caf91a053521d4';runpy.run_path('.refactor-baseline/rf120-calendar-index-v2/verify.py',run_name='__main__')"
         ],
         [
           "env",
@@ -9622,7 +9622,7 @@
           "python3",
           "-B",
           "-c",
-          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf120-calendar-index-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='409e8a3cde9c8ed51787ced374c69d71b1d633e7ff9d69107b37368d2ac7d280';runpy.run_path('.refactor-baseline/rf120-calendar-index-v1/verify.py',run_name='__main__')"
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf120-calendar-index-v2/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='e14683ccd82bc8cf1d6fa5d5a250782504a3b1c32e371f4c79caf91a053521d4';runpy.run_path('.refactor-baseline/rf120-calendar-index-v2/verify.py',run_name='__main__')"
         ],
         [
           "git",
@@ -9632,7 +9632,7 @@
       ],
       "risk": "high",
       "approved": true,
-      "status": "pending",
+      "status": "retry",
       "allowed_paths": [
         "lib/date.ts",
         "tests/unit/review-activity.test.ts",
@@ -9641,8 +9641,10 @@
       "attempts": 0,
       "discovery_evidence": ".refactor-baseline/rf063-review-activity-v1/dst-variants.md",
       "implementation_mode": "copy-only",
-      "readiness_evidence": ".refactor-baseline/rf120-calendar-index-v1/readiness.md",
-      "primary_preparation_evidence": ".refactor-baseline/rf120-calendar-index-v1/readiness.md"
+      "readiness_evidence": ".refactor-baseline/rf120-calendar-index-v2/readiness.md",
+      "primary_preparation_evidence": ".refactor-baseline/rf120-calendar-index-v2/readiness.md",
+      "started_at": "2026-11-03T05:53:11.807322+00:00",
+      "failure": "review stopped at account usage limit; see .ralph/runs/RF-120-1-1793685191809673813/review.jsonl"
     }
   ]
 }
