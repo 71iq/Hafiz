@@ -1,3 +1,4 @@
+import { parseJsonRecord } from "@/lib/serialization/json-record";
 import { buildLocalReviewCounts, calculateLongestStreak } from "@/lib/fsrs/review-activity";
 import type { SQLiteDatabase } from "expo-sqlite";
 import { enqueueSync } from "@/lib/database/sync-queue";
@@ -480,16 +481,4 @@ function rowToUnlock(row: UnlockRow): AchievementUnlock {
     localPayload: parseJsonRecord(row.local_payload),
     publicPayload: parseJsonRecord(row.public_payload),
   };
-}
-
-function parseJsonRecord(value: unknown): Record<string, unknown> {
-  if (!value) return {};
-  if (typeof value === "object" && !Array.isArray(value)) return value as Record<string, unknown>;
-  if (typeof value !== "string") return {};
-  try {
-    const parsed = JSON.parse(value);
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
-  } catch {
-    return {};
-  }
 }

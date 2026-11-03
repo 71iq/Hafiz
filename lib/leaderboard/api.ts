@@ -1,3 +1,4 @@
+import { parseJsonRecord as parsePayload } from "@/lib/serialization/json-record";
 import { parseDailyScoreRows, rankDailyScores } from "@/lib/leaderboard/ranking";
 import { isMissingPublicReviewAggregateError } from "@/lib/leaderboard/errors";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
@@ -430,17 +431,6 @@ function normalizePublicProfileStreak(profile: PublicProfile): PublicProfile {
   };
 }
 
-function parsePayload(value: unknown): Record<string, unknown> {
-  if (!value) return {};
-  if (typeof value === "object" && !Array.isArray(value)) return value as Record<string, unknown>;
-  if (typeof value !== "string") return {};
-  try {
-    const parsed = JSON.parse(value);
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
-  } catch {
-    return {};
-  }
-}
 
 function isMissingOptionalProfileColumnError(error: { code?: string; message?: string; details?: string } | null): boolean {
   const message = `${error?.code ?? ""} ${error?.message ?? ""} ${error?.details ?? ""}`.toLowerCase();
