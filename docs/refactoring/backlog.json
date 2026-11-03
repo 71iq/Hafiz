@@ -10036,15 +10036,20 @@
       ],
       "risk": "high",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "lib/auth/store.ts",
         "tests/unit/auth-profile-transition.test.ts"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "implementation_mode": "copy-only",
       "readiness_evidence": ".refactor-baseline/rf123-atomic-profile-clear-v1/readiness.md",
-      "primary_preparation_evidence": ".refactor-baseline/rf123-atomic-profile-clear-v1/readiness.md"
+      "primary_preparation_evidence": ".refactor-baseline/rf123-atomic-profile-clear-v1/readiness.md",
+      "started_at": "2026-11-03T15:00:25.807231+00:00",
+      "failure": "Batch resource limit reached",
+      "completed_at": "2026-11-03T15:03:53.180425+00:00",
+      "evidence": ".ralph/runs/RF-123-1-1793718025809887482",
+      "summary": "Installed the two frozen RF-123 artifacts only. Verification, review, and acceptance remain pending."
     }
   ]
 }

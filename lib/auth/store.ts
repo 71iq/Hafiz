@@ -69,6 +69,17 @@ function getPasswordResetRedirectTo(): string | undefined {
   return baseUrl ? `${baseUrl}/auth/reset-password` : undefined;
 }
 
+function setSessionIdentity({ session, user }: Pick<AuthState, "session" | "user">): void {
+  useAuthStore.setState((state) => ({
+    session,
+    user,
+    profile:
+      user && state.user?.id === user.id && state.profile?.id === user.id
+        ? state.profile
+        : null,
+  }));
+}
+
 export const useAuthStore = create<AuthStore>((set, get) => ({
   // ─── State ──────────────────────────────────────────────────
   session: null,
@@ -98,14 +109,14 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       if (error) throw error;
 
       if (session) {
-        set({ session, user: session.user });
+        setSessionIdentity({ session, user: session.user });
         connectQfSessionIfAvailable(session);
         get().ensureProfile();
       }
 
       // Listen for auth state changes
       supabase.auth.onAuthStateChange((_event, session) => {
-        set({
+        setSessionIdentity({
           session,
           user: session?.user ?? null,
         });
@@ -132,7 +143,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         password,
       });
       if (error) throw error;
-      set({ session: data.session, user: data.user });
+      setSessionIdentity({ session: data.session, user: data.user });
       await get().ensureProfile();
     } catch (err: any) {
       set({ error: err.message });
@@ -148,7 +159,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     try {
       const result = await startAppOAuth(QF_OAUTH_PROVIDER);
       if (result.session) {
-        set({ session: result.session, user: result.session.user });
+        setSessionIdentity({ session: result.session, user: result.session.user });
         await get().ensureProfile();
       }
     } catch (err: any) {
@@ -165,7 +176,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     try {
       const result = await startAppOAuth(QF_OAUTH_PROVIDER, "link");
       if (result.session) {
-        set({ session: result.session, user: result.session.user });
+        setSessionIdentity({ session: result.session, user: result.session.user });
         await get().ensureProfile();
       }
     } catch (err: any) {
@@ -206,7 +217,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         };
       }
 
-      set({ session: data.session, user: data.user });
+      setSessionIdentity({ session: data.session, user: data.user });
       await get().ensureProfile();
       return { status: "signedIn" };
     } catch (err: any) {
