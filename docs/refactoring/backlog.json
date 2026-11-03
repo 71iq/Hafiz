@@ -9874,7 +9874,7 @@
         "RF-119"
       ],
       "acceptance_criteria": [
-        "Actually read AGENTS/ARCHITECTURE/CONVENTIONS/TECH_STACK/RUNBOOK, entire RF122 JSON, .refactor-baseline/rf122-profile-read-owner-v2/readiness.md/reuse.md/correction.md/artifacts.json. Separate actual PROGRESS1,8p and 1245,1245p before copies, marker Primary prepares RF122 profile request owner guards.",
+        "Actually read AGENTS/ARCHITECTURE/CONVENTIONS/TECH_STACK/RUNBOOK and .refactor-baseline/rf122-profile-read-owner-v3/readiness.md/reuse.md/correction.md/artifacts.json. Read full task with jq .tasks[] in its own successful call. Before copies run exactly sed -n 1,8p docs/refactoring/PROGRESS.md as sole command in one successful tool call, and exactly sed -n 1251,1251p docs/refactoring/PROGRESS.md as sole command in another successful tool call. No bundling, pipes, other sed or jq in either call. Latest marker Primary corrects RF122 separate progress-read handoff. Old wrong-root jq combined-call exit5 and guard rejection preserved; source/test bytes unchanged.",
         "Copy-only two exact cp -- commands from artifacts metadata, each separate successful tool call. Required instruction/metadata reads only. No source/test/artifact/helper dumps, engineering/workflows/checks/tests/hashes/helpers/packages/services/agents/state edits/commits. Verification/review/primary acceptance pending.",
         "Private singleton revision changes on user-ID/session-reference transition only. Both actions capture revision/user and suppress stale success/error/fallback/return; ensure checks before optional insert, and returns null when stale. No already-issued insert cancellation/rollback. Current-owner query/insert/fallback, no-user and profile-only/metadata updates preserved. Whole store outside prescribed edits and all callers untouched.",
         "59 cases old44fail/15controls, final59 plus37 nearby=96, actual Zustand/auth callback/restore paths with synthetic external boundaries. Five semantic mutants fail. Preserve V1 strict-type failure and exact V2 type-only test repair; no weakened rules/assertions or permanent skips. Types/two-file zero-warning lint/test format/graphs/web/whitespace required.",
@@ -9885,7 +9885,7 @@
           "python3",
           "-B",
           "-c",
-          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf122-profile-read-owner-v2/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='8118938eb5dec8c9a7035c2473227622ee68aa9c8c9fc5b3507fb0fb48bfb217';runpy.run_path('.refactor-baseline/rf122-profile-read-owner-v2/verify.py',run_name='__main__')"
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf122-profile-read-owner-v3/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='73740d4a72cf8e837c96466123bfea9c7043bc012d25d9296ff2c4122dc6912d';runpy.run_path('.refactor-baseline/rf122-profile-read-owner-v3/verify.py',run_name='__main__')"
         ],
         [
           "npm",
@@ -9929,7 +9929,7 @@
           "python3",
           "-B",
           "-c",
-          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf122-profile-read-owner-v2/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='8118938eb5dec8c9a7035c2473227622ee68aa9c8c9fc5b3507fb0fb48bfb217';runpy.run_path('.refactor-baseline/rf122-profile-read-owner-v2/verify.py',run_name='__main__')"
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf122-profile-read-owner-v3/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='73740d4a72cf8e837c96466123bfea9c7043bc012d25d9296ff2c4122dc6912d';runpy.run_path('.refactor-baseline/rf122-profile-read-owner-v3/verify.py',run_name='__main__')"
         ],
         [
           "git",
@@ -9939,15 +9939,18 @@
       ],
       "risk": "high",
       "approved": true,
-      "status": "pending",
+      "status": "retry",
       "allowed_paths": [
         "lib/auth/store.ts",
         "tests/unit/auth-profile-owner.test.ts"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "implementation_mode": "copy-only",
-      "readiness_evidence": ".refactor-baseline/rf122-profile-read-owner-v2/readiness.md",
-      "primary_preparation_evidence": ".refactor-baseline/rf122-profile-read-owner-v2/readiness.md"
+      "readiness_evidence": ".refactor-baseline/rf122-profile-read-owner-v3/readiness.md",
+      "primary_preparation_evidence": ".refactor-baseline/rf122-profile-read-owner-v3/readiness.md",
+      "started_at": "2026-11-03T14:44:07.099855+00:00",
+      "failure": "Verification failed: ['python3', '-B', '-c', \"import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf122-profile-read-owner-v2/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='8118938eb5dec8c9a7035c2473227622ee68aa9c8c9fc5b3507fb0fb48bfb217';runpy.run_path('.refactor-baseline/rf122-profile-read-owner-v2/verify.py',run_name='__main__')\"]; see .ralph/runs/RF-122-1-1793717047102484749/verify-0.log",
+      "evidence": ".ralph/runs/RF-122-1-1793717047102484749"
     }
   ]
 }
