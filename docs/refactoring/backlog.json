@@ -4338,7 +4338,7 @@
     {
       "id": "RF-062",
       "title": "Consolidate the JSON-record parser with boundary tests",
-      "description": "Consolidate the JSON-record parser with boundary tests",
+      "description": "Copy four exact primary-prepared parser consolidation artifacts, preserving broad object/fallback semantics and every caller.",
       "rationale": "Group 25 duplicates parsing/fallback semantics.",
       "modules": [
         "lib/achievements/queries.ts",
@@ -4347,30 +4347,78 @@
         "tests/unit/json-record.test.ts"
       ],
       "dependencies": [
-        "RF-004",
-        "RF-043"
+        "RF-004"
       ],
       "acceptance_criteria": [
-        "Inspect both parser implementations and consumers. Test object input, JSON objects, null, arrays, primitives and malformed strings.",
-        "Use one pure owner with unknown input and accurate output. No unchecked any/casts or changed fallback policy."
+        "Actually read AGENTS/ARCHITECTURE/CONVENTIONS/TECH_STACK/RUNBOOK, entire current RF062 JSON, .refactor-baseline/rf062-json-record-v3/readiness.md/reuse.md/correction.md/artifacts.json. Separate actual PROGRESS1,8p and 1235,1235p reads before copies, marker Primary prepares RF062 shared JSON record parsing.",
+        "Four exact cp -- actions from artifacts.json, each in own successful tool call. Required instruction/metadata reads only. No source/test/helper/artifact dumps, engineering/workflows/checks/tests/hashes/helpers/packages/services/agents/state edits/commits. Verification/review/primary acceptance pending.",
+        "Preserve broad non-null non-array object semantics, identity/custom prototypes/nesting/special keys, malformed/nonstring/primitive/array fresh empty fallback. Unknown JSON.parse result plus truthful guard, no any/assertion/new dependency or domain policy. Whole callers preserved outside exact imports/private declaration removals; alias preserves API callsites.",
+        "33 old/new cases plus99 nearby=132,1000 seeded properties; four semantic mutants fail. Preserve both earlier lint/format preparation rejections, no weakened rules/assertions. No full escape-inventory claim; RF043 remains pending, exact two-body audit discharges local prerequisite only.",
+        "Nine fresh gates, stronger complete diff/old-parser/parity/actual-caller/property/mutation/all-event/read/four-copy review and primary acceptance required. No UI/browser/device/native/live data/network/full-suite, protected/schema/auth/dependency/original/production change or push/merge/deploy."
       ],
       "verification": [
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf062-json-record-v3/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='b3bc95fecc40b8f2c73aa12bf21b7bf94073ad57731d5f52367b5c5c3c6e79fc';runpy.run_path('.refactor-baseline/rf062-json-record-v3/verify.py',run_name='__main__')"
+        ],
         [
           "npm",
           "run",
           "test:unit",
           "--",
           "--runTestsByPath",
-          "tests/unit/json-record.test.ts"
+          "tests/unit/json-record.test.ts",
+          "tests/unit/leaderboard-daily-response.test.ts",
+          "tests/unit/leaderboard-ranking.test.ts",
+          "tests/unit/public-review-errors.test.ts",
+          "tests/unit/local-calendar-streak.test.ts",
+          "--no-cache"
         ],
         [
           "npm",
           "run",
           "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/achievements/queries.ts",
+          "lib/leaderboard/api.ts",
+          "lib/serialization/json-record.ts",
+          "tests/unit/json-record.test.ts",
+          "--max-warnings=0"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "lib/serialization/json-record.ts",
+          "tests/unit/json-record.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf062-json-record-v3/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='b3bc95fecc40b8f2c73aa12bf21b7bf94073ad57731d5f52367b5c5c3c6e79fc';runpy.run_path('.refactor-baseline/rf062-json-record-v3/verify.py',run_name='__main__')"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
         ]
       ],
       "risk": "medium",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
         "lib/achievements/queries.ts",
@@ -4378,7 +4426,10 @@
         "lib/serialization/json-record.ts",
         "tests/unit/json-record.test.ts"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "implementation_mode": "copy-only",
+      "readiness_evidence": ".refactor-baseline/rf062-json-record-v3/readiness.md",
+      "primary_preparation_evidence": ".refactor-baseline/rf062-json-record-v3/readiness.md"
     },
     {
       "id": "RF-063",
