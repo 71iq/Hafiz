@@ -3081,7 +3081,8 @@
         "RF-100",
         "RF-117",
         "RF-118",
-        "RF-119"
+        "RF-119",
+        "RF-120"
       ],
       "acceptance_criteria": [
         "Repeat identical clone/dead-code/native+web graph/security scopes.",
@@ -4394,27 +4395,116 @@
         "RF-022"
       ],
       "acceptance_criteria": [
-        "Compare full functions and callers. Characterize invalid dates, duplicate days, ordering, gaps, timezone and DST boundaries.",
-        "Share only the pure rule. Keep data access, achievements and wird policy separate."
+        "Actually read AGENTS/ARCHITECTURE/CONVENTIONS/TECH_STACK/RUNBOOK/current RF063/.refactor-baseline/rf063-review-activity-v1/readiness.md/reuse.md/dst-variants.md/artifacts.json. Separate actual progress1,8p and 1193,1193p before copies, marker Primary prepares RF063 local review activity extraction.",
+        "Copy-only four exact successful cp -- commands, each in own tool call. Required instruction/metadata/status reads only; no source/test/helper/artifact dumps, engineering/checks/tests/hashes/packages/services/agents/state edits/commits. Verification/review/primary acceptance pending.",
+        "Share only two exact pure function bodies/signatures using unchanged date helpers. Whole achievements/FSRS callers reverse after prescribed imports/removals. Keep input order, duplicate/invalid semantics, SQL/current-streak/wird/achievements/auth/remote policies unchanged. No dependencies/casts/any/protected changes.",
+        "23 hardcoded/property cases against each old body and candidate in four TZ processes.92 final zone executions plus9 unchanged date/scoring tests. Two500-run seeded properties each zone, five semantic mutation failures. Initial eight lint warnings/fixture preserved; namespace import only correction. Types/four-file zero-warning lint/test format/three graphs/web pass.",
+        "Existing London DST wrong result is deliberately characterized, not fixed or accepted as correct semantics. RF120 pending/unapproved and required for final audit. Variant report distinguishes actual pure repro from static current-streak/wird/leaderboard candidates and excluded UTC/difference owners. No actual SQL/network/manual UI/device/native/full-suite claim.",
+        "13 fresh controller gates, separate stronger whole-diff/all-generator-event/read/four-copy/timezone/property/old-body/mutation/debt review and primary acceptance required. Keep local, no push/merge/deploy/production/original/protected changes."
       ],
       "verification": [
         [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf063-review-activity-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='46f7a1961ec81bb13dfcd6e565a2976272fe1399a0c268478ee0e02848bc6970';runpy.run_path('.refactor-baseline/rf063-review-activity-v1/verify.py',run_name='__main__')"
+        ],
+        [
+          "env",
+          "TZ=UTC",
           "npm",
           "run",
           "test:unit",
           "--",
           "--runTestsByPath",
           "tests/unit/review-activity.test.ts",
-          "tests/unit/fsrs-scoring.test.ts"
+          "--no-cache"
+        ],
+        [
+          "env",
+          "TZ=America/New_York",
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/review-activity.test.ts",
+          "--no-cache"
+        ],
+        [
+          "env",
+          "TZ=Asia/Hebron",
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/review-activity.test.ts",
+          "--no-cache"
+        ],
+        [
+          "env",
+          "TZ=Europe/London",
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/review-activity.test.ts",
+          "--no-cache"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/fsrs-scoring.test.ts",
+          "tests/unit/date-utils.test.ts",
+          "--no-cache"
         ],
         [
           "npm",
           "run",
           "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/achievements/queries.ts",
+          "lib/fsrs/queries.ts",
+          "lib/fsrs/review-activity.ts",
+          "tests/unit/review-activity.test.ts",
+          "--max-warnings=0"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "tests/unit/review-activity.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf063-review-activity-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='46f7a1961ec81bb13dfcd6e565a2976272fe1399a0c268478ee0e02848bc6970';runpy.run_path('.refactor-baseline/rf063-review-activity-v1/verify.py',run_name='__main__')"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
         ]
       ],
       "risk": "high",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
         "lib/achievements/queries.ts",
@@ -4422,7 +4512,10 @@
         "lib/fsrs/review-activity.ts",
         "tests/unit/review-activity.test.ts"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "implementation_mode": "copy-only",
+      "readiness_evidence": ".refactor-baseline/rf063-review-activity-v1/readiness.md",
+      "primary_preparation_evidence": ".refactor-baseline/rf063-review-activity-v1/readiness.md"
     },
     {
       "id": "RF-064",
@@ -9392,6 +9485,57 @@
       "completed_at": "2026-11-03T02:49:05.627411+00:00",
       "evidence": ".ralph/runs/RF-119-1-1793673962575778119",
       "summary": "Installed the two RF-119 frozen artifacts by the prescribed copy-only commands. Verification, independent review, and primary acceptance remain pending."
+    },
+    {
+      "id": "RF-120",
+      "title": "Repair DST-sensitive local calendar day indexes",
+      "description": "RF063 reproduced London spring/autumn four-day longest streak as2 in both existing local implementations. Choose a calendar-date index repair and verify all real consumers separately.",
+      "rationale": "Local midnight epoch milliseconds divided/floored by86400000 can repeat or skip indexes when timezone offset crosses zero. Remote UTC summaries have different ownership.",
+      "modules": [
+        "lib/date.ts",
+        "lib/fsrs/review-activity.ts",
+        "lib/fsrs/queries.ts",
+        "lib/leaderboard/api.ts",
+        "tests/unit/review-activity.test.ts",
+        "tests/unit/date-utils.test.ts"
+      ],
+      "dependencies": [
+        "RF-063"
+      ],
+      "acceptance_criteria": [
+        "Pending primary design. Inspect all local-date index consumers and characterize full FSRS current-streak/wird and public streak outputs before selecting exact changes. Keep preserved RF063 old London evidence and hardcoded pre-repair expectations in ignored evidence.",
+        "Choose stable local calendar adjacency across UTC, New_York, Hebron, London spring/autumn and historical timezone/date normalization boundaries. Keep local today choice, remote UTC day indexes, sorting, duplicate/invalid input policies and all offline personal data. No data rewrite, schema/backend or auth change.",
+        "Separate semantic fix requires focused real caller regressions, all four TZ processes, types, relevant graphs/web and fresh stronger review/primary acceptance. Do not mark repaired from extraction or pure-only characterization."
+      ],
+      "verification": [
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/review-activity.test.ts",
+          "tests/unit/date-utils.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
+      ],
+      "risk": "high",
+      "approved": false,
+      "status": "pending",
+      "allowed_paths": [
+        "lib/date.ts",
+        "lib/fsrs/review-activity.ts",
+        "lib/fsrs/queries.ts",
+        "lib/leaderboard/api.ts",
+        "tests/unit/review-activity.test.ts",
+        "tests/unit/date-utils.test.ts"
+      ],
+      "attempts": 0,
+      "discovery_evidence": ".refactor-baseline/rf063-review-activity-v1/dst-variants.md"
     }
   ]
 }
