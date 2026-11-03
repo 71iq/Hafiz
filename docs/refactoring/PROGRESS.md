@@ -1277,3 +1277,7 @@ The mission is active. This file records durable events; backlog.json owns task 
 - 2026-11-03T20:55:43.612129+00:00 `RF-027` retry. Verification failed: ['python3', '-B', '.refactor-baseline/rf027-manual-fetch-v1/verify-inventory.py']; see .ralph/runs/RF-027-1-1793739340694058347/verify-1.log
 
 - 2026-11-03. Primary corrects RF027 Markdown link verification. V1 generation/admission stop and fresh gate1 failure preserved. Initial regex cut an existing angle-wrapped app/(tabs) route target at its parenthesis. V2 parses angle-wrapped and balanced route links; focused real-path controls and absent-path rejection pass. Both document artifacts and AST inventory/classification remain identical. Ordinary attempt1 spent, no refund/check removal/limit change. Evidence .refactor-baseline/rf027-manual-fetch-v2/correction.md. Required latest marker is this correction. Fresh generation/all five gates/new stronger complete review/primary acceptance remain mandatory; no app repair or mission completion.
+
+- 2026-11-03T20:58:15.871688+00:00 `RF-027` retry. Batch resource limit reached. Preserved work will be reverified on resume.
+
+- 2026-11-03T21:00:55.394969+00:00 `RF-027` verified. Installed the two frozen RF-027 artifacts only. Evidence `.ralph/runs/RF-027-2-1793739511299199917`.

@@ -2106,18 +2106,20 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "retry",
+      "status": "verified",
       "allowed_paths": [
         "docs/refactoring/MANUAL_FETCH_OWNERSHIP.md",
         "docs/refactoring/QUERY_AUDIT.md"
       ],
-      "attempts": 1,
+      "attempts": 2,
       "implementation_mode": "copy-only",
       "readiness_evidence": ".refactor-baseline/rf027-manual-fetch-v2/readiness.md",
       "primary_preparation_evidence": ".refactor-baseline/rf027-manual-fetch-v2/readiness.md",
-      "started_at": "2026-11-03T20:55:40.691421+00:00",
-      "failure": "Verification failed: ['python3', '-B', '.refactor-baseline/rf027-manual-fetch-v1/verify-inventory.py']; see .ralph/runs/RF-027-1-1793739340694058347/verify-1.log",
-      "evidence": ".ralph/runs/RF-027-1-1793739340694058347"
+      "started_at": "2026-11-03T20:58:31.296561+00:00",
+      "failure": "Batch resource limit reached",
+      "evidence": ".ralph/runs/RF-027-2-1793739511299199917",
+      "completed_at": "2026-11-03T21:00:55.392596+00:00",
+      "summary": "Installed the two frozen RF-027 artifacts only."
     },
     {
       "id": "RF-028",

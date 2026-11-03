@@ -1,0 +1,79 @@
+# Remaining remote fetch ownership
+
+RF027 is a source audit. It changes no application code and accepts no auth, sync or pagination repair. QUERY_AUDIT.md owns the existing Query families. This document classifies the remaining reads and the commands that also read remote state.
+
+## Inventory boundary
+
+The installed TypeScript compiler scans all 223 tracked .ts/.tsx files under app, components and lib. It records 76 direct fetch/Supabase entry calls in 13 files, plus the aliased getUserIdentities method in quran-foundation/user.ts. These are call sites, not 76 requests or 76 manual reads. They include auth subscriptions, writes and getPublicUrl, which constructs a URL without fetching it. Array.from and NetInfo.fetch are not server reads. The preserved inventory lists exact path, line, enclosing function, expression and first argument for every recorded site.
+
+The scanner matches direct fetch, supabase.from, functions.invoke, auth methods and storage.from, including the existing casted auth calls. Primary also searched for alternate transports and traced the known exported service wrappers into their UI/sync callers. This is a bounded authored-client inventory, not a whole-program network proof. It excludes external SDK internals, server Edge Functions, native media/image downloads and generated/native asset loaders. Indirect or newly added transport aliases require another review. Browser asset fetches still appear below so they cannot be mistaken for remote account state.
+
+| File                                       | Direct sites | Current owner and decision                                              |
+| ------------------------------------------ | ------------ | ----------------------------------------------------------------------- |
+| `app/auth/reset-password.tsx`              | 2            | Auth commands, RF125 caller contract; no Query conversion               |
+| `components/mushaf/MushafPage.tsx`         | 1            | Bundled layout asset, retain module promise                             |
+| `lib/auth/oauth.ts`                        | 6            | Auth command/session exchange, retain auth owner                        |
+| `lib/auth/store.ts`                        | 12           | Auth session/profile owner, RF025/RF122/RF123/RF125                     |
+| `lib/database/init.ts`                     | 4            | Bundled runtime content import, retain importer/cache                   |
+| `lib/database/sync.ts`                     | 7            | Durable queue/restore/conflict command, RF029-RF031                     |
+| `lib/fsrs/leaderboard-sync.ts`             | 12           | Read-before-write reconciliation, retain command; RF025 late publishers |
+| `lib/leaderboard/api.ts`                   | 12           | Public remote reads already consumed by Query                           |
+| `lib/profile/avatar.ts`                    | 3            | Selected URI read/upload command; getPublicUrl is URL construction      |
+| `lib/quran-foundation/content.ts`          | 1            | Remote content reads, retain offline cache; evaluate catalog sharing    |
+| `lib/quran-foundation/user.ts`             | 1            | Mixed status read and OAuth/sync commands; split by action              |
+| `lib/reflections/api.ts`                   | 14           | Reads already Query-backed, writes remain commands; RF026               |
+| `lib/translations/translation-requires.ts` | 1            | Bundled runtime translation asset, retain loader                        |
+
+## Reads already owned by Query
+
+lib/leaderboard/api.ts has twelve direct table-query sites. Its four leaderboard exports use Query in the leaderboard route. Public profile, badges, activity and surah progress use Query in ProfileModalContent. Private score/review helpers and the optional-column fallback feed those same exports. Do not wrap those helpers in another cache. Keep public result ownership by target/tab, activity window/date freshness and the existing missing-aggregate/optional-column behavior. RF065/RF121 validate ranking rows; other response assertions remain outside those repairs.
+
+lib/reflections/api.ts has fourteen entry sites covering public feed/ayah/count/comments, viewer-like enrichment and mutations/reporting. Those reads already feed the feature Query families described in QUERY_AUDIT.md. Keep viewer enrichment in the viewer-aware keys. A local liked/comment array can still outlive the query owner. RF119 repaired the ayah-section owner only. CommentsSheet/feed mutation state and page reconciliation remain RF025/RF026 work.
+
+Leaderboard query and prefetch callbacks currently call syncDailyScore and updateProfileStats before the public read. A query retry/refetch can therefore repeat account-dependent writes. Four tab prefetches can each enter that sync path. This is a static ordering finding, not a measured duplicate-request count. Keep those writes out of a future pure public read callback, but first define a single sync trigger and test account changes, retries and foreground events. RF025/RF029 must resolve write ownership before that change is approved.
+
+## Manual remote content reads
+
+| Service and caller                         | Current cache/lifecycle                                                                                                                                                                     | Decision                                                                                                                                                                                                |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| fetchQfAyahAudio through AyahAudioProvider | SQLite cache keyed by recitation/surah/ayah, 30-day age. Cached audio returns immediately; stale cache refreshes in background. Range playback has its own session predicate.               | Retain durable cache and player coordinator. Query is optional in-flight deduplication only if a later fixture proves duplicate reads; it must not become the durable owner or replay audio on refetch. |
+| fetchQfAyahHadiths through HadithTab       | SQLite cache keyed by surah/ayah/language/page/limit. Fresh nonempty page returns locally; stale page remains visible while remote refresh writes SQLite. Component holds pages/error/busy. | First repair late-page ownership at the component boundary. Do not add a second page cache before that fixture.                                                                                         |
+| fetchQfReciters through ReciterPicker      | Reads when visible or language changes. Effect cancellation guards all late result/error/finally state; fallback merges with bundled RECITERS. No shared remote catalog cache.              | One suitable small Query migration after defining cache/freshness. Preserve visibility gate, locale key and bundled/selected-ID fallback.                                                               |
+
+HadithTab's effect cancelled flag guards loading/error handling around loadPage, but loadPage itself can apply cached/remote pages and errors after the surah, ayah or language changes. It also writes the old page to its correctly parameterized SQLite cache. A cancellation flag around the caller does not guard these inner UI writes. Retry/load-more share those callbacks. This is source evidence of an unguarded continuation, not a reproduced screen failure. A future safety test must run the real component and resolve old/new responses in both orders. Preserve valid cache population separately from displayed-owner state.
+
+The content adapter returns tagged errors and has configuration gates. Its generic response assertion does not validate action-specific payloads. A Query migration cannot certify those payloads, offline playback, server policy, content accuracy or native media behavior.
+
+## QF connection and synchronization
+
+user.ts exposes a mixed command adapter. Status and linked-identity lookup are reads. begin/complete OAuth, provider-token connect and disconnect are commands. user-sync calls status, then cursor-paginates bookmarks and notes, and performs local merges/tombstones and remote writes. Each remote list has a twenty-page cap; note pages request limit50. Cursor reads participate in durable reconciliation and must stay in the sync command, not a UI infinite query. The cap and missing-variant fallbacks need RF029/RF031 safety fixtures before any semantics change.
+
+Settings refreshQfStatus writes qfStatus after status and optional identity lookup. It runs on its effect, after disconnect/manual sync and while finishing a callback. user-sync separately asks for connection status. The settings read lacks a request generation or current-session predicate across awaits. A dependency change creates another callback but does not cancel the old one. User-ID-only keys cannot distinguish same-ID reauthentication. This is a static lifecycle risk, not a reproduced account leak.
+
+A later bounded connection-read migration can remove duplicate settings status/loading state using one session-owned Query result. It must preserve the linked_no_sync fallback when server status is disconnected. Keep access/provider tokens, OAuth code/state, redirects and write operations out of query keys and persisted caches. Invalidate the active session's status only after connect/disconnect/complete succeeds. Existing disconnect resolves a tagged failure rather than always throwing, while settings currently ignores that result. Test that failure before changing success UI. The OAuth callback cancelled flag guards some messages but not router.replace after completion or rejection. That command/navigation lifecycle remains an auth repair, not a read-cache migration.
+
+## Reads that stay command-owned or local
+
+Auth store getSession, profile lookup/ensure, OAuth session exchange and password recovery belong to the auth lifecycle. ensureProfile can insert, updateProfile writes, and notifications initialize more work. RF122 prevents stale profile lookup publication and RF123 clears profile atomically across session changes. They do not solve updateProfile/password/other auth publishers or listener cleanup. RF124 rejected the password candidate against actual SDK notification ordering; RF125 remains unapproved. Do not create a parallel Query session/profile authority.
+
+fsrs/leaderboard-sync reads daily scores, public review aggregates, profile totals and remote surah progress before maximum/merge/upsert reconciliation. Keep those reads fresh inside the command instead of serving a stale public UI cache to a write. The restore-completed check is an existing write gate, not a late-owner check. patchCurrentProfile and the final profile result can still publish after a switch. RF025 owns those continuations; RF029 owns partial failures. A Query conversion alone cannot fix them.
+
+Profile avatar fetch reads the selected picker URI, checks blob size/type and uploads an owner-specific path before updateProfile. It is a command, not remote server-state browsing. A selected URI can use a platform-supported scheme; this audit does not assume every URI is local or certify picker/device behavior. Do not cache the blob or upload URL as a read query. Profile's default-deck/surah overview and current-user badge query are local SQLite reads. Keep SQLite authoritative. The existing local overview's late UI writes and pending avatar save need lifecycle tests separately.
+
+Database sync fetchRemoteRows/pullTable, remoteIsNewer and study-log duplicate lookup are restore, conflict and write-idempotency inputs. They accompany queued writes, timestamp/soft-delete handling and account restore. Preserve ordering and local ownership. RF029-RF033 own their failure, payload, bridge and schema work. Do not delete local data or move queues into Query to make this audit pass. useSync's NetInfo.fetch reads connectivity, not remote application data.
+
+Database initializer, translation loader and MushafPage fetch deployment runtime assets under /data. Their native equivalents use bundled mappings. Keep loader promises/import progress and offline requirements. RF104 still owns the independently reproduced tafsir replacement failure. A remote-read audit neither authorizes protected content changes nor makes those imports transactional.
+
+## Exact follow-up scopes, not approved implementations
+
+1. Reciter catalog read. Limit source to components/settings/ReciterPicker.tsx and one tests/unit/reciter-query.test.tsx fixture. Reuse the existing content adapter and Query provider. Key by language and the content family, gate by visible/configuration, choose an explicit freshness interval with bundled fallback. Test two consumers sharing an in-flight read, hide/reopen, locale change with late completion, failed response, selected ID absent from catalog and disabled configuration. Keep UI, selected setting and fallback conversion unchanged. No persistent Query cache or audio/hadith rewrite.
+2. Hadith displayed owner. Limit source to components/mushaf/ayah-tabs/HadithTab.tsx and one tests/unit/hadith-owner.test.tsx fixture. First reproduce old page/error/finally callbacks after verse/language change, unmount, retry and load-more overlap. Choose per-owner generation or keyed child after that evidence. Keep exact SQLite keys, 30-day/empty-page freshness, page size4, ordered merge, stale fallback and retry semantics. No content adapter/cache schema changes or automatic Query migration.
+3. Connection status read. After RF025/RF125 define a real session owner, limit work to settings QF status UI, one feature-local read hook if two real consumers can share its semantics, and one behavioral fixture. Freeze current status/linked fallback, tagged errors, auth replacement, explicit invalidations and command side effects first. Decide whether sync requires an uncached fresh status separately. Do not blindly route reconciliation through a UI cache. OAuth completion/navigation and durable queue repairs remain separate command scopes.
+
+These plans are not ready tasks. They need primary-authored behavior evidence and exact artifacts before approval. RF027 completes classification and preparation, not the migrations. RF025/RF026/RF029-RF033/RF104/RF125 remain open.
+
+## Evidence and limits
+
+Evidence is .refactor-baseline/rf027-manual-fetch-v1. inventory.cjs and inventory.json record the current source scan. classification.json covers every recorded file. The initial scanner/output remain preserved because its broad alias search captured enclosing declarations; the corrected scanner isolates the actual method alias and improves callback names. This preparation correction changes no app code or acceptance rule.
+
+Fresh controller gates regenerate and compare the full inventory, check coverage and every frozen old tracked input, validate document links/format/whitespace and audit actual worker reads/copies. Separate stronger review must inspect the source/caller classifications and complete diff. Application typecheck, Jest, web/native builds, browser/device/network/production checks are not required for this documentation-only classification and are not claimed. Static risk statements do not establish reproduced failures or a live security result. No application, dependency, schema, protected input, original checkout, production or deployment change is accepted here.
