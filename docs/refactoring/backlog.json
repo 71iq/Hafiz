@@ -1973,13 +1973,16 @@
         "RF-024",
         "RF-119",
         "RF-122",
-        "RF-123"
+        "RF-123",
+        "RF-124",
+        "RF-125"
       ],
       "acceptance_criteria": [
         "Test sign-in, sign-out, account switch, late responses, subscription cleanup and offline restore.",
         "Cancel/remove private cache at the correct lifecycle point with no new auth behavior.",
         "RF122 guards only fetchProfile/ensureProfile across user-ID/session-reference revisions. It does not close this parent. Independently verify atomic profile clearing, stale auth/updateProfile/leaderboard-sync publishers, Query eviction, listener cleanup, offline restore and same-owner ordering before acceptance. No personal SQLite destruction.",
-        "RF123 atomically clears or retains matching profile only in six successful session-identity assignment paths. Parent remains unapproved; stale auth/password/updateProfile/leaderboard publishers, cache/listener/offline policies and arbitrary external setState still need separate verification."
+        "RF123 atomically clears or retains matching profile only in six successful session-identity assignment paths. Parent remains unapproved; stale auth/password/updateProfile/leaderboard publishers, cache/listener/offline policies and arbitrary external setState still need separate verification.",
+        "RF124 audits password update/reset-route ownership and rejects an overbroad candidate that fails actual SDK USER_UPDATED continuity despite mocked tests passing. RF125 remains an unapproved repair. No auth-isolation closure before real SDK notification, loading/error and caller-continuation policies are resolved."
       ],
       "verification": [
         [
@@ -3089,7 +3092,9 @@
         "RF-120",
         "RF-121",
         "RF-122",
-        "RF-123"
+        "RF-123",
+        "RF-124",
+        "RF-125"
       ],
       "acceptance_criteria": [
         "Repeat identical clone/dead-code/native+web graph/security scopes.",
@@ -10050,6 +10055,112 @@
       "completed_at": "2026-11-03T15:03:53.180425+00:00",
       "evidence": ".ralph/runs/RF-123-1-1793718025809887482",
       "summary": "Installed the two frozen RF-123 artifacts only. Verification, review, and acceptance remain pending."
+    },
+    {
+      "id": "RF-124",
+      "title": "Audit password recovery ownership against actual auth SDK notifications",
+      "description": "Copy one primary-authored audit document. Proposed source repair is rejected and remains ignored; this task changes no app source.",
+      "rationale": "A store-only silent return can let the route sign out a new account; reusing profile reference revision rejects normal SDK USER_UPDATED success.",
+      "modules": [
+        "docs/refactoring/AUTH_PASSWORD_OWNERSHIP.md"
+      ],
+      "dependencies": [
+        "RF-122",
+        "RF-123"
+      ],
+      "acceptance_criteria": [
+        "Actually read AGENTS/ARCHITECTURE/CONVENTIONS/TECH_STACK/RUNBOOK, full selected RF124 JSON via jq filter .tasks[] | select(.id == \"RF-124\"), .refactor-baseline/rf124-password-owner-v1/readiness.md/audit-reuse.md/artifacts.json. Two exact successful standalone sed calls for PROGRESS1,8p and 1267,1267p, no bundling. Latest marker Primary prepares RF124 password SDK ownership audit.",
+        "Copy-only one exact cp -- from artifacts metadata. Required instruction/metadata reads only. No candidate/source/test/helper dumps, engineering/workflows/checks/tests/hashes/helpers/packages/services/agents/state edits/commits. Five gates/review/primary acceptance pending.",
+        "Publish diagnosis only. Current33-case workflow26fail/7controls includes proposed outcome-contract failures, not26 separate bugs. Candidate33pass and previous135nearby/types/lint/format/graphs/web do not establish correctness. Actual installed SDK2.99.3 current control passes; candidate fails normal update due USER_UPDATED before promise return and new session reference. Every proposed source/type/route change remains ignored/rejected.",
+        "Four isolated comparisons rerun fresh with exact expected exit/result signatures, in-memory storage and supplied fake fetch. No application-source write or real auth/network. Freeze document/evidence/SDK runtime/all old tracked inputs. Preserve all failures and no permanent unsafe product expectations.",
+        "Five fresh gates and separate stronger full-document/probe/current-candidate/SDK notification/caller-contract/test-count/whole-source/all generator event/read/one-copy review plus primary acceptance mandatory. RF025/RF125 remain unapproved. No accepted auth fix/full isolation/full suite/browser/native/device/live data/network/protected/production/push/merge/deploy claim."
+      ],
+      "verification": [
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf124-password-owner-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='0a3d7fc81c2f4906fe7f9e04dca294299662369cac9bb3ba89dc7006320be6b7';runpy.run_path('.refactor-baseline/rf124-password-owner-v1/verify.py',run_name='__main__')"
+        ],
+        [
+          "python3",
+          "-B",
+          ".refactor-baseline/rf124-password-owner-v1/verify-experiments.py"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "docs/refactoring/AUTH_PASSWORD_OWNERSHIP.md"
+        ],
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf124-password-owner-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='0a3d7fc81c2f4906fe7f9e04dca294299662369cac9bb3ba89dc7006320be6b7';runpy.run_path('.refactor-baseline/rf124-password-owner-v1/verify.py',run_name='__main__')"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
+        ]
+      ],
+      "risk": "high",
+      "approved": true,
+      "status": "pending",
+      "allowed_paths": [
+        "docs/refactoring/AUTH_PASSWORD_OWNERSHIP.md"
+      ],
+      "attempts": 0,
+      "implementation_mode": "copy-only",
+      "readiness_evidence": ".refactor-baseline/rf124-password-owner-v1/readiness.md",
+      "primary_preparation_evidence": ".refactor-baseline/rf124-password-owner-v1/readiness.md"
+    },
+    {
+      "id": "RF-125",
+      "title": "Repair password operation ownership without canceling SDK continuity",
+      "description": "Unapproved follow-up to RF124. Primary must choose auth operation/session ownership before preparing exact source artifacts.",
+      "rationale": "RF124 real SDK normal-update control rejects initial profile-reference generation reuse.",
+      "modules": [
+        "lib/auth/store.ts",
+        "lib/auth/types.ts",
+        "app/auth/reset-password.tsx",
+        "tests/unit/auth-password-owner.test.tsx"
+      ],
+      "dependencies": [
+        "RF-124"
+      ],
+      "acceptance_criteria": [
+        "Unapproved. Resolve genuine owner replacement versus USER_UPDATED/TOKEN_REFRESHED continuity, current/anonymous recovery, auth intents, stale SDK callbacks, error/loading ownership and sole route cancellation contract before exact small scopes. Compare a lifecycle revision with stable session identity and preserve failures.",
+        "Actual GoTrueClient with synthetic storage/fetch must preserve normal updates and auth notifications before response completion. Real store/route cases must prevent stale user/error/loading writes, new-account signout and stale navigation across same-ID and different-ID changes. Preserve current error identity and legitimate callbacks/no-callback navigation.",
+        "Define same-owner concurrency, unmount/navigation, pending recovery setSession/ready callbacks and inherited loading explicitly; split work if necessary. No cancellation/rollback guarantee for already-issued requests, no SQLite deletion, auth-policy/production/protected/dependency change. Fresh controller verification, stronger independent review and primary acceptance required."
+      ],
+      "verification": [
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/auth-password-owner.test.tsx",
+          "--no-cache"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
+      ],
+      "risk": "high",
+      "approved": false,
+      "status": "pending",
+      "allowed_paths": [
+        "lib/auth/store.ts",
+        "lib/auth/types.ts",
+        "app/auth/reset-password.tsx",
+        "tests/unit/auth-password-owner.test.tsx"
+      ],
+      "attempts": 0,
+      "discovery_evidence": ".refactor-baseline/rf124-password-owner-v1/sdk-candidate.log"
     }
   ]
 }
