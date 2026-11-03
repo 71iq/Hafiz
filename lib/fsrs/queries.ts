@@ -1,3 +1,4 @@
+import { buildLocalReviewCounts, calculateLongestStreak } from "@/lib/fsrs/review-activity";
 import type { SQLiteDatabase } from "expo-sqlite";
 import { createEmptyCard } from "./scheduler";
 import {
@@ -117,31 +118,7 @@ function isReviewableCard(row: StudyCardRow, nowIso: string): boolean {
   return !row.deleted_at && !row.suspended_at && (!row.buried_until || row.buried_until <= nowIso);
 }
 
-function buildLocalReviewCounts(rows: { reviewed_at: string }[]): Map<string, number> {
-  const counts = new Map<string, number>();
-  for (const row of rows) {
-    const reviewedAt = new Date(row.reviewed_at);
-    if (Number.isNaN(reviewedAt.getTime())) continue;
-    const key = formatLocalDateKey(reviewedAt);
-    counts.set(key, (counts.get(key) ?? 0) + 1);
-  }
-  return counts;
-}
 
-function calculateLongestStreak(dateKeys: string[]): number {
-  let maxStreak = 0;
-  let runStreak = 0;
-  let prevIndex: number | null = null;
-
-  for (const dateKey of dateKeys) {
-    const dayIndex = dayIndexFromDateKey(dateKey);
-    runStreak = prevIndex !== null && dayIndex - prevIndex === 1 ? runStreak + 1 : 1;
-    maxStreak = Math.max(maxStreak, runStreak);
-    prevIndex = dayIndex;
-  }
-
-  return maxStreak;
-}
 
 function calculateCurrentStreak(dateKeysDesc: string[], todayIndex: number): number {
   if (dateKeysDesc.length === 0) return 0;
