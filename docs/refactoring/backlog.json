@@ -4440,26 +4440,71 @@
         "RF-023"
       ],
       "acceptance_criteria": [
-        "Test matching table names/codes, schema-cache messages, null and unrelated errors.",
-        "Share a pure classifier and preserve both fallback paths. No client initialization side effects, schema or production change."
+        "Actually read AGENTS/ARCHITECTURE/CONVENTIONS/TECH_STACK/RUNBOOK/current task/.refactor-baseline/rf064-public-review-errors-v1/readiness.md/reuse.md/artifacts.json. Actual separate progress1,8p and 1185,1185p before copies. Marker Primary prepares RF064 public review error classifier.",
+        "Copy-only four exact successful cp -- commands from readiness, each in own tool call. Required instruction/metadata/status reads only. No source/test/helper/artifact dumps, engineering/checks/tests/hashes/packages/services/agents/state edits/commits. Verification/review/primary acceptance pending.",
+        "Share only exact existing missing public-review classifier, structural input type and body. Complete API and sync callers reverse after exact import/removal. Preserve table-plus-reason substring/case/field behavior and both existing fallback paths, all other warnings/errors/auth/SQL/policies. No client imports, casts/any, dependencies, backend/schema/data/native change.",
+        "31 fixed classification/actual public API cases independently pass both isolated old classifiers;34 candidate cases include3 existing scoring. Four mutations fail. Types/four-file zero-warning lint/new-test format/three graphs/web required. Actual sync/network/manual UI/device/native/full-suite not claimed.",
+        "Nine fresh controller gates, separate stronger Astra whole diff/security policy/fallback scope/baselines/mutations/all generator event types/required reads/four copies review and released-lease primary acceptance required. No push/merge/deploy/production/original/protected changes."
       ],
       "verification": [
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf064-public-review-errors-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='7d5906954608a6f5994b5de31c5734825d0bb991c1c1d18ef7ddf20f98f0e433';runpy.run_path('.refactor-baseline/rf064-public-review-errors-v1/verify.py',run_name='__main__')"
+        ],
         [
           "npm",
           "run",
           "test:unit",
           "--",
           "--runTestsByPath",
-          "tests/unit/public-review-errors.test.ts"
+          "tests/unit/public-review-errors.test.ts",
+          "tests/unit/fsrs-scoring.test.ts",
+          "--no-cache"
         ],
         [
           "npm",
           "run",
           "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/leaderboard/api.ts",
+          "lib/fsrs/leaderboard-sync.ts",
+          "lib/leaderboard/errors.ts",
+          "tests/unit/public-review-errors.test.ts",
+          "--max-warnings=0"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "tests/unit/public-review-errors.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf064-public-review-errors-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='7d5906954608a6f5994b5de31c5734825d0bb991c1c1d18ef7ddf20f98f0e433';runpy.run_path('.refactor-baseline/rf064-public-review-errors-v1/verify.py',run_name='__main__')"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
         ]
       ],
       "risk": "high",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
         "lib/fsrs/leaderboard-sync.ts",
@@ -4467,7 +4512,10 @@
         "lib/leaderboard/errors.ts",
         "tests/unit/public-review-errors.test.ts"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "implementation_mode": "copy-only",
+      "readiness_evidence": ".refactor-baseline/rf064-public-review-errors-v1/readiness.md",
+      "primary_preparation_evidence": ".refactor-baseline/rf064-public-review-errors-v1/readiness.md"
     },
     {
       "id": "RF-065",
