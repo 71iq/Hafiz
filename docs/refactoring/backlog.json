@@ -1972,12 +1972,14 @@
       "dependencies": [
         "RF-024",
         "RF-119",
-        "RF-122"
+        "RF-122",
+        "RF-123"
       ],
       "acceptance_criteria": [
         "Test sign-in, sign-out, account switch, late responses, subscription cleanup and offline restore.",
         "Cancel/remove private cache at the correct lifecycle point with no new auth behavior.",
-        "RF122 guards only fetchProfile/ensureProfile across user-ID/session-reference revisions. It does not close this parent. Independently verify atomic profile clearing, stale auth/updateProfile/leaderboard-sync publishers, Query eviction, listener cleanup, offline restore and same-owner ordering before acceptance. No personal SQLite destruction."
+        "RF122 guards only fetchProfile/ensureProfile across user-ID/session-reference revisions. It does not close this parent. Independently verify atomic profile clearing, stale auth/updateProfile/leaderboard-sync publishers, Query eviction, listener cleanup, offline restore and same-owner ordering before acceptance. No personal SQLite destruction.",
+        "RF123 atomically clears or retains matching profile only in six successful session-identity assignment paths. Parent remains unapproved; stale auth/password/updateProfile/leaderboard publishers, cache/listener/offline policies and arbitrary external setState still need separate verification."
       ],
       "verification": [
         [
@@ -3086,7 +3088,8 @@
         "RF-119",
         "RF-120",
         "RF-121",
-        "RF-122"
+        "RF-122",
+        "RF-123"
       ],
       "acceptance_criteria": [
         "Repeat identical clone/dead-code/native+web graph/security scopes.",
@@ -9953,6 +9956,95 @@
       "evidence": ".ralph/runs/RF-122-2-1793717205308284186",
       "completed_at": "2026-11-03T14:49:22.190469+00:00",
       "summary": "Installed the two exact RF-122 v3 artifacts by the required separate copy commands."
+    },
+    {
+      "id": "RF-123",
+      "title": "Publish session identity and profile ownership atomically",
+      "description": "Copy two exact primary-designed artifacts for atomic profile clearing/retention across six existing identity assignment paths. RF025 stays unapproved.",
+      "rationale": "Current real store exposes new user with old profile until deferred loading completes; separate clearing still leaks transient synchronous subscriber state.",
+      "modules": [
+        "lib/auth/store.ts",
+        "tests/unit/auth-profile-transition.test.ts"
+      ],
+      "dependencies": [
+        "RF-122"
+      ],
+      "acceptance_criteria": [
+        "Actually read AGENTS/ARCHITECTURE/CONVENTIONS/TECH_STACK/RUNBOOK, .refactor-baseline/rf123-atomic-profile-clear-v1/readiness.md/reuse.md/artifacts.json, and full selected task with jq filter .tasks[] | select(.id == \"RF-123\") in its own successful call. Do not dump all tasks. Before copies run exact sed -n 1,8p docs/refactoring/PROGRESS.md as sole command in one successful tool call and sed -n 1259,1259p docs/refactoring/PROGRESS.md as sole command in another successful tool call. No bundling/pipes/other commands. Latest marker Primary prepares RF123 atomic session profile clearing.",
+        "Copy-only two exact cp -- commands from artifacts metadata, each separate successful tool call. Required instruction/metadata reads only. No source/test/helper/candidate dumps, engineering/workflows/checks/tests/hashes/helpers/packages/services/agents/state edits/commits. Nine gates/review/primary acceptance pending.",
+        "One private functional Zustand setter publishes session/user/profile atomically across restore/auth notification/password/QF sign-in/link/session-signup. Retain only matching old/new user and profile IDs, otherwise null before loading. Whole store outside exact helper/six calls and RF122 observer/guards/callers stay unchanged; signout/no-session/error/current-owner behavior preserved.",
+        "39 new actual-store/subscriber cases old19fail/20controls, final39 plus96 nearby=135. Five semantic mutants fail with actual expectations. Types/two-file zero-warning lint/new-test format/three graphs/web/whitespace; no permanent skips/unsafe assertions or weakened rules.",
+        "Nine fresh gates, stronger complete store/private setter/all six paths/callers/RF122 preservation/subscriber atomicity/baseline/mutation/all generator event/read/two-copy review and primary acceptance mandatory. RF025 remains unapproved with stale other publishers/cache/listener/offline/arbitrary external state open. No full isolation, UI/browser/native/device/live-data/network/full-suite claim, schema/dependency/protected/original/production changes or push/merge/deploy."
+      ],
+      "verification": [
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf123-atomic-profile-clear-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='d456e70ec52431ca66e92a582472295ef6fc1ffc98091ce46c7c8314092f0ea5';runpy.run_path('.refactor-baseline/rf123-atomic-profile-clear-v1/verify.py',run_name='__main__')"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/auth-profile-transition.test.ts",
+          "tests/unit/auth-profile-owner.test.ts",
+          "tests/unit/auth-disabled.test.ts",
+          "tests/unit/reflection-owner.test.tsx",
+          "tests/unit/reflection-query-keys.test.ts",
+          "--no-cache"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/auth/store.ts",
+          "tests/unit/auth-profile-transition.test.ts",
+          "--max-warnings=0"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "tests/unit/auth-profile-transition.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf123-atomic-profile-clear-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='d456e70ec52431ca66e92a582472295ef6fc1ffc98091ce46c7c8314092f0ea5';runpy.run_path('.refactor-baseline/rf123-atomic-profile-clear-v1/verify.py',run_name='__main__')"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
+        ]
+      ],
+      "risk": "high",
+      "approved": true,
+      "status": "pending",
+      "allowed_paths": [
+        "lib/auth/store.ts",
+        "tests/unit/auth-profile-transition.test.ts"
+      ],
+      "attempts": 0,
+      "implementation_mode": "copy-only",
+      "readiness_evidence": ".refactor-baseline/rf123-atomic-profile-clear-v1/readiness.md",
+      "primary_preparation_evidence": ".refactor-baseline/rf123-atomic-profile-clear-v1/readiness.md"
     }
   ]
 }
