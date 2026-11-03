@@ -2058,38 +2058,63 @@
     {
       "id": "RF-027",
       "title": "Audit remaining manual remote fetches for Query ownership",
-      "description": "Audit remaining manual remote fetches for Query ownership",
+      "description": "Copy two primary-authored audit documents only. Classify remaining authored client reads and prepare bounded follow-up scopes, no app migration.",
       "rationale": "Only remote server state should migrate to Query.",
       "modules": [
-        "docs/refactoring/QUERY_AUDIT.md",
-        "lib/profile/*",
-        "lib/leaderboard/*",
-        "lib/quran-foundation/*"
+        "docs/refactoring/MANUAL_FETCH_OWNERSHIP.md",
+        "docs/refactoring/QUERY_AUDIT.md"
       ],
       "dependencies": [
         "RF-023"
       ],
       "acceptance_criteria": [
-        "Classify every manual remote fetch by cache/lifecycle needs.",
-        "Prepare small migrations only where they remove duplicate state. Keep local SQLite and queue writes outside Query."
+        "Actually read AGENTS/ARCHITECTURE/CONVENTIONS/TECH_STACK/RUNBOOK; full selected RF027 via jq .tasks[] | select(.id == \"RF-027\"); .refactor-baseline/rf027-manual-fetch-v1/readiness.md,reuse.md,artifacts.json. Mission sed -n 1,8p and latest sed -n 1273,1273p on docs/refactoring/PROGRESS.md each sole command in separate successful call. Marker Primary prepares RF027 manual remote fetch classification.",
+        "Copy exactly two frozen artifacts via separate cp -- calls. Required instruction/metadata reads only; no artifact/source/test/helper/inventory dumps, engineering/workflows/checks/tests/hashes/helpers/packages/services/agents/state edits/commits. Five gates/review/primary acceptance pending.",
+        "Audit only. Distinguish direct entry calls from requests/reads; include actual method alias and scanner boundary/limitations. Trace all13 entry files and wrappers/callers. Existing Query remains; SQLite/offline content and reconciliation/auth/upload/OAuth writes stay owned outside Query. Prepare exact small catalog/hadith-owner/connection-read scopes without approving implementation.",
+        "Separate stronger reviewer inspects whole docs, actual source/callers/inventory coverage and all started/completed generator event types, actual required reads/two copies. Primary acceptance mandatory. Current findings static, no reproduced failure/security/native/browser/live-network claim. Preserve RF124 rejected repair and all other inputs. RF025/RF125 and other repairs remain pending.",
+        "Documentation-only integrity/inventory/link/format/whitespace checks. No application typecheck/Jest/build/browser/native/device/network/production check required or claimed. No protected data/schema/dependency/original checkout/push/merge/deploy change."
       ],
       "verification": [
         [
-          "npm",
-          "run",
-          "typecheck"
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf027-manual-fetch-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='6ff3a81cd8409806896c9d1ca93bb9fb2d2d978262f1b2e79323979d92d4062d';runpy.run_path('.refactor-baseline/rf027-manual-fetch-v1/verify.py',run_name='__main__')"
+        ],
+        [
+          "python3",
+          "-B",
+          ".refactor-baseline/rf027-manual-fetch-v1/verify-inventory.py"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "docs/refactoring/MANUAL_FETCH_OWNERSHIP.md",
+          "docs/refactoring/QUERY_AUDIT.md"
+        ],
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf027-manual-fetch-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='6ff3a81cd8409806896c9d1ca93bb9fb2d2d978262f1b2e79323979d92d4062d';runpy.run_path('.refactor-baseline/rf027-manual-fetch-v1/verify.py',run_name='__main__')"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
         ]
       ],
       "risk": "medium",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
-        "docs/refactoring/QUERY_AUDIT.md",
-        "lib/profile/*",
-        "lib/leaderboard/*",
-        "lib/quran-foundation/*"
+        "docs/refactoring/MANUAL_FETCH_OWNERSHIP.md",
+        "docs/refactoring/QUERY_AUDIT.md"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "implementation_mode": "copy-only",
+      "readiness_evidence": ".refactor-baseline/rf027-manual-fetch-v1/readiness.md",
+      "primary_preparation_evidence": ".refactor-baseline/rf027-manual-fetch-v1/readiness.md"
     },
     {
       "id": "RF-028",
