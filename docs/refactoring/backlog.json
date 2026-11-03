@@ -1971,11 +1971,13 @@
       ],
       "dependencies": [
         "RF-024",
-        "RF-119"
+        "RF-119",
+        "RF-122"
       ],
       "acceptance_criteria": [
         "Test sign-in, sign-out, account switch, late responses, subscription cleanup and offline restore.",
-        "Cancel/remove private cache at the correct lifecycle point with no new auth behavior."
+        "Cancel/remove private cache at the correct lifecycle point with no new auth behavior.",
+        "RF122 guards only fetchProfile/ensureProfile across user-ID/session-reference revisions. It does not close this parent. Independently verify atomic profile clearing, stale auth/updateProfile/leaderboard-sync publishers, Query eviction, listener cleanup, offline restore and same-owner ordering before acceptance. No personal SQLite destruction."
       ],
       "verification": [
         [
@@ -3083,7 +3085,8 @@
         "RF-118",
         "RF-119",
         "RF-120",
-        "RF-121"
+        "RF-121",
+        "RF-122"
       ],
       "acceptance_criteria": [
         "Repeat identical clone/dead-code/native+web graph/security scopes.",
@@ -9856,6 +9859,95 @@
       "completed_at": "2026-11-03T10:54:53.062919+00:00",
       "evidence": ".ralph/runs/RF-121-1-1793703108907987135",
       "summary": "Installed the three supplied RF121 artifacts. Verification, review, and primary acceptance remain pending."
+    },
+    {
+      "id": "RF-122",
+      "title": "Ignore stale profile read and ensure completions across session owners",
+      "description": "Copy exact primary-designed two-action owner guards and actual-store safety fixture. RF025 parent remains unapproved.",
+      "rationale": "RF023 reproduced A profile replacing B; direct ID/object checks miss same-ID reauthentication and A-B-A.",
+      "modules": [
+        "lib/auth/store.ts",
+        "tests/unit/auth-profile-owner.test.ts"
+      ],
+      "dependencies": [
+        "RF-023",
+        "RF-119"
+      ],
+      "acceptance_criteria": [
+        "Actually read AGENTS/ARCHITECTURE/CONVENTIONS/TECH_STACK/RUNBOOK, entire RF122 JSON, .refactor-baseline/rf122-profile-read-owner-v2/readiness.md/reuse.md/correction.md/artifacts.json. Separate actual PROGRESS1,8p and 1245,1245p before copies, marker Primary prepares RF122 profile request owner guards.",
+        "Copy-only two exact cp -- commands from artifacts metadata, each separate successful tool call. Required instruction/metadata reads only. No source/test/artifact/helper dumps, engineering/workflows/checks/tests/hashes/helpers/packages/services/agents/state edits/commits. Verification/review/primary acceptance pending.",
+        "Private singleton revision changes on user-ID/session-reference transition only. Both actions capture revision/user and suppress stale success/error/fallback/return; ensure checks before optional insert, and returns null when stale. No already-issued insert cancellation/rollback. Current-owner query/insert/fallback, no-user and profile-only/metadata updates preserved. Whole store outside prescribed edits and all callers untouched.",
+        "59 cases old44fail/15controls, final59 plus37 nearby=96, actual Zustand/auth callback/restore paths with synthetic external boundaries. Five semantic mutants fail. Preserve V1 strict-type failure and exact V2 type-only test repair; no weakened rules/assertions or permanent skips. Types/two-file zero-warning lint/test format/graphs/web/whitespace required.",
+        "Nine fresh gates, stronger full store/callers/observer lifetime/each await/catch/all generator event/read/two-copy review and primary acceptance required. RF025 remains unapproved with atomic clear/stale other publishers/cache/listener/offline/same-owner policies open. No full isolation, manual UI/native/device/live-data/network/full-suite certification, schema/dependency/protected/original/production changes or push/merge/deploy."
+      ],
+      "verification": [
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf122-profile-read-owner-v2/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='8118938eb5dec8c9a7035c2473227622ee68aa9c8c9fc5b3507fb0fb48bfb217';runpy.run_path('.refactor-baseline/rf122-profile-read-owner-v2/verify.py',run_name='__main__')"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/auth-profile-owner.test.ts",
+          "tests/unit/auth-disabled.test.ts",
+          "tests/unit/reflection-owner.test.tsx",
+          "tests/unit/reflection-query-keys.test.ts",
+          "--no-cache"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/auth/store.ts",
+          "tests/unit/auth-profile-owner.test.ts",
+          "--max-warnings=0"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "tests/unit/auth-profile-owner.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf122-profile-read-owner-v2/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='8118938eb5dec8c9a7035c2473227622ee68aa9c8c9fc5b3507fb0fb48bfb217';runpy.run_path('.refactor-baseline/rf122-profile-read-owner-v2/verify.py',run_name='__main__')"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
+        ]
+      ],
+      "risk": "high",
+      "approved": true,
+      "status": "pending",
+      "allowed_paths": [
+        "lib/auth/store.ts",
+        "tests/unit/auth-profile-owner.test.ts"
+      ],
+      "attempts": 0,
+      "implementation_mode": "copy-only",
+      "readiness_evidence": ".refactor-baseline/rf122-profile-read-owner-v2/readiness.md",
+      "primary_preparation_evidence": ".refactor-baseline/rf122-profile-read-owner-v2/readiness.md"
     }
   ]
 }
