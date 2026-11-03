@@ -1,0 +1,31 @@
+# Password recovery ownership audit
+
+RF124 investigates the password-update branch of RF025. It accepts no application repair. The proposed four-file repair remains rejected in ignored evidence. RF125 must resolve the owner contract and pass the actual SDK case before any source approval.
+
+## Reproduced current behavior
+
+The real Zustand store accepts a late updatePassword response after a switch, signout or same-ID reauthentication and writes the old user back. Its catch/finally paths also write error/loading into the later owner's state. The real reset-password route then signs out after any resolved updatePassword call and later navigates to login. A store-only silent cancellation can therefore sign out the new account. An owner change while an already-issued signout is pending can also cause stale navigation.
+
+The investigation runs the actual reset route, Zustand store, React Hook Form and Zod in the native tree. Presentation, startup language, router and external auth calls are synthetic. Inputs use English labels and a native Android platform branch. This is behavioral rendered-tree evidence, not browser pixels or an Android build/device result. Thirty-three workflow cases cover five owner transitions, late success/errors/rejections, current and anonymous success, current errors, the store-to-route microtask gap, signout callbacks and pending-signout navigation. The current source fails26 and passes7. Two active-success failures assert the proposed result contract. Ten obsolete-error cases also reach the proposed cancellation outcome before their state assertions. Other failures directly observe stale identity, error notice, signout or navigation. These are26 failed cases, not26 distinct defects. The seven selected current controls pass. Selection uses testNamePattern only; no permanent skipped tests were added.
+
+## Why the proposed guard was rejected
+
+The ignored candidate reuses RF122's profileOwnerGeneration through captureAuthOwner, returns updated/superseded, and adds route checks before signout and after it. Its33 workflow cases,135 nearby cases, types, scoped lint, formatting, three dependency checks and web export pass. Six semantic mutants fail. These checks did not establish compatibility with actual auth notifications.
+
+Installed @supabase/auth-js2.99.3 GoTrueClient.\_updateUser loads a session, sends the request, assigns session.user, saves it and awaits USER_UPDATED subscribers before returning. A JSON-backed storage read produces a new Session object. The current store's auth listener assigns it and RF122's reference-based observer advances profileOwnerGeneration. The candidate therefore classifies an ordinary same-account password update as superseded. A profile-request generation is not automatically a password-operation owner.
+
+A separate fixture executes the installed GoTrueClient with isolated in-memory storage and a supplied fake fetch. It performs the actual password request and USER_UPDATED notification through the real store. Current source passes the normal-update contract. The candidate fails because it returns superseded. Every URL is synthetic and every request uses the supplied fake fetch. No real session, token, account, filesystem session storage or service is used. The proposed source and type/route changes remain ignored and are not accepted.
+
+## Repair constraints
+
+RF125 must define the owner using the auth lifecycle. Genuine sign-in/out, account replacement, same-ID reauthentication and recovery must invalidate old work. USER_UPDATED and TOKEN_REFRESHED continuity must not cancel normal updates. Cover current and initially anonymous recovery with the actual SDK, including an update notification before the operation promise resolves. Compare alternatives such as a session-lifecycle generation or validated stable session identity before choosing. Do not equate object replacement or every access-token refresh with a new account session.
+
+The action and its sole caller must share the cancellation contract. An obsolete result cannot look like successful completion to reset-password.tsx. Check ownership before success/signout effects, across the store-to-route continuation gap and after an already-issued signout. Preserve legitimate navigation with and without an auth callback. Define error/loading ownership explicitly. A later owner's active loading differs from loading inherited from the old request. Do not hide that distinction by always clearing or always retaining the global flag.
+
+Keep current error identity and anonymous recovery behavior unless a separately tested policy change is chosen. Define same-owner overlapping submissions, unmount/navigation, and the pending recovery setSession/ready callback before claiming full workflow safety. Already-issued remote operations cannot be rolled back by local state guards. Do not destroy SQLite data, alter server policies, or infer backend authorization from client tests.
+
+## Evidence and acceptance
+
+Evidence is .refactor-baseline/rf124-password-owner-v1. prepare.py preserves temporary source restoration and the original33-case pass,135 nearby pass and six rejected mutations. old-safety-final.log preserves26 failures/7 controls. sdk-current.log and sdk-candidate.log preserve the actual SDK contract difference. verify-experiments.py reruns all four isolated current/candidate comparisons without writing application source. Its candidate mapper reads only the frozen ignored artifacts. Normal project discovery excludes these probes.
+
+The audit changes only this document. RF025 and RF125 remain unapproved. Controller verification must freeze all old tracked inputs, this document, the investigation artifacts and installed SDK files, rerun the four comparisons and pass independent review. No accepted app change, full application suite, browser, native build/device, live-network, production, protected input or deployment result is claimed. The supervisor remains active.

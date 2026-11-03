@@ -10106,14 +10106,18 @@
       ],
       "risk": "high",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "docs/refactoring/AUTH_PASSWORD_OWNERSHIP.md"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "implementation_mode": "copy-only",
       "readiness_evidence": ".refactor-baseline/rf124-password-owner-v1/readiness.md",
-      "primary_preparation_evidence": ".refactor-baseline/rf124-password-owner-v1/readiness.md"
+      "primary_preparation_evidence": ".refactor-baseline/rf124-password-owner-v1/readiness.md",
+      "started_at": "2026-11-03T20:04:32.168944+00:00",
+      "completed_at": "2026-11-03T20:08:20.237768+00:00",
+      "evidence": ".ralph/runs/RF-124-1-1793736272171529063",
+      "summary": "Copied the primary-authored RF-124 audit document only."
     },
     {
       "id": "RF-125",
