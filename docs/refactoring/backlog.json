@@ -10210,7 +10210,7 @@
         "RF-027"
       ],
       "acceptance_criteria": [
-        "Actually read AGENTS/ARCHITECTURE/CONVENTIONS/TECH_STACK/RUNBOOK; full selected RF126 via jq .tasks[] | select(.id == \"RF-126\"); .refactor-baseline/rf126-hadith-owner-v1/readiness.md,reuse.md,artifacts.json. Mission sed -n 1,8p and latest sed -n 1289,1289p on docs/refactoring/PROGRESS.md each sole command in separate successful call. Marker Primary prepares RF126 Hadith displayed owner.",
+        "Actually read AGENTS/ARCHITECTURE/CONVENTIONS/TECH_STACK/RUNBOOK; full selected RF126 via jq .tasks[] | select(.id == \"RF-126\"); .refactor-baseline/rf126-hadith-owner-v2/readiness.md,reuse.md,artifacts.json. Mission sed -n 1,8p and latest sed -n 1295,1295p on docs/refactoring/PROGRESS.md each sole command in separate successful call. Marker Primary corrects RF126 selected-task read handoff. Also actually read correction.md. The exact filtered jq selected-task read must be the sole command in its own successful tool call, no bundled reads or &&. Preserve V1 failure/spent attempt1; production/test bytes unchanged.",
         "Copy exactly two frozen artifacts via separate cp -- calls. Required instruction/metadata reads only; no artifact/source/test/helper dumps, engineering/workflows/checks/tests/hashes/helpers/packages/services/agents/state edits/commits. Nine gates/review/primary acceptance pending.",
         "Public props unchanged. Private child owns state/callbacks by surah/ayah/normalized content language, following RF119 local pattern. Entire original load/cache/page/retry/error/HadithCard/render behavior byte-identical outside wrapper/normalization move. Preserve old-owner correctly keyed SQLite writes, page-size4, stale/fresh fallbacks, disabled configuration boundary and same-owner pages. No network cancellation, same-owner overlap/provider replacement fix or Query migration claimed.",
         "Actual rendered HadithTab/HadithCard fixtures exercise both completion orders, verse/surah/Arabic switch, delayed cache/stale refresh/old load-more/retry/error, same-owner/fresh-cache/refresh/page/retry/unmount controls. Old15 cases9fail/6controls, candidate15 plus38 nearby53pass; four semantic missing-key/dimension mutants fail. No permanent unsafe/skip expectations or weakened assertions.",
@@ -10221,7 +10221,7 @@
           "python3",
           "-B",
           "-c",
-          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf126-hadith-owner-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='0111a0d61f29cab720aef97690fc1c87076f803682cc754bee29bc6ec249828b';runpy.run_path('.refactor-baseline/rf126-hadith-owner-v1/verify.py',run_name='__main__')"
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf126-hadith-owner-v2/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='6d91b1db2e45e580f53c6fad3f35b3af933d4bf58b67c4b396250a4dfc6440e8';runpy.run_path('.refactor-baseline/rf126-hadith-owner-v2/verify.py',run_name='__main__')"
         ],
         [
           "node_modules/.bin/jest",
@@ -10263,7 +10263,7 @@
           "python3",
           "-B",
           "-c",
-          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf126-hadith-owner-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='0111a0d61f29cab720aef97690fc1c87076f803682cc754bee29bc6ec249828b';runpy.run_path('.refactor-baseline/rf126-hadith-owner-v1/verify.py',run_name='__main__')"
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf126-hadith-owner-v2/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='6d91b1db2e45e580f53c6fad3f35b3af933d4bf58b67c4b396250a4dfc6440e8';runpy.run_path('.refactor-baseline/rf126-hadith-owner-v2/verify.py',run_name='__main__')"
         ],
         [
           "git",
@@ -10273,15 +10273,18 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "pending",
+      "status": "retry",
       "allowed_paths": [
         "components/mushaf/ayah-tabs/HadithTab.tsx",
         "tests/unit/hadith-owner.test.tsx"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "implementation_mode": "copy-only",
-      "readiness_evidence": ".refactor-baseline/rf126-hadith-owner-v1/readiness.md",
-      "primary_preparation_evidence": ".refactor-baseline/rf126-hadith-owner-v1/readiness.md"
+      "readiness_evidence": ".refactor-baseline/rf126-hadith-owner-v2/readiness.md",
+      "primary_preparation_evidence": ".refactor-baseline/rf126-hadith-owner-v2/readiness.md",
+      "started_at": "2026-11-04T01:03:42.576429+00:00",
+      "failure": "Verification failed: ['python3', '-B', '-c', \"import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf126-hadith-owner-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='0111a0d61f29cab720aef97690fc1c87076f803682cc754bee29bc6ec249828b';runpy.run_path('.refactor-baseline/rf126-hadith-owner-v1/verify.py',run_name='__main__')\"]; see .ralph/runs/RF-126-1-1793754222579007089/verify-0.log",
+      "evidence": ".ralph/runs/RF-126-1-1793754222579007089"
     }
   ]
 }
