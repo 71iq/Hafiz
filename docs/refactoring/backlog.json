@@ -10273,18 +10273,20 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "retry",
+      "status": "verified",
       "allowed_paths": [
         "components/mushaf/ayah-tabs/HadithTab.tsx",
         "tests/unit/hadith-owner.test.tsx"
       ],
-      "attempts": 1,
+      "attempts": 2,
       "implementation_mode": "copy-only",
       "readiness_evidence": ".refactor-baseline/rf126-hadith-owner-v2/readiness.md",
       "primary_preparation_evidence": ".refactor-baseline/rf126-hadith-owner-v2/readiness.md",
-      "started_at": "2026-11-04T01:03:42.576429+00:00",
-      "failure": "Verification failed: ['python3', '-B', '-c', \"import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf126-hadith-owner-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='0111a0d61f29cab720aef97690fc1c87076f803682cc754bee29bc6ec249828b';runpy.run_path('.refactor-baseline/rf126-hadith-owner-v1/verify.py',run_name='__main__')\"]; see .ralph/runs/RF-126-1-1793754222579007089/verify-0.log",
-      "evidence": ".ralph/runs/RF-126-1-1793754222579007089"
+      "started_at": "2026-11-04T01:06:08.183645+00:00",
+      "failure": "Batch resource limit reached",
+      "evidence": ".ralph/runs/RF-126-2-1793754368186248133",
+      "completed_at": "2026-11-04T01:09:13.495673+00:00",
+      "summary": "Installed the two primary-supplied RF-126 artifacts by separate copy commands."
     }
   ]
 }
