@@ -3124,7 +3124,8 @@
         "RF-122",
         "RF-123",
         "RF-124",
-        "RF-125"
+        "RF-125",
+        "RF-126"
       ],
       "acceptance_criteria": [
         "Repeat identical clone/dead-code/native+web graph/security scopes.",
@@ -10195,6 +10196,92 @@
       ],
       "attempts": 0,
       "discovery_evidence": ".refactor-baseline/rf124-password-owner-v1/sdk-candidate.log"
+    },
+    {
+      "id": "RF-126",
+      "title": "Isolate Hadith pages and late work by verse and language",
+      "description": "Copy two exact primary-authored source/test artifacts for the bounded RF027 Hadith displayed-owner follow-up. No Query migration or auth change.",
+      "rationale": "Actual component fixtures reproduce old remote/cache/retry/pagination/error work crossing verse/language ownership despite outer effect cancellation.",
+      "modules": [
+        "components/mushaf/ayah-tabs/HadithTab.tsx",
+        "tests/unit/hadith-owner.test.tsx"
+      ],
+      "dependencies": [
+        "RF-027"
+      ],
+      "acceptance_criteria": [
+        "Actually read AGENTS/ARCHITECTURE/CONVENTIONS/TECH_STACK/RUNBOOK; full selected RF126 via jq .tasks[] | select(.id == \"RF-126\"); .refactor-baseline/rf126-hadith-owner-v1/readiness.md,reuse.md,artifacts.json. Mission sed -n 1,8p and latest sed -n 1289,1289p on docs/refactoring/PROGRESS.md each sole command in separate successful call. Marker Primary prepares RF126 Hadith displayed owner.",
+        "Copy exactly two frozen artifacts via separate cp -- calls. Required instruction/metadata reads only; no artifact/source/test/helper dumps, engineering/workflows/checks/tests/hashes/helpers/packages/services/agents/state edits/commits. Nine gates/review/primary acceptance pending.",
+        "Public props unchanged. Private child owns state/callbacks by surah/ayah/normalized content language, following RF119 local pattern. Entire original load/cache/page/retry/error/HadithCard/render behavior byte-identical outside wrapper/normalization move. Preserve old-owner correctly keyed SQLite writes, page-size4, stale/fresh fallbacks, disabled configuration boundary and same-owner pages. No network cancellation, same-owner overlap/provider replacement fix or Query migration claimed.",
+        "Actual rendered HadithTab/HadithCard fixtures exercise both completion orders, verse/surah/Arabic switch, delayed cache/stale refresh/old load-more/retry/error, same-owner/fresh-cache/refresh/page/retry/unmount controls. Old15 cases9fail/6controls, candidate15 plus38 nearby53pass; four semantic missing-key/dimension mutants fail. No permanent unsafe/skip expectations or weakened assertions.",
+        "Fresh controller commands and separate stronger full source/caller/body parity/fixture boundaries/old-new/mutations/all started-completed generator event types/actual reads/two-copy review plus primary acceptance mandatory. Protect all old inputs. Scope adds no strings/styles/content/dependency/schema/auth/protected/production/original changes. No full-suite/browser pixels/native build/device/real SQL/live network/push/merge/deploy certification. RF125 remains unapproved."
+      ],
+      "verification": [
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf126-hadith-owner-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='0111a0d61f29cab720aef97690fc1c87076f803682cc754bee29bc6ec249828b';runpy.run_path('.refactor-baseline/rf126-hadith-owner-v1/verify.py',run_name='__main__')"
+        ],
+        [
+          "node_modules/.bin/jest",
+          "--runInBand",
+          "--runTestsByPath",
+          "tests/unit/hadith-owner.test.tsx",
+          "tests/unit/qf-content-disabled.test.ts",
+          "tests/unit/ayah-tafsir-selection.test.tsx",
+          "tests/unit/reflection-owner.test.tsx",
+          "--no-cache"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "components/mushaf/ayah-tabs/HadithTab.tsx",
+          "tests/unit/hadith-owner.test.tsx",
+          "--max-warnings=0"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "tests/unit/hadith-owner.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy;from pathlib import Path;p=Path('.refactor-baseline/rf126-hadith-owner-v1/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='0111a0d61f29cab720aef97690fc1c87076f803682cc754bee29bc6ec249828b';runpy.run_path('.refactor-baseline/rf126-hadith-owner-v1/verify.py',run_name='__main__')"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
+        ]
+      ],
+      "risk": "medium",
+      "approved": true,
+      "status": "pending",
+      "allowed_paths": [
+        "components/mushaf/ayah-tabs/HadithTab.tsx",
+        "tests/unit/hadith-owner.test.tsx"
+      ],
+      "attempts": 0,
+      "implementation_mode": "copy-only",
+      "readiness_evidence": ".refactor-baseline/rf126-hadith-owner-v1/readiness.md",
+      "primary_preparation_evidence": ".refactor-baseline/rf126-hadith-owner-v1/readiness.md"
     }
   ]
 }
