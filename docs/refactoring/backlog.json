@@ -10520,7 +10520,8 @@
       ],
       "attempts": 0,
       "discovery_evidence": ".refactor-baseline/rf025-owner-audit-v1/receipt.json",
-      "primary_scope_document": "docs/refactoring/AUTH_PROFILE_SAVE_OWNERSHIP.md"
+      "primary_scope_document": "docs/refactoring/AUTH_PROFILE_SAVE_OWNERSHIP.md",
+      "primary_preparation_evidence": ".refactor-baseline/rf127-profile-save-v1/preparation-receipt.json"
     }
   ]
 }
