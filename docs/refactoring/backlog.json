@@ -10153,7 +10153,7 @@
     {
       "id": "RF-125",
       "title": "Guard password recovery ownership and preserve SDK continuity",
-      "description": "Install22 exact primary-authored source/test artifacts for the RF124 follow-up. Follow the frozen copy-only handoff; no design, dependency, production or protected-data work.",
+      "description": "FIRST TOOL COMMAND MUST BE exactly: cat .refactor-baseline/rf125-handoff-v9/readiness.md . No discovery or orientation before this command. The complete command allowlist applies from the FIRST command, including before reading readiness. Never use rg, find, sort, head, tail, pipelines, shell operators or bundled commands. Every call is one allowlisted command. Read AGENTS.md with cat, not sed. Only handoff-required files may be read. Do not read the primary_preparation_evidence decision document or its reuse document, they are evaluator evidence. Then follow readiness exactly to install22 artifacts. All target directories already exist. Prior attempt failed compliance for preliminary discovery/bundling, despite exact copies; do not repeat it.",
       "rationale": "Real SDK races require storage ownership as well as callback guards. Complete-app URL cleanup also replaces root/child lifetimes unless Router state and recovery ownership are explicit.",
       "modules": [
         "lib/supabase.ts",
@@ -10316,7 +10316,7 @@
       ],
       "risk": "high",
       "approved": true,
-      "status": "pending",
+      "status": "retry",
       "allowed_paths": [
         "lib/supabase.ts",
         "lib/auth/store.ts",
@@ -10341,11 +10341,14 @@
         "tests/unit/auth-session-identity.test.ts",
         "tests/unit/auth-command-coordinator.test.ts"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "discovery_evidence": ".refactor-baseline/rf124-password-owner-v1/sdk-candidate.log",
       "implementation_mode": "copy-only",
       "readiness_evidence": ".refactor-baseline/rf125-handoff-v9/readiness.md",
-      "primary_preparation_evidence": ".refactor-baseline/rf125-form-ownership-v10/decision.md"
+      "primary_preparation_evidence": ".refactor-baseline/rf125-form-ownership-v10/decision.md",
+      "started_at": "2026-11-05T04:50:32.258035+00:00",
+      "failure": "Verification failed: ['python3', '-B', '-c', \"import hashlib,runpy,sys;from pathlib import Path;p=Path('.refactor-baseline/rf125-handoff-v9/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='c4269516902b7a383fca1801fb9fa1c8c7d68f39745d118401a89ace3383ac61';sys.argv=['.refactor-baseline/rf125-handoff-v9/verification.py','all'];runpy.run_path('.refactor-baseline/rf125-handoff-v9/verification.py',run_name='__main__')\"]; see .ralph/runs/RF-125-1-1793854232260507523/verify-0.log",
+      "evidence": ".ralph/runs/RF-125-1-1793854232260507523"
     },
     {
       "id": "RF-126",
