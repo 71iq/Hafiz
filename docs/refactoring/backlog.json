@@ -10362,13 +10362,15 @@
       "additional_attempt_controller_counter_base": 0,
       "additional_attempt_historical_offset": 2,
       "historical_ordinary_attempts_spent_before_extension": 2,
-      "historical_total_ordinary_attempts_spent": 2,
-      "authorized_additional_attempts_used": 0,
+      "historical_total_ordinary_attempts_spent": 3,
+      "authorized_additional_attempts_used": 1,
       "attempt_count_stop_waived_by_user": true,
       "continuation_authorization": ".refactor-baseline/modernization-standing-continuation-2026-11-01.json",
       "primary_recovery_evidence": ".refactor-baseline/rf125-partial-url-v11/decision.md",
       "completed_at": "2026-11-05T10:03:20.879501+00:00",
-      "summary": "Installed all 22 frozen RF-125 artifacts. Controller verification, independent review, and primary acceptance remain pending."
+      "summary": "Primary accepted exact22-file recovery/session ownership repair after all17 fresh gates and separate stronger review. Partial credentials are removed before invalid returns; current SDK continuity and replacement guards pass. Wider RF025 remains open.",
+      "primary_accepted": true,
+      "primary_acceptance_evidence": ".refactor-baseline/rf125-primary-acceptance.json"
     },
     {
       "id": "RF-126",
