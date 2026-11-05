@@ -10326,7 +10326,7 @@
       ],
       "risk": "high",
       "approved": true,
-      "status": "retry",
+      "status": "verified",
       "allowed_paths": [
         "lib/supabase.ts",
         "lib/auth/store.ts",
@@ -10351,14 +10351,14 @@
         "tests/unit/auth-session-identity.test.ts",
         "tests/unit/auth-command-coordinator.test.ts"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "discovery_evidence": ".refactor-baseline/rf124-password-owner-v1/sdk-candidate.log",
       "implementation_mode": "copy-only",
       "readiness_evidence": ".refactor-baseline/rf125-handoff-v12/readiness.md",
       "primary_preparation_evidence": ".refactor-baseline/rf125-partial-url-v11/decision.md",
-      "started_at": "2026-11-05T04:54:51.760097+00:00",
-      "failure": "Independent review failed: [P2] lib/auth/password-recovery.tsx:101 returns before URL cleanup when either token is missing. An access-token-only or refresh-token-only link therefore retains that credential in both browser and Router URL state. An in-memory execution confirmed both cases. Capture the fragment, clear both URL states before validation returns, and add regressions asserting preserved query parameters, invalid recovery state and zero SDK calls.; Reviewed the entire diff and all untracked task files. Original generator compliance and 22 artifact hashes pass. All 15 controller gates record success, including 117 suites/1618 tests. Fresh scope/compliance and git diff --check passed; saved English/Arabic phone screenshots were inspected. Arabic React 418 remains recorded. No files changed. Native/device/live-backend verification and wider RF025 isolation remain open; primary acceptance remains pending.",
-      "evidence": ".ralph/runs/RF-125-2-1793854491764337060",
+      "started_at": "2026-11-05T09:55:21.204055+00:00",
+      "failure": "Batch resource limit reached",
+      "evidence": ".ralph/runs/RF-125-1-1793872521206881020",
       "additional_attempt_controller_counter_base": 0,
       "additional_attempt_historical_offset": 2,
       "historical_ordinary_attempts_spent_before_extension": 2,
@@ -10366,7 +10366,9 @@
       "authorized_additional_attempts_used": 0,
       "attempt_count_stop_waived_by_user": true,
       "continuation_authorization": ".refactor-baseline/modernization-standing-continuation-2026-11-01.json",
-      "primary_recovery_evidence": ".refactor-baseline/rf125-partial-url-v11/decision.md"
+      "primary_recovery_evidence": ".refactor-baseline/rf125-partial-url-v11/decision.md",
+      "completed_at": "2026-11-05T10:03:20.879501+00:00",
+      "summary": "Installed all 22 frozen RF-125 artifacts. Controller verification, independent review, and primary acceptance remain pending."
     },
     {
       "id": "RF-126",

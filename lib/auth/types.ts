@@ -1,3 +1,4 @@
+import type { AuthOwner, AuthCommandResult } from "@/lib/auth/coordinator";
 import type { Session, User } from "@supabase/supabase-js";
 
 export type Profile = {
@@ -33,18 +34,18 @@ export type AuthActions = {
   signIn: (email: string, password: string) => Promise<void>;
   signInWithQuranFoundation: () => Promise<void>;
   linkQuranFoundation: () => Promise<void>;
-  signUp: (
-    email: string,
-    password: string,
-    username: string,
-    displayName: string
-  ) => Promise<SignUpResult>;
+  signUp: (email: string, password: string, username: string, displayName: string) => Promise<SignUpResult>;
   signOut: () => Promise<void>;
   resendSignupConfirmation: (email: string) => Promise<void>;
   sendPasswordReset: (email: string) => Promise<void>;
-  updatePassword: (password: string) => Promise<void>;
+  updatePassword: (password: string, owner?: AuthOwner) => Promise<AuthCommandResult<void>>;
   ensureProfile: () => Promise<Profile | null>;
   fetchProfile: () => Promise<void>;
-  updateProfile: (updates: { displayName?: string | null; avatarUrl?: string | null; bio?: string | null; country?: string | null }) => Promise<Profile>;
+  updateProfile: (updates: {
+    displayName?: string | null;
+    avatarUrl?: string | null;
+    bio?: string | null;
+    country?: string | null;
+  }) => Promise<Profile>;
   clearError: () => void;
 };
