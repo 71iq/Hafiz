@@ -10152,50 +10152,200 @@
     },
     {
       "id": "RF-125",
-      "title": "Repair password operation ownership without canceling SDK continuity",
-      "description": "Unapproved follow-up to RF124. Primary must choose auth operation/session ownership before preparing exact source artifacts.",
-      "rationale": "RF124 real SDK normal-update control rejects initial profile-reference generation reuse.",
+      "title": "Guard password recovery ownership and preserve SDK continuity",
+      "description": "Install22 exact primary-authored source/test artifacts for the RF124 follow-up. Follow the frozen copy-only handoff; no design, dependency, production or protected-data work.",
+      "rationale": "Real SDK races require storage ownership as well as callback guards. Complete-app URL cleanup also replaces root/child lifetimes unless Router state and recovery ownership are explicit.",
       "modules": [
+        "lib/supabase.ts",
         "lib/auth/store.ts",
         "lib/auth/types.ts",
+        "lib/auth/oauth.ts",
+        "lib/i18n/strings.ts",
+        "lib/auth/commands.ts",
+        "lib/auth/coordinator.ts",
+        "lib/auth/session-identity.ts",
+        "lib/auth/owned-storage.ts",
+        "lib/auth/safe-lock.ts",
+        "lib/auth/client-adapter.ts",
+        "lib/auth/session-channel.ts",
+        "lib/auth/root-runtime.ts",
+        "tests/unit/auth-runtime-store.test.ts",
+        "tests/unit/auth-owned-client.test.ts",
+        "tests/unit/auth-root-runtime.test.ts",
+        "tests/unit/auth-password-workflow.test.tsx",
+        "lib/auth/password-recovery.tsx",
+        "app/_layout.tsx",
         "app/auth/reset-password.tsx",
-        "tests/unit/auth-password-owner.test.tsx"
+        "tests/unit/auth-session-identity.test.ts",
+        "tests/unit/auth-command-coordinator.test.ts"
       ],
       "dependencies": [
         "RF-124"
       ],
       "acceptance_criteria": [
-        "Unapproved. Resolve genuine owner replacement versus USER_UPDATED/TOKEN_REFRESHED continuity, current/anonymous recovery, auth intents, stale SDK callbacks, error/loading ownership and sole route cancellation contract before exact small scopes. Compare a lifecycle revision with stable session identity and preserve failures.",
-        "Actual GoTrueClient with synthetic storage/fetch must preserve normal updates and auth notifications before response completion. Real store/route cases must prevent stale user/error/loading writes, new-account signout and stale navigation across same-ID and different-ID changes. Preserve current error identity and legitimate callbacks/no-callback navigation.",
-        "Define same-owner concurrency, unmount/navigation, pending recovery setSession/ready callbacks and inherited loading explicitly; split work if necessary. No cancellation/rollback guarantee for already-issued requests, no SQLite deletion, auth-policy/production/protected/dependency change. Fresh controller verification, stronger independent review and primary acceptance required."
+        "Actually complete every required document/metadata read, sole filtered RF125 jq and separate mission/latest progress reads before copying. Install each of22 exact artifacts with its own successful cp call. All generator started/completed tool types and original logs must satisfy the frozen protocol, including after checkpoint reuse.",
+        "Preserve ordinary public SDK auth, configuration/lazy/offline/key/platform behavior and existing profile/OAuth/FIFO/error contracts. Validated stable UUID session identity preserves USER_UPDATED/TOKEN_REFRESHED continuity; unidentified owners fail closed. Main B/C writers must remain independent of command guards.",
+        "Owned password/read/recovery/signout must prevent old persistence, clear, state, notices and navigation over same/different-ID replacements. Current issued successful SDK work may retain persistence after screen cancellation; no rollback is promised for already-issued remote/asynchronous storage operations. Rejected recovery preserves the prior session.",
+        "Root-owned recovery survives internal child remounts, waits for bootstrap with an explicit-intent guard, removes tokens from browser and Router URL state while preserving query, retains one busy submission, binds callbacks to their rendered operation and clears obsolete/new-recovery drafts. Path exit/root disposal/beforeRemove revoke old work; web missing tokens never infer validity from arbitrary login. Recovery notices must not expose or clear another owner global status.",
+        "All15 fresh controller gates must pass, including the full117-suite/1618-case preflight contract, three dependency graphs, exact existing five-record Knip parity, synthetic web export, nine real Chrome runtime cases and three complete-app phone flows. Arabic React418 remains explicitly recorded;19-file formatting avoids broad changes to three baseline-debt files. Separate stronger source/compliance evaluation and primary exact-scope acceptance remain mandatory.",
+        "Keep RF025 wider main-SDK background/initialization attribution, PKCE/auxiliary/channel/hidden-tab/live realtime/native-device isolation claims open. No native/device/live-backend/production/protected-content/dependency/push/deployment claim."
       ],
       "verification": [
         [
-          "npm",
-          "run",
-          "test:unit",
-          "--",
-          "--runTestsByPath",
-          "tests/unit/auth-password-owner.test.tsx",
-          "--no-cache"
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy,sys;from pathlib import Path;p=Path('.refactor-baseline/rf125-handoff-v9/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='c4269516902b7a383fca1801fb9fa1c8c7d68f39745d118401a89ace3383ac61';sys.argv=['.refactor-baseline/rf125-handoff-v9/verification.py','all'];runpy.run_path('.refactor-baseline/rf125-handoff-v9/verification.py',run_name='__main__')"
         ],
         [
           "npm",
           "run",
           "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/supabase.ts",
+          "lib/auth/store.ts",
+          "lib/auth/types.ts",
+          "lib/auth/oauth.ts",
+          "lib/i18n/strings.ts",
+          "lib/auth/commands.ts",
+          "lib/auth/coordinator.ts",
+          "lib/auth/session-identity.ts",
+          "lib/auth/owned-storage.ts",
+          "lib/auth/safe-lock.ts",
+          "lib/auth/client-adapter.ts",
+          "lib/auth/session-channel.ts",
+          "lib/auth/root-runtime.ts",
+          "tests/unit/auth-runtime-store.test.ts",
+          "tests/unit/auth-owned-client.test.ts",
+          "tests/unit/auth-root-runtime.test.ts",
+          "tests/unit/auth-password-workflow.test.tsx",
+          "lib/auth/password-recovery.tsx",
+          "app/_layout.tsx",
+          "app/auth/reset-password.tsx",
+          "tests/unit/auth-session-identity.test.ts",
+          "tests/unit/auth-command-coordinator.test.ts",
+          "--max-warnings=0"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "lib/auth/store.ts",
+          "lib/auth/types.ts",
+          "lib/auth/oauth.ts",
+          "lib/auth/commands.ts",
+          "lib/auth/coordinator.ts",
+          "lib/auth/session-identity.ts",
+          "lib/auth/owned-storage.ts",
+          "lib/auth/safe-lock.ts",
+          "lib/auth/client-adapter.ts",
+          "lib/auth/session-channel.ts",
+          "lib/auth/root-runtime.ts",
+          "tests/unit/auth-runtime-store.test.ts",
+          "tests/unit/auth-owned-client.test.ts",
+          "tests/unit/auth-root-runtime.test.ts",
+          "tests/unit/auth-password-workflow.test.tsx",
+          "lib/auth/password-recovery.tsx",
+          "app/auth/reset-password.tsx",
+          "tests/unit/auth-session-identity.test.ts",
+          "tests/unit/auth-command-coordinator.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "python3",
+          "-B",
+          ".refactor-baseline/rf125-handoff-v9/verification.py",
+          "knip"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "node",
+          ".refactor-baseline/rf125-handoff-v9/browser-build.cjs"
+        ],
+        [
+          "node",
+          ".refactor-baseline/rf125-handoff-v9/browser-probe.cjs"
+        ],
+        [
+          "node",
+          ".refactor-baseline/rf125-handoff-v9/full-ui.cjs",
+          "current-en"
+        ],
+        [
+          "node",
+          ".refactor-baseline/rf125-handoff-v9/full-ui.cjs",
+          "unsupported-en"
+        ],
+        [
+          "node",
+          ".refactor-baseline/rf125-handoff-v9/full-ui.cjs",
+          "unsupported-ar"
+        ],
+        [
+          "python3",
+          "-B",
+          "-c",
+          "import hashlib,runpy,sys;from pathlib import Path;p=Path('.refactor-baseline/rf125-handoff-v9/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='c4269516902b7a383fca1801fb9fa1c8c7d68f39745d118401a89ace3383ac61';sys.argv=['.refactor-baseline/rf125-handoff-v9/verification.py','all'];runpy.run_path('.refactor-baseline/rf125-handoff-v9/verification.py',run_name='__main__')"
+        ],
+        [
+          "git",
+          "diff",
+          "--check"
         ]
       ],
       "risk": "high",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
+        "lib/supabase.ts",
         "lib/auth/store.ts",
         "lib/auth/types.ts",
+        "lib/auth/oauth.ts",
+        "lib/i18n/strings.ts",
+        "lib/auth/commands.ts",
+        "lib/auth/coordinator.ts",
+        "lib/auth/session-identity.ts",
+        "lib/auth/owned-storage.ts",
+        "lib/auth/safe-lock.ts",
+        "lib/auth/client-adapter.ts",
+        "lib/auth/session-channel.ts",
+        "lib/auth/root-runtime.ts",
+        "tests/unit/auth-runtime-store.test.ts",
+        "tests/unit/auth-owned-client.test.ts",
+        "tests/unit/auth-root-runtime.test.ts",
+        "tests/unit/auth-password-workflow.test.tsx",
+        "lib/auth/password-recovery.tsx",
+        "app/_layout.tsx",
         "app/auth/reset-password.tsx",
-        "tests/unit/auth-password-owner.test.tsx"
+        "tests/unit/auth-session-identity.test.ts",
+        "tests/unit/auth-command-coordinator.test.ts"
       ],
       "attempts": 0,
-      "discovery_evidence": ".refactor-baseline/rf124-password-owner-v1/sdk-candidate.log"
+      "discovery_evidence": ".refactor-baseline/rf124-password-owner-v1/sdk-candidate.log",
+      "implementation_mode": "copy-only",
+      "readiness_evidence": ".refactor-baseline/rf125-handoff-v9/readiness.md",
+      "primary_preparation_evidence": ".refactor-baseline/rf125-form-ownership-v10/decision.md"
     },
     {
       "id": "RF-126",
