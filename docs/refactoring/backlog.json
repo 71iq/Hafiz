@@ -10153,7 +10153,7 @@
     {
       "id": "RF-125",
       "title": "Guard password recovery ownership and preserve SDK continuity",
-      "description": "FIRST TOOL COMMAND MUST BE exactly: cat .refactor-baseline/rf125-handoff-v9/readiness.md . No discovery or orientation before this command. The complete command allowlist applies from the FIRST command, including before reading readiness. Never use rg, find, sort, head, tail, pipelines, shell operators or bundled commands. Every call is one allowlisted command. Read AGENTS.md with cat, not sed. Only handoff-required files may be read. Do not read the primary_preparation_evidence decision document or its reuse document, they are evaluator evidence. Then follow readiness exactly to install22 artifacts. All target directories already exist. Prior attempt failed compliance for preliminary discovery/bundling, despite exact copies; do not repeat it.",
+      "description": "FIRST TOOL COMMAND MUST BE exactly: cat .refactor-baseline/rf125-handoff-v12/readiness.md . No discovery or orientation before this command. The complete command allowlist applies from the FIRST command, including before reading readiness. Never use rg, find, sort, head, tail, pipelines, shell operators or bundled commands. Every call is one allowlisted command. Read AGENTS.md with cat, not sed. Only handoff-required files may be read. Do not read the primary_preparation_evidence decision document or its reuse document, they are evaluator evidence. Then follow readiness exactly to install22 artifacts. All target directories already exist. Prior attempt failed compliance for preliminary discovery/bundling, despite exact copies; do not repeat it. V11 also repairs partial-token cleanup before invalid returns; prior review failure remains preserved.",
       "rationale": "Real SDK races require storage ownership as well as callback guards. Complete-app URL cleanup also replaces root/child lifetimes unless Router state and recovery ownership are explicit.",
       "modules": [
         "lib/supabase.ts",
@@ -10187,7 +10187,7 @@
         "Preserve ordinary public SDK auth, configuration/lazy/offline/key/platform behavior and existing profile/OAuth/FIFO/error contracts. Validated stable UUID session identity preserves USER_UPDATED/TOKEN_REFRESHED continuity; unidentified owners fail closed. Main B/C writers must remain independent of command guards.",
         "Owned password/read/recovery/signout must prevent old persistence, clear, state, notices and navigation over same/different-ID replacements. Current issued successful SDK work may retain persistence after screen cancellation; no rollback is promised for already-issued remote/asynchronous storage operations. Rejected recovery preserves the prior session.",
         "Root-owned recovery survives internal child remounts, waits for bootstrap with an explicit-intent guard, removes tokens from browser and Router URL state while preserving query, retains one busy submission, binds callbacks to their rendered operation and clears obsolete/new-recovery drafts. Path exit/root disposal/beforeRemove revoke old work; web missing tokens never infer validity from arbitrary login. Recovery notices must not expose or clear another owner global status.",
-        "All15 fresh controller gates must pass, including the full117-suite/1618-case preflight contract, three dependency graphs, exact existing five-record Knip parity, synthetic web export, nine real Chrome runtime cases and three complete-app phone flows. Arabic React418 remains explicitly recorded;19-file formatting avoids broad changes to three baseline-debt files. Separate stronger source/compliance evaluation and primary exact-scope acceptance remain mandatory.",
+        "All17 fresh controller gates must pass, including the full117-suite/1622-case preflight contract, three dependency graphs, exact existing five-record Knip parity, synthetic web export, nine real Chrome runtime cases and five complete-app phone flows, including partial access/refresh fragments with preserved query, invalid state and zero recovery SDK calls. Arabic React418 remains explicitly recorded;19-file formatting avoids broad changes to three baseline-debt files. Separate stronger source/compliance evaluation and primary exact-scope acceptance remain mandatory.",
         "Keep RF025 wider main-SDK background/initialization attribution, PKCE/auxiliary/channel/hidden-tab/live realtime/native-device isolation claims open. No native/device/live-backend/production/protected-content/dependency/push/deployment claim."
       ],
       "verification": [
@@ -10195,7 +10195,7 @@
           "python3",
           "-B",
           "-c",
-          "import hashlib,runpy,sys;from pathlib import Path;p=Path('.refactor-baseline/rf125-handoff-v9/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='c4269516902b7a383fca1801fb9fa1c8c7d68f39745d118401a89ace3383ac61';sys.argv=['.refactor-baseline/rf125-handoff-v9/verification.py','all'];runpy.run_path('.refactor-baseline/rf125-handoff-v9/verification.py',run_name='__main__')"
+          "import hashlib,runpy,sys;from pathlib import Path;p=Path('.refactor-baseline/rf125-handoff-v12/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='badca7fa88a0ce35679e790c1a277d04c90970a639e5188b456773a4793ff64b';sys.argv=['.refactor-baseline/rf125-handoff-v12/verification.py','all'];runpy.run_path('.refactor-baseline/rf125-handoff-v12/verification.py',run_name='__main__')"
         ],
         [
           "npm",
@@ -10266,7 +10266,7 @@
         [
           "python3",
           "-B",
-          ".refactor-baseline/rf125-handoff-v9/verification.py",
+          ".refactor-baseline/rf125-handoff-v12/verification.py",
           "knip"
         ],
         [
@@ -10281,32 +10281,42 @@
         ],
         [
           "node",
-          ".refactor-baseline/rf125-handoff-v9/browser-build.cjs"
+          ".refactor-baseline/rf125-handoff-v12/browser-build.cjs"
         ],
         [
           "node",
-          ".refactor-baseline/rf125-handoff-v9/browser-probe.cjs"
+          ".refactor-baseline/rf125-handoff-v12/browser-probe.cjs"
         ],
         [
           "node",
-          ".refactor-baseline/rf125-handoff-v9/full-ui.cjs",
+          ".refactor-baseline/rf125-handoff-v12/full-ui.cjs",
           "current-en"
         ],
         [
           "node",
-          ".refactor-baseline/rf125-handoff-v9/full-ui.cjs",
+          ".refactor-baseline/rf125-handoff-v12/full-ui.cjs",
           "unsupported-en"
         ],
         [
           "node",
-          ".refactor-baseline/rf125-handoff-v9/full-ui.cjs",
+          ".refactor-baseline/rf125-handoff-v12/full-ui.cjs",
           "unsupported-ar"
+        ],
+        [
+          "node",
+          ".refactor-baseline/rf125-handoff-v12/full-ui.cjs",
+          "partial-access-en"
+        ],
+        [
+          "node",
+          ".refactor-baseline/rf125-handoff-v12/full-ui.cjs",
+          "partial-refresh-en"
         ],
         [
           "python3",
           "-B",
           "-c",
-          "import hashlib,runpy,sys;from pathlib import Path;p=Path('.refactor-baseline/rf125-handoff-v9/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='c4269516902b7a383fca1801fb9fa1c8c7d68f39745d118401a89ace3383ac61';sys.argv=['.refactor-baseline/rf125-handoff-v9/verification.py','all'];runpy.run_path('.refactor-baseline/rf125-handoff-v9/verification.py',run_name='__main__')"
+          "import hashlib,runpy,sys;from pathlib import Path;p=Path('.refactor-baseline/rf125-handoff-v12/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='badca7fa88a0ce35679e790c1a277d04c90970a639e5188b456773a4793ff64b';sys.argv=['.refactor-baseline/rf125-handoff-v12/verification.py','all'];runpy.run_path('.refactor-baseline/rf125-handoff-v12/verification.py',run_name='__main__')"
         ],
         [
           "git",
@@ -10341,14 +10351,22 @@
         "tests/unit/auth-session-identity.test.ts",
         "tests/unit/auth-command-coordinator.test.ts"
       ],
-      "attempts": 1,
+      "attempts": 0,
       "discovery_evidence": ".refactor-baseline/rf124-password-owner-v1/sdk-candidate.log",
       "implementation_mode": "copy-only",
-      "readiness_evidence": ".refactor-baseline/rf125-handoff-v9/readiness.md",
-      "primary_preparation_evidence": ".refactor-baseline/rf125-form-ownership-v10/decision.md",
-      "started_at": "2026-11-05T04:50:32.258035+00:00",
-      "failure": "Verification failed: ['python3', '-B', '-c', \"import hashlib,runpy,sys;from pathlib import Path;p=Path('.refactor-baseline/rf125-handoff-v9/pins.json');assert hashlib.sha256(p.read_bytes()).hexdigest()=='c4269516902b7a383fca1801fb9fa1c8c7d68f39745d118401a89ace3383ac61';sys.argv=['.refactor-baseline/rf125-handoff-v9/verification.py','all'];runpy.run_path('.refactor-baseline/rf125-handoff-v9/verification.py',run_name='__main__')\"]; see .ralph/runs/RF-125-1-1793854232260507523/verify-0.log",
-      "evidence": ".ralph/runs/RF-125-1-1793854232260507523"
+      "readiness_evidence": ".refactor-baseline/rf125-handoff-v12/readiness.md",
+      "primary_preparation_evidence": ".refactor-baseline/rf125-partial-url-v11/decision.md",
+      "started_at": "2026-11-05T04:54:51.760097+00:00",
+      "failure": "Independent review failed: [P2] lib/auth/password-recovery.tsx:101 returns before URL cleanup when either token is missing. An access-token-only or refresh-token-only link therefore retains that credential in both browser and Router URL state. An in-memory execution confirmed both cases. Capture the fragment, clear both URL states before validation returns, and add regressions asserting preserved query parameters, invalid recovery state and zero SDK calls.; Reviewed the entire diff and all untracked task files. Original generator compliance and 22 artifact hashes pass. All 15 controller gates record success, including 117 suites/1618 tests. Fresh scope/compliance and git diff --check passed; saved English/Arabic phone screenshots were inspected. Arabic React 418 remains recorded. No files changed. Native/device/live-backend verification and wider RF025 isolation remain open; primary acceptance remains pending.",
+      "evidence": ".ralph/runs/RF-125-2-1793854491764337060",
+      "additional_attempt_controller_counter_base": 0,
+      "additional_attempt_historical_offset": 2,
+      "historical_ordinary_attempts_spent_before_extension": 2,
+      "historical_total_ordinary_attempts_spent": 2,
+      "authorized_additional_attempts_used": 0,
+      "attempt_count_stop_waived_by_user": true,
+      "continuation_authorization": ".refactor-baseline/modernization-standing-continuation-2026-11-01.json",
+      "primary_recovery_evidence": ".refactor-baseline/rf125-partial-url-v11/decision.md"
     },
     {
       "id": "RF-126",
