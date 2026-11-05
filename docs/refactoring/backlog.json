@@ -1975,14 +1975,15 @@
         "RF-122",
         "RF-123",
         "RF-124",
-        "RF-125"
+        "RF-125",
+        "RF-127"
       ],
       "acceptance_criteria": [
         "Test sign-in, sign-out, account switch, late responses, subscription cleanup and offline restore.",
         "Cancel/remove private cache at the correct lifecycle point with no new auth behavior.",
         "RF122 guards only fetchProfile/ensureProfile across user-ID/session-reference revisions. It does not close this parent. Independently verify atomic profile clearing, stale auth/updateProfile/leaderboard-sync publishers, Query eviction, listener cleanup, offline restore and same-owner ordering before acceptance. No personal SQLite destruction.",
         "RF123 atomically clears or retains matching profile only in six successful session-identity assignment paths. Parent remains unapproved; stale auth/password/updateProfile/leaderboard publishers, cache/listener/offline policies and arbitrary external setState still need separate verification.",
-        "RF124 audits password update/reset-route ownership and rejects an overbroad candidate that fails actual SDK USER_UPDATED continuity despite mocked tests passing. RF125 remains an unapproved repair. No auth-isolation closure before real SDK notification, loading/error and caller-continuation policies are resolved."
+        "RF124 rejected an overbroad password candidate. RF125 is now verified and primary accepted with actual SDK continuity, storage ownership and root reset lifetime checks. It does not close this parent. Preserve its documented RF025 exclusions; the profile-save race reproduction and proposed RF127 follow-up remain unaccepted."
       ],
       "verification": [
         [
@@ -2009,7 +2010,8 @@
         "lib/query/*",
         "tests/unit/auth-query-lifecycle.test.tsx"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "primary_investigation_evidence": ".refactor-baseline/rf025-owner-audit-v1/receipt.json"
     },
     {
       "id": "RF-026",
@@ -10462,6 +10464,63 @@
       "evidence": ".ralph/runs/RF-126-2-1793754368186248133",
       "completed_at": "2026-11-04T01:09:13.495673+00:00",
       "summary": "Installed the two primary-supplied RF-126 artifacts by separate copy commands."
+    },
+    {
+      "id": "RF-127",
+      "title": "Guard profile saves and their editor continuations",
+      "description": "Unapproved RF025 follow-up. Primary must prepare exact artifacts for the five-path store/caller repair described in AUTH_PROFILE_SAVE_OWNERSHIP.md. Current source remains unchanged.",
+      "rationale": "Actual current store fails16 late-publisher/pre-dispatch safety cases while four controls pass. The sole editor also has asynchronous upload and status/cache continuations requiring owner-bound lifecycle tests.",
+      "modules": [
+        "lib/auth/store.ts",
+        "lib/auth/types.ts",
+        "components/profile/ProfileModalContent.tsx",
+        "tests/unit/auth-profile-update-owner.test.ts",
+        "tests/unit/profile-save-lifecycle.test.tsx"
+      ],
+      "dependencies": [
+        "RF-123",
+        "RF-125"
+      ],
+      "acceptance_criteria": [
+        "Unapproved until primary exact artifacts and fresh preflight. Reuse accepted authCommands/AuthOwner/AuthCommandResult and stable validated session identity. Preserve current update patch/trim/null/undefined/error contracts; anonymous rejection remains explicit.",
+        "Do not issue a new profile mutation after obsolete ensureProfile or avatar upload. Issued writes have no rollback claim. Old success/error/rejection cannot replace current profile, loading or error. Same-user new session and A-B-A are obsolete; same-session token/metadata continuity remains current.",
+        "The actual rendered ProfileModalContent save path must suppress obsolete notices, drafts, avatar state, cache set/invalidation and navigation effects. Bound delayed callbacks and cleanup must not cancel or submit B. Reset old-owner drafts, preserve current-owner refresh drafts, prevent duplicate same-stack submits and define FIFO same-owner store ordering.",
+        "Characterize current success, error identity, field patching, upload/remove, signed-out/disabled state and queue behavior before repair. Exercise deferred ensure/update/upload, all owner transitions, session notification continuity, close/unmount/remount and strict lifecycle with actual store/coordinator and rendered caller. Do not waive original safety failures or replace the caller with a duplicate test-only model.",
+        "Primary frozen scope/reversal checks, targeted cases, existing profile/password contracts, strict types, scoped diagnostics/format, dependency graph and web export must pass through a fresh pinned controller attempt plus separate stronger review and primary acceptance. Record any browser/native/device limits. RF025 cache/leaderboard/listener/offline/other ownership work stays open. No personal SQLite destruction, dependency, protected content, production or deployment change."
+      ],
+      "verification": [
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/auth-profile-update-owner.test.ts",
+          "tests/unit/profile-save-lifecycle.test.tsx",
+          "tests/unit/auth-profile-owner.test.ts",
+          "tests/unit/auth-profile-transition.test.ts",
+          "tests/unit/auth-password-workflow.test.tsx",
+          "--no-cache"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
+      ],
+      "risk": "high",
+      "approved": false,
+      "status": "pending",
+      "allowed_paths": [
+        "lib/auth/store.ts",
+        "lib/auth/types.ts",
+        "components/profile/ProfileModalContent.tsx",
+        "tests/unit/auth-profile-update-owner.test.ts",
+        "tests/unit/profile-save-lifecycle.test.tsx"
+      ],
+      "attempts": 0,
+      "discovery_evidence": ".refactor-baseline/rf025-owner-audit-v1/receipt.json",
+      "primary_scope_document": "docs/refactoring/AUTH_PROFILE_SAVE_OWNERSHIP.md"
     }
   ]
 }
