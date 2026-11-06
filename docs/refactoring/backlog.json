@@ -10952,7 +10952,9 @@
       "started_at": "2026-11-06T10:51:04.142614+00:00",
       "completed_at": "2026-11-06T10:58:34.550806+00:00",
       "evidence": ".ralph/runs/RF-130-1-1793962264146811012",
-      "summary": "Installed the two supplied RF-130 artifacts in the required order. Verification, independent review, and acceptance remain pending with the controller/evaluator."
+      "summary": "Primary accepts captured-owner account stats continuations after all10 fresh controller gates, separate stronger review and post-lease source/hash/event checks. Matching-session continuity and current failures are preserved. RF025, RF131 and RF132 remain open.",
+      "primary_accepted": true,
+      "primary_acceptance_evidence": ".refactor-baseline/rf130-primary-acceptance.json"
     },
     {
       "id": "RF-131",
