@@ -11057,7 +11057,9 @@
       "started_at": "2026-11-06T11:29:08.549612+00:00",
       "completed_at": "2026-11-06T11:36:16.991026+00:00",
       "evidence": ".ralph/runs/RF-131-1-1793964548554433350",
-      "summary": "Installed the two frozen RF-131 artifacts in the authorized order. Verification, independent review, controller gates, and primary acceptance remain pending."
+      "summary": "Primary accepts one-runtime owner-scoped stats FIFO after10 fresh gates, separate stronger review and post-lease scope/hash/event/prefix checks. Current errors and credential continuity remain; new owners/auth are independent. Current-owner stall, RF132 fields and widerRF025 remain open.",
+      "primary_accepted": true,
+      "primary_acceptance_evidence": ".refactor-baseline/rf131-primary-acceptance.json"
     },
     {
       "id": "RF-132",
