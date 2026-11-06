@@ -10940,15 +10940,19 @@
       ],
       "risk": "high",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "lib/fsrs/leaderboard-sync.ts",
         "tests/unit/leaderboard-stats-owner.test.ts"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "implementation_mode": "copy-only",
       "readiness_evidence": ".refactor-baseline/rf130-handoff-v1/readiness.md",
-      "primary_preparation_evidence": ".refactor-baseline/rf130-stats-ownership-v1/preparation-receipt.json"
+      "primary_preparation_evidence": ".refactor-baseline/rf130-stats-ownership-v1/preparation-receipt.json",
+      "started_at": "2026-11-06T10:51:04.142614+00:00",
+      "completed_at": "2026-11-06T10:58:34.550806+00:00",
+      "evidence": ".ralph/runs/RF-130-1-1793962264146811012",
+      "summary": "Installed the two supplied RF-130 artifacts in the required order. Verification, independent review, and acceptance remain pending with the controller/evaluator."
     },
     {
       "id": "RF-131",
