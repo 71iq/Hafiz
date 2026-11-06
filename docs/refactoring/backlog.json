@@ -14109,6 +14109,210 @@
       "independent_review": "pass",
       "evidence": "docs/refactoring/PROGRESS.md",
       "summary": "Validate each QF note/bookmark write acknowledgement before local linkage changes or queue success. Require matching update IDs/bookmark coordinates and explicit delete confirmation. Preserve retryable failed writes, valid short notes/empty-range fallback, owner fences and protected-collection skips."
+    },
+    {
+      "id": "RF-147",
+      "title": "Preserve word meanings and retry progress when an account pull fails",
+      "description": "Primary directly corrects local sync recovery; a bounded worker extends the existing real SQLite payload fixture. A failed word-meaning download is an incomplete snapshot, never an empty authoritative table. Keep successful incremental table work but preserve the retry watermark on any failed table.",
+      "rationale": "fetchRemoteAccountRows currently swallows user_word_meanings errors and can clear local meanings, complete restore and upload based on an unknown snapshot. Incremental sync separately swallows that table error and advances last_pull_at beyond unseen rows. The checked-in schema and migration include this private owner-scoped table.",
+      "modules": [
+        "lib/database/sync.ts",
+        "tests/unit/sync-payloads.test.ts"
+      ],
+      "dependencies": [
+        "RF-141",
+        "RF-146"
+      ],
+      "risk": "high",
+      "priority": 1,
+      "approved": true,
+      "status": "verified",
+      "attempts": 1,
+      "allowed_paths": [
+        "lib/database/sync.ts",
+        "tests/unit/sync-payloads.test.ts"
+      ],
+      "implementation_mode": "implementation",
+      "verification": [
+        [
+          "git",
+          "diff",
+          "--check"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "lib/database/sync.ts",
+          "tests/unit/sync-payloads.test.ts",
+          "docs/refactoring/PROGRESS.md"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/database/sync.ts",
+          "tests/unit/sync-payloads.test.ts",
+          "--max-warnings=0"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "check:analysis"
+        ],
+        [
+          "npm",
+          "run",
+          "postinstall"
+        ],
+        [
+          "npm",
+          "ls",
+          "--all",
+          "--json"
+        ],
+        [
+          "npm",
+          "run",
+          "lint"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "node",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/tests/brace-expansion.test.cjs",
+          "scripts/tests/dependency-boundaries.test.cjs",
+          "scripts/tests/icon-tool.test.cjs",
+          "scripts/tests/jest-config.test.cjs",
+          "scripts/tests/js-yaml.test.cjs",
+          "scripts/tests/lint-coverage.test.cjs",
+          "scripts/tests/metro-unicode.test.cjs",
+          "scripts/tests/nanoid.test.cjs",
+          "scripts/tests/router-dependency-range.test.cjs",
+          "scripts/tests/security-dependency-owner.test.cjs",
+          "scripts/tests/source-map-js.test.cjs",
+          "scripts/tests/tailwind-source-map.test.cjs",
+          "scripts/tests/ws.test.cjs",
+          "scripts/tests/xmldom.test.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "test:refactor-runner"
+        ],
+        [
+          "python3",
+          "-B",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "scripts/tests",
+          "-p",
+          "test_*.py"
+        ],
+        [
+          "npm",
+          "run",
+          "check:native-config"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=4096",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "android",
+          "--output-dir",
+          ".expo/modernization-checks/android",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/android')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=3072",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "ios",
+          "--output-dir",
+          ".expo/modernization-checks/ios",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/ios')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8197",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts",
+          "tests/e2e/database-bridge.spec.ts"
+        ]
+      ],
+      "acceptance_criteria": [
+        "Treat any user_word_meanings restore-fetch error, including a later page or missing-table error, like any other incomplete account snapshot. Propagate the original error before local clear/apply, restore/backfill markers or queue upload. Do not infer that failed remote data is empty or choose a new persistent account-data policy.",
+        "Keep incremental successful table/page commits and the existing word-meaning warning/continuation behavior, but withhold last_pull_at advancement when that table failed. Retry must request from the prior timestamp and import missed meanings. Keep owner-current checks and restore-before-upload ordering. Do not change success timestamp semantics, other table ordering, queue attempts, schema, server, protected inputs or production.",
+        "First reproduce both restore data loss and incremental false watermark in tests/unit/sync-payloads.test.ts against actual fullSync and isolated SQLite production schema. Add configurable word-meaning rows/errors and record since values without weakening the original32 cases. Failed restore preserves local meanings/cards/notes/settings/queues and does not invoke upload; later-page failure must remain pre-destructive.",
+        "Cover incremental first/later-page failure with successful later card work retained, old timestamp retained, then successful retry from old timestamp importing missed meaning and advancing the watermark. Retain genuinely successful empty-table behavior, original restore/card validation/ownership tests and original thrown error. Generic partial status/count reporting remains RF029; QF status follow-up stays separate.",
+        "Focused sync tests, types and scoped lint during iteration. All20 full controller checks, fresh separate stronger independent review, primary acceptance and one local commit. Keep only a short PROGRESS note; delete accepted outputs and keep baseline under2GB."
+      ],
+      "started_at": "2026-11-06T21:50:17.982660+00:00",
+      "completed_at": "2026-11-06T21:57:51.716483+00:00",
+      "independent_review": "pass",
+      "evidence": "docs/refactoring/PROGRESS.md",
+      "summary": "Failed word-meaning account snapshots stop before local replacement and upload. Incremental word-meaning errors preserve the retry cursor while later successful tables remain committed. Preserve exact restore errors, successful empty tables, retries, ownership and original account-replacement policy."
     }
   ]
 }

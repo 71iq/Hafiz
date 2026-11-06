@@ -136,6 +136,7 @@ async function pullRemoteChanges(db: SQLiteDatabase, owner: SyncOwner): Promise<
   const lastPullAt = lastSyncRow?.value ?? "1970-01-01T00:00:00Z";
 
   let totalPulled = 0;
+  let wordMeaningsComplete = true;
 
   try {
     // Pull syncable deck/review settings before cards so decks exist when rows arrive.
@@ -146,6 +147,7 @@ async function pullRemoteChanges(db: SQLiteDatabase, owner: SyncOwner): Promise<
       totalPulled += await pullTable(db, "user_word_meanings", userId, lastPullAt, upsertUserWordMeaning, owner);
     } catch (err: any) {
       owner.requireCurrent();
+      wordMeaningsComplete = false;
       console.warn("[Sync] Pull user_word_meanings skipped:", err.message);
     }
 
@@ -181,11 +183,13 @@ async function pullRemoteChanges(db: SQLiteDatabase, owner: SyncOwner): Promise<
     await backfillAchievements(db, { notify: false });
     owner.requireCurrent();
 
-    // Update last pull timestamp
+    // Keep the old cursor if any table was incomplete, so its unseen rows remain eligible for retry.
     owner.requireCurrent();
-    await db.runAsync("INSERT OR REPLACE INTO user_settings (key, value) VALUES ('last_pull_at', ?)", [
-      new Date().toISOString(),
-    ]);
+    if (wordMeaningsComplete) {
+      await db.runAsync("INSERT OR REPLACE INTO user_settings (key, value) VALUES ('last_pull_at', ?)", [
+        new Date().toISOString(),
+      ]);
+    }
   } catch (err: any) {
     owner.requireCurrent();
     console.warn("[Sync] Pull failed:", err.message);
@@ -323,10 +327,6 @@ async function fetchRemoteAccountRows(userId: string, owner: SyncOwner): Promise
       owner.requireCurrent();
     } catch (err: any) {
       owner.requireCurrent();
-      if (tableName === "user_word_meanings") {
-        console.warn("[Sync] Restore user_word_meanings skipped:", err.message);
-        continue;
-      }
       throw err;
     }
   }

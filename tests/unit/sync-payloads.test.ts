@@ -12,13 +12,17 @@ const NEW = "2026-02-01T00:00:00.000Z";
 let mockSession: Session | null = null;
 let mockRestoreCards: unknown[] = [];
 let mockIncrementalCards: unknown[] = [];
-const requests: { table: string; incremental: boolean; offset: number }[] = [];
+const requests: { table: string; incremental: boolean; offset: number; since: string | null }[] = [];
+const mockMeaningRestoreRows: unknown[] = [];
+const mockMeaningIncrementalRows: unknown[] = [];
+const mockQueryErrors = new Map<string, Error>();
 const writes: string[] = [];
 const mockPending = jest.fn(async () => []);
 const mockBackfill = jest.fn(async () => 0);
 
 class MockQuery {
   private incremental = false;
+  private since: string | null = null;
   constructor(private readonly table: string) {}
   select() {
     return this;
@@ -26,16 +30,29 @@ class MockQuery {
   eq() {
     return this;
   }
-  gt() {
+  gt(_column: string, value: string) {
     this.incremental = true;
+    this.since = value;
     return this;
   }
   order() {
     return this;
   }
   async range(start: number, end: number) {
-    requests.push({ table: this.table, incremental: this.incremental, offset: start });
-    const rows = this.table === "study_cards" ? (this.incremental ? mockIncrementalCards : mockRestoreCards) : [];
+    requests.push({ table: this.table, incremental: this.incremental, offset: start, since: this.since });
+    const key = `${this.table}:${this.incremental ? "incremental" : "restore"}:${start}`;
+    const error = mockQueryErrors.get(key);
+    if (error) return { data: null, error };
+    const rows =
+      this.table === "study_cards"
+        ? this.incremental
+          ? mockIncrementalCards
+          : mockRestoreCards
+        : this.table === "user_word_meanings"
+          ? this.incremental
+            ? mockMeaningIncrementalRows
+            : mockMeaningRestoreRows
+          : [];
     return { data: rows.slice(start, end + 1), error: null };
   }
 }
@@ -96,11 +113,42 @@ function putSetting(key: string, value: string) {
 function restoreComplete() {
   putSetting(`sync_account_restore_${USER_ID}_20260614_account_restore_v1`, "true");
 }
+function meaning(overrides: Record<string, SQLInputValue> = {}): Record<string, SQLInputValue> {
+  return {
+    surah: 2,
+    ayah: 256,
+    word_pos: 1,
+    word: "synthetic",
+    meaning: "synthetic meaning",
+    created_at: OLD,
+    updated_at: NEW,
+    ...overrides,
+  };
+}
+function putMeaning(row: Record<string, SQLInputValue> = meaning()) {
+  sql
+    .prepare(
+      "INSERT INTO user_word_meanings (surah,ayah,word_pos,word,meaning,created_at,updated_at) VALUES (?,?,?,?,?,?,?)",
+    )
+    .run(row.surah, row.ayah, row.word_pos, row.word, row.meaning, row.created_at, row.updated_at);
+}
+function putQueueRow() {
+  sql
+    .prepare(
+      "INSERT INTO sync_queue (table_name,operation,row_id,data,status,created_at) VALUES ('private_notes','UPDATE','synthetic-note','{}','pending',?)",
+    )
+    .run(OLD);
+}
+function failPage(table: string, mode: "restore" | "incremental", offset: number, error: Error) {
+  mockQueryErrors.set(`${table}:${mode}:${offset}`, error);
+}
 function snapshot() {
   return {
     cards: sql.prepare("SELECT * FROM study_cards ORDER BY id").all(),
     notes: sql.prepare("SELECT * FROM private_notes ORDER BY id").all(),
+    meanings: sql.prepare("SELECT * FROM user_word_meanings ORDER BY surah,ayah,word_pos").all(),
     settings: sql.prepare("SELECT * FROM user_settings ORDER BY key").all(),
+    queue: sql.prepare("SELECT * FROM sync_queue ORDER BY id").all(),
   };
 }
 
@@ -120,6 +168,9 @@ beforeEach(async () => {
   observeAuthSession(mockSession);
   mockRestoreCards = [];
   mockIncrementalCards = [];
+  mockMeaningRestoreRows.length = 0;
+  mockMeaningIncrementalRows.length = 0;
+  mockQueryErrors.clear();
   requests.length = 0;
   writes.length = 0;
   transactions = 0;
@@ -267,3 +318,133 @@ it.each([OLD, NEW])(
     });
   },
 );
+
+describe("word meaning restore and incremental recovery", () => {
+  it.each([
+    ["first", 0],
+    ["later", 500],
+  ] as const)("rejects a %s-page meaning restore failure before replacing local state", async (_label, offset) => {
+    const error = new Error("Synthetic word meaning restore failure " + offset);
+    mockRestoreCards = [card("synthetic-remote-card")];
+    if (offset === 500)
+      mockMeaningRestoreRows.push(
+        ...Array.from({ length: 500 }, (_, i) => meaning({ surah: 2 + Math.floor(i / 100), ayah: 1 + (i % 100) })),
+      );
+    failPage("user_word_meanings", "restore", offset, error);
+    putMeaning(meaning({ meaning: "keep local restore meaning", updated_at: OLD }));
+    putQueueRow();
+    const before = snapshot();
+    writes.length = 0;
+
+    const outcome = await fullSync(db).then(
+      () => null,
+      (failure: unknown) => failure,
+    );
+
+    expect(snapshot()).toEqual(before);
+    expect(outcome).toBe(error);
+    expect(requests.filter((r) => r.table === "user_word_meanings").map((r) => r.offset)).toEqual(
+      offset === 500 ? [0, 500] : [0],
+    );
+    expect(mockPending).not.toHaveBeenCalled();
+    expect(writes).toEqual([]);
+    expect(transactions).toBe(0);
+    expect(sql.prepare("SELECT value FROM user_settings WHERE key = 'last_pull_at'").get()).toEqual({ value: OLD });
+    expect(
+      sql.prepare("SELECT value FROM user_settings WHERE key LIKE 'sync_account_restore_%'").get(),
+    ).toBeUndefined();
+  });
+
+  it("rejects a missing meaning table instead of completing an otherwise empty snapshot", async () => {
+    const error = Object.assign(new Error("Synthetic missing word-meaning table"), { code: "42P01" });
+    failPage("user_word_meanings", "restore", 0, error);
+    await expect(fullSync(db)).rejects.toBe(error);
+    expect(
+      sql.prepare("SELECT value FROM user_settings WHERE key LIKE 'sync_account_restore_%'").get(),
+    ).toBeUndefined();
+    expect(mockPending).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["first", 0],
+    ["later", 500],
+  ] as const)(
+    "keeps successful card work but retries a %s-page incremental meaning failure from the old watermark",
+    async (_label, offset) => {
+      restoreComplete();
+      putSetting("last_pull_at", OLD);
+      if (offset === 500) {
+        mockMeaningIncrementalRows.push(
+          ...Array.from({ length: 500 }, (_, i) => meaning({ surah: 2 + Math.floor(i / 100), ayah: 1 + (i % 100) })),
+        );
+      }
+      const error = new Error("Synthetic incremental word meaning failure " + offset);
+      failPage("user_word_meanings", "incremental", offset, error);
+      mockIncrementalCards = [{ ...card(), updated_at: NEW, due: NEW }];
+      putMeaning(meaning({ meaning: "keep local incremental meaning", updated_at: OLD }));
+      const initialQueue = snapshot().queue;
+
+      await expect(fullSync(db)).resolves.toMatchObject({ accountRestored: false });
+      expect(sql.prepare("SELECT state,updated_at FROM study_cards WHERE id='2:255'").get()).toEqual({
+        state: State.Review,
+        updated_at: NEW,
+      });
+      expect(
+        sql.prepare("SELECT meaning FROM user_word_meanings WHERE surah=2 AND ayah=256 AND word_pos=1").get(),
+      ).toEqual({
+        meaning: "keep local incremental meaning",
+      });
+      expect(sql.prepare("SELECT value FROM user_settings WHERE key='last_pull_at'").get()).toEqual({ value: OLD });
+      expect(snapshot().queue).toEqual(initialQueue);
+
+      mockQueryErrors.clear();
+      mockMeaningIncrementalRows.length = 0;
+      mockMeaningIncrementalRows.push(meaning({ meaning: "downloaded after retry", ayah: 257 }));
+      mockIncrementalCards = [];
+      const retry = await fullSync(db);
+      expect(retry.accountRestored).toBe(false);
+      expect(requests.filter((r) => r.table === "user_word_meanings" && r.incremental).map((r) => r.since)).toEqual(
+        offset === 500 ? [OLD, OLD, OLD] : [OLD, OLD],
+      );
+      expect(
+        sql.prepare("SELECT meaning FROM user_word_meanings WHERE surah=2 AND ayah=257 AND word_pos=1").get(),
+      ).toEqual({
+        meaning: "downloaded after retry",
+      });
+      expect(sql.prepare("SELECT value FROM user_settings WHERE key='last_pull_at'").get()?.value).not.toBe(OLD);
+    },
+  );
+
+  it("restores valid remote meanings after a failed snapshot can be retried", async () => {
+    putMeaning(meaning({ meaning: "keep until a complete snapshot", updated_at: OLD }));
+    mockRestoreCards = [card("synthetic-remote-card")];
+    const error = new Error("Synthetic retryable snapshot failure");
+    failPage("user_word_meanings", "restore", 0, error);
+    await expect(fullSync(db)).rejects.toBe(error);
+    expect(sql.prepare("SELECT meaning FROM user_word_meanings").get()).toEqual({
+      meaning: "keep until a complete snapshot",
+    });
+    mockQueryErrors.clear();
+    mockMeaningRestoreRows.push(meaning({ meaning: "restored from a complete snapshot" }));
+    await expect(fullSync(db)).resolves.toMatchObject({ pulled: 2, accountRestored: true, localDataReplaced: true });
+    expect(sql.prepare("SELECT surah,ayah,word_pos,meaning,updated_at FROM user_word_meanings").get()).toEqual({
+      surah: 2,
+      ayah: 256,
+      word_pos: 1,
+      meaning: "restored from a complete snapshot",
+      updated_at: NEW,
+    });
+    expect(sql.prepare("SELECT value FROM user_settings WHERE key LIKE 'sync_account_restore_%'").get()).toEqual({
+      value: "true",
+    });
+  });
+
+  it("advances the watermark when the meaning table succeeds with no rows", async () => {
+    restoreComplete();
+    putSetting("last_pull_at", OLD);
+    mockMeaningIncrementalRows.length = 0;
+    await fullSync(db);
+    expect(requests.some((r) => r.table === "user_word_meanings" && r.incremental && r.since === OLD)).toBe(true);
+    expect(sql.prepare("SELECT value FROM user_settings WHERE key='last_pull_at'").get()?.value).not.toBe(OLD);
+  });
+});
