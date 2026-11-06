@@ -693,6 +693,7 @@ it.each(["bookmark read", "note read", "queue write"])(
       bookmarks: [
         {
           id: "remote-bookmark",
+          type: "ayah",
           surah: 2,
           ayah: 256,
           createdAt: OLD,
@@ -742,7 +743,15 @@ it("preserves rollback and the original error for an ordinary merge SQL failure"
   responses["list-bookmarks"] = {
     ok: true,
     bookmarks: [
-      { id: "remote-bookmark", surah: 2, ayah: 256, createdAt: OLD, isInDefaultCollection: true, collectionsCount: 0 },
+      {
+        id: "remote-bookmark",
+        type: "ayah",
+        surah: 2,
+        ayah: 256,
+        createdAt: OLD,
+        isInDefaultCollection: true,
+        collectionsCount: 0,
+      },
     ],
   };
   responses["list-notes"] = { ok: true, notes: [REMOTE_NOTE] };

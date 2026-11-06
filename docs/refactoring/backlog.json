@@ -14786,6 +14786,224 @@
       "allowed_paths": [],
       "attempts": 0,
       "priority": 1
+    },
+    {
+      "id": "RF-150",
+      "title": "Reject malformed Quran Foundation list rows before reconciliation",
+      "description": "Reject malformed Quran Foundation bookmark/note rows before using a complete remote list for local reconciliation. Reuse existing write acknowledgement shapes without changing valid skip behavior.",
+      "rationale": "A numeric remote ID42 compared with local SQLite TEXT IDstring42 can tombstone a represented local row. This is a source-established malformed reply risk, not observed production corruption.",
+      "modules": [
+        "lib/quran-foundation/user-payloads.ts",
+        "lib/quran-foundation/user-sync.ts"
+      ],
+      "dependencies": [
+        "RF-029",
+        "RF-143",
+        "RF-146"
+      ],
+      "acceptance_criteria": [
+        "Primary implements directly and reuses existing realSQLite pagination tests. Cause numeric remoteID42 vs local TEXT qf_id string42: merge attaches coerced value then missing Set numeric42 failsstring lookup, tombstones represented item and queuesordinary deletion. Source-established malformed-client-reply failure, not production observation.",
+        "Extract reusable readQfBookmarkRow(unknown)/readQfNoteRow(unknown) from existing ack shape checks in user-payloads. Keep ack-only envelope oktrue, expected bookmark coords, optional update noteID checks and existing error messages. Existing42 pure acknowledgement cases and63 real SDK acknowledgement cases retained. No shared new module, dependency, server/schema/production/protected change.",
+        "Apply row readers to every list row BEFORE appending page, using Array.from(array,reader) or for-of to reject holes as undefined, not map skipping holes. Keep complete-list/cursor20loop contracts, owner checks, API ordering and no additionalrequests. Invalid row rejects whole list, never filters/coerces/trims IDs. All collections fetched before reconciliation transaction so invalid first/later page prevents any reconciliation admission/application/tombstone/initial enqueue marker based on it.",
+        "Reuse current normalized-server shape contract: nonblank string opaqueIDs/body/timestamps, bookmark typeayah/positive integercoords/surah<=114/boolean default flag/nonnegative integercollection count, note dense copied string ranges. Preserve unsupported string ranges, empty ranges and short nonblank bodies as structurally valid, retaining current skip semantics. No new coordinate mapping/time parsing/semantic payload policy.",
+        "RealSQLite causal numeric IDs across bookmark/note, full/explicitinitial, first/laterpage, linked target localIDstring42. No pendinguploads; first verify data-level target corruption onoldsource then rejectederror+zero reconciliationtransactions+exact unchanged full rows/queues/settings. Use first/laterpage valid prefix to prove nopartialapply.",
+        "Valid string42 controls fullsync target remainsundeleted; existing completeempty/terminalcursor/page20 success stays. Preserve note linkedID with unsupported string/empty ranges and short body, no falsely missing deletion. Add null/invalid row/sparse list earlyfail cases and small directreader valid/numericID/densecopy controls; preserve existing cases.",
+        "Full ready-task20controller checks, fresh separate stronger review, primaryacceptance, one localcommit+short PROGRESS note, deleteacceptedlogs/tempfixtures baseline<2GB.",
+        "Fullsync's already completed upload/cleanup work remains independent; do not move push/pull phases or roll back acknowledged work. Snapshot-preservation fixtures have no pendinguploads and capture before malformedreconciliation. Explicitinitial rejects beforeenqueue marker. Generic per-tableRF031, sharedtransactions, persistentowner and upstream server-normalizer silently droppedrow limits remain separate; no historicaldatarepair claims.",
+        "Preserve all existing ownership/transaction assertions. Two legacy synthetic bookmark responses omit the normalized required type field; add typeayah to those fixtures so the owner/SQL-failure boundaries still execute under strict list validation. Initial focused failure is retained until acceptance."
+      ],
+      "verification": [
+        [
+          "git",
+          "diff",
+          "--check"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "lib/quran-foundation/user-payloads.ts",
+          "lib/quran-foundation/user-sync.ts",
+          "tests/unit/qf-write-payloads.test.ts",
+          "tests/unit/qf-sync-pagination.test.ts",
+          "tests/unit/qf-sync-owner.test.ts",
+          "docs/refactoring/PROGRESS.md"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/quran-foundation/user-payloads.ts",
+          "lib/quran-foundation/user-sync.ts",
+          "tests/unit/qf-write-payloads.test.ts",
+          "tests/unit/qf-sync-pagination.test.ts",
+          "tests/unit/qf-sync-owner.test.ts",
+          "--max-warnings=0"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "check:analysis"
+        ],
+        [
+          "npm",
+          "run",
+          "postinstall"
+        ],
+        [
+          "npm",
+          "ls",
+          "--all",
+          "--json"
+        ],
+        [
+          "npm",
+          "run",
+          "lint"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "node",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/tests/brace-expansion.test.cjs",
+          "scripts/tests/dependency-boundaries.test.cjs",
+          "scripts/tests/icon-tool.test.cjs",
+          "scripts/tests/jest-config.test.cjs",
+          "scripts/tests/js-yaml.test.cjs",
+          "scripts/tests/lint-coverage.test.cjs",
+          "scripts/tests/metro-unicode.test.cjs",
+          "scripts/tests/nanoid.test.cjs",
+          "scripts/tests/router-dependency-range.test.cjs",
+          "scripts/tests/security-dependency-owner.test.cjs",
+          "scripts/tests/source-map-js.test.cjs",
+          "scripts/tests/tailwind-source-map.test.cjs",
+          "scripts/tests/ws.test.cjs",
+          "scripts/tests/xmldom.test.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "test:refactor-runner"
+        ],
+        [
+          "python3",
+          "-B",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "scripts/tests",
+          "-p",
+          "test_*.py"
+        ],
+        [
+          "npm",
+          "run",
+          "check:native-config"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=4096",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "android",
+          "--output-dir",
+          ".expo/modernization-checks/android",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/android')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=3072",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "ios",
+          "--output-dir",
+          ".expo/modernization-checks/ios",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/ios')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8197",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts",
+          "tests/e2e/database-bridge.spec.ts"
+        ]
+      ],
+      "risk": "high",
+      "approved": true,
+      "status": "verified",
+      "allowed_paths": [
+        "lib/quran-foundation/user-payloads.ts",
+        "lib/quran-foundation/user-sync.ts",
+        "tests/unit/qf-write-payloads.test.ts",
+        "tests/unit/qf-sync-pagination.test.ts",
+        "tests/unit/qf-sync-owner.test.ts"
+      ],
+      "attempts": 1,
+      "priority": 1,
+      "implementation_mode": "implementation",
+      "started_at": "2026-11-06T22:58:41.349584+00:00",
+      "completed_at": "2026-11-06T23:06:33.862827+00:00",
+      "independent_review": "pass",
+      "evidence": "docs/refactoring/PROGRESS.md",
+      "summary": "Validate every Quran Foundation bookmark/note list row before local reconciliation. Reuse acknowledgement row guards, preserve opaque string IDs and valid note fallback behavior, reject malformed/sparse rows without local changes."
     }
   ]
 }

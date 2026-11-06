@@ -1,6 +1,8 @@
 import {
   readQfBookmarkAcknowledgement,
+  readQfBookmarkRow,
   readQfNoteAcknowledgement,
+  readQfNoteRow,
   requireQfDeleteAcknowledgement,
 } from "@/lib/quran-foundation/user-payloads";
 
@@ -88,3 +90,35 @@ it.each([
 ])("rejects an unconfirmed delete %j", (value) => {
   expect(() => requireQfDeleteAcknowledgement(value)).toThrow("Incomplete Quran Foundation delete");
 });
+
+it("reads a fresh bookmark row without normalizing its opaque identifier", () => {
+  const input = { ...bookmark, id: " opaque bookmark " };
+  const decoded = readQfBookmarkRow(input);
+  expect(decoded).toEqual(input);
+  expect(decoded).not.toBe(input);
+});
+it.each([null, { ...bookmark, id: 42 }])("rejects an invalid standalone bookmark row %j", (value) => {
+  expect(() => readQfBookmarkRow(value)).toThrow("Incomplete Quran Foundation bookmark");
+});
+it("copies note ranges and retains short text and opaque metadata", () => {
+  const input = { ...note, id: " opaque note ", body: "x", ranges: ["unsupported range"], createdAt: "opaque time" };
+  const decoded = readQfNoteRow(input);
+  expect(decoded).toEqual(input);
+  expect(decoded).not.toBe(input);
+  expect(decoded.ranges).not.toBe(input.ranges);
+  input.ranges[0] = "changed after validation";
+  expect(decoded.ranges).toEqual(["unsupported range"]);
+});
+it.each([null, { ...note, id: 42 }, { ...note, ranges: new Array(1) }])(
+  "rejects an invalid standalone note row %j",
+  (value) => {
+    expect(() => readQfNoteRow(value)).toThrow("Incomplete Quran Foundation note");
+  },
+);
+it.each([{ ranges: [] }, { ranges: ["unsupported range"] }])(
+  "keeps structurally valid fallback note ranges $ranges",
+  ({ ranges }) => {
+    const input = { ...note, body: "x", ranges };
+    expect(readQfNoteRow(input)).toEqual(input);
+  },
+);

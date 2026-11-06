@@ -299,3 +299,97 @@ it("completes valid initial empty reconciliation before publishing its initial-e
     value: "true",
   });
 });
+
+function linkedTarget(entity: Entity, id: unknown) {
+  return entity === "bookmarks"
+    ? { ...remoteBookmark, id, surah: 2, ayah: 255 }
+    : { ...remoteNote, id, body: "Synthetic local note", ranges: ["2:255-2:255"] };
+}
+function linkNumericTargets() {
+  sql.prepare("UPDATE bookmarks SET qf_bookmark_id='42' WHERE ayah=255").run();
+  sql.prepare("UPDATE private_notes SET qf_note_id='42' WHERE id='local-note-tail'").run();
+}
+function expectLinkedTarget(entity: Entity) {
+  expect(
+    entity === "bookmarks"
+      ? sql.prepare("SELECT deleted_at,qf_bookmark_id AS remote_id FROM bookmarks WHERE ayah=255").get()
+      : sql.prepare("SELECT deleted_at,qf_note_id AS remote_id FROM private_notes WHERE id='local-note-tail'").get(),
+  ).toEqual({ deleted_at: null, remote_id: "42" });
+}
+
+it.each(
+  modes.flatMap((mode) => entities.flatMap((entity) => [1, 2].map((invalidPage) => ({ mode, entity, invalidPage })))),
+)(
+  "preserves the numeric-ID target for $entity page$invalidPage during $mode sync",
+  async ({ mode, entity, invalidPage }) => {
+    prepare(mode);
+    linkNumericTargets();
+    const before = snapshot();
+    mockPage = (kind, index) =>
+      kind !== entity
+        ? page(kind)
+        : index < invalidPage
+          ? page(kind, "next")
+          : { ok: true, [kind]: [kind === "bookmarks" ? remoteBookmark : remoteNote, linkedTarget(kind, 42)] };
+    let failure: unknown;
+    try {
+      await run(mode);
+    } catch (error) {
+      failure = error;
+    }
+    expectLinkedTarget(entity);
+    expect(failure).toEqual(
+      expect.objectContaining({ message: expect.stringContaining("Incomplete Quran Foundation") }),
+    );
+    expect(transactions).toBe(0);
+    expect(snapshot()).toEqual(before);
+    expect(pageCounts[entity]).toBe(invalidPage);
+  },
+);
+
+it.each(entities)("keeps a valid string-ID target present in a complete %s list", async (entity) => {
+  prepare("full");
+  linkNumericTargets();
+  mockPage = (kind) => (kind === entity ? { ok: true, [kind]: [linkedTarget(kind, "42")] } : page(kind));
+  await expect(run("full")).resolves.toMatchObject({ status: "synced" });
+  expectLinkedTarget(entity);
+  expect(transactions).toBe(1);
+});
+
+it.each([
+  { label: "empty ranges", ranges: [], expectedContent: "Synthetic local note" },
+  { label: "unsupported string ranges", ranges: ["unsupported range"], expectedContent: "Synthetic local note" },
+  { label: "short nonblank body", ranges: ["2:255-2:255"], expectedContent: "x" },
+])("keeps a linked note present with $label", async ({ ranges, expectedContent }) => {
+  prepare("full");
+  linkNumericTargets();
+  mockPage = (kind) =>
+    kind === "notes"
+      ? {
+          ok: true,
+          notes: [{ ...linkedTarget("notes", "42"), body: "x", ranges, updatedAt: "2026-02-01T00:00:00.000Z" }],
+        }
+      : page(kind);
+  await expect(run("full")).resolves.toMatchObject({ status: "synced" });
+  expectLinkedTarget("notes");
+  expect(sql.prepare("SELECT content FROM private_notes WHERE id='local-note-tail'").get()).toEqual({
+    content: expectedContent,
+  });
+});
+
+it.each(
+  entities.flatMap((entity) =>
+    [
+      { label: "null row", rows: [null] },
+      { label: "invalid row", rows: [{}] },
+      { label: "sparse array", rows: new Array(1) },
+    ].map((value) => ({ entity, ...value })),
+  ),
+)("rejects $entity $label before reconciliation", async ({ entity, rows }) => {
+  prepare("full");
+  const before = snapshot();
+  mockPage = (kind) => (kind === entity ? { ok: true, [kind]: rows } : page(kind));
+  await expect(run("full")).rejects.toThrow("Incomplete Quran Foundation");
+  expect(transactions).toBe(0);
+  expect(snapshot()).toEqual(before);
+});

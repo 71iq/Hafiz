@@ -6,7 +6,9 @@ import { getQfConnectionStatus, invokeQfUser } from "./user";
 import { captureQfRequestOwner, type QfSessionOwner } from "./request-owner";
 import {
   readQfBookmarkAcknowledgement,
+  readQfBookmarkRow,
   readQfNoteAcknowledgement,
+  readQfNoteRow,
   requireQfDeleteAcknowledgement,
 } from "./user-payloads";
 import {
@@ -440,7 +442,7 @@ async function listAllQfBookmarks(owner: QfSyncOwner): Promise<QfBookmark[]> {
     ) {
       throw new Error("Incomplete Quran Foundation bookmarks list.");
     }
-    bookmarks.push(...response.bookmarks);
+    bookmarks.push(...Array.from(response.bookmarks, readQfBookmarkRow));
     after = response.nextCursor ?? undefined;
     if (!after) return bookmarks;
   }
@@ -470,7 +472,7 @@ async function listAllQfNotes(owner: QfSyncOwner): Promise<QfNote[]> {
     ) {
       throw new Error("Incomplete Quran Foundation notes list.");
     }
-    notes.push(...response.notes);
+    notes.push(...Array.from(response.notes, readQfNoteRow));
     cursor = response.nextCursor ?? undefined;
     if (!cursor) return notes;
   }

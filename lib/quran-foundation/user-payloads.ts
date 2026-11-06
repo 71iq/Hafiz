@@ -10,12 +10,8 @@ function incomplete(kind: string): never {
   throw new Error("Incomplete Quran Foundation " + kind + " response.");
 }
 
-export function readQfBookmarkAcknowledgement(
-  response: unknown,
-  expected: { surah: number; ayah: number },
-): QfBookmark {
-  if (!isRecord(response) || response.ok !== true || !isRecord(response.bookmark)) incomplete("bookmark");
-  const row = response.bookmark;
+export function readQfBookmarkRow(row: unknown): QfBookmark {
+  if (!isRecord(row)) incomplete("bookmark");
   if (
     !isNonblankText(row.id) ||
     row.type !== "ayah" ||
@@ -23,11 +19,9 @@ export function readQfBookmarkAcknowledgement(
     !Number.isInteger(row.surah) ||
     row.surah < 1 ||
     row.surah > 114 ||
-    row.surah !== expected.surah ||
     typeof row.ayah !== "number" ||
     !Number.isInteger(row.ayah) ||
     row.ayah < 1 ||
-    row.ayah !== expected.ayah ||
     !isNonblankText(row.createdAt) ||
     typeof row.isInDefaultCollection !== "boolean" ||
     typeof row.collectionsCount !== "number" ||
@@ -46,13 +40,21 @@ export function readQfBookmarkAcknowledgement(
   };
 }
 
-export function readQfNoteAcknowledgement(response: unknown, expectedId?: string): QfNote {
-  if (!isRecord(response) || response.ok !== true || !isRecord(response.note)) incomplete("note");
-  const row = response.note;
+export function readQfBookmarkAcknowledgement(
+  response: unknown,
+  expected: { surah: number; ayah: number },
+): QfBookmark {
+  if (!isRecord(response) || response.ok !== true) incomplete("bookmark");
+  const row = readQfBookmarkRow(response.bookmark);
+  if (row.surah !== expected.surah || row.ayah !== expected.ayah) incomplete("bookmark");
+  return row;
+}
+
+export function readQfNoteRow(row: unknown): QfNote {
+  if (!isRecord(row)) incomplete("note");
   const ranges = Array.isArray(row.ranges) ? Array.from(row.ranges) : null;
   if (
     !isNonblankText(row.id) ||
-    (expectedId !== undefined && row.id !== expectedId) ||
     !isNonblankText(row.body) ||
     !isNonblankText(row.createdAt) ||
     !isNonblankText(row.updatedAt) ||
@@ -61,6 +63,13 @@ export function readQfNoteAcknowledgement(response: unknown, expectedId?: string
   )
     incomplete("note");
   return { id: row.id, body: row.body, ranges, createdAt: row.createdAt, updatedAt: row.updatedAt };
+}
+
+export function readQfNoteAcknowledgement(response: unknown, expectedId?: string): QfNote {
+  if (!isRecord(response) || response.ok !== true) incomplete("note");
+  const row = readQfNoteRow(response.note);
+  if (expectedId !== undefined && row.id !== expectedId) incomplete("note");
+  return row;
 }
 
 export function requireQfDeleteAcknowledgement(response: unknown): void {
