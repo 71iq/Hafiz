@@ -11178,7 +11178,7 @@
       ],
       "risk": "high",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "lib/auth/store.ts",
         "lib/fsrs/leaderboard-sync.ts",
@@ -11187,11 +11187,15 @@
         "tests/unit/leaderboard-stats-owner.test.ts",
         "tests/unit/profile-save-lifecycle.test.tsx"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "primary_investigation_evidence": ".refactor-baseline/rf132-profile-publication-v1/decision.md",
       "implementation_mode": "copy-only",
       "readiness_evidence": ".refactor-baseline/rf132-handoff-v1/readiness.md",
-      "primary_preparation_evidence": ".refactor-baseline/rf132-profile-publication-v1/preparation-receipt.json"
+      "primary_preparation_evidence": ".refactor-baseline/rf132-profile-publication-v1/preparation-receipt.json",
+      "started_at": "2026-11-06T11:59:02.100247+00:00",
+      "completed_at": "2026-11-06T12:07:53.754362+00:00",
+      "evidence": ".ralph/runs/RF-132-1-1793966342104458551",
+      "summary": "Installed the six frozen RF-132 artifacts in the required order after completing all eleven ordered reads."
     }
   ]
 }

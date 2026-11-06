@@ -1138,3 +1138,397 @@ describe("account stats FIFO", () => {
     }
   });
 });
+
+describe("same-owner profile field publication", () => {
+  const oldStats = {
+    total_score: 10,
+    cards_reviewed: 1,
+    current_streak: 1,
+    longest_streak: 2,
+    last_review_date: "2026-01-01",
+  };
+  const newStats = {
+    total_score: 900,
+    cards_reviewed: 70,
+    current_streak: 8,
+    longest_streak: 9,
+    last_review_date: "2026-11-06",
+  };
+  const oldFields = {
+    display_name: "old name",
+    avatar_url: "https://example.invalid/old.png",
+    bio: "old bio",
+    country: "old country",
+  };
+  const fieldCases = [
+    {
+      kind: "values",
+      fields: {
+        display_name: "new name",
+        avatar_url: "https://example.invalid/new.png",
+        bio: "new bio",
+        country: "new country",
+      },
+    },
+    { kind: "nulls", fields: { display_name: null, avatar_url: null, bio: null, country: null } },
+  ];
+  const updates = (fields: (typeof fieldCases)[number]["fields"]) => ({
+    displayName: fields.display_name,
+    avatarUrl: fields.avatar_url,
+    bio: fields.bio,
+    country: fields.country,
+  });
+
+  function highLocalStats() {
+    mockGetTotalScore.mockResolvedValue(newStats.total_score);
+    jest.mocked(database.getFirstAsync).mockResolvedValue({ count: newStats.cards_reviewed });
+    mockGetWirdStatus.mockResolvedValue({
+      ...emptyWirdStatus,
+      currentDays: 8,
+      longestDays: 9,
+      lastReviewDate: "2026-11-06T12:00:00Z",
+    });
+  }
+
+  function remoteProfile(initial: Profile) {
+    let row = initial;
+    const request = (operation: QueryOperation): Promise<QueryResult> | undefined => {
+      if (operation.table !== "profiles") return undefined;
+      if (operation.kind === "select") return Promise.resolve({ data: { ...row }, error: null });
+      if (operation.kind === "update") {
+        row = { ...row, ...(operation.data as Partial<Profile>) };
+        return Promise.resolve({ data: { ...row }, error: null });
+      }
+      return undefined;
+    };
+    return { request, current: () => row };
+  }
+  function isStatsUpdate(operation: QueryOperation) {
+    return operation.table === "profiles" && operation.kind === "update" && "total_score" in (operation.data as object);
+  }
+  function isEditUpdate(operation: QueryOperation) {
+    return operation.table === "profiles" && operation.kind === "update" && !isStatsUpdate(operation);
+  }
+
+  test.each(fieldCases)("late stats reply preserves an actual completed edit with $kind", async ({ fields }) => {
+    beginAsA();
+    highLocalStats();
+    const remote = remoteProfile(makeProfile(userA.id, { ...oldStats, ...oldFields }));
+    const held = makeDeferred<QueryResult>();
+    const reached = makeDeferred<void>();
+    let oldReply: QueryResult | undefined;
+    mockQueryResponse = (operation) => {
+      const response = remote.request(operation);
+      if (isStatsUpdate(operation)) {
+        oldReply = { data: { ...remote.current() }, error: null };
+        reached.resolve();
+        return held.promise;
+      }
+      return response;
+    };
+    const stats = updateProfileStats(database);
+    await reached.promise;
+    try {
+      const result = await useAuthStore.getState().updateProfile(updates(fields));
+      expect(result.status).toBe("completed");
+      expect(useAuthStore.getState().profile).toMatchObject({ ...newStats, ...fields });
+      held.resolve(oldReply!);
+      await stats;
+      expect(useAuthStore.getState().profile).toMatchObject({ ...newStats, ...fields });
+      expect(remote.current()).toMatchObject({ ...newStats, ...fields });
+    } finally {
+      held.resolve(oldReply!);
+      await stats;
+    }
+  });
+
+  test.each(fieldCases)(
+    "late initial ensure read preserves an actual completed edit with $kind",
+    async ({ fields }) => {
+      beginAsA();
+      highLocalStats();
+      const remote = remoteProfile(makeProfile(userA.id, { ...oldStats, ...oldFields }));
+      const held = makeDeferred<QueryResult>();
+      const reached = makeDeferred<void>();
+      const score = makeDeferred<number>();
+      const scoreReached = makeDeferred<void>();
+      mockGetTotalScore.mockImplementationOnce(() => {
+        scoreReached.resolve();
+        return score.promise;
+      });
+      let first = true;
+      const oldReply = { data: { ...remote.current() }, error: null };
+      mockQueryResponse = (operation) => {
+        if (first && operation.table === "profiles" && operation.kind === "select") {
+          first = false;
+          reached.resolve();
+          return held.promise;
+        }
+        return remote.request(operation);
+      };
+      const stats = updateProfileStats(database);
+      await reached.promise;
+      try {
+        expect((await useAuthStore.getState().updateProfile(updates(fields))).status).toBe("completed");
+        const edited = useAuthStore.getState().profile;
+        held.resolve(oldReply);
+        await scoreReached.promise;
+        expect(useAuthStore.getState().profile).toBe(edited);
+        expect(useAuthStore.getState().profile).toMatchObject(fields);
+        score.resolve(900);
+        await stats;
+        expect(useAuthStore.getState().profile).toMatchObject({ ...newStats, ...fields });
+      } finally {
+        held.resolve(oldReply);
+        score.resolve(900);
+        await stats;
+      }
+    },
+  );
+
+  test.each(fieldCases)(
+    "late edit reply preserves newer actual stats with $kind and returns the accepted profile",
+    async ({ fields }) => {
+      const original = beginAsA();
+      highLocalStats();
+      const remote = remoteProfile(makeProfile(userA.id, { ...oldStats, ...oldFields }));
+      const held = makeDeferred<QueryResult>();
+      const reached = makeDeferred<void>();
+      let oldReply: QueryResult | undefined;
+      mockQueryResponse = (operation) => {
+        const response = remote.request(operation);
+        if (isEditUpdate(operation)) {
+          oldReply = { data: { ...remote.current() }, error: null };
+          reached.resolve();
+          return held.promise;
+        }
+        return response;
+      };
+      const edit = useAuthStore.getState().updateProfile(updates(fields));
+      await reached.promise;
+      try {
+        await updateProfileStats(database);
+        expect(useAuthStore.getState().profile).toMatchObject(newStats);
+        held.resolve(oldReply!);
+        const result = await edit;
+        expect(result).toMatchObject({
+          status: "completed",
+          value: expect.objectContaining({ ...newStats, ...fields }),
+        });
+        if (result.status === "completed") expect(result.value).toBe(useAuthStore.getState().profile);
+        expect(remote.current()).toMatchObject({ ...newStats, ...fields });
+        expect(useAuthStore.getState().session).toBe(original);
+      } finally {
+        held.resolve(oldReply!);
+        await edit;
+      }
+    },
+  );
+
+  test.each(["fetchProfile", "ensureProfile"] as const)(
+    "a fresh %s cannot lower optimistic stats while their request is pending",
+    async (action) => {
+      beginAsA();
+      highLocalStats();
+      const remote = remoteProfile(makeProfile(userA.id, { ...oldStats, ...oldFields }));
+      const held = makeDeferred<QueryResult>();
+      const reached = makeDeferred<void>();
+      mockQueryResponse = (operation) => {
+        if (isStatsUpdate(operation)) {
+          reached.resolve();
+          return held.promise;
+        }
+        return remote.request(operation);
+      };
+      const stats = updateProfileStats(database);
+      await reached.promise;
+      try {
+        const optimistic = useAuthStore.getState().profile;
+        expect(optimistic).toMatchObject(newStats);
+        const result = await useAuthStore.getState()[action]();
+        expect(useAuthStore.getState().profile).toBe(optimistic);
+        if (action === "ensureProfile") expect(result).toBe(optimistic);
+        expect(remote.current()).toMatchObject(oldStats);
+        held.resolve({ data: null, error: new Error("stats packet") });
+        await stats;
+        await useAuthStore.getState()[action]();
+        expect(useAuthStore.getState().profile).toMatchObject(oldStats);
+      } finally {
+        held.resolve({ data: null, error: new Error("stats packet") });
+        await stats;
+      }
+    },
+  );
+
+  test.each(fieldCases)(
+    "an edit completing before the pending stats commit preserves optimistic stats with $kind",
+    async ({ fields }) => {
+      beginAsA();
+      highLocalStats();
+      const remote = remoteProfile(makeProfile(userA.id, { ...oldStats, ...oldFields }));
+      const held = makeDeferred<QueryResult>();
+      const reached = makeDeferred<void>();
+      let operation: QueryOperation | undefined;
+      mockQueryResponse = (next) => {
+        if (isStatsUpdate(next)) {
+          operation = next;
+          reached.resolve();
+          return held.promise;
+        }
+        return remote.request(next);
+      };
+      const stats = updateProfileStats(database);
+      await reached.promise;
+      try {
+        const result = await useAuthStore.getState().updateProfile(updates(fields));
+        expect(result).toMatchObject({
+          status: "completed",
+          value: expect.objectContaining({ ...newStats, ...fields }),
+        });
+        expect(useAuthStore.getState().profile).toMatchObject({ ...newStats, ...fields });
+        expect(remote.current()).toMatchObject({ ...oldStats, ...fields });
+        held.resolve(await remote.request(operation!)!);
+        await stats;
+        expect(remote.current()).toMatchObject({ ...newStats, ...fields });
+        expect(useAuthStore.getState().profile).toMatchObject({ ...newStats, ...fields });
+      } finally {
+        held.resolve(await remote.request(operation!)!);
+        await stats;
+      }
+    },
+  );
+
+  test.each(["fetchProfile", "ensureProfile"] as const)(
+    "a %s begun during a write remains fenced after that write settles",
+    async (action) => {
+      beginAsA();
+      highLocalStats();
+      const remote = remoteProfile(makeProfile(userA.id, { ...oldStats, ...oldFields }));
+      const statsHeld = makeDeferred<QueryResult>();
+      const statsReached = makeDeferred<void>();
+      const readHeld = makeDeferred<QueryResult>();
+      let holdReads = false;
+      mockQueryResponse = (operation) => {
+        if (isStatsUpdate(operation)) {
+          statsReached.resolve();
+          return statsHeld.promise;
+        }
+        if (holdReads && operation.table === "profiles" && operation.kind === "select") return readHeld.promise;
+        return remote.request(operation);
+      };
+      const stats = updateProfileStats(database);
+      await statsReached.promise;
+      holdReads = true;
+      const optimistic = useAuthStore.getState().profile;
+      const read = useAuthStore.getState()[action]();
+      statsHeld.resolve({ data: null, error: new Error("stats failed") });
+      await stats;
+      readHeld.resolve({ data: { ...remote.current() }, error: null });
+      await read;
+      expect(useAuthStore.getState().profile).toBe(optimistic);
+    },
+  );
+  test.each(["same-user-new-session", "different-user-b", "a-b-a"] as const)(
+    "old profile write cleanup cannot release replacement write protection after %s",
+    async (kind) => {
+      const original = beginAsA();
+      highLocalStats();
+      const oldHeld = makeDeferred<QueryResult>();
+      const oldReached = makeDeferred<void>();
+      const newHeld = makeDeferred<QueryResult>();
+      const newReached = makeDeferred<void>();
+      let writes = 0;
+      mockQueryResponse = (operation) => {
+        if (isStatsUpdate(operation)) {
+          if (++writes === 1) {
+            oldReached.resolve();
+            return oldHeld.promise;
+          }
+          newReached.resolve();
+          return newHeld.promise;
+        }
+        if (operation.table === "profiles" && operation.kind === "select") {
+          const id = operation.filters.find(([key]) => key === "id")?.[1];
+          if (typeof id !== "string") throw Error("Missing fixture ID");
+          return Promise.resolve({ data: makeProfile(id, oldStats), error: null });
+        }
+        return undefined;
+      };
+      const oldWork = updateProfileStats(database);
+      await oldReached.promise;
+      const replacement = publishReplacement(kind, original);
+      await useAuthStore.getState().fetchProfile();
+      expect(useAuthStore.getState().profile).toMatchObject({ id: replacement.profile?.id, ...oldStats });
+      const newWork = updateProfileStats(database);
+      await newReached.promise;
+      try {
+        oldHeld.resolve({ data: makeProfile(userA.id, newStats), error: null });
+        await oldWork;
+        const optimistic = useAuthStore.getState().profile;
+        expect(optimistic).toMatchObject({ id: replacement.profile?.id, ...newStats });
+        await useAuthStore.getState().fetchProfile();
+        expect(useAuthStore.getState().profile).toBe(optimistic);
+        newHeld.resolve({ data: makeProfile(replacement.profile!.id, newStats), error: null });
+        await newWork;
+        await useAuthStore.getState().fetchProfile();
+        expect(useAuthStore.getState().profile).toMatchObject(oldStats);
+      } finally {
+        oldHeld.resolve({ data: null, error: null });
+        newHeld.resolve({ data: null, error: null });
+        await Promise.allSettled([oldWork, newWork]);
+      }
+    },
+  );
+
+  test.each(["fetchProfile", "ensureProfile"] as const)(
+    "pending-write %s fallback preserves current data and later rejection releases protection",
+    async (action) => {
+      beginAsA();
+      highLocalStats();
+      const held = makeDeferred<QueryResult>();
+      const reached = makeDeferred<void>();
+      let failRead = false;
+      mockQueryResponse = (operation) => {
+        if (isStatsUpdate(operation)) {
+          reached.resolve();
+          return held.promise;
+        }
+        if (operation.table === "profiles" && operation.kind === "select")
+          return Promise.resolve({
+            data: failRead ? null : makeProfile(userA.id, oldStats),
+            error: failRead ? new Error("read failed") : null,
+          });
+        return undefined;
+      };
+      const stats = updateProfileStats(database);
+      await reached.promise;
+      const optimistic = useAuthStore.getState().profile;
+      failRead = true;
+      await useAuthStore.getState()[action]();
+      expect(useAuthStore.getState().profile).toBe(optimistic);
+      const failure = new Error("write rejected");
+      held.reject(failure);
+      await expect(stats).rejects.toBe(failure);
+      failRead = false;
+      await useAuthStore.getState()[action]();
+      expect(useAuthStore.getState().profile).toMatchObject(oldStats);
+    },
+  );
+
+  test("stats protection ends before later aggregate requests", async () => {
+    beginAsA();
+    highLocalStats();
+    const pause = pauseAt("profile", "review-stats");
+    const stats = updateProfileStats(database);
+    await pause.reached;
+    try {
+      const before = useAuthStore.getState().profile;
+      await useAuthStore.getState().fetchProfile();
+      expect(useAuthStore.getState().profile).not.toBe(before);
+      expect(useAuthStore.getState().profile?.total_score).toBe(0);
+    } finally {
+      pause.release();
+      await stats;
+    }
+  });
+});

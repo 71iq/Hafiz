@@ -263,13 +263,26 @@ it.each(["metadata", "token-refresh"])("keeps current profile completion through
   mockUpdates.push(pending.promise);
   const work = useAuthStore.getState().updateProfile({ bio: "value" });
   await flush();
-  if (kind === "metadata") useAuthStore.setState({ user: { ...original.user, user_metadata: { name: "changed" } } });
-  else
-    activate({ ...original, access_token: original.access_token.replace(/c2ln$/, "c2lnMg") }, profile("a", "interim"));
-  const updated = profile("a", "updated");
-  pending.resolve({ data: updated, error: null });
-  expect((await work).status).toBe("completed");
-  expect(useAuthStore.getState().profile).toBe(updated);
+  const stats = {
+    total_score: 900,
+    cards_reviewed: 70,
+    current_streak: 8,
+    longest_streak: 9,
+    last_review_date: "2026-11-06",
+  };
+  const interim = { ...profile("a", "interim"), ...stats };
+  if (kind === "metadata")
+    useAuthStore.setState({ user: { ...original.user, user_metadata: { name: "changed" } }, profile: interim });
+  else activate({ ...original, access_token: original.access_token.replace(/c2ln$/, "c2lnMg") }, interim);
+  pending.resolve({ data: { ...profile("a"), bio: "value" }, error: null });
+  const result = await work;
+  expect(result.status).toBe("completed");
+  if (result.status === "completed") {
+    expect(result.owner.isCurrent()).toBe(true);
+    expect(result.value).toBe(useAuthStore.getState().profile);
+    expect(result.value).toMatchObject({ ...stats, display_name: "interim", bio: "value" });
+  }
+  expect(mockUpdate).toHaveBeenCalledWith({ bio: "value" });
 });
 it("does not reuse a same-user different-session owner", async () => {
   const a = session("a");
@@ -321,4 +334,44 @@ it.each(["missing", "unidentified", "mismatched"])("fails closed with %s session
 it("retains signed-out rejection without an SDK request", async () => {
   await expect(useAuthStore.getState().updateProfile({ bio: "value" })).rejects.toThrow("Not signed in");
   expect(mockFrom).not.toHaveBeenCalled();
+});
+
+it("merges explicit nullable edits while preserving omitted fields and newer stats", async () => {
+  const initial = {
+    ...profile("a"),
+    display_name: "old",
+    avatar_url: "old-avatar",
+    bio: "retained bio",
+    country: "old country",
+  };
+  activate(session("a"), initial);
+  const pending = deferred();
+  mockReads.push(Promise.resolve({ data: initial, error: null }));
+  mockUpdates.push(pending.promise);
+  const work = useAuthStore
+    .getState()
+    .updateProfile({ displayName: null, avatarUrl: null, bio: undefined, country: null });
+  await flush();
+  const stats = {
+    total_score: 900,
+    cards_reviewed: 70,
+    current_streak: 8,
+    longest_streak: 9,
+    last_review_date: "2026-11-06",
+  };
+  useAuthStore.setState({ profile: { ...initial, ...stats, bio: "newer unrequested bio" } });
+  pending.resolve({ data: { ...initial, display_name: null, avatar_url: null, country: null }, error: null });
+  const result = await work;
+  expect(result.status).toBe("completed");
+  if (result.status === "completed") {
+    expect(result.value).toBe(useAuthStore.getState().profile);
+    expect(result.value).toMatchObject({
+      ...stats,
+      display_name: null,
+      avatar_url: null,
+      country: null,
+      bio: "newer unrequested bio",
+    });
+  }
+  expect(mockUpdate).toHaveBeenCalledWith({ display_name: null, avatar_url: null, country: null });
 });

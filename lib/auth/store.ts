@@ -24,6 +24,39 @@ let profileOwnerGeneration = 0;
 let authInitialization: Promise<void> | undefined;
 let cancelAuthListener: (() => void) | undefined;
 
+// Reads and the two profile writers share one publication boundary. Obsolete
+// owners cannot keep a replacement session's reads behind an old request.
+const pendingProfileWrites = new Set<{ userId: string; owner: AuthOwner }>();
+
+function hasPendingProfileWrite(userId: string): boolean {
+  let pending = false;
+  for (const write of pendingProfileWrites) {
+    if (!write.owner.isCurrent()) pendingProfileWrites.delete(write);
+    else if (write.userId === userId) pending = true;
+  }
+  return pending;
+}
+
+export function beginProfileWrite(userId: string, owner: AuthOwner) {
+  const hadPendingWrite = hasPendingProfileWrite(userId);
+  const write = { userId, owner };
+  pendingProfileWrites.add(write);
+  return { hadPendingWrite, release: () => pendingProfileWrites.delete(write) };
+}
+
+function publishProfileRead(
+  userId: string,
+  profileAtRead: Profile | null,
+  hadPendingWrite: boolean,
+  incoming: Profile | null,
+): Profile | null {
+  const current = useAuthStore.getState().profile;
+  if (current?.id === userId && (current !== profileAtRead || hadPendingWrite || hasPendingProfileWrite(userId)))
+    return current;
+  useAuthStore.setState({ profile: incoming });
+  return incoming;
+}
+
 function buildFallbackProfile(user: NonNullable<AuthState["user"]>): Profile {
   const metadata = user.user_metadata ?? {};
   const emailName = user.email?.split("@")[0];
@@ -380,6 +413,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     if (!user) return;
 
     const generation = profileOwnerGeneration;
+    const profileAtRead = get().profile;
+    const hadPendingWrite = hasPendingProfileWrite(user.id);
     const isCurrentOwner = () => generation === profileOwnerGeneration && get().user?.id === user.id;
 
     try {
@@ -388,11 +423,11 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       if (!isCurrentOwner()) return;
 
       if (error) throw error;
-      set({ profile: data as Profile });
+      publishProfileRead(user.id, profileAtRead, hadPendingWrite, data as Profile);
     } catch (err: any) {
       if (!isCurrentOwner()) return;
       console.warn("[Auth] Failed to fetch profile:", err.message);
-      set({ profile: buildFallbackProfile(user) });
+      publishProfileRead(user.id, profileAtRead, hadPendingWrite, buildFallbackProfile(user));
     }
   },
 
@@ -420,12 +455,28 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         if (bio !== undefined) patch.bio = bio;
         if (country !== undefined) patch.country = country;
 
-        const { data, error } = await supabase.from("profiles").update(patch).eq("id", user.id).select("*").single();
-        requireCurrent();
-        if (error) throw error;
-        const profile = data as Profile;
-        set({ profile });
-        return profile;
+        const profileAtWrite = get().profile;
+        const write = beginProfileWrite(user.id, owner);
+        try {
+          const { data, error } = await supabase.from("profiles").update(patch).eq("id", user.id).select("*").single();
+          requireCurrent();
+          if (error) throw error;
+          const saved = data as Profile;
+          const current = get().profile;
+          let profile = saved;
+          if (current?.id === user.id && (current !== profileAtWrite || write.hadPendingWrite)) {
+            profile = { ...current };
+            if (displayName !== undefined) profile.display_name = saved.display_name;
+            if (avatarUrl !== undefined) profile.avatar_url = saved.avatar_url;
+            if (bio !== undefined) profile.bio = saved.bio;
+            if (country !== undefined) profile.country = saved.country;
+          }
+          set({ profile });
+          const published = get().profile;
+          return published?.id === user.id ? published : profile;
+        } finally {
+          write.release();
+        }
       } catch (err: any) {
         if (isCurrent()) set({ error: err.message });
         else owner.cancel();
@@ -439,6 +490,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     if (!user) return null;
 
     const generation = profileOwnerGeneration;
+    const profileAtRead = get().profile;
+    const hadPendingWrite = hasPendingProfileWrite(user.id);
     const isCurrentOwner = () =>
       generation === profileOwnerGeneration && get().user?.id === user.id && (!owner || owner.isCurrent());
 
@@ -455,9 +508,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
       if (existingError) throw existingError;
       if (existingProfile) {
-        const profile = existingProfile as Profile;
-        set({ profile });
-        return profile;
+        return publishProfileRead(user.id, profileAtRead, hadPendingWrite, existingProfile as Profile);
       }
 
       const { data, error } = await supabase.from("profiles").insert(buildProfileInsert(user)).select("*").single();
@@ -465,14 +516,11 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       if (!isCurrentOwner()) return null;
 
       if (error) throw error;
-      const profile = (data as Profile) ?? fallback;
-      set({ profile });
-      return profile;
+      return publishProfileRead(user.id, profileAtRead, hadPendingWrite, (data as Profile) ?? fallback);
     } catch (err: any) {
       if (!isCurrentOwner()) return null;
       console.warn("[Auth] Failed to ensure profile:", err.message);
-      set({ profile: fallback });
-      return fallback;
+      return publishProfileRead(user.id, profileAtRead, hadPendingWrite, fallback);
     }
   },
 

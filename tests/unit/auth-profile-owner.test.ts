@@ -255,20 +255,30 @@ it("retains current-owner fetch empty data behavior", async () => {
   expect(useAuthStore.getState().profile).toBeNull();
 });
 
-it.each(actions)("does not invalidate %s on same-session profile or same-ID metadata updates", async (action) => {
+it.each(actions)("preserves a newer same-session profile during %s and same-ID metadata updates", async (action) => {
   const original = session("a");
   activate(original, null);
   const pending = deferred();
   mockReads.push(pending.promise);
   const work = useAuthStore.getState()[action]();
-  useAuthStore.setState({
-    user: { ...original.user, user_metadata: { display_name: "new" } },
-    profile: profile("a", "interim"),
-  });
-  const current = profile("a", "loaded");
-  pending.resolve({ data: current, error: null });
-  await work;
-  expect(useAuthStore.getState().profile).toBe(current);
+  const interim = profile("a", "interim");
+  useAuthStore.setState({ user: { ...original.user, user_metadata: { display_name: "new" } }, profile: interim });
+  pending.resolve({ data: profile("a", "loaded"), error: null });
+  expect(await work).toBe(action === "ensureProfile" ? interim : undefined);
+  expect(useAuthStore.getState().profile).toBe(interim);
+});
+
+it.each(actions)("allows %s through same-ID metadata changes when no profile changed", async (action) => {
+  const original = session("a");
+  activate(original, null);
+  const pending = deferred();
+  mockReads.push(pending.promise);
+  const work = useAuthStore.getState()[action]();
+  useAuthStore.setState({ user: { ...original.user, user_metadata: { display_name: "new" } } });
+  const loaded = profile("a", "loaded");
+  pending.resolve({ data: loaded, error: null });
+  expect(await work).toBe(action === "ensureProfile" ? loaded : undefined);
+  expect(useAuthStore.getState().profile).toBe(loaded);
 });
 
 it.each(actions)("invalidates %s on a replacement same-ID session", async (action) => {
@@ -312,3 +322,39 @@ it("guards restored-session profile completion after an actual signed-out notifi
   expect(useAuthStore.getState().user).toBeNull();
   expect(useAuthStore.getState().profile).toBeNull();
 });
+
+it.each(
+  actions.flatMap((action) => ["success", "empty", "error", "rejection"].map((outcome) => ({ action, outcome }))),
+)("retains newer same-owner profile through $action $outcome", async ({ action, outcome }) => {
+  activate(session("a"), profile("a"));
+  const pending = deferred();
+  mockReads.push(pending.promise);
+  if (action === "ensureProfile" && outcome === "empty")
+    mockInserts.push(Promise.resolve({ data: profile("a", "inserted"), error: null }));
+  const work = useAuthStore.getState()[action]();
+  const newer = { ...profile("a", "newer"), total_score: 900, bio: null };
+  useAuthStore.setState({ profile: newer });
+  finish(pending, outcome);
+  const result = await work;
+  expect(useAuthStore.getState().profile).toBe(newer);
+  expect(result).toBe(action === "ensureProfile" ? newer : undefined);
+  expect(console.warn).toHaveBeenCalledTimes(outcome === "error" || outcome === "rejection" ? 1 : 0);
+  expect(mockInsert).toHaveBeenCalledTimes(action === "ensureProfile" && outcome === "empty" ? 1 : 0);
+});
+it.each(["success", "empty", "error", "rejection"])(
+  "retains newer profile through already-issued insert %s",
+  async (outcome) => {
+    activate(session("a"), null);
+    mockReads.push(Promise.resolve({ data: null, error: null }));
+    const pending = deferred();
+    mockInserts.push(pending.promise);
+    const work = useAuthStore.getState().ensureProfile();
+    await Promise.resolve();
+    expect(mockInsert).toHaveBeenCalledTimes(1);
+    const newer = { ...profile("a", "newer"), total_score: 900 };
+    useAuthStore.setState({ profile: newer });
+    finish(pending, outcome);
+    expect(await work).toBe(newer);
+    expect(useAuthStore.getState().profile).toBe(newer);
+  },
+);

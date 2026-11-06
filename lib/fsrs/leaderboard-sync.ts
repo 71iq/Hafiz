@@ -1,7 +1,7 @@
 import { isMissingPublicReviewAggregateError } from "@/lib/leaderboard/errors";
 import type { SQLiteDatabase } from "expo-sqlite";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
-import { useAuthStore } from "@/lib/auth/store";
+import { beginProfileWrite, useAuthStore } from "@/lib/auth/store";
 import { authCommands } from "@/lib/auth/commands";
 import type { AuthOwner } from "@/lib/auth/coordinator";
 import { getAuthSessionIdentity } from "@/lib/auth/session-identity";
@@ -424,15 +424,36 @@ export async function updateProfileStats(db: SQLiteDatabase): Promise<void> {
         ),
       };
 
-      patchCurrentProfile(owner, stats);
-      if (!owner.isCurrent()) return;
+      const write = beginProfileWrite(owner.userId, owner.authOwner);
+      try {
+        patchCurrentProfile(owner, stats);
+        if (!owner.isCurrent()) return;
+        const profileAtWrite = useAuthStore.getState().profile;
+        const { data, error } = await supabase
+          .from("profiles")
+          .update(stats)
+          .eq("id", owner.userId)
+          .select("*")
+          .single();
 
-      const { data, error } = await supabase.from("profiles").update(stats).eq("id", owner.userId).select("*").single();
-
-      if (!owner.isCurrent()) return;
-      if (error) console.warn("[Leaderboard] Failed to update profile stats:", error.message);
-      else if (data?.id === owner.userId) {
-        useAuthStore.setState((state) => (owner.isCurrent() ? { profile: data } : state));
+        if (!owner.isCurrent()) return;
+        if (error) console.warn("[Leaderboard] Failed to update profile stats:", error.message);
+        else if (data?.id === owner.userId) {
+          const current = useAuthStore.getState().profile;
+          if (current?.id === owner.userId && (current !== profileAtWrite || write.hadPendingWrite)) {
+            patchCurrentProfile(owner, {
+              total_score: data.total_score,
+              current_streak: data.current_streak,
+              longest_streak: data.longest_streak,
+              cards_reviewed: data.cards_reviewed,
+              last_review_date: data.last_review_date,
+            });
+          } else {
+            useAuthStore.setState((state) => (owner.isCurrent() ? { profile: data } : state));
+          }
+        }
+      } finally {
+        write.release();
       }
 
       try {

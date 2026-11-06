@@ -608,3 +608,71 @@ it("renews closed-editor ownership after batched A-B-A without reviving captured
   await act(async () => mockRootClose());
   expect(mockBack).toHaveBeenCalledTimes(1);
 });
+
+it.each(["name", "remove-avatar"])(
+  "preserves newer stats in the actual store and Query cache after %s save",
+  async (kind) => {
+    if (kind === "remove-avatar")
+      mockAuthStore.setState({ profile: { ...profile("a"), avatar_url: "https://synthetic.example.invalid/old.png" } });
+    const pending = deferred<Response>();
+    mockWrite.mockReturnValue(pending.promise);
+    const screen = await open();
+    if (kind === "name") change(screen);
+    else fireEvent.press(screen.getByText(strings.en.profileRemovePhoto));
+    fireEvent.press(screen.getByTestId("save"));
+    await waitFor(() => expect(mockWrite).toHaveBeenCalledTimes(1));
+    const stats = {
+      total_score: 900,
+      cards_reviewed: 70,
+      current_streak: 8,
+      longest_streak: 9,
+      last_review_date: "2026-11-06",
+    };
+    await act(async () => {
+      const current = mockAuthStore.getState().profile;
+      if (!current) throw Error("Missing current profile");
+      mockAuthStore.setState({ profile: { ...current, ...stats } });
+    });
+    await act(async () => pending.resolve({ data: profile("a", kind === "name" ? "Changed A" : "a"), error: null }));
+    await waitFor(() => expect(screen.getByText(strings.en.profileSaved)).toBeTruthy());
+    const accepted = mockAuthStore.getState().profile;
+    const cached = mockQueryClient.getQueryData<Profile>(["publicProfile", uid("a")]);
+    expect(accepted).toMatchObject({
+      ...stats,
+      ...(kind === "name" ? { display_name: "Changed A" } : { avatar_url: null }),
+    });
+    expect(cached).toEqual(accepted);
+    expect(cached).toMatchObject(stats);
+    expect(mockWrite).toHaveBeenCalledWith(kind === "name" ? { display_name: "Changed A" } : { avatar_url: null });
+  },
+);
+
+it("caches newer same-owner stats published synchronously during the save notification", async () => {
+  const stats = {
+    total_score: 900,
+    cards_reviewed: 70,
+    current_streak: 8,
+    longest_streak: 9,
+    last_review_date: "2026-11-06",
+  };
+  mockWrite.mockResolvedValue({ data: profile("a", "Changed A"), error: null });
+  const screen = await open();
+  change(screen);
+  let observed = false;
+  const unsubscribe = mockAuthStore.subscribe((state, previous) => {
+    if (!observed && state.profile !== previous.profile && state.profile?.display_name === "Changed A") {
+      observed = true;
+      mockAuthStore.setState({ profile: { ...state.profile, ...stats } });
+    }
+  });
+  try {
+    fireEvent.press(screen.getByTestId("save"));
+    await waitFor(() => expect(screen.getByText(strings.en.profileSaved)).toBeTruthy());
+    expect(observed).toBe(true);
+    expect(mockAuthStore.getState().profile).toMatchObject({ ...stats, display_name: "Changed A" });
+    expect(mockQueryClient.getQueryData(["publicProfile", uid("a")])).toEqual(mockAuthStore.getState().profile);
+    expect(mockQueryClient.getQueryData(["publicProfile", uid("a")])).toMatchObject(stats);
+  } finally {
+    unsubscribe();
+  }
+});
