@@ -11916,7 +11916,7 @@
       ],
       "risk": "high",
       "approved": true,
-      "status": "retry",
+      "status": "verified",
       "allowed_paths": [
         "scripts/tests/source-map-cases.cjs",
         "scripts/tests/source-map-js.test.cjs",
@@ -11925,14 +11925,14 @@
         "package.json",
         "docs/refactoring/DEPENDENCY_SECURITY.md"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "implementation_mode": "copy-only",
       "readiness_evidence": ".refactor-baseline/rf136-handoff-v5/readiness.md",
       "primary_investigation_evidence": ".refactor-baseline/rf136-tailwind-source-map-v1/vendor-manifest.json",
       "primary_preparation_evidence": ".refactor-baseline/rf136-handoff-v5/preparation-receipt.json",
-      "started_at": "2026-11-06T17:30:46.410056+00:00",
+      "started_at": "2026-11-06T17:34:03.331156+00:00",
       "failure": "Verification failed: ['python3', '-c', \"import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf136-handoff-v4/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='48e89a72a079e6ef7ceaeced252622d29a3df36e9cc93499b881af0a565ebf94';sys.argv=[str(p),'all'];runpy.run_path(str(p),run_name='__main__')\"]; see .ralph/runs/RF-136-2-1793986246414268255/verify-0.log",
-      "evidence": ".ralph/runs/RF-136-2-1793986246414268255",
+      "evidence": ".ralph/runs/RF-136-1-1793986443336289929",
       "primary_recovery_evidence": ".refactor-baseline/rf136-handoff-v5/diagnosis.json",
       "recovery_history": [
         {
@@ -11976,7 +11976,9 @@
       ],
       "historical_ordinary_attempts_spent_before_extension": 4,
       "additional_attempt_historical_offset": 4,
-      "historical_total_ordinary_attempts_spent": 4
+      "historical_total_ordinary_attempts_spent": 4,
+      "completed_at": "2026-11-06T17:44:54.947951+00:00",
+      "summary": "Installed the six frozen RF-136 artifacts. Verification remains pending."
     }
   ]
 }
