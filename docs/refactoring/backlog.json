@@ -13027,6 +13027,233 @@
       "independent_review": "pass",
       "evidence": "docs/refactoring/PROGRESS.md",
       "summary": "Reject invalid live scheduler states before restore replacement and incremental page transactions. Real in-memory SQLite regressions retain local rows. Valid states, sparse tombstones and timestamp ties retained; broader RF031/RF029 remain open."
+    },
+    {
+      "id": "RF-142",
+      "title": "Retire obsolete background sync publications and admit the latest account",
+      "description": "Primary direct repair of useSync lifecycle. Reuse authCommands and validated session identity. Capture one auth lifetime before connectivity; guard each continuation, UI notice/status/count and global event, retain physical single-flight until old work settles, then admit the latest eligible account. Own and clean up the idle timer and pending-count effect. No new shared service or persistent local-data policy.",
+      "rationale": "Actual source doSync closes over user but recaptures account in fullSync after awaiting connectivity; late work publishes status/notice/events/counts or starts stats/QF under replacement user. New-account auto-run is dropped while old isSyncing is true. Unowned idle timer can reset a later run or survive unmount. First independent review found the hook is inside SyncOverlay, conditionally mounted by immersive mode in app/(tabs)/_layout.tsx. A deferred remount regression reproduced two fullSync calls before settlement. Primary correction moves only the background physical run lease and mounted-view admission registry to module lifetime; auth/UI fences remain view-owned.",
+      "modules": [
+        "lib/sync/useSync.ts",
+        "tests/unit/sync-concurrency.test.tsx"
+      ],
+      "dependencies": [
+        "RF-140",
+        "RF-141"
+      ],
+      "acceptance_criteria": [
+        "Capture an identified matching account lifetime before connectivity. Recheck after every await and synchronous global event before subsequent account-dependent work or status/notice/count publication. Signout, account switch, same-ID new session, closed ABA, DB replacement, unmount and retired mount lifetimes suppress obsolete continuations. Same-session token refresh remains current. Publish latest DB/readiness/start refs only from committed layout effects. An uncommitted suspended transition must never retire committed work or start sync against its speculative database; exercise this through actual React Suspense/startTransition with a valid commit control.",
+        "Keep physical runs serial until old work actually settles. A replacement account/eligible DB or lifecycle can start one latest run after stale work retires. Preserve current-owner duplicate-trigger prevention, offline retry, settings/translation readiness and current errors. No automatic error retry loop. Preserve that background physical lease across actual overlay unmount/remount in this JavaScript runtime, including same/new account or database. Retired/unmounted views cannot receive admission; a latest mounted view can start once previous work settles. Other manual sync entrypoints and cross-tab transaction ownership remain separate.",
+        "Own the 3-second idle reset with cleanup and run identity so a previous success cannot hide a newer syncing/synced/error/offline status or publish after unmount. Guard separate pending-count effects and clear previous-owner notice/count/status on identity replacement.",
+        "Behavioral hook tests use real authCommands/observeAuthSession and synthetic sessions with deferred connectivity, fullSync, stats/QF and count completions. Include obsolete success/error, signout, same-ID replacement, closed ABA, current refresh, new-owner admission, old idle timer, unmount and existing readiness/single-flight/offline controls. Do not use source assertions or live services.",
+        "This hook boundary does not cancel already issued SQL/network work, fix QF internal request/token lifetimes, resolve partial-sync outcome reporting or choose persistent device data ownership. RF025/RF029 and newly discovered QF service concerns remain open. Full controller checks, separate stronger review and primary acceptance are mandatory, with one local commit and accepted-task cleanup."
+      ],
+      "verification": [
+        [
+          "git",
+          "diff",
+          "--check"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "lib/sync/useSync.ts",
+          "tests/unit/sync-concurrency.test.tsx",
+          "docs/refactoring/PROGRESS.md"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/sync/useSync.ts",
+          "tests/unit/sync-concurrency.test.tsx",
+          "--max-warnings=0"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "check:analysis"
+        ],
+        [
+          "npm",
+          "run",
+          "postinstall"
+        ],
+        [
+          "npm",
+          "ls",
+          "--all",
+          "--json"
+        ],
+        [
+          "npm",
+          "run",
+          "lint"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "node",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/tests/brace-expansion.test.cjs",
+          "scripts/tests/dependency-boundaries.test.cjs",
+          "scripts/tests/icon-tool.test.cjs",
+          "scripts/tests/jest-config.test.cjs",
+          "scripts/tests/js-yaml.test.cjs",
+          "scripts/tests/lint-coverage.test.cjs",
+          "scripts/tests/metro-unicode.test.cjs",
+          "scripts/tests/nanoid.test.cjs",
+          "scripts/tests/router-dependency-range.test.cjs",
+          "scripts/tests/security-dependency-owner.test.cjs",
+          "scripts/tests/source-map-js.test.cjs",
+          "scripts/tests/tailwind-source-map.test.cjs",
+          "scripts/tests/ws.test.cjs",
+          "scripts/tests/xmldom.test.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "test:refactor-runner"
+        ],
+        [
+          "python3",
+          "-B",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "scripts/tests",
+          "-p",
+          "test_*.py"
+        ],
+        [
+          "npm",
+          "run",
+          "check:native-config"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=4096",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "android",
+          "--output-dir",
+          ".expo/modernization-checks/android",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/android')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=3072",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "ios",
+          "--output-dir",
+          ".expo/modernization-checks/ios",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/ios')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8197",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts",
+          "tests/e2e/database-bridge.spec.ts"
+        ]
+      ],
+      "risk": "high",
+      "priority": 1,
+      "approved": true,
+      "status": "verified",
+      "attempts": 1,
+      "allowed_paths": [
+        "lib/sync/useSync.ts",
+        "tests/unit/sync-concurrency.test.tsx"
+      ],
+      "implementation_mode": "implementation",
+      "started_at": "2026-11-06T20:22:07.713108+00:00",
+      "failure_history": [
+        {
+          "time": "2026-11-06T20:04:35.587346+00:00",
+          "attempt": 1,
+          "reason": "Independent review finding: [\"[P2] lib/sync/useSync.ts:49: The physical lease is instance-local, so it does not serialize runs across actual unmount/remount. SyncOverlay is conditionally mounted by immersive mode in app/(tabs)/_layout.tsx:63. Entering and exiting focus mode while fullSync is pending creates a new hook with an empty lease, allowing another fullSync against the same database before the old work settles. Cleanup suppresses old publications but does not stop its database work. This leaves RF-142's physical serialization criterion unmet. Preserve the lease and latest-owner admission across remounts, and add a deferred unmount/remount regression asserting the replacement starts only after settlement. The existing unmount test checks suppressed continuations without mounting a replacement. All 20 controller checks passed, but they do not cover this path.\"]"
+        },
+        {
+          "time": "2026-11-06T20:13:08.952926+00:00",
+          "attempt": 2,
+          "reason": "Verification failed: ['env', 'CI=1', 'PLAYWRIGHT_CHROMIUM_CHANNEL=chrome', 'PLAYWRIGHT_PORT=8197', 'PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197', 'node_modules/.bin/playwright', 'test', '--project=smoke-chromium', 'tests/e2e/smoke.spec.ts', 'tests/e2e/database-bridge.spec.ts']; see .ralph/runs/RF-142-2-primary-1793995670804467497/verify-19.log",
+          "interrupted_by_primary": "Stop owned verification after primary concurrent-render review finding. Source regression reproduced speculative D1 dispatch; owned smoke server scope was stopped and port cleared."
+        }
+      ],
+      "recovery_windows": [
+        {
+          "time": "2026-11-06T20:20:44.698588+00:00",
+          "prior_attempt_offset": 0,
+          "prior_attempts": 2,
+          "reason": "Primary reproduced speculative D1 dispatch from an uncommitted suspended transition. Moved context/start publication and mount registry lifetime to committed layout effects. Attempt2 Chrome check was intentionally stopped; no environmental warning caused retry."
+        }
+      ],
+      "attempt_offset": 2,
+      "completed_at": "2026-11-06T20:30:47.244234+00:00",
+      "primary_accepted_at": "2026-11-06T20:30:47.244234+00:00",
+      "independent_review": "pass",
+      "evidence": "docs/refactoring/PROGRESS.md",
+      "summary": "Retire obsolete background sync publications; preserve physical serialization across overlay remounts and commit database/readiness refs only after React commits. Latest eligible account resumes after old work settles. Manual/QF internal/persistent ownership and partial outcomes remain separate."
     }
   ]
 }
