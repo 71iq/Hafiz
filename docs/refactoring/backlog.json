@@ -11203,7 +11203,7 @@
     {
       "id": "RF-133",
       "title": "Clear viewer Query results at auth lifecycle boundaries",
-      "description": "Canonical v8 six-artifact copy-only recovery. FIRST COMMAND exactly cat .refactor-baseline/rf133-handoff-v8/readiness.md. In EVERY exec_command call set shell=\"/usr/bin/sh\", login=false. Complete11orderedreads before6orderedcopies, one command per call. Only exact /usr/bin/sh -c wrapper accepted. No extra evidence/source/test reads, discovery or worker checks. Primary owns policy; controller owns14freshgates/newstrongerreview/commit. Only patch context changed; all13vendor runtime targets and5other artifacts unchanged. Preserve six spent attempts/offset6 and sandbox-denial rejection. Worker executes only listed11reads and6copies.",
+      "description": "Canonical v9 six-artifact copy-only recovery. FIRST COMMAND exactly cat .refactor-baseline/rf133-handoff-v9/readiness.md. In EVERY exec_command call set shell=\"/usr/bin/sh\", login=false. Complete11orderedreads before6orderedcopies, one command per call. Only exact /usr/bin/sh -c wrapper accepted. No extra evidence/source/test reads, discovery, plugins or worker checks. Primary owns policy; controller owns14freshgates/newstrongerreview/commit. All artifacts and vendor targets unchanged from v8. Preserve7spent ordinary attempts, currentwindow1/offset6, sandbox-denial rejection and all gate checks. Worker executes only listed11reads and6copies.",
       "rationale": "Actual controller review rejected cancellation/replacement races. Further primary regressions proved stable-owner cross-key erasure and synchronous same-owner rebind erasure. Atomic whole-snapshot detachment plus QueryClient-owned lifecycle state addresses the reproduced causes without changing original core methods.",
       "modules": [
         "app/_layout.tsx",
@@ -11229,12 +11229,12 @@
         [
           "python3",
           "-c",
-          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf133-handoff-v8/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='87db4acb0008fc50c69afb079abde46fc71ca9fad8cf941f5402f07ac659254b';sys.argv=[str(p),'all'];runpy.run_path(str(p),run_name='__main__')"
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf133-handoff-v9/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='2126025a5cdf3355798209c0b7c9e494168b5af2a3bbcfbd093d6686c7ce7d2a';sys.argv=[str(p),'all'];runpy.run_path(str(p),run_name='__main__')"
         ],
         [
           "python3",
           "-c",
-          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf133-handoff-v8/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='87db4acb0008fc50c69afb079abde46fc71ca9fad8cf941f5402f07ac659254b';sys.argv=[str(p),'patch'];runpy.run_path(str(p),run_name='__main__')"
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf133-handoff-v9/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='2126025a5cdf3355798209c0b7c9e494168b5af2a3bbcfbd093d6686c7ce7d2a';sys.argv=[str(p),'patch'];runpy.run_path(str(p),run_name='__main__')"
         ],
         [
           "npm",
@@ -11273,12 +11273,12 @@
         [
           "python3",
           "-c",
-          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf133-handoff-v8/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='87db4acb0008fc50c69afb079abde46fc71ca9fad8cf941f5402f07ac659254b';sys.argv=[str(p),'knip'];runpy.run_path(str(p),run_name='__main__')"
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf133-handoff-v9/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='2126025a5cdf3355798209c0b7c9e494168b5af2a3bbcfbd093d6686c7ce7d2a';sys.argv=[str(p),'knip'];runpy.run_path(str(p),run_name='__main__')"
         ],
         [
           "python3",
           "-c",
-          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf133-handoff-v8/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='87db4acb0008fc50c69afb079abde46fc71ca9fad8cf941f5402f07ac659254b';sys.argv=[str(p),'exports'];runpy.run_path(str(p),run_name='__main__')"
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf133-handoff-v9/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='2126025a5cdf3355798209c0b7c9e494168b5af2a3bbcfbd093d6686c7ce7d2a';sys.argv=[str(p),'exports'];runpy.run_path(str(p),run_name='__main__')"
         ],
         [
           "env",
@@ -11341,7 +11341,7 @@
         [
           "python3",
           "-c",
-          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf133-handoff-v8/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='87db4acb0008fc50c69afb079abde46fc71ca9fad8cf941f5402f07ac659254b';sys.argv=[str(p),'final'];runpy.run_path(str(p),run_name='__main__')"
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf133-handoff-v9/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='2126025a5cdf3355798209c0b7c9e494168b5af2a3bbcfbd093d6686c7ce7d2a';sys.argv=[str(p),'final'];runpy.run_path(str(p),run_name='__main__')"
         ]
       ],
       "risk": "high",
@@ -11355,14 +11355,14 @@
         "patches/@tanstack+query-core+5.95.0.patch",
         "docs/refactoring/QUERY_CACHE_DETACHMENT.md"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "implementation_mode": "copy-only",
       "primary_investigation_evidence": ".refactor-baseline/rf133-auth-query-lifecycle-v4/primary-diagnosis.md",
-      "readiness_evidence": ".refactor-baseline/rf133-handoff-v8/readiness.md",
+      "readiness_evidence": ".refactor-baseline/rf133-handoff-v9/readiness.md",
       "primary_preparation_evidence": ".refactor-baseline/rf133-auth-query-lifecycle-v4/preparation-receipt.json",
-      "started_at": "2026-11-06T15:01:49.647569+00:00",
-      "failure": "Command '['git', 'diff', '--cached', '--check']' returned non-zero exit status 2.",
-      "evidence": ".ralph/runs/RF-133-2-1793977309651555337",
+      "started_at": "2026-11-06T15:20:40.247636+00:00",
+      "failure": "Verification failed: ['python3', '-c', \"import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf133-handoff-v8/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='87db4acb0008fc50c69afb079abde46fc71ca9fad8cf941f5402f07ac659254b';sys.argv=[str(p),'all'];runpy.run_path(str(p),run_name='__main__')\"]; see .ralph/runs/RF-133-1-1793978440252081774/verify-0.log",
+      "evidence": ".ralph/runs/RF-133-1-1793978440252081774",
       "recovery_history": [
         {
           "time": "2026-11-06T14:07:09.217936+00:00",
@@ -11431,11 +11431,22 @@
             "completed_at": "2026-11-06T15:10:40.919400+00:00",
             "summary": "Installed the six frozen artifacts. Verification and acceptance remain pending."
           }
+        },
+        {
+          "time": "2026-11-06T15:26:07.507799+00:00",
+          "historical_offset": 6,
+          "current_window_attempts_spent": 1,
+          "total_ordinary_attempts_spent": 7,
+          "evidence": ".ralph/runs/RF-133-1-1793978440252081774",
+          "failure": "Verification failed: ['python3', '-c', \"import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf133-handoff-v8/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='87db4acb0008fc50c69afb079abde46fc71ca9fad8cf941f5402f07ac659254b';sys.argv=[str(p),'all'];runpy.run_path(str(p),run_name='__main__')\"]; see .ralph/runs/RF-133-1-1793978440252081774/verify-0.log",
+          "concrete_correction": ".refactor-baseline/rf133-handoff-v9/diagnosis-catalog.md",
+          "attempts_refunded": 0,
+          "six_application_artifacts_unchanged": true
         }
       ],
       "historical_ordinary_attempts_spent_before_extension": 6,
       "additional_attempt_historical_offset": 6,
-      "historical_total_ordinary_attempts_spent": 6
+      "historical_total_ordinary_attempts_spent": 7
     }
   ]
 }
