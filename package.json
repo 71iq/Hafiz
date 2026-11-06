@@ -55,7 +55,8 @@
     "check:boundaries:ios": "depcruise app components lib --config .dependency-cruiser.ios.cjs --output-type err --no-ignore-known --no-cache",
     "check:boundaries": "npm run check:boundaries:web && npm run check:boundaries:android && npm run check:boundaries:ios",
     "test:lint-coverage": "node --test --test-reporter=tap scripts/tests/lint-coverage.test.cjs",
-    "check:native-config": "python3 -B scripts/check-native-config.py"
+    "check:native-config": "python3 -B scripts/check-native-config.py",
+    "check:analysis": "node scripts/check-analysis-baseline.cjs"
   },
   "dependencies": {
     "@expo-google-fonts/manrope": "^0.4.2",

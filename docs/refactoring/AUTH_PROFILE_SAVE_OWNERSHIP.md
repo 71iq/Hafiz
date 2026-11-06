@@ -1,5 +1,9 @@
 # Profile save ownership investigation
 
+## Current status, 2026-11-06
+
+RF127 is accepted. The earlier failures and missing Query bridge statements below describe historical revisions, not the current implementation. Permanent auth profile ownership suites now cover those late-completion cases. The remaining account-isolation work is RF025 in backlog.json. Its stale diagnostic probe was removed during cleanup; use the maintained source tests and current code.
+
 RF125 is verified and primary accepted at ece140a. It repairs password/reset ownership, not all account publishers. RF025 remains unapproved. Its next bounded repair is the profile editor/store save pair.
 
 ## Reproduced failures

@@ -63,11 +63,11 @@ Rive's two packages and its required Nitro peer become reachable through platfor
 
 RF-009 depends on accepted SDK alignment RF-067, not the unresolved RF-008 lint/native-ownership decisions. Static root calibration does not require a lint downgrade or native regeneration.
 
-## Reproduction
+## Current reproduction, 2026-11-06
 
-Run `npm run analyze:unused` from the modernization worktree. It remains a report with a nonzero finding exit. Preserve its JSON and stderr before deciding on removals. The two primary preflight reports are `.refactor-baseline/rf009-current-knip.json` and `rf009-candidate-knip.json`; the frozen task gate writes `rf009-fresh-knip.json`. These ignored files persist in this worktree. No blanket ignore, issue threshold or automatic fix option was introduced.
+Run `npm run analyze:unused` for the current raw report. It retains five documented issue records and exits 1, so it is not clean. `npm run check:analysis` compares the semantic findings with the small current `.refactor-baseline/dependency-analysis/knip.json` baseline. Line, column and offset changes are not new findings. Any changed semantic record requires source inspection and review; no rule or dependency is suppressed.
 
-Application tests/builds, native/device checks and dependency/security scans are not rerun for this configuration/documentation task. Latest application evidence remains RF-078's 374 unit tests and 35 Chrome cases. A calibrated analysis cannot establish behavior on a device.
+The baseline was regenerated from current source during cleanup. Historical task scripts, frozen artifacts and accepted-task logs were deleted. Current application/tool checks do not read them. The earlier reports below describe their original revisions rather than files to restore.
 
 ## RF-010 source cleanup, 2026-10-17
 

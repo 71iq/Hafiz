@@ -2018,7 +2018,9 @@
         "tests/unit/auth-query-lifecycle.test.tsx"
       ],
       "attempts": 0,
-      "primary_investigation_evidence": ".refactor-baseline/rf025-owner-audit-v1/receipt.json"
+      "primary_investigation_evidence": ".refactor-baseline/rf025-owner-audit-v1/receipt.json",
+      "priority": 1,
+      "investigation_evidence": "docs/refactoring/AUTH_PROFILE_SAVE_OWNERSHIP.md"
     },
     {
       "id": "RF-026",
@@ -2062,7 +2064,8 @@
         "lib/reflections/*",
         "tests/unit/reflection-mutations.test.tsx"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "priority": 1
     },
     {
       "id": "RF-027",
@@ -2170,7 +2173,8 @@
         "lib/query/*",
         "tests/unit/query-native-lifecycle.test.tsx"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "priority": 3
     },
     {
       "id": "RF-029",
@@ -2214,7 +2218,8 @@
         "lib/sync/useSync.ts",
         "tests/unit/sync-partial-failure.test.tsx"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "priority": 1
     },
     {
       "id": "RF-030",
@@ -2261,7 +2266,8 @@
         "lib/database/bridge*",
         "tests/unit/database-bridge.test.ts"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "priority": 1
     },
     {
       "id": "RF-031",
@@ -2306,7 +2312,8 @@
         "lib/database/user-settings.ts",
         "tests/unit/sync-payloads.test.ts"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "priority": 1
     },
     {
       "id": "RF-032",
@@ -2352,7 +2359,8 @@
         "lib/quran-foundation/user-sync.ts",
         "tests/unit/local-write-contracts.test.ts"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "priority": 1
     },
     {
       "id": "RF-033",
@@ -2382,7 +2390,8 @@
       "allowed_paths": [
         "docs/refactoring/DATA_AUDIT.md"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "priority": 1
     },
     {
       "id": "RF-034",
@@ -2425,7 +2434,8 @@
         "components/profile/*",
         "tests/unit/form-validation.test.tsx"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "priority": 3
     },
     {
       "id": "RF-035",
@@ -2870,7 +2880,8 @@
       "allowed_paths": [
         "docs/refactoring/PERFORMANCE.md"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "priority": 2
     },
     {
       "id": "RF-040",
@@ -2907,7 +2918,8 @@
         ".maestro/*",
         "package.json"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "priority": 3
     },
     {
       "id": "RF-041",
@@ -2937,7 +2949,8 @@
       "allowed_paths": [
         "docs/refactoring/NATIVE_TESTING.md"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "priority": 3
     },
     {
       "id": "RF-042",
@@ -2967,7 +2980,8 @@
       "allowed_paths": [
         "docs/refactoring/NATIVE_TESTING.md"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "priority": 3
     },
     {
       "id": "RF-043",
@@ -2998,7 +3012,8 @@
       "allowed_paths": [
         "docs/refactoring/TYPES.md"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "priority": 3
     },
     {
       "id": "RF-044",
@@ -3046,7 +3061,8 @@
         "lib/*",
         "scripts/*"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "priority": 5
     },
     {
       "id": "RF-045",
@@ -3080,7 +3096,8 @@
         "docs/refactoring/decisions/0002-expo-upgrade.md",
         "docs/refactoring/TECH_STACK.md"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "priority": 5
     },
     {
       "id": "RF-046",
@@ -3174,7 +3191,8 @@
       "allowed_paths": [
         "docs/refactoring/RE_AUDIT.md"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "priority": 5
     },
     {
       "id": "RF-047",
@@ -3213,7 +3231,8 @@
         "tests/rtl/*",
         "docs/refactoring/TEST_COVERAGE.md"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "priority": 3
     },
     {
       "id": "RF-048",
@@ -3252,7 +3271,8 @@
         "tests/e2e/*",
         "tests/e2e/report-only/*"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "priority": 3
     },
     {
       "id": "RF-049",
@@ -3318,7 +3338,8 @@
       "allowed_paths": [
         "docs/refactoring/FINAL_REVIEW.md"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "priority": 3
     },
     {
       "id": "RF-050",
@@ -3354,7 +3375,8 @@
         "docs/refactoring/ARCHITECTURE.md",
         "docs/refactoring/TECH_STACK.md"
       ],
-      "attempts": 0
+      "attempts": 0,
+      "priority": 3
     },
     {
       "id": "RF-051",
@@ -6829,8 +6851,8 @@
     },
     {
       "id": "RF-090",
-      "title": "Triage and resolve remaining dependency audit findings",
-      "description": "Classify remaining advisory families and split exact compatible repairs after the brace-expansion patch.",
+      "title": "Triage dev/build dependency advisories at low priority",
+      "description": "Group dev/build-only advisories here. Prioritize a separate app repair only when an affected shipped-app path is demonstrated. No further vendor patch otherwise.",
       "rationale": "Fresh baseline has 74 package findings including 59 high; the selected compatible patch leaves 71/56 high. These counts include propagated parents, and require explicit exposure and remediation decisions before final completion.",
       "modules": [
         "package.json",
@@ -6856,7 +6878,8 @@
         "RF128 is the exact legacy XML child, root0.8.13 to0.8.15 with separate0.9.12 control. Ten direct XML advisory URLs must disappear without new sources; fresh November snapshot39findings/10high before,38/9 after. Parent remains open for every other family.",
         "RF134 is the exact three-record external WS child. Reviewed root availability advisory and independently observed empty-fragment guards are distinguished. Bundled react-devtools-core standalone WebSocket code is not replaced by external dependency resolution and remains a separate RF090 residual. Realtime uses global/platform or explicit caller transport, not a demonstrated automatic nested-WS fallback. Both audit scopes retain other high findings and computed metadata drift.",
         "RF135 is the exact external source-map-js1.2.1 to1.2.2 child. Tiny real PostCSS/constructor controls prove section-offset and nested/source-getter/short-code protections; normal generator and VM sorter compatibility stay bounded. Tailwind3.4.19 peers bundle still accepts the tiny excessive-offset map, and direct bundled submodule callers also remain. No external-entry alias or package update certifies all bundled paths. Keep this as a separate residual; fresh audits compare complete direct advisory records.",
-        "RF136 backports only official source-map-js repair hunks within Tailwind3.4.19 peers. All four internal modules and both direct css-tree callers retain constructor/wrapper identity. npm audit does not inspect bundled code, so unchanged audit counts do not certify or negate that repair. Other bundled DevTools and remaining advisory families stay open."
+        "RF136 backports only official source-map-js repair hunks within Tailwind3.4.19 peers. All four internal modules and both direct css-tree callers retain constructor/wrapper identity. npm audit does not inspect bundled code, so unchanged audit counts do not certify or negate that repair. Other bundled DevTools and remaining advisory families stay open.",
+        "2026-11-06 policy: dev/build-only findings remain one low-priority task. Do not patch vendor code unless the shipped app is affected; keep current reports visible without blocking unrelated app tasks."
       ],
       "verification": [
         [
@@ -6880,7 +6903,8 @@
         "docs/refactoring/DEPENDENCY_SECURITY.md"
       ],
       "attempts": 0,
-      "investigation_evidence": ".refactor-baseline/rf096-qiraat-parser-preflight-v1/dependency-readiness.json"
+      "investigation_evidence": "docs/refactoring/DEPENDENCY_SECURITY.md",
+      "priority": 5
     },
     {
       "id": "RF-091",
@@ -8140,7 +8164,8 @@
         "docs/refactoring/TAFSIR_IMPORT_ATOMICITY.md"
       ],
       "attempts": 0,
-      "discovery_evidence": ".refactor-baseline/rf098-atomic-import-investigation-v1/result.json"
+      "discovery_evidence": ".refactor-baseline/rf098-atomic-import-investigation-v1/result.json",
+      "priority": 1
     },
     {
       "id": "RF-105",
@@ -11766,7 +11791,7 @@
     {
       "id": "RF-136",
       "title": "Repair Tailwind bundled source-map parsing",
-      "description": "FIRST COMMAND exactly cat .refactor-baseline/rf136-handoff-v5/readiness.md. Every exec_command shell=\"/usr/bin/sh\", login=false. Eleven exact ordered reads then six exact ordered copies, each separate call. No worker discovery, checks, source dumps or extra tools. Controller runs 16 fresh gates and new separate stronger review; primary owns architecture/security/final acceptance.",
+      "description": "Review the committed Tailwind source-map repair from current source. Run ordinary full controller checks and independent review, then primary acceptance. Ignore CLI environment warnings; no handoff or worker-command audit.",
       "rationale": "External source-map-js update leaves four old bundled modules and direct callers. Exact official repair hunks preserve self-contained fallback, separate constructors, aliases and wrappers while adding bounded offset, source getter, short-code, serializer and CSP fixes.",
       "modules": [
         "scripts/tests/source-map-cases.cjs",
@@ -11780,17 +11805,15 @@
         "RF-135"
       ],
       "acceptance_criteria": [
-        "Exactly six frozen artifacts and 17 strict original ordered command pairs. All other tracked files, lock, protected inputs, real index and historical failures remain exact. Worker installs only.",
-        "Actual root postinstall applies all existing patches and the new Tailwind patch. Full253-file patched Tailwind tree, external18-file package, all13 Query-core targets and full installed graph match. No dependency, version, lock, app, font, mapping or data change.",
-        "All99 focused and170 security cases pass, zero skips. Original bundled copy fails34 with65 controls passing. Shared37 API cases preserve old36 and add real line9 getter-count work proof with exact descriptor restoration. Public lazyPostcss, both direct css-tree callers, constructor/cache identity, Unicode mapping and cssnano valid output, actual bundled VM sorting with allowed/denied string generation all pass. No huge serialization or resource-exhaustion case.",
-        "Both fresh audit scopes keep all12 complete direct advisory records and36 findings/7high/0critical; retain computed parent metadata. Audit remains non-clean; other RF090 families stay open. Fresh types, all unit tests, zero-warning scoped lint, format,3graphs,exact existing5Knip, web and separate bounded Android/iOS JS exports,28Chrome cases pass. CSS and both JS bundle bytes remain identical to accepted RF135. JS export is not native compilation or device proof.",
-        "Separate stronger evaluator inspects complete diff, all mandatory evidence and original tool log, with a session distinct from the worker. Primary rechecks exact artifacts, full vendor trees, every other input, commit scope, protocol and gates after both leases release. No whole-family/global security, live service, production or mission completion claim."
+        "Current-source dependency security regressions preserve external and bundled parser behavior, constructor identities and valid callers. No new dependency, app, protected-content or production change.",
+        "Run the full controller suite, independent code review and primary final acceptance. Environment diagnostics and worker command history do not determine acceptance.",
+        "Existing dependency advisories remain visible in the low-priority RF090 task. Native JavaScript exports do not certify native compilation or device behavior."
       ],
       "verification": [
         [
-          "python3",
-          "-c",
-          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf136-handoff-v5/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='76ec932ae515d964efa28bcfb92236068a4dfb7b650c06fbc4d9faf1e74db4b0';sys.argv=[str(p),'all'];runpy.run_path(str(p),run_name='__main__')"
+          "git",
+          "diff",
+          "--check"
         ],
         [
           "npm",
@@ -11798,35 +11821,10 @@
           "postinstall"
         ],
         [
-          "python3",
-          "-c",
-          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf136-handoff-v5/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='76ec932ae515d964efa28bcfb92236068a4dfb7b650c06fbc4d9faf1e74db4b0';sys.argv=[str(p),'installed'];runpy.run_path(str(p),run_name='__main__')"
-        ],
-        [
-          "python3",
-          "-c",
-          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf136-handoff-v5/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='76ec932ae515d964efa28bcfb92236068a4dfb7b650c06fbc4d9faf1e74db4b0';sys.argv=[str(p),'audit'];runpy.run_path(str(p),run_name='__main__')"
-        ],
-        [
           "npm",
-          "run",
-          "test:dependency-security"
-        ],
-        [
-          "node_modules/.bin/eslint",
-          "scripts/tests/source-map-cases.cjs",
-          "scripts/tests/source-map-js.test.cjs",
-          "scripts/tests/tailwind-source-map.test.cjs",
-          "--max-warnings=0"
-        ],
-        [
-          "node_modules/.bin/prettier",
-          "--check",
-          "scripts/tests/source-map-cases.cjs",
-          "scripts/tests/source-map-js.test.cjs",
-          "scripts/tests/tailwind-source-map.test.cjs",
-          "package.json",
-          "docs/refactoring/DEPENDENCY_SECURITY.md"
+          "ls",
+          "--all",
+          "--json"
         ],
         [
           "npm",
@@ -11836,9 +11834,79 @@
         [
           "npm",
           "run",
+          "lint"
+        ],
+        [
+          "npm",
+          "run",
           "test:unit",
           "--",
           "--no-cache"
+        ],
+        [
+          "node",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/tests/brace-expansion.test.cjs",
+          "scripts/tests/dependency-boundaries.test.cjs",
+          "scripts/tests/icon-tool.test.cjs",
+          "scripts/tests/jest-config.test.cjs",
+          "scripts/tests/js-yaml.test.cjs",
+          "scripts/tests/lint-coverage.test.cjs",
+          "scripts/tests/metro-unicode.test.cjs",
+          "scripts/tests/nanoid.test.cjs",
+          "scripts/tests/router-dependency-range.test.cjs",
+          "scripts/tests/security-dependency-owner.test.cjs",
+          "scripts/tests/source-map-js.test.cjs",
+          "scripts/tests/tailwind-source-map.test.cjs",
+          "scripts/tests/ws.test.cjs",
+          "scripts/tests/xmldom.test.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "test:refactor-runner"
+        ],
+        [
+          "python3",
+          "-B",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "scripts/tests",
+          "-p",
+          "test_*.py"
+        ],
+        [
+          "npm",
+          "run",
+          "check:native-config"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "npm",
+          "run",
+          "check:analysis"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "AGENTS.md",
+          "docs/refactoring/CONVENTIONS.md",
+          "docs/refactoring/MIGRATION_PLAN.md",
+          "docs/refactoring/PROGRESS.md",
+          "docs/refactoring/RUNBOOK.md",
+          "docs/refactoring/RUNNER_COMPLIANCE.md",
+          "package.json",
+          "scripts/check-analysis-baseline.cjs",
+          "docs/refactoring/DEPENDENCY_SECURITY.md",
+          "docs/refactoring/UNUSED.md"
         ],
         [
           "env",
@@ -11864,7 +11932,7 @@
           "--platform",
           "android",
           "--output-dir",
-          ".refactor-baseline/rf136-native-export-android",
+          ".expo/modernization-checks/android",
           "--no-bytecode",
           "--max-workers",
           "1"
@@ -11882,7 +11950,7 @@
           "--platform",
           "ios",
           "--output-dir",
-          ".refactor-baseline/rf136-native-export-ios",
+          ".expo/modernization-checks/ios",
           "--no-bytecode",
           "--max-workers",
           "1"
@@ -11897,21 +11965,6 @@
           "test",
           "--project=smoke-chromium",
           "tests/e2e/smoke.spec.ts"
-        ],
-        [
-          "npm",
-          "run",
-          "check:boundaries"
-        ],
-        [
-          "python3",
-          "-c",
-          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf136-handoff-v5/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='76ec932ae515d964efa28bcfb92236068a4dfb7b650c06fbc4d9faf1e74db4b0';sys.argv=[str(p),'knip'];runpy.run_path(str(p),run_name='__main__')"
-        ],
-        [
-          "python3",
-          "-c",
-          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf136-handoff-v5/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='76ec932ae515d964efa28bcfb92236068a4dfb7b650c06fbc4d9faf1e74db4b0';sys.argv=[str(p),'final'];runpy.run_path(str(p),run_name='__main__')"
         ]
       ],
       "risk": "high",
@@ -11926,59 +11979,222 @@
         "docs/refactoring/DEPENDENCY_SECURITY.md"
       ],
       "attempts": 1,
-      "implementation_mode": "copy-only",
-      "readiness_evidence": ".refactor-baseline/rf136-handoff-v5/readiness.md",
-      "primary_investigation_evidence": ".refactor-baseline/rf136-tailwind-source-map-v1/vendor-manifest.json",
-      "primary_preparation_evidence": ".refactor-baseline/rf136-handoff-v5/preparation-receipt.json",
+      "implementation_mode": "implementation",
       "started_at": "2026-11-06T17:34:03.331156+00:00",
-      "failure": "Verification failed: ['python3', '-c', \"import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf136-handoff-v4/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='48e89a72a079e6ef7ceaeced252622d29a3df36e9cc93499b881af0a565ebf94';sys.argv=[str(p),'all'];runpy.run_path(str(p),run_name='__main__')\"]; see .ralph/runs/RF-136-2-1793986246414268255/verify-0.log",
-      "evidence": ".ralph/runs/RF-136-1-1793986443336289929",
-      "primary_recovery_evidence": ".refactor-baseline/rf136-handoff-v5/diagnosis.json",
-      "recovery_history": [
-        {
-          "time": "2026-11-06T17:27:35.558844+00:00",
-          "window_attempts_spent": 2,
-          "historical_offset_before": 0,
-          "total_ordinary_attempts_spent": 2,
-          "last_failed_run": ".ralph/runs/RF-136-2-1793985862681992115",
-          "last_failure": "Verification failed: ['python3', '-c', \"import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf136-handoff-v2/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='2d52782ee9d2aaf95cde42c39467663ae64f6a743265516a4500dcd8a9c34893';sys.argv=[str(p),'all'];runpy.run_path(str(p),run_name='__main__')\"]; see .ralph/runs/RF-136-2-1793985862681992115/verify-0.log",
-          "concrete_correction": ".refactor-baseline/rf136-handoff-v3/diagnosis.json",
-          "diagnostic_controls": ".refactor-baseline/rf136-handoff-v3/diagnostic-controls.json",
-          "reopened_window_limit": 2,
-          "attempt_refunds": 0,
-          "six_artifacts_unchanged": true
-        },
-        {
-          "time": "2026-11-06T17:30:45.801311+00:00",
-          "historical_offset": 2,
-          "current_window_attempts_spent": 1,
-          "total_ordinary_attempts_spent": 3,
-          "failed_run": ".ralph/runs/RF-136-1-1793986069121699858",
-          "failure": "Verification failed: ['python3', '-c', \"import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf136-handoff-v3/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='73d91130ae8cebe2709b6aa1b6f3c03f99f6da3592c0faf3e9e09fb56acdd8e4';sys.argv=[str(p),'all'];runpy.run_path(str(p),run_name='__main__')\"]; see .ralph/runs/RF-136-1-1793986069121699858/verify-0.log",
-          "concrete_correction": ".refactor-baseline/rf136-handoff-v4/diagnosis.json",
-          "eight_controls": ".refactor-baseline/rf136-handoff-v4/diagnostic-controls.json",
-          "refunded": 0,
-          "same_six_artifacts": true
-        },
-        {
-          "time": "2026-11-06T17:34:02.744812+00:00",
-          "historical_offset_before": 2,
-          "window_attempts_spent": 2,
-          "total_ordinary_attempts_spent": 4,
-          "failed_run": ".ralph/runs/RF-136-2-1793986246414268255",
-          "failure": "Verification failed: ['python3', '-c', \"import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf136-handoff-v4/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='48e89a72a079e6ef7ceaeced252622d29a3df36e9cc93499b881af0a565ebf94';sys.argv=[str(p),'all'];runpy.run_path(str(p),run_name='__main__')\"]; see .ralph/runs/RF-136-2-1793986246414268255/verify-0.log",
-          "concrete_correction": ".refactor-baseline/rf136-handoff-v5/diagnosis.json",
-          "controls": ".refactor-baseline/rf136-handoff-v5/diagnostic-controls.json",
-          "refunded": 0,
-          "same_six_artifacts": true,
-          "reopened_window_limit": 2
-        }
-      ],
+      "evidence": "docs/refactoring/PROGRESS.md",
       "historical_ordinary_attempts_spent_before_extension": 4,
       "additional_attempt_historical_offset": 4,
-      "historical_total_ordinary_attempts_spent": 4,
-      "completed_at": "2026-11-06T17:44:54.947951+00:00",
-      "summary": "Installed the six frozen RF-136 artifacts. Verification remains pending."
+      "historical_total_ordinary_attempts_spent": 5,
+      "completed_at": "2026-11-06T18:39:10.684315+00:00",
+      "summary": "Accepted after 17 current-source controller checks, independent code review and primary acceptance.",
+      "primary_accepted_at": "2026-11-06T18:39:10.684315+00:00",
+      "primary_acceptance_evidence": "docs/refactoring/PROGRESS.md"
+    },
+    {
+      "id": "RF-137",
+      "title": "Trim modernization evidence and adopt direct verification",
+      "description": "Primary implements the user-requested cleanup and guidance changes directly. Run full ordinary controller checks from current source, independent code review and final acceptance. No generation handoff or worker-command audit.",
+      "rationale": "Historical exports, dependency installs, hash verifiers and command-log audits consumed storage and delayed application work. Retain only small current check inputs and unfinished bug reproductions.",
+      "modules": [
+        "AGENTS.md",
+        "docs/refactoring/CONVENTIONS.md",
+        "docs/refactoring/MIGRATION_PLAN.md",
+        "docs/refactoring/PROGRESS.md",
+        "docs/refactoring/RUNBOOK.md",
+        "docs/refactoring/RUNNER_COMPLIANCE.md",
+        "package.json",
+        "scripts/check-analysis-baseline.cjs",
+        "docs/refactoring/DEPENDENCY_SECURITY.md",
+        "docs/refactoring/UNUSED.md",
+        "docs/refactoring/AUTH_PROFILE_SAVE_OWNERSHIP.md"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "Delete accepted-task baseline output and run logs, preserving the event log and unfinished-task logs. Baseline remains below2GB; retained files have current consumers.",
+        "Full current-source controller checks pass after cleanup. No app/protected content/original checkout or production change. Any missing check input is rebuilt from current source.",
+        "Independent review and primary final acceptance precede one local cleanup commit. Future tasks implement directly, ignore CLI noise, verify once when ready and prioritize users."
+      ],
+      "verification": [
+        [
+          "git",
+          "diff",
+          "--check"
+        ],
+        [
+          "npm",
+          "run",
+          "postinstall"
+        ],
+        [
+          "npm",
+          "ls",
+          "--all",
+          "--json"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "lint"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "node",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/tests/brace-expansion.test.cjs",
+          "scripts/tests/dependency-boundaries.test.cjs",
+          "scripts/tests/icon-tool.test.cjs",
+          "scripts/tests/jest-config.test.cjs",
+          "scripts/tests/js-yaml.test.cjs",
+          "scripts/tests/lint-coverage.test.cjs",
+          "scripts/tests/metro-unicode.test.cjs",
+          "scripts/tests/nanoid.test.cjs",
+          "scripts/tests/router-dependency-range.test.cjs",
+          "scripts/tests/security-dependency-owner.test.cjs",
+          "scripts/tests/source-map-js.test.cjs",
+          "scripts/tests/tailwind-source-map.test.cjs",
+          "scripts/tests/ws.test.cjs",
+          "scripts/tests/xmldom.test.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "test:refactor-runner"
+        ],
+        [
+          "python3",
+          "-B",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "scripts/tests",
+          "-p",
+          "test_*.py"
+        ],
+        [
+          "npm",
+          "run",
+          "check:native-config"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "npm",
+          "run",
+          "check:analysis"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "AGENTS.md",
+          "docs/refactoring/CONVENTIONS.md",
+          "docs/refactoring/MIGRATION_PLAN.md",
+          "docs/refactoring/PROGRESS.md",
+          "docs/refactoring/RUNBOOK.md",
+          "docs/refactoring/RUNNER_COMPLIANCE.md",
+          "package.json",
+          "scripts/check-analysis-baseline.cjs",
+          "docs/refactoring/DEPENDENCY_SECURITY.md",
+          "docs/refactoring/UNUSED.md"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=4096",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "android",
+          "--output-dir",
+          ".expo/modernization-checks/android",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=3072",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "ios",
+          "--output-dir",
+          ".expo/modernization-checks/ios",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8197",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts"
+        ]
+      ],
+      "risk": "medium",
+      "approved": true,
+      "status": "verified",
+      "allowed_paths": [
+        "AGENTS.md",
+        "docs/refactoring/CONVENTIONS.md",
+        "docs/refactoring/MIGRATION_PLAN.md",
+        "docs/refactoring/PROGRESS.md",
+        "docs/refactoring/RUNBOOK.md",
+        "docs/refactoring/RUNNER_COMPLIANCE.md",
+        "package.json",
+        "scripts/check-analysis-baseline.cjs",
+        "docs/refactoring/DEPENDENCY_SECURITY.md",
+        "docs/refactoring/UNUSED.md",
+        "docs/refactoring/AUTH_PROFILE_SAVE_OWNERSHIP.md"
+      ],
+      "attempts": 0,
+      "implementation_mode": "implementation",
+      "completed_at": "2026-11-06T18:39:10.684315+00:00",
+      "primary_accepted_at": "2026-11-06T18:39:10.684315+00:00",
+      "evidence": "docs/refactoring/PROGRESS.md",
+      "primary_acceptance_evidence": "docs/refactoring/PROGRESS.md",
+      "summary": "Accepted after 17 current-source controller checks, independent code review and primary acceptance."
     }
   ]
 }

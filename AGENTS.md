@@ -125,8 +125,14 @@ Build and data:
 
 ## Autonomous modernization branch
 
-For modernization work, read `docs/refactoring/ARCHITECTURE.md`, `CONVENTIONS.md`, `TECH_STACK.md`, `PROGRESS.md` and the selected item in `backlog.json`. Use the personal `reuse-first-authoring` skill under `$CODEX_HOME/skills` or `~/.codex/skills` before a nontrivial extraction. Native UI work can consult `react-native-skills`, and component contract changes can consult `composition-patterns` in the same directory. The old repository paths resolve to those canonical skills on this workstation. Project behavior and verified compatibility take precedence over generic library recommendations.
+Use only `/home/ehab/.codex/worktrees/hafiz-modernization/Hafiz` on `codex/hafiz-modernization`. Preserve the original checkout and its AppNavigation change. Keep commits local. No push, merge, deployment, production operation or protected Quran input change is authorized.
 
-The current mission overrides the default push rule. Keep commits local on `codex/hafiz-modernization`. Push, merge, deployment, production operations, live policy changes and destructive data operations require separate user authorization. The original checkout's AppNavigation change belongs to the user.
+Read `docs/refactoring/RUNBOOK.md`, `ARCHITECTURE.md`, `CONVENTIONS.md`, `TECH_STACK.md`, current `PROGRESS.md` and the selected backlog task. The 2026-11-06 direct-work policy in RUNBOOK supersedes historical copy-only, frozen-artifact, command-log audit and evidence-retention instructions.
 
-Use `npm run refactor:status` to inspect the loop and `docs/refactoring/RUNBOOK.md` for start, stop, recovery and resource limits. One controller owns writes. Implementation sessions edit only approved task paths; the controller owns task statuses, independent review, verification and commits. Read-only reviewers do not modify source. A completed batch does not mean the mission is complete.
+Implement directly, using a bounded worker or the primary engineer. During iteration use focused tests, typecheck and changed-file lint. When ready, the controller runs the full task checks once; repair an actual failure and rerun. Each task requires a separate independent code review and primary final acceptance. Judge the implementation and check results, not the worker's command history or Codex CLI warnings. Keep scope, credentials, writer leases, process deadlines and memory safeguards.
+
+Prioritize user-facing bugs and data safety, then performance, accessibility/UX and features. Group dev/build-only advisories into one low-priority task. Do not patch vendor code without an affected shipped-app path. Change loop tooling only when it blocks application work.
+
+Use one commit per accepted task, including its short PROGRESS note. Do not commit preparation, diagnostics or evidence. Keep `.refactor-baseline` below 2 GB; retain only current shared check inputs and reproductions used by unfinished tasks. Delete a task's baseline files and `.ralph/runs` logs on acceptance. Keep `.ralph/events.jsonl`. Native exports are temporary and removed after their check.
+
+Continue immediately between bounded batches. Record decisions or unavailable hardware/accounts/payments as blockers and work on another task. Give a short status after each accepted task with its user effect and passed checks. Project completion still requires the documented criteria and independent final review.

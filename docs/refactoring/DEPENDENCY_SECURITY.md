@@ -2,6 +2,10 @@
 
 Prepared 2026-10-18 for Hafiz on the isolated modernization branch. Source baseline `4ca7c36`. RF-089 is the selected brace-expansion patch; controller verification and independent review still decide acceptance.
 
+## Current policy, 2026-11-06
+
+Prioritize shipped-app bugs and data safety. Dev/build-only advisories remain grouped in low-priority RF090; no further vendor patch is authorized without an affected shipped-app path. Historical reports below describe their original results. Their ignored artifacts and accepted-task logs were intentionally deleted; current checks execute the maintained source tests, not those old captures.
+
 ## Current audit
 
 The fresh baseline has 74 package findings, including 59 high, 14 moderate, one low and zero critical. It contains 44 advisory source records across 35 distinct GHSA URLs. Package counts include propagation through affected parents; they are not distinct application vulnerabilities. Other families remain for RF-090. No deployed external-input path is established by this inventory.

@@ -2,7 +2,11 @@
 
 `backlog.json` is the ordered task record. Every item has a stable ID, rationale, modules, dependencies, acceptance criteria, verification argv, risk, approval flag and status. Ready tasks have bounded paths and commands; larger workstream items remain pending until the primary engineer breaks down or characterizes the next slice. Approval here means engineering readiness under the user's existing authorization, not a new permission request.
 
-## Order
+## Current priority, 2026-11-06
+
+The user superseded the historical sequence: bugs and data safety, then performance, accessibility/UX and features. Group dev/build-only advisories in low-priority RF090. Implement directly; full controller checks, independent review and primary acceptance remain mandatory. Continue immediately between batches and record external blockers while working on other tasks.
+
+## Historical order
 
 1. Establish recovery, baseline, independent review and immutable input safeguards. Complete three small reuse/deletion slices to prove the real loop.
 2. Repair the pre-existing test failures without reducing coverage. Triage dependency advisories, align Expo-compatible patches and calibrate native/web unused-code analysis.
@@ -14,7 +18,7 @@
 
 No task may delete a platform variant based on Knip alone. No duplicate block is merged solely to reduce a percentage. No SDK upgrade is combined with a UI migration or database change.
 
-## Current bounded step, 2026-10-18
+## Historical bounded step, 2026-10-18
 
 RF-067 is accepted after fifteen fresh gates, independent evaluation and primary artifact/hash review. RF-008 still owns the two remaining Expo diagnostics; neither a lint downgrade nor native regeneration is approved. RF-068 characterized both actual account callouts before RF-053 extracted their shared inner row while retaining distinct containers. RF-069 and RF-070 characterized both date-editor callers. RF-072 repaired inline session date-save failure visibility with ordered red/green evidence. RF-055 then extracted the controlled sheet using existing Input/Button/overlay primitives and caller-owned native options. All six gates, independent Astra review and primary acceptance pass, local commit9828164. Existing caller tests are unchanged.
 
@@ -33,6 +37,10 @@ RF-089 is accepted after actual local red/green proof, all 12 controller checks,
 All in-scope items must be verified with evidence or have an exact documented external blocker. Required quality checks must pass, significant regressions and in-scope high-severity findings must be resolved, and an independent final architecture/behavior review must pass. Deliberate data/platform duplication must be documented. Literal zero text similarity is not a useful acceptance criterion for generated Quran inputs or platform adapters.
 
 A batch ending, no currently ready task, or a scanner exit code cannot mark the project complete. The final report must compare the same scan scope, list actual checks and native limits, and link remaining blocked items.
+
+## Historical outcome notes
+
+These notes describe earlier revisions. Use the current backlog and RUNBOOK for task status and instructions; do not revive retired artifact workflows.
 
 RF-091 is accepted after all 15 controller commands, independent Astra review and primary final scope/hash inspection. It patches only nanoid to 3.3.20 and preserves literal Unicode in the existing Metro minifier output to prevent native bundle string overflow. All 2,421 protected inputs remain identical. Both native JavaScript exports match the successful preflight hashes; these exports do not verify bytecode, native compilation or device behavior. Installed audit has 72 package findings/57 high, lock-only has 70/55, both zero critical and the same 30 advisory sources. RF-090 retains remaining security families, RF-039 owns measured native payload/runtime profiling, and RF-086 remains unresolved. Refresh exact dependency preflights before approving another family or RF-087 tooling.
 
@@ -70,7 +78,7 @@ Primary prepares RF-060 as the sole approved pending item. Four exact artifacts 
 
 RF-060 is verified and accepted, local commit a7f24e4. MushafPage and SurahHeader now share the existing optional-font readiness lifecycle through useSurahNameFont. Both whole callers reverse exactly outside prescribed imports/state/effect edits; all rendering, predicates, page/word loading and unrelated state stay in their owners. The loader, font/layout inputs, mappings, manifest/lock and configs remain unchanged. Eleven fresh controller gates, separate Astra and primary scope/hash/reversal/lifecycle checks pass. The same 36 real-caller cases pass before/after; 46 focused cases and 72 suites/465 cold cases pass without skips. Strict types, four-file zero-warning lint, new-file formatting, three platform boundary checks and web export pass. The unchanged duplication profile improves 20 groups/405 lines/183 sources to 19/386/184. Knip retains exit 1 and six issue records, not clean Knip. Existing queued-frame behavior remains unchanged. No actual native font/FontFace, browser/pixel/theme/tablet geometry, native-build or device verification is claimed. Evidence .refactor-baseline/rf060-primary-acceptance.json. Forty-eight of 96 tasks are verified. The batch reports 785106 tokens after its evaluator, above the unchanged 600000 admission threshold; no further session starts. This heartbeat completes RF060 only. No push, deployment, production or protected-input change.
 
-## Correctness before tafsir callback consolidation
+## Historical tafsir findings
 
 RF-014 preparation exposed overlapping same-render imports in both settings owners. RF-097 repairs that specific guard first and adds 32 real-owner picker cases. RF-014 depends on that repair and remains unapproved until a new exact extraction scope is ready. No shared hook is introduced in RF-097. RF-099 separately characterizes the modal variant. RF-098 investigates incomplete-source replacement safety with isolated data before any database repair is approved. Final re-audit RF-046 now depends on all three findings. Forty-eight of 99 items are verified.
 

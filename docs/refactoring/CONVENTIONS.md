@@ -2,7 +2,7 @@
 
 Read AGENTS.md, the selected task, ARCHITECTURE.md, CONVENTIONS.md, TECH_STACK.md and PROGRESS.md before editing. For implementation tasks, inspect implementation, callers and nearest tests before choosing a seam. Search components/ui and the owning feature for reusable behavior. Record whether the change reuses, extends or introduces a feature-local implementation, with the concrete reason.
 
-An approved task may use `implementation_mode: copy-only` when the primary engineer has frozen exact artifacts and reuse choices. That worker installs only those artifacts and reports verification pending. Required instruction and readiness/reuse reads remain mandatory. Caller/source/test inspection, full source/test dumps, implementation workflows and verification belong to the primary engineer, controller and evaluator for that handoff. The controller retains every task command and the evaluator must inspect the original generator command log. Missing mode keeps normal implementation guidance; unknown modes are rejected.
+Implement directly. A task specifies a small behavior change, allowed source paths and ordinary verification commands. Do not prepare copy-only handoffs, frozen artifacts or hash-pinned verification scripts. The primary engineer retains architecture, security/data decisions and final acceptance.
 
 ## Source and types
 
@@ -28,6 +28,6 @@ Add characterization tests before extracting nontrivial behavior. Prefer actual 
 
 Use each task's argv verification commands. Full-suite baseline failures remain visible until separately fixed. If a task requires zero ESLint warnings, enforce `--max-warnings=0`. Exit zero alone permits warnings. When existing warnings must remain, record and compare the exact baseline diagnostics instead of describing the run as warning-free. UI/native checks must record what ran, platform/viewport/locale/theme and observed result. A web build does not verify Android or iOS.
 
-Audit every started and completed generator tool-item type, including MCP, browser, REPL and collaboration calls. A shell-command-only audit can miss work outside the task scope.
+Judge source behavior, the full controller checks and independent review. Do not audit worker command history for acceptance. Ignore unrelated output and Codex CLI plugin, watcher, skills or sandbox diagnostic lines. An actual failed check or actionable code-review finding still requires a repair.
 
-The controller alone changes backlog statuses, appends progress and commits. Each implementation session edits only its approved paths. Failed work remains available for diagnosis and retries; it cannot enter another task. All commits stay on the local modernization branch.
+The controller or primary engineer owns backlog status and the short acceptance note. A worker edits only approved task paths. Keep failed source work for repair, but remove accepted-task evidence and logs. Use one local commit per accepted task; no preparation or diagnostic commits.
