@@ -6843,7 +6843,8 @@
         "RF-092",
         "RF-128",
         "RF-134",
-        "RF-135"
+        "RF-135",
+        "RF-136"
       ],
       "acceptance_criteria": [
         "Primary deduplicates actual advisory URLs, inspects installed instances/consumers and distinguishes shipped app, optional remote and development paths. Use fresh official advisories and compatible-version evidence.",
@@ -6854,7 +6855,8 @@
         "Reconcile npm propagated findings across root/isolated contexts. RF096 preparation preserves reports ranging from 72 to 74 with identical old package entries and the same 23 advisory objects. Retain raw counts/effects/fixAvailable evidence, inspect real affected versions and exposure, and never execute automatic major/downgrade suggestions or call the existing audit clean.",
         "RF128 is the exact legacy XML child, root0.8.13 to0.8.15 with separate0.9.12 control. Ten direct XML advisory URLs must disappear without new sources; fresh November snapshot39findings/10high before,38/9 after. Parent remains open for every other family.",
         "RF134 is the exact three-record external WS child. Reviewed root availability advisory and independently observed empty-fragment guards are distinguished. Bundled react-devtools-core standalone WebSocket code is not replaced by external dependency resolution and remains a separate RF090 residual. Realtime uses global/platform or explicit caller transport, not a demonstrated automatic nested-WS fallback. Both audit scopes retain other high findings and computed metadata drift.",
-        "RF135 is the exact external source-map-js1.2.1 to1.2.2 child. Tiny real PostCSS/constructor controls prove section-offset and nested/source-getter/short-code protections; normal generator and VM sorter compatibility stay bounded. Tailwind3.4.19 peers bundle still accepts the tiny excessive-offset map, and direct bundled submodule callers also remain. No external-entry alias or package update certifies all bundled paths. Keep this as a separate residual; fresh audits compare complete direct advisory records."
+        "RF135 is the exact external source-map-js1.2.1 to1.2.2 child. Tiny real PostCSS/constructor controls prove section-offset and nested/source-getter/short-code protections; normal generator and VM sorter compatibility stay bounded. Tailwind3.4.19 peers bundle still accepts the tiny excessive-offset map, and direct bundled submodule callers also remain. No external-entry alias or package update certifies all bundled paths. Keep this as a separate residual; fresh audits compare complete direct advisory records.",
+        "RF136 backports only official source-map-js repair hunks within Tailwind3.4.19 peers. All four internal modules and both direct css-tree callers retain constructor/wrapper identity. npm audit does not inspect bundled code, so unchanged audit counts do not certify or negate that repair. Other bundled DevTools and remaining advisory families stay open."
       ],
       "verification": [
         [
@@ -11760,6 +11762,174 @@
       "summary": "Installed the four supplied RF-135 artifacts. Verification and acceptance remain pending.",
       "primary_acceptance_evidence": ".refactor-baseline/rf135-primary-acceptance.json",
       "primary_accepted_at": "2026-11-06T16:39:52.731092+00:00"
+    },
+    {
+      "id": "RF-136",
+      "title": "Repair Tailwind bundled source-map parsing",
+      "description": "FIRST COMMAND exactly cat .refactor-baseline/rf136-handoff-v1/readiness.md. Every exec_command shell=\"/usr/bin/sh\", login=false. Eleven exact ordered reads then six exact ordered copies, each separate call. No worker discovery, checks, source dumps or extra tools. Controller runs 16 fresh gates and new separate stronger review; primary owns architecture/security/final acceptance.",
+      "rationale": "External source-map-js update leaves four old bundled modules and direct callers. Exact official repair hunks preserve self-contained fallback, separate constructors, aliases and wrappers while adding bounded offset, source getter, short-code, serializer and CSP fixes.",
+      "modules": [
+        "scripts/tests/source-map-cases.cjs",
+        "scripts/tests/source-map-js.test.cjs",
+        "scripts/tests/tailwind-source-map.test.cjs",
+        "patches/tailwindcss+3.4.19.patch",
+        "package.json",
+        "docs/refactoring/DEPENDENCY_SECURITY.md"
+      ],
+      "dependencies": [
+        "RF-135"
+      ],
+      "acceptance_criteria": [
+        "Exactly six frozen artifacts and 17 strict original ordered command pairs. All other tracked files, lock, protected inputs, real index and historical failures remain exact. Worker installs only.",
+        "Actual root postinstall applies all existing patches and the new Tailwind patch. Full253-file patched Tailwind tree, external18-file package, all13 Query-core targets and full installed graph match. No dependency, version, lock, app, font, mapping or data change.",
+        "All99 focused and170 security cases pass, zero skips. Original bundled copy fails34 with65 controls passing. Shared37 API cases preserve old36 and add real line9 getter-count work proof with exact descriptor restoration. Public lazyPostcss, both direct css-tree callers, constructor/cache identity, Unicode mapping and cssnano valid output, actual bundled VM sorting with allowed/denied string generation all pass. No huge serialization or resource-exhaustion case.",
+        "Both fresh audit scopes keep all12 complete direct advisory records and36 findings/7high/0critical; retain computed parent metadata. Audit remains non-clean; other RF090 families stay open. Fresh types, all unit tests, zero-warning scoped lint, format,3graphs,exact existing5Knip, web and separate bounded Android/iOS JS exports,28Chrome cases pass. CSS and both JS bundle bytes remain identical to accepted RF135. JS export is not native compilation or device proof.",
+        "Separate stronger evaluator inspects complete diff, all mandatory evidence and original tool log, with a session distinct from the worker. Primary rechecks exact artifacts, full vendor trees, every other input, commit scope, protocol and gates after both leases release. No whole-family/global security, live service, production or mission completion claim."
+      ],
+      "verification": [
+        [
+          "python3",
+          "-c",
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf136-handoff-v1/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='a4e56270607bef11233c0e46432348ac49c6115a3536eef5ac11a60052f3690f';sys.argv=[str(p),'all'];runpy.run_path(str(p),run_name='__main__')"
+        ],
+        [
+          "npm",
+          "run",
+          "postinstall"
+        ],
+        [
+          "python3",
+          "-c",
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf136-handoff-v1/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='a4e56270607bef11233c0e46432348ac49c6115a3536eef5ac11a60052f3690f';sys.argv=[str(p),'installed'];runpy.run_path(str(p),run_name='__main__')"
+        ],
+        [
+          "python3",
+          "-c",
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf136-handoff-v1/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='a4e56270607bef11233c0e46432348ac49c6115a3536eef5ac11a60052f3690f';sys.argv=[str(p),'audit'];runpy.run_path(str(p),run_name='__main__')"
+        ],
+        [
+          "npm",
+          "run",
+          "test:dependency-security"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "scripts/tests/source-map-cases.cjs",
+          "scripts/tests/source-map-js.test.cjs",
+          "scripts/tests/tailwind-source-map.test.cjs",
+          "--max-warnings=0"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "scripts/tests/source-map-cases.cjs",
+          "scripts/tests/source-map-js.test.cjs",
+          "scripts/tests/tailwind-source-map.test.cjs",
+          "package.json",
+          "docs/refactoring/DEPENDENCY_SECURITY.md"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=4096",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "android",
+          "--output-dir",
+          ".refactor-baseline/rf136-native-export-android",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=3072",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "ios",
+          "--output-dir",
+          ".refactor-baseline/rf136-native-export-ios",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8197",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "python3",
+          "-c",
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf136-handoff-v1/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='a4e56270607bef11233c0e46432348ac49c6115a3536eef5ac11a60052f3690f';sys.argv=[str(p),'knip'];runpy.run_path(str(p),run_name='__main__')"
+        ],
+        [
+          "python3",
+          "-c",
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf136-handoff-v1/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='a4e56270607bef11233c0e46432348ac49c6115a3536eef5ac11a60052f3690f';sys.argv=[str(p),'final'];runpy.run_path(str(p),run_name='__main__')"
+        ]
+      ],
+      "risk": "high",
+      "approved": true,
+      "status": "pending",
+      "allowed_paths": [
+        "scripts/tests/source-map-cases.cjs",
+        "scripts/tests/source-map-js.test.cjs",
+        "scripts/tests/tailwind-source-map.test.cjs",
+        "patches/tailwindcss+3.4.19.patch",
+        "package.json",
+        "docs/refactoring/DEPENDENCY_SECURITY.md"
+      ],
+      "attempts": 0,
+      "implementation_mode": "copy-only",
+      "readiness_evidence": ".refactor-baseline/rf136-handoff-v1/readiness.md",
+      "primary_investigation_evidence": ".refactor-baseline/rf136-tailwind-source-map-v1/vendor-manifest.json",
+      "primary_preparation_evidence": ".refactor-baseline/rf136-handoff-v1/preparation-receipt.json"
     }
   ]
 }
