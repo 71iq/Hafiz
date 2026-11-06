@@ -11203,29 +11203,38 @@
     {
       "id": "RF-133",
       "title": "Clear viewer Query results at auth lifecycle boundaries",
-      "description": "Frozen three-artifact copy-only task. FIRST COMMAND exactly cat .refactor-baseline/rf133-handoff-v1/readiness.md. Complete11 ordered reads before3 ordered copies, one command per call. No source/test dumps, discovery or worker checks. Primary owns policy; controller owns10 fresh gates, separate stronger evaluation and commit.",
-      "rationale": "Actual root lacked auth Query lifecycle, and removal alone leaves mounted old-viewer results. Synchronous cache notifications also expose replacement/removal, unbind, interrupted-pass and same-owner recursion races. Primary reproduced each with actual store/coordinator/TanStack/root controls.",
+      "description": "Corrected six-artifact copy-only recovery. FIRST COMMAND exactly cat .refactor-baseline/rf133-handoff-v3/readiness.md. Complete11 ordered reads before6 ordered copies, one command per call. Primary owns policy; controller owns14 fresh gates, separate stronger evaluation and commit. Preserve actual failed attempt1 and all superseded evidence.",
+      "rationale": "Actual controller review rejected cancellation/replacement races. Further primary regressions proved stable-owner cross-key erasure and synchronous same-owner rebind erasure. Atomic whole-snapshot detachment plus QueryClient-owned lifecycle state addresses the reproduced causes without changing original core methods.",
       "modules": [
         "app/_layout.tsx",
         "lib/query/auth-cache-lifecycle.ts",
-        "tests/unit/auth-query-lifecycle.test.tsx"
+        "tests/unit/auth-query-lifecycle.test.tsx",
+        "tests/unit/query-cache-detachment.test.ts",
+        "patches/@tanstack+query-core+5.95.0.patch",
+        "docs/refactoring/QUERY_CACHE_DETACHMENT.md"
       ],
       "dependencies": [
         "RF-129",
         "RF-132"
       ],
       "acceptance_criteria": [
-        "Install only3 exact artifacts. All original command starts/completions must pair in11-read then3-copy order; prohibit other tool kinds and malformed/extra shell wrappers. Preserve every other input and every failure.",
-        "Bind before root initialize and outside native font gating. Cancel/reset/remove only reflectionFeed, reflections, reflectionComments and currentUserPublicAchievementUnlocks on unknown initial binding or obsolete cached AuthOwner. Preserve actual public roots, matching-session continuity and completed same-owner remounts.",
-        "Clear mounted resolved results without automatic old-viewer refetch. Capture exact objects, retire obsolete/unsubscribed passes, preserve fresh defined/null/empty data and pending/paused reads during notifications. Retry interrupted passes and suppress same-binding same-owner recursion while permitting replacement owners. No global clear or SQLite deletion.",
-        "35 focused cases pass; original root5fail/30controls, eight mutants22/2/1/1/3/3/1/2. Root reverses exactly after two additions and seven explicit formatter reflows. Fresh full unit with no skips, types, zero-warning three-file lint/format, three graphs, exact five-record Knip, synthetic export and28 Chrome smoke must pass. Separate stronger original-log/full-diff/evidence review and primary acceptance mandatory.",
-        "Scope is a cache boundary, not later callback/query admission, shared SQLite attribution, coordinator-only intent without a store event/rebind, whole SDK/offline policy, wire abort or global privacy. RF025 and related publisher/data/native follow-ups remain open. No dependency, protected input, original checkout, production or push."
+        "Install exactly six frozen artifacts. Strictly pair every original start/completion in11read+6copy order; unknown tool kinds and malformed shell wrappers fail. Preserve all other inputs and historical failures.",
+        "Bind before root initialize outside native font gate. Retire exactly reflectionFeed/reflections/reflectionComments/currentUserPublicAchievementUnlocks on unknown initial binding or obsolete AuthOwner. Preserve true public roots and matching session continuity.",
+        "Pinned additive QueryCache.removeMany detaches all exact selected objects before any destroy/notification. Deduplicate; skip stale/absent. Finish later retire/reset attempts despite exceptions, propagate first thrown value. Original remove/all other methods remain unchanged. All13runtime/source/map/type hashes must match.",
+        "Shared per-QueryClient refreshing/complete/incomplete status suppresses same-owner recursion/rebind during retirement while permitting replacement owners. Clear old mounted results without automatic old refetch; preserve fresh data, pending/paused reads and rollback isolation on every captured key in successful cleanup. Error leaves incomplete; retry conservatively may evict fresh results from failed pass. Document throwing-observer limit.",
+        "69 focused cases and65 controls across source+fourcompiledformats pass; stable-Bcrosskey red9fail/52controls and synchronousrebind red1fail/68controls retained. Twelve semantic mutants fail. Fresh all-unit with no skips, types, zero-warning four-file lint, five-file formatting, three graphs, exact five-record Knip, web/native JS exports and28 Chrome smoke pass. Root exact reversal remains. Separate stronger original-log/full-diff/evidence review and primary acceptance mandatory.",
+        "Cache boundary only. Shared SQLite ownership, later SDK/publisher admission, initialData/hydration, wholeofflinepolicy, server/wire/global privacy and actual native compilation/device remain outside this slice and open. No package/version/lock change, protected data, original checkout, production or push."
       ],
       "verification": [
         [
           "python3",
           "-c",
-          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf133-handoff-v1/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='9edc17572829a1e10d6121f32932f55e5b4932b924ea216aa05632a113d1fe85';sys.argv=[str(p),'all'];runpy.run_path(str(p),run_name='__main__')"
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf133-handoff-v3/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='c9e6148afd31ab33e3f15bd54077e16ddb39b110c5b1c7f035527ad309e51d90';sys.argv=[str(p),'all'];runpy.run_path(str(p),run_name='__main__')"
+        ],
+        [
+          "python3",
+          "-c",
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf133-handoff-v3/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='c9e6148afd31ab33e3f15bd54077e16ddb39b110c5b1c7f035527ad309e51d90';sys.argv=[str(p),'patch'];runpy.run_path(str(p),run_name='__main__')"
         ],
         [
           "npm",
@@ -11237,6 +11246,7 @@
           "app/_layout.tsx",
           "lib/query/auth-cache-lifecycle.ts",
           "tests/unit/auth-query-lifecycle.test.tsx",
+          "tests/unit/query-cache-detachment.test.ts",
           "--max-warnings=0"
         ],
         [
@@ -11244,7 +11254,9 @@
           "--check",
           "app/_layout.tsx",
           "lib/query/auth-cache-lifecycle.ts",
-          "tests/unit/auth-query-lifecycle.test.tsx"
+          "tests/unit/auth-query-lifecycle.test.tsx",
+          "tests/unit/query-cache-detachment.test.ts",
+          "docs/refactoring/QUERY_CACHE_DETACHMENT.md"
         ],
         [
           "npm",
@@ -11261,17 +11273,59 @@
         [
           "python3",
           "-c",
-          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf133-handoff-v1/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='9edc17572829a1e10d6121f32932f55e5b4932b924ea216aa05632a113d1fe85';sys.argv=[str(p),'knip'];runpy.run_path(str(p),run_name='__main__')"
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf133-handoff-v3/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='c9e6148afd31ab33e3f15bd54077e16ddb39b110c5b1c7f035527ad309e51d90';sys.argv=[str(p),'knip'];runpy.run_path(str(p),run_name='__main__')"
+        ],
+        [
+          "python3",
+          "-c",
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf133-handoff-v3/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='c9e6148afd31ab33e3f15bd54077e16ddb39b110c5b1c7f035527ad309e51d90';sys.argv=[str(p),'exports'];runpy.run_path(str(p),run_name='__main__')"
         ],
         [
           "env",
           "CI=1",
+          "EXPO_NO_DOTENV=1",
           "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
           "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
           "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
           "npm",
           "run",
           "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=4096",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "android",
+          "--output-dir",
+          ".refactor-baseline/rf133-native-export-android-v3",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=4096",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "ios",
+          "--output-dir",
+          ".refactor-baseline/rf133-native-export-ios-v3",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
         ],
         [
           "env",
@@ -11287,22 +11341,39 @@
         [
           "python3",
           "-c",
-          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf133-handoff-v1/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='9edc17572829a1e10d6121f32932f55e5b4932b924ea216aa05632a113d1fe85';sys.argv=[str(p),'all'];runpy.run_path(str(p),run_name='__main__')"
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf133-handoff-v3/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='c9e6148afd31ab33e3f15bd54077e16ddb39b110c5b1c7f035527ad309e51d90';sys.argv=[str(p),'final'];runpy.run_path(str(p),run_name='__main__')"
         ]
       ],
       "risk": "high",
       "approved": true,
-      "status": "pending",
+      "status": "retry",
       "allowed_paths": [
         "app/_layout.tsx",
         "lib/query/auth-cache-lifecycle.ts",
-        "tests/unit/auth-query-lifecycle.test.tsx"
+        "tests/unit/auth-query-lifecycle.test.tsx",
+        "tests/unit/query-cache-detachment.test.ts",
+        "patches/@tanstack+query-core+5.95.0.patch",
+        "docs/refactoring/QUERY_CACHE_DETACHMENT.md"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "implementation_mode": "copy-only",
-      "primary_investigation_evidence": ".refactor-baseline/rf133-auth-query-lifecycle-v1/decision.md",
-      "readiness_evidence": ".refactor-baseline/rf133-handoff-v1/readiness.md",
-      "primary_preparation_evidence": ".refactor-baseline/rf133-auth-query-lifecycle-v1/preparation-receipt.json"
+      "primary_investigation_evidence": ".refactor-baseline/rf133-auth-query-lifecycle-v3/primary-diagnosis.md",
+      "readiness_evidence": ".refactor-baseline/rf133-handoff-v3/readiness.md",
+      "primary_preparation_evidence": ".refactor-baseline/rf133-auth-query-lifecycle-v3/preparation-receipt.json",
+      "started_at": "2026-11-06T13:07:02.734005+00:00",
+      "failure": "Independent review failed: [P1] lib/query/auth-cache-lifecycle.ts:33: cancelQueries evaluates all predicates before cancelling the selected queries. If cancellation of query 1 synchronously replaces owner B with C, C can start fresh work on query 2, which the obsolete B pass then cancels. An in-memory reproduction confirmed C's fresh request was aborted. Cancel individually, rechecking binding, owner and exact query before each operation, and add a two-query replacement regression.; [P2] lib/query/auth-cache-lifecycle.ts:38: The unconditional reset erases fresh data published synchronously during cancellation. A reproduction published 'fresh B' from the cancellation notification, then observed undefined after the boundary completed. Track changes across cancellation and preserve fresh publications and requests before resetting. Add cancellation-time regressions alongside the existing reset-time cases. Artifact hashes, generator compliance and all ten recorded controller gates pass, but those checks miss these failures. No files were changed.",
+      "evidence": ".ralph/runs/RF-133-1-1793970422739202405",
+      "recovery_history": [
+        {
+          "time": "2026-11-06T14:07:09.217936+00:00",
+          "attempts_preserved": 1,
+          "prior_evidence": ".ralph/runs/RF-133-1-1793970422739202405",
+          "prior_failure": "Independent review failed: [P1] lib/query/auth-cache-lifecycle.ts:33: cancelQueries evaluates all predicates before cancelling the selected queries. If cancellation of query 1 synchronously replaces owner B with C, C can start fresh work on query 2, which the obsolete B pass then cancels. An in-memory reproduction confirmed C's fresh request was aborted. Cancel individually, rechecking binding, owner and exact query before each operation, and add a two-query replacement regression.; [P2] lib/query/auth-cache-lifecycle.ts:38: The unconditional reset erases fresh data published synchronously during cancellation. A reproduction published 'fresh B' from the cancellation notification, then observed undefined after the boundary completed. Track changes across cancellation and preserve fresh publications and requests before resetting. Add cancellation-time regressions alongside the existing reset-time cases. Artifact hashes, generator compliance and all ten recorded controller gates pass, but those checks miss these failures. No files were changed.",
+          "concrete_correction": ".refactor-baseline/rf133-auth-query-lifecycle-v3/primary-diagnosis.md",
+          "preparation_receipt": ".refactor-baseline/rf133-auth-query-lifecycle-v3/preparation-receipt.json",
+          "handoff": ".refactor-baseline/rf133-handoff-v3"
+        }
+      ]
     }
   ]
 }
