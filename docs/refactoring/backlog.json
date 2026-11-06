@@ -10831,15 +10831,19 @@
       ],
       "risk": "high",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "lib/auth/store.ts",
         "tests/unit/auth-runtime-store.test.ts"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "implementation_mode": "copy-only",
       "readiness_evidence": ".refactor-baseline/rf129-handoff-v1/readiness.md",
-      "primary_preparation_evidence": ".refactor-baseline/rf129-auth-startup-v1/preparation-receipt.json"
+      "primary_preparation_evidence": ".refactor-baseline/rf129-auth-startup-v1/preparation-receipt.json",
+      "started_at": "2026-11-06T10:05:27.681990+00:00",
+      "completed_at": "2026-11-06T10:14:43.028059+00:00",
+      "evidence": ".ralph/runs/RF-129-1-1793959527686038956",
+      "summary": "Installed the two frozen RF-129 artifacts after completing all required ordered reads."
     }
   ]
 }

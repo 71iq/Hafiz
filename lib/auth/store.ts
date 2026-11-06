@@ -21,6 +21,8 @@ import type { AuthState, AuthActions, Profile } from "@/lib/auth/types";
 type AuthStore = AuthState & AuthActions;
 
 let profileOwnerGeneration = 0;
+let authInitialization: Promise<void> | undefined;
+let cancelAuthListener: (() => void) | undefined;
 
 function buildFallbackProfile(user: NonNullable<AuthState["user"]>): Profile {
   const metadata = user.user_metadata ?? {};
@@ -155,58 +157,69 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
   // ─── Actions ────────────────────────────────────────────────
 
-  initialize: async () =>
-    authCommands.bootstrap(async () => {
-      if (!isSupabaseConfigured()) {
-        set({ isInitialized: true });
-        return;
-      }
-
-      try {
-        set({ isLoading: true });
-
-        // Restore session from storage
-        const {
-          data: { session },
-          error,
-        } = await supabase.auth.getSession();
-
-        if (error) throw error;
-
-        if (session) {
-          setSessionIdentity({ session, user: session.user });
-          connectQfSessionIfAvailable(session);
-          get().ensureProfile();
+  initialize: () => {
+    if (authInitialization) return authInitialization;
+    if (get().isInitialized) return Promise.resolve();
+    const readOwner = authCommands.captureOwner();
+    authInitialization = authCommands
+      .bootstrap(async () => {
+        if (!isSupabaseConfigured()) {
+          set({ isInitialized: true });
+          return;
         }
-
-        // Listen for auth state changes
-        const initialOwner = authCommands.captureOwner();
-        let acceptsInitialSession = true;
-        supabase.auth.onAuthStateChange((_event, session) => {
-          if (_event === "INITIAL_SESSION") {
-            if (!acceptsInitialSession || !initialOwner.isCurrent()) return;
-            acceptsInitialSession = false;
-          } else {
-            acceptsInitialSession = false;
-          }
-          setSessionIdentity({
-            session,
-            user: session?.user ?? null,
+        try {
+          set({ isLoading: true });
+          // The singleton store owns its listener across root remounts.
+          // A new initialization retires any queued callback from its old listener.
+          cancelAuthListener?.();
+          let active = true;
+          let acceptsStartupSession = true;
+          const {
+            data: { subscription },
+          } = supabase.auth.onAuthStateChange((_event, session) => {
+            if (!active) return;
+            if (_event === "INITIAL_SESSION") {
+              if (!acceptsStartupSession || !canRestoreAuthSession(readOwner, session)) return;
+              acceptsStartupSession = false;
+            } else {
+              acceptsStartupSession = false;
+            }
+            setSessionIdentity({ session, user: session?.user ?? null });
+            if (session?.user) {
+              connectQfSessionIfAvailable(session);
+              get().ensureProfile();
+            } else {
+              set({ profile: null });
+            }
           });
-
-          if (session?.user) {
+          cancelAuthListener = () => {
+            active = false;
+            subscription.unsubscribe();
+          };
+          // A published SDK notification takes precedence over the pending startup snapshot.
+          // Same-session refreshes preserve command ownership but still replace older credentials.
+          const {
+            data: { session },
+            error,
+          } = await supabase.auth.getSession();
+          if (error) throw error;
+          if (session && acceptsStartupSession && canRestoreAuthSession(readOwner, session)) {
+            acceptsStartupSession = false;
+            setSessionIdentity({ session, user: session.user });
             connectQfSessionIfAvailable(session);
             get().ensureProfile();
-          } else {
-            set({ profile: null });
           }
-        });
-      } catch (err: any) {
-        console.warn("[Auth] Init error:", err.message);
-      } finally {
-        set({ isLoading: false, isInitialized: true });
-      }
-    }),
+        } catch (error) {
+          console.warn("[Auth] Init error:", error instanceof Error ? error.message : String(error));
+        } finally {
+          set({ isLoading: false, isInitialized: true });
+        }
+      })
+      .finally(() => {
+        authInitialization = undefined;
+      });
+    return authInitialization;
+  },
 
   signIn: async (email: string, password: string) =>
     authCommands.transition(async () => {

@@ -6,6 +6,7 @@ import type { AuthOwner } from "@/lib/auth/coordinator";
 let mockRuntime: ReturnType<typeof createRootAuthRuntime>;
 let mockLastPasswordError: unknown;
 let mockLastRecoveryError: unknown;
+const mockProfileReads: string[] = [];
 const mockProfile = (id: string) => ({
   id,
   username: id,
@@ -52,7 +53,10 @@ jest.mock("@/lib/supabase", () => ({
           id = value;
           return query;
         },
-        maybeSingle: async () => ({ data: mockProfile(id), error: null }),
+        maybeSingle: async () => {
+          mockProfileReads.push(id);
+          return { data: mockProfile(id), error: null };
+        },
       };
       return query;
     },
@@ -107,6 +111,35 @@ function sameSessionRefresh(initial: Session): Session {
     expires_at: payload.exp,
   };
 }
+type Runtime = ReturnType<typeof createRootAuthRuntime>;
+type Auth = Runtime["auth"];
+type Subscription = ReturnType<Auth["onAuthStateChange"]>["data"]["subscription"];
+function trackSubscriptions(auth: Auth) {
+  const subscriptions = new Set<Subscription>();
+  const retiredCallbacks = new Set<Parameters<Auth["onAuthStateChange"]>[0]>();
+  const trackedAuth = new Proxy(auth, {
+    get(target, property, receiver) {
+      if (property !== "onAuthStateChange") return Reflect.get(target, property, receiver);
+      return (callback: Parameters<Auth["onAuthStateChange"]>[0]) => {
+        const result = target.onAuthStateChange(callback);
+        const original = result.data.subscription;
+        const tracked: Subscription = {
+          ...original,
+          unsubscribe: () => {
+            if (subscriptions.delete(tracked)) {
+              retiredCallbacks.add(callback);
+              original.unsubscribe();
+            }
+          },
+        };
+        subscriptions.add(tracked);
+        return { ...result, data: { ...result.data, subscription: tracked } };
+      };
+    },
+  });
+  return { auth: trackedAuth, subscriptions, retiredCallbacks };
+}
+
 let sequence = 0;
 async function setup(
   mode:
@@ -118,18 +151,53 @@ async function setup(
     | "recovery"
     | "refresh-error"
     | "bounded-refresh-loop" = "normal",
+  initializeStore = true,
 ) {
   const key = `rf125-store-runtime-${++sequence}`;
   const initial = session(1),
     refreshed = sameSessionRefresh(initial);
   const values = new Map([[key, JSON.stringify(initial)]]);
+  type HeldRead = { started: ReturnType<typeof deferred>; release: ReturnType<typeof deferred>; skip: number };
+  let nextRead: HeldRead | undefined;
+  const heldReads = new Set<HeldRead>();
+  function holdNextSessionRead(skip = 0) {
+    if (nextRead) throw new Error("A session read is already armed");
+    const held: HeldRead = { started: deferred(), release: deferred(), skip };
+    nextRead = held;
+    heldReads.add(held);
+    return {
+      started: held.started.promise,
+      release: held.release.resolve,
+      cancel: () => {
+        if (nextRead === held) nextRead = undefined;
+        held.release.resolve();
+        heldReads.delete(held);
+      },
+    };
+  }
   const storage = {
-    getItem: (key: string) => values.get(key) ?? null,
-    setItem: (key: string, value: string) => {
-      values.set(key, value);
+    getItem: async (name: string) => {
+      const snapshot = values.get(name) ?? null;
+      if (name !== key || !nextRead) return snapshot;
+      if (nextRead.skip > 0) {
+        nextRead.skip -= 1;
+        return snapshot;
+      }
+      const held = nextRead;
+      nextRead = undefined;
+      held.started.resolve();
+      try {
+        await held.release.promise;
+        return snapshot;
+      } finally {
+        heldReads.delete(held);
+      }
     },
-    removeItem: (key: string) => {
-      values.delete(key);
+    setItem: (name: string, value: string) => {
+      values.set(name, value);
+    },
+    removeItem: (name: string) => {
+      values.delete(name);
     },
   };
   const started = deferred(),
@@ -148,6 +216,7 @@ async function setup(
     error: null,
   });
   mockLastPasswordError = null;
+  mockProfileReads.length = 0;
   const runtime = createRootAuthRuntime({
     url: "https://synthetic.example.invalid/",
     anonKey: "public-synthetic-key",
@@ -194,25 +263,34 @@ async function setup(
       return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
     },
   });
+  const tracked = trackSubscriptions(runtime.auth);
+  runtime.auth = tracked.auth;
   mockRuntime = runtime;
   await runtime.auth.initialize();
   await runtime.auth.stopAutoRefresh();
-  const spectator = runtime.auth.onAuthStateChange((event, session) => {
+  runtime.auth.onAuthStateChange((event, session) => {
     events.push({ event, session });
-  }).data.subscription;
-  await useAuthStore.getState().initialize();
-  await new Promise<void>((resolve) => {
-    const barrier = runtime.auth.onAuthStateChange((event) => {
-      if (event === "INITIAL_SESSION") {
-        barrier.data.subscription.unsubscribe();
-        resolve();
-      }
-    });
   });
-  await new Promise((resolve) => setTimeout(resolve, 0));
-  expect(useAuthStore.getState().user?.id).toBe(initial.user.id);
+  if (initializeStore) await useAuthStore.getState().initialize();
+  await settleAuth();
+  async function settleAuth() {
+    await new Promise<void>((resolve) => {
+      const barrier = runtime.auth.onAuthStateChange((event) => {
+        if (event === "INITIAL_SESSION") {
+          barrier.data.subscription.unsubscribe();
+          resolve();
+        }
+      });
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+  if (initializeStore) expect(useAuthStore.getState().user?.id).toBe(initial.user.id);
   return {
     runtime,
+    holdNextSessionRead,
+    settleAuth,
+    subscriptionCount: () => tracked.subscriptions.size,
+    retiredCallbacks: tracked.retiredCallbacks,
     initial,
     refreshed,
     values,
@@ -234,9 +312,12 @@ async function setup(
     persisted: () => JSON.parse(values.get(key) ?? "null") as Session | null,
     close: async () => {
       release.resolve();
-      spectator.unsubscribe();
+      nextRead = undefined;
+      for (const held of heldReads) held.release.resolve();
+      for (const subscription of [...tracked.subscriptions]) subscription.unsubscribe();
       await runtime.auth.stopAutoRefresh();
       await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(tracked.subscriptions.size).toBe(0);
     },
   };
 }
@@ -638,3 +719,252 @@ it("rejected recovery with a near-expiry prior session returns without extra ref
     await f.close();
   }
 });
+
+it.each([true, false])(
+  "repeated and concurrent initialization retain one store listener, previously initialized=%s",
+  async (initialized) => {
+    const f = await setup("normal", initialized);
+    try {
+      await Promise.all([
+        useAuthStore.getState().initialize(),
+        useAuthStore.getState().initialize(),
+        useAuthStore.getState().initialize(),
+      ]);
+      await f.settleAuth();
+      const before = mockProfileReads.length;
+      const b = session(2);
+      await f.external(b);
+      expect({ subscriptions: f.subscriptionCount(), profileReads: mockProfileReads.slice(before) }).toEqual({
+        subscriptions: 2,
+        profileReads: [b.user.id],
+      });
+    } finally {
+      await f.close();
+    }
+  },
+);
+it.each([false, true].flatMap((sameUser) => [false, true].map((force) => ({ sameUser, force }))))(
+  "late repeated startup cannot replace B or revoke its owner, same-user=$sameUser forced=$force",
+  async ({ sameUser, force }) => {
+    const f = await setup();
+    if (force) useAuthStore.setState({ isInitialized: false });
+    const held = f.holdNextSessionRead();
+    const b = session(sameUser ? 1 : 2, 1);
+    const observed: { owner?: AuthOwner; tokens: (string | null)[] } = { tokens: [] };
+    const detach = useAuthStore.subscribe((state, previous) => {
+      if (state.session === previous.session) return;
+      const token = state.session?.access_token ?? null;
+      if (token === b.access_token && !observed.owner) observed.owner = authCommands.captureOwner();
+      if (observed.owner) observed.tokens.push(token);
+    });
+    const startup = useAuthStore.getState().initialize();
+    let external: ReturnType<typeof f.external> | undefined;
+    let overlap: ReturnType<typeof f.runtime.auth.getSession> | undefined;
+    try {
+      const path = await Promise.race([
+        held.started.then(() => "read" as const),
+        startup.then(() => "completed" as const),
+      ]);
+      if (path === "read") {
+        external = f.external(b);
+        overlap = f.runtime.auth.getSession();
+        held.release();
+      } else {
+        held.cancel();
+        external = f.external(b);
+      }
+      await Promise.all([startup, external, overlap]);
+      await f.settleAuth();
+      expect(observed.tokens.length).toBeGreaterThan(0);
+      expect(observed.tokens.every((token) => token === b.access_token)).toBe(true);
+      expect(observed.owner?.isCurrent()).toBe(true);
+      expect(useAuthStore.getState().session?.access_token).toBe(b.access_token);
+      expect(f.persisted()?.access_token).toBe(b.access_token);
+      expect(f.subscriptionCount()).toBe(2);
+    } finally {
+      held.cancel();
+      await Promise.allSettled([startup, external, overlap]);
+      detach();
+      await f.close();
+    }
+  },
+);
+it.each([false, true])(
+  "first startup cannot publish old A after an actual SDK B notification, same-user=%s",
+  async (sameUser) => {
+    const f = await setup("normal", false);
+    const held = f.holdNextSessionRead();
+    const b = session(sameUser ? 1 : 2, 1);
+    let replacementNotified = false;
+    const publications: (string | null)[] = [];
+    let owner: AuthOwner | undefined;
+    const observer = f.runtime.auth.onAuthStateChange((_event, current) => {
+      if (current?.access_token === b.access_token) replacementNotified = true;
+    }).data.subscription;
+    const detach = useAuthStore.subscribe((state, previous) => {
+      if (state.session === previous.session || !replacementNotified) return;
+      publications.push(state.session?.access_token ?? null);
+      if (state.session?.access_token === b.access_token && !owner) owner = authCommands.captureOwner();
+    });
+    const startup = useAuthStore.getState().initialize();
+    let external: ReturnType<typeof f.external> | undefined;
+    let overlap: ReturnType<typeof f.runtime.auth.getSession> | undefined;
+    try {
+      await held.started;
+      external = f.external(b);
+      overlap = f.runtime.auth.getSession();
+      held.release();
+      await Promise.all([startup, external, overlap]);
+      await f.settleAuth();
+      expect(replacementNotified).toBe(true);
+      expect(publications.length).toBeGreaterThan(0);
+      expect(publications.every((token) => token === b.access_token)).toBe(true);
+      expect(owner?.isCurrent()).toBe(true);
+      expect(f.persisted()?.access_token).toBe(b.access_token);
+    } finally {
+      held.cancel();
+      await Promise.allSettled([startup, external, overlap]);
+      observer.unsubscribe();
+      detach();
+      await f.close();
+    }
+  },
+);
+
+it("retired store callbacks cannot restore A after a fresh initialization observes B", async () => {
+  const f = await setup();
+  try {
+    useAuthStore.setState({ isInitialized: false });
+    await useAuthStore.getState().initialize();
+    await f.settleAuth();
+    const b = session(2);
+    await f.external(b);
+    const owner = authCommands.captureOwner();
+    const current = useAuthStore.getState();
+    const before = mockProfileReads.length;
+    for (const callback of f.retiredCallbacks) await callback("SIGNED_IN", f.initial);
+    expect(f.subscriptionCount()).toBe(2);
+    expect(useAuthStore.getState().session).toBe(current.session);
+    expect(useAuthStore.getState().profile).toBe(current.profile);
+    expect(mockProfileReads).toHaveLength(before);
+    expect(owner.isCurrent()).toBe(true);
+  } finally {
+    await f.close();
+  }
+});
+
+it.each(["refresh", "metadata", "same-session-signin"] as const)(
+  "startup never restores an old snapshot after actual same-session %s notice",
+  async (kind) => {
+    const f = await setup();
+    useAuthStore.setState({ isInitialized: false });
+    const held = f.holdNextSessionRead(1);
+    const fingerprint = (value: Session | null) =>
+      JSON.stringify(
+        value ? { access: value.access_token, refresh: value.refresh_token, metadata: value.user.user_metadata } : null,
+      );
+    let newerObserved = false;
+    let owner: AuthOwner | undefined;
+    const publications: string[] = [];
+    const expected =
+      kind === "metadata"
+        ? { ...f.initial, user: { ...f.initial.user, user_metadata: { updated: true } } }
+        : f.refreshed;
+    const newer = fingerprint(expected);
+    const detach = useAuthStore.subscribe((state, previous) => {
+      if (state.session === previous.session) return;
+      const current = fingerprint(state.session);
+      if (current === newer && !newerObserved) {
+        newerObserved = true;
+        owner = authCommands.captureOwner();
+      }
+      if (newerObserved) publications.push(current);
+    });
+    const startup = useAuthStore.getState().initialize();
+    let operation: Promise<unknown> | undefined;
+    let overlap: ReturnType<typeof f.runtime.auth.getSession> | undefined;
+    try {
+      await held.started;
+      operation =
+        kind === "refresh"
+          ? f.runtime.auth.refreshSession()
+          : kind === "metadata"
+            ? f.runtime.auth.updateUser({ data: { updated: true } })
+            : f.external(f.refreshed);
+      overlap = f.runtime.auth.getSession();
+      held.release();
+      await Promise.all([startup, operation, overlap]);
+      await f.settleAuth();
+      expect(newerObserved).toBe(true);
+      expect(publications.length).toBeGreaterThan(0);
+      expect(publications.every((value) => value === newer)).toBe(true);
+      expect(fingerprint(useAuthStore.getState().session)).toBe(newer);
+      expect(fingerprint(f.persisted())).toBe(newer);
+      expect(owner?.isCurrent()).toBe(true);
+    } finally {
+      held.cancel();
+      await Promise.allSettled([startup, operation, overlap]);
+      detach();
+      await f.close();
+    }
+  },
+);
+
+it.each([0, 1])(
+  "startup cannot restore an old A snapshot after actual SDK A-B-A, held-read-offset=%s",
+  async (offset) => {
+    const f = await setup();
+    useAuthStore.setState({ isInitialized: false });
+    const held = f.holdNextSessionRead(offset);
+    const returned = { ...f.refreshed, user: { ...f.refreshed.user, user_metadata: { returned: true } } };
+    let observedB = false;
+    const originalOwner = authCommands.captureOwner();
+    let returnedObserved = false;
+    let owner: AuthOwner | undefined;
+    const publications: Session[] = [];
+    const detach = useAuthStore.subscribe((state, previous) => {
+      if (state.session === previous.session || !state.session) return;
+      if (state.session.user.id === session(2).user.id) observedB = true;
+      if (
+        state.session.access_token === returned.access_token &&
+        state.session.user.user_metadata.returned === true &&
+        !returnedObserved &&
+        observedB
+      ) {
+        returnedObserved = true;
+        owner = authCommands.captureOwner();
+      }
+      if (returnedObserved) publications.push(state.session);
+    });
+    const startup = useAuthStore.getState().initialize();
+    let away: ReturnType<typeof f.external> | undefined;
+    let back: ReturnType<typeof f.external> | undefined;
+    let overlap: ReturnType<typeof f.runtime.auth.getSession> | undefined;
+    try {
+      await held.started;
+      away = f.external(session(2));
+      back = f.external(returned);
+      overlap = f.runtime.auth.getSession();
+      held.release();
+      await Promise.all([startup, away, back, overlap]);
+      await f.settleAuth();
+      expect(observedB).toBe(true);
+      expect(originalOwner.isCurrent()).toBe(false);
+      expect(returnedObserved).toBe(true);
+      expect(publications.length).toBeGreaterThan(0);
+      expect(
+        publications.every(
+          (value) => value.access_token === returned.access_token && value.user.user_metadata.returned === true,
+        ),
+      ).toBe(true);
+      expect(owner?.isCurrent()).toBe(true);
+      expect(useAuthStore.getState().session?.access_token).toBe(returned.access_token);
+      expect(f.persisted()?.access_token).toBe(returned.access_token);
+    } finally {
+      held.cancel();
+      await Promise.allSettled([startup, away, back, overlap]);
+      detach();
+      await f.close();
+    }
+  },
+);
