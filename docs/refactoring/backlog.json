@@ -1980,7 +1980,8 @@
         "RF-129",
         "RF-130",
         "RF-131",
-        "RF-132"
+        "RF-132",
+        "RF-133"
       ],
       "acceptance_criteria": [
         "Test sign-in, sign-out, account switch, late responses, subscription cleanup and offline restore.",
@@ -1989,7 +1990,7 @@
         "RF123 atomically clears or retains matching profile only in six successful session-identity assignment paths. Parent remains unapproved; stale auth/password/updateProfile/leaderboard publishers, cache/listener/offline policies and arbitrary external setState still need separate verification.",
         "RF124 audit and RF125 password/reset repair are accepted. RF127 profile store/editor ownership is now verified and primary accepted, including initialization and closed A-B-A regressions. These children do not close RF025: Query cache, initialization/listener/SDK, leaderboard, offline and wider ownership policies remain to be verified.",
         "RF129 owns only singleton initialization/listener retirement and obsolete startup snapshot publication, including newer same-session notifications. Cache isolation, leaderboard/overview/community/other publishers and full SDK/offline lifecycle remain open after child acceptance.",
-        "RF130 only guards obsolete account stats lifetimes. RF131 same-owner ordering and RF132 ensure/stats full-row overwrites remain unapproved, with actual-module failures. No child closes Query/cache, overview/community, other publishers, offline or full SDK lifecycle."
+        "RF130 obsolete stats lifetimes, RF131 same-owner FIFO and RF132 field publication are verified and primary accepted. RF133 only addresses four viewer/local Query roots and remains pending. Parent still requires overview/community/other SDK publishers, offline and whole SQLite sync/data ownership. Remote Profile row identity/shape validation is not covered by sync-payload RF031."
       ],
       "verification": [
         [
@@ -11198,6 +11199,110 @@
       "summary": "Primary accepts owner-scoped same-runtime profile publication after13fresh gates, separate stronger evaluation, released-lease scope/hash/event checks, corrected strict pairing audit and11 rejected protocol variants.1930 unit cases and353 focused cases pass. BroaderRF025/payload/native/server limits remain.",
       "primary_accepted": true,
       "primary_acceptance_evidence": ".refactor-baseline/rf132-primary-acceptance.json"
+    },
+    {
+      "id": "RF-133",
+      "title": "Clear viewer Query results at auth lifecycle boundaries",
+      "description": "Frozen three-artifact copy-only task. FIRST COMMAND exactly cat .refactor-baseline/rf133-handoff-v1/readiness.md. Complete11 ordered reads before3 ordered copies, one command per call. No source/test dumps, discovery or worker checks. Primary owns policy; controller owns10 fresh gates, separate stronger evaluation and commit.",
+      "rationale": "Actual root lacked auth Query lifecycle, and removal alone leaves mounted old-viewer results. Synchronous cache notifications also expose replacement/removal, unbind, interrupted-pass and same-owner recursion races. Primary reproduced each with actual store/coordinator/TanStack/root controls.",
+      "modules": [
+        "app/_layout.tsx",
+        "lib/query/auth-cache-lifecycle.ts",
+        "tests/unit/auth-query-lifecycle.test.tsx"
+      ],
+      "dependencies": [
+        "RF-129",
+        "RF-132"
+      ],
+      "acceptance_criteria": [
+        "Install only3 exact artifacts. All original command starts/completions must pair in11-read then3-copy order; prohibit other tool kinds and malformed/extra shell wrappers. Preserve every other input and every failure.",
+        "Bind before root initialize and outside native font gating. Cancel/reset/remove only reflectionFeed, reflections, reflectionComments and currentUserPublicAchievementUnlocks on unknown initial binding or obsolete cached AuthOwner. Preserve actual public roots, matching-session continuity and completed same-owner remounts.",
+        "Clear mounted resolved results without automatic old-viewer refetch. Capture exact objects, retire obsolete/unsubscribed passes, preserve fresh defined/null/empty data and pending/paused reads during notifications. Retry interrupted passes and suppress same-binding same-owner recursion while permitting replacement owners. No global clear or SQLite deletion.",
+        "35 focused cases pass; original root5fail/30controls, eight mutants22/2/1/1/3/3/1/2. Root reverses exactly after two additions and seven explicit formatter reflows. Fresh full unit with no skips, types, zero-warning three-file lint/format, three graphs, exact five-record Knip, synthetic export and28 Chrome smoke must pass. Separate stronger original-log/full-diff/evidence review and primary acceptance mandatory.",
+        "Scope is a cache boundary, not later callback/query admission, shared SQLite attribution, coordinator-only intent without a store event/rebind, whole SDK/offline policy, wire abort or global privacy. RF025 and related publisher/data/native follow-ups remain open. No dependency, protected input, original checkout, production or push."
+      ],
+      "verification": [
+        [
+          "python3",
+          "-c",
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf133-handoff-v1/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='9edc17572829a1e10d6121f32932f55e5b4932b924ea216aa05632a113d1fe85';sys.argv=[str(p),'all'];runpy.run_path(str(p),run_name='__main__')"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "app/_layout.tsx",
+          "lib/query/auth-cache-lifecycle.ts",
+          "tests/unit/auth-query-lifecycle.test.tsx",
+          "--max-warnings=0"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "app/_layout.tsx",
+          "lib/query/auth-cache-lifecycle.ts",
+          "tests/unit/auth-query-lifecycle.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "python3",
+          "-c",
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf133-handoff-v1/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='9edc17572829a1e10d6121f32932f55e5b4932b924ea216aa05632a113d1fe85';sys.argv=[str(p),'knip'];runpy.run_path(str(p),run_name='__main__')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8197",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts"
+        ],
+        [
+          "python3",
+          "-c",
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf133-handoff-v1/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='9edc17572829a1e10d6121f32932f55e5b4932b924ea216aa05632a113d1fe85';sys.argv=[str(p),'all'];runpy.run_path(str(p),run_name='__main__')"
+        ]
+      ],
+      "risk": "high",
+      "approved": true,
+      "status": "pending",
+      "allowed_paths": [
+        "app/_layout.tsx",
+        "lib/query/auth-cache-lifecycle.ts",
+        "tests/unit/auth-query-lifecycle.test.tsx"
+      ],
+      "attempts": 0,
+      "implementation_mode": "copy-only",
+      "primary_investigation_evidence": ".refactor-baseline/rf133-auth-query-lifecycle-v1/decision.md",
+      "readiness_evidence": ".refactor-baseline/rf133-handoff-v1/readiness.md",
+      "primary_preparation_evidence": ".refactor-baseline/rf133-auth-query-lifecycle-v1/preparation-receipt.json"
     }
   ]
 }
