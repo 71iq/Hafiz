@@ -104,7 +104,7 @@ class IterationTests(unittest.TestCase):
         self.state.mkdir()
         self.backlog = self.docs / 'backlog.json'
         self.config = self.root / 'config.json'
-        self.config.write_text(json.dumps({'max_attempts': 2, 'batch_seconds': 30, 'session_seconds': 5, 'batch_tokens': 1000}))
+        self.config.write_text(json.dumps({'max_attempts': 2, 'batch_seconds': 30, 'session_seconds': 5}))
         (self.root / '.gitignore').write_text('.ralph/\nstop.md\n')
         (self.root / 'fixture.txt').write_text('before\n')
         (self.docs / 'PROGRESS.md').write_text('# Progress\n')
@@ -207,8 +207,88 @@ class IterationTests(unittest.TestCase):
             self.assertEqual(agent.call_count, 1)
         self.assertTrue((self.root / 'unrelated.txt').exists())
 
+    def test_high_reported_usage_does_not_block_verification_review_or_commit(self):
+        control.write_json(self.state / 'batch.json', {'started_epoch': control.time.time(), 'tokens': 600001})
+        def run_agent(*args, **kwargs):
+            return {'verdict': 'pass', 'findings': []} if kwargs.get('readonly') else self.generate()
+        with patch('sys.stdin.read', return_value='prompt'), patch.object(control, 'agent', side_effect=run_agent) as agent:
+            control.iteration()
+        self.assertEqual(agent.call_count, 2)
+        self.assertTrue(agent.call_args.kwargs['readonly'])
+        self.assertEqual(self.current_task()['status'], 'verified')
+        evidence = self.root / self.current_task()['evidence']
+        self.assertEqual(control.read_json(evidence / 'verification.json')[0]['exit'], 0)
+        self.assertEqual(self.git('show', 'HEAD:fixture.txt'), 'after')
+
+    def test_crossing_former_token_limit_during_generation_still_requires_review(self):
+        def run_agent(*args, **kwargs):
+            if kwargs.get('readonly'):
+                return {'verdict': 'pass', 'findings': []}
+            result = self.generate()
+            batch = control.read_json(self.state / 'batch.json')
+            batch['tokens'] = 1200000
+            control.write_json(self.state / 'batch.json', batch)
+            return result
+        with patch('sys.stdin.read', return_value='prompt'), patch.object(control, 'agent', side_effect=run_agent) as agent:
+            control.iteration()
+        self.assertEqual(agent.call_count, 2)
+        self.assertTrue(agent.call_args.kwargs['readonly'])
+        self.assertEqual(self.current_task()['status'], 'verified')
+        self.assertEqual(control.read_json(self.state / 'batch.json')['tokens'], 1200000)
+
+    def test_unknown_usage_preserves_reported_total_and_does_not_block_admission(self):
+        control.write_json(self.state / 'batch.json', {'started_epoch': control.time.time(), 'tokens': 123})
+        control.account_tokens(self.state / 'missing.jsonl')
+        batch = control.read_json(self.state / 'batch.json')
+        self.assertTrue(batch['usage_unknown'])
+        self.assertEqual(batch['tokens'], 123)
+        self.assertGreater(control.remaining_seconds(control.read_json(self.config)), 0)
+
+    def test_incomplete_completed_turn_usage_remains_unknown_and_allows_admission(self):
+        packets = [None, {}, {'input_tokens': 7}, {'output_tokens': 3},
+                   {'input_tokens': True, 'output_tokens': 3},
+                   {'input_tokens': -1, 'output_tokens': 3},
+                   {'input_tokens': '7', 'output_tokens': 3}]
+        logfile = self.state / 'partial.jsonl'
+        for usage in packets:
+            with self.subTest(usage=usage):
+                control.write_json(self.state / 'batch.json', {'started_epoch': control.time.time(), 'tokens': 123})
+                event = {'type': 'turn.completed'}
+                if usage is not None:
+                    event['usage'] = usage
+                logfile.write_text(json.dumps(event) + '\n')
+                control.account_tokens(logfile)
+                batch = control.read_json(self.state / 'batch.json')
+                self.assertTrue(batch['usage_unknown'])
+                self.assertEqual(batch['tokens'], 123)
+                self.assertGreater(control.remaining_seconds(control.read_json(self.config)), 0)
+
+    def test_partial_session_preserves_known_turn_totals_without_claiming_complete_usage(self):
+        completed = {'type': 'turn.completed', 'usage': {'input_tokens': 7, 'output_tokens': 3}}
+        suffixes = [[{'type': 'turn.failed', 'error': {'message': 'interrupted'}}],
+                    [{'type': 'turn.started'}], [{'type': 'turn.completed', 'usage': {}}]]
+        logfile = self.state / 'partial-session.jsonl'
+        for suffix in suffixes:
+            with self.subTest(suffix=suffix):
+                control.write_json(self.state / 'batch.json', {'started_epoch': control.time.time(), 'tokens': 123})
+                logfile.write_text(''.join(json.dumps(event) + '\n' for event in [completed, *suffix]))
+                control.account_tokens(logfile)
+                batch = control.read_json(self.state / 'batch.json')
+                self.assertTrue(batch['usage_unknown'])
+                self.assertEqual(batch['tokens'], 133)
+                self.assertGreater(control.remaining_seconds(control.read_json(self.config)), 0)
+
+    def test_valid_zero_and_positive_usage_accumulate_without_unknown_marker(self):
+        logfile = self.state / 'valid-session.jsonl'
+        logfile.write_text(''.join(json.dumps({'type': 'turn.completed', 'usage': usage}) + '\n' for usage in
+                                  [{'input_tokens': 0, 'output_tokens': 0}, {'input_tokens': 7, 'output_tokens': 3}]))
+        control.account_tokens(logfile)
+        batch = control.read_json(self.state / 'batch.json')
+        self.assertEqual(batch['tokens'], 10)
+        self.assertFalse(batch.get('usage_unknown', False))
+
     def test_exhausted_batch_does_not_spend_task_attempt(self):
-        control.write_json(self.state / 'batch.json', {'started_epoch': control.time.time(), 'tokens': 1000})
+        control.write_json(self.state / 'batch.json', {'started_epoch': control.time.time() - 31, 'tokens': 0})
         with patch('sys.stdin.read', return_value='prompt'), patch.object(control, 'agent') as agent:
             control.iteration()
             agent.assert_not_called()
@@ -265,7 +345,7 @@ class IterationTests(unittest.TestCase):
             self.assertEqual(self.git('rev-parse', 'HEAD'), head)
             batch = control.read_json(self.state / 'batch.json')
             self.assertTrue(batch['usage_unknown'])
-            self.assertEqual(batch['tokens'], config['batch_tokens'])
+            self.assertEqual(batch['tokens'], 1)
             self.assertEqual((self.state / 'check-runs').read_text(), 'ran\n')
             self.assertEqual((self.root / 'fixture.txt').read_text(), 'after\n')
 
@@ -371,7 +451,7 @@ class IterationTests(unittest.TestCase):
     def exhaust_after_generation(self):
         def generate(*_args, **_kwargs):
             result = self.generate()
-            control.write_json(self.state / 'batch.json', {'started_epoch': control.time.time(), 'tokens': 1000})
+            control.write_json(self.state / 'batch.json', {'started_epoch': control.time.time() - 31, 'tokens': 0})
             return result
         with patch('sys.stdin.read', return_value='prompt'), patch.object(control, 'agent', side_effect=generate):
             control.iteration()
@@ -400,7 +480,9 @@ class IterationTests(unittest.TestCase):
         changed_spec = dict(candidate, acceptance_criteria=['New mandatory criterion'])
         self.assertIsNone(control.generation_checkpoint(changed_spec))
         config = self.config.read_text()
-        self.config.write_text(config.replace('1000', '2000'))
+        changed_config = json.loads(config)
+        changed_config['session_seconds'] += 1
+        self.config.write_text(json.dumps(changed_config))
         self.assertIsNone(control.generation_checkpoint(candidate))
         self.config.write_text(config)
         self.assertIsNotNone(control.generation_checkpoint(candidate))

@@ -5,7 +5,6 @@
   "max_resource_timeouts": 2,
   "session_seconds": 900,
   "batch_seconds": 5400,
-  "batch_tokens": 600000,
   "memory_max": "6G",
   "model": "gpt-6-astra",
   "reasoning_effort": "high",

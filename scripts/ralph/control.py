@@ -207,7 +207,7 @@ def run_process(argv, logfile, timeout, stdin=None, env=None):
 def remaining_seconds(config):
     batch = read_json(STATE / 'batch.json')
     seconds = config['batch_seconds'] - (time.time() - batch['started_epoch'])
-    if seconds <= 0 or batch['tokens'] >= config['batch_tokens']:
+    if seconds <= 0:
         raise BatchLimit('Batch resource limit reached')
     return min(config['session_seconds'], seconds)
 
@@ -215,20 +215,34 @@ def remaining_seconds(config):
 def account_tokens(logfile):
     batch = read_json(STATE / 'batch.json')
     recorded = False
+    incomplete = False
+    pending_turn = False
     if logfile.exists():
         for line in logfile.read_text().splitlines():
             try:
                 event = json.loads(line)
-                if event.get('type') == 'turn.completed':
-                    usage = event.get('usage', {})
-                    batch['tokens'] += usage.get('input_tokens', 0) + usage.get('output_tokens', 0)
-                    recorded = True
             except (ValueError, TypeError):
-                pass
-    if not recorded:
-        # Usage is unknown on termination. Exhaust this batch rather than assume zero.
+                continue
+            if not isinstance(event, dict):
+                continue
+            kind = event.get('type')
+            if kind == 'turn.started':
+                pending_turn = True
+            elif kind == 'turn.failed':
+                pending_turn = False
+                incomplete = True
+            elif kind == 'turn.completed':
+                pending_turn = False
+                usage = event.get('usage')
+                counts = (usage.get('input_tokens'), usage.get('output_tokens')) if isinstance(usage, dict) else ()
+                if len(counts) != 2 or not all(type(value) is int and value >= 0 for value in counts):
+                    incomplete = True
+                    continue
+                batch['tokens'] += sum(counts)
+                recorded = True
+    if not recorded or incomplete or pending_turn:
+        # Missing usage is recorded without inventing a total or blocking work.
         batch['usage_unknown'] = True
-        batch['tokens'] = read_json(CONFIG)['batch_tokens']
     write_json(STATE / 'batch.json', batch)
 
 
