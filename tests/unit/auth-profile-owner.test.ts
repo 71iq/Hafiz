@@ -255,6 +255,39 @@ it("retains current-owner fetch empty data behavior", async () => {
   expect(useAuthStore.getState().profile).toBeNull();
 });
 
+it.each(actions)("does not publish a wrong-owner %s read response", async (action) => {
+  activate(session("a"), null);
+  const wrong = profile("b", "wrong-b");
+  const observed: Array<Profile | null> = [];
+  const unsubscribe = useAuthStore.subscribe((state) => observed.push(state.profile));
+  mockReads.push(Promise.resolve({ data: wrong, error: null }));
+
+  const result = await useAuthStore.getState()[action]();
+
+  unsubscribe();
+  expect(result).toBe(action === "ensureProfile" ? useAuthStore.getState().profile : undefined);
+  expect(useAuthStore.getState().profile?.id).toBe("a");
+  expect(observed).not.toContain(wrong);
+  expect(mockInsert).not.toHaveBeenCalled();
+});
+
+it("does not publish a wrong-owner ensure insert response or issue another insert", async () => {
+  activate(session("a"), null);
+  const wrong = profile("b", "wrong-b");
+  const observed: Array<Profile | null> = [];
+  const unsubscribe = useAuthStore.subscribe((state) => observed.push(state.profile));
+  mockReads.push(Promise.resolve({ data: null, error: null }));
+  mockInserts.push(Promise.resolve({ data: wrong, error: null }));
+
+  const result = await useAuthStore.getState().ensureProfile();
+
+  unsubscribe();
+  expect(result).toBe(useAuthStore.getState().profile);
+  expect(useAuthStore.getState().profile?.id).toBe("a");
+  expect(observed).not.toContain(wrong);
+  expect(mockInsert).toHaveBeenCalledTimes(1);
+});
+
 it.each(actions)("preserves a newer same-session profile during %s and same-ID metadata updates", async (action) => {
   const original = session("a");
   activate(original, null);

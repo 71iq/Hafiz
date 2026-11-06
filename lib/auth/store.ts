@@ -44,12 +44,19 @@ export function beginProfileWrite(userId: string, owner: AuthOwner) {
   return { hadPendingWrite, release: () => pendingProfileWrites.delete(write) };
 }
 
+function isProfileForUser(value: unknown, userId: string): boolean {
+  if (value === null) return true;
+  if (typeof value !== "object" || !("id" in value)) return false;
+  return value.id === userId;
+}
+
 function publishProfileRead(
   userId: string,
   profileAtRead: Profile | null,
   hadPendingWrite: boolean,
   incoming: Profile | null,
 ): Profile | null {
+  if (!isProfileForUser(incoming, userId)) throw new Error("Profile response belongs to another user");
   const current = useAuthStore.getState().profile;
   if (current?.id === userId && (current !== profileAtRead || hadPendingWrite || hasPendingProfileWrite(userId)))
     return current;
@@ -461,6 +468,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
           const { data, error } = await supabase.from("profiles").update(patch).eq("id", user.id).select("*").single();
           requireCurrent();
           if (error) throw error;
+          if (!isProfileForUser(data, user.id) || data === null)
+            throw new Error("Profile save returned no matching profile");
           const saved = data as Profile;
           const current = get().profile;
           let profile = saved;

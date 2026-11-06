@@ -4,7 +4,7 @@ The mission is active. All work stays local on the isolated modernization branch
 
 ## Current status
 
-114 of 137 tasks are accepted, including RF136 and the RF137 cleanup. There are 23 unfinished workstreams.
+At the RF137 baseline refresh, 114 tasks were accepted. See backlog.json for the current totals and unfinished work.
 
 RF137 accepted on 2026-11-06. Baseline allocated storage fell from 23,701,917,696 to 86,016 bytes. Removed 864 old root entries and accepted-task run logs; kept only the fresh dependency-analysis baseline and the RF104 tafsir-loss reproduction/result. The obsolete RF025 probe is covered by accepted permanent tests. The event log is preserved. No app, protected input, original checkout or production change.
 
@@ -130,9 +130,8 @@ Prioritize account isolation and tafsir data safety, then performance and access
 | RF-133 | Clear viewer Query results at auth lifecycle boundaries                         | 42955fa      |
 | RF-134 | Bound external WebSocket fragments and buffers                                  | 51de9ea      |
 | RF-135 | Repair external indexed source-map parsing                                      | d7dfe34      |
-
-RF-136 | Repair Tailwind bundled source-map parsing. Current-source checks and independent review pass. | 8695b6c
-RF-137 | Trim evidence and simplify verification. | This commit
+| RF-136 | Repair Tailwind bundled source-map parsing.                                     | 8695b6c      |
+| RF-137 | Trim evidence and simplify verification.                                        | 3c53f19      |
 
 ## Pending workstreams
 
@@ -165,3 +164,5 @@ RF-137 | Trim evidence and simplify verification. | This commit
 Earlier detailed preparation and diagnostic records are intentionally retired. Git and the retained event log preserve accepted commits; old ignored evidence links are not current check inputs.
 
 Cleanup checks: 1,999 Jest cases, 205 Node tooling/security cases, 38 controller tests, 10 native-config tests and 28 Chrome cases pass. Typecheck, three dependency graphs, native-config guard, reviewed Knip baseline, formatting, lifecycle/installed graph, web and separate Android/iOS JavaScript exports pass. Lint retains zero errors and 68 existing warnings. Exports were removed immediately; no native compilation/device verification is implied.
+
+- 2026-11-06T18:53:11.725790+00:00 `RF-138` verified. Profile reads now reject foreign rows through existing fallback handling, and profile saves reject missing or foreign responses before state or field merges. Evidence `.ralph/runs/RF-138-1-1793990503680049167`.

@@ -12195,6 +12195,211 @@
       "evidence": "docs/refactoring/PROGRESS.md",
       "primary_acceptance_evidence": "docs/refactoring/PROGRESS.md",
       "summary": "Accepted after 17 current-source controller checks, independent code review and primary acceptance."
+    },
+    {
+      "id": "RF-138",
+      "title": "Reject cross-account profile response rows",
+      "description": "Implement directly in the three allowed source/test files. Primary has inspected callers and selected a narrow ownership fix: never publish or merge a remote profile whose id differs from the captured signed-in user. Reuse publishProfileRead and existing updateProfile lifecycle and tests. No frozen artifacts, command-log protocol or new framework. Use focused tests, typecheck and changed-file lint during iteration; the controller runs the full suite once ready. Return a concise behavioral summary, put focused check details in the response evidence, and leave full controller/review/primary acceptance pending without adding such wording to the behavioral summary.",
+      "rationale": "Current profile reads can publish a wrong-id response. Profile updates can replace the current profile with it or copy another row's private fields into a newer current profile while retaining the current id. Existing request owner guards do not validate returned-row identity.",
+      "modules": [
+        "lib/auth/store.ts",
+        "tests/unit/auth-profile-owner.test.ts",
+        "tests/unit/auth-profile-update-owner.test.ts"
+      ],
+      "dependencies": [
+        "RF-127",
+        "RF-132"
+      ],
+      "acceptance_criteria": [
+        "Validate returned row ownership before publication/merge. Wrong-id fetchProfile/ensureProfile reads and ensure insert responses use existing failure/fallback handling and must never expose the wrong-owner object, even transiently. Preserve valid null fetch behavior and valid row reference identity. Do not treat a wrong-owner row as not-found or issue a new insert after it.",
+        "Wrong-id or missing updateProfile response must reject before any state or field merge and preserve the current profile, including a newer same-owner stats/profile object. Preserve original transport errors, request-owner cancellation, exact patches, null-vs-undefined fields, loading state and localized editor failure flow.",
+        "Extend the existing actual Zustand-store suites with wrong-row read/insert/save regressions, including subscription observations and the concurrent merge branch. The new cases should fail on the old implementation. Keep existing meaningful assertions. Do not introduce an unproved full Profile type assertion or claim full remote payload validation; broader RF025/RF043 remains open.",
+        "No UI text, remote schema/RLS/service behavior, dependencies, source content, native project, production or vendor change. Full controller checks, separate independent source review and primary final acceptance are required."
+      ],
+      "verification": [
+        [
+          "git",
+          "diff",
+          "--check"
+        ],
+        [
+          "npm",
+          "run",
+          "postinstall"
+        ],
+        [
+          "npm",
+          "ls",
+          "--all",
+          "--json"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "lint"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/auth/store.ts",
+          "tests/unit/auth-profile-owner.test.ts",
+          "tests/unit/auth-profile-update-owner.test.ts",
+          "--max-warnings=0"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "node",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/tests/brace-expansion.test.cjs",
+          "scripts/tests/dependency-boundaries.test.cjs",
+          "scripts/tests/icon-tool.test.cjs",
+          "scripts/tests/jest-config.test.cjs",
+          "scripts/tests/js-yaml.test.cjs",
+          "scripts/tests/lint-coverage.test.cjs",
+          "scripts/tests/metro-unicode.test.cjs",
+          "scripts/tests/nanoid.test.cjs",
+          "scripts/tests/router-dependency-range.test.cjs",
+          "scripts/tests/security-dependency-owner.test.cjs",
+          "scripts/tests/source-map-js.test.cjs",
+          "scripts/tests/tailwind-source-map.test.cjs",
+          "scripts/tests/ws.test.cjs",
+          "scripts/tests/xmldom.test.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "test:refactor-runner"
+        ],
+        [
+          "python3",
+          "-B",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "scripts/tests",
+          "-p",
+          "test_*.py"
+        ],
+        [
+          "npm",
+          "run",
+          "check:native-config"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "npm",
+          "run",
+          "check:analysis"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "lib/auth/store.ts",
+          "tests/unit/auth-profile-owner.test.ts",
+          "tests/unit/auth-profile-update-owner.test.ts",
+          "docs/refactoring/PROGRESS.md"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=4096",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "android",
+          "--output-dir",
+          ".expo/modernization-checks/android",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/android')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=3072",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "ios",
+          "--output-dir",
+          ".expo/modernization-checks/ios",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/ios')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8197",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts"
+        ]
+      ],
+      "risk": "high",
+      "priority": 1,
+      "approved": true,
+      "status": "verified",
+      "allowed_paths": [
+        "lib/auth/store.ts",
+        "tests/unit/auth-profile-owner.test.ts",
+        "tests/unit/auth-profile-update-owner.test.ts"
+      ],
+      "attempts": 1,
+      "implementation_mode": "implementation",
+      "started_at": "2026-11-06T18:41:43.675542+00:00",
+      "completed_at": "2026-11-06T18:53:11.717010+00:00",
+      "evidence": ".ralph/runs/RF-138-1-1793990503680049167",
+      "summary": "Profile reads now reject foreign rows through existing fallback handling, and profile saves reject missing or foreign responses before state or field merges."
     }
   ]
 }

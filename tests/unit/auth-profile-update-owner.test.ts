@@ -247,6 +247,32 @@ it.each(["packet", "rejection"])("current profile %s preserves original error id
   await expect(useAuthStore.getState().updateProfile({ bio: "value" })).rejects.toBe(error);
   expect(useAuthStore.getState()).toMatchObject({ error: error.message, isLoading: false });
 });
+it.each(["wrong-owner", "missing"])(
+  "rejects a %s save response before merging newer profile state",
+  async (outcome) => {
+    const initial = profile("a", "initial");
+    activate(session("a"), initial);
+    const pending = deferred();
+    mockReads.push(Promise.resolve({ data: initial, error: null }));
+    mockUpdates.push(pending.promise);
+    const work = useAuthStore.getState().updateProfile({ displayName: "changed" });
+    await flush();
+
+    const newer = { ...initial, display_name: "newer", total_score: 900, cards_reviewed: 70 };
+    const wrong = profile("b", "wrong-b");
+    const observed: Array<Profile | null> = [];
+    useAuthStore.setState({ profile: newer });
+    const unsubscribe = useAuthStore.subscribe((state) => observed.push(state.profile));
+    pending.resolve({ data: outcome === "wrong-owner" ? wrong : null, error: null });
+
+    await expect(work).rejects.toThrow("Profile save returned no matching profile");
+
+    unsubscribe();
+    expect(useAuthStore.getState().profile).toBe(newer);
+    expect(observed).not.toContain(wrong);
+    expect(useAuthStore.getState().error).toBe("Profile save returned no matching profile");
+  },
+);
 it.each([false, true])("profile save does not change unrelated global loading %s", async (isLoading) => {
   activate(session("a"), profile("a"));
   useAuthStore.setState({ isLoading });
