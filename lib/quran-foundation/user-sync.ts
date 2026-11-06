@@ -70,20 +70,20 @@ export async function enqueueQfSync(
   entityType: QfEntityType,
   operation: QfOperation,
   localId: string,
-  data: Record<string, unknown>
+  data: Record<string, unknown>,
 ): Promise<void> {
   const now = new Date().toISOString();
   await db.runAsync(
     `INSERT INTO qf_sync_queue
       (entity_type, operation, local_id, data, status, attempt_count, created_at, updated_at)
      VALUES (?, ?, ?, ?, 'pending', 0, ?, ?)`,
-    [entityType, operation, localId, JSON.stringify(data), now, now]
+    [entityType, operation, localId, JSON.stringify(data), now, now],
   );
 }
 
 export async function getPendingQfSyncCount(db: SQLiteDatabase): Promise<number> {
   const row = await db.getFirstAsync<{ count: number }>(
-    "SELECT COUNT(*) as count FROM qf_sync_queue WHERE status IN ('pending', 'failed')"
+    "SELECT COUNT(*) as count FROM qf_sync_queue WHERE status IN ('pending', 'failed')",
   );
   return row?.count ?? 0;
 }
@@ -109,31 +109,29 @@ export async function fullQfUserSync(db: SQLiteDatabase): Promise<QfSyncResult> 
     await markInitialLocalEnqueueDone(db);
     const pushed = await pushQfSyncQueue(db);
     const secondPull = await pullQfRemoteChanges(db);
-    await db.runAsync(
-      "INSERT OR REPLACE INTO user_settings (key, value) VALUES ('qf_last_sync_at', ?)",
-      [new Date().toISOString()]
-    );
+    await db.runAsync("INSERT OR REPLACE INTO user_settings (key, value) VALUES ('qf_last_sync_at', ?)", [
+      new Date().toISOString(),
+    ]);
     return { status: "synced", pushed, pulled: firstPull + secondPull };
   }
   const pushed = await pushQfSyncQueue(db);
   const pulled = await pullQfRemoteChanges(db);
-  await db.runAsync(
-    "INSERT OR REPLACE INTO user_settings (key, value) VALUES ('qf_last_sync_at', ?)",
-    [new Date().toISOString()]
-  );
+  await db.runAsync("INSERT OR REPLACE INTO user_settings (key, value) VALUES ('qf_last_sync_at', ?)", [
+    new Date().toISOString(),
+  ]);
   return { status: "synced", pushed, pulled };
 }
 
 async function needsInitialLocalEnqueue(db: SQLiteDatabase): Promise<boolean> {
   const row = await db.getFirstAsync<{ value: string }>(
-    "SELECT value FROM user_settings WHERE key = 'qf_initial_local_enqueue_done'"
+    "SELECT value FROM user_settings WHERE key = 'qf_initial_local_enqueue_done'",
   );
   return row?.value !== "true";
 }
 
 async function markInitialLocalEnqueueDone(db: SQLiteDatabase): Promise<void> {
   await db.runAsync(
-    "INSERT OR REPLACE INTO user_settings (key, value) VALUES ('qf_initial_local_enqueue_done', 'true')"
+    "INSERT OR REPLACE INTO user_settings (key, value) VALUES ('qf_initial_local_enqueue_done', 'true')",
   );
 }
 
@@ -147,9 +145,7 @@ async function getQfSyncConnectionState(): Promise<QfSyncConnectionState> {
 }
 
 async function enqueueAllActiveLocalRows(db: SQLiteDatabase): Promise<void> {
-  const bookmarks = await db.getAllAsync<LocalBookmarkRow>(
-    "SELECT * FROM bookmarks WHERE deleted_at IS NULL"
-  );
+  const bookmarks = await db.getAllAsync<LocalBookmarkRow>("SELECT * FROM bookmarks WHERE deleted_at IS NULL");
   for (const bookmark of bookmarks) {
     await enqueueQfSync(db, "bookmark", "UPSERT", bookmarkLocalId(bookmark.surah, bookmark.ayah), {
       surah: bookmark.surah,
@@ -157,9 +153,7 @@ async function enqueueAllActiveLocalRows(db: SQLiteDatabase): Promise<void> {
     });
   }
 
-  const notes = await db.getAllAsync<LocalPrivateNoteRow>(
-    "SELECT * FROM private_notes WHERE deleted_at IS NULL"
-  );
+  const notes = await db.getAllAsync<LocalPrivateNoteRow>("SELECT * FROM private_notes WHERE deleted_at IS NULL");
   for (const note of notes) {
     await enqueueQfSync(db, "private_note", "UPSERT", note.id, noteToPayload(note));
   }
@@ -170,7 +164,7 @@ async function pushQfSyncQueue(db: SQLiteDatabase): Promise<number> {
     `SELECT * FROM qf_sync_queue
      WHERE status IN ('pending', 'failed') AND attempt_count < 5
      ORDER BY id ASC
-     LIMIT 100`
+     LIMIT 100`,
   );
   let pushed = 0;
 
@@ -195,10 +189,10 @@ async function pushQfSyncQueue(db: SQLiteDatabase): Promise<number> {
 async function pushBookmarkEntry(db: SQLiteDatabase, entry: QfSyncQueueEntry): Promise<void> {
   const parsedId = parseBookmarkLocalId(entry.local_id);
   if (!parsedId) return;
-  const local = await db.getFirstAsync<LocalBookmarkRow>(
-    "SELECT * FROM bookmarks WHERE surah = ? AND ayah = ?",
-    [parsedId.surah, parsedId.ayah]
-  );
+  const local = await db.getFirstAsync<LocalBookmarkRow>("SELECT * FROM bookmarks WHERE surah = ? AND ayah = ?", [
+    parsedId.surah,
+    parsedId.ayah,
+  ]);
 
   if (entry.operation === "DELETE") {
     const data = safeJson<Record<string, unknown>>(entry.data) ?? {};
@@ -208,7 +202,8 @@ async function pushBookmarkEntry(db: SQLiteDatabase, entry: QfSyncQueueEntry): P
       (await findRemoteBookmarkId(parsedId.surah, parsedId.ayah));
     if (!qfBookmarkId) return;
 
-    const isInDefaultCollection = booleanFromUnknown(data.qfIsInDefaultCollection) || Boolean(local?.qf_is_in_default_collection);
+    const isInDefaultCollection =
+      booleanFromUnknown(data.qfIsInDefaultCollection) || Boolean(local?.qf_is_in_default_collection);
     const collectionsCount = numberFromUnknown(data.qfCollectionsCount) ?? local?.qf_collections_count ?? 0;
     if (isInDefaultCollection || collectionsCount > 0) return;
 
@@ -218,17 +213,18 @@ async function pushBookmarkEntry(db: SQLiteDatabase, entry: QfSyncQueueEntry): P
       `UPDATE bookmarks
        SET qf_bookmark_id = NULL, qf_synced_at = ?, qf_sync_error = NULL
        WHERE surah = ? AND ayah = ?`,
-      [new Date().toISOString(), parsedId.surah, parsedId.ayah]
+      [new Date().toISOString(), parsedId.surah, parsedId.ayah],
     );
     return;
   }
 
   if (!local || local.deleted_at) return;
   if (local.qf_bookmark_id) {
-    await db.runAsync(
-      "UPDATE bookmarks SET qf_synced_at = ?, qf_sync_error = NULL WHERE surah = ? AND ayah = ?",
-      [new Date().toISOString(), local.surah, local.ayah]
-    );
+    await db.runAsync("UPDATE bookmarks SET qf_synced_at = ?, qf_sync_error = NULL WHERE surah = ? AND ayah = ?", [
+      new Date().toISOString(),
+      local.surah,
+      local.ayah,
+    ]);
     return;
   }
 
@@ -242,10 +238,9 @@ async function pushBookmarkEntry(db: SQLiteDatabase, entry: QfSyncQueueEntry): P
 }
 
 async function pushPrivateNoteEntry(db: SQLiteDatabase, entry: QfSyncQueueEntry): Promise<void> {
-  const local = await db.getFirstAsync<LocalPrivateNoteRow>(
-    "SELECT * FROM private_notes WHERE id = ?",
-    [entry.local_id]
-  );
+  const local = await db.getFirstAsync<LocalPrivateNoteRow>("SELECT * FROM private_notes WHERE id = ?", [
+    entry.local_id,
+  ]);
 
   if (entry.operation === "DELETE") {
     const data = safeJson<Record<string, unknown>>(entry.data) ?? {};
@@ -253,19 +248,20 @@ async function pushPrivateNoteEntry(db: SQLiteDatabase, entry: QfSyncQueueEntry)
     if (!qfNoteId) return;
     const response = await invokeQfUser({ action: "delete-note", qfNoteId });
     if (!response.ok) throw new Error(response.message);
-    await db.runAsync(
-      "UPDATE private_notes SET qf_synced_at = ?, qf_sync_error = NULL WHERE id = ?",
-      [new Date().toISOString(), entry.local_id]
-    );
+    await db.runAsync("UPDATE private_notes SET qf_synced_at = ?, qf_sync_error = NULL WHERE id = ?", [
+      new Date().toISOString(),
+      entry.local_id,
+    ]);
     return;
   }
 
   if (!local || local.deleted_at) return;
   if (!isQfSyncableNoteContent(local.content)) {
-    await db.runAsync(
-      "UPDATE private_notes SET qf_sync_error = ?, qf_synced_at = ? WHERE id = ?",
-      ["Quran Foundation notes must be 6 to 10000 characters.", new Date().toISOString(), local.id]
-    );
+    await db.runAsync("UPDATE private_notes SET qf_sync_error = ?, qf_synced_at = ? WHERE id = ?", [
+      "Quran Foundation notes must be 6 to 10000 characters.",
+      new Date().toISOString(),
+      local.id,
+    ]);
     return;
   }
 
@@ -288,10 +284,7 @@ async function pushPrivateNoteEntry(db: SQLiteDatabase, entry: QfSyncQueueEntry)
 
 async function pullQfRemoteChanges(db: SQLiteDatabase): Promise<number> {
   const startedAt = new Date().toISOString();
-  const [bookmarks, notes] = await Promise.all([
-    listAllQfBookmarks(),
-    listAllQfNotes(),
-  ]);
+  const [bookmarks, notes] = await Promise.all([listAllQfBookmarks(), listAllQfNotes()]);
 
   let pulled = 0;
   await db.withTransactionAsync(async () => {
@@ -315,12 +308,18 @@ async function listAllQfBookmarks(): Promise<QfBookmark[]> {
   for (let page = 0; page < 20; page += 1) {
     const response = await invokeQfUser({ action: "list-bookmarks", after });
     if (!response.ok) throw new Error(response.message);
-    if (!("bookmarks" in response)) return bookmarks;
+    if (
+      !("bookmarks" in response) ||
+      !Array.isArray(response.bookmarks) ||
+      (response.nextCursor != null && typeof response.nextCursor !== "string")
+    ) {
+      throw new Error("Incomplete Quran Foundation bookmarks list.");
+    }
     bookmarks.push(...response.bookmarks);
     after = response.nextCursor ?? undefined;
-    if (!after) break;
+    if (!after) return bookmarks;
   }
-  return bookmarks;
+  throw new Error("Incomplete Quran Foundation bookmarks list.");
 }
 
 async function listAllQfNotes(): Promise<QfNote[]> {
@@ -334,19 +333,25 @@ async function listAllQfNotes(): Promise<QfNote[]> {
       sortBy: "newest",
     });
     if (!response.ok) throw new Error(response.message);
-    if (!("notes" in response)) return notes;
+    if (
+      !("notes" in response) ||
+      !Array.isArray(response.notes) ||
+      (response.nextCursor != null && typeof response.nextCursor !== "string")
+    ) {
+      throw new Error("Incomplete Quran Foundation notes list.");
+    }
     notes.push(...response.notes);
     cursor = response.nextCursor ?? undefined;
-    if (!cursor) break;
+    if (!cursor) return notes;
   }
-  return notes;
+  throw new Error("Incomplete Quran Foundation notes list.");
 }
 
 async function mergeRemoteBookmark(db: SQLiteDatabase, remote: QfBookmark): Promise<boolean> {
-  const local = await db.getFirstAsync<LocalBookmarkRow>(
-    "SELECT * FROM bookmarks WHERE surah = ? AND ayah = ?",
-    [remote.surah, remote.ayah]
-  );
+  const local = await db.getFirstAsync<LocalBookmarkRow>("SELECT * FROM bookmarks WHERE surah = ? AND ayah = ?", [
+    remote.surah,
+    remote.ayah,
+  ]);
   const remoteCreatedAt = remote.createdAt || new Date().toISOString();
 
   if (local?.deleted_at && local.updated_at > remoteCreatedAt) {
@@ -372,7 +377,7 @@ async function mergeRemoteBookmark(db: SQLiteDatabase, remote: QfBookmark): Prom
       new Date().toISOString(),
       remote.isInDefaultCollection ? 1 : 0,
       remote.collectionsCount,
-    ]
+    ],
   );
   enqueueSync(db, "bookmarks", "INSERT", bookmarkLocalId(remote.surah, remote.ayah), {
     surah: remote.surah,
@@ -393,10 +398,11 @@ async function attachQfBookmark(
   db: SQLiteDatabase,
   local: LocalBookmarkRow,
   remote: QfBookmark,
-  options: { updateActiveState: boolean }
+  options: { updateActiveState: boolean },
 ): Promise<void> {
   const now = new Date().toISOString();
-  const updatedAt = options.updateActiveState && local.updated_at < remote.createdAt ? remote.createdAt : local.updated_at;
+  const updatedAt =
+    options.updateActiveState && local.updated_at < remote.createdAt ? remote.createdAt : local.updated_at;
   const nextDeletedAt = options.updateActiveState ? null : local.deleted_at;
   const shouldEnqueueSupabase =
     local.qf_bookmark_id !== remote.id ||
@@ -418,7 +424,7 @@ async function attachQfBookmark(
       remote.collectionsCount,
       local.surah,
       local.ayah,
-    ]
+    ],
   );
   if (shouldEnqueueSupabase) {
     enqueueSync(db, "bookmarks", "UPDATE", bookmarkLocalId(local.surah, local.ayah), {
@@ -439,12 +445,12 @@ async function attachQfBookmark(
 async function tombstoneMissingRemoteBookmarks(
   db: SQLiteDatabase,
   remoteBookmarks: QfBookmark[],
-  startedAt: string
+  startedAt: string,
 ): Promise<void> {
   const remoteIds = new Set(remoteBookmarks.map((bookmark) => bookmark.id));
   const pending = await getPendingQfLocalIds(db, "bookmark");
   const rows = await db.getAllAsync<LocalBookmarkRow>(
-    "SELECT * FROM bookmarks WHERE qf_bookmark_id IS NOT NULL AND deleted_at IS NULL"
+    "SELECT * FROM bookmarks WHERE qf_bookmark_id IS NOT NULL AND deleted_at IS NULL",
   );
   const now = new Date().toISOString();
   for (const row of rows) {
@@ -453,7 +459,7 @@ async function tombstoneMissingRemoteBookmarks(
     if (pending.has(localId) || row.updated_at >= startedAt) continue;
     await db.runAsync(
       "UPDATE bookmarks SET updated_at = ?, deleted_at = ?, qf_synced_at = ?, qf_sync_error = NULL WHERE surah = ? AND ayah = ?",
-      [now, now, now, row.surah, row.ayah]
+      [now, now, now, row.surah, row.ayah],
     );
     enqueueSync(db, "bookmarks", "UPDATE", localId, {
       surah: row.surah,
@@ -476,10 +482,9 @@ async function mergeRemoteNote(db: SQLiteDatabase, remote: QfNote): Promise<bool
   const remoteBody = remote.body.trim();
   if (!remoteBody) return false;
 
-  const localByQfId = await db.getFirstAsync<LocalPrivateNoteRow>(
-    "SELECT * FROM private_notes WHERE qf_note_id = ?",
-    [remote.id]
-  );
+  const localByQfId = await db.getFirstAsync<LocalPrivateNoteRow>("SELECT * FROM private_notes WHERE qf_note_id = ?", [
+    remote.id,
+  ]);
   const updatedAt = remote.updatedAt || remote.createdAt || new Date().toISOString();
   const rangesJson = JSON.stringify(remote.ranges);
 
@@ -494,7 +499,7 @@ async function mergeRemoteNote(db: SQLiteDatabase, remote: QfNote): Promise<bool
       parsedRange.ayahStart,
       parsedRange.ayahEnd,
       remoteBody,
-      localByQfId.id
+      localByQfId.id,
     );
     if (duplicateLocal) {
       await tombstoneLocalQfDuplicate(db, localByQfId);
@@ -516,7 +521,7 @@ async function mergeRemoteNote(db: SQLiteDatabase, remote: QfNote): Promise<bool
         new Date().toISOString(),
         rangesJson,
         localByQfId.id,
-      ]
+      ],
     );
     enqueueSync(db, "private_notes", "UPDATE", localByQfId.id, {
       id: localByQfId.id,
@@ -535,7 +540,13 @@ async function mergeRemoteNote(db: SQLiteDatabase, remote: QfNote): Promise<bool
     return true;
   }
 
-  const exactLocal = await findExactLocalNote(db, parsedRange.surah, parsedRange.ayahStart, parsedRange.ayahEnd, remoteBody);
+  const exactLocal = await findExactLocalNote(
+    db,
+    parsedRange.surah,
+    parsedRange.ayahStart,
+    parsedRange.ayahEnd,
+    remoteBody,
+  );
   if (exactLocal) {
     if (exactLocal.qf_note_id && exactLocal.qf_note_id !== remote.id) return false;
     await attachQfNote(db, exactLocal.id, remote, remote.ranges, { enqueueSupabase: true });
@@ -560,7 +571,7 @@ async function mergeRemoteNote(db: SQLiteDatabase, remote: QfNote): Promise<bool
       remote.id,
       new Date().toISOString(),
       rangesJson,
-    ]
+    ],
   );
   enqueueSync(db, "private_notes", "INSERT", localId, {
     id: localId,
@@ -584,11 +595,16 @@ async function attachQfNote(
   localId: string,
   remote: QfNote,
   fallbackRanges: string[],
-  options: { enqueueSupabase: boolean }
+  options: { enqueueSupabase: boolean },
 ): Promise<void> {
   await db.runAsync(
     "UPDATE private_notes SET qf_note_id = ?, qf_synced_at = ?, qf_sync_error = NULL, qf_ranges_json = ? WHERE id = ?",
-    [remote.id, new Date().toISOString(), JSON.stringify(remote.ranges.length > 0 ? remote.ranges : fallbackRanges), localId]
+    [
+      remote.id,
+      new Date().toISOString(),
+      JSON.stringify(remote.ranges.length > 0 ? remote.ranges : fallbackRanges),
+      localId,
+    ],
   );
   if (!options.enqueueSupabase) return;
   const row = await db.getFirstAsync<LocalPrivateNoteRow>("SELECT * FROM private_notes WHERE id = ?", [localId]);
@@ -603,7 +619,7 @@ async function findExactLocalNote(
   ayahStart: number,
   ayahEnd: number,
   body: string,
-  excludeId?: string
+  excludeId?: string,
 ): Promise<LocalPrivateNoteRow | null> {
   return db.getFirstAsync<LocalPrivateNoteRow>(
     `SELECT * FROM private_notes
@@ -611,7 +627,7 @@ async function findExactLocalNote(
        AND (? IS NULL OR id != ?)
      ORDER BY qf_note_id IS NULL DESC, updated_at DESC
      LIMIT 1`,
-    [surah, ayahStart, ayahEnd, body.trim(), excludeId ?? null, excludeId ?? null]
+    [surah, ayahStart, ayahEnd, body.trim(), excludeId ?? null, excludeId ?? null],
   );
 }
 
@@ -620,7 +636,7 @@ async function tombstoneLocalQfDuplicate(db: SQLiteDatabase, row: LocalPrivateNo
   const now = new Date().toISOString();
   await db.runAsync(
     "UPDATE private_notes SET updated_at = ?, deleted_at = ?, qf_synced_at = ?, qf_sync_error = NULL WHERE id = ?",
-    [now, now, now, row.id]
+    [now, now, now, row.id],
   );
   enqueueSync(db, "private_notes", "UPDATE", row.id, {
     ...noteToPayload({ ...row, updated_at: now, deleted_at: now }),
@@ -632,12 +648,12 @@ async function tombstoneLocalQfDuplicate(db: SQLiteDatabase, row: LocalPrivateNo
 async function tombstoneMissingRemoteNotes(
   db: SQLiteDatabase,
   remoteNotes: QfNote[],
-  startedAt: string
+  startedAt: string,
 ): Promise<void> {
   const remoteIds = new Set(remoteNotes.map((note) => note.id));
   const pending = await getPendingQfLocalIds(db, "private_note");
   const rows = await db.getAllAsync<LocalPrivateNoteRow>(
-    "SELECT * FROM private_notes WHERE qf_note_id IS NOT NULL AND deleted_at IS NULL"
+    "SELECT * FROM private_notes WHERE qf_note_id IS NOT NULL AND deleted_at IS NULL",
   );
   const now = new Date().toISOString();
   for (const row of rows) {
@@ -645,7 +661,7 @@ async function tombstoneMissingRemoteNotes(
     if (pending.has(row.id) || row.updated_at >= startedAt) continue;
     await db.runAsync(
       "UPDATE private_notes SET updated_at = ?, deleted_at = ?, qf_synced_at = ?, qf_sync_error = NULL WHERE id = ?",
-      [now, now, now, row.id]
+      [now, now, now, row.id],
     );
     enqueueSync(db, "private_notes", "UPDATE", row.id, {
       ...noteToPayload({ ...row, updated_at: now, deleted_at: now }),
@@ -658,7 +674,7 @@ async function tombstoneMissingRemoteNotes(
 async function getPendingQfLocalIds(db: SQLiteDatabase, entityType: QfEntityType): Promise<Set<string>> {
   const rows = await db.getAllAsync<{ local_id: string }>(
     "SELECT DISTINCT local_id FROM qf_sync_queue WHERE entity_type = ? AND status IN ('pending', 'failed')",
-    [entityType]
+    [entityType],
   );
   return new Set(rows.map((row) => row.local_id));
 }
@@ -670,7 +686,7 @@ async function findRemoteBookmarkId(surah: number, ayah: number): Promise<string
       bookmark.surah === surah &&
       bookmark.ayah === ayah &&
       !bookmark.isInDefaultCollection &&
-      bookmark.collectionsCount === 0
+      bookmark.collectionsCount === 0,
   );
   return match?.id ?? null;
 }
@@ -678,7 +694,7 @@ async function findRemoteBookmarkId(surah: number, ayah: number): Promise<string
 async function markQfSynced(db: SQLiteDatabase, id: number): Promise<void> {
   await db.runAsync(
     "UPDATE qf_sync_queue SET status = 'synced', synced_at = ?, updated_at = ?, last_error = NULL WHERE id = ?",
-    [new Date().toISOString(), new Date().toISOString(), id]
+    [new Date().toISOString(), new Date().toISOString(), id],
   );
 }
 
@@ -687,17 +703,14 @@ async function markQfFailed(db: SQLiteDatabase, id: number, message: string): Pr
     `UPDATE qf_sync_queue
      SET status = 'failed', attempt_count = attempt_count + 1, last_error = ?, updated_at = ?
      WHERE id = ?`,
-    [message, new Date().toISOString(), id]
+    [message, new Date().toISOString(), id],
   );
 }
 
 async function cleanSyncedQfEntries(db: SQLiteDatabase): Promise<void> {
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - 7);
-  await db.runAsync(
-    "DELETE FROM qf_sync_queue WHERE status = 'synced' AND synced_at < ?",
-    [cutoff.toISOString()]
-  );
+  await db.runAsync("DELETE FROM qf_sync_queue WHERE status = 'synced' AND synced_at < ?", [cutoff.toISOString()]);
 }
 
 function noteToPayload(row: LocalPrivateNoteRow): Record<string, unknown> {
@@ -731,7 +744,7 @@ function parseBookmarkLocalId(localId: string): { surah: number; ayah: number } 
 function safeJson<T>(value: string): T | null {
   try {
     return JSON.parse(value) as T;
-  } catch (_) {
+  } catch {
     return null;
   }
 }
