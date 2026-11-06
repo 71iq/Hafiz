@@ -1976,14 +1976,16 @@
         "RF-123",
         "RF-124",
         "RF-125",
-        "RF-127"
+        "RF-127",
+        "RF-129"
       ],
       "acceptance_criteria": [
         "Test sign-in, sign-out, account switch, late responses, subscription cleanup and offline restore.",
         "Cancel/remove private cache at the correct lifecycle point with no new auth behavior.",
         "RF122 guards only fetchProfile/ensureProfile across user-ID/session-reference revisions. It does not close this parent. Independently verify atomic profile clearing, stale auth/updateProfile/leaderboard-sync publishers, Query eviction, listener cleanup, offline restore and same-owner ordering before acceptance. No personal SQLite destruction.",
         "RF123 atomically clears or retains matching profile only in six successful session-identity assignment paths. Parent remains unapproved; stale auth/password/updateProfile/leaderboard publishers, cache/listener/offline policies and arbitrary external setState still need separate verification.",
-        "RF124 audit and RF125 password/reset repair are accepted. RF127 profile store/editor ownership is now verified and primary accepted, including initialization and closed A-B-A regressions. These children do not close RF025: Query cache, initialization/listener/SDK, leaderboard, offline and wider ownership policies remain to be verified."
+        "RF124 audit and RF125 password/reset repair are accepted. RF127 profile store/editor ownership is now verified and primary accepted, including initialization and closed A-B-A regressions. These children do not close RF025: Query cache, initialization/listener/SDK, leaderboard, offline and wider ownership policies remain to be verified.",
+        "RF129 owns only singleton initialization/listener retirement and obsolete startup snapshot publication, including newer same-session notifications. Cache isolation, leaderboard/overview/community/other publishers and full SDK/offline lifecycle remain open after child acceptance."
       ],
       "verification": [
         [
@@ -10723,6 +10725,121 @@
       "summary": "Primary accepted exact legacy XML parser repair after13 fresh controller gates, separate stronger review and post-lease scope/hash checks. One lock entry changes, ten direct XML advisories removed without additions. Remaining RF090/security and RF025/auth work stay open.",
       "primary_accepted": true,
       "primary_acceptance_evidence": ".refactor-baseline/rf128-primary-acceptance.json"
+    },
+    {
+      "id": "RF-129",
+      "title": "Own auth startup and reject obsolete session snapshots",
+      "description": "Frozen two-artifact copy-only task. FIRST COMMAND exactly cat .refactor-baseline/rf129-handoff-v1/readiness.md. Finish all11 ordered reads before either copy. Then execute each of two copies exactly once. Do not copy after each read or loop across phases. No source/test inspection or checks. Primary owns architecture/security; controller owns13 fresh gates, separate evaluation and commit.",
+      "rationale": "Actual SDK/store reproduces duplicate subscriptions and stale session publication. Primary candidate preserves stable session continuity while giving newer SDK notifications precedence over pending startup snapshots.",
+      "modules": [
+        "lib/auth/store.ts",
+        "tests/unit/auth-runtime-store.test.ts"
+      ],
+      "dependencies": [
+        "RF-125",
+        "RF-127"
+      ],
+      "acceptance_criteria": [
+        "Install only two exact frozen artifacts after every mandatory read. Audit every original generator tool event. No changes outside allowed paths or prohibited worker verification.",
+        "Concurrent initialization shares one in-flight operation; initialized singleton store keeps one auth listener across root remounts. Explicit fresh initialization retires its old listener and permanently revokes queued callbacks. Do not add providers, SDK instances, global numeric revisions or coordinator policy.",
+        "Request-time existing AuthOwner/canRestore guards both INITIAL_SESSION and awaited getSession. The first valid startup publication closes the startup path. Noninitial SDK notifications stay authoritative. Same-session refresh, metadata update and sign-in must retain new credentials/user data and current command owner. Different-user, same-user new-session and A-B-A cannot restore old A.",
+        "Preserve all22 existing runtime test bodies and ordinary success/error/disabled, recovery/password/restore behavior. Final36 actual runtime cases, 14-suite374-case preflight, seven original red failures, three review-found same-session red failures and final1/3 semantic mutant failures remain recorded. Do not replace actual SDK methods with mocked getSession or weaken assertions.",
+        "All13 fresh controller gates, separate stronger full diff/evidence/original-generator review and primary final acceptance required. Full119 suites/1698 cases without skips, types, two-file zero-warning lint/format, three graphs, exact existing five-record Knip parity, synthetic build, three full-app Chrome auth controls and28 route/deep-link cases must pass. English/Arabic390white screenshots require primary inspection. Existing Arabic React418 remains a recorded RF048 lead.",
+        "RF025 stays open for cache isolation, leaderboard/overview/community and other async publishers, background SDK, offline and cross-tab coverage. This child claims no real native/device/live backend or storage rollback. Do not change root/provider/coordinator/client adapter/transport, dependencies, protected data, SQLite, production or deployment. Preserve every failure and continue the mission across batch boundaries."
+      ],
+      "verification": [
+        [
+          "python3",
+          "-c",
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf129-handoff-v1/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='78b50a4f2fbe091e82816382d1765de23df6843c0994e7e7e7d056a8d7f2b473';sys.argv=[str(p),'all'];runpy.run_path(str(p),run_name='__main__')"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/auth/store.ts",
+          "tests/unit/auth-runtime-store.test.ts",
+          "--max-warnings=0"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "lib/auth/store.ts",
+          "tests/unit/auth-runtime-store.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "python3",
+          "-c",
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf129-handoff-v1/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='78b50a4f2fbe091e82816382d1765de23df6843c0994e7e7e7d056a8d7f2b473';sys.argv=[str(p),'knip'];runpy.run_path(str(p),run_name='__main__')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "node",
+          ".refactor-baseline/rf129-handoff-v1/profile-browser.cjs",
+          "current-en"
+        ],
+        [
+          "node",
+          ".refactor-baseline/rf129-handoff-v1/profile-browser.cjs",
+          "current-ar"
+        ],
+        [
+          "node",
+          ".refactor-baseline/rf129-handoff-v1/profile-browser.cjs",
+          "late-en"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8197",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts"
+        ],
+        [
+          "python3",
+          "-c",
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf129-handoff-v1/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='78b50a4f2fbe091e82816382d1765de23df6843c0994e7e7e7d056a8d7f2b473';sys.argv=[str(p),'all'];runpy.run_path(str(p),run_name='__main__')"
+        ]
+      ],
+      "risk": "high",
+      "approved": true,
+      "status": "pending",
+      "allowed_paths": [
+        "lib/auth/store.ts",
+        "tests/unit/auth-runtime-store.test.ts"
+      ],
+      "attempts": 0,
+      "implementation_mode": "copy-only",
+      "readiness_evidence": ".refactor-baseline/rf129-handoff-v1/readiness.md",
+      "primary_preparation_evidence": ".refactor-baseline/rf129-auth-startup-v1/preparation-receipt.json"
     }
   ]
 }
