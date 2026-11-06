@@ -11195,7 +11195,9 @@
       "started_at": "2026-11-06T11:59:02.100247+00:00",
       "completed_at": "2026-11-06T12:07:53.754362+00:00",
       "evidence": ".ralph/runs/RF-132-1-1793966342104458551",
-      "summary": "Installed the six frozen RF-132 artifacts in the required order after completing all eleven ordered reads."
+      "summary": "Primary accepts owner-scoped same-runtime profile publication after13fresh gates, separate stronger evaluation, released-lease scope/hash/event checks, corrected strict pairing audit and11 rejected protocol variants.1930 unit cases and353 focused cases pass. BroaderRF025/payload/native/server limits remain.",
+      "primary_accepted": true,
+      "primary_acceptance_evidence": ".refactor-baseline/rf132-primary-acceptance.json"
     }
   ]
 }
