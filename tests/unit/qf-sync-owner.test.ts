@@ -249,6 +249,32 @@ function linkOldNote() {
   noPush();
   sql.exec("UPDATE private_notes SET qf_note_id='remote-keeper'");
 }
+function emptyRemoteLists() {
+  responses["list-bookmarks"] = { ok: true, bookmarks: [] };
+  responses["list-notes"] = { ok: true, notes: [] };
+}
+function seedActiveBookmark(surah = 2, ayah = 256, qfBookmarkId: string | null = null) {
+  noPush();
+  sql
+    .prepare(
+      `INSERT INTO bookmarks
+    (surah,ayah,created_at,updated_at,deleted_at,qf_bookmark_id,qf_synced_at,qf_sync_error,
+     qf_is_in_default_collection,qf_collections_count)
+    VALUES (?,?,?,?,NULL,?,?,NULL,0,0)`,
+    )
+    .run(surah, ayah, OLD, OLD, qfBookmarkId, qfBookmarkId ? OLD : null);
+}
+async function seedDeleteNote() {
+  noPush();
+  sql.prepare("UPDATE private_notes SET deleted_at=?,qf_note_id='remote-keeper' WHERE id='local-note'").run(OLD);
+  await enqueueQfSync(db, "private_note", "DELETE", "local-note", { qfNoteId: "remote-keeper" });
+}
+async function seedDeleteBookmark() {
+  noPush();
+  seedActiveBookmark(2, 256, "remote-bookmark");
+  sql.prepare("UPDATE bookmarks SET deleted_at=? WHERE surah=2 AND ayah=256").run(OLD);
+  await enqueueQfSync(db, "bookmark", "DELETE", "2:256", { qfBookmarkId: "remote-bookmark" });
+}
 
 it("pins delayed create-note transport to A and stops attaching or listing after A-to-B", async () => {
   delayedAccess = deferred<string>();
@@ -300,6 +326,183 @@ it.each(["account switch", "sign out", "same user new session", "closed ABA"])(
     }
   },
 );
+
+async function expectInvalidAcknowledgement(
+  action: string,
+  response: unknown,
+  setup: () => Promise<void>,
+  rowQuery: string,
+  rowParams: SQLInputValue[] = [],
+) {
+  emptyRemoteLists();
+  await setup();
+  const before = sql.prepare(rowQuery).get(...rowParams);
+  responses[action] = response;
+  const result = await fullQfUserSync(db);
+  expect(result).toMatchObject({ pushed: 0 });
+  expect(queueState()).toEqual([
+    { status: "failed", attempt_count: 1, last_error: expect.stringContaining("Incomplete Quran Foundation") },
+  ]);
+  await expect(getPendingQfSyncCount(db)).resolves.toBe(1);
+  expect(sql.prepare(rowQuery).get(...rowParams)).toEqual(before);
+  expect(sql.prepare("SELECT COUNT(*) AS count FROM sync_queue").get()).toEqual({ count: 0 });
+}
+const validNoteAck = { ok: true, note: { id: "remote-keeper", body: "x", ranges: [], createdAt: OLD, updatedAt: OLD } };
+const validBookmarkAck = {
+  ok: true,
+  bookmark: {
+    id: "remote-bookmark",
+    surah: 2,
+    ayah: 256,
+    type: "ayah",
+    createdAt: OLD,
+    isInDefaultCollection: false,
+    collectionsCount: 0,
+  },
+};
+
+it.each([
+  ["missing note", { ok: true }],
+  ["blank note id", { ok: true, note: { ...validNoteAck.note, id: " " } }],
+  ["blank note body", { ok: true, note: { ...validNoteAck.note, body: "\n " } }],
+  ["malformed note ranges", { ok: true, note: { ...validNoteAck.note, ranges: "2:255" } }],
+  ["malformed note timestamp", { ok: true, note: { ...validNoteAck.note, updatedAt: 12 } }],
+])("keeps create-note retryable for %s acknowledgement", async (_label, response) => {
+  await expectInvalidAcknowledgement(
+    "create-note",
+    response,
+    async () => {},
+    "SELECT * FROM private_notes WHERE id='local-note'",
+  );
+});
+it("rejects a note update acknowledgement for a different remote id", async () => {
+  await expectInvalidAcknowledgement(
+    "update-note",
+    { ...validNoteAck, note: { ...validNoteAck.note, id: "some-other-note" } },
+    async () => {
+      linkOldNote();
+      await enqueueQfSync(db, "private_note", "UPSERT", "local-note", { content: "synthetic local note" });
+    },
+    "SELECT * FROM private_notes WHERE id='local-note'",
+  );
+});
+it.each([
+  ["wrong response variant", { ok: true, status: "connected" }],
+  ["blank id", { ...validBookmarkAck, bookmark: { ...validBookmarkAck.bookmark, id: " " } }],
+  ["wrong coordinates", { ...validBookmarkAck, bookmark: { ...validBookmarkAck.bookmark, ayah: 257 } }],
+  ["wrong type", { ...validBookmarkAck, bookmark: { ...validBookmarkAck.bookmark, type: "page" } }],
+  [
+    "nonboolean collection flag",
+    { ...validBookmarkAck, bookmark: { ...validBookmarkAck.bookmark, isInDefaultCollection: 0 } },
+  ],
+  [
+    "invalid collection count",
+    { ...validBookmarkAck, bookmark: { ...validBookmarkAck.bookmark, collectionsCount: 1.5 } },
+  ],
+  ["blank created time", { ...validBookmarkAck, bookmark: { ...validBookmarkAck.bookmark, createdAt: " " } }],
+])("keeps bookmark upsert retryable for %s acknowledgement", async (_label, response) => {
+  await expectInvalidAcknowledgement(
+    "upsert-bookmark",
+    response,
+    async () => {
+      seedActiveBookmark();
+      await enqueueQfSync(db, "bookmark", "UPSERT", "2:256", { surah: 2, ayah: 256 });
+    },
+    "SELECT * FROM bookmarks WHERE surah=2 AND ayah=256",
+  );
+});
+it.each([
+  [
+    "delete-note",
+    { ok: true, status: "connected" },
+    seedDeleteNote,
+    "SELECT * FROM private_notes WHERE id='local-note'",
+  ],
+  [
+    "delete-bookmark",
+    { ok: true, status: "connected" },
+    seedDeleteBookmark,
+    "SELECT * FROM bookmarks WHERE surah=2 AND ayah=256",
+  ],
+])("keeps %s retryable unless the acknowledgement confirms deletion", async (action, response, setup, rowQuery) => {
+  await expectInvalidAcknowledgement(action, response, setup, rowQuery);
+});
+it("accepts a valid short note update with empty ranges as a server fallback", async () => {
+  emptyRemoteLists();
+  linkOldNote();
+  await enqueueQfSync(db, "private_note", "UPSERT", "local-note", { content: "synthetic local note" });
+  responses["update-note"] = validNoteAck;
+  responses["list-notes"] = { ok: true, notes: [{ ...validNoteAck.note, ranges: ["2:255-2:255"] }] };
+  await expect(fullQfUserSync(db)).resolves.toMatchObject({ pushed: 1 });
+  expect(queueState()).toEqual([{ status: "synced", attempt_count: 0, last_error: null }]);
+  expect(
+    sql.prepare("SELECT qf_note_id,qf_ranges_json,qf_synced_at FROM private_notes WHERE id='local-note'").get(),
+  ).toEqual({
+    qf_note_id: "remote-keeper",
+    qf_ranges_json: '["2:255-2:255"]',
+    qf_synced_at: expect.any(String),
+  });
+});
+it("accepts a complete matching bookmark acknowledgement", async () => {
+  emptyRemoteLists();
+  seedActiveBookmark();
+  await enqueueQfSync(db, "bookmark", "UPSERT", "2:256", { surah: 2, ayah: 256 });
+  responses["upsert-bookmark"] = validBookmarkAck;
+  responses["list-bookmarks"] = { ok: true, bookmarks: [validBookmarkAck.bookmark] };
+  await expect(fullQfUserSync(db)).resolves.toMatchObject({ pushed: 1 });
+  expect(queueState()).toEqual([{ status: "synced", attempt_count: 0, last_error: null }]);
+  expect(sql.prepare("SELECT qf_bookmark_id,qf_synced_at FROM bookmarks WHERE surah=2 AND ayah=256").get()).toEqual({
+    qf_bookmark_id: "remote-bookmark",
+    qf_synced_at: expect.any(String),
+  });
+});
+it.each(["note", "bookmark"] as const)("accepts an explicit valid %s deletion acknowledgement", async (entity) => {
+  emptyRemoteLists();
+  if (entity === "note") {
+    await seedDeleteNote();
+    responses["delete-note"] = { ok: true, deleted: true };
+  } else {
+    await seedDeleteBookmark();
+    responses["delete-bookmark"] = { ok: true, deleted: true };
+  }
+  await expect(fullQfUserSync(db)).resolves.toMatchObject({ pushed: 1 });
+  expect(queueState()).toEqual([{ status: "synced", attempt_count: 0, last_error: null }]);
+  if (entity === "note")
+    expect(sql.prepare("SELECT qf_note_id,qf_synced_at FROM private_notes WHERE id='local-note'").get()).toEqual({
+      qf_note_id: "remote-keeper",
+      qf_synced_at: expect.any(String),
+    });
+  else
+    expect(sql.prepare("SELECT qf_bookmark_id FROM bookmarks WHERE surah=2 AND ayah=256").get()).toEqual({
+      qf_bookmark_id: null,
+    });
+});
+it("does not call delete-bookmark for a protected collection bookmark", async () => {
+  emptyRemoteLists();
+  seedActiveBookmark(2, 256, "remote-bookmark");
+  sql.prepare("UPDATE bookmarks SET deleted_at=?,qf_is_in_default_collection=1 WHERE surah=2 AND ayah=256").run(OLD);
+  await enqueueQfSync(db, "bookmark", "DELETE", "2:256", { qfBookmarkId: "remote-bookmark" });
+  await expect(fullQfUserSync(db)).resolves.toMatchObject({ pushed: 1 });
+  expect(requests.some(({ action }) => action === "delete-bookmark")).toBe(false);
+  expect(sql.prepare("SELECT qf_bookmark_id,deleted_at FROM bookmarks WHERE surah=2 AND ayah=256").get()).toEqual({
+    qf_bookmark_id: "remote-bookmark",
+    deleted_at: OLD,
+  });
+});
+
+it("keeps a pending note write retryable when create-note returns an unrelated ok:true variant", async () => {
+  emptyRemoteLists();
+  responses["create-note"] = { ok: true, status: "connected" };
+  const original = sql.prepare("SELECT * FROM private_notes WHERE id='local-note'").get();
+  const result = await fullQfUserSync(db);
+  expect(queueState()).toEqual([
+    { status: "failed", attempt_count: 1, last_error: expect.stringContaining("Incomplete Quran Foundation") },
+  ]);
+  await expect(getPendingQfSyncCount(db)).resolves.toBe(1);
+  expect(result).toMatchObject({ pushed: 0 });
+  expect(sql.prepare("SELECT * FROM private_notes WHERE id='local-note'").get()).toEqual(original);
+  expect(sql.prepare("SELECT COUNT(*) AS count FROM sync_queue").get()).toEqual({ count: 0 });
+});
 
 it("allows unchanged-owner full sync with an acknowledged note and complete pull", async () => {
   await expect(fullQfUserSync(db)).resolves.toMatchObject({ status: "synced", pushed: 1 });

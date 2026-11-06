@@ -13898,6 +13898,217 @@
       "independent_review": "pass",
       "evidence": "docs/refactoring/PROGRESS.md",
       "summary": "Bind automatic QF provider-token connections to their accepted source session. Reuse one injected RF144 owner factory with fail-closed explicit-source matching; forward owner through both connection wrappers. Preserve detached callbacks, same-session renewal and legacy OAuth. No persisted account partition or transaction ownership change."
+    },
+    {
+      "id": "RF-146",
+      "title": "Keep Quran Foundation writes retryable until their acknowledgements are valid",
+      "description": "Primary owns direct boundary-decoder integration and final acceptance. A bounded worker extends only the existing real SQLite owner suite directly. Reject unexpected write-success variants and malformed entity acknowledgements before local attachment or queue success. Reuse current error/attempt/ownership handling; no frozen evidence or worker-command audit.",
+      "rationale": "Current push helpers return on unrelated ok:true upsert variants and accept any ok:true delete reply, then outer code marks queue entries synced. This silently loses retry eligibility and can clear or attach incorrect local linkage.",
+      "modules": [
+        "lib/quran-foundation/user-sync.ts",
+        "lib/quran-foundation/user-payloads.ts",
+        "tests/unit/qf-sync-owner.test.ts",
+        "tests/unit/qf-write-payloads.test.ts"
+      ],
+      "dependencies": [
+        "RF-145"
+      ],
+      "risk": "high",
+      "priority": 1,
+      "approved": true,
+      "status": "verified",
+      "attempts": 1,
+      "allowed_paths": [
+        "lib/quran-foundation/user-sync.ts",
+        "lib/quran-foundation/user-payloads.ts",
+        "tests/unit/qf-sync-owner.test.ts",
+        "tests/unit/qf-write-payloads.test.ts"
+      ],
+      "implementation_mode": "implementation",
+      "verification": [
+        [
+          "git",
+          "diff",
+          "--check"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "lib/quran-foundation/user-sync.ts",
+          "lib/quran-foundation/user-payloads.ts",
+          "tests/unit/qf-sync-owner.test.ts",
+          "tests/unit/qf-write-payloads.test.ts",
+          "docs/refactoring/PROGRESS.md"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/quran-foundation/user-sync.ts",
+          "lib/quran-foundation/user-payloads.ts",
+          "tests/unit/qf-sync-owner.test.ts",
+          "tests/unit/qf-write-payloads.test.ts",
+          "--max-warnings=0"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "check:analysis"
+        ],
+        [
+          "npm",
+          "run",
+          "postinstall"
+        ],
+        [
+          "npm",
+          "ls",
+          "--all",
+          "--json"
+        ],
+        [
+          "npm",
+          "run",
+          "lint"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "node",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/tests/brace-expansion.test.cjs",
+          "scripts/tests/dependency-boundaries.test.cjs",
+          "scripts/tests/icon-tool.test.cjs",
+          "scripts/tests/jest-config.test.cjs",
+          "scripts/tests/js-yaml.test.cjs",
+          "scripts/tests/lint-coverage.test.cjs",
+          "scripts/tests/metro-unicode.test.cjs",
+          "scripts/tests/nanoid.test.cjs",
+          "scripts/tests/router-dependency-range.test.cjs",
+          "scripts/tests/security-dependency-owner.test.cjs",
+          "scripts/tests/source-map-js.test.cjs",
+          "scripts/tests/tailwind-source-map.test.cjs",
+          "scripts/tests/ws.test.cjs",
+          "scripts/tests/xmldom.test.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "test:refactor-runner"
+        ],
+        [
+          "python3",
+          "-B",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "scripts/tests",
+          "-p",
+          "test_*.py"
+        ],
+        [
+          "npm",
+          "run",
+          "check:native-config"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=4096",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "android",
+          "--output-dir",
+          ".expo/modernization-checks/android",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/android')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=3072",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "ios",
+          "--output-dir",
+          ".expo/modernization-checks/ios",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/ios')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8197",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts",
+          "tests/e2e/database-bridge.spec.ts"
+        ]
+      ],
+      "acceptance_criteria": [
+        "Validate each QF write acknowledgement immediately after existing response.ok/error handling and before any local attachment, clearing SQL or queue success. Missing/wrong ok:true success variant must throw into the existing per-entry failed/retry path; require deleted:true for both delete actions.",
+        "Reuse a feature-local unknown-to-typed decoder module and existing QfBookmark/QfNote types. A bookmark acknowledgement needs nonblank ID, type ayah, exact requested coordinates, nonblank string createdAt, a real boolean collection flag and nonnegative integer count. A note acknowledgement needs nonblank ID/body and timestamp strings plus a string-array ranges field; allow empty ranges for the existing fallback. Update-note returned ID must equal requested ID. Do not impose six-character import/export minimum, normalize dates/opaque IDs, alter list imports or add packages.",
+        "Exercise actual public fullQfUserSync, installed SDK transport and isolated SQLite/production schema in existing qf-sync-owner fixture. First reproduce unrelated success variant falsely marking a pending note synced. Invalid note/bookmark create/update/delete acknowledgements must leave local linkage unchanged, queue failed with attempt1 and retryable, and pushed count0. Configure explicit empty list replies in invalid-ack cases so a later independent valid reconciliation is not mistaken for acknowledgement mutation. Seed local deleted_at for actual delete intents.",
+        "Preserve valid note create/update, bookmark upsert and both deletes, empty note-ranges fallback, short nonblank remote body, current remote errors, protected-collection/no-RPC skips, exact owner retirement and all prior pagination/transaction-settlement tests. Pure decoder cases may cover malformed unknown input without extra test tooling.",
+        "Overall partial-sync status remains RF029. Full-list row validation, duplicate IDs, actual verse-count bounds, timestamp ordering and upstream filtering/normalization remain separate RF031 work. No schema, server, protected data, OAuth, vendor or loop-tooling change. All full controller checks, separate stronger independent review and primary acceptance are required. One accepted local commit and immediate small-evidence/output cleanup."
+      ],
+      "started_at": "2026-11-06T21:37:40.920928+00:00",
+      "completed_at": "2026-11-06T21:45:37.875211+00:00",
+      "independent_review": "pass",
+      "evidence": "docs/refactoring/PROGRESS.md",
+      "summary": "Validate each QF note/bookmark write acknowledgement before local linkage changes or queue success. Require matching update IDs/bookmark coordinates and explicit delete confirmation. Preserve retryable failed writes, valid short notes/empty-range fallback, owner fences and protected-collection skips."
     }
   ]
 }

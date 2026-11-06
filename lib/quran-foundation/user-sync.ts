@@ -5,6 +5,11 @@ import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import { getQfConnectionStatus, invokeQfUser } from "./user";
 import { captureQfRequestOwner, type QfSessionOwner } from "./request-owner";
 import {
+  readQfBookmarkAcknowledgement,
+  readQfNoteAcknowledgement,
+  requireQfDeleteAcknowledgement,
+} from "./user-payloads";
+import {
   QF_DEFAULT_MUSHAF_ID,
   buildQfRange,
   isQfSyncableNoteContent,
@@ -272,6 +277,7 @@ async function pushBookmarkEntry(owner: QfSyncOwner, db: SQLiteDatabase, entry: 
     const response = await invokeQfUser({ action: "delete-bookmark", qfBookmarkId }, owner);
     owner.requireCurrent();
     if (!response.ok) throw new Error(response.message);
+    requireQfDeleteAcknowledgement(response);
     await db.runAsync(
       `UPDATE bookmarks
        SET qf_bookmark_id = NULL, qf_synced_at = ?, qf_sync_error = NULL
@@ -302,8 +308,8 @@ async function pushBookmarkEntry(owner: QfSyncOwner, db: SQLiteDatabase, entry: 
   );
   owner.requireCurrent();
   if (!response.ok) throw new Error(response.message);
-  if (!("bookmark" in response)) return;
-  await attachQfBookmark(db, local, response.bookmark, {
+  const bookmark = readQfBookmarkAcknowledgement(response, local);
+  await attachQfBookmark(db, local, bookmark, {
     updateActiveState: false,
     requireCurrent: owner.requireCurrent,
   });
@@ -324,6 +330,7 @@ async function pushPrivateNoteEntry(owner: QfSyncOwner, db: SQLiteDatabase, entr
     const response = await invokeQfUser({ action: "delete-note", qfNoteId }, owner);
     owner.requireCurrent();
     if (!response.ok) throw new Error(response.message);
+    requireQfDeleteAcknowledgement(response);
     await db.runAsync("UPDATE private_notes SET qf_synced_at = ?, qf_sync_error = NULL WHERE id = ?", [
       new Date().toISOString(),
       entry.local_id,
@@ -363,8 +370,8 @@ async function pushPrivateNoteEntry(owner: QfSyncOwner, db: SQLiteDatabase, entr
       );
   owner.requireCurrent();
   if (!response.ok) throw new Error(response.message);
-  if (!("note" in response)) return;
-  await attachQfNote(db, local.id, response.note, [range], {
+  const note = readQfNoteAcknowledgement(response, local.qf_note_id || undefined);
+  await attachQfNote(db, local.id, note, [range], {
     enqueueSupabase: true,
     requireCurrent: owner.requireCurrent,
   });
