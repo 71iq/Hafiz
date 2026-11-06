@@ -16,6 +16,7 @@ const requests: { table: string; incremental: boolean; offset: number; since: st
 const mockMeaningRestoreRows: unknown[] = [];
 const mockMeaningIncrementalRows: unknown[] = [];
 const mockQueryErrors = new Map<string, Error>();
+let rangeHook: ((table: string, incremental: boolean) => void) | null = null;
 const writes: string[] = [];
 const mockPending = jest.fn(async () => []);
 const mockBackfill = jest.fn(async () => 0);
@@ -53,7 +54,30 @@ class MockQuery {
             ? mockMeaningIncrementalRows
             : mockMeaningRestoreRows
           : [];
-    return { data: rows.slice(start, end + 1), error: null };
+    const wireRows = rows.map((row) => {
+      if (
+        row === null ||
+        typeof row !== "object" ||
+        Array.isArray(row) ||
+        Object.getPrototypeOf(row) !== Object.prototype
+      ) {
+        return row;
+      }
+      return { synced_at: NEW, ...row };
+    });
+    const eligibleRows = this.incremental
+      ? wireRows.filter(
+          (row) =>
+            row !== null &&
+            typeof row === "object" &&
+            "synced_at" in row &&
+            typeof row.synced_at === "string" &&
+            this.since !== null &&
+            row.synced_at > this.since,
+        )
+      : wireRows;
+    rangeHook?.(this.table, this.incremental);
+    return { data: eligibleRows.slice(start, end + 1), error: null };
   }
 }
 
@@ -171,6 +195,7 @@ beforeEach(async () => {
   mockMeaningRestoreRows.length = 0;
   mockMeaningIncrementalRows.length = 0;
   mockQueryErrors.clear();
+  rangeHook = null;
   requests.length = 0;
   writes.length = 0;
   transactions = 0;
@@ -447,4 +472,103 @@ describe("word meaning restore and incremental recovery", () => {
     expect(requests.some((r) => r.table === "user_word_meanings" && r.incremental && r.since === OLD)).toBe(true);
     expect(sql.prepare("SELECT value FROM user_settings WHERE key='last_pull_at'").get()?.value).not.toBe(OLD);
   });
+});
+
+describe("sync cursor snapshot windows", () => {
+  const T_PREVIOUS = "2026-03-01T00:00:00.000Z";
+  const T0 = "2026-03-02T00:00:00.000Z";
+  const T1 = "2026-03-02T00:00:01.000Z";
+  const T2 = "2026-03-02T00:00:02.000Z";
+
+  it("recovers a meaning written after its incremental table read on the next fullSync", async () => {
+    restoreComplete();
+    putSetting("last_pull_at", T_PREVIOUS);
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date(T0));
+    let inserted = false;
+    rangeHook = (table, incremental) => {
+      if (table === "study_cards" && incremental && !inserted) {
+        inserted = true;
+        jest.setSystemTime(new Date(T1));
+        mockMeaningIncrementalRows.push(
+          meaning({ ayah: 258, meaning: "arrived during later table read", updated_at: T1, synced_at: T1 }),
+        );
+      }
+      if (table === "achievement_unlocks" && incremental) jest.setSystemTime(new Date(T2));
+    };
+
+    try {
+      await fullSync(db);
+      const firstCursor = sql.prepare("SELECT value FROM user_settings WHERE key='last_pull_at'").get()?.value;
+      requests.length = 0;
+      await fullSync(db);
+
+      expect(
+        sql.prepare("SELECT meaning FROM user_word_meanings WHERE surah=2 AND ayah=258 AND word_pos=1").get(),
+      ).toEqual({
+        meaning: "arrived during later table read",
+      });
+      expect(firstCursor).toBe(T0);
+      expect(requests.find((request) => request.table === "user_word_meanings" && request.incremental)?.since).toBe(
+        firstCursor,
+      );
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it.each(["empty", "nonempty"] as const)(
+    "catches a meaning written during the later study-card read in the same %s restore fullSync",
+    async (restoreKind) => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date(T0));
+      const remoteMeaning = meaning({
+        ayah: 259,
+        meaning: "snapshot meaning",
+        updated_at: T_PREVIOUS,
+        synced_at: T_PREVIOUS,
+      });
+      if (restoreKind === "nonempty") {
+        mockRestoreCards = [card("synthetic-remote-card")];
+        mockMeaningRestoreRows.push(remoteMeaning);
+        mockMeaningIncrementalRows.push(remoteMeaning);
+      }
+      let changed = false;
+      rangeHook = (table, incremental) => {
+        if (table === "study_cards" && !incremental && !changed) {
+          changed = true;
+          jest.setSystemTime(new Date(T1));
+          if (restoreKind === "empty") {
+            mockMeaningIncrementalRows.push(
+              meaning({ ayah: 260, meaning: "late restore meaning", updated_at: T1, synced_at: T1 }),
+            );
+          } else {
+            Object.assign(remoteMeaning, {
+              meaning: "late updated meaning",
+              updated_at: T1,
+              synced_at: T1,
+            });
+          }
+        }
+        if (table === "achievement_unlocks" && !incremental) jest.setSystemTime(new Date(T2));
+      };
+
+      try {
+        await fullSync(db);
+        const target = restoreKind === "empty" ? 260 : 259;
+        const expected = restoreKind === "empty" ? "late restore meaning" : "late updated meaning";
+        expect(
+          sql.prepare("SELECT meaning FROM user_word_meanings WHERE surah=2 AND ayah=? AND word_pos=1").get(target),
+        ).toEqual({ meaning: expected });
+        expect(requests.find((request) => request.table === "user_word_meanings" && request.incremental)?.since).toBe(
+          T0,
+        );
+        expect(
+          sql.prepare("SELECT updated_at FROM user_settings WHERE key LIKE 'sync_account_restore_%'").get(),
+        ).toEqual({ updated_at: T2 });
+      } finally {
+        jest.useRealTimers();
+      }
+    },
+  );
 });

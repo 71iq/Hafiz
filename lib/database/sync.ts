@@ -134,6 +134,7 @@ async function pullRemoteChanges(db: SQLiteDatabase, owner: SyncOwner): Promise<
   );
   owner.requireCurrent();
   const lastPullAt = lastSyncRow?.value ?? "1970-01-01T00:00:00Z";
+  const pullStartedAt = new Date().toISOString();
 
   let totalPulled = 0;
   let wordMeaningsComplete = true;
@@ -187,7 +188,7 @@ async function pullRemoteChanges(db: SQLiteDatabase, owner: SyncOwner): Promise<
     owner.requireCurrent();
     if (wordMeaningsComplete) {
       await db.runAsync("INSERT OR REPLACE INTO user_settings (key, value) VALUES ('last_pull_at', ?)", [
-        new Date().toISOString(),
+        pullStartedAt,
       ]);
     }
   } catch (err: any) {
@@ -249,6 +250,7 @@ async function markAccountRestoreComplete(
   db: SQLiteDatabase,
   userId: string,
   restoredFromRemote: boolean,
+  snapshotStartedAt: string,
   owner: SyncOwner,
 ): Promise<void> {
   const now = new Date().toISOString();
@@ -260,7 +262,7 @@ async function markAccountRestoreComplete(
   owner.requireCurrent();
   await db.runAsync(
     "INSERT OR REPLACE INTO user_settings (key, value, updated_at, deleted_at) VALUES ('last_pull_at', ?, ?, NULL)",
-    [now, now],
+    [snapshotStartedAt, now],
   );
   owner.requireCurrent();
   if (!restoredFromRemote) return;
@@ -287,11 +289,12 @@ async function restoreAccountDataIfNeeded(db: SQLiteDatabase, owner: SyncOwner):
     return { pulled: 0, accountRestored: false, localDataReplaced: false };
   }
 
+  const snapshotStartedAt = new Date().toISOString();
   const remoteRows = await fetchRemoteAccountRows(userId, owner);
   owner.requireCurrent();
   const remoteRowCount = REMOTE_RESTORE_TABLES.reduce((sum, tableName) => sum + remoteRows[tableName].length, 0);
   if (remoteRowCount === 0) {
-    await markAccountRestoreComplete(db, userId, false, owner);
+    await markAccountRestoreComplete(db, userId, false, snapshotStartedAt, owner);
     owner.requireCurrent();
     return { pulled: 0, accountRestored: false, localDataReplaced: false };
   }
@@ -304,7 +307,7 @@ async function restoreAccountDataIfNeeded(db: SQLiteDatabase, owner: SyncOwner):
     owner.requireCurrent();
     await applyRemoteAccountRows(db, remoteRows);
     owner.requireCurrent();
-    await markAccountRestoreComplete(db, userId, true, owner);
+    await markAccountRestoreComplete(db, userId, true, snapshotStartedAt, owner);
     owner.requireCurrent();
   });
   owner.requireCurrent();

@@ -4,6 +4,7 @@ import type { Profile } from "@/lib/auth/types";
 import type { WirdStatus } from "@/lib/fsrs/queries";
 import type { ProfileSurahProgress } from "@/lib/profile/progress";
 import { authCommands } from "@/lib/auth/commands";
+import { formatLocalDateKey } from "@/lib/date";
 import { getAuthSessionIdentity } from "@/lib/auth/session-identity";
 import { useAuthStore } from "@/lib/auth/store";
 import { syncDailyScore, updateProfileStats } from "@/lib/fsrs/leaderboard-sync";
@@ -729,7 +730,7 @@ test.each(["review-stats", "review-activity"] as const)(
 
 test("current profile retains remote maxima and exact aggregate/progress payloads", async () => {
   beginAsA();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = formatLocalDateKey(new Date());
   mockGetLocalSurahProgress.mockResolvedValue([
     { surah: 1, nameArabic: "synthetic", nameEnglish: "synthetic", totalCards: 12, memorized: 7 },
   ]);
