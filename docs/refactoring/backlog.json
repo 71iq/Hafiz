@@ -10843,7 +10843,9 @@
       "started_at": "2026-11-06T10:05:27.681990+00:00",
       "completed_at": "2026-11-06T10:14:43.028059+00:00",
       "evidence": ".ralph/runs/RF-129-1-1793959527686038956",
-      "summary": "Installed the two frozen RF-129 artifacts after completing all required ordered reads."
+      "summary": "Primary accepted singleton auth startup, retired callbacks and obsolete snapshot guards after13 fresh controller gates, independent Astra and post-lease source/image/protocol checks. Stable same-session continuity and newer credentials are preserved; wider RF025 remains open.",
+      "primary_accepted": true,
+      "primary_acceptance_evidence": ".refactor-baseline/rf129-primary-acceptance.json"
     }
   ]
 }
