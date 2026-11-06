@@ -1977,7 +1977,10 @@
         "RF-124",
         "RF-125",
         "RF-127",
-        "RF-129"
+        "RF-129",
+        "RF-130",
+        "RF-131",
+        "RF-132"
       ],
       "acceptance_criteria": [
         "Test sign-in, sign-out, account switch, late responses, subscription cleanup and offline restore.",
@@ -1985,7 +1988,8 @@
         "RF122 guards only fetchProfile/ensureProfile across user-ID/session-reference revisions. It does not close this parent. Independently verify atomic profile clearing, stale auth/updateProfile/leaderboard-sync publishers, Query eviction, listener cleanup, offline restore and same-owner ordering before acceptance. No personal SQLite destruction.",
         "RF123 atomically clears or retains matching profile only in six successful session-identity assignment paths. Parent remains unapproved; stale auth/password/updateProfile/leaderboard publishers, cache/listener/offline policies and arbitrary external setState still need separate verification.",
         "RF124 audit and RF125 password/reset repair are accepted. RF127 profile store/editor ownership is now verified and primary accepted, including initialization and closed A-B-A regressions. These children do not close RF025: Query cache, initialization/listener/SDK, leaderboard, offline and wider ownership policies remain to be verified.",
-        "RF129 owns only singleton initialization/listener retirement and obsolete startup snapshot publication, including newer same-session notifications. Cache isolation, leaderboard/overview/community/other publishers and full SDK/offline lifecycle remain open after child acceptance."
+        "RF129 owns only singleton initialization/listener retirement and obsolete startup snapshot publication, including newer same-session notifications. Cache isolation, leaderboard/overview/community/other publishers and full SDK/offline lifecycle remain open after child acceptance.",
+        "RF130 only guards obsolete account stats lifetimes. RF131 same-owner ordering and RF132 ensure/stats full-row overwrites remain unapproved, with actual-module failures. No child closes Query/cache, overview/community, other publishers, offline or full SDK lifecycle."
       ],
       "verification": [
         [
@@ -10846,6 +10850,192 @@
       "summary": "Primary accepted singleton auth startup, retired callbacks and obsolete snapshot guards after13 fresh controller gates, independent Astra and post-lease source/image/protocol checks. Stable same-session continuity and newer credentials are preserved; wider RF025 remains open.",
       "primary_accepted": true,
       "primary_acceptance_evidence": ".refactor-baseline/rf129-primary-acceptance.json"
+    },
+    {
+      "id": "RF-130",
+      "title": "Guard account stats continuations with the captured owner",
+      "description": "Frozen two-artifact copy-only task. FIRST COMMAND exactly cat .refactor-baseline/rf130-handoff-v1/readiness.md. Complete all11 ordered reads before either copy, then each of two copies exactly once in order. No source/test dumps or worker checks. Primary owns account/data policy; controller owns10 fresh gates, separate stronger evaluation and commit.",
+      "rationale": "Actual helpers can patch B with A stats and publish a late A profile after replacement; later aggregate/progress writes also continue under a captured obsolete account.",
+      "modules": [
+        "lib/fsrs/leaderboard-sync.ts",
+        "tests/unit/leaderboard-stats-owner.test.ts"
+      ],
+      "dependencies": [
+        "RF-129",
+        "RF-127"
+      ],
+      "acceptance_criteria": [
+        "Install only two exact frozen artifacts, preserving every other input and auditing every original generator tool event.",
+        "Capture existing stable AuthOwner before the first await and retain captured user filters. Guard restore/ensure/score/profile/aggregate/activity/progress/daily continuations, including obsolete success, packet and rejection. Pass the same owner to real ensureProfile. A later replacement intent, different user, same-user new session, observed A-B-A or signout cannot dispatch the next request or publish a profile.",
+        "Local publication requires a matching current profile. The guard after local setState blocks synchronous subscriber replacement before dispatch. Returned stats profile must match captured account. Preserve matching-session refresh credentials/metadata and original current error/warning, missing-table, restore prerequisite, maxima and payload behavior.",
+        "All173 actual helper/store cases and original116 red failures/57 controls remain. Full120 suites/1871 cases without skips, types, two-file zero-warning lint/format, three platform graphs, exact existing five Knip records, synthetic build and28 Chrome smoke cases pass freshly in controller. Three focused semantic mutants fail1/2/1. All10 gates, separate stronger full diff/evidence/protocol review and primary acceptance required.",
+        "No same-owner ordering or edited-field overwrite claim, RF131/RF132 and RF025 remain open. No new queue/coordinator policy, pending-intent admission for new calls, issued-request rollback, REST credential attribution, RLS/live service, cache/caller, native/device or production certification. Do not touch dependencies, protected data, original checkout, database or deployment. Preserve every failure and continue across process batches."
+      ],
+      "verification": [
+        [
+          "python3",
+          "-c",
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf130-handoff-v1/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='1a732a707c2f7e5c0b467c97fddc31f2f8503f4c72c04b67aa2ad7e54db6b756';sys.argv=[str(p),'all'];runpy.run_path(str(p),run_name='__main__')"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/fsrs/leaderboard-sync.ts",
+          "tests/unit/leaderboard-stats-owner.test.ts",
+          "--max-warnings=0"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "lib/fsrs/leaderboard-sync.ts",
+          "tests/unit/leaderboard-stats-owner.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "python3",
+          "-c",
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf130-handoff-v1/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='1a732a707c2f7e5c0b467c97fddc31f2f8503f4c72c04b67aa2ad7e54db6b756';sys.argv=[str(p),'knip'];runpy.run_path(str(p),run_name='__main__')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8197",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts"
+        ],
+        [
+          "python3",
+          "-c",
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf130-handoff-v1/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='1a732a707c2f7e5c0b467c97fddc31f2f8503f4c72c04b67aa2ad7e54db6b756';sys.argv=[str(p),'all'];runpy.run_path(str(p),run_name='__main__')"
+        ]
+      ],
+      "risk": "high",
+      "approved": true,
+      "status": "pending",
+      "allowed_paths": [
+        "lib/fsrs/leaderboard-sync.ts",
+        "tests/unit/leaderboard-stats-owner.test.ts"
+      ],
+      "attempts": 0,
+      "implementation_mode": "copy-only",
+      "readiness_evidence": ".refactor-baseline/rf130-handoff-v1/readiness.md",
+      "primary_preparation_evidence": ".refactor-baseline/rf130-stats-ownership-v1/preparation-receipt.json"
+    },
+    {
+      "id": "RF-131",
+      "title": "Serialize same-owner account stats refreshes",
+      "description": "Primary diagnosis recorded; exact implementation and behavioral handoff not approved.",
+      "rationale": "Actual unchanged helper finishes score900 then obsolete111 under one still-current owner. Later tasks must prove FIFO/rejection recovery and allow a new account to proceed independently of hung old work.",
+      "modules": [
+        "lib/fsrs/leaderboard-sync.ts",
+        "tests/unit/leaderboard-stats-owner.test.ts"
+      ],
+      "dependencies": [
+        "RF-130"
+      ],
+      "acceptance_criteria": [
+        "Prepare exact source scope and actual-module regressions before approval. Preserve current-owner error behavior, stable-session continuity and account isolation.",
+        "Fresh controller verification, separate stronger review and primary acceptance mandatory. No protected inputs or production."
+      ],
+      "verification": [
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/leaderboard-stats-owner.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
+      ],
+      "risk": "high",
+      "approved": false,
+      "status": "pending",
+      "allowed_paths": [
+        "lib/fsrs/leaderboard-sync.ts",
+        "tests/unit/leaderboard-stats-owner.test.ts"
+      ],
+      "attempts": 0,
+      "primary_investigation_evidence": ".refactor-baseline/rf130-stats-ownership-v1/decision.md"
+    },
+    {
+      "id": "RF-132",
+      "title": "Preserve newer profile edits during stats reads and replies",
+      "description": "Primary diagnosis recorded; exact implementation and behavioral handoff not approved.",
+      "rationale": "Actual stats ensureProfile read and full-row update success each overwrite newer same-session display/avatar/bio/country, including null clears. A stats-success-only projection does not fix the earlier ensure publisher. Primary must choose and prove a narrow publication policy.",
+      "modules": [
+        "lib/auth/store.ts",
+        "lib/fsrs/leaderboard-sync.ts",
+        "tests/unit/auth-profile-owner.test.ts",
+        "tests/unit/leaderboard-stats-owner.test.ts"
+      ],
+      "dependencies": [
+        "RF-130",
+        "RF-131"
+      ],
+      "acceptance_criteria": [
+        "Prepare exact source scope and actual-module regressions before approval. Preserve current-owner error behavior, stable-session continuity and account isolation.",
+        "Fresh controller verification, separate stronger review and primary acceptance mandatory. No protected inputs or production."
+      ],
+      "verification": [
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--runTestsByPath",
+          "tests/unit/leaderboard-stats-owner.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ]
+      ],
+      "risk": "high",
+      "approved": false,
+      "status": "pending",
+      "allowed_paths": [
+        "lib/auth/store.ts",
+        "lib/fsrs/leaderboard-sync.ts",
+        "tests/unit/auth-profile-owner.test.ts",
+        "tests/unit/leaderboard-stats-owner.test.ts"
+      ],
+      "attempts": 0,
+      "primary_investigation_evidence": ".refactor-baseline/rf130-stats-ownership-v1/decision.md"
     }
   ]
 }
