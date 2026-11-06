@@ -10704,21 +10704,23 @@
       ],
       "risk": "medium",
       "approved": true,
-      "status": "retry",
+      "status": "verified",
       "allowed_paths": [
         "package.json",
         "package-lock.json",
         "scripts/tests/xmldom.test.cjs",
         "docs/refactoring/DEPENDENCY_SECURITY.md"
       ],
-      "attempts": 1,
+      "attempts": 2,
       "implementation_mode": "copy-only",
       "readiness_evidence": ".refactor-baseline/rf128-handoff-v2/readiness.md",
       "primary_preparation_evidence": ".refactor-baseline/rf128-xmldom-preflight-v1/preparation-receipt.json",
-      "started_at": "2026-11-06T09:18:19.921653+00:00",
+      "started_at": "2026-11-06T09:22:40.865679+00:00",
       "failure": "Verification failed: ['python3', '-c', \"import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf128-handoff-v1/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='b846aaa36077cad9902adcf5b1e4a7fe4d0e0502041b38f22fb2b8d5e40f08a4';sys.argv=[str(p),'all'];runpy.run_path(str(p),run_name='__main__')\"]; see .ralph/runs/RF-128-1-1793956699926555606/verify-0.log",
-      "evidence": ".ralph/runs/RF-128-1-1793956699926555606",
-      "primary_recovery_evidence": ".refactor-baseline/rf128-xmldom-preflight-v1/handoff-recovery-v2/decision.json"
+      "evidence": ".ralph/runs/RF-128-2-1793956960871038075",
+      "primary_recovery_evidence": ".refactor-baseline/rf128-xmldom-preflight-v1/handoff-recovery-v2/decision.json",
+      "completed_at": "2026-11-06T09:31:25.596943+00:00",
+      "summary": "Installed the four supplied artifacts exactly once after completing all eleven prescribed reads."
     }
   ]
 }
