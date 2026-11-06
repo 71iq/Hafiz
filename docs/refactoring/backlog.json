@@ -11044,16 +11044,20 @@
       ],
       "risk": "high",
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "lib/fsrs/leaderboard-sync.ts",
         "tests/unit/leaderboard-stats-owner.test.ts"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "primary_investigation_evidence": ".refactor-baseline/rf130-stats-ownership-v1/decision.md",
       "implementation_mode": "copy-only",
       "readiness_evidence": ".refactor-baseline/rf131-handoff-v1/readiness.md",
-      "primary_preparation_evidence": ".refactor-baseline/rf131-stats-ordering-v1/preparation-receipt.json"
+      "primary_preparation_evidence": ".refactor-baseline/rf131-stats-ordering-v1/preparation-receipt.json",
+      "started_at": "2026-11-06T11:29:08.549612+00:00",
+      "completed_at": "2026-11-06T11:36:16.991026+00:00",
+      "evidence": ".ralph/runs/RF-131-1-1793964548554433350",
+      "summary": "Installed the two frozen RF-131 artifacts in the authorized order. Verification, independent review, controller gates, and primary acceptance remain pending."
     },
     {
       "id": "RF-132",

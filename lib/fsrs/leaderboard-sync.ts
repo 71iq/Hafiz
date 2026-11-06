@@ -66,6 +66,21 @@ function captureStatsOwner(): StatsOwner | null {
   };
 }
 
+let statsQueue: { owner: StatsOwner; tail: Promise<void> } | null = null;
+
+function enqueueStats(owner: StatsOwner, work: () => Promise<void>): Promise<void> {
+  const queue = statsQueue?.owner.isCurrent() ? statsQueue : { owner, tail: Promise.resolve() };
+  statsQueue = queue;
+  const result = queue.tail.then(async () => {
+    if (owner.isCurrent()) await work();
+  });
+  queue.tail = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  return result;
+}
+
 async function ensureProfileRow(owner: StatsOwner) {
   if (!owner.isCurrent()) return null;
   return useAuthStore.getState().ensureProfile(owner.authOwner);
@@ -284,43 +299,45 @@ export async function syncDailyScore(db: SQLiteDatabase): Promise<void> {
   if (!isSupabaseConfigured()) return;
   const owner = captureStatsOwner();
   if (!owner) return;
-  try {
-    if (!(await canWriteAccountDerivedStats(db, owner))) return;
-    await ensureProfileRow(owner);
-    if (!owner.isCurrent()) return;
+  return enqueueStats(owner, async () => {
+    try {
+      if (!(await canWriteAccountDerivedStats(db, owner))) return;
+      await ensureProfileRow(owner);
+      if (!owner.isCurrent()) return;
 
-    const today = new Date().toISOString().split("T")[0];
-    const { score, reviewsCount } = await getTodayScore(db);
-    if (!owner.isCurrent() || reviewsCount === 0) return;
+      const today = new Date().toISOString().split("T")[0];
+      const { score, reviewsCount } = await getTodayScore(db);
+      if (!owner.isCurrent() || reviewsCount === 0) return;
 
-    const { data: existing, error: existingError } = await supabase
-      .from("daily_scores")
-      .select("score, reviews_count")
-      .eq("user_id", owner.userId)
-      .eq("date", today)
-      .maybeSingle();
+      const { data: existing, error: existingError } = await supabase
+        .from("daily_scores")
+        .select("score, reviews_count")
+        .eq("user_id", owner.userId)
+        .eq("date", today)
+        .maybeSingle();
 
-    if (!owner.isCurrent()) return;
-    if (existingError) {
-      console.warn("[Leaderboard] Failed to read existing daily score:", existingError.message);
-      return;
+      if (!owner.isCurrent()) return;
+      if (existingError) {
+        console.warn("[Leaderboard] Failed to read existing daily score:", existingError.message);
+        return;
+      }
+
+      const { error } = await supabase.from("daily_scores").upsert(
+        {
+          user_id: owner.userId,
+          date: today,
+          score: Math.max(score, existing?.score ?? 0),
+          reviews_count: Math.max(reviewsCount, existing?.reviews_count ?? 0),
+        },
+        { onConflict: "user_id,date" },
+      );
+
+      if (!owner.isCurrent()) return;
+      if (error) console.warn("[Leaderboard] Failed to sync daily score:", error.message);
+    } catch (error) {
+      if (owner.isCurrent()) throw error;
     }
-
-    const { error } = await supabase.from("daily_scores").upsert(
-      {
-        user_id: owner.userId,
-        date: today,
-        score: Math.max(score, existing?.score ?? 0),
-        reviews_count: Math.max(reviewsCount, existing?.reviews_count ?? 0),
-      },
-      { onConflict: "user_id,date" },
-    );
-
-    if (!owner.isCurrent()) return;
-    if (error) console.warn("[Leaderboard] Failed to sync daily score:", error.message);
-  } catch (error) {
-    if (owner.isCurrent()) throw error;
-  }
+  });
 }
 
 /** Update profile stats on Supabase (total_score, streak, cards_reviewed, last_review_date) */
@@ -328,160 +345,163 @@ export async function updateProfileStats(db: SQLiteDatabase): Promise<void> {
   if (!isSupabaseConfigured()) return;
   const owner = captureStatsOwner();
   if (!owner) return;
-  try {
-    if (!(await canWriteAccountDerivedStats(db, owner))) return;
-    await ensureProfileRow(owner);
-    if (!owner.isCurrent()) return;
-
-    const [
-      totalScore,
-      wirdStatus,
-      cardsReviewedRow,
-      localReviewSummary,
-      remoteDailySummary,
-      remotePublicReviewSummary,
-    ] = await Promise.all([
-      getTotalScore(db),
-      getWirdStatus(db),
-      db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM study_log"),
-      getLocalReviewSummary(db),
-      fetchDailyScoreSummary(owner.userId).catch((error) => {
-        if (owner.isCurrent()) console.warn("[Leaderboard] Failed to read remote daily scores:", error.message);
-        return {
-          totalScore: 0,
-          cardsReviewed: 0,
-          currentStreak: 0,
-          longestStreak: 0,
-          lastReviewDate: null,
-        };
-      }),
-      fetchPublicReviewSummary(owner.userId).catch((error) => {
-        if (owner.isCurrent()) console.warn("[Leaderboard] Failed to read public review summary:", error.message);
-        return null;
-      }),
-    ]);
-
-    if (!owner.isCurrent()) return;
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("total_score, current_streak, longest_streak, cards_reviewed, last_review_date")
-      .eq("id", owner.userId)
-      .maybeSingle();
-
-    if (!owner.isCurrent()) return;
-    const today = new Date().toISOString().slice(0, 10);
-    const localReviewedCount = cardsReviewedRow?.count ?? 0;
-    const lastReviewDay = wirdStatus.lastReviewDate ? wirdStatus.lastReviewDate.split("T")[0] : null;
-    const profileCurrentStreak = profile?.last_review_date?.slice(0, 10) === today ? (profile?.current_streak ?? 0) : 0;
-    const stats: ProfileStatsPatch = {
-      total_score: Math.max(totalScore, remoteDailySummary.totalScore, profile?.total_score ?? 0),
-      current_streak: Math.max(
-        wirdStatus.currentDays,
-        localReviewSummary.currentStreak,
-        remoteDailySummary.currentStreak,
-        remotePublicReviewSummary?.currentStreak ?? 0,
-        profileCurrentStreak,
-      ),
-      longest_streak: Math.max(
-        wirdStatus.longestDays,
-        localReviewSummary.longestStreak,
-        remoteDailySummary.longestStreak,
-        remotePublicReviewSummary?.longestStreak ?? 0,
-        profile?.longest_streak ?? 0,
-      ),
-      cards_reviewed: Math.max(
-        localReviewedCount,
-        localReviewSummary.totalReviews,
-        remoteDailySummary.cardsReviewed,
-        remotePublicReviewSummary?.totalReviews ?? 0,
-        profile?.cards_reviewed ?? 0,
-      ),
-      last_review_date: maxDate(
-        lastReviewDay,
-        localReviewSummary.lastReviewDate,
-        remoteDailySummary.lastReviewDate,
-        remotePublicReviewSummary?.lastReviewDate,
-        profile?.last_review_date?.slice(0, 10),
-      ),
-    };
-
-    patchCurrentProfile(owner, stats);
-    if (!owner.isCurrent()) return;
-
-    const { data, error } = await supabase.from("profiles").update(stats).eq("id", owner.userId).select("*").single();
-
-    if (!owner.isCurrent()) return;
-    if (error) console.warn("[Leaderboard] Failed to update profile stats:", error.message);
-    else if (data?.id === owner.userId) {
-      useAuthStore.setState((state) => (owner.isCurrent() ? { profile: data } : state));
-    }
-
+  return enqueueStats(owner, async () => {
     try {
-      await upsertPublicReviewSummary(owner, localReviewSummary, remotePublicReviewSummary);
-    } catch (reviewAggregateError: any) {
+      if (!(await canWriteAccountDerivedStats(db, owner))) return;
+      await ensureProfileRow(owner);
       if (!owner.isCurrent()) return;
-      if (!isMissingPublicReviewAggregateError(reviewAggregateError)) {
-        console.warn("[Leaderboard] Failed to update public review summary:", reviewAggregateError.message);
-      }
-    }
 
-    if (!owner.isCurrent()) return;
-    try {
-      const [surahProgress, remoteSurahProgress] = await Promise.all([
-        getLocalSurahProgress(db),
-        supabase
-          .from("public_surah_progress")
-          .select("surah, total_cards, memorized_cards")
-          .eq("user_id", owner.userId),
+      const [
+        totalScore,
+        wirdStatus,
+        cardsReviewedRow,
+        localReviewSummary,
+        remoteDailySummary,
+        remotePublicReviewSummary,
+      ] = await Promise.all([
+        getTotalScore(db),
+        getWirdStatus(db),
+        db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM study_log"),
+        getLocalReviewSummary(db),
+        fetchDailyScoreSummary(owner.userId).catch((error) => {
+          if (owner.isCurrent()) console.warn("[Leaderboard] Failed to read remote daily scores:", error.message);
+          return {
+            totalScore: 0,
+            cardsReviewed: 0,
+            currentStreak: 0,
+            longestStreak: 0,
+            lastReviewDate: null,
+          };
+        }),
+        fetchPublicReviewSummary(owner.userId).catch((error) => {
+          if (owner.isCurrent()) console.warn("[Leaderboard] Failed to read public review summary:", error.message);
+          return null;
+        }),
       ]);
+
       if (!owner.isCurrent()) return;
-      if (remoteSurahProgress.error) throw remoteSurahProgress.error;
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("total_score, current_streak, longest_streak, cards_reviewed, last_review_date")
+        .eq("id", owner.userId)
+        .maybeSingle();
 
-      const bySurah = new Map<number, { surah: number; total_cards: number; memorized_cards: number }>();
-      for (const row of remoteSurahProgress.data ?? []) {
-        bySurah.set(row.surah, {
-          surah: row.surah,
-          total_cards: row.total_cards ?? 0,
-          memorized_cards: row.memorized_cards ?? 0,
-        });
-      }
-      for (const row of surahProgress) {
-        const existing = bySurah.get(row.surah);
-        bySurah.set(row.surah, {
-          surah: row.surah,
-          total_cards: Math.max(row.totalCards, existing?.total_cards ?? 0),
-          memorized_cards: Math.max(row.memorized, existing?.memorized_cards ?? 0),
-        });
+      if (!owner.isCurrent()) return;
+      const today = new Date().toISOString().slice(0, 10);
+      const localReviewedCount = cardsReviewedRow?.count ?? 0;
+      const lastReviewDay = wirdStatus.lastReviewDate ? wirdStatus.lastReviewDate.split("T")[0] : null;
+      const profileCurrentStreak =
+        profile?.last_review_date?.slice(0, 10) === today ? (profile?.current_streak ?? 0) : 0;
+      const stats: ProfileStatsPatch = {
+        total_score: Math.max(totalScore, remoteDailySummary.totalScore, profile?.total_score ?? 0),
+        current_streak: Math.max(
+          wirdStatus.currentDays,
+          localReviewSummary.currentStreak,
+          remoteDailySummary.currentStreak,
+          remotePublicReviewSummary?.currentStreak ?? 0,
+          profileCurrentStreak,
+        ),
+        longest_streak: Math.max(
+          wirdStatus.longestDays,
+          localReviewSummary.longestStreak,
+          remoteDailySummary.longestStreak,
+          remotePublicReviewSummary?.longestStreak ?? 0,
+          profile?.longest_streak ?? 0,
+        ),
+        cards_reviewed: Math.max(
+          localReviewedCount,
+          localReviewSummary.totalReviews,
+          remoteDailySummary.cardsReviewed,
+          remotePublicReviewSummary?.totalReviews ?? 0,
+          profile?.cards_reviewed ?? 0,
+        ),
+        last_review_date: maxDate(
+          lastReviewDay,
+          localReviewSummary.lastReviewDate,
+          remoteDailySummary.lastReviewDate,
+          remotePublicReviewSummary?.lastReviewDate,
+          profile?.last_review_date?.slice(0, 10),
+        ),
+      };
+
+      patchCurrentProfile(owner, stats);
+      if (!owner.isCurrent()) return;
+
+      const { data, error } = await supabase.from("profiles").update(stats).eq("id", owner.userId).select("*").single();
+
+      if (!owner.isCurrent()) return;
+      if (error) console.warn("[Leaderboard] Failed to update profile stats:", error.message);
+      else if (data?.id === owner.userId) {
+        useAuthStore.setState((state) => (owner.isCurrent() ? { profile: data } : state));
       }
 
-      const mergedSurahProgress = Array.from(bySurah.values());
-      if (mergedSurahProgress.length > 0) {
-        const now = new Date().toISOString();
-        const { error: progressError } = await supabase.from("public_surah_progress").upsert(
-          mergedSurahProgress.map((row) => ({
-            user_id: owner.userId,
+      try {
+        await upsertPublicReviewSummary(owner, localReviewSummary, remotePublicReviewSummary);
+      } catch (reviewAggregateError: any) {
+        if (!owner.isCurrent()) return;
+        if (!isMissingPublicReviewAggregateError(reviewAggregateError)) {
+          console.warn("[Leaderboard] Failed to update public review summary:", reviewAggregateError.message);
+        }
+      }
+
+      if (!owner.isCurrent()) return;
+      try {
+        const [surahProgress, remoteSurahProgress] = await Promise.all([
+          getLocalSurahProgress(db),
+          supabase
+            .from("public_surah_progress")
+            .select("surah, total_cards, memorized_cards")
+            .eq("user_id", owner.userId),
+        ]);
+        if (!owner.isCurrent()) return;
+        if (remoteSurahProgress.error) throw remoteSurahProgress.error;
+
+        const bySurah = new Map<number, { surah: number; total_cards: number; memorized_cards: number }>();
+        for (const row of remoteSurahProgress.data ?? []) {
+          bySurah.set(row.surah, {
             surah: row.surah,
-            total_cards: row.total_cards,
-            memorized_cards: row.memorized_cards,
-            updated_at: now,
-          })),
-          { onConflict: "user_id,surah" },
-        );
-        if (!owner.isCurrent()) return;
-        if (progressError) throw progressError;
-      } else {
-        const { error: deleteError } = await supabase
-          .from("public_surah_progress")
-          .delete()
-          .eq("user_id", owner.userId);
-        if (!owner.isCurrent()) return;
-        if (deleteError) throw deleteError;
+            total_cards: row.total_cards ?? 0,
+            memorized_cards: row.memorized_cards ?? 0,
+          });
+        }
+        for (const row of surahProgress) {
+          const existing = bySurah.get(row.surah);
+          bySurah.set(row.surah, {
+            surah: row.surah,
+            total_cards: Math.max(row.totalCards, existing?.total_cards ?? 0),
+            memorized_cards: Math.max(row.memorized, existing?.memorized_cards ?? 0),
+          });
+        }
+
+        const mergedSurahProgress = Array.from(bySurah.values());
+        if (mergedSurahProgress.length > 0) {
+          const now = new Date().toISOString();
+          const { error: progressError } = await supabase.from("public_surah_progress").upsert(
+            mergedSurahProgress.map((row) => ({
+              user_id: owner.userId,
+              surah: row.surah,
+              total_cards: row.total_cards,
+              memorized_cards: row.memorized_cards,
+              updated_at: now,
+            })),
+            { onConflict: "user_id,surah" },
+          );
+          if (!owner.isCurrent()) return;
+          if (progressError) throw progressError;
+        } else {
+          const { error: deleteError } = await supabase
+            .from("public_surah_progress")
+            .delete()
+            .eq("user_id", owner.userId);
+          if (!owner.isCurrent()) return;
+          if (deleteError) throw deleteError;
+        }
+      } catch (progressError: any) {
+        if (owner.isCurrent())
+          console.warn("[Leaderboard] Failed to update public surah progress:", progressError.message);
       }
-    } catch (progressError: any) {
-      if (owner.isCurrent())
-        console.warn("[Leaderboard] Failed to update public surah progress:", progressError.message);
+    } catch (error) {
+      if (owner.isCurrent()) throw error;
     }
-  } catch (error) {
-    if (owner.isCurrent()) throw error;
-  }
+  });
 }

@@ -836,3 +836,305 @@ test("incomplete restore also stops daily score reads and writes", async () => {
   expect(mockFrom).not.toHaveBeenCalled();
   expect(mockGetTodayScore).not.toHaveBeenCalled();
 });
+
+describe("account stats FIFO", () => {
+  async function drain() {
+    for (let turn = 0; turn < 128; turn += 1) await Promise.resolve();
+  }
+  const pairs: { firstKind: SyncKind; secondKind: SyncKind }[] = [
+    { firstKind: "profile", secondKind: "profile" },
+    { firstKind: "daily", secondKind: "daily" },
+    { firstKind: "daily", secondKind: "profile" },
+    { firstKind: "profile", secondKind: "daily" },
+  ];
+  test.each(pairs)(
+    "holds $secondKind behind unfinished $firstKind before computing data",
+    async ({ firstKind, secondKind }) => {
+      beginAsA();
+      const owner = authCommands.captureOwner();
+      const firstScore = makeDeferred<number>();
+      const firstStarted = makeDeferred<void>();
+      mockGetTotalScore.mockResolvedValue(900);
+      mockGetTodayScore.mockResolvedValue({ score: 900, reviewsCount: 9 });
+      if (firstKind === "profile")
+        mockGetTotalScore.mockImplementationOnce(() => {
+          firstStarted.resolve();
+          return firstScore.promise;
+        });
+      else
+        mockGetTodayScore.mockImplementationOnce(async () => {
+          firstStarted.resolve();
+          return { score: await firstScore.promise, reviewsCount: 1 };
+        });
+      const first = syncWork(firstKind);
+      await firstStarted.promise;
+      const second = syncWork(secondKind);
+      try {
+        await drain();
+        expect(owner.isCurrent()).toBe(true);
+        expect(mockHasCompletedAccountRestore).toHaveBeenCalledTimes(1);
+        expect(writeIntents()).toEqual([]);
+        firstScore.resolve(111);
+        await Promise.all([first, second]);
+        const scores = writeIntents().filter((row) => row.table === "profiles" || row.table === "daily_scores");
+        expect(scores.map((row) => row.table)).toEqual([
+          firstKind === "profile" ? "profiles" : "daily_scores",
+          secondKind === "profile" ? "profiles" : "daily_scores",
+        ]);
+        expect(
+          scores.map((row) =>
+            row.table === "profiles"
+              ? (row.data as { total_score: number }).total_score
+              : (row.data as { score: number }).score,
+          ),
+        ).toEqual([111, 900]);
+        if (secondKind === "profile") expect(useAuthStore.getState().profile?.total_score).toBe(900);
+      } finally {
+        firstScore.resolve(111);
+        await Promise.allSettled([first, second]);
+      }
+    },
+  );
+
+  const failures: { sync: SyncKind; phase: PausePhase; packet: boolean }[] = [
+    { sync: "profile", phase: "score", packet: false },
+    { sync: "profile", phase: "profile-update", packet: false },
+    { sync: "profile", phase: "profile-update", packet: true },
+    { sync: "daily", phase: "score", packet: false },
+    { sync: "daily", phase: "daily-write", packet: false },
+  ];
+  test.each(failures)("keeps later work usable after $sync $phase packet=$packet", async ({ sync, phase, packet }) => {
+    beginAsA();
+    mockGetTotalScore.mockResolvedValue(950);
+    const pause = pauseAt(sync, phase);
+    const first = syncWork(sync);
+    const firstOutcome = first.then(
+      () => ({ error: null }),
+      (error: unknown) => ({ error }),
+    );
+    await pause.reached;
+    const second = updateProfileStats(database);
+    const error = new Error("original queued failure");
+    try {
+      await drain();
+      expect(mockHasCompletedAccountRestore).toHaveBeenCalledTimes(1);
+      if (packet) pause.packet(error);
+      else pause.reject(error);
+      expect((await firstOutcome).error).toBe(packet ? null : error);
+      await second;
+      expect(useAuthStore.getState().profile?.total_score).toBe(950);
+      mockGetTotalScore.mockResolvedValue(1000);
+      await updateProfileStats(database);
+      expect(useAuthStore.getState().profile?.total_score).toBe(1000);
+      if (packet)
+        expect(console.warn).toHaveBeenCalledWith("[Leaderboard] Failed to update profile stats:", error.message);
+    } finally {
+      pause.release();
+      await Promise.allSettled([first, second]);
+    }
+  });
+
+  test.each(["metadata", "credentials"] as const)("retains FIFO through same-session %s", async (kind) => {
+    const original = beginAsA();
+    const owner = authCommands.captureOwner();
+    const pause = pauseAt("profile", "score");
+    mockGetTotalScore.mockResolvedValue(900);
+    const first = updateProfileStats(database);
+    await pause.reached;
+    const currentProfile = useAuthStore.getState().profile;
+    const refreshed =
+      kind === "metadata"
+        ? { ...original, user: { ...original.user, user_metadata: { name: "updated" } } }
+        : {
+            ...original,
+            access_token: original.access_token.replace(/[^.]+$/, "bmV3"),
+            refresh_token: "rotated-refresh",
+          };
+    expect(getAuthSessionIdentity(refreshed)).toEqual(getAuthSessionIdentity(original));
+    activate(refreshed, currentProfile);
+    const second = updateProfileStats(database);
+    try {
+      await drain();
+      expect(owner.isCurrent()).toBe(true);
+      expect(mockHasCompletedAccountRestore).toHaveBeenCalledTimes(1);
+      pause.release();
+      await Promise.all([first, second]);
+      expect(useAuthStore.getState().session).toBe(refreshed);
+      expect(useAuthStore.getState().profile?.total_score).toBe(900);
+      expect(
+        writeIntents()
+          .filter((row) => row.table === "profiles")
+          .map((row) => (row.data as { total_score: number }).total_score),
+      ).toEqual([42, 900]);
+    } finally {
+      pause.release();
+      await Promise.allSettled([first, second]);
+    }
+  });
+
+  test.each(transitions)("new owner proceeds while old and queued jobs remain blocked after %s", async (kind) => {
+    const original = beginAsA();
+    const oldOwner = authCommands.captureOwner();
+    const pause = pauseAt("profile", "score");
+    mockGetTotalScore.mockResolvedValue(900);
+    const first = updateProfileStats(database);
+    await pause.reached;
+    const queued = updateProfileStats(database);
+    const queuedAgain = updateProfileStats(database);
+    await drain();
+    const replacement = publishReplacement(kind, original);
+    expect(oldOwner.isCurrent()).toBe(false);
+    if (kind === "a-b-a") expect(replacement.observedUserIds).toEqual([userB.id, userA.id]);
+    let completed = false;
+    const current = updateProfileStats(database).then(() => {
+      completed = true;
+    });
+    try {
+      await drain();
+      expect(completed).toBe(true);
+      expect(mockGetTotalScore).toHaveBeenCalledTimes(kind === "signout" ? 1 : 2);
+      if (kind !== "signout")
+        expect(useAuthStore.getState().profile).toMatchObject({ id: replacement.profile?.id, total_score: 900 });
+      const latest = useAuthStore.getState().profile;
+      const requests = mockOperations.length;
+      const restoreCalls = mockHasCompletedAccountRestore.mock.calls.length;
+      pause.release();
+      await Promise.all([first, queued, queuedAgain, current]);
+      expect(mockOperations).toHaveLength(requests);
+      expect(mockHasCompletedAccountRestore).toHaveBeenCalledTimes(restoreCalls);
+      expect(useAuthStore.getState().profile).toBe(latest);
+    } finally {
+      pause.release();
+      await Promise.allSettled([first, queued, queuedAgain, current]);
+    }
+  });
+
+  test("completion of old A cannot reset the newer B queue", async () => {
+    beginAsA();
+    const oldScore = makeDeferred<number>();
+    const oldStarted = makeDeferred<void>();
+    const newScore = makeDeferred<number>();
+    const newStarted = makeDeferred<void>();
+    mockGetTotalScore
+      .mockImplementationOnce(() => {
+        oldStarted.resolve();
+        return oldScore.promise;
+      })
+      .mockImplementationOnce(() => {
+        newStarted.resolve();
+        return newScore.promise;
+      })
+      .mockResolvedValueOnce(900)
+      .mockResolvedValueOnce(1000);
+    const old = updateProfileStats(database);
+    await oldStarted.promise;
+    activate(makeSession(userB), makeProfile(userB.id));
+    const firstB = updateProfileStats(database);
+    await newStarted.promise;
+    const secondB = updateProfileStats(database);
+    let thirdB: Promise<void> | undefined;
+    try {
+      oldScore.resolve(111);
+      await old;
+      thirdB = updateProfileStats(database);
+      await drain();
+      expect(mockHasCompletedAccountRestore).toHaveBeenCalledTimes(2);
+      expect(mockGetTotalScore).toHaveBeenCalledTimes(2);
+      newScore.resolve(333);
+      await Promise.all([firstB, secondB, thirdB]);
+      expect(useAuthStore.getState().profile).toMatchObject({ id: userB.id, total_score: 1000 });
+      expect(
+        writeIntents()
+          .filter((row) => row.table === "profiles")
+          .map((row) => (row.data as { total_score: number }).total_score),
+      ).toEqual([333, 900, 1000]);
+    } finally {
+      oldScore.resolve(111);
+      newScore.resolve(333);
+      await Promise.allSettled([old, firstB, secondB, thirdB]);
+    }
+  });
+
+  test("auth replacement does not wait for blocked stats", async () => {
+    beginAsA();
+    const pause = pauseAt("profile", "score");
+    const work = updateProfileStats(database);
+    await pause.reached;
+    let completed = false;
+    const replacement = authCommands.transition(async () => {
+      activate(makeSession(userB), makeProfile(userB.id));
+      completed = true;
+    });
+    try {
+      await drain();
+      expect(completed).toBe(true);
+      expect(useAuthStore.getState().user?.id).toBe(userB.id);
+    } finally {
+      pause.release();
+      await Promise.allSettled([work, replacement]);
+    }
+  });
+
+  const lateWrites: { sync: SyncKind; phase: PausePhase }[] = [
+    { sync: "profile", phase: "review-stats" },
+    { sync: "profile", phase: "review-activity" },
+    { sync: "profile", phase: "surah-upsert" },
+    { sync: "profile", phase: "surah-write" },
+    { sync: "daily", phase: "daily-write" },
+  ];
+  test.each(lateWrites)(
+    "waits through final remote $sync $phase before starting later work",
+    async ({ sync, phase }) => {
+      beginAsA();
+      const pause = pauseAt(sync, phase);
+      const first = syncWork(sync);
+      await pause.reached;
+      const requests = mockOperations.length;
+      const second = syncWork(sync === "profile" ? "daily" : "profile");
+      try {
+        await drain();
+        expect(mockHasCompletedAccountRestore).toHaveBeenCalledTimes(1);
+        expect(mockOperations).toHaveLength(requests);
+        pause.release();
+        await Promise.all([first, second]);
+        expect(mockHasCompletedAccountRestore).toHaveBeenCalledTimes(2);
+      } finally {
+        pause.release();
+        await Promise.allSettled([first, second]);
+      }
+    },
+  );
+
+  test("a later intent starts a fresh queue without relabeling queued old jobs", async () => {
+    beginAsA();
+    const oldOwner = authCommands.captureOwner();
+    const pause = pauseAt("profile", "score");
+    mockGetTotalScore.mockResolvedValue(900);
+    const first = updateProfileStats(database);
+    await pause.reached;
+    const queued = updateProfileStats(database);
+    const queuedAgain = updateProfileStats(database);
+    await authCommands.transition(async () => undefined);
+    expect(oldOwner.isCurrent()).toBe(false);
+    let completed = false;
+    const current = updateProfileStats(database).then(() => {
+      completed = true;
+    });
+    try {
+      await drain();
+      expect(completed).toBe(true);
+      expect(mockGetTotalScore).toHaveBeenCalledTimes(2);
+      const latest = useAuthStore.getState().profile;
+      const requests = mockOperations.length;
+      const restores = mockHasCompletedAccountRestore.mock.calls.length;
+      pause.release();
+      await Promise.all([first, queued, queuedAgain, current]);
+      expect(mockOperations).toHaveLength(requests);
+      expect(mockHasCompletedAccountRestore).toHaveBeenCalledTimes(restores);
+      expect(useAuthStore.getState().profile).toBe(latest);
+    } finally {
+      pause.release();
+      await Promise.allSettled([first, queued, queuedAgain, current]);
+    }
+  });
+});
