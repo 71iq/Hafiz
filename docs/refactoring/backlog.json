@@ -10720,7 +10720,9 @@
       "evidence": ".ralph/runs/RF-128-2-1793956960871038075",
       "primary_recovery_evidence": ".refactor-baseline/rf128-xmldom-preflight-v1/handoff-recovery-v2/decision.json",
       "completed_at": "2026-11-06T09:31:25.596943+00:00",
-      "summary": "Installed the four supplied artifacts exactly once after completing all eleven prescribed reads."
+      "summary": "Primary accepted exact legacy XML parser repair after13 fresh controller gates, separate stronger review and post-lease scope/hash checks. One lock entry changes, ten direct XML advisories removed without additions. Remaining RF090/security and RF025/auth work stay open.",
+      "primary_accepted": true,
+      "primary_acceptance_evidence": ".refactor-baseline/rf128-primary-acceptance.json"
     }
   ]
 }
