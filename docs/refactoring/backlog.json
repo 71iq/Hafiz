@@ -1983,7 +1983,7 @@
         "Cancel/remove private cache at the correct lifecycle point with no new auth behavior.",
         "RF122 guards only fetchProfile/ensureProfile across user-ID/session-reference revisions. It does not close this parent. Independently verify atomic profile clearing, stale auth/updateProfile/leaderboard-sync publishers, Query eviction, listener cleanup, offline restore and same-owner ordering before acceptance. No personal SQLite destruction.",
         "RF123 atomically clears or retains matching profile only in six successful session-identity assignment paths. Parent remains unapproved; stale auth/password/updateProfile/leaderboard publishers, cache/listener/offline policies and arbitrary external setState still need separate verification.",
-        "RF124 rejected an overbroad password candidate. RF125 is now verified and primary accepted with actual SDK continuity, storage ownership and root reset lifetime checks. It does not close this parent. Preserve its documented RF025 exclusions; the profile-save race reproduction and proposed RF127 follow-up remain unaccepted."
+        "RF124 audit and RF125 password/reset repair are accepted. RF127 profile store/editor ownership is now verified and primary accepted, including initialization and closed A-B-A regressions. These children do not close RF025: Query cache, initialization/listener/SDK, leaderboard, offline and wider ownership policies remain to be verified."
       ],
       "verification": [
         [
@@ -10589,7 +10589,9 @@
       "evidence": ".ralph/runs/RF-127-2-1793953846055927098",
       "primary_recovery_evidence": ".refactor-baseline/rf127-profile-save-v3/decision.md",
       "completed_at": "2026-11-06T08:39:04.680474+00:00",
-      "summary": "Installed the five supplied RF-127 V3 artifacts. Verification, controller checks, independent review, and primary acceptance remain pending."
+      "summary": "Primary accepted five-file profile-save ownership repair after12 fresh controller gates and separate stronger review. Missing-profile initialization and closed A-B-A regressions fixed; wider RF025 remains open.",
+      "primary_accepted": true,
+      "primary_acceptance_evidence": ".refactor-baseline/rf127-primary-acceptance.json"
     }
   ]
 }
