@@ -3,6 +3,7 @@ import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { useAuthStore } from "@/lib/auth/store";
 import { authCommands } from "@/lib/auth/commands";
 import { getAuthSessionIdentity } from "@/lib/auth/session-identity";
+import { State } from "@/lib/fsrs/scheduler";
 import {
   getPendingSyncEntries,
   markSynced,
@@ -332,6 +333,25 @@ async function fetchRemoteAccountRows(userId: string, owner: SyncOwner): Promise
   return rows;
 }
 
+function validateIncomingStudyCards(rows: readonly unknown[]): void {
+  for (const row of rows) {
+    if (!row || typeof row !== "object" || Array.isArray(row)) {
+      throw new Error("Invalid synced study card state");
+    }
+    // Deleted cards retain the existing sparse payload and default-state contract.
+    if ("deleted_at" in row && row.deleted_at) continue;
+    if (
+      !("state" in row) ||
+      (row.state !== State.New &&
+        row.state !== State.Learning &&
+        row.state !== State.Review &&
+        row.state !== State.Relearning)
+    ) {
+      throw new Error("Invalid synced study card state");
+    }
+  }
+}
+
 async function fetchRemoteRows(tableName: string, userId: string, owner: SyncOwner, since?: string): Promise<any[]> {
   const timeCol = "synced_at";
   const batchSize = 500;
@@ -350,6 +370,7 @@ async function fetchRemoteRows(tableName: string, userId: string, owner: SyncOwn
     if (error) throw error;
     if (!data || data.length === 0) break;
 
+    if (tableName === "study_cards") validateIncomingStudyCards(data);
     rows.push(...data);
     if (data.length < batchSize) break;
     offset += data.length;
@@ -696,6 +717,7 @@ async function pullTable(
     owner.requireCurrent();
     if (error) throw error;
     if (!data || data.length === 0) break;
+    if (tableName === "study_cards") validateIncomingStudyCards(data);
 
     await db.withTransactionAsync(async () => {
       owner.requireCurrent();
