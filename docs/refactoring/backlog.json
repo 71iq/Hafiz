@@ -11766,7 +11766,7 @@
     {
       "id": "RF-136",
       "title": "Repair Tailwind bundled source-map parsing",
-      "description": "FIRST COMMAND exactly cat .refactor-baseline/rf136-handoff-v1/readiness.md. Every exec_command shell=\"/usr/bin/sh\", login=false. Eleven exact ordered reads then six exact ordered copies, each separate call. No worker discovery, checks, source dumps or extra tools. Controller runs 16 fresh gates and new separate stronger review; primary owns architecture/security/final acceptance.",
+      "description": "FIRST COMMAND exactly cat .refactor-baseline/rf136-handoff-v2/readiness.md. Every exec_command shell=\"/usr/bin/sh\", login=false. Eleven exact ordered reads then six exact ordered copies, each separate call. No worker discovery, checks, source dumps or extra tools. Controller runs 16 fresh gates and new separate stronger review; primary owns architecture/security/final acceptance.",
       "rationale": "External source-map-js update leaves four old bundled modules and direct callers. Exact official repair hunks preserve self-contained fallback, separate constructors, aliases and wrappers while adding bounded offset, source getter, short-code, serializer and CSP fixes.",
       "modules": [
         "scripts/tests/source-map-cases.cjs",
@@ -11790,7 +11790,7 @@
         [
           "python3",
           "-c",
-          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf136-handoff-v1/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='a4e56270607bef11233c0e46432348ac49c6115a3536eef5ac11a60052f3690f';sys.argv=[str(p),'all'];runpy.run_path(str(p),run_name='__main__')"
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf136-handoff-v2/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='2d52782ee9d2aaf95cde42c39467663ae64f6a743265516a4500dcd8a9c34893';sys.argv=[str(p),'all'];runpy.run_path(str(p),run_name='__main__')"
         ],
         [
           "npm",
@@ -11800,12 +11800,12 @@
         [
           "python3",
           "-c",
-          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf136-handoff-v1/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='a4e56270607bef11233c0e46432348ac49c6115a3536eef5ac11a60052f3690f';sys.argv=[str(p),'installed'];runpy.run_path(str(p),run_name='__main__')"
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf136-handoff-v2/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='2d52782ee9d2aaf95cde42c39467663ae64f6a743265516a4500dcd8a9c34893';sys.argv=[str(p),'installed'];runpy.run_path(str(p),run_name='__main__')"
         ],
         [
           "python3",
           "-c",
-          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf136-handoff-v1/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='a4e56270607bef11233c0e46432348ac49c6115a3536eef5ac11a60052f3690f';sys.argv=[str(p),'audit'];runpy.run_path(str(p),run_name='__main__')"
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf136-handoff-v2/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='2d52782ee9d2aaf95cde42c39467663ae64f6a743265516a4500dcd8a9c34893';sys.argv=[str(p),'audit'];runpy.run_path(str(p),run_name='__main__')"
         ],
         [
           "npm",
@@ -11906,17 +11906,17 @@
         [
           "python3",
           "-c",
-          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf136-handoff-v1/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='a4e56270607bef11233c0e46432348ac49c6115a3536eef5ac11a60052f3690f';sys.argv=[str(p),'knip'];runpy.run_path(str(p),run_name='__main__')"
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf136-handoff-v2/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='2d52782ee9d2aaf95cde42c39467663ae64f6a743265516a4500dcd8a9c34893';sys.argv=[str(p),'knip'];runpy.run_path(str(p),run_name='__main__')"
         ],
         [
           "python3",
           "-c",
-          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf136-handoff-v1/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='a4e56270607bef11233c0e46432348ac49c6115a3536eef5ac11a60052f3690f';sys.argv=[str(p),'final'];runpy.run_path(str(p),run_name='__main__')"
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf136-handoff-v2/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='2d52782ee9d2aaf95cde42c39467663ae64f6a743265516a4500dcd8a9c34893';sys.argv=[str(p),'final'];runpy.run_path(str(p),run_name='__main__')"
         ]
       ],
       "risk": "high",
       "approved": true,
-      "status": "pending",
+      "status": "retry",
       "allowed_paths": [
         "scripts/tests/source-map-cases.cjs",
         "scripts/tests/source-map-js.test.cjs",
@@ -11925,11 +11925,15 @@
         "package.json",
         "docs/refactoring/DEPENDENCY_SECURITY.md"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "implementation_mode": "copy-only",
-      "readiness_evidence": ".refactor-baseline/rf136-handoff-v1/readiness.md",
+      "readiness_evidence": ".refactor-baseline/rf136-handoff-v2/readiness.md",
       "primary_investigation_evidence": ".refactor-baseline/rf136-tailwind-source-map-v1/vendor-manifest.json",
-      "primary_preparation_evidence": ".refactor-baseline/rf136-handoff-v1/preparation-receipt.json"
+      "primary_preparation_evidence": ".refactor-baseline/rf136-handoff-v2/preparation-receipt.json",
+      "started_at": "2026-11-06T17:11:22.759379+00:00",
+      "failure": "Verification failed: ['python3', '-c', \"import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf136-handoff-v1/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='a4e56270607bef11233c0e46432348ac49c6115a3536eef5ac11a60052f3690f';sys.argv=[str(p),'knip'];runpy.run_path(str(p),run_name='__main__')\"]; see .ralph/runs/RF-136-1-1793985082763233184/verify-14.log",
+      "evidence": ".ralph/runs/RF-136-1-1793985082763233184",
+      "primary_recovery_evidence": ".refactor-baseline/rf136-tailwind-source-map-v1/dependency-owner-recovery-v3/diagnosis.json"
     }
   ]
 }
