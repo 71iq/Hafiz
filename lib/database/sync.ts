@@ -971,6 +971,19 @@ async function upsertBookmark(db: SQLiteDatabase, row: any): Promise<void> {
 async function upsertHighlight(db: SQLiteDatabase, row: any): Promise<void> {
   const syncId = row.sync_id ?? highlightSyncId(row);
   const remoteUpdatedAt = row.updated_at ?? row.created_at ?? row.synced_at;
+
+  if (row.deleted_at) {
+    const timestampCondition = remoteUpdatedAt ? " AND (updated_at IS NULL OR updated_at = '' OR updated_at < ?)" : "";
+    const params = [syncId, row.surah, row.ayah, row.color, row.word_start, row.word_end];
+    if (remoteUpdatedAt) params.push(remoteUpdatedAt);
+    await db.runAsync(
+      `DELETE FROM highlights
+       WHERE (sync_id = ?
+          OR (surah = ? AND ayah = ? AND color = ? AND word_start IS ? AND word_end IS ?))${timestampCondition}`,
+      params,
+    );
+    return;
+  }
   const existing = await db.getFirstAsync<{ id: number; updated_at: string | null }>(
     `SELECT id, updated_at FROM highlights
      WHERE sync_id = ?
@@ -979,16 +992,6 @@ async function upsertHighlight(db: SQLiteDatabase, row: any): Promise<void> {
     [syncId, row.surah, row.ayah, row.color, row.word_start, row.word_end],
   );
   if (existing?.updated_at && remoteUpdatedAt && existing.updated_at >= remoteUpdatedAt) return;
-
-  if (row.deleted_at) {
-    await db.runAsync(
-      `DELETE FROM highlights
-       WHERE sync_id = ?
-          OR (surah = ? AND ayah = ? AND color = ? AND word_start IS ? AND word_end IS ?)`,
-      [syncId, row.surah, row.ayah, row.color, row.word_start, row.word_end],
-    );
-    return;
-  }
 
   if (existing) {
     await db.runAsync(

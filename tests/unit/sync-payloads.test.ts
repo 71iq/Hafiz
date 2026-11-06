@@ -12,6 +12,8 @@ const NEW = "2026-02-01T00:00:00.000Z";
 let mockSession: Session | null = null;
 let mockRestoreCards: unknown[] = [];
 let mockIncrementalCards: unknown[] = [];
+let mockRestoreHighlights: unknown[] = [];
+let mockIncrementalHighlights: unknown[] = [];
 const requests: { table: string; incremental: boolean; offset: number; since: string | null }[] = [];
 const mockMeaningRestoreRows: unknown[] = [];
 const mockMeaningIncrementalRows: unknown[] = [];
@@ -53,7 +55,11 @@ class MockQuery {
           ? this.incremental
             ? mockMeaningIncrementalRows
             : mockMeaningRestoreRows
-          : [];
+          : this.table === "highlights"
+            ? this.incremental
+              ? mockIncrementalHighlights
+              : mockRestoreHighlights
+            : [];
     const wireRows = rows.map((row) => {
       if (
         row === null ||
@@ -171,6 +177,7 @@ function failPage(table: string, mode: "restore" | "incremental", offset: number
 function snapshot() {
   return {
     cards: sql.prepare("SELECT * FROM study_cards ORDER BY id").all(),
+    highlights: sql.prepare("SELECT * FROM highlights ORDER BY id").all(),
     notes: sql.prepare("SELECT * FROM private_notes ORDER BY id").all(),
     meanings: sql.prepare("SELECT * FROM user_word_meanings ORDER BY surah,ayah,word_pos").all(),
     settings: sql.prepare("SELECT * FROM user_settings ORDER BY key").all(),
@@ -194,6 +201,8 @@ beforeEach(async () => {
   observeAuthSession(mockSession);
   mockRestoreCards = [];
   mockIncrementalCards = [];
+  mockRestoreHighlights = [];
+  mockIncrementalHighlights = [];
   mockMeaningRestoreRows.length = 0;
   mockMeaningIncrementalRows.length = 0;
   mockQueryErrors.clear();
@@ -432,6 +441,8 @@ describe("word meaning restore and incremental recovery", () => {
       mockMeaningIncrementalRows.length = 0;
       mockMeaningIncrementalRows.push(meaning({ meaning: "downloaded after retry", ayah: 257 }));
       mockIncrementalCards = [];
+      mockRestoreHighlights = [];
+      mockIncrementalHighlights = [];
       const retry = await fullSync(db);
       expect(retry).toMatchObject({ status: "synced", pulled: 1, accountRestored: false });
       expect(requests.filter((r) => r.table === "user_word_meanings" && r.incremental).map((r) => r.since)).toEqual(
@@ -577,4 +588,105 @@ describe("sync cursor snapshot windows", () => {
       }
     },
   );
+});
+
+const HIGHLIGHT_DELETION_TIME = "2026-01-15T00:00:00.000Z";
+const HIGHLIGHT_CANONICAL_ID = "highlight:2:255:ayah:ayah:yellow";
+function highlightRow(syncId: string, updatedAt: string | null, ayah = 255): Record<string, SQLInputValue> {
+  return {
+    sync_id: syncId,
+    surah: 2,
+    ayah,
+    word_start: null,
+    word_end: null,
+    color: "yellow",
+    created_at: OLD,
+    updated_at: updatedAt,
+    deleted_at: null,
+  };
+}
+function putHighlight(row: Record<string, SQLInputValue>) {
+  const columns = Object.keys(row);
+  sql
+    .prepare(`INSERT INTO highlights (${columns.join(",")}) VALUES (${columns.map(() => "?").join(",")})`)
+    .run(...Object.values(row));
+}
+function highlightRows() {
+  return sql.prepare("SELECT * FROM highlights ORDER BY id").all();
+}
+function remoteHighlightDeletion(overrides: Record<string, SQLInputValue> = {}) {
+  return {
+    ...highlightRow(HIGHLIGHT_CANONICAL_ID, HIGHLIGHT_DELETION_TIME),
+    deleted_at: HIGHLIGHT_DELETION_TIME,
+    synced_at: NEW,
+    ...overrides,
+  };
+}
+
+it.each(
+  ["canonical", "opaque", "missing"].flatMap((identity) =>
+    [false, true].map((newerFirst) => ({ identity, newerFirst })),
+  ),
+)(
+  "applies highlight tombstones per target for $identity IDs with newerFirst=$newerFirst",
+  async ({ identity, newerFirst }) => {
+    restoreComplete();
+    const oldId = identity === "opaque" ? "opaque imported highlight" : HIGHLIGHT_CANONICAL_ID;
+    const newId = oldId + ":101";
+    const older = highlightRow(oldId, OLD);
+    const newer = highlightRow(newId, NEW);
+    for (const row of newerFirst ? [newer, older] : [older, newer]) putHighlight(row);
+    const preserved = sql.prepare("SELECT * FROM highlights WHERE sync_id=?").get(newId);
+    mockIncrementalHighlights.push(remoteHighlightDeletion({ sync_id: identity === "missing" ? null : oldId }));
+    await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
+    expect(highlightRows()).toEqual([preserved]);
+    expect(sql.prepare("SELECT value FROM user_settings WHERE key='last_pull_at'").get()).not.toEqual({ value: OLD });
+  },
+);
+
+it.each([
+  { label: "equal", updatedAt: HIGHLIGHT_DELETION_TIME, retained: true },
+  { label: "null", updatedAt: null, retained: false },
+  { label: "empty", updatedAt: "", retained: false },
+])("keeps highlight timestamp precedence for a $label local timestamp", async ({ updatedAt, retained }) => {
+  restoreComplete();
+  putHighlight(highlightRow(HIGHLIGHT_CANONICAL_ID, OLD));
+  putHighlight(highlightRow(HIGHLIGHT_CANONICAL_ID + ":101", updatedAt));
+  const sibling = highlightRows()[1];
+  mockIncrementalHighlights.push(remoteHighlightDeletion());
+  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
+  expect(highlightRows()).toEqual(retained ? [sibling] : []);
+});
+
+it("protects a newer ID match when another older row matches the deletion coordinates", async () => {
+  restoreComplete();
+  putHighlight(highlightRow(HIGHLIGHT_CANONICAL_ID, OLD));
+  const protectedId = "opaque newer highlight";
+  putHighlight(highlightRow(protectedId, NEW, 256));
+  const preserved = highlightRows()[1];
+  mockIncrementalHighlights.push(remoteHighlightDeletion({ sync_id: protectedId }));
+  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
+  expect(highlightRows()).toEqual([preserved]);
+});
+
+it.each([
+  { field: "created_at", created_at: HIGHLIGHT_DELETION_TIME, synced_at: NEW },
+  { field: "synced_at", created_at: null, synced_at: HIGHLIGHT_DELETION_TIME },
+])("keeps the existing highlight deletion timestamp fallback to $field", async ({ created_at, synced_at }) => {
+  restoreComplete();
+  putHighlight(highlightRow(HIGHLIGHT_CANONICAL_ID, OLD));
+  putHighlight(highlightRow(HIGHLIGHT_CANONICAL_ID + ":101", NEW));
+  const preserved = highlightRows()[1];
+  mockIncrementalHighlights.push(remoteHighlightDeletion({ updated_at: null, created_at, synced_at }));
+  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
+  expect(highlightRows()).toEqual([preserved]);
+});
+
+it("retains the legacy unrestricted deletion when resolved highlight updated_at is empty", async () => {
+  restoreComplete();
+  putHighlight(highlightRow(HIGHLIGHT_CANONICAL_ID, OLD));
+  putHighlight(highlightRow(HIGHLIGHT_CANONICAL_ID + ":101", NEW));
+  mockIncrementalHighlights.push(remoteHighlightDeletion({ updated_at: "" }));
+  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
+  expect(highlightRows()).toEqual([]);
 });
