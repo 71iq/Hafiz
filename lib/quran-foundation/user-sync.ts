@@ -1,8 +1,10 @@
 import type { SQLiteDatabase } from "expo-sqlite";
 import { enqueueSync } from "@/lib/database/sync-queue";
 import { useAuthStore } from "@/lib/auth/store";
-import { isSupabaseConfigured } from "@/lib/supabase";
-import { getQfConnectionStatus, invokeQfUser } from "./user";
+import { isSupabaseConfigured, supabase } from "@/lib/supabase";
+import { authCommands } from "@/lib/auth/commands";
+import { getAuthSessionIdentity } from "@/lib/auth/session-identity";
+import { getQfConnectionStatus, invokeQfUser, type QfRequestOwner } from "./user";
 import {
   QF_DEFAULT_MUSHAF_ID,
   buildQfRange,
@@ -65,6 +67,59 @@ type LocalPrivateNoteRow = {
   qf_ranges_json: string | null;
 };
 
+type QfSyncOwner = QfRequestOwner & { isCurrent: () => boolean };
+
+function captureQfSyncOwner(): QfSyncOwner | null {
+  if (!isSupabaseConfigured()) return null;
+  const auth = useAuthStore.getState();
+  const identity = getAuthSessionIdentity(auth.session);
+  if (!auth.user || identity.kind !== "identified" || identity.userId !== auth.user.id.toLowerCase()) return null;
+  const ticket = authCommands.captureOwner();
+  const isCurrent = () => {
+    const current = useAuthStore.getState();
+    const currentIdentity = getAuthSessionIdentity(current.session);
+    return (
+      ticket.isCurrent() &&
+      current.user?.id.toLowerCase() === identity.userId &&
+      currentIdentity.kind === "identified" &&
+      currentIdentity.userId === identity.userId &&
+      currentIdentity.sessionId === identity.sessionId
+    );
+  };
+  const requireCurrent = () => {
+    if (!isCurrent()) throw new Error("Quran Foundation sync account changed");
+  };
+  return {
+    isCurrent,
+    requireCurrent,
+    getAccessToken: async () => {
+      requireCurrent();
+      // Keep the SDK's normal renewal path without accepting another session's token.
+      const { data, error } = await supabase.auth.getSession();
+      requireCurrent();
+      if (error) throw error;
+      const session = data.session;
+      const returned = getAuthSessionIdentity(session);
+      if (
+        !session ||
+        returned.kind !== "identified" ||
+        returned.userId !== identity.userId ||
+        returned.sessionId !== identity.sessionId
+      )
+        throw new Error("Quran Foundation sync session changed");
+      return session.access_token;
+    },
+  };
+}
+
+async function enqueueSupabase(...args: Parameters<typeof enqueueSync>): Promise<void> {
+  try {
+    await enqueueSync(...args);
+  } catch (error) {
+    console.warn(error);
+  }
+}
+
 export async function enqueueQfSync(
   db: SQLiteDatabase,
   entityType: QfEntityType,
@@ -89,117 +144,160 @@ export async function getPendingQfSyncCount(db: SQLiteDatabase): Promise<number>
 }
 
 export async function runInitialQfUserSync(db: SQLiteDatabase): Promise<QfSyncResult> {
-  const connection = await getQfSyncConnectionState();
+  const owner = captureQfSyncOwner();
+  if (!owner) return { status: "not_connected", pushed: 0, pulled: 0 };
+  const connection = await getQfSyncConnectionState(owner);
+  owner.requireCurrent();
   if (connection !== "connected") return { status: connection, pushed: 0, pulled: 0 };
 
-  const firstPull = await pullQfRemoteChanges(db);
-  await enqueueAllActiveLocalRows(db);
-  await markInitialLocalEnqueueDone(db);
-  const pushed = await pushQfSyncQueue(db);
-  const secondPull = await pullQfRemoteChanges(db);
+  const firstPull = await pullQfRemoteChanges(owner, db);
+  owner.requireCurrent();
+  await enqueueAllActiveLocalRows(owner, db);
+  owner.requireCurrent();
+  await markInitialLocalEnqueueDone(owner, db);
+  owner.requireCurrent();
+  const pushed = await pushQfSyncQueue(owner, db);
+  owner.requireCurrent();
+  const secondPull = await pullQfRemoteChanges(owner, db);
+  owner.requireCurrent();
   return { status: "synced", pushed, pulled: firstPull + secondPull };
 }
 
 export async function fullQfUserSync(db: SQLiteDatabase): Promise<QfSyncResult> {
-  const connection = await getQfSyncConnectionState();
+  const owner = captureQfSyncOwner();
+  if (!owner) return { status: "not_connected", pushed: 0, pulled: 0 };
+  const connection = await getQfSyncConnectionState(owner);
+  owner.requireCurrent();
   if (connection !== "connected") return { status: connection, pushed: 0, pulled: 0 };
-  if (await needsInitialLocalEnqueue(db)) {
-    const firstPull = await pullQfRemoteChanges(db);
-    await enqueueAllActiveLocalRows(db);
-    await markInitialLocalEnqueueDone(db);
-    const pushed = await pushQfSyncQueue(db);
-    const secondPull = await pullQfRemoteChanges(db);
+  const needsInitial = await needsInitialLocalEnqueue(owner, db);
+  owner.requireCurrent();
+  if (needsInitial) {
+    const firstPull = await pullQfRemoteChanges(owner, db);
+    owner.requireCurrent();
+    await enqueueAllActiveLocalRows(owner, db);
+    owner.requireCurrent();
+    await markInitialLocalEnqueueDone(owner, db);
+    owner.requireCurrent();
+    const pushed = await pushQfSyncQueue(owner, db);
+    owner.requireCurrent();
+    const secondPull = await pullQfRemoteChanges(owner, db);
+    owner.requireCurrent();
     await db.runAsync("INSERT OR REPLACE INTO user_settings (key, value) VALUES ('qf_last_sync_at', ?)", [
       new Date().toISOString(),
     ]);
+    owner.requireCurrent();
     return { status: "synced", pushed, pulled: firstPull + secondPull };
   }
-  const pushed = await pushQfSyncQueue(db);
-  const pulled = await pullQfRemoteChanges(db);
+  const pushed = await pushQfSyncQueue(owner, db);
+  owner.requireCurrent();
+  const pulled = await pullQfRemoteChanges(owner, db);
+  owner.requireCurrent();
   await db.runAsync("INSERT OR REPLACE INTO user_settings (key, value) VALUES ('qf_last_sync_at', ?)", [
     new Date().toISOString(),
   ]);
+  owner.requireCurrent();
   return { status: "synced", pushed, pulled };
 }
 
-async function needsInitialLocalEnqueue(db: SQLiteDatabase): Promise<boolean> {
+async function needsInitialLocalEnqueue(owner: QfSyncOwner, db: SQLiteDatabase): Promise<boolean> {
+  owner.requireCurrent();
   const row = await db.getFirstAsync<{ value: string }>(
     "SELECT value FROM user_settings WHERE key = 'qf_initial_local_enqueue_done'",
   );
+  owner.requireCurrent();
   return row?.value !== "true";
 }
 
-async function markInitialLocalEnqueueDone(db: SQLiteDatabase): Promise<void> {
+async function markInitialLocalEnqueueDone(owner: QfSyncOwner, db: SQLiteDatabase): Promise<void> {
+  owner.requireCurrent();
   await db.runAsync(
     "INSERT OR REPLACE INTO user_settings (key, value) VALUES ('qf_initial_local_enqueue_done', 'true')",
   );
+  owner.requireCurrent();
 }
 
-async function getQfSyncConnectionState(): Promise<QfSyncConnectionState> {
+async function getQfSyncConnectionState(owner: QfSyncOwner): Promise<QfSyncConnectionState> {
+  owner.requireCurrent();
   if (!isSupabaseConfigured()) return "not_connected";
   if (!useAuthStore.getState().user) return "not_connected";
-  const status = await getQfConnectionStatus();
+  const status = await getQfConnectionStatus(owner);
+  owner.requireCurrent();
   if (!status.ok) return status.code === "needs_reauth" ? "needs_reauth" : "failed";
   if (status.status === "needs_reauth") return "needs_reauth";
   return status.status === "connected" ? "connected" : "not_connected";
 }
 
-async function enqueueAllActiveLocalRows(db: SQLiteDatabase): Promise<void> {
+async function enqueueAllActiveLocalRows(owner: QfSyncOwner, db: SQLiteDatabase): Promise<void> {
+  owner.requireCurrent();
   const bookmarks = await db.getAllAsync<LocalBookmarkRow>("SELECT * FROM bookmarks WHERE deleted_at IS NULL");
+  owner.requireCurrent();
   for (const bookmark of bookmarks) {
     await enqueueQfSync(db, "bookmark", "UPSERT", bookmarkLocalId(bookmark.surah, bookmark.ayah), {
       surah: bookmark.surah,
       ayah: bookmark.ayah,
     });
+    owner.requireCurrent();
   }
 
   const notes = await db.getAllAsync<LocalPrivateNoteRow>("SELECT * FROM private_notes WHERE deleted_at IS NULL");
+  owner.requireCurrent();
   for (const note of notes) {
     await enqueueQfSync(db, "private_note", "UPSERT", note.id, noteToPayload(note));
+    owner.requireCurrent();
   }
 }
 
-async function pushQfSyncQueue(db: SQLiteDatabase): Promise<number> {
+async function pushQfSyncQueue(owner: QfSyncOwner, db: SQLiteDatabase): Promise<number> {
+  owner.requireCurrent();
   const entries = await db.getAllAsync<QfSyncQueueEntry>(
     `SELECT * FROM qf_sync_queue
      WHERE status IN ('pending', 'failed') AND attempt_count < 5
      ORDER BY id ASC
      LIMIT 100`,
   );
+  owner.requireCurrent();
   let pushed = 0;
 
   for (const entry of entries) {
     try {
       if (entry.entity_type === "bookmark") {
-        await pushBookmarkEntry(db, entry);
+        await pushBookmarkEntry(owner, db, entry);
+        owner.requireCurrent();
       } else {
-        await pushPrivateNoteEntry(db, entry);
+        await pushPrivateNoteEntry(owner, db, entry);
+        owner.requireCurrent();
       }
-      await markQfSynced(db, entry.id);
+      await markQfSynced(owner, db, entry.id);
+      owner.requireCurrent();
       pushed += 1;
     } catch (error) {
-      await markQfFailed(db, entry.id, errorMessage(error));
+      await markQfFailed(owner, db, entry.id, errorMessage(error));
+      owner.requireCurrent();
     }
   }
 
-  await cleanSyncedQfEntries(db);
+  await cleanSyncedQfEntries(owner, db);
+  owner.requireCurrent();
   return pushed;
 }
 
-async function pushBookmarkEntry(db: SQLiteDatabase, entry: QfSyncQueueEntry): Promise<void> {
+async function pushBookmarkEntry(owner: QfSyncOwner, db: SQLiteDatabase, entry: QfSyncQueueEntry): Promise<void> {
+  owner.requireCurrent();
   const parsedId = parseBookmarkLocalId(entry.local_id);
   if (!parsedId) return;
   const local = await db.getFirstAsync<LocalBookmarkRow>("SELECT * FROM bookmarks WHERE surah = ? AND ayah = ?", [
     parsedId.surah,
     parsedId.ayah,
   ]);
+  owner.requireCurrent();
 
   if (entry.operation === "DELETE") {
     const data = safeJson<Record<string, unknown>>(entry.data) ?? {};
     const qfBookmarkId =
       stringOrNull(data.qfBookmarkId) ??
       local?.qf_bookmark_id ??
-      (await findRemoteBookmarkId(parsedId.surah, parsedId.ayah));
+      (await findRemoteBookmarkId(owner, parsedId.surah, parsedId.ayah));
+    owner.requireCurrent();
     if (!qfBookmarkId) return;
 
     const isInDefaultCollection =
@@ -207,7 +305,8 @@ async function pushBookmarkEntry(db: SQLiteDatabase, entry: QfSyncQueueEntry): P
     const collectionsCount = numberFromUnknown(data.qfCollectionsCount) ?? local?.qf_collections_count ?? 0;
     if (isInDefaultCollection || collectionsCount > 0) return;
 
-    const response = await invokeQfUser({ action: "delete-bookmark", qfBookmarkId });
+    const response = await invokeQfUser({ action: "delete-bookmark", qfBookmarkId }, owner);
+    owner.requireCurrent();
     if (!response.ok) throw new Error(response.message);
     await db.runAsync(
       `UPDATE bookmarks
@@ -215,6 +314,7 @@ async function pushBookmarkEntry(db: SQLiteDatabase, entry: QfSyncQueueEntry): P
        WHERE surah = ? AND ayah = ?`,
       [new Date().toISOString(), parsedId.surah, parsedId.ayah],
     );
+    owner.requireCurrent();
     return;
   }
 
@@ -225,33 +325,46 @@ async function pushBookmarkEntry(db: SQLiteDatabase, entry: QfSyncQueueEntry): P
       local.surah,
       local.ayah,
     ]);
+    owner.requireCurrent();
     return;
   }
 
-  const response = await invokeQfUser({
-    action: "upsert-bookmark",
-    bookmark: { surah: local.surah, ayah: local.ayah, mushafId: QF_DEFAULT_MUSHAF_ID },
-  });
+  const response = await invokeQfUser(
+    {
+      action: "upsert-bookmark",
+      bookmark: { surah: local.surah, ayah: local.ayah, mushafId: QF_DEFAULT_MUSHAF_ID },
+    },
+    owner,
+  );
+  owner.requireCurrent();
   if (!response.ok) throw new Error(response.message);
   if (!("bookmark" in response)) return;
-  await attachQfBookmark(db, local, response.bookmark, { updateActiveState: false });
+  await attachQfBookmark(db, local, response.bookmark, {
+    updateActiveState: false,
+    requireCurrent: owner.requireCurrent,
+  });
+  owner.requireCurrent();
 }
 
-async function pushPrivateNoteEntry(db: SQLiteDatabase, entry: QfSyncQueueEntry): Promise<void> {
+async function pushPrivateNoteEntry(owner: QfSyncOwner, db: SQLiteDatabase, entry: QfSyncQueueEntry): Promise<void> {
+  owner.requireCurrent();
   const local = await db.getFirstAsync<LocalPrivateNoteRow>("SELECT * FROM private_notes WHERE id = ?", [
     entry.local_id,
   ]);
+  owner.requireCurrent();
 
   if (entry.operation === "DELETE") {
     const data = safeJson<Record<string, unknown>>(entry.data) ?? {};
     const qfNoteId = stringOrNull(data.qfNoteId) ?? local?.qf_note_id;
     if (!qfNoteId) return;
-    const response = await invokeQfUser({ action: "delete-note", qfNoteId });
+    const response = await invokeQfUser({ action: "delete-note", qfNoteId }, owner);
+    owner.requireCurrent();
     if (!response.ok) throw new Error(response.message);
     await db.runAsync("UPDATE private_notes SET qf_synced_at = ?, qf_sync_error = NULL WHERE id = ?", [
       new Date().toISOString(),
       entry.local_id,
     ]);
+    owner.requireCurrent();
     return;
   }
 
@@ -262,32 +375,50 @@ async function pushPrivateNoteEntry(db: SQLiteDatabase, entry: QfSyncQueueEntry)
       new Date().toISOString(),
       local.id,
     ]);
+    owner.requireCurrent();
     return;
   }
 
   const range = buildQfRange(local.surah, local.ayah_start, local.ayah_end);
   const response = local.qf_note_id
-    ? await invokeQfUser({
-        action: "update-note",
-        qfNoteId: local.qf_note_id,
-        body: local.content,
-        saveToQR: false,
-      })
-    : await invokeQfUser({
-        action: "create-note",
-        note: { body: local.content, ranges: [range], saveToQR: false },
-      });
+    ? await invokeQfUser(
+        {
+          action: "update-note",
+          qfNoteId: local.qf_note_id,
+          body: local.content,
+          saveToQR: false,
+        },
+        owner,
+      )
+    : await invokeQfUser(
+        {
+          action: "create-note",
+          note: { body: local.content, ranges: [range], saveToQR: false },
+        },
+        owner,
+      );
+  owner.requireCurrent();
   if (!response.ok) throw new Error(response.message);
   if (!("note" in response)) return;
-  await attachQfNote(db, local.id, response.note, [range], { enqueueSupabase: true });
+  await attachQfNote(db, local.id, response.note, [range], {
+    enqueueSupabase: true,
+    requireCurrent: owner.requireCurrent,
+  });
+  owner.requireCurrent();
 }
 
-async function pullQfRemoteChanges(db: SQLiteDatabase): Promise<number> {
+async function pullQfRemoteChanges(owner: QfSyncOwner, db: SQLiteDatabase): Promise<number> {
+  owner.requireCurrent();
   const startedAt = new Date().toISOString();
-  const [bookmarks, notes] = await Promise.all([listAllQfBookmarks(), listAllQfNotes()]);
+  const [bookmarks, notes] = await Promise.all([listAllQfBookmarks(owner), listAllQfNotes(owner)]);
+  owner.requireCurrent();
 
   let pulled = 0;
   await db.withTransactionAsync(async () => {
+    // This nonexclusive transaction may already contain another local write.
+    // Skip an obsolete merge without rolling that write back. Once admitted,
+    // finish the existing merge before fencing its following phases.
+    if (!owner.isCurrent()) return;
     for (const bookmark of bookmarks) {
       if (await mergeRemoteBookmark(db, bookmark)) pulled += 1;
     }
@@ -298,15 +429,18 @@ async function pullQfRemoteChanges(db: SQLiteDatabase): Promise<number> {
     }
     await tombstoneMissingRemoteNotes(db, notes, startedAt);
   });
+  owner.requireCurrent();
 
   return pulled;
 }
 
-async function listAllQfBookmarks(): Promise<QfBookmark[]> {
+async function listAllQfBookmarks(owner: QfSyncOwner): Promise<QfBookmark[]> {
+  owner.requireCurrent();
   const bookmarks: QfBookmark[] = [];
   let after: string | undefined;
   for (let page = 0; page < 20; page += 1) {
-    const response = await invokeQfUser({ action: "list-bookmarks", after });
+    const response = await invokeQfUser({ action: "list-bookmarks", after }, owner);
+    owner.requireCurrent();
     if (!response.ok) throw new Error(response.message);
     if (
       !("bookmarks" in response) ||
@@ -322,16 +456,21 @@ async function listAllQfBookmarks(): Promise<QfBookmark[]> {
   throw new Error("Incomplete Quran Foundation bookmarks list.");
 }
 
-async function listAllQfNotes(): Promise<QfNote[]> {
+async function listAllQfNotes(owner: QfSyncOwner): Promise<QfNote[]> {
+  owner.requireCurrent();
   const notes: QfNote[] = [];
   let cursor: string | undefined;
   for (let page = 0; page < 20; page += 1) {
-    const response = await invokeQfUser({
-      action: "list-notes",
-      cursor,
-      limit: 50,
-      sortBy: "newest",
-    });
+    const response = await invokeQfUser(
+      {
+        action: "list-notes",
+        cursor,
+        limit: 50,
+        sortBy: "newest",
+      },
+      owner,
+    );
+    owner.requireCurrent();
     if (!response.ok) throw new Error(response.message);
     if (
       !("notes" in response) ||
@@ -379,7 +518,7 @@ async function mergeRemoteBookmark(db: SQLiteDatabase, remote: QfBookmark): Prom
       remote.collectionsCount,
     ],
   );
-  enqueueSync(db, "bookmarks", "INSERT", bookmarkLocalId(remote.surah, remote.ayah), {
+  await enqueueSupabase(db, "bookmarks", "INSERT", bookmarkLocalId(remote.surah, remote.ayah), {
     surah: remote.surah,
     ayah: remote.ayah,
     created_at: remoteCreatedAt,
@@ -390,7 +529,7 @@ async function mergeRemoteBookmark(db: SQLiteDatabase, remote: QfBookmark): Prom
     qf_sync_error: null,
     qf_is_in_default_collection: remote.isInDefaultCollection,
     qf_collections_count: remote.collectionsCount,
-  }).catch(console.warn);
+  });
   return true;
 }
 
@@ -398,8 +537,9 @@ async function attachQfBookmark(
   db: SQLiteDatabase,
   local: LocalBookmarkRow,
   remote: QfBookmark,
-  options: { updateActiveState: boolean },
+  options: { updateActiveState: boolean; requireCurrent?: () => void },
 ): Promise<void> {
+  options.requireCurrent?.();
   const now = new Date().toISOString();
   const updatedAt =
     options.updateActiveState && local.updated_at < remote.createdAt ? remote.createdAt : local.updated_at;
@@ -426,8 +566,9 @@ async function attachQfBookmark(
       local.ayah,
     ],
   );
+  options.requireCurrent?.();
   if (shouldEnqueueSupabase) {
-    enqueueSync(db, "bookmarks", "UPDATE", bookmarkLocalId(local.surah, local.ayah), {
+    await enqueueSupabase(db, "bookmarks", "UPDATE", bookmarkLocalId(local.surah, local.ayah), {
       surah: local.surah,
       ayah: local.ayah,
       created_at: local.created_at,
@@ -438,7 +579,8 @@ async function attachQfBookmark(
       qf_sync_error: null,
       qf_is_in_default_collection: remote.isInDefaultCollection,
       qf_collections_count: remote.collectionsCount,
-    }).catch(console.warn);
+    });
+    options.requireCurrent?.();
   }
 }
 
@@ -461,7 +603,7 @@ async function tombstoneMissingRemoteBookmarks(
       "UPDATE bookmarks SET updated_at = ?, deleted_at = ?, qf_synced_at = ?, qf_sync_error = NULL WHERE surah = ? AND ayah = ?",
       [now, now, now, row.surah, row.ayah],
     );
-    enqueueSync(db, "bookmarks", "UPDATE", localId, {
+    await enqueueSupabase(db, "bookmarks", "UPDATE", localId, {
       surah: row.surah,
       ayah: row.ayah,
       created_at: row.created_at,
@@ -472,7 +614,7 @@ async function tombstoneMissingRemoteBookmarks(
       qf_sync_error: null,
       qf_is_in_default_collection: Boolean(row.qf_is_in_default_collection),
       qf_collections_count: row.qf_collections_count ?? 0,
-    }).catch(console.warn);
+    });
   }
 }
 
@@ -523,7 +665,7 @@ async function mergeRemoteNote(db: SQLiteDatabase, remote: QfNote): Promise<bool
         localByQfId.id,
       ],
     );
-    enqueueSync(db, "private_notes", "UPDATE", localByQfId.id, {
+    await enqueueSupabase(db, "private_notes", "UPDATE", localByQfId.id, {
       id: localByQfId.id,
       surah: parsedRange.surah,
       ayah_start: parsedRange.ayahStart,
@@ -536,7 +678,7 @@ async function mergeRemoteNote(db: SQLiteDatabase, remote: QfNote): Promise<bool
       qf_synced_at: new Date().toISOString(),
       qf_sync_error: null,
       qf_ranges_json: remote.ranges,
-    }).catch(console.warn);
+    });
     return true;
   }
 
@@ -573,7 +715,7 @@ async function mergeRemoteNote(db: SQLiteDatabase, remote: QfNote): Promise<bool
       rangesJson,
     ],
   );
-  enqueueSync(db, "private_notes", "INSERT", localId, {
+  await enqueueSupabase(db, "private_notes", "INSERT", localId, {
     id: localId,
     surah: parsedRange.surah,
     ayah_start: parsedRange.ayahStart,
@@ -586,7 +728,7 @@ async function mergeRemoteNote(db: SQLiteDatabase, remote: QfNote): Promise<bool
     qf_synced_at: new Date().toISOString(),
     qf_sync_error: null,
     qf_ranges_json: remote.ranges,
-  }).catch(console.warn);
+  });
   return true;
 }
 
@@ -595,8 +737,9 @@ async function attachQfNote(
   localId: string,
   remote: QfNote,
   fallbackRanges: string[],
-  options: { enqueueSupabase: boolean },
+  options: { enqueueSupabase: boolean; requireCurrent?: () => void },
 ): Promise<void> {
+  options.requireCurrent?.();
   await db.runAsync(
     "UPDATE private_notes SET qf_note_id = ?, qf_synced_at = ?, qf_sync_error = NULL, qf_ranges_json = ? WHERE id = ?",
     [
@@ -606,10 +749,13 @@ async function attachQfNote(
       localId,
     ],
   );
+  options.requireCurrent?.();
   if (!options.enqueueSupabase) return;
   const row = await db.getFirstAsync<LocalPrivateNoteRow>("SELECT * FROM private_notes WHERE id = ?", [localId]);
+  options.requireCurrent?.();
   if (row) {
-    enqueueSync(db, "private_notes", "UPDATE", localId, noteToPayload(row)).catch(console.warn);
+    await enqueueSupabase(db, "private_notes", "UPDATE", localId, noteToPayload(row));
+    options.requireCurrent?.();
   }
 }
 
@@ -638,11 +784,11 @@ async function tombstoneLocalQfDuplicate(db: SQLiteDatabase, row: LocalPrivateNo
     "UPDATE private_notes SET updated_at = ?, deleted_at = ?, qf_synced_at = ?, qf_sync_error = NULL WHERE id = ?",
     [now, now, now, row.id],
   );
-  enqueueSync(db, "private_notes", "UPDATE", row.id, {
+  await enqueueSupabase(db, "private_notes", "UPDATE", row.id, {
     ...noteToPayload({ ...row, updated_at: now, deleted_at: now }),
     qf_synced_at: now,
     qf_sync_error: null,
-  }).catch(console.warn);
+  });
 }
 
 async function tombstoneMissingRemoteNotes(
@@ -663,11 +809,11 @@ async function tombstoneMissingRemoteNotes(
       "UPDATE private_notes SET updated_at = ?, deleted_at = ?, qf_synced_at = ?, qf_sync_error = NULL WHERE id = ?",
       [now, now, now, row.id],
     );
-    enqueueSync(db, "private_notes", "UPDATE", row.id, {
+    await enqueueSupabase(db, "private_notes", "UPDATE", row.id, {
       ...noteToPayload({ ...row, updated_at: now, deleted_at: now }),
       qf_synced_at: now,
       qf_sync_error: null,
-    }).catch(console.warn);
+    });
   }
 }
 
@@ -679,8 +825,10 @@ async function getPendingQfLocalIds(db: SQLiteDatabase, entityType: QfEntityType
   return new Set(rows.map((row) => row.local_id));
 }
 
-async function findRemoteBookmarkId(surah: number, ayah: number): Promise<string | null> {
-  const bookmarks = await listAllQfBookmarks();
+async function findRemoteBookmarkId(owner: QfSyncOwner, surah: number, ayah: number): Promise<string | null> {
+  owner.requireCurrent();
+  const bookmarks = await listAllQfBookmarks(owner);
+  owner.requireCurrent();
   const match = bookmarks.find(
     (bookmark) =>
       bookmark.surah === surah &&
@@ -691,26 +839,32 @@ async function findRemoteBookmarkId(surah: number, ayah: number): Promise<string
   return match?.id ?? null;
 }
 
-async function markQfSynced(db: SQLiteDatabase, id: number): Promise<void> {
+async function markQfSynced(owner: QfSyncOwner, db: SQLiteDatabase, id: number): Promise<void> {
+  owner.requireCurrent();
   await db.runAsync(
     "UPDATE qf_sync_queue SET status = 'synced', synced_at = ?, updated_at = ?, last_error = NULL WHERE id = ?",
     [new Date().toISOString(), new Date().toISOString(), id],
   );
+  owner.requireCurrent();
 }
 
-async function markQfFailed(db: SQLiteDatabase, id: number, message: string): Promise<void> {
+async function markQfFailed(owner: QfSyncOwner, db: SQLiteDatabase, id: number, message: string): Promise<void> {
+  owner.requireCurrent();
   await db.runAsync(
     `UPDATE qf_sync_queue
      SET status = 'failed', attempt_count = attempt_count + 1, last_error = ?, updated_at = ?
      WHERE id = ?`,
     [message, new Date().toISOString(), id],
   );
+  owner.requireCurrent();
 }
 
-async function cleanSyncedQfEntries(db: SQLiteDatabase): Promise<void> {
+async function cleanSyncedQfEntries(owner: QfSyncOwner, db: SQLiteDatabase): Promise<void> {
+  owner.requireCurrent();
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - 7);
   await db.runAsync("DELETE FROM qf_sync_queue WHERE status = 'synced' AND synced_at < ?", [cutoff.toISOString()]);
+  owner.requireCurrent();
 }
 
 function noteToPayload(row: LocalPrivateNoteRow): Record<string, unknown> {

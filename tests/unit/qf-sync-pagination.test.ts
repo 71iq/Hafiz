@@ -1,5 +1,7 @@
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
 import type { SQLiteDatabase } from "expo-sqlite";
+import type { Session } from "@supabase/supabase-js";
+import { observeAuthSession } from "@/lib/auth/commands";
 import { createSchema } from "@/lib/database/schema";
 import { fullQfUserSync, runInitialQfUserSync } from "@/lib/quran-foundation/user-sync";
 import type { QfUserAction } from "@/lib/quran-foundation/user-types";
@@ -25,14 +27,16 @@ const remoteNote = {
 };
 const requests: QfUserAction[] = [];
 let mockPage: (entity: Entity, page: number) => unknown;
+let mockSession: Session | null = null;
 const pageCounts = { bookmarks: 0, notes: 0 };
 
 jest.mock("@/lib/auth/store", () => ({
-  useAuthStore: { getState: () => ({ user: { id: "synthetic-user" } }) },
+  useAuthStore: { getState: () => ({ user: mockSession?.user ?? null, session: mockSession }) },
 }));
 jest.mock("@/lib/supabase", () => ({
   isSupabaseConfigured: () => true,
   supabase: {
+    auth: { getSession: async () => ({ data: { session: mockSession }, error: null }) },
     functions: {
       invoke: async (_name: string, options: { body: QfUserAction }) => {
         const action = options.body;
@@ -76,6 +80,18 @@ function snapshot() {
   };
 }
 beforeEach(async () => {
+  const userId = "00000000-0000-4000-8000-000000000001";
+  const claims = Buffer.from(
+    JSON.stringify({ sub: userId, session_id: "10000000-0000-4000-8000-000000000001" }),
+  ).toString("base64url");
+  mockSession = {
+    user: { id: userId, aud: "authenticated", created_at: OLD, app_metadata: {}, user_metadata: {} },
+    access_token: "e30." + claims + ".c2ln",
+    refresh_token: "synthetic",
+    token_type: "bearer",
+    expires_in: 3600,
+  };
+  observeAuthSession(mockSession);
   requests.length = 0;
   pageCounts.bookmarks = 0;
   pageCounts.notes = 0;
@@ -117,6 +133,8 @@ beforeEach(async () => {
 });
 afterEach(() => {
   sql.close();
+  mockSession = null;
+  observeAuthSession(null);
 });
 
 const modes: Mode[] = ["full", "initial"];

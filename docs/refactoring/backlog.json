@@ -13457,6 +13457,228 @@
       "independent_review": "pass",
       "evidence": "docs/refactoring/PROGRESS.md",
       "summary": "Reject incomplete QF list envelopes and unfinished20page enumeration before local reconciliation. Keep terminal page20, valid empty deletions, pending local work and transport errors. Row/session/server normalization and transaction ownership remain open."
+    },
+    {
+      "id": "RF-144",
+      "title": "Bind Quran Foundation sync requests and local continuations to their starting session",
+      "description": "Primary owns the session/security design and app integration. A bounded worker implements only the new behavioral test file directly. Inject an optional request context into user.ts without importing the store there. user-sync captures one validated authCommands lifetime at full/initial entry, acquires a fresh matching SDK session token for each request, supplies explicit invoke Authorization and guards async continuations. Reuse existing SDK refresh, SQLite/queue helpers and sync order. No frozen artifacts or command-log audit. Primary correction: supersession checks stay outside an admitted nonexclusive legacy merge. Callback-entry supersession returns without merge work, avoiding rollback interference with unrelated writes.",
+      "rationale": "Installed SDK fetchWithAuth awaits its access-token lookup before dispatch. Actual installed createClient reproduction sends an A action under delayed B credentials unless Authorization is explicit. QF actions have no user_id filter, and current user-sync has no lifetime guards across status, list/push replies, local reads, queue acknowledgements or initial markers.",
+      "modules": [
+        "lib/quran-foundation/user.ts",
+        "lib/quran-foundation/user-sync.ts",
+        "tests/unit/qf-sync-owner.test.ts",
+        "tests/unit/qf-sync-pagination.test.ts"
+      ],
+      "dependencies": [
+        "RF-143"
+      ],
+      "risk": "high",
+      "priority": 1,
+      "approved": true,
+      "status": "verified",
+      "attempts": 2,
+      "allowed_paths": [
+        "lib/quran-foundation/user.ts",
+        "lib/quran-foundation/user-sync.ts",
+        "tests/unit/qf-sync-owner.test.ts",
+        "tests/unit/qf-sync-pagination.test.ts"
+      ],
+      "implementation_mode": "implementation",
+      "verification": [
+        [
+          "git",
+          "diff",
+          "--check"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "lib/quran-foundation/user.ts",
+          "lib/quran-foundation/user-sync.ts",
+          "tests/unit/qf-sync-owner.test.ts",
+          "tests/unit/qf-sync-pagination.test.ts",
+          "docs/refactoring/PROGRESS.md"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/quran-foundation/user.ts",
+          "lib/quran-foundation/user-sync.ts",
+          "tests/unit/qf-sync-owner.test.ts",
+          "tests/unit/qf-sync-pagination.test.ts",
+          "--max-warnings=0"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "check:analysis"
+        ],
+        [
+          "npm",
+          "run",
+          "postinstall"
+        ],
+        [
+          "npm",
+          "ls",
+          "--all",
+          "--json"
+        ],
+        [
+          "npm",
+          "run",
+          "lint"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "node",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/tests/brace-expansion.test.cjs",
+          "scripts/tests/dependency-boundaries.test.cjs",
+          "scripts/tests/icon-tool.test.cjs",
+          "scripts/tests/jest-config.test.cjs",
+          "scripts/tests/js-yaml.test.cjs",
+          "scripts/tests/lint-coverage.test.cjs",
+          "scripts/tests/metro-unicode.test.cjs",
+          "scripts/tests/nanoid.test.cjs",
+          "scripts/tests/router-dependency-range.test.cjs",
+          "scripts/tests/security-dependency-owner.test.cjs",
+          "scripts/tests/source-map-js.test.cjs",
+          "scripts/tests/tailwind-source-map.test.cjs",
+          "scripts/tests/ws.test.cjs",
+          "scripts/tests/xmldom.test.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "test:refactor-runner"
+        ],
+        [
+          "python3",
+          "-B",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "scripts/tests",
+          "-p",
+          "test_*.py"
+        ],
+        [
+          "npm",
+          "run",
+          "check:native-config"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=4096",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "android",
+          "--output-dir",
+          ".expo/modernization-checks/android",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/android')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=3072",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "ios",
+          "--output-dir",
+          ".expo/modernization-checks/ios",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/ios')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8197",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts",
+          "tests/e2e/database-bridge.spec.ts"
+        ]
+      ],
+      "acceptance_criteria": [
+        "Capture one matching identified store user/session and authCommands owner at full/initial entry. Unconfigured, signed-out and unidentified entries do no QF account work. A-to-B, signout, same-ID new session and closed A-B-A retire old work; same-session refresh remains current. Compare canonical user/session IDs as well as coordinator lifetime.",
+        "For each owned QF request, use public supabase.auth.getSession to preserve existing token renewal, then recheck owner and validate returned user/session identity before accepting its token. Reject errors, missing or foreign sessions. Send the matching token as explicit invoke-level Authorization, so a second delayed SDK lookup cannot substitute B. Recheck after invocation and after asynchronous error-body reads. No new auth/storage locks, token cache, web capability restriction or store/user import cycle. Legacy settings/OAuth wrappers remain unchanged in this bounded slice.",
+        "Thread captured owner through full/initial phases, request/page/queue and nontransaction SQL continuations. Require current ownership before later RPC/SQL, initial/last-sync markers and queue acknowledgement. At legacy transaction callback admission, skip obsolete merges by returning, never throwing supersession after BEGIN. Once admitted, the existing SQL merge and awaited queue helpers settle without supersession throws; fence afterward before later phases. Preserve ordinary SQL rollback/error semantics. A superseded push catch cannot acknowledge or increment failure attempts. Keep offline enqueue/count and RF143 completeness protection.",
+        "Behavioral tests invoke actual sync against real isolated SQLite/createSchema/queues and real authCommands identity tracking. Use synthetic sessions and actual installed FunctionsClient/createClient custom transport for delayed token substitution, with no network. Cover delayed RPC/SDK/session/DB and transaction-admission boundaries, obsolete success/error, replacement variants, same-session token renewal including an expired store token, foreign/missing/error SDK session results, current success/failure and offline enqueue. Retain all37 RF143 assertions while adapting only its auth fixture. First reproduce the delayed-token wrong-account action before source repair. Also causally reproduce account-change rollback of an unrelated edit after BEGIN, retain that edit on admission skip, exercise midmerge SQL/queue settlement and ordinary SQL-error rollback. Do not claim cancellation of an admitted legacy merge.",
+        "This does not cancel already dispatched A SQL/RPC, establish transaction ownership/rollback across platforms, choose persistent local-data ownership, validate every remote row or fix OAuth provider-credential source ownership/UI workflows. Record those limits. Full controller checks, fresh separate stronger review and primary final acceptance remain mandatory; one local commit and immediate accepted-output cleanup. Admitted legacy merges may still apply their captured rows after account retirement; isolated shared transaction ownership is prerequisite to midmerge cancellation and remains RF104 work."
+      ],
+      "started_at": "2026-11-06T21:05:05.023663+00:00",
+      "failure_history": [
+        {
+          "attempt": 1,
+          "stage": "primary acceptance",
+          "time": "2026-11-06T21:03:12.387352+00:00",
+          "reason": "Primary acceptance rejected introduced account-supersession rollback interference; causal real SQLite regression loses unrelated B edit.",
+          "checks": "all20 passed",
+          "independent_review": "pass",
+          "causal_regression_exit": 1
+        }
+      ],
+      "completed_at": "2026-11-06T21:13:35.205296+00:00",
+      "independent_review": "pass",
+      "evidence": "docs/refactoring/PROGRESS.md",
+      "summary": "QF sync pins fresh matching SDK credentials to one captured session and retires later request/nontransaction continuations. Obsolete legacy-merge admission skips without rollback; admitted merges settle before fencing. Shared transaction ownership, persisted account-data partition and OAuth/provider source ownership remain open."
     }
   ]
 }

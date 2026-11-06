@@ -10,7 +10,13 @@ import type {
 } from "./user-types";
 import { QF_OAUTH_PROVIDER, QF_OAUTH_SCOPES } from "./user-types";
 
-export async function invokeQfUser(action: QfUserAction): Promise<QfUserResponse> {
+export type QfRequestOwner = Readonly<{
+  requireCurrent: () => void;
+  getAccessToken: () => Promise<string>;
+}>;
+
+export async function invokeQfUser(action: QfUserAction, owner?: QfRequestOwner): Promise<QfUserResponse> {
+  owner?.requireCurrent();
   if (!isSupabaseConfigured()) {
     return {
       ok: false,
@@ -19,14 +25,19 @@ export async function invokeQfUser(action: QfUserAction): Promise<QfUserResponse
     };
   }
 
+  const headers = owner ? { Authorization: "Bearer " + (await owner.getAccessToken()) } : undefined;
+  owner?.requireCurrent();
   const { data, error } = await supabase.functions.invoke<QfUserResponse>("qf-user", {
     body: action,
+    ...(headers ? { headers } : {}),
   });
+  owner?.requireCurrent();
 
   if (data?.ok === true || data?.ok === false) return data;
 
   if (error) {
     const errorBody = await readFunctionError(error);
+    owner?.requireCurrent();
     if (errorBody) return errorBody;
     return {
       ok: false,
@@ -58,7 +69,7 @@ export async function connectQfFromSession(session: Session | null): Promise<QfU
 
 export async function connectQfProviderTokens(
   providerAccessToken: string,
-  providerRefreshToken?: string
+  providerRefreshToken?: string,
 ): Promise<QfUserResponse> {
   return invokeQfUser({
     action: "connect",
@@ -68,15 +79,15 @@ export async function connectQfProviderTokens(
   });
 }
 
-export async function getQfConnectionStatus(): Promise<QfConnectionStatusResponse | QfUserError> {
-  const response = await invokeQfUser({ action: "status" });
+export async function getQfConnectionStatus(owner?: QfRequestOwner): Promise<QfConnectionStatusResponse | QfUserError> {
+  const response = await invokeQfUser({ action: "status" }, owner);
   if (response.ok && "status" in response) return response as QfConnectionStatusResponse;
   return response as QfUserError;
 }
 
 export async function beginQfOAuthConnection(
   redirectUri: string,
-  returnTo?: string
+  returnTo?: string,
 ): Promise<QfBeginOAuthResponse | QfUserError> {
   const response = await invokeQfUser({ action: "begin-oauth", redirectUri, returnTo });
   if (response.ok && "authorizationUrl" in response) return response as QfBeginOAuthResponse;
@@ -86,10 +97,11 @@ export async function beginQfOAuthConnection(
 export async function completeQfOAuthConnection(
   code: string,
   state: string,
-  redirectUri: string
+  redirectUri: string,
 ): Promise<QfCompleteOAuthResponse | QfUserError> {
   const response = await invokeQfUser({ action: "complete-oauth", code, state, redirectUri });
-  if (response.ok && "status" in response && response.status === "connected") return response as QfCompleteOAuthResponse;
+  if (response.ok && "status" in response && response.status === "connected")
+    return response as QfCompleteOAuthResponse;
   return response as QfUserError;
 }
 
@@ -113,7 +125,7 @@ async function readFunctionError(error: unknown): Promise<QfUserError | null> {
   try {
     const body = await (context as Response).json();
     if (body?.ok === false) return body as QfUserError;
-  } catch (_) {}
+  } catch {}
   return null;
 }
 
