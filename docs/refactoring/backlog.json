@@ -6841,7 +6841,8 @@
         "RF-089",
         "RF-091",
         "RF-092",
-        "RF-128"
+        "RF-128",
+        "RF-134"
       ],
       "acceptance_criteria": [
         "Primary deduplicates actual advisory URLs, inspects installed instances/consumers and distinguishes shipped app, optional remote and development paths. Use fresh official advisories and compatible-version evidence.",
@@ -6850,7 +6851,8 @@
         "RF-091 is the first exact child slice, nanoid only. Track installed and virtual-lock audit scopes separately; no new advisory source is permitted by the child. Residual high findings still need smaller reviewed repairs.",
         "RF-092 is the exact YAML child, two installed legacy-line updates with existing xcpretty control. Seven direct advisory records must disappear; inherited argparse/sprintf debt and both audit scopes stay visible. Other families remain unapproved until separate preflight.",
         "Reconcile npm propagated findings across root/isolated contexts. RF096 preparation preserves reports ranging from 72 to 74 with identical old package entries and the same 23 advisory objects. Retain raw counts/effects/fixAvailable evidence, inspect real affected versions and exposure, and never execute automatic major/downgrade suggestions or call the existing audit clean.",
-        "RF128 is the exact legacy XML child, root0.8.13 to0.8.15 with separate0.9.12 control. Ten direct XML advisory URLs must disappear without new sources; fresh November snapshot39findings/10high before,38/9 after. Parent remains open for every other family."
+        "RF128 is the exact legacy XML child, root0.8.13 to0.8.15 with separate0.9.12 control. Ten direct XML advisory URLs must disappear without new sources; fresh November snapshot39findings/10high before,38/9 after. Parent remains open for every other family.",
+        "RF134 is the exact three-record external WS child. Reviewed root availability advisory and independently observed empty-fragment guards are distinguished. Bundled react-devtools-core standalone WebSocket code is not replaced by external dependency resolution and remains a separate RF090 residual. Realtime uses global/platform or explicit caller transport, not a demonstrated automatic nested-WS fallback. Both audit scopes retain other high findings and computed metadata drift."
       ],
       "verification": [
         [
@@ -11451,6 +11453,135 @@
       "summary": "Installed the six frozen artifacts. Verification, independent review, and primary acceptance remain pending.",
       "primary_acceptance_evidence": ".refactor-baseline/rf133-primary-acceptance.json",
       "primary_accepted_at": "2026-11-06T15:39:58.618824+00:00"
+    },
+    {
+      "id": "RF-134",
+      "title": "Bound external WebSocket fragments and buffers",
+      "description": "FIRST COMMAND exactly cat .refactor-baseline/rf134-handoff-v1/readiness.md. In EVERY exec_command call set shell=\"/usr/bin/sh\", login=false. Execute11ordered metadata reads then4ordered copies. No source/test reads or worker checks. Only exact /usr/bin/sh -c wrapper. Four frozen artifacts only. Controller owns14fresh gates, new stronger evaluation and commit. Primary owns policy/residuals and final acceptance.",
+      "rationale": "Root7.5.10 lacks structural allocation caps. Nested8.21.0 fails bounded empty-fragment guards. Maintained compatible patches add correct guards/reset behavior without changing parent declarations. Preparation separately corrected legacy compression and public chunk forwarding proof.",
+      "modules": [
+        "docs/refactoring/DEPENDENCY_SECURITY.md",
+        "package-lock.json",
+        "package.json",
+        "scripts/tests/ws.test.cjs"
+      ],
+      "dependencies": [
+        "RF-128",
+        "RF-133"
+      ],
+      "acceptance_criteria": [
+        "Install exactly four frozen artifacts with15strict ordered original command start/completion pairs. No worker verification, discovery or other mutation. Preserve all other tracked inputs, index semantics and protected data.",
+        "Exactly three existing WS lock entries change only version/resolved/integrity: root7.5.10 to7.5.13, realtime/jsdom8.21.0 to8.21.1; Expo8.22.1 stays. Parent ranges accept each. No override/direct dependency/major jump. Real strict-peer npm lifecycle install and exact four full source trees, Query-core13patch targets and full graph must match.",
+        "All49WS cases and71dependency-security cases pass with zero skips, including tiny empty/nonempty fragment caps, counter reset, incomplete-header chunk caps, disabled-limit/Unicode/binary controls, public client/server compression plus nonzero chunk forwarding and close1008. Compression threshold0 must cause4real valid-message decompressions. Parent resolution does not establish actual automatic usage.",
+        "Both fresh audit scopes remove only direct WS advisory1123260 with no other direct source additions/changes. Audit remains non-clean and computed parent effects/fixAvailable may differ. Existing five Knip records, types, scoped zero-warning lint/format, all unit cases, web export,28Chrome cases and all three platform graphs pass.",
+        "Embedded DevTools standalone WS remains RF090; no whole-family remediation, app exploitability, automatic realtime fallback, global privacy, native compilation/device or production claim. Separate stronger original-log/diff/evidence review and primary acceptance mandatory. No original checkout/protected input/backend/push change."
+      ],
+      "verification": [
+        [
+          "python3",
+          "-c",
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf134-handoff-v1/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='ea72b06edf44a914374ad5660586ab837a1f9d39f66540b10e0dc7ad0a6b7e23';sys.argv=[str(p),'all'];runpy.run_path(str(p),run_name='__main__')"
+        ],
+        [
+          "npm",
+          "install",
+          "--strict-peer-deps",
+          "--no-audit",
+          "--no-fund",
+          "--cache",
+          ".refactor-baseline/rf134-handoff-v1/install-cache"
+        ],
+        [
+          "python3",
+          "-c",
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf134-handoff-v1/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='ea72b06edf44a914374ad5660586ab837a1f9d39f66540b10e0dc7ad0a6b7e23';sys.argv=[str(p),'installed'];runpy.run_path(str(p),run_name='__main__')"
+        ],
+        [
+          "python3",
+          "-c",
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf134-handoff-v1/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='ea72b06edf44a914374ad5660586ab837a1f9d39f66540b10e0dc7ad0a6b7e23';sys.argv=[str(p),'audit'];runpy.run_path(str(p),run_name='__main__')"
+        ],
+        [
+          "npm",
+          "run",
+          "test:dependency-security"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "scripts/tests/ws.test.cjs",
+          "--max-warnings=0"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "scripts/tests/ws.test.cjs",
+          "package.json",
+          "docs/refactoring/DEPENDENCY_SECURITY.md"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8197",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "python3",
+          "-c",
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf134-handoff-v1/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='ea72b06edf44a914374ad5660586ab837a1f9d39f66540b10e0dc7ad0a6b7e23';sys.argv=[str(p),'knip'];runpy.run_path(str(p),run_name='__main__')"
+        ],
+        [
+          "python3",
+          "-c",
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf134-handoff-v1/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='ea72b06edf44a914374ad5660586ab837a1f9d39f66540b10e0dc7ad0a6b7e23';sys.argv=[str(p),'final'];runpy.run_path(str(p),run_name='__main__')"
+        ]
+      ],
+      "risk": "high",
+      "approved": true,
+      "status": "pending",
+      "allowed_paths": [
+        "docs/refactoring/DEPENDENCY_SECURITY.md",
+        "package-lock.json",
+        "package.json",
+        "scripts/tests/ws.test.cjs"
+      ],
+      "attempts": 0,
+      "implementation_mode": "copy-only",
+      "readiness_evidence": ".refactor-baseline/rf134-handoff-v1/readiness.md",
+      "primary_investigation_evidence": ".refactor-baseline/rf134-ws-family-v1/test-review-correction.md",
+      "primary_preparation_evidence": ".refactor-baseline/rf134-ws-family-v1/preparation-review.json"
     }
   ]
 }
