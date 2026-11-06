@@ -11766,7 +11766,7 @@
     {
       "id": "RF-136",
       "title": "Repair Tailwind bundled source-map parsing",
-      "description": "FIRST COMMAND exactly cat .refactor-baseline/rf136-handoff-v3/readiness.md. Every exec_command shell=\"/usr/bin/sh\", login=false. Eleven exact ordered reads then six exact ordered copies, each separate call. No worker discovery, checks, source dumps or extra tools. Controller runs 16 fresh gates and new separate stronger review; primary owns architecture/security/final acceptance.",
+      "description": "FIRST COMMAND exactly cat .refactor-baseline/rf136-handoff-v4/readiness.md. Every exec_command shell=\"/usr/bin/sh\", login=false. Eleven exact ordered reads then six exact ordered copies, each separate call. No worker discovery, checks, source dumps or extra tools. Controller runs 16 fresh gates and new separate stronger review; primary owns architecture/security/final acceptance.",
       "rationale": "External source-map-js update leaves four old bundled modules and direct callers. Exact official repair hunks preserve self-contained fallback, separate constructors, aliases and wrappers while adding bounded offset, source getter, short-code, serializer and CSP fixes.",
       "modules": [
         "scripts/tests/source-map-cases.cjs",
@@ -11790,7 +11790,7 @@
         [
           "python3",
           "-c",
-          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf136-handoff-v3/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='73d91130ae8cebe2709b6aa1b6f3c03f99f6da3592c0faf3e9e09fb56acdd8e4';sys.argv=[str(p),'all'];runpy.run_path(str(p),run_name='__main__')"
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf136-handoff-v4/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='48e89a72a079e6ef7ceaeced252622d29a3df36e9cc93499b881af0a565ebf94';sys.argv=[str(p),'all'];runpy.run_path(str(p),run_name='__main__')"
         ],
         [
           "npm",
@@ -11800,12 +11800,12 @@
         [
           "python3",
           "-c",
-          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf136-handoff-v3/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='73d91130ae8cebe2709b6aa1b6f3c03f99f6da3592c0faf3e9e09fb56acdd8e4';sys.argv=[str(p),'installed'];runpy.run_path(str(p),run_name='__main__')"
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf136-handoff-v4/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='48e89a72a079e6ef7ceaeced252622d29a3df36e9cc93499b881af0a565ebf94';sys.argv=[str(p),'installed'];runpy.run_path(str(p),run_name='__main__')"
         ],
         [
           "python3",
           "-c",
-          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf136-handoff-v3/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='73d91130ae8cebe2709b6aa1b6f3c03f99f6da3592c0faf3e9e09fb56acdd8e4';sys.argv=[str(p),'audit'];runpy.run_path(str(p),run_name='__main__')"
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf136-handoff-v4/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='48e89a72a079e6ef7ceaeced252622d29a3df36e9cc93499b881af0a565ebf94';sys.argv=[str(p),'audit'];runpy.run_path(str(p),run_name='__main__')"
         ],
         [
           "npm",
@@ -11906,12 +11906,12 @@
         [
           "python3",
           "-c",
-          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf136-handoff-v3/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='73d91130ae8cebe2709b6aa1b6f3c03f99f6da3592c0faf3e9e09fb56acdd8e4';sys.argv=[str(p),'knip'];runpy.run_path(str(p),run_name='__main__')"
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf136-handoff-v4/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='48e89a72a079e6ef7ceaeced252622d29a3df36e9cc93499b881af0a565ebf94';sys.argv=[str(p),'knip'];runpy.run_path(str(p),run_name='__main__')"
         ],
         [
           "python3",
           "-c",
-          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf136-handoff-v3/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='73d91130ae8cebe2709b6aa1b6f3c03f99f6da3592c0faf3e9e09fb56acdd8e4';sys.argv=[str(p),'final'];runpy.run_path(str(p),run_name='__main__')"
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf136-handoff-v4/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='48e89a72a079e6ef7ceaeced252622d29a3df36e9cc93499b881af0a565ebf94';sys.argv=[str(p),'final'];runpy.run_path(str(p),run_name='__main__')"
         ]
       ],
       "risk": "high",
@@ -11925,15 +11925,15 @@
         "package.json",
         "docs/refactoring/DEPENDENCY_SECURITY.md"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "implementation_mode": "copy-only",
-      "readiness_evidence": ".refactor-baseline/rf136-handoff-v3/readiness.md",
+      "readiness_evidence": ".refactor-baseline/rf136-handoff-v4/readiness.md",
       "primary_investigation_evidence": ".refactor-baseline/rf136-tailwind-source-map-v1/vendor-manifest.json",
-      "primary_preparation_evidence": ".refactor-baseline/rf136-handoff-v3/preparation-receipt.json",
-      "started_at": "2026-11-06T17:24:22.675998+00:00",
-      "failure": "Verification failed: ['python3', '-c', \"import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf136-handoff-v2/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='2d52782ee9d2aaf95cde42c39467663ae64f6a743265516a4500dcd8a9c34893';sys.argv=[str(p),'all'];runpy.run_path(str(p),run_name='__main__')\"]; see .ralph/runs/RF-136-2-1793985862681992115/verify-0.log",
-      "evidence": ".ralph/runs/RF-136-2-1793985862681992115",
-      "primary_recovery_evidence": ".refactor-baseline/rf136-handoff-v3/diagnosis.json",
+      "primary_preparation_evidence": ".refactor-baseline/rf136-handoff-v4/preparation-receipt.json",
+      "started_at": "2026-11-06T17:27:49.117638+00:00",
+      "failure": "Verification failed: ['python3', '-c', \"import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf136-handoff-v3/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='73d91130ae8cebe2709b6aa1b6f3c03f99f6da3592c0faf3e9e09fb56acdd8e4';sys.argv=[str(p),'all'];runpy.run_path(str(p),run_name='__main__')\"]; see .ralph/runs/RF-136-1-1793986069121699858/verify-0.log",
+      "evidence": ".ralph/runs/RF-136-1-1793986069121699858",
+      "primary_recovery_evidence": ".refactor-baseline/rf136-handoff-v4/diagnosis.json",
       "recovery_history": [
         {
           "time": "2026-11-06T17:27:35.558844+00:00",
@@ -11947,11 +11947,23 @@
           "reopened_window_limit": 2,
           "attempt_refunds": 0,
           "six_artifacts_unchanged": true
+        },
+        {
+          "time": "2026-11-06T17:30:45.801311+00:00",
+          "historical_offset": 2,
+          "current_window_attempts_spent": 1,
+          "total_ordinary_attempts_spent": 3,
+          "failed_run": ".ralph/runs/RF-136-1-1793986069121699858",
+          "failure": "Verification failed: ['python3', '-c', \"import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf136-handoff-v3/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='73d91130ae8cebe2709b6aa1b6f3c03f99f6da3592c0faf3e9e09fb56acdd8e4';sys.argv=[str(p),'all'];runpy.run_path(str(p),run_name='__main__')\"]; see .ralph/runs/RF-136-1-1793986069121699858/verify-0.log",
+          "concrete_correction": ".refactor-baseline/rf136-handoff-v4/diagnosis.json",
+          "eight_controls": ".refactor-baseline/rf136-handoff-v4/diagnostic-controls.json",
+          "refunded": 0,
+          "same_six_artifacts": true
         }
       ],
       "historical_ordinary_attempts_spent_before_extension": 2,
       "additional_attempt_historical_offset": 2,
-      "historical_total_ordinary_attempts_spent": 2
+      "historical_total_ordinary_attempts_spent": 3
     }
   ]
 }
