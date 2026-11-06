@@ -1990,7 +1990,7 @@
         "RF123 atomically clears or retains matching profile only in six successful session-identity assignment paths. Parent remains unapproved; stale auth/password/updateProfile/leaderboard publishers, cache/listener/offline policies and arbitrary external setState still need separate verification.",
         "RF124 audit and RF125 password/reset repair are accepted. RF127 profile store/editor ownership is now verified and primary accepted, including initialization and closed A-B-A regressions. These children do not close RF025: Query cache, initialization/listener/SDK, leaderboard, offline and wider ownership policies remain to be verified.",
         "RF129 owns only singleton initialization/listener retirement and obsolete startup snapshot publication, including newer same-session notifications. Cache isolation, leaderboard/overview/community/other publishers and full SDK/offline lifecycle remain open after child acceptance.",
-        "RF130 obsolete stats lifetimes, RF131 same-owner FIFO and RF132 field publication are verified and primary accepted. RF133 only addresses four viewer/local Query roots and remains pending. Parent still requires overview/community/other SDK publishers, offline and whole SQLite sync/data ownership. Remote Profile row identity/shape validation is not covered by sync-payload RF031."
+        "RF130 obsolete stats lifetimes, RF131 same-owner FIFO and RF132 field publication are verified and primary accepted. RF133 is verified and primary accepted for four viewer/local Query roots only. Parent still requires overview/community/other SDK publishers, offline and whole SQLite sync/data ownership. Remote Profile row identity/shape validation is not covered by sync-payload RF031."
       ],
       "verification": [
         [
@@ -11446,9 +11446,11 @@
       ],
       "historical_ordinary_attempts_spent_before_extension": 6,
       "additional_attempt_historical_offset": 6,
-      "historical_total_ordinary_attempts_spent": 7,
+      "historical_total_ordinary_attempts_spent": 8,
       "completed_at": "2026-11-06T15:36:25.585827+00:00",
-      "summary": "Installed the six frozen artifacts. Verification, independent review, and primary acceptance remain pending."
+      "summary": "Installed the six frozen artifacts. Verification, independent review, and primary acceptance remain pending.",
+      "primary_acceptance_evidence": ".refactor-baseline/rf133-primary-acceptance.json",
+      "primary_accepted_at": "2026-11-06T15:39:58.618824+00:00"
     }
   ]
 }
