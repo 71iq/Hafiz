@@ -10959,8 +10959,8 @@
     {
       "id": "RF-131",
       "title": "Serialize same-owner account stats refreshes",
-      "description": "Primary diagnosis recorded; exact implementation and behavioral handoff not approved.",
-      "rationale": "Actual unchanged helper finishes score900 then obsolete111 under one still-current owner. Later tasks must prove FIFO/rejection recovery and allow a new account to proceed independently of hung old work.",
+      "description": "Frozen two-artifact copy-only task. FIRST COMMAND exactly cat .refactor-baseline/rf131-handoff-v1/readiness.md. Complete all11 ordered reads before either copy, then each copy once in order. No source/test dumps or worker checks. Primary owns ordering/data policy; controller owns10 fresh gates, separate stronger evaluation and commit.",
+      "rationale": "Actual overlap finishes900 then111 under one still-current owner. Serialize complete eligible operations while allowing a replacement account and auth commands to proceed independently of hung old work.",
       "modules": [
         "lib/fsrs/leaderboard-sync.ts",
         "tests/unit/leaderboard-stats-owner.test.ts"
@@ -10969,39 +10969,97 @@
         "RF-130"
       ],
       "acceptance_criteria": [
-        "Prepare exact source scope and actual-module regressions before approval. Preserve current-owner error behavior, stable-session continuity and account isolation.",
-        "Fresh controller verification, separate stronger review and primary acceptance mandatory. No protected inputs or production."
+        "Install only two exact frozen artifacts and audit all original generator events. Preserve all other inputs and every failure.",
+        "Capture RF130 StatsOwner at invocation, before enqueue. Share private FIFO across daily/profile helpers and compute all data inside each queued body. Retain local queue references; new owner creates a fresh queue while old requests remain pending. Skip each obsolete queued body before any restore read. Keep authCommands independent.",
+        "Preserve original current caller errors and warning packets; rejected work cannot poison later work. Matching-session metadata/credential refresh retains ordering. Five late-write tests require the complete body through aggregate/activity/surah/daily awaits, and a finished old A cannot reset the newer B queue.",
+        "All196 actual cases, original21 red failures/175 controls, exact original173-case file prefix and whole-module token reversal remain. Four semantic mutants fail4/3/4/4. Fresh controller full120 suites/1894 cases without skips, types, two-file zero-warning lint/format, all3graphs, exact five Knip records, synthetic build and28 Chrome smoke must pass. All10 gates, separate stronger full diff/evidence/protocol review and primary acceptance required.",
+        "Current-owner hung stats may stall later stats until settlement; auth and new owner remain independent. One-runtime queue does not serialize other publishers/tabs/server triggers or undo sent requests. RF132 edited-field conflicts and wider RF025 remain open. No dependency, provider, auth policy, retry, protected data, original checkout or production change."
       ],
       "verification": [
         [
-          "npm",
-          "run",
-          "test:unit",
-          "--",
-          "--runTestsByPath",
-          "tests/unit/leaderboard-stats-owner.test.ts"
+          "python3",
+          "-c",
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf131-handoff-v1/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='2af8bd9f032b22fc62c4876ced33146ef5133dbaecc7bc728c03e63338739b29';sys.argv=[str(p),'all'];runpy.run_path(str(p),run_name='__main__')"
         ],
         [
           "npm",
           "run",
           "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/fsrs/leaderboard-sync.ts",
+          "tests/unit/leaderboard-stats-owner.test.ts",
+          "--max-warnings=0"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "lib/fsrs/leaderboard-sync.ts",
+          "tests/unit/leaderboard-stats-owner.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "python3",
+          "-c",
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf131-handoff-v1/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='2af8bd9f032b22fc62c4876ced33146ef5133dbaecc7bc728c03e63338739b29';sys.argv=[str(p),'knip'];runpy.run_path(str(p),run_name='__main__')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8197",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts"
+        ],
+        [
+          "python3",
+          "-c",
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf131-handoff-v1/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='2af8bd9f032b22fc62c4876ced33146ef5133dbaecc7bc728c03e63338739b29';sys.argv=[str(p),'all'];runpy.run_path(str(p),run_name='__main__')"
         ]
       ],
       "risk": "high",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
         "lib/fsrs/leaderboard-sync.ts",
         "tests/unit/leaderboard-stats-owner.test.ts"
       ],
       "attempts": 0,
-      "primary_investigation_evidence": ".refactor-baseline/rf130-stats-ownership-v1/decision.md"
+      "primary_investigation_evidence": ".refactor-baseline/rf130-stats-ownership-v1/decision.md",
+      "implementation_mode": "copy-only",
+      "readiness_evidence": ".refactor-baseline/rf131-handoff-v1/readiness.md",
+      "primary_preparation_evidence": ".refactor-baseline/rf131-stats-ordering-v1/preparation-receipt.json"
     },
     {
       "id": "RF-132",
       "title": "Preserve newer profile edits during stats reads and replies",
       "description": "Primary diagnosis recorded; exact implementation and behavioral handoff not approved.",
-      "rationale": "Actual stats ensureProfile read and full-row update success each overwrite newer same-session display/avatar/bio/country, including null clears. A stats-success-only projection does not fix the earlier ensure publisher. Primary must choose and prove a narrow publication policy.",
+      "rationale": "Actual stats ensureProfile read and full-row update success each overwrite newer same-session display/avatar/bio/country, including null clears. A stats-success-only projection does not fix the earlier ensure publisher. Primary must choose and prove a narrow publication policy. Reverse overlap also proves an actual completed edit response restores old values for all five stats fields after newer stats finish. The local store regresses while synthetic remote data retains newer values.",
       "modules": [
         "lib/auth/store.ts",
         "lib/fsrs/leaderboard-sync.ts",
