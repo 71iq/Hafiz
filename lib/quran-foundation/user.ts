@@ -53,8 +53,9 @@ export async function invokeQfUser(action: QfUserAction, owner?: QfRequestOwner)
   };
 }
 
-export async function connectQfFromSession(session: Session | null): Promise<QfUserResponse> {
-  const providerAccessToken = stringOrUndefined((session as any)?.provider_token);
+export async function connectQfFromSession(session: Session | null, owner?: QfRequestOwner): Promise<QfUserResponse> {
+  owner?.requireCurrent();
+  const providerAccessToken = stringOrUndefined(session?.provider_token);
   if (!providerAccessToken) {
     return {
       ok: false,
@@ -63,20 +64,24 @@ export async function connectQfFromSession(session: Session | null): Promise<QfU
     };
   }
 
-  const providerRefreshToken = stringOrUndefined((session as any)?.provider_refresh_token);
-  return connectQfProviderTokens(providerAccessToken, providerRefreshToken);
+  const providerRefreshToken = stringOrUndefined(session?.provider_refresh_token);
+  return connectQfProviderTokens(providerAccessToken, providerRefreshToken, owner);
 }
 
 export async function connectQfProviderTokens(
   providerAccessToken: string,
   providerRefreshToken?: string,
+  owner?: QfRequestOwner,
 ): Promise<QfUserResponse> {
-  return invokeQfUser({
-    action: "connect",
-    providerAccessToken,
-    providerRefreshToken,
-    scopes: QF_OAUTH_SCOPES.split(" "),
-  });
+  return invokeQfUser(
+    {
+      action: "connect",
+      providerAccessToken,
+      providerRefreshToken,
+      scopes: QF_OAUTH_SCOPES.split(" "),
+    },
+    owner,
+  );
 }
 
 export async function getQfConnectionStatus(owner?: QfRequestOwner): Promise<QfConnectionStatusResponse | QfUserError> {

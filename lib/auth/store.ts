@@ -15,6 +15,7 @@ import { startAppOAuth } from "@/lib/auth/oauth";
 import { isEmailAuthFlowsEnabled } from "@/lib/auth/config";
 import { isQfLoginEnabled, isQfSyncEnabled } from "@/lib/quran-foundation/config";
 import { connectQfFromSession } from "@/lib/quran-foundation/user";
+import { captureQfRequestOwner } from "@/lib/quran-foundation/request-owner";
 import { QF_OAUTH_PROVIDER } from "@/lib/quran-foundation/user-types";
 import type { AuthState, AuthActions, Profile } from "@/lib/auth/types";
 
@@ -97,8 +98,14 @@ function buildFallbackProfile(user: NonNullable<AuthState["user"]>): Profile {
 
 function connectQfSessionIfAvailable(session: AuthState["session"]): void {
   if (!isQfSyncEnabled()) return;
-  if (!(session as any)?.provider_token) return;
-  connectQfFromSession(session).catch(console.warn);
+  if (!session?.provider_token) return;
+  const owner = captureQfRequestOwner({
+    getState: useAuthStore.getState,
+    readSession: () => supabase.auth.getSession(),
+    sourceSession: session,
+  });
+  if (!owner) return;
+  connectQfFromSession(session, owner).catch(console.warn);
 }
 
 function buildProfileInsert(user: NonNullable<AuthState["user"]>) {

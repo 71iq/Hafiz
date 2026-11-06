@@ -2,9 +2,8 @@ import type { SQLiteDatabase } from "expo-sqlite";
 import { enqueueSync } from "@/lib/database/sync-queue";
 import { useAuthStore } from "@/lib/auth/store";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
-import { authCommands } from "@/lib/auth/commands";
-import { getAuthSessionIdentity } from "@/lib/auth/session-identity";
-import { getQfConnectionStatus, invokeQfUser, type QfRequestOwner } from "./user";
+import { getQfConnectionStatus, invokeQfUser } from "./user";
+import { captureQfRequestOwner, type QfSessionOwner } from "./request-owner";
 import {
   QF_DEFAULT_MUSHAF_ID,
   buildQfRange,
@@ -67,49 +66,14 @@ type LocalPrivateNoteRow = {
   qf_ranges_json: string | null;
 };
 
-type QfSyncOwner = QfRequestOwner & { isCurrent: () => boolean };
+type QfSyncOwner = QfSessionOwner;
 
 function captureQfSyncOwner(): QfSyncOwner | null {
   if (!isSupabaseConfigured()) return null;
-  const auth = useAuthStore.getState();
-  const identity = getAuthSessionIdentity(auth.session);
-  if (!auth.user || identity.kind !== "identified" || identity.userId !== auth.user.id.toLowerCase()) return null;
-  const ticket = authCommands.captureOwner();
-  const isCurrent = () => {
-    const current = useAuthStore.getState();
-    const currentIdentity = getAuthSessionIdentity(current.session);
-    return (
-      ticket.isCurrent() &&
-      current.user?.id.toLowerCase() === identity.userId &&
-      currentIdentity.kind === "identified" &&
-      currentIdentity.userId === identity.userId &&
-      currentIdentity.sessionId === identity.sessionId
-    );
-  };
-  const requireCurrent = () => {
-    if (!isCurrent()) throw new Error("Quran Foundation sync account changed");
-  };
-  return {
-    isCurrent,
-    requireCurrent,
-    getAccessToken: async () => {
-      requireCurrent();
-      // Keep the SDK's normal renewal path without accepting another session's token.
-      const { data, error } = await supabase.auth.getSession();
-      requireCurrent();
-      if (error) throw error;
-      const session = data.session;
-      const returned = getAuthSessionIdentity(session);
-      if (
-        !session ||
-        returned.kind !== "identified" ||
-        returned.userId !== identity.userId ||
-        returned.sessionId !== identity.sessionId
-      )
-        throw new Error("Quran Foundation sync session changed");
-      return session.access_token;
-    },
-  };
+  return captureQfRequestOwner({
+    getState: useAuthStore.getState,
+    readSession: () => supabase.auth.getSession(),
+  });
 }
 
 async function enqueueSupabase(...args: Parameters<typeof enqueueSync>): Promise<void> {

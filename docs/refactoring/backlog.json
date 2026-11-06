@@ -13679,6 +13679,225 @@
       "independent_review": "pass",
       "evidence": "docs/refactoring/PROGRESS.md",
       "summary": "QF sync pins fresh matching SDK credentials to one captured session and retires later request/nontransaction continuations. Obsolete legacy-merge admission skips without rollback; admitted merges settle before fencing. Shared transaction ownership, persisted account-data partition and OAuth/provider source ownership remain open."
+    },
+    {
+      "id": "RF-145",
+      "title": "Keep automatic Quran Foundation connections with their source session",
+      "description": "Primary owns architecture/security and direct source integration. A bounded worker changes only auth-runtime-store.test.ts directly, retaining existing cases and adding causal real SDK transport coverage. Extract RF144 ownership into an injected feature-local factory, reuse it unchanged for sync, and bind store auto-connect to the explicit source session through existing connection wrappers. Keep callbacks detached. No frozen artifacts or worker-command audit.",
+      "rationale": "Detached store connectQfFromSession receives A provider tokens but currently uses unowned invoke. A delayed SDK credential lookup can send those tokens under B application Authorization and link the wrong provider account. Source ownership must be captured synchronously at accepted publication, never after an await.",
+      "modules": [
+        "lib/quran-foundation/request-owner.ts",
+        "lib/quran-foundation/user-sync.ts",
+        "lib/quran-foundation/user.ts",
+        "lib/auth/store.ts",
+        "tests/unit/auth-runtime-store.test.ts",
+        "tests/unit/qf-request-owner.test.ts"
+      ],
+      "dependencies": [
+        "RF-144"
+      ],
+      "risk": "high",
+      "priority": 1,
+      "approved": true,
+      "status": "verified",
+      "attempts": 1,
+      "allowed_paths": [
+        "lib/quran-foundation/request-owner.ts",
+        "lib/quran-foundation/user-sync.ts",
+        "lib/quran-foundation/user.ts",
+        "lib/auth/store.ts",
+        "tests/unit/auth-runtime-store.test.ts",
+        "tests/unit/qf-request-owner.test.ts"
+      ],
+      "implementation_mode": "implementation",
+      "verification": [
+        [
+          "git",
+          "diff",
+          "--check"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "lib/quran-foundation/request-owner.ts",
+          "lib/quran-foundation/user-sync.ts",
+          "lib/quran-foundation/user.ts",
+          "lib/auth/store.ts",
+          "tests/unit/auth-runtime-store.test.ts",
+          "tests/unit/qf-request-owner.test.ts",
+          "docs/refactoring/PROGRESS.md"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/quran-foundation/request-owner.ts",
+          "lib/quran-foundation/user-sync.ts",
+          "lib/quran-foundation/user.ts",
+          "lib/auth/store.ts",
+          "tests/unit/auth-runtime-store.test.ts",
+          "tests/unit/qf-request-owner.test.ts",
+          "--max-warnings=0"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "check:analysis"
+        ],
+        [
+          "npm",
+          "run",
+          "postinstall"
+        ],
+        [
+          "npm",
+          "ls",
+          "--all",
+          "--json"
+        ],
+        [
+          "npm",
+          "run",
+          "lint"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "node",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/tests/brace-expansion.test.cjs",
+          "scripts/tests/dependency-boundaries.test.cjs",
+          "scripts/tests/icon-tool.test.cjs",
+          "scripts/tests/jest-config.test.cjs",
+          "scripts/tests/js-yaml.test.cjs",
+          "scripts/tests/lint-coverage.test.cjs",
+          "scripts/tests/metro-unicode.test.cjs",
+          "scripts/tests/nanoid.test.cjs",
+          "scripts/tests/router-dependency-range.test.cjs",
+          "scripts/tests/security-dependency-owner.test.cjs",
+          "scripts/tests/source-map-js.test.cjs",
+          "scripts/tests/tailwind-source-map.test.cjs",
+          "scripts/tests/ws.test.cjs",
+          "scripts/tests/xmldom.test.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "test:refactor-runner"
+        ],
+        [
+          "python3",
+          "-B",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "scripts/tests",
+          "-p",
+          "test_*.py"
+        ],
+        [
+          "npm",
+          "run",
+          "check:native-config"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=4096",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "android",
+          "--output-dir",
+          ".expo/modernization-checks/android",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/android')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=3072",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "ios",
+          "--output-dir",
+          ".expo/modernization-checks/ios",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/ios')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8197",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts",
+          "tests/e2e/database-bridge.spec.ts"
+        ]
+      ],
+      "acceptance_criteria": [
+        "Reuse RF144 request-lifetime and matching SDK token behavior in one dependency-light feature-local factory with injected state/session readers. Snapshot canonical source user/session and authCommands ticket synchronously. An omitted source uses current session; explicit null, unidentified source, source/current mismatch and missing current user fail closed. No store import or Supabase value dependency in the factory.",
+        "The store's two accepted startup/notification auto-connect paths capture immediately after publishing the accepted session, passing that same explicit source session. Null capture skips connect; never pass undefined as fallback. Pass the same optional owner through connectQfFromSession and connectQfProviderTokens to invokeQfUser. Keep provider credentials from the source object. Never recapture after an await. Preserve detached callback/catch behavior so getSession is not awaited by the SDK callback.",
+        "Actual root auth runtime/store and installed FunctionsClient tests reproduce A provider tokens under delayed B application Authorization before correction. Gate client.auth.getSession only after its real read releases the SDK lock so replacement can proceed. Track detached connect promises explicitly and always settle gates/cleanup. Cover A-B, signout, same-user new session, closed ABA, healthy startup and auth notification, same-session credential renewal, disabled/no-provider controls. Do not assert incidental unaccepted startup paths as extra successful connections.",
+        "Focused factory cases reject null/mismatched/unidentified source without SDK reads/transport and preserve matching same-session source with new credentials. Retain all RF144 ownership/transaction-settlement and RF143 pagination cases; this is reuse, not a relaxation. Validate imports/types and ordinary source diff.",
+        "OAuth source handling, settings/UI workflow ownership, persistent local-data partition and shared transaction ownership remain separate. No schema, provider/SDK/vendor patch, private endpoint, production/protected data or loop-tooling change. Every full controller check, separate fresh stronger review and primary acceptance required; one local commit, short PROGRESS note, accepted-output deletion and baseline below2GB."
+      ],
+      "started_at": "2026-11-06T21:20:25.532031+00:00",
+      "completed_at": "2026-11-06T21:29:28.596082+00:00",
+      "independent_review": "pass",
+      "evidence": "docs/refactoring/PROGRESS.md",
+      "summary": "Bind automatic QF provider-token connections to their accepted source session. Reuse one injected RF144 owner factory with fail-closed explicit-source matching; forward owner through both connection wrappers. Preserve detached callbacks, same-session renewal and legacy OAuth. No persisted account partition or transaction ownership change."
     }
   ]
 }

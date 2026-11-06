@@ -3,9 +3,11 @@ import { authCommands } from "@/lib/auth/commands";
 import { finishPasswordRecovery, preparePasswordRecovery, useAuthStore } from "@/lib/auth/store";
 import type { Session, User } from "@supabase/supabase-js";
 import type { AuthOwner } from "@/lib/auth/coordinator";
+import * as qfUser from "@/lib/quran-foundation/user";
 let mockRuntime: ReturnType<typeof createRootAuthRuntime>;
 let mockLastPasswordError: unknown;
 let mockLastRecoveryError: unknown;
+let mockQfSyncEnabled = false;
 const mockProfileReads: string[] = [];
 const mockProfile = (id: string) => ({
   id,
@@ -45,6 +47,9 @@ jest.mock("@/lib/supabase", () => ({
     get auth() {
       return mockRuntime.auth;
     },
+    get functions() {
+      return mockRuntime.client.functions;
+    },
     from: () => {
       let id = "";
       const query = {
@@ -63,8 +68,10 @@ jest.mock("@/lib/supabase", () => ({
   },
 }));
 jest.mock("@/lib/auth/oauth", () => ({ startAppOAuth: jest.fn() }));
-jest.mock("@/lib/quran-foundation/config", () => ({ isQfSyncEnabled: () => false, isQfLoginEnabled: () => false }));
-jest.mock("@/lib/quran-foundation/user", () => ({ connectQfFromSession: jest.fn() }));
+jest.mock("@/lib/quran-foundation/config", () => ({
+  isQfSyncEnabled: () => mockQfSyncEnabled,
+  isQfLoginEnabled: () => false,
+}));
 function deferred() {
   let resolve!: () => void;
   const promise = new Promise<void>((done) => {
@@ -72,7 +79,12 @@ function deferred() {
   });
   return { promise, resolve };
 }
-function session(index: number, revision = 0, seconds = 3600): Session {
+function session(
+  index: number,
+  revision = 0,
+  seconds = 3600,
+  providerTokens?: { accessToken: string; refreshToken?: string },
+): Session & { provider_token?: string; provider_refresh_token?: string } {
   const user: User = {
     id: `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
     aud: "authenticated",
@@ -95,6 +107,9 @@ function session(index: number, revision = 0, seconds = 3600): Session {
     token_type: "bearer",
     expires_in: seconds,
     expires_at: exp,
+    ...(providerTokens
+      ? { provider_token: providerTokens.accessToken, provider_refresh_token: providerTokens.refreshToken }
+      : {}),
   };
 }
 function sameSessionRefresh(initial: Session): Session {
@@ -152,9 +167,12 @@ async function setup(
     | "refresh-error"
     | "bounded-refresh-loop" = "normal",
   initializeStore = true,
+  initialSession = session(1),
+  qfSyncEnabled = false,
 ) {
+  mockQfSyncEnabled = qfSyncEnabled;
   const key = `rf125-store-runtime-${++sequence}`;
-  const initial = session(1),
+  const initial = initialSession,
     refreshed = sameSessionRefresh(initial);
   const values = new Map([[key, JSON.stringify(initial)]]);
   type HeldRead = { started: ReturnType<typeof deferred>; release: ReturnType<typeof deferred>; skip: number };
@@ -205,6 +223,12 @@ async function setup(
   const events: { event: string; session: Session | null }[] = [];
   const requests: string[] = [];
   const requestHeaders: { method: string; url: string; apikey: string | null; authorization: string | null }[] = [];
+  const qfRequests: {
+    action: string;
+    providerAccessToken?: string;
+    providerRefreshToken?: string;
+    authorization: string | null;
+  }[] = [];
   let refreshCount = 0;
   const replacements: Session[] = [];
   useAuthStore.setState({
@@ -232,7 +256,16 @@ async function setup(
       requestHeaders.push({ method, url, apikey: headers.get("apikey"), authorization: headers.get("Authorization") });
       let body: unknown,
         status = 200;
-      if (path.endsWith("/user") && method === "PUT") {
+      if (path.endsWith("/qf-user") && method === "POST") {
+        const action = JSON.parse(String(init?.body ?? "{}"));
+        qfRequests.push({
+          action: action.action,
+          providerAccessToken: action.providerAccessToken,
+          providerRefreshToken: action.providerRefreshToken,
+          authorization: headers.get("Authorization"),
+        });
+        body = { ok: true, status: "connected" };
+      } else if (path.endsWith("/user") && method === "PUT") {
         started.resolve();
         if (mode === "put") await release.promise;
         if (mode === "error") {
@@ -298,6 +331,7 @@ async function setup(
     events,
     requests,
     requestHeaders,
+    qfRequests,
     started,
     release,
     external: async (next: Session) => {
@@ -321,6 +355,207 @@ async function setup(
     },
   };
 }
+
+function trackQfConnections() {
+  const calls: { session: Session | null; promise: Promise<unknown> }[] = [];
+  const original = qfUser.connectQfFromSession;
+  const spy = jest.spyOn(qfUser, "connectQfFromSession").mockImplementation((...args) => {
+    const promise = original(...args);
+    calls.push({ session: args[0], promise });
+    return promise;
+  });
+  return {
+    calls,
+    settle: () => Promise.allSettled(calls.map((call) => call.promise)),
+    restore: () => spy.mockRestore(),
+  };
+}
+function gateNextSdkSessionRead(runtime: ReturnType<typeof createRootAuthRuntime>) {
+  const entered = deferred();
+  const release = deferred();
+  const auth = runtime.client.auth;
+  const original = auth.getSession.bind(auth);
+  let armed = true;
+  Object.defineProperty(auth, "getSession", {
+    configurable: true,
+    value: async (...args: Parameters<typeof auth.getSession>) => {
+      await original(...args); // Finish the real read and release the SDK storage lock first.
+      if (armed) {
+        armed = false;
+        entered.resolve();
+        await release.promise;
+      }
+      return original(...args); // Read the current session after the replacement publishes.
+    },
+  });
+  return {
+    entered: entered.promise,
+    release: release.resolve,
+    restore: () => {
+      delete (auth as unknown as Record<string, unknown>).getSession;
+    },
+  };
+}
+it("retires detached A provider credentials before dispatch under B app Authorization", async () => {
+  const connections = trackQfConnections();
+  const f = await setup("normal", true, session(1), true);
+  const gate = gateNextSdkSessionRead(f.runtime);
+  const a = session(1, 0, 3600, { accessToken: "provider-token-A", refreshToken: "provider-refresh-A" });
+  const signingInA = f.external(a);
+  try {
+    await gate.entered;
+    await signingInA;
+    const b = session(2);
+    await f.external(b);
+    expect(useAuthStore.getState().session?.access_token).toBe(b.access_token);
+    gate.release();
+    await connections.settle();
+    expect(f.qfRequests).toEqual([]);
+  } finally {
+    gate.release();
+    await Promise.allSettled([signingInA, ...connections.calls.map((call) => call.promise)]);
+    gate.restore();
+    connections.restore();
+    await f.close();
+  }
+});
+
+it.each(["same-user-new-session", "signout", "closed-ABA"] as const)(
+  "retires detached provider connect after %s",
+  async (transition) => {
+    const connections = trackQfConnections();
+    const f = await setup("normal", true, session(1), true);
+    const gate = gateNextSdkSessionRead(f.runtime);
+    const a = session(1, 0, 3600, { accessToken: "provider-token-A", refreshToken: "provider-refresh-A" });
+    const signingInA = f.external(a);
+    try {
+      await gate.entered;
+      await signingInA; // A's auth callback returned while its connection is still pending.
+      if (transition === "signout") {
+        expect((await f.runtime.auth.signOut()).error).toBeNull();
+      } else if (transition === "closed-ABA") {
+        await f.external(session(2));
+        await f.external(session(1)); // Same original identity, without provider tokens.
+      } else {
+        await f.external(session(1, 1));
+      }
+      gate.release();
+      await connections.settle();
+      expect(f.qfRequests).toEqual([]);
+    } finally {
+      gate.release();
+      await Promise.allSettled([signingInA, ...connections.calls.map((call) => call.promise)]);
+      gate.restore();
+      connections.restore();
+      await f.close();
+    }
+  },
+);
+
+it("keeps A provider credentials while a matching session refresh supplies the current app token", async () => {
+  const connections = trackQfConnections();
+  const f = await setup("normal", true, session(1), true);
+  const gate = gateNextSdkSessionRead(f.runtime);
+  const a = session(1, 0, 3600, { accessToken: "provider-token-A", refreshToken: "provider-refresh-A" });
+  const signingInA = f.external(a);
+  try {
+    await gate.entered;
+    await signingInA;
+    const refreshed = sameSessionRefresh(a);
+    const result = await f.runtime.auth.setSession({
+      access_token: refreshed.access_token,
+      refresh_token: refreshed.refresh_token,
+    });
+    expect(result.error).toBeNull();
+    expect(useAuthStore.getState().session?.access_token).toBe(refreshed.access_token);
+    gate.release();
+    await connections.settle();
+    expect(f.qfRequests).toHaveLength(1);
+    expect(f.qfRequests[0]).toMatchObject({
+      action: "connect",
+      providerAccessToken: "provider-token-A",
+      providerRefreshToken: "provider-refresh-A",
+      authorization: `Bearer ${refreshed.access_token}`,
+    });
+  } finally {
+    gate.release();
+    await Promise.allSettled([signingInA, ...connections.calls.map((call) => call.promise)]);
+    gate.restore();
+    connections.restore();
+    await f.close();
+  }
+});
+
+it("auto-connects once from the accepted startup session with matching credentials", async () => {
+  const connections = trackQfConnections();
+  const initial = session(1, 0, 3600, { accessToken: "startup-provider-A", refreshToken: "startup-refresh-A" });
+  const f = await setup("normal", true, initial, true);
+  try {
+    await connections.settle();
+    expect(connections.calls).toHaveLength(1);
+    expect(connections.calls[0]?.session?.access_token).toBe(initial.access_token);
+    expect(f.qfRequests).toHaveLength(1);
+    expect(f.qfRequests[0]).toMatchObject({
+      action: "connect",
+      providerAccessToken: "startup-provider-A",
+      providerRefreshToken: "startup-refresh-A",
+      authorization: `Bearer ${initial.access_token}`,
+    });
+  } finally {
+    await connections.settle();
+    connections.restore();
+    await f.close();
+  }
+});
+
+it("auto-connects from a newly accepted auth event with that event's credentials", async () => {
+  const f = await setup("normal", true, session(1), true);
+  const connections = trackQfConnections();
+  const a = session(2, 0, 3600, { accessToken: "event-provider-B", refreshToken: "event-refresh-B" });
+  try {
+    await f.external(a);
+    await connections.settle();
+    expect(connections.calls).toHaveLength(1);
+    expect(connections.calls[0]?.session?.access_token).toBe(a.access_token);
+    expect(f.qfRequests).toHaveLength(1);
+    expect(f.qfRequests[0]).toMatchObject({
+      action: "connect",
+      providerAccessToken: "event-provider-B",
+      providerRefreshToken: "event-refresh-B",
+      authorization: `Bearer ${a.access_token}`,
+    });
+  } finally {
+    await connections.settle();
+    connections.restore();
+    await f.close();
+  }
+});
+
+it("keeps disabled and missing-provider auto-connect controls quiet", async () => {
+  const disabledConnections = trackQfConnections();
+  const disabled = await setup("normal", true, session(1, 0, 3600, { accessToken: "disabled-provider" }), false);
+  try {
+    await disabledConnections.settle();
+    expect(disabledConnections.calls).toHaveLength(0);
+    expect(disabled.qfRequests).toEqual([]);
+  } finally {
+    disabledConnections.restore();
+    await disabled.close();
+  }
+
+  const noProviderConnections = trackQfConnections();
+  const enabled = await setup("normal", true, session(1), true);
+  try {
+    await enabled.external(session(2));
+    await noProviderConnections.settle();
+    expect(noProviderConnections.calls).toHaveLength(0);
+    expect(enabled.qfRequests).toEqual([]);
+  } finally {
+    noProviderConnections.restore();
+    await enabled.close();
+  }
+});
+
 it("real runtime/store preserves normal password callbacks and terminal recovery signout", async () => {
   const f = await setup();
   try {
