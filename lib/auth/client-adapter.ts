@@ -60,7 +60,12 @@ export function createOwnedAuthClient(options: Options) {
     event === "TOKEN_REFRESHED" ||
     event === "USER_UPDATED" ||
     event === "PASSWORD_RECOVERY";
-  async function deliver(event: SessionNotice["event"], session: Session | null, publish: boolean) {
+  async function deliver(
+    event: SessionNotice["event"],
+    session: Session | null,
+    publish: boolean,
+    authorized: () => boolean = () => true,
+  ) {
     const pending: Promise<void>[] = [];
     await shared.atomic(async (raw) => {
       const value = await raw.getItem(options.storageKey);
@@ -86,6 +91,7 @@ export function createOwnedAuthClient(options: Options) {
         )
           return;
       }
+      if (!authorized()) return;
       // Start credential propagation while the matching storage transaction still owns the lock.
       if (event === "TOKEN_REFRESHED" || event === "SIGNED_IN")
         pending.push(client.realtime.setAuth(session?.access_token));
@@ -93,9 +99,10 @@ export function createOwnedAuthClient(options: Options) {
         // Supabase uses the public key while anonymous. Avoid a second, stale async session lookup.
         pending.push(client.realtime.setAuth(options.anonKey));
       }
-      if (publish && (session === null || sessionIdentity(session) !== null))
+      if (authorized() && publish && (session === null || sessionIdentity(session) !== null))
         options.channel?.publish({ event, identity: sessionIdentity(session) });
       for (const entry of subscriptions) {
+        if (!authorized()) break;
         try {
           pending.push(Promise.resolve(entry.callback(event, session)));
         } catch (error) {
@@ -175,8 +182,7 @@ export function createOwnedAuthClient(options: Options) {
           persistSession: true,
           detectSessionInUrl: false,
           fetch: (input, init) => {
-            const address = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-            if (init?.method === "PUT" && new URL(address).pathname.endsWith("/user") && !owned.canDispatch())
+            if (commandActive && !owned.canDispatch())
               return Promise.resolve(
                 new Response(JSON.stringify({ msg: "Auth operation superseded", error_code: "operation_superseded" }), {
                   status: 409,
@@ -189,7 +195,8 @@ export function createOwnedAuthClient(options: Options) {
         await auth.initialize();
         await auth.stopAutoRefresh();
         auth.onAuthStateChange((event, session) => {
-          if (commandActive && noticeEvent(event)) return deliver(event, session, true);
+          if (commandActive && noticeEvent(event))
+            return deliver(event, session, true, owned.capturePublication(session));
         });
         // Drain SDK initial-session reads before activating a command ownership scope.
         await new Promise<void>((resolve) => {
@@ -223,28 +230,26 @@ export function createOwnedAuthClient(options: Options) {
       }
     });
   }
+  function routeOwner(owner: AuthOwner, isActive: () => boolean): AuthOwner {
+    return {
+      isCurrent: () => isActive() && owner.isCurrent(),
+      cancel: () => owner.cancel(),
+      canSettleSameLifetime: () => isActive() && (owner.canSettleSameLifetime?.() ?? owner.isCurrent()),
+      canCompleteRecovery: (identity) => isActive() && (owner.canCompleteRecovery?.(identity) ?? owner.isCurrent()),
+      adoptOwnSignOut: () => isActive() && (owner.adoptOwnSignOut?.() ?? owner.isCurrent()),
+    };
+  }
   return {
     client,
     auth,
     readSession: (owner: AuthOwner, session: Session | null, isActive: () => boolean) =>
-      run(
-        { isCurrent: () => owner.isCurrent() && isActive(), cancel: () => owner.cancel() },
-        session,
-        (auth) => auth.getSession(),
-        session === null,
-      ),
+      run(routeOwner(owner, isActive), session, (auth) => auth.getSession(), session === null),
     restoreSession: (
       owner: AuthOwner,
       session: Session | null,
       tokens: { access_token: string; refresh_token: string },
       isActive: () => boolean,
-    ) =>
-      run(
-        { isCurrent: () => owner.isCurrent() && isActive(), cancel: () => owner.cancel() },
-        session,
-        (auth) => auth.setSession(tokens),
-        true,
-      ),
+    ) => run(routeOwner(owner, isActive), session, (auth) => auth.setSession(tokens), true),
     updatePassword: (owner: AuthOwner, session: Session | null, password: string) =>
       run(owner, session, (auth) => auth.updateUser({ password })),
     signOut: (owner: AuthOwner, session: Session | null) => run(owner, session, (auth) => auth.signOut()),

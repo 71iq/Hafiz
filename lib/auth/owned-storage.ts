@@ -49,14 +49,31 @@ export function createSharedStorage(
   return { atomic, storage };
 }
 export function createOwnedStorage(shared: Pick<ReturnType<typeof createSharedStorage>, "atomic">, key: string) {
-  type Guard = { owner: AuthOwner; identity: string | null; removed: boolean; recovery: boolean; committed: boolean };
+  type Guard = {
+    owner: AuthOwner;
+    identity: string | null;
+    removed: boolean;
+    recovery: boolean;
+    committed: boolean;
+    denied: boolean;
+  };
   let active: Guard | null = null;
   const matches = (value: string | null, expected: string | null) =>
     expected === null ? value === null : identity(value) === expected;
   const supersede = (guard: Guard): never => {
+    guard.denied = true;
     guard.owner.cancel();
     throw new AuthError("Auth operation superseded", 409, "operation_superseded");
   };
+  const settles = (guard: Guard) => guard.owner.canSettleSameLifetime?.() ?? guard.owner.isCurrent();
+  const permitted = (guard: Guard) =>
+    !guard.denied &&
+    (guard.removed
+      ? settles(guard)
+      : guard.recovery
+        ? guard.owner.isCurrent() || (guard.committed && (guard.owner.canCompleteRecovery?.(guard.identity) ?? false))
+        : settles(guard));
+  const protectedKey = (name: string) => name === key || name === key + "-code-verifier" || name === key + "-user";
   const storage: Storage = {
     getItem: (name) =>
       shared.atomic(async (raw) => {
@@ -65,8 +82,9 @@ export function createOwnedStorage(shared: Pick<ReturnType<typeof createSharedSt
         if (
           guard &&
           name === key &&
-          !(guard.removed && value === null) &&
-          ((!(guard.recovery && guard.committed) && !guard.owner.isCurrent()) || !matches(value, guard.identity))
+          ((!guard.committed && !guard.removed && !guard.owner.isCurrent()) ||
+            !permitted(guard) ||
+            !(guard.removed ? value === null : matches(value, guard.identity)))
         )
           supersede(guard);
         return value;
@@ -75,18 +93,17 @@ export function createOwnedStorage(shared: Pick<ReturnType<typeof createSharedSt
       shared.atomic(async (raw) => {
         const guard = active;
         let next: string | null = null;
-        if (guard && name === key) {
+        if (guard && protectedKey(name)) {
           const current = await raw.getItem(key);
-          next = identity(value);
-          if (
-            !matches(current, guard.identity) ||
-            next === null ||
-            (guard.recovery && !guard.committed ? !guard.owner.isCurrent() : next !== guard.identity)
-          )
-            supersede(guard);
+          if (!permitted(guard) || guard.removed || !matches(current, guard.identity)) supersede(guard);
+          if (name === key) {
+            next = identity(value);
+            if (next === null || (!(guard.recovery && !guard.committed) && next !== guard.identity)) supersede(guard);
+          }
         }
         await raw.setItem(name, value);
-        if (guard && name === key && guard.recovery) {
+        if (guard && name === key) {
+          // A receipt exists only after the guarded backing write succeeds.
           guard.identity = next;
           guard.committed = true;
         }
@@ -98,9 +115,10 @@ export function createOwnedStorage(shared: Pick<ReturnType<typeof createSharedSt
           // Recovery must not delete the existing session or its auxiliary state when its own token fails.
           if (name === key || name === key + "-code-verifier" || name === key + "-user") return;
         }
-        if (guard && (name === key || name === key + "-code-verifier" || name === key + "-user")) {
+        if (guard && protectedKey(name)) {
           const current = await raw.getItem(key);
-          if (guard.removed ? current !== null : !matches(current, guard.identity)) supersede(guard);
+          if (!permitted(guard) || (guard.removed ? current !== null : !matches(current, guard.identity)))
+            supersede(guard);
         }
         await raw.removeItem(name);
         if (guard && name === key) guard.removed = true;
@@ -122,6 +140,7 @@ export function createOwnedStorage(shared: Pick<ReturnType<typeof createSharedSt
       removed: false,
       recovery,
       committed: false,
+      denied: false,
     };
     try {
       return await work();
@@ -131,7 +150,34 @@ export function createOwnedStorage(shared: Pick<ReturnType<typeof createSharedSt
   }
   return {
     storage,
-    canDispatch: () => active !== null && active.owner.isCurrent(),
+    canDispatch: () => {
+      if (!active || active.denied) return false;
+      if (active.owner.isCurrent()) return true;
+      // A refused refresh can make the SDK attempt SIGNED_OUT cleanup.
+      // Nothing was sent, so that cleanup must not delete the prior session.
+      active.denied = true;
+      return false;
+    },
+    capturePublication: (session: Session | null) => {
+      const guard = active;
+      const parsed = getAuthSessionIdentity(session);
+      const next = parsed.kind === "identified" ? JSON.stringify(parsed) : null;
+      let adopted = false;
+      return () => {
+        if (
+          !guard ||
+          active !== guard ||
+          !permitted(guard) ||
+          (session === null ? !guard.removed : !guard.committed || next === null || next !== guard.identity)
+        )
+          return false;
+        if (session === null && !adopted) {
+          if (guard.owner.adoptOwnSignOut && !guard.owner.adoptOwnSignOut()) return false;
+          adopted = true;
+        }
+        return true;
+      };
+    },
     run: <T>(owner: AuthOwner, session: Session | null, work: () => Promise<T>) => run(owner, session, work, false),
     restore: <T>(owner: AuthOwner, session: Session | null, work: () => Promise<T>) => run(owner, session, work, true),
   };

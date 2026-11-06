@@ -1,4 +1,12 @@
-export type AuthOwner = { isCurrent: () => boolean; cancel: () => void };
+export type AuthOwner = {
+  isCurrent: () => boolean;
+  cancel: () => void;
+  // Only already-issued SDK work may settle after its screen cancels.
+  canSettleSameLifetime?: () => boolean;
+  canCompleteRecovery?: (identity: string | null) => boolean;
+  // Called only after the owned adapter verifies its own session-removal receipt.
+  adoptOwnSignOut?: () => boolean;
+};
 export type AuthCommandResult<T> = { status: "completed"; value: T; owner: AuthOwner } | { status: "superseded" };
 
 type Ticket = { epoch: number; intent: number; cancelled: boolean; key: string | null };
@@ -19,10 +27,28 @@ export function createAuthCoordinator(initialIdentity: string | null) {
     const ticket = tickets.get(owner);
     return !!ticket && !ticket.cancelled && ticket.epoch === epoch && ticket.intent === intent;
   }
+  function sameLifetime(owner: AuthOwner): boolean {
+    const ticket = tickets.get(owner);
+    return !!ticket && ticket.epoch === epoch && ticket.intent === intent;
+  }
   function captureOwner(): AuthOwner {
     const ticket: Ticket = { epoch, intent, cancelled: false, key: identity };
     const owner: AuthOwner = {
       isCurrent: () => current(owner),
+      canSettleSameLifetime: () => sameLifetime(owner),
+      canCompleteRecovery: (next) => canCompleteRecovery(owner, next),
+      adoptOwnSignOut: () => {
+        if (!sameLifetime(owner) || identity === null) return false;
+        identity = null;
+        epoch += 1;
+        ticket.epoch = epoch;
+        ticket.key = null;
+        // A successful terminal logout keeps its result authority. Cleanup from another
+        // issued SDK operation may publish null, but cannot revive that command's result.
+        if (active?.owner === owner && active.allowSignOut) active.allowSignOut = false;
+        else ticket.cancelled = true;
+        return true;
+      },
       cancel: () => {
         ticket.cancelled = true;
       },
@@ -32,15 +58,8 @@ export function createAuthCoordinator(initialIdentity: string | null) {
   }
   function observeIdentity(next: string | null): void {
     if (next === identity) return;
-    const adopted =
-      active && active.allowSignOut && next === null && current(active.owner) ? tickets.get(active.owner) : undefined;
     identity = next;
     epoch += 1;
-    if (adopted) {
-      adopted.epoch = epoch;
-      adopted.key = null;
-      if (active) active.allowSignOut = false;
-    }
   }
   // A read begun without a session may observe its own one-step SDK restore.
   // A changed signed-in owner or any intervening A-B-A sequence stays obsolete.

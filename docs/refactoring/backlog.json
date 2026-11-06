@@ -1981,7 +1981,8 @@
         "RF-130",
         "RF-131",
         "RF-132",
-        "RF-133"
+        "RF-133",
+        "RF-152"
       ],
       "acceptance_criteria": [
         "Test sign-in, sign-out, account switch, late responses, subscription cleanup and offline restore.",
@@ -1990,7 +1991,8 @@
         "RF123 atomically clears or retains matching profile only in six successful session-identity assignment paths. Parent remains unapproved; stale auth/password/updateProfile/leaderboard publishers, cache/listener/offline policies and arbitrary external setState still need separate verification.",
         "RF124 audit and RF125 password/reset repair are accepted. RF127 profile store/editor ownership is now verified and primary accepted, including initialization and closed A-B-A regressions. These children do not close RF025: Query cache, initialization/listener/SDK, leaderboard, offline and wider ownership policies remain to be verified.",
         "RF129 owns only singleton initialization/listener retirement and obsolete startup snapshot publication, including newer same-session notifications. Cache isolation, leaderboard/overview/community/other publishers and full SDK/offline lifecycle remain open after child acceptance.",
-        "RF130 obsolete stats lifetimes, RF131 same-owner FIFO and RF132 field publication are verified and primary accepted. RF133 is verified and primary accepted for four viewer/local Query roots only. Parent still requires overview/community/other SDK publishers, offline and whole SQLite sync/data ownership. Remote Profile row identity/shape validation is not covered by sync-payload RF031."
+        "RF130 obsolete stats lifetimes, RF131 same-owner FIFO and RF132 field publication are verified and primary accepted. RF133 is verified and primary accepted for four viewer/local Query roots only. Parent still requires overview/community/other SDK publishers, offline and whole SQLite sync/data ownership. Remote Profile row identity/shape validation is not covered by sync-payload RF031.",
+        "RF152 is accepted for owned password/read/recovery/logout settlement and private SDK notifications. Native interactive OAuth, legacy raw main-client writers/background behavior and persistent account-data policy remain open; this parent is not closed."
       ],
       "verification": [
         [
@@ -15433,6 +15435,240 @@
       "independent_review": "pass",
       "evidence": "docs/refactoring/PROGRESS.md",
       "summary": "Apply highlight tombstone timestamp precedence to every matched local row so older duplicates cannot admit deletion of newer edits or block deletion of older siblings. Preserve opaque/migrated IDs, existing nullish fallbacks and live upserts."
+    },
+    {
+      "id": "RF-152",
+      "title": "Retire obsolete SDK persistence and notifications",
+      "description": "Fence owned SDK settlement by account epoch and command intent while preserving cancelled-screen same-lifetime settlement.",
+      "rationale": "Held same-identity password/refresh/logout replies and commit-to-notification gaps can bypass intent or closed A-B-A retirement.",
+      "modules": [
+        "lib/auth/coordinator.ts",
+        "lib/auth/owned-storage.ts",
+        "lib/auth/client-adapter.ts"
+      ],
+      "dependencies": [
+        "RF-125",
+        "RF-129",
+        "RF-145"
+      ],
+      "acceptance_criteria": [
+        "Primary security design. Add optional owner canSettleSameLifetime and canCompleteRecovery capabilities and an attributed own-signout adoption capability. Strict isCurrent remains admission, subsequent dispatch and UI completion authority. Same-lifetime settlement ignores only ticket cancellation, never new intent or epoch/closedABA. Fake owners without capabilities use strict currentness.",
+        "Guard session/auxiliary persistence, deletion and post-removal reads by receipt and settlement permission. Retain precommit recovery cleanup suppression and original SDK error/prior credentials. A recovery write receipt exists only after raw write succeeds; no blanket committed bypass. Route read/restore wrappers AND every capability with isActive.",
+        "Private SDK deliver captures operation guard/receipt and checks it inside shared storage lock after exact session match, before realtime/channel/listeners and between listeners. Retired delivery cannot publish. Keep main SDK/cross-tab reconciliation unchanged. Never compensate or roll back an already authorized commit.",
+        "Remove implicit adoption of any null observation during active allowSignOut. Guarded own removal explicitly adopts its own one-shot null transition immediately before delivery. Keep cancellation cancelled and external null/B/ABA retired. Current terminal recovery signout remains completed.",
+        "Real runtime/SDK causal tests cover held PUT/refresh/logout under new intent and closedABA, route-cancelled refresh read, postcommit retirement delivery barriers and current/cancelled controls. Pure owned-storage tests cover guarded receipts, invalid removal and fallback owners. Preserve established cancelled password/refresh settlement and no subsequent PUT.",
+        "Focused auth tests/types/scoped lint while iterating, full20 controller checks once ready, fresh stronger independent review and primary acceptance. One local commit, short PROGRESS note, delete accepted run folders, baseline below2GB. No OAuth integration, production, protected data or historical rewrite.",
+        "Existing rendered password route mock must attribute only its owned signOut adapter callback through the supplied capability, keeping all success/error/obsolete UI assertions. Generic raw signout remains unattributed. Own cleanup outside terminal signout may deliver null but cannot revive command result authority.",
+        "Primary found a pre-dispatch cancellation regression despite first full20/review pass. Reads stay strict until an own commit/removal receipt; every new private-command fetch requires strict currentness. A denied dispatch or rejected guard permanently denies that operation storage/publication so SDK refresh-error cleanup cannot erase prior keys. Inactive command bootstrap and main/background fetch behavior remain unchanged. Test held initial read, cancellation after validated read and actual issued-refresh-failure cleanup."
+      ],
+      "verification": [
+        [
+          "git",
+          "diff",
+          "--check"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "lib/auth/coordinator.ts",
+          "lib/auth/owned-storage.ts",
+          "lib/auth/client-adapter.ts",
+          "tests/unit/auth-command-coordinator.test.ts",
+          "tests/unit/auth-runtime-store.test.ts",
+          "tests/unit/auth-owned-storage.test.ts",
+          "tests/unit/auth-password-workflow.test.tsx",
+          "docs/refactoring/PROGRESS.md"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/auth/coordinator.ts",
+          "lib/auth/owned-storage.ts",
+          "lib/auth/client-adapter.ts",
+          "tests/unit/auth-command-coordinator.test.ts",
+          "tests/unit/auth-runtime-store.test.ts",
+          "tests/unit/auth-owned-storage.test.ts",
+          "tests/unit/auth-password-workflow.test.tsx",
+          "--max-warnings=0"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "check:analysis"
+        ],
+        [
+          "npm",
+          "run",
+          "postinstall"
+        ],
+        [
+          "npm",
+          "ls",
+          "--all",
+          "--json"
+        ],
+        [
+          "npm",
+          "run",
+          "lint"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "node",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/tests/brace-expansion.test.cjs",
+          "scripts/tests/dependency-boundaries.test.cjs",
+          "scripts/tests/icon-tool.test.cjs",
+          "scripts/tests/jest-config.test.cjs",
+          "scripts/tests/js-yaml.test.cjs",
+          "scripts/tests/lint-coverage.test.cjs",
+          "scripts/tests/metro-unicode.test.cjs",
+          "scripts/tests/nanoid.test.cjs",
+          "scripts/tests/router-dependency-range.test.cjs",
+          "scripts/tests/security-dependency-owner.test.cjs",
+          "scripts/tests/source-map-js.test.cjs",
+          "scripts/tests/tailwind-source-map.test.cjs",
+          "scripts/tests/ws.test.cjs",
+          "scripts/tests/xmldom.test.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "test:refactor-runner"
+        ],
+        [
+          "python3",
+          "-B",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "scripts/tests",
+          "-p",
+          "test_*.py"
+        ],
+        [
+          "npm",
+          "run",
+          "check:native-config"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=4096",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "android",
+          "--output-dir",
+          ".expo/modernization-checks/android",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/android')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=3072",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "ios",
+          "--output-dir",
+          ".expo/modernization-checks/ios",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/ios')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8197",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts",
+          "tests/e2e/database-bridge.spec.ts"
+        ]
+      ],
+      "risk": "high",
+      "approved": true,
+      "status": "verified",
+      "allowed_paths": [
+        "lib/auth/coordinator.ts",
+        "lib/auth/owned-storage.ts",
+        "lib/auth/client-adapter.ts",
+        "tests/unit/auth-command-coordinator.test.ts",
+        "tests/unit/auth-runtime-store.test.ts",
+        "tests/unit/auth-owned-storage.test.ts",
+        "tests/unit/auth-password-workflow.test.tsx"
+      ],
+      "attempts": 2,
+      "priority": 1,
+      "implementation_mode": "implementation",
+      "started_at": "2026-11-06T23:29:49.758872+00:00",
+      "failure_history": [
+        {
+          "at": "2026-11-06T23:42:39.499501+00:00",
+          "attempt": 1,
+          "evidence": ".ralph/runs/RF-152-1-primary-1794008064796407070",
+          "reason": "Primary inspection after passing full20/review found cancelled pre-dispatch reads can initiate refresh, and synthetic dispatch denial must revoke cleanup permission.",
+          "independent_review": "pass",
+          "primary_acceptance": "rejected"
+        }
+      ],
+      "completed_at": "2026-11-06T23:53:22.599587+00:00",
+      "independent_review": "pass",
+      "evidence": "docs/refactoring/PROGRESS.md",
+      "summary": "Retire owned SDK persistence, deletion, dispatch and notification by account lifetime and intent. Preserve already-issued same-lifetime cancellation settlement, guarded recovery and attributed logout; denied requests cannot trigger destructive SDK cleanup."
     }
   ]
 }

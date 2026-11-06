@@ -193,6 +193,20 @@ async function setup(
       },
     };
   }
+  let nextWrite: ReturnType<typeof holdNextSessionWrite> | undefined;
+  function holdNextSessionWrite() {
+    if (nextWrite) throw new Error("A session write is already armed");
+    const started = deferred(),
+      release = deferred();
+    const held = {
+      started: started.promise,
+      committed: started.resolve,
+      release: release.resolve,
+      wait: release.promise,
+    };
+    nextWrite = held;
+    return held;
+  }
   const storage = {
     getItem: async (name: string) => {
       const snapshot = values.get(name) ?? null;
@@ -211,8 +225,15 @@ async function setup(
         heldReads.delete(held);
       }
     },
-    setItem: (name: string, value: string) => {
+    setItem: async (name: string, value: string) => {
       values.set(name, value);
+      if (name === key && nextWrite) {
+        const held = nextWrite;
+        nextWrite = undefined;
+        // The raw write has committed; hold its return before SDK notification.
+        held.committed();
+        await held.wait;
+      }
     },
     removeItem: (name: string) => {
       values.delete(name);
@@ -321,6 +342,7 @@ async function setup(
   return {
     runtime,
     holdNextSessionRead,
+    holdNextSessionWrite,
     settleAuth,
     subscriptionCount: () => tracked.subscriptions.size,
     retiredCallbacks: tracked.retiredCallbacks,
@@ -347,6 +369,8 @@ async function setup(
     close: async () => {
       release.resolve();
       nextRead = undefined;
+      nextWrite?.release();
+      nextWrite = undefined;
       for (const held of heldReads) held.release.resolve();
       for (const subscription of [...tracked.subscriptions]) subscription.unsubscribe();
       await runtime.auth.stopAutoRefresh();
@@ -1203,3 +1227,331 @@ it.each([0, 1])(
     }
   },
 );
+
+it.each(["put", "refresh", "logout"] as const)(
+  "real runtime/store rejects retired same-identity %s settlement at a newer intent",
+  async (mode) => {
+    const f = await setup(mode);
+    let pending: Promise<unknown> | undefined;
+    let replacement: Promise<unknown> | undefined;
+    try {
+      if (mode === "refresh") {
+        const near = session(1, 0, 60);
+        expect(
+          (await f.runtime.auth.setSession({ access_token: near.access_token, refresh_token: near.refresh_token }))
+            .error,
+        ).toBeNull();
+      }
+      const before = f.persisted();
+      pending =
+        mode === "logout"
+          ? finishPasswordRecovery(authCommands.captureOwner())
+          : useAuthStore.getState().updatePassword("synthetic-password");
+      await f.started.promise;
+      const events = f.events.length;
+      replacement = authCommands.transition(async () => undefined);
+      useAuthStore.setState({ error: "new intent", isLoading: true });
+      f.release.resolve();
+      expect(await pending).toEqual({ status: "superseded" });
+      await replacement;
+      expect(f.persisted()).toEqual(before);
+      expect(useAuthStore.getState().session).toEqual(before);
+      expect(f.events.slice(events)).toEqual([]);
+      expect(useAuthStore.getState().error).toBe("new intent");
+      expect(useAuthStore.getState().isLoading).toBe(true);
+      if (mode === "refresh") expect(f.requests.some((row) => row.startsWith("PUT "))).toBe(false);
+    } finally {
+      f.release.resolve();
+      await Promise.allSettled([pending, replacement]);
+      await f.close();
+    }
+  },
+);
+
+it.each(["put", "refresh", "logout"] as const)(
+  "real runtime/store rejects closed A-B-A %s settlement",
+  async (mode) => {
+    const f = await setup(mode);
+    let pending: Promise<unknown> | undefined;
+    try {
+      if (mode === "refresh") {
+        const near = session(1, 0, 60);
+        expect(
+          (await f.runtime.auth.setSession({ access_token: near.access_token, refresh_token: near.refresh_token }))
+            .error,
+        ).toBeNull();
+      }
+      const original = f.persisted();
+      if (!original) throw new Error("Missing starting session");
+      pending =
+        mode === "logout"
+          ? finishPasswordRecovery(authCommands.captureOwner())
+          : useAuthStore.getState().updatePassword("synthetic-password");
+      await f.started.promise;
+      await f.external(session(2));
+      await f.external(original);
+      const events = f.events.length;
+      f.release.resolve();
+      expect(await pending).toEqual({ status: "superseded" });
+      expect(f.persisted()).toEqual(original);
+      expect(useAuthStore.getState().session).toEqual(original);
+      expect(f.events.slice(events)).toEqual([]);
+      if (mode === "refresh") expect(f.requests.some((row) => row.startsWith("PUT "))).toBe(false);
+    } finally {
+      f.release.resolve();
+      await pending;
+      await f.close();
+    }
+  },
+);
+
+it("real runtime/store cancelled recovery read cannot persist or publish an issued refresh", async () => {
+  const f = await setup("refresh");
+  let active = true;
+  let pending: ReturnType<typeof preparePasswordRecovery> | undefined;
+  try {
+    const near = session(1, 0, 60);
+    expect(
+      (await f.runtime.auth.setSession({ access_token: near.access_token, refresh_token: near.refresh_token })).error,
+    ).toBeNull();
+    const before = f.persisted();
+    pending = preparePasswordRecovery(undefined, () => active);
+    await f.started.promise;
+    const events = f.events.length;
+    active = false;
+    f.release.resolve();
+    expect(await pending).toEqual({ status: "superseded" });
+    expect(f.persisted()).toEqual(before);
+    expect(useAuthStore.getState().session).toEqual(before);
+    expect(f.events.slice(events)).toEqual([]);
+  } finally {
+    f.release.resolve();
+    await pending;
+    await f.close();
+  }
+});
+
+it.each(["put", "recovery"] as const)(
+  "real runtime/store keeps an authorized %s commit but refuses retired notification",
+  async (mode) => {
+    const f = await setup(mode);
+    const write = f.holdNextSessionWrite();
+    let pending: Promise<unknown> | undefined;
+    let replacement: Promise<unknown> | undefined;
+    try {
+      const target = session(1, 4);
+      pending =
+        mode === "put"
+          ? useAuthStore.getState().updatePassword("synthetic-password")
+          : preparePasswordRecovery({ access_token: target.access_token, refresh_token: target.refresh_token });
+      await f.started.promise;
+      f.release.resolve();
+      await write.started;
+      const committed = f.persisted();
+      if (mode === "put") expect(committed?.user.user_metadata.updated).toBe(true);
+      else expect(committed?.access_token).toBe(target.access_token);
+      const events = f.events.length;
+      const realtime = jest.spyOn(f.runtime.client.realtime, "setAuth");
+      replacement = authCommands.transition(async () => undefined);
+      write.release();
+      expect(await pending).toEqual({ status: "superseded" });
+      await replacement;
+      expect(f.persisted()).toEqual(committed);
+      expect(f.events.slice(events)).toEqual([]);
+      expect(useAuthStore.getState().session?.access_token).toBe(f.initial.access_token);
+      expect(useAuthStore.getState().user?.user_metadata.updated).toBeUndefined();
+      expect(realtime).not.toHaveBeenCalled();
+      realtime.mockRestore();
+    } finally {
+      f.release.resolve();
+      write.release();
+      await Promise.allSettled([pending, replacement]);
+      await f.close();
+    }
+  },
+);
+it("real runtime/store current commit still publishes through its storage barrier", async () => {
+  const f = await setup("put");
+  const write = f.holdNextSessionWrite();
+  const pending = useAuthStore.getState().updatePassword("synthetic-password");
+  try {
+    await f.started.promise;
+    f.release.resolve();
+    await write.started;
+    write.release();
+    expect((await pending).status).toBe("completed");
+    expect(useAuthStore.getState().user?.user_metadata.updated).toBe(true);
+    expect(f.events.some((row) => row.event === "USER_UPDATED")).toBe(true);
+  } finally {
+    f.release.resolve();
+    write.release();
+    await pending;
+    await f.close();
+  }
+});
+
+it("real runtime/store keeps cancelled issued terminal logout anonymous without reviving UI authority", async () => {
+  const f = await setup("logout");
+  const owner = authCommands.captureOwner();
+  const pending = finishPasswordRecovery(owner);
+  try {
+    await f.started.promise;
+    owner.cancel();
+    useAuthStore.setState({ error: "new screen", isLoading: true });
+    f.release.resolve();
+    expect(await pending).toEqual({ status: "superseded" });
+    expect(f.persisted()).toBeNull();
+    expect(useAuthStore.getState().session).toBeNull();
+    expect(f.events.some((row) => row.event === "SIGNED_OUT")).toBe(true);
+    expect(useAuthStore.getState().error).toBe("new screen");
+    expect(useAuthStore.getState().isLoading).toBe(true);
+  } finally {
+    f.release.resolve();
+    await pending;
+    await f.close();
+  }
+});
+
+it("real runtime/store stops remaining callbacks when a listener starts a newer auth intent", async () => {
+  const f = await setup("put", false);
+  let replacement: Promise<unknown> | undefined;
+  const retiring = f.runtime.auth.onAuthStateChange((event) => {
+    if (event === "USER_UPDATED") replacement = authCommands.transition(async () => undefined);
+  }).data.subscription;
+  await useAuthStore.getState().initialize();
+  const late = jest.fn();
+  const observer = f.runtime.auth.onAuthStateChange((event) => {
+    if (event === "USER_UPDATED") late();
+  }).data.subscription;
+  const pending = useAuthStore.getState().updatePassword("synthetic-password");
+  try {
+    await f.started.promise;
+    f.release.resolve();
+    expect(await pending).toEqual({ status: "superseded" });
+    await replacement;
+    expect(f.persisted()?.user.user_metadata.updated).toBe(true);
+    expect(useAuthStore.getState().user?.user_metadata.updated).toBeUndefined();
+    expect(late).not.toHaveBeenCalled();
+  } finally {
+    f.release.resolve();
+    await Promise.allSettled([pending, replacement]);
+    retiring.unsubscribe();
+    observer.unsubscribe();
+    await f.close();
+  }
+});
+
+it("real runtime/store cancellation during first session read cannot start refresh work", async () => {
+  const f = await setup("refresh");
+  let pending: Promise<unknown> | undefined;
+  let read: ReturnType<typeof f.holdNextSessionRead> | undefined;
+  try {
+    const near = session(1, 0, 60);
+    expect(
+      (await f.runtime.auth.setSession({ access_token: near.access_token, refresh_token: near.refresh_token })).error,
+    ).toBeNull();
+    const before = f.persisted();
+    const requests = f.requests.length;
+    const events = f.events.length;
+    const owner = authCommands.captureOwner();
+    read = f.holdNextSessionRead();
+    pending = useAuthStore.getState().updatePassword("synthetic-password", owner);
+    await read.started;
+    owner.cancel();
+    read.release();
+    f.release.resolve();
+    expect(await pending).toEqual({ status: "superseded" });
+    expect(f.requests.slice(requests)).toEqual([]);
+    expect(f.persisted()).toEqual(before);
+    expect(useAuthStore.getState().session).toEqual(before);
+    expect(f.events.slice(events)).toEqual([]);
+  } finally {
+    f.release.resolve();
+    read?.cancel();
+    await pending;
+    await f.close();
+  }
+});
+
+it("real runtime/store cancellation after validated read cannot dispatch refresh or delete its prior session", async () => {
+  const f = await setup("refresh");
+  let pending: Promise<unknown> | undefined;
+  let read: ReturnType<typeof f.holdNextSessionRead> | undefined;
+  try {
+    const near = session(1, 0, 60);
+    expect(
+      (await f.runtime.auth.setSession({ access_token: near.access_token, refresh_token: near.refresh_token })).error,
+    ).toBeNull();
+    const before = f.persisted();
+    f.values.set(f.key + "-user", "synthetic prior user");
+    f.values.set(f.key + "-code-verifier", "synthetic prior verifier");
+    const keys = [...f.values];
+    const events = f.events.length;
+    const requests = f.requests.length;
+    const owner = authCommands.captureOwner();
+    const isCurrent = owner.isCurrent;
+    let armed = false;
+    let cancelledAfterValidation = false;
+    const spy = jest.spyOn(owner, "isCurrent").mockImplementation(() => {
+      const current = isCurrent();
+      if (armed && current) {
+        armed = false;
+        // Retire after the adapter validates this read but before the SDK resumes.
+        queueMicrotask(() => {
+          owner.cancel();
+          cancelledAfterValidation = true;
+        });
+      }
+      return current;
+    });
+    read = f.holdNextSessionRead();
+    pending = useAuthStore.getState().updatePassword("synthetic-password", owner);
+    await read.started;
+    armed = true;
+    read.release();
+    f.release.resolve();
+    expect(await pending).toEqual({ status: "superseded" });
+    expect(cancelledAfterValidation).toBe(true);
+    expect(f.requests.slice(requests)).toEqual([]);
+    expect([...f.values]).toEqual(keys);
+    expect(f.persisted()).toEqual(before);
+    expect(useAuthStore.getState().session).toEqual(before);
+    expect(f.events.slice(events)).toEqual([]);
+    spy.mockRestore();
+  } finally {
+    f.release.resolve();
+    read?.cancel();
+    await pending;
+    jest.restoreAllMocks();
+    await f.close();
+  }
+});
+
+it("real runtime/store preserves cleanup for a refresh failure that was actually issued", async () => {
+  const f = await setup("refresh-error");
+  try {
+    const late = jest.fn();
+    const listener = f.runtime.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT") late();
+    }).data.subscription;
+    // Drain subscriber initialization while A is still long-lived. Only the
+    // subsequent private password read may issue this failing refresh.
+    await f.settleAuth();
+    const near = session(1, 0, 60);
+    expect(
+      (await f.runtime.auth.setSession({ access_token: near.access_token, refresh_token: near.refresh_token })).error,
+    ).toBeNull();
+    f.values.set(f.key + "-user", "synthetic prior user");
+    f.values.set(f.key + "-code-verifier", "synthetic prior verifier");
+    expect(await useAuthStore.getState().updatePassword("synthetic-password")).toEqual({ status: "superseded" });
+    expect(f.requests.filter((row) => row.includes("grant_type=refresh_token"))).toHaveLength(1);
+    expect(f.persisted()).toBeNull();
+    expect(f.values.has(f.key + "-user")).toBe(false);
+    expect(f.values.has(f.key + "-code-verifier")).toBe(false);
+    expect(useAuthStore.getState().session).toBeNull();
+    expect(late).toHaveBeenCalledTimes(1);
+    listener.unsubscribe();
+  } finally {
+    await f.close();
+  }
+});

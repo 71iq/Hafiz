@@ -1,4 +1,5 @@
 import { authCommands } from "@/lib/auth/commands";
+import type { AuthOwner } from "@/lib/auth/coordinator";
 import React from "react";
 import type { ReactNode } from "react";
 import type { Session, User } from "@supabase/supabase-js";
@@ -47,7 +48,10 @@ jest.mock("@/lib/supabase", () => ({
   restoreOwnedSession: (_owner: unknown, _session: unknown, tokens: { access_token: string; refresh_token: string }) =>
     mockSetSession(tokens),
   updateOwnedPassword: (_owner: unknown, _session: unknown, password: string) => mockUpdateUser({ password }),
-  signOutOwnedSession: () => mockSignOut(),
+  signOutOwnedSession: (owner: AuthOwner) => {
+    if (mockSignOutChangesOwner) owner.adoptOwnSignOut?.();
+    return mockSignOut();
+  },
   supabase: {
     auth: {
       getSession: () => mockGetSession(),

@@ -168,6 +168,7 @@ it("preserves legitimate owned signout with a synchronous SDK callback", async (
   const result = await c.owned(
     owner,
     async () => {
+      expect(owner.adoptOwnSignOut?.()).toBe(true);
       c.observeIdentity(null);
       return "out";
     },
@@ -267,4 +268,47 @@ it("a newly captured ticket during a queued legacy transition cannot target its 
   expect(work).not.toHaveBeenCalled();
   gate.resolve();
   await change;
+});
+
+it("settlement authority ignores screen cancellation but never a new intent or closed ABA", async () => {
+  const c = createAuthCoordinator("A");
+  const owner = c.captureOwner();
+  owner.cancel();
+  expect(owner.isCurrent()).toBe(false);
+  expect(owner.canSettleSameLifetime?.()).toBe(true);
+  c.observeIdentity("B");
+  c.observeIdentity("A");
+  expect(owner.canSettleSameLifetime?.()).toBe(false);
+  const next = c.captureOwner();
+  const transition = c.transition(async () => undefined);
+  expect(next.canSettleSameLifetime?.()).toBe(false);
+  await transition;
+});
+it("an unrelated null observation cannot be adopted by an active terminal signout", async () => {
+  const c = createAuthCoordinator("A");
+  const owner = c.captureOwner();
+  const gate = deferred<void>();
+  const pending = c.owned(owner, () => gate.promise, true);
+  await tick();
+  c.observeIdentity(null);
+  expect(owner.isCurrent()).toBe(false);
+  expect(owner.adoptOwnSignOut?.()).toBe(false);
+  gate.resolve();
+  expect(await pending).toEqual({ status: "superseded" });
+});
+it("an issued cancelled own logout settles without restoring its result authority", async () => {
+  const c = createAuthCoordinator("A");
+  const owner = c.captureOwner();
+  const result = await c.owned(
+    owner,
+    async () => {
+      owner.cancel();
+      expect(owner.adoptOwnSignOut?.()).toBe(true);
+      c.observeIdentity(null);
+      expect(owner.isCurrent()).toBe(false);
+      expect(owner.canSettleSameLifetime?.()).toBe(true);
+    },
+    true,
+  );
+  expect(result).toEqual({ status: "superseded" });
 });
