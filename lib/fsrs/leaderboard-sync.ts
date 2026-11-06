@@ -6,10 +6,9 @@ import { authCommands } from "@/lib/auth/commands";
 import type { AuthOwner } from "@/lib/auth/coordinator";
 import { getAuthSessionIdentity } from "@/lib/auth/session-identity";
 import { getTodayScore, getTotalScore } from "./scoring";
-import { getWirdStatus } from "./queries";
 import { getLocalSurahProgress } from "@/lib/profile/progress";
 import { hasCompletedAccountRestore } from "@/lib/database/sync";
-import { dayIndexFromUtcDateKey as toDayIndex, formatLocalDateKey } from "@/lib/date";
+import { dayIndexFromUtcDateKey as toDayIndex, formatUtcDateKey } from "@/lib/date";
 
 type ProfileStatsPatch = {
   total_score: number;
@@ -138,7 +137,7 @@ function summarizeReviewCounts(counts: Map<string, number>): PublicReviewSummary
     .filter((dateKey) => (counts.get(dateKey) ?? 0) > 0)
     .sort();
   const dateKeysDesc = [...dateKeysAsc].reverse();
-  const todayIndex = toDayIndex(formatLocalDateKey(new Date()));
+  const todayIndex = toDayIndex(formatUtcDateKey(new Date()));
 
   return {
     activity: dateKeysAsc.map((date) => ({ date, count: counts.get(date) ?? 0 })),
@@ -185,7 +184,7 @@ async function getLocalReviewSummary(db: SQLiteDatabase): Promise<PublicReviewSu
   for (const row of rows) {
     const reviewedAt = new Date(row.reviewed_at);
     if (Number.isNaN(reviewedAt.getTime())) continue;
-    const date = formatLocalDateKey(reviewedAt);
+    const date = formatUtcDateKey(reviewedAt);
     counts.set(date, (counts.get(date) ?? 0) + 1);
   }
   return summarizeReviewCounts(counts);
@@ -218,7 +217,7 @@ async function fetchPublicReviewSummary(userId: string): Promise<PublicReviewSum
   const stats = statsResult.data as any | null;
   if (!stats) return summary.totalReviews > 0 ? summary : null;
   const statsLastReviewDate = stats.last_review_date?.slice(0, 10) ?? null;
-  const today = formatLocalDateKey(new Date());
+  const today = formatUtcDateKey(new Date());
 
   return {
     activity: summary.activity,
@@ -243,7 +242,7 @@ async function upsertPublicReviewSummary(
     .sort((a, b) => a.date.localeCompare(b.date));
   const mergedCounts = new Map(mergedActivity.map((row) => [row.date, row.count]));
   const derived = summarizeReviewCounts(mergedCounts);
-  const today = formatLocalDateKey(new Date());
+  const today = formatUtcDateKey(new Date());
   const remoteCurrentStreak = remoteSummary?.lastReviewDate === today ? remoteSummary.currentStreak : 0;
   const mergedStats = {
     totalReviews: Math.max(localSummary.totalReviews, remoteSummary?.totalReviews ?? 0, derived.totalReviews),
@@ -305,7 +304,7 @@ export async function syncDailyScore(db: SQLiteDatabase): Promise<void> {
       await ensureProfileRow(owner);
       if (!owner.isCurrent()) return;
 
-      const today = new Date().toISOString().split("T")[0];
+      const today = formatUtcDateKey(new Date());
       const { score, reviewsCount } = await getTodayScore(db);
       if (!owner.isCurrent() || reviewsCount === 0) return;
 
@@ -351,33 +350,26 @@ export async function updateProfileStats(db: SQLiteDatabase): Promise<void> {
       await ensureProfileRow(owner);
       if (!owner.isCurrent()) return;
 
-      const [
-        totalScore,
-        wirdStatus,
-        cardsReviewedRow,
-        localReviewSummary,
-        remoteDailySummary,
-        remotePublicReviewSummary,
-      ] = await Promise.all([
-        getTotalScore(db),
-        getWirdStatus(db),
-        db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM study_log"),
-        getLocalReviewSummary(db),
-        fetchDailyScoreSummary(owner.userId).catch((error) => {
-          if (owner.isCurrent()) console.warn("[Leaderboard] Failed to read remote daily scores:", error.message);
-          return {
-            totalScore: 0,
-            cardsReviewed: 0,
-            currentStreak: 0,
-            longestStreak: 0,
-            lastReviewDate: null,
-          };
-        }),
-        fetchPublicReviewSummary(owner.userId).catch((error) => {
-          if (owner.isCurrent()) console.warn("[Leaderboard] Failed to read public review summary:", error.message);
-          return null;
-        }),
-      ]);
+      const [totalScore, cardsReviewedRow, localReviewSummary, remoteDailySummary, remotePublicReviewSummary] =
+        await Promise.all([
+          getTotalScore(db),
+          db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM study_log"),
+          getLocalReviewSummary(db),
+          fetchDailyScoreSummary(owner.userId).catch((error) => {
+            if (owner.isCurrent()) console.warn("[Leaderboard] Failed to read remote daily scores:", error.message);
+            return {
+              totalScore: 0,
+              cardsReviewed: 0,
+              currentStreak: 0,
+              longestStreak: 0,
+              lastReviewDate: null,
+            };
+          }),
+          fetchPublicReviewSummary(owner.userId).catch((error) => {
+            if (owner.isCurrent()) console.warn("[Leaderboard] Failed to read public review summary:", error.message);
+            return null;
+          }),
+        ]);
 
       if (!owner.isCurrent()) return;
       const { data: profile } = await supabase
@@ -387,22 +379,19 @@ export async function updateProfileStats(db: SQLiteDatabase): Promise<void> {
         .maybeSingle();
 
       if (!owner.isCurrent()) return;
-      const today = new Date().toISOString().slice(0, 10);
+      const today = formatUtcDateKey(new Date());
       const localReviewedCount = cardsReviewedRow?.count ?? 0;
-      const lastReviewDay = wirdStatus.lastReviewDate ? wirdStatus.lastReviewDate.split("T")[0] : null;
       const profileCurrentStreak =
         profile?.last_review_date?.slice(0, 10) === today ? (profile?.current_streak ?? 0) : 0;
       const stats: ProfileStatsPatch = {
         total_score: Math.max(totalScore, remoteDailySummary.totalScore, profile?.total_score ?? 0),
         current_streak: Math.max(
-          wirdStatus.currentDays,
           localReviewSummary.currentStreak,
           remoteDailySummary.currentStreak,
           remotePublicReviewSummary?.currentStreak ?? 0,
           profileCurrentStreak,
         ),
         longest_streak: Math.max(
-          wirdStatus.longestDays,
           localReviewSummary.longestStreak,
           remoteDailySummary.longestStreak,
           remotePublicReviewSummary?.longestStreak ?? 0,
@@ -416,7 +405,6 @@ export async function updateProfileStats(db: SQLiteDatabase): Promise<void> {
           profile?.cards_reviewed ?? 0,
         ),
         last_review_date: maxDate(
-          lastReviewDay,
           localReviewSummary.lastReviewDate,
           remoteDailySummary.lastReviewDate,
           remotePublicReviewSummary?.lastReviewDate,

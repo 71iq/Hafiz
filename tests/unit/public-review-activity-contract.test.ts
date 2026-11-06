@@ -17,8 +17,8 @@ describe("public review activity aggregate contract", () => {
     expect(migration).toContain("CREATE TABLE IF NOT EXISTS public.public_review_stats");
     expect(migration).toContain("ALTER TABLE public.public_review_activity ENABLE ROW LEVEL SECURITY");
     expect(migration).toContain("ALTER TABLE public.public_review_stats ENABLE ROW LEVEL SECURITY");
-    expect(migration).toContain("CREATE POLICY \"Public review activity is publicly readable\"");
-    expect(migration).toContain("CREATE POLICY \"Public review stats are publicly readable\"");
+    expect(migration).toContain('CREATE POLICY "Public review activity is publicly readable"');
+    expect(migration).toContain('CREATE POLICY "Public review stats are publicly readable"');
     expect(migration).toContain("CREATE OR REPLACE FUNCTION private.refresh_public_review_stats_for_user");
     expect(migration).toContain("CREATE TRIGGER study_log_public_review_stats_insert");
     expect(migration).toContain("CREATE TRIGGER study_log_public_review_stats_update");
@@ -54,7 +54,7 @@ describe("public review activity aggregate contract", () => {
     expect(sync).toContain("upsertPublicReviewSummary");
     expect(sync).toContain('from("public_review_activity")');
     expect(sync).toContain('from("public_review_stats")');
-    expect(sync).toContain("formatLocalDateKey(reviewedAt)");
+    expect(sync).toContain("formatUtcDateKey(reviewedAt)");
     expect(sync).toContain("localReviewSummary.totalReviews");
     expect(sync).toContain("remotePublicReviewSummary?.totalReviews");
   });
@@ -62,7 +62,9 @@ describe("public review activity aggregate contract", () => {
   it("uses the merged public review total for public Cards Reviewed", () => {
     const profile = read("components/profile/ProfileModalContent.tsx");
 
-    expect(profile).toContain("const publicCardsReviewed = Math.max(visibleProfile?.cards_reviewed ?? 0, review.totalReviews);");
+    expect(profile).toContain(
+      "const publicCardsReviewed = Math.max(visibleProfile?.cards_reviewed ?? 0, review.totalReviews);",
+    );
     expect(profile).toContain("value: isOwnProfile ? ownStats.cardsReviewed : publicCardsReviewed");
   });
 });

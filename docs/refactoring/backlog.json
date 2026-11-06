@@ -14764,28 +14764,254 @@
     {
       "id": "RF-149",
       "title": "Align public streaks with their existing UTC server calendar",
-      "description": "Investigate and repair the confirmed UTC/local-date mismatch for remote-backed public review streaks, while offline local summaries keep their local calendar. Prepare exact scope before approval.",
-      "rationale": "RF148 gate investigation found public aggregates and daily scores are UTC-backed, but client public readers compare to local today and public upload merges local-date activity. A review just after local midnight can be shown with current streak zero.",
+      "description": "Align remote-backed public review dates, streak comparisons and activity windows with the existing UTC server contract while keeping offline local calendars unchanged.",
+      "rationale": "Existing server/daily public dates are UTC. Local offline getWirdStatus/getReviewStats remain device-calendar and unchanged. No user policy choice needed to align public fields with current server contract. No claim of historical wrongly dated activity repair.",
       "modules": [
+        "lib/date.ts",
         "lib/fsrs/leaderboard-sync.ts",
-        "lib/leaderboard/api.ts",
-        "tests/unit/leaderboard-stats-owner.test.ts"
+        "lib/leaderboard/api.ts"
       ],
       "dependencies": [
-        "RF-029"
+        "RF-029",
+        "RF-151"
       ],
       "acceptance_criteria": [
-        "Confirm the actual checked-in server UTC contract and reproduce wrong public streaks across positive and negative local offsets through real caller tests.",
-        "Align remote public reads and uploaded activity with that existing contract; preserve offline local calendar and deliberate UTC daily leaderboard. No schema, server, production or protected input changes.",
-        "Prepare exact small source/test paths, full controller checks, independent review and primary acceptance before implementation."
+        "Reuse lib/date.ts owner by adding formatUtcDateKey(Date) = ISO.slice(0,10); use it for all remote/public dates in leaderboard-sync/api, retaining existing UTC ordinal helper. No new module.",
+        "leaderboard-sync summarizeReviewCounts now UTC today; getLocalReviewSummary validates instants then groups UTC, so uploaded public activity matches server. fetchPublicReviewSummary/upsertPublicReviewSummary UTC checks. updateProfileStats remove getWirdStatus local currentDays/longestDays/lastReviewDay and its import/Promise read; use UTC local study_log summaries + existing remote/profile maxima. Preserve owner FIFO/profile field merge and count/score semantics; offline query APIs unchanged.",
+        "api summarizeDailyScoreRows, fetchPublicReviewStats, normalizePublicProfileStreak UTC today; fetchStreakLeaderboard UTC ordinal mapping/today (replace local ordinal imports); public activity start range uses setUTCHours/setUTCDate and formatUtcDateKey. Preserve sort/rank/duplicates/error/selection/fallback semantics.",
+        "Actual updateProfileStats owner fixture new timezone-boundary cases UTC local study_log group/upload/current&longest&lastdate, ensure local-Wird-derived values cannot inflate remote fields; preserve all214 owner/field-protection cases. Current remote-maxima test today fixture uses UTC matching repaired contract.",
+        "same-owner field-publication fixture highLocalStats currently gets8/9/currentNov6 from local getWirdStatus mock. Replace with real mocked study_log timestamps: 9-day earlier run +8-day current run ending fixedNov6; freeze that describe clock toNov6T12Z and restore afterward. Retain exact newStats fields and edit/stat overlap assertions. Remove now-unused Wird mocks/type/empty fixture.",
+        "New public-review-calendar tests call actual fetchPublicProfile, fetchStreakLeaderboard and fetchPublicReviewActivity. Synthetic transport honors eq/gte/order and returns copied rows. Both UTC instants around positive/negative offset midnight, profile/aggregate/daily sources, old UTC-day expiry, duplicate-date ranking/stable ties, exact1/90/default-day DST windows and missing-table fallback. Fixtures include positive priorUTCday and prewindowcounts, so bad bounds alter actual results. Existing offline local calculations retain actualSQLite tests.",
+        "Existing public-review-activity source contract replace obsolete local-date substring with UTC equivalent, retain server schema/RLS/trigger assertions plus real new behavioral coverage. local-calendar-streak public ranking case set fixed UTC noon; all actual local calendar cases remain unchanged.",
+        "Run focused relevant suites in explicit TZ=Asia/Hebron and TZ=America/New_York, then full controller20 plus two explicit focused timezone commands (22 total) once ready, fresh separate stronger independent review and primary acceptance. No protected/server/production changes.",
+        "Primary implements directly using current date owner and actual caller fixtures. Real causal old-source failures in both timezone processes precede correction. No historical activity rewrite. Full22 checks, fresh separate stronger review, primary acceptance, one local commit and short PROGRESS note; delete accepted outputs."
       ],
-      "verification": [],
+      "verification": [
+        [
+          "git",
+          "diff",
+          "--check"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "lib/date.ts",
+          "lib/fsrs/leaderboard-sync.ts",
+          "lib/leaderboard/api.ts",
+          "tests/unit/leaderboard-stats-owner.test.ts",
+          "tests/unit/public-review-activity-contract.test.ts",
+          "tests/unit/local-calendar-streak.test.ts",
+          "tests/unit/public-review-calendar.test.ts",
+          "docs/refactoring/PROGRESS.md"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/date.ts",
+          "lib/fsrs/leaderboard-sync.ts",
+          "lib/leaderboard/api.ts",
+          "tests/unit/leaderboard-stats-owner.test.ts",
+          "tests/unit/public-review-activity-contract.test.ts",
+          "tests/unit/local-calendar-streak.test.ts",
+          "tests/unit/public-review-calendar.test.ts",
+          "--max-warnings=0"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "env",
+          "TZ=Asia/Hebron",
+          "node_modules/.bin/jest",
+          "--runInBand",
+          "--no-cache",
+          "tests/unit/public-review-calendar.test.ts",
+          "tests/unit/leaderboard-stats-owner.test.ts",
+          "tests/unit/local-calendar-streak.test.ts",
+          "tests/unit/public-review-activity-contract.test.ts",
+          "tests/unit/public-review-errors.test.ts",
+          "tests/unit/leaderboard-ranking.test.ts",
+          "tests/unit/leaderboard-daily-response.test.ts"
+        ],
+        [
+          "env",
+          "TZ=America/New_York",
+          "node_modules/.bin/jest",
+          "--runInBand",
+          "--no-cache",
+          "tests/unit/public-review-calendar.test.ts",
+          "tests/unit/leaderboard-stats-owner.test.ts",
+          "tests/unit/local-calendar-streak.test.ts",
+          "tests/unit/public-review-activity-contract.test.ts",
+          "tests/unit/public-review-errors.test.ts",
+          "tests/unit/leaderboard-ranking.test.ts",
+          "tests/unit/leaderboard-daily-response.test.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "check:analysis"
+        ],
+        [
+          "npm",
+          "run",
+          "postinstall"
+        ],
+        [
+          "npm",
+          "ls",
+          "--all",
+          "--json"
+        ],
+        [
+          "npm",
+          "run",
+          "lint"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "node",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/tests/brace-expansion.test.cjs",
+          "scripts/tests/dependency-boundaries.test.cjs",
+          "scripts/tests/icon-tool.test.cjs",
+          "scripts/tests/jest-config.test.cjs",
+          "scripts/tests/js-yaml.test.cjs",
+          "scripts/tests/lint-coverage.test.cjs",
+          "scripts/tests/metro-unicode.test.cjs",
+          "scripts/tests/nanoid.test.cjs",
+          "scripts/tests/router-dependency-range.test.cjs",
+          "scripts/tests/security-dependency-owner.test.cjs",
+          "scripts/tests/source-map-js.test.cjs",
+          "scripts/tests/tailwind-source-map.test.cjs",
+          "scripts/tests/ws.test.cjs",
+          "scripts/tests/xmldom.test.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "test:refactor-runner"
+        ],
+        [
+          "python3",
+          "-B",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "scripts/tests",
+          "-p",
+          "test_*.py"
+        ],
+        [
+          "npm",
+          "run",
+          "check:native-config"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=4096",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "android",
+          "--output-dir",
+          ".expo/modernization-checks/android",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/android')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=3072",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "ios",
+          "--output-dir",
+          ".expo/modernization-checks/ios",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/ios')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8197",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts",
+          "tests/e2e/database-bridge.spec.ts"
+        ]
+      ],
       "risk": "high",
-      "approved": false,
-      "status": "pending",
-      "allowed_paths": [],
-      "attempts": 0,
-      "priority": 1
+      "approved": true,
+      "status": "verified",
+      "allowed_paths": [
+        "lib/date.ts",
+        "lib/fsrs/leaderboard-sync.ts",
+        "lib/leaderboard/api.ts",
+        "tests/unit/leaderboard-stats-owner.test.ts",
+        "tests/unit/public-review-activity-contract.test.ts",
+        "tests/unit/local-calendar-streak.test.ts",
+        "tests/unit/public-review-calendar.test.ts"
+      ],
+      "attempts": 1,
+      "priority": 1,
+      "implementation_mode": "implementation",
+      "started_at": "2026-11-06T23:18:36.539719+00:00",
+      "completed_at": "2026-11-06T23:28:27.193300+00:00",
+      "independent_review": "pass",
+      "evidence": "docs/refactoring/PROGRESS.md",
+      "summary": "Use the existing UTC server calendar for public review upload groups, streaks and activity windows. Preserve offline local calendars, owner ordering, remote maxima and ranking/fallback rules."
     },
     {
       "id": "RF-150",

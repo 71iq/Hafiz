@@ -130,6 +130,7 @@ describe.each([
   });
 
   it("keeps public streak ranking, duplicate dates and missing profile fallbacks", async () => {
+    jest.setSystemTime(new Date(`${dates[3]}T12:00:00Z`));
     for (const date of [...dates, dates[1]])
       mockRows.push({
         user_id: "four-days",

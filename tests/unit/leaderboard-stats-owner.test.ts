@@ -1,10 +1,9 @@
 import type { SQLiteDatabase } from "expo-sqlite";
 import type { Session, User } from "@supabase/supabase-js";
 import type { Profile } from "@/lib/auth/types";
-import type { WirdStatus } from "@/lib/fsrs/queries";
 import type { ProfileSurahProgress } from "@/lib/profile/progress";
 import { authCommands } from "@/lib/auth/commands";
-import { formatLocalDateKey } from "@/lib/date";
+import { formatUtcDateKey } from "@/lib/date";
 import { getAuthSessionIdentity } from "@/lib/auth/session-identity";
 import { useAuthStore } from "@/lib/auth/store";
 import { syncDailyScore, updateProfileStats } from "@/lib/fsrs/leaderboard-sync";
@@ -31,7 +30,6 @@ interface QueryOperation {
 const mockOperations: QueryOperation[] = [];
 const mockGetTotalScore = jest.fn<Promise<number>, [SQLiteDatabase]>();
 const mockGetTodayScore = jest.fn<Promise<{ score: number; reviewsCount: number }>, [SQLiteDatabase]>();
-const mockGetWirdStatus = jest.fn<Promise<WirdStatus>, [SQLiteDatabase]>();
 const mockGetLocalSurahProgress = jest.fn<Promise<ProfileSurahProgress[]>, [SQLiteDatabase]>();
 const mockHasCompletedAccountRestore = jest.fn<Promise<boolean>, [SQLiteDatabase, string]>();
 let mockQueryResponse: ((operation: QueryOperation) => Promise<QueryResult> | undefined) | null = null;
@@ -198,7 +196,6 @@ jest.mock("@/lib/fsrs/scoring", () => ({
   getTotalScore: (db: SQLiteDatabase) => mockGetTotalScore(db),
   getTodayScore: (db: SQLiteDatabase) => mockGetTodayScore(db),
 }));
-jest.mock("@/lib/fsrs/queries", () => ({ getWirdStatus: (db: SQLiteDatabase) => mockGetWirdStatus(db) }));
 jest.mock("@/lib/profile/progress", () => ({
   getLocalSurahProgress: (db: SQLiteDatabase) => mockGetLocalSurahProgress(db),
 }));
@@ -268,14 +265,6 @@ const database = {
   getAllAsync: (sql: string) => mockDatabaseAll(sql),
 } as unknown as SQLiteDatabase;
 
-const emptyWirdStatus: WirdStatus = {
-  currentDays: 0,
-  longestDays: 0,
-  maintainedToday: false,
-  lastReviewDate: null,
-  state: "empty",
-};
-
 function writeIntents(): QueryOperation[] {
   return mockOperations.filter(({ kind }) => kind !== "select");
 }
@@ -298,12 +287,12 @@ beforeEach(() => {
   mockQueryResponse = null;
   mockConfigured = true;
   mockDatabaseAll.mockReset().mockResolvedValue([]);
+  jest.mocked(database.getFirstAsync).mockReset().mockResolvedValue({ count: 0 });
   mockFrom.mockClear();
   mockProfileUpdateResponse = null;
   mockProfileUpdateIssued = null;
   mockGetTotalScore.mockReset().mockResolvedValue(42);
   mockGetTodayScore.mockReset().mockResolvedValue({ score: 42, reviewsCount: 1 });
-  mockGetWirdStatus.mockReset().mockResolvedValue(emptyWirdStatus);
   mockGetLocalSurahProgress.mockReset().mockResolvedValue([]);
   mockHasCompletedAccountRestore.mockReset().mockResolvedValue(true);
   jest.spyOn(console, "warn").mockImplementation(() => undefined);
@@ -730,7 +719,7 @@ test.each(["review-stats", "review-activity"] as const)(
 
 test("current profile retains remote maxima and exact aggregate/progress payloads", async () => {
   beginAsA();
-  const today = formatLocalDateKey(new Date());
+  const today = formatUtcDateKey(new Date());
   mockGetLocalSurahProgress.mockResolvedValue([
     { surah: 1, nameArabic: "synthetic", nameEnglish: "synthetic", totalCards: 12, memorized: 7 },
   ]);
@@ -1141,6 +1130,11 @@ describe("account stats FIFO", () => {
 });
 
 describe("same-owner profile field publication", () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date("2026-11-06T12:00:00.000Z"));
+  });
+  afterEach(() => jest.useRealTimers());
   const oldStats = {
     total_score: 10,
     cards_reviewed: 1,
@@ -1183,12 +1177,11 @@ describe("same-owner profile field publication", () => {
   function highLocalStats() {
     mockGetTotalScore.mockResolvedValue(newStats.total_score);
     jest.mocked(database.getFirstAsync).mockResolvedValue({ count: newStats.cards_reviewed });
-    mockGetWirdStatus.mockResolvedValue({
-      ...emptyWirdStatus,
-      currentDays: 8,
-      longestDays: 9,
-      lastReviewDate: "2026-11-06T12:00:00Z",
-    });
+    const reviewedAt = [
+      ...Array.from({ length: 9 }, (_, day) => new Date(Date.UTC(2026, 9, 1 + day, 12))),
+      ...Array.from({ length: 8 }, (_, day) => new Date(Date.UTC(2026, 9, 30 + day, 12))),
+    ];
+    mockDatabaseAll.mockResolvedValue(reviewedAt.map((date) => ({ reviewed_at: date.toISOString() })));
   }
 
   function remoteProfile(initial: Profile) {
@@ -1531,5 +1524,51 @@ describe("same-owner profile field publication", () => {
       pause.release();
       await stats;
     }
+  });
+});
+
+describe("public UTC review publication", () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
+  test.each([
+    {
+      instant: "2026-11-03T22:30:00.000Z",
+      reviewedAt: ["2026-11-03T21:30:00.000Z", "2026-11-03T22:30:00.000Z"],
+      lastDay: "2026-11-03",
+      streak: 1,
+      activity: [{ date: "2026-11-03", reviews_count: 2 }],
+    },
+    {
+      instant: "2026-11-04T04:30:00.000Z",
+      reviewedAt: ["2026-11-03T23:30:00.000Z", "2026-11-04T04:30:00.000Z"],
+      lastDay: "2026-11-04",
+      streak: 2,
+      activity: [
+        { date: "2026-11-03", reviews_count: 1 },
+        { date: "2026-11-04", reviews_count: 1 },
+      ],
+    },
+  ])("publishes UTC dates and streaks at $instant", async ({ instant, reviewedAt, lastDay, streak, activity }) => {
+    jest.setSystemTime(new Date(instant));
+    beginAsA();
+    mockDatabaseAll.mockResolvedValue(reviewedAt.map((reviewed_at) => ({ reviewed_at })));
+    await updateProfileStats(database);
+    expect(writeIntents().find((operation) => operation.table === "profiles")?.data).toMatchObject({
+      current_streak: streak,
+      longest_streak: streak,
+      last_review_date: lastDay,
+      cards_reviewed: 2,
+    });
+    expect(writeIntents().find((operation) => operation.table === "public_review_stats")?.data).toMatchObject({
+      current_streak: streak,
+      longest_streak: streak,
+      last_review_date: lastDay,
+      total_reviews: 2,
+      active_days: activity.length,
+    });
+    expect(writeIntents().find((operation) => operation.table === "public_review_activity")?.data).toEqual(
+      activity.map((row) => ({ user_id: userA.id, ...row, updated_at: instant })),
+    );
   });
 });
