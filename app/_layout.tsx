@@ -1,4 +1,5 @@
 import "../global.css";
+import { bindAuthQueryCache } from "@/lib/query/auth-cache-lifecycle";
 import { PasswordRecoveryProvider } from "@/lib/auth/password-recovery";
 import { Stack, usePathname } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
@@ -66,6 +67,8 @@ export default function RootLayout() {
   const [fontsLoaded, setFontsLoaded] = useState(Platform.OS === "web");
   const initialize = useAuthStore((s) => s.initialize);
 
+  useEffect(() => bindAuthQueryCache(queryClient), []);
+
   useEffect(() => {
     if (Platform.OS === "web") {
       loadUiFontsWeb().catch(console.error);
@@ -100,34 +103,13 @@ export default function RootLayout() {
               <Stack.Screen name="zayt-preview" />
               <Stack.Screen name="onboarding" options={{ animation: "fade" }} />
               <Stack.Screen name="open" />
-              <Stack.Screen
-                name="flashcards/session"
-                options={{ animation: "slide_from_bottom" }}
-              />
-              <Stack.Screen
-                name="auth/login"
-                options={{ animation: "slide_from_bottom" }}
-              />
-              <Stack.Screen
-                name="auth/signup"
-                options={{ animation: "slide_from_bottom" }}
-              />
-              <Stack.Screen
-                name="auth/forgot-password"
-                options={{ animation: "slide_from_bottom" }}
-              />
-              <Stack.Screen
-                name="auth/reset-password"
-                options={{ animation: "slide_from_bottom" }}
-              />
-              <Stack.Screen
-                name="profile/index"
-                options={{ animation: "fade", presentation: "transparentModal" }}
-              />
-              <Stack.Screen
-                name="profile/[userId]"
-                options={{ animation: "fade", presentation: "transparentModal" }}
-              />
+              <Stack.Screen name="flashcards/session" options={{ animation: "slide_from_bottom" }} />
+              <Stack.Screen name="auth/login" options={{ animation: "slide_from_bottom" }} />
+              <Stack.Screen name="auth/signup" options={{ animation: "slide_from_bottom" }} />
+              <Stack.Screen name="auth/forgot-password" options={{ animation: "slide_from_bottom" }} />
+              <Stack.Screen name="auth/reset-password" options={{ animation: "slide_from_bottom" }} />
+              <Stack.Screen name="profile/index" options={{ animation: "fade", presentation: "transparentModal" }} />
+              <Stack.Screen name="profile/[userId]" options={{ animation: "fade", presentation: "transparentModal" }} />
             </Stack>
             <PortalHost />
           </AudioProviderBoundary>

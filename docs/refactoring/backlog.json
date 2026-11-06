@@ -11346,7 +11346,7 @@
       ],
       "risk": "high",
       "approved": true,
-      "status": "retry",
+      "status": "verified",
       "allowed_paths": [
         "app/_layout.tsx",
         "lib/query/auth-cache-lifecycle.ts",
@@ -11355,14 +11355,14 @@
         "patches/@tanstack+query-core+5.95.0.patch",
         "docs/refactoring/QUERY_CACHE_DETACHMENT.md"
       ],
-      "attempts": 1,
+      "attempts": 2,
       "implementation_mode": "copy-only",
       "primary_investigation_evidence": ".refactor-baseline/rf133-auth-query-lifecycle-v4/primary-diagnosis.md",
       "readiness_evidence": ".refactor-baseline/rf133-handoff-v9/readiness.md",
       "primary_preparation_evidence": ".refactor-baseline/rf133-auth-query-lifecycle-v4/preparation-receipt.json",
-      "started_at": "2026-11-06T15:20:40.247636+00:00",
+      "started_at": "2026-11-06T15:27:40.667285+00:00",
       "failure": "Verification failed: ['python3', '-c', \"import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf133-handoff-v8/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='87db4acb0008fc50c69afb079abde46fc71ca9fad8cf941f5402f07ac659254b';sys.argv=[str(p),'all'];runpy.run_path(str(p),run_name='__main__')\"]; see .ralph/runs/RF-133-1-1793978440252081774/verify-0.log",
-      "evidence": ".ralph/runs/RF-133-1-1793978440252081774",
+      "evidence": ".ralph/runs/RF-133-2-1793978860672086965",
       "recovery_history": [
         {
           "time": "2026-11-06T14:07:09.217936+00:00",
@@ -11446,7 +11446,9 @@
       ],
       "historical_ordinary_attempts_spent_before_extension": 6,
       "additional_attempt_historical_offset": 6,
-      "historical_total_ordinary_attempts_spent": 7
+      "historical_total_ordinary_attempts_spent": 7,
+      "completed_at": "2026-11-06T15:36:25.585827+00:00",
+      "summary": "Installed the six frozen artifacts. Verification, independent review, and primary acceptance remain pending."
     }
   ]
 }
