@@ -6833,7 +6833,8 @@
       "dependencies": [
         "RF-089",
         "RF-091",
-        "RF-092"
+        "RF-092",
+        "RF-128"
       ],
       "acceptance_criteria": [
         "Primary deduplicates actual advisory URLs, inspects installed instances/consumers and distinguishes shipped app, optional remote and development paths. Use fresh official advisories and compatible-version evidence.",
@@ -6841,7 +6842,8 @@
         "Do not approve this umbrella as one huge implementation. Final security acceptance requires resolved in-scope high findings or exact documented genuine blockers, with independent review. Preserve residual findings and all attempted evidence.",
         "RF-091 is the first exact child slice, nanoid only. Track installed and virtual-lock audit scopes separately; no new advisory source is permitted by the child. Residual high findings still need smaller reviewed repairs.",
         "RF-092 is the exact YAML child, two installed legacy-line updates with existing xcpretty control. Seven direct advisory records must disappear; inherited argparse/sprintf debt and both audit scopes stay visible. Other families remain unapproved until separate preflight.",
-        "Reconcile npm propagated findings across root/isolated contexts. RF096 preparation preserves reports ranging from 72 to 74 with identical old package entries and the same 23 advisory objects. Retain raw counts/effects/fixAvailable evidence, inspect real affected versions and exposure, and never execute automatic major/downgrade suggestions or call the existing audit clean."
+        "Reconcile npm propagated findings across root/isolated contexts. RF096 preparation preserves reports ranging from 72 to 74 with identical old package entries and the same 23 advisory objects. Retain raw counts/effects/fixAvailable evidence, inspect real affected versions and exposure, and never execute automatic major/downgrade suggestions or call the existing audit clean.",
+        "RF128 is the exact legacy XML child, root0.8.13 to0.8.15 with separate0.9.12 control. Ten direct XML advisory URLs must disappear without new sources; fresh November snapshot39findings/10high before,38/9 after. Parent remains open for every other family."
       ],
       "verification": [
         [
@@ -10592,6 +10594,127 @@
       "summary": "Primary accepted five-file profile-save ownership repair after12 fresh controller gates and separate stronger review. Missing-profile initialization and closed A-B-A regressions fixed; wider RF025 remains open.",
       "primary_accepted": true,
       "primary_acceptance_evidence": ".refactor-baseline/rf127-primary-acceptance.json"
+    },
+    {
+      "id": "RF-128",
+      "title": "Repair the legacy XML parser without changing its consumers",
+      "description": "Frozen copy-only installation. FIRST COMMAND exactly cat .refactor-baseline/rf128-handoff-v1/readiness.md. Follow its complete single-command allowlist from command1. Read required instructions, selected task and two progress ranges before copying four exact artifacts. Do not inspect/dump source/tests or run checks. The primary owns design and security; controller owns installation lifecycle,13 fresh gates, independent review and commit.",
+      "rationale": "Compatible legacy parser patch removes ten direct XML advisories. Actual old-package probes fail five cases while semantic controls pass; patched real packages pass13. Existing parent ranges accept0.8.15, and separate0.9.12 remains exact.",
+      "modules": [
+        "package.json",
+        "package-lock.json",
+        "scripts/tests/xmldom.test.cjs",
+        "docs/refactoring/DEPENDENCY_SECURITY.md"
+      ],
+      "dependencies": [
+        "RF-092"
+      ],
+      "acceptance_criteria": [
+        "Install only the four exact manifest artifacts under the frozen all-tool-event protocol. Preserve every existing source, declaration, override, protected input and unrelated backlog task.",
+        "Only root node_modules/@xmldom/xmldom changes0.8.13 to0.8.15 plus upstream license metadata. Actual strict installation runs existing postinstall/patches with no peer bypass or lifecycle suppression. Full installed graph must pass.",
+        "Both fresh installed/lock audits remove exactly ten direct XML URLs, add no advisory source and retain zero critical. Residual high findings stay with RF090. Never run audit fix, force or unsupported major upgrades.",
+        "Preserve all semantic controls and both patched copies. All22 dependency-security tests including13 XML cases must pass without skips. Operation-count tests restore instrumentation, preserve actual text/node identity and keep child128MB/five-second bounds. Namespace case is semantic, not memory-complexity proof.",
+        "All13 controller gates, separate stronger complete-source and original-generator-log review, and primary final source/hash/evidence acceptance required.119 application suites/1684 cases, strict types, zero-warning scoped lint/format, three graphs, exact five existing Knip records, synthetic web build and28 real Chrome smoke cases remain mandatory.",
+        "No protected inputs, app/native/backend behavior, deployment, push, production, signing or live policy change. No native build/device/live-backend certification. Preserve every failure; a batch ending cannot complete the mission."
+      ],
+      "verification": [
+        [
+          "python3",
+          "-c",
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf128-handoff-v1/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='b846aaa36077cad9902adcf5b1e4a7fe4d0e0502041b38f22fb2b8d5e40f08a4';sys.argv=[str(p),'all'];runpy.run_path(str(p),run_name='__main__')"
+        ],
+        [
+          "npm",
+          "install",
+          "--offline",
+          "--strict-peer-deps",
+          "--no-audit",
+          "--no-fund"
+        ],
+        [
+          "python3",
+          "-c",
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf128-handoff-v1/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='b846aaa36077cad9902adcf5b1e4a7fe4d0e0502041b38f22fb2b8d5e40f08a4';sys.argv=[str(p),'installed'];runpy.run_path(str(p),run_name='__main__')"
+        ],
+        [
+          "npm",
+          "run",
+          "test:dependency-security"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "scripts/tests/xmldom.test.cjs",
+          "--max-warnings=0"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "scripts/tests/xmldom.test.cjs",
+          "package.json",
+          "docs/refactoring/DEPENDENCY_SECURITY.md"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8197",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "python3",
+          "-c",
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf128-handoff-v1/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='b846aaa36077cad9902adcf5b1e4a7fe4d0e0502041b38f22fb2b8d5e40f08a4';sys.argv=[str(p),'knip'];runpy.run_path(str(p),run_name='__main__')"
+        ],
+        [
+          "python3",
+          "-c",
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf128-handoff-v1/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='b846aaa36077cad9902adcf5b1e4a7fe4d0e0502041b38f22fb2b8d5e40f08a4';sys.argv=[str(p),'all'];runpy.run_path(str(p),run_name='__main__')"
+        ]
+      ],
+      "risk": "medium",
+      "approved": true,
+      "status": "pending",
+      "allowed_paths": [
+        "package.json",
+        "package-lock.json",
+        "scripts/tests/xmldom.test.cjs",
+        "docs/refactoring/DEPENDENCY_SECURITY.md"
+      ],
+      "attempts": 0,
+      "implementation_mode": "copy-only",
+      "readiness_evidence": ".refactor-baseline/rf128-handoff-v1/readiness.md",
+      "primary_preparation_evidence": ".refactor-baseline/rf128-xmldom-preflight-v1/preparation-receipt.json"
     }
   ]
 }
