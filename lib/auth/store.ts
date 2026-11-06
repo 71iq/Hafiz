@@ -383,39 +383,51 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     }
   },
 
-  updateProfile: async ({ displayName, avatarUrl, bio, country }) => {
+  updateProfile: async ({ displayName, avatarUrl, bio, country }, owner = authCommands.captureOwner()) => {
     const user = get().user;
     if (!user) throw new Error("Not signed in");
+    const identity = getAuthSessionIdentity(get().session);
+    if (identity.kind !== "identified" || identity.userId !== user.id.toLowerCase()) return { status: "superseded" };
+    const isCurrent = () => owner.isCurrent() && get().user?.id === user.id;
+    const requireCurrent = () => {
+      if (!isCurrent()) {
+        owner.cancel();
+        throw new Error("Profile operation superseded");
+      }
+    };
+    return authCommands.owned(owner, async () => {
+      requireCurrent();
+      set({ error: null });
+      try {
+        await get().ensureProfile(owner);
+        requireCurrent();
+        const patch: Record<string, string | null> = {};
+        if (displayName !== undefined) patch.display_name = displayName;
+        if (avatarUrl !== undefined) patch.avatar_url = avatarUrl;
+        if (bio !== undefined) patch.bio = bio;
+        if (country !== undefined) patch.country = country;
 
-    set({ isLoading: true, error: null });
-    try {
-      await get().ensureProfile();
-      const patch: Record<string, string | null> = {};
-      if (displayName !== undefined) patch.display_name = displayName;
-      if (avatarUrl !== undefined) patch.avatar_url = avatarUrl;
-      if (bio !== undefined) patch.bio = bio;
-      if (country !== undefined) patch.country = country;
-
-      const { data, error } = await supabase.from("profiles").update(patch).eq("id", user.id).select("*").single();
-
-      if (error) throw error;
-      const profile = data as Profile;
-      set({ profile });
-      return profile;
-    } catch (err: any) {
-      set({ error: err.message });
-      throw err;
-    } finally {
-      set({ isLoading: false });
-    }
+        const { data, error } = await supabase.from("profiles").update(patch).eq("id", user.id).select("*").single();
+        requireCurrent();
+        if (error) throw error;
+        const profile = data as Profile;
+        set({ profile });
+        return profile;
+      } catch (err: any) {
+        if (isCurrent()) set({ error: err.message });
+        else owner.cancel();
+        throw err;
+      }
+    });
   },
 
-  ensureProfile: async () => {
+  ensureProfile: async (owner) => {
     const user = get().user;
     if (!user) return null;
 
     const generation = profileOwnerGeneration;
-    const isCurrentOwner = () => generation === profileOwnerGeneration && get().user?.id === user.id;
+    const isCurrentOwner = () =>
+      generation === profileOwnerGeneration && get().user?.id === user.id && (!owner || owner.isCurrent());
 
     const fallback = buildFallbackProfile(user);
 

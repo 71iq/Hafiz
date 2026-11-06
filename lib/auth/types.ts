@@ -39,13 +39,16 @@ export type AuthActions = {
   resendSignupConfirmation: (email: string) => Promise<void>;
   sendPasswordReset: (email: string) => Promise<void>;
   updatePassword: (password: string, owner?: AuthOwner) => Promise<AuthCommandResult<void>>;
-  ensureProfile: () => Promise<Profile | null>;
+  ensureProfile: (owner?: AuthOwner) => Promise<Profile | null>;
   fetchProfile: () => Promise<void>;
-  updateProfile: (updates: {
-    displayName?: string | null;
-    avatarUrl?: string | null;
-    bio?: string | null;
-    country?: string | null;
-  }) => Promise<Profile>;
+  updateProfile: (
+    updates: {
+      displayName?: string | null;
+      avatarUrl?: string | null;
+      bio?: string | null;
+      country?: string | null;
+    },
+    owner?: AuthOwner,
+  ) => Promise<AuthCommandResult<Profile>>;
   clearError: () => void;
 };

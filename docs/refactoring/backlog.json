@@ -10570,7 +10570,7 @@
       ],
       "risk": "high",
       "approved": true,
-      "status": "retry",
+      "status": "verified",
       "allowed_paths": [
         "lib/auth/store.ts",
         "lib/auth/types.ts",
@@ -10578,16 +10578,18 @@
         "tests/unit/auth-profile-update-owner.test.ts",
         "tests/unit/profile-save-lifecycle.test.tsx"
       ],
-      "attempts": 1,
+      "attempts": 2,
       "discovery_evidence": ".refactor-baseline/rf025-owner-audit-v1/receipt.json",
       "primary_scope_document": "docs/refactoring/AUTH_PROFILE_SAVE_OWNERSHIP.md",
       "primary_preparation_evidence": ".refactor-baseline/rf127-profile-save-v3/preparation-receipt.json",
       "implementation_mode": "copy-only",
       "readiness_evidence": ".refactor-baseline/rf127-handoff-v2/readiness.md",
-      "started_at": "2026-11-05T14:56:34.017839+00:00",
-      "failure": "Independent review failed: [P1] components/profile/ProfileModalContent.tsx:234: Opening the editor before the initial profile loads leaves drafts blank permanently. When the profile arrives, Save becomes enabled and submits {display_name:null,bio:null,country:null}, erasing existing values without edits. An in-memory rendered-component probe reproduced this; the HEAD component populated the fields and issued no write. Initialize untouched drafts when the first matching profile arrives, or prevent editing until initialization completes, while preserving genuine unsaved drafts. Add this regression to profile-save-lifecycle.test.tsx.; [P2] components/profile/ProfileModalContent.tsx:211: A batched A-B-A transition while the editor is closed leaves editScope bound to an obsolete owner. Its memo dependencies end unchanged, and the subscription ignores inactive scopes. Both Edit and profile Close then silently stop working. The rendered probe reproduced zero opened modals and zero navigation calls; HEAD allowed both. Create a fresh scope after ownership changes even when the editor is closed, keep previously captured callbacks revoked, and add a rendered regression.; Verification: Reviewed the full diff and both untracked tests. All five artifact hashes and frozen pins match. The original generator followed the allowed protocol with no prohibited checks or source/test dumps. Controller logs record all 12 gates passing, including 119 suites and 1682 tests. git diff --check passed; English/Arabic screenshots were inspected. The additional probes used actual component/store/coordinator code with mocked services and UI primitives. No files changed. Native/device, live-service and browser-avatar behavior remain unverified; primary acceptance must remain pending.",
-      "evidence": ".ralph/runs/RF-127-1-1793890594020682984",
-      "primary_recovery_evidence": ".refactor-baseline/rf127-profile-save-v3/decision.md"
+      "started_at": "2026-11-06T08:30:46.043156+00:00",
+      "failure": "review stopped at account usage limit; see .ralph/runs/RF-127-2-1793892001178813119/review.jsonl",
+      "evidence": ".ralph/runs/RF-127-2-1793953846055927098",
+      "primary_recovery_evidence": ".refactor-baseline/rf127-profile-save-v3/decision.md",
+      "completed_at": "2026-11-06T08:39:04.680474+00:00",
+      "summary": "Installed the five supplied RF-127 V3 artifacts. Verification, controller checks, independent review, and primary acceptance remain pending."
     }
   ]
 }
