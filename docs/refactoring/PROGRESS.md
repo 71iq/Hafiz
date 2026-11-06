@@ -165,4 +165,10 @@ Earlier detailed preparation and diagnostic records are intentionally retired. G
 
 Cleanup checks: 1,999 Jest cases, 205 Node tooling/security cases, 38 controller tests, 10 native-config tests and 28 Chrome cases pass. Typecheck, three dependency graphs, native-config guard, reviewed Knip baseline, formatting, lifecycle/installed graph, web and separate Android/iOS JavaScript exports pass. Lint retains zero errors and 68 existing warnings. Exports were removed immediately; no native compilation/device verification is implied.
 
-- 2026-11-06T18:53:11.725790+00:00 `RF-138` verified. Profile reads now reject foreign rows through existing fallback handling, and profile saves reject missing or foreign responses before state or field merges. Evidence `.ralph/runs/RF-138-1-1793990503680049167`.
+RF138 accepted, local commit a9e7b35. Wrong-account profile reads and missing/foreign save replies cannot publish or merge private fields. All20controller checks and independent source review pass: 2,004 Jest cases and28Chrome cases, plus tooling, types, lint, analysis and three-platform JavaScript exports. Task logs and temporary exports deleted. Broader profile payload validation remains pending.
+
+## External verification needs
+
+RF042 iOS native compilation/runtime needs a supported Mac and Xcode; this Linux host has neither. Physical-device checks need an attached authorized device. Android emulator work is available locally through the existing AVD and writable KVM, so RF040/RF041 are not blocked by the absent phone. JavaScript exports do not prove native runtime behavior.
+
+RF139 accepted on2026-11-06. Malformed browser database messages are ignored and wrong-host replies cannot consume pending requests. Array/named/variadic/blob bindings remain supported. All20controller checks and independent source review pass: 123suites/2,027Jest cases,205Node cases,38runner cases,10native-config cases and29Chrome cases. Types, lint, analysis, three dependency graphs and web/Android/iOS JavaScript exports pass. Initial unused exports and focused test-harness mistakes were repaired without relaxing checks. Logs and temporary exports are deleted after acceptance. RF030 lifecycle/recovery and RF104 transaction ownership remain open.

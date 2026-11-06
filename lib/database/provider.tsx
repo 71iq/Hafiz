@@ -1,17 +1,17 @@
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-} from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
 import { Platform } from "react-native";
-import {
-  importDatabaseFromAssetAsync,
-  openDatabaseAsync,
-  type SQLiteDatabase,
-} from "expo-sqlite";
+import { importDatabaseFromAssetAsync, openDatabaseAsync, type SQLiteDatabase } from "expo-sqlite";
 import { initializeDatabase, type ImportProgress } from "./init";
 import { backfillAchievements } from "@/lib/achievements/queries";
+import {
+  decodeDbMessage,
+  isSQLiteBindParams,
+  isSQLiteBindValue,
+  type DbMessage,
+  type DbOperation,
+  type DbRequestMessage,
+  type DbWireParam,
+} from "@/lib/database/bridge-messages";
 
 type DatabaseContextType = {
   db: SQLiteDatabase | null;
@@ -39,42 +39,22 @@ const HOST_CONNECT_RETRY_DELAY_MS = 300;
 const REQUEST_TIMEOUT_MS = 60000;
 const POST_CLOSE_SETTLE_MS = 200;
 
-type DbOperation = "exec" | "run" | "getFirst" | "getAll";
-
-type HostProbeMessage = { type: "host-probe"; tabId: string };
-type HostReadyMessage = { type: "host-ready"; tabId: string };
-type HostClosingMessage = { type: "host-closing"; tabId: string };
-type DbRequestMessage = {
-  type: "request";
-  requestId: string;
-  fromTabId: string;
-  targetTabId: string;
-  operation: DbOperation;
-  source: string;
-  params: unknown[];
-};
-type DbResponseMessage = {
-  type: "response";
-  requestId: string;
-  fromTabId: string;
-  targetTabId: string;
-  ok: boolean;
-  result?: unknown;
-  error?: string;
-};
-
-type DbMessage =
-  | HostProbeMessage
-  | HostReadyMessage
-  | HostClosingMessage
-  | DbRequestMessage
-  | DbResponseMessage;
-
 type PendingRequest = {
   resolve: (value: unknown) => void;
   reject: (error: Error) => void;
   timeout: ReturnType<typeof setTimeout>;
+  expectedHostTabId: string;
 };
+
+type WebLockManager = {
+  request: (
+    name: string,
+    options: { mode: "exclusive"; ifAvailable: true },
+    callback: (lock: unknown) => Promise<void> | void,
+  ) => Promise<void>;
+};
+
+type NavigatorWithWebLocks = Navigator & { locks?: WebLockManager };
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -98,16 +78,45 @@ function toCloneableResult(result: unknown) {
   return JSON.parse(JSON.stringify(result)) as unknown;
 }
 
+function executeBoundOperation(
+  db: SQLiteDatabase,
+  operation: Exclude<DbOperation, "exec">,
+  source: string,
+  params: DbRequestMessage["params"],
+) {
+  if (params.length === 1 && isSQLiteBindParams(params[0])) {
+    switch (operation) {
+      case "run":
+        return db.runAsync(source, params[0]);
+      case "getFirst":
+        return db.getFirstAsync(source, params[0]);
+      case "getAll":
+        return db.getAllAsync(source, params[0]);
+    }
+  }
+
+  if (params.every(isSQLiteBindValue)) {
+    switch (operation) {
+      case "run":
+        return db.runAsync(source, ...params);
+      case "getFirst":
+        return db.getFirstAsync(source, ...params);
+      case "getAll":
+        return db.getAllAsync(source, ...params);
+    }
+  }
+
+  throw new Error("Invalid database binding parameters");
+}
+
 async function executeDbOperation(db: SQLiteDatabase, message: DbRequestMessage) {
   switch (message.operation) {
     case "exec":
       return db.execAsync(message.source);
     case "run":
-      return db.runAsync(message.source, ...(message.params as any[]));
     case "getFirst":
-      return db.getFirstAsync(message.source, ...(message.params as any[]));
     case "getAll":
-      return db.getAllAsync(message.source, ...(message.params as any[]));
+      return executeBoundOperation(db, message.operation, message.source, message.params);
     default:
       throw new Error("Unsupported database operation");
   }
@@ -135,12 +144,11 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
     let lifecycleClosePromise: Promise<void> | null = null;
     const pendingRequests = new Map<string, PendingRequest>();
     const isWeb = Platform.OS === "web";
-    const hasBroadcastChannel =
-      isWeb && typeof BroadcastChannel !== "undefined";
+    const hasBroadcastChannel = isWeb && typeof BroadcastChannel !== "undefined";
     const hasWebLocks =
       isWeb &&
       typeof navigator !== "undefined" &&
-      typeof (navigator as any).locks?.request === "function";
+      typeof (navigator as NavigatorWithWebLocks).locks?.request === "function";
 
     function postMessage(message: DbMessage) {
       channel?.postMessage(message);
@@ -155,11 +163,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
     }
 
     function createRemoteDatabaseProxy(targetTabId: string) {
-      const request = (
-        operation: DbOperation,
-        source: string,
-        params: unknown[] = [],
-      ) =>
+      const request = (operation: DbOperation, source: string, params: DbWireParam[] = []) =>
         new Promise<unknown>((resolve, reject) => {
           if (!channel) {
             reject(new Error("Database channel is unavailable"));
@@ -175,7 +179,12 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
             reject(new Error("Database request timed out"));
           }, REQUEST_TIMEOUT_MS);
 
-          pendingRequests.set(requestId, { resolve, reject, timeout });
+          pendingRequests.set(requestId, {
+            resolve,
+            reject,
+            timeout,
+            expectedHostTabId: targetTabId,
+          });
           postMessage({
             type: "request",
             requestId,
@@ -187,29 +196,22 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
           });
         });
 
-      const proxy: any = {
-        execAsync: (source: string) =>
-          request("exec", source) as Promise<void>,
-        runAsync: (source: string, ...params: unknown[]) =>
-          request("run", source, params) as ReturnType<
-            SQLiteDatabase["runAsync"]
-          >,
-        getFirstAsync: (source: string, ...params: unknown[]) =>
-          request("getFirst", source, params) as ReturnType<
-            SQLiteDatabase["getFirstAsync"]
-          >,
-        getAllAsync: (source: string, ...params: unknown[]) =>
-          request("getAll", source, params) as ReturnType<
-            SQLiteDatabase["getAllAsync"]
-          >,
+      const proxy = {
+        execAsync: (source: string) => request("exec", source) as Promise<void>,
+        runAsync: (source: string, ...params: DbWireParam[]) =>
+          request("run", source, params) as ReturnType<SQLiteDatabase["runAsync"]>,
+        getFirstAsync: (source: string, ...params: DbWireParam[]) =>
+          request("getFirst", source, params) as ReturnType<SQLiteDatabase["getFirstAsync"]>,
+        getAllAsync: (source: string, ...params: DbWireParam[]) =>
+          request("getAll", source, params) as ReturnType<SQLiteDatabase["getAllAsync"]>,
         withTransactionAsync: async (task: () => Promise<void>) => {
-          await proxy.execAsync?.("BEGIN");
+          await proxy.execAsync("BEGIN");
           try {
             await task();
-            await proxy.execAsync?.("COMMIT");
+            await proxy.execAsync("COMMIT");
           } catch (transactionError) {
             try {
-              await proxy.execAsync?.("ROLLBACK");
+              await proxy.execAsync("ROLLBACK");
             } catch {
               // Ignore rollback failures and surface the original transaction error.
             }
@@ -217,7 +219,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
           }
         },
         prepareAsync: async (source: string) => ({
-          executeAsync: (...params: unknown[]) => request("run", source, params),
+          executeAsync: (...params: DbWireParam[]) => request("run", source, params),
           finalizeAsync: async () => {},
         }),
         closeAsync: async () => {},
@@ -226,9 +228,9 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
       return proxy as SQLiteDatabase;
     }
 
-    function handleChannelMessage(event: MessageEvent<DbMessage>) {
-      const message = event.data;
-      if (!message || !("type" in message)) return;
+    function handleChannelMessage(event: MessageEvent<unknown>) {
+      const message = decodeDbMessage(event.data);
+      if (!message) return;
 
       if (message.type === "host-probe") {
         if (message.tabId !== tabId && isHostReady) {
@@ -256,9 +258,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
 
         void (async () => {
           try {
-            const result = toCloneableResult(
-              await executeDbOperation(currentDb!, message),
-            );
+            const result = toCloneableResult(await executeDbOperation(currentDb!, message));
             postMessage({
               type: "response",
               requestId: message.requestId,
@@ -285,6 +285,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
         if (message.targetTabId !== tabId) return;
         const pending = pendingRequests.get(message.requestId);
         if (!pending) return;
+        if (message.fromTabId !== pending.expectedHostTabId) return;
 
         clearTimeout(pending.timeout);
         pendingRequests.delete(message.requestId);
@@ -309,9 +310,9 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
           resolve(null);
         }, timeoutMs);
 
-        const onMessage = (event: MessageEvent<DbMessage>) => {
-          const message = event.data;
-          if (message?.type !== "host-ready" || message.tabId === tabId) return;
+        const onMessage = (event: MessageEvent<unknown>) => {
+          const message = decodeDbMessage(event.data);
+          if (!message || message.type !== "host-ready" || message.tabId === tabId) return;
           if (settled) return;
 
           settled = true;
@@ -329,32 +330,24 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
       if (!hasWebLocks) return true;
 
       return new Promise<boolean>((resolve, reject) => {
-        const locks = (navigator as Navigator & {
-          locks: {
-            request: (
-              name: string,
-              options: { mode: "exclusive"; ifAvailable: true },
-              callback: (lock: unknown) => Promise<void> | void,
-            ) => Promise<void>;
-          };
-        }).locks;
+        const locks = (navigator as NavigatorWithWebLocks).locks;
+        if (!locks) {
+          resolve(true);
+          return;
+        }
 
         locks
-          .request(
-            LOCK_NAME,
-            { mode: "exclusive", ifAvailable: true },
-            (lock) => {
-              if (!lock) {
-                resolve(false);
-                return;
-              }
+          .request(LOCK_NAME, { mode: "exclusive", ifAvailable: true }, (lock) => {
+            if (!lock) {
+              resolve(false);
+              return;
+            }
 
-              return new Promise<void>((release) => {
-                releaseLock = release;
-                resolve(true);
-              });
-            },
-          )
+            return new Promise<void>((release) => {
+              releaseLock = release;
+              resolve(true);
+            });
+          })
           .catch(reject);
       });
     }
@@ -583,11 +576,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  return (
-    <DatabaseContext.Provider value={{ db, isReady, progress, error }}>
-      {children}
-    </DatabaseContext.Provider>
-  );
+  return <DatabaseContext.Provider value={{ db, isReady, progress, error }}>{children}</DatabaseContext.Provider>;
 }
 
 export function useDatabase() {
