@@ -90,6 +90,8 @@ jest.mock("@/lib/supabase", () => ({
 }));
 jest.mock("@/lib/database/sync-queue", () => ({
   getPendingSyncEntries: () => mockPending(),
+  getPendingSyncCount:
+    jest.requireActual<typeof import("@/lib/database/sync-queue")>("@/lib/database/sync-queue").getPendingSyncCount,
   enqueueSync: jest.fn(async () => {}),
   markSynced: jest.fn(async () => {}),
   markFailed: jest.fn(async () => {}),
@@ -409,7 +411,11 @@ describe("word meaning restore and incremental recovery", () => {
       putMeaning(meaning({ meaning: "keep local incremental meaning", updated_at: OLD }));
       const initialQueue = snapshot().queue;
 
-      await expect(fullSync(db)).resolves.toMatchObject({ accountRestored: false });
+      await expect(fullSync(db)).resolves.toMatchObject({
+        status: "partial",
+        pulled: offset + 1,
+        accountRestored: false,
+      });
       expect(sql.prepare("SELECT state,updated_at FROM study_cards WHERE id='2:255'").get()).toEqual({
         state: State.Review,
         updated_at: NEW,
@@ -427,7 +433,7 @@ describe("word meaning restore and incremental recovery", () => {
       mockMeaningIncrementalRows.push(meaning({ meaning: "downloaded after retry", ayah: 257 }));
       mockIncrementalCards = [];
       const retry = await fullSync(db);
-      expect(retry.accountRestored).toBe(false);
+      expect(retry).toMatchObject({ status: "synced", pulled: 1, accountRestored: false });
       expect(requests.filter((r) => r.table === "user_word_meanings" && r.incremental).map((r) => r.since)).toEqual(
         offset === 500 ? [OLD, OLD, OLD] : [OLD, OLD],
       );

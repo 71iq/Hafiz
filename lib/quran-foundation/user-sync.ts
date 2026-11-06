@@ -129,7 +129,7 @@ export async function runInitialQfUserSync(db: SQLiteDatabase): Promise<QfSyncRe
   owner.requireCurrent();
   const secondPull = await pullQfRemoteChanges(owner, db);
   owner.requireCurrent();
-  return { status: "synced", pushed, pulled: firstPull + secondPull };
+  return readQfSyncResult(owner, db, pushed, firstPull + secondPull);
 }
 
 export async function fullQfUserSync(db: SQLiteDatabase): Promise<QfSyncResult> {
@@ -151,21 +151,41 @@ export async function fullQfUserSync(db: SQLiteDatabase): Promise<QfSyncResult> 
     owner.requireCurrent();
     const secondPull = await pullQfRemoteChanges(owner, db);
     owner.requireCurrent();
-    await db.runAsync("INSERT OR REPLACE INTO user_settings (key, value) VALUES ('qf_last_sync_at', ?)", [
-      new Date().toISOString(),
-    ]);
+    const result = await readQfSyncResult(owner, db, pushed, firstPull + secondPull);
     owner.requireCurrent();
-    return { status: "synced", pushed, pulled: firstPull + secondPull };
+    if (result.status === "synced") {
+      await db.runAsync("INSERT OR REPLACE INTO user_settings (key, value) VALUES ('qf_last_sync_at', ?)", [
+        new Date().toISOString(),
+      ]);
+      owner.requireCurrent();
+    }
+    return result;
   }
   const pushed = await pushQfSyncQueue(owner, db);
   owner.requireCurrent();
   const pulled = await pullQfRemoteChanges(owner, db);
   owner.requireCurrent();
-  await db.runAsync("INSERT OR REPLACE INTO user_settings (key, value) VALUES ('qf_last_sync_at', ?)", [
-    new Date().toISOString(),
-  ]);
+  const result = await readQfSyncResult(owner, db, pushed, pulled);
   owner.requireCurrent();
-  return { status: "synced", pushed, pulled };
+  if (result.status === "synced") {
+    await db.runAsync("INSERT OR REPLACE INTO user_settings (key, value) VALUES ('qf_last_sync_at', ?)", [
+      new Date().toISOString(),
+    ]);
+    owner.requireCurrent();
+  }
+  return result;
+}
+
+async function readQfSyncResult(
+  owner: QfSyncOwner,
+  db: SQLiteDatabase,
+  pushed: number,
+  pulled: number,
+): Promise<QfSyncResult> {
+  owner.requireCurrent();
+  const pending = await getPendingQfSyncCount(db);
+  owner.requireCurrent();
+  return { status: pending === 0 ? "synced" : "failed", pushed, pulled };
 }
 
 async function needsInitialLocalEnqueue(owner: QfSyncOwner, db: SQLiteDatabase): Promise<boolean> {

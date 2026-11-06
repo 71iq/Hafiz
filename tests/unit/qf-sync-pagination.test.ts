@@ -281,7 +281,7 @@ it.each(entities)("keeps pending local %s protected in a complete empty snapshot
     );
   const before = snapshot();
   mockPage = (kind) => page(kind, null, false);
-  await expect(run("full")).resolves.toMatchObject({ status: "synced", pulled: 0 });
+  await expect(run("full")).resolves.toMatchObject({ status: "failed", pulled: 0 });
   const after = snapshot();
   expect(entity === "bookmarks" ? after.bookmarks : after.notes).toEqual(
     entity === "bookmarks" ? before.bookmarks : before.notes,

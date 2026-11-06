@@ -26,6 +26,8 @@ let delayedAccess: ReturnType<typeof deferred<string>> | null = null;
 let delayedAccessEntered: ReturnType<typeof deferred<void>> | null = null;
 let mockConfigured = true;
 let remoteCreated = false;
+let mockAfterCountOwnerRead: (() => void) | null = null;
+let retireAfterCountRead: (() => void) | null = null;
 const authSession = jest.fn<Promise<{ data: { session: Session | null }; error: unknown }>, []>();
 const requests: { action: string; authorization: string | null }[] = [];
 const responses: Record<string, unknown> = {};
@@ -64,7 +66,15 @@ const mockClient = createClient("https://synthetic.invalid", "synthetic-anon-key
 });
 
 jest.mock("@/lib/auth/store", () => ({
-  useAuthStore: { getState: () => ({ user: mockCurrentSession?.user ?? null, session: mockCurrentSession }) },
+  useAuthStore: {
+    getState: () => {
+      const state = { user: mockCurrentSession?.user ?? null, session: mockCurrentSession };
+      const afterRead = mockAfterCountOwnerRead;
+      mockAfterCountOwnerRead = null;
+      afterRead?.();
+      return state;
+    },
+  },
 }));
 jest.mock("@/lib/supabase", () => ({
   isSupabaseConfigured: () => mockConfigured,
@@ -139,6 +149,13 @@ let readWait: { gate: ReturnType<typeof hold>; query: string } | null = null;
 let enqueueWait: ReturnType<typeof hold> | null = null;
 let transactionCount = 0;
 async function afterRead(source: string) {
+  if (retireAfterCountRead && source.includes("SELECT COUNT(*) as count FROM qf_sync_queue")) {
+    const retire = retireAfterCountRead;
+    retireAfterCountRead = null;
+    mockAfterCountOwnerRead = () => {
+      queueMicrotask(retire);
+    };
+  }
   if (readWait && source.includes(readWait.query)) {
     readWait.gate.entered.resolve();
     await readWait.gate.release.promise;
@@ -152,6 +169,8 @@ beforeEach(async () => {
   Object.keys(responses).forEach((key) => delete responses[key]);
   mockConfigured = true;
   remoteCreated = false;
+  mockAfterCountOwnerRead = null;
+  retireAfterCountRead = null;
   observeAuthSession(null);
   switchSession(session());
   accessTokenCall = 0;
@@ -339,7 +358,7 @@ async function expectInvalidAcknowledgement(
   const before = sql.prepare(rowQuery).get(...rowParams);
   responses[action] = response;
   const result = await fullQfUserSync(db);
-  expect(result).toMatchObject({ pushed: 0 });
+  expect(result).toMatchObject({ status: "failed", pushed: 0 });
   expect(queueState()).toEqual([
     { status: "failed", attempt_count: 1, last_error: expect.stringContaining("Incomplete Quran Foundation") },
   ]);
@@ -553,7 +572,7 @@ it.each(["list-bookmarks", "list-notes"])("keeps current-owner %s errors and loc
 });
 it("preserves current-owner queue failure accounting", async () => {
   responses["create-note"] = { ok: false, code: "upstream", message: "Synthetic push failure" };
-  await expect(fullQfUserSync(db)).resolves.toMatchObject({ pushed: 0 }); // Partial-outcome reporting remains RF029.
+  await expect(fullQfUserSync(db)).resolves.toMatchObject({ status: "failed", pushed: 0 });
   expect(queueState()).toEqual([{ status: "failed", attempt_count: 1, last_error: "Synthetic push failure" }]);
 });
 
@@ -889,3 +908,108 @@ it("preserves the existing unowned invocation path for legacy callers", async ()
   expect(authSession).not.toHaveBeenCalled();
   expect(requests).toEqual([{ action: "status", authorization: "Bearer " + token(USER_A, SESSION_A) }]);
 });
+
+it.each(["full-ready", "full-initial", "explicit-initial"] as const)(
+  "reports failed queue entries and preserves the success timestamp in %s",
+  async (mode) => {
+    sql.prepare("INSERT INTO user_settings (key,value) VALUES ('qf_last_sync_at',?)").run(OLD);
+    if (mode === "full-initial") sql.exec("DELETE FROM user_settings WHERE key='qf_initial_local_enqueue_done'");
+    responses["create-note"] = { ok: false, code: "upstream", message: "Synthetic push failure" };
+    const result = mode === "explicit-initial" ? await runInitialQfUserSync(db) : await fullQfUserSync(db);
+    expect(result).toMatchObject({ status: "failed", pushed: 0, pulled: 0 });
+    const expectedCount = mode === "full-ready" ? 1 : 2;
+    expect(await getPendingQfSyncCount(db)).toBe(expectedCount);
+    expect(queueState()).toEqual(
+      Array.from({ length: expectedCount }, () => ({
+        status: "failed",
+        attempt_count: 1,
+        last_error: "Synthetic push failure",
+      })),
+    );
+    expect(sql.prepare("SELECT value FROM user_settings WHERE key='qf_last_sync_at'").get()).toEqual({ value: OLD });
+  },
+);
+
+it("includes exhausted QF entries in incomplete status without resetting attempts", async () => {
+  sql.exec("UPDATE qf_sync_queue SET status='failed',attempt_count=5,last_error='prior failure'");
+  sql.prepare("INSERT INTO user_settings (key,value) VALUES ('qf_last_sync_at',?)").run(OLD);
+  const before = queueState();
+  await expect(fullQfUserSync(db)).resolves.toMatchObject({ status: "failed", pushed: 0 });
+  expect(queueState()).toEqual(before);
+  expect(await getPendingQfSyncCount(db)).toBe(1);
+  expect(requests.some(({ action }) => action === "create-note")).toBe(false);
+  expect(sql.prepare("SELECT value FROM user_settings WHERE key='qf_last_sync_at'").get()).toEqual({ value: OLD });
+});
+
+it("reports the 100-entry QF cap as incomplete, retaining the remaining entry for retry", async () => {
+  noPush();
+  sql.prepare("INSERT INTO user_settings (key,value) VALUES ('qf_last_sync_at',?)").run(OLD);
+  for (let index = 0; index < 101; index += 1)
+    await enqueueQfSync(db, "private_note", "UPSERT", "missing-note-" + index, {});
+  await expect(fullQfUserSync(db)).resolves.toMatchObject({ status: "failed", pushed: 100 });
+  expect(await getPendingQfSyncCount(db)).toBe(1);
+  expect(queueState().filter((row) => row.status === "pending")).toHaveLength(1);
+  expect(sql.prepare("SELECT value FROM user_settings WHERE key='qf_last_sync_at'").get()).toEqual({ value: OLD });
+  await expect(fullQfUserSync(db)).resolves.toMatchObject({ status: "synced", pushed: 1 });
+  expect(await getPendingQfSyncCount(db)).toBe(0);
+  expect(sql.prepare("SELECT value FROM user_settings WHERE key='qf_last_sync_at'").get()?.value).not.toBe(OLD);
+});
+
+it("includes QF work enqueued while the final pull is pending", async () => {
+  noPush();
+  sql.prepare("INSERT INTO user_settings (key,value) VALUES ('qf_last_sync_at',?)").run(OLD);
+  const entered = watch("list-notes");
+  const gate = deferred<unknown>();
+  responses["list-notes"] = gate.promise;
+  const run = start();
+  try {
+    await reached(entered, run);
+    await enqueueQfSync(db, "private_note", "UPSERT", "new-work", {});
+    gate.resolve({ ok: true, notes: [] });
+    expect(await run).toMatchObject({ kind: "resolved", value: { status: "failed", pushed: 0 } });
+    expect(await getPendingQfSyncCount(db)).toBe(1);
+    expect(queueState()).toEqual([{ status: "pending", attempt_count: 0, last_error: null }]);
+    expect(sql.prepare("SELECT value FROM user_settings WHERE key='qf_last_sync_at'").get()).toEqual({ value: OLD });
+  } finally {
+    gate.resolve({ ok: true, notes: [] });
+    await run;
+  }
+});
+
+it("rechecks ownership after the final pending-count read before writing success", async () => {
+  noPush();
+  sql.prepare("INSERT INTO user_settings (key,value) VALUES ('qf_last_sync_at',?)").run(OLD);
+  readWait = { query: "SELECT COUNT(*) as count FROM qf_sync_queue", gate: hold() };
+  const gate = readWait.gate;
+  const run = start();
+  try {
+    await reached(gate.entered.promise, run);
+    switchSession(session(USER_B, SESSION_B));
+    gate.release.resolve();
+    expect(failure(await run)).toEqual(expect.any(Error));
+    expect(sql.prepare("SELECT value FROM user_settings WHERE key='qf_last_sync_at'").get()).toEqual({ value: OLD });
+    expect(requests.every(({ authorization }) => authorization === "Bearer " + token(USER_A, SESSION_A))).toBe(true);
+  } finally {
+    gate.release.resolve();
+    await run;
+  }
+});
+
+it.each(["full-ready", "full-initial"] as const)(
+  "retires after the final result fence before caller timestamp publication in %s",
+  async (mode) => {
+    noPush();
+    sql.exec("DELETE FROM private_notes");
+    if (mode === "full-initial") sql.exec("DELETE FROM user_settings WHERE key='qf_initial_local_enqueue_done'");
+    sql.prepare("INSERT INTO user_settings (key,value) VALUES ('qf_last_sync_at',?)").run(OLD);
+    let retired = false;
+    retireAfterCountRead = () => {
+      retired = true;
+      switchSession(session(USER_B, SESSION_B));
+    };
+    await expect(fullQfUserSync(db)).rejects.toThrow("Quran Foundation sync account changed");
+    expect(retired).toBe(true);
+    expect(sql.prepare("SELECT value FROM user_settings WHERE key='qf_last_sync_at'").get()).toEqual({ value: OLD });
+    expect(requests.every(({ authorization }) => authorization === "Bearer " + token(USER_A, SESSION_A))).toBe(true);
+  },
+);

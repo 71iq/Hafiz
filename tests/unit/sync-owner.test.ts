@@ -58,6 +58,7 @@ jest.mock("@/lib/supabase", () => ({
 }));
 jest.mock("@/lib/database/sync-queue", () => ({
   getPendingSyncEntries: () => mockPending(),
+  getPendingSyncCount: async () => 0,
   enqueueSync: (...args: unknown[]) => mockEnqueue(...args),
   markSynced: (...args: unknown[]) => mockMarkSynced(...args),
   markFailed: (...args: unknown[]) => mockMarkFailed(...args),
@@ -279,6 +280,7 @@ it.each([false, true])("preserves a current-owner restore and subsequent phases,
   activate(session(A));
   mockRestoreRows = nonempty ? [setting()] : [];
   await expect(fullSync(db)).resolves.toEqual({
+    status: "synced",
     pushed: 0,
     pulled: nonempty ? 1 : 0,
     accountRestored: nonempty,
@@ -333,6 +335,7 @@ it.each(["unconfigured", "signed out", "unidentified"])("does no account work wh
   else if (state === "signed out") activate(null);
   else activate({ ...mockAuth.session!, access_token: "unidentified" });
   await expect(fullSync(db)).resolves.toEqual({
+    status: "not_connected",
     pushed: 0,
     pulled: 0,
     accountRestored: false,

@@ -244,7 +244,15 @@ export default function SettingsScreen() {
           const status = await refreshQfStatus();
           if (status === "connected") {
             const result = await runInitialQfUserSync(db);
-            setQfMessage(result.status === "synced" ? s.qfSyncComplete : s.qfFinishConnection);
+            setQfMessage(
+              result.status === "synced"
+                ? s.qfSyncComplete
+                : result.status === "failed"
+                  ? s.qfSyncFailed
+                  : result.status === "needs_reauth"
+                    ? s.qfNeedsReauth
+                    : s.qfFinishConnection,
+            );
           } else {
             setQfMessage(s.qfFinishConnection);
           }
@@ -260,7 +268,16 @@ export default function SettingsScreen() {
     return () => {
       cancelled = true;
     };
-  }, [db, params.qf, params.qf_error, refreshQfStatus, s.qfFinishConnection, s.qfSyncComplete, s.qfSyncFailed]);
+  }, [
+    db,
+    params.qf,
+    params.qf_error,
+    refreshQfStatus,
+    s.qfFinishConnection,
+    s.qfSyncComplete,
+    s.qfSyncFailed,
+    s.qfNeedsReauth,
+  ]);
 
   const handleLogout = useCallback(async () => {
     await signOut();
@@ -308,7 +325,9 @@ export default function SettingsScreen() {
           ? s.qfSyncComplete
           : result.status === "needs_reauth"
             ? s.qfNeedsReauth
-            : s.qfFinishConnection,
+            : result.status === "failed"
+              ? s.qfSyncFailed
+              : s.qfFinishConnection,
       );
     } catch (err: any) {
       setQfMessage(err.message || s.qfSyncFailed);
@@ -353,10 +372,9 @@ export default function SettingsScreen() {
     },
     [s.tafseerSourceImportFailed],
   );
-  const {
-    importingSource: importingTafseerSource,
-    selectSource: handleTafseerSourceSelect,
-  } = useTafsirSourceSelection({ db, onSelected: setTafseerSource, onError: handleTafsirSelectionError });
+  const { importingSource: importingTafseerSource, selectSource: handleTafseerSourceSelect } = useTafsirSourceSelection(
+    { db, onSelected: setTafseerSource, onError: handleTafsirSelectionError },
+  );
 
   const categoryPanels = (
     <>

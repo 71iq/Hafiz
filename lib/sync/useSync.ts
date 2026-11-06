@@ -9,6 +9,7 @@ import { isSupabaseConfigured } from "@/lib/supabase";
 import { fullSync, type SyncStatus } from "@/lib/database/sync";
 import { getPendingSyncCount } from "@/lib/database/sync-queue";
 import { updateProfileStats } from "@/lib/fsrs/leaderboard-sync";
+import { isQfSyncEnabled } from "@/lib/quran-foundation/config";
 import { fullQfUserSync, getPendingQfSyncCount } from "@/lib/quran-foundation/user-sync";
 import { emitSyncCompleted } from "@/lib/sync/events";
 import { useSettings } from "@/lib/settings/context";
@@ -140,12 +141,17 @@ export function useSync() {
       if (result.localDataReplaced) setAccountRestoreNotice(true);
       if (result.pushed > 0 || result.pulled > 0) emitSyncCompleted(result);
       if (!isCurrent()) return;
-      await fullQfUserSync(db);
+      const qfResult = isQfSyncEnabled() ? await fullQfUserSync(db) : null;
       if (!isCurrent()) return;
-      setStatus("synced");
       const counts = await Promise.all([getPendingSyncCount(db), getPendingQfSyncCount(db)]);
       if (!isCurrent()) return;
       setPendingCount(counts[0] + counts[1]);
+      const complete =
+        result.status === "synced" &&
+        counts[0] === 0 &&
+        (qfResult === null || qfResult.status === "not_connected" || (qfResult.status === "synced" && counts[1] === 0));
+      setStatus(complete ? "synced" : "error");
+      if (!complete) return;
       const timer = setTimeout(() => {
         if (idleTimer.current !== timer) return;
         idleTimer.current = null;
@@ -160,6 +166,16 @@ export function useSync() {
       if (isCurrent()) {
         console.warn("[Sync] Error:", error instanceof Error ? error.message : String(error));
         setStatus("error");
+        try {
+          const counts = await Promise.all([getPendingSyncCount(db), getPendingQfSyncCount(db)]);
+          if (isCurrent()) setPendingCount(counts[0] + counts[1]);
+        } catch (countError) {
+          if (isCurrent())
+            console.warn(
+              "[Sync] Failed to refresh pending count:",
+              countError instanceof Error ? countError.message : String(countError),
+            );
+        }
       }
     } finally {
       const retired = !isCurrent();

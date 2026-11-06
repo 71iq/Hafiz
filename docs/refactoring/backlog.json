@@ -2178,48 +2178,278 @@
     },
     {
       "id": "RF-029",
-      "title": "Characterize sync partial failure and status",
-      "description": "Characterize sync partial failure and status",
-      "rationale": "Pull catches failures while callers may report synced.",
+      "title": "Report incomplete account sync without losing retry progress",
+      "description": "Primary directly implements truthful account-sync outcomes through existing functions and UI. A bounded worker adds actual SQLite/production-queue causal regressions. Retain queue retry/restore/owner semantics and existing global indicator states; reuse current bilingual QF error text.",
+      "rationale": "Generic pull catches errors and loses earlier committed-page totals; callers report synced. QF per-entry failures/exhausted/capped queues also return synced and advance qf_last_sync_at. Settings maps failed outcomes to connection setup. Separate stronger design inspection confirms this coherent remaining RF029 scope.",
       "modules": [
         "lib/database/sync.ts",
         "lib/sync/useSync.ts",
-        "tests/unit/sync-partial-failure.test.tsx"
+        "lib/quran-foundation/user-sync.ts",
+        "app/(tabs)/settings.tsx",
+        "tests/unit/sync-owner.test.ts",
+        "tests/unit/sync-payloads.test.ts",
+        "tests/unit/sync-concurrency.test.tsx",
+        "tests/unit/qf-sync-owner.test.ts",
+        "tests/unit/qf-sync-pagination.test.ts",
+        "tests/unit/sync-partial-failure.test.ts",
+        "tests/unit/qf-sync-settings.test.tsx"
       ],
       "dependencies": [
-        "RF-025"
+        "RF-140",
+        "RF-142",
+        "RF-145",
+        "RF-146",
+        "RF-147",
+        "RF-148"
       ],
       "acceptance_criteria": [
-        "Test partial pulls, failed upload, lost connectivity, watermark advancement and retry.",
-        "Separate successful/partial/failed outcomes without changing restore-before-upload or queue semantics."
+        "Export SyncResult existing counts+restore flags and status synced|partial|failed|not_connected. No configured/matching owner => not_connected, restore hard errors keep original throw.",
+        "Push private result pushed acknowledged group count, failed count, successfulEntry boolean. Set successful-entry flag after each resolved pushDelete/pushUpsert, including reconciled no-op; preserve all grouped markSynced/markFailed and retry semantics.",
+        "Pull private result pulled+complete; required callback per committed page increments total after successful transaction+owner fence exactly once. No outer table total increments. complete only after all applicable pulls and cursor publication, preserve RF147 word-error continuation and RF148 start cursor.",
+        "Read pending SQL count and owner fence after await. status synced iff pull complete, zero failed push, zero pending; failed iff actual failure and no completed/reconciled push or pulled/restored progress; otherwise partial including capped/new pending without failure.",
+        "QF entrypoints read remaining queue including exhausted entries and owner fence. Remaining => existing failed status retaining counts, full entrypoint withholds qf_last_sync_at. runInitial never writes qf_last_sync_at as before. Existing initial-enqueue ordering unchanged.",
+        "Hook keep stats/restore notice/event order, events before QF. Read both results/counts before final status. synced only generic synced/count0 and QF synced/count0 or optional QFnot_connected. Else error; only healthy run gets idle timer. Thrown errors best-effort refresh counts with retirement fence, never mask original.",
+        "Settings both manual/callback map failed=>qfSyncFailed, needs_reauth=>qfNeedsReauth, synced=>qfSyncComplete, not_connected=>qfFinishConnection; use existing both-language strings.",
+        "Focused realSQLite production queue with late-page failure/preserved500/count500/retry, first failure, midgroup remote success/failure, failure-only uploads, capped/new pending, connectivity loss after initial online; hook retirement/count/no timer and healthy controls; QF actualSDK failure/exhausted/cap/new pending and unchanged queue states/timestamps; actual rendered screen10 en/ar cases.",
+        "Full20 once ready + new fresh stronger independent review + primary acceptance + one commit; baseline under2GB; no logs retained after acceptance.",
+        "No new shared transaction/account ownership/cursor clock policy/schema/server/vendor/protected/production changes.",
+        "Respect existing isQfSyncEnabled in background hook: disabled QF makes no request, retained QF counts do not block ordinary success, ordinary failures still surface. Preserve enabled-QF ownership/status tests with explicit enabled fixture. Separate stronger source inspection confirms the flag already gates settings and auto-connect.",
+        "Review repair: both fullQfUserSync branches recheck owner immediately after awaited readQfSyncResult, before success timestamp SQL. Preserve two causal microtask regressions retiring after the helper final fence and before caller continuation, in addition to retirement during count read. Keep the first failed independent verdict and reproduction logs until acceptance.",
+        "Explicit ordinary queue cap regression: real SQLite and production queue10001 entries. FirstfullSync acknowledges10000 and returnspartial with one pending; retry acknowledgesone and returnssynced. Retain exact SQL queue status/counts and upsert transport count so acknowledged entries are not replayed. This is separate from QF100 cap."
       ],
       "verification": [
         [
-          "npm",
-          "run",
-          "test:unit",
-          "--",
-          "--runTestsByPath",
-          "tests/unit/sync-partial-failure.test.tsx",
+          "git",
+          "diff",
+          "--check"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "lib/database/sync.ts",
+          "lib/sync/useSync.ts",
+          "lib/quran-foundation/user-sync.ts",
+          "app/(tabs)/settings.tsx",
+          "tests/unit/sync-owner.test.ts",
+          "tests/unit/sync-payloads.test.ts",
           "tests/unit/sync-concurrency.test.tsx",
-          "tests/unit/sync-restore-contract.test.ts"
+          "tests/unit/qf-sync-owner.test.ts",
+          "tests/unit/qf-sync-pagination.test.ts",
+          "tests/unit/sync-partial-failure.test.ts",
+          "tests/unit/qf-sync-settings.test.tsx",
+          "docs/refactoring/PROGRESS.md"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/database/sync.ts",
+          "lib/sync/useSync.ts",
+          "lib/quran-foundation/user-sync.ts",
+          "app/(tabs)/settings.tsx",
+          "tests/unit/sync-owner.test.ts",
+          "tests/unit/sync-payloads.test.ts",
+          "tests/unit/sync-concurrency.test.tsx",
+          "tests/unit/qf-sync-owner.test.ts",
+          "tests/unit/qf-sync-pagination.test.ts",
+          "tests/unit/sync-partial-failure.test.ts",
+          "tests/unit/qf-sync-settings.test.tsx",
+          "--max-warnings=0"
         ],
         [
           "npm",
           "run",
           "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "check:analysis"
+        ],
+        [
+          "npm",
+          "run",
+          "postinstall"
+        ],
+        [
+          "npm",
+          "ls",
+          "--all",
+          "--json"
+        ],
+        [
+          "npm",
+          "run",
+          "lint"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "node",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/tests/brace-expansion.test.cjs",
+          "scripts/tests/dependency-boundaries.test.cjs",
+          "scripts/tests/icon-tool.test.cjs",
+          "scripts/tests/jest-config.test.cjs",
+          "scripts/tests/js-yaml.test.cjs",
+          "scripts/tests/lint-coverage.test.cjs",
+          "scripts/tests/metro-unicode.test.cjs",
+          "scripts/tests/nanoid.test.cjs",
+          "scripts/tests/router-dependency-range.test.cjs",
+          "scripts/tests/security-dependency-owner.test.cjs",
+          "scripts/tests/source-map-js.test.cjs",
+          "scripts/tests/tailwind-source-map.test.cjs",
+          "scripts/tests/ws.test.cjs",
+          "scripts/tests/xmldom.test.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "test:refactor-runner"
+        ],
+        [
+          "python3",
+          "-B",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "scripts/tests",
+          "-p",
+          "test_*.py"
+        ],
+        [
+          "npm",
+          "run",
+          "check:native-config"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=4096",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "android",
+          "--output-dir",
+          ".expo/modernization-checks/android",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/android')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=3072",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "ios",
+          "--output-dir",
+          ".expo/modernization-checks/ios",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/ios')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8197",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts",
+          "tests/e2e/database-bridge.spec.ts"
         ]
       ],
       "risk": "high",
-      "approved": false,
-      "status": "pending",
+      "approved": true,
+      "status": "verified",
       "allowed_paths": [
         "lib/database/sync.ts",
         "lib/sync/useSync.ts",
-        "tests/unit/sync-partial-failure.test.tsx"
+        "lib/quran-foundation/user-sync.ts",
+        "app/(tabs)/settings.tsx",
+        "tests/unit/sync-owner.test.ts",
+        "tests/unit/sync-payloads.test.ts",
+        "tests/unit/sync-concurrency.test.tsx",
+        "tests/unit/qf-sync-owner.test.ts",
+        "tests/unit/qf-sync-pagination.test.ts",
+        "tests/unit/sync-partial-failure.test.ts",
+        "tests/unit/qf-sync-settings.test.tsx"
       ],
-      "attempts": 0,
-      "priority": 1
+      "attempts": 1,
+      "priority": 1,
+      "implementation_mode": "implementation",
+      "started_at": "2026-11-06T22:45:30.914407+00:00",
+      "failure_history": [
+        {
+          "time": "2026-11-06T22:32:02.903019+00:00",
+          "attempt": 1,
+          "failure": "Independent review failed: [\"[P2] lib/quran-foundation/user-sync.ts:154 and :167: Add owner.requireCurrent() immediately after each awaited readQfSyncResult(). Its internal fence runs before the caller resumes, leaving a new microtask window where logout/account replacement can retire the owner before qf_last_sync_at is written. The post-write fence detects retirement too late. Cover both branches with retirement between helper resolution and caller continuation; the existing test only retires during the count read. All 20 recorded checks passed.\"]",
+          "directory": ".ralph/runs/RF-029-1-primary-1794003861398881385"
+        },
+        {
+          "time": "2026-11-06T22:42:39.308917+00:00",
+          "attempt": 2,
+          "failure": "Independent review failed: [\"[P2 coverage] tests/unit/sync-partial-failure.test.ts:291 covers newly enqueued work but omits RF-029's required generic queue-cap regression. Add a real SQLite/production-queue case with 10,001 entries: the first run must acknowledge 10,000, retain one pending entry, and return partial despite successful uploads; retry must acknowledge the remaining entry and return synced. The QF 100-entry test exercises a different implementation. The repaired owner fences and both causal regressions look correct; all 20 recorded checks passed.\"]",
+          "directory": ".ralph/runs/RF-029-2-primary-1794004496317388899"
+        }
+      ],
+      "recovery_windows": [
+        {
+          "time": "2026-11-06T22:44:49.266351+00:00",
+          "prior_attempt_offset": 0,
+          "prior_attempts": 2,
+          "reason": "Second review confirmed repaired owner fences and all20 checks but required independent ordinary10000 queue-cap coverage. Added real production-queue10001 case:10000 acked/one retained/partial, then one acked/synced retry, with exact persisted states and no duplicate acknowledged replay. Focused9 cases/types/scopedlint pass."
+        }
+      ],
+      "attempt_offset": 2,
+      "completed_at": "2026-11-06T22:53:26.130734+00:00",
+      "independent_review": "pass",
+      "evidence": "docs/refactoring/PROGRESS.md",
+      "summary": "Incomplete ordinary and Quran Foundation sync retains accurate committed progress, pending retry work and failure status. Optional disconnected sync stays optional. Settings show existing localized failure/reauthentication messages. Both independent review corrections are covered by causal regressions."
     },
     {
       "id": "RF-030",
@@ -14530,6 +14760,32 @@
       "independent_review": "pass",
       "evidence": "docs/refactoring/PROGRESS.md",
       "summary": "Capture remote-read start timestamps so updates arriving during later sequential table reads remain eligible for retry. Covers incremental and empty/nonempty account-restore windows under the existing comparable-clock assumption. Restore/backfill completion timestamps and incomplete-pull handling stay intact."
+    },
+    {
+      "id": "RF-149",
+      "title": "Align public streaks with their existing UTC server calendar",
+      "description": "Investigate and repair the confirmed UTC/local-date mismatch for remote-backed public review streaks, while offline local summaries keep their local calendar. Prepare exact scope before approval.",
+      "rationale": "RF148 gate investigation found public aggregates and daily scores are UTC-backed, but client public readers compare to local today and public upload merges local-date activity. A review just after local midnight can be shown with current streak zero.",
+      "modules": [
+        "lib/fsrs/leaderboard-sync.ts",
+        "lib/leaderboard/api.ts",
+        "tests/unit/leaderboard-stats-owner.test.ts"
+      ],
+      "dependencies": [
+        "RF-029"
+      ],
+      "acceptance_criteria": [
+        "Confirm the actual checked-in server UTC contract and reproduce wrong public streaks across positive and negative local offsets through real caller tests.",
+        "Align remote public reads and uploaded activity with that existing contract; preserve offline local calendar and deliberate UTC daily leaderboard. No schema, server, production or protected input changes.",
+        "Prepare exact small source/test paths, full controller checks, independent review and primary acceptance before implementation."
+      ],
+      "verification": [],
+      "risk": "high",
+      "approved": false,
+      "status": "pending",
+      "allowed_paths": [],
+      "attempts": 0,
+      "priority": 1
     }
   ]
 }

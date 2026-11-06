@@ -6,17 +6,20 @@ import { observeAuthSession } from "@/lib/auth/commands";
 import { emitSyncCompleted } from "@/lib/sync/events";
 import { useSync } from "@/lib/sync/useSync";
 
-type Summary = { pushed: number; pulled: number; accountRestored: boolean; localDataReplaced: boolean };
-const HEALTHY: Summary = { pushed: 1, pulled: 0, accountRestored: false, localDataReplaced: false };
-const OLD_RESULT: Summary = { pushed: 0, pulled: 99, accountRestored: true, localDataReplaced: true };
+type Summary = import("@/lib/database/sync").SyncResult;
+type QfResult = import("@/lib/quran-foundation/user-sync").QfSyncResult;
+const QF_HEALTHY: QfResult = { status: "synced", pushed: 0, pulled: 0 };
+const HEALTHY: Summary = { status: "synced", pushed: 1, pulled: 0, accountRestored: false, localDataReplaced: false };
+const OLD_RESULT: Summary = { status: "synced", pushed: 0, pulled: 99, accountRestored: true, localDataReplaced: true };
 const A = "00000000-0000-4000-8000-000000000001";
 const B = "00000000-0000-4000-8000-000000000002";
 let mockDb: object = {};
+let mockQfEnabled = true;
 let mockSession: Session | null = null;
 let mockSettings = { isLoaded: true, isTranslationLoading: false };
 const mockFullSync = jest.fn(async (..._args: unknown[]): Promise<Summary> => HEALTHY);
 const mockStats = jest.fn(async (..._args: unknown[]) => {});
-const mockQfSync = jest.fn(async (..._args: unknown[]) => {});
+const mockQfSync = jest.fn(async (..._args: unknown[]): Promise<QfResult> => QF_HEALTHY);
 const mockCount = jest.fn(async (..._args: unknown[]) => 0);
 const mockQfCount = jest.fn(async (..._args: unknown[]) => 0);
 
@@ -33,6 +36,7 @@ jest.mock("@/lib/supabase", () => ({ isSupabaseConfigured: () => true }));
 jest.mock("@/lib/database/sync", () => ({ fullSync: (...args: unknown[]) => mockFullSync(...args) }));
 jest.mock("@/lib/database/sync-queue", () => ({ getPendingSyncCount: (...args: unknown[]) => mockCount(...args) }));
 jest.mock("@/lib/fsrs/leaderboard-sync", () => ({ updateProfileStats: (...args: unknown[]) => mockStats(...args) }));
+jest.mock("@/lib/quran-foundation/config", () => ({ isQfSyncEnabled: () => mockQfEnabled }));
 jest.mock("@/lib/quran-foundation/user-sync", () => ({
   fullQfUserSync: (...args: unknown[]) => mockQfSync(...args),
   getPendingQfSyncCount: (...args: unknown[]) => mockQfCount(...args),
@@ -77,10 +81,11 @@ beforeEach(() => {
   activate(null);
   activate(session());
   mockDb = {};
+  mockQfEnabled = true;
   mockSettings = { isLoaded: true, isTranslationLoading: false };
   mockFullSync.mockReset().mockResolvedValue(HEALTHY);
   mockStats.mockReset().mockResolvedValue();
-  mockQfSync.mockReset().mockResolvedValue();
+  mockQfSync.mockReset().mockResolvedValue(QF_HEALTHY);
   mockCount.mockReset().mockResolvedValue(0);
   mockQfCount.mockReset().mockResolvedValue(0);
   jest.mocked(NetInfo.fetch).mockReset().mockResolvedValue(network(true));
@@ -200,8 +205,9 @@ it("ignores an obsolete failure and starts the replacement account once", async 
 
 it.each(["stats", "QF"])("stops the old continuation after deferred %s work", async (stage) => {
   const response = deferred<void>();
+  const qfResponse = deferred<QfResult>();
   if (stage === "stats") mockStats.mockReturnValueOnce(response.promise);
-  else mockQfSync.mockReturnValueOnce(response.promise);
+  else mockQfSync.mockReturnValueOnce(qfResponse.promise);
   mockFullSync.mockResolvedValueOnce(OLD_RESULT);
   const { result, rerender } = renderHook(() => useSync());
   await waitFor(() => expect(stage === "stats" ? mockStats : mockQfSync).toHaveBeenCalledTimes(1));
@@ -211,7 +217,8 @@ it.each(["stats", "QF"])("stops the old continuation after deferred %s work", as
   });
   jest.mocked(emitSyncCompleted).mockClear();
   await act(async () => {
-    response.resolve();
+    if (stage === "stats") response.resolve();
+    else qfResponse.resolve(QF_HEALTHY);
   });
   await waitFor(() => expect(result.current.status).toBe("synced"));
   expect(mockFullSync).toHaveBeenCalledTimes(2);
@@ -455,4 +462,128 @@ it("does not admit a speculative database from a suspended transition before com
   }
   await waitFor(() => expect(mockFullSync).toHaveBeenCalledTimes(2));
   expect(mockFullSync.mock.calls.map(([db]) => db)).toEqual([committedDb, mockDb]);
+});
+
+it.each(["partial", "failed"] as const)(
+  "keeps an ordinary %s result visible and retries without a success timer",
+  async (status) => {
+    const summary: Summary = { ...HEALTHY, status, pushed: 0, pulled: status === "partial" ? 3 : 0 };
+    mockFullSync.mockResolvedValueOnce(summary);
+    mockCount.mockResolvedValue(2);
+    const { result } = renderHook(() => useSync());
+    await waitFor(() => expect(result.current.status).toBe("error"));
+    expect(result.current.pendingCount).toBe(2);
+    expect(mockStats).toHaveBeenCalledTimes(1);
+    if (status === "partial") expect(emitSyncCompleted).toHaveBeenCalledWith(summary);
+    else expect(emitSyncCompleted).not.toHaveBeenCalled();
+    await act(async () => {
+      jest.advanceTimersByTime(5000);
+    });
+    expect(result.current.status).toBe("error");
+    mockCount.mockResolvedValue(0);
+    await act(async () => {
+      await result.current.triggerSync();
+    });
+    expect(result.current.status).toBe("synced");
+    await act(async () => {
+      jest.advanceTimersByTime(3000);
+    });
+    expect(result.current.status).toBe("idle");
+  },
+);
+
+it.each(["failed", "needs_reauth", "not_connected", "synced"] as const)(
+  "evaluates the enabled QF %s result after ordinary sync",
+  async (status) => {
+    mockQfSync.mockResolvedValue({ status, pushed: 0, pulled: 0 });
+    mockQfCount.mockResolvedValue(status === "not_connected" ? 4 : status === "failed" ? 2 : 0);
+    const { result } = renderHook(() => useSync());
+    const expected = status === "failed" || status === "needs_reauth" ? "error" : "synced";
+    await waitFor(() => expect(result.current.status).toBe(expected));
+    expect(mockQfSync).toHaveBeenCalledTimes(1);
+    expect(result.current.pendingCount).toBe(status === "not_connected" ? 4 : status === "failed" ? 2 : 0);
+    if (expected === "error") {
+      await act(async () => {
+        jest.advanceTimersByTime(5000);
+      });
+      expect(result.current.status).toBe("error");
+    }
+  },
+);
+
+it.each(["synced", "failed"] as const)(
+  "does not request disabled QF sync or hide ordinary %s status",
+  async (status) => {
+    mockQfEnabled = false;
+    mockQfCount.mockResolvedValue(7);
+    mockFullSync.mockResolvedValue({ ...HEALTHY, status });
+    const { result } = renderHook(() => useSync());
+    await waitFor(() => expect(result.current.status).toBe(status === "synced" ? "synced" : "error"));
+    expect(result.current.pendingCount).toBe(7);
+    expect(mockQfSync).not.toHaveBeenCalled();
+  },
+);
+
+it("waits for final pending counts before publishing success", async () => {
+  const count = deferred<number>();
+  mockCount.mockReturnValue(count.promise);
+  const { result } = renderHook(() => useSync());
+  await waitFor(() => expect(mockQfSync).toHaveBeenCalledTimes(1));
+  expect(result.current.status).toBe("syncing");
+  await act(async () => {
+    count.resolve(0);
+  });
+  await waitFor(() => expect(result.current.status).toBe("synced"));
+});
+
+it("shows pending work added after the ordinary outcome instead of a false success", async () => {
+  mockCount.mockResolvedValue(1);
+  const { result } = renderHook(() => useSync());
+  await waitFor(() => expect(result.current.status).toBe("error"));
+  expect(result.current.pendingCount).toBe(1);
+});
+
+it("refreshes both queue counts after connectivity is lost during an admitted sync", async () => {
+  mockFullSync.mockRejectedValueOnce(new Error("Synthetic connection lost"));
+  mockCount.mockResolvedValue(3);
+  mockQfCount.mockResolvedValue(2);
+  const { result } = renderHook(() => useSync());
+  await waitFor(() => expect(result.current.status).toBe("error"));
+  await waitFor(() => expect(result.current.pendingCount).toBe(5));
+  expect(NetInfo.fetch).toHaveBeenCalledTimes(1);
+  expect(mockStats).not.toHaveBeenCalled();
+  expect(mockQfSync).not.toHaveBeenCalled();
+  expect(console.warn).toHaveBeenCalledWith("[Sync] Error:", "Synthetic connection lost");
+  await act(async () => {
+    jest.advanceTimersByTime(5000);
+  });
+  expect(result.current.status).toBe("error");
+});
+
+it("does not let error-count recovery publish after its account retires", async () => {
+  const oldCount = deferred<number>();
+  const entered = deferred<void>();
+  mockFullSync.mockRejectedValueOnce(new Error("Synthetic old-owner failure"));
+  mockCount.mockImplementation(async () => {
+    if (mockSession?.user.id === A && mockFullSync.mock.calls.length === 1) {
+      entered.resolve();
+      return oldCount.promise;
+    }
+    return 0;
+  });
+  const { result, rerender } = renderHook(() => useSync());
+  await act(async () => {
+    await entered.promise;
+  });
+  await act(async () => {
+    activate(session(B));
+    rerender({});
+  });
+  expect(result.current.pendingCount).toBe(0);
+  await act(async () => {
+    oldCount.resolve(77);
+  });
+  await waitFor(() => expect(result.current.status).toBe("synced"));
+  expect(result.current.pendingCount).toBe(0);
+  expect(mockFullSync).toHaveBeenCalledTimes(2);
 });

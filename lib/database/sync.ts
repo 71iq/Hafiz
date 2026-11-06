@@ -6,6 +6,7 @@ import { getAuthSessionIdentity } from "@/lib/auth/session-identity";
 import { State } from "@/lib/fsrs/scheduler";
 import {
   getPendingSyncEntries,
+  getPendingSyncCount,
   markSynced,
   markFailed,
   cleanSyncedEntries,
@@ -58,6 +59,14 @@ type AccountRestoreResult = {
   localDataReplaced: boolean;
 };
 
+export type SyncResult = AccountRestoreResult & {
+  pushed: number;
+  status: "synced" | "partial" | "failed" | "not_connected";
+};
+
+type PushResult = { pushed: number; failed: number; hadSuccessfulEntry: boolean };
+type PullResult = { pulled: number; complete: boolean };
+
 function highlightSyncId(row: {
   surah: number;
   ayah: number;
@@ -70,10 +79,11 @@ function highlightSyncId(row: {
 
 /**
  * Process the local sync queue — push pending changes to Supabase.
- * Returns the number of entries successfully synced.
+ * Retains group acknowledgement counts and whether any entry completed before a failure.
  */
-async function pushSyncQueue(db: SQLiteDatabase, owner: SyncOwner): Promise<number> {
-  if (!isSupabaseConfigured()) return 0;
+async function pushSyncQueue(db: SQLiteDatabase, owner: SyncOwner): Promise<PushResult> {
+  const empty = { pushed: 0, failed: 0, hadSuccessfulEntry: false };
+  if (!isSupabaseConfigured()) return empty;
 
   owner.requireCurrent();
   const { userId } = owner;
@@ -85,17 +95,20 @@ async function pushSyncQueue(db: SQLiteDatabase, owner: SyncOwner): Promise<numb
 
   const entries = await getPendingSyncEntries(db, 10000);
   owner.requireCurrent();
-  if (entries.length === 0) return 0;
+  if (entries.length === 0) return empty;
 
   // Group entries by table for batch operations
   const groups = groupByTable(entries);
   const syncedIds: number[] = [];
   const failedIds: number[] = [];
+  let hadSuccessfulEntry = false;
 
   for (const [tableName, tableEntries] of Object.entries(groups)) {
     owner.requireCurrent();
     try {
-      await pushTableEntries(tableName, tableEntries, userId);
+      await pushTableEntries(tableName, tableEntries, userId, () => {
+        hadSuccessfulEntry = true;
+      });
       owner.requireCurrent();
       syncedIds.push(...tableEntries.map((e) => e.id));
     } catch (err: any) {
@@ -115,15 +128,15 @@ async function pushSyncQueue(db: SQLiteDatabase, owner: SyncOwner): Promise<numb
   // Clean up old synced entries periodically
   await cleanSyncedEntries(db);
 
-  return syncedIds.length;
+  return { pushed: syncedIds.length, failed: failedIds.length, hadSuccessfulEntry };
 }
 
 /**
  * Pull remote changes from Supabase to local SQLite.
  * For multi-device support: fetches data updated after last sync.
  */
-async function pullRemoteChanges(db: SQLiteDatabase, owner: SyncOwner): Promise<number> {
-  if (!isSupabaseConfigured()) return 0;
+async function pullRemoteChanges(db: SQLiteDatabase, owner: SyncOwner): Promise<PullResult> {
+  if (!isSupabaseConfigured()) return { pulled: 0, complete: false };
 
   owner.requireCurrent();
   const { userId } = owner;
@@ -137,15 +150,19 @@ async function pullRemoteChanges(db: SQLiteDatabase, owner: SyncOwner): Promise<
   const pullStartedAt = new Date().toISOString();
 
   let totalPulled = 0;
+  let complete = false;
+  const onPageApplied = (count: number) => {
+    totalPulled += count;
+  };
   let wordMeaningsComplete = true;
 
   try {
     // Pull syncable deck/review settings before cards so decks exist when rows arrive.
-    totalPulled += await pullTable(db, "user_settings", userId, lastPullAt, upsertUserSetting, owner);
+    await pullTable(db, "user_settings", userId, lastPullAt, upsertUserSetting, owner, onPageApplied);
 
     // Pull user-supplied word meanings before cards so vocabulary previews resolve.
     try {
-      totalPulled += await pullTable(db, "user_word_meanings", userId, lastPullAt, upsertUserWordMeaning, owner);
+      await pullTable(db, "user_word_meanings", userId, lastPullAt, upsertUserWordMeaning, owner, onPageApplied);
     } catch (err: any) {
       owner.requireCurrent();
       wordMeaningsComplete = false;
@@ -153,32 +170,33 @@ async function pullRemoteChanges(db: SQLiteDatabase, owner: SyncOwner): Promise<
     }
 
     // Pull study_cards
-    totalPulled += await pullTable(db, "study_cards", userId, lastPullAt, upsertStudyCard, owner);
+    await pullTable(db, "study_cards", userId, lastPullAt, upsertStudyCard, owner, onPageApplied);
 
     // Pull study_log
-    totalPulled += await pullTable(db, "study_log", userId, lastPullAt, upsertStudyLog, owner);
+    await pullTable(db, "study_log", userId, lastPullAt, upsertStudyLog, owner, onPageApplied);
 
     // Pull bookmarks
-    totalPulled += await pullTable(db, "bookmarks", userId, lastPullAt, upsertBookmark, owner);
+    await pullTable(db, "bookmarks", userId, lastPullAt, upsertBookmark, owner, onPageApplied);
 
     // Pull highlights
-    totalPulled += await pullTable(db, "highlights", userId, lastPullAt, upsertHighlight, owner);
+    await pullTable(db, "highlights", userId, lastPullAt, upsertHighlight, owner, onPageApplied);
 
     // Pull private notes
-    totalPulled += await pullTable(db, "private_notes", userId, lastPullAt, upsertPrivateNote, owner);
+    await pullTable(db, "private_notes", userId, lastPullAt, upsertPrivateNote, owner, onPageApplied);
 
     // Pull Reflection Journey entries
-    totalPulled += await pullTable(
+    await pullTable(
       db,
       "reflection_journey_entries",
       userId,
       lastPullAt,
       upsertReflectionJourneyEntry,
       owner,
+      onPageApplied,
     );
 
     // Pull public badge unlocks. Pulled badges are already seen locally.
-    totalPulled += await pullTable(db, "achievement_unlocks", userId, lastPullAt, upsertAchievementUnlock, owner);
+    await pullTable(db, "achievement_unlocks", userId, lastPullAt, upsertAchievementUnlock, owner, onPageApplied);
 
     owner.requireCurrent();
     await backfillAchievements(db, { notify: false });
@@ -190,22 +208,28 @@ async function pullRemoteChanges(db: SQLiteDatabase, owner: SyncOwner): Promise<
       await db.runAsync("INSERT OR REPLACE INTO user_settings (key, value) VALUES ('last_pull_at', ?)", [
         pullStartedAt,
       ]);
+      owner.requireCurrent();
+      complete = true;
     }
   } catch (err: any) {
     owner.requireCurrent();
     console.warn("[Sync] Pull failed:", err.message);
   }
 
-  return totalPulled;
+  return { pulled: totalPulled, complete };
 }
 
 /**
  * Full sync: restore account state before any upload, then run normal queue sync.
  */
-export async function fullSync(
-  db: SQLiteDatabase,
-): Promise<{ pushed: number; pulled: number; accountRestored: boolean; localDataReplaced: boolean }> {
-  const empty = { pushed: 0, pulled: 0, accountRestored: false, localDataReplaced: false };
+export async function fullSync(db: SQLiteDatabase): Promise<SyncResult> {
+  const empty: SyncResult = {
+    status: "not_connected",
+    pushed: 0,
+    pulled: 0,
+    accountRestored: false,
+    localDataReplaced: false,
+  };
   if (!isSupabaseConfigured()) return empty;
   const owner = captureSyncOwner();
   if (!owner) return empty;
@@ -216,9 +240,16 @@ export async function fullSync(
   owner.requireCurrent();
   const pulled = await pullRemoteChanges(db, owner);
   owner.requireCurrent();
+  const pending = await getPendingSyncCount(db);
+  owner.requireCurrent();
+  const totalPulled = restored.pulled + pulled.pulled;
+  const failed = !pulled.complete || pushed.failed > 0;
+  const madeProgress = pushed.hadSuccessfulEntry || totalPulled > 0 || restored.accountRestored;
+  const status = !failed && pending === 0 ? "synced" : failed && !madeProgress ? "failed" : "partial";
   return {
-    pushed,
-    pulled: restored.pulled + pulled,
+    status,
+    pushed: pushed.pushed,
+    pulled: totalPulled,
     accountRestored: restored.accountRestored,
     localDataReplaced: restored.localDataReplaced,
   };
@@ -445,7 +476,12 @@ function groupByTable(entries: SyncQueueEntry[]): Record<string, SyncQueueEntry[
   return groups;
 }
 
-async function pushTableEntries(tableName: string, entries: SyncQueueEntry[], userId: string): Promise<void> {
+async function pushTableEntries(
+  tableName: string,
+  entries: SyncQueueEntry[],
+  userId: string,
+  onEntryCompleted: () => void,
+): Promise<void> {
   for (const entry of entries) {
     const data = JSON.parse(entry.data);
     const operation = entry.operation;
@@ -456,6 +492,7 @@ async function pushTableEntries(tableName: string, entries: SyncQueueEntry[], us
       // INSERT or UPDATE → upsert
       await pushUpsert(tableName, data, userId);
     }
+    onEntryCompleted();
   }
 }
 
@@ -701,11 +738,11 @@ async function pullTable(
   since: string,
   upsertFn: (db: SQLiteDatabase, row: any) => Promise<void>,
   owner: SyncOwner,
-): Promise<number> {
+  onPageApplied: (count: number) => void,
+): Promise<void> {
   const timeCol = "synced_at";
   const batchSize = 500;
   let offset = 0;
-  let total = 0;
 
   while (true) {
     owner.requireCurrent();
@@ -732,12 +769,10 @@ async function pullTable(
     });
 
     owner.requireCurrent();
-    total += data.length;
+    onPageApplied(data.length);
     if (data.length < batchSize) break;
     offset += data.length;
   }
-
-  return total;
 }
 
 async function upsertUserSetting(db: SQLiteDatabase, row: any): Promise<void> {
