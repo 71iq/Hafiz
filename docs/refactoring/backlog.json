@@ -11064,48 +11064,134 @@
     {
       "id": "RF-132",
       "title": "Preserve newer profile edits during stats reads and replies",
-      "description": "Primary diagnosis recorded; exact implementation and behavioral handoff not approved.",
+      "description": "Frozen six-artifact copy-only task. FIRST COMMAND exactly cat .refactor-baseline/rf132-handoff-v1/readiness.md. Complete all11 ordered reads before any copy, then each copy once in order. No source/test dumps or worker checks. Primary owns field/owner policy; controller owns13 fresh gates, separate stronger evaluation and commit.",
       "rationale": "Actual stats ensureProfile read and full-row update success each overwrite newer same-session display/avatar/bio/country, including null clears. A stats-success-only projection does not fix the earlier ensure publisher. Primary must choose and prove a narrow publication policy. Reverse overlap also proves an actual completed edit response restores old values for all five stats fields after newer stats finish. The local store regresses while synthetic remote data retains newer values.",
       "modules": [
         "lib/auth/store.ts",
         "lib/fsrs/leaderboard-sync.ts",
         "tests/unit/auth-profile-owner.test.ts",
-        "tests/unit/leaderboard-stats-owner.test.ts"
+        "tests/unit/auth-profile-update-owner.test.ts",
+        "tests/unit/leaderboard-stats-owner.test.ts",
+        "tests/unit/profile-save-lifecycle.test.tsx"
       ],
       "dependencies": [
         "RF-130",
         "RF-131"
       ],
       "acceptance_criteria": [
-        "Prepare exact source scope and actual-module regressions before approval. Preserve current-owner error behavior, stable-session continuity and account isolation.",
-        "Fresh controller verification, separate stronger review and primary acceptance mandatory. No protected inputs or production."
+        "Install only six exact artifacts; every original generator event must follow eleven ordered reads then six ordered copies. Preserve all other inputs and failures.",
+        "Preserve same-owner newer publications across fetch/ensure success, empty fetch, fallback and insert completion, without skipping required insert. Latch pending-write overlap at read dispatch and completion. Keep current generation/owner guards and warnings.",
+        "Register each profile write by exact owner-scoped token; old cleanup cannot release replacement registration. Retain matching-session continuity. Stats register before optimistic publication and release in finally before optional aggregates. Keep the RF131 FIFO and auth queue independent.",
+        "On overlapping publication/write, merge only requested non-undefined editable fields or the five stats fields into the current matching profile. Preserve explicit nulls, normal full-row identity, caller errors and obsolete suppression. Return the accepted matching row after synchronous notifications to the actual editor cache consumer.",
+        "Preparation353 cases pass; original37fail/316controls, seven mutants27/2/9/2/2/3/1, unrelated AST-token parity and two original test prefixes remain. Fresh full unit without skips, types, six-file zero-warning lint/format, three graphs, exact five Knip records, synthetic export, three strict-error profile browser controls and28 Chrome smoke pass. All13 gates, separate stronger full diff/evidence/protocol review and primary acceptance mandatory.",
+        "One-runtime field publication does not establish server/two-tab/other-writer ordering, cancel requests, roll back failed writes or validate full wire rows. WiderRF025 and payloadRF031 remain open. No dependency, auth policy, protected input, original checkout, production or push."
       ],
       "verification": [
         [
-          "npm",
-          "run",
-          "test:unit",
-          "--",
-          "--runTestsByPath",
-          "tests/unit/leaderboard-stats-owner.test.ts"
+          "python3",
+          "-c",
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf132-handoff-v1/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='a0d2eb3b86fa1d18eff9a11e218ff905164d4374a6cb6c873338cc21ab49c39c';sys.argv=[str(p),'all'];runpy.run_path(str(p),run_name='__main__')"
         ],
         [
           "npm",
           "run",
           "typecheck"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/auth/store.ts",
+          "lib/fsrs/leaderboard-sync.ts",
+          "tests/unit/auth-profile-owner.test.ts",
+          "tests/unit/auth-profile-update-owner.test.ts",
+          "tests/unit/leaderboard-stats-owner.test.ts",
+          "tests/unit/profile-save-lifecycle.test.tsx",
+          "--max-warnings=0"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "lib/auth/store.ts",
+          "lib/fsrs/leaderboard-sync.ts",
+          "tests/unit/auth-profile-owner.test.ts",
+          "tests/unit/auth-profile-update-owner.test.ts",
+          "tests/unit/leaderboard-stats-owner.test.ts",
+          "tests/unit/profile-save-lifecycle.test.tsx"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "python3",
+          "-c",
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf132-handoff-v1/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='a0d2eb3b86fa1d18eff9a11e218ff905164d4374a6cb6c873338cc21ab49c39c';sys.argv=[str(p),'knip'];runpy.run_path(str(p),run_name='__main__')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "node",
+          ".refactor-baseline/rf132-handoff-v1/profile-browser.cjs",
+          "current-en"
+        ],
+        [
+          "node",
+          ".refactor-baseline/rf132-handoff-v1/profile-browser.cjs",
+          "current-ar"
+        ],
+        [
+          "node",
+          ".refactor-baseline/rf132-handoff-v1/profile-browser.cjs",
+          "late-en"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8197",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts"
+        ],
+        [
+          "python3",
+          "-c",
+          "import hashlib,pathlib,runpy,sys;p=pathlib.Path('.refactor-baseline/rf132-handoff-v1/verification.py');assert hashlib.sha256(p.read_bytes()).hexdigest()=='a0d2eb3b86fa1d18eff9a11e218ff905164d4374a6cb6c873338cc21ab49c39c';sys.argv=[str(p),'all'];runpy.run_path(str(p),run_name='__main__')"
         ]
       ],
       "risk": "high",
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "allowed_paths": [
         "lib/auth/store.ts",
         "lib/fsrs/leaderboard-sync.ts",
         "tests/unit/auth-profile-owner.test.ts",
-        "tests/unit/leaderboard-stats-owner.test.ts"
+        "tests/unit/auth-profile-update-owner.test.ts",
+        "tests/unit/leaderboard-stats-owner.test.ts",
+        "tests/unit/profile-save-lifecycle.test.tsx"
       ],
       "attempts": 0,
-      "primary_investigation_evidence": ".refactor-baseline/rf130-stats-ownership-v1/decision.md"
+      "primary_investigation_evidence": ".refactor-baseline/rf132-profile-publication-v1/decision.md",
+      "implementation_mode": "copy-only",
+      "readiness_evidence": ".refactor-baseline/rf132-handoff-v1/readiness.md",
+      "primary_preparation_evidence": ".refactor-baseline/rf132-profile-publication-v1/preparation-receipt.json"
     }
   ]
 }
