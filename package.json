@@ -20,7 +20,7 @@
     "typecheck": "tsc --noEmit",
     "test:unit": "jest --runInBand",
     "test:jest-config": "node --test --test-reporter=tap scripts/tests/jest-config.test.cjs",
-    "test:dependency-security": "node --test --test-reporter=tap scripts/tests/brace-expansion.test.cjs scripts/tests/nanoid.test.cjs scripts/tests/js-yaml.test.cjs scripts/tests/xmldom.test.cjs scripts/tests/ws.test.cjs",
+    "test:dependency-security": "node --test --test-reporter=tap scripts/tests/brace-expansion.test.cjs scripts/tests/nanoid.test.cjs scripts/tests/js-yaml.test.cjs scripts/tests/xmldom.test.cjs scripts/tests/ws.test.cjs scripts/tests/source-map-js.test.cjs",
     "test:metro-unicode": "node --test --test-reporter=tap scripts/tests/metro-unicode.test.cjs",
     "build:web:test": "npm run build:web",
     "test:e2e:smoke": "npm run build:web:test && playwright test --project=smoke-chromium tests/e2e/smoke.spec.ts",
