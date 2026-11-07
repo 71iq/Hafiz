@@ -18986,7 +18986,7 @@
     {
       "id": "RF-162",
       "title": "Make active translation replacement atomic",
-      "description": "Discovered during RF161 caller migration: DELETE translation_active precedes separately committed batches. Diagnose and prepare a small scoped repair with actual SQLite retention, retry and concurrent-generation regressions.",
+      "description": "Load a translation candidate before reserving one private SQLite transaction for deleting and replacing all active rows. Preserve the previous generation on known SQL failure and keep concurrent replacements complete.",
       "modules": [
         "lib/translations/import.ts",
         "tests/unit/translation-import-safety.test.ts"
@@ -19004,14 +19004,217 @@
       ],
       "priority": 1,
       "risk": "high",
-      "approved": false,
-      "status": "pending",
-      "attempts": 0,
+      "approved": true,
+      "status": "verified",
+      "attempts": 1,
       "implementation_mode": "implementation",
       "acceptance_criteria": [
-        "Unapproved discovered task. Primary must inspect the current loader/settings caller and prepare exact scope. Use actual isolated SQLite through the real owner, not a fake transaction adapter, before selecting the repair. Preserve loader/content/schema/language-setting policies. Full controller checks, separate stronger review and primary acceptance remain required."
+        "Keep translation bundle loading before any transaction. Replace ordinary DELETE plus per500-row commits with one AppDatabase.withTransactionAsync scope covering DELETE translation_active and every candidate INSERT through one prepared handle finalized in finally. Use only supplied TransactionDatabase for SQL. Preserve original INSERT duplicate behavior, row values/order, loader/membership paths and language-setting caller policy. No new shared abstraction, provider/SDK/schema/asset changes.",
+        "Use a new focused test file with actual isolated Node SQLite behind the real connection owner. Mock only loadTranslation's external boundary with synthetic rows; do not cast a fake AppDatabase transaction wrapper. Preserve unrelated content, language metadata and sync queue. Loader rejection/missing and pending load keep existing rows; successful replacement publishes exact complete data.",
+        "Before production repair, demonstrate actual first/later BEFORE INSERT trigger failures and deferred-FK COMMIT failure losing retained content under the current code. After repair, assert exact old snapshot after each failure and successful fresh retry. Match specific SQL errors so fixtures prove the intended failure point.",
+        "Deterministic held loaders/actual first INSERT overlap two languages, including an A-only final row. Another ordinary write observes all of A, and B as last admitted transaction replaces all of A with exact complete B. Preserve unrelated metadata/queue. A successful COMMIT whose acknowledgement is lost is unknown, quarantined and never replayed; prove whole committed data and no partial replay.",
+        "Run full actual controller checks including current real Chrome/worker/OPFS rollback and tafsir failure/retry cases. Node's automatic finalization and JS exports are not native SDK/device proof. RF041 retains native verification; RF163 owns notification survival during uncertain cleanup recovery. Do not claim any new candidate completeness validation or language-setting behavior.",
+        "Both changed files lint0 and format; full lint retains the same63 diagnostics by path/rule/message,0 errors, and existing five Knip findings. No suppression, dropped assertions, protected data/generated maps, dependency/vendor/loop edits or production operations.",
+        "All20 fresh controller checks, separate stronger independent review and primary acceptance remain mandatory. One local accepted-task commit with short PROGRESS note, then delete task logs/temporary native/browser outputs and maintain baseline under2GB. Continue the next task without stopping between batches."
       ],
-      "verification": []
+      "verification": [
+        [
+          "git",
+          "diff",
+          "--check"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "lib/translations/import.ts",
+          "tests/unit/translation-import-safety.test.ts",
+          "docs/refactoring/PROGRESS.md"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/translations/import.ts",
+          "tests/unit/translation-import-safety.test.ts",
+          "--max-warnings=0"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "check:analysis"
+        ],
+        [
+          "npm",
+          "run",
+          "postinstall"
+        ],
+        [
+          "npm",
+          "ls",
+          "--all",
+          "--json"
+        ],
+        [
+          "npm",
+          "run",
+          "lint",
+          "--",
+          "--format",
+          "json"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "node",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/tests/brace-expansion.test.cjs",
+          "scripts/tests/dependency-boundaries.test.cjs",
+          "scripts/tests/icon-tool.test.cjs",
+          "scripts/tests/jest-config.test.cjs",
+          "scripts/tests/js-yaml.test.cjs",
+          "scripts/tests/lint-coverage.test.cjs",
+          "scripts/tests/metro-unicode.test.cjs",
+          "scripts/tests/nanoid.test.cjs",
+          "scripts/tests/router-dependency-range.test.cjs",
+          "scripts/tests/security-dependency-owner.test.cjs",
+          "scripts/tests/source-map-js.test.cjs",
+          "scripts/tests/tailwind-source-map.test.cjs",
+          "scripts/tests/ws.test.cjs",
+          "scripts/tests/xmldom.test.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "test:refactor-runner"
+        ],
+        [
+          "python3",
+          "-B",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "scripts/tests",
+          "-p",
+          "test_*.py"
+        ],
+        [
+          "npm",
+          "run",
+          "check:native-config"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=4096",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "android",
+          "--output-dir",
+          ".expo/modernization-checks/android",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/android')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=3072",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "ios",
+          "--output-dir",
+          ".expo/modernization-checks/ios",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/ios')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8197",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts",
+          "tests/e2e/database-bridge.spec.ts",
+          "tests/e2e/tafsir-import.spec.ts"
+        ]
+      ],
+      "diagnosis": "Primary inspected current loader, private owner, Settings import/metadata/fallback caller and language membership. Ordinary DELETE plus per500-row commits expose retained active rows to SQL failure and generation interleaving. Keep loader/schema/caller policy unchanged.",
+      "reuse": "Reuse existing AppDatabase owner and inline scoped prepared loop; no new shared helper or provider/SDK/asset changes.",
+      "baseline": {
+        "unit_tests": 2993,
+        "unit_suites": 146,
+        "full_lint_warnings": 63,
+        "full_lint_errors": 0,
+        "knip_findings": 5
+      },
+      "focused_validation": {
+        "pre_fix": "5 intended failures and4 passing loader/success controls against actual Node SQLite/real owner",
+        "post_fix": "All9 regressions, typecheck, clean scoped lint and whitespace pass. Exact retained content/metadata, first/later INSERT, deferred COMMIT, concurrency/retry and unknown-ACK no replay covered."
+      },
+      "started_at": "2026-11-07T08:29:57.145423+00:00",
+      "completed_at": "2026-11-07T08:41:27.300180+00:00",
+      "primary_accepted_at": "2026-11-07T08:41:27.300180+00:00",
+      "independent_review": "pass",
+      "evidence": "docs/refactoring/PROGRESS.md",
+      "discovery_evidence": "tests/unit/translation-import-safety.test.ts",
+      "summary": "Active translation replacement uses one private scoped transaction after loading. Known SQL failures preserve complete retained rows and fresh retries succeed; concurrent generations stay complete. All20 fresh controller checks, separate stronger review and primary acceptance pass:147 suites/3002 unit cases,9 focused translation cases and33 actual Chrome cases. Loader and language-setting policies are unchanged. Native SDK/device runtime remains RF041.",
+      "failure_history": [
+        {
+          "phase": "causal-before-repair",
+          "failure": "Five intended actual-SQLite/real-owner failures preceded source repair: first/later INSERT, deferred COMMIT, concurrent partial generations and lost-ACK partial publication. Four loader/success controls passed; all9 cases pass with one scoped transaction."
+        }
+      ]
     },
     {
       "id": "RF-163",
