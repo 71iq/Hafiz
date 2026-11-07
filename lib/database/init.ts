@@ -1,5 +1,6 @@
 import { Platform } from "react-native";
-import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
+import type { SQLiteBindParams } from "expo-sqlite";
+import type { AppDatabase, DatabaseExecutor, TransactionDatabase } from "@/lib/database/types";
 import { createSchema, createTextSearchIndex, migrateUserSchema } from "./schema";
 import { normalizeArabicCore, normalizeArabicWord } from "@/lib/arabic";
 import {
@@ -334,19 +335,25 @@ async function isPopulated(db: DatabaseExecutor): Promise<boolean> {
   }
 }
 
+async function insertPreparedRows(
+  tx: TransactionDatabase,
+  sql: string,
+  rows: readonly SQLiteBindParams[],
+): Promise<void> {
+  const stmt = await tx.prepareAsync(sql);
+  try {
+    for (const row of rows) {
+      await stmt.executeAsync(row);
+    }
+  } finally {
+    await stmt.finalizeAsync();
+  }
+}
+
 async function batchInsert(db: AppDatabase, sql: string, rows: any[][], batchSize: number = 500): Promise<void> {
   for (let i = 0; i < rows.length; i += batchSize) {
     const batch = rows.slice(i, i + batchSize);
-    await db.withTransactionAsync(async (tx) => {
-      const stmt = await tx.prepareAsync(sql);
-      try {
-        for (const row of batch) {
-          await stmt.executeAsync(row);
-        }
-      } finally {
-        await stmt.finalizeAsync();
-      }
-    });
+    await db.withTransactionAsync((tx) => insertPreparedRows(tx, sql, batch));
   }
 }
 
@@ -599,12 +606,14 @@ export async function ensureTafsirSourceImported(db: AppDatabase, sourceId: Tafs
     throw new Error("Tafsir source " + source.id + " is unavailable");
   }
 
-  await db.runAsync("DELETE FROM tafseer WHERE source = ?", [source.id]);
-  await batchInsert(
-    db,
-    "INSERT OR REPLACE INTO tafseer (surah, ayah, source, text) VALUES (?, ?, ?, ?)",
-    candidateRows,
-  );
+  await db.withTransactionAsync(async (tx) => {
+    await tx.runAsync("DELETE FROM tafseer WHERE source = ?", [source.id]);
+    await insertPreparedRows(
+      tx,
+      "INSERT OR REPLACE INTO tafseer (surah, ayah, source, text) VALUES (?, ?, ?, ?)",
+      candidateRows,
+    );
+  });
   console.log("[Import] Tafsir (" + source.id + ") done: " + candidateRows.length + " rows");
 }
 

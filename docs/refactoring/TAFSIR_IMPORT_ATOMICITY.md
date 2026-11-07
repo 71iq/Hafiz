@@ -1,46 +1,17 @@
-# Tafsir replacement atomicity investigation
+# Tafsir replacement atomicity
 
-RF-098, 2026-10-27. This investigation reproduced incomplete-source replacement failures. It did not repair the importer or establish that a production user encountered them. RF155 repairs download safety below; RF104 owns the remaining transaction repair and blocks final mission acceptance.
+An incomplete downloadable tafsir source is replaced as one transaction. The importer stages all 114 source files and validates the configured distinct-coordinate count before requesting the database owner. The scoped transaction deletes only that source, inserts the complete candidate through one prepared command, finalizes it and commits. Other importers retain their existing batches of 500 rows.
 
-## Observed behavior before RF155
+A known INSERT or COMMIT failure rolls back the complete replacement and preserves the previous source, unrelated sources, settings and pending sync work. Loading, HTTP, JSON, empty or incomplete-candidate failures do not start a replacement. A fresh invocation can retry. Existing count shortcuts, thresholds for each source, text cleaning and last-duplicate-wins behavior are unchanged.
 
-`ensureTafsirSourceImported` in `lib/database/init.ts` counts the requested source and returns when its configured expected count is met. For an incomplete source it deletes that source, then loads and inserts 114 surah files. `batchInsert` commits each batch separately. The initial deletion has no transaction covering the whole replacement.
+Concurrent replacements use RF161's private connection owner on native and the versioned browser bridge. Each replacement reserves the whole transaction. The last admitted same-source replacement wins as one complete generation; a queued ordinary operation observes the settled generation. Staging can run concurrently and does not hold the database reservation.
 
-| Synthetic case                                  | Observed result                                                                                            |
-| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| Qurtubi has 6234 rows                           | Returns without loading or writing.                                                                        |
-| Al-Bahr al-Madid has 5843 rows                  | Returns without loading or writing.                                                                        |
-| A default-count source has 6236 rows            | Returns without loading or writing.                                                                        |
-| Partial source, first loader rejects            | Rejects after deleting the existing rows. Other-source rows remain.                                        |
-| Partial source, second loader rejects           | Rejects with the first replacement prefix already committed.                                               |
-| SQL execution fails during a replacement batch  | Rolls back that batch but cannot restore the earlier deletion.                                             |
-| All 114 loaders return no content               | Throws unavailable after deleting prior partial content.                                                   |
-| Initially empty source, unavailable replacement | Rejects and leaves other-source content intact.                                                            |
-| Retry after a load rejection                    | Can install new synthetic rows. A partial synthetic success remains below the real completeness threshold. |
-| Two callers overlap during loading              | Both delete before loading. Their successful writes can leave rows from different replacement generations. |
+## Verification
 
-The concurrency case deliberately completes one caller's SQL before releasing the other's loader. It demonstrates mixed generations without relying on a nested-transaction error or timing lottery. The SQL-failure case uses real SQLite rollback of the current batch. The tests retain full SQL traces and exact before/after rows.
+Permanent synthetic tests are in `tests/unit/tafsir-import-safety.test.ts`. They execute the importer against actual isolated Node SQLite through the real connection owner. SQLite triggers reject first/later inserts, and a deferred foreign-key constraint rejects COMMIT. Tests compare retained rows and metadata, retry successfully, overlap same/different-source candidates and interleave another bridge client's ordinary write. Existing RF155 download, parsing and completeness cases remain.
 
-## Reproduction and boundaries
+`tests/e2e/tafsir-import.spec.ts` exercises the actual local Chrome Settings picker, installed SQLite worker/WASM/OPFS, 114 synthetic download responses and a real SQLite trigger. It checks visible commit-failure recovery, retained content/selection and successful retry. A separate insert-failure case verifies retained data and retry across conservative provider recovery; RF163 owns the disappearing notification in that path. Only fresh preview data is written. Controller results and independent acceptance are recorded briefly in PROGRESS.
 
-Evidence lives at `.refactor-baseline/rf098-atomic-import-investigation-v1/`. Run `node .refactor-baseline/rf098-atomic-import-investigation-v1/reproduce.cjs` from the modernization worktree. It executes ten assertions against actual whole TypeScript modules transpiled with the installed compiler. It does not slice or copy the importer. Its injected boundaries select the native-loader branch and supply synthetic loader results. Node's in-memory SQLite executes the real SQL with a small asynchronous adapter.
+An acknowledgement lost after SQLite has actually committed has an unknown outcome. The owner quarantines the handle and does not replay the replacement. Tests demonstrate a complete committed generation under simulated acknowledgement loss, without promising that every rejected call restored old rows. Node's automatic statement lifecycle and JavaScript exports do not prove native SDK or device behavior; RF041 retains that verification.
 
-This is a model of the importer and SQL contract. It is not an Expo Android/iOS runtime test, a browser/OPFS bridge test or a physical-device test. The row identifiers and text are synthetic. No protected asset, bundled Quran database, network service or live database is loaded. No production corruption, native locking behavior or cross-tab isolation claim follows from these fixtures.
-
-The checked-in web database proxy sends BEGIN, individual operations and COMMIT as separate requests. The existing batch importer also opens transactions. Wrapping the current importer in another ordinary transaction would therefore require nested-transaction and request-interleaving decisions. The installed native and web contracts need separate verification before selecting a repair.
-
-## Required repair invariant
-
-A failed replacement must leave the previously stored source unchanged. A successful replacement must expose one internally consistent candidate generation, and unrelated sources must remain unchanged. Concurrent callers must not interleave replacement generations. Keep the configured completeness thresholds, count fast paths, identifiers, content parsing and existing retry behavior unless a separately reviewed decision changes them.
-
-RF-104 must first choose the transaction owner for native SQLite and the web host/proxy. Inspect existing serialization rather than assuming an ordinary asynchronous transaction is exclusive. Stage replacement loading and validation before destructive writes, then replace through a tested atomic write operation without nesting the current batch transactions. Decide partial/unavailable-candidate semantics explicitly without lowering thresholds. Reproduce rollback, later-file failure, SQL failure, retry, same/different-source concurrent callers and interleaved web requests. Use the current fixture evidence as the failing baseline, then add permanent behavior tests with the retained-content invariant.
-
-No importer, schema, provider, source registry, dependency, protected input or production setting changes in RF-098. Fresh reproduction, artifact/inventory integrity, document formatting and whitespace checks plus separate stronger review are required before accepting this investigation. Application typecheck, full Jest, builds, browser/native/device checks are not claimed for this documentation-only investigation.
-
-## RF155 download safety
-
-RF155 stages all 114 source files before writing. The candidate must contain at least the source's configured distinct surah/ayah count. Load, JSON, HTTP and incomplete-candidate failures preserve retained rows, other sources and metadata. Duplicate coordinates retain the last cleaned row. Existing source-count shortcuts, parsing and per-batch SQL remain in place. Protected datasets and loader maps are unchanged.
-
-A read-only audit of the nine bundled sources found 114 array files per source and exactly the configured distinct counts: 6,234 for Qurtubi, 5,843 for Al-Bahr, 6,010 for Jalalayn and 6,236 for each remaining source. Permanent synthetic SQLite regressions live in `tests/unit/tafsir-import-safety.test.ts`, including native-loader and simulated web-fetch paths. These are not native or browser/OPFS runtime checks.
-
-The RF098 reproduction above records the old failure and is retained only for unfinished RF104. Its old failure assertions are not a current passing gate. RF104 still owns SQL failure rollback, transaction ownership, concurrent replacement generations and retained local-handle lifetime. Staging alone does not make replacement atomic.
+RF098 reproduced the original deletion/per-batch exposure. RF155 added complete download staging. RF161 established transaction ownership, and RF104 makes this replacement atomic. The historical reproduction is removed after acceptance because permanent regressions cover the current implementation.

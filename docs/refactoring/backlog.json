@@ -9036,52 +9036,258 @@
     {
       "id": "RF-104",
       "title": "Make incomplete tafsir-source replacement atomic",
-      "description": "Repair SQL failure/concurrent-generation and local-handle lifetime failures after RF155 download staging, with explicit native/web transaction ownership.",
-      "rationale": "Actual importer deletes before loading and commits per batch. Synthetic SQLite reproductions show content loss on load/SQL failure and mixed concurrent generations.",
+      "description": "Replace one incomplete downloadable tafsir source in one owned transaction after complete staging, preserving retained content on actual SQLite failure and preventing mixed concurrent generations.",
+      "rationale": "RF161 supplies the private scoped owner. Current source DELETE remains ordinary and candidate INSERTs commit separately in batches of500, so failed SQL can discard the old source and concurrent replacements can mix generations.",
       "modules": [
         "lib/database/init.ts",
-        "lib/database/provider.tsx",
         "tests/unit/tafsir-import-safety.test.ts",
-        "docs/refactoring/TAFSIR_IMPORT_ATOMICITY.md"
+        "tests/e2e/tafsir-import.spec.ts"
       ],
       "dependencies": [
         "RF-098",
-        "RF-155"
+        "RF-155",
+        "RF-161"
       ],
       "acceptance_criteria": [
-        "Unapproved repair. Primary must inspect native and web SQLite transaction/exclusivity, nested batch transactions, host/proxy serialization and representative callers before preparing exact small scopes. Split transaction-owner changes if needed. RF155 separately owns download staging and incomplete-candidate retention; accepting that child does not accept SQL atomicity.",
-        "A failed replacement leaves previous source rows unchanged; successful replacement is one internally consistent generation and preserves unrelated sources. Loading/validation must precede destructive writes. Preserve count fast paths, source-specific expected counts, identifiers and content parsing. Decide partial/unavailable candidate and retry semantics explicitly without lowering thresholds.",
-        "Exercise load failure at first/later files, SQL execution/commit failure, empty/partial/complete sources, retry, same/different-source concurrency and interleaved web host/proxy requests. Real isolated SQLite plus platform-specific evidence must support atomicity; no fake transaction-only proof.",
-        "No live data access, destructive database operations, schema resets, protected-content changes, regenerated maps/database, threshold reduction, production or deployment. Carry unavailable native/device checks honestly. Separate stronger review and primary acceptance required."
+        "Reuse RF161's private AppDatabase owner and scoped TransactionDatabase. Extract one private prepared-row insertion helper used by existing batchInsert without changing its default500/per-batch semantics for other importers. Only ensureTafsirSourceImported reserves one transaction for its source DELETE plus every staged candidate INSERT, with one prepared handle and try/finally finalization. No nested transactions, network work inside transaction, new shared service or provider change.",
+        "Preserve source-count fast paths, all114-file staging, source-specific distinct-row thresholds, identifiers, last-duplicate-wins cleaning/parsing and unavailable-candidate behavior. No protected data/schema/require-map/dependency changes. Known insert/COMMIT failure restores the exact previous source; successful replacement publishes a complete single candidate generation. An acknowledgement lost after actual COMMIT is unknown, never silently replayed or described as a guaranteed rollback.",
+        "Replace only the tafsir test adapter with an actual isolated Node SQLite connection behind createConnectionOwner. Keep existing RF155 load/HTTP/JSON/duplicate/partial/empty/count/retry tests. Add genuine SQLite BEFORE INSERT RAISE at first and later batches, and deferred-FK COMMIT failure, with specific-error assertions and exact retained target/other-source/settings/queue snapshots plus successful fresh retry.",
+        "Use deterministic held final-file and actual INSERT barriers for same-source and different-source concurrent replacements, including a first-generation extra coordinate absent from the second. The last admitted same-source transaction wins completely. An unrelated ordinary write observes the complete first generation and survives. Use actual configured source counts, including Jalalayn6010.",
+        "Run the actual importer through the versioned bridge client/host backed by the real owner and Node SQLite. Interleave another peer's ordinary write with a held replacement that later fails; prove exact rollback and outside-write retention. Keep browser/native distinctions honest; Node finalization and private SDK native runtime remain RF041.",
+        "Real local-only Chrome Settings cases use a fresh context, synthetic retained rows,114 synthetic responses and actual TEMP SQLite triggers. Deferred-FK COMMIT failure displays the existing error, resets Download, preserves selected source/old rows/unrelated counts and permits full6234-row retry. Actual INSERT/finalization failure additionally proves retained data across conservative provider recovery and successful retry; RF163 separately owns notification survival through that recovery. No app debug global, production records or protected inputs.",
+        "Refresh TAFSIR_IMPORT_ATOMICITY.md to the current invariant, transaction ownership and actual evidence, retaining concise RF098/RF155 history and the unknown-ACK/native-runtime limits. Delete the obsolete RF098 unfinished-task reproduction after RF104 acceptance. Keep evidence small and baseline below2GB.",
+        "Preserve existing63 full-lint diagnostics by path/rule/message counts, ignoring line shifts. New/clean files lint0; init.ts keeps its23 existing warnings. Format changed files, without broad source formatting or suppressions.",
+        "All20 fresh actual controller commands, separate stronger independent review and primary final acceptance are mandatory. One local commit with short PROGRESS note, then remove RF104 per-run logs/temporary exports/browser reports. No push, merge, deployment, production access or protected Quran input change."
       ],
       "verification": [
         [
-          "npm",
-          "run",
-          "test:unit",
-          "--",
-          "--runTestsByPath",
+          "git",
+          "diff",
+          "--check"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "lib/database/init.ts",
           "tests/unit/tafsir-import-safety.test.ts",
-          "--no-cache"
+          "tests/e2e/tafsir-import.spec.ts",
+          "docs/refactoring/TAFSIR_IMPORT_ATOMICITY.md",
+          "docs/refactoring/PROGRESS.md"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "tests/unit/tafsir-import-safety.test.ts",
+          "tests/e2e/tafsir-import.spec.ts",
+          "--max-warnings=0"
         ],
         [
           "npm",
           "run",
           "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "check:analysis"
+        ],
+        [
+          "npm",
+          "run",
+          "postinstall"
+        ],
+        [
+          "npm",
+          "ls",
+          "--all",
+          "--json"
+        ],
+        [
+          "npm",
+          "run",
+          "lint",
+          "--",
+          "--format",
+          "json"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "node",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/tests/brace-expansion.test.cjs",
+          "scripts/tests/dependency-boundaries.test.cjs",
+          "scripts/tests/icon-tool.test.cjs",
+          "scripts/tests/jest-config.test.cjs",
+          "scripts/tests/js-yaml.test.cjs",
+          "scripts/tests/lint-coverage.test.cjs",
+          "scripts/tests/metro-unicode.test.cjs",
+          "scripts/tests/nanoid.test.cjs",
+          "scripts/tests/router-dependency-range.test.cjs",
+          "scripts/tests/security-dependency-owner.test.cjs",
+          "scripts/tests/source-map-js.test.cjs",
+          "scripts/tests/tailwind-source-map.test.cjs",
+          "scripts/tests/ws.test.cjs",
+          "scripts/tests/xmldom.test.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "test:refactor-runner"
+        ],
+        [
+          "python3",
+          "-B",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "scripts/tests",
+          "-p",
+          "test_*.py"
+        ],
+        [
+          "npm",
+          "run",
+          "check:native-config"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=4096",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "android",
+          "--output-dir",
+          ".expo/modernization-checks/android",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/android')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=3072",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "ios",
+          "--output-dir",
+          ".expo/modernization-checks/ios",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/ios')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8197",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts",
+          "tests/e2e/database-bridge.spec.ts",
+          "tests/e2e/tafsir-import.spec.ts"
         ]
       ],
       "risk": "high",
-      "approved": false,
-      "status": "pending",
+      "approved": true,
+      "status": "verified",
       "allowed_paths": [
         "lib/database/init.ts",
-        "lib/database/provider.tsx",
         "tests/unit/tafsir-import-safety.test.ts",
+        "tests/e2e/tafsir-import.spec.ts",
         "docs/refactoring/TAFSIR_IMPORT_ATOMICITY.md"
       ],
-      "attempts": 0,
-      "discovery_evidence": ".refactor-baseline/rf098-atomic-import-investigation-v1/result.json",
-      "priority": 1
+      "attempts": 2,
+      "discovery_evidence": "tests/unit/tafsir-import-safety.test.ts",
+      "priority": 1,
+      "files": [
+        "lib/database/init.ts",
+        "tests/unit/tafsir-import-safety.test.ts",
+        "tests/e2e/tafsir-import.spec.ts",
+        "docs/refactoring/TAFSIR_IMPORT_ATOMICITY.md"
+      ],
+      "implementation_mode": "implementation",
+      "diagnosis": "Primary inspected current staging/parser/count/loader path, real private owner and all Settings/reading/modal callers. RF161 independently accepted prerequisite covers native/web ownership; RF104 needs only the importer and tests/docs. Actual trigger/commit/concurrency/browser causal tests precede production repair.",
+      "reuse": "Extract the current prepared-row insertion loop privately; retain other batchInsert callers and the established source-selection lifecycle. Reuse real owner/bridge and current test fixtures without a fake transaction adapter.",
+      "baseline": {
+        "unit_tests": 2986,
+        "unit_suites": 146,
+        "full_lint_warnings": 63,
+        "full_lint_errors": 0,
+        "init_lint_warnings": 23,
+        "knip_findings": 5
+      },
+      "focused_validation": {
+        "pre_fix_unit_tests": "7 intended failures,18 existing staging cases pass against actual SQLite/real owner",
+        "pre_fix_chrome_commit": "Visible error/reset passes, exact retained-source assertion fails with500 committed candidate rows",
+        "additional_discovery": "Actual failed INSERT returns a finalization error, quarantines and recovers. RF163 preserves this unresolved notification issue; no unsafe finalize retry/error guessing.",
+        "post_fix": "25 focused tafsir cases pass, including all7 causal failures; typecheck, clean test/browser lint and unchanged23 init diagnostics pass."
+      },
+      "started_at": "2026-11-07T08:16:28.278401+00:00",
+      "evidence": "docs/refactoring/PROGRESS.md",
+      "completed_at": "2026-11-07T08:28:12.472466+00:00",
+      "primary_accepted_at": "2026-11-07T08:28:12.472466+00:00",
+      "independent_review": "pass",
+      "summary": "Whole staged tafsir replacement uses one private scoped transaction. Actual SQLite insert/commit failures retain the source, retry succeeds and concurrent generations stay complete. All20 fresh controller checks, separate stronger review and primary acceptance pass:146 suites/2993 unit cases,25 focused tafsir cases and33 actual Chrome cases. RF163 retains notification survival; RF041 retains native SDK/device runtime.",
+      "failure_history": [
+        {
+          "phase": "causal-before-repair",
+          "failure": "Seven real-owner SQLite failures and actual Chrome deferred-FK COMMIT showed retained rows lost; Chrome retained500 committed candidate rows. One scoped replacement transaction repairs retention/concurrency."
+        },
+        {
+          "phase": "additional-discovery",
+          "failure": "Actual Chrome INSERT failure returns SDK finalization error, triggers conservative recovery and loses local toast. RF163 records the separate unresolved notification; data rollback/retry pass."
+        },
+        {
+          "phase": "controller-transport",
+          "failure": "First full execution received SIGTERM after10 recorded passing checks and38 passing runner cases without receipt. No OOM/surviving writer; identical generation resumed detached with all20 fresh commands/review."
+        }
+      ]
     },
     {
       "id": "RF-105",
@@ -18776,6 +18982,60 @@
       "primary_accepted_at": "2026-11-07T07:58:56.794483+00:00",
       "independent_review": "pass",
       "summary": "Private SQLite ownership isolates whole transactions and statement cleanup, rejects retired handles and fences browser reservations. All20 fresh controller checks, separate stronger review and primary acceptance pass:146 suites/2986 unit cases,45 focused owner/protocol cases and31 Chrome cases. Native SDK/device runtime remains RF041; whole-source replacement remains RF104."
+    },
+    {
+      "id": "RF-162",
+      "title": "Make active translation replacement atomic",
+      "description": "Discovered during RF161 caller migration: DELETE translation_active precedes separately committed batches. Diagnose and prepare a small scoped repair with actual SQLite retention, retry and concurrent-generation regressions.",
+      "modules": [
+        "lib/translations/import.ts",
+        "tests/unit/translation-import-safety.test.ts"
+      ],
+      "files": [
+        "lib/translations/import.ts",
+        "tests/unit/translation-import-safety.test.ts"
+      ],
+      "allowed_paths": [
+        "lib/translations/import.ts",
+        "tests/unit/translation-import-safety.test.ts"
+      ],
+      "dependencies": [
+        "RF-161"
+      ],
+      "priority": 1,
+      "risk": "high",
+      "approved": false,
+      "status": "pending",
+      "attempts": 0,
+      "implementation_mode": "implementation",
+      "acceptance_criteria": [
+        "Unapproved discovered task. Primary must inspect the current loader/settings caller and prepare exact scope. Use actual isolated SQLite through the real owner, not a fake transaction adapter, before selecting the repair. Preserve loader/content/schema/language-setting policies. Full controller checks, separate stronger review and primary acceptance remain required."
+      ],
+      "verification": []
+    },
+    {
+      "id": "RF-163",
+      "title": "Preserve recoverable SQLite error reporting in the shipped app",
+      "description": "All114 synthetic qurtubi requests200. Actual BEFOREINSERT RAISE(ABORT) reports code19 plus failed finalization; owner quarantines and provider recovers, dismissing picker/toast. No production/protected data accessed. Diagnose finalization semantics and define a small app-owned correction before approval.",
+      "modules": [
+        "lib/database/connection-owner.ts",
+        "lib/database/provider.tsx"
+      ],
+      "files": [],
+      "allowed_paths": [],
+      "dependencies": [
+        "RF-161"
+      ],
+      "priority": 1,
+      "risk": "high",
+      "approved": false,
+      "status": "pending",
+      "attempts": 0,
+      "implementation_mode": "implementation",
+      "acceptance_criteria": [
+        "Unapproved discovered task. Confirm actual installed SDK step/finalize behavior and distinguish known statement destruction from transport/uncertain cleanup. Do not relax quarantine from error-message guessing. Keep true cleanup uncertainty fenced. Preserve visible failure/retry and test actual Chrome plus isolated owner behavior. No vendor change without an affected shipped path. Full controller checks, independent review and primary acceptance remain required."
+      ],
+      "verification": []
     }
   ]
 }
