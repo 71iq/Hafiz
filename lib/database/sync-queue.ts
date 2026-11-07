@@ -1,10 +1,10 @@
-import type { SQLiteDatabase } from "expo-sqlite";
+import type { DatabaseExecutor } from "@/lib/database/types";
 
 /**
  * Enqueue a sync operation. Called after every write to a syncable table.
  */
 export async function enqueueSync(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   tableName: string,
   operation: "INSERT" | "UPDATE" | "DELETE",
   rowId: string,
@@ -18,7 +18,7 @@ export async function enqueueSync(
 }
 
 /** Get count of pending sync entries */
-export async function getPendingSyncCount(db: SQLiteDatabase): Promise<number> {
+export async function getPendingSyncCount(db: DatabaseExecutor): Promise<number> {
   const row = await db.getFirstAsync<{ count: number }>(
     "SELECT COUNT(*) as count FROM sync_queue WHERE status IN ('pending', 'failed')"
   );
@@ -27,7 +27,7 @@ export async function getPendingSyncCount(db: SQLiteDatabase): Promise<number> {
 
 /** Get pending sync entries (oldest first) */
 export async function getPendingSyncEntries(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   limit: number = 50
 ): Promise<SyncQueueEntry[]> {
   return db.getAllAsync<SyncQueueEntry>(
@@ -38,7 +38,7 @@ export async function getPendingSyncEntries(
 
 /** Mark entries as synced */
 export async function markSynced(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   ids: number[]
 ): Promise<void> {
   if (ids.length === 0) return;
@@ -55,7 +55,7 @@ export async function markSynced(
 
 /** Mark entries as failed */
 export async function markFailed(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   ids: number[]
 ): Promise<void> {
   if (ids.length === 0) return;
@@ -70,7 +70,7 @@ export async function markFailed(
 }
 
 /** Clean up old synced entries (keep last 7 days) */
-export async function cleanSyncedEntries(db: SQLiteDatabase): Promise<void> {
+export async function cleanSyncedEntries(db: DatabaseExecutor): Promise<void> {
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - 7);
   await db.runAsync(

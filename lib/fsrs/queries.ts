@@ -1,5 +1,5 @@
 import { buildLocalReviewCounts, calculateLongestStreak } from "@/lib/fsrs/review-activity";
-import type { SQLiteDatabase } from "expo-sqlite";
+import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import { createEmptyCard } from "./scheduler";
 import {
   ALL_NEW_CARD_SORT_ORDERS,
@@ -227,7 +227,7 @@ function normalizeDeckReviewSettings(value: unknown, fallback?: DeckReviewSettin
   };
 }
 
-async function readLegacyReviewSettings(db: SQLiteDatabase): Promise<DeckReviewSettings> {
+async function readLegacyReviewSettings(db: DatabaseExecutor): Promise<DeckReviewSettings> {
   const [dailyLimitRow, testModesRow, wordModesRow] = await Promise.all([
     db.getFirstAsync<{ value: string }>("SELECT value FROM user_settings WHERE key = 'daily_review_limit'"),
     db.getFirstAsync<{ value: string }>("SELECT value FROM user_settings WHERE key = 'flashcard_test_modes'"),
@@ -265,7 +265,7 @@ async function readLegacyReviewSettings(db: SQLiteDatabase): Promise<DeckReviewS
 }
 
 export async function readDeckReviewSettings(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   deckId: string | null | undefined
 ): Promise<DeckReviewSettings> {
   const fallback = await readLegacyReviewSettings(db);
@@ -285,7 +285,7 @@ export async function readDeckReviewSettings(
 }
 
 export async function writeDeckReviewSettings(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   deckId: string,
   settings: Partial<DeckReviewSettings>
 ): Promise<void> {
@@ -298,7 +298,7 @@ function meaningCardId(surah: number, ayah: number, wordPos: number): string {
 }
 
 export async function isMeaningCardSaved(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   surah: number,
   ayah: number,
   wordPos: number
@@ -311,7 +311,7 @@ export async function isMeaningCardSaved(
 }
 
 export async function addMeaningCard(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   surah: number,
   ayah: number,
   wordPos: number
@@ -418,7 +418,7 @@ function reviewQueueOptionsFromSettings(settings: DeckReviewSettings, limit: num
   };
 }
 
-async function getTodayReviewedCount(db: SQLiteDatabase, deckId?: string): Promise<number> {
+async function getTodayReviewedCount(db: DatabaseExecutor, deckId?: string): Promise<number> {
   const { start, end } = todayBounds();
   if (deckId) {
     const row = await db.getFirstAsync<{ count: number }>(
@@ -443,7 +443,7 @@ async function getTodayReviewedCount(db: SQLiteDatabase, deckId?: string): Promi
 }
 
 export async function getRemainingReviewLimit(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   deckId: string | undefined,
   limit: number
 ): Promise<number> {
@@ -451,7 +451,7 @@ export async function getRemainingReviewLimit(
 }
 
 export async function getTodayDueCount(
-  db: SQLiteDatabase,
+  db: AppDatabase,
   deckId: string | undefined,
   settingsOrLimit: DeckReviewSettings | number
 ): Promise<number> {
@@ -463,7 +463,7 @@ export async function getTodayDueCount(
   return (await getDueCardsForReview(db, deckId, reviewQueueOptionsFromSettings(settings, remaining))).length;
 }
 
-export async function getDueCount(db: SQLiteDatabase, deckId?: string): Promise<number> {
+export async function getDueCount(db: AppDatabase, deckId?: string): Promise<number> {
   const now = new Date().toISOString();
   if (isSmartDeckId(deckId)) {
     return (await getSmartDeckStats(db, deckId)).due;
@@ -487,7 +487,7 @@ export async function getDueCount(db: SQLiteDatabase, deckId?: string): Promise<
 }
 
 export async function getDeckTodayStats(
-  db: SQLiteDatabase,
+  db: AppDatabase,
   deckId: string,
   settingsOrLimit: DeckReviewSettings | number
 ): Promise<{ total: number; dueCount: number; newCount: number }> {
@@ -515,7 +515,7 @@ export async function getDeckTodayStats(
   };
 }
 
-export async function getTotalCardCount(db: SQLiteDatabase, deckId?: string): Promise<number> {
+export async function getTotalCardCount(db: AppDatabase, deckId?: string): Promise<number> {
   if (isSmartDeckId(deckId)) {
     return (await getSmartDeckStats(db, deckId)).total;
   }
@@ -537,7 +537,7 @@ export async function getTotalCardCount(db: SQLiteDatabase, deckId?: string): Pr
   return nonSmartRows.length + smartRows.length;
 }
 
-async function getFilteredSmartMaterializedRows(db: SQLiteDatabase): Promise<StudyCardRow[]> {
+async function getFilteredSmartMaterializedRows(db: DatabaseExecutor): Promise<StudyCardRow[]> {
   const rows = await db.getAllAsync<StudyCardRow>(
     `SELECT * FROM study_cards WHERE deleted_at IS NULL AND ${SMART_CARD_SQL}`,
     []
@@ -546,7 +546,7 @@ async function getFilteredSmartMaterializedRows(db: SQLiteDatabase): Promise<Stu
   return rows.map(rowWithDefaultStatus).filter((row) => matchingSmartIds.has(row.id));
 }
 
-export async function getTotalAyahCardCount(db: SQLiteDatabase): Promise<number> {
+export async function getTotalAyahCardCount(db: AppDatabase): Promise<number> {
   await migrateLegacyRetentionDecks(db);
   const rows = await db.getAllAsync<StudyCardRow>(
     `SELECT *
@@ -559,7 +559,7 @@ export async function getTotalAyahCardCount(db: SQLiteDatabase): Promise<number>
   return (await filterStudyRowsByDefaultDeckFilter(db, rows)).length;
 }
 
-export async function getMemorizedAyahCardCount(db: SQLiteDatabase): Promise<number> {
+export async function getMemorizedAyahCardCount(db: AppDatabase): Promise<number> {
   await migrateLegacyRetentionDecks(db);
   const rows = await db.getAllAsync<StudyCardRow>(
     `SELECT *
@@ -573,7 +573,7 @@ export async function getMemorizedAyahCardCount(db: SQLiteDatabase): Promise<num
   return (await filterStudyRowsByDefaultDeckFilter(db, rows)).length;
 }
 
-export async function getNewCount(db: SQLiteDatabase, deckId?: string): Promise<number> {
+export async function getNewCount(db: AppDatabase, deckId?: string): Promise<number> {
   if (isSmartDeckId(deckId)) {
     return (await getSmartDeckStats(db, deckId)).newCount;
   }
@@ -598,7 +598,7 @@ export async function getNewCount(db: SQLiteDatabase, deckId?: string): Promise<
 }
 
 async function ensureStudyCardRow(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   deckId: string,
   cardId: string
 ): Promise<StudyCardRow> {
@@ -681,7 +681,7 @@ async function ensureStudyCardRow(
 }
 
 export async function deleteStudyCard(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   deckId: string,
   cardId: string
 ): Promise<void> {
@@ -704,7 +704,7 @@ export async function deleteStudyCard(
 }
 
 export async function setStudyCardSuspended(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   deckId: string,
   cardId: string,
   suspended: boolean
@@ -722,7 +722,7 @@ export async function setStudyCardSuspended(
 }
 
 export async function setStudyCardBuried(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   deckId: string,
   cardId: string,
   buried: boolean
@@ -739,7 +739,7 @@ export async function setStudyCardBuried(
 }
 
 export async function setStudyCardMarked(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   deckId: string,
   cardId: string,
   marked: boolean
@@ -756,7 +756,7 @@ export async function setStudyCardMarked(
 }
 
 export async function resetStudyCardProgress(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   deckId: string,
   cardId: string
 ): Promise<StudyCardRow> {
@@ -782,7 +782,7 @@ export async function resetStudyCardProgress(
 }
 
 export async function setStudyCardDueDate(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   deckId: string,
   cardId: string,
   dueDate: Date
@@ -807,7 +807,7 @@ export async function setStudyCardDueDate(
   return updated;
 }
 
-export async function getNextEligibleReviewDate(db: SQLiteDatabase): Promise<string | null> {
+export async function getNextEligibleReviewDate(db: DatabaseExecutor): Promise<string | null> {
   const rows = await db.getAllAsync<StudyCardRow>(
     `SELECT *
        FROM study_cards
@@ -832,7 +832,7 @@ function getReviewEligibleAt(row: StudyCardRow): string {
 }
 
 export async function getDeckCardsForList(
-  db: SQLiteDatabase,
+  db: AppDatabase,
   deckId: string
 ): Promise<DeckCardListItem[]> {
   if (isSmartDeckId(deckId)) {
@@ -886,7 +886,7 @@ export async function getDeckCardsForList(
 }
 
 async function decorateDeckCardListItem(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   row: StudyCardRow,
   isVirtual: boolean
 ): Promise<DeckCardListItem> {
@@ -1047,7 +1047,7 @@ function parseStudyCardId(cardId: string): { kind: "ayah" | "word"; surah: numbe
   return null;
 }
 
-export async function updateCard(db: SQLiteDatabase, card: StudyCardRow): Promise<void> {
+export async function updateCard(db: DatabaseExecutor, card: StudyCardRow): Promise<void> {
   await db.runAsync(
     `UPDATE study_cards SET
       due = ?, stability = ?, difficulty = ?, elapsed_days = ?, scheduled_days = ?,
@@ -1067,7 +1067,7 @@ export async function updateCard(db: SQLiteDatabase, card: StudyCardRow): Promis
 }
 
 export async function insertStudyLog(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   cardId: string,
   rating: number,
   state: number,
@@ -1102,7 +1102,7 @@ export async function insertStudyLog(
   emitReviewActivity();
 }
 
-export async function getStudyStreak(db: SQLiteDatabase): Promise<number> {
+export async function getStudyStreak(db: DatabaseExecutor): Promise<number> {
   const rows = await db.getAllAsync<{ reviewed_at: string }>(
     `SELECT reviewed_at FROM study_log ORDER BY reviewed_at DESC`
   );
@@ -1116,7 +1116,7 @@ export async function getStudyStreak(db: SQLiteDatabase): Promise<number> {
   return calculateCurrentStreak(reviewDates, todayIdx);
 }
 
-export async function getWirdStatus(db: SQLiteDatabase): Promise<WirdStatus> {
+export async function getWirdStatus(db: DatabaseExecutor): Promise<WirdStatus> {
   const rows = await db.getAllAsync<{ reviewed_at: string }>(
     `SELECT reviewed_at FROM study_log ORDER BY reviewed_at DESC`
   );
@@ -1160,7 +1160,7 @@ export async function getWirdStatus(db: SQLiteDatabase): Promise<WirdStatus> {
   };
 }
 
-export async function getReviewStats(db: SQLiteDatabase, activityDays = 90): Promise<ReviewStats> {
+export async function getReviewStats(db: DatabaseExecutor, activityDays = 90): Promise<ReviewStats> {
   const rows = await db.getAllAsync<{ reviewed_at: string }>(
     "SELECT reviewed_at FROM study_log ORDER BY reviewed_at ASC"
   );

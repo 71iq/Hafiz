@@ -1,4 +1,4 @@
-import type { SQLiteDatabase } from "expo-sqlite";
+import type { DatabaseExecutor } from "@/lib/database/types";
 import type { BookmarkEntry, HighlightEntry } from "./types";
 import { enqueueSync } from "@/lib/database/sync-queue";
 import { enqueueQfSync } from "@/lib/quran-foundation/user-sync";
@@ -52,7 +52,7 @@ export type UthmaniSelectionText = {
   ranges: UthmaniSelectionRange[];
 };
 
-export async function fetchAllBookmarks(db: SQLiteDatabase): Promise<BookmarkEntry[]> {
+export async function fetchAllBookmarks(db: DatabaseExecutor): Promise<BookmarkEntry[]> {
   return db.getAllAsync<BookmarkEntry>(
     `SELECT surah, ayah, created_at as createdAt
      FROM bookmarks
@@ -61,7 +61,7 @@ export async function fetchAllBookmarks(db: SQLiteDatabase): Promise<BookmarkEnt
   );
 }
 
-export async function addBookmark(db: SQLiteDatabase, surah: number, ayah: number): Promise<void> {
+export async function addBookmark(db: DatabaseExecutor, surah: number, ayah: number): Promise<void> {
   const now = new Date().toISOString();
   await db.runAsync(
     `INSERT INTO bookmarks (surah, ayah, created_at, updated_at, deleted_at)
@@ -79,7 +79,7 @@ export async function addBookmark(db: SQLiteDatabase, surah: number, ayah: numbe
   enqueueQfSync(db, "bookmark", "UPSERT", `${surah}:${ayah}`, { surah, ayah }).catch(console.warn);
 }
 
-export async function removeBookmark(db: SQLiteDatabase, surah: number, ayah: number): Promise<void> {
+export async function removeBookmark(db: DatabaseExecutor, surah: number, ayah: number): Promise<void> {
   const existing = await getBookmarkRow(db, surah, ayah);
   if (!existing) return;
   const now = new Date().toISOString();
@@ -100,7 +100,7 @@ export async function removeBookmark(db: SQLiteDatabase, surah: number, ayah: nu
   }).catch(console.warn);
 }
 
-export async function fetchAllHighlights(db: SQLiteDatabase): Promise<HighlightEntry[]> {
+export async function fetchAllHighlights(db: DatabaseExecutor): Promise<HighlightEntry[]> {
   return db.getAllAsync<HighlightEntry>(
     `SELECT id, surah, ayah, word_start as wordStart, word_end as wordEnd, color
      FROM highlights
@@ -135,7 +135,7 @@ function highlightToSyncData(row: HighlightRow): Record<string, any> {
 }
 
 export async function addHighlight(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   surah: number,
   ayah: number,
   color: string,
@@ -158,7 +158,7 @@ export async function addHighlight(
 }
 
 export async function addHighlightsForSelectionRefs(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   refs: QuranSelectionWordRef[],
   color: string,
 ): Promise<number[]> {
@@ -179,7 +179,7 @@ export async function addHighlightsForSelectionRefs(
 }
 
 export async function removeHighlightsForAyah(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   surah: number,
   ayah: number,
 ): Promise<void> {
@@ -199,7 +199,7 @@ export async function removeHighlightsForAyah(
 }
 
 export async function fetchUthmaniRange(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   surah: number,
   ayahStart: number,
   ayahEnd: number,
@@ -212,7 +212,7 @@ export async function fetchUthmaniRange(
 }
 
 export async function fetchUthmaniWordsForSelection(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   refs: QuranSelectionWordRef[],
 ): Promise<UthmaniSelectionText | null> {
   const grouped = new Map<string, QuranSelectionWordRef[]>();
@@ -266,7 +266,7 @@ export async function fetchUthmaniWordsForSelection(
 }
 
 export async function fetchSurahName(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   surah: number,
 ): Promise<string> {
   const row = await db.getFirstAsync<{ name_arabic: string }>(
@@ -343,7 +343,7 @@ function compactSelectedAyahs(
 }
 
 async function getBookmarkRow(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   surah: number,
   ayah: number
 ): Promise<BookmarkRow | null> {

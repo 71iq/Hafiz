@@ -1,4 +1,4 @@
-import type { SQLiteDatabase } from "expo-sqlite";
+import type { AppDatabase } from "@/lib/database/types";
 import { loadTranslation } from "./translation-requires";
 
 /**
@@ -6,7 +6,7 @@ import { loadTranslation } from "./translation-requires";
  * Clears existing data and batch-inserts from the bundled JSON.
  */
 export async function importTranslation(
-  db: SQLiteDatabase,
+  db: AppDatabase,
   langCode: string
 ): Promise<void> {
   const data = await loadTranslation(langCode);
@@ -24,8 +24,8 @@ export async function importTranslation(
   const BATCH_SIZE = 500;
   for (let i = 0; i < data.length; i += BATCH_SIZE) {
     const batch = data.slice(i, i + BATCH_SIZE);
-    await db.withTransactionAsync(async () => {
-      const stmt = await db.prepareAsync(
+    await db.withTransactionAsync(async (tx) => {
+      const stmt = await tx.prepareAsync(
         "INSERT INTO translation_active (surah, ayah, text) VALUES (?, ?, ?)"
       );
       try {

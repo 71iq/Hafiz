@@ -7,7 +7,7 @@ import {
   useAudioPlayerStatus,
   type AudioPlayer,
 } from "expo-audio";
-import type { SQLiteDatabase } from "expo-sqlite";
+import type { DatabaseExecutor } from "@/lib/database/types";
 import { useDatabase } from "@/lib/database/provider";
 import {
   readCachedAyahAudio,
@@ -423,7 +423,7 @@ function clampPositiveInt(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, next));
 }
 
-function refreshAudioCache(db: SQLiteDatabase, surah: number, ayah: number, recitationId: number) {
+function refreshAudioCache(db: DatabaseExecutor, surah: number, ayah: number, recitationId: number) {
   fetchQfAyahAudio(surah, ayah, recitationId)
     .then((response) => {
       if (response.ok) {

@@ -1,4 +1,4 @@
-import type { SQLiteDatabase } from "expo-sqlite";
+import type { DatabaseExecutor } from "@/lib/database/types";
 
 /**
  * Card Uniqueness Algorithm (§3.6.2)
@@ -28,7 +28,7 @@ type UniqueFront = {
 // Cache of text_clean → occurrence count
 let duplicateCache: Map<string, number> | null = null;
 
-async function buildDuplicateCache(db: SQLiteDatabase): Promise<Map<string, number>> {
+async function buildDuplicateCache(db: DatabaseExecutor): Promise<Map<string, number>> {
   if (duplicateCache) return duplicateCache;
 
   const rows = await db.getAllAsync<{ text_clean: string; cnt: number }>(
@@ -47,7 +47,7 @@ async function buildDuplicateCache(db: SQLiteDatabase): Promise<Map<string, numb
  * Returns the minimum context needed to make this card's prompt unique.
  */
 export async function computeUniqueFront(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   surah: number,
   ayah: number
 ): Promise<UniqueFront> {

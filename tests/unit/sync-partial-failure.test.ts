@@ -1,5 +1,5 @@
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
-import type { SQLiteDatabase } from "expo-sqlite";
+import type { AppDatabase, TransactionDatabase } from "@/lib/database/types";
 import type { Session } from "@supabase/supabase-js";
 import { observeAuthSession } from "@/lib/auth/commands";
 import { createSchema } from "@/lib/database/schema";
@@ -93,7 +93,7 @@ jest.mock("@/lib/achievements/queries", () => ({
 }));
 
 let sql: DatabaseSync;
-let db: SQLiteDatabase;
+let db: AppDatabase;
 
 function putSetting(key: string, value: string) {
   sql.prepare("INSERT OR REPLACE INTO user_settings (key,value,updated_at) VALUES (?,?,?)").run(key, value, OLD);
@@ -179,10 +179,10 @@ beforeEach(async () => {
       return sql.prepare(source).all(...params);
     },
     runAsync: async (source: string, params: SQLInputValue[] = []) => sql.prepare(source).run(...params),
-    withTransactionAsync: async (work: () => Promise<void>) => {
+    withTransactionAsync: async (work: (transaction: TransactionDatabase) => Promise<void>) => {
       sql.exec("BEGIN");
       try {
-        await work();
+        await work(db as unknown as TransactionDatabase);
         sql.exec("COMMIT");
       } catch (error) {
         sql.exec("ROLLBACK");
@@ -190,7 +190,7 @@ beforeEach(async () => {
       }
     },
   };
-  db = adapter as unknown as SQLiteDatabase;
+  db = adapter as unknown as AppDatabase;
   await createSchema(db);
   putSetting(`sync_initial_backfill_${USER_ID}_20260525_sync_v1`, "true");
   putSetting(`sync_user_settings_backfill_${USER_ID}_20260528_user_settings_v1`, "true");

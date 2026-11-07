@@ -1,8 +1,8 @@
 import React, { useEffect } from "react";
 import { act, render, waitFor } from "@testing-library/react-native";
 import { Platform } from "react-native";
-import type { SQLiteDatabase } from "expo-sqlite";
-import { decodeDbMessage } from "@/lib/database/bridge-messages";
+import type { AppDatabase } from "@/lib/database/types";
+import { DB_BRIDGE_VERSION, decodeDbMessage } from "@/lib/database/bridge-messages";
 import { DatabaseProvider, useDatabaseStatus } from "@/lib/database/provider";
 
 const mockInitializeDatabase = jest.fn();
@@ -102,12 +102,30 @@ function StatusProbe({ onStatus }: { onStatus: (status: ReturnType<typeof useDat
 }
 
 function makeDatabase() {
+  const runAsync = jest.fn().mockResolvedValue({ lastInsertRowId: 1, changes: 1 });
+  const getFirstAsync = jest.fn().mockResolvedValue(null);
+  const getAllAsync = jest.fn().mockResolvedValue([]);
+  const finalizeAsync = jest.fn().mockResolvedValue(undefined);
   return {
     closeAsync: jest.fn().mockResolvedValue(undefined),
     execAsync: jest.fn().mockResolvedValue(undefined),
-    runAsync: jest.fn().mockResolvedValue({ lastInsertRowId: 1, changes: 1 }),
-    getFirstAsync: jest.fn().mockResolvedValue(null),
-    getAllAsync: jest.fn().mockResolvedValue([]),
+    runAsync,
+    getFirstAsync,
+    getAllAsync,
+    finalizeAsync,
+    prepareAsync: jest.fn(async (source: string) => ({
+      executeAsync: jest.fn(async (...params: unknown[]) => {
+        const result = /^\s*(SELECT|PRAGMA)\b/i.test(source)
+          ? { lastInsertRowId: 0, changes: 0 }
+          : await runAsync(source, ...params);
+        return {
+          ...(result ?? { lastInsertRowId: 0, changes: 0 }),
+          getFirstAsync: () => getFirstAsync(source, ...params),
+          getAllAsync: () => getAllAsync(source, ...params),
+        };
+      }),
+      finalizeAsync: () => finalizeAsync(source),
+    })),
   };
 }
 
@@ -157,7 +175,7 @@ describe("database bridge message boundary", () => {
     mockInitializeDatabase.mockResolvedValue(undefined);
     mockBackfillAchievements.mockResolvedValue(undefined);
     mockImportDatabaseFromAssetAsync.mockResolvedValue(undefined);
-    mockOpenDatabaseAsync.mockResolvedValue(hostDb as unknown as SQLiteDatabase);
+    mockOpenDatabaseAsync.mockResolvedValue(hostDb);
   });
 
   afterEach(() => {
@@ -208,9 +226,10 @@ describe("database bridge message boundary", () => {
     [],
     {},
     { type: "unknown" },
-    { type: "host-ready", tabId: "" },
+    { type: "host-ready", version: DB_BRIDGE_VERSION, tabId: "" },
     {
       type: "request",
+      version: DB_BRIDGE_VERSION,
       requestId: "r1",
       fromTabId: "client",
       targetTabId: "host",
@@ -220,6 +239,7 @@ describe("database bridge message boundary", () => {
     },
     {
       type: "request",
+      version: DB_BRIDGE_VERSION,
       requestId: "r1",
       fromTabId: "client",
       targetTabId: "host",
@@ -229,6 +249,7 @@ describe("database bridge message boundary", () => {
     },
     {
       type: "request",
+      version: DB_BRIDGE_VERSION,
       requestId: "r1",
       fromTabId: "client",
       targetTabId: "host",
@@ -236,7 +257,14 @@ describe("database bridge message boundary", () => {
       source: "SELECT 1",
       params: [[1, undefined]],
     },
-    { type: "response", requestId: "r1", fromTabId: "host", targetTabId: "client", ok: "true" },
+    {
+      type: "response",
+      version: DB_BRIDGE_VERSION,
+      requestId: "r1",
+      fromTabId: "host",
+      targetTabId: "client",
+      ok: "true",
+    },
   ])("rejects malformed value %j", (value) => {
     expect(decodeDbMessage(value)).toBeNull();
   });
@@ -254,6 +282,7 @@ describe("database bridge message boundary", () => {
     expect(
       decodeDbMessage({
         type: "request",
+        version: DB_BRIDGE_VERSION,
         requestId: "invalid",
         fromTabId: "client",
         targetTabId: "host",
@@ -269,6 +298,7 @@ describe("database bridge message boundary", () => {
     const values = ["text", 1, Number.NaN, Number.POSITIVE_INFINITY, true, null, blob];
     const message = decodeDbMessage({
       type: "request",
+      version: DB_BRIDGE_VERSION,
       requestId: "request-1",
       fromTabId: "client",
       targetTabId: "host",
@@ -280,6 +310,7 @@ describe("database bridge message boundary", () => {
 
     expect(message).toEqual({
       type: "request",
+      version: DB_BRIDGE_VERSION,
       requestId: "request-1",
       fromTabId: "client",
       targetTabId: "host",
@@ -290,6 +321,7 @@ describe("database bridge message boundary", () => {
     expect(
       decodeDbMessage({
         type: "request",
+        version: DB_BRIDGE_VERSION,
         requestId: "request-2",
         fromTabId: "client",
         targetTabId: "host",
@@ -301,6 +333,7 @@ describe("database bridge message boundary", () => {
     expect(
       decodeDbMessage({
         type: "request",
+        version: DB_BRIDGE_VERSION,
         requestId: "request-3",
         fromTabId: "client",
         targetTabId: "host",
@@ -332,16 +365,16 @@ describe("database bridge message boundary", () => {
 
     const blob = new Uint8Array([7]);
     await database.execAsync("SELECT 1");
-    await database.runAsync("SELECT ?", "value", 2, true, null, blob);
-    await database.runAsync("SELECT ?", ["array", 3]);
-    await database.runAsync("SELECT $value", { $value: "named" });
+    await database.runAsync("INSERT binding VALUES (?)", "value", 2, true, null, blob);
+    await database.runAsync("INSERT binding VALUES (?)", ["array", 3]);
+    await database.runAsync("INSERT binding VALUES ($value)", { $value: "named" });
     await expect(database.getFirstAsync("SELECT NULL")).resolves.toBeNull();
     await expect(database.getAllAsync("SELECT 1")).resolves.toEqual([]);
 
     expect(hostDb.execAsync).toHaveBeenCalledWith("SELECT 1");
-    expect(hostDb.runAsync).toHaveBeenNthCalledWith(1, "SELECT ?", "value", 2, true, null, blob);
-    expect(hostDb.runAsync).toHaveBeenNthCalledWith(2, "SELECT ?", ["array", 3]);
-    expect(hostDb.runAsync).toHaveBeenNthCalledWith(3, "SELECT $value", { $value: "named" });
+    expect(hostDb.runAsync).toHaveBeenNthCalledWith(1, "INSERT binding VALUES (?)", "value", 2, true, null, blob);
+    expect(hostDb.runAsync).toHaveBeenNthCalledWith(2, "INSERT binding VALUES (?)", ["array", 3]);
+    expect(hostDb.runAsync).toHaveBeenNthCalledWith(3, "INSERT binding VALUES ($value)", { $value: "named" });
     expect(hostDb.getFirstAsync).toHaveBeenCalledWith("SELECT NULL");
     expect(hostDb.getAllAsync).toHaveBeenCalledWith("SELECT 1");
 
@@ -354,6 +387,7 @@ describe("database bridge message boundary", () => {
     external.postMessage(42);
     external.postMessage({
       type: "request",
+      version: DB_BRIDGE_VERSION,
       requestId: "invalid-request",
       fromTabId: "external",
       targetTabId: hostReady.tabId,
@@ -365,7 +399,7 @@ describe("database bridge message boundary", () => {
     expect(hostDb.runAsync).toHaveBeenCalledTimes(runCallCount);
 
     hostDb.runAsync.mockRejectedValueOnce(new Error("synthetic failure"));
-    await expect(database.runAsync("SELECT error")).rejects.toThrow("synthetic failure");
+    await expect(database.runAsync("INSERT error")).rejects.toThrow("synthetic failure");
 
     let releaseDelayed!: (value: { legitimate: boolean }) => void;
     hostDb.getFirstAsync.mockReturnValueOnce(
@@ -384,6 +418,7 @@ describe("database bridge message boundary", () => {
     if (!request) throw new Error("Expected delayed request envelope");
     const reply = {
       type: "response",
+      version: DB_BRIDGE_VERSION,
       requestId: request.requestId,
       fromTabId: request.targetTabId,
       targetTabId: request.fromTabId,
@@ -452,13 +487,17 @@ describe("database bridge message boundary", () => {
     await waitFor(() =>
       expect(FakeBroadcastChannel.messages.some((value) => objectMessage(value)?.type === "host-probe")).toBe(true),
     );
-    for (const invalid of [42, { type: "host-ready", tabId: 123 }, { type: "host-ready", tabId: "" }]) {
+    for (const invalid of [
+      42,
+      { type: "host-ready", version: DB_BRIDGE_VERSION, tabId: 123 },
+      { type: "host-ready", version: DB_BRIDGE_VERSION, tabId: "" },
+    ]) {
       external.postMessage(invalid);
       await flushMessages();
       expect(statuses.at(-1)?.isReady).toBe(false);
       expect(mockOpenDatabaseAsync).not.toHaveBeenCalled();
     }
-    external.postMessage({ type: "host-ready", tabId: "synthetic-host" });
+    external.postMessage({ type: "host-ready", version: DB_BRIDGE_VERSION, tabId: "synthetic-host" });
     await waitFor(() => expect(statuses.at(-1)?.isReady).toBe(true));
     expect(mockOpenDatabaseAsync).not.toHaveBeenCalled();
     await view.unmountAsync();
@@ -469,7 +508,7 @@ describe("database bridge message boundary", () => {
     const external = new FakeBroadcastChannel("hafiz-db-bridge");
     external.addEventListener("message", (event) => {
       if (objectMessage(event.data)?.type === "host-probe")
-        external.postMessage({ type: "host-ready", tabId: "lost-host" });
+        external.postMessage({ type: "host-ready", version: DB_BRIDGE_VERSION, tabId: "lost-host" });
     });
     const statuses: ReturnType<typeof useDatabaseStatus>[] = [];
     const view = render(
@@ -512,7 +551,7 @@ describe("database bridge message boundary", () => {
     const external = new FakeBroadcastChannel("hafiz-db-bridge");
     external.addEventListener("message", (event) => {
       if (objectMessage(event.data)?.type === "host-probe")
-        external.postMessage({ type: "host-ready", tabId: "active-host" });
+        external.postMessage({ type: "host-ready", version: DB_BRIDGE_VERSION, tabId: "active-host" });
     });
     const statuses: ReturnType<typeof useDatabaseStatus>[] = [];
     const view = render(
@@ -606,7 +645,9 @@ describe("database bridge message boundary", () => {
       await waitFor(() => expect(mockOpenDatabaseAsync).toHaveBeenCalledTimes(2));
       await waitFor(() => expect(statuses.at(-1)?.isReady).toBe(true));
       expect(old.closeAsync).toHaveBeenCalledTimes(1);
-      expect(statuses.at(-1)?.db).toBe(current);
+      expect(statuses.at(-1)?.db).toBe(mockInitializeDatabase.mock.calls.at(-1)![0]);
+      await statuses.at(-1)!.db!.execAsync("SELECT current handle");
+      expect(current.execAsync).toHaveBeenCalledWith("SELECT current handle");
       expect(FakeLockManager.held).toBe(true);
     } finally {
       resolveOpen(old);
@@ -636,6 +677,7 @@ describe("database bridge message boundary", () => {
         .find((value) => value?.type === "host-ready")!.tabId;
       external.postMessage({
         type: "request",
+        version: DB_BRIDGE_VERSION,
         requestId: "held-write",
         fromTabId: "synthetic-client",
         targetTabId: host,
@@ -671,7 +713,8 @@ describe("database bridge message boundary", () => {
     const wire = { hostId: "first-host", requests: [] as Record<string, unknown>[] };
     external.addEventListener("message", (event) => {
       const message = objectMessage(event.data);
-      if (message?.type === "host-probe") external.postMessage({ type: "host-ready", tabId: wire.hostId });
+      if (message?.type === "host-probe")
+        external.postMessage({ type: "host-ready", version: DB_BRIDGE_VERSION, tabId: wire.hostId });
       if (message?.type === "request") wire.requests.push(message);
     });
     const statuses: ReturnType<typeof useDatabaseStatus>[] = [];
@@ -688,7 +731,6 @@ describe("database bridge message boundary", () => {
     async (mode) => {
       const f = await remoteFixture();
       try {
-        const prepared = await f.db.prepareAsync("INSERT prepared");
         const pending = f.db.getFirstAsync("SELECT pending");
         const expectation = expect(pending).rejects.toThrow(
           mode === "unmount" ? "Database provider closed" : "Database page hidden",
@@ -706,9 +748,11 @@ describe("database bridge message boundary", () => {
           () => f.db.runAsync("INSERT stale run"),
           () => f.db.getFirstAsync("SELECT stale"),
           () => f.db.getAllAsync("SELECT stale all"),
-          () => prepared.executeAsync(),
+          () => f.db.withTransactionAsync(async () => {}),
         ]) {
-          await expect(operation()).rejects.toThrow("Database proxy is no longer active");
+          await expect(operation()).rejects.toThrow(
+            mode === "unmount" ? "Database provider closed" : "Database page hidden",
+          );
         }
         await flushMessages();
         expect(f.wire.requests).toHaveLength(before);
@@ -727,7 +771,7 @@ describe("database bridge message boundary", () => {
       const oldRequest = f.wire.requests.at(-1)!;
       f.wire.hostId = "second-host";
       await act(async () => {
-        f.external.postMessage({ type: "host-closing", tabId: "first-host" });
+        f.external.postMessage({ type: "host-closing", version: DB_BRIDGE_VERSION, tabId: "first-host" });
       });
       await oldRejected;
       await waitFor(() => expect(f.statuses.at(-1)?.db).not.toBe(f.db));
@@ -739,9 +783,10 @@ describe("database bridge message boundary", () => {
       });
       await flushMessages();
       const request = f.wire.requests.at(-1)!;
-      f.external.postMessage({ type: "host-closing", tabId: "first-host" });
+      f.external.postMessage({ type: "host-closing", version: DB_BRIDGE_VERSION, tabId: "first-host" });
       f.external.postMessage({
         type: "response",
+        version: DB_BRIDGE_VERSION,
         requestId: oldRequest.requestId,
         fromTabId: "first-host",
         targetTabId: oldRequest.fromTabId,
@@ -750,6 +795,7 @@ describe("database bridge message boundary", () => {
       });
       f.external.postMessage({
         type: "response",
+        version: DB_BRIDGE_VERSION,
         requestId: request.requestId,
         fromTabId: "first-host",
         targetTabId: request.fromTabId,
@@ -761,6 +807,7 @@ describe("database bridge message boundary", () => {
       expect(f.statuses.at(-1)?.isReady).toBe(true);
       f.external.postMessage({
         type: "response",
+        version: DB_BRIDGE_VERSION,
         requestId: request.requestId,
         fromTabId: "second-host",
         targetTabId: request.fromTabId,
@@ -768,7 +815,7 @@ describe("database bridge message boundary", () => {
         result: { current: true },
       });
       await expect(result).resolves.toEqual({ current: true });
-      await expect(f.db.runAsync("INSERT old callback")).rejects.toThrow("Database proxy is no longer active");
+      await expect(f.db.runAsync("INSERT old callback")).rejects.toThrow("Database host closed");
     } finally {
       await f.view.unmountAsync();
       f.external.close();
@@ -837,7 +884,9 @@ describe("database bridge message boundary", () => {
             else resolve(stage === "open" ? old : undefined);
           });
           await waitFor(() => expect(statuses.at(-1)?.isReady).toBe(true));
-          expect(statuses.at(-1)?.db).toBe(fresh);
+          expect(statuses.at(-1)?.db).toBe(mockInitializeDatabase.mock.calls.at(-1)![0]);
+          await statuses.at(-1)!.db!.execAsync("SELECT fresh handle");
+          expect(fresh.execAsync).toHaveBeenCalledWith("SELECT fresh handle");
           expect(statuses.at(-1)?.error).toBeNull();
           expect(mockOpenDatabaseAsync).toHaveBeenCalledTimes(stage === "import" ? 1 : 2);
           expect(old.closeAsync).toHaveBeenCalledTimes(stage === "import" || (stage === "open" && fails) ? 0 : 1);
@@ -882,7 +931,9 @@ describe("database bridge message boundary", () => {
         release();
       });
       await waitFor(() => expect(statuses.at(-1)?.isReady).toBe(true));
-      expect(statuses.at(-1)?.db).toBe(fresh);
+      expect(statuses.at(-1)?.db).toBe(mockInitializeDatabase.mock.calls.at(-1)![0]);
+      await statuses.at(-1)!.db!.execAsync("SELECT fresh handle");
+      expect(fresh.execAsync).toHaveBeenCalledWith("SELECT fresh handle");
       expect(mockOpenDatabaseAsync).toHaveBeenCalledTimes(2);
       expect(old.closeAsync).toHaveBeenCalledTimes(1);
     } finally {
@@ -941,8 +992,11 @@ describe("database bridge message boundary", () => {
     );
     await waitFor(() => expect(statuses.at(-1)?.isReady).toBe(true));
     expect(mockImportDatabaseFromAssetAsync).not.toHaveBeenCalled();
-    expect(mockInitializeDatabase).toHaveBeenCalledWith(hostDb, expect.any(Function));
-    expect(mockBackfillAchievements).toHaveBeenCalledWith(hostDb, { notify: false });
+    expect(mockOpenDatabaseAsync).toHaveBeenCalledWith("hafiz.db", { useNewConnection: true });
+    expect(statuses.at(-1)?.db).not.toHaveProperty("closeAsync");
+    expect(statuses.at(-1)?.db).not.toHaveProperty("prepareAsync");
+    expect(mockInitializeDatabase).toHaveBeenCalledWith(statuses.at(-1)?.db, expect.any(Function));
+    expect(mockBackfillAchievements).toHaveBeenCalledWith(statuses.at(-1)?.db, { notify: false });
     await view.unmountAsync();
     await flushMessages();
     expect(hostDb.closeAsync).toHaveBeenCalledTimes(1);
@@ -1017,15 +1071,15 @@ describe("database bridge message boundary", () => {
       }
     },
   );
-  it("RF030 does not replay uncertain SQL or roll it back through a reconnected proxy", async () => {
+  it("RF030 drains and rolls back timed-out transaction SQL without replay through a new proxy", async () => {
     let release!: () => void,
-      commits = 0;
+      writeCompletions = 0;
     const held = new Promise<void>((yes) => {
       release = yes;
     });
     hostDb.runAsync.mockImplementationOnce(async () => {
       await held;
-      commits++;
+      writeCompletions++;
       return { lastInsertRowId: 1, changes: 1 };
     });
     const hostStatuses: ReturnType<typeof useDatabaseStatus>[] = [],
@@ -1046,8 +1100,8 @@ describe("database bridge message boundary", () => {
       await waitFor(() => expect(proxyStatuses.at(-1)?.isReady).toBe(true));
       const old = proxyStatuses.at(-1)!.db!;
       jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
-      const transaction = old.withTransactionAsync(async () => {
-        await old.runAsync("INSERT uncertain");
+      const transaction = old.withTransactionAsync(async (tx) => {
+        await tx.runAsync("INSERT uncertain");
       });
       const rejected = expect(transaction).rejects.toThrow("Database request timed out");
       await act(async () => {
@@ -1064,15 +1118,15 @@ describe("database bridge message boundary", () => {
       expect(proxyStatuses.at(-1)?.isReady).toBe(true);
       expect(proxyStatuses.at(-1)?.db).not.toBe(old);
       expect(hostDb.execAsync.mock.calls.map((args) => args[0])).toEqual(["BEGIN"]);
-      expect(commits).toBe(0);
+      expect(writeCompletions).toBe(0);
       await act(async () => {
         release();
       });
-      expect(commits).toBe(1);
+      expect(writeCompletions).toBe(1);
       expect(hostDb.runAsync).toHaveBeenCalledTimes(1);
-      hostDb.getFirstAsync.mockResolvedValueOnce({ commits });
-      await expect(proxyStatuses.at(-1)!.db!.getFirstAsync("SELECT committed")).resolves.toEqual({ commits: 1 });
-      expect(hostDb.execAsync.mock.calls.map((args) => args[0])).toEqual(["BEGIN"]);
+      hostDb.getFirstAsync.mockResolvedValueOnce({ value: "fresh" });
+      await expect(proxyStatuses.at(-1)!.db!.getFirstAsync("SELECT fresh")).resolves.toEqual({ value: "fresh" });
+      expect(hostDb.execAsync.mock.calls.map((args) => args[0])).toEqual(["BEGIN", "ROLLBACK"]);
     } finally {
       release();
       jest.useRealTimers();
@@ -1102,6 +1156,7 @@ describe("database bridge message boundary", () => {
         .find((value) => value?.type === "host-ready")!.tabId;
       external.postMessage({
         type: "request",
+        version: DB_BRIDGE_VERSION,
         requestId: "rejected-drain",
         fromTabId: "synthetic",
         targetTabId: hostId,
@@ -1201,6 +1256,239 @@ describe("database bridge message boundary", () => {
     } finally {
       await view.unmountAsync();
       await new Promise((yes) => setTimeout(yes, 250));
+    }
+  });
+
+  async function hostedTransactionFixture() {
+    const statuses: ReturnType<typeof useDatabaseStatus>[] = [];
+    const view = render(
+      <DatabaseProvider>
+        <StatusProbe onStatus={(status) => statuses.push(status)} />
+      </DatabaseProvider>,
+    );
+    const external = new FakeBroadcastChannel("hafiz-db-bridge");
+    await waitFor(() => expect(statuses.at(-1)?.isReady).toBe(true));
+    const host = FakeBroadcastChannel.messages
+      .map(objectMessage)
+      .find((message) => message?.type === "host-ready")!.tabId;
+    const nonce = "provider-transaction-" + Math.random();
+    let serial = 0;
+    const send = (operation: string, data: Record<string, unknown> = {}) => {
+      const requestId = nonce + "-" + ++serial;
+      external.postMessage({
+        type: "request",
+        version: DB_BRIDGE_VERSION,
+        requestId,
+        fromTabId: "provider-peer",
+        targetTabId: host,
+        operation,
+        ...data,
+      });
+      return requestId;
+    };
+    const response = (id: string) =>
+      FakeBroadcastChannel.messages
+        .map(objectMessage)
+        .find((message) => message?.type === "response" && message.requestId === id);
+    const begin = send("begin", { nonce });
+    await waitFor(() => expect(response(begin)?.ok).toBe(true));
+    const receipt = response(begin)!.result as { token: string };
+    return { statuses, view, external, send, response, identity: { nonce, token: receipt.token } };
+  }
+
+  it("recovers a fatal private-handle failure during bootstrap without self-waiting", async () => {
+    const old = hostDb,
+      fresh = makeDatabase();
+    old.finalizeAsync.mockRejectedValueOnce(new Error("bootstrap finalization failed"));
+    mockOpenDatabaseAsync.mockResolvedValueOnce(old).mockResolvedValue(fresh);
+    mockInitializeDatabase.mockImplementation(async (db: AppDatabase) => {
+      await db.runAsync("INSERT bootstrap");
+    });
+    const statuses: ReturnType<typeof useDatabaseStatus>[] = [];
+    const view = render(
+      <DatabaseProvider>
+        <StatusProbe onStatus={(status) => statuses.push(status)} />
+      </DatabaseProvider>,
+    );
+    try {
+      await waitFor(() => expect(statuses.at(-1)?.isReady).toBe(true));
+      expect(mockOpenDatabaseAsync).toHaveBeenCalledTimes(2);
+      expect(old.closeAsync).toHaveBeenCalledTimes(1);
+      expect(fresh.runAsync).toHaveBeenCalledWith("INSERT bootstrap");
+      expect(statuses.at(-1)?.error).toBeNull();
+      expect(FakeLockManager.held).toBe(true);
+      expect(statuses.at(-1)?.db).toBe(mockInitializeDatabase.mock.calls.at(-1)![0]);
+    } finally {
+      await view.unmountAsync();
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+  });
+
+  it("retains the file lock when close after a bootstrap fatal error is rejected", async () => {
+    hostDb.finalizeAsync.mockRejectedValueOnce(new Error("bootstrap finalization failed"));
+    hostDb.closeAsync.mockRejectedValueOnce(new Error("bootstrap close failed"));
+    mockInitializeDatabase.mockImplementation(async (db: AppDatabase) => {
+      await db.runAsync("INSERT bootstrap");
+    });
+    const statuses: ReturnType<typeof useDatabaseStatus>[] = [];
+    const view = render(
+      <DatabaseProvider>
+        <StatusProbe onStatus={(status) => statuses.push(status)} />
+      </DatabaseProvider>,
+    );
+    try {
+      await waitFor(() => expect(statuses.at(-1)?.error).toBe("bootstrap close failed"));
+      expect(statuses.at(-1)?.isReady).toBe(false);
+      expect(FakeLockManager.held).toBe(true);
+      await act(async () => {
+        window.dispatchEvent(new Event("pageshow"));
+      });
+      expect(mockOpenDatabaseAsync).toHaveBeenCalledTimes(1);
+      expect(hostDb.closeAsync).toHaveBeenCalledTimes(1);
+    } finally {
+      await view.unmountAsync();
+    }
+  });
+
+  it("ignores a stale fatal notification while retiring an old generation", async () => {
+    let rejectFinalize!: (error: Error) => void;
+    const old = hostDb,
+      fresh = makeDatabase();
+    old.finalizeAsync.mockReturnValueOnce(
+      new Promise<void>((_resolve, reject) => {
+        rejectFinalize = reject;
+      }),
+    );
+    mockOpenDatabaseAsync.mockResolvedValueOnce(old).mockResolvedValue(fresh);
+    const statuses: ReturnType<typeof useDatabaseStatus>[] = [];
+    const view = render(
+      <DatabaseProvider>
+        <StatusProbe onStatus={(status) => statuses.push(status)} />
+      </DatabaseProvider>,
+    );
+    try {
+      await waitFor(() => expect(statuses.at(-1)?.isReady).toBe(true));
+      const write = statuses.at(-1)!.db!.runAsync("INSERT old-generation");
+      const rejected = expect(write).rejects.toThrow("obsolete finalization failed");
+      await waitFor(() => expect(old.finalizeAsync).toHaveBeenCalledTimes(1));
+      await act(async () => {
+        window.dispatchEvent(new Event("pagehide"));
+        window.dispatchEvent(new Event("pageshow"));
+      });
+      await act(async () => {
+        rejectFinalize(new Error("obsolete finalization failed"));
+      });
+      await rejected;
+      await waitFor(() => expect(statuses.at(-1)?.isReady).toBe(true));
+      expect(statuses.at(-1)?.error).toBeNull();
+      expect(mockOpenDatabaseAsync).toHaveBeenCalledTimes(2);
+      expect(old.closeAsync).toHaveBeenCalledTimes(1);
+      await statuses.at(-1)!.db!.runAsync("INSERT fresh-generation");
+      expect(fresh.runAsync).toHaveBeenCalledWith("INSERT fresh-generation");
+    } finally {
+      rejectFinalize?.(new Error("fixture cleanup"));
+      await view.unmountAsync();
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+  });
+
+  it("aborts a hosted transaction before teardown waits for its held protocol callback", async () => {
+    let release!: () => void;
+    const rollback = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    hostDb.execAsync.mockImplementation(async (source: string) => {
+      if (source === "ROLLBACK") await rollback;
+    });
+    const f = await hostedTransactionFixture();
+    try {
+      const write = f.send("run", { source: "INSERT peer", params: [], transaction: f.identity });
+      await waitFor(() => expect(f.response(write)?.ok).toBe(true));
+      await act(async () => {
+        window.dispatchEvent(new Event("pagehide"));
+      });
+      await waitFor(() => expect(hostDb.execAsync).toHaveBeenCalledWith("ROLLBACK"));
+      expect(hostDb.closeAsync).not.toHaveBeenCalled();
+      expect(FakeLockManager.held).toBe(true);
+      await act(async () => {
+        release();
+      });
+      await waitFor(() => expect(hostDb.closeAsync).toHaveBeenCalledTimes(1));
+      expect(hostDb.execAsync.mock.calls.map((args) => args[0])).toEqual(["BEGIN", "ROLLBACK"]);
+    } finally {
+      release();
+      f.external.close();
+      await f.view.unmountAsync();
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+  });
+
+  it("joins an admitted hosted commit before closing without issuing a concurrent rollback", async () => {
+    let release!: () => void;
+    const committing = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    hostDb.execAsync.mockImplementation(async (source: string) => {
+      if (source === "COMMIT") await committing;
+    });
+    const f = await hostedTransactionFixture();
+    try {
+      f.send("commit", f.identity);
+      await waitFor(() => expect(hostDb.execAsync).toHaveBeenCalledWith("COMMIT"));
+      await act(async () => {
+        window.dispatchEvent(new Event("pagehide"));
+      });
+      expect(hostDb.closeAsync).not.toHaveBeenCalled();
+      expect(hostDb.execAsync).not.toHaveBeenCalledWith("ROLLBACK");
+      await act(async () => {
+        release();
+      });
+      await waitFor(() => expect(hostDb.closeAsync).toHaveBeenCalledTimes(1));
+      expect(hostDb.execAsync.mock.calls.map((args) => args[0])).toEqual(["BEGIN", "COMMIT"]);
+    } finally {
+      release();
+      f.external.close();
+      await f.view.unmountAsync();
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+  });
+
+  it("cancels the proxy nonce before unmount closes its transport", async () => {
+    const f = await remoteFixture();
+    f.external.addEventListener("message", (event) => {
+      const message = objectMessage(event.data);
+      if (message?.type === "request" && message.operation === "begin")
+        f.external.postMessage({
+          type: "response",
+          version: DB_BRIDGE_VERSION,
+          requestId: message.requestId,
+          fromTabId: f.wire.hostId,
+          targetTabId: message.fromTabId,
+          ok: true,
+          result: { token: "unmount-token" },
+        });
+    });
+    let entered!: () => void;
+    const started = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const work = f.db.withTransactionAsync(async () => {
+      entered();
+      await new Promise(() => {});
+    });
+    const rejected = expect(work).rejects.toThrow("Database provider closed");
+    try {
+      await started;
+      await f.view.unmountAsync();
+      await rejected;
+      await flushMessages();
+      const begin = f.wire.requests.find((message) => message.operation === "begin");
+      const cancel = f.wire.requests.find((message) => message.operation === "cancel");
+      expect(cancel?.nonce).toBe(begin?.nonce);
+      expect(typeof cancel?.nonce).toBe("string");
+    } finally {
+      await f.view.unmountAsync();
+      f.external.close();
     }
   });
 });

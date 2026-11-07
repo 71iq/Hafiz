@@ -1,4 +1,4 @@
-import type { SQLiteDatabase } from "expo-sqlite";
+import type { DatabaseExecutor } from "@/lib/database/types";
 import { enqueueSync } from "@/lib/database/sync-queue";
 
 const SYNCABLE_SETTING_PREFIXES = ["deck_", "review_settings_", "smart_deck_filter_", "card_answer_"];
@@ -24,7 +24,7 @@ export function userSettingToSyncData(row: UserSettingRow): Record<string, strin
   };
 }
 
-export async function writeUserSetting(db: SQLiteDatabase, key: string, value: string): Promise<void> {
+export async function writeUserSetting(db: DatabaseExecutor, key: string, value: string): Promise<void> {
   const updatedAt = new Date().toISOString();
   await db.runAsync(
     "INSERT OR REPLACE INTO user_settings (key, value, updated_at, deleted_at) VALUES (?, ?, ?, NULL)",
@@ -41,7 +41,7 @@ export async function writeUserSetting(db: SQLiteDatabase, key: string, value: s
   }
 }
 
-export async function deleteUserSetting(db: SQLiteDatabase, key: string): Promise<void> {
+export async function deleteUserSetting(db: DatabaseExecutor, key: string): Promise<void> {
   const deletedAt = new Date().toISOString();
   await db.runAsync("DELETE FROM user_settings WHERE key = ?", [key]);
 

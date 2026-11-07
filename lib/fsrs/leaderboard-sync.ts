@@ -1,5 +1,5 @@
 import { isMissingPublicReviewAggregateError } from "@/lib/leaderboard/errors";
-import type { SQLiteDatabase } from "expo-sqlite";
+import type { DatabaseExecutor } from "@/lib/database/types";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { beginProfileWrite, useAuthStore } from "@/lib/auth/store";
 import { authCommands } from "@/lib/auth/commands";
@@ -85,7 +85,7 @@ async function ensureProfileRow(owner: StatsOwner) {
   return useAuthStore.getState().ensureProfile(owner.authOwner);
 }
 
-async function canWriteAccountDerivedStats(db: SQLiteDatabase, owner: StatsOwner): Promise<boolean> {
+async function canWriteAccountDerivedStats(db: DatabaseExecutor, owner: StatsOwner): Promise<boolean> {
   const restored = await hasCompletedAccountRestore(db, owner.userId);
   if (!owner.isCurrent()) return false;
   if (!restored) console.warn("[Leaderboard] Skipping profile stats until account data restore completes.");
@@ -176,7 +176,7 @@ async function fetchDailyScoreSummary(userId: string): Promise<DailyScoreSummary
   return summarizeDailyScores((data ?? []) as DailyScoreRow[]);
 }
 
-async function getLocalReviewSummary(db: SQLiteDatabase): Promise<PublicReviewSummary> {
+async function getLocalReviewSummary(db: DatabaseExecutor): Promise<PublicReviewSummary> {
   const rows = await db.getAllAsync<{ reviewed_at: string }>(
     "SELECT reviewed_at FROM study_log ORDER BY reviewed_at ASC",
   );
@@ -294,7 +294,7 @@ function patchCurrentProfile(owner: StatsOwner, stats: ProfileStatsPatch): void 
 }
 
 /** Sync today's daily score to Supabase */
-export async function syncDailyScore(db: SQLiteDatabase): Promise<void> {
+export async function syncDailyScore(db: DatabaseExecutor): Promise<void> {
   if (!isSupabaseConfigured()) return;
   const owner = captureStatsOwner();
   if (!owner) return;
@@ -340,7 +340,7 @@ export async function syncDailyScore(db: SQLiteDatabase): Promise<void> {
 }
 
 /** Update profile stats on Supabase (total_score, streak, cards_reviewed, last_review_date) */
-export async function updateProfileStats(db: SQLiteDatabase): Promise<void> {
+export async function updateProfileStats(db: DatabaseExecutor): Promise<void> {
   if (!isSupabaseConfigured()) return;
   const owner = captureStatsOwner();
   if (!owner) return;

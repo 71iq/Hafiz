@@ -1,5 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
-import type { SQLiteDatabase } from "expo-sqlite";
+import type { AppDatabase, TransactionDatabase } from "@/lib/database/types";
 import { enqueueSync } from "@/lib/database/sync-queue";
 import {
   getDueCardsForReview,
@@ -17,7 +17,7 @@ const FUTURE = "2026-11-03T12:00:00.000Z";
 
 describe("smart-deck and review queue SQLite contracts", () => {
   let sql: DatabaseSync;
-  let db: SQLiteDatabase;
+  let db: AppDatabase;
 
   beforeEach(() => {
     jest.useFakeTimers();
@@ -59,10 +59,10 @@ describe("smart-deck and review queue SQLite contracts", () => {
       runAsync: jest.fn(async (query: string, params: (string | number | null)[] = []) =>
         sql.prepare(query).run(...params),
       ),
-      withTransactionAsync: async (operation: () => Promise<void>) => {
+      withTransactionAsync: async (operation: (transaction: TransactionDatabase) => Promise<void>) => {
         sql.exec("BEGIN");
         try {
-          await operation();
+          await operation(db as unknown as TransactionDatabase);
           sql.exec("COMMIT");
         } catch (error) {
           sql.exec("ROLLBACK");
@@ -70,7 +70,7 @@ describe("smart-deck and review queue SQLite contracts", () => {
         }
       },
     };
-    db = adapter as unknown as SQLiteDatabase;
+    db = adapter as unknown as AppDatabase;
   });
 
   afterEach(() => {

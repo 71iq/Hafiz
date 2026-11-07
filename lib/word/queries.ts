@@ -1,4 +1,4 @@
-import type { SQLiteDatabase } from "expo-sqlite";
+import type { DatabaseExecutor } from "@/lib/database/types";
 import { enqueueSync } from "@/lib/database/sync-queue";
 
 export type WordTranslationRow = {
@@ -35,7 +35,7 @@ export type RootOccurrence = {
 };
 
 export async function fetchWordTranslation(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   surah: number,
   ayah: number,
   wordPos: number,
@@ -47,7 +47,7 @@ export async function fetchWordTranslation(
 }
 
 export async function fetchWordIrab(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   surah: number,
   ayah: number,
   wordPos: number,
@@ -59,7 +59,7 @@ export async function fetchWordIrab(
 }
 
 export async function fetchWordTajweed(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   surah: number,
   ayah: number,
 ): Promise<TajweedRow[]> {
@@ -70,7 +70,7 @@ export async function fetchWordTajweed(
 }
 
 export async function fetchWordRoot(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   surah: number,
   ayah: number,
   wordPos: number,
@@ -82,7 +82,7 @@ export async function fetchWordRoot(
 }
 
 export async function fetchWordText(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   surah: number,
   ayah: number,
   wordPos: number,
@@ -119,7 +119,7 @@ export async function fetchWordText(
 }
 
 export async function fetchWordQcf2Glyph(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   surah: number,
   ayah: number,
   wordPos: number,
@@ -133,7 +133,7 @@ export async function fetchWordQcf2Glyph(
 }
 
 export async function fetchRootOccurrences(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   root: string,
 ): Promise<RootOccurrence[]> {
   return db.getAllAsync<RootOccurrence>(
@@ -143,7 +143,7 @@ export async function fetchRootOccurrences(
 }
 
 export async function fetchTextUthmani(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   surah: number,
   ayah: number,
 ): Promise<string | null> {
@@ -193,7 +193,7 @@ export type QiraatRow = {
 };
 
 export async function upsertUserWordMeaning(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   params: {
     surah: number;
     ayah: number;
@@ -223,7 +223,7 @@ export async function upsertUserWordMeaning(
 }
 
 export async function fetchWordMeaningAr(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   surah: number,
   ayah: number,
   wordPos: number,
@@ -248,7 +248,7 @@ export async function fetchWordMeaningAr(
 }
 
 export async function fetchWordIrabDaasForAyah(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   surah: number,
   ayah: number,
 ): Promise<WordIrabDaasRow[]> {
@@ -259,7 +259,7 @@ export async function fetchWordIrabDaasForAyah(
 }
 
 export async function fetchTajweedRuleAr(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   ruleKey: string,
 ): Promise<TajweedRuleArRow | null> {
   return db.getFirstAsync<TajweedRuleArRow>(
@@ -269,7 +269,7 @@ export async function fetchTajweedRuleAr(
 }
 
 export async function fetchTajweedRuleEn(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   ruleKey: string,
 ): Promise<TajweedRuleEnRow | null> {
   return db.getFirstAsync<TajweedRuleEnRow>(
@@ -279,7 +279,7 @@ export async function fetchTajweedRuleEn(
 }
 
 export async function fetchQiraat(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   surah: number,
   ayah: number,
 ): Promise<QiraatRow | null> {

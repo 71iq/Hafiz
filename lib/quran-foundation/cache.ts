@@ -1,4 +1,4 @@
-import type { SQLiteDatabase } from "expo-sqlite";
+import type { DatabaseExecutor } from "@/lib/database/types";
 import type { QfAudioResponse, QfHadithResponse } from "./content";
 
 const QF_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -38,7 +38,7 @@ type HadithCacheRow = {
 };
 
 export async function readCachedAyahAudio(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   surah: number,
   ayah: number,
   recitationId: number
@@ -67,7 +67,7 @@ export async function readCachedAyahAudio(
 }
 
 export async function writeCachedAyahAudio(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   response: QfAudioResponse,
   surah: number,
   ayah: number
@@ -93,7 +93,7 @@ export async function writeCachedAyahAudio(
 }
 
 export async function readCachedAyahHadiths(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   surah: number,
   ayah: number,
   language: "en" | "ar",
@@ -123,7 +123,7 @@ export async function readCachedAyahHadiths(
 }
 
 export async function writeCachedAyahHadiths(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   response: QfHadithResponse,
   surah: number,
   ayah: number

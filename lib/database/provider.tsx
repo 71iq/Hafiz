@@ -1,20 +1,15 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { Platform } from "react-native";
-import { importDatabaseFromAssetAsync, openDatabaseAsync, type SQLiteDatabase } from "expo-sqlite";
+import { importDatabaseFromAssetAsync, openDatabaseAsync } from "expo-sqlite";
+import { createConnectionOwner, type ConnectionOwner } from "@/lib/database/connection-owner";
+import { createDatabaseBridgeClient, createDatabaseBridgeHost } from "@/lib/database/bridge-connection";
+import type { AppDatabase } from "@/lib/database/types";
 import { initializeDatabase, type ImportProgress } from "./init";
 import { backfillAchievements } from "@/lib/achievements/queries";
-import {
-  decodeDbMessage,
-  isSQLiteBindParams,
-  isSQLiteBindValue,
-  type DbMessage,
-  type DbOperation,
-  type DbRequestMessage,
-  type DbWireParam,
-} from "@/lib/database/bridge-messages";
+import { DB_BRIDGE_VERSION, decodeDbMessage, type DbMessage } from "@/lib/database/bridge-messages";
 
 type DatabaseContextType = {
-  db: SQLiteDatabase | null;
+  db: AppDatabase | null;
   isReady: boolean;
   progress: ImportProgress | null;
   error: string | null;
@@ -36,16 +31,7 @@ const OPEN_RETRY_DELAY_MS = 400;
 const HOST_WAIT_TIMEOUT_MS = 30000;
 const HOST_RETRY_WAIT_TIMEOUT_MS = 1500;
 const HOST_CONNECT_RETRY_DELAY_MS = 300;
-const REQUEST_TIMEOUT_MS = 60000;
 const POST_CLOSE_SETTLE_MS = 200;
-
-type PendingRequest = {
-  resolve: (value: unknown) => void;
-  reject: (error: Error) => void;
-  timeout: ReturnType<typeof setTimeout>;
-  expectedHostTabId: string;
-  owner: object;
-};
 
 type WebLockManager = {
   request: (
@@ -70,61 +56,8 @@ function isOpfsLockError(error: unknown) {
   );
 }
 
-function formatRemoteError(error: unknown) {
-  return error instanceof Error ? error.message : String(error);
-}
-
-function toCloneableResult(result: unknown) {
-  if (result == null) return null;
-  return JSON.parse(JSON.stringify(result)) as unknown;
-}
-
-function executeBoundOperation(
-  db: SQLiteDatabase,
-  operation: Exclude<DbOperation, "exec">,
-  source: string,
-  params: DbRequestMessage["params"],
-) {
-  if (params.length === 1 && isSQLiteBindParams(params[0])) {
-    switch (operation) {
-      case "run":
-        return db.runAsync(source, params[0]);
-      case "getFirst":
-        return db.getFirstAsync(source, params[0]);
-      case "getAll":
-        return db.getAllAsync(source, params[0]);
-    }
-  }
-
-  if (params.every(isSQLiteBindValue)) {
-    switch (operation) {
-      case "run":
-        return db.runAsync(source, ...params);
-      case "getFirst":
-        return db.getFirstAsync(source, ...params);
-      case "getAll":
-        return db.getAllAsync(source, ...params);
-    }
-  }
-
-  throw new Error("Invalid database binding parameters");
-}
-
-async function executeDbOperation(db: SQLiteDatabase, message: DbRequestMessage) {
-  switch (message.operation) {
-    case "exec":
-      return db.execAsync(message.source);
-    case "run":
-    case "getFirst":
-    case "getAll":
-      return executeBoundOperation(db, message.operation, message.source, message.params);
-    default:
-      throw new Error("Unsupported database operation");
-  }
-}
-
 export function DatabaseProvider({ children }: { children: React.ReactNode }) {
-  const [db, setDb] = useState<SQLiteDatabase | null>(null);
+  const [db, setDb] = useState<AppDatabase | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [progress, setProgress] = useState<ImportProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -142,20 +75,27 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
     type Host = {
       id: string;
       epoch: number;
-      db: SQLiteDatabase | null;
+      db: AppDatabase | null;
+      owner: ConnectionOwner | null;
+      bridge: ReturnType<typeof createDatabaseBridgeHost> | null;
       release: (() => void) | null;
       ready: boolean;
       operations: Set<Promise<void>>;
       close: Promise<void> | null;
       cleanupFailure: Error | null;
     };
-    type Remote = { hostId: string; active: boolean; db: SQLiteDatabase | null };
+    type Remote = {
+      hostId: string;
+      active: boolean;
+      db: AppDatabase | null;
+      client: ReturnType<typeof createDatabaseBridgeClient> | null;
+    };
     type Attempt = { epoch: number; resources: Host[]; promise: Promise<void> };
     let cancelled = false;
     let hidden = false;
     let epoch = 0;
     let channel: BroadcastChannel | null = null;
-    let currentDb: SQLiteDatabase | null = null;
+    let currentDb: AppDatabase | null = null;
     let host: Host | null = null;
     let remote: Remote | null = null;
     let attempt: Attempt | null = null;
@@ -164,7 +104,6 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
     let closeFailure: Error | null = null;
     let recoveryTimer: ReturnType<typeof setTimeout> | null = null;
     const cancelWaits = new Set<() => void>();
-    const pendingRequests = new Map<string, PendingRequest>();
     const live = (generation: number) => !cancelled && !hidden && generation === epoch;
     const asError = (value: unknown) => (value instanceof Error ? value : new Error(String(value)));
 
@@ -176,14 +115,6 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
       } catch {
         // A host result may settle after its channel has closed.
         return false;
-      }
-    }
-    function rejectPendingRequests(reason: Error, owner?: object) {
-      for (const [id, pending] of pendingRequests) {
-        if (owner && pending.owner !== owner) continue;
-        clearTimeout(pending.timeout);
-        pendingRequests.delete(id);
-        pending.reject(reason);
       }
     }
     function cancelRecovery() {
@@ -198,13 +129,13 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
         if (live(generation) && !currentDb) void runInit();
       }, POST_CLOSE_SETTLE_MS);
     }
-    function retireRemote(owner: Remote, reason: Error, recover: boolean) {
+    function retireRemote(owner: Remote, reason: Error, recover: boolean, publish = true) {
       if (remote !== owner || !owner.active) return;
       owner.active = false;
+      owner.client?.retire(reason);
       remote = null;
       if (currentDb === owner.db) currentDb = null;
-      rejectPendingRequests(reason, owner);
-      if (!cancelled) {
+      if (!cancelled && publish) {
         setDb(null);
         setIsReady(false);
         setProgress(null);
@@ -212,68 +143,16 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
       if (recover && !cancelled && !hidden) scheduleRecovery();
     }
     function createRemoteDatabaseProxy(target: string) {
-      const owner: Remote = { hostId: target, active: true, db: null };
-      const active = () => owner.active && remote === owner && currentDb === owner.db && !cancelled && !hidden;
-      const request = (operation: DbOperation, source: string, params: DbWireParam[] = []) =>
-        new Promise<unknown>((resolve, reject) => {
-          if (!active() || !channel) {
-            reject(new Error("Database proxy is no longer active"));
-            return;
-          }
-          const requestId = uniqueId();
-          const timeout = setTimeout(() => {
-            if (pendingRequests.get(requestId)?.owner !== owner) return;
-            pendingRequests.delete(requestId);
-            reject(new Error("Database request timed out"));
-            retireRemote(owner, new Error("Database host connection lost"), true);
-          }, REQUEST_TIMEOUT_MS);
-          pendingRequests.set(requestId, { resolve, reject, timeout, expectedHostTabId: target, owner });
-          if (
-            !postMessage({
-              type: "request",
-              requestId,
-              fromTabId: tabId,
-              targetTabId: target,
-              operation,
-              source,
-              params,
-            })
-          ) {
-            clearTimeout(timeout);
-            pendingRequests.delete(requestId);
-            reject(new Error("Database channel is unavailable"));
-            retireRemote(owner, new Error("Database channel is unavailable"), true);
-          }
-        });
-      const proxy = {
-        execAsync: (source: string) => request("exec", source) as Promise<void>,
-        runAsync: (source: string, ...params: DbWireParam[]) =>
-          request("run", source, params) as ReturnType<SQLiteDatabase["runAsync"]>,
-        getFirstAsync: (source: string, ...params: DbWireParam[]) =>
-          request("getFirst", source, params) as ReturnType<SQLiteDatabase["getFirstAsync"]>,
-        getAllAsync: (source: string, ...params: DbWireParam[]) =>
-          request("getAll", source, params) as ReturnType<SQLiteDatabase["getAllAsync"]>,
-        withTransactionAsync: async (task: () => Promise<void>) => {
-          await proxy.execAsync("BEGIN");
-          try {
-            await task();
-            await proxy.execAsync("COMMIT");
-          } catch (failure) {
-            try {
-              await proxy.execAsync("ROLLBACK");
-            } catch {
-              /* Preserve the original failure. */
-            }
-            throw failure;
-          }
-        },
-        prepareAsync: async (source: string) => ({
-          executeAsync: (...params: DbWireParam[]) => request("run", source, params),
-          finalizeAsync: async () => {},
-        }),
-        closeAsync: async () => {},
-      };
-      owner.db = proxy as SQLiteDatabase;
+      const owner: Remote = { hostId: target, active: true, db: null, client: null };
+      owner.client = createDatabaseBridgeClient({
+        tabId,
+        hostId: target,
+        uniqueId,
+        postMessage,
+        isActive: () => owner.active && remote === owner && currentDb === owner.db && !cancelled && !hidden,
+        onDisconnect: (reason) => retireRemote(owner, reason, true),
+      });
+      owner.db = owner.client.database;
       return owner;
     }
     const hostIsCurrent = (resource: Host) =>
@@ -282,7 +161,8 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
       const message = decodeDbMessage(event.data);
       if (!message) return;
       if (message.type === "host-probe") {
-        if (host && hostIsCurrent(host) && message.tabId !== tabId) postMessage({ type: "host-ready", tabId: host.id });
+        if (host && hostIsCurrent(host) && message.tabId !== tabId)
+          postMessage({ type: "host-ready", version: DB_BRIDGE_VERSION, tabId: host.id });
         return;
       }
       if (message.type === "host-closing") {
@@ -291,45 +171,16 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
       }
       if (message.type === "request") {
         const resource = host;
-        if (!resource || message.targetTabId !== resource.id || !hostIsCurrent(resource)) return;
-        const database = resource.db!;
-        const operation = (async () => {
-          try {
-            const result = toCloneableResult(await executeDbOperation(database, message));
-            if (hostIsCurrent(resource))
-              postMessage({
-                type: "response",
-                requestId: message.requestId,
-                fromTabId: resource.id,
-                targetTabId: message.fromTabId,
-                ok: true,
-                result,
-              });
-          } catch (failure) {
-            if (hostIsCurrent(resource))
-              postMessage({
-                type: "response",
-                requestId: message.requestId,
-                fromTabId: resource.id,
-                targetTabId: message.fromTabId,
-                ok: false,
-                error: formatRemoteError(failure),
-              });
-          }
-        })();
+        if (!resource?.bridge || message.targetTabId !== resource.id || !hostIsCurrent(resource)) return;
+        const operation = resource.bridge.handleRequest(message);
         resource.operations.add(operation);
-        void operation.finally(() => resource.operations.delete(operation));
+        void operation.then(
+          () => resource.operations.delete(operation),
+          () => resource.operations.delete(operation),
+        );
         return;
       }
-      if (message.type === "response") {
-        if (message.targetTabId !== tabId) return;
-        const pending = pendingRequests.get(message.requestId);
-        if (!pending || pending.owner !== remote || message.fromTabId !== pending.expectedHostTabId) return;
-        clearTimeout(pending.timeout);
-        pendingRequests.delete(message.requestId);
-        if (message.ok) pending.resolve(message.result);
-        else pending.reject(new Error(message.error ?? "Database request failed"));
-      }
+      if (message.type === "response") remote?.client?.handleResponse(message);
     }
     function waitBeforeRetry(ms: number, isActive: () => boolean) {
       if (!isActive()) return Promise.resolve();
@@ -364,7 +215,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
         const timer = setTimeout(cancel, timeoutMs);
         cancelWaits.add(cancel);
         targetChannel.addEventListener("message", onMessage);
-        if (!postMessage({ type: "host-probe", tabId })) finish(null);
+        if (!postMessage({ type: "host-probe", version: DB_BRIDGE_VERSION, tabId })) finish(null);
       });
     }
     function tryAcquireHostLock(resource: Host, isActive: () => boolean) {
@@ -393,15 +244,21 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
         await sleep(POST_CLOSE_SETTLE_MS);
       }
     }
-    function closeResource(resource: Host): Promise<void> {
+    function retireResource(resource: Host, reason: Error) {
       resource.ready = false;
+      resource.owner?.retire(reason);
+      resource.bridge?.retire(reason);
+    }
+    function closeResource(resource: Host): Promise<void> {
+      retireResource(resource, new Error("Database connection closing"));
       if (!resource.close)
         resource.close = (async () => {
           await Promise.allSettled([...resource.operations]);
           if (resource.cleanupFailure) throw resource.cleanupFailure;
-          if (resource.db) {
-            // Do not release its lock or open another handle if close fails.
-            await resource.db.closeAsync();
+          if (resource.owner) {
+            // Keep the host lock if private handle close is uncertain.
+            await resource.owner.close();
+            resource.owner = null;
             resource.db = null;
           }
           await releaseResourceLock(resource);
@@ -428,7 +285,17 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
         try {
           if (isWeb) await importDatabaseFromAssetAsync(DATABASE_NAME, { assetId: quranDbAsset });
           if (!isActive()) return;
-          resource.db = await openDatabaseAsync(DATABASE_NAME);
+          const raw = await openDatabaseAsync(DATABASE_NAME, { useNewConnection: true });
+          const owner = createConnectionOwner(raw, (failure) => {
+            const belongs = host === resource || attempt?.resources.includes(resource);
+            if (!live(resource.epoch) || !belongs) return;
+            retire(failure);
+            if (!cancelled) setError(failure.message);
+            if (!cancelled && !hidden) scheduleRecovery();
+          });
+          resource.owner = owner;
+          resource.db = owner.database;
+          if (!isActive()) owner.retire(new Error("Database initialization retired"));
           return;
         } catch (failure) {
           lastError = failure;
@@ -479,6 +346,12 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
       if (!isActive()) return;
       await backfillAchievements(database, { notify: false });
       if (!isActive()) return;
+      resource.bridge = createDatabaseBridgeHost(resource.owner!, {
+        hostId: resource.id,
+        uniqueId,
+        postMessage,
+        isActive: () => hostIsCurrent(resource),
+      });
       host = resource;
       resource.ready = true;
       currentDb = database;
@@ -487,7 +360,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
       setProgress(null);
       setError(null);
       setIsReady(true);
-      postMessage({ type: "host-ready", tabId: resource.id });
+      postMessage({ type: "host-ready", version: DB_BRIDGE_VERSION, tabId: resource.id });
     }
     function runInit(): Promise<void> {
       if (cancelled || hidden || currentDb) return Promise.resolve();
@@ -508,6 +381,8 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
           id: uniqueId(),
           epoch: owner.epoch,
           db: null,
+          owner: null,
+          bridge: null,
           release: null,
           ready: false,
           operations: new Set(),
@@ -573,24 +448,25 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
         });
       return owner.promise;
     }
-    function retire(reason: Error) {
+    function retire(reason: Error, publish = true) {
       epoch += 1;
       restartRequested = false;
       cancelRecovery();
       for (const cancel of [...cancelWaits]) cancel();
       const oldHost = host;
+      const oldAttempt = attempt;
       host = null;
-      if (oldHost?.ready) postMessage({ type: "host-closing", tabId: oldHost.id });
-      if (oldHost) oldHost.ready = false;
-      if (remote) retireRemote(remote, reason, false);
-      rejectPendingRequests(reason);
+      if (oldHost?.ready) postMessage({ type: "host-closing", version: DB_BRIDGE_VERSION, tabId: oldHost.id });
+      // Release held protocol callbacks before waiting for initialization or RPCs.
+      for (const resource of new Set([...(oldAttempt?.resources ?? []), ...(oldHost ? [oldHost] : [])]))
+        retireResource(resource, reason);
+      if (remote) retireRemote(remote, reason, false, publish);
       currentDb = null;
-      if (!cancelled) {
+      if (!cancelled && publish) {
         setDb(null);
         setIsReady(false);
         setProgress(null);
       }
-      const oldAttempt = attempt;
       const previousClose = closeBarrier;
       closeBarrier = (async () => {
         const prior = await Promise.allSettled([previousClose, oldAttempt?.promise ?? Promise.resolve()]);
@@ -618,13 +494,12 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
     lifecycleWindow?.addEventListener("pageshow", handlePageShow);
     void runInit();
     return () => {
-      // Stop admission before draining captured work and closing its resources.
       lifecycleWindow?.removeEventListener("pagehide", handlePageHide);
       lifecycleWindow?.removeEventListener("pageshow", handlePageShow);
-      if (host?.ready) postMessage({ type: "host-closing", tabId: host.id });
-      cancelled = true;
       hidden = true;
-      retire(new Error("Database provider closed"));
+      // Send remote reservation cancellation while the channel is still usable.
+      retire(new Error("Database provider closed"), false);
+      cancelled = true;
       channel?.close();
       channel = null;
     };

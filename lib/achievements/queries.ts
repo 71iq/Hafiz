@@ -1,6 +1,6 @@
 import { parseJsonRecord } from "@/lib/serialization/json-record";
 import { buildLocalReviewCounts, calculateLongestStreak } from "@/lib/fsrs/review-activity";
-import type { SQLiteDatabase } from "expo-sqlite";
+import type { DatabaseExecutor } from "@/lib/database/types";
 import { enqueueSync } from "@/lib/database/sync-queue";
 import { ACHIEVEMENTS, getAchievementDefinition, type AchievementDefinition } from "./catalog";
 import type { AchievementEvent, AchievementProgress, AchievementUnlock } from "./types";
@@ -45,7 +45,7 @@ export function subscribeAchievementUnlocks(listener: AchievementUnlockListener)
 }
 
 export async function recordAchievementEvent(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   event: AchievementEvent
 ): Promise<void> {
   switch (event.type) {
@@ -84,7 +84,7 @@ export async function recordAchievementEvent(
 }
 
 export async function backfillAchievements(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   options: { notify?: boolean } = {}
 ): Promise<void> {
   const notify = options.notify ?? false;
@@ -96,7 +96,7 @@ export async function backfillAchievements(
   await backfillVocabAchievements(db, notify);
 }
 
-export async function getAchievementDashboard(db: SQLiteDatabase): Promise<AchievementDashboard> {
+export async function getAchievementDashboard(db: DatabaseExecutor): Promise<AchievementDashboard> {
   await backfillAchievements(db, { notify: false });
 
   const [unlockRows, progressRows, recentUnlocks] = await Promise.all([
@@ -136,7 +136,7 @@ export async function getAchievementDashboard(db: SQLiteDatabase): Promise<Achie
 }
 
 export async function getRecentUnlocks(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   limit: number
 ): Promise<AchievementUnlock[]> {
   const activeIds = new Set(ACHIEVEMENTS.filter((achievement) => achievement.active).map((achievement) => achievement.id));
@@ -150,7 +150,7 @@ export async function getRecentUnlocks(
     .map(rowToUnlock);
 }
 
-export async function getLatestUnseenUnlock(db: SQLiteDatabase): Promise<AchievementUnlock | null> {
+export async function getLatestUnseenUnlock(db: DatabaseExecutor): Promise<AchievementUnlock | null> {
   const activeIds = new Set(ACHIEVEMENTS.filter((achievement) => achievement.active).map((achievement) => achievement.id));
   const rows = await db.getAllAsync<UnlockRow>(
     "SELECT * FROM achievement_unlocks WHERE seen_at IS NULL ORDER BY unlocked_at DESC LIMIT 10"
@@ -160,7 +160,7 @@ export async function getLatestUnseenUnlock(db: SQLiteDatabase): Promise<Achieve
 }
 
 export async function markAchievementSeen(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   achievementId: string
 ): Promise<void> {
   await db.runAsync(
@@ -170,7 +170,7 @@ export async function markAchievementSeen(
 }
 
 export async function insertRemoteAchievementUnlock(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   row: { achievement_id: string; unlocked_at: string; public_payload?: unknown }
 ): Promise<void> {
   const publicPayload = parseJsonRecord(row.public_payload);
@@ -182,7 +182,7 @@ export async function insertRemoteAchievementUnlock(
   );
 }
 
-async function backfillReviewAchievements(db: SQLiteDatabase, notify: boolean): Promise<void> {
+async function backfillReviewAchievements(db: DatabaseExecutor, notify: boolean): Promise<void> {
   const totalRow = await db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM study_log");
   const total = totalRow?.count ?? 0;
   await upsertProgress(db, "first_review", Math.min(total, 1), 1);
@@ -251,7 +251,7 @@ async function backfillReviewAchievements(db: SQLiteDatabase, notify: boolean): 
   }
 }
 
-async function backfillDeckAchievements(db: SQLiteDatabase, notify: boolean): Promise<void> {
+async function backfillDeckAchievements(db: DatabaseExecutor, notify: boolean): Promise<void> {
   const rows = await db.getAllAsync<{ key: string; value: string }>(
     "SELECT key, value FROM user_settings WHERE key LIKE 'deck_%' AND key != 'deck_meanings'"
   );
@@ -272,7 +272,7 @@ async function backfillDeckAchievements(db: SQLiteDatabase, notify: boolean): Pr
   );
 }
 
-async function backfillCompletionAchievements(db: SQLiteDatabase, notify: boolean): Promise<void> {
+async function backfillCompletionAchievements(db: DatabaseExecutor, notify: boolean): Promise<void> {
   const surahRows = await db.getAllAsync<{ surah: number; total: number; mastered: number }>(
     `SELECT
        qt.surah as surah,
@@ -333,7 +333,7 @@ async function backfillCompletionAchievements(db: SQLiteDatabase, notify: boolea
   }
 }
 
-async function backfillPrivateNoteAchievements(db: SQLiteDatabase, notify: boolean): Promise<void> {
+async function backfillPrivateNoteAchievements(db: DatabaseExecutor, notify: boolean): Promise<void> {
   const countRow = await db.getFirstAsync<{ count: number }>(
     "SELECT COUNT(*) as count FROM private_notes WHERE deleted_at IS NULL"
   );
@@ -361,7 +361,7 @@ async function backfillPrivateNoteAchievements(db: SQLiteDatabase, notify: boole
   }
 }
 
-async function backfillReflectionAchievements(db: SQLiteDatabase, notify: boolean): Promise<void> {
+async function backfillReflectionAchievements(db: DatabaseExecutor, notify: boolean): Promise<void> {
   const first = await db.getFirstAsync<ProgressRow>(
     "SELECT * FROM achievement_progress WHERE achievement_id = 'first_public_reflection'"
   );
@@ -378,7 +378,7 @@ async function backfillReflectionAchievements(db: SQLiteDatabase, notify: boolea
   }
 }
 
-async function backfillVocabAchievements(db: SQLiteDatabase, notify: boolean): Promise<void> {
+async function backfillVocabAchievements(db: DatabaseExecutor, notify: boolean): Promise<void> {
   const countRow = await db.getFirstAsync<{ count: number }>(
     "SELECT COUNT(*) as count FROM study_cards WHERE id LIKE 'word:%' AND deleted_at IS NULL"
   );
@@ -393,7 +393,7 @@ async function backfillVocabAchievements(db: SQLiteDatabase, notify: boolean): P
 }
 
 async function upsertProgress(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   achievementId: string,
   currentValue: number,
   targetValue: number,
@@ -408,7 +408,7 @@ async function upsertProgress(
 }
 
 async function incrementProgress(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   achievementId: string,
   delta: number,
   targetValue: number,
@@ -422,7 +422,7 @@ async function incrementProgress(
 }
 
 async function unlockIfProgressReached(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   achievementId: string,
   unlockedAt: string,
   notify: boolean
@@ -436,7 +436,7 @@ async function unlockIfProgressReached(
 }
 
 async function unlockAchievement(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   achievementId: string,
   unlockedAt: string,
   localPayload: Record<string, unknown> = {},

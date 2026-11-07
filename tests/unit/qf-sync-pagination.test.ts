@@ -1,5 +1,5 @@
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
-import type { SQLiteDatabase } from "expo-sqlite";
+import type { AppDatabase, TransactionDatabase } from "@/lib/database/types";
 import type { Session } from "@supabase/supabase-js";
 import { observeAuthSession } from "@/lib/auth/commands";
 import { createSchema } from "@/lib/database/schema";
@@ -54,7 +54,7 @@ jest.mock("@/lib/supabase", () => ({
 }));
 
 let sql: DatabaseSync;
-let db: SQLiteDatabase;
+let db: AppDatabase;
 let transactions: number;
 function page(entity: Entity, nextCursor?: unknown, includePrefix = true) {
   return {
@@ -105,11 +105,11 @@ beforeEach(async () => {
     getFirstAsync: async (source: string, params: SQLInputValue[] = []) => sql.prepare(source).get(...params) ?? null,
     getAllAsync: async (source: string, params: SQLInputValue[] = []) => sql.prepare(source).all(...params),
     runAsync: async (source: string, params: SQLInputValue[] = []) => sql.prepare(source).run(...params),
-    withTransactionAsync: async (work: () => Promise<void>) => {
+    withTransactionAsync: async (work: (transaction: TransactionDatabase) => Promise<void>) => {
       transactions += 1;
       sql.exec("BEGIN");
       try {
-        await work();
+        await work(db as unknown as TransactionDatabase);
         sql.exec("COMMIT");
       } catch (error) {
         sql.exec("ROLLBACK");
@@ -118,7 +118,7 @@ beforeEach(async () => {
     },
   };
   // Only this fixture adapts Expo's wider API to a real isolated SQLite database.
-  db = adapter as unknown as SQLiteDatabase;
+  db = adapter as unknown as AppDatabase;
   await createSchema(db);
   sql
     .prepare(

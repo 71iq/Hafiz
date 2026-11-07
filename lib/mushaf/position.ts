@@ -1,4 +1,4 @@
-import type { SQLiteDatabase } from "expo-sqlite";
+import type { DatabaseExecutor } from "@/lib/database/types";
 
 type JuzRow = {
   juz: number;
@@ -39,7 +39,7 @@ export type MushafIndex = {
 
 let cachedIndex: MushafIndex | null = null;
 
-export async function loadMushafIndex(db: SQLiteDatabase): Promise<MushafIndex> {
+export async function loadMushafIndex(db: DatabaseExecutor): Promise<MushafIndex> {
   if (cachedIndex) return cachedIndex;
   const [juzRows, hizbRows, surahs, pages] = await Promise.all([
     db.getAllAsync<JuzRow>(

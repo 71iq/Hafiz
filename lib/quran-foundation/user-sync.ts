@@ -1,4 +1,4 @@
-import type { SQLiteDatabase } from "expo-sqlite";
+import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import { compareSyncTimestamps, syncTimestampSchema } from "@/lib/database/sync-timestamps";
 import { enqueueSync } from "@/lib/database/sync-queue";
 import { useAuthStore } from "@/lib/auth/store";
@@ -92,7 +92,7 @@ function captureQfSyncOwner(): QfSyncOwner | null {
 }
 
 export async function enqueueQfSync(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   entityType: QfEntityType,
   operation: QfOperation,
   localId: string,
@@ -107,7 +107,7 @@ export async function enqueueQfSync(
   );
 }
 
-export async function getPendingQfSyncCount(db: SQLiteDatabase): Promise<number> {
+export async function getPendingQfSyncCount(db: DatabaseExecutor): Promise<number> {
   const row = await db.getFirstAsync<{ count: number }>(
     "SELECT COUNT(*) as count FROM qf_sync_queue WHERE status IN ('pending', 'failed')",
   );
@@ -115,7 +115,7 @@ export async function getPendingQfSyncCount(db: SQLiteDatabase): Promise<number>
 }
 
 export async function runInitialQfUserSync(
-  db: SQLiteDatabase,
+  db: AppDatabase,
   initiatingOwner?: QfSessionOwner | null,
 ): Promise<QfSyncResult> {
   const owner = initiatingOwner === undefined ? captureQfSyncOwner() : initiatingOwner;
@@ -138,7 +138,7 @@ export async function runInitialQfUserSync(
   return readQfSyncResult(owner, db, pushed, firstPull + secondPull);
 }
 
-export async function fullQfUserSync(db: SQLiteDatabase): Promise<QfSyncResult> {
+export async function fullQfUserSync(db: AppDatabase): Promise<QfSyncResult> {
   const owner = captureQfSyncOwner();
   if (!owner) return { status: "not_connected", pushed: 0, pulled: 0 };
   const connection = await getQfSyncConnectionState(owner);
@@ -184,7 +184,7 @@ export async function fullQfUserSync(db: SQLiteDatabase): Promise<QfSyncResult> 
 
 async function readQfSyncResult(
   owner: QfSyncOwner,
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   pushed: number,
   pulled: number,
 ): Promise<QfSyncResult> {
@@ -194,7 +194,7 @@ async function readQfSyncResult(
   return { status: pending === 0 ? "synced" : "failed", pushed, pulled };
 }
 
-async function needsInitialLocalEnqueue(owner: QfSyncOwner, db: SQLiteDatabase): Promise<boolean> {
+async function needsInitialLocalEnqueue(owner: QfSyncOwner, db: DatabaseExecutor): Promise<boolean> {
   owner.requireCurrent();
   const row = await db.getFirstAsync<{ value: string }>(
     "SELECT value FROM user_settings WHERE key = 'qf_initial_local_enqueue_done'",
@@ -203,7 +203,7 @@ async function needsInitialLocalEnqueue(owner: QfSyncOwner, db: SQLiteDatabase):
   return row?.value !== "true";
 }
 
-async function markInitialLocalEnqueueDone(owner: QfSyncOwner, db: SQLiteDatabase): Promise<void> {
+async function markInitialLocalEnqueueDone(owner: QfSyncOwner, db: DatabaseExecutor): Promise<void> {
   owner.requireCurrent();
   await db.runAsync(
     "INSERT OR REPLACE INTO user_settings (key, value) VALUES ('qf_initial_local_enqueue_done', 'true')",
@@ -222,7 +222,7 @@ async function getQfSyncConnectionState(owner: QfSyncOwner): Promise<QfSyncConne
   return status.status === "connected" ? "connected" : "not_connected";
 }
 
-async function enqueueAllActiveLocalRows(owner: QfSyncOwner, db: SQLiteDatabase): Promise<void> {
+async function enqueueAllActiveLocalRows(owner: QfSyncOwner, db: DatabaseExecutor): Promise<void> {
   owner.requireCurrent();
   const bookmarks = await db.getAllAsync<LocalBookmarkRow>("SELECT * FROM bookmarks WHERE deleted_at IS NULL");
   owner.requireCurrent();
@@ -242,7 +242,7 @@ async function enqueueAllActiveLocalRows(owner: QfSyncOwner, db: SQLiteDatabase)
   }
 }
 
-async function pushQfSyncQueue(owner: QfSyncOwner, db: SQLiteDatabase): Promise<number> {
+async function pushQfSyncQueue(owner: QfSyncOwner, db: DatabaseExecutor): Promise<number> {
   owner.requireCurrent();
   const entries = await db.getAllAsync<QfSyncQueueEntry>(
     `SELECT * FROM qf_sync_queue
@@ -280,7 +280,7 @@ async function pushQfSyncQueue(owner: QfSyncOwner, db: SQLiteDatabase): Promise<
   return pushed;
 }
 
-async function enqueueCurrentQfRow(owner: QfSyncOwner, db: SQLiteDatabase, entry: QfSyncQueueEntry): Promise<void> {
+async function enqueueCurrentQfRow(owner: QfSyncOwner, db: DatabaseExecutor, entry: QfSyncQueueEntry): Promise<void> {
   owner.requireCurrent();
   if (entry.entity_type === "bookmark") {
     const parsedId = parseBookmarkLocalId(entry.local_id);
@@ -314,7 +314,7 @@ async function enqueueCurrentQfRow(owner: QfSyncOwner, db: SQLiteDatabase, entry
   owner.requireCurrent();
 }
 
-async function pushBookmarkEntry(owner: QfSyncOwner, db: SQLiteDatabase, entry: QfSyncQueueEntry): Promise<void> {
+async function pushBookmarkEntry(owner: QfSyncOwner, db: DatabaseExecutor, entry: QfSyncQueueEntry): Promise<void> {
   owner.requireCurrent();
   const parsedId = parseBookmarkLocalId(entry.local_id);
   if (!parsedId) return;
@@ -380,7 +380,7 @@ async function pushBookmarkEntry(owner: QfSyncOwner, db: SQLiteDatabase, entry: 
   owner.requireCurrent();
 }
 
-async function pushPrivateNoteEntry(owner: QfSyncOwner, db: SQLiteDatabase, entry: QfSyncQueueEntry): Promise<void> {
+async function pushPrivateNoteEntry(owner: QfSyncOwner, db: DatabaseExecutor, entry: QfSyncQueueEntry): Promise<void> {
   owner.requireCurrent();
   const local = await db.getFirstAsync<LocalPrivateNoteRow>("SELECT * FROM private_notes WHERE id = ?", [
     entry.local_id,
@@ -442,27 +442,25 @@ async function pushPrivateNoteEntry(owner: QfSyncOwner, db: SQLiteDatabase, entr
   owner.requireCurrent();
 }
 
-async function pullQfRemoteChanges(owner: QfSyncOwner, db: SQLiteDatabase): Promise<number> {
+async function pullQfRemoteChanges(owner: QfSyncOwner, db: AppDatabase): Promise<number> {
   owner.requireCurrent();
   const startedAt = new Date().toISOString();
   const [bookmarks, notes] = await Promise.all([listAllQfBookmarks(owner), listAllQfNotes(owner)]);
   owner.requireCurrent();
 
   let pulled = 0;
-  await db.withTransactionAsync(async () => {
-    // This nonexclusive transaction may already contain another local write.
-    // Skip an obsolete merge without rolling that write back. Once admitted,
-    // finish the existing merge before fencing its following phases.
+  await db.withTransactionAsync(async (tx) => {
+    // The owned reservation admits this merge as one transaction.
     if (!owner.isCurrent()) return;
     for (const bookmark of bookmarks) {
-      if (await mergeRemoteBookmark(db, bookmark)) pulled += 1;
+      if (await mergeRemoteBookmark(tx, bookmark)) pulled += 1;
     }
-    await tombstoneMissingRemoteBookmarks(db, bookmarks, startedAt);
+    await tombstoneMissingRemoteBookmarks(tx, bookmarks, startedAt);
 
     for (const note of notes) {
-      if (await mergeRemoteNote(db, note)) pulled += 1;
+      if (await mergeRemoteNote(tx, note)) pulled += 1;
     }
-    await tombstoneMissingRemoteNotes(db, notes, startedAt);
+    await tombstoneMissingRemoteNotes(tx, notes, startedAt);
   });
   owner.requireCurrent();
 
@@ -521,7 +519,7 @@ async function listAllQfNotes(owner: QfSyncOwner): Promise<QfNote[]> {
   throw new Error("Incomplete Quran Foundation notes list.");
 }
 
-async function mergeRemoteBookmark(db: SQLiteDatabase, remote: QfBookmark): Promise<boolean> {
+async function mergeRemoteBookmark(db: DatabaseExecutor, remote: QfBookmark): Promise<boolean> {
   const local = await db.getFirstAsync<LocalBookmarkRow>("SELECT * FROM bookmarks WHERE surah = ? AND ayah = ?", [
     remote.surah,
     remote.ayah,
@@ -569,7 +567,7 @@ async function mergeRemoteBookmark(db: SQLiteDatabase, remote: QfBookmark): Prom
 }
 
 async function attachQfBookmark(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   local: LocalBookmarkRow,
   remote: QfBookmark,
   options: { updateActiveState: boolean; requireCurrent?: () => void },
@@ -633,7 +631,7 @@ async function attachQfBookmark(
 }
 
 async function tombstoneMissingRemoteBookmarks(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   remoteBookmarks: QfBookmark[],
   startedAt: string,
 ): Promise<void> {
@@ -666,7 +664,7 @@ async function tombstoneMissingRemoteBookmarks(
   }
 }
 
-async function mergeRemoteNote(db: SQLiteDatabase, remote: QfNote): Promise<boolean> {
+async function mergeRemoteNote(db: DatabaseExecutor, remote: QfNote): Promise<boolean> {
   const parsedRange = remote.ranges.map(parseQfRange).find((range) => range !== null);
   if (!parsedRange) return false;
   const remoteBody = remote.body.trim();
@@ -785,7 +783,7 @@ async function mergeRemoteNote(db: SQLiteDatabase, remote: QfNote): Promise<bool
 }
 
 async function attachQfNote(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   localId: string,
   remote: QfNote,
   fallbackRanges: string[],
@@ -812,7 +810,7 @@ async function attachQfNote(
 }
 
 async function findExactLocalNote(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   surah: number,
   ayahStart: number,
   ayahEnd: number,
@@ -829,7 +827,7 @@ async function findExactLocalNote(
   );
 }
 
-async function tombstoneLocalQfDuplicate(db: SQLiteDatabase, row: LocalPrivateNoteRow): Promise<void> {
+async function tombstoneLocalQfDuplicate(db: DatabaseExecutor, row: LocalPrivateNoteRow): Promise<void> {
   if (row.deleted_at) return;
   const now = new Date().toISOString();
   await db.runAsync(
@@ -844,7 +842,7 @@ async function tombstoneLocalQfDuplicate(db: SQLiteDatabase, row: LocalPrivateNo
 }
 
 async function tombstoneMissingRemoteNotes(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   remoteNotes: QfNote[],
   startedAt: string,
 ): Promise<void> {
@@ -869,7 +867,7 @@ async function tombstoneMissingRemoteNotes(
   }
 }
 
-async function getPendingQfLocalIds(db: SQLiteDatabase, entityType: QfEntityType): Promise<Set<string>> {
+async function getPendingQfLocalIds(db: DatabaseExecutor, entityType: QfEntityType): Promise<Set<string>> {
   const rows = await db.getAllAsync<{ local_id: string }>(
     "SELECT DISTINCT local_id FROM qf_sync_queue WHERE entity_type = ? AND status IN ('pending', 'failed')",
     [entityType],
@@ -891,7 +889,7 @@ async function findRemoteBookmarkId(owner: QfSyncOwner, surah: number, ayah: num
   return match?.id ?? null;
 }
 
-async function markQfSynced(owner: QfSyncOwner, db: SQLiteDatabase, id: number): Promise<void> {
+async function markQfSynced(owner: QfSyncOwner, db: DatabaseExecutor, id: number): Promise<void> {
   owner.requireCurrent();
   await db.runAsync(
     "UPDATE qf_sync_queue SET status = 'synced', synced_at = ?, updated_at = ?, last_error = NULL WHERE id = ?",
@@ -900,7 +898,7 @@ async function markQfSynced(owner: QfSyncOwner, db: SQLiteDatabase, id: number):
   owner.requireCurrent();
 }
 
-async function markQfFailed(owner: QfSyncOwner, db: SQLiteDatabase, id: number, message: string): Promise<void> {
+async function markQfFailed(owner: QfSyncOwner, db: DatabaseExecutor, id: number, message: string): Promise<void> {
   owner.requireCurrent();
   await db.runAsync(
     `UPDATE qf_sync_queue
@@ -911,7 +909,7 @@ async function markQfFailed(owner: QfSyncOwner, db: SQLiteDatabase, id: number, 
   owner.requireCurrent();
 }
 
-async function cleanSyncedQfEntries(owner: QfSyncOwner, db: SQLiteDatabase): Promise<void> {
+async function cleanSyncedQfEntries(owner: QfSyncOwner, db: DatabaseExecutor): Promise<void> {
   owner.requireCurrent();
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - 7);

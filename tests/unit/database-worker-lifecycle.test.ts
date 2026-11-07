@@ -591,3 +591,27 @@ test.each([false, true])(
     expect(lateClose).toHaveBeenCalledTimes(1);
   },
 );
+
+test("private same-file opens bypass the worker cache and close only their own pointer", async () => {
+  const cached = createHarness();
+  await cached.dispatch("open", open(1, "same.sqlite"), 1);
+  await cached.dispatch("open", open(2, "same.sqlite"), 2);
+  expect(cached.openCalls).toHaveLength(1);
+
+  const privateHandles = createHarness();
+  const privateOpen = (id: number) => ({ ...open(id, "same.sqlite"), options: { useNewConnection: true } });
+  await privateHandles.dispatch("open", privateOpen(1), 1);
+  await privateHandles.dispatch("open", privateOpen(2), 2);
+  expect(privateHandles.openCalls.map((call) => call.pointer)).toEqual([10, 11]);
+  privateHandles.events.length = 0;
+  await privateHandles.dispatch("close", { nativeDatabaseId: 1 }, 3);
+  expect(privateHandles.events).toContain("sqlite.close:10");
+  expect(privateHandles.events).not.toContain("sqlite.close:11");
+  expect(privateHandles.events).not.toContain("persistent.close");
+  await privateHandles.dispatch("exec", { nativeDatabaseId: 2, source: "SELECT 161" }, 4);
+  expect(replyFor(privateHandles, 4)?.error).toBeNull();
+  expect(privateHandles.events).toContain("sqlite.exec:11:SELECT 161");
+  await privateHandles.dispatch("close", { nativeDatabaseId: 2 }, 5);
+  expect(privateHandles.events).toContain("sqlite.close:11");
+  expect(privateHandles.events).toContain("persistent.close");
+});

@@ -1,5 +1,5 @@
 import { Platform } from "react-native";
-import type { SQLiteDatabase } from "expo-sqlite";
+import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import { createSchema, createTextSearchIndex, migrateUserSchema } from "./schema";
 import { normalizeArabicCore, normalizeArabicWord } from "@/lib/arabic";
 import {
@@ -264,7 +264,7 @@ function appendMappedWordRow(
   }
 }
 
-async function loadCanonicalWordsByAyah(db: SQLiteDatabase): Promise<Map<string, CanonicalWord[]>> {
+async function loadCanonicalWordsByAyah(db: DatabaseExecutor): Promise<Map<string, CanonicalWord[]>> {
   const rows = await db.getAllAsync<{
     surah: number;
     ayah: number;
@@ -325,7 +325,7 @@ function mapRowsToCanonicalWords(
   return Array.from(rowsByKey.values()).sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]);
 }
 
-async function isPopulated(db: SQLiteDatabase): Promise<boolean> {
+async function isPopulated(db: DatabaseExecutor): Promise<boolean> {
   try {
     const result = await db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM surahs");
     return (result?.count ?? 0) >= 114;
@@ -334,11 +334,11 @@ async function isPopulated(db: SQLiteDatabase): Promise<boolean> {
   }
 }
 
-async function batchInsert(db: SQLiteDatabase, sql: string, rows: any[][], batchSize: number = 500): Promise<void> {
+async function batchInsert(db: AppDatabase, sql: string, rows: any[][], batchSize: number = 500): Promise<void> {
   for (let i = 0; i < rows.length; i += batchSize) {
     const batch = rows.slice(i, i + batchSize);
-    await db.withTransactionAsync(async () => {
-      const stmt = await db.prepareAsync(sql);
+    await db.withTransactionAsync(async (tx) => {
+      const stmt = await tx.prepareAsync(sql);
       try {
         for (const row of batch) {
           await stmt.executeAsync(row);
@@ -350,12 +350,12 @@ async function batchInsert(db: SQLiteDatabase, sql: string, rows: any[][], batch
   }
 }
 
-async function readSetting(db: SQLiteDatabase, key: string): Promise<string | null> {
+async function readSetting(db: DatabaseExecutor, key: string): Promise<string | null> {
   const row = await db.getFirstAsync<{ value: string }>("SELECT value FROM user_settings WHERE key = ?", [key]);
   return row?.value ?? null;
 }
 
-async function writeSetting(db: SQLiteDatabase, key: string, value: string): Promise<void> {
+async function writeSetting(db: DatabaseExecutor, key: string, value: string): Promise<void> {
   await db.runAsync("INSERT OR REPLACE INTO user_settings (key, value) VALUES (?, ?)", [key, value]);
 }
 
@@ -369,7 +369,7 @@ const DEFAULT_SURAH_ENGLISH_NAMES = new Map(
     .map((row) => [row.number, row.name_english]),
 );
 
-async function ensureDefaultSurahEnglishNames(db: SQLiteDatabase): Promise<void> {
+async function ensureDefaultSurahEnglishNames(db: AppDatabase): Promise<void> {
   const baqaraName = DEFAULT_SURAH_ENGLISH_NAMES.get(2);
   if (!baqaraName) return;
 
@@ -385,7 +385,7 @@ async function ensureDefaultSurahEnglishNames(db: SQLiteDatabase): Promise<void>
 
 // ─── Import functions ────────────────────────────────────────
 
-async function importSurahs(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {
+async function importSurahs(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   const quranData = await loadData("quran-data.json");
   const surahs = quranData.tables.surahs;
   onProgress({ step: "Surahs", current: 1, total: TOTAL_STEPS, detail: `${surahs.length} surahs` });
@@ -406,7 +406,7 @@ async function importSurahs(db: SQLiteDatabase, onProgress: ProgressCallback): P
   console.log(`[Import] Surahs done: ${surahs.length} rows`);
 }
 
-async function importSurahInfo(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {
+async function importSurahInfo(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   const data = await loadData("surah-info.json");
   if (!Array.isArray(data)) throw new Error("Invalid surah-info.json");
   onProgress({ step: "Surah Information", current: 22, total: TOTAL_STEPS, detail: `${data.length} entries` });
@@ -428,7 +428,7 @@ async function importSurahInfo(db: SQLiteDatabase, onProgress: ProgressCallback)
   console.log(`[Import] Surah information done: ${rows.length} rows`);
 }
 
-async function importQuranText(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {
+async function importQuranText(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   const [quranData, qcf2Data] = await Promise.all([loadData("quran-data.json"), loadData("quran-qcf2.json")]);
   const texts = quranData.tables.quran_text;
   onProgress({ step: "Quran Text", current: 2, total: TOTAL_STEPS, detail: `${texts.length} ayahs` });
@@ -460,7 +460,7 @@ async function importQuranText(db: SQLiteDatabase, onProgress: ProgressCallback)
   console.log(`[Import] Quran text done: ${texts.length} rows`);
 }
 
-async function importJuzAndHizb(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {
+async function importJuzAndHizb(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   const quranData = await loadData("quran-data.json");
   const juzMap = quranData.tables.juz_map;
   const hizbMap = quranData.tables.hizb_map;
@@ -484,7 +484,7 @@ async function importJuzAndHizb(db: SQLiteDatabase, onProgress: ProgressCallback
   console.log(`[Import] Juz & Hizb done`);
 }
 
-async function importWordRoots(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {
+async function importWordRoots(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   const quranData = await loadData("quran-data.json");
   const roots = quranData.tables.word_roots;
   onProgress({ step: "Word Roots", current: 4, total: TOTAL_STEPS, detail: `${roots.length} words` });
@@ -499,7 +499,7 @@ async function importWordRoots(db: SQLiteDatabase, onProgress: ProgressCallback)
   console.log(`[Import] Word roots done: ${roots.length} rows`);
 }
 
-async function importTafseer(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {
+async function importTafseer(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   onProgress({ step: "Tafsir", current: 5, total: TOTAL_STEPS, detail: "Al-Muyassar (114 files)" });
   console.log(`[Import] Importing tafseer (muyassar) from 114 files...`);
 
@@ -521,7 +521,7 @@ async function importTafseer(db: SQLiteDatabase, onProgress: ProgressCallback): 
   console.log(`[Import] Tafsir (muyassar) done: ${totalRows} rows`);
 }
 
-async function importZilal(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {
+async function importZilal(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   onProgress({ step: "Tafsir", current: 6, total: TOTAL_STEPS, detail: "Fi Zilal al-Quran" });
   console.log(`[Import] Importing tafseer (zilal)...`);
 
@@ -584,7 +584,7 @@ async function loadSurahRowTafsirSourceCandidate(source: TafsirSourceConfig): Pr
   return [...rowsByCoordinate.values()];
 }
 
-export async function ensureTafsirSourceImported(db: SQLiteDatabase, sourceId: TafsirSourceId): Promise<void> {
+export async function ensureTafsirSourceImported(db: AppDatabase, sourceId: TafsirSourceId): Promise<void> {
   const source = TAFSIR_SOURCES.find((item) => item.id === sourceId);
   if (!source || source.importKind !== "surahRows") return;
 
@@ -608,7 +608,7 @@ export async function ensureTafsirSourceImported(db: SQLiteDatabase, sourceId: T
   console.log("[Import] Tafsir (" + source.id + ") done: " + candidateRows.length + " rows");
 }
 
-async function importTranslations(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {
+async function importTranslations(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   onProgress({ step: "Translations", current: 8, total: TOTAL_STEPS, detail: "Sahih International" });
   console.log(`[Import] Importing translations...`);
 
@@ -625,7 +625,7 @@ async function importTranslations(db: SQLiteDatabase, onProgress: ProgressCallba
   console.log(`[Import] Translations done: ${allRows.length} rows`);
 }
 
-async function importPageMap(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {
+async function importPageMap(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   const pageMapData = await loadData("page-map.json");
   onProgress({ step: "Page Map", current: 9, total: TOTAL_STEPS, detail: "604 pages" });
   console.log(`[Import] Importing ${pageMapData.length} page_map rows...`);
@@ -645,7 +645,7 @@ async function importPageMap(db: SQLiteDatabase, onProgress: ProgressCallback): 
   console.log(`[Import] Page map done: ${pageMapData.length} rows`);
 }
 
-async function importWordTranslations(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {
+async function importWordTranslations(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   const wbwData = await loadData("wbw/wbw.json");
   onProgress({ step: "Word-by-Word", current: 10, total: TOTAL_STEPS, detail: `${wbwData.length} words` });
   console.log(`[Import] Importing ${wbwData.length} word_translations rows...`);
@@ -666,7 +666,7 @@ async function importWordTranslations(db: SQLiteDatabase, onProgress: ProgressCa
   console.log(`[Import] Word translations done: ${wbwData.length} rows`);
 }
 
-async function importWordIrab(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {
+async function importWordIrab(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   const masaqData = await loadData("masaq/masaq-aggregated.json");
   onProgress({ step: "Grammar (إعراب)", current: 11, total: TOTAL_STEPS, detail: `${masaqData.length} words` });
   console.log(`[Import] Importing ${masaqData.length} word_irab rows...`);
@@ -690,7 +690,7 @@ async function importWordIrab(db: SQLiteDatabase, onProgress: ProgressCallback):
   console.log(`[Import] Word irab done: ${masaqData.length} rows`);
 }
 
-async function importPageLines(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {
+async function importPageLines(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   const pageLinesData = await loadData("layout/page-lines.json");
   onProgress({ step: "Page Layout", current: 13, total: TOTAL_STEPS, detail: `${pageLinesData.length} lines` });
   console.log(`[Import] Importing ${pageLinesData.length} page_lines rows...`);
@@ -712,7 +712,7 @@ async function importPageLines(db: SQLiteDatabase, onProgress: ProgressCallback)
   console.log(`[Import] Page lines done: ${pageLinesData.length} rows`);
 }
 
-async function importTajweed(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {
+async function importTajweed(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   const tajweedData = await loadData("tajweed.json");
   onProgress({ step: "Tajweed Rules", current: 12, total: TOTAL_STEPS, detail: `${tajweedData.length} ayahs` });
   console.log(`[Import] Importing tajweed rules...`);
@@ -736,7 +736,7 @@ async function importTajweed(db: SQLiteDatabase, onProgress: ProgressCallback): 
 
 // ─── New tab dataset importers ───────────────────────────────
 
-async function importWordMeaningsAr(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {
+async function importWordMeaningsAr(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   const data = await loadData("wbw-arabic-meanings.json");
   if (!Array.isArray(data)) return;
   onProgress({ step: "Arabic Meanings", current: 14, total: TOTAL_STEPS, detail: `${data.length} words` });
@@ -758,7 +758,7 @@ async function importWordMeaningsAr(db: SQLiteDatabase, onProgress: ProgressCall
   console.log(`[Import] word_meanings_ar done: ${rows.length} canonical rows`);
 }
 
-async function importWordIrabDaas(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {
+async function importWordIrabDaas(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   const data = await loadData("irab-per-word.json");
   if (!Array.isArray(data)) return;
   onProgress({ step: "Da'as Iʿrab", current: 15, total: TOTAL_STEPS, detail: `${data.length} words` });
@@ -781,7 +781,7 @@ async function importWordIrabDaas(db: SQLiteDatabase, onProgress: ProgressCallba
   console.log(`[Import] word_irab_daas done: ${rows.length} canonical rows (from ${data.length} source entries)`);
 }
 
-async function importTajweedRulesAr(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {
+async function importTajweedRulesAr(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   const data = await loadData("tajweed-rules-ar.json");
   if (!data || typeof data !== "object") return;
   const keys = Object.keys(data).filter((k) => !k.startsWith("_"));
@@ -800,7 +800,7 @@ async function importTajweedRulesAr(db: SQLiteDatabase, onProgress: ProgressCall
   console.log(`[Import] tajweed_rules_ar done: ${rows.length} rows`);
 }
 
-async function importTajweedRulesEn(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {
+async function importTajweedRulesEn(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   const data = await loadData("tajweed-rules-en.json");
   if (!data || typeof data !== "object") return;
   const keys = Object.keys(data).filter((k) => !k.startsWith("_"));
@@ -819,7 +819,7 @@ async function importTajweedRulesEn(db: SQLiteDatabase, onProgress: ProgressCall
   console.log(`[Import] tajweed_rules_en done: ${rows.length} rows`);
 }
 
-async function importQiraatEncyclopedia(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {
+async function importQiraatEncyclopedia(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   const data = await loadData("al-qira-at-al-mawsoo-ah-al-qur-aniyyah.json");
   if (!data || typeof data !== "object") return;
   onProgress({ step: "Qiraʾat", current: 18, total: TOTAL_STEPS, detail: "…" });
@@ -877,7 +877,7 @@ async function importQiraatEncyclopedia(db: SQLiteDatabase, onProgress: Progress
   console.log(`[Import] qiraat_encyclopedia done: ${rows.length} rows`);
 }
 
-async function importAsbabAlNuzul(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {
+async function importAsbabAlNuzul(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   const data = await loadData("asbab-al-nuzul.json");
   if (!data || typeof data !== "object" || data.schema_version !== "1.0") {
     throw new Error("Unsupported asbab_al_nuzul schema_version");
@@ -911,7 +911,7 @@ async function importAsbabAlNuzul(db: SQLiteDatabase, onProgress: ProgressCallba
   console.log(`[Import] asbab_al_nuzul done: ${rows.length} rows`);
 }
 
-async function importMutashabihat(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {
+async function importMutashabihat(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   const data = await loadData("mutashabihat/nourquran_hafiz.json");
   if (!data || typeof data !== "object" || data.schema_version !== "1.0") {
     throw new Error("Unsupported Nour Quran mutashabihat schema_version");
@@ -960,9 +960,9 @@ async function importMutashabihat(db: SQLiteDatabase, onProgress: ProgressCallba
   appendGroups(similarGroups, "similar");
   appendGroups(tailGroups, "tail");
 
-  await db.withTransactionAsync(async () => {
-    await db.runAsync("DELETE FROM mutashabihat_refs");
-    await db.runAsync("DELETE FROM mutashabihat_groups");
+  await db.withTransactionAsync(async (tx) => {
+    await tx.runAsync("DELETE FROM mutashabihat_refs");
+    await tx.runAsync("DELETE FROM mutashabihat_groups");
   });
 
   await batchInsert(
@@ -979,7 +979,7 @@ async function importMutashabihat(db: SQLiteDatabase, onProgress: ProgressCallba
   console.log(`[Import] mutashabihat done: ${groupRows.length} groups + ${refRows.length} refs`);
 }
 
-async function importReflectionJourneyLevels(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {
+async function importReflectionJourneyLevels(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   const [seedData, quranData, storedFingerprint, existingCountRow] = await Promise.all([
     loadData("reflection-journey.json"),
     loadData("quran-data.json"),
@@ -1004,11 +1004,11 @@ async function importReflectionJourneyLevels(db: SQLiteDatabase, onProgress: Pro
     return;
   }
 
-  await db.withTransactionAsync(async () => {
-    await db.runAsync("DELETE FROM reflection_journey_levels");
+  await db.withTransactionAsync(async (tx) => {
+    await tx.runAsync("DELETE FROM reflection_journey_levels");
 
     if (parsed.levels.length > 0) {
-      const stmt = await db.prepareAsync(
+      const stmt = await tx.prepareAsync(
         `INSERT INTO reflection_journey_levels
           (id, slug, order_index, title_en, title_ar, summary_en, summary_ar, response_prompt_en, response_prompt_ar, estimated_minutes, content_json)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -1034,13 +1034,13 @@ async function importReflectionJourneyLevels(db: SQLiteDatabase, onProgress: Pro
       }
     }
 
-    await writeSetting(db, "reflection_journey_content_fingerprint", fingerprint);
+    await writeSetting(tx, "reflection_journey_content_fingerprint", fingerprint);
   });
 
   console.log(`[Import] Reflection Journey done: ${parsed.levels.length} levels`);
 }
 
-async function runNewTabImports(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {
+async function runNewTabImports(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   // Idempotent: only import tables that are empty. Safe to call on fresh
   // installs and existing installs alike. Wrap each in try/catch so a
   // single bad dataset doesn't block the rest.
@@ -1145,7 +1145,7 @@ async function runNewTabImports(db: SQLiteDatabase, onProgress: ProgressCallback
   }
 }
 
-async function ensureQfUserSyncSchema(db: SQLiteDatabase): Promise<void> {
+async function ensureQfUserSyncSchema(db: DatabaseExecutor): Promise<void> {
   try {
     await db.execAsync("ALTER TABLE bookmarks ADD COLUMN updated_at TEXT");
   } catch (_) {}
@@ -1232,7 +1232,7 @@ async function ensureQfUserSyncSchema(db: SQLiteDatabase): Promise<void> {
 
 // ─── Main initialization ─────────────────────────────────────
 
-export async function initializeDatabase(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {
+export async function initializeDatabase(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   console.log("[Import] Creating schema...");
   await createSchema(db);
   await migrateUserSchema(db);

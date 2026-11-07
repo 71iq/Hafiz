@@ -1,4 +1,4 @@
-import type { SQLiteDatabase } from "expo-sqlite";
+import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import { enqueueSync } from "@/lib/database/sync-queue";
 import { deleteUserSetting, writeUserSetting } from "@/lib/database/user-settings";
 import { createEmptyCard } from "./scheduler";
@@ -101,7 +101,7 @@ const SQLITE_PARAM_BATCH = 800;
 const INSERT_BATCH = 500;
 const ACTIVE_CARD_SQL = "deleted_at IS NULL";
 const REVIEWABLE_CARD_SQL = `${ACTIVE_CARD_SQL} AND suspended_at IS NULL AND (buried_until IS NULL OR buried_until <= ?)`;
-const retentionMigrationPromises = new WeakMap<SQLiteDatabase, Promise<number>>();
+const retentionMigrationPromises = new WeakMap<AppDatabase, Promise<number>>();
 
 function isReviewableCard(row: StudyCardRow, nowIso: string): boolean {
   return !row.deleted_at && !row.suspended_at && (!row.buried_until || row.buried_until <= nowIso);
@@ -154,7 +154,7 @@ function smartDeckFilterKey(deckId: SmartDeckId): string {
   return `smart_deck_filter_${deckId}`;
 }
 
-async function readFilterSetting(db: SQLiteDatabase, key: string): Promise<BuiltInDeckFilter | null> {
+async function readFilterSetting(db: DatabaseExecutor, key: string): Promise<BuiltInDeckFilter | null> {
   const row = await db.getFirstAsync<{ value: string }>(
     "SELECT value FROM user_settings WHERE key = ?",
     [key]
@@ -206,7 +206,7 @@ function normalizeSmartDeckFilter(filter: unknown): BuiltInDeckFilter {
 }
 
 export async function readSmartDeckFilter(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   deckId: SmartDeckId
 ): Promise<BuiltInDeckFilter> {
   return await readFilterSetting(db, smartDeckFilterKey(deckId))
@@ -214,7 +214,7 @@ export async function readSmartDeckFilter(
 }
 
 export async function writeSmartDeckFilter(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   deckId: SmartDeckId,
   filter: BuiltInDeckFilter
 ): Promise<void> {
@@ -222,14 +222,14 @@ export async function writeSmartDeckFilter(
   await writeUserSetting(db, smartDeckFilterKey(deckId), JSON.stringify(normalized));
 }
 
-async function readDefaultDeckFilter(db: SQLiteDatabase): Promise<BuiltInDeckFilter> {
+async function readDefaultDeckFilter(db: DatabaseExecutor): Promise<BuiltInDeckFilter> {
   return await readFilterSetting(db, ALL_DECKS_FILTER_KEY)
     ?? await readFilterSetting(db, smartDeckFilterKey(SMART_DECK_IDS.retention))
     ?? { type: "all" };
 }
 
 export async function writeAllDecksFilter(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   filter: BuiltInDeckFilter
 ): Promise<void> {
   const normalized = normalizeSmartDeckFilter(filter);
@@ -241,7 +241,7 @@ export async function writeAllDecksFilter(
 }
 
 export async function filterQuranRefsByDefaultDeckFilter<T extends { surah: number; ayah: number }>(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   rows: T[]
 ): Promise<T[]> {
   const filter = await readDefaultDeckFilter(db);
@@ -249,7 +249,7 @@ export async function filterQuranRefsByDefaultDeckFilter<T extends { surah: numb
 }
 
 export async function filterStudyRowsByDefaultDeckFilter<T extends { id: string }>(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   rows: T[]
 ): Promise<T[]> {
   const filter = await readDefaultDeckFilter(db);
@@ -265,7 +265,7 @@ export async function filterStudyRowsByDefaultDeckFilter<T extends { id: string 
   return rows.filter((row) => allowed.has(row));
 }
 
-export async function migrateLegacyRetentionDecks(db: SQLiteDatabase): Promise<number> {
+export async function migrateLegacyRetentionDecks(db: AppDatabase): Promise<number> {
   const running = retentionMigrationPromises.get(db);
   if (running) return running;
   const promise = runLegacyRetentionDeckMigration(db).finally(() => {
@@ -275,7 +275,7 @@ export async function migrateLegacyRetentionDecks(db: SQLiteDatabase): Promise<n
   return promise;
 }
 
-async function runLegacyRetentionDeckMigration(db: SQLiteDatabase): Promise<number> {
+async function runLegacyRetentionDeckMigration(db: AppDatabase): Promise<number> {
   const now = new Date().toISOString();
   let migrated = 0;
   const syncOps: Array<{
@@ -294,18 +294,18 @@ async function runLegacyRetentionDeckMigration(db: SQLiteDatabase): Promise<numb
   );
 
   if (rows.length > 0) {
-    await db.withTransactionAsync(async () => {
+    await db.withTransactionAsync(async (tx) => {
       for (const row of rows) {
         const legacyAyahId = parseLegacyMutashabihatCardId(row.id);
         if (legacyAyahId) {
-          const existing = await db.getFirstAsync<StudyCardRow>(
+          const existing = await tx.getFirstAsync<StudyCardRow>(
             "SELECT * FROM study_cards WHERE id = ? AND deleted_at IS NULL",
             [legacyAyahId]
           );
-          await db.runAsync("UPDATE study_log SET card_id = ? WHERE card_id = ?", [legacyAyahId, row.id]);
+          await tx.runAsync("UPDATE study_log SET card_id = ? WHERE card_id = ?", [legacyAyahId, row.id]);
           if (existing?.id) {
             const markedAt = existing.marked_at ?? row.marked_at ?? now;
-            await db.runAsync(
+            await tx.runAsync(
               "UPDATE study_cards SET marked_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL",
               [markedAt, now, legacyAyahId]
             );
@@ -318,7 +318,7 @@ async function runLegacyRetentionDeckMigration(db: SQLiteDatabase): Promise<numb
                 updated_at: now,
               }),
             });
-            await db.runAsync(
+            await tx.runAsync(
               "UPDATE study_cards SET updated_at = ?, deleted_at = ? WHERE id = ? AND deleted_at IS NULL",
               [now, now, row.id]
             );
@@ -333,7 +333,7 @@ async function runLegacyRetentionDeckMigration(db: SQLiteDatabase): Promise<numb
             });
           } else {
             const markedAt = row.marked_at ?? now;
-            await db.runAsync(
+            await tx.runAsync(
               "UPDATE study_cards SET id = ?, deck_id = ?, marked_at = ?, updated_at = ?, deleted_at = NULL WHERE id = ? AND deleted_at IS NULL",
               [legacyAyahId, SMART_DECK_IDS.retention, markedAt, now, row.id]
             );
@@ -357,7 +357,7 @@ async function runLegacyRetentionDeckMigration(db: SQLiteDatabase): Promise<numb
         if (!parseAyahCardId(row.id)) continue;
         if (row.deck_id === SMART_DECK_IDS.retention) continue;
         const markedAt = row.marked_at ?? now;
-        await db.runAsync(
+        await tx.runAsync(
           "UPDATE study_cards SET deck_id = ?, marked_at = ?, updated_at = ?, deleted_at = NULL WHERE id = ? AND deleted_at IS NULL",
           [SMART_DECK_IDS.retention, markedAt, now, row.id]
         );
@@ -401,7 +401,7 @@ async function runLegacyRetentionDeckMigration(db: SQLiteDatabase): Promise<numb
 }
 
 export async function getSmartDeckCandidateCardIds(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   deckId: SmartDeckId,
   filter?: BuiltInDeckFilter
 ): Promise<string[]> {
@@ -473,7 +473,7 @@ export async function getSmartDeckCandidateCardIds(
     .map((row) => `${prefix}${row.id}:${row.ref_sort_order}`);
 }
 
-export async function getAllMatchingSmartCardIdSet(db: SQLiteDatabase): Promise<Set<string>> {
+export async function getAllMatchingSmartCardIdSet(db: DatabaseExecutor): Promise<Set<string>> {
   const ids = await Promise.all(SMART_DECK_ID_LIST.map((deckId) => getSmartDeckCandidateCardIds(db, deckId)));
   return new Set(ids.flat());
 }
@@ -561,7 +561,7 @@ function applyReviewQueueOptions(rows: StudyCardRow[], options?: DueCardsForRevi
 }
 
 export async function getSmartDeckStats(
-  db: SQLiteDatabase,
+  db: AppDatabase,
   deckId: SmartDeckId,
   filter?: BuiltInDeckFilter
 ): Promise<SmartDeckStats> {
@@ -583,7 +583,7 @@ export async function getSmartDeckStats(
 }
 
 export async function getSmartDeckTodayStats(
-  db: SQLiteDatabase,
+  db: AppDatabase,
   deckId: SmartDeckId,
   options?: DueCardsForReviewOptions
 ): Promise<SmartDeckStats> {
@@ -635,7 +635,7 @@ export async function getSmartDeckTodayStats(
 }
 
 export async function materializeSmartDeckCards(
-  db: SQLiteDatabase,
+  db: AppDatabase,
   deckId: SmartDeckId,
   limit?: number,
   newCardsLimit = DEFAULT_DECK_NEW_CARD_LIMIT
@@ -686,7 +686,7 @@ export async function materializeSmartDeckCards(
     deleted_at: null,
   }));
 
-  await db.withTransactionAsync(async () => {
+  await db.withTransactionAsync(async (tx) => {
     for (let i = 0; i < createdRows.length; i += INSERT_BATCH) {
       const batch = createdRows.slice(i, i + INSERT_BATCH);
       const placeholders = batch.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").join(",");
@@ -713,7 +713,7 @@ export async function materializeSmartDeckCards(
           row.deleted_at
         );
       }
-      await db.runAsync(
+      await tx.runAsync(
         `INSERT INTO study_cards
           (id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days, learning_steps, reps, lapses, state, last_review, suspended_at, buried_until, marked_at, created_at, updated_at, deleted_at)
          VALUES ${placeholders}
@@ -749,7 +749,7 @@ export async function materializeSmartDeckCards(
 }
 
 export async function materializeAllSmartDeckCards(
-  db: SQLiteDatabase,
+  db: AppDatabase,
   limitPerDeck?: number,
   newCardsLimit = DEFAULT_DECK_NEW_CARD_LIMIT
 ): Promise<number> {
@@ -761,7 +761,7 @@ export async function materializeAllSmartDeckCards(
 }
 
 export async function getDueCardsForReview(
-  db: SQLiteDatabase,
+  db: AppDatabase,
   deckId?: string,
   options?: DueCardsForReviewOptions
 ): Promise<StudyCardRow[]> {
@@ -796,7 +796,7 @@ export async function getDueCardsForReview(
 }
 
 export async function getSmartCardContent(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   cardId: string
 ): Promise<SmartCardContent | null> {
   if (cardId.startsWith("mutashabihat:")) {
@@ -909,7 +909,7 @@ export async function getSmartCardContent(
 }
 
 async function getMutashabihatCardContent(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   groupId: string,
   targetSortOrder: number,
   kind: "mutashabihat" | "similarTail"
@@ -997,7 +997,7 @@ async function getMutashabihatCardContent(
 }
 
 async function getPreviousAyahPromptContext(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   targetRef: SmartDeckRef
 ): Promise<{ textQcf2: string; v2Page: number } | null> {
   let previousSurah = targetRef.surah;
@@ -1233,7 +1233,7 @@ function normalizeArabicWords(text: string): string[] {
 }
 
 async function getSmartDeckDueRows(
-  db: SQLiteDatabase,
+  db: AppDatabase,
   deckId: SmartDeckId,
   dueUntil: string,
   now: string
@@ -1257,7 +1257,7 @@ async function getSmartDeckDueRows(
 }
 
 async function getStudyCardsByIds(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   ids: string[],
   deckId: SmartDeckId
 ): Promise<StudyCardRow[]> {
@@ -1338,7 +1338,7 @@ function normalizeRanges(values: unknown[], surahs: number[]): SurahAyahRange[] 
 }
 
 async function filterQuranRefs<T extends { surah: number; ayah: number }>(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   rows: T[],
   filter: BuiltInDeckFilter
 ): Promise<T[]> {
@@ -1366,7 +1366,7 @@ function matchesSurahFilter(
 }
 
 async function readJuzRanges(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   juzNumbers: number[]
 ): Promise<Array<{ surah: number; ayah_start: number; ayah_end: number }>> {
   if (juzNumbers.length === 0) return [];

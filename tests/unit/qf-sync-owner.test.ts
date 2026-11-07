@@ -1,5 +1,6 @@
+import { createConnectionOwner } from "@/lib/database/connection-owner";
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
-import type { SQLiteDatabase } from "expo-sqlite";
+import type { AppDatabase, TransactionDatabase } from "@/lib/database/types";
 import { createClient, type Session } from "@supabase/supabase-js";
 import { captureQfRequestOwner } from "@/lib/quran-foundation/request-owner";
 import { observeAuthSession } from "@/lib/auth/commands";
@@ -143,7 +144,7 @@ function hold() {
   return { entered: deferred<void>(), release: deferred<void>() };
 }
 let sql: DatabaseSync;
-let db: SQLiteDatabase;
+let db: AppDatabase;
 let transactionWait: ReturnType<typeof hold> | null = null;
 let transactionOpenedWait: ReturnType<typeof hold> | null = null;
 let readWait: { gate: ReturnType<typeof hold>; query: string } | null = null;
@@ -208,7 +209,7 @@ beforeEach(async () => {
       }
       return value;
     },
-    withTransactionAsync: async (work: () => Promise<void>) => {
+    withTransactionAsync: async (work: (transaction: TransactionDatabase) => Promise<void>) => {
       transactionCount += 1;
       if (transactionWait) {
         transactionWait.entered.resolve();
@@ -220,7 +221,7 @@ beforeEach(async () => {
           transactionOpenedWait.entered.resolve();
           await transactionOpenedWait.release.promise;
         }
-        await work();
+        await work(db as unknown as TransactionDatabase);
         sql.exec("COMMIT");
       } catch (error) {
         sql.exec("ROLLBACK");
@@ -229,7 +230,7 @@ beforeEach(async () => {
     },
   };
   // This adapter supplies only the Expo operations used by sync, against real isolated SQLite.
-  db = adapter as unknown as SQLiteDatabase;
+  db = adapter as unknown as AppDatabase;
   await createSchema(db);
   sql.prepare("INSERT INTO user_settings (key,value) VALUES ('qf_initial_local_enqueue_done','true')").run();
   sql
@@ -1403,4 +1404,52 @@ it("keeps a committed post-push note acknowledgement when a later pull transacti
     { table_name: "bookmarks", row_id: "2:256" },
     { table_name: "bookmarks", row_id: "2:257" },
   ]);
+});
+
+it("reconciles QF pull rows and account queue through the real private transaction owner", async () => {
+  const ownedSql = new DatabaseSync(":memory:");
+  const raw: Parameters<typeof createConnectionOwner>[0] = {
+    async execAsync(source) {
+      ownedSql.exec(source);
+    },
+    async prepareAsync(source) {
+      const statement = ownedSql.prepare(source);
+      return {
+        async executeAsync(...args: unknown[]) {
+          const bindings = args.length === 1 && Array.isArray(args[0]) ? args[0] : args;
+          const values = bindings as SQLInputValue[];
+          const result = statement.columns().length ? null : statement.run(...values);
+          return {
+            changes: Number(result?.changes ?? 0),
+            lastInsertRowId: Number(result?.lastInsertRowid ?? 0),
+            getFirstAsync: async <T>() => (statement.get(...values) as T | undefined) ?? null,
+            getAllAsync: async <T>() => statement.all(...values) as T[],
+          };
+        },
+        async finalizeAsync() {},
+      };
+    },
+    async closeAsync() {
+      ownedSql.close();
+    },
+  };
+  const owner = createConnectionOwner(raw);
+  try {
+    await createSchema(owner.database);
+    await owner.database.runAsync(
+      "INSERT INTO user_settings (key,value) VALUES ('qf_initial_local_enqueue_done','true')",
+    );
+    responses["list-bookmarks"] = { ok: true, bookmarks: [validBookmarkAck.bookmark] };
+    responses["list-notes"] = { ok: true, notes: [REMOTE_NOTE] };
+    await expect(fullQfUserSync(owner.database)).resolves.toMatchObject({ status: "synced", pulled: 2 });
+    expect(
+      await owner.database.getFirstAsync("SELECT content FROM private_notes WHERE qf_note_id = ?", [REMOTE_NOTE.id]),
+    ).toEqual({ content: REMOTE_NOTE.body });
+    expect(await owner.database.getAllAsync("SELECT table_name,operation,status FROM sync_queue ORDER BY id")).toEqual([
+      { table_name: "bookmarks", operation: "INSERT", status: "pending" },
+      { table_name: "private_notes", operation: "INSERT", status: "pending" },
+    ]);
+  } finally {
+    await owner.close();
+  }
 });

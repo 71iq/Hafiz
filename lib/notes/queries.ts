@@ -1,4 +1,4 @@
-import type { SQLiteDatabase } from "expo-sqlite";
+import type { DatabaseExecutor } from "@/lib/database/types";
 import { enqueueSync } from "@/lib/database/sync-queue";
 import { recordAchievementEvent } from "@/lib/achievements/queries";
 import { enqueueQfSync } from "@/lib/quran-foundation/user-sync";
@@ -64,7 +64,7 @@ type PrivateNoteSearchRow = PrivateNoteRow & {
 };
 
 export async function createPrivateNote(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   input: CreatePrivateNoteInput
 ): Promise<PrivateNote> {
   const now = new Date().toISOString();
@@ -110,7 +110,7 @@ export async function createPrivateNote(
 }
 
 export async function updatePrivateNote(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   id: string,
   content: string
 ): Promise<void> {
@@ -136,7 +136,7 @@ export async function updatePrivateNote(
   }
 }
 
-export async function deletePrivateNote(db: SQLiteDatabase, id: string): Promise<void> {
+export async function deletePrivateNote(db: DatabaseExecutor, id: string): Promise<void> {
   const now = new Date().toISOString();
   await db.runAsync(
     "UPDATE private_notes SET updated_at = ?, deleted_at = ? WHERE id = ? AND deleted_at IS NULL",
@@ -153,7 +153,7 @@ export async function deletePrivateNote(db: SQLiteDatabase, id: string): Promise
 }
 
 export async function listPrivateNotesForAyah(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   surah: number,
   ayah: number
 ): Promise<PrivateNote[]> {
@@ -167,7 +167,7 @@ export async function listPrivateNotesForAyah(
 }
 
 export async function searchPrivateNotes(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   query: string
 ): Promise<PrivateNoteSearchResult[]> {
   const trimmed = query.trim();
@@ -264,7 +264,7 @@ export function isDuplicatePrivateNoteError(error: unknown): boolean {
 }
 
 async function hasExactPrivateNote(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   surah: number,
   ayahStart: number,
   ayahEnd: number,

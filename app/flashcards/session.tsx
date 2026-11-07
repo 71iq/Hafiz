@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import type { SQLiteDatabase } from "expo-sqlite";
+import type { DatabaseExecutor } from "@/lib/database/types";
 import { CalendarDays, ChevronLeft, ChevronRight, Clock3, EllipsisVertical, PauseCircle, Pencil, RotateCcw, Star, Trash2, Trophy, X } from "lucide-react-native";
 import { useDatabase, useDatabaseStatus } from "@/lib/database/provider";
 import { SettingsProvider, useSettings, withThemeOpacity } from "@/lib/settings/context";
@@ -1111,7 +1111,7 @@ function cardAnswerSettingKey(cardId: string, mode: ReviewMode): string {
   return `${CARD_ANSWER_SETTING_PREFIX}${cardId}:${mode}`;
 }
 
-async function readCardAnswerOverrides(db: SQLiteDatabase, cardId: string): Promise<Partial<Record<ReviewMode, string>>> {
+async function readCardAnswerOverrides(db: DatabaseExecutor, cardId: string): Promise<Partial<Record<ReviewMode, string>>> {
   const result: Partial<Record<ReviewMode, string>> = {};
   await Promise.all(EDITABLE_ANSWER_MODES.map(async (mode) => {
     const row = await db.getFirstAsync<{ value: string }>(

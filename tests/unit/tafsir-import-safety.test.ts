@@ -1,5 +1,5 @@
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
-import type { SQLiteDatabase } from "expo-sqlite";
+import type { AppDatabase, TransactionDatabase } from "@/lib/database/types";
 import { TAFSIR_SOURCES } from "@/lib/tafsir/sources";
 import { ensureTafsirSourceImported } from "@/lib/database/init";
 
@@ -59,7 +59,7 @@ function bindValues(args: unknown[]): SQLInputValue[] {
 }
 
 let sql: DatabaseSync;
-let db: SQLiteDatabase;
+let db: AppDatabase;
 const mutationSql: string[] = [];
 
 function rememberMutation(statement: string) {
@@ -160,10 +160,10 @@ beforeEach(() => {
       },
       finalizeAsync: async () => {},
     }),
-    withTransactionAsync: async (work: () => Promise<void>) => {
+    withTransactionAsync: async (work: (transaction: TransactionDatabase) => Promise<void>) => {
       sql.exec("BEGIN");
       try {
-        await work();
+        await work(db as unknown as TransactionDatabase);
         sql.exec("COMMIT");
       } catch (error) {
         sql.exec("ROLLBACK");
@@ -171,7 +171,7 @@ beforeEach(() => {
       }
     },
   };
-  db = adapter as unknown as SQLiteDatabase;
+  db = adapter as unknown as AppDatabase;
   addStoredRows("qurtubi", 2, "old target ");
   addStoredRows("other-source", 1, "other ");
   sql.prepare("INSERT INTO user_settings (key, value) VALUES (?, ?)").run("synthetic-setting", "retained");

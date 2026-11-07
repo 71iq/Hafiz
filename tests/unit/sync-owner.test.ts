@@ -1,5 +1,5 @@
 import type { Session, User } from "@supabase/supabase-js";
-import type { SQLiteDatabase } from "expo-sqlite";
+import type { AppDatabase, TransactionDatabase } from "@/lib/database/types";
 import { observeAuthSession } from "@/lib/auth/commands";
 import { fullSync } from "@/lib/database/sync";
 
@@ -17,7 +17,7 @@ let mockOnRun: ((source: string, params: unknown[]) => void) | null = null;
 const mockFirst = jest.fn<Promise<unknown>, [string, ...unknown[]]>();
 const mockAll = jest.fn<Promise<unknown[]>, [string, ...unknown[]]>();
 const mockRun = jest.fn<Promise<{ changes: number; lastInsertRowId: number }>, [string, ...unknown[]]>();
-const mockTransaction = jest.fn<Promise<void>, [() => Promise<void>]>();
+const mockTransaction = jest.fn<Promise<void>, [(transaction: TransactionDatabase) => Promise<void>]>();
 const mockPending = jest.fn(async () => []);
 const mockEnqueue = jest.fn(async (..._args: unknown[]) => {});
 const mockMarkSynced = jest.fn(async (..._args: unknown[]) => {});
@@ -73,8 +73,9 @@ const db = {
   getFirstAsync: (...args: [string, ...unknown[]]) => mockFirst(...args),
   getAllAsync: (...args: [string, ...unknown[]]) => mockAll(...args),
   runAsync: (...args: [string, ...unknown[]]) => mockRun(...args),
-  withTransactionAsync: (work: () => Promise<void>) => mockTransaction(work),
-} as unknown as SQLiteDatabase;
+  withTransactionAsync: (work: (transaction: TransactionDatabase) => Promise<void>) =>
+    mockTransaction(() => work(db as unknown as TransactionDatabase)),
+} as unknown as AppDatabase;
 
 function deferred<T>() {
   let resolve!: (value: T | PromiseLike<T>) => void;
@@ -163,7 +164,7 @@ beforeEach(() => {
     mockOnRun?.(source, params);
     return { changes: 1, lastInsertRowId: 1 };
   });
-  mockTransaction.mockImplementation(async (work) => work());
+  mockTransaction.mockImplementation(async (work) => work(db as unknown as TransactionDatabase));
   mockPending.mockResolvedValue([]);
   mockEnqueue.mockResolvedValue();
   mockBackfill.mockResolvedValue(0);
@@ -239,7 +240,7 @@ it("rechecks a delayed transaction callback before its first destructive write",
   mockTransaction.mockImplementation(async (work) => {
     reached.resolve();
     await admission.promise;
-    await work();
+    await work(db as unknown as TransactionDatabase);
   });
   const rejected = expect(fullSync(db)).rejects.toThrow("Sync account changed");
   await reached.promise;
@@ -254,7 +255,7 @@ it("does not hand an obsolete restore completion to the upload phase", async () 
   activate(session(A));
   mockRestoreRows = [setting()];
   mockTransaction.mockImplementation(async (work) => {
-    await work();
+    await work(db as unknown as TransactionDatabase);
     activate(session(B));
   });
   await expect(fullSync(db)).rejects.toThrow("Sync account changed");
