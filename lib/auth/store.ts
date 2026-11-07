@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { getAuthSessionIdentity } from "@/lib/auth/session-identity";
-import type { AuthOwner } from "@/lib/auth/coordinator";
+import type { AuthOwner, AuthCommandResult } from "@/lib/auth/coordinator";
 import { authCommands, observeAuthSession, canRestoreAuthSession, canCompleteAuthRecovery } from "@/lib/auth/commands";
 import { Platform } from "react-native";
 import {
@@ -10,6 +10,8 @@ import {
   signOutOwnedSession,
   restoreOwnedSession,
   readOwnedSession,
+  signInOwnedPassword,
+  signUpOwnedPassword,
 } from "@/lib/supabase";
 import { startAppOAuth } from "@/lib/auth/oauth";
 import { isEmailAuthFlowsEnabled } from "@/lib/auth/config";
@@ -17,7 +19,7 @@ import { isQfLoginEnabled, isQfSyncEnabled } from "@/lib/quran-foundation/config
 import { connectQfFromSession } from "@/lib/quran-foundation/user";
 import { captureQfRequestOwner } from "@/lib/quran-foundation/request-owner";
 import { QF_OAUTH_PROVIDER } from "@/lib/quran-foundation/user-types";
-import type { AuthState, AuthActions, Profile } from "@/lib/auth/types";
+import type { AuthState, AuthActions, Profile, AuthActionHandle, SignUpResult } from "@/lib/auth/types";
 
 type AuthStore = AuthState & AuthActions;
 
@@ -168,6 +170,45 @@ function publishOAuthSession(session: NonNullable<AuthState["session"]>): void {
   setSessionIdentity({ session, user: session.user });
 }
 
+function startEmailCommand<T>(
+  request: (owner: AuthOwner, session: AuthState["session"]) => Promise<{ session: AuthState["session"]; value: T }>,
+): AuthActionHandle<T> {
+  const loading = beginAuthLoading();
+  let owner: AuthOwner | undefined;
+  type Outcome = { kind: "value"; value: T } | { kind: "obsolete" };
+  const obsolete: Outcome = { kind: "obsolete" };
+  const reservation = authCommands.reserveReplacement<Outcome>(async (isIntentCurrent, origin) => {
+    try {
+      const response = await request(origin, useAuthStore.getState().session);
+      if (
+        !isIntentCurrent() ||
+        !(response.session ? canCompleteAuthRecovery(origin, response.session) : origin.isCurrent())
+      )
+        return obsolete;
+      if (response.session) {
+        publishOAuthSession(response.session);
+        owner = authCommands.captureOwner();
+        await useAuthStore.getState().ensureProfile(owner);
+      }
+      if (!owner?.isCurrent() || !isIntentCurrent()) return obsolete;
+      return { kind: "value", value: response.value };
+    } catch (error) {
+      if (!owner?.isCurrent() || !isIntentCurrent()) return obsolete;
+      if (loading.isCurrent()) useAuthStore.setState({ error: error instanceof Error ? error.message : String(error) });
+      throw error;
+    }
+  });
+  owner = reservation.owner;
+  const result = reservation.result
+    .then((result): AuthCommandResult<T> => {
+      if (result.status !== "completed" || result.value.kind !== "value" || !owner?.isCurrent())
+        return { status: "superseded" };
+      return { status: "completed", value: result.value.value, owner };
+    })
+    .finally(loading.finish);
+  return { isCurrent: () => owner?.isCurrent() ?? false, result };
+}
+
 export async function preparePasswordRecovery(
   tokens?: { access_token: string; refresh_token: string },
   isActive: () => boolean = () => true,
@@ -302,23 +343,14 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     return authInitialization;
   },
 
-  signIn: async (email: string, password: string) =>
-    authCommands.transition(async () => {
-      const loading = beginAuthLoading();
-      try {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: email.trim().toLowerCase(),
-          password,
-        });
-        if (error) throw error;
-        setSessionIdentity({ session: data.session, user: data.user });
-        await get().ensureProfile();
-      } catch (err: any) {
-        set({ error: err.message });
-        throw err;
-      } finally {
-        loading.finish();
-      }
+  signIn: (email: string, password: string) =>
+    startEmailCommand<void>(async (owner, session) => {
+      const { data, error } = await signInOwnedPassword(owner, session, {
+        email: email.trim().toLowerCase(),
+        password,
+      });
+      if (error) throw error;
+      return { session: data.session, value: undefined };
     }),
 
   signInWithQuranFoundation: async () => {
@@ -359,44 +391,30 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     }
   },
 
-  signUp: async (email: string, password: string, username: string, displayName: string) =>
-    authCommands.transition(async () => {
+  signUp: (email: string, password: string, username: string, displayName: string) =>
+    startEmailCommand<SignUpResult>(async (owner, session) => {
       if (!isEmailAuthFlowsEnabled()) throw new Error("Signup is temporarily unavailable.");
-      const loading = beginAuthLoading();
-      try {
-        // Pass username and display_name as user metadata so the
-        // handle_new_user() database trigger can create the profile row
-        // automatically via SECURITY DEFINER (bypasses RLS).
-        const { data, error } = await supabase.auth.signUp({
-          email: email.trim().toLowerCase(),
-          password,
-          options: {
-            data: { username: username.trim(), display_name: displayName.trim() || null },
-            emailRedirectTo: getEmailRedirectTo(),
-          },
-        });
-        if (error) throw error;
-        if (!data.user) throw new Error("Signup failed — no user returned");
-
-        if (!data.session) {
-          const identities = data.user.identities;
-          return {
-            status:
-              identities && identities.length === 0
-                ? ("alreadyRegistered" as const)
-                : ("needsEmailConfirmation" as const),
-          };
-        }
-
-        setSessionIdentity({ session: data.session, user: data.user });
-        await get().ensureProfile();
-        return { status: "signedIn" as const };
-      } catch (err: any) {
-        set({ error: err.message });
-        throw err;
-      } finally {
-        loading.finish();
-      }
+      // Metadata feeds the existing SECURITY DEFINER profile trigger.
+      const { data, error } = await signUpOwnedPassword(owner, session, {
+        email: email.trim().toLowerCase(),
+        password,
+        options: {
+          data: { username: username.trim(), display_name: displayName.trim() || null },
+          emailRedirectTo: getEmailRedirectTo(),
+        },
+      });
+      if (error) throw error;
+      if (!data.user) throw new Error("Signup failed — no user returned");
+      return {
+        session: data.session,
+        value: {
+          status: data.session
+            ? "signedIn"
+            : data.user.identities?.length === 0
+              ? "alreadyRegistered"
+              : "needsEmailConfirmation",
+        },
+      };
     }),
 
   resendSignupConfirmation: async (email: string) => {

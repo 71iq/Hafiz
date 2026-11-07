@@ -16,9 +16,11 @@ export type Profile = {
   created_at: string;
 };
 
-type SignUpResult = {
+export type SignUpResult = {
   status: "signedIn" | "needsEmailConfirmation" | "alreadyRegistered";
 };
+
+export type AuthActionHandle<T> = { isCurrent: () => boolean; result: Promise<AuthCommandResult<T>> };
 
 export type AuthState = {
   session: Session | null;
@@ -31,10 +33,10 @@ export type AuthState = {
 
 export type AuthActions = {
   initialize: () => Promise<void>;
-  signIn: (email: string, password: string) => Promise<void>;
+  signIn: (email: string, password: string) => AuthActionHandle<void>;
   signInWithQuranFoundation: () => Promise<void>;
   linkQuranFoundation: () => Promise<void>;
-  signUp: (email: string, password: string, username: string, displayName: string) => Promise<SignUpResult>;
+  signUp: (email: string, password: string, username: string, displayName: string) => AuthActionHandle<SignUpResult>;
   signOut: () => Promise<void>;
   resendSignupConfirmation: (email: string) => Promise<void>;
   sendPasswordReset: (email: string) => Promise<void>;

@@ -4,6 +4,8 @@ import {
   type SupportedStorage,
   type Session,
   type SignInWithOAuthCredentials,
+  type SignInWithPasswordCredentials,
+  type SignUpWithPasswordCredentials,
 } from "@supabase/supabase-js";
 import { createOwnedAuthClient } from "@/lib/auth/client-adapter";
 import { createBrowserSessionChannel } from "@/lib/auth/session-channel";
@@ -99,6 +101,13 @@ export function createRootAuthRuntime(options: Options) {
       requireOwnership();
       return runtime.restoreSession(owner, session, tokens, isActive, expectedUserId);
     },
+    // Preserve email login on existing memory and browser fallbacks. The private
+    // replacement still guards this runtime and persisted base; cross-tab lifetime
+    // notices require the channel above, as for the main SDK's existing fallback.
+    signInWithPassword: (owner: AuthOwner, session: Session | null, credentials: SignInWithPasswordCredentials) =>
+      runtime.signInWithPassword(owner, session, credentials),
+    signUp: (owner: AuthOwner, session: Session | null, credentials: SignUpWithPasswordCredentials) =>
+      runtime.signUp(owner, session, credentials),
     prepareLink: (owner: AuthOwner, session: Session | null, credentials: SignInWithOAuthCredentials) => {
       requireOwnership();
       return runtime.prepareLink(owner, session, credentials);

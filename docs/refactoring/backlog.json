@@ -1984,7 +1984,8 @@
         "RF-133",
         "RF-152",
         "RF-153",
-        "RF-026"
+        "RF-026",
+        "RF-154"
       ],
       "acceptance_criteria": [
         "Test sign-in, sign-out, account switch, late responses, subscription cleanup and offline restore.",
@@ -16267,6 +16268,281 @@
       "independent_review": "pass",
       "evidence": "docs/refactoring/PROGRESS.md",
       "summary": "Native OAuth callbacks, provider linking and initial QF sync retain their initiating account/intent. Retired work cannot replace credentials or publish stale UI; current SDK errors, own logout and credential renewal remain observable. Private SDK operations serialize before owned storage admission. All20 checks, stronger independent review and primary acceptance pass. Raw main-client writers and persistent data policy remain RF025."
+    },
+    {
+      "id": "RF-154",
+      "title": "Keep email sign-in and signup within the latest account intent",
+      "description": "Direct email login/signup repair through the existing private SDK and storage boundary. Reserve the initiating intent before queuing, guard persistence and notifications against later owners, expose an owner-aware result and fence actual form continuations.",
+      "rationale": "Legacy raw main-client email calls can persist and publish a held response after a newer login intent or external account has replaced it. Their forms unconditionally navigate or show old errors/confirmation after await. A fresh explicit credential replacement must also handle an earlier private commit whose notification was suppressed, without weakening account-bound password/recovery guards.",
+      "modules": [
+        "lib/auth/owned-storage.ts",
+        "lib/auth/client-adapter.ts",
+        "lib/auth/root-runtime.ts",
+        "lib/supabase.ts",
+        "lib/auth/store.ts",
+        "lib/auth/types.ts",
+        "app/auth/login.tsx",
+        "app/auth/signup.tsx",
+        "components/auth/use-email-submission.ts"
+      ],
+      "dependencies": [
+        "RF-153"
+      ],
+      "acceptance_criteria": [
+        "Use the real private SDK tail and installed SDK lock for email methods. Capture the actual persisted base at admission for a fresh explicit credential-replacement command, revalidate its origin around reads and its base at writes, and allow only one valid candidate identity. Preserve existing account-bound/recovery behavior. Opaque prior storage matches exact bytes, valid prior identity permits same-session renewal, and an invalid new response preserves the prior session and reports a current error.",
+        "Store and form callbacks expose and honor completed/superseded ownership. Preserve normalized email, unchanged password bytes, metadata/redirect, original current SDK errors, signup signed-in/confirmation/already-registered outcomes and no-session prior profile/storage. Obsolete work cannot persist credentials, notify, load an obsolete profile, change current loading/error or navigate/show stale confirmation. Synchronous duplicate submission and unmounted callbacks cannot dispatch. UI unmount alone does not revoke already-issued global login authority.",
+        "Exercise actual SDK/runtime/store requests and persisted values with synthetic fixtures, queued and external same-user/new-user/closed-ABA retirement, commit-notification gap recovery, renewal, malformed old/new data, no-session and failure controls. Render real RHF/Zod login/signup controls in English/Arabic with deferred owner-aware results. Keep raw signout/background auth, resend, persistent personal SQLite policy and broader payload validation outside this task.",
+        "All20 fresh controller checks, separate stronger independent review and primary final acceptance are required. One local commit with a short PROGRESS note; delete accepted run outputs. No protected input, schema, dependency/vendor, production, push or deployment changes.",
+        "Preserve existing email login capability on browser memory and persistent fallbacks. Guard local lifetime and observable persisted-base changes; unsupported web environments without existing Web Locks/session notices retain their existing cross-context coordination limitation, tracked by RF025. Do not newly block email access or loosen account-bound/recovery capability rules."
+      ],
+      "verification": [
+        [
+          "git",
+          "diff",
+          "--check"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "lib/auth/owned-storage.ts",
+          "lib/auth/client-adapter.ts",
+          "lib/auth/root-runtime.ts",
+          "lib/supabase.ts",
+          "lib/auth/store.ts",
+          "lib/auth/types.ts",
+          "app/auth/login.tsx",
+          "app/auth/signup.tsx",
+          "components/auth/use-email-submission.ts",
+          "tests/unit/auth-profile-transition.test.ts",
+          "tests/unit/auth-disabled.test.ts",
+          "tests/unit/auth-email-runtime.test.ts",
+          "tests/unit/auth-email-forms.test.tsx",
+          "docs/refactoring/PROGRESS.md"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/auth/owned-storage.ts",
+          "lib/auth/client-adapter.ts",
+          "lib/auth/root-runtime.ts",
+          "lib/supabase.ts",
+          "lib/auth/store.ts",
+          "lib/auth/types.ts",
+          "app/auth/login.tsx",
+          "app/auth/signup.tsx",
+          "components/auth/use-email-submission.ts",
+          "tests/unit/auth-profile-transition.test.ts",
+          "tests/unit/auth-disabled.test.ts",
+          "tests/unit/auth-email-runtime.test.ts",
+          "tests/unit/auth-email-forms.test.tsx",
+          "--max-warnings=0"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "check:analysis"
+        ],
+        [
+          "npm",
+          "run",
+          "postinstall"
+        ],
+        [
+          "npm",
+          "ls",
+          "--all",
+          "--json"
+        ],
+        [
+          "npm",
+          "run",
+          "lint"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "node",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/tests/brace-expansion.test.cjs",
+          "scripts/tests/dependency-boundaries.test.cjs",
+          "scripts/tests/icon-tool.test.cjs",
+          "scripts/tests/jest-config.test.cjs",
+          "scripts/tests/js-yaml.test.cjs",
+          "scripts/tests/lint-coverage.test.cjs",
+          "scripts/tests/metro-unicode.test.cjs",
+          "scripts/tests/nanoid.test.cjs",
+          "scripts/tests/router-dependency-range.test.cjs",
+          "scripts/tests/security-dependency-owner.test.cjs",
+          "scripts/tests/source-map-js.test.cjs",
+          "scripts/tests/tailwind-source-map.test.cjs",
+          "scripts/tests/ws.test.cjs",
+          "scripts/tests/xmldom.test.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "test:refactor-runner"
+        ],
+        [
+          "python3",
+          "-B",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "scripts/tests",
+          "-p",
+          "test_*.py"
+        ],
+        [
+          "npm",
+          "run",
+          "check:native-config"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=4096",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "android",
+          "--output-dir",
+          ".expo/modernization-checks/android",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/android')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=3072",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "ios",
+          "--output-dir",
+          ".expo/modernization-checks/ios",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/ios')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8197",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts",
+          "tests/e2e/database-bridge.spec.ts"
+        ]
+      ],
+      "risk": "high",
+      "approved": true,
+      "status": "verified",
+      "allowed_paths": [
+        "lib/auth/owned-storage.ts",
+        "lib/auth/client-adapter.ts",
+        "lib/auth/root-runtime.ts",
+        "lib/supabase.ts",
+        "lib/auth/store.ts",
+        "lib/auth/types.ts",
+        "app/auth/login.tsx",
+        "app/auth/signup.tsx",
+        "components/auth/use-email-submission.ts",
+        "tests/unit/auth-profile-transition.test.ts",
+        "tests/unit/auth-disabled.test.ts",
+        "tests/unit/auth-email-runtime.test.ts",
+        "tests/unit/auth-email-forms.test.tsx"
+      ],
+      "attempts": 1,
+      "priority": 1,
+      "implementation_mode": "implementation",
+      "failure_history": [
+        {
+          "phase": "actual-sdk-causal",
+          "time": "2026-11-07T01:30:00.123591+00:00",
+          "failure": "Six initial actual SDK/store cases reproduced old completion/error contracts after retirement. Strengthened persistence/publication assertions to precede the new result protocol assertions and drained every queued action during fixture cleanup; the six cases still fail, including obsolete SIGNED_IN/profile publication and persisted session overwrite. No application source has changed."
+        },
+        {
+          "phase": "form-fixture",
+          "time": "2026-11-07T01:35:34.269653+00:00",
+          "failure": "First rendered form run stopped before tests because Jest hoisting rejected a local type alias in the mock factory. Inlined that fixture type while preserving real RHF Controller/Zod/native inputs, then reran original screen source for causal behavior."
+        },
+        {
+          "phase": "rendered-form-causal",
+          "time": "2026-11-07T01:44:42.953093+00:00",
+          "failure": "Original forms reproduced eight duplicate/early-navigation failures and four retained-unmounted-callback dispatch failures. A mock host onPress lookup and later multi-render/accessibility-state fixture mistakes were corrected; all36 rendered en/ar controls pass with real RHF/Zod inputs."
+        },
+        {
+          "phase": "primary-receipt-gap-causal",
+          "time": "2026-11-07T01:44:42.953149+00:00",
+          "failure": "Two actual SDK races showed completed email results after their authorized physical receipt was replaced without a store notice before notification. Final guarded receipt/base read now rejects those results before store fallback publication, including no-session replies."
+        },
+        {
+          "phase": "expanded-controls",
+          "time": "2026-11-07T01:45:46.019478+00:00",
+          "failure": "Expanded focused controls initially counted startup SIGNED_IN as task output and tried concurrent main-SDK signout while its installed lock was intentionally held. Fixtures now reset startup notices and model an independent-context logout notice. A real new invalid-candidate error was masked by unconditional final receipt validation; validate successful SDK replies only, preserving original errors. Two direct persistent-fallback tests now cover unchanged email capability and changed-base rejection."
+        },
+        {
+          "phase": "strictmode-fixture",
+          "time": "2026-11-07T01:46:10.900834+00:00",
+          "failure": "Expanded focused run passed all35 actual runtime cases and seven earlier auth suites; the new signup-remount control exposed an unused mockReturnValueOnce queue from the preceding login control. Reset both action mocks per test so remount scenarios remain isolated, retaining every assertion. The subsequent scoped lint found one unused waitFor import, removed before full verification."
+        }
+      ],
+      "completed_at": "2026-11-07T01:55:53.131668+00:00",
+      "primary_accepted_at": "2026-11-07T01:55:53.131668+00:00",
+      "independent_review": "pass",
+      "evidence": "docs/refactoring/PROGRESS.md",
+      "summary": "Email login/signup retain latest intent through guarded credentials, notifications, profile and form completion. All20 fresh controller checks, independent stronger review and primary acceptance pass:2611unit and29Chrome cases. Existing browser fallback capability remains; unsupported cross-context lifetime coordination, raw logout/background SDK writers and persistent personal SQLite ownership remain RF025 work."
     }
   ]
 }

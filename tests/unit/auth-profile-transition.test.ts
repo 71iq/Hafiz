@@ -20,6 +20,8 @@ const mockOAuth = jest.fn(async () => {
 const mockSignOut = jest.fn(async () => ({ error: null }));
 jest.mock("@/lib/supabase", () => ({
   isSupabaseConfigured: () => true,
+  signInOwnedPassword: () => mockSignIn(),
+  signUpOwnedPassword: () => mockSignIn(),
   supabase: {
     from: () => ({
       select: jest.fn().mockReturnThis(),
@@ -96,10 +98,15 @@ async function trigger(route: Route) {
     mockListener("SIGNED_IN", mockSession);
     return;
   }
-  if (route === "password") return store.signIn("qa@example.invalid", "synthetic-password");
+  if (route === "password")
+    return store
+      .signIn("qa@example.invalid", "synthetic-password")
+      .result.then((result) => (result.status === "completed" ? result.value : undefined));
   if (route === "oauth") return store.signInWithQuranFoundation();
   if (route === "link") return store.linkQuranFoundation();
-  return store.signUp("qa@example.invalid", "synthetic-password", "qa", "QA");
+  return store
+    .signUp("qa@example.invalid", "synthetic-password", "qa", "QA")
+    .result.then((result) => (result.status === "completed" ? result.value : undefined));
 }
 beforeEach(() => {
   activate(null, null);

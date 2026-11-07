@@ -6,6 +6,8 @@ import {
   type Session,
   type LockFunc,
   type SignInWithOAuthCredentials,
+  type SignInWithPasswordCredentials,
+  type SignUpWithPasswordCredentials,
 } from "@supabase/supabase-js";
 import type { AuthOwner } from "@/lib/auth/coordinator";
 import { createOwnedStorage, createSharedStorage } from "@/lib/auth/owned-storage";
@@ -225,7 +227,7 @@ export function createOwnedAuthClient(options: Options) {
     owner: AuthOwner,
     session: Session | null,
     work: (auth: Auth) => Promise<T>,
-    recovery = false,
+    mode: "owned" | "recovery" | "replacement" = "owned",
     expectedUserId?: string,
   ): Promise<T> {
     // OAuth's returned QF reader can outlive the coordinator reservation. Queue the
@@ -233,19 +235,18 @@ export function createOwnedAuthClient(options: Options) {
     // Admission still validates the captured owner after all earlier work settles.
     const result = commandTail.then(async () => {
       const auth = await commandClient();
-      return (recovery ? owned.restore : owned.run)(
-        owner,
-        session,
-        async () => {
-          commandActive = true;
-          try {
-            return await work(auth);
-          } finally {
-            commandActive = false;
-          }
-        },
-        expectedUserId,
-      );
+      const execute = async () => {
+        commandActive = true;
+        try {
+          return await work(auth);
+        } finally {
+          commandActive = false;
+        }
+      };
+      if (mode === "replacement") return owned.replace(owner, session, execute);
+      return mode === "recovery"
+        ? owned.restore(owner, session, execute, expectedUserId)
+        : owned.run(owner, session, execute);
     });
     commandTail = result.then(
       () => undefined,
@@ -266,14 +267,40 @@ export function createOwnedAuthClient(options: Options) {
     client,
     auth,
     readSession: (owner: AuthOwner, session: Session | null, isActive: () => boolean) =>
-      run(routeOwner(owner, isActive), session, (auth) => auth.getSession(), session === null),
+      run(routeOwner(owner, isActive), session, (auth) => auth.getSession(), session === null ? "recovery" : "owned"),
     restoreSession: (
       owner: AuthOwner,
       session: Session | null,
       tokens: { access_token: string; refresh_token: string },
       isActive: () => boolean,
       expectedUserId?: string,
-    ) => run(routeOwner(owner, isActive), session, (auth) => auth.setSession(tokens), true, expectedUserId),
+    ) => run(routeOwner(owner, isActive), session, (auth) => auth.setSession(tokens), "recovery", expectedUserId),
+    signInWithPassword: (owner: AuthOwner, session: Session | null, credentials: SignInWithPasswordCredentials) =>
+      run(
+        owner,
+        session,
+        async (auth) => {
+          const result = await options.lock("lock:" + options.storageKey, -1, () =>
+            auth.signInWithPassword(credentials),
+          );
+          // A suppressed notice cannot authorize fallback publication of this reply.
+          // Preserve an original SDK error, including invalid candidate identity.
+          if (!result.error) await owned.storage.getItem(commandKey);
+          return result;
+        },
+        "replacement",
+      ),
+    signUp: (owner: AuthOwner, session: Session | null, credentials: SignUpWithPasswordCredentials) =>
+      run(
+        owner,
+        session,
+        async (auth) => {
+          const result = await options.lock("lock:" + options.storageKey, -1, () => auth.signUp(credentials));
+          if (!result.error) await owned.storage.getItem(commandKey);
+          return result;
+        },
+        "replacement",
+      ),
     prepareLink: (owner: AuthOwner, session: Session | null, credentials: SignInWithOAuthCredentials) =>
       run(owner, session, (auth) =>
         // Installed linkIdentityOAuth uses _useSession without acquiring the SDK lock.

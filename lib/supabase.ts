@@ -1,4 +1,10 @@
-import { type SupabaseClient, type SignInWithOAuthCredentials, type Session } from "@supabase/supabase-js";
+import {
+  type SupabaseClient,
+  type SignInWithOAuthCredentials,
+  type SignInWithPasswordCredentials,
+  type SignUpWithPasswordCredentials,
+  type Session,
+} from "@supabase/supabase-js";
 import { createRootAuthRuntime } from "@/lib/auth/root-runtime";
 import type { AuthOwner } from "@/lib/auth/coordinator";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -126,4 +132,19 @@ export function readOwnedSession(owner: AuthOwner, session: Session | null, isAc
 
 export function prepareOwnedLink(owner: AuthOwner, session: Session | null, credentials: SignInWithOAuthCredentials) {
   return ownedRuntime().prepareLink(owner, session, credentials);
+}
+
+export function signInOwnedPassword(
+  owner: AuthOwner,
+  session: Session | null,
+  credentials: SignInWithPasswordCredentials,
+) {
+  return ownedRuntime().signInWithPassword(owner, session, credentials);
+}
+export function signUpOwnedPassword(
+  owner: AuthOwner,
+  session: Session | null,
+  credentials: SignUpWithPasswordCredentials,
+) {
+  return ownedRuntime().signUp(owner, session, credentials);
 }

@@ -61,10 +61,14 @@ export function createOwnedStorage(shared: Pick<ReturnType<typeof createSharedSt
     committed: boolean;
     denied: boolean;
     expectedUserId: string | undefined;
+    replacement: boolean;
+    opaqueBase: string | undefined;
   };
   let active: Guard | null = null;
   const matches = (value: string | null, expected: string | null) =>
     expected === null ? value === null : identity(value) === expected;
+  const matchesGuard = (value: string | null, guard: Guard) =>
+    !guard.committed && guard.opaqueBase !== undefined ? value === guard.opaqueBase : matches(value, guard.identity);
   const supersede = (guard: Guard): never => {
     guard.denied = true;
     guard.owner.cancel();
@@ -89,7 +93,7 @@ export function createOwnedStorage(shared: Pick<ReturnType<typeof createSharedSt
           name === key &&
           ((!guard.committed && !guard.removed && !guard.owner.isCurrent()) ||
             !permitted(guard) ||
-            !(guard.removed ? value === null : matches(value, guard.identity)))
+            !(guard.removed ? value === null : matchesGuard(value, guard)))
         )
           supersede(guard);
         return value;
@@ -100,13 +104,17 @@ export function createOwnedStorage(shared: Pick<ReturnType<typeof createSharedSt
         let next: string | null = null;
         if (guard && protectedKey(name)) {
           const current = await raw.getItem(key);
-          if (!permitted(guard) || guard.removed || !matches(current, guard.identity)) supersede(guard);
+          if (!permitted(guard) || guard.removed || !matchesGuard(current, guard)) supersede(guard);
           if (name === key) {
             const candidate = storedIdentity(value);
             next = candidate ? JSON.stringify(candidate) : null;
             if (candidate && guard.expectedUserId !== undefined && candidate.userId !== guard.expectedUserId) {
               guard.denied = true;
               throw new AuthError("OAuth callback belongs to a different account", 400, "oauth_link_user_mismatch");
+            }
+            if (next === null && guard.replacement) {
+              guard.denied = true;
+              throw new AuthError("Auth response has an invalid session identity", 400, "auth_session_invalid");
             }
             if (next === null || (!(guard.recovery && !guard.committed) && next !== guard.identity)) supersede(guard);
           }
@@ -127,8 +135,7 @@ export function createOwnedStorage(shared: Pick<ReturnType<typeof createSharedSt
         }
         if (guard && protectedKey(name)) {
           const current = await raw.getItem(key);
-          if (!permitted(guard) || (guard.removed ? current !== null : !matches(current, guard.identity)))
-            supersede(guard);
+          if (!permitted(guard) || (guard.removed ? current !== null : !matchesGuard(current, guard))) supersede(guard);
         }
         await raw.removeItem(name);
         if (guard && name === key) guard.removed = true;
@@ -140,19 +147,36 @@ export function createOwnedStorage(shared: Pick<ReturnType<typeof createSharedSt
     work: () => Promise<T>,
     recovery: boolean,
     expectedUserId?: string,
+    replacement = false,
   ): Promise<T> {
     const parsed = getAuthSessionIdentity(session);
     if (active) throw new Error("Overlapping owned SDK operation");
-    if (!owner.isCurrent() || parsed.kind === "unidentified" || (!recovery && parsed.kind !== "identified"))
+    if (
+      !owner.isCurrent() ||
+      (!replacement && (parsed.kind === "unidentified" || (!recovery && parsed.kind !== "identified")))
+    )
       throw new AuthError("Auth operation superseded", 409, "operation_superseded");
+    let startingIdentity = parsed.kind === "identified" ? JSON.stringify(parsed) : null;
+    let opaqueBase: string | undefined;
+    if (replacement) {
+      // Explicit new credentials replace the persisted base present before dispatch. It may
+      // include an earlier private commit whose obsolete notification was suppressed.
+      const value = await shared.atomic(async (raw) => raw.getItem(key));
+      if (!owner.isCurrent()) throw new AuthError("Auth operation superseded", 409, "operation_superseded");
+      if (active) throw new Error("Overlapping owned SDK operation");
+      startingIdentity = identity(value);
+      if (value !== null && startingIdentity === null) opaqueBase = value;
+    }
     active = {
       owner,
-      identity: parsed.kind === "identified" ? JSON.stringify(parsed) : null,
+      identity: startingIdentity,
       removed: false,
       recovery,
       committed: false,
       denied: false,
       expectedUserId: expectedUserId?.toLowerCase(),
+      replacement,
+      opaqueBase,
     };
     try {
       return await work();
@@ -193,5 +217,7 @@ export function createOwnedStorage(shared: Pick<ReturnType<typeof createSharedSt
     run: <T>(owner: AuthOwner, session: Session | null, work: () => Promise<T>) => run(owner, session, work, false),
     restore: <T>(owner: AuthOwner, session: Session | null, work: () => Promise<T>, expectedUserId?: string) =>
       run(owner, session, work, true, expectedUserId),
+    replace: <T>(owner: AuthOwner, session: Session | null, work: () => Promise<T>) =>
+      run(owner, session, work, true, undefined, true),
   };
 }

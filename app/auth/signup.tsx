@@ -20,6 +20,7 @@ import {
   AuthUnavailableState,
 } from "@/components/auth/AuthScreenShell";
 import { OAuthButtons } from "@/components/auth/OAuthButtons";
+import { useEmailSubmission } from "@/components/auth/use-email-submission";
 import type { Direction } from "@/lib/ui/direction";
 
 type SignupForm = {
@@ -55,6 +56,7 @@ function SignupFormScreen() {
   const s = strings[locale];
   const schema = useMemo(() => createSignupSchema(s), [s]);
   const { signUp, resendSignupConfirmation, isLoading, error } = useAuthStore();
+  const { acquire } = useEmailSubmission();
   const [showError, setShowError] = useState<string | null>(null);
   const [pendingConfirmationEmail, setPendingConfirmationEmail] = useState<string | null>(null);
   const [passwordVisible, setPasswordVisible] = useState(false);
@@ -74,25 +76,33 @@ function SignupFormScreen() {
   });
 
   const onSubmit = async (data: SignupForm) => {
-    if (!configured) {
-      setShowError(s.authUnavailableSubtitle);
-      return;
-    }
+    const lease = acquire();
+    if (!lease) return;
+    let flow: ReturnType<typeof signUp> | null = null;
     try {
       setShowError(null);
-      const result = await signUp(data.email, data.password, data.username, data.displayName || "");
-      if (result.status === "alreadyRegistered") {
+      if (!configured) {
+        if (lease.isCurrent()) setShowError(s.authUnavailableSubtitle);
+        return;
+      }
+      flow = signUp(data.email, data.password, data.username, data.displayName || "");
+      const result = await flow.result;
+      if (!lease.isCurrent() || !flow.isCurrent() || result.status !== "completed" || !result.owner.isCurrent()) return;
+      if (result.value.status === "alreadyRegistered") {
         setShowError(s.authSignupAlreadyRegistered);
         return;
       }
-      if (result.status === "needsEmailConfirmation") {
+      if (result.value.status === "needsEmailConfirmation") {
         setPendingConfirmationEmail(data.email);
         setShowError(s.authSignupConfirmEmail);
         return;
       }
       router.back();
-    } catch (err: any) {
-      setShowError(err.message);
+    } catch (err: unknown) {
+      if (!lease.isCurrent() || (flow && !flow.isCurrent())) return;
+      setShowError(err instanceof Error ? err.message : String(err));
+    } finally {
+      lease.release();
     }
   };
 
@@ -247,10 +257,7 @@ function SignupFormScreen() {
 
   const footer = configured ? (
     <>
-      <OAuthButtons
-        strings={s}
-        onError={(msg) => setShowError(msg)}
-      />
+      <OAuthButtons strings={s} onError={(msg) => setShowError(msg)} />
       <AuthRouteLink
         prompt={s.authHasAccount}
         action={s.authLogin}

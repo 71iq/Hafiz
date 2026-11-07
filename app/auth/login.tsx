@@ -21,6 +21,7 @@ import {
   useAuthDarkMode,
 } from "@/components/auth/AuthScreenShell";
 import { OAuthButtons } from "@/components/auth/OAuthButtons";
+import { useEmailSubmission } from "@/components/auth/use-email-submission";
 import type { Direction } from "@/lib/ui/direction";
 
 type LoginForm = {
@@ -42,6 +43,7 @@ export default function LoginScreen() {
   const s = strings[locale];
   const schema = useMemo(() => createLoginSchema(s), [s]);
   const { signIn, isLoading, error } = useAuthStore();
+  const { acquire } = useEmailSubmission();
   const [showError, setShowError] = useState<string | null>(null);
   const [passwordVisible, setPasswordVisible] = useState(false);
   const configured = isSupabaseConfigured();
@@ -58,16 +60,25 @@ export default function LoginScreen() {
   });
 
   const onSubmit = async (data: LoginForm) => {
-    if (!configured) {
-      setShowError(s.authUnavailableSubtitle);
-      return;
-    }
+    const lease = acquire();
+    if (!lease) return;
+    let flow: ReturnType<typeof signIn> | null = null;
     try {
       setShowError(null);
-      await signIn(data.email, data.password);
+      if (!configured) {
+        if (lease.isCurrent()) setShowError(s.authUnavailableSubtitle);
+        return;
+      }
+      flow = signIn(data.email, data.password);
+      const result = await flow.result;
+      if (!lease.isCurrent() || !flow.isCurrent() || result.status !== "completed" || !result.owner.isCurrent()) return;
       router.replace("/(tabs)/home");
-    } catch (err: any) {
-      setShowError(err.message === "Invalid login credentials" ? s.authInvalidCredentials : err.message);
+    } catch (err: unknown) {
+      if (!lease.isCurrent() || (flow && !flow.isCurrent())) return;
+      const message = err instanceof Error ? err.message : String(err);
+      setShowError(message === "Invalid login credentials" ? s.authInvalidCredentials : message);
+    } finally {
+      lease.release();
     }
   };
 
@@ -163,10 +174,7 @@ export default function LoginScreen() {
 
   const footer = configured ? (
     <>
-      <OAuthButtons
-        strings={s}
-        onError={(msg) => setShowError(msg)}
-      />
+      <OAuthButtons strings={s} onError={(msg) => setShowError(msg)} />
       {isEmailAuthFlowsEnabled() && (
         <AuthRouteLink
           prompt={s.authNoAccount}
