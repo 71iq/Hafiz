@@ -3280,7 +3280,7 @@
     {
       "id": "RF-033",
       "title": "Audit local schema and remote migration parity offline",
-      "description": "Audit local schema and remote migration parity offline",
+      "description": "Audit current local/server sync schemas, all20 checked-in migrations, RLS ownership and both QF functions. Record actual isolated PostgreSQL proof separately from source candidates and unavailable live verification; change no application, schema, policy or protected input.",
       "rationale": "Production policy changes are outside authorization.",
       "modules": [
         "docs/refactoring/DATA_AUDIT.md"
@@ -3289,24 +3289,216 @@
         "RF-031"
       ],
       "acceptance_criteria": [
-        "Inspect schema.sql, every migration, RLS ownership, SQLite sync columns and Edge Function auth.",
-        "Record concrete gaps and separate authorization needs. Never apply SQL or contact production."
+        "Inspect current schema.sql, all20 migration files, SQLite schema, sync/payload/queue boundaries and both QF Edge Functions. Document all nine sync identities and intentional local/server representations.",
+        "Record concrete findings and separate authorization choices, without production contact or SQL. Only a synthetic local network-disabled disposable PostgreSQL fixture is allowed; auth/storage stubs and table grants are explicit assumptions.",
+        "Actual PostgreSQL two-user/anonymous probe demonstrates cross-author invoker-trigger counter drift, hidden/soft-deleted child visibility, hard-delete cascade and four private-owner controls. Empty timestamp rejection is datatype evidence; queued transport proof is a future task.",
+        "Distinguish source-only backfill/outbox/conflict candidates, historical base-schema drift and dormant QF re-enable risks from production incidents. Add unfinished app findings as unapproved small scopes; request the unresolved discussion access policy and continue independent work.",
+        "All20 fresh full controller checks, separate configured stronger independent review and primary acceptance. One local accepted audit commit; short PROGRESS note, delete accepted logs/fixtures, retain events and dependency-analysis baseline under2GB."
       ],
       "verification": [
         [
           "git",
           "diff",
           "--check"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "docs/refactoring/DATA_AUDIT.md",
+          "docs/refactoring/PROGRESS.md"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/database/sync-payloads.ts",
+          "lib/database/sync-timestamps.ts",
+          "--max-warnings=0"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "check:analysis"
+        ],
+        [
+          "npm",
+          "run",
+          "postinstall"
+        ],
+        [
+          "npm",
+          "ls",
+          "--all",
+          "--json"
+        ],
+        [
+          "npm",
+          "run",
+          "lint",
+          "--",
+          "--format",
+          "json"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit"
+        ],
+        [
+          "node",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/tests/brace-expansion.test.cjs",
+          "scripts/tests/dependency-boundaries.test.cjs",
+          "scripts/tests/icon-tool.test.cjs",
+          "scripts/tests/jest-config.test.cjs",
+          "scripts/tests/js-yaml.test.cjs",
+          "scripts/tests/lint-coverage.test.cjs",
+          "scripts/tests/metro-unicode.test.cjs",
+          "scripts/tests/nanoid.test.cjs",
+          "scripts/tests/router-dependency-range.test.cjs",
+          "scripts/tests/security-dependency-owner.test.cjs",
+          "scripts/tests/source-map-js.test.cjs",
+          "scripts/tests/tailwind-source-map.test.cjs",
+          "scripts/tests/ws.test.cjs",
+          "scripts/tests/xmldom.test.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "test:refactor-runner"
+        ],
+        [
+          "python3",
+          "-B",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "scripts/tests",
+          "-p",
+          "test_*.py"
+        ],
+        [
+          "npm",
+          "run",
+          "check:native-config"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=4096",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "android",
+          "--output-dir",
+          ".expo/modernization-checks/android",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/android')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=3072",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "ios",
+          "--output-dir",
+          ".expo/modernization-checks/ios",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/ios')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8197",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts",
+          "tests/e2e/database-bridge.spec.ts",
+          "tests/e2e/tafsir-import.spec.ts",
+          "tests/e2e/translation-import.spec.ts"
         ]
       ],
       "risk": "high",
-      "approved": false,
-      "status": "pending",
+      "approved": true,
+      "status": "verified",
       "allowed_paths": [
         "docs/refactoring/DATA_AUDIT.md"
       ],
-      "attempts": 0,
-      "priority": 1
+      "attempts": 1,
+      "priority": 1,
+      "implementation_mode": "implementation",
+      "files": [
+        "docs/refactoring/DATA_AUDIT.md"
+      ],
+      "verification_rationale": "Retain all20 full current controller checks including full149/3054 Jest, all35 Chrome and platform JS exports, despite this audit changing docs only. Scoped zero-warning lint checks current sync boundary modules; no application test result is substituted.",
+      "diagnosis": "Primary read current source, all20 migration files, isolated PostgreSQL17 fixture outputs and two separate read-only stronger/mechanical inventories. Source findings require later focused app regressions. No service/SQL/SDK/runtime production inference.",
+      "failure_history": [
+        {
+          "phase": "probe-setup",
+          "failure": "JavaScript string replacement interpreted SQL dollar quoting. Use literal callback substitution; preserve original failing log. No app defect inferred."
+        },
+        {
+          "phase": "probe-readiness",
+          "failure": "pg_isready briefly saw the official image initialization server before restart. Require final postgres PID1 plus readiness. Owned containers/storage removed in both failures and successful third probe."
+        }
+      ],
+      "focused_validation": {
+        "proof": "Summarized in docs/refactoring/DATA_AUDIT.md; probe logs deleted on acceptance.",
+        "limits": "Only unchanged base schema plus current comment-like migration executed in synthetic PG. All20 migrations inspected as source, not claimed replayed or deployed. No Deno, JWT gateway, Storage REST or production verification."
+      },
+      "started_at": "2026-11-07T10:06:30.298222+00:00",
+      "completed_at": "2026-11-07T11:31:30.246995+00:00",
+      "primary_accepted_at": "2026-11-07T11:31:30.246995+00:00",
+      "independent_review": "pass",
+      "evidence": "docs/refactoring/DATA_AUDIT.md",
+      "summary": "Offline schema, all 20 migrations, RLS ownership and both QF functions audited. Isolated PostgreSQL 17 probe confirmed counter drift and public children of hidden/soft-deleted posts; four owner controls and cascade pass. Six follow-ups RF166-RF171 recorded; discussion access choice pending. All 20 full checks, separate review and primary acceptance pass. No app, schema, policy or production change."
     },
     {
       "id": "RF-034",
@@ -19866,6 +20058,160 @@
       "acceptance_criteria": [
         "Pending exact primary scope for role, selected/busy/disabled semantics and keyboard/native compatibility. Preserve styling and selection/recovery behavior; full controller checks, independent review and primary acceptance required."
       ],
+      "verification": []
+    },
+    {
+      "id": "RF-166",
+      "title": "Keep community reaction counters correct across authors",
+      "priority": 1,
+      "risk": "high",
+      "description": "Reproduce current reflection likes/comments/comment-likes count drift under two real PostgreSQL roles. Primary selects a least-privilege trigger repair and reviews current/future schema definitions, backfill and delete behavior. Source-only reviewed migrations, never apply to production.",
+      "dependencies": [
+        "RF-033"
+      ],
+      "modules": [
+        "supabase/schema.sql",
+        "supabase/migrations"
+      ],
+      "acceptance_criteria": [
+        "Pending exact bounded source and actual PostgreSQL regression scope. Preserve RLS ownership and intended public access. Test cross-author insert/delete, direct unauthorized updates, search-path attacks, cascade and concurrent counts. No production SQL. Full controller checks, separate stronger review and primary acceptance."
+      ],
+      "approved": false,
+      "status": "pending",
+      "attempts": 0,
+      "implementation_mode": "implementation",
+      "files": [],
+      "allowed_paths": [],
+      "verification": []
+    },
+    {
+      "id": "RF-167",
+      "title": "Retry initial account backfill after local queue failure",
+      "priority": 1,
+      "risk": "medium",
+      "description": "enqueueInitialLocalDataForSync and the settings-only backfill swallow queue INSERT errors then set completion markers, permanently skipping unqueued rows. Prove with actual SQLite through fullSync, propagate local persistence failures and leave markers unset for retry without changing restore/data ownership.",
+      "dependencies": [
+        "RF-033"
+      ],
+      "modules": [
+        "lib/database/sync.ts",
+        "tests/unit/sync-partial-failure.test.ts"
+      ],
+      "acceptance_criteria": [
+        "Pending exact primary scope. Exercise first/later local queue failure, retained earlier queued rows, no false completion marker, successful retry and normal completed-marker controls, using actual SQLite and public fullSync. Preserve remote failure/status and account ownership contracts. Full controller checks, independent review and primary acceptance."
+      ],
+      "approved": false,
+      "status": "pending",
+      "attempts": 0,
+      "implementation_mode": "implementation",
+      "files": [],
+      "allowed_paths": [],
+      "verification": []
+    },
+    {
+      "id": "RF-168",
+      "title": "Normalize legacy highlight timestamps before upload",
+      "priority": 1,
+      "risk": "medium",
+      "description": "Existing legacy highlight queue payloads may contain updated_at='', accepted by the shared wire schema and passed unchanged to TIMESTAMPTZ or skipped freshness checks. First reproduce actual outgoing transport and select the established timestamp fallback without changing incoming legacy deletion semantics.",
+      "dependencies": [
+        "RF-033"
+      ],
+      "modules": [
+        "lib/database/sync.ts",
+        "lib/database/sync-payloads.ts",
+        "tests/unit/sync-queue-payloads.test.ts"
+      ],
+      "acceptance_criteria": [
+        "Pending exact causal proof and primary timestamp policy. Cover upload/delete freshness, created/deleted fallback and valid timestamp controls, retain all RF151/RF156 incoming contracts. No invented current timestamp, data rewrite or production operation. Full controller checks, independent review and primary acceptance."
+      ],
+      "approved": false,
+      "status": "pending",
+      "attempts": 0,
+      "implementation_mode": "implementation",
+      "files": [],
+      "allowed_paths": [],
+      "verification": []
+    },
+    {
+      "id": "RF-169",
+      "title": "Protect sync conflict decisions from intervening remote writes",
+      "priority": 1,
+      "risk": "high",
+      "description": "remoteIsNewer performs a SELECT before unconditional upsert/delete, allowing an intervening newer device write to be overwritten. Reproduce a held-probe/intervening-write flow and design an atomic server-side contract before implementation. A second client check is not atomic.",
+      "dependencies": [
+        "RF-033"
+      ],
+      "modules": [
+        "lib/database/sync.ts",
+        "supabase/schema.sql",
+        "supabase/migrations"
+      ],
+      "acceptance_criteria": [
+        "Pending primary conflict semantics and exact isolated transport/PostgreSQL regression scope. Preserve timestamp equivalence, tombstones, client compatibility and queue acknowledgements; no production SQL or service change. Full controller checks, independent stronger review and primary acceptance."
+      ],
+      "approved": false,
+      "status": "pending",
+      "attempts": 0,
+      "implementation_mode": "implementation",
+      "files": [],
+      "allowed_paths": [],
+      "verification": []
+    },
+    {
+      "id": "RF-170",
+      "title": "Set discussion visibility for hidden or deleted reflections",
+      "priority": 1,
+      "risk": "high",
+      "description": "Current reflection SELECT hides inactive parents, while comment/like tables remain publicly readable by retained parent IDs. Confirm actual two-user/anon PostgreSQL behavior; obtain the unresolved access-policy choice before any policy implementation.",
+      "dependencies": [
+        "RF-033"
+      ],
+      "modules": [
+        "supabase/schema.sql",
+        "supabase/migrations",
+        "lib/reflections/api.ts"
+      ],
+      "acceptance_criteria": [
+        "Await user access-policy choice and exact primary plan. Distinguish hidden/soft-deleted parents from hard-delete cascade. Preserve ownership, intentional public fields and readable active discussions. No production SQL. Full controller checks, independent review and primary acceptance."
+      ],
+      "approved": false,
+      "status": "pending",
+      "attempts": 0,
+      "implementation_mode": "implementation",
+      "files": [],
+      "allowed_paths": [],
+      "verification": [],
+      "blocker": "User access-policy choice pending through async question: hide discussion/reactions with hidden/deleted parent, or keep public. No policy implementation authorized until resolved."
+    },
+    {
+      "id": "RF-171",
+      "title": "Preserve upload work when local mutation queue writes fail",
+      "priority": 1,
+      "risk": "high",
+      "description": "Notes, bookmarks/highlights, word meanings, reviews, settings and smart-deck paths can save/delete local records then detach or swallow sync queue INSERT failure. Once initial backfill is complete, later upload has no durable work to retry. Characterize and split into feature-sized atomic local-write/outbox repairs with postcommit notifications and existing transaction reuse.",
+      "dependencies": [
+        "RF-033",
+        "RF-161"
+      ],
+      "modules": [
+        "lib/notes/queries.ts",
+        "lib/selection/queries.ts",
+        "lib/word/queries.ts",
+        "lib/fsrs/queries.ts",
+        "lib/fsrs/persist-review.ts",
+        "lib/fsrs/smart-decks.ts",
+        "lib/database/user-settings.ts"
+      ],
+      "acceptance_criteria": [
+        "Unapproved parent, prepare exact feature-sized scopes after causal SQLite proofs. Local mutations and required main/QF queue writes must settle atomically without nested transactions; publish achievement/review/UI side effects after successful commit, and retain existing offline/data ownership policies. No remote requirement for local saving. Full controller checks, independent stronger review and primary acceptance for each approved repair."
+      ],
+      "approved": false,
+      "status": "pending",
+      "attempts": 0,
+      "implementation_mode": "implementation",
+      "files": [],
+      "allowed_paths": [],
       "verification": []
     }
   ]
