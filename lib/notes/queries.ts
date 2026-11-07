@@ -71,17 +71,7 @@ export async function createPrivateNote(
   const id = createId();
   const content = input.content.trim();
   assertQfNoteContent(content);
-  if (await hasExactPrivateNote(db, input.surah, input.ayahStart, input.ayahEnd, content)) {
-    throw new DuplicatePrivateNoteError();
-  }
   const rangesJson = JSON.stringify([buildQfRange(input.surah, input.ayahStart, input.ayahEnd)]);
-  await db.runAsync(
-    `INSERT INTO private_notes
-      (id, surah, ayah_start, ayah_end, content, created_at, updated_at, deleted_at,
-       qf_note_id, qf_synced_at, qf_sync_error, qf_ranges_json)
-     VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, ?)`,
-    [id, input.surah, input.ayahStart, input.ayahEnd, content, now, now, rangesJson]
-  );
   const data: PrivateNoteRow = {
     id,
     surah: input.surah,
@@ -96,8 +86,22 @@ export async function createPrivateNote(
     qf_sync_error: null,
     qf_ranges_json: rangesJson,
   };
-  enqueueSync(db, "private_notes", "INSERT", id, rowToSyncData(data)).catch(console.warn);
-  enqueueQfSync(db, "private_note", "UPSERT", id, rowToSyncData(data)).catch(console.warn);
+  // The note and both upload queue entries commit together or not at all.
+  await db.withTransactionAsync(async (tx) => {
+    if (await hasExactPrivateNote(tx, input.surah, input.ayahStart, input.ayahEnd, content)) {
+      throw new DuplicatePrivateNoteError();
+    }
+    await tx.runAsync(
+      `INSERT INTO private_notes
+        (id, surah, ayah_start, ayah_end, content, created_at, updated_at, deleted_at,
+         qf_note_id, qf_synced_at, qf_sync_error, qf_ranges_json)
+       VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, ?)`,
+      [id, input.surah, input.ayahStart, input.ayahEnd, content, now, now, rangesJson]
+    );
+    await enqueueSync(tx, "private_notes", "INSERT", id, rowToSyncData(data));
+    await enqueueQfSync(tx, "private_note", "UPSERT", id, rowToSyncData(data));
+  });
+  // The badge is a side effect of a saved note; its failure must not fail the save.
   recordAchievementEvent(db, {
     type: "private_note_created",
     noteId: id,
@@ -110,13 +114,17 @@ export async function createPrivateNote(
 }
 
 export async function updatePrivateNote(
-  db: DatabaseExecutor,
+  database: AppDatabase,
   id: string,
   content: string
 ): Promise<void> {
   const now = new Date().toISOString();
   const trimmed = content.trim();
   assertQfNoteContent(trimmed);
+  await database.withTransactionAsync((db) => updatePrivateNoteRows(db, id, trimmed, now));
+}
+
+async function updatePrivateNoteRows(db: DatabaseExecutor, id: string, trimmed: string, now: string): Promise<void> {
   const current = await db.getFirstAsync<PrivateNoteRow>(
     "SELECT * FROM private_notes WHERE id = ? AND deleted_at IS NULL",
     [id]
@@ -131,24 +139,27 @@ export async function updatePrivateNote(
   );
   const row = await db.getFirstAsync<PrivateNoteRow>("SELECT * FROM private_notes WHERE id = ?", [id]);
   if (row) {
-    enqueueSync(db, "private_notes", "UPDATE", id, rowToSyncData(row)).catch(console.warn);
-    enqueueQfSync(db, "private_note", "UPSERT", id, rowToSyncData(row)).catch(console.warn);
+    await enqueueSync(db, "private_notes", "UPDATE", id, rowToSyncData(row));
+    await enqueueQfSync(db, "private_note", "UPSERT", id, rowToSyncData(row));
   }
 }
 
-export async function deletePrivateNote(db: DatabaseExecutor, id: string): Promise<void> {
-  const now = new Date().toISOString();
+export async function deletePrivateNote(database: AppDatabase, id: string): Promise<void> {
+  await database.withTransactionAsync((db) => deletePrivateNoteRows(db, id, new Date().toISOString()));
+}
+
+async function deletePrivateNoteRows(db: DatabaseExecutor, id: string, now: string): Promise<void> {
   await db.runAsync(
     "UPDATE private_notes SET updated_at = ?, deleted_at = ? WHERE id = ? AND deleted_at IS NULL",
     [now, now, id]
   );
   const row = await db.getFirstAsync<PrivateNoteRow>("SELECT * FROM private_notes WHERE id = ?", [id]);
   if (row) {
-    enqueueSync(db, "private_notes", "UPDATE", id, rowToSyncData(row)).catch(console.warn);
-    enqueueQfSync(db, "private_note", "DELETE", id, {
+    await enqueueSync(db, "private_notes", "UPDATE", id, rowToSyncData(row));
+    await enqueueQfSync(db, "private_note", "DELETE", id, {
       ...rowToSyncData(row),
       qfNoteId: row.qf_note_id,
-    }).catch(console.warn);
+    });
   }
 }
 
