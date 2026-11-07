@@ -1,6 +1,14 @@
 import { parseJsonRecord as parsePayload } from "@/lib/serialization/json-record";
 import { parseDailyScoreRows, rankDailyScores } from "@/lib/leaderboard/ranking";
 import { isMissingPublicReviewAggregateError } from "@/lib/leaderboard/errors";
+import {
+  parseAchievementUnlockRows,
+  parseDailyScoreSummaryRows,
+  parseReviewActivityRows,
+  parseReviewStatsRow,
+  parseStreakRows,
+  parseSurahProgressRows,
+} from "@/lib/leaderboard/rows";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import type { AchievementUnlock } from "@/lib/achievements/types";
 import { dayIndexFromUtcDateKey as toDayIndex, formatUtcDateKey } from "@/lib/date";
@@ -141,9 +149,7 @@ async function fetchPublicScoreSummary(userId: string): Promise<PublicScoreSumma
     .eq("user_id", userId);
 
   if (error) throw error;
-  return summarizeDailyScoreRows(
-    (data ?? []) as Array<{ date: string; score: number | null; reviews_count: number | null }>,
-  );
+  return summarizeDailyScoreRows(parseDailyScoreSummaryRows(data));
 }
 
 async function fetchPublicReviewStats(userId: string): Promise<PublicReviewStats | null> {
@@ -157,14 +163,15 @@ async function fetchPublicReviewStats(userId: string): Promise<PublicReviewStats
     if (isMissingPublicReviewAggregateError(error)) return null;
     throw error;
   }
-  if (!data) return null;
-  const lastReviewDate = (data as any).last_review_date?.slice(0, 10) ?? null;
+  const stats = parseReviewStatsRow(data);
+  if (!stats) return null;
+  const lastReviewDate = stats.last_review_date?.slice(0, 10) ?? null;
   const today = formatUtcDateKey(new Date());
   return {
-    totalReviews: (data as any).total_reviews ?? 0,
-    activeDays: (data as any).active_days ?? 0,
-    currentStreak: lastReviewDate === today ? ((data as any).current_streak ?? 0) : 0,
-    longestStreak: (data as any).longest_streak ?? 0,
+    totalReviews: stats.total_reviews,
+    activeDays: stats.active_days,
+    currentStreak: lastReviewDate === today ? stats.current_streak : 0,
+    longestStreak: stats.longest_streak,
     lastReviewDate,
   };
 }
@@ -179,9 +186,9 @@ async function fetchDailyScoreActivity(userId: string, startDate: string): Promi
 
   if (error) throw error;
 
-  const activity = (data ?? []).map((row: any) => ({
+  const activity = parseReviewActivityRows(data).map((row) => ({
     date: row.date,
-    count: row.reviews_count ?? 0,
+    count: row.reviews_count,
   }));
   return {
     activity,
@@ -209,9 +216,9 @@ async function fetchPublicReviewAggregateActivity(
     throw rowsResult.error;
   }
 
-  const activity = (rowsResult.data ?? []).map((row: any) => ({
+  const activity = parseReviewActivityRows(rowsResult.data).map((row) => ({
     date: row.date,
-    count: row.reviews_count ?? 0,
+    count: row.reviews_count,
   }));
   return {
     activity,
@@ -298,15 +305,15 @@ export async function fetchStreakLeaderboard(): Promise<LeaderboardEntry[]> {
     string,
     { username: string; display_name: string | null; avatar_url: string | null; dates: Set<string> }
   >();
-  for (const row of data ?? []) {
+  for (const row of parseStreakRows(data)) {
     const existing = byUser.get(row.user_id);
     if (existing) {
       existing.dates.add(row.date);
     } else {
       byUser.set(row.user_id, {
-        username: (row as any).profiles?.username ?? "unknown",
-        display_name: (row as any).profiles?.display_name ?? null,
-        avatar_url: (row as any).profiles?.avatar_url ?? null,
+        username: row.profiles?.username ?? "unknown",
+        display_name: row.profiles?.display_name ?? null,
+        avatar_url: row.profiles?.avatar_url ?? null,
         dates: new Set([row.date]),
       });
     }
@@ -416,7 +423,7 @@ export async function fetchPublicAchievementUnlocks(userId: string): Promise<Ach
     .order("unlocked_at", { ascending: false });
 
   if (error) throw error;
-  return (data ?? []).map((row: any) => ({
+  return parseAchievementUnlockRows(data).map((row) => ({
     achievementId: row.achievement_id,
     unlockedAt: row.unlocked_at,
     seenAt: row.unlocked_at,
@@ -465,10 +472,10 @@ export async function fetchPublicSurahProgress(userId: string): Promise<PublicSu
     .order("surah", { ascending: true });
 
   if (error) throw error;
-  return (data ?? []).map((row: any) => ({
+  return parseSurahProgressRows(data).map((row) => ({
     surah: row.surah,
-    totalCards: row.total_cards ?? 0,
-    memorized: row.memorized_cards ?? 0,
+    totalCards: row.total_cards,
+    memorized: row.memorized_cards,
   }));
 }
 

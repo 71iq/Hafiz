@@ -1,4 +1,6 @@
 import { isMissingPublicReviewAggregateError } from "@/lib/leaderboard/errors";
+import { ZodError } from "zod";
+import { parseReviewActivityRows, parseReviewStatsRow } from "@/lib/leaderboard/rows";
 import type { DatabaseExecutor } from "@/lib/database/types";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { beginProfileWrite, useAuthStore } from "@/lib/auth/store";
@@ -210,21 +212,21 @@ async function fetchPublicReviewSummary(userId: string): Promise<PublicReviewSum
   }
 
   const counts = new Map<string, number>();
-  for (const row of activityResult.data ?? []) {
-    counts.set((row as any).date, (row as any).reviews_count ?? 0);
+  for (const row of parseReviewActivityRows(activityResult.data)) {
+    counts.set(row.date, row.reviews_count);
   }
   const summary = summarizeReviewCounts(counts);
-  const stats = statsResult.data as any | null;
+  const stats = parseReviewStatsRow(statsResult.data);
   if (!stats) return summary.totalReviews > 0 ? summary : null;
   const statsLastReviewDate = stats.last_review_date?.slice(0, 10) ?? null;
   const today = formatUtcDateKey(new Date());
 
   return {
     activity: summary.activity,
-    totalReviews: Math.max(summary.totalReviews, stats.total_reviews ?? 0),
-    activeDays: Math.max(summary.activeDays, stats.active_days ?? 0),
-    currentStreak: Math.max(summary.currentStreak, statsLastReviewDate === today ? (stats.current_streak ?? 0) : 0),
-    longestStreak: Math.max(summary.longestStreak, stats.longest_streak ?? 0),
+    totalReviews: Math.max(summary.totalReviews, stats.total_reviews),
+    activeDays: Math.max(summary.activeDays, stats.active_days),
+    currentStreak: Math.max(summary.currentStreak, statsLastReviewDate === today ? stats.current_streak : 0),
+    longestStreak: Math.max(summary.longestStreak, stats.longest_streak),
     lastReviewDate: maxDate(summary.lastReviewDate, statsLastReviewDate),
   };
 }
@@ -366,6 +368,8 @@ export async function updateProfileStats(db: DatabaseExecutor): Promise<void> {
             };
           }),
           fetchPublicReviewSummary(owner.userId).catch((error) => {
+            // A malformed remote row aborts this run rather than letting local totals replace it.
+            if (error instanceof ZodError) throw error;
             if (owner.isCurrent()) console.warn("[Leaderboard] Failed to read public review summary:", error.message);
             return null;
           }),

@@ -1527,6 +1527,18 @@ describe("same-owner profile field publication", () => {
   });
 });
 
+test("a malformed remote review summary aborts the run before any stats write (RF-191)", async () => {
+  beginAsA();
+  mockQueryResponse = (operation) =>
+    operation.kind === "select" && operation.table === "public_review_stats"
+      ? Promise.resolve({ data: { total_reviews: "many" }, error: null })
+      : undefined;
+
+  await expect(updateProfileStats(database)).rejects.toThrow();
+
+  expect(writeIntents()).toEqual([]);
+});
+
 describe("public UTC review publication", () => {
   beforeEach(() => jest.useFakeTimers());
   afterEach(() => jest.useRealTimers());
