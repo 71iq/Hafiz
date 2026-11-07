@@ -5,6 +5,7 @@ import { observeAuthSession } from "@/lib/auth/commands";
 import { createSchema } from "@/lib/database/schema";
 import { fullSync } from "@/lib/database/sync";
 import { State } from "@/lib/fsrs/scheduler";
+import { getReviewStats } from "@/lib/fsrs/queries";
 
 const USER_ID = "00000000-0000-4000-8000-000000000001";
 const OLD = "2026-01-01T00:00:00.000Z";
@@ -118,6 +119,8 @@ jest.mock("@/lib/achievements/queries", () => ({
 let sql: DatabaseSync;
 let db: SQLiteDatabase;
 let transactions = 0;
+let studyLogTimestampCandidateQueries = 0;
+let studyLogTimestampCandidateRowsLoaded = 0;
 function card(id = "2:255"): Record<string, SQLInputValue> {
   return {
     id,
@@ -148,6 +151,26 @@ function putCard(row: Record<string, SQLInputValue>) {
 }
 function putSetting(key: string, value: string) {
   sql.prepare("INSERT OR REPLACE INTO user_settings (key,value,updated_at) VALUES (?,?,?)").run(key, value, OLD);
+}
+function studyLogRow(overrides: Record<string, SQLInputValue> = {}): Record<string, SQLInputValue> {
+  return {
+    card_id: "2:255",
+    rating: 3,
+    state: State.Review,
+    due: OLD,
+    stability: 5,
+    difficulty: 4,
+    elapsed_days: 1,
+    scheduled_days: 1,
+    reviewed_at: NEW,
+    ...overrides,
+  };
+}
+function insertStudyLog(row: Record<string, SQLInputValue>) {
+  const columns = Object.keys(row);
+  sql
+    .prepare(`INSERT INTO study_log (${columns.join(",")}) VALUES (${columns.map(() => "?").join(",")})`)
+    .run(...Object.values(row));
 }
 function restoreComplete() {
   putSetting(`sync_account_restore_${USER_ID}_20260614_account_restore_v1`, "true");
@@ -235,13 +258,23 @@ beforeEach(async () => {
   writes.length = 0;
   beforeHighlightDelete = null;
   transactions = 0;
+  studyLogTimestampCandidateQueries = 0;
+  studyLogTimestampCandidateRowsLoaded = 0;
   sql = new DatabaseSync(":memory:");
   const adapter = {
     execAsync: async (source: string) => {
       sql.exec(source);
     },
     getFirstAsync: async (source: string, params: SQLInputValue[] = []) => sql.prepare(source).get(...params) ?? null,
-    getAllAsync: async (source: string, params: SQLInputValue[] = []) => sql.prepare(source).all(...params),
+    getAllAsync: async (source: string, params: SQLInputValue[] = []) => {
+      const rows = sql.prepare(source).all(...params);
+      const normalizedSql = source.replace(/\s+/g, " ").trim().toLowerCase();
+      if (normalizedSql.includes("from study_log") && normalizedSql.includes("reviewed_at")) {
+        studyLogTimestampCandidateQueries += 1;
+        studyLogTimestampCandidateRowsLoaded += rows.length;
+      }
+      return rows;
+    },
     runAsync: async (source: string, params: SQLInputValue[] = []) => {
       writes.push(source);
       if (source.trimStart().toUpperCase().startsWith("DELETE FROM HIGHLIGHTS") && beforeHighlightDelete) {
@@ -485,6 +518,286 @@ it("retains a row and cursor on malformed local time, then retries after manual 
     state: State.New,
     updated_at: "2026-06-01T00:00:00.1001Z",
   });
+});
+
+it("does not duplicate an incremental review with an equivalent timestamp spelling", async () => {
+  restoreComplete();
+  insertStudyLog({
+    id: 71,
+    ...studyLogRow({ card_id: "review-equivalent", reviewed_at: "2026-06-01T04:00:00+02:00", rating: 3 }),
+    sync_status: "pending",
+  });
+  const original = sql.prepare("SELECT * FROM study_log WHERE id=71").get();
+  mockTableRows.set("study_log:incremental", [
+    studyLogRow({ card_id: "review-equivalent", reviewed_at: "2026-06-01T02:00:00Z", rating: 1 }),
+  ]);
+
+  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
+
+  const rows = sql.prepare("SELECT * FROM study_log WHERE card_id='review-equivalent'").all();
+  const stats = await getReviewStats(db);
+  expect({ rows, totalReviews: stats.totalReviews }).toEqual({ rows: [original], totalReviews: 1 });
+
+  putSetting("last_pull_at", OLD);
+  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
+  expect(sql.prepare("SELECT * FROM study_log WHERE card_id='review-equivalent'").all()).toEqual([original]);
+});
+
+it("deduplicates an equivalent restore review across the 500-row page boundary", async () => {
+  const first = studyLogRow({
+    id: "9000000000000000001",
+    card_id: "restore-equivalent",
+    reviewed_at: "2026-06-01T04:00:00+02:00",
+    rating: 3,
+  });
+  const otherEvents = Array.from({ length: 499 }, (_, index) =>
+    studyLogRow({ card_id: `restore-distinct-${index}`, reviewed_at: "2026-06-01T12:00:00.123456789Z" }),
+  );
+  const equivalent = studyLogRow({
+    id: "9000000000000000002",
+    card_id: "restore-equivalent",
+    reviewed_at: "2026-06-01T02:00:00.000Z",
+    rating: 1,
+  });
+  mockTableRows.set("study_log:restore", [first, ...otherEvents, equivalent]);
+
+  await expect(fullSync(db)).resolves.toMatchObject({
+    status: "synced",
+    pulled: 501,
+    accountRestored: true,
+  });
+
+  expect(
+    requests.filter((request) => request.table === "study_log" && !request.incremental).map((r) => r.offset),
+  ).toEqual([0, 500]);
+  const eventRows = sql
+    .prepare("SELECT card_id,rating,reviewed_at,sync_status FROM study_log WHERE card_id='restore-equivalent'")
+    .all();
+  const candidateLoad = {
+    queries: studyLogTimestampCandidateQueries,
+    rows: studyLogTimestampCandidateRowsLoaded,
+  };
+  const stats = await getReviewStats(db);
+  expect({ eventRows, totalReviews: stats.totalReviews, candidateLoad }).toEqual({
+    eventRows: [{ card_id: "restore-equivalent", rating: 3, reviewed_at: first.reviewed_at, sync_status: "synced" }],
+    totalReviews: 500,
+    candidateLoad: { queries: 0, rows: 0 },
+  });
+});
+
+it("preserves historical duplicate reviews when an equivalent incremental event arrives", async () => {
+  restoreComplete();
+  const first = {
+    id: 81,
+    ...studyLogRow({ card_id: "historical-duplicates", reviewed_at: "2026-06-01T04:00:00+02:00" }),
+    sync_status: "pending",
+  };
+  const second = {
+    id: 82,
+    ...studyLogRow({ card_id: "historical-duplicates", reviewed_at: "2026-06-01T04:00:00+02:00", rating: 1 }),
+    sync_status: "synced",
+  };
+  insertStudyLog(first);
+  insertStudyLog(second);
+  mockTableRows.set("study_log:incremental", [
+    studyLogRow({ card_id: "historical-duplicates", reviewed_at: "2026-06-01T02:00:00.000Z", rating: 2 }),
+  ]);
+
+  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
+
+  const rows = sql.prepare("SELECT * FROM study_log WHERE card_id='historical-duplicates' ORDER BY id").all();
+  const stats = await getReviewStats(db);
+  expect({ rows, totalReviews: stats.totalReviews }).toEqual({
+    rows: [first, second],
+    totalReviews: 2,
+  });
+});
+
+it("keeps distinct cards and sub-millisecond review instants", async () => {
+  restoreComplete();
+  insertStudyLog({
+    id: 91,
+    ...studyLogRow({ card_id: "fractional-review", reviewed_at: "2026-06-01T02:00:00.100Z", rating: 3 }),
+    sync_status: "pending",
+  });
+  mockTableRows.set("study_log:incremental", [
+    studyLogRow({ card_id: "fractional-review", reviewed_at: "2026-06-01T02:00:00.1001Z", rating: 1 }),
+    studyLogRow({ card_id: "fractional-review", reviewed_at: "2026-06-01T04:00:00.10010+02:00", rating: 2 }),
+    studyLogRow({ card_id: "fractional-review", reviewed_at: "2026-06-01T02:00:00.1002Z", rating: 4 }),
+    studyLogRow({ card_id: "other-card", reviewed_at: "2026-06-01T02:00:00.1001Z", rating: 2 }),
+  ]);
+
+  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pulled: 4 });
+
+  expect(sql.prepare("SELECT id,card_id,rating,reviewed_at,sync_status FROM study_log ORDER BY id").all()).toEqual([
+    {
+      id: 91,
+      card_id: "fractional-review",
+      rating: 3,
+      reviewed_at: "2026-06-01T02:00:00.100Z",
+      sync_status: "pending",
+    },
+    {
+      id: 92,
+      card_id: "fractional-review",
+      rating: 1,
+      reviewed_at: "2026-06-01T02:00:00.1001Z",
+      sync_status: "synced",
+    },
+    {
+      id: 93,
+      card_id: "fractional-review",
+      rating: 4,
+      reviewed_at: "2026-06-01T02:00:00.1002Z",
+      sync_status: "synced",
+    },
+    {
+      id: 94,
+      card_id: "other-card",
+      rating: 2,
+      reviewed_at: "2026-06-01T02:00:00.1001Z",
+      sync_status: "synced",
+    },
+  ]);
+});
+
+it("fails closed on a malformed same-card review timestamp and retries after repair", async () => {
+  restoreComplete();
+  insertStudyLog({
+    id: 101,
+    ...studyLogRow({ card_id: "malformed-review", reviewed_at: "not-a-timestamp" }),
+    sync_status: "pending",
+  });
+  putSetting("last_pull_at", OLD);
+  mockTableRows.set("study_log:incremental", [
+    studyLogRow({ card_id: "malformed-review", reviewed_at: "2026-06-01T02:00:00Z" }),
+  ]);
+  const before = snapshot();
+
+  await expect(fullSync(db)).resolves.toMatchObject({ status: "failed", pulled: 0 });
+  expect(snapshot()).toEqual(before);
+  expect(sql.prepare("SELECT value FROM user_settings WHERE key='last_pull_at'").get()).toEqual({ value: OLD });
+  expect(studyLogTimestampCandidateRowsLoaded).toBe(1);
+
+  sql.prepare("UPDATE study_log SET reviewed_at='2026-06-01T01:00:00Z' WHERE id=101").run();
+  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
+  expect(sql.prepare("SELECT card_id,reviewed_at FROM study_log ORDER BY id").all()).toEqual([
+    { card_id: "malformed-review", reviewed_at: "2026-06-01T01:00:00Z" },
+    { card_id: "malformed-review", reviewed_at: "2026-06-01T02:00:00Z" },
+  ]);
+});
+
+it("rolls back an incremental review page after a later SQL insert failure and retries", async () => {
+  restoreComplete();
+  putSetting("last_pull_at", OLD);
+  insertStudyLog({
+    id: 115,
+    ...studyLogRow({ card_id: "incremental-original", reviewed_at: OLD }),
+    sync_status: "pending",
+  });
+  mockTableRows.set("study_log:incremental", [
+    studyLogRow({ card_id: "incremental-before-trigger", reviewed_at: "2026-06-01T11:00:00Z" }),
+    studyLogRow({ card_id: "incremental-trigger-failure", reviewed_at: "2026-06-01T12:00:00Z" }),
+  ]);
+  sql.exec(
+    "CREATE TEMP TRIGGER fail_later_incremental_review BEFORE INSERT ON study_log " +
+      "WHEN NEW.card_id='incremental-trigger-failure' BEGIN SELECT RAISE(ABORT,'RF157 incremental insert failure'); END",
+  );
+  const before = snapshot();
+
+  await expect(fullSync(db)).resolves.toMatchObject({ status: "failed", pulled: 0 });
+  expect(snapshot()).toEqual(before);
+  expect(sql.prepare("SELECT value FROM user_settings WHERE key='last_pull_at'").get()).toEqual({ value: OLD });
+
+  sql.exec("DROP TRIGGER fail_later_incremental_review");
+  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pulled: 2 });
+  expect(sql.prepare("SELECT card_id,reviewed_at,sync_status FROM study_log ORDER BY id").all()).toEqual([
+    { card_id: "incremental-original", reviewed_at: OLD, sync_status: "pending" },
+    { card_id: "incremental-before-trigger", reviewed_at: "2026-06-01T11:00:00Z", sync_status: "synced" },
+    { card_id: "incremental-trigger-failure", reviewed_at: "2026-06-01T12:00:00Z", sync_status: "synced" },
+  ]);
+});
+
+it("keeps the literal review lookup ahead of unrelated malformed history", async () => {
+  restoreComplete();
+  insertStudyLog({
+    id: 111,
+    ...studyLogRow({ card_id: "literal-review", reviewed_at: "malformed-local-history" }),
+    sync_status: "pending",
+  });
+  insertStudyLog({
+    id: 112,
+    ...studyLogRow({ card_id: "literal-review", reviewed_at: "2026-06-01T02:00:00Z" }),
+    sync_status: "synced",
+  });
+  mockTableRows.set("study_log:incremental", [
+    studyLogRow({ card_id: "literal-review", reviewed_at: "2026-06-01T02:00:00Z" }),
+  ]);
+
+  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
+
+  expect(sql.prepare("SELECT id FROM study_log WHERE card_id='literal-review' ORDER BY id").all()).toEqual([
+    { id: 111 },
+    { id: 112 },
+  ]);
+  expect(studyLogTimestampCandidateRowsLoaded).toBe(0);
+});
+
+it("preserves local history on an empty account restore", async () => {
+  insertStudyLog({
+    id: 121,
+    ...studyLogRow({ card_id: "empty-restore-history" }),
+    sync_status: "pending",
+  });
+  putQueueRow();
+  const beforeLogs = sql.prepare("SELECT * FROM study_log ORDER BY id").all();
+  const beforeQueue = snapshot().queue;
+
+  await fullSync(db);
+
+  expect(sql.prepare("SELECT * FROM study_log ORDER BY id").all()).toEqual(beforeLogs);
+  expect(snapshot().queue).toEqual(beforeQueue);
+  expect(transactions).toBe(0);
+});
+
+it("discards restore duplicate keys when a later insert rolls back, then retries cleanly", async () => {
+  insertStudyLog({
+    id: 131,
+    ...studyLogRow({ card_id: "old-review-history" }),
+    sync_status: "pending",
+  });
+  putQueueRow();
+  mockTableRows.set("study_log:restore", [
+    studyLogRow({ card_id: "restore-before-trigger", reviewed_at: "2026-06-01T04:00:00+02:00", rating: 3 }),
+    studyLogRow({ card_id: "trigger-failure", reviewed_at: "2026-06-01T12:00:00Z", rating: 2 }),
+  ]);
+  sql.exec(
+    "CREATE TEMP TRIGGER fail_later_review_insert BEFORE INSERT ON study_log " +
+      "WHEN NEW.card_id='trigger-failure' BEGIN SELECT RAISE(ABORT,'RF157 synthetic insert failure'); END",
+  );
+  const before = snapshot();
+
+  await expect(fullSync(db)).rejects.toThrow("RF157 synthetic insert failure");
+  expect(snapshot()).toEqual(before);
+  expect(transactions).toBe(1);
+
+  sql.exec("DROP TRIGGER fail_later_review_insert");
+  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pulled: 2, accountRestored: true });
+  expect(sql.prepare("SELECT card_id,rating,reviewed_at,sync_status FROM study_log ORDER BY id").all()).toEqual([
+    {
+      card_id: "restore-before-trigger",
+      rating: 3,
+      reviewed_at: "2026-06-01T04:00:00+02:00",
+      sync_status: "synced",
+    },
+    {
+      card_id: "trigger-failure",
+      rating: 2,
+      reviewed_at: "2026-06-01T12:00:00Z",
+      sync_status: "synced",
+    },
+  ]);
+  await expect(getReviewStats(db)).resolves.toMatchObject({ totalReviews: 2 });
 });
 
 it.each(invalidStates.flatMap((entry) => ["restore", "incremental"].map((mode) => ({ ...entry, mode }))))(

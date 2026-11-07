@@ -11,7 +11,7 @@ import {
   type SyncRows,
   type SyncTable,
 } from "@/lib/database/sync-payloads";
-import { compareSyncTimestamps } from "@/lib/database/sync-timestamps";
+import { compareSyncTimestamps, syncTimestampKey } from "@/lib/database/sync-timestamps";
 import {
   getPendingSyncEntries,
   getPendingSyncCount,
@@ -343,7 +343,8 @@ async function restoreAccountDataIfNeeded(db: SQLiteDatabase, owner: SyncOwner):
     owner.requireCurrent();
     await clearLocalSyncableData(db);
     owner.requireCurrent();
-    await applyRemoteAccountRows(db, remoteRows);
+    const studyLogKeysByCard = new Map<string, Set<string>>();
+    await applyRemoteAccountRows(db, remoteRows, studyLogKeysByCard);
     owner.requireCurrent();
     await markAccountRestoreComplete(db, userId, true, snapshotStartedAt, owner);
     owner.requireCurrent();
@@ -439,11 +440,15 @@ async function clearLocalSyncableData(db: SQLiteDatabase): Promise<void> {
   }
 }
 
-async function applyRemoteAccountRows(db: SQLiteDatabase, rows: RemoteAccountRows): Promise<void> {
+async function applyRemoteAccountRows(
+  db: SQLiteDatabase,
+  rows: RemoteAccountRows,
+  studyLogKeysByCard: Map<string, Set<string>>,
+): Promise<void> {
   for (const row of rows.user_settings) await upsertUserSetting(db, row);
   for (const row of rows.user_word_meanings) await upsertUserWordMeaning(db, row);
   for (const row of rows.study_cards) await upsertStudyCard(db, row);
-  for (const row of rows.study_log) await upsertStudyLog(db, row);
+  for (const row of rows.study_log) await upsertStudyLog(db, row, studyLogKeysByCard);
   for (const row of rows.bookmarks) await upsertBookmark(db, row);
   for (const row of rows.highlights) await upsertHighlight(db, row);
   for (const row of rows.private_notes) await upsertPrivateNote(db, row);
@@ -895,13 +900,39 @@ async function upsertStudyCard(db: SQLiteDatabase, row: SyncRows["study_cards"])
   );
 }
 
-async function upsertStudyLog(db: SQLiteDatabase, row: SyncRows["study_log"]): Promise<void> {
-  // Study log is append-only: check if we already have this exact entry
+async function upsertStudyLog(
+  db: SQLiteDatabase,
+  row: SyncRows["study_log"],
+  restoreKeysByCard?: Map<string, Set<string>>,
+): Promise<void> {
+  const restoreKey = restoreKeysByCard ? syncTimestampKey(row.reviewed_at) : null;
+  const seenRestoreKeys = restoreKeysByCard?.get(row.card_id);
+  if (restoreKey !== null && seenRestoreKeys?.has(restoreKey)) return;
+
+  // Preserve the literal lookup as the fast path for incremental pulls and restore.
   const existing = await db.getFirstAsync<{ id: number }>(
     "SELECT id FROM study_log WHERE card_id = ? AND reviewed_at = ?",
     [row.card_id, row.reviewed_at],
   );
-  if (existing) return;
+  const rememberRestoreKey = () => {
+    if (restoreKeysByCard === undefined || restoreKey === null) return;
+    const keys = restoreKeysByCard.get(row.card_id) ?? new Set<string>();
+    keys.add(restoreKey);
+    restoreKeysByCard.set(row.card_id, keys);
+  };
+  if (existing) {
+    rememberRestoreKey();
+    return;
+  }
+
+  if (restoreKeysByCard === undefined) {
+    const sameCardRows = await db.getAllAsync<{ reviewed_at: string }>(
+      "SELECT reviewed_at FROM study_log WHERE card_id = ?",
+      [row.card_id],
+    );
+    const incomingKey = syncTimestampKey(row.reviewed_at);
+    if (sameCardRows.some((local) => syncTimestampKey(local.reviewed_at) === incomingKey)) return;
+  }
 
   await db.runAsync(
     `INSERT INTO study_log
@@ -919,6 +950,7 @@ async function upsertStudyLog(db: SQLiteDatabase, row: SyncRows["study_log"]): P
       row.reviewed_at,
     ],
   );
+  rememberRestoreKey();
 }
 
 async function upsertBookmark(db: SQLiteDatabase, row: SyncRows["bookmarks"]): Promise<void> {

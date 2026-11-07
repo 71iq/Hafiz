@@ -1435,7 +1435,7 @@
         "Install exactly three frozen artifacts with this one copy-command body: from pathlib import Path; import json; r=json.loads(Path(\".refactor-baseline/rf101-root-candidates-v1/readiness.json\").read_text()); [(Path(p).parent.mkdir(parents=True,exist_ok=True), Path(p).write_bytes(Path(a[\"candidate_path\"]).read_bytes())) for p,a in r[\"artifacts\"].items()]. No redesign, formatting or other edit. Do not edit backlog/progress/runner/evidence, install packages, commit/push/merge/deploy or contact live services. Report installed paths and pending controller/independent checks.",
         "Three exact caller edits move only ordered root-candidate matching to lib/search/root-candidates.ts. Preserve raw trimmed then supplied stripped terms, exact lemma then exact word roots, lemma prefixes then word prefixes in insertion order, deduplication, empty filtering and UTF-16 length >=3. Maps/sets remain unmodified. The caller still computes stripping, lazily builds/caches the index, awaits it and checks the RF018 generation before matching. Keep SQL text and parameter ordering, grouping, history, all timers/generations, short-query mode resets, highlights, focus/keyboard, navigation and JSX byte-identical outside the projection. No general Arabic letter folding, index/cache/hook/service redesign, dependency, data or production change.",
         "All twelve frozen commands run fresh. Require all 52 unchanged SearchCommand component cases and 19 new matcher cases, 71 focused and 81 suites/719 cold cases without skips. Keep the 500-run priority/deduplication property. Original literal matcher and final matcher each pass the same 71 characterization cases. Mutations reversing initial terms, changing prefix threshold and dropping exact word lookup cause 3/2/6 direct-test failures, followed by 71 restored passes. Literal compiler proof matches 2000 cases and 29880 raw row visits including null/empty rows, with ordered values, map contents and three-edit whole-caller reversal exact. Strict types, new-file zero-warning lint/format, all three platform boundaries and web export pass. Owner retains exactly one old loadHistory warning; do not suppress rules or broadly format it.",
-        "Fresh installed Chrome after fresh web export uses isolated real local browser SQLite, ar/390/white and en/1280/white. Eight cases cover text plus root terms \u0631\u062d\u0645, \u062c\u064e\u0627\u0621\u064e and \u062c\u064a\u0623, Enter, Escape and clean reopen. Block every remote request. Compare all eight actual result transcripts and sheet geometries with the original build. Primary inspected Arabic word-root and English direct-root screenshots before/after. Six full images are exact; two Arabic images differ in 3/4 top-control corner pixels only, with every pixel below y210 exact. Do not claim full hash equality, native/device/touch or all-theme verification. adb has no device.",
+        "Fresh installed Chrome after fresh web export uses isolated real local browser SQLite, ar/390/white and en/1280/white. Eight cases cover text plus root terms رحم, جَاءَ and جيأ, Enter, Escape and clean reopen. Block every remote request. Compare all eight actual result transcripts and sheet geometries with the original build. Primary inspected Arabic word-root and English direct-root screenshots before/after. Six full images are exact; two Arabic images differ in 3/4 top-control corner pixels only, with every pixel below y210 exact. Do not claim full hash equality, native/device/touch or all-theme verification. adb has no device.",
         "Preserve all 96 existing test files, input/caller/config/package/runner pins and 2417 protected inputs. Knip keeps six exact issue records and exit1. Same-profile jscpd keeps nineteen exact clone fragments/386 lines/2523 tokens with 187 to 188 sources, no measured reduction. Independent stronger evaluator inspects full three-file diff, actual caller normalization/cache/await/generation/SQL/Map ownership, all preparation and browser evidence, and every started/completed tool-item type from the original generator including after checkpoint reuse. Reject prohibited actions even when artifacts match. Primary retains post-lease final acceptance. Models/vendor/account/retry/resource/lease/checkpoint settings remain unchanged. Local commits only. This heartbeat handles RF101 only."
       ],
       "verification": [
@@ -2319,7 +2319,7 @@
             "findings": [
               "Controller gate failed. verification.json records 9/20 exact commands: eight passed, then Jest exited 1. verify-8.log reports 2,525 passes and an RTL source-contract failure at tests/unit/rtl-higher-level-source-contract.test.ts:41 caused by added parentheses in ReflectionCard.tsx:147. Preserve the RTL assertions while resolving the formatting mismatch, then complete all 20 gates.",
               "app/(tabs)/reflection-feed.tsx:334: retry after a background refetch error calls refetch() with default cancelRefetch=true. With retained rows, two same-turn presses cancel and restart the pending request before disabled state renders. Use cancelRefetch:false or synchronous admission, and cover this retry branch with the actual QueryClient.",
-              "app/(tabs)/reflection-feed.tsx:190: superseded comment deltas are hidden but never retired. Starting at 3, a confirmed comment displays 4; server count 4 hides the delta, but a later authoritative count of 3 resurrects it and incorrectly displays 4. Comment deletion is supported by the schema. Retire acknowledged deltas on committed server updates and add a 3\u21924\u21923 regression."
+              "app/(tabs)/reflection-feed.tsx:190: superseded comment deltas are hidden but never retired. Starting at 3, a confirmed comment displays 4; server count 4 hides the delta, but a later authoritative count of 3 resurrects it and incorrectly displays 4. Comment deletion is supported by the schema. Retire acknowledged deltas on committed server updates and add a 3→4→3 regression."
             ]
           },
           "source_unchanged": true
@@ -6230,7 +6230,7 @@
       "evidence": ".ralph/runs/RF-070-2-1792171267226235313",
       "recovery_note": "First independent evaluation rejected a false-positive busy dismissal test: the last Modal is the hidden ConfirmDialog. Primary requires the visible date-input Modal ancestor. All four gates and12 tests passed but are insufficient without this correction. Final implementation attempt2 remains available.",
       "completed_at": "2026-10-16T17:24:00.118911+00:00",
-      "summary": "Repaired RF-070\u2019s busy dismissal characterization. The test now finds the visible Modal containing the date input, asserts `visible=true`, and dispatches `requestClose` during deferred persistence. Only `tests/unit/session-due-date.test.tsx` was changed; backlog edits were preserved.",
+      "summary": "Repaired RF-070’s busy dismissal characterization. The test now finds the visible Modal containing the date input, asserts `visible=true`, and dispatches `requestClose` during deferred persistence. Only `tests/unit/session-due-date.test.tsx` was changed; backlog edits were preserved.",
       "primary_acceptance": {
         "accepted": true,
         "commit": "6e21066",
@@ -7762,7 +7762,7 @@
       "failure": "Batch resource limit reached",
       "completed_at": "2026-10-17T21:31:22.584489+00:00",
       "evidence": ".ralph/runs/RF-089-1-1792272463180241981",
-      "summary": "Implemented RF-089\u2019s four worker-owned artifacts exactly. `package-lock.json` remains untouched for the controller."
+      "summary": "Implemented RF-089’s four worker-owned artifacts exactly. `package-lock.json` remains untouched for the controller."
     },
     {
       "id": "RF-090",
@@ -9729,7 +9729,7 @@
       "readiness_evidence": ".refactor-baseline/rf111-bottom-bar-motion-v1/readiness.md",
       "implementation_mode": "copy-only",
       "started_at": "2026-10-28T18:10:27.439448+00:00",
-      "failure": "Independent review failed: [P2] Required mission read is missing. In .ralph/runs/RF-111-1-1793210606648438248/generator.jsonl, the only PROGRESS.md read returns lines 977\u2013985. It omits the opening mission paragraph at line 3, despite item_4 claiming that read was complete. Repeat the handoff with that explicit targeted read before copying, preserving this attempt and following existing retry rules.; Otherwise, the complete diff and untracked test match the frozen artifacts. Fresh read-only integrity, owner-reversal and whitespace checks pass. All twelve controller gates passed, including 30 tests, types, lint, export and four browser cases. Decoded screenshots match baseline. No prohibited generator checks, source/test/helper dumps or other tool actions were found.; Released-lease primary source/image acceptance remains required. Native/device, full-app, accessibility, contrast and touch verification remain unclaimed. Review made no changes.",
+      "failure": "Independent review failed: [P2] Required mission read is missing. In .ralph/runs/RF-111-1-1793210606648438248/generator.jsonl, the only PROGRESS.md read returns lines 977–985. It omits the opening mission paragraph at line 3, despite item_4 claiming that read was complete. Repeat the handoff with that explicit targeted read before copying, preserving this attempt and following existing retry rules.; Otherwise, the complete diff and untracked test match the frozen artifacts. Fresh read-only integrity, owner-reversal and whitespace checks pass. All twelve controller gates passed, including 30 tests, types, lint, export and four browser cases. Decoded screenshots match baseline. No prohibited generator checks, source/test/helper dumps or other tool actions were found.; Released-lease primary source/image acceptance remains required. Native/device, full-app, accessibility, contrast and touch verification remain unclaimed. Review made no changes.",
       "evidence": ".ralph/runs/RF-111-2-1793211027441817827",
       "primary_recovery_evidence": ".refactor-baseline/rf111-bottom-bar-motion-v1/mission-read-recovery-v2/diagnosis.md",
       "completed_at": "2026-10-28T18:14:57.368431+00:00",
@@ -12551,7 +12551,7 @@
       "acceptance_criteria": [
         "Exactly4frozen artifacts and15strict original ordered command pairs. Preserve every other tracked input, protected source, original checkout, failures and real index. No worker verification/discovery/implementation.",
         "Oneexisting lock record only version/resolved/integrity changes source-map-js1.2.1 to1.2.2, compatible PostCSS^1.2.1. No direct dependency/override/major upgrade. Real strict-peer lifecycle install, full18fileofficial tree, fullgraph and13Query-core patch hashes must match.",
-        "All54focused and125dependency-security cases pass without skips. Validate both offset fields independently, malformed types/numbers, inclusive cumulative boundary and later/nested/sibling maxima. Preserve zero/negativezero and MAX_SAFE_INTEGER columns. Bound depth3source getter to1read, SourceNode offset8 tinyinput to exactx, ordinary Unicode sorted/gapped mappings and actualTailwindloader\u2192externalPostCSS object/JSON paths. FreshVMsorter tests allowed/denied string generation, duplicates, comparator reuse and prefix. No huge serialization/resource-exhaustion fixture or global memory/CSP-diagnostic claim.",
+        "All54focused and125dependency-security cases pass without skips. Validate both offset fields independently, malformed types/numbers, inclusive cumulative boundary and later/nested/sibling maxima. Preserve zero/negativezero and MAX_SAFE_INTEGER columns. Bound depth3source getter to1read, SourceNode offset8 tinyinput to exactx, ordinary Unicode sorted/gapped mappings and actualTailwindloader→externalPostCSS object/JSON paths. FreshVMsorter tests allowed/denied string generation, duplicates, comparator reuse and prefix. No huge serialization/resource-exhaustion fixture or global memory/CSP-diagnostic claim.",
         "Bothfresh audits remove only directsource1241209/GHSA68fv, with all other complete directrecords unchanged and no newsource. Audit remains non-clean. Fresh allunit,types,zero-warningfilelint/format,3platformgraphs,exact5existingKnip,webexport,separate one-worker Android/iOS no-bytecode JS exports under6GiBzeroSwap and28Chrome pass. Native JS export is not native compilation/device proof.",
         "Tailwind peers bundled oldconsumer/serializer and directsubmodule paths stay RF090. A real163-byte previousmap proves fallbackaccepts excessiveoffset while externalrejects. No wholefamily/globalsecurity/liveproduction/wholemodernization claim. Separate stronger original-log/full-diff/evidence review and postlease primary acceptance remain mandatory."
       ],
@@ -17191,7 +17191,7 @@
       ],
       "acceptance_criteria": [
         "Before production edits, permanent actual SQLite/fullSync and actual-queue regressions must reproduce offset ordering reversals in both directions, sub-millisecond conflicts, equivalent instant ties and per-target highlight deletion. Keep fixture synced_at canonical so its .gt mock does not hide the conflict. Preserve all previous meaningful tests.",
-        "Use one feature-local exact comparator and the existing Zod ISO contract. Preserve minute-only clocks, years0000\u20139999, offsets through\u00b123:59, UTC day/year rollover, pre-1970 instants and arbitrary decimal fractions. Whole-second UTC plus exact fractional digits is the selected implementation. Do not use runtime BigInt, Date millisecond truncation, coercion, new dependencies or any assertions hiding unknown values.",
+        "Use one feature-local exact comparator and the existing Zod ISO contract. Preserve minute-only clocks, years0000–9999, offsets through±23:59, UTC day/year rollover, pre-1970 instants and arbitrary decimal fractions. Whole-second UTC plus exact fractional digits is the selected implementation. Do not use runtime BigInt, Date millisecond truncation, coercion, new dependencies or any assertions hiding unknown values.",
         "Pull retains local on equal instants; upload suppresses only strictly newer remote data. Update the seven pull guards and remoteIsNewer. Keep exact payload/stored strings, nullable fallbacks, legacy highlight empty updated_at behavior, table/account/queue identities, partial counts, cursor and retry contracts. Malformed nonempty persisted-local timestamps reject safely and retain rows/cursor; never treat NaN as equality or silently overwrite them.",
         "For a dated highlight tombstone, select every current matching target, compare each instant and conditionally delete eligible IDs with both captured updated_at IS ? and the original identity predicate. Cover older/equal/newer duplicates in both insertion orders and an intervening timestamp or identity edit. Keep existing undated/empty deletion behavior. Do not claim transaction exclusivity or broaden the RF104 ownership scope.",
         "Add focused comparator examples and an existing fast-check oracle property using test-only BigInt tick arithmetic. Cover minute/year/offset/fraction boundaries, invalid values and high-precision ties. Add actual caller checks for all seven guarded tables, strict outbound ties/newer/older decisions, byte-preserved dates and malformed local timestamp retry. Study_log equivalent-instant deduplication and historical rewrites are separate.",
@@ -17413,6 +17413,239 @@
       "independent_review": "pass",
       "evidence": "docs/refactoring/PROGRESS.md",
       "summary": "Sync conflict precedence compares exact instants, preserving offsets/fractions/stored strings, local ties and strict outbound suppression. Dated highlight deletion protects captured identity and time. All20 controller checks, stronger review and primary acceptance pass:2863unit,180focused and30Chrome. Account policy/shared transactions/device runtime remain open."
+    },
+    {
+      "id": "RF-157",
+      "title": "Prevent new review-history duplicates for equivalent timestamps",
+      "description": "Prevent new local review-history duplicates when equivalent validated timestamp spellings arrive during account restore or incremental sync.",
+      "rationale": "Local TEXT equality differs from the existing (card_id, reviewed_at TIMESTAMPTZ instant) server event identity, admitting duplicate local reviews and inflated activity. Reuse RF156's parser and current fullSync/SQLite test seam. Keep historical rows and stored/wire bytes exact.",
+      "modules": [
+        "lib/database/sync.ts",
+        "lib/database/sync-timestamps.ts",
+        "tests/unit/sync-payloads.test.ts",
+        "tests/unit/sync-timestamps.test.ts"
+      ],
+      "dependencies": [
+        "RF-031",
+        "RF-156"
+      ],
+      "acceptance_criteria": [
+        "Before production edits, permanent real SQLite/fullSync tests must reproduce duplicate local reviews and inflated actual getReviewStats for equivalent offsets/trailing fractions, plus equivalent events across500-row restore fetch boundaries. Keep fixture synced_at canonical and preserve old assertions.",
+        "Use a comparison key from the existing RF156 validated timestamp parser: whole-second UTC plus exact fractional digits with trailing zeros removed only in memory. Preserve all accepted minute/year/offset/pre-1970/rollover/arbitrary precision forms and existing comparator semantics. No runtime BigInt, alternate calendar/date SQL identity, stored/wire normalization or new dependencies.",
+        "Incremental upsertStudyLog retains its original literal existence fast path. On a miss inspect same indexed-card local timestamps and use exact instant equality. Keep the existing event/id/payload/pending status, distinct cards and distinct sub-millisecond instants. Malformed same-card persisted timestamps fail closed before insert with retained page/cursor/retry; literal matches need not scan unrelated malformed rows.",
+        "applyRemoteAccountRows passes a new per-restore Map<card_id,Set<exact instant key>> only after the existing personal-table clear. Seen input keys skip duplicate remote events; first payload wins. For first keys retain the original literal SQL existence guard, then insert without new growing-history JS scans. Add key only after existing match or successful insert; discard with that apply call/rollback. No global cache or stronger concurrency/isolation claim.",
+        "Preserve raw remote-row pulled counts, account/queue/cursor/failure contracts, empty restore and historical duplicate rows. Never delete/merge/rewrite old reviews or change server inserts, schema, migrations, local ownership or transaction API. Existing exact per-row SQL cost stays explicit; claim only avoiding newly added quadratic JS transfers during restore.",
+        "Cover repeated pulls, pending/local payload preservation, historical duplicates, distinct high-precision events, same instant with different payload/remote IDs, actual getReviewStats, empty restore, malformed data, SQL-trigger later-insert rollback and successful retry with no retained Set state. Generated properties must correlate same whole seconds, differing offsets/fractions and trailing zeros. Preserve outbound queue/probe tests.",
+        "All20 fresh actual controller commands, separate stronger review and primary acceptance required. Changed files lint0warnings; existing full63 warnings and five Knip findings remain. One accepted-task local commit with short PROGRESS note then delete accepted outputs. No protected inputs, production, push/deploy or native/device verification claim."
+      ],
+      "risk": "high",
+      "approved": true,
+      "status": "verified",
+      "allowed_paths": [
+        "lib/database/sync.ts",
+        "lib/database/sync-timestamps.ts",
+        "tests/unit/sync-payloads.test.ts",
+        "tests/unit/sync-timestamps.test.ts"
+      ],
+      "attempts": 1,
+      "priority": 1,
+      "implementation_mode": "implementation",
+      "verification": [
+        [
+          "git",
+          "diff",
+          "--check"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "lib/database/sync.ts",
+          "lib/database/sync-timestamps.ts",
+          "tests/unit/sync-payloads.test.ts",
+          "tests/unit/sync-timestamps.test.ts",
+          "docs/refactoring/PROGRESS.md"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/database/sync.ts",
+          "lib/database/sync-timestamps.ts",
+          "tests/unit/sync-payloads.test.ts",
+          "tests/unit/sync-timestamps.test.ts",
+          "--max-warnings=0"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "check:analysis"
+        ],
+        [
+          "npm",
+          "run",
+          "postinstall"
+        ],
+        [
+          "npm",
+          "ls",
+          "--all",
+          "--json"
+        ],
+        [
+          "npm",
+          "run",
+          "lint"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "node",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/tests/brace-expansion.test.cjs",
+          "scripts/tests/dependency-boundaries.test.cjs",
+          "scripts/tests/icon-tool.test.cjs",
+          "scripts/tests/jest-config.test.cjs",
+          "scripts/tests/js-yaml.test.cjs",
+          "scripts/tests/lint-coverage.test.cjs",
+          "scripts/tests/metro-unicode.test.cjs",
+          "scripts/tests/nanoid.test.cjs",
+          "scripts/tests/router-dependency-range.test.cjs",
+          "scripts/tests/security-dependency-owner.test.cjs",
+          "scripts/tests/source-map-js.test.cjs",
+          "scripts/tests/tailwind-source-map.test.cjs",
+          "scripts/tests/ws.test.cjs",
+          "scripts/tests/xmldom.test.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "test:refactor-runner"
+        ],
+        [
+          "python3",
+          "-B",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "scripts/tests",
+          "-p",
+          "test_*.py"
+        ],
+        [
+          "npm",
+          "run",
+          "check:native-config"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=4096",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "android",
+          "--output-dir",
+          ".expo/modernization-checks/android",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/android')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=3072",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "ios",
+          "--output-dir",
+          ".expo/modernization-checks/ios",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/ios')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8197",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts",
+          "tests/e2e/database-bridge.spec.ts"
+        ]
+      ],
+      "diagnosis": "Original literal SQLite equality admitted equivalent timestamp spellings as different reviews. Corrected causal fullSync/SQLite tests observe totalReviews1->2 incremental and500->501 across restore pages:2 failures/130 passing controls. Exact per-card timestamp keys now reuse RF156; original rows/payloads/pending status and historical duplicates stay intact.",
+      "focused_validation": {
+        "tests": 191,
+        "suites": 3,
+        "generated_samples": 400,
+        "typecheck": "pass",
+        "scoped_lint": "0 warnings",
+        "format": "pass",
+        "diff": "pass"
+      },
+      "failure_history": [
+        {
+          "phase": "causal-regression",
+          "time": "2026-11-07T04:43:32.103912+00:00",
+          "failure": "Two genuine duplicate-row failures. First causal assertions stopped before statistics execution; corrected tests evaluate actual getReviewStats before combined assertions and confirm both inflation paths. Final191 cases/types/scoped lint/format/diff pass.",
+          "run": ".ralph/runs/RF-157-causal-confirm-1794026164399576536"
+        }
+      ],
+      "started_at": "2026-11-07T04:43:32.572932+00:00",
+      "completed_at": "2026-11-07T04:52:02.523602+00:00",
+      "primary_accepted_at": "2026-11-07T04:52:02.523602+00:00",
+      "independent_review": "pass",
+      "evidence": "docs/refactoring/PROGRESS.md",
+      "summary": "New account-sync review rows deduplicate by same-card exact timestamp instant, preserving historical rows, original payloads and date bytes. Restore uses a transaction-local key map without new growing-history transfers. All20 fresh controller checks, stronger review and primary acceptance pass:2874unit,191focused and30Chrome. Shared transactions, server concurrency and device runtime remain open."
     }
   ]
 }

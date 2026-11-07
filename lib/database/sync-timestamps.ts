@@ -21,6 +21,11 @@ function parseTimestamp(value: unknown): TimestampParts {
   return { wholeSeconds, fraction };
 }
 
+export function syncTimestampKey(value: unknown): string {
+  const { wholeSeconds, fraction } = parseTimestamp(value);
+  return `${wholeSeconds}:${fraction.replace(/0+$/, "")}`;
+}
+
 export function compareSyncTimestamps(left: unknown, right: unknown): -1 | 0 | 1 {
   const leftParts = parseTimestamp(left);
   const rightParts = parseTimestamp(right);
