@@ -1,0 +1,235 @@
+diff --git a/node_modules/expo-sqlite/web/worker.ts b/node_modules/expo-sqlite/web/worker.ts
+--- a/node_modules/expo-sqlite/web/worker.ts
++++ b/node_modules/expo-sqlite/web/worker.ts
+@@ -64,23 +64,33 @@
+-self.onmessage = async (event: MessageEvent<SQLiteWorkerMessage>) => {
+-  let result: ResultType | null = null;
+-  let error: Error | null = null;
+-  try {
+-    const message = event.data as MessageTypeMap[typeof event.data.type];
+-    result = await handleMessageImpl(message);
+-  } catch (e) {
+-    error = e instanceof Error ? e : new Error(String(e));
+-  }
+-
+-  const syncTrait = event.data.isSync
+-    ? {
+-        lockBuffer: event.data.lockBuffer,
+-        resultBuffer: event.data.resultBuffer,
++// Keep initialization, SQL and idle VFS retirement within one worker request lifetime.
++let requestTail: Promise<void> = Promise.resolve();
++let cleanupFailure: Error | null = null;
++const CLEANUP_FAILURE = 'SQLite worker cleanup failed: ';
++
++self.onmessage = (event: MessageEvent<SQLiteWorkerMessage>) => {
++  const execute = async () => {
++    let result: ResultType | null = null;
++    let error: Error | null = null;
++    try {
++      if (cleanupFailure) throw cleanupFailure;
++      const message = event.data as MessageTypeMap[typeof event.data.type];
++      result = await handleMessageImpl(message);
++    } catch (e) {
++      error = e instanceof Error ? e : new Error(String(e));
++      if (error.message.includes(CLEANUP_FAILURE)) cleanupFailure = error;
++    }
++    if (!cleanupFailure && databaseIdMap.size === 0) {
++      try {
++        await retireIdleRuntime();
++      } catch (e) {
++        cleanupFailure = new Error(CLEANUP_FAILURE + String(e));
++        error = cleanupFailure;
+       }
+-    : undefined;
+-  sendWorkerResult({
+-    id: event.data.id,
+-    result,
+-    error,
+-    syncTrait,
+-  });
++    }
++    const syncTrait = event.data.isSync
++      ? { lockBuffer: event.data.lockBuffer, resultBuffer: event.data.resultBuffer }
++      : undefined;
++    sendWorkerResult({ id: event.data.id, result, error, syncTrait });
++  };
++  requestTail = requestTail.then(execute, execute);
++  return requestTail;
+ };
+@@ -255,9 +265,14 @@
+ async function closeDatabase(nativeDatabaseId: number) {
+-  maybeFinalizeAllStatements(nativeDatabaseId);
+-  const { sqlite3 } = await maybeInitAsync();
+-  const dbEntity = databaseIdMap.get(nativeDatabaseId);
+-  if (dbEntity) {
+-    databaseIdMap.delete(nativeDatabaseId);
+-    await sqlite3.close(dbEntity.pointer);
++  try {
++    await maybeFinalizeAllStatements(nativeDatabaseId);
++    const { sqlite3 } = await maybeInitAsync();
++    const dbEntity = databaseIdMap.get(nativeDatabaseId);
++    if (dbEntity) {
++      await sqlite3.close(dbEntity.pointer);
++      databaseIdMap.delete(nativeDatabaseId);
++    }
++  } catch (error) {
++    // A failed close may already have invalidated SQLite's pointer tracking.
++    throw new Error(CLEANUP_FAILURE + String(error));
+   }
+ }
+@@ -358,14 +373,21 @@
+     );
+   }
+   const serializedData = new Uint8Array(await response.arrayBuffer());
+-  const srcDb = await sqlite3.open_v2(
+-    databasePath,
+-    SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
+-    VFS_NAME_PERSISTENT
+-  );
+-  await sqlite3.deserialize(srcDb, 'main', serializedData);
+-  const destDb = await sqlite3.open_v2(databasePath);
+-  await sqlite3.backup(destDb, 'main', srcDb, 'main');
+-  await sqlite3.close(srcDb);
+-  await sqlite3.close(destDb);
++  const temporary: DatabasePointer[] = [];
++  try {
++    const srcDb = await sqlite3.open_v2(
++      databasePath,
++      SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
++      VFS_NAME_PERSISTENT
++    );
++    temporary.push(srcDb);
++    await sqlite3.deserialize(srcDb, 'main', serializedData);
++    const destDb = await sqlite3.open_v2(databasePath);
++    temporary.push(destDb);
++    await sqlite3.backup(destDb, 'main', srcDb, 'main');
++  } finally {
++    const closed = await Promise.allSettled(temporary.map(async (pointer) => await sqlite3.close(pointer)));
++    const failed = closed.find((entry) => entry.status === 'rejected');
++    if (failed?.status === 'rejected') throw new Error(CLEANUP_FAILURE + String(failed.reason));
++  }
+ }
+@@ -750,7 +772,7 @@
+   while (stmt != null && stmt !== 0) {
+     const nextStmt: StatementPointer = sqlite3.next_stmt(dbEntity.pointer, stmt);
+     try {
+-      sqlite3.finalize(stmt);
++      await sqlite3.finalize(stmt);
+       finalizedStatements.push(stmt);
+     } catch (e) {
+       error = e;
+@@ -778,29 +800,27 @@
+   vfsMemory: MemoryVFS;
+ }> {
+   if (!_sqlite3) {
+-    const module = await WaSQLiteFactory({
+-      locateFile: () => wasmModule,
+-    });
+-    _sqlite3 = SQLite.Factory(module) as SQLiteAPI;
+-    if (!_sqlite3) {
+-      throw new Error('Failed to initialize wa-sqlite');
+-    }
+-
+-    if (_vfs == null) {
+-      _vfs = await AccessHandlePoolVFS.create(VFS_NAME_PERSISTENT, module);
+-      if (_vfs == null) {
+-        throw new Error('Failed to initialize AccessHandlePoolVFS');
+-      }
+-    }
+-    _sqlite3.vfs_register(_vfs, true);
+-
+-    if (_vfsMemory == null) {
+-      _vfsMemory = await MemoryVFS.create(VFS_NAME_MEMORY, module);
+-      if (_vfsMemory == null) {
+-        throw new Error('Failed to initialize MemoryVFS');
+-      }
+-    }
+-    _sqlite3.vfs_register(_vfsMemory, false);
++    const module = await WaSQLiteFactory({ locateFile: () => wasmModule });
++    const sqlite3 = SQLite.Factory(module) as SQLiteAPI;
++    if (!sqlite3) throw new Error('Failed to initialize wa-sqlite');
++    let vfs: AccessHandlePoolVFS | null = null;
++    let memory: MemoryVFS | null = null;
++    try {
++      vfs = await AccessHandlePoolVFS.create(VFS_NAME_PERSISTENT, module);
++      memory = await MemoryVFS.create(VFS_NAME_MEMORY, module);
++      if (!vfs || !memory) throw new Error('Failed to initialize SQLite VFS');
++      sqlite3.vfs_register(vfs, true);
++      sqlite3.vfs_register(memory, false);
++      // Publish only a complete runtime, so a failed initialization can retry.
++      _sqlite3 = sqlite3;
++      _vfs = vfs;
++      _vfsMemory = memory;
++    } catch (error) {
++      const closed = await Promise.allSettled([Promise.resolve().then(() => vfs?.close()), Promise.resolve().then(() => memory?.close())]);
++      const failed = closed.find((entry) => entry.status === 'rejected');
++      if (failed?.status === 'rejected') throw new Error(CLEANUP_FAILURE + String(failed.reason));
++      throw error;
++    }
+   }
+   if (_vfs == null || _vfsMemory == null) {
+     throw new Error('Invalid VFS state');
+@@ -811,1 +831,13 @@
++async function retireIdleRuntime(): Promise<void> {
++  // SQLite close alone retains OPFS pool locks. Release them before host handoff,
++  // also when an asset import finishes without a subsequent open.
++  await _vfs?.close();
++  await _vfsMemory?.close();
++  _sqlite3 = null;
++  _vfs = null;
++  _vfsMemory = null;
++  statementIdMap.clear();
++  sessionIdMap.clear();
++}
++
+ //#endregion Internal helpers
+diff --git a/node_modules/expo-sqlite/web/wa-sqlite/AccessHandlePoolVFS.js b/node_modules/expo-sqlite/web/wa-sqlite/AccessHandlePoolVFS.js
+--- a/node_modules/expo-sqlite/web/wa-sqlite/AccessHandlePoolVFS.js
++++ b/node_modules/expo-sqlite/web/wa-sqlite/AccessHandlePoolVFS.js
+@@ -54,5 +54,14 @@
+   static async create(name, module) {
+     const vfs = new AccessHandlePoolVFS(name, module);
+-    await vfs.isReady();
+-    return vfs;
++    try {
++      await vfs.isReady();
++      return vfs;
++    } catch (error) {
++      try {
++        await vfs.close();
++      } catch (cleanupError) {
++        throw new Error('SQLite worker cleanup failed: ' + String(cleanupError));
++      }
++      throw error;
++    }
+   }
+@@ -304,5 +313,5 @@
+     // Open access handles in parallel, separating associated and unassociated.
+-    await Promise.all(
++    const acquired = await Promise.allSettled(
+       files.map(async ([name, handle]) => {
+         const accessHandle = await handle.createSyncAccessHandle();
+         this.#mapAccessHandleToName.set(accessHandle, name);
+@@ -314,4 +323,6 @@
+         }
+       })
+     );
++    const failed = acquired.find((entry) => entry.status === 'rejected');
++    if (failed) throw failed.reason;
+   }
+@@ -319,7 +330,13 @@
+   #releaseAccessHandles() {
++    let failure;
+     for (const accessHandle of this.#mapAccessHandleToName.keys()) {
+-      accessHandle.close();
+-    }
++      try {
++        accessHandle.close();
++      } catch (error) {
++        failure ??= error;
++      }
++    }
++    if (failure) throw failure;
+     this.#mapAccessHandleToName.clear();
+     this.#mapPathToAccessHandle.clear();
+     this.#availableAccessHandles.clear();

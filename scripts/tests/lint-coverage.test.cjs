@@ -53,3 +53,12 @@ test("a valid component passes", async () => {
   );
   assert.equal(result.errorCount, 0);
 });
+
+test("excludes generated browser reports while retaining source checks", async () => {
+  for (const file of ["test-results/playwright/html/trace/assets/report.js", "playwright-report/assets/report.js"]) {
+    assert.equal(await eslint.isPathIgnored(file), true, file);
+  }
+  for (const file of ["lib/database/provider.tsx", "tests/e2e/database-bridge.spec.ts"]) {
+    assert.equal(await eslint.isPathIgnored(file), false, file);
+  }
+});

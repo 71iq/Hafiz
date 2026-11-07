@@ -2732,29 +2732,56 @@
     },
     {
       "id": "RF-030",
-      "title": "Validate web database bridge messages and SQL values",
-      "description": "Validate web database bridge messages and SQL values",
-      "rationale": "Bridge wire values currently pass through any casts. RF139 first closes malformed envelope and reply-owner bugs; this parent retains host lifecycle/cancellation and remaining bridge boundary acceptance.",
+      "title": "Recover database host lifetimes without replaying uncertain work",
+      "description": "Retire stale remote proxies, rediscover after lost-host timeouts and serialize local database lifetime teardown with owned initialization and admitted host operations.",
+      "rationale": "A lost host leaves clients ready against a dead target after every60second timeout. Hidden/retained proxies and old initialization continuations can dispatch or publish after lifecycle retirement; constant host identity also lets old queued messages reach a reopened handle.",
       "modules": [
         "lib/database/provider.tsx",
-        "lib/database/bridge*",
-        "tests/unit/database-bridge.test.ts"
+        "tests/unit/database-bridge.test.tsx",
+        "tests/e2e/database-bridge.spec.ts",
+        "patches/expo-sqlite+55.0.20.patch",
+        "tests/unit/database-worker-lifecycle.test.ts",
+        "eslint.config.js",
+        "scripts/tests/lint-coverage.test.cjs"
       ],
       "dependencies": [
-        "RF-029"
+        "RF-029",
+        "RF-139"
       ],
       "acceptance_criteria": [
-        "Test malformed/unknown messages, bind-value validation, host changes, stale replies, timeouts and cancellation.",
-        "Preserve native/web initialization and one-writer OPFS behavior."
+        "Keep existing message/bind validation, native boot and one-writer OPFS lock election. Give each hosted database tenure a fresh wire identity so queued old requests and closing notices cannot target a reopened handle.",
+        "A current remote timeout retires exactly that proxy, rejects sibling requests and restarts bounded lock/discovery. Every retained method, prepared execution and transaction continuation refuses dispatch after retirement/pagehide/unmount. Do not replay a timed-out SQL operation or send its rollback through a replacement proxy; earlier SQL may have committed.",
+        "Capture initialization and resource ownership across every await. Retirement cancels discovery/retry waits, prevents later phases/progress/ready publication, and drains admitted work before closing the captured handle and releasing its captured lock. A foreground event during old initialization schedules one fresh attempt. Late lock grants release themselves; obsolete failures cannot close a newer resource. Close failure is explicit and cannot authorize an unsafe new local open.",
+        "Characterize host loss, normal handoff, pagehide/show and unmount with deterministic releasable barriers, including late replies, open/init/lock/SQL completion and failures. Add isolated real Chrome multi-page recovery/handoff coverage. All20 fresh controller checks, stronger independent review and primary acceptance remain mandatory; one local accepted commit and prompt cleanup.",
+        "No protected Quran input, schema/content rewrite, dependency version or production/native release change. The new real Chrome handoff proves installed Expo SQLite retains its OPFS pool after close and poisons partial initialization. A narrowly scoped patch to that shipped web worker must release VFS ownership before close resolves, recover failed initialization without leaked handles, preserve other live databases and be covered by actual-worker unit regressions. No unrelated vendor edits. Ambient transaction atomicity and unknown commit receipts remain RF104.",
+        "The failed Chrome run generated trace bundles under test-results, which the full lint command mistakenly treated as app source. Exclude only documented generated browser reports and retain active source/compiler checks, with a real ESLint API regression. This check-scope correction blocks this app task; do not change runner tooling or relax source rules."
       ],
       "verification": [
         [
-          "npm",
-          "run",
-          "test:unit",
-          "--",
-          "--runTestsByPath",
-          "tests/unit/database-bridge.test.ts"
+          "git",
+          "diff",
+          "--check"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "lib/database/provider.tsx",
+          "tests/unit/database-bridge.test.tsx",
+          "tests/e2e/database-bridge.spec.ts",
+          "tests/unit/database-worker-lifecycle.test.ts",
+          "eslint.config.js",
+          "scripts/tests/lint-coverage.test.cjs",
+          "docs/refactoring/PROGRESS.md"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/database/provider.tsx",
+          "tests/unit/database-bridge.test.tsx",
+          "tests/e2e/database-bridge.spec.ts",
+          "tests/unit/database-worker-lifecycle.test.ts",
+          "eslint.config.js",
+          "scripts/tests/lint-coverage.test.cjs",
+          "--max-warnings=0"
         ],
         [
           "npm",
@@ -2764,19 +2791,201 @@
         [
           "npm",
           "run",
+          "check:analysis"
+        ],
+        [
+          "npm",
+          "run",
+          "postinstall"
+        ],
+        [
+          "npm",
+          "ls",
+          "--all",
+          "--json"
+        ],
+        [
+          "npm",
+          "run",
+          "lint"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "node",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/tests/brace-expansion.test.cjs",
+          "scripts/tests/dependency-boundaries.test.cjs",
+          "scripts/tests/icon-tool.test.cjs",
+          "scripts/tests/jest-config.test.cjs",
+          "scripts/tests/js-yaml.test.cjs",
+          "scripts/tests/lint-coverage.test.cjs",
+          "scripts/tests/metro-unicode.test.cjs",
+          "scripts/tests/nanoid.test.cjs",
+          "scripts/tests/router-dependency-range.test.cjs",
+          "scripts/tests/security-dependency-owner.test.cjs",
+          "scripts/tests/source-map-js.test.cjs",
+          "scripts/tests/tailwind-source-map.test.cjs",
+          "scripts/tests/ws.test.cjs",
+          "scripts/tests/xmldom.test.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "test:refactor-runner"
+        ],
+        [
+          "python3",
+          "-B",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "scripts/tests",
+          "-p",
+          "test_*.py"
+        ],
+        [
+          "npm",
+          "run",
+          "check:native-config"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "npm",
+          "run",
           "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=4096",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "android",
+          "--output-dir",
+          ".expo/modernization-checks/android",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/android')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=3072",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "ios",
+          "--output-dir",
+          ".expo/modernization-checks/ios",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/ios')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8197",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts",
+          "tests/e2e/database-bridge.spec.ts"
         ]
       ],
       "risk": "high",
-      "approved": false,
-      "status": "pending",
+      "approved": true,
+      "status": "verified",
       "allowed_paths": [
         "lib/database/provider.tsx",
-        "lib/database/bridge*",
-        "tests/unit/database-bridge.test.ts"
+        "tests/unit/database-bridge.test.tsx",
+        "tests/e2e/database-bridge.spec.ts",
+        "patches/expo-sqlite+55.0.20.patch",
+        "tests/unit/database-worker-lifecycle.test.ts",
+        "eslint.config.js",
+        "scripts/tests/lint-coverage.test.cjs"
       ],
-      "attempts": 0,
-      "priority": 1
+      "attempts": 1,
+      "priority": 1,
+      "implementation_mode": "implementation",
+      "failure_history": [
+        {
+          "phase": "causal-lifecycle",
+          "time": "2026-11-07T02:06:05.235070+00:00",
+          "failure": "Original provider failed silent-host recovery, hidden retained-proxy admission, fresh host identity and pending-open foreground ownership. A fifth SQL-drain case was obscured by an unused mockResolvedValueOnce from the prior failed fixture; reset mock implementations before each test. App source changes follow those four confirmed causal failures. Focused five-case repair and then all39 bridge cases passed. Existing permanent-promise fixtures were split into equivalent pending-unmount/pagehide controls; new drain tests use releasable barriers. Close failure keeps its captured lock quarantined until a reload rather than opening against an unresolved handle."
+        },
+        {
+          "phase": "full-controller-and-independent-review",
+          "time": "2026-11-07T02:22:59.858992+00:00",
+          "failure": "Verification failed: ['env', 'CI=1', 'PLAYWRIGHT_CHROMIUM_CHANNEL=chrome', 'PLAYWRIGHT_PORT=8197', 'PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197', 'node_modules/.bin/playwright', 'test', '--project=smoke-chromium', 'tests/e2e/smoke.spec.ts', 'tests/e2e/database-bridge.spec.ts']; see .ralph/runs/RF-030-direct-1794017698278653594/verify-19.log; Review finding: {\"verdict\": \"fail\", \"findings\": [\"[P1] lib/database/provider.tsx:402-405 releases the Web Lock after closeAsync(), but the installed Expo SQLite worker retains pooled OPFS access handles. The first A-to-B handoff therefore fails: tests/e2e/database-bridge.spec.ts:312 times out discovering B, and the browser trace reports \\\"Invalid VFS state\\\". Repair ownership of the actual worker/VFS lifetime before releasing host ownership, including recovery from partial VFS initialization. Preserve the handoff assertion; increasing its timeout is insufficient.\", \"All 20 controller results inspected: 19 passed; Chrome exited 1 with 29 passed and the new handoff case failed. gate-result.json confirms failure and unchanged source. Review remained read-only. RF104 transaction ownership and unknown commit outcomes remain outside scope; no physical native runtime verification is claimed.\"]}",
+          "run": ".ralph/runs/RF-030-direct-1794017698278653594"
+        },
+        {
+          "phase": "worker-lifetime-diagnosis-and-repair",
+          "time": "2026-11-07T02:35:34.034240+00:00",
+          "failure": "Real Chrome and separate review found retained pooled OPFS handles and partial initialization poisoning. Patched only shipped Expo web worker/VFS: serialize request lifetimes, release idle pool before replies including import-only cancellation, close temporary import handles, publish complete initialization, settle and clean partial acquisitions, await finalization and quarantine failed close/cleanup before releasing app ownership. New worker fixture first had import/mock/ordering omissions; retained last output and this summary because the helper overwrote its first fixture log. Fixed fixture fidelity and unsafe post-close-use assertion. All65 actual-worker/provider focused cases, strict types, scoped lint and diff check now pass; no handoff assertion weakened."
+        },
+        {
+          "phase": "full-controller-and-independent-review",
+          "time": "2026-11-07T02:38:41.538806+00:00",
+          "failure": "Verification failed: ['npm', 'run', 'lint']; see .ralph/runs/RF-030-direct-1794018934038817496/verify-7.log; Review finding: {\"verdict\": \"fail\", \"findings\": [\"Mandatory verification is incomplete. In .ralph/runs/RF-030-direct-1794018934038817496, verification.json records seven passes followed by full lint exiting 1. verify-7.log contains 2,491 errors from generated Playwright trace bundles under test-results/playwright/html/trace/. gate-result.json confirms failure and unchanged source. Logs 8\\u201319 are absent. Preserve diagnostics outside lint inputs, then have the controller complete fresh verification and review.\", \"No additional actionable source defect found after reviewing the complete provider diff, SDK patch, three test files, representative callers and installed SQLite implementation. Failed close correctly quarantines the worker without assuming its retained pointer remains usable. Acceptance remains blocked by the failed gate. Review was read-only; no checks were rerun. RF104 transaction semantics and native compilation/device/iOS runtime verification remain outside this review.\"]}",
+          "run": ".ralph/runs/RF-030-direct-1794018934038817496"
+        }
+      ],
+      "started_at": "2026-11-07T02:40:11.214420+00:00",
+      "recovery_windows": [
+        {
+          "time": "2026-11-07T02:39:16.022622+00:00",
+          "prior_attempt_offset": 0,
+          "prior_attempts": 2,
+          "reason": "Primary corrected the shipped web worker/VFS failure and all65 focused cases pass. The next full check was blocked solely by generated Playwright trace bundles being linted. Added generated-output exclusions with a regression retaining real app/compiler checks. Preserve both full-run outcomes; fresh all20 commands, independent review and acceptance remain mandatory."
+        }
+      ],
+      "attempt_offset": 2,
+      "completed_at": "2026-11-07T02:48:42.398405+00:00",
+      "primary_accepted_at": "2026-11-07T02:48:42.398405+00:00",
+      "independent_review": "pass",
+      "evidence": "docs/refactoring/PROGRESS.md",
+      "summary": "Remote database proxies recover from lost hosts without replaying uncertain SQL, and fresh host tenures reject old messages. Hosted RPC/init work drains before the actual SQLite/VFS resources and Web Lock retire. Failed cleanup quarantines the worker and host lock. All20 fresh controller checks, independent stronger review and primary acceptance pass:2653unit/30Chrome cases. Direct local caller lifetime, shared transaction isolation and unknown commit receipts remain RF104 work; no native/device verification claim."
     },
     {
       "id": "RF-031",

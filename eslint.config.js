@@ -21,6 +21,8 @@ module.exports = defineConfig([
       ".agents/**",
       ".claude/**",
       "coverage/**",
+      "test-results/**",
+      "playwright-report/**",
       "dist/**",
       "node_modules/**",
       "quran.com-frontend-next/**",
