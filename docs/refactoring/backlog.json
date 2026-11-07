@@ -23107,13 +23107,30 @@
         "Find the native cause with a device reproduction; every word renders fully in all font styles on Android without changing Quran data or page mappings. Device screenshots before and after, plus full checks, review and acceptance."
       ],
       "approved": true,
-      "status": "pending",
-      "attempts": 2,
+      "status": "verified",
+      "attempts": 3,
       "implementation_mode": "implementation",
-      "files": [],
-      "allowed_paths": [],
+      "files": [
+        "components/mushaf/AyahBlock.tsx",
+        "components/mushaf/WordToken.tsx",
+        "components/mushaf/WordSpan.tsx",
+        "components/mushaf/useWordTap.ts",
+        "tests/unit/ayah-word-text.test.tsx"
+      ],
+      "allowed_paths": [
+        "components/mushaf/AyahBlock.tsx",
+        "components/mushaf/WordToken.tsx",
+        "components/mushaf/WordSpan.tsx",
+        "components/mushaf/useWordTap.ts",
+        "tests/unit/ayah-word-text.test.tsx"
+      ],
       "verification": [],
-      "diagnosis": "Device evidence (SM-A546E, QA release build): the page font IS applied (the ayah-number glyph from the same page font renders, and the fragments do not match the standard Unicode ligatures for these codepoints). Flashcards (components/flashcards/Qcf2AyahText.tsx) render the same page-1 glyphs completely; AyahBlock/WordToken and the Settings preview render most words partially, in both V2 Classic and V4 styles. Ruled out on device: (1) horizontal clipping of glyph overhang (Android padding/negative-margin bleed of 1.8 em left and 5 em right changed nothing); (2) typeface fallback from rendering before the font loaded (remounting gated views on font readiness changed nothing); (3) font style choice. Font facts: QPC V2 p1 upm 2500, hhea ascent 2809 / descent -1301, glyph y range -1041..2724; word glyphs extend up to 1.77 em left and 4.98 em right of their advance across all 604 V2/V4 page fonts. Next step: a QA debug build with Metro (adb reverse) to iterate styles on device in seconds; diff the remaining props between Qcf2AyahText and WordToken/settings preview (lineHeight values, text-center, Pressable wrapper, explicit transparent background, writingDirection)."
+      "diagnosis": "Device evidence (SM-A546E, QA release build): the page font IS applied (the ayah-number glyph from the same page font renders, and the fragments do not match the standard Unicode ligatures for these codepoints). Flashcards (components/flashcards/Qcf2AyahText.tsx) render the same page-1 glyphs completely; AyahBlock/WordToken and the Settings preview render most words partially, in both V2 Classic and V4 styles. Ruled out on device: (1) horizontal clipping of glyph overhang (Android padding/negative-margin bleed of 1.8 em left and 5 em right changed nothing); (2) typeface fallback from rendering before the font loaded (remounting gated views on font readiness changed nothing); (3) font style choice. Font facts: QPC V2 p1 upm 2500, hhea ascent 2809 / descent -1301, glyph y range -1041..2724; word glyphs extend up to 1.77 em left and 4.98 em right of their advance across all 604 V2/V4 page fonts. Next step: a QA debug build with Metro (adb reverse) to iterate styles on device in seconds; diff the remaining props between Qcf2AyahText and WordToken/settings preview (lineHeight values, text-center, Pressable wrapper, explicit transparent background, writingDirection).",
+      "completed_at": "2026-11-07T20:03:24.653824+00:00",
+      "primary_accepted_at": "2026-11-07T20:03:24.653824+00:00",
+      "independent_review": "pass",
+      "evidence": "docs/refactoring/PROGRESS.md",
+      "summary": "On Android (outside hide mode) the verse-by-verse Mushaf renders each ayah as one Text with nested word spans, because Android clips each separate Text to its content box and page-font glyphs draw outside their advance. Tap logic moved to useWordTap; Android long presses route through the ayah Text to the word recorded on press-in, cleared on release. Device: every Al-Fatiha word renders fully, tap selects, long press opens the right word's detail sheet. Related suites (179 cases), typecheck, zero-warning lint and a light review pass; the review's stale-word defect has a causal test."
     },
     {
       "id": "RF-185",
@@ -23385,11 +23402,35 @@
       "files": [],
       "allowed_paths": [],
       "verification": []
+    },
+    {
+      "id": "RF-189",
+      "title": "Stop clipping extreme word glyphs in the Android page view",
+      "priority": 2,
+      "risk": "medium",
+      "description": "RF184 follow-up: the page view keeps one Text per word so lines can stretch with space-between; on Android a few words whose glyphs draw far outside their advance (for example 1:1 \u0671\u0644\u0631\u064e\u0651\u062d\u06e1\u0645\u064e\u0670\u0646\u0650) are clipped. Android does not justify a single-line Text, so the RF184 single-Text approach would change page layout.",
+      "dependencies": [
+        "RF-184"
+      ],
+      "modules": [
+        "components/mushaf/MushafPage.tsx",
+        "components/mushaf/WordToken.tsx"
+      ],
+      "acceptance_criteria": [
+        "Every page-view word renders fully on Android with unchanged line layout and taps; device screenshots of affected pages; review and acceptance."
+      ],
+      "approved": true,
+      "status": "pending",
+      "attempts": 0,
+      "implementation_mode": "implementation",
+      "files": [],
+      "allowed_paths": [],
+      "verification": []
     }
   ],
   "checkpoint": {
-    "time": "2026-11-07T19:27:51.618700+00:00",
-    "current_task": "RF-184 Android verse-by-verse Mushaf words: device experiment showed one Text per ayah renders correctly while one Text per word clips overhanging glyphs; next render each ayah as a single Text with nested pressable word spans on Android, then verify on device",
+    "time": "2026-11-07T20:03:24.653824+00:00",
+    "current_task": "next by priority after RF-184 (open: RF-169, RF-025, RF-032, RF-180, RF-183, RF-186, RF-188, RF-189, ...)",
     "open_follow_ups": [
       "RF-180",
       "RF-182",

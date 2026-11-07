@@ -1,8 +1,7 @@
-import { memo, useCallback, useEffect, useMemo, useRef } from "react";
+import { memo, useCallback, useRef } from "react";
 import { Text, Pressable, Platform, View } from "react-native";
-import { useWordInteraction } from "@/lib/word/context";
-import { useChrome } from "@/lib/ui/chrome";
 import { useSettings } from "@/lib/settings/context";
+import { useWordTap } from "./useWordTap";
 
 type Props = {
   glyph: string;
@@ -20,8 +19,6 @@ type Props = {
   compactLayout?: boolean;
 };
 
-const DOUBLE_TAP_MS = 260;
-
 function WordTokenInner({
   glyph,
   fontFamily,
@@ -37,72 +34,23 @@ function WordTokenInner({
   hidden = false,
   compactLayout = false,
 }: Props) {
-  const { tooltipWord, setTooltipWord, openDetail } = useWordInteraction();
-  const { markActivity } = useChrome();
   const { isDark, viewMode, pageScroll } = useSettings();
   const tokenRef = useRef<View>(null);
-  const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isTouchInput = useMemo(() => {
-    if (Platform.OS !== "web") return true;
-    if (typeof navigator !== "undefined" && navigator.maxTouchPoints > 0) return true;
-    if (typeof window !== "undefined" && typeof window.matchMedia === "function") {
-      return window.matchMedia("(pointer: coarse)").matches;
-    }
-    return false;
-  }, []);
-
-  useEffect(() => () => {
-    if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
-  }, []);
-
-  const isTooltipSelected =
-    tooltipWord !== null &&
-    tooltipWord.surah === surah &&
-    tooltipWord.ayah === ayah &&
-    tooltipWord.wordPos === wordPos;
+  const tap = useWordTap({ surah, ayah, wordPos, v2Page, disabled, hidden });
+  const { wordRef, isTooltipSelected, isTouchInput, openDetail } = tap;
   const allowNativeTouchSelection =
     Platform.OS === "web" &&
     isTouchInput &&
     viewMode === "page" &&
     pageScroll === "horizontal";
 
-  const wordRef = { surah, ayah, wordPos, v2Page };
-
-  const showTooltip = useCallback(() => {
-    tokenRef.current?.measureInWindow((x, y, width, height) => {
-      setTooltipWord(wordRef, { x, y, width, height });
-    });
-  }, [surah, ayah, wordPos, v2Page, setTooltipWord]);
-
+  const pressWord = tap.press;
   const handlePress = useCallback(() => {
-    if (disabled || hidden) return;
-    if (!isTouchInput) {
-      // Mouse / desktop: single click → tooltip
-      showTooltip();
-      return;
-    }
-    // Touch input: keep reader chrome changes owned by the reader tap layer.
-    if (tapTimerRef.current) {
-      clearTimeout(tapTimerRef.current);
-      tapTimerRef.current = null;
-      showTooltip();
-      return;
-    }
-    tapTimerRef.current = setTimeout(() => {
-      tapTimerRef.current = null;
-      showTooltip();
-    }, DOUBLE_TAP_MS);
-  }, [disabled, hidden, isTouchInput, showTooltip]);
-
-  const handleLongPress = useCallback(() => {
-    if (disabled || hidden) return;
-    markActivity();
-    if (tapTimerRef.current) {
-      clearTimeout(tapTimerRef.current);
-      tapTimerRef.current = null;
-    }
-    openDetail(wordRef);
-  }, [disabled, hidden, surah, ayah, wordPos, v2Page, markActivity, openDetail]);
+    pressWord((done) =>
+      tokenRef.current?.measureInWindow((x, y, width, height) => done({ x, y, width, height })),
+    );
+  }, [pressWord]);
+  const handleLongPress = tap.longPress;
 
   // Web: right-click also opens the detail sheet (matches "long press" intent)
   const webContextMenu =

@@ -12,6 +12,7 @@ import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
 import { useSelection } from "@/lib/selection/context";
 import { WordToken } from "./WordToken";
+import { AyahWordText } from "./WordSpan";
 import {
   BookOpenText,
   Bookmark,
@@ -324,80 +325,115 @@ function AyahBlockInner({
           className={isPhone ? "pt-8 pb-1" : "pt-6 pb-1"}
           style={{ opacity: fontVisible ? 1 : 0, direction: "ltr", alignItems: "flex-end", paddingHorizontal: 3, alignSelf: "stretch", width: "100%" }}
         >
-          <View
-            className="self-end"
-            style={{
-              direction: "ltr",
-              flexDirection: "row-reverse",
-              flexWrap: "wrap",
-              justifyContent: "flex-start",
-              alignItems: "center",
-              gap: 2,
-              rowGap: Math.max(4, fontSize * 0.12),
-              width: "100%",
-              maxWidth: "100%",
-              ...(highlightColor && {
-                backgroundColor: highlightColor + "20",
-                borderRadius: 8,
-                paddingHorizontal: 4,
-                paddingVertical: 2,
-              }),
-            }}
-          >
-            {wordTokens.words.map((glyph, i) => {
-              const wordPos = i + 1;
-              return (
-                <WordToken
-                  key={`${surah}-${ayah}-w${i}`}
-                  glyph={glyph}
-                  fontFamily={fontFamily}
-                  fontPalette={fontPaletteStyle?.fontPalette ?? null}
-                  fontSize={fontSize}
-                  lineHeight={qcf2LineHeight}
-                  surah={surah}
-                  ayah={ayah}
-                  wordPos={wordPos}
-                  v2Page={v2Page}
-                  disabled={hideMode}
-                  highlightColor={
-                    highlightedWordPos === wordPos
-                      ? "#0d9488"
-                      : getWordHighlightColor(surah, ayah, wordPos)
-                  }
-                />
-              );
-            })}
-            {/* Ayah end marker */}
-            {showAyahMarkers && wordTokens.marker && (
-              <Text
-                {...(Platform.OS === "web"
-                  ? ({
-                      selectable: true,
-                      dataSet: {
-                        hafizQuranToken: "marker",
-                        hafizSurah: String(surah),
-                        hafizAyah: String(ayah),
-                        hafizWordPos: "0",
-                        hafizAyahMarker: "true",
-                        hafizQuranHidden: hideMode ? "true" : "false",
-                      },
-                    } as any)
-                  : {})}
-                className="text-charcoal dark:text-neutral-100"
-                style={{
-                  fontFamily,
-                  ...markerFontPaletteStyle,
-                  fontSize,
-                  lineHeight: qcf2LineHeight,
-                  paddingHorizontal: 2,
-                  writingDirection: "rtl",
-                  ...(Platform.OS === "web" ? ({ userSelect: hideMode ? "none" : "text" } as any) : null),
-                }}
-              >
-                {wordTokens.marker}
-              </Text>
-            )}
-          </View>
+          {Platform.OS === "android" && !hideMode ? (
+            // Android clips each separate Text to its own box, which cut page-font word glyphs that draw
+            // outside their advance. One Text per ayah with nested word spans draws every word fully.
+            <AyahWordText
+              words={wordTokens.words}
+              marker={
+                showAyahMarkers && wordTokens.marker ? (
+                  <Text style={markerFontPaletteStyle}>{wordTokens.marker}</Text>
+                ) : null
+              }
+              surah={surah}
+              ayah={ayah}
+              v2Page={v2Page}
+              fontSize={fontSize}
+              lineHeight={qcf2LineHeight}
+              className="text-charcoal dark:text-neutral-100"
+              style={{
+                fontFamily,
+                fontSize,
+                lineHeight: qcf2LineHeight,
+                textAlign: "right",
+                alignSelf: "stretch",
+                ...(highlightColor && {
+                  backgroundColor: highlightColor + "20",
+                  borderRadius: 8,
+                  paddingHorizontal: 4,
+                  paddingVertical: 2,
+                }),
+              }}
+              wordHighlightColor={(wordPos) =>
+                highlightedWordPos === wordPos ? "#0d9488" : getWordHighlightColor(surah, ayah, wordPos)
+              }
+            />
+          ) : (
+            <View
+              className="self-end"
+              style={{
+                direction: "ltr",
+                flexDirection: "row-reverse",
+                flexWrap: "wrap",
+                justifyContent: "flex-start",
+                alignItems: "center",
+                gap: 2,
+                rowGap: Math.max(4, fontSize * 0.12),
+                width: "100%",
+                maxWidth: "100%",
+                ...(highlightColor && {
+                  backgroundColor: highlightColor + "20",
+                  borderRadius: 8,
+                  paddingHorizontal: 4,
+                  paddingVertical: 2,
+                }),
+              }}
+            >
+              {wordTokens.words.map((glyph, i) => {
+                const wordPos = i + 1;
+                return (
+                  <WordToken
+                    key={`${surah}-${ayah}-w${i}`}
+                    glyph={glyph}
+                    fontFamily={fontFamily}
+                    fontPalette={fontPaletteStyle?.fontPalette ?? null}
+                    fontSize={fontSize}
+                    lineHeight={qcf2LineHeight}
+                    surah={surah}
+                    ayah={ayah}
+                    wordPos={wordPos}
+                    v2Page={v2Page}
+                    disabled={hideMode}
+                    highlightColor={
+                      highlightedWordPos === wordPos
+                        ? "#0d9488"
+                        : getWordHighlightColor(surah, ayah, wordPos)
+                    }
+                  />
+                );
+              })}
+              {/* Ayah end marker */}
+              {showAyahMarkers && wordTokens.marker && (
+                <Text
+                  {...(Platform.OS === "web"
+                    ? ({
+                        selectable: true,
+                        dataSet: {
+                          hafizQuranToken: "marker",
+                          hafizSurah: String(surah),
+                          hafizAyah: String(ayah),
+                          hafizWordPos: "0",
+                          hafizAyahMarker: "true",
+                          hafizQuranHidden: hideMode ? "true" : "false",
+                        },
+                      } as any)
+                    : {})}
+                  className="text-charcoal dark:text-neutral-100"
+                  style={{
+                    fontFamily,
+                    ...markerFontPaletteStyle,
+                    fontSize,
+                    lineHeight: qcf2LineHeight,
+                    paddingHorizontal: 2,
+                    writingDirection: "rtl",
+                    ...(Platform.OS === "web" ? ({ userSelect: hideMode ? "none" : "text" } as any) : null),
+                  }}
+                >
+                  {wordTokens.marker}
+                </Text>
+              )}
+            </View>
+          )}
         </View>
       )}
 
