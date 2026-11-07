@@ -1,8 +1,11 @@
 import type { AppDatabase } from "@/lib/database/types";
-import { insertStudyLog, updateCard } from "@/lib/fsrs/queries";
+import { publishReviewLogged, putCardRow, putStudyLogRow, type StudyLogInput } from "@/lib/fsrs/queries";
 import type { ReviewTransition } from "@/lib/fsrs/review-transition";
 
-/** Preserve ordered card/log writes and propagate their existing partial-save failures. */
+/**
+ * Save a calculated review. The updated card, its review log and both queued uploads commit
+ * together or not at all; achievements and review listeners run only after the commit.
+ */
 export async function persistReviewTransition({
   db,
   cardId,
@@ -12,18 +15,21 @@ export async function persistReviewTransition({
   cardId: string;
   transition: ReviewTransition;
 }): Promise<void> {
-  await updateCard(db, transition.updatedCard);
   const { reviewRecord } = transition;
-  await insertStudyLog(
-    db,
+  const log: StudyLogInput = {
     cardId,
-    reviewRecord.rating,
-    reviewRecord.state,
-    reviewRecord.due,
-    reviewRecord.stability,
-    reviewRecord.difficulty,
-    reviewRecord.elapsedDays,
-    reviewRecord.scheduledDays,
-    reviewRecord.reviewedAt,
-  );
+    rating: reviewRecord.rating,
+    state: reviewRecord.state,
+    due: reviewRecord.due,
+    stability: reviewRecord.stability,
+    difficulty: reviewRecord.difficulty,
+    elapsedDays: reviewRecord.elapsedDays,
+    scheduledDays: reviewRecord.scheduledDays,
+    reviewedAt: reviewRecord.reviewedAt,
+  };
+  await db.withTransactionAsync(async (tx) => {
+    await putCardRow(tx, transition.updatedCard);
+    await putStudyLogRow(tx, log);
+  });
+  publishReviewLogged(db, log);
 }

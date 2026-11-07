@@ -20576,7 +20576,7 @@
       "title": "Preserve upload work when local mutation queue writes fail",
       "priority": 1,
       "risk": "high",
-      "description": "Notes, bookmarks/highlights, word meanings, reviews, settings and smart-deck paths can save/delete local records then detach or swallow sync queue INSERT failure. Once initial backfill is complete, later upload has no durable work to retry. Characterize and split into feature-sized atomic local-write/outbox repairs with postcommit notifications and existing transaction reuse. Also lib/achievements/queries.ts unlockAchievement (detached queue write, listeners before durability) and lib/reflection-journey/queries.ts. Scoping on 2026-11-07 proposes six ordered sub-tasks: settings, achievements, notes, selection, meanings/journey, reviews/smart decks.",
+      "description": "Notes, bookmarks/highlights, word meanings, reviews, settings and smart-deck paths can save/delete local records then detach or swallow sync queue INSERT failure. Once initial backfill is complete, later upload has no durable work to retry. Characterize and split into feature-sized atomic local-write/outbox repairs with postcommit notifications and existing transaction reuse. Also lib/achievements/queries.ts unlockAchievement (detached queue write, listeners before durability) and lib/reflection-journey/queries.ts. Scoping on 2026-11-07 proposes six ordered sub-tasks: settings, achievements, notes, selection, meanings/journey, reviews/smart decks. Sub-tasks: RF172 settings, RF173 achievements, RF174 notes, RF175 selection, RF176 meanings/journey, RF177 reviews/card actions, RF178 smart decks.",
       "dependencies": [
         "RF-033",
         "RF-161"
@@ -21733,6 +21733,233 @@
       "independent_review": "pass",
       "evidence": "docs/refactoring/PROGRESS.md",
       "summary": "Custom word meanings and Reflection Journey drafts/completions commit with their upload queue entries; existing screens show failures. All 20 full checks (3,088 unit, 35 Chrome) and independent review pass."
+    },
+    {
+      "id": "RF-177",
+      "title": "Save reviews and card actions with their upload queue",
+      "priority": 1,
+      "risk": "high",
+      "description": "RF171 sub-task 6a. Grading wrote the card and its review log as two commits and detached both queue writes, so a failure could leave a graded card without a log or upload; card actions and addMeaningCard also detached queue writes and split creation from the change. Reviews now save the card, log and both queue entries in one transaction with achievements and review listeners after commit; each card action, deletion and meanings card save is one transaction.",
+      "dependencies": [
+        "RF-176"
+      ],
+      "modules": [
+        "lib/fsrs/queries.ts",
+        "lib/fsrs/persist-review.ts",
+        "tests/unit/review-outbox.test.ts",
+        "tests/unit/session-due-date.test.tsx",
+        "docs/refactoring/ARCHITECTURE.md"
+      ],
+      "files": [
+        "lib/fsrs/queries.ts",
+        "lib/fsrs/persist-review.ts",
+        "tests/unit/review-outbox.test.ts",
+        "tests/unit/session-due-date.test.tsx",
+        "docs/refactoring/ARCHITECTURE.md"
+      ],
+      "allowed_paths": [
+        "lib/fsrs/queries.ts",
+        "lib/fsrs/persist-review.ts",
+        "tests/unit/review-outbox.test.ts",
+        "tests/unit/session-due-date.test.tsx",
+        "docs/refactoring/ARCHITECTURE.md"
+      ],
+      "acceptance_criteria": [
+        "A graded review commits the updated card, its study_log row and both queue entries together; a failure leaves the card unchanged, writes no log and notifies no review listener, and the session's existing flashcardsReviewSaveFailed retry works.",
+        "Suspend, bury, mark, reset, due-date and delete each create-if-needed, change and queue in one transaction. addMeaningCard commits the meanings deck setting, card and both queue entries together; vocab achievements run after commit.",
+        "The documented partial-save behavior in ARCHITECTURE.md is replaced by the transactional rule. Unused updateCard/insertStudyLog are removed; session tests keep their ordering, duplicate-grade and retry assertions against the step functions.",
+        "Causal tests through the real connection owner. All full controller checks, separate independent review and primary acceptance."
+      ],
+      "verification": [
+        [
+          "git",
+          "diff",
+          "--check"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "lib/fsrs/persist-review.ts",
+          "tests/unit/review-outbox.test.ts",
+          "tests/unit/session-due-date.test.tsx",
+          "docs/refactoring/ARCHITECTURE.md",
+          "docs/refactoring/PROGRESS.md"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/fsrs/queries.ts",
+          "lib/fsrs/persist-review.ts",
+          "tests/unit/review-outbox.test.ts",
+          "tests/unit/session-due-date.test.tsx",
+          "--max-warnings=0"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "check:analysis"
+        ],
+        [
+          "npm",
+          "run",
+          "postinstall"
+        ],
+        [
+          "npm",
+          "ls",
+          "--all",
+          "--json"
+        ],
+        [
+          "npm",
+          "run",
+          "lint",
+          "--",
+          "--format",
+          "json"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit"
+        ],
+        [
+          "node",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/tests/brace-expansion.test.cjs",
+          "scripts/tests/dependency-boundaries.test.cjs",
+          "scripts/tests/icon-tool.test.cjs",
+          "scripts/tests/jest-config.test.cjs",
+          "scripts/tests/js-yaml.test.cjs",
+          "scripts/tests/lint-coverage.test.cjs",
+          "scripts/tests/metro-unicode.test.cjs",
+          "scripts/tests/nanoid.test.cjs",
+          "scripts/tests/router-dependency-range.test.cjs",
+          "scripts/tests/security-dependency-owner.test.cjs",
+          "scripts/tests/source-map-js.test.cjs",
+          "scripts/tests/tailwind-source-map.test.cjs",
+          "scripts/tests/ws.test.cjs",
+          "scripts/tests/xmldom.test.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "test:refactor-runner"
+        ],
+        [
+          "python3",
+          "-B",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "scripts/tests",
+          "-p",
+          "test_*.py"
+        ],
+        [
+          "npm",
+          "run",
+          "check:native-config"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=4096",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "android",
+          "--output-dir",
+          ".expo/modernization-checks/android",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/android')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=3072",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "ios",
+          "--output-dir",
+          ".expo/modernization-checks/ios",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/ios')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8197",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts",
+          "tests/e2e/database-bridge.spec.ts",
+          "tests/e2e/tafsir-import.spec.ts",
+          "tests/e2e/translation-import.spec.ts"
+        ]
+      ],
+      "approved": true,
+      "status": "verified",
+      "attempts": 1,
+      "implementation_mode": "implementation",
+      "started_at": "2026-11-07T13:58:51.968151+00:00",
+      "reuse": "tests/jest/outbox-sqlite.ts; putUserSetting from RF172; existing review-events and achievement modules.",
+      "focused_validation": {
+        "pre_fix": "All 4 new cases failed on the original source: a graded card kept its update without a log, a first card action created a card without its update queued, a delete and a meanings card saved without queue entries.",
+        "post_fix": "All 4 new cases, the 45 session and deck-card cases, and the full Jest suite (155 suites/3,092 cases) pass; typecheck and scoped zero-warning lint pass."
+      },
+      "completed_at": "2026-11-07T14:08:26.091505+00:00",
+      "primary_accepted_at": "2026-11-07T14:08:26.091505+00:00",
+      "independent_review": "pass",
+      "evidence": "docs/refactoring/PROGRESS.md",
+      "summary": "Grading saves the card, its review log and both uploads in one transaction with listeners after commit; card actions, deletion and meanings cards are single transactions. All 20 full checks (3,092 unit, 35 Chrome) and independent review pass; the review-requested ARCHITECTURE.md scope clause reran format and diff checks."
     }
   ]
 }

@@ -1,6 +1,6 @@
 import { buildLocalReviewCounts, calculateLongestStreak } from "@/lib/fsrs/review-activity";
 import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
-import { createEmptyCard } from "./scheduler";
+import { createEmptyCard, type Card } from "./scheduler";
 import {
   ALL_NEW_CARD_SORT_ORDERS,
   ALL_NEW_REVIEW_ORDERS,
@@ -34,7 +34,7 @@ import {
   type WordTestMode,
 } from "./types";
 import { enqueueSync } from "@/lib/database/sync-queue";
-import { writeUserSetting } from "@/lib/database/user-settings";
+import { putUserSetting, writeUserSetting } from "@/lib/database/user-settings";
 import {
   dayDiffLocal,
   dayIndexFromLocalDateKey as dayIndexFromDateKey,
@@ -320,12 +320,39 @@ export async function addMeaningCard(
   const emptyCard = createEmptyCard();
   const cardId = meaningCardId(surah, ayah, wordPos);
 
+  let created = false;
+  // The deck setting, the card and their queued uploads commit together or not at all.
+  await db.withTransactionAsync(async (tx) => {
+    created = await insertMeaningCardRows(tx, cardId, now, emptyCard);
+  });
+
+  if (created) {
+    // The badge is a side effect of a saved card; its failure must not fail the save.
+    recordAchievementEvent(db, {
+      type: "vocab_saved",
+      cardId,
+      surah,
+      ayah,
+      wordPos,
+      createdAt: now,
+    }).catch(console.warn);
+  }
+
+  return { created };
+}
+
+async function insertMeaningCardRows(
+  db: DatabaseExecutor,
+  cardId: string,
+  now: string,
+  emptyCard: Card
+): Promise<boolean> {
   const existingDeck = await db.getFirstAsync<{ value: string }>(
     "SELECT value FROM user_settings WHERE key = ?",
     [`deck_${MEANINGS_DECK_ID}`]
   );
   if (!existingDeck) {
-    await writeUserSetting(db, `deck_${MEANINGS_DECK_ID}`, JSON.stringify({
+    await putUserSetting(db, `deck_${MEANINGS_DECK_ID}`, JSON.stringify({
       id: MEANINGS_DECK_ID,
       scope: { type: "custom", surahStart: 1, ayahStart: 1, surahEnd: 1, ayahEnd: 1 },
       createdAt: now,
@@ -372,7 +399,7 @@ export async function addMeaningCard(
 
   const created = (result.changes ?? 0) > 0;
   if (created) {
-    enqueueSync(db, "study_cards", "INSERT", cardId, {
+    await enqueueSync(db, "study_cards", "INSERT", cardId, {
       id: cardId,
       deck_id: MEANINGS_DECK_ID,
       due: emptyCard.due.toISOString(),
@@ -391,19 +418,9 @@ export async function addMeaningCard(
       created_at: now,
       updated_at: now,
       deleted_at: null,
-    }).catch(console.warn);
-
-    recordAchievementEvent(db, {
-      type: "vocab_saved",
-      cardId,
-      surah,
-      ayah,
-      wordPos,
-      createdAt: now,
-    }).catch(console.warn);
+    });
   }
-
-  return { created };
+  return created;
 }
 
 // ─── Query helpers ───────────────────────────────────────────
@@ -676,15 +693,16 @@ async function ensureStudyCardRow(
       row.updated_at,
     ]
   );
-  enqueueSync(db, "study_cards", "INSERT", cardId, cardToSyncData(row)).catch(console.warn);
+  await enqueueSync(db, "study_cards", "INSERT", cardId, cardToSyncData(row));
   return row;
 }
 
-export async function deleteStudyCard(
-  db: DatabaseExecutor,
-  deckId: string,
-  cardId: string
-): Promise<void> {
+/** Delete a card. The tombstone and its queued upload commit together or not at all. */
+export async function deleteStudyCard(database: AppDatabase, deckId: string, cardId: string): Promise<void> {
+  await database.withTransactionAsync((db) => deleteStudyCardRow(db, deckId, cardId));
+}
+
+async function deleteStudyCardRow(db: DatabaseExecutor, deckId: string, cardId: string): Promise<void> {
   const row = await db.getFirstAsync<StudyCardRow>(
     "SELECT * FROM study_cards WHERE id = ? AND deck_id = ? AND deleted_at IS NULL",
     [cardId, deckId]
@@ -695,116 +713,116 @@ export async function deleteStudyCard(
     [deletedAt, deletedAt, cardId, deckId]
   );
   if ((result.changes ?? 0) > 0) {
-    enqueueSync(db, "study_cards", "DELETE", cardId, row ? {
+    await enqueueSync(db, "study_cards", "DELETE", cardId, row ? {
       ...cardToSyncData(rowWithDefaultStatus(row)),
       updated_at: deletedAt,
       deleted_at: deletedAt,
-    } : { id: cardId, updated_at: deletedAt, deleted_at: deletedAt }).catch(console.warn);
+    } : { id: cardId, updated_at: deletedAt, deleted_at: deletedAt });
   }
 }
 
 export async function setStudyCardSuspended(
-  db: DatabaseExecutor,
+  db: AppDatabase,
   deckId: string,
   cardId: string,
   suspended: boolean
 ): Promise<StudyCardRow> {
-  const row = await ensureStudyCardRow(db, deckId, cardId);
-  const now = new Date().toISOString();
-  const updated = {
-    ...row,
-    suspended_at: suspended ? now : null,
-    buried_until: suspended ? null : row.buried_until,
-    updated_at: now,
-  };
-  await updateCard(db, updated);
-  return updated;
+  return updateStudyCardInTransaction(db, deckId, cardId, (row) => {
+    const now = new Date().toISOString();
+    const updated = {
+      ...row,
+      suspended_at: suspended ? now : null,
+      buried_until: suspended ? null : row.buried_until,
+      updated_at: now,
+    };
+    return updated;
+  });
 }
 
 export async function setStudyCardBuried(
-  db: DatabaseExecutor,
+  db: AppDatabase,
   deckId: string,
   cardId: string,
   buried: boolean
 ): Promise<StudyCardRow> {
-  const row = await ensureStudyCardRow(db, deckId, cardId);
-  const now = new Date().toISOString();
-  const updated = {
-    ...row,
-    buried_until: buried ? localStartOfTomorrow().toISOString() : null,
-    updated_at: now,
-  };
-  await updateCard(db, updated);
-  return updated;
+  return updateStudyCardInTransaction(db, deckId, cardId, (row) => {
+    const now = new Date().toISOString();
+    const updated = {
+      ...row,
+      buried_until: buried ? localStartOfTomorrow().toISOString() : null,
+      updated_at: now,
+    };
+    return updated;
+  });
 }
 
 export async function setStudyCardMarked(
-  db: DatabaseExecutor,
+  db: AppDatabase,
   deckId: string,
   cardId: string,
   marked: boolean
 ): Promise<StudyCardRow> {
-  const row = await ensureStudyCardRow(db, deckId, cardId);
-  const now = new Date().toISOString();
-  const updated = {
-    ...row,
-    marked_at: marked ? now : null,
-    updated_at: now,
-  };
-  await updateCard(db, updated);
-  return updated;
+  return updateStudyCardInTransaction(db, deckId, cardId, (row) => {
+    const now = new Date().toISOString();
+    const updated = {
+      ...row,
+      marked_at: marked ? now : null,
+      updated_at: now,
+    };
+    return updated;
+  });
 }
 
 export async function resetStudyCardProgress(
-  db: DatabaseExecutor,
+  db: AppDatabase,
   deckId: string,
   cardId: string
 ): Promise<StudyCardRow> {
-  const row = await ensureStudyCardRow(db, deckId, cardId);
-  const now = new Date();
-  const emptyCard = createEmptyCard(now);
-  const updated = {
-    ...row,
-    due: emptyCard.due.toISOString(),
-    stability: emptyCard.stability,
-    difficulty: emptyCard.difficulty,
-    elapsed_days: emptyCard.elapsed_days,
-    scheduled_days: emptyCard.scheduled_days,
-    learning_steps: emptyCard.learning_steps,
-    reps: emptyCard.reps,
-    lapses: emptyCard.lapses,
-    state: emptyCard.state,
-    last_review: null,
-    updated_at: now.toISOString(),
-  };
-  await updateCard(db, updated);
-  return updated;
+  return updateStudyCardInTransaction(db, deckId, cardId, (row) => {
+    const now = new Date();
+    const emptyCard = createEmptyCard(now);
+    const updated = {
+      ...row,
+      due: emptyCard.due.toISOString(),
+      stability: emptyCard.stability,
+      difficulty: emptyCard.difficulty,
+      elapsed_days: emptyCard.elapsed_days,
+      scheduled_days: emptyCard.scheduled_days,
+      learning_steps: emptyCard.learning_steps,
+      reps: emptyCard.reps,
+      lapses: emptyCard.lapses,
+      state: emptyCard.state,
+      last_review: null,
+      updated_at: now.toISOString(),
+    };
+    return updated;
+  });
 }
 
 export async function setStudyCardDueDate(
-  db: DatabaseExecutor,
+  db: AppDatabase,
   deckId: string,
   cardId: string,
   dueDate: Date
 ): Promise<StudyCardRow> {
-  const row = await ensureStudyCardRow(db, deckId, cardId);
-  const now = new Date();
-  const today = new Date(now);
-  today.setHours(0, 0, 0, 0);
-  const target = new Date(dueDate);
-  target.setHours(0, 0, 0, 0);
-  const scheduledDays = dayDiffLocal(today, target);
-  const due = scheduledDays === 0 ? now : target;
-  const updated = {
-    ...row,
-    due: due.toISOString(),
-    scheduled_days: scheduledDays,
-    suspended_at: null,
-    buried_until: null,
-    updated_at: now.toISOString(),
-  };
-  await updateCard(db, updated);
-  return updated;
+  return updateStudyCardInTransaction(db, deckId, cardId, (row) => {
+    const now = new Date();
+    const today = new Date(now);
+    today.setHours(0, 0, 0, 0);
+    const target = new Date(dueDate);
+    target.setHours(0, 0, 0, 0);
+    const scheduledDays = dayDiffLocal(today, target);
+    const due = scheduledDays === 0 ? now : target;
+    const updated = {
+      ...row,
+      due: due.toISOString(),
+      scheduled_days: scheduledDays,
+      suspended_at: null,
+      buried_until: null,
+      updated_at: now.toISOString(),
+    };
+    return updated;
+  });
 }
 
 export async function getNextEligibleReviewDate(db: DatabaseExecutor): Promise<string | null> {
@@ -1047,7 +1065,28 @@ function parseStudyCardId(cardId: string): { kind: "ayah" | "word"; surah: numbe
   return null;
 }
 
-export async function updateCard(db: DatabaseExecutor, card: StudyCardRow): Promise<void> {
+/**
+ * Create the card row if needed, apply a change and queue both uploads in one transaction, so a
+ * queue failure leaves the card as it was.
+ */
+async function updateStudyCardInTransaction(
+  database: AppDatabase,
+  deckId: string,
+  cardId: string,
+  change: (row: StudyCardRow) => StudyCardRow
+): Promise<StudyCardRow> {
+  let updated: StudyCardRow | null = null;
+  await database.withTransactionAsync(async (db) => {
+    const next = change(await ensureStudyCardRow(db, deckId, cardId));
+    await putCardRow(db, next);
+    updated = next;
+  });
+  if (!updated) throw new Error("Study card was not saved.");
+  return updated;
+}
+
+/** Write a card's scheduling state and queue its upload with the given executor. */
+export async function putCardRow(db: DatabaseExecutor, card: StudyCardRow): Promise<void> {
   await db.runAsync(
     `UPDATE study_cards SET
       due = ?, stability = ?, difficulty = ?, elapsed_days = ?, scheduled_days = ?,
@@ -1062,30 +1101,30 @@ export async function updateCard(db: DatabaseExecutor, card: StudyCardRow): Prom
     ]
   );
 
-  // Enqueue for sync
-  enqueueSync(db, "study_cards", "UPDATE", card.id, cardToSyncData(card)).catch(console.warn);
+  await enqueueSync(db, "study_cards", "UPDATE", card.id, cardToSyncData(card));
 }
 
-export async function insertStudyLog(
-  db: AppDatabase,
-  cardId: string,
-  rating: number,
-  state: number,
-  due: string,
-  stability: number,
-  difficulty: number,
-  elapsedDays: number,
-  scheduledDays: number,
-  reviewedAt: string
-): Promise<void> {
+export type StudyLogInput = {
+  cardId: string;
+  rating: number;
+  state: number;
+  due: string;
+  stability: number;
+  difficulty: number;
+  elapsedDays: number;
+  scheduledDays: number;
+  reviewedAt: string;
+};
+
+/** Record one review and queue its upload with the given executor. */
+export async function putStudyLogRow(db: DatabaseExecutor, log: StudyLogInput): Promise<void> {
+  const { cardId, rating, state, due, stability, difficulty, elapsedDays, scheduledDays, reviewedAt } = log;
   await db.runAsync(
     `INSERT INTO study_log (card_id, rating, state, due, stability, difficulty, elapsed_days, scheduled_days, reviewed_at, sync_status)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
     [cardId, rating, state, due, stability, difficulty, elapsedDays, scheduledDays, reviewedAt]
   );
-
-  // Enqueue for sync
-  enqueueSync(db, "study_log", "INSERT", `${cardId}:${reviewedAt}`, {
+  await enqueueSync(db, "study_log", "INSERT", `${cardId}:${reviewedAt}`, {
     card_id: cardId,
     rating,
     state,
@@ -1095,10 +1134,17 @@ export async function insertStudyLog(
     elapsed_days: elapsedDays,
     scheduled_days: scheduledDays,
     reviewed_at: reviewedAt,
+  });
+}
+
+/** Publish a committed review: achievements are a logged side effect, then listeners refresh. */
+export function publishReviewLogged(db: AppDatabase, log: StudyLogInput): void {
+  recordAchievementEvent(db, {
+    type: "review_logged",
+    cardId: log.cardId,
+    rating: log.rating,
+    reviewedAt: log.reviewedAt,
   }).catch(console.warn);
-
-  recordAchievementEvent(db, { type: "review_logged", cardId, rating, reviewedAt }).catch(console.warn);
-
   emitReviewActivity();
 }
 
