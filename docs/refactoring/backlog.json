@@ -20314,22 +20314,213 @@
         "tests/unit/sync-queue-payloads.test.ts"
       ],
       "acceptance_criteria": [
-        "Pending exact causal proof and primary timestamp policy. Cover upload/delete freshness, created/deleted fallback and valid timestamp controls, retain all RF151/RF156 incoming contracts. No invented current timestamp, data rewrite or production operation. Full controller checks, independent review and primary acceptance."
+        "Outgoing highlight upserts and tombstone deletes never send an empty updated_at. Use deleted_at when present, otherwise created_at; never invent the current time and never rewrite local rows.",
+        "The freshness check uses that fallback, so a newer remote highlight is not overwritten by a legacy row.",
+        "Valid timestamps, incoming legacy deletion handling and the RF151/RF156 wire contracts are unchanged. Real SQLite queue rows through public fullSync, with causal failures before repair.",
+        "All full controller checks, separate independent review and primary acceptance."
       ],
-      "approved": false,
-      "status": "pending",
-      "attempts": 0,
+      "approved": true,
+      "status": "verified",
+      "attempts": 1,
       "implementation_mode": "implementation",
-      "files": [],
-      "allowed_paths": [],
-      "verification": []
+      "files": [
+        "lib/database/sync.ts",
+        "tests/unit/sync-queue-payloads.test.ts"
+      ],
+      "allowed_paths": [
+        "lib/database/sync.ts",
+        "tests/unit/sync-queue-payloads.test.ts"
+      ],
+      "verification": [
+        [
+          "git",
+          "diff",
+          "--check"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "lib/database/sync.ts",
+          "tests/unit/sync-queue-payloads.test.ts",
+          "docs/refactoring/PROGRESS.md"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/database/sync.ts",
+          "tests/unit/sync-queue-payloads.test.ts",
+          "--max-warnings=0"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "check:analysis"
+        ],
+        [
+          "npm",
+          "run",
+          "postinstall"
+        ],
+        [
+          "npm",
+          "ls",
+          "--all",
+          "--json"
+        ],
+        [
+          "npm",
+          "run",
+          "lint",
+          "--",
+          "--format",
+          "json"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit"
+        ],
+        [
+          "node",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/tests/brace-expansion.test.cjs",
+          "scripts/tests/dependency-boundaries.test.cjs",
+          "scripts/tests/icon-tool.test.cjs",
+          "scripts/tests/jest-config.test.cjs",
+          "scripts/tests/js-yaml.test.cjs",
+          "scripts/tests/lint-coverage.test.cjs",
+          "scripts/tests/metro-unicode.test.cjs",
+          "scripts/tests/nanoid.test.cjs",
+          "scripts/tests/router-dependency-range.test.cjs",
+          "scripts/tests/security-dependency-owner.test.cjs",
+          "scripts/tests/source-map-js.test.cjs",
+          "scripts/tests/tailwind-source-map.test.cjs",
+          "scripts/tests/ws.test.cjs",
+          "scripts/tests/xmldom.test.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "test:refactor-runner"
+        ],
+        [
+          "python3",
+          "-B",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "scripts/tests",
+          "-p",
+          "test_*.py"
+        ],
+        [
+          "npm",
+          "run",
+          "check:native-config"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=4096",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "android",
+          "--output-dir",
+          ".expo/modernization-checks/android",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/android')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=3072",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "ios",
+          "--output-dir",
+          ".expo/modernization-checks/ios",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/ios')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8197",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts",
+          "tests/e2e/database-bridge.spec.ts",
+          "tests/e2e/tafsir-import.spec.ts",
+          "tests/e2e/translation-import.spec.ts"
+        ]
+      ],
+      "started_at": "2026-11-07T12:14:09.646326+00:00",
+      "diagnosis": "The wire schema accepts updated_at='' for highlights. rowTimestamp uses ?? so '' is kept, remoteIsNewer treats it as no timestamp and skips the probe, and the upsert sends '' to TIMESTAMPTZ (PostgreSQL 22007, confirmed in RF033). The failed entry then fails its whole highlights group on every sync.",
+      "reuse": "One normalization in normalizeRemoteRow, which both pushUpsert and the highlight tombstone path in pushDelete already use.",
+      "focused_validation": {
+        "pre_fix": "Four new fullSync cases failed: three uploads sent updated_at '' and a newer remote highlight was overwritten. The valid-timestamp control passed.",
+        "post_fix": "All 176 sync-queue-payloads and sync-payloads cases, typecheck and scoped zero-warning lint pass."
+      },
+      "completed_at": "2026-11-07T12:23:40.213689+00:00",
+      "primary_accepted_at": "2026-11-07T12:23:40.213689+00:00",
+      "independent_review": "pass",
+      "evidence": "docs/refactoring/PROGRESS.md",
+      "summary": "Outgoing highlight upserts and tombstones replace a legacy empty updated_at with deleted_at or created_at, so the server accepts them and the freshness check protects newer remote rows. All 20 full checks (3,064 unit, 35 Chrome) and independent review pass."
     },
     {
       "id": "RF-169",
       "title": "Protect sync conflict decisions from intervening remote writes",
       "priority": 1,
       "risk": "high",
-      "description": "remoteIsNewer performs a SELECT before unconditional upsert/delete, allowing an intervening newer device write to be overwritten. Reproduce a held-probe/intervening-write flow and design an atomic server-side contract before implementation. A second client check is not atomic.",
+      "description": "remoteIsNewer performs a SELECT before unconditional upsert/delete, allowing an intervening newer device write to be overwritten. Reproduce a held-probe/intervening-write flow and design an atomic server-side contract before implementation. A second client check is not atomic. RF168 review follow-ups: pushDelete stamps a missing deleted_at with the current time for settings/meanings/cards/highlights tombstones, which can let a stale delete beat a newer remote edit; incoming live highlights with updated_at \"\" skip freshness and are stored empty until the schema repair runs.",
       "dependencies": [
         "RF-033"
       ],

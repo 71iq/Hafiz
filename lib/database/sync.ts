@@ -552,6 +552,11 @@ function normalizeRemoteRow(tableName: SyncTable, row: Record<string, any>): Rec
   if (tableName === "highlights" && row.sync_id) {
     delete row.id;
   }
+  // Legacy local highlights can carry an empty updated_at. The server column is TIMESTAMPTZ and the
+  // freshness check needs a real instant, so use the row's own deletion or creation time.
+  if (tableName === "highlights" && row.updated_at === "") {
+    row.updated_at = row.deleted_at || row.created_at;
+  }
 
   if (
     tableName === "study_cards" ||

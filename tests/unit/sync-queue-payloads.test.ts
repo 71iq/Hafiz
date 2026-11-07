@@ -599,3 +599,71 @@ it("preserves every generated database integer ID from the real queue through re
     { seed: 310231, numRuns: 60, examples: [[[9007199254740993n, 9223372036854775807n]]] },
   );
 });
+
+describe("RF-168 legacy empty highlight updated_at", () => {
+  const SYNC_ID = "highlight:2:255:ayah:ayah:yellow";
+  const DELETED = "2026-01-15T00:00:00.000Z";
+
+  function legacyHighlight(overrides: Record<string, unknown> = {}) {
+    return {
+      sync_id: SYNC_ID,
+      surah: 2,
+      ayah: 255,
+      word_start: null,
+      word_end: null,
+      color: "yellow",
+      created_at: OLD,
+      updated_at: "",
+      deleted_at: null,
+      ...overrides,
+    };
+  }
+
+  async function queueHighlight(operation: "UPDATE" | "DELETE", data: Record<string, unknown>) {
+    await enqueueSync(db, "highlights", operation, SYNC_ID, data);
+    const row = await db.getFirstAsync<{ id: number }>("SELECT id FROM sync_queue ORDER BY id DESC LIMIT 1");
+    if (!row) throw new Error("Expected queued highlight");
+    return row.id;
+  }
+
+  it.each([
+    { label: "live upload falls back to created_at", operation: "UPDATE" as const, data: {}, expected: OLD },
+    {
+      label: "soft-deleted upload falls back to deleted_at",
+      operation: "UPDATE" as const,
+      data: { deleted_at: DELETED },
+      expected: DELETED,
+    },
+    {
+      label: "tombstone delete falls back to deleted_at",
+      operation: "DELETE" as const,
+      data: { deleted_at: DELETED },
+      expected: DELETED,
+    },
+  ])("never uploads an empty TIMESTAMPTZ: $label", async ({ operation, data, expected }) => {
+    const id = await queueHighlight(operation, legacyHighlight(data));
+
+    await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pushed: 1 });
+
+    expect(remoteWrites).toMatchObject([{ table: "highlights", kind: "upsert", row: { updated_at: expected } }]);
+    expect(queueState(id)).toEqual({ status: "synced" });
+  });
+
+  it("keeps a newer remote highlight instead of overwriting it with a legacy empty timestamp", async () => {
+    const id = await queueHighlight("UPDATE", legacyHighlight());
+    mockProbeData = [{ updated_at: NEW }];
+
+    await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pushed: 1 });
+
+    expect(remoteWrites).toEqual([]);
+    expect(queueState(id)).toEqual({ status: "synced" });
+  });
+
+  it("keeps a valid highlight updated_at unchanged", async () => {
+    await queueHighlight("UPDATE", legacyHighlight({ updated_at: NEW }));
+
+    await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pushed: 1 });
+
+    expect(remoteWrites).toMatchObject([{ row: { updated_at: NEW, created_at: OLD } }]);
+  });
+});
