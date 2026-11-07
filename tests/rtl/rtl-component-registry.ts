@@ -218,6 +218,12 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "Word detail sheet chrome and tabs mirror; word glyphs remain natural.",
   ),
   entry(
+    "components/mushaf/WordSpan.tsx",
+    "quran-text",
+    "source",
+    "Android nested word span keeps Quran order inside its ayah text; the tooltip anchors to the touch point.",
+  ),
+  entry(
     "components/mushaf/WordToken.tsx",
     "quran-text",
     "source",
