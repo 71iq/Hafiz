@@ -1,4 +1,4 @@
-import type { DatabaseExecutor } from "@/lib/database/types";
+import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import { enqueueSync } from "@/lib/database/sync-queue";
 import { recordAchievementEvent } from "@/lib/achievements/queries";
 import { enqueueQfSync } from "@/lib/quran-foundation/user-sync";
@@ -64,7 +64,7 @@ type PrivateNoteSearchRow = PrivateNoteRow & {
 };
 
 export async function createPrivateNote(
-  db: DatabaseExecutor,
+  db: AppDatabase,
   input: CreatePrivateNoteInput
 ): Promise<PrivateNote> {
   const now = new Date().toISOString();

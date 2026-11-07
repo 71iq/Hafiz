@@ -20850,6 +20850,238 @@
       "independent_review": "pass",
       "evidence": "docs/refactoring/PROGRESS.md",
       "summary": "Syncable setting writes/deletes, the all-decks filter and the meanings deck setting commit together with their upload queue entries. A queue failure keeps the previous value and surfaces through existing caller error handling. All 20 full checks (3,068 unit, 35 Chrome) and independent review pass."
+    },
+    {
+      "id": "RF-173",
+      "title": "Commit achievement unlocks with their upload and notify after commit",
+      "priority": 1,
+      "risk": "medium",
+      "description": "RF171 sub-task 2. unlockAchievement inserted the unlock, detached its sync queue write with .catch(console.warn) and notified listeners before anything was durable. A lost queue row was permanent because a later INSERT OR IGNORE changes no row. recordAchievementEvent and backfillAchievements now run in one transaction each, await the queue write, and publish unlocks to listeners only after commit.",
+      "dependencies": [
+        "RF-172"
+      ],
+      "modules": [
+        "lib/achievements/queries.ts",
+        "lib/notes/queries.ts",
+        "lib/fsrs/queries.ts",
+        "lib/fsrs/persist-review.ts",
+        "tests/unit/achievement-outbox.test.ts"
+      ],
+      "files": [
+        "lib/achievements/queries.ts",
+        "lib/notes/queries.ts",
+        "lib/fsrs/queries.ts",
+        "lib/fsrs/persist-review.ts",
+        "tests/unit/achievement-outbox.test.ts"
+      ],
+      "allowed_paths": [
+        "lib/achievements/queries.ts",
+        "lib/notes/queries.ts",
+        "lib/fsrs/queries.ts",
+        "lib/fsrs/persist-review.ts",
+        "tests/unit/achievement-outbox.test.ts"
+      ],
+      "acceptance_criteria": [
+        "An unlock row, its progress and its queue entry commit together; a queue failure rejects and leaves no unlock, so derivable achievements retry on the next backfill.",
+        "Listeners hear about an unlock only after its transaction commits, never for a rolled-back unlock. Silent backfills never notify.",
+        "Signatures that reach these functions take AppDatabase; callers already pass the app database. Startup, pull and dashboard callers keep their existing error handling; event callers keep logging failures without failing the user's save.",
+        "Causal tests through the real connection owner. All full controller checks, separate independent review and primary acceptance."
+      ],
+      "verification": [
+        [
+          "git",
+          "diff",
+          "--check"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "lib/fsrs/persist-review.ts",
+          "tests/unit/achievement-outbox.test.ts",
+          "docs/refactoring/PROGRESS.md"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/achievements/queries.ts",
+          "lib/fsrs/queries.ts",
+          "lib/fsrs/persist-review.ts",
+          "tests/unit/achievement-outbox.test.ts",
+          "--max-warnings=0"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "check:analysis"
+        ],
+        [
+          "npm",
+          "run",
+          "postinstall"
+        ],
+        [
+          "npm",
+          "ls",
+          "--all",
+          "--json"
+        ],
+        [
+          "npm",
+          "run",
+          "lint",
+          "--",
+          "--format",
+          "json"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit"
+        ],
+        [
+          "node",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/tests/brace-expansion.test.cjs",
+          "scripts/tests/dependency-boundaries.test.cjs",
+          "scripts/tests/icon-tool.test.cjs",
+          "scripts/tests/jest-config.test.cjs",
+          "scripts/tests/js-yaml.test.cjs",
+          "scripts/tests/lint-coverage.test.cjs",
+          "scripts/tests/metro-unicode.test.cjs",
+          "scripts/tests/nanoid.test.cjs",
+          "scripts/tests/router-dependency-range.test.cjs",
+          "scripts/tests/security-dependency-owner.test.cjs",
+          "scripts/tests/source-map-js.test.cjs",
+          "scripts/tests/tailwind-source-map.test.cjs",
+          "scripts/tests/ws.test.cjs",
+          "scripts/tests/xmldom.test.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "test:refactor-runner"
+        ],
+        [
+          "python3",
+          "-B",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "scripts/tests",
+          "-p",
+          "test_*.py"
+        ],
+        [
+          "npm",
+          "run",
+          "check:native-config"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=4096",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "android",
+          "--output-dir",
+          ".expo/modernization-checks/android",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/android')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=3072",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "ios",
+          "--output-dir",
+          ".expo/modernization-checks/ios",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/ios')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8197",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts",
+          "tests/e2e/database-bridge.spec.ts",
+          "tests/e2e/tafsir-import.spec.ts",
+          "tests/e2e/translation-import.spec.ts"
+        ]
+      ],
+      "approved": true,
+      "status": "verified",
+      "attempts": 1,
+      "implementation_mode": "implementation",
+      "started_at": "2026-11-07T12:53:12.998308+00:00",
+      "reuse": "tests/jest/outbox-sqlite.ts from RF172; AppDatabase.withTransactionAsync. No new listener mechanism.",
+      "diagnosis": "Event-only unlocks such as first_mutashabih_pair are not derivable by backfill; on a rolled-back queue write they are recorded by the next matching event instead of being kept locally without an upload.",
+      "failure_history": [
+        {
+          "phase": "primary-iteration",
+          "failure": "A startup catch in lib/database/provider.tsx was reverted: it would hide a dead connection during startup backfill and diverged from the obsolete-host failure contract in database-bridge.test.tsx. Startup backfill errors propagate as before."
+        }
+      ],
+      "focused_validation": {
+        "pre_fix": "Two of three new cases failed on the original source: a partial backfill committed an unlock with no queue row and notified a listener, and an event unlock persisted without its queue row.",
+        "post_fix": "All 3 new cases and the full Jest suite (151 suites/3,071 cases) pass; typecheck and scoped zero-warning lint pass. lib/notes/queries.ts keeps one existing unused-variable warning and is excluded from scoped zero-warning lint."
+      },
+      "completed_at": "2026-11-07T13:02:34.775247+00:00",
+      "primary_accepted_at": "2026-11-07T13:02:34.775247+00:00",
+      "independent_review": "pass",
+      "evidence": "docs/refactoring/PROGRESS.md",
+      "summary": "Achievement unlocks, their progress and upload queue entries commit together; listeners hear only committed unlocks. Event callers still log failures without failing the save. All 20 full checks (3,071 unit, 35 Chrome) and independent review pass."
     }
   ]
 }

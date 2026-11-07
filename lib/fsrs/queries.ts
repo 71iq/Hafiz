@@ -1067,7 +1067,7 @@ export async function updateCard(db: DatabaseExecutor, card: StudyCardRow): Prom
 }
 
 export async function insertStudyLog(
-  db: DatabaseExecutor,
+  db: AppDatabase,
   cardId: string,
   rating: number,
   state: number,

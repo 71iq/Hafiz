@@ -1,4 +1,4 @@
-import type { DatabaseExecutor } from "@/lib/database/types";
+import type { AppDatabase } from "@/lib/database/types";
 import { insertStudyLog, updateCard } from "@/lib/fsrs/queries";
 import type { ReviewTransition } from "@/lib/fsrs/review-transition";
 
@@ -8,7 +8,7 @@ export async function persistReviewTransition({
   cardId,
   transition,
 }: {
-  db: DatabaseExecutor;
+  db: AppDatabase;
   cardId: string;
   transition: ReviewTransition;
 }): Promise<void> {
