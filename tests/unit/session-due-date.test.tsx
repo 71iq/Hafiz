@@ -279,6 +279,7 @@ function makeSmartRef(groupId: string, surah: number, ayah: number): SmartDeckRe
 const firstCard = makeStudyCard("mutashabihat:fixture-one:0", localDateWithOffset(2));
 const secondCard = makeStudyCard("mutashabihat:fixture-two:0", localDateWithOffset(5));
 const firstCue = "First synthetic cue";
+const DIALOG_CLOSE_TIMEOUT_MS = 5000;
 const secondCue = "Second synthetic cue";
 const firstRef = makeSmartRef("fixture-one", 2, 10);
 const secondRef = makeSmartRef("fixture-two", 3, 20);
@@ -965,8 +966,10 @@ describe("Flashcard session due-date editor characterization", () => {
           expect(hapticMedium).toHaveBeenCalledTimes(1);
 
           fireEvent.press(within(failedModal).getByRole("button", { name: s.flashcardsDelete }));
-          await waitFor(() =>
-            expect(view.UNSAFE_getAllByType(NativeModal).filter((node) => node.props.visible)).toHaveLength(0),
+          await waitFor(
+            () => expect(view.UNSAFE_getAllByType(NativeModal).filter((node) => node.props.visible)).toHaveLength(0),
+            // The dialog stays mounted through its real-timer exit animation; allow for a loaded CI host.
+            { timeout: DIALOG_CLOSE_TIMEOUT_MS },
           );
           await waitFor(() => expect(view.getByText(secondCue)).toBeTruthy());
           expect(view.queryByText(firstCue)).toBeNull();
@@ -1144,8 +1147,10 @@ describe("Flashcard session due-date editor characterization", () => {
           expect(hapticMedium).toHaveBeenCalledTimes(1);
 
           fireEvent.press(within(failedModal).getByRole("button", { name: s.cardResetProgress }));
-          await waitFor(() =>
-            expect(view.UNSAFE_getAllByType(NativeModal).filter((node) => node.props.visible)).toHaveLength(0),
+          await waitFor(
+            () => expect(view.UNSAFE_getAllByType(NativeModal).filter((node) => node.props.visible)).toHaveLength(0),
+            // The dialog stays mounted through its real-timer exit animation; allow for a loaded CI host.
+            { timeout: DIALOG_CLOSE_TIMEOUT_MS },
           );
           await waitFor(() => expect(view.getByText(s.flashcardsReveal)).toBeTruthy());
           expect(view.getByText(firstCue)).toBeTruthy();

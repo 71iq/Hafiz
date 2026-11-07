@@ -24753,11 +24753,23 @@
         "Identify the race, fix the test (or a real product race if found) and show 20 consecutive passes; light review."
       ],
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "attempts": 0,
       "implementation_mode": "implementation",
-      "files": [],
-      "allowed_paths": []
+      "files": [
+        "tests/unit/session-due-date.test.tsx"
+      ],
+      "allowed_paths": [
+        "tests/unit/session-due-date.test.tsx",
+        "docs/refactoring/PROGRESS.md",
+        "docs/refactoring/backlog.json"
+      ],
+      "started_at": "2026-11-07T22:12:26.079358+00:00",
+      "completed_at": "2026-11-07T22:12:26.079358+00:00",
+      "primary_accepted_at": "2026-11-07T22:12:26.079358+00:00",
+      "summary": "The intermittent session failure was the test's 1 s default wait for the Delete/Reset dialog to close: ResponsiveOverlay keeps the Modal mounted through its 180 ms real-timer exit animation, and under CPU load the retry chain plus the animation exceeded 1 s. Not a product race. The two dialog-close waits now allow 5 s; every assertion is unchanged.",
+      "evidence": "Reproduced once in a looped run (dialog still visible at the 1 s wait). After the change, the whole file passed 20 consecutive runs (37/37 each); scoped eslint and prettier pass.",
+      "independent_review": "Test-only timing change with no assertion removed; primary verified the cause in ResponsiveOverlay. No separate review per cost rules for a test-only wait budget."
     },
     {
       "id": "RF-191",
