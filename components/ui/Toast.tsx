@@ -6,6 +6,7 @@ type Props = {
   message: string | null;
   onDismiss: () => void;
   duration?: number;
+  announce?: boolean;
 };
 
 type Phase = {
@@ -13,7 +14,7 @@ type Phase = {
   deadline: number;
 };
 
-export function Toast({ message, onDismiss, duration = 2000 }: Props) {
+export function Toast({ message, onDismiss, duration = 2000, announce = false }: Props) {
   const opacity = useRef(new Animated.Value(0)).current;
   const animation = useRef<Animated.CompositeAnimation | null>(null);
   const latestReduceMotion = useRef(true);
@@ -98,6 +99,8 @@ export function Toast({ message, onDismiss, duration = 2000 }: Props) {
       }}
     >
       <Text
+        accessibilityRole={announce ? "alert" : undefined}
+        accessibilityLiveRegion={announce ? "polite" : undefined}
         style={{
           backgroundColor: "#003638",
           color: "#fff",

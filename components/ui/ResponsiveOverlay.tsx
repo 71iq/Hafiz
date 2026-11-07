@@ -1,3 +1,4 @@
+import { OperationNoticeOverlay } from "@/components/ui/OperationNoticeProvider";
 import { useEffect, useMemo, useRef, type Ref, type RefObject } from "react";
 import {
   Animated,
@@ -251,6 +252,7 @@ export function ResponsiveOverlay({
           {children}
         </Animated.View>
       </Container>
+      <OperationNoticeOverlay overlayId={overlayId} open={open} />
     </Modal>
   );
 }

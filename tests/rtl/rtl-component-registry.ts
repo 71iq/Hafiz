@@ -441,6 +441,12 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "Full-width banner is centered; action/close order mirrors when present.",
   ),
   entry(
+    "components/ui/OperationNoticeProvider.tsx",
+    "feedback",
+    "rntl",
+    "Captured Arabic/English notices survive recovery; centered modal/root placement is direction-neutral. Rendered coverage is in tests/unit/operation-notice.test.tsx and tafsir-selection.test.tsx.",
+  ),
+  entry(
     "components/ui/Progress.tsx",
     "progress-chart",
     "rntl",

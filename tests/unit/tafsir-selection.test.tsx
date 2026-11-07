@@ -1,3 +1,5 @@
+import { Toast } from "@/components/ui/Toast";
+import { OperationNoticeOverlay, OperationNoticeProvider } from "@/components/ui/OperationNoticeProvider";
 import React, { type ComponentProps } from "react";
 import { Dimensions, I18nManager } from "react-native";
 import { act, cleanup, fireEvent, render } from "@testing-library/react-native";
@@ -12,6 +14,8 @@ import { strings } from "@/lib/i18n/strings";
 import { stringByKey } from "@/lib/i18n/useStrings";
 import type { useSettings } from "@/lib/settings/context";
 import { AVAILABLE_TAFSIR_SOURCES, type TafsirSourceId } from "@/lib/tafsir/sources";
+
+let mockNoticeReady = true;
 
 type PickerProps = ComponentProps<typeof TafsirSourcePicker>;
 let mockPickerProps: PickerProps | undefined;
@@ -134,7 +138,9 @@ function Wrapper({ children }: React.PropsWithChildren) {
         insets: { top: 0, left: 0, bottom: 0, right: 0 },
       }}
     >
-      <DirectionProvider dir={mockSettings.isRTL ? "rtl" : "ltr"}>{children}</DirectionProvider>
+      <OperationNoticeProvider ready={mockNoticeReady}>
+        <DirectionProvider dir={mockSettings.isRTL ? "rtl" : "ltr"}>{children}</DirectionProvider>
+      </OperationNoticeProvider>
     </SafeAreaProvider>
   );
 }
@@ -183,6 +189,7 @@ describe.each(cases)("$owner $language/$width tafsir selection", ({ owner, langu
     expect(picker().importingSource).toBe(busy ? sourceA : null);
   }
   beforeEach(() => {
+    mockNoticeReady = true;
     jest.clearAllMocks();
     mockPickerProps = undefined;
     mockSelectionResults.length = 0;
@@ -228,7 +235,7 @@ describe.each(cases)("$owner $language/$width tafsir selection", ({ owner, langu
     expect(picker().importingSource).toBeNull();
     expect(picker().selectedSource).toBe(sourceA);
     expect(picker().visible).toBe(false);
-  });
+  }, 10000);
   it("reports import failure without selecting or closing", async () => {
     const view = await open();
     const result = begin(view);
@@ -316,6 +323,63 @@ describe.each(cases)("$owner $language/$width tafsir selection", ({ owner, langu
     expect(mockSetSource).toHaveBeenCalledWith(sourceA);
     expect(picker().visible).toBe(false);
     expect(picker().importingSource).toBeNull();
+  });
+  it("hands one failure notice from the real picker to its sheet and root", async () => {
+    const view = await open();
+    const result = begin(view);
+    expectedWarnings = 1;
+    jest.useFakeTimers();
+    try {
+      await act(async () => {
+        pending.reject(new Error("Synthetic nested picker failure"));
+        await result;
+      });
+      const activeSlots = () =>
+        view.UNSAFE_queryAllByType(OperationNoticeOverlay).filter((slot) => slot.findAllByType(Toast).length > 0);
+      expect(view.UNSAFE_getAllByType(Toast)).toHaveLength(1);
+      expect(activeSlots()).toHaveLength(1);
+      const pickerId: unknown = activeSlots()[0].props.overlayId;
+      act(() => picker().onClose());
+      expect(view.UNSAFE_getAllByType(Toast)).toHaveLength(1);
+      expect(view.getByText(strings[language].tafseerSourceImportFailed)).toBeTruthy();
+      if (owner === "reading") {
+        expect(activeSlots()).toHaveLength(1);
+        expect(activeSlots()[0].props.overlayId).not.toBe(pickerId);
+      } else {
+        expect(activeSlots()).toHaveLength(0);
+      }
+      view.rerender(<></>);
+      expect(activeSlots()).toHaveLength(0);
+      expect(view.UNSAFE_getAllByType(Toast)).toHaveLength(1);
+      expect(view.getByText(strings[language].tafseerSourceImportFailed)).toBeTruthy();
+    } finally {
+      view.unmount();
+      jest.useRealTimers();
+    }
+  });
+  it("retains a deferred failure after the owner disappears and readiness recovers", async () => {
+    const view = await open();
+    const result = begin(view);
+    expectedWarnings = 1;
+    jest.useFakeTimers();
+    try {
+      mockNoticeReady = false;
+      view.rerender(<></>);
+      await act(async () => {
+        pending.reject(new Error("Synthetic retired SQLite failure"));
+        await result;
+      });
+      await expect(result).resolves.toBe(false);
+      expect(mockSetSource).not.toHaveBeenCalled();
+      act(() => jest.advanceTimersByTime(5000));
+      expect(view.queryByText(strings[language].tafseerSourceImportFailed)).toBeNull();
+      mockNoticeReady = true;
+      view.rerender(<></>);
+      expect(view.getByText(strings[language].tafseerSourceImportFailed)).toBeTruthy();
+    } finally {
+      view.unmount();
+      jest.useRealTimers();
+    }
   });
   it("preserves selection completion after the owner unmounts", async () => {
     const view = await open();

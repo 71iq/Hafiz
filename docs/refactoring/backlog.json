@@ -19218,25 +19218,365 @@
     },
     {
       "id": "RF-163",
-      "title": "Preserve recoverable SQLite error reporting in the shipped app",
-      "description": "All114 synthetic qurtubi requests200. Actual BEFOREINSERT RAISE(ABORT) reports code19 plus failed finalization; owner quarantines and provider recovers, dismissing picker/toast. No production/protected data accessed. Diagnose finalization semantics and define a small app-owned correction before approval.",
+      "title": "Preserve tafsir failure notices through recovery and modal layers",
+      "description": "Stable UI ownership retains localized tafsir errors when conservative SQLite recovery replaces screens and renders one readable notice in the existing active modal window.",
       "modules": [
-        "lib/database/connection-owner.ts",
-        "lib/database/provider.tsx"
+        "components/ui/OperationNoticeProvider.tsx",
+        "components/ui/ResponsiveOverlay.tsx",
+        "app/_layout.tsx",
+        "app/(tabs)/settings.tsx",
+        "components/mushaf/ReadingSettingsSheet.tsx",
+        "components/mushaf/AyahDetailModal.tsx",
+        "tests/unit/operation-notice.test.tsx",
+        "tests/unit/tafsir-selection.test.tsx",
+        "tests/unit/ayah-tafsir-selection.test.tsx",
+        "tests/unit/reading-stepper.test.tsx",
+        "tests/unit/qf-sync-settings.test.tsx",
+        "tests/e2e/tafsir-import.spec.ts",
+        "components/ui/Toast.tsx",
+        "tests/rtl/rtl-component-registry.ts"
+      ],
+      "files": [
+        "components/ui/OperationNoticeProvider.tsx",
+        "components/ui/ResponsiveOverlay.tsx",
+        "app/_layout.tsx",
+        "app/(tabs)/settings.tsx",
+        "components/mushaf/ReadingSettingsSheet.tsx",
+        "components/mushaf/AyahDetailModal.tsx",
+        "tests/unit/operation-notice.test.tsx",
+        "tests/unit/tafsir-selection.test.tsx",
+        "tests/unit/ayah-tafsir-selection.test.tsx",
+        "tests/unit/reading-stepper.test.tsx",
+        "tests/unit/qf-sync-settings.test.tsx",
+        "tests/e2e/tafsir-import.spec.ts",
+        "components/ui/Toast.tsx",
+        "tests/rtl/rtl-component-registry.ts"
+      ],
+      "allowed_paths": [
+        "components/ui/OperationNoticeProvider.tsx",
+        "components/ui/ResponsiveOverlay.tsx",
+        "app/_layout.tsx",
+        "app/(tabs)/settings.tsx",
+        "components/mushaf/ReadingSettingsSheet.tsx",
+        "components/mushaf/AyahDetailModal.tsx",
+        "tests/unit/operation-notice.test.tsx",
+        "tests/unit/tafsir-selection.test.tsx",
+        "tests/unit/ayah-tafsir-selection.test.tsx",
+        "tests/unit/reading-stepper.test.tsx",
+        "tests/unit/qf-sync-settings.test.tsx",
+        "tests/e2e/tafsir-import.spec.ts",
+        "components/ui/Toast.tsx",
+        "tests/rtl/rtl-component-registry.ts"
+      ],
+      "dependencies": [
+        "RF-104",
+        "RF-161",
+        "RF-162"
+      ],
+      "priority": 1,
+      "risk": "high",
+      "approved": true,
+      "status": "verified",
+      "attempts": 1,
+      "implementation_mode": "implementation",
+      "acceptance_criteria": [
+        "Keep conservative SQLite quarantine/retirement, transaction settlement, provider and installed SDK untouched. Primary confirmed sqlite3_finalize can destroy a failed-step command and still reject, so no error-message guessing or unsafe pointer retry.",
+        "Add a generic OperationNoticeProvider(ready,children) without database/settings imports. A root DatabaseNoticeBoundary supplies ready from db/isReady, below DatabaseProvider and above AudioProviderBoundary. Own one latest localized message with increasing identity; stable showNotice survives child retirement, holds while unavailable and starts a fresh full display period after recovery. Matching identity prevents stale dismissal.",
+        "Reuse existing Toast and ResponsiveOverlay Modal windows. Root presents only with no open registered overlay. An optional OperationNoticeOverlay slot sits after the clipped animated container inside the existing Modal; stable id/open-only registration routes one notice to the newest open nested tafsir picker, back to parent sheet and then root. Independently rendered overlays without a notice provider remain usable. Do not claim arbitrary persistent sibling Modal stacking is repaired or add a new Modal/portal/vendor layer.",
+        "Switch only the Settings, ReadingSettingsSheet and AyahDetailModal tafsir failure callbacks to stable notice reporting, passing their captured existing translated message. Remove ReadingSettingsSheet's now-unused local Toast; retain all unrelated Settings and verse copy/audio notices, settings/import ordering, selection guards and retries. TranslationLanguagePicker's persistent inline error is a separate pending follow-up.",
+        "Operation notices opt into existing alert/polite announcement semantics through an optional Toast prop; other Toast callers retain existing behavior. Do not move keyboard focus. Use actual Toast tests for normal duration, readiness hold/recovery, identical repeated failures/stale dismissal, nested picker-parent-root ownership, independent overlays and timer cleanup.",
+        "Before caller repair reproduce six English/Arabic failures when deferred tafsir rejection arrives after screen/modal unmount while notice owner remains unavailable, then recovers after more than the display duration. Preserve existing success, failure/retry, same-render/stale guard and unmount completion tests. Unit wrappers supply the real notice provider without fake toast dispatch.",
+        "Real local-only Chrome tests keep actual SQLite TEMP triggers, synthetic114-source responses, exact retained rows/selection and successful retry. COMMIT failure proves message is readable above the modal through geometric hit testing; INSERT/finalize recovery must display the captured message after readiness returns. Cover desktop English and phone Arabic, inspect captures, keep screenshot/log output ignored and delete on acceptance. Add a representative real nested picker/parent handoff check if current browser flow needs coverage.",
+        "Keep exact63 full-lint diagnostics/0 errors and five Knip findings; no suppressions/dropped assertions. ReadingSettingsSheet and AyahDetailModal were pre-existing unformatted, so keep their edits narrow rather than broad formatting. Format clean changed files. All20 fresh controller checks, separate stronger independent review and primary acceptance required. One local accepted-task commit, small PROGRESS note, cleanup under2GB; no push/deploy/protected input changes."
+      ],
+      "verification": [
+        [
+          "git",
+          "diff",
+          "--check"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "components/ui/OperationNoticeProvider.tsx",
+          "components/ui/ResponsiveOverlay.tsx",
+          "app/_layout.tsx",
+          "app/(tabs)/settings.tsx",
+          "tests/unit/operation-notice.test.tsx",
+          "tests/unit/tafsir-selection.test.tsx",
+          "tests/unit/ayah-tafsir-selection.test.tsx",
+          "tests/unit/reading-stepper.test.tsx",
+          "tests/unit/qf-sync-settings.test.tsx",
+          "tests/e2e/tafsir-import.spec.ts",
+          "components/ui/Toast.tsx",
+          "docs/refactoring/PROGRESS.md",
+          "tests/rtl/rtl-component-registry.ts"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "components/ui/OperationNoticeProvider.tsx",
+          "app/_layout.tsx",
+          "app/(tabs)/settings.tsx",
+          "components/mushaf/ReadingSettingsSheet.tsx",
+          "tests/unit/operation-notice.test.tsx",
+          "tests/unit/tafsir-selection.test.tsx",
+          "tests/unit/ayah-tafsir-selection.test.tsx",
+          "tests/unit/reading-stepper.test.tsx",
+          "tests/unit/qf-sync-settings.test.tsx",
+          "tests/e2e/tafsir-import.spec.ts",
+          "components/ui/Toast.tsx",
+          "tests/rtl/rtl-component-registry.ts",
+          "--max-warnings=0"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "check:analysis"
+        ],
+        [
+          "npm",
+          "run",
+          "postinstall"
+        ],
+        [
+          "npm",
+          "ls",
+          "--all",
+          "--json"
+        ],
+        [
+          "npm",
+          "run",
+          "lint",
+          "--",
+          "--format",
+          "json"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "node",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/tests/brace-expansion.test.cjs",
+          "scripts/tests/dependency-boundaries.test.cjs",
+          "scripts/tests/icon-tool.test.cjs",
+          "scripts/tests/jest-config.test.cjs",
+          "scripts/tests/js-yaml.test.cjs",
+          "scripts/tests/lint-coverage.test.cjs",
+          "scripts/tests/metro-unicode.test.cjs",
+          "scripts/tests/nanoid.test.cjs",
+          "scripts/tests/router-dependency-range.test.cjs",
+          "scripts/tests/security-dependency-owner.test.cjs",
+          "scripts/tests/source-map-js.test.cjs",
+          "scripts/tests/tailwind-source-map.test.cjs",
+          "scripts/tests/ws.test.cjs",
+          "scripts/tests/xmldom.test.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "test:refactor-runner"
+        ],
+        [
+          "python3",
+          "-B",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "scripts/tests",
+          "-p",
+          "test_*.py"
+        ],
+        [
+          "npm",
+          "run",
+          "check:native-config"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=4096",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "android",
+          "--output-dir",
+          ".expo/modernization-checks/android",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/android')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=3072",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "ios",
+          "--output-dir",
+          ".expo/modernization-checks/ios",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/ios')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8197",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts",
+          "tests/e2e/database-bridge.spec.ts",
+          "tests/e2e/tafsir-import.spec.ts"
+        ]
+      ],
+      "diagnosis": "Primary inspected installed SQLite step/finalize semantics, actual Chrome recovery, root/provider remounts, all3 tafsir callers, existing Toast/Modal layers and rendered unit wrappers. Stronger read-only sanity check confirmed nested modal routing and missing announcement constraints; arbitrary persistent sibling Modal ordering is not claimed repaired.",
+      "reuse": "Reuse Toast with opt-in announcement and existing ResponsiveOverlay modal windows; one stable generic notice context above remounts, no new database or portal abstraction.",
+      "baseline": {
+        "unit_tests": 3002,
+        "unit_suites": 147,
+        "full_lint_warnings": 63,
+        "full_lint_errors": 0,
+        "knip_findings": 5,
+        "preexisting_unformatted_paths": [
+          "components/mushaf/ReadingSettingsSheet.tsx",
+          "components/mushaf/AyahDetailModal.tsx"
+        ],
+        "touched_legacy_lint_warnings": 9,
+        "lint_warning_files": [
+          "components/mushaf/AyahDetailModal.tsx",
+          "components/ui/ResponsiveOverlay.tsx"
+        ],
+        "expected_unit_suites": 148,
+        "expected_unit_tests": 3019
+      },
+      "failure_history": [
+        {
+          "phase": "focused-fixture",
+          "failure": "Six causal bilingual notice losses; initial Ayah5sec timeout and global timer assertion including unrelated renderer work."
+        },
+        {
+          "phase": "bounded-render-diagnosis",
+          "failure": "Unchanged Ayah first render5332ms versus279ms later; specific10sec bound retains every assertion."
+        },
+        {
+          "phase": "focused-lint",
+          "failure": "Imperative probe wrote during render; move capture to effect without rule suppression."
+        },
+        {
+          "phase": "nested-fixture",
+          "failure": "Two Reading handoff cases animated outside act; explicit fake timers/cleanup repair zero-error checks."
+        },
+        {
+          "phase": "settings-cold-render",
+          "failure": "Unchanged Settings first render5262ms versus198/256/164ms later; specific10sec bound retains every assertion."
+        },
+        {
+          "phase": "first-full-controller",
+          "failure": "3018/3019 pass; missing new feedback-owner RTL registry entry repaired with existing coverage assertions."
+        },
+        {
+          "phase": "second-full-controller",
+          "failure": "All19 earlier commands and31 existing Chrome cases pass; both notices visible/unoccluded. Incorrect alert accessible-name lookup repaired to role/text/polite semantics; explicit recovery readiness retained. Both focused and fresh full Chrome cases pass."
+        }
+      ],
+      "focused_validation": {
+        "pre_fix": "6 bilingual deferred post-unmount missing-notice cases; actual old-export Chrome desktop COMMIT notice occluded at9-point hit test and Arabic phone INSERT recovery notice absent.",
+        "post_fix": "142 focused UI cases pass across relevant unchanged/scoped reruns, including all6 causal cases,7 actual notice-owner timing/overlay cases and4 actual picker-parent-root handoffs. Types, clean-file lint and whitespace pass; legacy9 diagnostics remain subject to exact full63 parity.",
+        "limits": "Root generic owner has no database/settings imports. Existing nested tafsir modal hierarchy is tested; arbitrary persistent sibling Modal stacking is not claimed repaired. Native SDK/device runtime remainsRF041; translation inline recovery feedbackRF164.",
+        "registry_repair": "New feedback owner must be listed in the RTL component registry; no assertion suppression.",
+        "browser_repair": "Both actual local Chrome cases pass after exact role/text/live-region selector repair and explicit Arabic post-recovery readiness. Data rollback and6234-row retry assertions unchanged."
+      },
+      "started_at": "2026-11-07T09:18:43.126020+00:00",
+      "evidence": "docs/refactoring/PROGRESS.md",
+      "recovery_windows": [
+        {
+          "opened_at": "2026-11-07T09:18:42.895113+00:00",
+          "prior_attempts": 2,
+          "prior_attempt_offset": 0,
+          "reason": "Primary diagnosed and corrected browser accessibility selector plus explicit post-recovery readiness; focused real Chrome cases pass. Reopen bounded attempts preserving cumulative history."
+        }
+      ],
+      "attempt_offset": 2,
+      "completed_at": "2026-11-07T09:29:58.922031+00:00",
+      "primary_accepted_at": "2026-11-07T09:29:58.922031+00:00",
+      "independent_review": "pass",
+      "discovery_evidence": "tests/unit/operation-notice.test.tsx",
+      "summary": "Tafsir failure messages survive database recovery and appear above existing nested modals. All20 fresh full controller checks, separate stronger review and primary acceptance pass:148 suites/3019 unit cases,33 actual Chrome cases. Six causal bilingual caller failures, actual desktop occlusion and missing Arabic recovery messages preceded repair. Translation inline feedback remains RF164; native SDK/device behavior remains RF041; arbitrary persistent sibling Modal stacking is not claimed fixed."
+    },
+    {
+      "id": "RF-164",
+      "title": "Preserve translation failure feedback during database recovery",
+      "description": "TranslationLanguagePicker keeps a persistent inline error on ordinary failure, but a database retirement replaces that screen. Define and test a small recovery-only feedback policy without duplicating ordinary errors or losing retry context.",
+      "modules": [
+        "components/settings/TranslationLanguagePicker.tsx",
+        "lib/settings/context.tsx"
       ],
       "files": [],
       "allowed_paths": [],
       "dependencies": [
-        "RF-161"
+        "RF-162",
+        "RF-163"
       ],
       "priority": 1,
-      "risk": "high",
+      "risk": "medium",
       "approved": false,
       "status": "pending",
       "attempts": 0,
       "implementation_mode": "implementation",
       "acceptance_criteria": [
-        "Unapproved discovered task. Confirm actual installed SDK step/finalize behavior and distinguish known statement destruction from transport/uncertain cleanup. Do not relax quarantine from error-message guessing. Keep true cleanup uncertainty fenced. Preserve visible failure/retry and test actual Chrome plus isolated owner behavior. No vendor change without an affected shipped path. Full controller checks, independent review and primary acceptance remain required."
+        "Pending exact primary scope after real recovery/inline-error diagnosis. Preserve ordinary inline retry behavior, captured bilingual messages and language-setting policy. Full controller checks, independent stronger review and primary acceptance required."
       ],
       "verification": []
     }

@@ -1,3 +1,4 @@
+import { useOperationNotice } from "@/components/ui/OperationNoticeProvider";
 import { useCallback, useMemo, useState } from "react";
 import { ActivityIndicator, Platform, Pressable, Text, View, useWindowDimensions } from "react-native";
 import { Check, ChevronLeft, ChevronRight, X } from "lucide-react-native";
@@ -5,7 +6,6 @@ import { TafsirSourcePicker } from "@/components/settings/TafsirSourcePicker";
 import { OverlayBody, ResponsiveOverlay } from "@/components/ui/ResponsiveOverlay";
 import { Switch } from "@/components/ui/Switch";
 import { ReadingStepper } from "@/components/settings/ReadingStepper";
-import { Toast } from "@/components/ui/Toast";
 import { ThemeColorSwatch } from "@/components/ui/ThemeColorSwatch";
 import { useTafsirSourceSelection } from "@/lib/settings/use-tafsir-source-selection";
 import { useDatabase } from "@/lib/database/provider";
@@ -44,6 +44,7 @@ export function ReadingSettingsSheet({
 }: Props) {
   const db = useDatabase();
   const s = useStrings();
+  const showNotice = useOperationNotice();
   const { width } = useWindowDimensions();
   const {
     theme,
@@ -64,7 +65,6 @@ export function ReadingSettingsSheet({
   const [fontPickerVisible, setFontPickerVisible] = useState(false);
   const [markerStylePickerVisible, setMarkerStylePickerVisible] = useState(false);
   const [tafseerPickerVisible, setTafseerPickerVisible] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
   const Chevron = isRTL ? ChevronLeft : ChevronRight;
   const controlColor = isDark ? "#a3a3a3" : "#7C6A58";
   const accentColor = isDark ? DARK_ACCENT : ACCENT;
@@ -130,9 +130,9 @@ export function ReadingSettingsSheet({
   const handleTafsirSelectionError = useCallback(
     (error: unknown) => {
       console.warn("[ReadingSettingsSheet] Failed to import tafsir source:", error);
-      setToast(s.tafseerSourceImportFailed);
+      showNotice(s.tafseerSourceImportFailed);
     },
-    [s.tafseerSourceImportFailed],
+    [s.tafseerSourceImportFailed, showNotice],
   );
   const {
     importingSource: importingTafseerSource,
@@ -325,7 +325,6 @@ export function ReadingSettingsSheet({
         onClose={() => setTafseerPickerVisible(false)}
         helperText={s.tafseerDownloadHint}
       />
-      <Toast message={toast} onDismiss={() => setToast(null)} />
     </>
   );
 }

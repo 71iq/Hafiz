@@ -1,3 +1,4 @@
+import { useOperationNotice } from "@/components/ui/OperationNoticeProvider";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ActivityIndicator, Platform, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 import * as Clipboard from "expo-clipboard";
@@ -66,6 +67,7 @@ type Props = {
 export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Props) {
   const db = useDatabase();
   const s = useStrings();
+  const showNotice = useOperationNotice();
   const { width, height } = useWindowDimensions();
   const {
     translationLanguage,
@@ -335,7 +337,7 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
         return true;
       } catch (err) {
         console.warn("[AyahDetailModal] Failed to import tafsir source:", err);
-        showToast(s.tafseerSourceImportFailed);
+        showNotice(s.tafseerSourceImportFailed);
         return false;
       } finally {
         importingTafsirSourceRef.current = null;
@@ -347,7 +349,7 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
       s.tafseerSourceImportFailed,
       selectedTafsirSource,
       setTafseerSource,
-      showToast,
+      showNotice,
       tafsirRows,
     ]
   );

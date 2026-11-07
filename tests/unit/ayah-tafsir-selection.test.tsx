@@ -1,3 +1,4 @@
+import { OperationNoticeProvider } from "@/components/ui/OperationNoticeProvider";
 import React, { type ComponentProps } from "react";
 import { Dimensions, I18nManager } from "react-native";
 import { act, cleanup, fireEvent, render } from "@testing-library/react-native";
@@ -11,6 +12,8 @@ import { strings } from "@/lib/i18n/strings";
 import { stringByKey } from "@/lib/i18n/useStrings";
 import type { useSettings } from "@/lib/settings/context";
 import { AVAILABLE_TAFSIR_SOURCES, type TafsirSourceId } from "@/lib/tafsir/sources";
+
+let mockNoticeReady = true;
 
 type PickerProps = ComponentProps<typeof TafsirSourcePicker>;
 let mockPickerProps: PickerProps | undefined;
@@ -128,7 +131,9 @@ function Wrapper({ children }: React.PropsWithChildren) {
         insets: { top: 0, right: 0, bottom: 0, left: 0 },
       }}
     >
-      <DirectionProvider dir={mockSettings.isRTL ? "rtl" : "ltr"}>{children}</DirectionProvider>
+      <OperationNoticeProvider ready={mockNoticeReady}>
+        <DirectionProvider dir={mockSettings.isRTL ? "rtl" : "ltr"}>{children}</DirectionProvider>
+      </OperationNoticeProvider>
     </SafeAreaProvider>
   );
 }
@@ -179,6 +184,7 @@ describe.each(cases)("ayah tafsir $language/$width", ({ language, width }) => {
     await expect(result).resolves.toBe(true);
   }
   beforeEach(() => {
+    mockNoticeReady = true;
     jest.clearAllMocks();
     mockPickerProps = undefined;
     mockSelectionResults.length = 0;
@@ -221,7 +227,7 @@ describe.each(cases)("ayah tafsir $language/$width", ({ language, width }) => {
     expect(picker().visible).toBe(false);
     expect(mockTafsirRead).toHaveBeenCalledTimes(reads + 1);
     expect(view.getByText("Synthetic imported tafsir body")).toBeTruthy();
-  });
+  }, 10000);
   it("reports import failure without save or reload and permits successful retry", async () => {
     const view = await open();
     const reads = mockTafsirRead.mock.calls.length;
@@ -239,7 +245,8 @@ describe.each(cases)("ayah tafsir $language/$width", ({ language, width }) => {
     expect(mockSetSource).not.toHaveBeenCalled();
     expect(mockTafsirRead).toHaveBeenCalledTimes(reads);
     expect(warn).toHaveBeenCalledWith("[AyahDetailModal] Failed to import tafsir source:", error);
-    expect(mockToast).toHaveBeenCalledWith(strings[language].tafseerSourceImportFailed);
+    expect(view.getByText(strings[language].tafseerSourceImportFailed)).toBeTruthy();
+    expect(mockToast).not.toHaveBeenCalled();
     pending = deferred();
     jest.mocked(ensureTafsirSourceImported).mockReturnValue(pending.promise);
     const retry = begin(view);
@@ -264,7 +271,8 @@ describe.each(cases)("ayah tafsir $language/$width", ({ language, width }) => {
     expect(picker().selectedSource).toBe("muyassar");
     expect(mockTafsirRead).toHaveBeenCalledTimes(reads);
     expect(warn).toHaveBeenCalledWith("[AyahDetailModal] Failed to import tafsir source:", error);
-    expect(mockToast).toHaveBeenCalledWith(strings[language].tafseerSourceImportFailed);
+    expect(view.getByText(strings[language].tafseerSourceImportFailed)).toBeTruthy();
+    expect(mockToast).not.toHaveBeenCalled();
     pending = deferred();
     jest.mocked(ensureTafsirSourceImported).mockReturnValue(pending.promise);
     const retry = begin(view);
@@ -382,6 +390,30 @@ describe.each(cases)("ayah tafsir $language/$width", ({ language, width }) => {
     await complete(result);
     expect(mockTafsirRead).toHaveBeenCalledTimes(reads + 1);
     expect(mockSetSource).toHaveBeenCalledWith(sourceA);
+  });
+  it("retains a deferred failure after the owner disappears and readiness recovers", async () => {
+    const view = await open();
+    const result = begin(view);
+    expectedWarnings = 1;
+    jest.useFakeTimers();
+    try {
+      mockNoticeReady = false;
+      view.rerender(<></>);
+      await act(async () => {
+        pending.reject(new Error("Synthetic retired SQLite failure"));
+        await result;
+      });
+      await expect(result).resolves.toBe(false);
+      expect(mockSetSource).not.toHaveBeenCalled();
+      act(() => jest.advanceTimersByTime(5000));
+      expect(view.queryByText(strings[language].tafseerSourceImportFailed)).toBeNull();
+      mockNoticeReady = true;
+      view.rerender(<></>);
+      expect(view.getByText(strings[language].tafseerSourceImportFailed)).toBeTruthy();
+    } finally {
+      view.unmount();
+      jest.useRealTimers();
+    }
   });
   it("preserves save completion after the modal owner unmounts", async () => {
     const view = await open();

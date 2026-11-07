@@ -1,3 +1,4 @@
+import { useOperationNotice } from "@/components/ui/OperationNoticeProvider";
 import { useState, useEffect, useCallback, type ReactNode } from "react";
 import { View, Text, Pressable, ActivityIndicator, Linking, ScrollView, StyleSheet } from "react-native";
 import { Card } from "@/components/ui/Card";
@@ -120,6 +121,7 @@ export default function SettingsScreen() {
   } = useSettings();
   const db = useDatabase();
   const s = useStrings();
+  const showNotice = useOperationNotice();
   const router = useRouter();
   const params = useLocalSearchParams<{ qf?: string; qf_error?: string; category?: string }>();
   const configured = isSupabaseConfigured();
@@ -368,9 +370,9 @@ export default function SettingsScreen() {
   const handleTafsirSelectionError = useCallback(
     (error: unknown) => {
       console.warn("[Settings] Failed to import tafsir source:", error);
-      setToast(s.tafseerSourceImportFailed);
+      showNotice(s.tafseerSourceImportFailed);
     },
-    [s.tafseerSourceImportFailed],
+    [s.tafseerSourceImportFailed, showNotice],
   );
   const { importingSource: importingTafseerSource, selectSource: handleTafseerSourceSelect } = useTafsirSourceSelection(
     { db, onSelected: setTafseerSource, onError: handleTafsirSelectionError },

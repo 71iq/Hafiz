@@ -1,4 +1,5 @@
 import { gzipSync } from "node:zlib";
+import { strings } from "@/lib/i18n/strings";
 import { expect, test, type Page } from "@playwright/test";
 import { assertHealthyPage, captureConsole, waitForQaReady } from "./helpers";
 
@@ -60,24 +61,41 @@ async function databaseSql(page: Page, operation: "exec" | "getAll" | "getFirst"
   );
 }
 
-for (const failureKind of ["commit", "insert"] as const) {
+const cases = [
+  { failureKind: "commit", language: "en", width: 1280 },
+  { failureKind: "insert", language: "ar", width: 390 },
+] as const;
+for (const { failureKind, language, width } of cases) {
+  const s = strings[language];
   test(
-    "tafsir download retains the old source after " + failureKind + " failure and succeeds on retry",
+    "tafsir download retains the old source after " +
+      failureKind +
+      " failure and succeeds on retry " +
+      language +
+      "/" +
+      width,
     async ({ browser, baseURL }, testInfo) => {
       const origin = new URL(baseURL ?? "");
       expect(origin.hostname).toMatch(/^(127\.0\.0\.1|localhost)$/);
       const context = await browser.newContext({
-        locale: "en-US",
-        viewport: { width: 1280, height: 800 },
+        locale: language === "en" ? "en-US" : "ar",
+        viewport: { width, height: language === "en" ? 800 : 844 },
+        reducedMotion: "reduce",
         colorScheme: "light",
         storageState: { cookies: [], origins: [] },
       });
       try {
+        await context.addInitScript((language) => {
+          if (location.hostname === "127.0.0.1" || location.hostname === "localhost")
+            localStorage.setItem("hafiz_ui_language", language);
+        }, language);
         const page = await context.newPage();
         const capture = captureConsole(page);
         await waitForQaReady(page);
         await page.goto("/settings?category=content", { waitUntil: "domcontentloaded" });
-        await expect(page.getByRole("button", { name: /^Tafsir Source/ })).toBeVisible({ timeout: 30_000 });
+        await expect(page.getByRole("button", { name: new RegExp("^" + s.tafseerSourceLabel) })).toBeVisible({
+          timeout: 30_000,
+        });
 
         const surahs = await databaseSql(page, "getAll", "SELECT number, ayah_count FROM surahs ORDER BY number");
         if (!Array.isArray(surahs)) throw new Error("Missing synthetic-preview coordinate index");
@@ -131,9 +149,9 @@ for (const failureKind of ["commit", "insert"] as const) {
           "getAll",
           "SELECT source,COUNT(*) AS count FROM tafseer WHERE source<>'qurtubi' GROUP BY source ORDER BY source",
         );
-        await page.getByRole("button", { name: /^Tafsir Source/ }).click();
-        const qurtubi = page.getByRole("button", { name: /^Al-Qurtubi/ });
-        await expect(qurtubi.getByText("Download and use", { exact: true })).toBeVisible();
+        await page.getByRole("button", { name: new RegExp("^" + s.tafseerSourceLabel) }).click();
+        const qurtubi = page.getByRole("button", { name: new RegExp("^" + s.tafseerQurtubi) });
+        await expect(qurtubi.getByText(s.tafseerDownloadAction, { exact: true })).toBeVisible();
         const failure = page.waitForEvent("console", {
           predicate: (message) =>
             message.type() === "warning" &&
@@ -146,10 +164,34 @@ for (const failureKind of ["commit", "insert"] as const) {
         });
         await qurtubi.click();
         await failure;
-        if (failureKind === "commit") {
-          await expect(page.getByText("Could not load this tafsir source", { exact: true })).toBeVisible();
-        } else {
-          // RF163 owns error-message survival during conservative cleanup recovery.
+        if (failureKind === "insert") {
+          await expect(qurtubi).not.toBeVisible();
+          await expect(page.getByRole("button", { name: new RegExp("^" + s.tafseerSourceLabel) })).toBeVisible();
+        }
+        const notice = page.getByText(s.tafseerSourceImportFailed, { exact: true });
+        await expect(notice).toBeVisible();
+        const unoccluded = await notice.evaluate((element: HTMLElement) => {
+          const previous = element.style.pointerEvents;
+          element.style.pointerEvents = "auto";
+          try {
+            const bounds = element.getBoundingClientRect();
+            return [0.25, 0.5, 0.75].every((x) =>
+              [0.25, 0.5, 0.75].every((y) => {
+                const hit = document.elementFromPoint(bounds.x + bounds.width * x, bounds.y + bounds.height * y);
+                return hit === element || element.contains(hit);
+              }),
+            );
+          } finally {
+            element.style.pointerEvents = previous;
+          }
+        });
+        expect(unoccluded, "Failure notice must be readable above the modal").toBe(true);
+        const alert = page.getByRole("alert").filter({ hasText: s.tafseerSourceImportFailed });
+        await expect(alert).toBeVisible();
+        await expect(alert).toHaveText(s.tafseerSourceImportFailed);
+        await expect(alert).toHaveAttribute("aria-live", "polite");
+        await page.screenshot({ path: testInfo.outputPath("tafsir-failure.png") });
+        if (failureKind === "insert") {
           await expect
             .poll(
               async () => {
@@ -166,10 +208,11 @@ for (const failureKind of ["commit", "insert"] as const) {
               { timeout: 60_000 },
             )
             .toEqual(retained);
-          if (!(await qurtubi.isVisible())) await page.getByRole("button", { name: /^Tafsir Source/ }).click();
+          if (!(await qurtubi.isVisible()))
+            await page.getByRole("button", { name: new RegExp("^" + s.tafseerSourceLabel) }).click();
         }
-        await expect(qurtubi.getByText("Download and use", { exact: true })).toBeVisible();
-        await page.screenshot({ path: testInfo.outputPath("tafsir-failure.png") });
+        await expect(qurtubi.getByText(s.tafseerDownloadAction, { exact: true })).toBeVisible();
+        await page.screenshot({ path: testInfo.outputPath("tafsir-retry-ready.png") });
         expect(
           await databaseSql(
             page,
@@ -185,11 +228,13 @@ for (const failureKind of ["commit", "insert"] as const) {
           ),
         ).toEqual(unrelated);
         await expect(
-          page.getByRole("button", { name: /^Al-Muyassar/ }).getByText("Selected", { exact: true }),
+          page
+            .getByRole("button", { name: new RegExp("^" + s.tafseerMuyassar) })
+            .getByText(s.tafseerSelected, { exact: true }),
         ).toBeVisible();
         await databaseSql(page, "exec", "DROP TRIGGER IF EXISTS fail_rf104_candidate");
         await qurtubi.click();
-        await expect(qurtubi.getByText("Selected", { exact: true })).toBeVisible({ timeout: 60_000 });
+        await expect(qurtubi.getByText(s.tafseerSelected, { exact: true })).toBeVisible({ timeout: 60_000 });
         await page.screenshot({ path: testInfo.outputPath("tafsir-success.png") });
         expect(
           await databaseSql(

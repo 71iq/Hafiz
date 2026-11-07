@@ -1,3 +1,4 @@
+import { OperationNoticeProvider } from "@/components/ui/OperationNoticeProvider";
 import React from "react";
 import { Dimensions, I18nManager } from "react-native";
 import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react-native";
@@ -88,7 +89,9 @@ function Wrapper({ children }: React.PropsWithChildren) {
         insets: { top: 0, left: 0, bottom: 0, right: 0 },
       }}
     >
-      <DirectionProvider dir={mockSettings.isRTL ? "rtl" : "ltr"}>{children}</DirectionProvider>
+      <OperationNoticeProvider ready={true}>
+        <DirectionProvider dir={mockSettings.isRTL ? "rtl" : "ltr"}>{children}</DirectionProvider>
+      </OperationNoticeProvider>
     </SafeAreaProvider>
   );
 }
