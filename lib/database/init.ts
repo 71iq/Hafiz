@@ -71,7 +71,10 @@ async function doLoadTafsirSourceFile(source: TafsirSourceId, surahNumber: numbe
       }
     }
     const resp = await fetch(path);
-    return resp.ok ? resp.json() : null;
+    if (!resp.ok) {
+      throw new Error("Failed to load tafsir source " + source + " surah " + surahNumber + ": HTTP " + resp.status);
+    }
+    return resp.json();
   }
   const loader = nativeTafsirSourceLoader(source, surahNumber);
   return loader ? loader() : null;
@@ -539,34 +542,46 @@ async function importZilal(db: SQLiteDatabase, onProgress: ProgressCallback): Pr
   console.log(`[Import] Tafsir (zilal) done: ${allRows.length} rows`);
 }
 
-async function importSurahRowTafsirSource(
-  db: SQLiteDatabase,
-  source: TafsirSourceConfig,
-  onProgress: ProgressCallback,
-): Promise<number> {
-  onProgress({ step: "Tafsir", current: 7, total: TOTAL_STEPS, detail: source.progressDetail });
-  console.log(`[Import] Importing tafseer (${source.id}) from 114 surah files...`);
+type TafsirSourceCandidateRow = [surah: number, ayah: number, source: TafsirSourceId, text: string];
 
-  let inserted = 0;
+function isTafsirSourceRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isUnknownArray(value: unknown): value is unknown[] {
+  return Array.isArray(value);
+}
+
+async function loadSurahRowTafsirSourceCandidate(source: TafsirSourceConfig): Promise<TafsirSourceCandidateRow[]> {
+  console.log("[Import] Staging tafseer (" + source.id + ") from 114 surah files...");
+
+  const rowsByCoordinate = new Map<string, TafsirSourceCandidateRow>();
   for (let surahNumber = 1; surahNumber <= 114; surahNumber++) {
-    const data = await doLoadTafsirSourceFile(source.id, surahNumber);
-    if (!Array.isArray(data)) continue;
-    const rows: any[][] = [];
+    const data: unknown = await doLoadTafsirSourceFile(source.id, surahNumber);
+    if (!isUnknownArray(data)) continue;
     for (const row of data) {
-      const surah = Array.isArray(row) ? row[0] : row?.surah;
-      const ayah = Array.isArray(row) ? row[1] : row?.ayah;
-      const text = Array.isArray(row) ? row[2] : row?.text;
-      if (!Number.isInteger(surah) || !Number.isInteger(ayah)) continue;
+      let surah: unknown;
+      let ayah: unknown;
+      let text: unknown;
+      if (Array.isArray(row)) {
+        [surah, ayah, text] = row;
+      } else if (isTafsirSourceRecord(row)) {
+        surah = row.surah;
+        ayah = row.ayah;
+        text = row.text;
+      } else {
+        continue;
+      }
+      if (typeof surah !== "number" || !Number.isInteger(surah)) continue;
+      if (typeof ayah !== "number" || !Number.isInteger(ayah)) continue;
       const cleanText = stripHtml(String(text ?? ""));
       if (cleanText.length === 0) continue;
-      rows.push([surah, ayah, source.id, cleanText]);
+      const candidateRow: TafsirSourceCandidateRow = [surah, ayah, source.id, cleanText];
+      rowsByCoordinate.set(String(surah) + ":" + String(ayah), candidateRow);
     }
-    await batchInsert(db, "INSERT OR REPLACE INTO tafseer (surah, ayah, source, text) VALUES (?, ?, ?, ?)", rows);
-    inserted += rows.length;
   }
 
-  console.log(`[Import] Tafsir (${source.id}) done: ${inserted} rows`);
-  return inserted;
+  return [...rowsByCoordinate.values()];
 }
 
 export async function ensureTafsirSourceImported(db: SQLiteDatabase, sourceId: TafsirSourceId): Promise<void> {
@@ -579,11 +594,18 @@ export async function ensureTafsirSourceImported(db: SQLiteDatabase, sourceId: T
   );
   if ((sourceCount?.count ?? 0) >= (source.expectedRows ?? 6236)) return;
 
-  await db.runAsync("DELETE FROM tafseer WHERE source = ?", [source.id]);
-  const inserted = await importSurahRowTafsirSource(db, source, () => {});
-  if (inserted === 0) {
-    throw new Error(`Tafsir source ${source.id} is unavailable`);
+  const candidateRows = await loadSurahRowTafsirSourceCandidate(source);
+  if (candidateRows.length < (source.expectedRows ?? 6236)) {
+    throw new Error("Tafsir source " + source.id + " is unavailable");
   }
+
+  await db.runAsync("DELETE FROM tafseer WHERE source = ?", [source.id]);
+  await batchInsert(
+    db,
+    "INSERT OR REPLACE INTO tafseer (surah, ayah, source, text) VALUES (?, ?, ?, ?)",
+    candidateRows,
+  );
+  console.log("[Import] Tafsir (" + source.id + ") done: " + candidateRows.length + " rows");
 }
 
 async function importTranslations(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {

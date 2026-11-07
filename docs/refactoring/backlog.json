@@ -9036,7 +9036,7 @@
     {
       "id": "RF-104",
       "title": "Make incomplete tafsir-source replacement atomic",
-      "description": "Repair the RF098 reproduced retained-content and concurrent-generation failures after choosing native/web transaction ownership.",
+      "description": "Repair SQL failure/concurrent-generation and local-handle lifetime failures after RF155 download staging, with explicit native/web transaction ownership.",
       "rationale": "Actual importer deletes before loading and commits per batch. Synthetic SQLite reproductions show content loss on load/SQL failure and mixed concurrent generations.",
       "modules": [
         "lib/database/init.ts",
@@ -9045,10 +9045,11 @@
         "docs/refactoring/TAFSIR_IMPORT_ATOMICITY.md"
       ],
       "dependencies": [
-        "RF-098"
+        "RF-098",
+        "RF-155"
       ],
       "acceptance_criteria": [
-        "Unapproved repair. Primary must inspect native and web SQLite transaction/exclusivity, nested batch transactions, host/proxy serialization and representative callers before preparing exact small scopes. Split transaction-owner changes if needed.",
+        "Unapproved repair. Primary must inspect native and web SQLite transaction/exclusivity, nested batch transactions, host/proxy serialization and representative callers before preparing exact small scopes. Split transaction-owner changes if needed. RF155 separately owns download staging and incomplete-candidate retention; accepting that child does not accept SQL atomicity.",
         "A failed replacement leaves previous source rows unchanged; successful replacement is one internally consistent generation and preserves unrelated sources. Loading/validation must precede destructive writes. Preserve count fast paths, source-specific expected counts, identifiers and content parsing. Decide partial/unavailable candidate and retry semantics explicitly without lowering thresholds.",
         "Exercise load failure at first/later files, SQL execution/commit failure, empty/partial/complete sources, retry, same/different-source concurrency and interleaved web host/proxy requests. Real isolated SQLite plus platform-specific evidence must support atomicity; no fake transaction-only proof.",
         "No live data access, destructive database operations, schema resets, protected-content changes, regenerated maps/database, threshold reduction, production or deployment. Carry unavailable native/device checks honestly. Separate stronger review and primary acceptance required."
@@ -16949,6 +16950,227 @@
       "independent_review": "pass",
       "evidence": "docs/refactoring/PROGRESS.md",
       "summary": "Email login/signup retain latest intent through guarded credentials, notifications, profile and form completion. All20 fresh controller checks, independent stronger review and primary acceptance pass:2611unit and29Chrome cases. Existing browser fallback capability remains; unsupported cross-context lifetime coordination, raw logout/background SDK writers and persistent personal SQLite ownership remain RF025 work."
+    },
+    {
+      "id": "RF-155",
+      "title": "Preserve retained tafsir while replacement files load",
+      "description": "Split the download/validation safety portion of RF104 into a direct app repair. Stage and validate an entire candidate before destructive writes; transaction isolation and concurrent SQL replacement remain RF104.",
+      "rationale": "Current ensureTafsirSourceImported deletes retained content before first/later source loads and accepts incomplete candidates. A read-only compatibility audit found all9 bundled surahRows sources have114 JSON arrays and exactly their configured distinct row counts:6234Qurtubi,5843AlBahr,6010Jalalayn,6236others. Complete-candidate validation therefore preserves valid shipped source availability without changing thresholds or protected data.",
+      "modules": [
+        "lib/database/init.ts",
+        "tests/unit/tafsir-import-safety.test.ts",
+        "docs/refactoring/TAFSIR_IMPORT_ATOMICITY.md"
+      ],
+      "dependencies": [
+        "RF-098",
+        "RF-031"
+      ],
+      "acceptance_criteria": [
+        "Load and parse all114 source files before any DELETE/INSERT to retained tafsir. Keep existing tuple/object parsing, integer-coordinate checks, String conversion, HTML removal and source-specific expected-count fast paths. Reuse the existing loader/source registry and batchInsert SQL; no protected asset/map/schema/data/dependency changes.",
+        "A loader/JSON/HTTP failure, unavailable candidate or candidate with fewer than the existing configured number of distinct surah/ayah rows rejects before destructive SQL, preserving exact old target, unrelated source, settings and queues. JSON HTTP failure must not masquerade as absent content; optional gzip failure still falls back to JSON. All bundled sources were audited read-only and meet their current thresholds. Treat incomplete candidates as unavailable; never lower those thresholds.",
+        "Build one candidate with duplicate coordinates resolved to the last encountered cleaned row, matching existing INSERT OR REPLACE results. A complete candidate replaces only its requested source through existing per-batch SQL. Preserve existing unavailable error text and retry after a load/candidate failure. Do not promise SQL rollback, transaction exclusivity, mixed-generation prevention or retired raw-handle admission; these remain RF104.",
+        "First reproduce retained-content loss with permanent isolated real SQLite tests calling the actual exported module and synthetic native/web loaders. Cover first/later load errors, deferred final file with no early writes, non-OK JSON HTTP, gzip fallback, unavailable/partial/duplicate-false-count candidates, all configured fast-count variants, exact complete candidate success, parsing/last-duplicate behavior, unchanged other-source/metadata/queues and retry. Do not load real protected datasets in tests or weaken any meaningful assertion.",
+        "All20 fresh controller checks, separate stronger review and primary acceptance are required. Changed-file lint allows only the23 existing unused catch bindings in unchanged init code; no new warning/rule suppression. One accepted-task local commit with a short PROGRESS note, then delete task outputs. No push/deploy/production or physical/native-runtime claim."
+      ],
+      "verification": [
+        [
+          "git",
+          "diff",
+          "--check"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "lib/database/init.ts",
+          "tests/unit/tafsir-import-safety.test.ts",
+          "docs/refactoring/TAFSIR_IMPORT_ATOMICITY.md",
+          "docs/refactoring/PROGRESS.md"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/database/init.ts",
+          "tests/unit/tafsir-import-safety.test.ts",
+          "--max-warnings=23"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "check:analysis"
+        ],
+        [
+          "npm",
+          "run",
+          "postinstall"
+        ],
+        [
+          "npm",
+          "ls",
+          "--all",
+          "--json"
+        ],
+        [
+          "npm",
+          "run",
+          "lint"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "node",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/tests/brace-expansion.test.cjs",
+          "scripts/tests/dependency-boundaries.test.cjs",
+          "scripts/tests/icon-tool.test.cjs",
+          "scripts/tests/jest-config.test.cjs",
+          "scripts/tests/js-yaml.test.cjs",
+          "scripts/tests/lint-coverage.test.cjs",
+          "scripts/tests/metro-unicode.test.cjs",
+          "scripts/tests/nanoid.test.cjs",
+          "scripts/tests/router-dependency-range.test.cjs",
+          "scripts/tests/security-dependency-owner.test.cjs",
+          "scripts/tests/source-map-js.test.cjs",
+          "scripts/tests/tailwind-source-map.test.cjs",
+          "scripts/tests/ws.test.cjs",
+          "scripts/tests/xmldom.test.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "test:refactor-runner"
+        ],
+        [
+          "python3",
+          "-B",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "scripts/tests",
+          "-p",
+          "test_*.py"
+        ],
+        [
+          "npm",
+          "run",
+          "check:native-config"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=4096",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "android",
+          "--output-dir",
+          ".expo/modernization-checks/android",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/android')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=3072",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "ios",
+          "--output-dir",
+          ".expo/modernization-checks/ios",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/ios')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8197",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts",
+          "tests/e2e/database-bridge.spec.ts"
+        ]
+      ],
+      "risk": "high",
+      "approved": true,
+      "status": "verified",
+      "allowed_paths": [
+        "lib/database/init.ts",
+        "tests/unit/tafsir-import-safety.test.ts",
+        "docs/refactoring/TAFSIR_IMPORT_ATOMICITY.md"
+      ],
+      "attempts": 1,
+      "priority": 1,
+      "implementation_mode": "implementation",
+      "failure_history": [
+        {
+          "phase": "causal-regression",
+          "time": "2026-11-07T03:49:43.423571+00:00",
+          "failure": "Corrected real SQLite fixtures reproduce8 original retained-content failures;10 controls pass. First harness rejection ordering and gzip/coordinate fixture errors were corrected before repair.",
+          "run": ".ralph/runs/RF-155-causal-1794023035151226662"
+        },
+        {
+          "phase": "focused-iteration",
+          "time": "2026-11-07T03:49:43.423590+00:00",
+          "failure": "Initial source interpolation, fixture-coordinate, unused import and escaped-newline errors were repaired before full checks. Final18 cases, types, format and scoped lint pass; only23 unchanged catch-binding warnings remain."
+        }
+      ],
+      "started_at": "2026-11-07T03:49:48.870974+00:00",
+      "completed_at": "2026-11-07T04:02:52.199988+00:00",
+      "primary_accepted_at": "2026-11-07T04:02:52.199988+00:00",
+      "independent_review": "pass",
+      "evidence": "docs/refactoring/PROGRESS.md",
+      "summary": "Complete distinct tafsir candidates stage before replacement. All20 fresh controller checks, separate stronger review and primary acceptance pass:2819unit,18 focused and30Chrome cases. SQL/commit/concurrent-generation/local-handle safety remains RF104; runtime/device memory unverified."
     }
   ]
 }

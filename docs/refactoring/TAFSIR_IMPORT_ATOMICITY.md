@@ -1,8 +1,8 @@
 # Tafsir replacement atomicity investigation
 
-RF-098, 2026-10-27. This investigation reproduces incomplete-source replacement failures. It does not repair the importer or establish that a production user has encountered them. RF-104 owns the repair and blocks final mission acceptance.
+RF-098, 2026-10-27. This investigation reproduced incomplete-source replacement failures. It did not repair the importer or establish that a production user encountered them. RF155 repairs download safety below; RF104 owns the remaining transaction repair and blocks final mission acceptance.
 
-## Actual behavior
+## Observed behavior before RF155
 
 `ensureTafsirSourceImported` in `lib/database/init.ts` counts the requested source and returns when its configured expected count is met. For an incomplete source it deletes that source, then loads and inserts 114 surah files. `batchInsert` commits each batch separately. The initial deletion has no transaction covering the whole replacement.
 
@@ -36,3 +36,11 @@ A failed replacement must leave the previously stored source unchanged. A succes
 RF-104 must first choose the transaction owner for native SQLite and the web host/proxy. Inspect existing serialization rather than assuming an ordinary asynchronous transaction is exclusive. Stage replacement loading and validation before destructive writes, then replace through a tested atomic write operation without nesting the current batch transactions. Decide partial/unavailable-candidate semantics explicitly without lowering thresholds. Reproduce rollback, later-file failure, SQL failure, retry, same/different-source concurrent callers and interleaved web requests. Use the current fixture evidence as the failing baseline, then add permanent behavior tests with the retained-content invariant.
 
 No importer, schema, provider, source registry, dependency, protected input or production setting changes in RF-098. Fresh reproduction, artifact/inventory integrity, document formatting and whitespace checks plus separate stronger review are required before accepting this investigation. Application typecheck, full Jest, builds, browser/native/device checks are not claimed for this documentation-only investigation.
+
+## RF155 download safety
+
+RF155 stages all 114 source files before writing. The candidate must contain at least the source's configured distinct surah/ayah count. Load, JSON, HTTP and incomplete-candidate failures preserve retained rows, other sources and metadata. Duplicate coordinates retain the last cleaned row. Existing source-count shortcuts, parsing and per-batch SQL remain in place. Protected datasets and loader maps are unchanged.
+
+A read-only audit of the nine bundled sources found 114 array files per source and exactly the configured distinct counts: 6,234 for Qurtubi, 5,843 for Al-Bahr, 6,010 for Jalalayn and 6,236 for each remaining source. Permanent synthetic SQLite regressions live in `tests/unit/tafsir-import-safety.test.ts`, including native-loader and simulated web-fetch paths. These are not native or browser/OPFS runtime checks.
+
+The RF098 reproduction above records the old failure and is retained only for unfinished RF104. Its old failure assertions are not a current passing gate. RF104 still owns SQL failure rollback, transaction ownership, concurrent replacement generations and retained local-handle lifetime. Staging alone does not make replacement atomic.
