@@ -1,27 +1,21 @@
 import "../global.css";
 import { OperationNoticeProvider } from "@/components/ui/OperationNoticeProvider";
 import { bindAuthQueryCache } from "@/lib/query/auth-cache-lifecycle";
+import { bindNativeQueryLifecycle, createAppQueryClient } from "@/lib/query/native-lifecycle";
 import { PasswordRecoveryProvider } from "@/lib/auth/password-recovery";
 import { Stack, usePathname } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import * as Font from "expo-font";
 import { Platform } from "react-native";
 import { useEffect, useState } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { PortalHost } from "@rn-primitives/portal";
 import { DatabaseProvider, useDatabaseStatus } from "@/lib/database/provider";
 import { UI_FONTS, loadUiFontsWeb } from "@/lib/fonts/ui-fonts";
 import { useAuthStore } from "@/lib/auth/store";
 import { AyahAudioProvider } from "@/lib/audio/ayah-audio";
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes
-      retry: 1,
-    },
-  },
-});
+const queryClient = createAppQueryClient();
 
 export { ErrorBoundary } from "expo-router";
 
@@ -74,6 +68,7 @@ export default function RootLayout() {
   const initialize = useAuthStore((s) => s.initialize);
 
   useEffect(() => bindAuthQueryCache(queryClient), []);
+  useEffect(() => bindNativeQueryLifecycle(), []);
 
   useEffect(() => {
     if (Platform.OS === "web") {

@@ -12,3 +12,6 @@ jest.mock("@rn-primitives/slot", () => {
     ),
   };
 });
+
+// NetInfo has no native module under Jest; use the library's own mock unless a test mocks it itself.
+jest.mock("@react-native-community/netinfo", () => require("@react-native-community/netinfo/jest/netinfo-mock.js"));

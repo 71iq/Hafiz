@@ -2597,29 +2597,202 @@
       ],
       "verification": [
         [
-          "npm",
-          "run",
-          "test:unit",
-          "--",
-          "--runTestsByPath",
-          "tests/unit/query-native-lifecycle.test.tsx"
+          "git",
+          "diff",
+          "--check"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "lib/query/native-lifecycle.ts",
+          "tests/unit/query-native-lifecycle.test.ts",
+          "docs/refactoring/PROGRESS.md"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/query/native-lifecycle.ts",
+          "app/_layout.tsx",
+          "tests/unit/query-native-lifecycle.test.ts",
+          "tests/jest/setup.ts",
+          "--max-warnings=0"
         ],
         [
           "npm",
           "run",
           "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "check:analysis"
+        ],
+        [
+          "npm",
+          "run",
+          "postinstall"
+        ],
+        [
+          "npm",
+          "ls",
+          "--all",
+          "--json"
+        ],
+        [
+          "npm",
+          "run",
+          "lint",
+          "--",
+          "--format",
+          "json"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit"
+        ],
+        [
+          "node",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/tests/brace-expansion.test.cjs",
+          "scripts/tests/dependency-boundaries.test.cjs",
+          "scripts/tests/icon-tool.test.cjs",
+          "scripts/tests/jest-config.test.cjs",
+          "scripts/tests/js-yaml.test.cjs",
+          "scripts/tests/lint-coverage.test.cjs",
+          "scripts/tests/metro-unicode.test.cjs",
+          "scripts/tests/nanoid.test.cjs",
+          "scripts/tests/router-dependency-range.test.cjs",
+          "scripts/tests/security-dependency-owner.test.cjs",
+          "scripts/tests/source-map-js.test.cjs",
+          "scripts/tests/tailwind-source-map.test.cjs",
+          "scripts/tests/ws.test.cjs",
+          "scripts/tests/xmldom.test.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "test:refactor-runner"
+        ],
+        [
+          "python3",
+          "-B",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "scripts/tests",
+          "-p",
+          "test_*.py"
+        ],
+        [
+          "npm",
+          "run",
+          "check:native-config"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=4096",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "android",
+          "--output-dir",
+          ".expo/modernization-checks/android",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/android')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=3072",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "ios",
+          "--output-dir",
+          ".expo/modernization-checks/ios",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/ios')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8197",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts",
+          "tests/e2e/database-bridge.spec.ts",
+          "tests/e2e/tafsir-import.spec.ts",
+          "tests/e2e/translation-import.spec.ts"
         ]
       ],
       "risk": "high",
-      "approved": false,
-      "status": "pending",
+      "approved": true,
+      "status": "verified",
       "allowed_paths": [
+        "lib/query/native-lifecycle.ts",
         "app/_layout.tsx",
-        "lib/query/*",
-        "tests/unit/query-native-lifecycle.test.tsx"
+        "tests/unit/query-native-lifecycle.test.ts",
+        "tests/jest/setup.ts",
+        "docs/refactoring/PROGRESS.md",
+        "docs/refactoring/backlog.json"
       ],
       "attempts": 0,
-      "priority": 3
+      "priority": 3,
+      "started_at": "2026-11-07T22:03:01.151850+00:00",
+      "completed_at": "2026-11-07T22:03:01.151850+00:00",
+      "primary_accepted_at": "2026-11-07T22:03:01.151850+00:00",
+      "files": [
+        "lib/query/native-lifecycle.ts",
+        "app/_layout.tsx",
+        "tests/unit/query-native-lifecycle.test.ts",
+        "tests/jest/setup.ts"
+      ],
+      "summary": "On Android and iOS, TanStack Query now follows NetInfo (online unless connection or reachability is false) and AppState (foreground = focused), with listener cleanup and a single listener pair across strict remounts, so cached lists refetch on reconnect and on return to the app. Native queries and mutations use networkMode 'always', preserving the previous offline behavior: local SQLite queries keep loading, remote queries fail visibly rather than sitting paused, and no write is paused and replayed. The web keeps its default mode and browser listeners. The Jest setup now uses NetInfo's own mock.",
+      "evidence": "Six cases; the two offline cases (local query loads offline, write not paused) fail when the native mode is the default 'online'. Affected root/auth/query suites 131/131; full unit run 3,142/3,143 with one intermittent pre-existing session-due-date failure that passes alone (RF-190). Typecheck, scoped eslint/prettier, dependency boundaries and Knip baseline pass. Device network/foreground behavior not exercised.",
+      "independent_review": "Light-model review: blocker found (two local-SQLite queries would pause offline on native: reflection feed filters, own profile badges) and fixed by native networkMode 'always' with a regression case. Noted: the leaderboard queryFn's own-stats sync now also runs on foreground refetch after 2 minutes, matching web. No mutations use useMutation today; web unchanged; auth cache isolation unaffected."
     },
     {
       "id": "RF-029",
@@ -24554,6 +24727,26 @@
       "files": [],
       "allowed_paths": [],
       "verification": []
+    },
+    {
+      "id": "RF-190",
+      "title": "Stabilize the intermittent session Delete-confirmation test",
+      "priority": 3,
+      "risk": "low",
+      "description": "tests/unit/session-due-date.test.tsx 'keeps the Delete confirmation open for a rejected write and retries through the real route for English dark revealed' failed once in two full unit runs on 2026-11-07/08 and once alone, then passed in repeated focused runs. Find the timing dependency and make the wait deterministic without weakening the assertions.",
+      "dependencies": [],
+      "modules": [
+        "tests/unit/session-due-date.test.tsx"
+      ],
+      "acceptance_criteria": [
+        "Identify the race, fix the test (or a real product race if found) and show 20 consecutive passes; light review."
+      ],
+      "approved": true,
+      "status": "pending",
+      "attempts": 0,
+      "implementation_mode": "implementation",
+      "files": [],
+      "allowed_paths": []
     }
   ],
   "checkpoint": {
