@@ -11,6 +11,7 @@ const USER_ID = "00000000-0000-4000-8000-000000000001";
 const OTHER_USER_ID = "00000000-0000-4000-8000-000000000002";
 const OLD = "2026-01-01T00:00:00.000Z";
 const NEW = "2026-02-01T00:00:00.000Z";
+const QUEUED = "2026-01-20T00:00:00.000Z";
 
 type RemoteFilter = [column: string, value: unknown];
 type RemoteWrite = {
@@ -49,6 +50,16 @@ class MockQuery {
   }
 
   gt() {
+    return this;
+  }
+
+  lte(column: string, value: unknown) {
+    this.filters.push([`${column}<=`, value]);
+    return this;
+  }
+
+  or(expression: string) {
+    this.filters.push(["or", expression]);
     return this;
   }
 
@@ -422,7 +433,6 @@ it("preserves sparse card, numeric highlight and canonical highlight physical DE
   await enqueueSync(db, "highlights", "DELETE", canonicalHighlightId, {});
   await enqueueSync(db, "bookmarks", "DELETE", "2:255", {});
   await enqueueSync(db, "user_word_meanings", "DELETE", "2:255:1", {});
-
   const result = await fullSync(db);
 
   expect(result).toMatchObject({ status: "synced", pushed: 5 });
@@ -458,6 +468,7 @@ it("preserves sparse card, numeric highlight and canonical highlight physical DE
       filters: [
         ["user_id", USER_ID],
         ["id", cardId],
+        ["updated_at<=", NEW],
       ],
     },
     {
@@ -665,5 +676,60 @@ describe("RF-168 legacy empty highlight updated_at", () => {
     await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pushed: 1 });
 
     expect(remoteWrites).toMatchObject([{ row: { updated_at: NEW, created_at: OLD } }]);
+  });
+});
+
+describe("RF-169 tombstone time", () => {
+  it.each([
+    { table: "user_settings", rowId: "daily_review_limit", data: { key: "daily_review_limit" } },
+    { table: "study_cards", rowId: "qiraat:2:255", data: { ...card(), deleted_at: null } },
+  ])("stamps a legacy $table tombstone with its queue time, not the push time", async ({ table, rowId, data }) => {
+    await enqueueSync(db, table, "DELETE", rowId, data);
+    sql.prepare("UPDATE sync_queue SET created_at = ?").run(QUEUED);
+
+    await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pushed: 1 });
+
+    expect(remoteWrites).toMatchObject([{ table, kind: "upsert", row: { deleted_at: QUEUED } }]);
+  });
+
+  it("conditions an explicitly timed hard delete on the row time", async () => {
+    const offsetTime = "2026-01-20T00:00:00+00:00";
+    await enqueueSync(db, "bookmarks", "DELETE", "2:255", { deleted_at: QUEUED });
+    await enqueueSync(db, "highlights", "DELETE", "42", { deleted_at: offsetTime });
+
+    await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pushed: 2 });
+
+    expect(remoteWrites.map((write) => write.filters.at(-1))).toEqual([
+      ["updated_at<=", QUEUED],
+      ["or", `updated_at.is.null,updated_at.lte."${offsetTime}"`],
+    ]);
+  });
+
+  it("keeps a legacy untimed hard delete unrestricted so a server-stamped row cannot return", async () => {
+    await enqueueSync(db, "bookmarks", "UPDATE", "2:255", { surah: 2, ayah: 255, created_at: OLD });
+    await enqueueSync(db, "bookmarks", "DELETE", "2:255", {});
+    sql.prepare("UPDATE sync_queue SET created_at = ?").run(QUEUED);
+
+    await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pushed: 2 });
+
+    expect(remoteWrites.at(-1)).toEqual({
+      table: "bookmarks",
+      kind: "delete",
+      filters: [
+        ["user_id", USER_ID],
+        ["surah", 2],
+        ["ayah", 255],
+      ],
+    });
+  });
+
+  it("keeps a remote edit made after a legacy delete was queued", async () => {
+    await enqueueSync(db, "user_settings", "DELETE", "daily_review_limit", { key: "daily_review_limit" });
+    sql.prepare("UPDATE sync_queue SET created_at = ?").run(QUEUED);
+    mockProbeData = [{ updated_at: NEW }];
+
+    await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pushed: 1 });
+
+    expect(remoteWrites).toEqual([]);
   });
 });

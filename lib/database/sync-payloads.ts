@@ -350,6 +350,8 @@ export type DecodedSyncEntry = {
   operation: "INSERT" | "UPDATE" | "DELETE";
   rowId: string;
   data: Record<string, unknown>;
+  /** When the change was queued; the honest time for a legacy tombstone without deleted_at. */
+  queuedAt: string;
 };
 export function decodeSyncQueueEntry(input: unknown, ownerId: string): DecodedSyncEntry {
   const result = envelope.safeParse(input);
@@ -385,7 +387,7 @@ export function decodeSyncQueueEntry(input: unknown, ownerId: string): DecodedSy
     )
       fail(table);
   }
-  return { table, operation: entry.operation, rowId: entry.row_id, data };
+  return { table, operation: entry.operation, rowId: entry.row_id, data, queuedAt: entry.created_at };
 }
 
 const freshness = z.object({

@@ -20745,15 +20745,217 @@
         "supabase/migrations"
       ],
       "acceptance_criteria": [
-        "Pending primary conflict semantics and exact isolated transport/PostgreSQL regression scope. Preserve timestamp equivalence, tombstones, client compatibility and queue acknowledgements; no production SQL or service change. Full controller checks, independent stronger review and primary acceptance."
+        "Conflict contract: the newer row wins by the client's existing timestamp precedence; equal times update; the decision is made under the row lock by a BEFORE UPDATE trigger, so an older upload arriving after or waiting on a newer one is skipped as a success and acknowledged.",
+        "Hard deletes carry the freshness condition in the DELETE itself; a legacy tombstone without deleted_at uses its queue time, not the push time.",
+        "A live incoming highlight with an empty updated_at keeps the local freshness check and stores its creation time; the empty-timestamp tombstone contract is unchanged.",
+        "Causal Jest cases fail on the original source; an isolated network-disabled PostgreSQL 17 probe reproduces the loss on the old schema and shows the fix. Source-only migration; never applied to a deployed database without explicit approval."
       ],
-      "approved": false,
-      "status": "pending",
+      "approved": true,
+      "status": "verified",
       "attempts": 0,
       "implementation_mode": "implementation",
-      "files": [],
-      "allowed_paths": [],
-      "verification": []
+      "files": [
+        "lib/database/sync.ts",
+        "lib/database/sync-payloads.ts",
+        "tests/unit/sync-queue-payloads.test.ts",
+        "tests/unit/sync-payloads.test.ts",
+        "supabase/migrations/20261107200000_sync_keep_newer_row.sql",
+        "supabase/schema.sql",
+        "scripts/supabase-probes/sync-conflicts.sh"
+      ],
+      "allowed_paths": [
+        "lib/database/sync.ts",
+        "lib/database/sync-payloads.ts",
+        "tests/unit/sync-queue-payloads.test.ts",
+        "tests/unit/sync-payloads.test.ts",
+        "supabase/migrations/20261107200000_sync_keep_newer_row.sql",
+        "supabase/schema.sql",
+        "scripts/supabase-probes/sync-conflicts.sh",
+        "docs/refactoring/PROGRESS.md",
+        "docs/refactoring/backlog.json"
+      ],
+      "verification": [
+        [
+          "git",
+          "diff",
+          "--check"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "lib/database/sync.ts",
+          "lib/database/sync-payloads.ts",
+          "tests/unit/sync-queue-payloads.test.ts",
+          "tests/unit/sync-payloads.test.ts",
+          "docs/refactoring/PROGRESS.md"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/database/sync.ts",
+          "lib/database/sync-payloads.ts",
+          "tests/unit/sync-queue-payloads.test.ts",
+          "tests/unit/sync-payloads.test.ts",
+          "--max-warnings=0"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "check:analysis"
+        ],
+        [
+          "npm",
+          "run",
+          "postinstall"
+        ],
+        [
+          "npm",
+          "ls",
+          "--all",
+          "--json"
+        ],
+        [
+          "npm",
+          "run",
+          "lint",
+          "--",
+          "--format",
+          "json"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit"
+        ],
+        [
+          "node",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/tests/brace-expansion.test.cjs",
+          "scripts/tests/dependency-boundaries.test.cjs",
+          "scripts/tests/icon-tool.test.cjs",
+          "scripts/tests/jest-config.test.cjs",
+          "scripts/tests/js-yaml.test.cjs",
+          "scripts/tests/lint-coverage.test.cjs",
+          "scripts/tests/metro-unicode.test.cjs",
+          "scripts/tests/nanoid.test.cjs",
+          "scripts/tests/router-dependency-range.test.cjs",
+          "scripts/tests/security-dependency-owner.test.cjs",
+          "scripts/tests/source-map-js.test.cjs",
+          "scripts/tests/tailwind-source-map.test.cjs",
+          "scripts/tests/ws.test.cjs",
+          "scripts/tests/xmldom.test.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "test:refactor-runner"
+        ],
+        [
+          "python3",
+          "-B",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "scripts/tests",
+          "-p",
+          "test_*.py"
+        ],
+        [
+          "npm",
+          "run",
+          "check:native-config"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=4096",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "android",
+          "--output-dir",
+          ".expo/modernization-checks/android",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/android')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=3072",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "ios",
+          "--output-dir",
+          ".expo/modernization-checks/ios",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/ios')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8197",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts",
+          "tests/e2e/database-bridge.spec.ts",
+          "tests/e2e/tafsir-import.spec.ts",
+          "tests/e2e/translation-import.spec.ts"
+        ]
+      ],
+      "started_at": "2026-11-07T20:33:05.329089+00:00",
+      "completed_at": "2026-11-07T20:37:21.115461+00:00",
+      "primary_accepted_at": "2026-11-07T20:37:21.115461+00:00",
+      "summary": "An older upload from one device no longer overwrites a newer row written by another device between the client's freshness read and its upsert. Source-only migration 20261107200000 adds a BEFORE UPDATE trigger on the eight synced tables that skips an update whose row time is strictly older than the stored row, under the ON CONFLICT row lock; the client keeps its pre-check for servers without the migration. Explicitly timed hard deletes carry updated_at <= deleted_at in the DELETE; legacy tombstones without deleted_at use their queue time instead of the push time; legacy untimed hard deletes stay unrestricted. A live incoming highlight with an empty updated_at keeps the local freshness check and stores its creation time.",
+      "evidence": "Five causal Jest cases failed on the original source. Isolated network-disabled PostgreSQL 17 probe (scripts/supabase-probes/sync-conflicts.sh, synthetic user): the old schema lost the newer write sequentially and while waiting on its row lock; the new schema kept it; equal/newer times, inserts, metadata updates and null-time highlights still update; conditional deletes keep newer rows. Full Jest run (3,105 passing; two unrelated failures: the RF-184 registry gap fixed in 6a61c00 and a load-timing pass on rerun), typecheck, scoped prettier/eslint. Full 20-check gate deferred to the batch gate per cost rules.",
+      "independent_review": "High-effort independent review: no blockers. Should-fix (legacy untimed bookmark delete could be skipped when the add got a server-default updated_at) fixed by conditioning only explicitly timed deletes, with a regression case; migration comment notes added for uploads without updated_at and admin repairs. Nits left: no automated trigger test beyond the probe.",
+      "waiting_on_user": "Applying migration 20261107200000 to the deployed database needs explicit approval."
     },
     {
       "id": "RF-170",
@@ -23442,7 +23644,7 @@
       "onboarding 'Skip for now' skips step 3 (confirm intent)"
     ],
     "decisions_waiting_on_ehab": [
-      "Apply RF-166 and RF-170 migrations to the deployed database",
+      "Apply RF-166, RF-170 and RF-169 migrations to the deployed database",
       "Final push after all work is verified"
     ],
     "last_green_commit": "5aff3d2 (full 20-check batch gate: 3,099 unit, 35 Chrome)",

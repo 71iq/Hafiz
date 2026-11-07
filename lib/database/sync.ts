@@ -475,7 +475,7 @@ async function pushTableEntries(
   const decoded = entries.map((entry) => decodeSyncQueueEntry(entry, userId));
   for (const entry of decoded) {
     if (entry.operation === "DELETE") {
-      await pushDelete(entry.table, entry.rowId, userId, entry.data);
+      await pushDelete(entry.table, entry.rowId, userId, entry.queuedAt, entry.data);
     } else {
       await pushUpsert(entry.table, entry.data, userId);
     }
@@ -623,9 +623,12 @@ async function pushDelete(
   tableName: SyncTable,
   rowId: string,
   userId: string,
+  queuedAt: string,
   data: Record<string, any> = {},
 ): Promise<void> {
-  const deletedAt = data.deleted_at ?? new Date().toISOString();
+  // A legacy entry without deleted_at was deleted no later than it was queued. Stamping the push time
+  // instead would let a stale delete beat a newer edit from another device.
+  const deletedAt = data.deleted_at ?? queuedAt;
   if (tableName === "user_settings") {
     await pushUpsert(
       tableName,
@@ -711,6 +714,18 @@ async function pushDelete(
       break;
     default:
       query = query.eq("id", rowId);
+  }
+
+  // With an explicit deletion time the freshness condition is part of the DELETE itself, so a newer row
+  // written by another device between queueing and pushing survives. Equal times delete, matching the
+  // upload rule. Legacy entries without deleted_at keep the unrestricted delete: their rows could carry a
+  // server-default time later than the queue time, and a conditional delete would bring them back.
+  if (data.deleted_at) {
+    if (tableName === "highlights") {
+      query = query.or(`updated_at.is.null,updated_at.lte."${data.deleted_at}"`);
+    } else {
+      query = query.lte(tableName === "achievement_unlocks" ? "unlocked_at" : "updated_at", data.deleted_at);
+    }
   }
 
   const { error } = await query;
@@ -1017,6 +1032,9 @@ async function upsertHighlight(db: DatabaseExecutor, row: SyncRows["highlights"]
   }
   if (typeof row.created_at !== "string" || remoteUpdatedAt == null)
     throw new Error("Invalid synced highlights payload");
+  // An empty updated_at is only a deletion contract. A live row falls back to its creation time so the
+  // freshness check still applies and no empty timestamp is stored.
+  const liveUpdatedAt = remoteUpdatedAt || row.created_at;
   const existing = await db.getFirstAsync<{ id: number; updated_at: string | null }>(
     `SELECT id, updated_at FROM highlights
      WHERE sync_id = ?
@@ -1024,8 +1042,7 @@ async function upsertHighlight(db: DatabaseExecutor, row: SyncRows["highlights"]
      LIMIT 1`,
     [syncId, row.surah, row.ayah, row.color, row.word_start ?? null, row.word_end ?? null],
   );
-  if (existing?.updated_at && remoteUpdatedAt && compareSyncTimestamps(existing.updated_at, remoteUpdatedAt) >= 0)
-    return;
+  if (existing?.updated_at && compareSyncTimestamps(existing.updated_at, liveUpdatedAt) >= 0) return;
 
   if (existing) {
     await db.runAsync(
@@ -1041,7 +1058,7 @@ async function upsertHighlight(db: DatabaseExecutor, row: SyncRows["highlights"]
         row.word_end ?? null,
         row.color,
         row.created_at,
-        remoteUpdatedAt,
+        liveUpdatedAt,
         existing.id,
       ],
     );
@@ -1058,7 +1075,7 @@ async function upsertHighlight(db: DatabaseExecutor, row: SyncRows["highlights"]
         row.word_end ?? null,
         row.color,
         row.created_at,
-        remoteUpdatedAt,
+        liveUpdatedAt,
       ],
     );
   }

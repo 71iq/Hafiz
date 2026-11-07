@@ -1339,6 +1339,29 @@ it("retains the legacy unrestricted deletion when resolved highlight updated_at 
   expect(highlightRows()).toEqual([]);
 });
 
+describe("RF-169 live highlight with an empty remote updated_at", () => {
+  const live = () => ({ ...highlightRow(HIGHLIGHT_CANONICAL_ID, ""), synced_at: NEW });
+
+  it("keeps a newer local highlight instead of skipping the freshness check", async () => {
+    restoreComplete();
+    putHighlight({ ...highlightRow(HIGHLIGHT_CANONICAL_ID, NEW), color: "yellow" });
+    mockIncrementalHighlights.push(live());
+
+    await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
+
+    expect(highlightRows()).toMatchObject([{ sync_id: HIGHLIGHT_CANONICAL_ID, updated_at: NEW }]);
+  });
+
+  it("stores the remote creation time rather than an empty updated_at", async () => {
+    restoreComplete();
+    mockIncrementalHighlights.push(live());
+
+    await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
+
+    expect(highlightRows()).toMatchObject([{ sync_id: HIGHLIGHT_CANONICAL_ID, updated_at: OLD, deleted_at: null }]);
+  });
+});
+
 const boundaryRows: Record<string, Record<string, unknown>> = {
   user_settings: { key: "daily_review_limit", value: "30", updated_at: NEW },
   user_word_meanings: meaning(),
