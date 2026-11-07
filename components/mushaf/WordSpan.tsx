@@ -64,7 +64,7 @@ function WordSpanInner({
   );
 }
 
-export const WordSpan = memo(WordSpanInner);
+const WordSpan = memo(WordSpanInner);
 
 type AyahWordTextProps = {
   words: string[];
