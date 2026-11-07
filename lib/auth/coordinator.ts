@@ -96,15 +96,19 @@ export function createAuthCoordinator(initialIdentity: string | null) {
     );
     return result;
   }
-  function replace<T>(work: (isCurrent: () => boolean) => Promise<T>): Promise<AuthCommandResult<T>> {
+  function reservation<T>(
+    work: (isCurrent: () => boolean, owner: AuthOwner) => Promise<T>,
+    requireOrigin: boolean,
+  ): { owner: AuthOwner; result: Promise<AuthCommandResult<T>> } {
     const ownIntent = ++intent;
+    const owner = captureOwner();
     const id = ++nextId;
     pending.set(id, { kind: "replacement", intent: ownIntent });
-    return enqueue(async () => {
+    const result = enqueue(async (): Promise<AuthCommandResult<T>> => {
       const isCurrent = () => ownIntent === intent;
       try {
-        if (!isCurrent()) return { status: "superseded" };
-        const value = await work(isCurrent);
+        if (!isCurrent() || (requireOrigin && !owner.isCurrent())) return { status: "superseded" };
+        const value = await work(isCurrent, owner);
         if (!isCurrent()) return { status: "superseded" };
         return { status: "completed", value, owner: captureOwner() };
       } catch (error) {
@@ -114,6 +118,13 @@ export function createAuthCoordinator(initialIdentity: string | null) {
         pending.delete(id);
       }
     });
+    return { owner, result };
+  }
+  function reserveReplacement<T>(work: (isCurrent: () => boolean, owner: AuthOwner) => Promise<T>) {
+    return reservation(work, true);
+  }
+  function replace<T>(work: (isCurrent: () => boolean) => Promise<T>): Promise<AuthCommandResult<T>> {
+    return reservation(work, false).result;
   }
   // Startup reads share ordering without impersonating a newer explicit auth intent.
   function bootstrap<T>(work: () => Promise<T>): Promise<T> {
@@ -172,6 +183,7 @@ export function createAuthCoordinator(initialIdentity: string | null) {
     observeIdentity,
     canRestore,
     canCompleteRecovery,
+    reserveReplacement,
     replace,
     transition,
     owned,

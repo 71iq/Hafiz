@@ -1,12 +1,12 @@
 import { AuthError, type Session } from "@supabase/supabase-js";
 import type { AuthOwner } from "@/lib/auth/coordinator";
-import { getAuthSessionIdentity } from "@/lib/auth/session-identity";
+import { getAuthSessionIdentity, type AuthSessionIdentity } from "@/lib/auth/session-identity";
 type Storage = {
   getItem(key: string): string | null | Promise<string | null>;
   setItem(key: string, value: string): void | Promise<void>;
   removeItem(key: string): void | Promise<void>;
 };
-function identity(value: string | null): string | null {
+function storedIdentity(value: string | null): Extract<AuthSessionIdentity, { kind: "identified" }> | null {
   if (value === null) return null;
   try {
     const data: unknown = JSON.parse(value);
@@ -23,10 +23,14 @@ function identity(value: string | null): string | null {
     )
       return null;
     const parsed = getAuthSessionIdentity({ access_token: data.access_token, user: { id: data.user.id } });
-    return parsed.kind === "identified" ? JSON.stringify(parsed) : null;
+    return parsed.kind === "identified" ? parsed : null;
   } catch {
     return null;
   }
+}
+function identity(value: string | null): string | null {
+  const parsed = storedIdentity(value);
+  return parsed ? JSON.stringify(parsed) : null;
 }
 export function createSharedStorage(
   backing: Storage,
@@ -56,6 +60,7 @@ export function createOwnedStorage(shared: Pick<ReturnType<typeof createSharedSt
     recovery: boolean;
     committed: boolean;
     denied: boolean;
+    expectedUserId: string | undefined;
   };
   let active: Guard | null = null;
   const matches = (value: string | null, expected: string | null) =>
@@ -97,7 +102,12 @@ export function createOwnedStorage(shared: Pick<ReturnType<typeof createSharedSt
           const current = await raw.getItem(key);
           if (!permitted(guard) || guard.removed || !matches(current, guard.identity)) supersede(guard);
           if (name === key) {
-            next = identity(value);
+            const candidate = storedIdentity(value);
+            next = candidate ? JSON.stringify(candidate) : null;
+            if (candidate && guard.expectedUserId !== undefined && candidate.userId !== guard.expectedUserId) {
+              guard.denied = true;
+              throw new AuthError("OAuth callback belongs to a different account", 400, "oauth_link_user_mismatch");
+            }
             if (next === null || (!(guard.recovery && !guard.committed) && next !== guard.identity)) supersede(guard);
           }
         }
@@ -129,6 +139,7 @@ export function createOwnedStorage(shared: Pick<ReturnType<typeof createSharedSt
     session: Session | null,
     work: () => Promise<T>,
     recovery: boolean,
+    expectedUserId?: string,
   ): Promise<T> {
     const parsed = getAuthSessionIdentity(session);
     if (active) throw new Error("Overlapping owned SDK operation");
@@ -141,6 +152,7 @@ export function createOwnedStorage(shared: Pick<ReturnType<typeof createSharedSt
       recovery,
       committed: false,
       denied: false,
+      expectedUserId: expectedUserId?.toLowerCase(),
     };
     try {
       return await work();
@@ -179,6 +191,7 @@ export function createOwnedStorage(shared: Pick<ReturnType<typeof createSharedSt
       };
     },
     run: <T>(owner: AuthOwner, session: Session | null, work: () => Promise<T>) => run(owner, session, work, false),
-    restore: <T>(owner: AuthOwner, session: Session | null, work: () => Promise<T>) => run(owner, session, work, true),
+    restore: <T>(owner: AuthOwner, session: Session | null, work: () => Promise<T>, expectedUserId?: string) =>
+      run(owner, session, work, true, expectedUserId),
   };
 }

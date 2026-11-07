@@ -312,3 +312,30 @@ it("an issued cancelled own logout settles without restoring its result authorit
   );
   expect(result).toEqual({ status: "superseded" });
 });
+
+it.each(["external", "ABA"])("reserved replacement retains synchronous origin across queued %s", async (kind) => {
+  const c = createAuthCoordinator("A");
+  const held = deferred<void>();
+  const first = c.bootstrap(() => held.promise);
+  const work = jest.fn(async () => 1);
+  const reservation = c.reserveReplacement(work);
+  expect(reservation.owner.isCurrent()).toBe(true);
+  c.observeIdentity("B");
+  if (kind === "ABA") c.observeIdentity("A");
+  held.resolve();
+  await first;
+  expect(await reservation.result).toEqual({ status: "superseded" });
+  expect(work).not.toHaveBeenCalled();
+});
+it("reserved replacement retains existing same-origin completion and immediate intent invalidation", async () => {
+  const c = createAuthCoordinator("A");
+  const previous = c.captureOwner();
+  const work = jest.fn(async (_current: () => boolean, owner: ReturnType<typeof c.captureOwner>) => {
+    expect(owner.isCurrent()).toBe(true);
+    return 7;
+  });
+  const reservation = c.reserveReplacement(work);
+  expect(previous.isCurrent()).toBe(false);
+  expect(await reservation.result).toMatchObject({ status: "completed", value: 7 });
+  expect(work).toHaveBeenCalledTimes(1);
+});

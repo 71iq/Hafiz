@@ -1,4 +1,4 @@
-import { type SupabaseClient, type Session } from "@supabase/supabase-js";
+import { type SupabaseClient, type SignInWithOAuthCredentials, type Session } from "@supabase/supabase-js";
 import { createRootAuthRuntime } from "@/lib/auth/root-runtime";
 import type { AuthOwner } from "@/lib/auth/coordinator";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -15,7 +15,10 @@ import Constants from "expo-constants";
 // 3. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY in .env.
 //    Vercel builds map Supabase integration vars in scripts/vercel-build.sh.
 
-const expoExtra = (Constants.expoConfig?.extra ?? Constants.manifest2?.extra ?? {}) as Record<string, string | undefined>;
+const expoExtra = (Constants.expoConfig?.extra ?? Constants.manifest2?.extra ?? {}) as Record<
+  string,
+  string | undefined
+>;
 
 const SUPABASE_URL =
   process.env.EXPO_PUBLIC_SUPABASE_URL ??
@@ -45,10 +48,7 @@ const SUPABASE_ANON_KEY =
 
 /** Returns true if the Supabase client is configured with real credentials */
 export function isSupabaseConfigured(): boolean {
-  return (
-    !SUPABASE_URL.includes("YOUR_PROJECT") &&
-    !SUPABASE_ANON_KEY.includes("YOUR_ANON_KEY")
-  );
+  return !SUPABASE_URL.includes("YOUR_PROJECT") && !SUPABASE_ANON_KEY.includes("YOUR_ANON_KEY");
 }
 
 // Lazy-initialize the Supabase client so the app can boot without
@@ -115,10 +115,15 @@ export function restoreOwnedSession(
   session: Session | null,
   tokens: { access_token: string; refresh_token: string },
   isActive: () => boolean,
+  expectedUserId?: string,
 ) {
-  return ownedRuntime().restoreSession(owner, session, tokens, isActive);
+  return ownedRuntime().restoreSession(owner, session, tokens, isActive, expectedUserId);
 }
 
 export function readOwnedSession(owner: AuthOwner, session: Session | null, isActive: () => boolean) {
   return ownedRuntime().readSession(owner, session, isActive);
+}
+
+export function prepareOwnedLink(owner: AuthOwner, session: Session | null, credentials: SignInWithOAuthCredentials) {
+  return ownedRuntime().prepareLink(owner, session, credentials);
 }

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useLayoutEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -12,7 +12,8 @@ import {
 import { useColorScheme } from "nativewind";
 import { BookOpen } from "lucide-react-native";
 import { isSupabaseConfigured } from "@/lib/supabase";
-import { startAppOAuth } from "@/lib/auth/oauth";
+import { startAppOAuth, type AppOAuthProvider } from "@/lib/auth/oauth";
+import { useAuthStore } from "@/lib/auth/store";
 import { isSocialAuthEnabled } from "@/lib/auth/config";
 import { useDatabaseStatus } from "@/lib/database/provider";
 import { isQfLoginEnabled } from "@/lib/quran-foundation/config";
@@ -51,34 +52,54 @@ export function OAuthButtons({ strings: s, isDark, onError }: Props) {
   const dir = useUIDirection();
   const [busyProvider, setBusyProvider] = useState<"google" | "apple" | "facebook" | "qf" | null>(null);
 
+  const busyOwner = useRef<object | null>(null);
+  const mounted = useRef(false);
+  const committedDb = useRef({ db });
+  useLayoutEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      busyOwner.current = null;
+    };
+  }, []);
+  useLayoutEffect(() => {
+    if (committedDb.current.db !== db) committedDb.current = { db };
+  }, [db]);
+
   if (!isSupabaseConfigured() || !isSocialAuthEnabled()) return null;
 
-  const handlePress = async (provider: "google" | "apple" | "facebook") => {
-    if (busyProvider) return;
-    setBusyProvider(provider);
+  const handleOAuth = async (provider: AppOAuthProvider, busy: NonNullable<typeof busyProvider>) => {
+    if (busyOwner.current || !mounted.current) return;
+    const invocation = {};
+    const databaseScope = committedDb.current;
+    busyOwner.current = invocation;
+    setBusyProvider(busy);
+    const ownsBusy = () => mounted.current && busyOwner.current === invocation;
+    const flow = startAppOAuth(provider, "sign-in", useAuthStore.getState);
     try {
-      await startAppOAuth(provider);
-    } catch (err: any) {
-      onError?.(err.message);
-    } finally {
-      setBusyProvider(null);
-    }
-  };
-
-  const handleQfPress = async () => {
-    if (busyProvider) return;
-    setBusyProvider("qf");
-    try {
-      const result = await startAppOAuth(QF_OAUTH_PROVIDER);
-      if (result.qfConnected && db) {
-        runInitialQfUserSync(db).catch(console.warn);
+      const result = await flow.result;
+      if (
+        ownsBusy() &&
+        db &&
+        committedDb.current === databaseScope &&
+        result.status === "completed" &&
+        result.owner.isCurrent() &&
+        result.value.qfConnected &&
+        result.value.qfOwner?.isCurrent()
+      ) {
+        runInitialQfUserSync(db, result.value.qfOwner).catch(console.warn);
       }
-    } catch (err: any) {
-      onError?.(err.message);
+    } catch (error) {
+      if (ownsBusy() && flow.isCurrent()) onError?.(error instanceof Error ? error.message : String(error));
     } finally {
-      setBusyProvider(null);
+      if (ownsBusy()) {
+        busyOwner.current = null;
+        setBusyProvider(null);
+      }
     }
   };
+  const handlePress = (provider: "google" | "apple" | "facebook") => handleOAuth(provider, provider);
+  const handleQfPress = () => handleOAuth(QF_OAUTH_PROVIDER, "qf");
 
   const mutedColor = resolvedIsDark ? "#525252" : "#DFD9D1";
   const buttonBorderColor = resolvedIsDark ? "#E5E7EB" : "#DFD9D1";

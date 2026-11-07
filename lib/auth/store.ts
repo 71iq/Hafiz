@@ -24,6 +24,22 @@ type AuthStore = AuthState & AuthActions;
 let profileOwnerGeneration = 0;
 let authInitialization: Promise<void> | undefined;
 let cancelAuthListener: (() => void) | undefined;
+let loadingOwner: object | null = null;
+
+// Busy state belongs to the action that set it, independently of auth authority.
+function beginAuthLoading(clearError = true) {
+  const token = {};
+  loadingOwner = token;
+  useAuthStore.setState(clearError ? { isLoading: true, error: null } : { isLoading: true });
+  return {
+    isCurrent: () => loadingOwner === token,
+    finish: () => {
+      if (loadingOwner !== token) return;
+      loadingOwner = null;
+      useAuthStore.setState({ isLoading: false });
+    },
+  };
+}
 
 // Reads and the two profile writers share one publication boundary. Obsolete
 // owners cannot keep a replacement session's reads behind an old request.
@@ -135,6 +151,23 @@ function setSessionIdentity({ session, user }: Pick<AuthState, "session" | "user
   }));
 }
 
+// SDK notifications can renew credentials while the provider response is pending.
+// Keep the current matching session rather than republishing the callback snapshot.
+function publishOAuthSession(session: NonNullable<AuthState["session"]>): void {
+  const current = useAuthStore.getState();
+  const before = getAuthSessionIdentity(current.session);
+  const incoming = getAuthSessionIdentity(session);
+  if (
+    before.kind === "identified" &&
+    incoming.kind === "identified" &&
+    before.userId === incoming.userId &&
+    before.sessionId === incoming.sessionId &&
+    current.user?.id === current.session?.user.id
+  )
+    return;
+  setSessionIdentity({ session, user: session.user });
+}
+
 export async function preparePasswordRecovery(
   tokens?: { access_token: string; refresh_token: string },
   isActive: () => boolean = () => true,
@@ -214,8 +247,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
           set({ isInitialized: true });
           return;
         }
+        const loading = beginAuthLoading(false);
         try {
-          set({ isLoading: true });
           // The singleton store owns its listener across root remounts.
           // A new initialization retires any queued callback from its old listener.
           cancelAuthListener?.();
@@ -259,7 +292,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         } catch (error) {
           console.warn("[Auth] Init error:", error instanceof Error ? error.message : String(error));
         } finally {
-          set({ isLoading: false, isInitialized: true });
+          set({ isInitialized: true });
+          loading.finish();
         }
       })
       .finally(() => {
@@ -270,7 +304,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
   signIn: async (email: string, password: string) =>
     authCommands.transition(async () => {
-      set({ isLoading: true, error: null });
+      const loading = beginAuthLoading();
       try {
         const { data, error } = await supabase.auth.signInWithPassword({
           email: email.trim().toLowerCase(),
@@ -283,48 +317,52 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         set({ error: err.message });
         throw err;
       } finally {
-        set({ isLoading: false });
+        loading.finish();
       }
     }),
 
   signInWithQuranFoundation: async () => {
     if (!isQfLoginEnabled()) throw new Error("Quran Foundation sign-in is not enabled.");
-    set({ isLoading: true, error: null });
+    const loading = beginAuthLoading();
+    const flow = startAppOAuth(QF_OAUTH_PROVIDER, "sign-in", get);
     try {
-      const result = await startAppOAuth(QF_OAUTH_PROVIDER);
-      if (result.session) {
-        setSessionIdentity({ session: result.session, user: result.session.user });
-        await get().ensureProfile();
+      const result = await flow.result;
+      if (result.status === "completed" && result.owner.isCurrent() && result.value.session) {
+        publishOAuthSession(result.value.session);
+        await get().ensureProfile(result.owner);
       }
-    } catch (err: any) {
-      set({ error: err.message });
-      throw err;
+    } catch (error) {
+      if (!flow.isCurrent()) return;
+      if (loading.isCurrent()) set({ error: error instanceof Error ? error.message : String(error) });
+      throw error;
     } finally {
-      set({ isLoading: false });
+      loading.finish();
     }
   },
 
   linkQuranFoundation: async () => {
     if (!isQfLoginEnabled()) throw new Error("Quran Foundation sign-in is not enabled.");
-    set({ isLoading: true, error: null });
+    const loading = beginAuthLoading();
+    const flow = startAppOAuth(QF_OAUTH_PROVIDER, "link", get);
     try {
-      const result = await startAppOAuth(QF_OAUTH_PROVIDER, "link");
-      if (result.session) {
-        setSessionIdentity({ session: result.session, user: result.session.user });
-        await get().ensureProfile();
+      const result = await flow.result;
+      if (result.status === "completed" && result.owner.isCurrent() && result.value.session) {
+        publishOAuthSession(result.value.session);
+        await get().ensureProfile(result.owner);
       }
-    } catch (err: any) {
-      set({ error: err.message });
-      throw err;
+    } catch (error) {
+      if (!flow.isCurrent()) return;
+      if (loading.isCurrent()) set({ error: error instanceof Error ? error.message : String(error) });
+      throw error;
     } finally {
-      set({ isLoading: false });
+      loading.finish();
     }
   },
 
   signUp: async (email: string, password: string, username: string, displayName: string) =>
     authCommands.transition(async () => {
       if (!isEmailAuthFlowsEnabled()) throw new Error("Signup is temporarily unavailable.");
-      set({ isLoading: true, error: null });
+      const loading = beginAuthLoading();
       try {
         // Pass username and display_name as user metadata so the
         // handle_new_user() database trigger can create the profile row
@@ -357,13 +395,13 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         set({ error: err.message });
         throw err;
       } finally {
-        set({ isLoading: false });
+        loading.finish();
       }
     }),
 
   resendSignupConfirmation: async (email: string) => {
     if (!isEmailAuthFlowsEnabled()) throw new Error("Signup is temporarily unavailable.");
-    set({ isLoading: true, error: null });
+    const loading = beginAuthLoading();
     try {
       const { error } = await supabase.auth.resend({
         type: "signup",
@@ -375,13 +413,13 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       set({ error: err.message });
       throw err;
     } finally {
-      set({ isLoading: false });
+      loading.finish();
     }
   },
 
   sendPasswordReset: async (email: string) => {
     if (!isEmailAuthFlowsEnabled()) throw new Error("Password reset is temporarily unavailable.");
-    set({ isLoading: true, error: null });
+    const loading = beginAuthLoading();
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
         redirectTo: getPasswordResetRedirectTo(),
@@ -391,7 +429,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       set({ error: err.message });
       throw err;
     } finally {
-      set({ isLoading: false });
+      loading.finish();
     }
   },
 
@@ -411,14 +449,15 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
   signOut: async () =>
     authCommands.transition(async () => {
-      set({ isLoading: true, error: null });
+      const loading = beginAuthLoading();
       try {
         const { error } = await supabase.auth.signOut({ scope: "local" });
         if (error) throw error;
       } catch (err: any) {
         console.warn("[Auth] Sign out error:", err.message);
       } finally {
-        set({ session: null, user: null, profile: null, isLoading: false, error: null });
+        set({ session: null, user: null, profile: null, error: null });
+        loading.finish();
       }
     }),
 

@@ -114,9 +114,13 @@ export async function getPendingQfSyncCount(db: SQLiteDatabase): Promise<number>
   return row?.count ?? 0;
 }
 
-export async function runInitialQfUserSync(db: SQLiteDatabase): Promise<QfSyncResult> {
-  const owner = captureQfSyncOwner();
+export async function runInitialQfUserSync(
+  db: SQLiteDatabase,
+  initiatingOwner?: QfSessionOwner | null,
+): Promise<QfSyncResult> {
+  const owner = initiatingOwner === undefined ? captureQfSyncOwner() : initiatingOwner;
   if (!owner) return { status: "not_connected", pushed: 0, pulled: 0 };
+  owner.requireCurrent();
   const connection = await getQfSyncConnectionState(owner);
   owner.requireCurrent();
   if (connection !== "connected") return { status: connection, pushed: 0, pulled: 0 };

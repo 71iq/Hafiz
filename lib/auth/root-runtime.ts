@@ -1,4 +1,10 @@
-import { AuthError, navigatorLock, type SupportedStorage, type Session } from "@supabase/supabase-js";
+import {
+  AuthError,
+  navigatorLock,
+  type SupportedStorage,
+  type Session,
+  type SignInWithOAuthCredentials,
+} from "@supabase/supabase-js";
 import { createOwnedAuthClient } from "@/lib/auth/client-adapter";
 import { createBrowserSessionChannel } from "@/lib/auth/session-channel";
 import { safeProcessLock } from "@/lib/auth/safe-lock";
@@ -88,9 +94,14 @@ export function createRootAuthRuntime(options: Options) {
       session: Session | null,
       tokens: { access_token: string; refresh_token: string },
       isActive: () => boolean,
+      expectedUserId?: string,
     ) => {
       requireOwnership();
-      return runtime.restoreSession(owner, session, tokens, isActive);
+      return runtime.restoreSession(owner, session, tokens, isActive, expectedUserId);
+    },
+    prepareLink: (owner: AuthOwner, session: Session | null, credentials: SignInWithOAuthCredentials) => {
+      requireOwnership();
+      return runtime.prepareLink(owner, session, credentials);
     },
     updatePassword: (owner: AuthOwner, session: Session | null, password: string) => {
       requireOwnership();

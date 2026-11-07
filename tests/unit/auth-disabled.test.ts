@@ -49,8 +49,12 @@ describe("temporarily disabled account flows", () => {
   });
 
   it("rejects Google sign-in and linking without a request", async () => {
-    await expect(startAppOAuth("google")).rejects.toThrow("temporarily unavailable");
-    await expect(startAppOAuth("google", "link")).rejects.toThrow("temporarily unavailable");
+    await expect(startAppOAuth("google", "sign-in", useAuthStore.getState).result).rejects.toThrow(
+      "temporarily unavailable",
+    );
+    await expect(startAppOAuth("google", "link", useAuthStore.getState).result).rejects.toThrow(
+      "temporarily unavailable",
+    );
     expect(supabase.auth.signInWithOAuth).not.toHaveBeenCalled();
   });
 });

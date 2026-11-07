@@ -1,6 +1,12 @@
 import { getAuthSessionIdentity } from "@/lib/auth/session-identity";
 import type { SessionChannel, SessionNotice } from "@/lib/auth/session-channel";
-import { createClient, AuthClient, type Session, type LockFunc } from "@supabase/supabase-js";
+import {
+  createClient,
+  AuthClient,
+  type Session,
+  type LockFunc,
+  type SignInWithOAuthCredentials,
+} from "@supabase/supabase-js";
 import type { AuthOwner } from "@/lib/auth/coordinator";
 import { createOwnedStorage, createSharedStorage } from "@/lib/auth/owned-storage";
 
@@ -214,21 +220,38 @@ export function createOwnedAuthClient(options: Options) {
     }
     return ready;
   }
-  async function run<T>(
+  let commandTail: Promise<void> = Promise.resolve();
+  function run<T>(
     owner: AuthOwner,
     session: Session | null,
     work: (auth: Auth) => Promise<T>,
     recovery = false,
+    expectedUserId?: string,
   ): Promise<T> {
-    const auth = await commandClient();
-    return (recovery ? owned.restore : owned.run)(owner, session, async () => {
-      commandActive = true;
-      try {
-        return await work(auth);
-      } finally {
-        commandActive = false;
-      }
+    // OAuth's returned QF reader can outlive the coordinator reservation. Queue the
+    // entire private operation before activating its single storage/publication guard.
+    // Admission still validates the captured owner after all earlier work settles.
+    const result = commandTail.then(async () => {
+      const auth = await commandClient();
+      return (recovery ? owned.restore : owned.run)(
+        owner,
+        session,
+        async () => {
+          commandActive = true;
+          try {
+            return await work(auth);
+          } finally {
+            commandActive = false;
+          }
+        },
+        expectedUserId,
+      );
     });
+    commandTail = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
   }
   function routeOwner(owner: AuthOwner, isActive: () => boolean): AuthOwner {
     return {
@@ -249,7 +272,13 @@ export function createOwnedAuthClient(options: Options) {
       session: Session | null,
       tokens: { access_token: string; refresh_token: string },
       isActive: () => boolean,
-    ) => run(routeOwner(owner, isActive), session, (auth) => auth.setSession(tokens), true),
+      expectedUserId?: string,
+    ) => run(routeOwner(owner, isActive), session, (auth) => auth.setSession(tokens), true, expectedUserId),
+    prepareLink: (owner: AuthOwner, session: Session | null, credentials: SignInWithOAuthCredentials) =>
+      run(owner, session, (auth) =>
+        // Installed linkIdentityOAuth uses _useSession without acquiring the SDK lock.
+        options.lock("lock:" + options.storageKey, -1, () => auth.linkIdentity(credentials)),
+      ),
     updatePassword: (owner: AuthOwner, session: Session | null, password: string) =>
       run(owner, session, (auth) => auth.updateUser({ password })),
     signOut: (owner: AuthOwner, session: Session | null) => run(owner, session, (auth) => auth.signOut()),

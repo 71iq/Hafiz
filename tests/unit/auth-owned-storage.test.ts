@@ -141,3 +141,50 @@ it("denied private dispatch revokes cleanup even when cancelled work otherwise m
     expect(f.owned.capturePublication(null)()).toBe(false);
   });
 });
+
+function candidateFor(f: ReturnType<typeof fixture>, foreign: boolean): Session {
+  const userId = foreign ? "00000000-0000-4000-8000-000000000002" : f.session.user.id;
+  const claims = { sub: userId, session_id: "10000000-0000-4000-8000-000000000002" };
+  return {
+    ...f.session,
+    user: { ...f.session.user, id: userId },
+    access_token: "e30." + Buffer.from(JSON.stringify(claims)).toString("base64url") + ".c2ln",
+  };
+}
+it("expected-user restore rejects a foreign candidate without revoking current owner or changing prior keys", async () => {
+  const f = fixture(),
+    owner = f.c.captureOwner(),
+    foreign = candidateFor(f, true);
+  const before = [...f.values];
+  await f.owned.restore(
+    owner,
+    f.session,
+    async () => {
+      await expect(f.owned.storage.setItem(f.key, JSON.stringify(foreign))).rejects.toMatchObject({
+        code: "oauth_link_user_mismatch",
+        status: 400,
+      });
+      expect(f.owned.capturePublication(foreign)()).toBe(false);
+      for (const key of f.values.keys()) await f.owned.storage.removeItem(key);
+    },
+    f.session.user.id,
+  );
+  expect(owner.isCurrent()).toBe(true);
+  expect([...f.values]).toEqual(before);
+});
+it("expected-user restore allows a new session for the same canonical account and grants its receipt", async () => {
+  const f = fixture(),
+    owner = f.c.captureOwner(),
+    next = candidateFor(f, false);
+  await f.owned.restore(
+    owner,
+    f.session,
+    async () => {
+      await f.owned.storage.setItem(f.key, JSON.stringify(next));
+      f.c.observeIdentity(JSON.stringify(getAuthSessionIdentity(next)));
+      expect(f.owned.capturePublication(next)()).toBe(true);
+    },
+    f.session.user.id.toUpperCase(),
+  );
+  expect(f.values.get(f.key)).toBe(JSON.stringify(next));
+});

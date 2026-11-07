@@ -1,6 +1,7 @@
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
 import type { SQLiteDatabase } from "expo-sqlite";
 import { createClient, type Session } from "@supabase/supabase-js";
+import { captureQfRequestOwner } from "@/lib/quran-foundation/request-owner";
 import { observeAuthSession } from "@/lib/auth/commands";
 import { createSchema } from "@/lib/database/schema";
 import { invokeQfUser } from "@/lib/quran-foundation/user";
@@ -1022,3 +1023,46 @@ it.each(["full-ready", "full-initial"] as const)(
     expect(requests.every(({ authorization }) => authorization === "Bearer " + token(USER_A, SESSION_A))).toBe(true);
   },
 );
+
+function initialOwner() {
+  const owner = captureQfRequestOwner({
+    getState: () => ({ user: mockCurrentSession?.user ?? null, session: mockCurrentSession }),
+    readSession: async () => {
+      const { data, error } = await authSession();
+      if (error) throw error;
+      return data.session ? { data: { session: data.session }, error: null } : { data: { session: null }, error: null };
+    },
+  });
+  if (!owner) throw new Error("Missing synthetic initial owner");
+  return owner;
+}
+it.each(["external", "ABA", "signed out"])(
+  "explicit initial-sync owner cannot be recaptured after %s",
+  async (kind) => {
+    const original = mockCurrentSession,
+      owner = initialOwner(),
+      before = snapshot();
+    switchSession(kind === "signed out" ? null : session(USER_B, SESSION_B));
+    if (kind === "ABA") switchSession(original);
+    await expect(runInitialQfUserSync(db, owner)).rejects.toThrow("account changed");
+    expect(requests).toEqual([]);
+    expect(snapshot()).toEqual(before);
+    expect(authSession).not.toHaveBeenCalled();
+  },
+);
+it("explicit missing initial owner fails closed without capturing the current account", async () => {
+  const before = snapshot();
+  await expect(runInitialQfUserSync(db, null)).resolves.toMatchObject({ status: "not_connected" });
+  expect(requests).toEqual([]);
+  expect(snapshot()).toEqual(before);
+});
+it("current explicit initial owner supplies every credential read", async () => {
+  const owner = initialOwner();
+  const read = jest.spyOn(owner, "getAccessToken");
+  await expect(runInitialQfUserSync(db, owner)).resolves.toMatchObject({ status: "synced" });
+  expect(read).toHaveBeenCalled();
+  expect(requests.length).toBeGreaterThan(0);
+  expect(requests.every((request) => request.authorization === "Bearer " + mockCurrentSession?.access_token)).toBe(
+    true,
+  );
+});

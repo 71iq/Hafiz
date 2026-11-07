@@ -1,5 +1,7 @@
 import { createRootAuthRuntime } from "@/lib/auth/root-runtime";
 import { authCommands } from "@/lib/auth/commands";
+import { startAppOAuth } from "@/lib/auth/oauth";
+import { QF_OAUTH_PROVIDER } from "@/lib/quran-foundation/user-types";
 import { finishPasswordRecovery, preparePasswordRecovery, useAuthStore } from "@/lib/auth/store";
 import type { Session, User } from "@supabase/supabase-js";
 import type { AuthOwner } from "@/lib/auth/coordinator";
@@ -7,6 +9,7 @@ import * as qfUser from "@/lib/quran-foundation/user";
 let mockRuntime: ReturnType<typeof createRootAuthRuntime>;
 let mockLastPasswordError: unknown;
 let mockLastRecoveryError: unknown;
+let mockLastReadError: unknown;
 let mockQfSyncEnabled = false;
 const mockProfileReads: string[] = [];
 const mockProfile = (id: string) => ({
@@ -25,18 +28,23 @@ const mockProfile = (id: string) => ({
 });
 jest.mock("@/lib/supabase", () => ({
   isSupabaseConfigured: () => true,
-  readOwnedSession: (owner: AuthOwner, session: Session | null, isActive: () => boolean) =>
-    mockRuntime.readSession(owner, session, isActive),
+  readOwnedSession: async (owner: AuthOwner, session: Session | null, isActive: () => boolean) => {
+    const result = await mockRuntime.readSession(owner, session, isActive);
+    mockLastReadError = result.error;
+    return result;
+  },
   restoreOwnedSession: async (
     owner: AuthOwner,
     session: Session | null,
     tokens: { access_token: string; refresh_token: string },
     isActive: () => boolean,
+    expectedUserId?: string,
   ) => {
-    const result = await mockRuntime.restoreSession(owner, session, tokens, isActive);
+    const result = await mockRuntime.restoreSession(owner, session, tokens, isActive, expectedUserId);
     mockLastRecoveryError = result.error;
     return result;
   },
+  prepareOwnedLink: (...args: Parameters<typeof mockRuntime.prepareLink>) => mockRuntime.prepareLink(...args),
   updateOwnedPassword: async (owner: AuthOwner, session: Session | null, password: string) => {
     const result = await mockRuntime.updatePassword(owner, session, password);
     mockLastPasswordError = result.error;
@@ -67,10 +75,15 @@ jest.mock("@/lib/supabase", () => ({
     },
   },
 }));
-jest.mock("@/lib/auth/oauth", () => ({ startAppOAuth: jest.fn() }));
+type BrowserResult = { type: "success"; url: string } | { type: "cancel" };
+const mockBrowser = jest.fn<Promise<BrowserResult>, [string, string | undefined]>();
+jest.mock("expo-web-browser", () => ({
+  openAuthSessionAsync: (url: string, redirect: string | undefined) => mockBrowser(url, redirect),
+}));
+jest.mock("expo-linking", () => ({ createURL: (path: string) => "hafiz://" + path }));
 jest.mock("@/lib/quran-foundation/config", () => ({
   isQfSyncEnabled: () => mockQfSyncEnabled,
-  isQfLoginEnabled: () => false,
+  isQfLoginEnabled: () => true,
 }));
 function deferred() {
   let resolve!: () => void;
@@ -165,15 +178,19 @@ async function setup(
     | "error"
     | "recovery"
     | "refresh-error"
+    | "held-refresh-error"
     | "bounded-refresh-loop" = "normal",
   initializeStore = true,
   initialSession = session(1),
   qfSyncEnabled = false,
 ) {
   mockQfSyncEnabled = qfSyncEnabled;
+  mockBrowser.mockReset().mockResolvedValue({ type: "cancel" });
   const key = `rf125-store-runtime-${++sequence}`;
   const initial = initialSession,
     refreshed = sameSessionRefresh(initial);
+  let refreshResponse = refreshed;
+  let callbackUser = initial.user;
   const values = new Map([[key, JSON.stringify(initial)]]);
   type HeldRead = { started: ReturnType<typeof deferred>; release: ReturnType<typeof deferred>; skip: number };
   let nextRead: HeldRead | undefined;
@@ -261,6 +278,7 @@ async function setup(
     error: null,
   });
   mockLastPasswordError = null;
+  mockLastReadError = null;
   mockProfileReads.length = 0;
   const runtime = createRootAuthRuntime({
     url: "https://synthetic.example.invalid/",
@@ -286,6 +304,8 @@ async function setup(
           authorization: headers.get("Authorization"),
         });
         body = { ok: true, status: "connected" };
+      } else if (path.endsWith("/user/identities/authorize")) {
+        body = { url: "https://synthetic.authorization.invalid/authorize" };
       } else if (path.endsWith("/user") && method === "PUT") {
         started.resolve();
         if (mode === "put") await release.promise;
@@ -298,18 +318,22 @@ async function setup(
           started.resolve();
           await release.promise;
         }
-        body = { user: initial.user };
+        body = { user: callbackUser };
       } else if (path.endsWith("/logout")) {
         started.resolve();
         if (mode === "logout") await release.promise;
         body = {};
       } else if (url.includes("grant_type=refresh_token")) {
         started.resolve();
-        if (mode === "refresh") await release.promise;
-        if (mode === "refresh-error" || (mode === "bounded-refresh-loop" && ++refreshCount < 4)) {
+        if (mode === "refresh" || mode === "held-refresh-error") await release.promise;
+        if (
+          mode === "refresh-error" ||
+          mode === "held-refresh-error" ||
+          (mode === "bounded-refresh-loop" && ++refreshCount < 4)
+        ) {
           status = 400;
           body = { msg: "Synthetic recovery token rejected", error_code: "synthetic_recovery_rejected" };
-        } else body = refreshed;
+        } else body = refreshResponse;
       } else if (url.includes("grant_type=password")) {
         body = replacements.shift();
         if (!body) throw new Error("Missing synthetic replacement");
@@ -341,6 +365,12 @@ async function setup(
   if (initializeStore) expect(useAuthStore.getState().user?.id).toBe(initial.user.id);
   return {
     runtime,
+    setCallbackUser: (next: User) => {
+      callbackUser = next;
+    },
+    setRefreshResponse: (next: Session) => {
+      refreshResponse = next;
+    },
     holdNextSessionRead,
     holdNextSessionWrite,
     settleAuth,
@@ -1555,3 +1585,686 @@ it("real runtime/store preserves cleanup for a refresh failure that was actually
     await f.close();
   }
 });
+
+function beginNativeOAuth(provider: Parameters<typeof startAppOAuth>[0], mode: "sign-in" | "link" = "sign-in") {
+  return startAppOAuth(provider, mode, useAuthStore.getState).result;
+}
+function holdNativeBrowser() {
+  const started = deferred();
+  let finish!: (result: BrowserResult) => void;
+  const result = new Promise<BrowserResult>((resolve) => {
+    finish = resolve;
+  });
+  mockBrowser.mockImplementation(async () => {
+    started.resolve();
+    return result;
+  });
+  return {
+    started: started.promise,
+    release: (session: Session | null, extra = "") => {
+      const params = new URLSearchParams();
+      if (session) {
+        params.set("access_token", session.access_token);
+        params.set("refresh_token", session.refresh_token);
+      }
+      if (extra) new URLSearchParams(extra).forEach((v, k) => params.set(k, v));
+      finish({ type: "success", url: "hafiz://auth/callback#" + params.toString() });
+    },
+    cancel: () => finish({ type: "cancel" }),
+  };
+}
+
+it.each(["external", "same-user", "ABA", "intent"] as const)(
+  "native OAuth browser callback cannot replace its retired %s account lifetime",
+  async (retirement) => {
+    const f = await setup();
+    const browser = holdNativeBrowser();
+    const pending = beginNativeOAuth("google");
+    let newer: Promise<unknown> | undefined;
+    try {
+      await browser.started;
+      if (retirement === "external") await f.external(session(2));
+      else if (retirement === "same-user") await f.external(session(1, 3));
+      else if (retirement === "ABA") {
+        await f.external(session(2));
+        await f.external(f.initial);
+      } else newer = authCommands.transition(async () => undefined);
+      const before = f.persisted();
+      const events = f.events.length;
+      browser.release(session(1, 4));
+      await pending;
+      await newer;
+      expect(f.persisted()).toEqual(before);
+      expect(useAuthStore.getState().session).toEqual(before);
+      expect(f.events.slice(events).some((row) => row.event === "SIGNED_IN")).toBe(false);
+    } finally {
+      browser.cancel();
+      await Promise.allSettled([pending, newer]);
+      await f.close();
+    }
+  },
+);
+
+it("native tokenless QF callback cannot send A provider credentials under external B", async () => {
+  const f = await setup();
+  const browser = holdNativeBrowser();
+  const pending = beginNativeOAuth(QF_OAUTH_PROVIDER);
+  try {
+    await browser.started;
+    await f.external(session(2));
+    browser.release(null, "provider_token=synthetic-provider-A&provider_refresh_token=synthetic-provider-refresh-A");
+    await pending;
+    expect(f.qfRequests).toEqual([]);
+    expect(f.persisted()?.user.id).toBe(session(2).user.id);
+  } finally {
+    browser.cancel();
+    await pending;
+    await f.close();
+  }
+});
+
+it("native expired link callback cannot persist a refreshed different user", async () => {
+  const f = await setup();
+  f.setRefreshResponse(session(2));
+  const browser = holdNativeBrowser();
+  const pending = beginNativeOAuth("google", "link").catch(() => undefined);
+  try {
+    await browser.started;
+    const before = f.persisted();
+    f.values.set(f.key + "-user", "synthetic prior user");
+    f.values.set(f.key + "-code-verifier", "synthetic prior verifier");
+    const keys = [...f.values];
+    browser.release(session(1, 4, -60));
+    await pending;
+    expect(f.persisted()).toEqual(before);
+    expect([...f.values]).toEqual(keys);
+    expect(useAuthStore.getState().session).toEqual(before);
+  } finally {
+    browser.cancel();
+    await pending;
+    await f.close();
+  }
+});
+
+it("native link URL preparation cannot refresh retired A over external B", async () => {
+  const f = await setup("refresh");
+  let pending: Promise<unknown> | undefined;
+  try {
+    const near = session(1, 0, 60);
+    expect(
+      (await f.runtime.auth.setSession({ access_token: near.access_token, refresh_token: near.refresh_token })).error,
+    ).toBeNull();
+    pending = beginNativeOAuth("google", "link");
+    await f.started.promise;
+    const b = session(2);
+    await f.external(b);
+    f.release.resolve();
+    await pending;
+    expect(f.persisted()?.access_token).toBe(b.access_token);
+    expect(useAuthStore.getState().session?.access_token).toBe(b.access_token);
+    expect(mockBrowser).not.toHaveBeenCalled();
+  } finally {
+    f.release.resolve();
+    await pending;
+    await f.close();
+  }
+});
+
+it.each(["sign-in", "link"] as const)("accepts current native %s and retains its accepted owner", async (mode) => {
+  const f = await setup();
+  const browser = holdNativeBrowser();
+  const chosen = mode === "sign-in" ? session(2) : session(1, 4);
+  f.setCallbackUser(chosen.user);
+  const flow = startAppOAuth("google", mode, useAuthStore.getState);
+  try {
+    expect(flow.isCurrent()).toBe(true);
+    await browser.started;
+    browser.release(chosen);
+    const result = await flow.result;
+    expect(result.status).toBe("completed");
+    if (result.status !== "completed") throw new Error("Current OAuth was superseded");
+    expect(result.value.session?.access_token).toBe(chosen.access_token);
+    expect(result.owner.isCurrent()).toBe(true);
+    expect(flow.isCurrent()).toBe(true);
+    expect(f.persisted()?.access_token).toBe(chosen.access_token);
+    expect(useAuthStore.getState().session?.access_token).toBe(chosen.access_token);
+    expect(f.qfRequests).toEqual([]);
+  } finally {
+    browser.cancel();
+    await flow.result;
+    await f.close();
+  }
+});
+
+it.each(["cancel", "tokenless"] as const)(
+  "native sign-in %s cannot adopt a global session or connect QF",
+  async (kind) => {
+    const f = await setup();
+    const browser = holdNativeBrowser();
+    const flow = startAppOAuth(QF_OAUTH_PROVIDER, "sign-in", useAuthStore.getState);
+    try {
+      await browser.started;
+      const before = [...f.values];
+      if (kind === "cancel") browser.cancel();
+      else browser.release(null, "provider_token=synthetic-provider");
+      const result = await flow.result;
+      expect(result).toMatchObject({
+        status: "completed",
+        value: { session: null, qfConnected: false, qfOwner: null },
+      });
+      expect([...f.values]).toEqual(before);
+      expect(f.qfRequests).toEqual([]);
+      expect(flow.isCurrent()).toBe(true);
+    } finally {
+      browser.cancel();
+      await flow.result;
+      await f.close();
+    }
+  },
+);
+
+it("tokenless native QF link reads its starting account and sends provider credentials with that bearer", async () => {
+  const f = await setup();
+  const browser = holdNativeBrowser();
+  const flow = startAppOAuth(QF_OAUTH_PROVIDER, "link", useAuthStore.getState);
+  try {
+    await browser.started;
+    browser.release(null, "provider_token=synthetic-provider&provider_refresh_token=synthetic-refresh");
+    const result = await flow.result;
+    expect(result).toMatchObject({ status: "completed", value: { qfConnected: true } });
+    if (result.status !== "completed") throw new Error("Current link was superseded");
+    expect(result.value.qfOwner?.isCurrent()).toBe(true);
+    expect(result.value.session?.access_token).toBe(f.initial.access_token);
+    expect(f.qfRequests).toEqual([
+      {
+        action: "connect",
+        providerAccessToken: "synthetic-provider",
+        providerRefreshToken: "synthetic-refresh",
+        authorization: "Bearer " + f.initial.access_token,
+      },
+    ]);
+  } finally {
+    browser.cancel();
+    await flow.result;
+    await f.close();
+  }
+});
+
+it("incomplete native credentials are a current error and preserve every prior key", async () => {
+  const f = await setup();
+  const browser = holdNativeBrowser();
+  const flow = startAppOAuth("google", "sign-in", useAuthStore.getState);
+  const result = flow.result.catch((error) => error);
+  try {
+    await browser.started;
+    const before = [...f.values];
+    browser.release(null, "access_token=synthetic-incomplete");
+    expect(await result).toMatchObject({ code: "oauth_callback_invalid" });
+    expect(flow.isCurrent()).toBe(true);
+    expect([...f.values]).toEqual(before);
+  } finally {
+    browser.cancel();
+    await result;
+    await f.close();
+  }
+});
+
+it("wrong-user refreshed link reports the original current error without cancelling its owner", async () => {
+  const f = await setup();
+  f.setRefreshResponse(session(2));
+  const browser = holdNativeBrowser();
+  const flow = startAppOAuth("google", "link", useAuthStore.getState);
+  const result = flow.result.catch((error) => error);
+  try {
+    await browser.started;
+    f.values.set(f.key + "-user", "prior user");
+    f.values.set(f.key + "-code-verifier", "prior verifier");
+    const before = [...f.values];
+    browser.release(session(1, 4, -60));
+    const error = await result;
+    expect(error).toBe(mockLastRecoveryError);
+    expect(error).toMatchObject({ code: "oauth_link_user_mismatch", status: 400 });
+    expect(flow.isCurrent()).toBe(true);
+    expect([...f.values]).toEqual(before);
+  } finally {
+    browser.cancel();
+    await result;
+    await f.close();
+  }
+});
+
+it("expired same-user native link accepts a guarded refresh", async () => {
+  const f = await setup();
+  const browser = holdNativeBrowser();
+  const flow = startAppOAuth("google", "link", useAuthStore.getState);
+  try {
+    await browser.started;
+    browser.release(session(1, 4, -60));
+    expect(await flow.result).toMatchObject({
+      status: "completed",
+      value: { session: { access_token: f.refreshed.access_token } },
+    });
+    expect(f.persisted()?.access_token).toBe(f.refreshed.access_token);
+    expect(flow.isCurrent()).toBe(true);
+  } finally {
+    browser.cancel();
+    await flow.result;
+    await f.close();
+  }
+});
+
+it.each(["external", "ABA"] as const)("reserves native OAuth origin before queueing across %s", async (retirement) => {
+  const f = await setup();
+  const gate = deferred();
+  const blocking = authCommands.bootstrap(() => gate.promise);
+  const flow = startAppOAuth("google", "sign-in", useAuthStore.getState);
+  try {
+    await f.external(session(2));
+    if (retirement === "ABA") await f.external(f.initial);
+    gate.resolve();
+    await blocking;
+    expect(await flow.result).toEqual({ status: "superseded" });
+    expect(mockBrowser).not.toHaveBeenCalled();
+    expect(f.requests.some((request) => request.includes("/authorize"))).toBe(false);
+  } finally {
+    gate.resolve();
+    await blocking;
+    await flow.result;
+    await f.close();
+  }
+});
+
+it.each([false, true])(
+  "QF failure after own session adoption retains current error unless retired=%s",
+  async (retire) => {
+    const f = await setup();
+    const browser = holdNativeBrowser();
+    const entered = deferred(),
+      release = deferred();
+    const failure = new Error("synthetic provider failure");
+    const spy = jest.spyOn(qfUser, "connectQfProviderTokens").mockImplementation(async () => {
+      entered.resolve();
+      await release.promise;
+      throw failure;
+    });
+    const chosen = session(2);
+    f.setCallbackUser(chosen.user);
+    const flow = startAppOAuth(QF_OAUTH_PROVIDER, "sign-in", useAuthStore.getState);
+    const result = flow.result.catch((error) => error);
+    try {
+      await browser.started;
+      browser.release(chosen, "provider_token=synthetic-provider");
+      await entered.promise;
+      expect(flow.isCurrent()).toBe(true);
+      if (retire) await f.external(session(3));
+      release.resolve();
+      if (retire) expect(await result).toEqual({ status: "superseded" });
+      else expect(await result).toBe(failure);
+      expect(flow.isCurrent()).toBe(!retire);
+      expect(f.persisted()?.user.id).toBe(session(retire ? 3 : 2).user.id);
+    } finally {
+      browser.cancel();
+      release.resolve();
+      await result;
+      spy.mockRestore();
+      await f.close();
+    }
+  },
+);
+
+it("QF caller retains a same-session credential renewal received while the provider responds", async () => {
+  const f = await setup();
+  const browser = holdNativeBrowser();
+  const entered = deferred(),
+    release = deferred();
+  const spy = jest.spyOn(qfUser, "connectQfProviderTokens").mockImplementation(async () => {
+    entered.resolve();
+    await release.promise;
+    return { ok: true, status: "connected" };
+  });
+  const chosen = session(2);
+  f.setCallbackUser(chosen.user);
+  const pending = useAuthStore.getState().signInWithQuranFoundation();
+  try {
+    await browser.started;
+    browser.release(chosen, "provider_token=synthetic-provider");
+    await entered.promise;
+    const fresh = sameSessionRefresh(chosen);
+    await f.external(fresh);
+    release.resolve();
+    await pending;
+    expect(useAuthStore.getState().session?.access_token).toBe(fresh.access_token);
+    expect(f.persisted()?.access_token).toBe(fresh.access_token);
+    expect(useAuthStore.getState().isLoading).toBe(false);
+  } finally {
+    browser.cancel();
+    release.resolve();
+    await pending;
+    spy.mockRestore();
+    await f.close();
+  }
+});
+
+it("retired store OAuth cleans its own busy state but cannot clear a newer password-reset action", async () => {
+  const f = await setup();
+  const browser = holdNativeBrowser();
+  const entered = deferred(),
+    release = deferred();
+  const spy = jest.spyOn(f.runtime.client.auth, "resetPasswordForEmail").mockImplementation(async () => {
+    entered.resolve();
+    await release.promise;
+    return { data: {}, error: null };
+  });
+  const oauth = useAuthStore.getState().signInWithQuranFoundation();
+  let reset: Promise<void> | undefined;
+  try {
+    await browser.started;
+    reset = useAuthStore.getState().sendPasswordReset("synthetic@example.invalid");
+    await entered.promise;
+    await f.external(session(2));
+    browser.cancel();
+    await oauth;
+    expect(useAuthStore.getState().isLoading).toBe(true);
+    expect(useAuthStore.getState().error).toBeNull();
+    release.resolve();
+    await reset;
+    expect(useAuthStore.getState().isLoading).toBe(false);
+  } finally {
+    browser.cancel();
+    release.resolve();
+    await Promise.allSettled([oauth, reset]);
+    spy.mockRestore();
+    await f.close();
+  }
+});
+
+it("retired store OAuth releases busy after external account replacement", async () => {
+  const f = await setup();
+  const browser = holdNativeBrowser();
+  const pending = useAuthStore.getState().signInWithQuranFoundation();
+  try {
+    await browser.started;
+    await f.external(session(2));
+    browser.cancel();
+    await pending;
+    expect(useAuthStore.getState()).toMatchObject({ isLoading: false, error: null, user: { id: session(2).user.id } });
+  } finally {
+    browser.cancel();
+    await pending;
+    await f.close();
+  }
+});
+
+it.each(["prepare", "tokenless-read"] as const)(
+  "current native link %s preserves its SDK refresh error after attributed logout",
+  async (phase) => {
+    const f = await setup("refresh-error");
+    const browser = holdNativeBrowser();
+    const near = session(1, 0, 60);
+    if (phase === "prepare") f.values.set(f.key, JSON.stringify(near));
+    const flow = startAppOAuth("google", "link", useAuthStore.getState);
+    const pending = flow.result.catch((error) => error);
+    try {
+      if (phase === "tokenless-read") {
+        await browser.started;
+        f.values.set(f.key, JSON.stringify(near));
+        browser.release(null);
+      }
+      const error = await pending;
+      expect(error).toMatchObject({ code: "synthetic_recovery_rejected", status: 400 });
+      expect(flow.isCurrent()).toBe(true);
+      expect(useAuthStore.getState().session).toBeNull();
+      if (phase === "prepare") expect(mockBrowser).not.toHaveBeenCalled();
+    } finally {
+      browser.cancel();
+      await pending;
+      await f.close();
+    }
+  },
+);
+
+it.each(["sign-in", "link"] as const)(
+  "current store QF %s publishes provider failure after own session adoption",
+  async (mode) => {
+    const f = await setup(),
+      browser = holdNativeBrowser(),
+      entered = deferred(),
+      release = deferred();
+    const error = new Error("current provider failure");
+    const spy = jest.spyOn(qfUser, "connectQfProviderTokens").mockImplementation(async () => {
+      entered.resolve();
+      await release.promise;
+      throw error;
+    });
+    const chosen = mode === "sign-in" ? session(2) : session(1, 4);
+    f.setCallbackUser(chosen.user);
+    const work =
+      mode === "sign-in"
+        ? useAuthStore.getState().signInWithQuranFoundation()
+        : useAuthStore.getState().linkQuranFoundation();
+    const pending = work.catch((failure) => failure);
+    try {
+      await browser.started;
+      browser.release(chosen, "provider_token=synthetic-provider");
+      await entered.promise;
+      release.resolve();
+      expect(await pending).toBe(error);
+      expect(useAuthStore.getState()).toMatchObject({
+        isLoading: false,
+        error: error.message,
+        user: { id: chosen.user.id },
+      });
+      expect(useAuthStore.getState().session?.access_token).toBe(chosen.access_token);
+    } finally {
+      browser.cancel();
+      release.resolve();
+      await pending;
+      spy.mockRestore();
+      await f.close();
+    }
+  },
+);
+
+it.each(["handle", "store"] as const)(
+  "QF credential-read failure delivers its own logout and SDK error through %s",
+  async (caller) => {
+    const f = await setup("refresh-error"),
+      browser = holdNativeBrowser(),
+      chosen = session(2, 0, 60);
+    f.setCallbackUser(chosen.user);
+    const flow = caller === "handle" ? startAppOAuth(QF_OAUTH_PROVIDER, "sign-in", useAuthStore.getState) : null;
+    const pending = (flow ? flow.result : useAuthStore.getState().signInWithQuranFoundation()).catch((error) => error);
+    try {
+      await browser.started;
+      browser.release(chosen, "provider_token=synthetic-provider");
+      const error = await pending;
+      expect(error).toBe(mockLastReadError);
+      expect(error).toMatchObject({ code: "synthetic_recovery_rejected", status: 400 });
+      expect(f.persisted()).toBeNull();
+      expect(useAuthStore.getState()).toMatchObject({ session: null, user: null, profile: null, isLoading: false });
+      expect(f.events.some((row) => row.event === "SIGNED_OUT")).toBe(true);
+      expect(f.qfRequests).toEqual([]);
+      if (flow) expect(flow.isCurrent()).toBe(true);
+      else expect(useAuthStore.getState().error).toBe(error.message);
+    } finally {
+      browser.cancel();
+      await pending;
+      await f.close();
+    }
+  },
+);
+
+it("QF credential-read renewal retains the accepted account and uses its fresh bearer", async () => {
+  const f = await setup(),
+    browser = holdNativeBrowser(),
+    chosen = session(2, 0, 60),
+    fresh = sameSessionRefresh(chosen);
+  f.setCallbackUser(chosen.user);
+  f.setRefreshResponse(fresh);
+  const pending = useAuthStore.getState().signInWithQuranFoundation();
+  try {
+    await browser.started;
+    browser.release(chosen, "provider_token=synthetic-provider");
+    await pending;
+    expect(f.qfRequests).toEqual([
+      { action: "connect", providerAccessToken: "synthetic-provider", authorization: "Bearer " + fresh.access_token },
+    ]);
+    expect(f.persisted()?.access_token).toBe(fresh.access_token);
+    expect(useAuthStore.getState()).toMatchObject({
+      session: { access_token: fresh.access_token },
+      user: { id: chosen.user.id },
+      error: null,
+      isLoading: false,
+    });
+  } finally {
+    browser.cancel();
+    await pending;
+    await f.close();
+  }
+});
+
+it.each(["external", "ABA"] as const)(
+  "QF credential-read error cannot log out or report under retired %s",
+  async (kind) => {
+    const f = await setup("held-refresh-error"),
+      browser = holdNativeBrowser(),
+      chosen = session(1, 4, 60);
+    const flow = startAppOAuth(QF_OAUTH_PROVIDER, "sign-in", useAuthStore.getState);
+    try {
+      await browser.started;
+      browser.release(chosen, "provider_token=synthetic-provider");
+      await f.started.promise;
+      await f.external(session(2));
+      if (kind === "ABA") await f.external(chosen);
+      const before = f.persisted(),
+        events = f.events.length;
+      f.release.resolve();
+      expect(await flow.result).toEqual({ status: "superseded" });
+      expect(f.persisted()).toEqual(before);
+      expect(useAuthStore.getState().session).toEqual(before);
+      expect(f.events.slice(events).some((row) => row.event === "SIGNED_OUT")).toBe(false);
+      expect(f.qfRequests).toEqual([]);
+    } finally {
+      browser.cancel();
+      f.release.resolve();
+      await flow.result;
+      await f.close();
+    }
+  },
+);
+
+it.each(["link", "recovery"] as const)(
+  "OAuth-produced QF reader yields to a newer %s command without overlapping storage guards",
+  async (command) => {
+    const f = await setup("refresh"),
+      browser = holdNativeBrowser();
+    const flow = startAppOAuth(QF_OAUTH_PROVIDER, "link", useAuthStore.getState);
+    let read: Promise<unknown> | undefined;
+    let newer: Promise<unknown> | undefined;
+    let secondBrowser: ReturnType<typeof holdNativeBrowser> | undefined;
+    try {
+      await browser.started;
+      browser.release(null, "provider_token=synthetic-provider");
+      const accepted = await flow.result;
+      expect(accepted.status).toBe("completed");
+      if (accepted.status !== "completed" || !accepted.value.qfOwner) throw new Error("Missing accepted QF owner");
+      const qfOwner = accepted.value.qfOwner;
+      const near = session(1, 0, 60);
+      expect((await f.runtime.auth.setSession(near)).error).toBeNull();
+      read = qfOwner.getAccessToken().catch((error) => error);
+      await f.started.promise;
+      let settled = false;
+      const target = session(1, 4);
+      secondBrowser = holdNativeBrowser();
+      newer = (
+        command === "link"
+          ? startAppOAuth("google", "link", useAuthStore.getState).result
+          : preparePasswordRecovery({ access_token: target.access_token, refresh_token: target.refresh_token })
+      )
+        .catch((error) => error)
+        .finally(() => {
+          settled = true;
+        });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(settled).toBe(false);
+      f.release.resolve();
+      secondBrowser.cancel();
+      expect(await newer).toMatchObject({ status: "completed" });
+      expect(await read).toBeInstanceOf(Error);
+      expect(qfOwner.isCurrent()).toBe(false);
+      expect(f.events.some((row) => row.event === "SIGNED_OUT")).toBe(false);
+      const expected = command === "link" ? f.refreshed : target;
+      expect(f.persisted()?.access_token).toBe(expected.access_token);
+      expect(useAuthStore.getState().session?.access_token).toBe(expected.access_token);
+      if (command === "link") expect(f.requests.some((row) => row.includes("/user/identities/authorize"))).toBe(true);
+    } finally {
+      browser.cancel();
+      secondBrowser?.cancel();
+      f.release.resolve();
+      await Promise.allSettled([flow.result, read, newer]);
+      await f.close();
+    }
+  },
+);
+
+it.each(["current", "cancel", "external", "ABA"] as const)(
+  "private SDK queue revalidates a %s caller and drains after rejection",
+  async (retirement) => {
+    const f = await setup("refresh"),
+      browser = holdNativeBrowser();
+    const flow = startAppOAuth(QF_OAUTH_PROVIDER, "link", useAuthStore.getState);
+    let read: Promise<unknown> | undefined;
+    let update: Promise<unknown> | undefined;
+    try {
+      await browser.started;
+      browser.release(null, "provider_token=synthetic-provider");
+      const accepted = await flow.result;
+      if (accepted.status !== "completed" || !accepted.value.qfOwner) throw new Error("Missing accepted QF owner");
+      const near = session(1, 0, 60);
+      expect((await f.runtime.auth.setSession(near)).error).toBeNull();
+      read = accepted.value.qfOwner.getAccessToken().catch((error) => error);
+      await f.started.promise;
+      const queuedOwner = authCommands.captureOwner();
+      let settled = false;
+      update = f.runtime
+        .updatePassword(queuedOwner, near, "synthetic-password")
+        .catch((error) => error)
+        .finally(() => {
+          settled = true;
+        });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(settled).toBe(false);
+      if (retirement === "cancel") queuedOwner.cancel();
+      else if (retirement !== "current") {
+        await f.external(session(2));
+        if (retirement === "ABA") await f.external(near);
+      }
+      const before = f.persisted();
+      f.release.resolve();
+      const result = await update;
+      if (retirement === "current") {
+        expect(result).toMatchObject({ error: null });
+        expect(await read).toBe(f.refreshed.access_token);
+        expect(f.requests.filter((row) => row.startsWith("PUT "))).toHaveLength(1);
+      } else {
+        expect(result).toMatchObject({ code: "operation_superseded", status: 409 });
+        expect(f.requests.filter((row) => row.startsWith("PUT "))).toHaveLength(0);
+        if (retirement === "cancel") expect(await read).toBe(f.refreshed.access_token);
+        else {
+          expect(await read).toBeInstanceOf(Error);
+          expect(f.persisted()).toEqual(before);
+        }
+      }
+      const current = useAuthStore.getState().session;
+      const next = await f.runtime.readSession(authCommands.captureOwner(), current, () => true);
+      expect(next.error).toBeNull();
+      expect(next.data.session?.access_token).toBe(f.persisted()?.access_token);
+      expect(f.events.some((row) => row.event === "SIGNED_OUT")).toBe(false);
+    } finally {
+      browser.cancel();
+      f.release.resolve();
+      await Promise.allSettled([flow.result, read, update]);
+      await f.close();
+    }
+  },
+);

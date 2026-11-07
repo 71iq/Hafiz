@@ -1982,7 +1982,8 @@
         "RF-131",
         "RF-132",
         "RF-133",
-        "RF-152"
+        "RF-152",
+        "RF-153"
       ],
       "acceptance_criteria": [
         "Test sign-in, sign-out, account switch, late responses, subscription cleanup and offline restore.",
@@ -1992,7 +1993,8 @@
         "RF124 audit and RF125 password/reset repair are accepted. RF127 profile store/editor ownership is now verified and primary accepted, including initialization and closed A-B-A regressions. These children do not close RF025: Query cache, initialization/listener/SDK, leaderboard, offline and wider ownership policies remain to be verified.",
         "RF129 owns only singleton initialization/listener retirement and obsolete startup snapshot publication, including newer same-session notifications. Cache isolation, leaderboard/overview/community/other publishers and full SDK/offline lifecycle remain open after child acceptance.",
         "RF130 obsolete stats lifetimes, RF131 same-owner FIFO and RF132 field publication are verified and primary accepted. RF133 is verified and primary accepted for four viewer/local Query roots only. Parent still requires overview/community/other SDK publishers, offline and whole SQLite sync/data ownership. Remote Profile row identity/shape validation is not covered by sync-payload RF031.",
-        "RF152 is accepted for owned password/read/recovery/logout settlement and private SDK notifications. Native interactive OAuth, legacy raw main-client writers/background behavior and persistent account-data policy remain open; this parent is not closed."
+        "RF152 is accepted for owned password/read/recovery/logout settlement and private SDK notifications. Native interactive OAuth, legacy raw main-client writers/background behavior and persistent account-data policy remain open; this parent is not closed.",
+        "RF153 native interactive OAuth and source-owned QF initial sync are verified and primary accepted, including attributed logout/error, renewal and private SDK operation overlap. Raw main-client signIn/signUp/signOut/background writers, remaining publishers/cache and persistent account-data policy still require verification. This parent remains open."
       ],
       "verification": [
         [
@@ -15669,6 +15671,328 @@
       "independent_review": "pass",
       "evidence": "docs/refactoring/PROGRESS.md",
       "summary": "Retire owned SDK persistence, deletion, dispatch and notification by account lifetime and intent. Preserve already-issued same-lifetime cancellation settlement, guarded recovery and attributed logout; denied requests cannot trigger destructive SDK cleanup."
+    },
+    {
+      "id": "RF-153",
+      "title": "Keep native OAuth within its initiating account intent",
+      "description": "Fence native URL preparation, browser callbacks, session installation, QF connection and caller follow-up by reserved and accepted account ownership.",
+      "rationale": "Raw native linkIdentity/setSession/getSession can overwrite a replacement session or pair provider credentials with another user. Legacy callers also publish obsolete error/busy/profile/sync state.",
+      "modules": [
+        "lib/auth/coordinator.ts",
+        "lib/auth/oauth.ts",
+        "lib/auth/client-adapter.ts",
+        "lib/auth/root-runtime.ts",
+        "lib/auth/owned-storage.ts",
+        "lib/supabase.ts",
+        "lib/auth/store.ts",
+        "components/auth/OAuthButtons.tsx",
+        "lib/quran-foundation/user-sync.ts"
+      ],
+      "dependencies": [
+        "RF-152"
+      ],
+      "acceptance_criteria": [
+        "Primary owns security and API design. Add synchronous reserveReplacement returning reserved owner/result, capture ticket immediately when intent increments before queued work, and delegate existing replace to result without changing its contract. Test external identity/closedABA while queued.",
+        "startAppOAuth returns synchronous handle isCurrent/result, including config failures delivered through result. Track reserved owner and update only after attributable session establishment. Map obsolete completion to superseded and return the specific tracked owner, never whichever generic replacement owner exists at return. Caller errors retain attribution after own session adoption and QF await.",
+        "Native link URL preparation uses existing owned private SDK operation under existing SDK lock because installed linkIdentityOAuth omits its own lock. Release before opening browser. Native callbacks use guarded restore, not raw main setSession. Optional canonical expectedUserId for link validates SDK-produced candidate before persistence including expired-token refreshed replies. A wrong-user current reply gives ordinary AuthError without cancelling owner; retain prior session and auxiliary state. Recovery default remains unchanged.",
+        "Tokenless native sign-in returns no adopted session and no provider connection. Tokenless native link uses starting-owner guarded read and preserves genuine SDK errors. Native sign-in can install a legitimately chosen new account only if origin still owns its lifetime/intent. Check before/after every awaited phase and before follow-up. Web callback behavior stays as currently supported.",
+        "Pass getState explicitly without OAuth-to-store cycle. Capture accepted AuthOwner/QfSessionOwner immediately after validated restoration, before QF awaits, and pass source-bound owner to connectProviderTokens/connectFromSession. Expose accepted QF owner in result and allow optional explicit owner for initial sync, failing closed for explicit missing/stale owner while preserving existing no-argument callers.",
+        "Store QF actions consume handle and fence session/profile/error follow-up. Add a private loading ownership token shared by existing loading-producing store actions so retired cleanup releases its own busy state without clearing newer work. Preserve existing SDK/sign-in/signup/signout payloads, flags and results; raw main-client lifetime races remain RF025. No broad auth API rewrite.",
+        "OAuthButtons uses synchronous per-invocation busy admission and mounted/current invocation checks. Auth retirement suppresses errors and initial sync but cannot leave local buttons stuck busy. Pass exact accepted QF owner to initial sync; prevent follow-up on unmount or replaced database. Keep markup, locales, themes, responsive styles and web redirects unchanged.",
+        "Real runtime/SDK/browser causal tests prove replacement/ABA/new-intent callback overwrites, tokenless provider credential pairing, expired wrong-user link and stale URL-preparation refresh. Add valid native sign-in/link/cancel/tokenless, current/stale QF responses, queued retirement, expected-user receipt and initial-owner controls. Preserve prior auth cases, SDK errors and exact field assertions. Adapt only old protocol mocks. Render actual buttons in representative English/Arabic phone cases for busy/error/initial-sync ownership.",
+        "Focused auth/QF/types/scopedlint while iterating, full20 controller checks once ready, separate stronger independent review and primary acceptance. Source remains immutable during checks/review. One local commit and short PROGRESS note, delete accepted outputs, baseline under2GB. No production, protected data, signing, dependency or device-verification claim.",
+        "A QF credential read near SDK expiry must deliver its own receipt-attributed logout and preserve the original SDK error; route activity cannot cancel its own notification. Fresh bearer renewal succeeds; external replacement/closedABA read failures cannot clear or report under the new account.",
+        "Serialize the entire private SDK operation before activating owned storage, including the OAuth-produced QF reader after reservation completion. Revalidate queued owners; preserve SDK locking, current settlement and queue progress after failure. Actual-runtime overlap tests cover newer link/recovery and current/cancelled/external/closedABA queued commands."
+      ],
+      "verification": [
+        [
+          "git",
+          "diff",
+          "--check"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "tests/unit/auth-disabled.test.ts",
+          "lib/auth/coordinator.ts",
+          "lib/auth/oauth.ts",
+          "lib/auth/client-adapter.ts",
+          "lib/auth/root-runtime.ts",
+          "lib/auth/owned-storage.ts",
+          "lib/supabase.ts",
+          "lib/auth/store.ts",
+          "components/auth/OAuthButtons.tsx",
+          "lib/quran-foundation/user-sync.ts",
+          "tests/unit/auth-command-coordinator.test.ts",
+          "tests/unit/auth-owned-storage.test.ts",
+          "tests/unit/auth-runtime-store.test.ts",
+          "tests/unit/auth-profile-transition.test.ts",
+          "tests/unit/oauth-buttons-contract.test.tsx",
+          "tests/unit/oauth-buttons-owner.test.tsx",
+          "tests/unit/qf-sync-owner.test.ts",
+          "docs/refactoring/PROGRESS.md"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/auth/coordinator.ts",
+          "tests/unit/auth-disabled.test.ts",
+          "lib/auth/oauth.ts",
+          "lib/auth/client-adapter.ts",
+          "lib/auth/root-runtime.ts",
+          "lib/auth/owned-storage.ts",
+          "lib/supabase.ts",
+          "lib/auth/store.ts",
+          "components/auth/OAuthButtons.tsx",
+          "lib/quran-foundation/user-sync.ts",
+          "tests/unit/auth-command-coordinator.test.ts",
+          "tests/unit/auth-owned-storage.test.ts",
+          "tests/unit/auth-runtime-store.test.ts",
+          "tests/unit/auth-profile-transition.test.ts",
+          "tests/unit/oauth-buttons-contract.test.tsx",
+          "tests/unit/oauth-buttons-owner.test.tsx",
+          "tests/unit/qf-sync-owner.test.ts",
+          "--max-warnings=0"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "check:analysis"
+        ],
+        [
+          "npm",
+          "run",
+          "postinstall"
+        ],
+        [
+          "npm",
+          "ls",
+          "--all",
+          "--json"
+        ],
+        [
+          "npm",
+          "run",
+          "lint"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "node",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/tests/brace-expansion.test.cjs",
+          "scripts/tests/dependency-boundaries.test.cjs",
+          "scripts/tests/icon-tool.test.cjs",
+          "scripts/tests/jest-config.test.cjs",
+          "scripts/tests/js-yaml.test.cjs",
+          "scripts/tests/lint-coverage.test.cjs",
+          "scripts/tests/metro-unicode.test.cjs",
+          "scripts/tests/nanoid.test.cjs",
+          "scripts/tests/router-dependency-range.test.cjs",
+          "scripts/tests/security-dependency-owner.test.cjs",
+          "scripts/tests/source-map-js.test.cjs",
+          "scripts/tests/tailwind-source-map.test.cjs",
+          "scripts/tests/ws.test.cjs",
+          "scripts/tests/xmldom.test.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "test:refactor-runner"
+        ],
+        [
+          "python3",
+          "-B",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "scripts/tests",
+          "-p",
+          "test_*.py"
+        ],
+        [
+          "npm",
+          "run",
+          "check:native-config"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=4096",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "android",
+          "--output-dir",
+          ".expo/modernization-checks/android",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/android')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=3072",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "ios",
+          "--output-dir",
+          ".expo/modernization-checks/ios",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/ios')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8197",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts",
+          "tests/e2e/database-bridge.spec.ts"
+        ]
+      ],
+      "risk": "high",
+      "approved": true,
+      "status": "verified",
+      "allowed_paths": [
+        "lib/auth/coordinator.ts",
+        "lib/auth/oauth.ts",
+        "lib/auth/client-adapter.ts",
+        "lib/auth/root-runtime.ts",
+        "lib/auth/owned-storage.ts",
+        "lib/supabase.ts",
+        "lib/auth/store.ts",
+        "components/auth/OAuthButtons.tsx",
+        "lib/quran-foundation/user-sync.ts",
+        "tests/unit/auth-command-coordinator.test.ts",
+        "tests/unit/auth-owned-storage.test.ts",
+        "tests/unit/auth-runtime-store.test.ts",
+        "tests/unit/auth-profile-transition.test.ts",
+        "tests/unit/oauth-buttons-contract.test.tsx",
+        "tests/unit/oauth-buttons-owner.test.tsx",
+        "tests/unit/qf-sync-owner.test.ts",
+        "tests/unit/auth-disabled.test.ts"
+      ],
+      "attempts": 1,
+      "priority": 1,
+      "implementation_mode": "implementation",
+      "started_at": "2026-11-07T00:37:22.513070+00:00",
+      "failure_history": [
+        {
+          "phase": "focused-regressions",
+          "failure": "Seven original causal SDK failures; two additional source regressions reproduced: same-session credential renewal overwritten by QF caller, and database A-B-A initial-sync admission. Fixture action name and proxy spy corrected without weakening checks.",
+          "time": "2026-11-07T00:09:59.331936+00:00"
+        },
+        {
+          "phase": "focused-regressions",
+          "time": "2026-11-07T00:10:44.740666+00:00",
+          "failure": "Two actual SDK regressions reproduced current native link refresh errors being suppressed after its attributed logout. Preserve original error with receipt-bound anonymous owner; never adopt external logout or ABA."
+        },
+        {
+          "time": "2026-11-07T00:19:00.363429+00:00",
+          "phase": "full-gates-review",
+          "gate": {
+            "status": "passed",
+            "count": 20
+          },
+          "review": {
+            "verdict": "fail",
+            "findings": [
+              "[P2] lib/auth/oauth.ts:118 passes isCurrent into the QF-owned session read, which blocks delivery of that operation's own attributed logout. A native QF callback token expiring in 60 seconds passes SDK setSession, but the subsequent QF credential read triggers renewal within the SDK's 90-second margin. If renewal fails, storage is cleared and adoptOwnSignOut cancels the accepted owner. The adapter's subsequent authorization checks then fail, suppressing SIGNED_OUT delivery to the store. The store remains signed in, and OAuth returns superseded because its catch requires session === null. Additionally, request-owner.ts:42 replaces the SDK error with an account-change error. Use an activity guard that survives receipt-attributed logout while retaining epoch/intent fencing, preserve the original SDK error, and add an actual-SDK regression for this QF read path. This is a read-only source finding. The required gate reports passed, all 20 controller commands exited 0, and final logs confirm 2,445 Jest tests and 29 Chrome tests passed."
+            ]
+          }
+        },
+        {
+          "time": "2026-11-07T00:21:22.458217+00:00",
+          "phase": "review-causal",
+          "failure": "Two actual SDK regressions reproduced the independent review finding: QF credential-read failure left the store signed in and suppressed its original error after guarded storage logout. Reader now keeps intent activity through attributed logout and throws the SDK error before QF source-owner postvalidation. Positive renewal and retired external/ABA controls retained."
+        },
+        {
+          "time": "2026-11-07T00:29:38.209785+00:00",
+          "phase": "full-gates-review",
+          "gate": {
+            "status": "passed",
+            "count": 20
+          },
+          "review": {
+            "verdict": "fail",
+            "findings": [
+              "[P2] lib/auth/oauth.ts:118-125 exposes a private SDK reader through the returned qfOwner, which OAuthButtons.tsx:90 reuses for initial sync after the coordinator reservation finishes. If that read is awaiting refresh and a new link/recovery command starts, client-adapter.ts:230-243 enters owned storage before acquiring the SDK lock. owned-storage.ts:145 then throws \"Overlapping owned SDK operation\", failing the newer valid command. Serialize private operations before activating their storage guard, retaining ownership revalidation, and add an actual-runtime overlap test using the OAuth-produced qfOwner. This is a source-derived finding; no tests were run by this evaluator.",
+              "The QF logout/error correction is sound. The required gate reports passed, all 20 commands match the backlog and exited 0, and final logs confirm 2,450 Jest tests and 29 Chrome cases passed. Existing tests do not cover the overlap above. Native JavaScript exports do not establish device verification."
+            ]
+          }
+        },
+        {
+          "time": "2026-11-07T00:36:22.296088+00:00",
+          "phase": "overlap-causal",
+          "failure": "Two actual-runtime tests reproduced the second independent finding: OAuth-returned QF read fails a newer link/recovery before its held renewal settles. Private adapter now queues whole operations before guard admission; owners are revalidated after waiting and rejection cannot poison the tail."
+        }
+      ],
+      "recovery_windows": [
+        {
+          "time": "2026-11-07T00:37:22.513054+00:00",
+          "prior_attempt_offset": 0,
+          "prior_attempts": 2,
+          "reason": "Primary reproduced and corrected both independent findings; the second correction serializes actual private SDK operations before guard admission. Six overlap/admission cases pass with all265focused auth/QF cases and typecheck. Preserve historical failure evidence."
+        }
+      ],
+      "attempt_offset": 2,
+      "completed_at": "2026-11-07T00:45:02.065107+00:00",
+      "primary_accepted_at": "2026-11-07T00:45:02.065107+00:00",
+      "independent_review": "pass",
+      "evidence": "docs/refactoring/PROGRESS.md",
+      "summary": "Native OAuth callbacks, provider linking and initial QF sync retain their initiating account/intent. Retired work cannot replace credentials or publish stale UI; current SDK errors, own logout and credential renewal remain observable. Private SDK operations serialize before owned storage admission. All20 checks, stronger independent review and primary acceptance pass. Raw main-client writers and persistent data policy remain RF025."
     }
   ]
 }

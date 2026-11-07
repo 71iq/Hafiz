@@ -38,7 +38,12 @@ jest.mock("@/lib/supabase", () => ({
     },
   },
 }));
-jest.mock("@/lib/auth/oauth", () => ({ startAppOAuth: () => mockOAuth() }));
+jest.mock("@/lib/auth/oauth", () => ({
+  startAppOAuth: () => {
+    const owner = { isCurrent: () => true, cancel: () => undefined };
+    return { isCurrent: owner.isCurrent, result: mockOAuth().then((value) => ({ status: "completed", value, owner })) };
+  },
+}));
 jest.mock("@/lib/auth/config", () => ({ isEmailAuthFlowsEnabled: () => true }));
 jest.mock("@/lib/quran-foundation/config", () => ({ isQfSyncEnabled: () => false, isQfLoginEnabled: () => true }));
 jest.mock("@/lib/quran-foundation/user", () => ({ connectQfFromSession: jest.fn() }));
