@@ -24557,25 +24557,21 @@
     }
   ],
   "checkpoint": {
-    "time": "2026-11-07T21:04:55.341575+00:00",
-    "current_task": "RF-025 (listener/late-request only). 2026-11-07 check: the AUTH_PROFILE_SAVE_OWNERSHIP.md leads are resolved in current code (store.initialize owns one SDK listener and retires it on re-init; leaderboard-sync checks its StatsOwner after every await and patchCurrentProfile is owner-guarded); no supabase.auth calls outside lib/auth except QF readSession. Next: enumerate remaining auth-derived publishers (profile/overview/community Query roots, QF sync, offline restore) and write one causal late-response test per unguarded one, or close RF-025 with that audit if none remain.",
+    "time": "2026-11-07T21:46:14.705041+00:00",
+    "current_task": "RF-028 (native Query online/focus: NetInfo + AppState via onlineManager/focusManager with cleanup; native mutations networkMode 'always' so nothing replays; web unchanged)",
     "open_follow_ups": [
-      "RF-182",
       "RF-186",
       "RF-187",
       "RF-188",
       "RF-189",
       "onboarding 'Skip for now' skips step 3 (confirm intent)"
     ],
+    "device_tasks": "RF-188 (asset loading via expo-asset + expo-file-system 55.x; measure APK/import), RF-186, RF-187, RF-189 need the phone",
     "decisions_waiting_on_ehab": [
       "Final push after all work is verified"
     ],
-    "last_green_commit": "447e375 (full 20-check batch gate: 3,115 unit, 35 Chrome)",
-    "accepted_since_gate": [
-      "RF-183 1958473"
-    ],
+    "last_green_commit": "7e911a0 (full 20-check batch gate: 3,137 unit, 35 Chrome)",
     "uncommitted": null,
-    "device": "Samsung SM-A546E may be unplugged; replug for RF-186/RF-187/RF-189. QA app com.anonymous.hafiz.qa; build with scripts/android-qa-build.sh",
-    "production": "RF-166, RF-170, RF-169 migrations applied 2026-11-07 after backup 20261107T205118Z (local copy in ~/.local/share/hafiz-hetzner-migration/backups/)."
+    "production": "RF-166, RF-170, RF-169 migrations applied 2026-11-07 after backup 20261107T205118Z."
   }
 }
