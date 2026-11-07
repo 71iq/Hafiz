@@ -44,7 +44,7 @@ export async function putUserSetting(db: DatabaseExecutor, key: string, value: s
 }
 
 /** Delete one setting with the given executor, queueing a syncable key's tombstone. */
-async function removeUserSetting(db: DatabaseExecutor, key: string): Promise<void> {
+export async function removeUserSetting(db: DatabaseExecutor, key: string): Promise<void> {
   const deletedAt = new Date().toISOString();
   await db.runAsync("DELETE FROM user_settings WHERE key = ?", [key]);
   if (!isSyncableUserSetting(key)) return;

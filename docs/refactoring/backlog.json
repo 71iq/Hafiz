@@ -20596,12 +20596,17 @@
         "Unapproved parent, prepare exact feature-sized scopes after causal SQLite proofs. Local mutations and required main/QF queue writes must settle atomically without nested transactions; publish achievement/review/UI side effects after successful commit, and retain existing offline/data ownership policies. No remote requirement for local saving. Full controller checks, independent stronger review and primary acceptance for each approved repair."
       ],
       "approved": false,
-      "status": "pending",
+      "status": "verified",
       "attempts": 0,
       "implementation_mode": "implementation",
       "files": [],
       "allowed_paths": [],
-      "verification": []
+      "verification": [],
+      "completed_at": "2026-11-07T16:12:57.459688+00:00",
+      "primary_accepted_at": "2026-11-07T16:12:57.459688+00:00",
+      "independent_review": "pass",
+      "evidence": "docs/refactoring/PROGRESS.md",
+      "summary": "Parent closed by sub-tasks RF172-RF178; no detached sync queue writes remain in lib, app or components."
     },
     {
       "id": "RF-172",
@@ -21960,6 +21965,275 @@
       "independent_review": "pass",
       "evidence": "docs/refactoring/PROGRESS.md",
       "summary": "Grading saves the card, its review log and both uploads in one transaction with listeners after commit; card actions, deletion and meanings cards are single transactions. All 20 full checks (3,092 unit, 35 Chrome) and independent review pass; the review-requested ARCHITECTURE.md scope clause reran format and diff checks."
+    },
+    {
+      "id": "RF-178",
+      "title": "Save smart-deck migration and materialization with their upload queue",
+      "priority": 1,
+      "risk": "medium",
+      "description": "RF171 sub-task 6b. The legacy retention migration committed card moves, then detached their queue writes and deleted legacy deck settings in separate concurrent transactions; once moved, the rows no longer match the migration query, so a lost queue row was permanent. Materialization also detached its card queue writes. Both now run the local writes and every queue entry in one transaction.",
+      "dependencies": [
+        "RF-177"
+      ],
+      "modules": [
+        "lib/fsrs/smart-decks.ts",
+        "lib/database/user-settings.ts",
+        "tests/unit/smart-deck-outbox.test.ts",
+        "docs/refactoring/ARCHITECTURE.md"
+      ],
+      "files": [
+        "lib/fsrs/smart-decks.ts",
+        "lib/database/user-settings.ts",
+        "tests/unit/smart-deck-outbox.test.ts",
+        "docs/refactoring/ARCHITECTURE.md"
+      ],
+      "allowed_paths": [
+        "lib/fsrs/smart-decks.ts",
+        "lib/database/user-settings.ts",
+        "tests/unit/smart-deck-outbox.test.ts",
+        "docs/refactoring/ARCHITECTURE.md"
+      ],
+      "acceptance_criteria": [
+        "Legacy retention migration moves cards, removes legacy deck settings and queues all uploads in one transaction; a queue failure leaves the legacy rows and settings for retry.",
+        "Materialization creates smart-deck cards and their INSERT queue entries together or not at all.",
+        "ARCHITECTURE.md states the transactional rule without the RF178 exception. The 41 existing smart-deck and home deck cases keep passing.",
+        "Causal tests through the real connection owner. All full controller checks, separate independent review and primary acceptance."
+      ],
+      "verification": [
+        [
+          "git",
+          "diff",
+          "--check"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "lib/database/user-settings.ts",
+          "tests/unit/smart-deck-outbox.test.ts",
+          "docs/refactoring/ARCHITECTURE.md",
+          "docs/refactoring/PROGRESS.md"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/fsrs/smart-decks.ts",
+          "lib/database/user-settings.ts",
+          "tests/unit/smart-deck-outbox.test.ts",
+          "--max-warnings=0"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "check:analysis"
+        ],
+        [
+          "npm",
+          "run",
+          "postinstall"
+        ],
+        [
+          "npm",
+          "ls",
+          "--all",
+          "--json"
+        ],
+        [
+          "npm",
+          "run",
+          "lint",
+          "--",
+          "--format",
+          "json"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit"
+        ],
+        [
+          "node",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/tests/brace-expansion.test.cjs",
+          "scripts/tests/dependency-boundaries.test.cjs",
+          "scripts/tests/icon-tool.test.cjs",
+          "scripts/tests/jest-config.test.cjs",
+          "scripts/tests/js-yaml.test.cjs",
+          "scripts/tests/lint-coverage.test.cjs",
+          "scripts/tests/metro-unicode.test.cjs",
+          "scripts/tests/nanoid.test.cjs",
+          "scripts/tests/router-dependency-range.test.cjs",
+          "scripts/tests/security-dependency-owner.test.cjs",
+          "scripts/tests/source-map-js.test.cjs",
+          "scripts/tests/tailwind-source-map.test.cjs",
+          "scripts/tests/ws.test.cjs",
+          "scripts/tests/xmldom.test.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "test:refactor-runner"
+        ],
+        [
+          "python3",
+          "-B",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "scripts/tests",
+          "-p",
+          "test_*.py"
+        ],
+        [
+          "npm",
+          "run",
+          "check:native-config"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=4096",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "android",
+          "--output-dir",
+          ".expo/modernization-checks/android",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/android')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=3072",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "ios",
+          "--output-dir",
+          ".expo/modernization-checks/ios",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/ios')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8197",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts",
+          "tests/e2e/database-bridge.spec.ts",
+          "tests/e2e/tafsir-import.spec.ts",
+          "tests/e2e/translation-import.spec.ts"
+        ]
+      ],
+      "approved": true,
+      "status": "verified",
+      "attempts": 1,
+      "implementation_mode": "implementation",
+      "started_at": "2026-11-07T14:13:47.312906+00:00",
+      "reuse": "removeUserSetting step from RF172, now exported; tests/jest/outbox-sqlite.ts.",
+      "focused_validation": {
+        "pre_fix": "All 3 new cases failed on the original source: migrated cards and created cards committed without queue entries, and the legacy setting was removed without its tombstone.",
+        "post_fix": "All 3 new cases, 41 existing smart-deck/home cases and the full Jest suite (156 suites/3,095 cases) pass; typecheck and scoped zero-warning lint pass."
+      },
+      "completed_at": "2026-11-07T16:12:57.459688+00:00",
+      "primary_accepted_at": "2026-11-07T16:12:57.459688+00:00",
+      "independent_review": "pass",
+      "evidence": "docs/refactoring/PROGRESS.md",
+      "summary": "Legacy retention migration and smart-deck materialization commit their card changes, legacy setting removals and queue entries in one transaction. All 20 full checks (3,095 unit, 35 Chrome) and independent review pass."
+    },
+    {
+      "id": "RF-179",
+      "title": "Never queue an empty card over an existing card during creation",
+      "priority": 1,
+      "risk": "high",
+      "description": "RF178 review: materializeSmartDeckCards and ensureStudyCardRow check existing cards only within one deck, outside the write transaction, then queue an INSERT even when ON CONFLICT ... WHERE deleted_at IS NOT NULL inserted nothing. A sync pull committing a legacy-deck S:A row in that gap makes the upload replace the server card with an empty one, and the next pull resets the local card's progress. Concurrent materializations can also queue duplicate INSERTs.",
+      "dependencies": [
+        "RF-178"
+      ],
+      "modules": [
+        "lib/fsrs/smart-decks.ts",
+        "lib/fsrs/queries.ts"
+      ],
+      "acceptance_criteria": [
+        "Inside the write transaction, select live ids without a deck filter (or use INSERT ... RETURNING) and queue only rows actually inserted or revived. Causal real-SQLite regression for a live card in another deck and for repeated materialization. Full controller checks, independent review and primary acceptance."
+      ],
+      "approved": true,
+      "status": "pending",
+      "attempts": 0,
+      "implementation_mode": "implementation",
+      "files": [],
+      "allowed_paths": [],
+      "verification": []
+    },
+    {
+      "id": "RF-180",
+      "title": "Show an error state when the home dashboard fails to load",
+      "priority": 2,
+      "risk": "low",
+      "description": "RF178 review: app/(tabs)/home.tsx loadData has no catch and its callers do not await it, so a migration or query failure leaves the dashboard partly stale with an unhandled rejection.",
+      "dependencies": [
+        "RF-178"
+      ],
+      "modules": [
+        "app/(tabs)/home.tsx"
+      ],
+      "acceptance_criteria": [
+        "Catch loadData failures, keep the last good data, show an existing or new bilingual error state with retry, and test it. Full controller checks, independent review and primary acceptance."
+      ],
+      "approved": true,
+      "status": "pending",
+      "attempts": 0,
+      "implementation_mode": "implementation",
+      "files": [],
+      "allowed_paths": [],
+      "verification": []
     }
   ]
 }

@@ -1,6 +1,6 @@
 import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import { enqueueSync } from "@/lib/database/sync-queue";
-import { deleteUserSetting, putUserSetting, writeUserSetting } from "@/lib/database/user-settings";
+import { putUserSetting, removeUserSetting, writeUserSetting } from "@/lib/database/user-settings";
 import { createEmptyCard } from "./scheduler";
 import {
   ALL_NEW_CARD_SORT_ORDERS,
@@ -278,7 +278,19 @@ export async function migrateLegacyRetentionDecks(db: AppDatabase): Promise<numb
   return promise;
 }
 
-async function runLegacyRetentionDeckMigration(db: AppDatabase): Promise<number> {
+/**
+ * Move legacy retention cards into the smart deck and drop legacy deck settings. Every local change
+ * and its queued upload commit in one transaction, so a queue failure leaves the legacy rows for retry.
+ */
+async function runLegacyRetentionDeckMigration(database: AppDatabase): Promise<number> {
+  let migrated = 0;
+  await database.withTransactionAsync(async (tx) => {
+    migrated = await migrateLegacyRetentionRows(tx);
+  });
+  return migrated;
+}
+
+async function migrateLegacyRetentionRows(db: DatabaseExecutor): Promise<number> {
   const now = new Date().toISOString();
   let migrated = 0;
   const syncOps: Array<{
@@ -296,109 +308,105 @@ async function runLegacyRetentionDeckMigration(db: AppDatabase): Promise<number>
     [...SMART_DECK_ID_LIST, MEANINGS_DECK_ID]
   );
 
-  if (rows.length > 0) {
-    await db.withTransactionAsync(async (tx) => {
-      for (const row of rows) {
-        const legacyAyahId = parseLegacyMutashabihatCardId(row.id);
-        if (legacyAyahId) {
-          const existing = await tx.getFirstAsync<StudyCardRow>(
-            "SELECT * FROM study_cards WHERE id = ? AND deleted_at IS NULL",
-            [legacyAyahId]
-          );
-          await tx.runAsync("UPDATE study_log SET card_id = ? WHERE card_id = ?", [legacyAyahId, row.id]);
-          if (existing?.id) {
-            const markedAt = existing.marked_at ?? row.marked_at ?? now;
-            await tx.runAsync(
-              "UPDATE study_cards SET marked_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL",
-              [markedAt, now, legacyAyahId]
-            );
-            syncOps.push({
-              operation: "UPDATE",
-              rowId: legacyAyahId,
-              data: studyCardToSyncData({
-                ...existing,
-                marked_at: markedAt,
-                updated_at: now,
-              }),
-            });
-            await tx.runAsync(
-              "UPDATE study_cards SET updated_at = ?, deleted_at = ? WHERE id = ? AND deleted_at IS NULL",
-              [now, now, row.id]
-            );
-            syncOps.push({
-              operation: "DELETE",
-              rowId: row.id,
-              data: {
-                ...studyCardToSyncData(row),
-                updated_at: now,
-                deleted_at: now,
-              },
-            });
-          } else {
-            const markedAt = row.marked_at ?? now;
-            await tx.runAsync(
-              "UPDATE study_cards SET id = ?, deck_id = ?, marked_at = ?, updated_at = ?, deleted_at = NULL WHERE id = ? AND deleted_at IS NULL",
-              [legacyAyahId, SMART_DECK_IDS.retention, markedAt, now, row.id]
-            );
-            syncOps.push({
-              operation: "UPDATE",
-              rowId: legacyAyahId,
-              data: studyCardToSyncData({
-                ...row,
-                id: legacyAyahId,
-                deck_id: SMART_DECK_IDS.retention,
-                marked_at: markedAt,
-                updated_at: now,
-                deleted_at: null,
-              }),
-            });
-          }
-          migrated++;
-          continue;
-        }
-
-        if (!parseAyahCardId(row.id)) continue;
-        if (row.deck_id === SMART_DECK_IDS.retention) continue;
-        const markedAt = row.marked_at ?? now;
-        await tx.runAsync(
-          "UPDATE study_cards SET deck_id = ?, marked_at = ?, updated_at = ?, deleted_at = NULL WHERE id = ? AND deleted_at IS NULL",
-          [SMART_DECK_IDS.retention, markedAt, now, row.id]
+  for (const row of rows) {
+    const legacyAyahId = parseLegacyMutashabihatCardId(row.id);
+    if (legacyAyahId) {
+      const existing = await db.getFirstAsync<StudyCardRow>(
+        "SELECT * FROM study_cards WHERE id = ? AND deleted_at IS NULL",
+        [legacyAyahId]
+      );
+      await db.runAsync("UPDATE study_log SET card_id = ? WHERE card_id = ?", [legacyAyahId, row.id]);
+      if (existing?.id) {
+        const markedAt = existing.marked_at ?? row.marked_at ?? now;
+        await db.runAsync(
+          "UPDATE study_cards SET marked_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL",
+          [markedAt, now, legacyAyahId]
         );
         syncOps.push({
           operation: "UPDATE",
+          rowId: legacyAyahId,
+          data: studyCardToSyncData({
+            ...existing,
+            marked_at: markedAt,
+            updated_at: now,
+          }),
+        });
+        await db.runAsync(
+          "UPDATE study_cards SET updated_at = ?, deleted_at = ? WHERE id = ? AND deleted_at IS NULL",
+          [now, now, row.id]
+        );
+        syncOps.push({
+          operation: "DELETE",
           rowId: row.id,
+          data: {
+            ...studyCardToSyncData(row),
+            updated_at: now,
+            deleted_at: now,
+          },
+        });
+      } else {
+        const markedAt = row.marked_at ?? now;
+        await db.runAsync(
+          "UPDATE study_cards SET id = ?, deck_id = ?, marked_at = ?, updated_at = ?, deleted_at = NULL WHERE id = ? AND deleted_at IS NULL",
+          [legacyAyahId, SMART_DECK_IDS.retention, markedAt, now, row.id]
+        );
+        syncOps.push({
+          operation: "UPDATE",
+          rowId: legacyAyahId,
           data: studyCardToSyncData({
             ...row,
+            id: legacyAyahId,
             deck_id: SMART_DECK_IDS.retention,
             marked_at: markedAt,
             updated_at: now,
             deleted_at: null,
           }),
         });
-        migrated++;
       }
+      migrated++;
+      continue;
+    }
+
+    if (!parseAyahCardId(row.id)) continue;
+    if (row.deck_id === SMART_DECK_IDS.retention) continue;
+    const markedAt = row.marked_at ?? now;
+    await db.runAsync(
+      "UPDATE study_cards SET deck_id = ?, marked_at = ?, updated_at = ?, deleted_at = NULL WHERE id = ? AND deleted_at IS NULL",
+      [SMART_DECK_IDS.retention, markedAt, now, row.id]
+    );
+    syncOps.push({
+      operation: "UPDATE",
+      rowId: row.id,
+      data: studyCardToSyncData({
+        ...row,
+        deck_id: SMART_DECK_IDS.retention,
+        marked_at: markedAt,
+        updated_at: now,
+        deleted_at: null,
+      }),
     });
+    migrated++;
   }
 
   for (const op of syncOps) {
-    enqueueSync(db, "study_cards", op.operation, op.rowId, op.data).catch(console.warn);
+    await enqueueSync(db, "study_cards", op.operation, op.rowId, op.data);
   }
 
   const deckSettings = await db.getAllAsync<{ key: string; value: string }>(
     "SELECT key, value FROM user_settings WHERE key LIKE 'deck_%'"
   );
-  await Promise.all(deckSettings.map(async (setting) => {
+  for (const setting of deckSettings) {
     let deckId = setting.key.startsWith("deck_") ? setting.key.slice("deck_".length) : "";
     try {
       const deck = JSON.parse(setting.value);
       deckId = typeof deck?.id === "string" ? deck.id : deckId;
-      if (deck?.id === MEANINGS_DECK_ID) return;
+      if (deck?.id === MEANINGS_DECK_ID) continue;
     } catch {}
-    await deleteUserSetting(db, setting.key);
+    await removeUserSetting(db, setting.key);
     if (deckId && deckId !== MEANINGS_DECK_ID) {
-      await deleteUserSetting(db, `review_settings_${deckId}`);
+      await removeUserSetting(db, `review_settings_${deckId}`);
     }
-  }));
+  }
 
   return migrated;
 }
@@ -742,11 +750,11 @@ export async function materializeSmartDeckCards(
         params
       );
     }
+    // New cards and their queued uploads commit together or not at all.
+    for (const row of createdRows) {
+      await enqueueSync(tx, "study_cards", "INSERT", row.id, row);
+    }
   });
-
-  for (const row of createdRows) {
-    enqueueSync(db, "study_cards", "INSERT", row.id, row).catch(console.warn);
-  }
 
   return createdRows.length;
 }
