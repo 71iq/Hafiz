@@ -330,41 +330,51 @@ CREATE POLICY "Users can delete own reflections"
   ON reflections FOR DELETE
   USING (auth.uid() = user_id);
 
--- ─── Reflection Likes: publicly readable, auth required to write
-CREATE POLICY "Likes are publicly readable"
+-- ─── Reflection Likes: visible with their reflection, auth required to write
+-- Child policies look up the parent under its own RLS, so discussion follows reflection visibility.
+CREATE POLICY "Likes follow reflection visibility"
   ON reflection_likes FOR SELECT
-  USING (true);
+  USING (EXISTS (SELECT 1 FROM public.reflections AS r WHERE r.id = reflection_id));
 
 -- Likes are only added or removed, never updated: owner-rights counters fire on insert and delete.
 CREATE POLICY "Users can insert own likes"
   ON reflection_likes FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
+  WITH CHECK (
+    (SELECT auth.uid()) = user_id
+    AND EXISTS (SELECT 1 FROM public.reflections AS r WHERE r.id = reflection_id)
+  );
 
 CREATE POLICY "Users can delete own likes"
   ON reflection_likes FOR DELETE
   USING (auth.uid() = user_id);
 
--- ─── Reflection Comments: publicly readable, auth required to write
-CREATE POLICY "Comments are publicly readable"
+-- ─── Reflection Comments: visible with their reflection, auth required to write
+CREATE POLICY "Comments follow reflection visibility"
   ON reflection_comments FOR SELECT
-  USING (true);
+  USING (EXISTS (SELECT 1 FROM public.reflections AS r WHERE r.id = reflection_id));
 
 CREATE POLICY "Users can insert own comments"
   ON reflection_comments FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
+  WITH CHECK (
+    (SELECT auth.uid()) = user_id
+    AND EXISTS (SELECT 1 FROM public.reflections AS r WHERE r.id = reflection_id)
+  );
 
 CREATE POLICY "Users can delete own comments"
   ON reflection_comments FOR DELETE
   USING (auth.uid() = user_id);
 
--- ─── Reflection Comment Likes: publicly readable, auth required to write
-CREATE POLICY "Comment likes are publicly readable"
+-- ─── Reflection Comment Likes: visible with their comment, auth required to write
+CREATE POLICY "Comment likes follow reflection visibility"
   ON reflection_comment_likes FOR SELECT
-  USING (true);
+  USING (EXISTS (SELECT 1 FROM public.reflection_comments AS c WHERE c.id = comment_id));
 
 CREATE POLICY "Users can insert own comment likes"
   ON reflection_comment_likes FOR INSERT
-  WITH CHECK ((SELECT auth.uid()) = user_id);
+  WITH CHECK (
+    (SELECT auth.uid()) = user_id
+    AND EXISTS (SELECT 1 FROM public.reflection_comments AS c WHERE c.id = comment_id)
+  );
 
 CREATE POLICY "Users can delete own comment likes"
   ON reflection_comment_likes FOR DELETE
