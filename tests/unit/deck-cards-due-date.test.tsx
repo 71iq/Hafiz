@@ -18,6 +18,7 @@ import type { DeckCardListItem, StudyCardRow } from "@/lib/fsrs/types";
 import { formatLocalDateInput, parseDueDateInput } from "@/lib/date";
 import { strings, type UIStrings } from "@/lib/i18n/strings";
 import { State } from "@/lib/fsrs/scheduler";
+import { StudyCardDeletedError } from "@/lib/fsrs/card-errors";
 import { expectTextAlignStart, expectWritingDirection, flattenStyle } from "../rtl/rtl-test-utils";
 
 const mockDatabase = { name: "isolated-deck-cards-fixture" };
@@ -386,7 +387,9 @@ describe("DeckCardsSheet due-date editor characterization", () => {
       await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
       expect(view.queryByPlaceholderText(s.cardDueDatePlaceholder)).toBeNull();
       expect(setStudyCardDueDate).toHaveBeenCalledTimes(1);
-      expect(setStudyCardDueDate).toHaveBeenCalledWith(mockDatabase, "deck-1", secondCard.id, parsed.date);
+      expect(setStudyCardDueDate).toHaveBeenCalledWith(mockDatabase, "deck-1", secondCard.id, parsed.date, {
+        requireLive: true,
+      });
       expect(getDeckCardsForList).toHaveBeenCalledTimes(2);
       expect(getDeckCardsForList).toHaveBeenLastCalledWith(mockDatabase, "deck-1");
       expect(onChanged).toHaveBeenCalledTimes(1);
@@ -397,6 +400,40 @@ describe("DeckCardsSheet due-date editor characterization", () => {
         await deferred.promise;
       });
     }
+  });
+
+  it("refreshes the list and explains when a card was deleted elsewhere (RF-183)", async () => {
+    const s = strings.ar;
+    const onChanged = jest.fn();
+    jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    const view = renderDeckWithCallbacks(jest.fn(), onChanged);
+    await waitFor(() => expect(view.getByText(secondCard.title)).toBeTruthy());
+    await openSecondCardEditor(view, s);
+    jest.mocked(setStudyCardDueDate).mockRejectedValueOnce(new StudyCardDeletedError());
+    jest.mocked(getDeckCardsForList).mockResolvedValueOnce([firstCard]);
+
+    await fireEventAsync.press(getTextButton(view, s.cardSaveDueDate));
+
+    await waitFor(() => expect(view.getByText(s.cardDeletedElsewhere)).toBeTruthy());
+    expect(view.queryByPlaceholderText(s.cardDueDatePlaceholder)).toBeNull();
+    expect(view.queryByText(secondCard.title)).toBeNull();
+    expect(getDeckCardsForList).toHaveBeenCalledTimes(2);
+    expect(onChanged).toHaveBeenCalledTimes(1);
+    expect(view.queryByText(s.cardActionFailed)).toBeNull();
+  });
+
+  it("still lets a virtual smart-deck card be created or restored (RF-183)", async () => {
+    const s = strings.ar;
+    jest.mocked(getDeckCardsForList).mockResolvedValue([firstCard, { ...secondCard, isVirtual: true }]);
+    jest.mocked(setStudyCardDueDate).mockResolvedValue(secondCard);
+    const view = renderDeckWithCallbacks(jest.fn(), jest.fn());
+    await waitFor(() => expect(view.getByText(secondCard.title)).toBeTruthy());
+    await openSecondCardEditor(view, s);
+
+    await fireEventAsync.press(getTextButton(view, s.cardSaveDueDate));
+
+    await waitFor(() => expect(setStudyCardDueDate).toHaveBeenCalledTimes(1));
+    expect(jest.mocked(setStudyCardDueDate).mock.calls[0][4]).toEqual({ requireLive: false });
   });
 
   it("keeps the real editor open after a rejected date write and reports the failure", async () => {
@@ -464,12 +501,16 @@ describe("DeckCardsSheet due-date editor characterization", () => {
         expect(getDeckCardsForList).toHaveBeenCalledTimes(1);
         expect(onChanged).not.toHaveBeenCalled();
         expect(setStudyCardDueDate).toHaveBeenCalledTimes(1);
-        expect(setStudyCardDueDate).toHaveBeenCalledWith(mockDatabase, "deck-1", secondCard.id, parsed.date);
+        expect(setStudyCardDueDate).toHaveBeenCalledWith(mockDatabase, "deck-1", secondCard.id, parsed.date, {
+          requireLive: true,
+        });
 
         await fireEventAsync.press(within(editorModal).getByRole("button", { name: s.cardSaveDueDate }));
         await waitFor(() => expect(view.queryByPlaceholderText(s.cardDueDatePlaceholder)).toBeNull());
         expect(setStudyCardDueDate).toHaveBeenCalledTimes(2);
-        expect(setStudyCardDueDate).toHaveBeenNthCalledWith(2, mockDatabase, "deck-1", secondCard.id, parsed.date);
+        expect(setStudyCardDueDate).toHaveBeenNthCalledWith(2, mockDatabase, "deck-1", secondCard.id, parsed.date, {
+          requireLive: true,
+        });
         expect(getDeckCardsForList).toHaveBeenCalledTimes(2);
         expect(getDeckCardsForList).toHaveBeenLastCalledWith(mockDatabase, "deck-1");
         expect(onChanged).toHaveBeenCalledTimes(1);
@@ -528,7 +569,9 @@ describe("DeckCardsSheet due-date editor characterization", () => {
         expect(input.props.value).toBe(failedDateKey);
         expectWritingDirection(input, "ltr");
         expect(setStudyCardDueDate).toHaveBeenCalledTimes(1);
-        expect(setStudyCardDueDate).toHaveBeenCalledWith(mockDatabase, "deck-1", secondCard.id, parsed.date);
+        expect(setStudyCardDueDate).toHaveBeenCalledWith(mockDatabase, "deck-1", secondCard.id, parsed.date, {
+          requireLive: true,
+        });
         expect(getDeckCardsForList).toHaveBeenCalledTimes(1);
         expect(onChanged).not.toHaveBeenCalled();
         expect(onClose).not.toHaveBeenCalled();
@@ -614,7 +657,9 @@ describe("DeckCardsSheet due-date editor characterization", () => {
             expect(getTextButton(view, s.flashcardsCancel).props.accessibilityState.disabled).toBe(true);
           });
           expect(setStudyCardDueDate).toHaveBeenCalledTimes(1);
-          expect(setStudyCardDueDate).toHaveBeenCalledWith(mockDatabase, "deck-1", secondCard.id, parsed.date);
+          expect(setStudyCardDueDate).toHaveBeenCalledWith(mockDatabase, "deck-1", secondCard.id, parsed.date, {
+            requireLive: true,
+          });
 
           fireEvent(editorModal, "requestClose");
           expect(view.getByPlaceholderText(s.cardDueDatePlaceholder)).toBeTruthy();
@@ -840,7 +885,9 @@ describe("DeckCardsSheet due-date editor characterization", () => {
           expect(within(guardedModal).getByText(s.cardResetConfirm)).toBeTruthy();
           fireEvent.press(within(guardedModal).getAllByRole("button")[1]);
           expect(resetStudyCardProgress).toHaveBeenCalledTimes(1);
-          expect(resetStudyCardProgress).toHaveBeenCalledWith(mockDatabase, secondCard.deck_id, secondCard.id);
+          expect(resetStudyCardProgress).toHaveBeenCalledWith(mockDatabase, secondCard.deck_id, secondCard.id, {
+            requireLive: true,
+          });
           expect(getDeckCardsForList).toHaveBeenCalledTimes(1);
           expect(onChanged).not.toHaveBeenCalled();
           expect(onClose).not.toHaveBeenCalled();
@@ -895,8 +942,12 @@ describe("DeckCardsSheet due-date editor characterization", () => {
             expect(view.getByText(secondCard.title)).toBeTruthy();
           });
           expect(resetStudyCardProgress).toHaveBeenCalledTimes(2);
-          expect(resetStudyCardProgress).toHaveBeenNthCalledWith(1, mockDatabase, secondCard.deck_id, secondCard.id);
-          expect(resetStudyCardProgress).toHaveBeenNthCalledWith(2, mockDatabase, secondCard.deck_id, secondCard.id);
+          expect(resetStudyCardProgress).toHaveBeenNthCalledWith(1, mockDatabase, secondCard.deck_id, secondCard.id, {
+            requireLive: true,
+          });
+          expect(resetStudyCardProgress).toHaveBeenNthCalledWith(2, mockDatabase, secondCard.deck_id, secondCard.id, {
+            requireLive: true,
+          });
           expect(getDeckCardsForList).toHaveBeenCalledTimes(2);
           expect(getDeckCardsForList).toHaveBeenLastCalledWith(mockDatabase, "deck-1");
           expect(onChanged).toHaveBeenCalledTimes(1);

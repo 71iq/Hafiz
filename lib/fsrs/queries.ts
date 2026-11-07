@@ -1,4 +1,5 @@
 import { buildLocalReviewCounts, calculateLongestStreak } from "@/lib/fsrs/review-activity";
+import { StudyCardDeletedError } from "@/lib/fsrs/card-errors";
 import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import { createEmptyCard, type Card } from "./scheduler";
 import {
@@ -614,10 +615,18 @@ export async function getNewCount(db: AppDatabase, deckId?: string): Promise<num
   return nonSmartRows.length + smartRows.filter((row) => row.state === 0 && isReviewableCard(row, now)).length;
 }
 
+/**
+ * requireLive: the caller acted on a card it loaded as a live row, such as a session card. If that
+ * row is gone or deleted the action fails instead of creating or reviving the card. Without it, an
+ * action on a virtual smart-deck card creates the row and may revive an earlier deletion.
+ */
+export type CardActionOptions = { requireLive?: boolean };
+
 async function ensureStudyCardRow(
   db: DatabaseExecutor,
   deckId: string,
-  cardId: string
+  cardId: string,
+  requireLive: boolean
 ): Promise<StudyCardRow> {
   // A card id is global, so a live card in another deck is the same card: keep its progress
   // instead of creating an empty card that would overwrite it locally and on the server.
@@ -626,6 +635,7 @@ async function ensureStudyCardRow(
     [cardId]
   );
   if (existing) return rowWithDefaultStatus(existing);
+  if (requireLive) throw new StudyCardDeletedError();
 
   const now = new Date();
   const nowIso = now.toISOString();
@@ -727,9 +737,10 @@ export async function setStudyCardSuspended(
   db: AppDatabase,
   deckId: string,
   cardId: string,
-  suspended: boolean
+  suspended: boolean,
+  options: CardActionOptions = {}
 ): Promise<StudyCardRow> {
-  return updateStudyCardInTransaction(db, deckId, cardId, (row) => {
+  return updateStudyCardInTransaction(db, deckId, cardId, options, (row) => {
     const now = new Date().toISOString();
     const updated = {
       ...row,
@@ -745,9 +756,10 @@ export async function setStudyCardBuried(
   db: AppDatabase,
   deckId: string,
   cardId: string,
-  buried: boolean
+  buried: boolean,
+  options: CardActionOptions = {}
 ): Promise<StudyCardRow> {
-  return updateStudyCardInTransaction(db, deckId, cardId, (row) => {
+  return updateStudyCardInTransaction(db, deckId, cardId, options, (row) => {
     const now = new Date().toISOString();
     const updated = {
       ...row,
@@ -762,9 +774,10 @@ export async function setStudyCardMarked(
   db: AppDatabase,
   deckId: string,
   cardId: string,
-  marked: boolean
+  marked: boolean,
+  options: CardActionOptions = {}
 ): Promise<StudyCardRow> {
-  return updateStudyCardInTransaction(db, deckId, cardId, (row) => {
+  return updateStudyCardInTransaction(db, deckId, cardId, options, (row) => {
     const now = new Date().toISOString();
     const updated = {
       ...row,
@@ -778,9 +791,10 @@ export async function setStudyCardMarked(
 export async function resetStudyCardProgress(
   db: AppDatabase,
   deckId: string,
-  cardId: string
+  cardId: string,
+  options: CardActionOptions = {}
 ): Promise<StudyCardRow> {
-  return updateStudyCardInTransaction(db, deckId, cardId, (row) => {
+  return updateStudyCardInTransaction(db, deckId, cardId, options, (row) => {
     const now = new Date();
     const emptyCard = createEmptyCard(now);
     const updated = {
@@ -805,9 +819,10 @@ export async function setStudyCardDueDate(
   db: AppDatabase,
   deckId: string,
   cardId: string,
-  dueDate: Date
+  dueDate: Date,
+  options: CardActionOptions = {}
 ): Promise<StudyCardRow> {
-  return updateStudyCardInTransaction(db, deckId, cardId, (row) => {
+  return updateStudyCardInTransaction(db, deckId, cardId, options, (row) => {
     const now = new Date();
     const today = new Date(now);
     today.setHours(0, 0, 0, 0);
@@ -1075,11 +1090,12 @@ async function updateStudyCardInTransaction(
   database: AppDatabase,
   deckId: string,
   cardId: string,
+  options: CardActionOptions,
   change: (row: StudyCardRow) => StudyCardRow
 ): Promise<StudyCardRow> {
   let updated: StudyCardRow | null = null;
   await database.withTransactionAsync(async (db) => {
-    const next = change(await ensureStudyCardRow(db, deckId, cardId));
+    const next = change(await ensureStudyCardRow(db, deckId, cardId, options.requireLive ?? false));
     await putCardRow(db, next);
     updated = next;
   });
@@ -1105,7 +1121,7 @@ export async function putCardRow(db: DatabaseExecutor, card: StudyCardRow): Prom
       card.id,
     ]
   );
-  if ((result.changes ?? 0) === 0) throw new Error("This card was deleted and can no longer be updated.");
+  if ((result.changes ?? 0) === 0) throw new StudyCardDeletedError();
 
   await enqueueSync(db, "study_cards", "UPDATE", card.id, cardToSyncData(card));
 }

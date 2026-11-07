@@ -1,5 +1,14 @@
 import { persistReviewTransition } from "@/lib/fsrs/persist-review";
-import { addMeaningCard, deleteStudyCard, setStudyCardMarked, setStudyCardSuspended } from "@/lib/fsrs/queries";
+import {
+  addMeaningCard,
+  deleteStudyCard,
+  resetStudyCardProgress,
+  setStudyCardBuried,
+  setStudyCardDueDate,
+  setStudyCardMarked,
+  setStudyCardSuspended,
+} from "@/lib/fsrs/queries";
+import { StudyCardDeletedError } from "@/lib/fsrs/card-errors";
 import { subscribeReviewActivity } from "@/lib/fsrs/review-events";
 import { calculateReviewTransition } from "@/lib/fsrs/review-transition";
 import { Rating } from "@/lib/fsrs/scheduler";
@@ -76,6 +85,45 @@ describe("RF-177 reviews, card actions and their upload queue", () => {
     expect(card()?.deleted_at).toEqual(expect.any(String));
     expect(count("study_log")).toBe(0);
     expect(count("sync_queue")).toBe(queuedBefore);
+  });
+
+  it.each([
+    ["suspend", () => setStudyCardSuspended(store.db, DECK, CARD, true, { requireLive: true })],
+    ["bury", () => setStudyCardBuried(store.db, DECK, CARD, true, { requireLive: true })],
+    ["mark", () => setStudyCardMarked(store.db, DECK, CARD, true, { requireLive: true })],
+    ["reset", () => resetStudyCardProgress(store.db, DECK, CARD, { requireLive: true })],
+    [
+      "due date",
+      () => setStudyCardDueDate(store.db, DECK, CARD, new Date("2030-01-01T00:00:00.000Z"), { requireLive: true }),
+    ],
+  ])("does not revive a card deleted during the session on %s (RF-183)", async (_label, act) => {
+    await setStudyCardMarked(store.db, DECK, CARD, false);
+    await deleteStudyCard(store.db, DECK, CARD);
+    const queuedBefore = count("sync_queue");
+
+    await expect(act()).rejects.toBeInstanceOf(StudyCardDeletedError);
+
+    expect(card()?.deleted_at).toEqual(expect.any(String));
+    expect(count("sync_queue")).toBe(queuedBefore);
+  });
+
+  it("still lets an action on a virtual smart-deck card restore an earlier deletion", async () => {
+    await setStudyCardMarked(store.db, DECK, CARD, false);
+    await deleteStudyCard(store.db, DECK, CARD);
+
+    const marked = await setStudyCardMarked(store.db, DECK, CARD, true);
+
+    expect(card()).toMatchObject({ deleted_at: null, marked_at: marked.marked_at });
+  });
+
+  it("reports grading a deleted card with the typed error (RF-183)", async () => {
+    const loaded = await setStudyCardMarked(store.db, DECK, CARD, false);
+    await deleteStudyCard(store.db, DECK, CARD);
+    const transition = calculateReviewTransition({ card: loaded, rating: Rating.Good, reviewedAt: new Date() });
+
+    await expect(persistReviewTransition({ db: store.db, cardId: CARD, transition })).rejects.toBeInstanceOf(
+      StudyCardDeletedError,
+    );
   });
 
   it("creates no card when a first card action cannot be queued", async () => {

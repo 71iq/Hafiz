@@ -37,6 +37,7 @@ import {
   setStudyCardSuspended,
   putCardRow,
 } from "@/lib/fsrs/queries";
+import { StudyCardDeletedError } from "@/lib/fsrs/card-errors";
 import { hapticMedium } from "@/lib/haptics";
 import { recordAchievementEvent } from "@/lib/achievements/queries";
 import { syncDailyScore, updateProfileStats } from "@/lib/fsrs/leaderboard-sync";
@@ -522,23 +523,35 @@ function configureRejectedDirectAction(
 function expectDirectCardActionCalls(action: DirectCardAction) {
   if (action === "suspend") {
     expect(setStudyCardSuspended).toHaveBeenCalledTimes(2);
-    expect(setStudyCardSuspended).toHaveBeenNthCalledWith(1, mockDatabase, firstCard.deck_id, firstCard.id, true);
-    expect(setStudyCardSuspended).toHaveBeenNthCalledWith(2, mockDatabase, firstCard.deck_id, firstCard.id, true);
+    expect(setStudyCardSuspended).toHaveBeenNthCalledWith(1, mockDatabase, firstCard.deck_id, firstCard.id, true, {
+      requireLive: true,
+    });
+    expect(setStudyCardSuspended).toHaveBeenNthCalledWith(2, mockDatabase, firstCard.deck_id, firstCard.id, true, {
+      requireLive: true,
+    });
     expect(setStudyCardBuried).not.toHaveBeenCalled();
     expect(setStudyCardMarked).not.toHaveBeenCalled();
     return;
   }
   if (action === "bury") {
     expect(setStudyCardBuried).toHaveBeenCalledTimes(2);
-    expect(setStudyCardBuried).toHaveBeenNthCalledWith(1, mockDatabase, firstCard.deck_id, firstCard.id, true);
-    expect(setStudyCardBuried).toHaveBeenNthCalledWith(2, mockDatabase, firstCard.deck_id, firstCard.id, true);
+    expect(setStudyCardBuried).toHaveBeenNthCalledWith(1, mockDatabase, firstCard.deck_id, firstCard.id, true, {
+      requireLive: true,
+    });
+    expect(setStudyCardBuried).toHaveBeenNthCalledWith(2, mockDatabase, firstCard.deck_id, firstCard.id, true, {
+      requireLive: true,
+    });
     expect(setStudyCardSuspended).not.toHaveBeenCalled();
     expect(setStudyCardMarked).not.toHaveBeenCalled();
     return;
   }
   expect(setStudyCardMarked).toHaveBeenCalledTimes(2);
-  expect(setStudyCardMarked).toHaveBeenNthCalledWith(1, mockDatabase, firstCard.deck_id, firstCard.id, true);
-  expect(setStudyCardMarked).toHaveBeenNthCalledWith(2, mockDatabase, firstCard.deck_id, firstCard.id, true);
+  expect(setStudyCardMarked).toHaveBeenNthCalledWith(1, mockDatabase, firstCard.deck_id, firstCard.id, true, {
+    requireLive: true,
+  });
+  expect(setStudyCardMarked).toHaveBeenNthCalledWith(2, mockDatabase, firstCard.deck_id, firstCard.id, true, {
+    requireLive: true,
+  });
   expect(setStudyCardSuspended).not.toHaveBeenCalled();
   expect(setStudyCardBuried).not.toHaveBeenCalled();
 }
@@ -744,7 +757,9 @@ describe("Flashcard session due-date editor characterization", () => {
       expect(view.queryByText(firstCue)).toBeNull();
       expect(view.queryByPlaceholderText(s.cardDueDatePlaceholder)).toBeNull();
       expect(setStudyCardDueDate).toHaveBeenCalledTimes(1);
-      expect(setStudyCardDueDate).toHaveBeenCalledWith(mockDatabase, firstCard.deck_id, firstCard.id, parsed.date);
+      expect(setStudyCardDueDate).toHaveBeenCalledWith(mockDatabase, firstCard.deck_id, firstCard.id, parsed.date, {
+        requireLive: true,
+      });
       expect(mockRouterReplace).not.toHaveBeenCalled();
       expect(putStudyLogRow).not.toHaveBeenCalled();
       expect(putCardRow).not.toHaveBeenCalled();
@@ -861,7 +876,9 @@ describe("Flashcard session due-date editor characterization", () => {
         expect(view.getByText(s.flashcardsReveal)).toBeTruthy();
         expect(mockRouterReplace).not.toHaveBeenCalled();
         expect(setStudyCardDueDate).toHaveBeenCalledTimes(1);
-        expect(setStudyCardDueDate).toHaveBeenCalledWith(mockDatabase, firstCard.deck_id, firstCard.id, parsed.date);
+        expect(setStudyCardDueDate).toHaveBeenCalledWith(mockDatabase, firstCard.deck_id, firstCard.id, parsed.date, {
+          requireLive: true,
+        });
         expect(hapticMedium).toHaveBeenCalledTimes(1);
         expect(putStudyLogRow).not.toHaveBeenCalled();
         expect(putCardRow).not.toHaveBeenCalled();
@@ -1017,7 +1034,9 @@ describe("Flashcard session due-date editor characterization", () => {
           });
           expect(hapticMedium).toHaveBeenCalledTimes(1);
           expect(setStudyCardDueDate).toHaveBeenCalledTimes(1);
-          expect(setStudyCardDueDate).toHaveBeenCalledWith(mockDatabase, firstCard.deck_id, firstCard.id, parsed.date);
+          expect(setStudyCardDueDate).toHaveBeenCalledWith(mockDatabase, firstCard.deck_id, firstCard.id, parsed.date, {
+            requireLive: true,
+          });
 
           fireEvent(editorModal, "requestClose");
           expect(view.getByPlaceholderText(s.cardDueDatePlaceholder)).toBeTruthy();
@@ -1118,7 +1137,9 @@ describe("Flashcard session due-date editor characterization", () => {
           }
           expect(view.getByRole("button", { name: s.cardActionsTitle }).props.accessibilityState.disabled).toBe(false);
           expect(resetStudyCardProgress).toHaveBeenCalledTimes(1);
-          expect(resetStudyCardProgress).toHaveBeenNthCalledWith(1, mockDatabase, firstCard.deck_id, firstCard.id);
+          expect(resetStudyCardProgress).toHaveBeenNthCalledWith(1, mockDatabase, firstCard.deck_id, firstCard.id, {
+            requireLive: true,
+          });
           expect(deleteStudyCard).not.toHaveBeenCalled();
           expect(hapticMedium).toHaveBeenCalledTimes(1);
 
@@ -1130,7 +1151,9 @@ describe("Flashcard session due-date editor characterization", () => {
           expect(view.getByText(firstCue)).toBeTruthy();
           expect(view.queryByText(secondCue)).toBeNull();
           expect(resetStudyCardProgress).toHaveBeenCalledTimes(2);
-          expect(resetStudyCardProgress).toHaveBeenNthCalledWith(2, mockDatabase, firstCard.deck_id, firstCard.id);
+          expect(resetStudyCardProgress).toHaveBeenNthCalledWith(2, mockDatabase, firstCard.deck_id, firstCard.id, {
+            requireLive: true,
+          });
           expect(deleteStudyCard).not.toHaveBeenCalled();
           expect(hapticMedium).toHaveBeenCalledTimes(2);
           expect(view.getByRole("button", { name: s.cardActionsTitle }).props.accessibilityState.disabled).toBe(false);
@@ -1754,6 +1777,45 @@ describe("Flashcard session due-date editor characterization", () => {
         expect(computeReviewPoints).toHaveBeenCalledTimes(1);
       },
     );
+
+    it("skips a card deleted during the session when it is graded (RF-183)", async () => {
+      jest.spyOn(console, "warn").mockImplementation(() => undefined);
+      jest.mocked(putCardRow).mockRejectedValueOnce(new StudyCardDeletedError());
+      const view = renderSession();
+      await reveal(view);
+      fireEvent.press(getTextButton(view, s.flashcardsEasy));
+
+      await waitFor(() => expect(view.getByText(secondCue)).toBeTruthy());
+      expect(view.getByText(s.cardDeletedSkipped)).toBeTruthy();
+      expect(view.queryByText(s.flashcardsReviewSaveFailed)).toBeNull();
+      expect(computeReviewPoints).not.toHaveBeenCalled();
+    });
+
+    it("shows the deleted-card notice on the summary when the deleted card was the last one (RF-183)", async () => {
+      jest.spyOn(console, "warn").mockImplementation(() => undefined);
+      jest.mocked(getDueCardsForReview).mockResolvedValue([firstCard]);
+      jest.mocked(putCardRow).mockRejectedValueOnce(new StudyCardDeletedError());
+      const view = renderSession();
+      await reveal(view);
+      fireEvent.press(getTextButton(view, s.flashcardsEasy));
+
+      await waitFor(() => expect(view.getByText(s.flashcardsSummaryTitle)).toBeTruthy());
+      expect(view.getByText(s.cardDeletedSkipped)).toBeTruthy();
+    });
+
+    it("skips a card deleted during the session when a card action finds it gone (RF-183)", async () => {
+      jest.spyOn(console, "warn").mockImplementation(() => undefined);
+      jest.mocked(setStudyCardMarked).mockRejectedValueOnce(new StudyCardDeletedError());
+      const view = renderSession();
+      await openDirectCardAction(view, s, "front", "mark");
+
+      await waitFor(() => expect(view.getByText(secondCue)).toBeTruthy());
+      expect(view.getByText(s.cardDeletedSkipped)).toBeTruthy();
+      expect(view.queryByText(s.cardActionFailed)).toBeNull();
+      expect(setStudyCardMarked).toHaveBeenCalledWith(mockDatabase, firstCard.deck_id, firstCard.id, true, {
+        requireLive: true,
+      });
+    });
 
     it("reports optional score and achievement failures while advancing after durable writes", async () => {
       const failure = new Error("synthetic optional failure");

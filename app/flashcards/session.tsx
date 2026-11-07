@@ -39,6 +39,7 @@ import {
   setStudyCardMarked,
   setStudyCardSuspended,
 } from "@/lib/fsrs/queries";
+import { StudyCardDeletedError } from "@/lib/fsrs/card-errors";
 import { computeUniqueFront } from "@/lib/fsrs/uniqueness";
 import { computeReviewPoints, addTodayPoints } from "@/lib/fsrs/scoring";
 import { hapticMedium, hapticSuccess } from "@/lib/haptics";
@@ -157,6 +158,9 @@ const EDITABLE_ANSWER_MODES: ReviewMode[] = [
 ];
 
 // ─── Main Component ──────────────────────────────────────────
+
+/** Session cards are loaded as live rows, so an action must not recreate or revive a deleted one. */
+const LIVE_CARD = { requireLive: true } as const;
 
 export default function FlashcardSessionScreenWrapper() {
   const { isReady, progress, error } = useDatabaseStatus();
@@ -604,6 +608,15 @@ function FlashcardSessionScreen() {
     reviewedCountsRef.current = next;
   }, []);
 
+  /** The current card was deleted elsewhere after the session loaded it: move past it and say so. */
+  const skipDeletedCurrentCard = useCallback(async () => {
+    setConfirmCardAction(null);
+    setDueDateOpen(false);
+    await advanceAfterRemovingCurrentCard();
+    // Set after advancing, which clears the error; the summary also shows it when this was the last card.
+    setSessionError(s.cardDeletedSkipped);
+  }, [advanceAfterRemovingCurrentCard, s.cardDeletedSkipped]);
+
   const runCardAction = useCallback(async (action: () => Promise<void>) => {
     if (cardActionBusy || !currentCard) return;
     setCardActionBusy(true);
@@ -612,18 +625,19 @@ function FlashcardSessionScreen() {
       await action();
     } catch (e) {
       console.warn("[FlashcardSession] Card action failed:", e);
-      setSessionError(s.cardActionFailed);
+      if (e instanceof StudyCardDeletedError) await skipDeletedCurrentCard();
+      else setSessionError(s.cardActionFailed);
     } finally {
       setCardActionBusy(false);
     }
-  }, [cardActionBusy, currentCard, s.cardActionFailed]);
+  }, [cardActionBusy, currentCard, s.cardActionFailed, skipDeletedCurrentCard]);
 
   const handleSuspendCard = useCallback(() => {
     if (!currentCard) return;
     setCardMenuOpen(false);
     runCardAction(async () => {
       hapticMedium();
-      await setStudyCardSuspended(db, currentCard.card.deck_id, currentCard.card.id, true);
+      await setStudyCardSuspended(db, currentCard.card.deck_id, currentCard.card.id, true, LIVE_CARD);
       await advanceAfterRemovingCurrentCard();
     });
   }, [advanceAfterRemovingCurrentCard, currentCard, db, runCardAction]);
@@ -633,7 +647,7 @@ function FlashcardSessionScreen() {
     setCardMenuOpen(false);
     runCardAction(async () => {
       hapticMedium();
-      await setStudyCardBuried(db, currentCard.card.deck_id, currentCard.card.id, true);
+      await setStudyCardBuried(db, currentCard.card.deck_id, currentCard.card.id, true, LIVE_CARD);
       await advanceAfterRemovingCurrentCard();
     });
   }, [advanceAfterRemovingCurrentCard, currentCard, db, runCardAction]);
@@ -647,7 +661,8 @@ function FlashcardSessionScreen() {
         db,
         currentCard.card.deck_id,
         currentCard.card.id,
-        !currentCard.card.marked_at
+        !currentCard.card.marked_at,
+        LIVE_CARD
       );
       updateCurrentCardRow(updated);
     });
@@ -664,7 +679,7 @@ function FlashcardSessionScreen() {
         await advanceAfterRemovingCurrentCard();
         return;
       }
-      const updated = await resetStudyCardProgress(db, currentCard.card.deck_id, currentCard.card.id);
+      const updated = await resetStudyCardProgress(db, currentCard.card.deck_id, currentCard.card.id, LIVE_CARD);
       updateCurrentCardRow(updated);
       setCurrentSideIndex(0);
       setRevealed(false);
@@ -692,7 +707,7 @@ function FlashcardSessionScreen() {
     setDueDateError(null);
     runCardAction(async () => {
       hapticMedium();
-      await setStudyCardDueDate(db, currentCard.card.deck_id, currentCard.card.id, parsed.date);
+      await setStudyCardDueDate(db, currentCard.card.deck_id, currentCard.card.id, parsed.date, LIVE_CARD);
       setDueDateOpen(false);
       setDueDateError(null);
       await advanceAfterRemovingCurrentCard();
@@ -792,7 +807,8 @@ function FlashcardSessionScreen() {
       }
     } catch (e) {
       console.warn("[FlashcardSession] Failed to grade card:", e);
-      setSessionError(s.flashcardsReviewSaveFailed);
+      if (e instanceof StudyCardDeletedError) await skipDeletedCurrentCard();
+      else setSessionError(s.flashcardsReviewSaveFailed);
     } finally {
       gradingInFlightRef.current = false;
       setGradingBusy(false);

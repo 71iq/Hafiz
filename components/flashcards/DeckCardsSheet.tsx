@@ -17,6 +17,7 @@ import {
   setStudyCardMarked,
   setStudyCardSuspended,
 } from "@/lib/fsrs/queries";
+import { StudyCardDeletedError } from "@/lib/fsrs/card-errors";
 import type { DeckCardListItem } from "@/lib/fsrs/types";
 import { formatLocalDateInput, parseDueDateInput } from "@/lib/date";
 import { useSettings } from "@/lib/settings/context";
@@ -55,6 +56,11 @@ const CARD_FILTERS: Filter[] = [
   "buried",
 ];
 
+/** A listed row was live when loaded, so acting on it must not revive it; a virtual card may be created. */
+function liveIf(card: DeckCardListItem) {
+  return { requireLive: !card.isVirtual };
+}
+
 export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged }: Props) {
   const db = useDatabase();
   const s = useStrings();
@@ -70,15 +76,18 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
   const [dueDateText, setDueDateText] = useState("");
   const [dueDateError, setDueDateError] = useState<string | null>(null);
 
+  /** Reload the list; false when it failed and its own error is showing. */
   const loadCards = useCallback(async () => {
-    if (!visible || !deckId) return;
+    if (!visible || !deckId) return true;
     setLoading(true);
     setError(null);
     try {
       setCards(await getDeckCardsForList(db, deckId));
+      return true;
     } catch (e) {
       console.warn("[DeckCardsSheet] Failed to load cards:", e);
       setError(s.deckCardsLoadFailed);
+      return false;
     } finally {
       setLoading(false);
     }
@@ -119,11 +128,17 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
       onChanged();
     } catch (e) {
       console.warn("[DeckCardsSheet] Card action failed:", e);
-      setError(s.cardActionFailed);
+      if (e instanceof StudyCardDeletedError) {
+        setConfirmAction(null);
+        setDueTarget(null);
+        const reloaded = await loadCards();
+        onChanged();
+        if (reloaded) setError(s.cardDeletedElsewhere);
+      } else setError(s.cardActionFailed);
     } finally {
       setBusyId(null);
     }
-  }, [busyId, deckId, loadCards, onChanged, s.cardActionFailed]);
+  }, [busyId, deckId, loadCards, onChanged, s.cardActionFailed, s.cardDeletedElsewhere]);
 
   const openDueDate = useCallback((card: DeckCardListItem) => {
     setDueTarget(card);
@@ -141,7 +156,7 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
     }
     setDueDateError(null);
     runAction(dueTarget, async () => {
-      await setStudyCardDueDate(db, deckId, dueTarget.id, parsed.date);
+      await setStudyCardDueDate(db, deckId, dueTarget.id, parsed.date, liveIf(dueTarget));
       setDueTarget(null);
       setDueDateError(null);
     });
@@ -248,15 +263,15 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
                         setConfirmAction({ type: "reset", card });
                       }}
                       onToggleMark={() => runAction(card, async () => {
-                        await setStudyCardMarked(db, card.deck_id, card.id, !card.marked_at);
+                        await setStudyCardMarked(db, card.deck_id, card.id, !card.marked_at, liveIf(card));
                       })}
                       onToggleSuspend={() => runAction(card, async () => {
-                        await setStudyCardSuspended(db, card.deck_id, card.id, !card.suspended_at);
+                        await setStudyCardSuspended(db, card.deck_id, card.id, !card.suspended_at, liveIf(card));
                       })}
                       onToggleBury={() => {
                         const isBuried = !!card.buried_until && card.buried_until > new Date().toISOString();
                         runAction(card, async () => {
-                          await setStudyCardBuried(db, card.deck_id, card.id, !isBuried);
+                          await setStudyCardBuried(db, card.deck_id, card.id, !isBuried, liveIf(card));
                         });
                       }}
                       onSetDueDate={() => openDueDate(card)}
@@ -292,7 +307,7 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
           }
           runAction(card, async () => {
             if (type === "delete") await deleteStudyCard(db, card.deck_id, card.id);
-            else await resetStudyCardProgress(db, card.deck_id, card.id);
+            else await resetStudyCardProgress(db, card.deck_id, card.id, liveIf(card));
             setConfirmAction(null);
           });
         }}
