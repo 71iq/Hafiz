@@ -4,7 +4,7 @@ The mission is active. All work stays local on the isolated modernization branch
 
 ## Current status
 
-At the RF137 baseline refresh, 114 tasks were accepted. See backlog.json for the current totals and unfinished work.
+At RF160 acceptance, 141 of160 tasks are accepted and19 remain open. See backlog.json for current totals and unfinished work.
 
 RF137 accepted on 2026-11-06. Baseline allocated storage fell from 23,701,917,696 to 86,016 bytes. Removed 864 old root entries and accepted-task run logs; kept only the fresh dependency-analysis baseline and the RF104 tafsir-loss reproduction/result. The obsolete RF025 probe is covered by accepted permanent tests. The event log is preserved. No app, protected input, original checkout or production change.
 
@@ -139,8 +139,6 @@ Prioritize account isolation and tafsir data safety, then performance and access
 | ------ | ---------------------------------------------------------------------- |
 | RF-025 | Verify auth cache isolation and late requests                          |
 | RF-028 | Integrate native Query online and focus lifecycle                      |
-| RF-029 | Characterize sync partial failure and status                           |
-| RF-031 | Validate sync payloads at entry                                        |
 | RF-032 | Consolidate only matching local sync/query helpers                     |
 | RF-033 | Audit local schema and remote migration parity offline                 |
 | RF-034 | Standardize one inconsistent multi-field form                          |
@@ -166,6 +164,8 @@ Cleanup checks: 1,999 Jest cases, 205 Node tooling/security cases, 38 controller
 RF138 accepted, local commit a9e7b35. Wrong-account profile reads and missing/foreign save replies cannot publish or merge private fields. All20controller checks and independent source review pass: 2,004 Jest cases and28Chrome cases, plus tooling, types, lint, analysis and three-platform JavaScript exports. Task logs and temporary exports deleted. Broader profile payload validation remains pending.
 
 ## External verification needs
+
+RF025 needs Ehab's decision on ownership of saved offline personal data across accounts. The recommendation is per-account storage with explicit guest-data import. Auth race repairs continue independently.
 
 RF042 iOS native compilation/runtime needs a supported Mac and Xcode; this Linux host has neither. Physical-device checks need an attached authorized device. Android emulator work is available locally through the existing AVD and writable KVM, so RF040/RF041 are not blocked by the absent phone. JavaScript exports do not prove native runtime behavior.
 
@@ -218,3 +218,5 @@ RF157 accepted on 2026-11-07. Equivalent timestamp spellings no longer add dupli
 RF158 accepted on 2026-11-07. Failed main-sync queue writes now roll back Quran Foundation pulls, preserving saved rows and success markers for retry. Nine causal SQLite failures preceded the repair. All 20 fresh controller checks, separate stronger review and primary acceptance pass: 144 suites/2,886 unit cases, 196 focused cases and 30 Chrome cases, plus tooling, types, lint and web/Android/iOS JavaScript exports. The full suite also verifies the strengthened first-retry assertion. Existing 63 lint warnings and five Knip findings remain. Duplicate-trigger and absent-marker fixture corrections stay recorded. Acknowledged uploads survive later pull rollback. Post-push propagation durability, timestamp precedence, shared transactions and native runtime remain open. Accepted-task outputs are deleted.
 
 RF159 accepted on 2026-11-07. Quran Foundation reconciliation preserves newer bookmarks, notes and deletions across UTC offsets and fractional timestamps, keeping exact saved strings and legacy-date behavior. Twelve causal SQLite failures preceded the repair;37 new cases cover ordering, ties, fractions and legacy fallbacks. All20 fresh controller checks, separate stronger review and primary acceptance pass:144 suites/2,923 unit cases,253 focused cases and30 Chrome cases, plus tooling, types, lint and web/Android/iOS JavaScript exports. Existing63 lint warnings and five Knip findings remain. Post-push propagation durability, shared transactions and native/device runtime remain open. Accepted-task outputs are deleted.
+
+RF160 accepted on2026-11-07. Acknowledged QF uploads stay retryable until current local data is queued for account sync; delayed bookmark replies preserve user edits and deletions. Three causal failures preceded repair. Independent review caught a confounded duplicate-queue assertion; exact active UPDATE payload checks repaired it. All20 fresh controller checks, fresh stronger review and primary acceptance pass:144 suites/2,933 unit cases,90 focused owner cases,206 tooling cases and30 Chrome cases, plus types, lint, analysis and web/Android/iOS JavaScript exports. Existing63 lint warnings and five Knip findings remain. Prior backlog records are semantically unchanged after restoring controller JSON formatting. DELETE receipt recovery, shared transactions, local-data ownership and native runtime remain open. Accepted-task outputs are deleted.

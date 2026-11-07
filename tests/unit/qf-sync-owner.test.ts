@@ -1067,80 +1067,282 @@ it("current explicit initial owner supplies every credential read", async () => 
   );
 });
 
-it("keeps an acknowledged post-push note attachment when its best-effort main queue insert aborts", async () => {
-  const warning = jest.spyOn(console, "warn").mockImplementation(() => {});
-  sql.exec(`
-    CREATE TEMP TRIGGER fail_post_push_sync_queue
-    BEFORE INSERT ON sync_queue
-    WHEN NEW.table_name = 'private_notes' AND NEW.row_id = 'local-note'
-    BEGIN SELECT RAISE(ABORT, 'RF158 post-push queue insert aborted'); END;
-  `);
-  responses["list-notes"] = {
-    ok: false,
-    code: "upstream",
-    message: "Synthetic required pull failed after the create acknowledgement",
-  };
-
+it("keeps an acknowledged note UPSERT failed when its account queue insert aborts", async () => {
+  sql.exec(
+    "CREATE TEMP TRIGGER fail_post_push_sync_queue BEFORE INSERT ON sync_queue WHEN NEW.table_name = 'private_notes' AND NEW.row_id = 'local-note' BEGIN SELECT RAISE(ABORT, 'RF160 note queue insert aborted'); END;",
+  );
+  responses["list-bookmarks"] = { ok: true, bookmarks: [] };
+  responses["list-notes"] = { ok: true, notes: [REMOTE_NOTE] };
   try {
-    const firstOutcome = await start();
-    expect({
-      outcome: firstOutcome,
-      note: sql.prepare("SELECT qf_note_id,qf_synced_at FROM private_notes WHERE id='local-note'").get(),
-      queue: queueState(),
-      supabaseQueue: sql.prepare("SELECT * FROM sync_queue").all(),
-      createCount: requests.filter((request) => request.action === "create-note").length,
-    }).toEqual({
-      outcome: {
-        kind: "rejected",
-        error: expect.objectContaining({
-          message: "Synthetic required pull failed after the create acknowledgement",
-        }),
-      },
-      note: { qf_note_id: "remote-note", qf_synced_at: expect.any(String) },
-      queue: [{ status: "synced", attempt_count: 0, last_error: null }],
-      supabaseQueue: [],
-      createCount: 1,
+    await expect(fullQfUserSync(db)).resolves.toMatchObject({ status: "failed", pushed: 0 });
+    expect(sql.prepare("SELECT qf_note_id,qf_synced_at FROM private_notes WHERE id='local-note'").get()).toEqual({
+      qf_note_id: "remote-note",
+      qf_synced_at: expect.any(String),
     });
-    expect(warning).toHaveBeenCalledWith(expect.objectContaining({ message: "RF158 post-push queue insert aborted" }));
-
+    expect(queueState()).toEqual([
+      { status: "failed", attempt_count: 1, last_error: expect.stringContaining("RF160 note queue insert aborted") },
+    ]);
+    expect(sql.prepare("SELECT * FROM sync_queue").all()).toEqual([]);
+    expect(requests.filter((request) => request.action === "create-note")).toHaveLength(1);
     sql.exec("DROP TRIGGER fail_post_push_sync_queue");
-    delete responses["list-notes"];
     await expect(fullQfUserSync(db)).resolves.toMatchObject({ status: "synced" });
     expect(requests.filter((request) => request.action === "create-note")).toHaveLength(1);
-    expect(sql.prepare("SELECT qf_note_id FROM private_notes WHERE id='local-note'").get()).toEqual({
+    expect(requests.filter((request) => request.action === "update-note")).toHaveLength(1);
+    const queued = sql
+      .prepare(
+        "SELECT data FROM sync_queue WHERE table_name='private_notes' AND row_id='local-note' ORDER BY id DESC LIMIT 1",
+      )
+      .get() as { data: string };
+    expect(JSON.parse(queued.data)).toMatchObject({
+      id: "local-note",
+      content: "synthetic local note",
       qf_note_id: "remote-note",
     });
   } finally {
-    warning.mockRestore();
+    sql.exec("DROP TRIGGER IF EXISTS fail_post_push_sync_queue");
+  }
+});
+it.each([
+  { label: "valid edit", content: "edited after enqueue failure", deleted: null, updateRemote: true },
+  { label: "unsyncable edit", content: "x", deleted: null, updateRemote: false },
+  { label: "deletion", content: "synthetic local note", deleted: "2026-02-02T00:00:00.000Z", updateRemote: false },
+])("retries a failed note UPSERT using the current $label row", async ({ content, deleted, updateRemote }) => {
+  sql.exec(
+    "CREATE TEMP TRIGGER fail_post_push_sync_queue BEFORE INSERT ON sync_queue WHEN NEW.table_name = 'private_notes' AND NEW.row_id = 'local-note' BEGIN SELECT RAISE(ABORT, 'RF160 retry queue insert aborted'); END;",
+  );
+  responses["list-bookmarks"] = { ok: true, bookmarks: [] };
+  responses["list-notes"] = { ok: true, notes: [REMOTE_NOTE] };
+  try {
+    await expect(fullQfUserSync(db)).resolves.toMatchObject({ status: "failed", pushed: 0 });
+    expect(queueState()).toEqual([
+      { status: "failed", attempt_count: 1, last_error: expect.stringContaining("RF160 retry queue insert aborted") },
+    ]);
+    expect(sql.prepare("SELECT qf_note_id FROM private_notes WHERE id='local-note'").get()).toEqual({
+      qf_note_id: "remote-note",
+    });
+
+    const createdAt = "2001-02-03T04:05:06.123456Z";
+    const updatedAt = "2026-02-02T01:00:00.000+01:00";
+    sql
+      .prepare("UPDATE private_notes SET content=?,created_at=?,updated_at=?,deleted_at=? WHERE id='local-note'")
+      .run(content, createdAt, updatedAt, deleted);
+    sql.exec("DROP TRIGGER fail_post_push_sync_queue");
+    responses["update-note"] = { ok: true, note: REMOTE_NOTE };
+    await expect(fullQfUserSync(db)).resolves.toMatchObject({ status: "synced" });
+
+    const stored = sql
+      .prepare("SELECT content,created_at,updated_at,deleted_at,qf_note_id FROM private_notes WHERE id='local-note'")
+      .get();
+    expect(stored).toEqual({
+      content,
+      created_at: createdAt,
+      updated_at: updatedAt,
+      deleted_at: deleted,
+      qf_note_id: "remote-note",
+    });
+    const queued = sql
+      .prepare(
+        "SELECT data FROM sync_queue WHERE table_name='private_notes' AND row_id='local-note' ORDER BY id ASC LIMIT 1",
+      )
+      .get() as { data: string };
+    expect(JSON.parse(queued.data)).toMatchObject({
+      content,
+      created_at: createdAt,
+      updated_at: updatedAt,
+      deleted_at: deleted,
+      qf_note_id: "remote-note",
+    });
+    expect(requests.filter((request) => request.action === "create-note")).toHaveLength(1);
+    expect(requests.filter((request) => request.action === "update-note")).toHaveLength(updateRemote ? 1 : 0);
+  } finally {
+    sql.exec("DROP TRIGGER IF EXISTS fail_post_push_sync_queue");
   }
 });
 
-it("keeps bookmark upsert queue propagation best-effort after a valid Quran Foundation acknowledgement", async () => {
-  const warning = jest.spyOn(console, "warn").mockImplementation(() => {});
+it("keeps an acknowledged bookmark UPSERT failed when its account queue insert aborts", async () => {
   seedActiveBookmark();
   await enqueueQfSync(db, "bookmark", "UPSERT", "2:256", { surah: 2, ayah: 256 });
   responses["upsert-bookmark"] = validBookmarkAck;
   responses["list-bookmarks"] = { ok: true, bookmarks: [validBookmarkAck.bookmark] };
   responses["list-notes"] = { ok: true, notes: [] };
-  sql.exec(`
-    CREATE TEMP TRIGGER fail_post_push_bookmark_queue
-    BEFORE INSERT ON sync_queue
-    WHEN NEW.table_name = 'bookmarks' AND NEW.row_id = '2:256'
-    BEGIN SELECT RAISE(ABORT, 'RF158 bookmark post-push queue aborted'); END;
-  `);
-
+  sql.exec(
+    "CREATE TEMP TRIGGER fail_post_push_bookmark_queue BEFORE INSERT ON sync_queue WHEN NEW.table_name = 'bookmarks' AND NEW.row_id = '2:256' BEGIN SELECT RAISE(ABORT, 'RF160 bookmark queue insert aborted'); END;",
+  );
   try {
-    await expect(fullQfUserSync(db)).resolves.toMatchObject({ status: "synced", pushed: 1 });
+    await expect(fullQfUserSync(db)).resolves.toMatchObject({ status: "failed", pushed: 0 });
     expect(sql.prepare("SELECT qf_bookmark_id FROM bookmarks WHERE surah=2 AND ayah=256").get()).toEqual({
       qf_bookmark_id: "remote-bookmark",
     });
-    expect(queueState()).toEqual([{ status: "synced", attempt_count: 0, last_error: null }]);
-    expect(sql.prepare("SELECT COUNT(*) AS count FROM sync_queue").get()).toEqual({ count: 0 });
-    expect(warning).toHaveBeenCalledWith(
-      expect.objectContaining({ message: "RF158 bookmark post-push queue aborted" }),
-    );
+    expect(queueState()).toEqual([
+      {
+        status: "failed",
+        attempt_count: 1,
+        last_error: expect.stringContaining("RF160 bookmark queue insert aborted"),
+      },
+    ]);
+    expect(sql.prepare("SELECT * FROM sync_queue").all()).toEqual([]);
+    expect(requests.filter((request) => request.action === "upsert-bookmark")).toHaveLength(1);
+    sql.exec("DROP TRIGGER fail_post_push_bookmark_queue");
+    await expect(fullQfUserSync(db)).resolves.toMatchObject({ status: "synced" });
+    expect(requests.filter((request) => request.action === "upsert-bookmark")).toHaveLength(1);
+    const queued = sql
+      .prepare("SELECT data FROM sync_queue WHERE table_name='bookmarks' AND row_id='2:256' ORDER BY id DESC LIMIT 1")
+      .get() as { data: string };
+    expect(JSON.parse(queued.data)).toMatchObject({ surah: 2, ayah: 256, qf_bookmark_id: "remote-bookmark" });
   } finally {
-    warning.mockRestore();
+    sql.exec("DROP TRIGGER IF EXISTS fail_post_push_bookmark_queue");
+  }
+});
+it.each([
+  { label: "valid edit", content: "edited local note", deleted: null },
+  { label: "unsyncable edit", content: "x", deleted: null },
+  { label: "deletion", content: "synthetic local note", deleted: "2026-02-02T00:00:00.000Z" },
+])("queues the current note after create acknowledgement with a concurrent $label", async ({ content, deleted }) => {
+  const gate = deferred<unknown>();
+  const entered = watch("create-note");
+  responses["create-note"] = gate.promise;
+  responses["list-bookmarks"] = { ok: true, bookmarks: [] };
+  responses["list-notes"] = { ok: true, notes: [{ ...REMOTE_NOTE, id: "remote-note" }] };
+  const run = start();
+  try {
+    await reached(entered, run);
+    const updatedAt = "2026-02-02T00:00:00.000Z";
+    sql
+      .prepare("UPDATE private_notes SET content=?,updated_at=?,deleted_at=? WHERE id='local-note'")
+      .run(content, updatedAt, deleted);
+    gate.resolve({ ok: true, note: { ...REMOTE_NOTE, id: "remote-note" } });
+    await expect(run).resolves.toMatchObject({ kind: "resolved", value: { status: "synced" } });
+    expect(
+      sql.prepare("SELECT content,updated_at,deleted_at,qf_note_id FROM private_notes WHERE id='local-note'").get(),
+    ).toEqual({
+      content,
+      updated_at: updatedAt,
+      deleted_at: deleted,
+      qf_note_id: "remote-note",
+    });
+    const queued = sql
+      .prepare(
+        "SELECT data FROM sync_queue WHERE table_name='private_notes' AND row_id='local-note' ORDER BY id DESC LIMIT 1",
+      )
+      .get() as { data: string };
+    expect(JSON.parse(queued.data)).toMatchObject({
+      content,
+      updated_at: updatedAt,
+      deleted_at: deleted,
+      qf_note_id: "remote-note",
+    });
+  } finally {
+    gate.resolve({ ok: true, note: { ...REMOTE_NOTE, id: "remote-note" } });
+    await run;
+  }
+});
+
+it("allows at-least-once account enqueue when QF acknowledgement marking fails", async () => {
+  sql.exec(
+    "CREATE TEMP TRIGGER fail_qf_synced BEFORE UPDATE ON qf_sync_queue WHEN NEW.status='synced' BEGIN SELECT RAISE(ABORT, 'RF160 mark synced aborted'); END;",
+  );
+  responses["list-bookmarks"] = { ok: true, bookmarks: [] };
+  responses["list-notes"] = { ok: true, notes: [REMOTE_NOTE] };
+  try {
+    await expect(fullQfUserSync(db)).resolves.toMatchObject({ status: "failed", pushed: 0 });
+    expect(queueState()).toEqual([
+      { status: "failed", attempt_count: 1, last_error: expect.stringContaining("RF160 mark synced aborted") },
+    ]);
+    expect(
+      sql
+        .prepare("SELECT COUNT(*) AS count FROM sync_queue WHERE table_name='private_notes' AND row_id='local-note'")
+        .get(),
+    ).toEqual({ count: 1 });
+    sql.exec("DROP TRIGGER fail_qf_synced");
+    await expect(fullQfUserSync(db)).resolves.toMatchObject({ status: "synced" });
+    expect(requests.filter((request) => request.action === "create-note")).toHaveLength(1);
+    const queuedRows = sql
+      .prepare(
+        "SELECT operation,data FROM sync_queue WHERE table_name='private_notes' AND row_id='local-note' ORDER BY id",
+      )
+      .all() as { operation: string; data: string }[];
+    expect(queuedRows).toHaveLength(2);
+    for (const row of queuedRows) {
+      expect(row.operation).toBe("UPDATE");
+      expect(JSON.parse(row.data)).toMatchObject({
+        id: "local-note",
+        content: "synthetic local note",
+        created_at: OLD,
+        updated_at: OLD,
+        deleted_at: null,
+        qf_note_id: "remote-note",
+      });
+    }
+  } finally {
+    sql.exec("DROP TRIGGER IF EXISTS fail_qf_synced");
+  }
+});
+
+it.each(["edit", "delete"] as const)(
+  "preserves a bookmark %s made while its UPSERT acknowledgement is held",
+  async (change) => {
+    seedActiveBookmark();
+    await enqueueQfSync(db, "bookmark", "UPSERT", "2:256", { surah: 2, ayah: 256 });
+    const gate = deferred<unknown>();
+    const entered = watch("upsert-bookmark");
+    responses["upsert-bookmark"] = gate.promise;
+    responses["list-bookmarks"] = { ok: true, bookmarks: [validBookmarkAck.bookmark] };
+    responses["list-notes"] = { ok: true, notes: [] };
+    const run = start();
+    try {
+      await reached(entered, run);
+      const editedAt = "2026-02-02T00:00:00.000Z";
+      sql
+        .prepare("UPDATE bookmarks SET updated_at=?,deleted_at=? WHERE surah=2 AND ayah=256")
+        .run(editedAt, change === "delete" ? editedAt : null);
+      gate.resolve(validBookmarkAck);
+      await expect(run).resolves.toMatchObject({ kind: "resolved", value: { status: "synced" } });
+      expect(
+        sql
+          .prepare("SELECT created_at,updated_at,deleted_at,qf_bookmark_id FROM bookmarks WHERE surah=2 AND ayah=256")
+          .get(),
+      ).toEqual({
+        created_at: OLD,
+        updated_at: editedAt,
+        deleted_at: change === "delete" ? editedAt : null,
+        qf_bookmark_id: "remote-bookmark",
+      });
+      const queued = sql
+        .prepare("SELECT data FROM sync_queue WHERE table_name='bookmarks' AND row_id='2:256' ORDER BY id DESC LIMIT 1")
+        .get() as { data: string };
+      expect(JSON.parse(queued.data)).toMatchObject({
+        created_at: OLD,
+        updated_at: editedAt,
+        deleted_at: change === "delete" ? editedAt : null,
+        qf_bookmark_id: "remote-bookmark",
+      });
+    } finally {
+      gate.resolve(validBookmarkAck);
+      await run;
+    }
+  },
+);
+
+it("retires during a push account enqueue before acknowledging the QF entry", async () => {
+  enqueueWait = hold();
+  const gate = enqueueWait;
+  const before = queueState();
+  const run = start();
+  try {
+    await reached(gate.entered.promise, run);
+    switchSession(session(USER_B, SESSION_B));
+    gate.release.resolve();
+    expect(failure(await run)).toBeInstanceOf(Error);
+    expect(queueState()).toEqual(before);
+    expect(
+      sql
+        .prepare("SELECT COUNT(*) AS count FROM sync_queue WHERE table_name='private_notes' AND row_id='local-note'")
+        .get(),
+    ).toEqual({ count: 1 });
+    expect(requests.map((request) => request.action)).toEqual(["status", "create-note"]);
+  } finally {
+    gate.release.resolve();
+    await run;
   }
 });
 

@@ -91,14 +91,6 @@ function captureQfSyncOwner(): QfSyncOwner | null {
   });
 }
 
-async function enqueueSupabase(...args: Parameters<typeof enqueueSync>): Promise<void> {
-  try {
-    await enqueueSync(...args);
-  } catch (error) {
-    console.warn(error);
-  }
-}
-
 export async function enqueueQfSync(
   db: SQLiteDatabase,
   entityType: QfEntityType,
@@ -270,6 +262,10 @@ async function pushQfSyncQueue(owner: QfSyncOwner, db: SQLiteDatabase): Promise<
         await pushPrivateNoteEntry(owner, db, entry);
         owner.requireCurrent();
       }
+      if (entry.operation === "UPSERT") {
+        await enqueueCurrentQfRow(owner, db, entry);
+        owner.requireCurrent();
+      }
       await markQfSynced(owner, db, entry.id);
       owner.requireCurrent();
       pushed += 1;
@@ -282,6 +278,40 @@ async function pushQfSyncQueue(owner: QfSyncOwner, db: SQLiteDatabase): Promise<
   await cleanSyncedQfEntries(owner, db);
   owner.requireCurrent();
   return pushed;
+}
+
+async function enqueueCurrentQfRow(owner: QfSyncOwner, db: SQLiteDatabase, entry: QfSyncQueueEntry): Promise<void> {
+  owner.requireCurrent();
+  if (entry.entity_type === "bookmark") {
+    const parsedId = parseBookmarkLocalId(entry.local_id);
+    if (!parsedId) return;
+    const row = await db.getFirstAsync<LocalBookmarkRow>("SELECT * FROM bookmarks WHERE surah = ? AND ayah = ?", [
+      parsedId.surah,
+      parsedId.ayah,
+    ]);
+    owner.requireCurrent();
+    if (!row) return;
+    await enqueueSync(db, "bookmarks", "UPDATE", bookmarkLocalId(row.surah, row.ayah), {
+      surah: row.surah,
+      ayah: row.ayah,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+      deleted_at: row.deleted_at,
+      qf_bookmark_id: row.qf_bookmark_id,
+      qf_synced_at: row.qf_synced_at,
+      qf_sync_error: row.qf_sync_error,
+      qf_is_in_default_collection: Boolean(row.qf_is_in_default_collection),
+      qf_collections_count: row.qf_collections_count ?? 0,
+    });
+    owner.requireCurrent();
+    return;
+  }
+
+  const row = await db.getFirstAsync<LocalPrivateNoteRow>("SELECT * FROM private_notes WHERE id = ?", [entry.local_id]);
+  owner.requireCurrent();
+  if (!row) return;
+  await enqueueSync(db, "private_notes", "UPDATE", row.id, noteToPayload(row));
+  owner.requireCurrent();
 }
 
 async function pushBookmarkEntry(owner: QfSyncOwner, db: SQLiteDatabase, entry: QfSyncQueueEntry): Promise<void> {
@@ -345,7 +375,6 @@ async function pushBookmarkEntry(owner: QfSyncOwner, db: SQLiteDatabase, entry: 
   const bookmark = readQfBookmarkAcknowledgement(response, local);
   await attachQfBookmark(db, local, bookmark, {
     updateActiveState: false,
-    enqueueMainSync: enqueueSupabase,
     requireCurrent: owner.requireCurrent,
   });
   owner.requireCurrent();
@@ -407,8 +436,7 @@ async function pushPrivateNoteEntry(owner: QfSyncOwner, db: SQLiteDatabase, entr
   if (!response.ok) throw new Error(response.message);
   const note = readQfNoteAcknowledgement(response, local.qf_note_id || undefined);
   await attachQfNote(db, local.id, note, [range], {
-    enqueueSupabase: true,
-    enqueueMainSync: enqueueSupabase,
+    enqueueSupabase: false,
     requireCurrent: owner.requireCurrent,
   });
   owner.requireCurrent();
@@ -505,7 +533,7 @@ async function mergeRemoteBookmark(db: SQLiteDatabase, remote: QfBookmark): Prom
   }
 
   if (local) {
-    await attachQfBookmark(db, local, remote, { updateActiveState: true, enqueueMainSync: enqueueSync });
+    await attachQfBookmark(db, local, remote, { updateActiveState: true });
     return true;
   }
 
@@ -544,7 +572,7 @@ async function attachQfBookmark(
   db: SQLiteDatabase,
   local: LocalBookmarkRow,
   remote: QfBookmark,
-  options: { updateActiveState: boolean; enqueueMainSync: typeof enqueueSync; requireCurrent?: () => void },
+  options: { updateActiveState: boolean; requireCurrent?: () => void },
 ): Promise<void> {
   options.requireCurrent?.();
   const now = new Date().toISOString();
@@ -553,31 +581,42 @@ async function attachQfBookmark(
       ? remote.createdAt
       : local.updated_at;
   const nextDeletedAt = options.updateActiveState ? null : local.deleted_at;
-  const shouldEnqueueSupabase =
-    local.qf_bookmark_id !== remote.id ||
-    local.deleted_at !== nextDeletedAt ||
-    updatedAt !== local.updated_at ||
-    Boolean(local.qf_is_in_default_collection) !== remote.isInDefaultCollection ||
-    (local.qf_collections_count ?? 0) !== remote.collectionsCount;
-  await db.runAsync(
-    `UPDATE bookmarks
-     SET updated_at = ?, deleted_at = ?, qf_bookmark_id = ?, qf_synced_at = ?,
-         qf_sync_error = NULL, qf_is_in_default_collection = ?, qf_collections_count = ?
-     WHERE surah = ? AND ayah = ?`,
-    [
-      updatedAt,
-      nextDeletedAt,
-      remote.id,
-      now,
-      remote.isInDefaultCollection ? 1 : 0,
-      remote.collectionsCount,
-      local.surah,
-      local.ayah,
-    ],
-  );
+  if (options.updateActiveState) {
+    await db.runAsync(
+      `UPDATE bookmarks
+       SET updated_at = ?, deleted_at = ?, qf_bookmark_id = ?, qf_synced_at = ?,
+           qf_sync_error = NULL, qf_is_in_default_collection = ?, qf_collections_count = ?
+       WHERE surah = ? AND ayah = ?`,
+      [
+        updatedAt,
+        nextDeletedAt,
+        remote.id,
+        now,
+        remote.isInDefaultCollection ? 1 : 0,
+        remote.collectionsCount,
+        local.surah,
+        local.ayah,
+      ],
+    );
+  } else {
+    await db.runAsync(
+      `UPDATE bookmarks
+       SET qf_bookmark_id = ?, qf_synced_at = ?, qf_sync_error = NULL,
+           qf_is_in_default_collection = ?, qf_collections_count = ?
+       WHERE surah = ? AND ayah = ?`,
+      [remote.id, now, remote.isInDefaultCollection ? 1 : 0, remote.collectionsCount, local.surah, local.ayah],
+    );
+  }
   options.requireCurrent?.();
+  const shouldEnqueueSupabase =
+    options.updateActiveState &&
+    (local.qf_bookmark_id !== remote.id ||
+      local.deleted_at !== nextDeletedAt ||
+      updatedAt !== local.updated_at ||
+      Boolean(local.qf_is_in_default_collection) !== remote.isInDefaultCollection ||
+      (local.qf_collections_count ?? 0) !== remote.collectionsCount);
   if (shouldEnqueueSupabase) {
-    await options.enqueueMainSync(db, "bookmarks", "UPDATE", bookmarkLocalId(local.surah, local.ayah), {
+    await enqueueSync(db, "bookmarks", "UPDATE", bookmarkLocalId(local.surah, local.ayah), {
       surah: local.surah,
       ayah: local.ayah,
       created_at: local.created_at,
@@ -643,7 +682,6 @@ async function mergeRemoteNote(db: SQLiteDatabase, remote: QfNote): Promise<bool
     if (compareQfTimestamps(localByQfId.updated_at, updatedAt) >= 0) {
       await attachQfNote(db, localByQfId.id, remote, remote.ranges, {
         enqueueSupabase: false,
-        enqueueMainSync: enqueueSync,
       });
       return false;
     }
@@ -705,7 +743,6 @@ async function mergeRemoteNote(db: SQLiteDatabase, remote: QfNote): Promise<bool
     if (exactLocal.qf_note_id && exactLocal.qf_note_id !== remote.id) return false;
     await attachQfNote(db, exactLocal.id, remote, remote.ranges, {
       enqueueSupabase: true,
-      enqueueMainSync: enqueueSync,
     });
     return true;
   }
@@ -752,7 +789,7 @@ async function attachQfNote(
   localId: string,
   remote: QfNote,
   fallbackRanges: string[],
-  options: { enqueueSupabase: boolean; enqueueMainSync: typeof enqueueSync; requireCurrent?: () => void },
+  options: { enqueueSupabase: boolean; requireCurrent?: () => void },
 ): Promise<void> {
   options.requireCurrent?.();
   await db.runAsync(
@@ -769,7 +806,7 @@ async function attachQfNote(
   const row = await db.getFirstAsync<LocalPrivateNoteRow>("SELECT * FROM private_notes WHERE id = ?", [localId]);
   options.requireCurrent?.();
   if (row) {
-    await options.enqueueMainSync(db, "private_notes", "UPDATE", localId, noteToPayload(row));
+    await enqueueSync(db, "private_notes", "UPDATE", localId, noteToPayload(row));
     options.requireCurrent?.();
   }
 }
