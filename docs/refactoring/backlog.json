@@ -3267,16 +3267,21 @@
       ],
       "risk": "high",
       "approved": false,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
-        "lib/notes/*",
-        "lib/selection/*",
-        "lib/reflection-journey/*",
-        "lib/quran-foundation/user-sync.ts",
-        "tests/unit/local-write-contracts.test.ts"
+        "docs/refactoring/PROGRESS.md",
+        "docs/refactoring/backlog.json"
       ],
       "attempts": 0,
-      "priority": 1
+      "priority": 1,
+      "started_at": "2026-11-07T21:14:58.536664+00:00",
+      "completed_at": "2026-11-07T21:14:58.536664+00:00",
+      "primary_accepted_at": "2026-11-07T21:14:58.536664+00:00",
+      "files": [],
+      "summary": "Characterized; no consolidation. The repeated pull-side 'keep the newer local row' checks in lib/database/sync.ts are not one rule: user_settings and user_word_meanings skip the check and overwrite when the local updated_at is empty (nullable/legacy); study_cards, private_notes and reflection_journey_entries compare a NOT NULL local time and throw on an empty legacy value, failing the page; bookmarks omit the remote-time guard; highlights have their own tombstone and live-row contract. Merging them would choose one empty-timestamp behavior, which is a behavior change, not a consolidation. The truly identical pairs are one-line conditions, where a shared helper adds indirection without reducing risk. Queue writes already share enqueueSync/enqueueQfSync, and transactional ownership was consolidated by RF171-RF178.",
+      "evidence": "Source characterization of every upsert* freshness check against the local schema (schema.ts NOT NULL/nullable updated_at). No code change, so no checks were run beyond review of the doc diff.",
+      "independent_review": "Not applicable: documentation-only closure with no source change; the characterization is recorded for the final independent review (RF-049).",
+      "decision": "Primary decision 2026-11-07: do not unify differing empty-timestamp semantics without a product decision; no helper for one-line identical conditions."
     },
     {
       "id": "RF-033",
