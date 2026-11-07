@@ -9,6 +9,7 @@ import SettingsScreen from "@/app/(tabs)/settings";
 import { strings } from "@/lib/i18n/strings";
 import { DirectionProvider } from "@/lib/ui/direction";
 import { type useSettings } from "@/lib/settings/context";
+import { getQfConnectionStatus, getQfLinkedIdentityState } from "@/lib/quran-foundation/user";
 
 const mockDatabase = {
   getFirstAsync: jest.fn(async () => null),
@@ -28,6 +29,8 @@ const mockUser = {
   app_metadata: {},
   user_metadata: {},
 };
+const mockOtherUser = { ...mockUser, id: "00000000-0000-4000-8000-000000000002" };
+let mockCurrentUser: typeof mockUser = mockUser;
 const mockManualResult: QfSyncResult = { status: "synced", pushed: 1, pulled: 2 };
 const mockCallbackResult: QfSyncResult = { status: "synced", pushed: 1, pulled: 2 };
 const mockFullQfUserSync = jest.fn(async (_db: SQLiteDatabase): Promise<QfSyncResult> => mockManualResult);
@@ -48,7 +51,10 @@ jest.mock("expo-router", () => ({
 }));
 jest.mock("@/lib/auth/config", () => ({ isEmailAuthFlowsEnabled: () => false }));
 jest.mock("@/lib/auth/store", () => ({
-  useAuthStore: () => ({ user: mockUser, profile: null, isLoading: false, signOut: mockUnexpected }),
+  useAuthStore: Object.assign(
+    () => ({ user: mockCurrentUser, profile: null, isLoading: false, signOut: mockUnexpected }),
+    { getState: () => ({ user: mockCurrentUser }) },
+  ),
 }));
 jest.mock("@/lib/supabase", () => ({
   isSupabaseConfigured: () => true,
@@ -62,7 +68,7 @@ jest.mock("@/lib/quran-foundation/user", () => ({
   beginQfOAuthConnection: (...args: unknown[]) => mockUnexpected(...args),
   disconnectQfUser: (...args: unknown[]) => mockUnexpected(...args),
   getQfConnectionStatus: jest.fn(async () => ({ ok: true as const, status: "connected" as const })),
-  getQfLinkedIdentityState: (...args: unknown[]) => mockUnexpected(...args),
+  getQfLinkedIdentityState: jest.fn((...args: unknown[]) => mockUnexpected(...args)),
 }));
 jest.mock("@/lib/quran-foundation/user-sync", () => ({
   fullQfUserSync: (...args: unknown[]) => mockFullQfUserSync(...(args as [SQLiteDatabase])),
@@ -116,6 +122,7 @@ async function openSettings() {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockCurrentUser = mockUser;
   mockParams = { category: "account" };
   mockManualResult.status = "synced";
   mockCallbackResult.status = "synced";
@@ -209,5 +216,66 @@ describe.each(callbackCases)("QF callback sync $language/$status", ({ language, 
     expect(mockRunInitialQfUserSync).toHaveBeenCalledWith(mockDatabase);
     expect(mockFullQfUserSync).not.toHaveBeenCalled();
     await waitFor(() => expectMessageOutcome(view, language, status));
+  });
+});
+
+describe.each(["en", "ar"] as const)("QF status after an account switch in %s (RF-025)", (language) => {
+  it("ignores the previous account's late connection status", async () => {
+    configure(language);
+    const locale = strings[language];
+    type Status = Awaited<ReturnType<typeof getQfConnectionStatus>>;
+    let settleOld: (status: Status) => void = () => {};
+    jest
+      .mocked(getQfConnectionStatus)
+      .mockImplementationOnce(() => new Promise<Status>((resolve) => (settleOld = resolve)));
+    jest.mocked(getQfConnectionStatus).mockResolvedValueOnce({ ok: true, status: "disconnected" });
+    jest.mocked(getQfLinkedIdentityState).mockResolvedValueOnce({ linked: false } as never);
+    const view = await openSettings();
+
+    mockCurrentUser = mockOtherUser;
+    view.rerender(<SettingsScreen />);
+    await waitFor(() => expect(view.getByText(locale.qfConnect)).toBeTruthy());
+
+    await act(async () => {
+      settleOld({ ok: true, status: "connected" });
+    });
+
+    expect(view.queryByText(locale.qfManualSync)).toBeNull();
+    expect(view.queryByText(locale.qfConnected)).toBeNull();
+    expect(view.getByText(locale.qfConnect)).toBeTruthy();
+  });
+
+  it("clears the previous account's sync message when the account changes", async () => {
+    configure(language);
+    const locale = strings[language];
+    const view = await openSettings();
+    await act(async () => {
+      fireEvent.press(await view.findByText(locale.qfManualSync));
+    });
+    expect(view.getByText(locale.qfSyncComplete)).toBeTruthy();
+
+    mockCurrentUser = mockOtherUser;
+    await act(async () => {
+      view.rerender(<SettingsScreen />);
+    });
+
+    expect(view.queryByText(locale.qfSyncComplete)).toBeNull();
+  });
+
+  it("does not replay the previous account's OAuth return for the next account", async () => {
+    configure(language, "connected");
+    const locale = strings[language];
+    mockCallbackResult.status = "failed";
+    const view = await openSettings();
+    await waitFor(() => expect(mockRunInitialQfUserSync).toHaveBeenCalledTimes(1));
+
+    mockCurrentUser = mockOtherUser;
+    await act(async () => {
+      view.rerender(<SettingsScreen />);
+    });
+
+    expect(mockRunInitialQfUserSync).toHaveBeenCalledTimes(1);
+    expect(view.queryByText(locale.qfSyncFailed)).toBeNull();
+    expect(view.queryByText(locale.qfFinishConnection)).toBeNull();
   });
 });
