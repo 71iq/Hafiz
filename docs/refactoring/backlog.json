@@ -4018,17 +4018,19 @@
         ]
       ],
       "risk": "high",
-      "approved": false,
-      "status": "pending",
+      "approved": true,
+      "status": "running",
       "allowed_paths": [
-        "docs/refactoring/NATIVE_TESTING.md",
-        "scripts/qa/*",
-        ".maestro/*",
-        "package.json"
+        "android/app/build.gradle"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "priority": 3,
-      "decision": "User has an Android phone available (2026-11-07). Connect it with USB debugging when RF040/RF041 start. Use a distinct QA applicationId and preserve the installed app and its data."
+      "decision": "User has an Android phone available (2026-11-07). Connect it with USB debugging when RF040/RF041 start. Use a distinct QA applicationId and preserve the installed app and its data.",
+      "started_at": "2026-11-07T17:31:16.876624+00:00",
+      "files": [
+        "android/app/build.gradle"
+      ],
+      "progress_note": "Uncommitted in the worktree: android/app/build.gradle adds applicationIdSuffix '.qa' only when -PhafizQa=true. Device: Samsung SM-A546E (Android 16, arm64-v8a) over USB; com.anonymous.hafiz is not installed on user 0. Build with JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ANDROID_HOME=/home/ehab/Android/Sdk, synthetic EXPO_PUBLIC_SUPABASE_* values, -PreactNativeArchitectures=arm64-v8a. A single assembleRelease under the 6 GiB scope was OOM-killed twice because the Metro bundle overlaps native C++ compiles. ':app:mergeReleaseNativeLibs' alone succeeds (1.5 GB peak). Bundling inside Gradle still OOMs at 6 GiB with a 3.5 GB Node heap; next, bundle JS separately with expo export:embed into the generated createBundleReleaseJsAndAssets output dirs, then run assembleRelease without that task. Never uninstall or clear any app on the phone."
     },
     {
       "id": "RF-041",
