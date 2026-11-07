@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { View, Text, Pressable, useWindowDimensions } from "react-native";
 import { useRouter, type Href } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
@@ -103,6 +103,7 @@ export default function HomeScreen() {
   });
   const [showSearch, setShowSearch] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [filterDeckId, setFilterDeckId] = useState<SmartDeckId | null>(null);
   const [reviewSettingsTarget, setReviewSettingsTarget] = useState<DeckReviewSettingsTarget | null>(null);
   const [deckCardsTarget, setDeckCardsTarget] = useState<DeckCardsTarget | null>(null);
@@ -128,140 +129,162 @@ export default function HomeScreen() {
     }
   }, [db]);
 
-  const loadData = useCallback(async () => {
-    const surahRows = await db.getAllAsync<{ number: number; name_arabic: string; name_english: string }>(
-      "SELECT number, name_arabic, name_english FROM surahs",
-    );
-    const nameMap: Record<number, string> = {};
-    for (const row of surahRows) {
-      nameMap[row.number] = uiLanguage === "ar" ? row.name_arabic : row.name_english;
-    }
-    setSurahNames(nameMap);
-    await migrateLegacyRetentionDecks(db);
-
-    const smartDefinitions = [
-      {
-        id: SMART_DECK_IDS.retention,
-        title: s.smartDeckRetentionTitle,
-        subtitle: s.smartDeckRetentionSubtitle,
-        icon: Layers,
-      },
-      {
-        id: SMART_DECK_IDS.mutashabihat,
-        title: s.smartDeckMutashabihatTitle,
-        subtitle: s.smartDeckMutashabihatSubtitle,
-        icon: Sparkles,
-      },
-      {
-        id: SMART_DECK_IDS.similarTails,
-        title: s.smartDeckSimilarTailsTitle,
-        subtitle: s.smartDeckSimilarTailsSubtitle,
-        icon: ListEnd,
-      },
-      {
-        id: SMART_DECK_IDS.qiraat,
-        title: s.smartDeckQiraatTitle,
-        subtitle: s.smartDeckQiraatSubtitle,
-        icon: BookOpenText,
-      },
-      {
-        id: SMART_DECK_IDS.reasonsOfRevelation,
-        title: s.smartDeckReasonsTitle,
-        subtitle: s.smartDeckReasonsSubtitle,
-        icon: BookMarked,
-      },
-    ] as const;
-
-    const smartDisplays = await Promise.all(
-      smartDefinitions.map(async (definition) => {
-        const [settings, filter] = await Promise.all([
-          readDeckReviewSettings(db, definition.id),
-          readSmartDeckFilter(db, definition.id),
-        ]);
-        const stats = await getDeckTodayStats(db, definition.id, settings);
-        return {
-          ...definition,
-          filter,
-          total: stats.total,
-          dueCount: stats.dueCount,
-          newCount: stats.newCount,
-        };
-      }),
-    );
-    setSmartDecks(smartDisplays);
-
-    const [dashboardSettings, vocabSettings] = await Promise.all([
-      readDeckReviewSettings(db, undefined),
-      readDeckReviewSettings(db, MEANINGS_DECK_ID),
-    ]);
-    const [dashboardDue, memorizedTotal, nextWirdStatus, vocabTodayStats, reflectionJourneySummary] = await Promise.all(
-      [
-        getTodayDueCount(db, undefined, dashboardSettings),
-        getMemorizedAyahCardCount(db),
-        getWirdStatus(db),
-        getDeckTodayStats(db, MEANINGS_DECK_ID, vocabSettings),
-        getReflectionJourneySummary(db),
-      ],
-    );
-    setTotalDue(dashboardDue);
-    setMemorizedCards(memorizedTotal);
-    setWirdStatus(nextWirdStatus);
-    setVocabStats(vocabTodayStats);
-    loadLatestUnlock();
-    setJourneySummary({
-      totalLevels: reflectionJourneySummary.totalLevels,
-      completedLevels: reflectionJourneySummary.completedLevels,
-      currentLevelTitle: reflectionJourneySummary.currentLevelTitle
-        ? localizeReflectionJourneyText(reflectionJourneySummary.currentLevelTitle, uiLanguage)
-        : null,
-    });
-
-    try {
-      const row = await db.getFirstAsync<{ value: string }>(
-        "SELECT value FROM user_settings WHERE key = 'last_mushaf_position'",
+  const loadDashboard = useCallback(
+    async (isCurrent: () => boolean) => {
+      const surahRows = await db.getAllAsync<{ number: number; name_arabic: string; name_english: string }>(
+        "SELECT number, name_arabic, name_english FROM surahs",
       );
-      if (!row?.value) {
-        setResume(null);
-        return;
+      const nameMap: Record<number, string> = {};
+      for (const row of surahRows) {
+        nameMap[row.number] = uiLanguage === "ar" ? row.name_arabic : row.name_english;
       }
-      const parsed = JSON.parse(row.value);
-      if (parsed?.mode === "page" && typeof parsed.page === "number") {
-        const pageMeta = await db.getFirstAsync<{ surah_start: number; ayah_start: number }>(
-          "SELECT surah_start, ayah_start FROM page_map WHERE page = ?",
-          [parsed.page],
+      await migrateLegacyRetentionDecks(db);
+
+      const smartDefinitions = [
+        {
+          id: SMART_DECK_IDS.retention,
+          title: s.smartDeckRetentionTitle,
+          subtitle: s.smartDeckRetentionSubtitle,
+          icon: Layers,
+        },
+        {
+          id: SMART_DECK_IDS.mutashabihat,
+          title: s.smartDeckMutashabihatTitle,
+          subtitle: s.smartDeckMutashabihatSubtitle,
+          icon: Sparkles,
+        },
+        {
+          id: SMART_DECK_IDS.similarTails,
+          title: s.smartDeckSimilarTailsTitle,
+          subtitle: s.smartDeckSimilarTailsSubtitle,
+          icon: ListEnd,
+        },
+        {
+          id: SMART_DECK_IDS.qiraat,
+          title: s.smartDeckQiraatTitle,
+          subtitle: s.smartDeckQiraatSubtitle,
+          icon: BookOpenText,
+        },
+        {
+          id: SMART_DECK_IDS.reasonsOfRevelation,
+          title: s.smartDeckReasonsTitle,
+          subtitle: s.smartDeckReasonsSubtitle,
+          icon: BookMarked,
+        },
+      ] as const;
+
+      const smartDisplays = await Promise.all(
+        smartDefinitions.map(async (definition) => {
+          const [settings, filter] = await Promise.all([
+            readDeckReviewSettings(db, definition.id),
+            readSmartDeckFilter(db, definition.id),
+          ]);
+          const stats = await getDeckTodayStats(db, definition.id, settings);
+          return {
+            ...definition,
+            filter,
+            total: stats.total,
+            dueCount: stats.dueCount,
+            newCount: stats.newCount,
+          };
+        }),
+      );
+
+      const [dashboardSettings, vocabSettings] = await Promise.all([
+        readDeckReviewSettings(db, undefined),
+        readDeckReviewSettings(db, MEANINGS_DECK_ID),
+      ]);
+      const [dashboardDue, memorizedTotal, nextWirdStatus, vocabTodayStats, reflectionJourneySummary] =
+        await Promise.all([
+          getTodayDueCount(db, undefined, dashboardSettings),
+          getMemorizedAyahCardCount(db),
+          getWirdStatus(db),
+          getDeckTodayStats(db, MEANINGS_DECK_ID, vocabSettings),
+          getReflectionJourneySummary(db),
+        ]);
+      const currentLevelTitle = reflectionJourneySummary.currentLevelTitle
+        ? localizeReflectionJourneyText(reflectionJourneySummary.currentLevelTitle, uiLanguage)
+        : null;
+      // Apply the dashboard only once every query succeeded, so a failure keeps the last good values,
+      // and only for the latest load, so an older overlapping load cannot overwrite a newer one.
+      if (!isCurrent()) return;
+      setSurahNames(nameMap);
+      setSmartDecks(smartDisplays);
+      setTotalDue(dashboardDue);
+      setMemorizedCards(memorizedTotal);
+      setWirdStatus(nextWirdStatus);
+      setVocabStats(vocabTodayStats);
+      loadLatestUnlock();
+      setJourneySummary({
+        totalLevels: reflectionJourneySummary.totalLevels,
+        completedLevels: reflectionJourneySummary.completedLevels,
+        currentLevelTitle,
+      });
+
+      const applyResume = (value: { surah: number; ayah: number; page: number } | null) => {
+        if (isCurrent()) setResume(value);
+      };
+      try {
+        const row = await db.getFirstAsync<{ value: string }>(
+          "SELECT value FROM user_settings WHERE key = 'last_mushaf_position'",
         );
-        if (pageMeta) {
-          setResume({ surah: pageMeta.surah_start, ayah: pageMeta.ayah_start, page: parsed.page });
-        } else {
-          setResume(null);
+        if (!row?.value) {
+          applyResume(null);
+          return;
         }
-      } else if (parsed?.mode === "verse" && typeof parsed.surah === "number" && typeof parsed.ayah === "number") {
-        const page = await db.getFirstAsync<{ v2_page: number }>(
-          "SELECT v2_page FROM quran_text WHERE surah = ? AND ayah = ?",
-          [parsed.surah, parsed.ayah],
-        );
-        setResume({ surah: parsed.surah, ayah: parsed.ayah, page: page?.v2_page ?? 1 });
-      } else {
-        setResume(null);
+        const parsed = JSON.parse(row.value);
+        if (parsed?.mode === "page" && typeof parsed.page === "number") {
+          const pageMeta = await db.getFirstAsync<{ surah_start: number; ayah_start: number }>(
+            "SELECT surah_start, ayah_start FROM page_map WHERE page = ?",
+            [parsed.page],
+          );
+          if (pageMeta) {
+            applyResume({ surah: pageMeta.surah_start, ayah: pageMeta.ayah_start, page: parsed.page });
+          } else {
+            applyResume(null);
+          }
+        } else if (parsed?.mode === "verse" && typeof parsed.surah === "number" && typeof parsed.ayah === "number") {
+          const page = await db.getFirstAsync<{ v2_page: number }>(
+            "SELECT v2_page FROM quran_text WHERE surah = ? AND ayah = ?",
+            [parsed.surah, parsed.ayah],
+          );
+          applyResume({ surah: parsed.surah, ayah: parsed.ayah, page: page?.v2_page ?? 1 });
+        } else {
+          applyResume(null);
+        }
+      } catch {
+        applyResume(null);
       }
-    } catch {
-      setResume(null);
+    },
+    [
+      db,
+      loadLatestUnlock,
+      s.smartDeckRetentionTitle,
+      s.smartDeckRetentionSubtitle,
+      s.smartDeckMutashabihatTitle,
+      s.smartDeckMutashabihatSubtitle,
+      s.smartDeckSimilarTailsTitle,
+      s.smartDeckSimilarTailsSubtitle,
+      s.smartDeckQiraatTitle,
+      s.smartDeckQiraatSubtitle,
+      s.smartDeckReasonsTitle,
+      s.smartDeckReasonsSubtitle,
+      uiLanguage,
+    ],
+  );
+
+  const latestLoad = useRef(0);
+  const loadData = useCallback(async () => {
+    const load = ++latestLoad.current;
+    const isCurrent = () => load === latestLoad.current;
+    try {
+      await loadDashboard(isCurrent);
+      if (isCurrent()) setLoadFailed(false);
+    } catch (e) {
+      console.warn(e);
+      if (isCurrent()) setLoadFailed(true);
     }
-  }, [
-    db,
-    loadLatestUnlock,
-    s.smartDeckRetentionTitle,
-    s.smartDeckRetentionSubtitle,
-    s.smartDeckMutashabihatTitle,
-    s.smartDeckMutashabihatSubtitle,
-    s.smartDeckSimilarTailsTitle,
-    s.smartDeckSimilarTailsSubtitle,
-    s.smartDeckQiraatTitle,
-    s.smartDeckQiraatSubtitle,
-    s.smartDeckReasonsTitle,
-    s.smartDeckReasonsSubtitle,
-    uiLanguage,
-  ]);
+  }, [loadDashboard]);
 
   useFocusEffect(
     useCallback(() => {
@@ -353,6 +376,37 @@ export default function HomeScreen() {
             </Pressable>
           </View>
         </View>
+
+        {loadFailed && (
+          <Card elevation="low" className="p-4 mb-6">
+            <View className={`items-center gap-3 ${isRTL ? "flex-row-reverse" : "flex-row"}`} style={mirroredRowStyle}>
+              <Text
+                className="flex-1 text-charcoal dark:text-neutral-200"
+                style={{
+                  fontFamily: "Manrope_500Medium",
+                  fontSize: 13,
+                  lineHeight: 19,
+                  textAlign: isRTL ? "right" : "left",
+                  writingDirection: isRTL ? "rtl" : "ltr",
+                }}
+                accessibilityRole="alert"
+              >
+                {s.homeLoadFailed}
+              </Text>
+              <Pressable
+                onPress={loadData}
+                accessibilityRole="button"
+                hitSlop={8}
+                className="rounded-full bg-primary-accent px-4 py-2 min-h-[36px] justify-center"
+                style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.97 : 1 }] })}
+              >
+                <Text className="text-white" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12 }}>
+                  {s.homeLoadRetry}
+                </Text>
+              </Pressable>
+            </View>
+          </Card>
+        )}
 
         {latestUnlock && <AchievementUnlockToast unlock={latestUnlock} onDismiss={dismissLatestUnlock} />}
 

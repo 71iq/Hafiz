@@ -382,3 +382,78 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("real home deck cards in %
     },
   );
 });
+
+describe.each(["en", "ar"] satisfies ("en" | "ar")[])("home dashboard load failure in %s", (language) => {
+  beforeEach(() => {
+    Object.assign(mockSettings, { uiLanguage: language, isRTL: language === "ar" });
+    jest.replaceProperty(I18nManager, "isRTL", language === "ar");
+  });
+
+  it("keeps the last good dashboard, shows a retryable error and recovers", async () => {
+    const view = await home();
+    const s = strings[language];
+    expect(view.queryByText(s.homeLoadFailed)).toBeNull();
+    jest.spyOn(console, "warn").mockImplementation(() => {});
+    const changedSmart = { ...smartStats, total: 23 };
+    jest.mocked(getDeckTodayStats).mockImplementation(async (_db, id) => {
+      if (id === MEANINGS_DECK_ID) throw new Error("synthetic dashboard failure");
+      return { ...changedSmart };
+    });
+
+    await act(async () => {
+      review().onSaved();
+    });
+
+    await waitFor(() => expect(view.getByText(s.homeLoadFailed)).toBeTruthy());
+    expect(within(card(view, s.smartDeckRetentionTitle)).getByText(String(smartStats.total))).toBeTruthy();
+    expect(within(card(view, s.vocabDeckTitle)).getByText(String(vocabStats.total))).toBeTruthy();
+
+    jest
+      .mocked(getDeckTodayStats)
+      .mockImplementation(async (_db, id) => ({ ...(id === MEANINGS_DECK_ID ? vocabStats : changedSmart) }));
+    await act(async () => {
+      fireEvent.press(view.getByText(s.homeLoadRetry));
+    });
+
+    await waitFor(() => expect(view.queryByText(s.homeLoadFailed)).toBeNull());
+    expect(within(card(view, s.smartDeckRetentionTitle)).getByText(String(changedSmart.total))).toBeTruthy();
+  });
+
+  it.each(["fails", "succeeds"] as const)(
+    "ignores an older overlapping load that %s after a newer one",
+    async (outcome) => {
+      const view = await home();
+      const s = strings[language];
+      jest.spyOn(console, "warn").mockImplementation(() => {});
+      let settleOlder: (stats: Stats | Error) => void = () => {};
+      const older = new Promise<Stats>((resolve, reject) => {
+        settleOlder = (value) => (value instanceof Error ? reject(value) : resolve(value));
+      });
+      const olderSmart = { ...smartStats, total: 99 };
+      const newerSmart = { ...smartStats, total: 23 };
+      jest.mocked(getDeckTodayStats).mockImplementation(async (_db, id) => {
+        if (id === MEANINGS_DECK_ID) return older;
+        return { ...olderSmart };
+      });
+      await act(async () => {
+        review().onSaved();
+      });
+      jest
+        .mocked(getDeckTodayStats)
+        .mockImplementation(async (_db, id) => ({ ...(id === MEANINGS_DECK_ID ? vocabStats : newerSmart) }));
+      await act(async () => {
+        review().onSaved();
+      });
+      await waitFor(() =>
+        expect(within(card(view, s.smartDeckRetentionTitle)).getByText(String(newerSmart.total))).toBeTruthy(),
+      );
+
+      await act(async () => {
+        settleOlder(outcome === "fails" ? new Error("synthetic older failure") : { ...vocabStats });
+      });
+
+      expect(view.queryByText(s.homeLoadFailed)).toBeNull();
+      expect(within(card(view, s.smartDeckRetentionTitle)).getByText(String(newerSmart.total))).toBeTruthy();
+    },
+  );
+});
