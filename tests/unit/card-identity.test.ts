@@ -1,5 +1,10 @@
 import { setStudyCardMarked } from "@/lib/fsrs/queries";
-import { materializeSmartDeckCards, SMART_DECK_IDS } from "@/lib/fsrs/smart-decks";
+import {
+  getSmartDeckStats,
+  getSmartDeckTodayStats,
+  materializeSmartDeckCards,
+  SMART_DECK_IDS,
+} from "@/lib/fsrs/smart-decks";
 import { openOutboxDatabase, type OutboxDatabase } from "@/tests/jest/outbox-sqlite";
 
 const OLD = "2026-01-01T00:00:00.000Z";
@@ -82,5 +87,32 @@ describe("RF-179 card identity during creation", () => {
     });
     expect(marked.reps).toBe(5);
     expect(queued("2:255")).toEqual(["UPDATE"]);
+  });
+});
+
+describe("RF-182 smart-deck stats count only reachable cards", () => {
+  beforeEach(() => {
+    for (const ayah of [1, 2, 3]) {
+      store.sql
+        .prepare("INSERT INTO qiraat_encyclopedia (surah, ayah, text) VALUES (2, ?, 'synthetic qiraat')")
+        .run(ayah);
+    }
+    // The session never shows this id from the smart deck: materialization skips a card live elsewhere.
+    seedLiveCard("qiraat:2:1", "synthetic-other-deck");
+  });
+
+  it("does not count a candidate live in another deck as new or due", async () => {
+    await expect(getSmartDeckStats(store.db, SMART_DECK_IDS.qiraat)).resolves.toEqual({
+      total: 3,
+      due: 2,
+      newCount: 2,
+    });
+  });
+
+  it("does not offer a candidate live in another deck in today's counts", async () => {
+    await expect(
+      getSmartDeckTodayStats(store.db, SMART_DECK_IDS.qiraat, { limit: 10, newCardsLimit: 10 }),
+    ).resolves.toEqual({ total: 3, due: 0, newCount: 2 });
+    await expect(materializeSmartDeckCards(store.db, SMART_DECK_IDS.qiraat, 10, 10)).resolves.toBe(2);
   });
 });

@@ -583,9 +583,9 @@ export async function getSmartDeckStats(
   if (ids.length === 0) return { total: 0, due: 0, newCount: 0 };
 
   const now = new Date().toISOString();
-  const rows = await getStudyCardsByIds(db, ids, deckId);
-  const existing = new Set(rows.map((row) => row.id));
-  const missing = ids.filter((id) => !existing.has(id)).length;
+  const [rows, live] = await Promise.all([getStudyCardsByIds(db, ids, deckId), getLiveStudyCardIds(db, ids)]);
+  // A candidate live in another deck is that deck's card; materialization skips it, so it is not new here.
+  const missing = ids.filter((id) => !live.has(id)).length;
   return {
     total: ids.length,
     due: rows.filter((row) => row.due <= now && isReviewableCard(row, now)).length + missing,
@@ -606,13 +606,12 @@ export async function getSmartDeckTodayStats(
 
   const now = new Date().toISOString();
   const normalized = normalizeDueOptions(options);
-  const rows = await getStudyCardsByIds(db, ids, deckId);
-  const existing = new Set(rows.map((row) => row.id));
+  const [rows, live] = await Promise.all([getStudyCardsByIds(db, ids, deckId), getLiveStudyCardIds(db, ids)]);
   const dueRows = rows
     .filter((row) => row.due <= now && isReviewableCard(row, now))
     .sort((a, b) => a.due.localeCompare(b.due));
   const missingRows = ids
-    .filter((id) => !existing.has(id))
+    .filter((id) => !live.has(id))
     .slice(0, normalized.newCardsLimit)
     .map((id) => {
       const emptyCard = createEmptyCard();
