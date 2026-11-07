@@ -1,4 +1,5 @@
 import type { SQLiteDatabase } from "expo-sqlite";
+import { compareSyncTimestamps, syncTimestampSchema } from "@/lib/database/sync-timestamps";
 import { enqueueSync } from "@/lib/database/sync-queue";
 import { useAuthStore } from "@/lib/auth/store";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
@@ -74,6 +75,13 @@ type LocalPrivateNoteRow = {
 };
 
 type QfSyncOwner = QfSessionOwner;
+
+function compareQfTimestamps(left: string, right: string): -1 | 0 | 1 {
+  if (syncTimestampSchema.safeParse(left).success && syncTimestampSchema.safeParse(right).success) {
+    return compareSyncTimestamps(left, right);
+  }
+  return left < right ? -1 : left > right ? 1 : 0;
+}
 
 function captureQfSyncOwner(): QfSyncOwner | null {
   if (!isSupabaseConfigured()) return null;
@@ -492,7 +500,7 @@ async function mergeRemoteBookmark(db: SQLiteDatabase, remote: QfBookmark): Prom
   ]);
   const remoteCreatedAt = remote.createdAt || new Date().toISOString();
 
-  if (local?.deleted_at && local.updated_at > remoteCreatedAt) {
+  if (local?.deleted_at && compareQfTimestamps(local.updated_at, remoteCreatedAt) > 0) {
     return false;
   }
 
@@ -541,7 +549,9 @@ async function attachQfBookmark(
   options.requireCurrent?.();
   const now = new Date().toISOString();
   const updatedAt =
-    options.updateActiveState && local.updated_at < remote.createdAt ? remote.createdAt : local.updated_at;
+    options.updateActiveState && compareQfTimestamps(local.updated_at, remote.createdAt) < 0
+      ? remote.createdAt
+      : local.updated_at;
   const nextDeletedAt = options.updateActiveState ? null : local.deleted_at;
   const shouldEnqueueSupabase =
     local.qf_bookmark_id !== remote.id ||
@@ -597,7 +607,7 @@ async function tombstoneMissingRemoteBookmarks(
   for (const row of rows) {
     if (!row.qf_bookmark_id || remoteIds.has(row.qf_bookmark_id)) continue;
     const localId = bookmarkLocalId(row.surah, row.ayah);
-    if (pending.has(localId) || row.updated_at >= startedAt) continue;
+    if (pending.has(localId) || compareQfTimestamps(row.updated_at, startedAt) >= 0) continue;
     await db.runAsync(
       "UPDATE bookmarks SET updated_at = ?, deleted_at = ?, qf_synced_at = ?, qf_sync_error = NULL WHERE surah = ? AND ayah = ?",
       [now, now, now, row.surah, row.ayah],
@@ -630,7 +640,7 @@ async function mergeRemoteNote(db: SQLiteDatabase, remote: QfNote): Promise<bool
   const rangesJson = JSON.stringify(remote.ranges);
 
   if (localByQfId) {
-    if (localByQfId.updated_at >= updatedAt) {
+    if (compareQfTimestamps(localByQfId.updated_at, updatedAt) >= 0) {
       await attachQfNote(db, localByQfId.id, remote, remote.ranges, {
         enqueueSupabase: false,
         enqueueMainSync: enqueueSync,
@@ -809,7 +819,7 @@ async function tombstoneMissingRemoteNotes(
   const now = new Date().toISOString();
   for (const row of rows) {
     if (!row.qf_note_id || remoteIds.has(row.qf_note_id)) continue;
-    if (pending.has(row.id) || row.updated_at >= startedAt) continue;
+    if (pending.has(row.id) || compareQfTimestamps(row.updated_at, startedAt) >= 0) continue;
     await db.runAsync(
       "UPDATE private_notes SET updated_at = ?, deleted_at = ?, qf_synced_at = ?, qf_sync_error = NULL WHERE id = ?",
       [now, now, now, row.id],

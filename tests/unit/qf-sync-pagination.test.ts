@@ -132,6 +132,7 @@ beforeEach(async () => {
     .run(OLD, OLD);
 });
 afterEach(() => {
+  jest.useRealTimers();
   sql.close();
   mockSession = null;
   observeAuthSession(null);
@@ -594,5 +595,471 @@ it.each(queueAbortCases)(
       expect(row).toBeDefined();
       expect(queuedPayload).toMatchObject(row ?? {});
     }
+  },
+);
+
+const FROZEN_SYNC_START = "2026-11-07T12:00:00.000Z";
+const LOCAL_AFTER_START = "2026-11-07T11:30:00-01:00"; // 12:30Z
+const LOCAL_BEFORE_START = "2026-11-07T12:30:00+01:00"; // 11:30Z
+
+function freezeSyncStart() {
+  jest.useFakeTimers();
+  jest.setSystemTime(new Date(FROZEN_SYNC_START));
+}
+function stubRemoteCollections(bookmarks: (typeof remoteBookmark)[], notes: (typeof remoteNote)[]) {
+  mockPage = (entity) =>
+    entity === "bookmarks" ? { ok: true, bookmarks, nextCursor: null } : { ok: true, notes, nextCursor: null };
+}
+
+it.each([
+  {
+    mode: "full" as const,
+    localUpdatedAt: "2026-11-07T12:00:00.000Z",
+    remoteCreatedAt: "2026-11-07T13:00:00+02:00",
+    deleted: true,
+  },
+  {
+    mode: "full" as const,
+    localUpdatedAt: "2026-11-07T13:00:00+02:00",
+    remoteCreatedAt: "2026-11-07T12:00:00.000Z",
+    deleted: false,
+  },
+  {
+    mode: "initial" as const,
+    localUpdatedAt: "2026-11-07T12:00:00.000Z",
+    remoteCreatedAt: "2026-11-07T13:00:00+02:00",
+    deleted: true,
+  },
+  {
+    mode: "initial" as const,
+    localUpdatedAt: "2026-11-07T13:00:00+02:00",
+    remoteCreatedAt: "2026-11-07T12:00:00.000Z",
+    deleted: false,
+  },
+])(
+  "uses bookmark tombstone instant ordering during $mode reconciliation: local $localUpdatedAt, remote $remoteCreatedAt",
+  async ({ mode, localUpdatedAt, remoteCreatedAt, deleted }) => {
+    freezeSyncStart();
+    prepare(mode);
+    sql.prepare("UPDATE bookmarks SET updated_at=?,deleted_at=? WHERE ayah=255").run(localUpdatedAt, localUpdatedAt);
+    sql.prepare("UPDATE private_notes SET deleted_at=? WHERE id='local-note-tail'").run(OLD);
+    stubRemoteCollections(
+      [{ ...remoteBookmark, id: "remote-bookmark-tail", ayah: 255, createdAt: remoteCreatedAt }],
+      [],
+    );
+    await expect(run(mode)).resolves.toMatchObject({ status: "synced" });
+    expect(sql.prepare("SELECT updated_at,deleted_at FROM bookmarks WHERE ayah=255").get()).toEqual({
+      updated_at: deleted ? localUpdatedAt : remoteCreatedAt,
+      deleted_at: deleted ? localUpdatedAt : null,
+    });
+  },
+);
+
+it.each([
+  {
+    localUpdatedAt: "2026-11-07T12:00:00.000Z",
+    remoteCreatedAt: "2026-11-07T13:00:00+02:00",
+    expectedUpdatedAt: "2026-11-07T12:00:00.000Z",
+  },
+  {
+    localUpdatedAt: "2026-11-07T13:00:00+02:00",
+    remoteCreatedAt: "2026-11-07T12:00:00.000Z",
+    expectedUpdatedAt: "2026-11-07T12:00:00.000Z",
+  },
+])(
+  "keeps or advances bookmark metadata by instant during full reconciliation: local $localUpdatedAt, remote $remoteCreatedAt",
+  async ({ localUpdatedAt, remoteCreatedAt, expectedUpdatedAt }) => {
+    freezeSyncStart();
+    prepare("full");
+    sql.prepare("UPDATE bookmarks SET updated_at=? WHERE ayah=255").run(localUpdatedAt);
+    sql.prepare("UPDATE private_notes SET deleted_at=? WHERE id='local-note-tail'").run(OLD);
+    stubRemoteCollections(
+      [{ ...remoteBookmark, id: "remote-bookmark-tail", ayah: 255, createdAt: remoteCreatedAt }],
+      [],
+    );
+    await expect(run("full")).resolves.toMatchObject({ status: "synced" });
+    expect(sql.prepare("SELECT updated_at,deleted_at FROM bookmarks WHERE ayah=255").get()).toEqual({
+      updated_at: expectedUpdatedAt,
+      deleted_at: null,
+    });
+    if (expectedUpdatedAt === remoteCreatedAt && expectedUpdatedAt !== localUpdatedAt) {
+      const queued = sql
+        .prepare("SELECT data FROM sync_queue WHERE table_name='bookmarks' AND row_id='2:255'")
+        .get() as { data: string } | undefined;
+      expect(JSON.parse(queued?.data ?? "null")).toMatchObject({
+        updated_at: remoteCreatedAt,
+        qf_bookmark_id: "remote-bookmark-tail",
+      });
+    }
+  },
+);
+
+it.each([
+  {
+    localUpdatedAt: "2026-11-07T12:00:00.000Z",
+    remoteUpdatedAt: "2026-11-07T13:00:00+02:00",
+    expectedContent: "Newer local note",
+    expectedUpdatedAt: "2026-11-07T12:00:00.000Z",
+  },
+  {
+    localUpdatedAt: "2026-11-07T13:00:00+02:00",
+    remoteUpdatedAt: "2026-11-07T12:00:00.000Z",
+    expectedContent: "Newer remote note",
+    expectedUpdatedAt: "2026-11-07T12:00:00.000Z",
+  },
+])(
+  "preserves the newer linked note by instant during full reconciliation: local $localUpdatedAt, remote $remoteUpdatedAt",
+  async ({ localUpdatedAt, remoteUpdatedAt, expectedContent, expectedUpdatedAt }) => {
+    freezeSyncStart();
+    prepare("full");
+    sql.prepare("UPDATE bookmarks SET deleted_at=? WHERE ayah=255").run(OLD);
+    sql
+      .prepare("UPDATE private_notes SET content=?,updated_at=? WHERE id='local-note-tail'")
+      .run("Newer local note", localUpdatedAt);
+    stubRemoteCollections(
+      [],
+      [
+        {
+          ...remoteNote,
+          id: "remote-note-tail",
+          body: "Newer remote note",
+          ranges: ["2:255-2:255"],
+          updatedAt: remoteUpdatedAt,
+        },
+      ],
+    );
+    await expect(run("full")).resolves.toMatchObject({ status: "synced" });
+    expect(
+      sql.prepare("SELECT content,updated_at,deleted_at FROM private_notes WHERE id='local-note-tail'").get(),
+    ).toEqual({
+      content: expectedContent,
+      updated_at: expectedUpdatedAt,
+      deleted_at: null,
+    });
+    if (expectedContent === "Newer remote note") {
+      const queued = sql
+        .prepare("SELECT data FROM sync_queue WHERE table_name='private_notes' AND row_id='local-note-tail'")
+        .get() as { data: string } | undefined;
+      expect(JSON.parse(queued?.data ?? "null")).toMatchObject({
+        content: "Newer remote note",
+        updated_at: expectedUpdatedAt,
+        qf_note_id: "remote-note-tail",
+      });
+    }
+  },
+);
+
+it.each([
+  { entity: "bookmarks" as const, localUpdatedAt: LOCAL_AFTER_START, deleted: false },
+  { entity: "bookmarks" as const, localUpdatedAt: LOCAL_BEFORE_START, deleted: true },
+  { entity: "notes" as const, localUpdatedAt: LOCAL_AFTER_START, deleted: false },
+  { entity: "notes" as const, localUpdatedAt: LOCAL_BEFORE_START, deleted: true },
+])(
+  "applies the $entity missing-row cutoff by instant for local $localUpdatedAt",
+  async ({ entity, localUpdatedAt, deleted }) => {
+    freezeSyncStart();
+    prepare("full");
+    sql.prepare("UPDATE bookmarks SET updated_at=? WHERE ayah=255").run(localUpdatedAt);
+    sql.prepare("UPDATE private_notes SET updated_at=? WHERE id='local-note-tail'").run(localUpdatedAt);
+    stubRemoteCollections([], []);
+    await expect(run("full")).resolves.toMatchObject({ status: "synced" });
+    const row =
+      entity === "bookmarks"
+        ? sql.prepare("SELECT updated_at,deleted_at FROM bookmarks WHERE ayah=255").get()
+        : sql.prepare("SELECT updated_at,deleted_at FROM private_notes WHERE id='local-note-tail'").get();
+    if (deleted) {
+      expect(row).toEqual({ updated_at: FROZEN_SYNC_START, deleted_at: FROZEN_SYNC_START });
+      const queued = sql.prepare("SELECT row_id,data FROM sync_queue ORDER BY id").all() as {
+        row_id: string;
+        data: string;
+      }[];
+      expect(queued).toHaveLength(2);
+      expect(queued.map(({ row_id, data }) => ({ row_id, ...JSON.parse(data) }))).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ row_id: "2:255", updated_at: FROZEN_SYNC_START, deleted_at: FROZEN_SYNC_START }),
+          expect.objectContaining({
+            row_id: "local-note-tail",
+            updated_at: FROZEN_SYNC_START,
+            deleted_at: FROZEN_SYNC_START,
+          }),
+        ]),
+      );
+    } else {
+      expect(row).toEqual({ updated_at: localUpdatedAt, deleted_at: null });
+      expect(sql.prepare("SELECT COUNT(*) AS count FROM sync_queue").get()).toEqual({ count: 0 });
+    }
+  },
+);
+
+it("preserves each operator's distinct exact-instant tie behavior", async () => {
+  freezeSyncStart();
+  prepare("full");
+  const bookmarkLocalTime = "2026-11-07T12:00:00.000Z";
+  const bookmarkEquivalentRemoteTime = "2026-11-07T14:00:00.000+02:00";
+  sql
+    .prepare("UPDATE bookmarks SET updated_at=?,deleted_at=? WHERE ayah=255")
+    .run(bookmarkLocalTime, bookmarkLocalTime);
+  sql
+    .prepare("UPDATE private_notes SET content='Tie local note',updated_at=? WHERE id='local-note-tail'")
+    .run("2026-11-07T12:00:00.1000Z");
+  stubRemoteCollections(
+    [{ ...remoteBookmark, id: "remote-bookmark-tail", ayah: 255, createdAt: bookmarkEquivalentRemoteTime }],
+    [
+      {
+        ...remoteNote,
+        id: "remote-note-tail",
+        body: "Tie remote note",
+        ranges: ["2:255-2:255"],
+        updatedAt: "2026-11-07T14:00:00.100+02:00",
+      },
+    ],
+  );
+
+  await expect(run("full")).resolves.toMatchObject({ status: "synced" });
+  expect(sql.prepare("SELECT updated_at,deleted_at FROM bookmarks WHERE ayah=255").get()).toEqual({
+    updated_at: bookmarkLocalTime,
+    deleted_at: null,
+  });
+  expect(sql.prepare("SELECT content,updated_at FROM private_notes WHERE id='local-note-tail'").get()).toEqual({
+    content: "Tie local note",
+    updated_at: "2026-11-07T12:00:00.1000Z",
+  });
+});
+
+it.each([
+  {
+    localUpdatedAt: "2026-11-07T12:00:00.1001Z",
+    remoteUpdatedAt: "2026-11-07T14:00:00.100+02:00",
+    expectedContent: "Newer local note",
+    expectedUpdatedAt: "2026-11-07T12:00:00.1001Z",
+  },
+  {
+    localUpdatedAt: "2026-11-07T12:00:00.100Z",
+    remoteUpdatedAt: "2026-11-07T14:00:00.1001+02:00",
+    expectedContent: "Newer remote note",
+    expectedUpdatedAt: "2026-11-07T14:00:00.1001+02:00",
+  },
+])(
+  "orders distinct sub-millisecond linked note instants: local $localUpdatedAt, remote $remoteUpdatedAt",
+  async ({ localUpdatedAt, remoteUpdatedAt, expectedContent, expectedUpdatedAt }) => {
+    freezeSyncStart();
+    prepare("full");
+    sql.prepare("UPDATE bookmarks SET deleted_at=? WHERE ayah=255").run(OLD);
+    sql
+      .prepare("UPDATE private_notes SET content='Newer local note',updated_at=? WHERE id='local-note-tail'")
+      .run(localUpdatedAt);
+    stubRemoteCollections(
+      [],
+      [
+        {
+          ...remoteNote,
+          id: "remote-note-tail",
+          body: "Newer remote note",
+          ranges: ["2:255-2:255"],
+          updatedAt: remoteUpdatedAt,
+        },
+      ],
+    );
+
+    await expect(run("full")).resolves.toMatchObject({ status: "synced" });
+    expect(sql.prepare("SELECT content,updated_at FROM private_notes WHERE id='local-note-tail'").get()).toEqual({
+      content: expectedContent,
+      updated_at: expectedUpdatedAt,
+    });
+  },
+);
+
+it.each(["bookmarks", "notes"] as const)("preserves $entity rows at an exact snapshot cutoff tie", async (entity) => {
+  freezeSyncStart();
+  prepare("full");
+  sql.prepare("UPDATE bookmarks SET updated_at=? WHERE ayah=255").run(FROZEN_SYNC_START);
+  sql.prepare("UPDATE private_notes SET updated_at=? WHERE id='local-note-tail'").run(FROZEN_SYNC_START);
+  stubRemoteCollections([], []);
+
+  await expect(run("full")).resolves.toMatchObject({ status: "synced", pulled: 0 });
+  const row =
+    entity === "bookmarks"
+      ? sql.prepare("SELECT updated_at,deleted_at FROM bookmarks WHERE ayah=255").get()
+      : sql.prepare("SELECT updated_at,deleted_at FROM private_notes WHERE id='local-note-tail'").get();
+  expect(row).toEqual({ updated_at: FROZEN_SYNC_START, deleted_at: null });
+  expect(sql.prepare("SELECT COUNT(*) AS count FROM sync_queue").get()).toEqual({ count: 0 });
+});
+
+type LegacyTimestampCase = {
+  kind: "tombstone" | "bookmark" | "note" | "missing-bookmark" | "missing-note";
+  label: string;
+  local: string;
+  remote?: string;
+  winner: "local" | "remote";
+};
+const legacyTimestampCases: LegacyTimestampCase[] = [
+  { kind: "tombstone", label: "opaque local-newer", local: "zz-opaque", remote: "aa-opaque", winner: "local" },
+  { kind: "tombstone", label: "opaque remote-newer", local: "aa-opaque", remote: "zz-opaque", winner: "remote" },
+  { kind: "bookmark", label: "opaque local-newer", local: "zz-opaque", remote: "aa-opaque", winner: "local" },
+  { kind: "bookmark", label: "opaque remote-newer", local: "aa-opaque", remote: "zz-opaque", winner: "remote" },
+  { kind: "note", label: "opaque local-newer", local: "zz-opaque", remote: "aa-opaque", winner: "local" },
+  { kind: "note", label: "opaque remote-newer", local: "aa-opaque", remote: "zz-opaque", winner: "remote" },
+  { kind: "missing-bookmark", label: "opaque local-newer", local: "zz-opaque", winner: "local" },
+  { kind: "missing-bookmark", label: "opaque remote-newer", local: "0-opaque", winner: "remote" },
+  { kind: "missing-note", label: "opaque local-newer", local: "zz-opaque", winner: "local" },
+  { kind: "missing-note", label: "opaque remote-newer", local: "0-opaque", winner: "remote" },
+  {
+    kind: "tombstone",
+    label: "mixed valid-local and legacy-remote",
+    local: "2026-11-07T12:00:00Z",
+    remote: "2026-11-07T12:00:00",
+    winner: "local",
+  },
+  {
+    kind: "tombstone",
+    label: "mixed legacy-local and valid-remote",
+    local: "2026-11-07T12:00:00",
+    remote: "2026-11-07T12:00:00Z",
+    winner: "remote",
+  },
+  {
+    kind: "bookmark",
+    label: "mixed valid-local and legacy-remote",
+    local: "2026-11-07T12:00:00Z",
+    remote: "2026-11-07T12:00:00",
+    winner: "local",
+  },
+  {
+    kind: "bookmark",
+    label: "mixed legacy-local and valid-remote",
+    local: "2026-11-07T12:00:00",
+    remote: "2026-11-07T12:00:00Z",
+    winner: "remote",
+  },
+  {
+    kind: "note",
+    label: "mixed valid-local and legacy-remote",
+    local: "2026-11-07T12:00:00Z",
+    remote: "2026-11-07T12:00:00",
+    winner: "local",
+  },
+  {
+    kind: "note",
+    label: "mixed legacy-local and valid-remote",
+    local: "2026-11-07T12:00:00",
+    remote: "2026-11-07T12:00:00Z",
+    winner: "remote",
+  },
+  {
+    kind: "missing-bookmark",
+    label: "mixed legacy-local after cutoff",
+    local: "2026-11-07T12:00:00z",
+    winner: "local",
+  },
+  {
+    kind: "missing-bookmark",
+    label: "mixed legacy-local before cutoff",
+    local: "2026-11-07T12:00:00",
+    winner: "remote",
+  },
+  { kind: "missing-note", label: "mixed legacy-local after cutoff", local: "2026-11-07T12:00:00z", winner: "local" },
+  { kind: "missing-note", label: "mixed legacy-local before cutoff", local: "2026-11-07T12:00:00", winner: "remote" },
+];
+
+it.each(legacyTimestampCases)(
+  "preserves the legacy lexical result for $kind with $label timestamps",
+  async ({ kind, local, remote, winner }) => {
+    freezeSyncStart();
+    prepare("full");
+    sql.prepare("UPDATE bookmarks SET deleted_at=? WHERE ayah=255").run(OLD);
+    sql.prepare("UPDATE private_notes SET deleted_at=? WHERE id='local-note-tail'").run(OLD);
+
+    if (kind === "tombstone") {
+      sql.prepare("UPDATE bookmarks SET updated_at=?,deleted_at=? WHERE ayah=255").run(local, local);
+      stubRemoteCollections([{ ...remoteBookmark, id: "remote-bookmark-tail", ayah: 255, createdAt: remote! }], []);
+      await expect(run("full")).resolves.toMatchObject({ status: "synced" });
+      expect(sql.prepare("SELECT updated_at,deleted_at FROM bookmarks WHERE ayah=255").get()).toEqual(
+        winner === "local" ? { updated_at: local, deleted_at: local } : { updated_at: remote, deleted_at: null },
+      );
+      return;
+    }
+
+    if (kind === "bookmark") {
+      sql.prepare("UPDATE bookmarks SET deleted_at=NULL,updated_at=? WHERE ayah=255").run(local);
+      stubRemoteCollections([{ ...remoteBookmark, id: "remote-bookmark-tail", ayah: 255, createdAt: remote! }], []);
+      await expect(run("full")).resolves.toMatchObject({ status: "synced" });
+      const expectedUpdatedAt = winner === "local" ? local : remote;
+      expect(sql.prepare("SELECT updated_at FROM bookmarks WHERE ayah=255").get()).toEqual({
+        updated_at: expectedUpdatedAt,
+      });
+      if (winner === "remote") {
+        const queued = sql
+          .prepare("SELECT data FROM sync_queue WHERE table_name='bookmarks' AND row_id='2:255'")
+          .get() as { data: string } | undefined;
+        expect(JSON.parse(queued?.data ?? "null")).toMatchObject({
+          updated_at: remote,
+          qf_bookmark_id: "remote-bookmark-tail",
+        });
+      }
+      return;
+    }
+
+    if (kind === "note") {
+      sql
+        .prepare(
+          "UPDATE private_notes SET deleted_at=NULL,content='Local legacy note',updated_at=? WHERE id='local-note-tail'",
+        )
+        .run(local);
+      stubRemoteCollections(
+        [],
+        [
+          {
+            ...remoteNote,
+            id: "remote-note-tail",
+            body: "Remote legacy note",
+            ranges: ["2:255-2:255"],
+            updatedAt: remote!,
+          },
+        ],
+      );
+      await expect(run("full")).resolves.toMatchObject({ status: "synced" });
+      expect(sql.prepare("SELECT content,updated_at FROM private_notes WHERE id='local-note-tail'").get()).toEqual(
+        winner === "local"
+          ? { content: "Local legacy note", updated_at: local }
+          : { content: "Remote legacy note", updated_at: remote },
+      );
+      if (winner === "remote") {
+        const queued = sql
+          .prepare("SELECT data FROM sync_queue WHERE table_name='private_notes' AND row_id='local-note-tail'")
+          .get() as { data: string } | undefined;
+        expect(JSON.parse(queued?.data ?? "null")).toMatchObject({
+          content: "Remote legacy note",
+          updated_at: remote,
+          qf_note_id: "remote-note-tail",
+        });
+      }
+      return;
+    }
+
+    if (kind === "missing-bookmark") {
+      sql.prepare("UPDATE bookmarks SET deleted_at=NULL,updated_at=? WHERE ayah=255").run(local);
+    } else {
+      sql.prepare("UPDATE private_notes SET deleted_at=NULL,updated_at=? WHERE id='local-note-tail'").run(local);
+    }
+    stubRemoteCollections([], []);
+    await expect(run("full")).resolves.toMatchObject({ status: "synced" });
+    const rowId = kind === "missing-bookmark" ? "2:255" : "local-note-tail";
+    const row =
+      kind === "missing-bookmark"
+        ? sql.prepare("SELECT updated_at,deleted_at FROM bookmarks WHERE ayah=255").get()
+        : sql.prepare("SELECT updated_at,deleted_at FROM private_notes WHERE id='local-note-tail'").get();
+
+    if (winner === "local") {
+      expect(row).toEqual({ updated_at: local, deleted_at: null });
+      expect(sql.prepare("SELECT COUNT(*) AS count FROM sync_queue").get()).toEqual({ count: 0 });
+      return;
+    }
+
+    expect(row).toEqual({ updated_at: FROZEN_SYNC_START, deleted_at: FROZEN_SYNC_START });
+    const queued = sql.prepare("SELECT data FROM sync_queue WHERE row_id=?").get(rowId) as { data: string } | undefined;
+    expect(JSON.parse(queued?.data ?? "null")).toMatchObject({
+      updated_at: FROZEN_SYNC_START,
+      deleted_at: FROZEN_SYNC_START,
+    });
   },
 );
