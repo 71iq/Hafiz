@@ -23818,24 +23818,23 @@
     }
   ],
   "checkpoint": {
-    "time": "2026-11-07T20:03:24.653824+00:00",
-    "current_task": "next by priority after RF-184 (open: RF-169, RF-025, RF-032, RF-180, RF-183, RF-186, RF-188, RF-189, ...)",
+    "time": "2026-11-07T20:49:43.211406+00:00",
+    "current_task": "RF-183 (investigated: ensureStudyCardRow revives tombstones; throw a typed StudyCardDeletedError there and in putCardRow, and have the session skip the card with a bilingual notice; smart-deck materialization revival is intended and stays)",
     "open_follow_ups": [
-      "RF-180",
       "RF-182",
       "RF-183",
-      "RF-184",
       "RF-186",
       "RF-187",
       "RF-188",
+      "RF-189",
       "onboarding 'Skip for now' skips step 3 (confirm intent)"
     ],
     "decisions_waiting_on_ehab": [
-      "Apply RF-166, RF-170 and RF-169 migrations to the deployed database",
+      "Apply RF-166, RF-170 and RF-169 migrations to the deployed database (explained; awaiting explicit go-ahead)",
       "Final push after all work is verified"
     ],
-    "last_green_commit": "5aff3d2 (full 20-check batch gate: 3,099 unit, 35 Chrome)",
+    "last_green_commit": "447e375 (full 20-check batch gate: 3,115 unit, 35 Chrome)",
     "uncommitted": null,
-    "device": "Samsung SM-A546E over USB; QA app com.anonymous.hafiz.qa installed; build with scripts/android-qa-build.sh"
+    "device": "Samsung SM-A546E may be unplugged; replug for RF-186/RF-187/RF-189. QA app com.anonymous.hafiz.qa; build with scripts/android-qa-build.sh"
   }
 }
