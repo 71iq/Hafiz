@@ -1087,9 +1087,12 @@ async function updateStudyCardInTransaction(
   return updated;
 }
 
-/** Write a card's scheduling state and queue its upload with the given executor. */
+/**
+ * Write a card's scheduling state and queue its upload with the given executor. A card deleted
+ * meanwhile, for example by a sync pull, is not revived: the write fails and nothing is queued.
+ */
 export async function putCardRow(db: DatabaseExecutor, card: StudyCardRow): Promise<void> {
-  await db.runAsync(
+  const result = await db.runAsync(
     `UPDATE study_cards SET
       due = ?, stability = ?, difficulty = ?, elapsed_days = ?, scheduled_days = ?,
       learning_steps = ?, reps = ?, lapses = ?, state = ?, last_review = ?,
@@ -1102,6 +1105,7 @@ export async function putCardRow(db: DatabaseExecutor, card: StudyCardRow): Prom
       card.id,
     ]
   );
+  if ((result.changes ?? 0) === 0) throw new Error("This card was deleted and can no longer be updated.");
 
   await enqueueSync(db, "study_cards", "UPDATE", card.id, cardToSyncData(card));
 }

@@ -62,6 +62,22 @@ describe("RF-177 reviews, card actions and their upload queue", () => {
     unsubscribe();
   });
 
+  it("does not revive a card that was deleted while it was being graded (RF-181)", async () => {
+    const loaded = await setStudyCardMarked(store.db, DECK, CARD, false);
+    // For example, a sync pull or another tab deletes the card during the session.
+    await deleteStudyCard(store.db, DECK, CARD);
+    const queuedBefore = count("sync_queue");
+    const transition = calculateReviewTransition({ card: loaded, rating: Rating.Good, reviewedAt: new Date() });
+
+    await expect(persistReviewTransition({ db: store.db, cardId: CARD, transition })).rejects.toThrow(
+      "This card was deleted",
+    );
+
+    expect(card()?.deleted_at).toEqual(expect.any(String));
+    expect(count("study_log")).toBe(0);
+    expect(count("sync_queue")).toBe(queuedBefore);
+  });
+
   it("creates no card when a first card action cannot be queued", async () => {
     // A first action creates the card row, then updates it; fail the update's queue write.
     store.failQueueInsert(2);

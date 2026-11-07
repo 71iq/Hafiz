@@ -22636,18 +22636,203 @@
       ],
       "modules": [
         "lib/fsrs/queries.ts",
-        "lib/fsrs/persist-review.ts"
+        "tests/unit/review-outbox.test.ts"
       ],
       "acceptance_criteria": [
         "Queue the card update only when a live row changed; a grade on a deleted card fails visibly through the existing review error and writes no log. Causal real-SQLite test. Full controller checks, independent review and primary acceptance."
       ],
       "approved": true,
-      "status": "pending",
-      "attempts": 0,
+      "status": "verified",
+      "attempts": 1,
       "implementation_mode": "implementation",
-      "files": [],
-      "allowed_paths": [],
-      "verification": []
+      "files": [
+        "lib/fsrs/queries.ts",
+        "tests/unit/review-outbox.test.ts"
+      ],
+      "allowed_paths": [
+        "lib/fsrs/queries.ts",
+        "tests/unit/review-outbox.test.ts"
+      ],
+      "verification": [
+        [
+          "git",
+          "diff",
+          "--check"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "tests/unit/review-outbox.test.ts",
+          "docs/refactoring/PROGRESS.md"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/fsrs/queries.ts",
+          "tests/unit/review-outbox.test.ts",
+          "--max-warnings=0"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "check:analysis"
+        ],
+        [
+          "npm",
+          "run",
+          "postinstall"
+        ],
+        [
+          "npm",
+          "ls",
+          "--all",
+          "--json"
+        ],
+        [
+          "npm",
+          "run",
+          "lint",
+          "--",
+          "--format",
+          "json"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit"
+        ],
+        [
+          "node",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/tests/brace-expansion.test.cjs",
+          "scripts/tests/dependency-boundaries.test.cjs",
+          "scripts/tests/icon-tool.test.cjs",
+          "scripts/tests/jest-config.test.cjs",
+          "scripts/tests/js-yaml.test.cjs",
+          "scripts/tests/lint-coverage.test.cjs",
+          "scripts/tests/metro-unicode.test.cjs",
+          "scripts/tests/nanoid.test.cjs",
+          "scripts/tests/router-dependency-range.test.cjs",
+          "scripts/tests/security-dependency-owner.test.cjs",
+          "scripts/tests/source-map-js.test.cjs",
+          "scripts/tests/tailwind-source-map.test.cjs",
+          "scripts/tests/ws.test.cjs",
+          "scripts/tests/xmldom.test.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "test:refactor-runner"
+        ],
+        [
+          "python3",
+          "-B",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "scripts/tests",
+          "-p",
+          "test_*.py"
+        ],
+        [
+          "npm",
+          "run",
+          "check:native-config"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=4096",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "android",
+          "--output-dir",
+          ".expo/modernization-checks/android",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/android')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=3072",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "ios",
+          "--output-dir",
+          ".expo/modernization-checks/ios",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/ios')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8197",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts",
+          "tests/e2e/database-bridge.spec.ts",
+          "tests/e2e/tafsir-import.spec.ts",
+          "tests/e2e/translation-import.spec.ts"
+        ]
+      ],
+      "started_at": "2026-11-07T16:47:00.757741+00:00",
+      "focused_validation": {
+        "pre_fix": "The new real-SQLite case failed on the original source: grading a soft-deleted card resolved and queued an UPDATE with deleted_at null.",
+        "post_fix": "All 5 review-outbox cases and the full Jest suite (157 suites/3,099 cases) pass; typecheck and scoped zero-warning lint pass."
+      },
+      "completed_at": "2026-11-07T16:55:54.283109+00:00",
+      "primary_accepted_at": "2026-11-07T16:55:54.283109+00:00",
+      "independent_review": "pass",
+      "evidence": "docs/refactoring/PROGRESS.md",
+      "summary": "putCardRow refuses to update or queue a card deleted meanwhile, so grading a just-deleted card fails with the existing review error and writes no log instead of reviving it. All 20 full checks (3,099 unit, 35 Chrome) and independent review pass."
     },
     {
       "id": "RF-182",
@@ -22663,6 +22848,30 @@
       ],
       "acceptance_criteria": [
         "Exclude ids live in any deck when counting missing cards; regression test. Full controller checks, independent review and primary acceptance."
+      ],
+      "approved": true,
+      "status": "pending",
+      "attempts": 0,
+      "implementation_mode": "implementation",
+      "files": [],
+      "allowed_paths": [],
+      "verification": []
+    },
+    {
+      "id": "RF-183",
+      "title": "Keep session card actions from reviving a just-deleted card",
+      "priority": 2,
+      "risk": "low",
+      "description": "RF181 review: suspend, bury, mark, reset and due-date actions use ensureStudyCardRow, whose ON CONFLICT ... WHERE deleted_at IS NOT NULL revives a card deleted after the session loaded it, as an empty card with a queued INSERT. Grading such a card now fails every retry; the session could skip it instead.",
+      "dependencies": [
+        "RF-181"
+      ],
+      "modules": [
+        "lib/fsrs/queries.ts",
+        "app/flashcards/session.tsx"
+      ],
+      "acceptance_criteria": [
+        "Session actions on a deleted card fail without reviving it; grading or acting on a deleted card advances past it with a bilingual notice using a typed error. Tests for both. Full controller checks, independent review and primary acceptance."
       ],
       "approved": true,
       "status": "pending",
