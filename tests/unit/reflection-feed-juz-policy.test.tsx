@@ -23,7 +23,7 @@ jest.mock("@tanstack/react-query", () => ({
     refetch: mockForbidden,
     fetchNextPage: mockForbidden,
   }),
-  useQueryClient: () => ({ invalidateQueries: mockForbidden }),
+  useQueryClient: () => ({ invalidateQueries: mockForbidden, getQueryState: () => ({ dataUpdateCount: 1 }) }),
 }));
 jest.mock("expo-router", () => ({ router: { push: mockForbidden } }));
 jest.mock("@/lib/database/provider", () => ({ useDatabase: () => ({ getAllAsync: mockForbidden }) }));

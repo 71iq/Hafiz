@@ -1,18 +1,18 @@
 import { reflectionQueryKeys } from "@/lib/reflections/query-keys";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useLayoutEffect } from "react";
 import { View, Text, Pressable, ActivityIndicator, useWindowDimensions } from "react-native";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { Input } from "@/components/ui/Input";
 import { useAuthStore } from "@/lib/auth/store";
 import { useSettings } from "@/lib/settings/context";
-import { useStrings } from "@/lib/i18n/useStrings";
+import { useStrings, interpolate } from "@/lib/i18n/useStrings";
 import { createReflection } from "@/lib/reflections/api";
 import { useDatabase } from "@/lib/database/provider";
 import { recordAchievementEvent } from "@/lib/achievements/queries";
 import { useQueryClient } from "@tanstack/react-query";
-import { interpolate } from "@/lib/i18n/useStrings";
 import { router } from "expo-router";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
+import { useReflectionMutationScope } from "./use-mutation-scope";
 import { findJuzForAyah, loadMushafIndex } from "@/lib/mushaf/position";
 
 type Props = {
@@ -25,15 +25,7 @@ type Props = {
   onSuccess?: () => void;
 };
 
-export function WriteReflectionSheet({
-  open,
-  onClose,
-  surah,
-  ayahStart,
-  ayahEnd,
-  ayahPreview,
-  onSuccess,
-}: Props) {
+export function WriteReflectionSheet({ open, onClose, surah, ayahStart, ayahEnd, ayahPreview, onSuccess }: Props) {
   const { isDark, isRTL } = useSettings();
   const { width, height } = useWindowDimensions();
   const s = useStrings();
@@ -41,8 +33,17 @@ export function WriteReflectionSheet({
   const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
   const [content, setContent] = useState("");
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { begin, pending, retire } = useReflectionMutationScope(
+    JSON.stringify([open, surah, ayahStart, ayahEnd]),
+    user?.id,
+    db,
+  );
+  const submitting = pending.has("submit");
+  useLayoutEffect(() => {
+    setContent("");
+    setError(null);
+  }, [open, surah, ayahStart, ayahEnd, user?.id, db]);
 
   const isPhone = width < SIDEBAR_BREAKPOINT;
   const maxOverlayHeight = Math.min(height - (isPhone ? 12 : 48), isPhone ? height * 0.94 : 640);
@@ -51,11 +52,13 @@ export function WriteReflectionSheet({
   const isValid = charCount >= 10 && charCount <= 5000;
 
   const handleSubmit = useCallback(async () => {
-    if (!user || !isValid) return;
-    setSubmitting(true);
+    if (!open || !user || !isValid) return;
+    const lease = begin("submit");
+    if (!lease) return;
     setError(null);
     try {
       const mushafIndex = await loadMushafIndex(db);
+      if (!lease.isCurrent()) return;
       const juzStart = findJuzForAyah(mushafIndex, surah, ayahStart);
       const juzEnd = findJuzForAyah(mushafIndex, surah, ayahEnd);
       const reflection = await createReflection(
@@ -65,8 +68,10 @@ export function WriteReflectionSheet({
         ayahEnd,
         Math.min(juzStart, juzEnd),
         Math.max(juzStart, juzEnd),
-        content.trim()
+        content.trim(),
+        lease.isCurrent,
       );
+      if (!lease.isCurrent()) return;
       recordAchievementEvent(db, {
         type: "public_reflection_created",
         reflectionId: reflection.id,
@@ -84,21 +89,44 @@ export function WriteReflectionSheet({
       setContent("");
       onClose();
       onSuccess?.();
-    } catch (e: any) {
-      const message = e.code === "PGRST205" || e.code === "PGRST204" || e.message?.includes("schema cache")
-        ? s.reflectionSetupRequired
-        : e.message || s.reflectionPostFailed;
-      setError(message);
+    } catch (error) {
+      if (!lease.isCurrent()) return;
+      const code = error && typeof error === "object" && "code" in error ? error.code : undefined;
+      const message =
+        error && typeof error === "object" && "message" in error && typeof error.message === "string"
+          ? error.message
+          : undefined;
+      setError(
+        code === "PGRST205" || code === "PGRST204" || message?.includes("schema cache")
+          ? s.reflectionSetupRequired
+          : message || s.reflectionPostFailed,
+      );
     } finally {
-      setSubmitting(false);
+      lease.release();
     }
-  }, [user, isValid, surah, ayahStart, ayahEnd, content, queryClient, onClose, onSuccess, db]);
+  }, [
+    open,
+    user,
+    isValid,
+    begin,
+    surah,
+    ayahStart,
+    ayahEnd,
+    content,
+    queryClient,
+    onClose,
+    onSuccess,
+    db,
+    s.reflectionSetupRequired,
+    s.reflectionPostFailed,
+  ]);
 
   const handleClose = useCallback(() => {
+    if (!retire()) return;
     setContent("");
     setError(null);
     onClose();
-  }, [onClose]);
+  }, [onClose, retire]);
 
   const handleLogin = useCallback(() => {
     handleClose();
@@ -170,6 +198,7 @@ export function WriteReflectionSheet({
             )}
 
             <Input
+              editable={!submitting}
               value={content}
               onChangeText={setContent}
               placeholder={s.reflectionPlaceholder}
@@ -227,11 +256,14 @@ export function WriteReflectionSheet({
               {submitting ? (
                 <ActivityIndicator size="small" color="#FFFFFF" />
               ) : (
-                <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, color: "#FFFFFF" }}>{s.reflectionSubmit}</Text>
+                <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, color: "#FFFFFF" }}>
+                  {s.reflectionSubmit}
+                </Text>
               )}
             </Pressable>
           </>
         )}
       </OverlayBody>
     </ResponsiveSheet>
-  );}
+  );
+}

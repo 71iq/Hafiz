@@ -163,6 +163,41 @@ describe("reflection state follows active viewer and ayah", () => {
     expect(fetchReflections).toHaveBeenCalledWith(2, 1, 1, "synthetic-a");
     expect(client.getQueryData(key("synthetic-a"))).toEqual(page(true, true));
   });
+  it("admits only one manual page before a busy render", async () => {
+    const pending = deferred();
+    client.setQueryData(key("synthetic-a"), page(true, true));
+    jest.mocked(fetchReflections).mockReturnValue(pending.promise);
+    const view = render(screen());
+    const label = view.getByText(strings.en.reflectionLoadMore);
+    let target = label;
+    while (typeof target.props.onPress !== "function" && target.parent) target = target.parent;
+    const press: () => void = target.props.onPress;
+    act(() => {
+      press();
+      press();
+    });
+    expect(fetchReflections).toHaveBeenCalledTimes(1);
+    await act(async () => pending.resolve({ data: [row(true), row(false, "second-page")], hasMore: false }));
+    expect(view.getAllByTestId("synthetic-post")).toHaveLength(1);
+    expect(view.getAllByTestId("second-page")).toHaveLength(1);
+  });
+  it("a refreshed first page retires the preceding pending manual page", async () => {
+    const pending = deferred();
+    client.setQueryData(key("synthetic-a"), page(true, true));
+    jest
+      .mocked(fetchReflections)
+      .mockReturnValueOnce(pending.promise)
+      .mockResolvedValueOnce(page(false, false, "fresh-first"));
+    const view = render(screen());
+    fireEvent.press(view.getByText(strings.en.reflectionLoadMore));
+    await act(async () => {
+      await client.invalidateQueries({ queryKey: key("synthetic-a"), exact: true });
+    });
+    await waitFor(() => expect(view.getByTestId("fresh-first")).toBeTruthy());
+    await act(async () => pending.resolve(page(true, false, "obsolete-page")));
+    expect(view.queryByTestId("obsolete-page")).toBeNull();
+    expect(view.getByTestId("fresh-first")).toBeTruthy();
+  });
   it("late manual A pagination cannot append after B has loaded its own rows", async () => {
     const extra = deferred();
     jest.mocked(fetchReflections).mockImplementation((_surah, _ayah, pageNumber, id) => {

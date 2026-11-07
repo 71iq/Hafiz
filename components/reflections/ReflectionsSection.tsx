@@ -1,11 +1,11 @@
 import { reflectionQueryKeys } from "@/lib/reflections/query-keys";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useMemo } from "react";
 import { ActivityIndicator, View, Text, Pressable } from "react-native";
 import { ChevronDown, ChevronUp, PenLine, MessageSquare } from "lucide-react-native";
 import { router, type Href } from "expo-router";
 import { ReflectionsSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "@/lib/auth/store";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -14,6 +14,7 @@ import { fetchReflections, fetchReflectionCount } from "@/lib/reflections/api";
 import { ReflectionCard } from "./ReflectionCard";
 import { CommentsSheet } from "./CommentsSheet";
 import { WriteReflectionSheet } from "./WriteReflectionSheet";
+import { useReflectionMutationScope } from "./use-mutation-scope";
 import type { Reflection } from "@/lib/reflections/types";
 
 type Props = {
@@ -25,13 +26,7 @@ type Props = {
 
 export function ReflectionsSection(props: Props) {
   const user = useAuthStore((s) => s.user);
-  return (
-    <ReflectionsSectionContent
-      key={JSON.stringify([props.surah, props.ayah, user?.id])}
-      {...props}
-      user={user}
-    />
-  );
+  return <ReflectionsSectionContent key={JSON.stringify([props.surah, props.ayah, user?.id])} {...props} user={user} />;
 }
 
 function ReflectionsSectionContent({
@@ -43,12 +38,13 @@ function ReflectionsSectionContent({
 }: Props & { user: ReturnType<typeof useAuthStore.getState>["user"] }) {
   const { isDark, themeColors } = useSettings();
   const s = useStrings();
-  const queryClient = useQueryClient();
+  const { begin, pending } = useReflectionMutationScope(JSON.stringify([surah, ayah]), user?.id);
+  const firstPageGeneration = useRef(0);
   const [expanded, setExpanded] = useState(initiallyExpanded);
   const [page, setPage] = useState(0);
   const [loadedReflections, setAllReflections] = useState<Reflection[] | null>(null);
   const [loadedHasMore, setHasMore] = useState<boolean | null>(null);
-  const [loadingMore, setLoadingMore] = useState(false);
+  const loadingMore = pending.has("page");
   const [error, setError] = useState<string | null>(null);
   const [commentsReflectionId, setCommentsReflectionId] = useState<string | null>(null);
   const [writeOpen, setWriteOpen] = useState(false);
@@ -68,12 +64,15 @@ function ReflectionsSectionContent({
   const {
     data: firstPage,
     isLoading,
+    isFetching,
     error: reflectionsError,
     refetch: refetchReflections,
   } = useQuery({
     queryKey: reflectionQueryKeys.reflections.firstPage({ surah, ayah, viewerId: user?.id }),
     queryFn: async () => {
+      const generation = ++firstPageGeneration.current;
       const result = await fetchReflections(surah, ayah, 0, user?.id);
+      if (generation !== firstPageGeneration.current) return result;
       setError(null);
       setAllReflections(result.data);
       setHasMore(result.hasMore);
@@ -84,46 +83,72 @@ function ReflectionsSectionContent({
     staleTime: 1000 * 60 * 5,
   });
 
-  const allReflections = loadedReflections ?? firstPage?.data ?? [];
+  const allReflections = useMemo(
+    () => loadedReflections ?? firstPage?.data ?? [],
+    [loadedReflections, firstPage?.data],
+  );
   const hasMore = loadedHasMore ?? firstPage?.hasMore ?? false;
 
   const handleLoadMore = useCallback(async () => {
-    if (loadingMore || !hasMore) return;
-    const nextPage = page + 1;
-    setLoadingMore(true);
+    if (!hasMore || isFetching) return;
+    const lease = begin("page");
+    if (!lease) return;
+    const nextPage = page + 1,
+      generation = firstPageGeneration.current;
     setError(null);
     try {
       const result = await fetchReflections(surah, ayah, nextPage, user?.id);
-      setAllReflections((prev) => [...(prev ?? firstPage?.data ?? []), ...result.data]);
+      if (!lease.isCurrent() || generation !== firstPageGeneration.current) return;
+      setAllReflections((prev) => {
+        const rows = prev ?? firstPage?.data ?? [],
+          ids = new Set(rows.map((row) => row.id));
+        return [
+          ...rows,
+          ...result.data.filter((row) => {
+            if (ids.has(row.id)) return false;
+            ids.add(row.id);
+            return true;
+          }),
+        ];
+      });
       setHasMore(result.hasMore);
       setPage(nextPage);
-    } catch (e) {
-      console.warn("[Reflections] Load more failed:", e);
-      setError(s.reflectionLoadFailed);
+    } catch (error) {
+      if (lease.isCurrent() && generation === firstPageGeneration.current) {
+        console.warn("[Reflections] Load more failed:", error);
+        setError(s.reflectionLoadFailed);
+      }
     } finally {
-      setLoadingMore(false);
+      lease.release();
     }
-  }, [surah, ayah, page, user?.id, hasMore, loadingMore, s.reflectionLoadFailed, firstPage?.data]);
+  }, [surah, ayah, page, user?.id, hasMore, isFetching, begin, s.reflectionLoadFailed, firstPage?.data]);
 
-  const handleLikeToggled = useCallback((reflectionId: string, liked: boolean, delta: number) => {
-    setAllReflections((prev) =>
-      (prev ?? firstPage?.data ?? []).map((r) =>
-        r.id === reflectionId ? { ...r, user_has_liked: liked, likes_count: r.likes_count + delta } : r,
-      ),
-    );
-  }, [firstPage?.data]);
+  const handleLikeToggled = useCallback(
+    (reflectionId: string, liked: boolean, delta: number) => {
+      setAllReflections((prev) =>
+        (prev ?? firstPage?.data ?? []).map((r) =>
+          r.id === reflectionId && (r.user_has_liked ?? false) !== liked
+            ? { ...r, user_has_liked: liked, likes_count: Math.max(0, r.likes_count + delta) }
+            : r,
+        ),
+      );
+    },
+    [firstPage?.data],
+  );
 
-  const handleCommentAdded = useCallback((reflectionId: string) => {
-    setAllReflections((prev) =>
-      (prev ?? firstPage?.data ?? []).map((r) => (r.id === reflectionId ? { ...r, comments_count: r.comments_count + 1 } : r)),
-    );
-  }, [firstPage?.data]);
-
-  const handleWriteSuccess = useCallback(() => {
-    // Invalidate and refetch
-    queryClient.invalidateQueries({ queryKey: reflectionQueryKeys.reflections.ayah({ surah, ayah }) });
-    queryClient.invalidateQueries({ queryKey: reflectionQueryKeys.count({ surah, ayah }) });
-  }, [queryClient, surah, ayah]);
+  const handleCommentAdded = useCallback(
+    (reflectionId: string) => {
+      const base = allReflections.find((row) => row.id === reflectionId)?.comments_count;
+      setAllReflections((prev) =>
+        (prev ?? firstPage?.data ?? []).map((row) =>
+          row.id === reflectionId && row.comments_count === base
+            ? { ...row, comments_count: row.comments_count + 1 }
+            : row,
+        ),
+      );
+    },
+    [allReflections, firstPage?.data],
+  );
 
   if (!supabaseConfigured) return null;
 
@@ -262,7 +287,6 @@ function ReflectionsSectionContent({
         ayahStart={ayah}
         ayahEnd={ayah}
         ayahPreview={`${surah}:${ayah}`}
-        onSuccess={handleWriteSuccess}
       />
     </>
   );

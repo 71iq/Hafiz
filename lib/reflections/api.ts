@@ -23,34 +23,35 @@ function pageResult<T>(rows: T[], pageSize: number): { data: T[]; hasMore: boole
   return { data: hasMore ? rows.slice(0, pageSize) : rows, hasMore };
 }
 
-function isMissingJuzColumnsError(error: { code?: string; message?: string } | null): boolean {
-  return !!(
-    error &&
-    (error.code === "PGRST204" ||
-      error.code === "PGRST205" ||
-      error.message?.includes("juz_start") ||
-      error.message?.includes("juz_end"))
-  );
+type CompatibilityError = { code?: string; message?: string; details?: string; hint?: string } | null;
+function hasNamedMissingColumn(error: CompatibilityError, column: string): boolean {
+  if (!error) return false;
+  const text = `${error.message ?? ""} ${error.details ?? ""}`.toLowerCase();
+  const escapedColumn = column.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const quoted = `["']?${escapedColumn}["']?`;
+  const postgrest = new RegExp(`could not find (?:the )?${quoted} column(?: of| in|$)`).test(text);
+  const postgres = new RegExp(
+    `column\\s+(?:"?[a-z0-9_]+"?\\.){0,2}${quoted}(?:\\s+of\\s+relation\\s+["'a-z0-9_.]+)?\\s+does not exist`,
+  ).test(text);
+  if (error.code === "PGRST204") return postgrest;
+  if (error.code === "42703") return postgres;
+  return !error.code && (postgrest || postgres);
 }
-
-function isMissingColumnError(error: { code?: string; message?: string } | null, column: string): boolean {
-  return !!(
-    error &&
-    (error.code === "PGRST204" ||
-      error.code === "PGRST205" ||
-      error.message?.includes(column))
-  );
+function isMissingJuzColumnsError(error: CompatibilityError): boolean {
+  return hasNamedMissingColumn(error, "juz_start") || hasNamedMissingColumn(error, "juz_end");
 }
-
-function isMissingCommentLikesTableError(error: { code?: string; message?: string; details?: string } | null): boolean {
-  const message = `${error?.code ?? ""} ${error?.message ?? ""} ${error?.details ?? ""}`.toLowerCase();
-  return (
-    message.includes("reflection_comment_likes") &&
-    (message.includes("does not exist") ||
-      message.includes("schema cache") ||
-      message.includes("pgrst205") ||
-      message.includes("42p01"))
-  );
+function isMissingColumnError(error: CompatibilityError, column: string): boolean {
+  return hasNamedMissingColumn(error, column);
+}
+function isMissingCommentLikesTableError(error: CompatibilityError): boolean {
+  if (!error) return false;
+  const text = `${error.message ?? ""} ${error.details ?? ""}`.toLowerCase();
+  const table = `["']?(?:"?public"?\\.)?"?reflection_comment_likes"?["']?(?=\\s|$)`;
+  const postgrest = new RegExp(`could not find (?:the )?table ${table}`).test(text);
+  const postgres = new RegExp(`relation\\s+${table}\\s+does not exist`).test(text);
+  if (error.code === "PGRST205") return postgrest;
+  if (error.code === "42P01") return postgres;
+  return !error.code && (postgrest || postgres);
 }
 
 function normalizeSearchTerm(value?: string): string {
@@ -64,14 +65,16 @@ function escapeIlikePattern(value: string): string {
 async function attachUserLikes(reflections: Reflection[], userId?: string): Promise<Reflection[]> {
   if (!userId || reflections.length === 0) return reflections;
 
-  const { data: likes } = await supabase
+  const { data: likes, error } = await supabase
     .from("reflection_likes")
     .select("reflection_id")
     .eq("user_id", userId)
     .in(
       "reflection_id",
-      reflections.map((r) => r.id)
+      reflections.map((r) => r.id),
     );
+
+  if (error) throw error;
 
   const likedSet = new Set((likes ?? []).map((l) => l.reflection_id));
   return reflections.map((reflection) => ({
@@ -97,7 +100,7 @@ async function attachUserCommentLikes(comments: ReflectionComment[], userId?: st
     .eq("user_id", userId)
     .in(
       "comment_id",
-      normalized.map((comment) => comment.id)
+      normalized.map((comment) => comment.id),
     );
 
   if (error) {
@@ -117,7 +120,7 @@ export async function fetchReflections(
   surah: number,
   ayah: number,
   page: number,
-  userId?: string
+  userId?: string,
 ): Promise<{ data: Reflection[]; hasMore: boolean }> {
   if (!isSupabaseConfigured()) return { data: [], hasMore: false };
 
@@ -218,10 +221,7 @@ export async function fetchReflectionFeed({
 }
 
 /** Get reflection count for an ayah */
-export async function fetchReflectionCount(
-  surah: number,
-  ayah: number
-): Promise<number> {
+export async function fetchReflectionCount(surah: number, ayah: number): Promise<number> {
   if (!isSupabaseConfigured()) return 0;
 
   const { count, error } = await supabase
@@ -244,8 +244,10 @@ export async function createReflection(
   ayahEnd: number,
   juzStart: number,
   juzEnd: number,
-  content: string
+  content: string,
+  canContinue: () => boolean = () => true,
 ): Promise<Reflection> {
+  if (!canContinue()) throw new Error("Reflection creation superseded");
   const insertPayload = {
     user_id: userId,
     surah,
@@ -261,7 +263,7 @@ export async function createReflection(
     .select("*, profiles:profiles!reflections_user_id_fkey(username, display_name, avatar_url)")
     .single();
 
-  if (isMissingJuzColumnsError(error)) {
+  if (isMissingJuzColumnsError(error) && canContinue()) {
     const fallback = await supabase
       .from("reflections")
       .insert({ user_id: userId, surah, ayah_start: ayahStart, ayah_end: ayahEnd, content })
@@ -277,11 +279,7 @@ export async function createReflection(
 }
 
 /** Toggle like on a reflection */
-export async function toggleLike(
-  userId: string,
-  reflectionId: string,
-  currentlyLiked: boolean
-): Promise<boolean> {
+export async function toggleLike(userId: string, reflectionId: string, currentlyLiked: boolean): Promise<boolean> {
   if (currentlyLiked) {
     const { error } = await supabase
       .from("reflection_likes")
@@ -291,9 +289,7 @@ export async function toggleLike(
     if (error) throw error;
     return false;
   } else {
-    const { error } = await supabase
-      .from("reflection_likes")
-      .insert({ user_id: userId, reflection_id: reflectionId });
+    const { error } = await supabase.from("reflection_likes").insert({ user_id: userId, reflection_id: reflectionId });
     if (error) throw error;
     return true;
   }
@@ -304,7 +300,7 @@ export async function fetchComments(
   reflectionId: string,
   page: number,
   sort: ReflectionCommentSort = "oldest",
-  userId?: string
+  userId?: string,
 ): Promise<{ data: ReflectionComment[]; hasMore: boolean }> {
   if (!isSupabaseConfigured()) return { data: [], hasMore: false };
 
@@ -339,11 +335,7 @@ export async function fetchComments(
 }
 
 /** Add a comment to a reflection */
-export async function addComment(
-  userId: string,
-  reflectionId: string,
-  content: string
-): Promise<ReflectionComment> {
+export async function addComment(userId: string, reflectionId: string, content: string): Promise<ReflectionComment> {
   const { data, error } = await supabase
     .from("reflection_comments")
     .insert({ user_id: userId, reflection_id: reflectionId, content })
@@ -351,15 +343,15 @@ export async function addComment(
     .single();
 
   if (error) throw error;
-  return { ...(data as ReflectionComment), likes_count: (data as ReflectionComment).likes_count ?? 0, user_has_liked: false };
+  return {
+    ...(data as ReflectionComment),
+    likes_count: (data as ReflectionComment).likes_count ?? 0,
+    user_has_liked: false,
+  };
 }
 
 /** Toggle like on a comment */
-export async function toggleCommentLike(
-  userId: string,
-  commentId: string,
-  currentlyLiked: boolean
-): Promise<boolean> {
+export async function toggleCommentLike(userId: string, commentId: string, currentlyLiked: boolean): Promise<boolean> {
   if (currentlyLiked) {
     const { error } = await supabase
       .from("reflection_comment_likes")
@@ -370,19 +362,13 @@ export async function toggleCommentLike(
     return false;
   }
 
-  const { error } = await supabase
-    .from("reflection_comment_likes")
-    .insert({ user_id: userId, comment_id: commentId });
+  const { error } = await supabase.from("reflection_comment_likes").insert({ user_id: userId, comment_id: commentId });
   if (error) throw error;
   return true;
 }
 
 /** Report a reflection */
-export async function reportReflection(
-  reporterId: string,
-  reflectionId: string,
-  reason?: string
-): Promise<void> {
+export async function reportReflection(reporterId: string, reflectionId: string, reason?: string): Promise<void> {
   const { error } = await supabase
     .from("reports")
     .insert({ reporter_id: reporterId, reflection_id: reflectionId, reason });

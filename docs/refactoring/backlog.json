@@ -1983,7 +1983,8 @@
         "RF-132",
         "RF-133",
         "RF-152",
-        "RF-153"
+        "RF-153",
+        "RF-026"
       ],
       "acceptance_criteria": [
         "Test sign-in, sign-out, account switch, late responses, subscription cleanup and offline restore.",
@@ -1994,7 +1995,8 @@
         "RF129 owns only singleton initialization/listener retirement and obsolete startup snapshot publication, including newer same-session notifications. Cache isolation, leaderboard/overview/community/other publishers and full SDK/offline lifecycle remain open after child acceptance.",
         "RF130 obsolete stats lifetimes, RF131 same-owner FIFO and RF132 field publication are verified and primary accepted. RF133 is verified and primary accepted for four viewer/local Query roots only. Parent still requires overview/community/other SDK publishers, offline and whole SQLite sync/data ownership. Remote Profile row identity/shape validation is not covered by sync-payload RF031.",
         "RF152 is accepted for owned password/read/recovery/logout settlement and private SDK notifications. Native interactive OAuth, legacy raw main-client writers/background behavior and persistent account-data policy remain open; this parent is not closed.",
-        "RF153 native interactive OAuth and source-owned QF initial sync are verified and primary accepted, including attributed logout/error, renewal and private SDK operation overlap. Raw main-client signIn/signUp/signOut/background writers, remaining publishers/cache and persistent account-data policy still require verification. This parent remains open."
+        "RF153 native interactive OAuth and source-owned QF initial sync are verified and primary accepted, including attributed logout/error, renewal and private SDK operation overlap. Raw main-client signIn/signUp/signOut/background writers, remaining publishers/cache and persistent account-data policy still require verification. This parent remains open.",
+        "RF026 is verified and primary accepted for feature-local community write/page admission, rollback, exact invalidation and retired UI continuations. This does not close raw main auth writers, general remote reader lifetimes or persistent SQLite ownership."
       ],
       "verification": [
         [
@@ -2029,47 +2031,319 @@
     {
       "id": "RF-026",
       "title": "Test community mutation rollback and pagination",
-      "description": "Test community mutation rollback and pagination",
-      "rationale": "Optimistic counts/likes and infinite pages need consistent behavior.",
+      "description": "Direct community reliability repair: admit each active write/page once, preserve current rollback and account/source lifetimes, refresh exact affected caches, retain loaded pages after later failures and distinguish genuine missing-column compatibility from unrelated service errors.",
+      "rationale": "State-only guards admit duplicate same-turn likes, comments and posts. Async callbacks can publish into changed views. Comment caches omit new posts on reopen, feed count overlays double-count after refetch, later-page failures hide existing rows and likes-query errors appear as unliked success.",
       "modules": [
-        "components/reflections/*",
+        "components/reflections/use-mutation-scope.ts",
+        "components/reflections/ReflectionCard.tsx",
+        "components/reflections/CommentsSheet.tsx",
+        "components/reflections/WriteReflectionSheet.tsx",
+        "components/reflections/ReflectionsSection.tsx",
         "app/(tabs)/reflection-feed.tsx",
-        "lib/reflections/*",
-        "tests/unit/reflection-mutations.test.tsx"
+        "lib/reflections/api.ts",
+        "lib/reflections/query-keys.ts"
       ],
       "dependencies": [
-        "RF-024"
+        "RF-024",
+        "RF-133",
+        "RF-153"
       ],
       "acceptance_criteria": [
-        "Test failed and concurrent likes/comments, page boundaries and targeted invalidation.",
-        "Preserve compatibility handling for missing server columns without hiding unrelated errors."
+        "Primary owns source/account/cache behavior. Reuse existing feature UI, query keys, auth coordinator and services. Add one feature-local committed mutation scope only because reflection likes/reports, comment likes/submits, public posting and manual pages share synchronous admission/current lifetime/own busy cleanup. Scope rotates on committed source/viewer/open/database changes, including closed ABA; do not publish speculative render identities. Independent operation keys permit parallel comment likes. Captured viewer must still match actual store at admission. Do not edit controller/vendor/dependencies/protected inputs or server semantics.",
+        "Actual rendered components must prove same-turn double-press/Enter paths issue exactly one write. Keep immediate local optimistic feedback, restore from latest canonical props/query rows on failure, and prevent stale rollback or parent callbacks from altering refreshed data. Parent like callbacks may publish confirmed deltas only, once, without inverse rollback against fresh props. Current errors and retry remain available. Retired/unmounted/source/account/closedABA responses suppress follow-up while own cleanup cannot clear newer busy state. Already-issued server work may settle.",
+        "Comments success remains visible, invalidates the exact reflection comments prefix across sorts/viewers and survives close/reopen of a fresh60-second cache. Distinct posts and public caches remain untouched. Confirmed comment likes refresh that target; failed likes restore latest loaded state. Public reflection posting revalidates after loading the Mushaf index before dispatch and before achievement/cache/close/success/error; preserve payloads, drafts appropriately, existing setup error messages, locale/theme/markup/RTL/native behavior and per-range/feed invalidation. Remove duplicate parent write invalidation only if the child owns it.",
+        "Manual ayah pagination admits one pending page before React state updates, keeps existing keyed owner/refetch replacement semantics and supports retry. Actual TanStack Query feed/comments paging must not restart the same pending fetch on same-turn taps. Later-page errors retain loaded rows with a visible localized retry. Feed comment counts must not add a local delta again after the server count advances. Preserve cache row immutability and viewer-key isolation.",
+        "Service boundary: propagate original reflection_likes errors rather than reporting false unliked success. Juz/likes_count fallbacks require the exact missing named column and actual missing-column evidence; unrelated PGRST codes or mere field mentions do not qualify. Retain genuine missing reflection_comment_likes table compatibility; propagate unrelated and fallback errors by identity. Verify actual adjacent5/10/20-row windows/lookahead trimming, personalized attachments and empty/no-viewer query skips.",
+        "Add causal service/component regressions before repair and distinguish fixture errors from source failures. Retain all RF133 owner/query-key and feed Juz label assertions. Use real QueryClient and actual handlers with sanitized services/rows, actual English/Arabic strings and representative phone rendering; mocked overlay/Input/profile/database leaves do not prove browser/native device behavior. During iteration run focused tests, types and scoped lint. When ready run all20 controller checks, separate stronger independent review and primary acceptance. Keep failures small, one local accepted-task commit and short PROGRESS note; delete accepted outputs and keep baseline below2GB.",
+        "The creation API itself checks the supplied currentness callback immediately before its compatibility fallback INSERT. Preserve original error/no fallback after retirement and ordinary default caller compatibility. Comment preview filtering responds to lifetime changes even without new query rows, and successful likes rebase onto latest committed canonical comment before further presses/refetch. Three advisory findings must have actual causal regressions and retain source/fixture failure records."
       ],
       "verification": [
         [
-          "npm",
-          "run",
-          "test:unit",
-          "--",
-          "--runTestsByPath",
-          "tests/unit/reflection-mutations.test.tsx"
+          "git",
+          "diff",
+          "--check"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "tests/unit/reflection-feed-juz-policy.test.tsx",
+          "tests/unit/rtl-higher-level-source-contract.test.ts",
+          "components/reflections/use-mutation-scope.ts",
+          "components/reflections/ReflectionCard.tsx",
+          "components/reflections/CommentsSheet.tsx",
+          "components/reflections/WriteReflectionSheet.tsx",
+          "components/reflections/ReflectionsSection.tsx",
+          "app/(tabs)/reflection-feed.tsx",
+          "lib/reflections/api.ts",
+          "lib/reflections/query-keys.ts",
+          "tests/unit/reflection-mutations.test.tsx",
+          "tests/unit/reflection-api-pages.test.ts",
+          "tests/unit/reflection-feed-pagination.test.tsx",
+          "tests/unit/reflection-owner.test.tsx",
+          "tests/unit/reflection-query-keys.test.ts",
+          "docs/refactoring/PROGRESS.md"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "tests/unit/reflection-feed-juz-policy.test.tsx",
+          "tests/unit/rtl-higher-level-source-contract.test.ts",
+          "components/reflections/use-mutation-scope.ts",
+          "components/reflections/ReflectionCard.tsx",
+          "components/reflections/CommentsSheet.tsx",
+          "components/reflections/WriteReflectionSheet.tsx",
+          "components/reflections/ReflectionsSection.tsx",
+          "app/(tabs)/reflection-feed.tsx",
+          "lib/reflections/api.ts",
+          "lib/reflections/query-keys.ts",
+          "tests/unit/reflection-mutations.test.tsx",
+          "tests/unit/reflection-api-pages.test.ts",
+          "tests/unit/reflection-feed-pagination.test.tsx",
+          "tests/unit/reflection-owner.test.tsx",
+          "tests/unit/reflection-query-keys.test.ts",
+          "--max-warnings=0"
         ],
         [
           "npm",
           "run",
           "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "check:analysis"
+        ],
+        [
+          "npm",
+          "run",
+          "postinstall"
+        ],
+        [
+          "npm",
+          "ls",
+          "--all",
+          "--json"
+        ],
+        [
+          "npm",
+          "run",
+          "lint"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "node",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/tests/brace-expansion.test.cjs",
+          "scripts/tests/dependency-boundaries.test.cjs",
+          "scripts/tests/icon-tool.test.cjs",
+          "scripts/tests/jest-config.test.cjs",
+          "scripts/tests/js-yaml.test.cjs",
+          "scripts/tests/lint-coverage.test.cjs",
+          "scripts/tests/metro-unicode.test.cjs",
+          "scripts/tests/nanoid.test.cjs",
+          "scripts/tests/router-dependency-range.test.cjs",
+          "scripts/tests/security-dependency-owner.test.cjs",
+          "scripts/tests/source-map-js.test.cjs",
+          "scripts/tests/tailwind-source-map.test.cjs",
+          "scripts/tests/ws.test.cjs",
+          "scripts/tests/xmldom.test.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "test:refactor-runner"
+        ],
+        [
+          "python3",
+          "-B",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "scripts/tests",
+          "-p",
+          "test_*.py"
+        ],
+        [
+          "npm",
+          "run",
+          "check:native-config"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=4096",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "android",
+          "--output-dir",
+          ".expo/modernization-checks/android",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/android')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=3072",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "ios",
+          "--output-dir",
+          ".expo/modernization-checks/ios",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/ios')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8197",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts",
+          "tests/e2e/database-bridge.spec.ts"
         ]
       ],
       "risk": "high",
-      "approved": false,
-      "status": "pending",
+      "approved": true,
+      "status": "verified",
       "allowed_paths": [
-        "components/reflections/*",
+        "components/reflections/use-mutation-scope.ts",
+        "components/reflections/ReflectionCard.tsx",
+        "components/reflections/CommentsSheet.tsx",
+        "components/reflections/WriteReflectionSheet.tsx",
+        "components/reflections/ReflectionsSection.tsx",
         "app/(tabs)/reflection-feed.tsx",
-        "lib/reflections/*",
-        "tests/unit/reflection-mutations.test.tsx"
+        "lib/reflections/api.ts",
+        "lib/reflections/query-keys.ts",
+        "tests/unit/reflection-mutations.test.tsx",
+        "tests/unit/reflection-api-pages.test.ts",
+        "tests/unit/reflection-feed-pagination.test.tsx",
+        "tests/unit/reflection-owner.test.tsx",
+        "tests/unit/reflection-query-keys.test.ts",
+        "tests/unit/rtl-higher-level-source-contract.test.ts",
+        "tests/unit/reflection-feed-juz-policy.test.tsx"
       ],
-      "attempts": 0,
-      "priority": 1
+      "attempts": 2,
+      "priority": 1,
+      "implementation_mode": "implementation",
+      "started_at": "2026-11-07T01:18:56.497389+00:00",
+      "failure_history": [
+        {
+          "phase": "focused-ui-causal",
+          "time": "2026-11-07T00:53:41.981726+00:00",
+          "failure": "Fourteen actual component cases in English/Arabic reproduced duplicate likes/comments/posts, inverse rollback against refreshed counts, dispatch after source change during index loading, and old optimistic/busy state retained after account replacement. Initial UI selectors reached real controls; two cases stopped at stale account count rather than the later dispatch assertion. API fixture/red/green results remain separately preserved."
+        },
+        {
+          "phase": "primary-page-api-causal",
+          "time": "2026-11-07T00:57:31.005115+00:00",
+          "failure": "After draining actual Query notification timers,11 failures reproduce duplicate manual/feed requests, retained feed delta doubling refreshed server counts, six exact-object API classifier gaps. The first page run missed the count error before observer notification; its output is retained. Primary narrow clause/code/boundary correction preserves valid INSERT-column errors and rejects suffix table names. API worker prior corrected fixture yields8 genuine original failures; its23-case final and all failures remain retained."
+        },
+        {
+          "phase": "focused-types",
+          "time": "2026-11-07T00:59:08.369660+00:00",
+          "failure": "All96 focused cases passed; TypeScript then caught nullable optimistic-preview access and a void-return achievement mock resolved with an array. Both corrected without changing behavior assertions."
+        },
+        {
+          "phase": "read-only-consult-causal",
+          "time": "2026-11-07T01:01:41.306930+00:00",
+          "failure": "Three consult findings reproduced as three genuine source failures: retired creation sent its fallback INSERT; memoized optimistic comment survived same-user session replacement; acknowledged comment like vanished after fresh row and allowed duplicate INSERT. Added boundary currentness callback, live preview filtering and success rebase. Prior focused111/types passed; scopedlint found one new unstable callback dependency and two existing duplicate imports in touched source, repaired without suppressions."
+        },
+        {
+          "phase": "primary-edit",
+          "time": "2026-11-07T01:03:22.034046+00:00",
+          "failure": "An exact-text editing assertion stopped the last controls patch after the API entry guard/test was written; no check ran. Inspected actual formatting and completed remaining edits without losing any source or tests."
+        },
+        {
+          "phase": "focused-fixture",
+          "time": "2026-11-07T01:04:33.896440+00:00",
+          "failure": "Final focused117 cases had116 pass; new no-dispatch API control saw57 earlier mock calls because the worker fixture reset queues but not mock call history. Reset the mock between cases, preserving the zero-call assertion and actual API entry guard."
+        },
+        {
+          "time": "2026-11-07T01:11:32.817856+00:00",
+          "phase": "full-gates-review",
+          "gate": {
+            "status": "failed",
+            "error": "Verification failed: ['npm', 'run', 'test:unit', '--', '--no-cache']; see .ralph/runs/RF-026-full-1794013546746754732/verify-8.log"
+          },
+          "review": {
+            "verdict": "fail",
+            "findings": [
+              "Controller gate failed. verification.json records 9/20 exact commands: eight passed, then Jest exited 1. verify-8.log reports 2,525 passes and an RTL source-contract failure at tests/unit/rtl-higher-level-source-contract.test.ts:41 caused by added parentheses in ReflectionCard.tsx:147. Preserve the RTL assertions while resolving the formatting mismatch, then complete all 20 gates.",
+              "app/(tabs)/reflection-feed.tsx:334: retry after a background refetch error calls refetch() with default cancelRefetch=true. With retained rows, two same-turn presses cancel and restart the pending request before disabled state renders. Use cancelRefetch:false or synchronous admission, and cover this retry branch with the actual QueryClient.",
+              "app/(tabs)/reflection-feed.tsx:190: superseded comment deltas are hidden but never retired. Starting at 3, a confirmed comment displays 4; server count 4 hides the delta, but a later authoritative count of 3 resurrects it and incorrectly displays 4. Comment deletion is supported by the schema. Retire acknowledged deltas on committed server updates and add a 3\u21924\u21923 regression."
+            ]
+          },
+          "source_unchanged": true
+        },
+        {
+          "phase": "independent-review-causal",
+          "time": "2026-11-07T01:13:39.116932+00:00",
+          "failure": "First full Jest failed one exact RTL source-text assertion after canonical formatting; all2525 other cases passed. Independent review also found retained-data retry cancellation and resurrected count delta after3-to4-to3. Four genuine actual Query failures reproduced both behaviors in both locales. Retry disables cancellation; count deltas now use the actual Query update revision and retire after committed server data, including unchanged structural data. Replace only ReflectionCard source snippets with rendered row/direction assertions, retaining all other contracts. A metadata key typo interrupted the primary patch wrapper after source/tests were written but before checks or metadata save; corrected to the existing verification field."
+        },
+        {
+          "phase": "focused-fixture",
+          "time": "2026-11-07T01:14:19.774066+00:00",
+          "failure": "All121 focused behavior/contract cases passed, but the12 existing Juz label cases used a deliberately narrow mock QueryClient without getQueryState. Add only its pure revision read, keeping every forbidden network/navigation callback and label assertion intact."
+        },
+        {
+          "phase": "primary-key-causal",
+          "time": "2026-11-07T01:17:28.392538+00:00",
+          "failure": "Revision-only repair passed an uncached sort transition because its loading revision retired the delta. Two further actual Query failures with a fresh cached alternate sort reproduced cross-key reuse of equal revision counters. Bind each delta to the exact feed key and revision, clear it only on committed updates and retain rendered selection/count controls. All reload entry points now disable pending cancellation."
+        }
+      ],
+      "completed_at": "2026-11-07T01:27:13.445566+00:00",
+      "primary_accepted_at": "2026-11-07T01:27:13.445566+00:00",
+      "independent_review": "pass",
+      "evidence": "docs/refactoring/PROGRESS.md",
+      "summary": "Community actions admit one current write, preserve fresh canonical counts/drafts, invalidate exact affected caches, fence retired continuations and retain pages through retry. Compatibility fallbacks preserve original unrelated errors. All20 fresh checks, stronger independent review and primary acceptance pass with2538unit cases and29Chrome cases. Authenticated/device checks and broader data ownership remain separate."
     },
     {
       "id": "RF-027",

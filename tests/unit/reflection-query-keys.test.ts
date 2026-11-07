@@ -137,3 +137,24 @@ describe("reflection query keys preserve existing cache contracts", () => {
     expect(client.getQueryCache().getAll()).toHaveLength(2);
   });
 });
+
+it("a single comments target prefix reaches all sorts/viewers without other posts or public counts", async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
+  try {
+    const target = [
+      keys.comments.list({ reflectionId: "post", sort: "oldest", viewerId: "a" }),
+      keys.comments.list({ reflectionId: "post", sort: "popular", viewerId: "b" }),
+    ];
+    const other = [
+      keys.comments.list({ reflectionId: "other", sort: "newest", viewerId: "a" }),
+      keys.count({ surah: 2, ayah: 1 }),
+    ];
+    [...target, ...other].forEach((key) => client.setQueryData(key, 1));
+    expect(keys.comments.forReflection("post")).toEqual(["reflectionComments", "post"]);
+    await client.invalidateQueries({ queryKey: keys.comments.forReflection("post"), refetchType: "none" });
+    target.forEach((key) => expect(client.getQueryState(key)?.isInvalidated).toBe(true));
+    other.forEach((key) => expect(client.getQueryState(key)?.isInvalidated).toBe(false));
+  } finally {
+    client.clear();
+  }
+});

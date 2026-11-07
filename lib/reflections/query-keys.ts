@@ -34,6 +34,7 @@ export const reflectionQueryKeys = {
   count: ({ surah, ayah }: AyahInput) => ["reflectionCount", surah, ayah] as const,
   comments: {
     all: commentsRoot,
+    forReflection: (reflectionId: string) => [...commentsRoot, reflectionId] as const,
     list: ({ reflectionId, sort, viewerId }: CommentsInput) => [...commentsRoot, reflectionId, sort, viewerId] as const,
   },
 };
