@@ -24021,11 +24021,10 @@
     }
   ],
   "checkpoint": {
-    "time": "2026-11-07T20:53:22.937257+00:00",
-    "current_task": "RF-183 (investigated: ensureStudyCardRow revives tombstones; throw a typed StudyCardDeletedError there and in putCardRow, and have the session skip the card with a bilingual notice; smart-deck materialization revival is intended and stays)",
+    "time": "2026-11-07T21:04:55.341575+00:00",
+    "current_task": "RF-025 (listener/late-request only). 2026-11-07 check: the AUTH_PROFILE_SAVE_OWNERSHIP.md leads are resolved in current code (store.initialize owns one SDK listener and retires it on re-init; leaderboard-sync checks its StatsOwner after every await and patchCurrentProfile is owner-guarded); no supabase.auth calls outside lib/auth except QF readSession. Next: enumerate remaining auth-derived publishers (profile/overview/community Query roots, QF sync, offline restore) and write one causal late-response test per unguarded one, or close RF-025 with that audit if none remain.",
     "open_follow_ups": [
       "RF-182",
-      "RF-183",
       "RF-186",
       "RF-187",
       "RF-188",
@@ -24036,7 +24035,11 @@
       "Final push after all work is verified"
     ],
     "last_green_commit": "447e375 (full 20-check batch gate: 3,115 unit, 35 Chrome)",
+    "accepted_since_gate": [
+      "RF-183 1958473"
+    ],
     "uncommitted": null,
-    "device": "Samsung SM-A546E may be unplugged; replug for RF-186/RF-187/RF-189. QA app com.anonymous.hafiz.qa; build with scripts/android-qa-build.sh"
+    "device": "Samsung SM-A546E may be unplugged; replug for RF-186/RF-187/RF-189. QA app com.anonymous.hafiz.qa; build with scripts/android-qa-build.sh",
+    "production": "RF-166, RF-170, RF-169 migrations applied 2026-11-07 after backup 20261107T205118Z (local copy in ~/.local/share/hafiz-hetzner-migration/backups/)."
   }
 }
