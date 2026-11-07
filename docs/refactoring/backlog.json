@@ -20297,7 +20297,7 @@
       "independent_review": "pass",
       "evidence": "docs/refactoring/DATA_AUDIT.md",
       "summary": "Source-only migration and schema.sql: reaction counters run as owner with an empty search path and table guard, EXECUTE revoked, likes limited to insert/delete with no UPDATE privilege, and a locked one-time recount. Isolated PostgreSQL 17 probe confirms drift before and correct counts after, with the like-move exploit refused. All 20 full checks and independent security review pass. Not applied to any deployed database.",
-      "waiting_on_user": "RF-166 migration is source-only; applying it to the deployed database needs explicit approval"
+      "production_rollout": "Applied to the Hafiz Hetzner database on 2026-11-07 with Ehab's explicit approval, after official backup 20261107T205118Z (copied off the VM and checksum-verified). Run as postgres, one transaction per file, under the operation lock; PostgREST schema reloaded; health check passed."
     },
     {
       "id": "RF-167",
@@ -20955,7 +20955,7 @@
       "summary": "An older upload from one device no longer overwrites a newer row written by another device between the client's freshness read and its upsert. Source-only migration 20261107200000 adds a BEFORE UPDATE trigger on the eight synced tables that skips an update whose row time is strictly older than the stored row, under the ON CONFLICT row lock; the client keeps its pre-check for servers without the migration. Explicitly timed hard deletes carry updated_at <= deleted_at in the DELETE; legacy tombstones without deleted_at use their queue time instead of the push time; legacy untimed hard deletes stay unrestricted. A live incoming highlight with an empty updated_at keeps the local freshness check and stores its creation time.",
       "evidence": "Five causal Jest cases failed on the original source. Isolated network-disabled PostgreSQL 17 probe (scripts/supabase-probes/sync-conflicts.sh, synthetic user): the old schema lost the newer write sequentially and while waiting on its row lock; the new schema kept it; equal/newer times, inserts, metadata updates and null-time highlights still update; conditional deletes keep newer rows. Full Jest run (3,105 passing; two unrelated failures: the RF-184 registry gap fixed in 6a61c00 and a load-timing pass on rerun), typecheck, scoped prettier/eslint. Full 20-check gate deferred to the batch gate per cost rules.",
       "independent_review": "High-effort independent review: no blockers. Should-fix (legacy untimed bookmark delete could be skipped when the add got a server-default updated_at) fixed by conditioning only explicitly timed deletes, with a regression case; migration comment notes added for uploads without updated_at and admin repairs. Nits left: no automated trigger test beyond the probe.",
-      "waiting_on_user": "Applying migration 20261107200000 to the deployed database needs explicit approval."
+      "production_rollout": "Applied to the Hafiz Hetzner database on 2026-11-07 with Ehab's explicit approval, after official backup 20261107T205118Z (copied off the VM and checksum-verified). Run as postgres, one transaction per file, under the operation lock; PostgREST schema reloaded; health check passed."
     },
     {
       "id": "RF-170",
@@ -21178,7 +21178,7 @@
       "independent_review": "pass",
       "evidence": "docs/refactoring/DATA_AUDIT.md",
       "summary": "Source-only migration and schema.sql: comments, likes and comment likes are readable only with a readable parent, and new reactions need one. Isolated PostgreSQL 17 probe confirms hidden/soft-deleted discussion disappears for anon, another user and the author, with new reactions refused by RLS. All 20 full checks and independent review pass. Not applied to any deployed database.",
-      "waiting_on_user": "RF-170 migration is source-only; applying it to the deployed database needs explicit approval"
+      "production_rollout": "Applied to the Hafiz Hetzner database on 2026-11-07 with Ehab's explicit approval, after official backup 20261107T205118Z (copied off the VM and checksum-verified). Run as postgres, one transaction per file, under the operation lock; PostgREST schema reloaded; health check passed."
     },
     {
       "id": "RF-171",
@@ -23818,7 +23818,7 @@
     }
   ],
   "checkpoint": {
-    "time": "2026-11-07T20:49:43.211406+00:00",
+    "time": "2026-11-07T20:53:22.937257+00:00",
     "current_task": "RF-183 (investigated: ensureStudyCardRow revives tombstones; throw a typed StudyCardDeletedError there and in putCardRow, and have the session skip the card with a bilingual notice; smart-deck materialization revival is intended and stays)",
     "open_follow_ups": [
       "RF-182",
@@ -23830,7 +23830,6 @@
       "onboarding 'Skip for now' skips step 3 (confirm intent)"
     ],
     "decisions_waiting_on_ehab": [
-      "Apply RF-166, RF-170 and RF-169 migrations to the deployed database (explained; awaiting explicit go-ahead)",
       "Final push after all work is verified"
     ],
     "last_green_commit": "447e375 (full 20-check batch gate: 3,115 unit, 35 Chrome)",
