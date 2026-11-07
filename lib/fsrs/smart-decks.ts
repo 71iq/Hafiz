@@ -697,9 +697,15 @@ export async function materializeSmartDeckCards(
     deleted_at: null,
   }));
 
+  let insertedCount = 0;
   await db.withTransactionAsync(async (tx) => {
-    for (let i = 0; i < createdRows.length; i += INSERT_BATCH) {
-      const batch = createdRows.slice(i, i + INSERT_BATCH);
+    // A card id is global. Skip ids that are live in any deck now, including rows a sync pull wrote
+    // after the deck-scoped read above; queueing an empty card for them would overwrite real progress.
+    const live = await getLiveStudyCardIds(tx, createdRows.map((row) => row.id));
+    const insertedRows = createdRows.filter((row) => !live.has(row.id));
+    insertedCount = insertedRows.length;
+    for (let i = 0; i < insertedRows.length; i += INSERT_BATCH) {
+      const batch = insertedRows.slice(i, i + INSERT_BATCH);
       const placeholders = batch.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").join(",");
       const params: any[] = [];
       for (const row of batch) {
@@ -751,12 +757,12 @@ export async function materializeSmartDeckCards(
       );
     }
     // New cards and their queued uploads commit together or not at all.
-    for (const row of createdRows) {
+    for (const row of insertedRows) {
       await enqueueSync(tx, "study_cards", "INSERT", row.id, row);
     }
   });
 
-  return createdRows.length;
+  return insertedCount;
 }
 
 export async function materializeAllSmartDeckCards(
@@ -1265,6 +1271,19 @@ async function getSmartDeckDueRows(
     ));
   }
   return rows.sort((a, b) => a.due.localeCompare(b.due));
+}
+
+async function getLiveStudyCardIds(db: DatabaseExecutor, ids: string[]): Promise<Set<string>> {
+  const live = new Set<string>();
+  for (const chunk of chunks(ids, SQLITE_PARAM_BATCH)) {
+    const placeholders = chunk.map(() => "?").join(",");
+    const rows = await db.getAllAsync<{ id: string }>(
+      `SELECT id FROM study_cards WHERE deleted_at IS NULL AND id IN (${placeholders})`,
+      chunk
+    );
+    for (const row of rows) live.add(row.id);
+  }
+  return live;
 }
 
 async function getStudyCardsByIds(

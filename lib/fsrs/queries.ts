@@ -619,9 +619,11 @@ async function ensureStudyCardRow(
   deckId: string,
   cardId: string
 ): Promise<StudyCardRow> {
+  // A card id is global, so a live card in another deck is the same card: keep its progress
+  // instead of creating an empty card that would overwrite it locally and on the server.
   const existing = await db.getFirstAsync<StudyCardRow>(
-    "SELECT * FROM study_cards WHERE id = ? AND deck_id = ? AND deleted_at IS NULL",
-    [cardId, deckId]
+    "SELECT * FROM study_cards WHERE id = ? AND deleted_at IS NULL",
+    [cardId]
   );
   if (existing) return rowWithDefaultStatus(existing);
 
