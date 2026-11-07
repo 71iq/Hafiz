@@ -23108,11 +23108,12 @@
       ],
       "approved": true,
       "status": "pending",
-      "attempts": 0,
+      "attempts": 2,
       "implementation_mode": "implementation",
       "files": [],
       "allowed_paths": [],
-      "verification": []
+      "verification": [],
+      "diagnosis": "Device evidence (SM-A546E, QA release build): the page font IS applied (the ayah-number glyph from the same page font renders, and the fragments do not match the standard Unicode ligatures for these codepoints). Flashcards (components/flashcards/Qcf2AyahText.tsx) render the same page-1 glyphs completely; AyahBlock/WordToken and the Settings preview render most words partially, in both V2 Classic and V4 styles. Ruled out on device: (1) horizontal clipping of glyph overhang (Android padding/negative-margin bleed of 1.8 em left and 5 em right changed nothing); (2) typeface fallback from rendering before the font loaded (remounting gated views on font readiness changed nothing); (3) font style choice. Font facts: QPC V2 p1 upm 2500, hhea ascent 2809 / descent -1301, glyph y range -1041..2724; word glyphs extend up to 1.77 em left and 4.98 em right of their advance across all 604 V2/V4 page fonts. Next step: a QA debug build with Metro (adb reverse) to iterate styles on device in seconds; diff the remaining props between Qcf2AyahText and WordToken/settings preview (lineHeight values, text-center, Pressable wrapper, explicit transparent background, writingDirection)."
     },
     {
       "id": "RF-185",
@@ -23210,8 +23211,8 @@
     }
   ],
   "checkpoint": {
-    "time": "2026-11-07T18:05:34.734745+00:00",
-    "current_task": "RF-184 Android verse-by-verse Mushaf word rendering",
+    "time": "2026-11-07T19:00:45.205037+00:00",
+    "current_task": "RF-184 paused with device findings; next RF-185 onboarding buttons/rows",
     "open_follow_ups": [
       "RF-180",
       "RF-182",
