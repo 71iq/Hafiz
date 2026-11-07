@@ -20074,19 +20074,217 @@
         "RF-033"
       ],
       "modules": [
+        "supabase/migrations/20261107180000_definer_reaction_counters.sql",
         "supabase/schema.sql",
-        "supabase/migrations"
+        "docs/refactoring/DATA_AUDIT.md"
       ],
       "acceptance_criteria": [
-        "Pending exact bounded source and actual PostgreSQL regression scope. Preserve RLS ownership and intended public access. Test cross-author insert/delete, direct unauthorized updates, search-path attacks, cascade and concurrent counts. No production SQL. Full controller checks, separate stronger review and primary acceptance."
+        "Reflection like, comment and comment-like counters update correctly when one user reacts to another author's post, for inserts and deletes, without granting users write access to other authors' rows.",
+        "The trigger functions are SECURITY DEFINER with search_path '', refuse other tables, have EXECUTE revoked, and never decrement below zero; the migration recounts existing totals once. schema.sql matches. Likes have separate INSERT/DELETE policies and no UPDATE privilege; the recount holds SHARE locks.",
+        "An isolated, network-disabled PostgreSQL 17 probe with synthetic users shows the drift before and correct counts after, including 20 concurrent likes, a blocked direct UPDATE, a refused direct call and a refused foreign trigger. No production SQL, deployment or credential use.",
+        "All full controller checks, separate independent review and primary acceptance."
       ],
-      "approved": false,
-      "status": "pending",
-      "attempts": 0,
+      "approved": true,
+      "status": "verified",
+      "attempts": 1,
       "implementation_mode": "implementation",
-      "files": [],
-      "allowed_paths": [],
-      "verification": []
+      "files": [
+        "supabase/migrations/20261107180000_definer_reaction_counters.sql",
+        "supabase/schema.sql",
+        "docs/refactoring/DATA_AUDIT.md"
+      ],
+      "allowed_paths": [
+        "supabase/migrations/20261107180000_definer_reaction_counters.sql",
+        "supabase/schema.sql",
+        "docs/refactoring/DATA_AUDIT.md"
+      ],
+      "verification": [
+        [
+          "git",
+          "diff",
+          "--check"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "docs/refactoring/DATA_AUDIT.md",
+          "docs/refactoring/PROGRESS.md"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/database/sync.ts",
+          "--max-warnings=0"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "check:analysis"
+        ],
+        [
+          "npm",
+          "run",
+          "postinstall"
+        ],
+        [
+          "npm",
+          "ls",
+          "--all",
+          "--json"
+        ],
+        [
+          "npm",
+          "run",
+          "lint",
+          "--",
+          "--format",
+          "json"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit"
+        ],
+        [
+          "node",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/tests/brace-expansion.test.cjs",
+          "scripts/tests/dependency-boundaries.test.cjs",
+          "scripts/tests/icon-tool.test.cjs",
+          "scripts/tests/jest-config.test.cjs",
+          "scripts/tests/js-yaml.test.cjs",
+          "scripts/tests/lint-coverage.test.cjs",
+          "scripts/tests/metro-unicode.test.cjs",
+          "scripts/tests/nanoid.test.cjs",
+          "scripts/tests/router-dependency-range.test.cjs",
+          "scripts/tests/security-dependency-owner.test.cjs",
+          "scripts/tests/source-map-js.test.cjs",
+          "scripts/tests/tailwind-source-map.test.cjs",
+          "scripts/tests/ws.test.cjs",
+          "scripts/tests/xmldom.test.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "test:refactor-runner"
+        ],
+        [
+          "python3",
+          "-B",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "scripts/tests",
+          "-p",
+          "test_*.py"
+        ],
+        [
+          "npm",
+          "run",
+          "check:native-config"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=4096",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "android",
+          "--output-dir",
+          ".expo/modernization-checks/android",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/android')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=3072",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "ios",
+          "--output-dir",
+          ".expo/modernization-checks/ios",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/ios')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8197",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts",
+          "tests/e2e/database-bridge.spec.ts",
+          "tests/e2e/tafsir-import.spec.ts",
+          "tests/e2e/translation-import.spec.ts"
+        ]
+      ],
+      "started_at": "2026-11-07T16:14:02.543634+00:00",
+      "diagnosis": "Trigger functions ran with the invoker's rights; reflections and reflection_comments UPDATE policies only allow the author, so another user's reaction updated zero rows silently.",
+      "verification_rationale": "App checks are retained although only SQL and docs change. The SQL evidence is the scratch PostgreSQL probe, which needs Docker and is not part of the controller suite; its results are recorded in DATA_AUDIT.md.",
+      "focused_validation": {
+        "pre_fix": "Probe on the HEAD schema: stored/actual likes 0/1, comments 1/2, comment likes 0/1 after a second user reacted.",
+        "post_fix": "After the migration: all counts correct for cross-author inserts and deletes and 20 concurrent likes; direct UPDATE unchanged, direct call refused, foreign trigger refused; all three functions report definer=true and search_path=\"\". Like move by UPDATE and comment-like UPDATE refused; anon/authenticated have no EXECUTE on the functions and no UPDATE on either likes table."
+      },
+      "failure_history": [
+        {
+          "phase": "independent-review",
+          "failure": "Review found that the FOR ALL likes policy let a user move a like by UPDATE, which fires no counter trigger; with owner-rights counters that could shift any reflection's count. Replaced it with INSERT and DELETE policies, revoked UPDATE on both likes tables, locked the recount, and extended the probe with the move attempt and has_function_privilege/has_table_privilege checks."
+        }
+      ],
+      "completed_at": "2026-11-07T16:27:50.880999+00:00",
+      "primary_accepted_at": "2026-11-07T16:27:50.880999+00:00",
+      "independent_review": "pass",
+      "evidence": "docs/refactoring/DATA_AUDIT.md",
+      "summary": "Source-only migration and schema.sql: reaction counters run as owner with an empty search path and table guard, EXECUTE revoked, likes limited to insert/delete with no UPDATE privilege, and a locked one-time recount. Isolated PostgreSQL 17 probe confirms drift before and correct counts after, with the like-move exploit refused. All 20 full checks and independent security review pass. Not applied to any deployed database."
     },
     {
       "id": "RF-167",

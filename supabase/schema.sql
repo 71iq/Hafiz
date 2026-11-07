@@ -335,10 +335,14 @@ CREATE POLICY "Likes are publicly readable"
   ON reflection_likes FOR SELECT
   USING (true);
 
-CREATE POLICY "Users can manage own likes"
-  ON reflection_likes FOR ALL
-  USING (auth.uid() = user_id)
+-- Likes are only added or removed, never updated: owner-rights counters fire on insert and delete.
+CREATE POLICY "Users can insert own likes"
+  ON reflection_likes FOR INSERT
   WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own likes"
+  ON reflection_likes FOR DELETE
+  USING (auth.uid() = user_id);
 
 -- ─── Reflection Comments: publicly readable, auth required to write
 CREATE POLICY "Comments are publicly readable"
@@ -580,17 +584,24 @@ CREATE POLICY "Users can delete own avatar images"
   );
 
 -- ─── Trigger: auto-update likes_count on reflections ────────
-CREATE OR REPLACE FUNCTION update_reflection_likes_count()
-RETURNS TRIGGER AS $$
+CREATE OR REPLACE FUNCTION public.update_reflection_likes_count()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
 BEGIN
+  IF TG_TABLE_SCHEMA <> 'public' OR TG_TABLE_NAME <> 'reflection_likes' THEN
+    RAISE EXCEPTION 'update_reflection_likes_count only maintains public.reflection_likes';
+  END IF;
   IF TG_OP = 'INSERT' THEN
-    UPDATE reflections SET likes_count = likes_count + 1 WHERE id = NEW.reflection_id;
+    UPDATE public.reflections SET likes_count = COALESCE(likes_count, 0) + 1 WHERE id = NEW.reflection_id;
   ELSIF TG_OP = 'DELETE' THEN
-    UPDATE reflections SET likes_count = likes_count - 1 WHERE id = OLD.reflection_id;
+    UPDATE public.reflections SET likes_count = GREATEST(COALESCE(likes_count, 0) - 1, 0) WHERE id = OLD.reflection_id;
   END IF;
   RETURN NULL;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 DROP TRIGGER IF EXISTS trg_reflection_likes_count ON reflection_likes;
 CREATE TRIGGER trg_reflection_likes_count
@@ -598,17 +609,24 @@ CREATE TRIGGER trg_reflection_likes_count
   FOR EACH ROW EXECUTE FUNCTION update_reflection_likes_count();
 
 -- ─── Trigger: auto-update comments_count on reflections ─────
-CREATE OR REPLACE FUNCTION update_reflection_comments_count()
-RETURNS TRIGGER AS $$
+CREATE OR REPLACE FUNCTION public.update_reflection_comments_count()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
 BEGIN
+  IF TG_TABLE_SCHEMA <> 'public' OR TG_TABLE_NAME <> 'reflection_comments' THEN
+    RAISE EXCEPTION 'update_reflection_comments_count only maintains public.reflection_comments';
+  END IF;
   IF TG_OP = 'INSERT' THEN
-    UPDATE reflections SET comments_count = comments_count + 1 WHERE id = NEW.reflection_id;
+    UPDATE public.reflections SET comments_count = COALESCE(comments_count, 0) + 1 WHERE id = NEW.reflection_id;
   ELSIF TG_OP = 'DELETE' THEN
-    UPDATE reflections SET comments_count = comments_count - 1 WHERE id = OLD.reflection_id;
+    UPDATE public.reflections SET comments_count = GREATEST(COALESCE(comments_count, 0) - 1, 0) WHERE id = OLD.reflection_id;
   END IF;
   RETURN NULL;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 DROP TRIGGER IF EXISTS trg_reflection_comments_count ON reflection_comments;
 CREATE TRIGGER trg_reflection_comments_count
@@ -616,22 +634,37 @@ CREATE TRIGGER trg_reflection_comments_count
   FOR EACH ROW EXECUTE FUNCTION update_reflection_comments_count();
 
 -- ─── Trigger: auto-update likes_count on reflection comments
-CREATE OR REPLACE FUNCTION update_reflection_comment_likes_count()
-RETURNS TRIGGER AS $$
+CREATE OR REPLACE FUNCTION public.update_reflection_comment_likes_count()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
 BEGIN
+  IF TG_TABLE_SCHEMA <> 'public' OR TG_TABLE_NAME <> 'reflection_comment_likes' THEN
+    RAISE EXCEPTION 'update_reflection_comment_likes_count only maintains public.reflection_comment_likes';
+  END IF;
   IF TG_OP = 'INSERT' THEN
-    UPDATE reflection_comments SET likes_count = likes_count + 1 WHERE id = NEW.comment_id;
+    UPDATE public.reflection_comments SET likes_count = likes_count + 1 WHERE id = NEW.comment_id;
   ELSIF TG_OP = 'DELETE' THEN
-    UPDATE reflection_comments SET likes_count = GREATEST(likes_count - 1, 0) WHERE id = OLD.comment_id;
+    UPDATE public.reflection_comments SET likes_count = GREATEST(likes_count - 1, 0) WHERE id = OLD.comment_id;
   END IF;
   RETURN NULL;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 DROP TRIGGER IF EXISTS trg_reflection_comment_likes_count ON reflection_comment_likes;
 CREATE TRIGGER trg_reflection_comment_likes_count
   AFTER INSERT OR DELETE ON reflection_comment_likes
   FOR EACH ROW EXECUTE FUNCTION update_reflection_comment_likes_count();
+
+-- Counter triggers run as their owner so a reaction to another author's post still updates its
+-- count under RLS. They are never called directly.
+REVOKE UPDATE ON public.reflection_likes FROM PUBLIC, anon, authenticated;
+REVOKE UPDATE ON public.reflection_comment_likes FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.update_reflection_likes_count() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.update_reflection_comments_count() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.update_reflection_comment_likes_count() FROM PUBLIC, anon, authenticated;
 
 -- ============================================================
 -- Indexes
