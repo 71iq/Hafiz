@@ -14,6 +14,8 @@ let mockRestoreCards: unknown[] = [];
 let mockIncrementalCards: unknown[] = [];
 let mockRestoreHighlights: unknown[] = [];
 let mockIncrementalHighlights: unknown[] = [];
+const mockTableRows = new Map<string, unknown[]>();
+const mockRawResponses = new Map<string, unknown>();
 const requests: { table: string; incremental: boolean; offset: number; since: string | null }[] = [];
 const mockMeaningRestoreRows: unknown[] = [];
 const mockMeaningIncrementalRows: unknown[] = [];
@@ -46,8 +48,10 @@ class MockQuery {
     const key = `${this.table}:${this.incremental ? "incremental" : "restore"}:${start}`;
     const error = mockQueryErrors.get(key);
     if (error) return { data: null, error };
+    if (mockRawResponses.has(key)) return { data: mockRawResponses.get(key), error: null };
     const rows =
-      this.table === "study_cards"
+      mockTableRows.get(`${this.table}:${this.incremental ? "incremental" : "restore"}`) ??
+      (this.table === "study_cards"
         ? this.incremental
           ? mockIncrementalCards
           : mockRestoreCards
@@ -59,7 +63,7 @@ class MockQuery {
             ? this.incremental
               ? mockIncrementalHighlights
               : mockRestoreHighlights
-            : [];
+            : []);
     const wireRows = rows.map((row) => {
       if (
         row === null ||
@@ -105,7 +109,9 @@ jest.mock("@/lib/database/sync-queue", () => ({
 }));
 jest.mock("@/lib/achievements/queries", () => ({
   backfillAchievements: () => mockBackfill(),
-  insertRemoteAchievementUnlock: jest.fn(),
+  insertRemoteAchievementUnlock:
+    jest.requireActual<typeof import("@/lib/achievements/queries")>("@/lib/achievements/queries")
+      .insertRemoteAchievementUnlock,
 }));
 
 let sql: DatabaseSync;
@@ -165,11 +171,21 @@ function putMeaning(row: Record<string, SQLInputValue> = meaning()) {
     .run(row.surah, row.ayah, row.word_pos, row.word, row.meaning, row.created_at, row.updated_at);
 }
 function putQueueRow() {
+  const personalNotePayload = JSON.stringify({
+    id: "synthetic-note",
+    surah: 2,
+    ayah_start: 255,
+    ayah_end: 255,
+    content: "synthetic queued personal note",
+    created_at: OLD,
+    updated_at: OLD,
+    deleted_at: null,
+  });
   sql
     .prepare(
-      "INSERT INTO sync_queue (table_name,operation,row_id,data,status,created_at) VALUES ('private_notes','UPDATE','synthetic-note','{}','pending',?)",
+      "INSERT INTO sync_queue (table_name,operation,row_id,data,status,created_at) VALUES ('private_notes','UPDATE','synthetic-note',?,'pending',?)",
     )
-    .run(OLD);
+    .run(personalNotePayload, OLD);
 }
 function failPage(table: string, mode: "restore" | "incremental", offset: number, error: Error) {
   mockQueryErrors.set(`${table}:${mode}:${offset}`, error);
@@ -181,6 +197,11 @@ function snapshot() {
     notes: sql.prepare("SELECT * FROM private_notes ORDER BY id").all(),
     meanings: sql.prepare("SELECT * FROM user_word_meanings ORDER BY surah,ayah,word_pos").all(),
     settings: sql.prepare("SELECT * FROM user_settings ORDER BY key").all(),
+    logs: sql.prepare("SELECT * FROM study_log ORDER BY id").all(),
+    bookmarks: sql.prepare("SELECT * FROM bookmarks ORDER BY surah,ayah").all(),
+    journey: sql.prepare("SELECT * FROM reflection_journey_entries ORDER BY level_id").all(),
+    achievements: sql.prepare("SELECT * FROM achievement_unlocks ORDER BY achievement_id").all(),
+    qfQueue: sql.prepare("SELECT * FROM qf_sync_queue ORDER BY id").all(),
     queue: sql.prepare("SELECT * FROM sync_queue ORDER BY id").all(),
   };
 }
@@ -199,6 +220,8 @@ beforeEach(async () => {
     expires_in: 3600,
   };
   observeAuthSession(mockSession);
+  mockTableRows.clear();
+  mockRawResponses.clear();
   mockRestoreCards = [];
   mockIncrementalCards = [];
   mockRestoreHighlights = [];
@@ -682,6 +705,61 @@ it.each([
   expect(highlightRows()).toEqual([preserved]);
 });
 
+const malformedHighlightTombstones: {
+  field: "updated_at" | "deleted_at";
+  overrides: Record<string, SQLInputValue>;
+}[] = [
+  {
+    field: "updated_at",
+    overrides: { updated_at: "9999-not-a-date", deleted_at: HIGHLIGHT_DELETION_TIME },
+  },
+  {
+    field: "deleted_at",
+    overrides: { updated_at: HIGHLIGHT_DELETION_TIME, deleted_at: "not-a-date" },
+  },
+];
+
+function seedDuplicateHighlights() {
+  putHighlight(highlightRow(HIGHLIGHT_CANONICAL_ID, OLD));
+  putHighlight(highlightRow(HIGHLIGHT_CANONICAL_ID + ":newer", NEW));
+}
+
+it.each(
+  malformedHighlightTombstones.flatMap((entry) =>
+    (["restore", "incremental"] as const).map((mode) => ({ ...entry, mode })),
+  ),
+)(
+  "rejects a highlight tombstone with malformed truthy $field during $mode before local mutation",
+  async ({ field, overrides, mode }) => {
+    seedDuplicateHighlights();
+    putQueueRow();
+    const payload = remoteHighlightDeletion(overrides);
+    if (mode === "restore") mockRestoreHighlights.push(payload);
+    else {
+      restoreComplete();
+      mockIncrementalHighlights.push(payload);
+    }
+    const before = snapshot();
+    writes.length = 0;
+
+    if (mode === "restore") {
+      await expect(fullSync(db)).rejects.toThrow();
+      expect(mockPending).not.toHaveBeenCalled();
+      expect(transactions).toBe(0);
+      expect(writes).toEqual([]);
+    } else {
+      await expect(fullSync(db)).resolves.toMatchObject({ status: "failed", pulled: 0 });
+      expect(sql.prepare("SELECT value FROM user_settings WHERE key='last_pull_at'").get()).toEqual({ value: OLD });
+      expect(mockPending).toHaveBeenCalled();
+    }
+
+    expect(snapshot()).toEqual(before);
+    expect(highlightRows()).toHaveLength(2);
+    expect(snapshot().queue).toEqual(before.queue);
+    expect(snapshot().notes).toEqual(before.notes);
+  },
+);
+
 it("retains the legacy unrestricted deletion when resolved highlight updated_at is empty", async () => {
   restoreComplete();
   putHighlight(highlightRow(HIGHLIGHT_CANONICAL_ID, OLD));
@@ -689,4 +767,133 @@ it("retains the legacy unrestricted deletion when resolved highlight updated_at 
   mockIncrementalHighlights.push(remoteHighlightDeletion({ updated_at: "" }));
   await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
   expect(highlightRows()).toEqual([]);
+});
+
+const boundaryRows: Record<string, Record<string, unknown>> = {
+  user_settings: { key: "daily_review_limit", value: "30", updated_at: NEW },
+  user_word_meanings: meaning(),
+  study_cards: card("boundary-card"),
+  study_log: {
+    card_id: "boundary-card",
+    rating: 3,
+    state: 2,
+    due: NEW,
+    stability: 1,
+    difficulty: 2,
+    elapsed_days: 1,
+    scheduled_days: 1,
+    reviewed_at: NEW,
+  },
+  bookmarks: { surah: 2, ayah: 255, created_at: OLD, updated_at: NEW },
+  highlights: highlightRow("boundary-highlight", NEW),
+  private_notes: {
+    id: "boundary-note",
+    surah: 2,
+    ayah_start: 255,
+    ayah_end: 255,
+    content: "synthetic boundary",
+    created_at: OLD,
+    updated_at: NEW,
+    deleted_at: null,
+  },
+  reflection_journey_entries: {
+    level_id: "boundary-level",
+    status: "draft",
+    response_text: "",
+    created_at: OLD,
+    updated_at: NEW,
+    completed_at: null,
+  },
+  achievement_unlocks: { achievement_id: "boundary-badge", unlocked_at: NEW, public_payload: {} },
+};
+
+it.each(
+  Object.keys(boundaryRows).flatMap((table) => (["restore", "incremental"] as const).map((mode) => ({ table, mode }))),
+)("rejects a valid prefix and malformed row in $table during $mode before any page write", async ({ table, mode }) => {
+  if (mode === "incremental") restoreComplete();
+  putQueueRow();
+  const row = boundaryRows[table];
+  mockTableRows.set(`${table}:${mode}`, [row, { ...row, user_id: "foreign-owner" }]);
+  const before = snapshot();
+  writes.length = 0;
+  if (mode === "restore") await expect(fullSync(db)).rejects.toThrow();
+  else await expect(fullSync(db)).resolves.toMatchObject({ status: "failed", pulled: 0 });
+  expect(snapshot()).toEqual(before);
+  expect(transactions).toBe(0);
+  expect(writes).toEqual([]);
+});
+
+it.each(Object.keys(boundaryRows))("rejects a malformed later %s restore page before replacement", async (table) => {
+  putQueueRow();
+  const row = boundaryRows[table];
+  mockTableRows.set(`${table}:restore`, [
+    ...Array.from({ length: 500 }, () => row),
+    { ...row, synced_at: "not-a-date" },
+  ]);
+  const before = snapshot();
+  writes.length = 0;
+  await expect(fullSync(db)).rejects.toThrow();
+  expect(requests.filter((r) => r.table === table).map((r) => r.offset)).toEqual([0, 500]);
+  expect(snapshot()).toEqual(before);
+  expect(writes).toEqual([]);
+  expect(transactions).toBe(0);
+});
+
+it.each([null, {}, { length: 0 }])("rejects non-array account results %p before replacement", async (data) => {
+  putQueueRow();
+  mockRawResponses.set("highlights:restore:0", data);
+  const before = snapshot();
+  await expect(fullSync(db)).rejects.toThrow();
+  expect(snapshot()).toEqual(before);
+  expect(transactions).toBe(0);
+  expect(writes).toEqual([]);
+});
+
+it("keeps committed page counts and the cursor when a later incremental page is malformed, then retries", async () => {
+  restoreComplete();
+  putQueueRow();
+  const row = boundaryRows.private_notes;
+  const valid = Array.from({ length: 501 }, (_, i) => ({ ...row, id: `boundary-note-${i}` }));
+  mockTableRows.set("private_notes:incremental", [...valid.slice(0, 500), { ...valid[500], updated_at: "invalid" }]);
+  const queueBefore = sql.prepare("SELECT * FROM sync_queue ORDER BY id").all();
+  await expect(fullSync(db)).resolves.toMatchObject({ status: "partial", pulled: 500 });
+  expect(sql.prepare("SELECT COUNT(*) AS count FROM private_notes WHERE id LIKE 'boundary-note-%'").get()).toEqual({
+    count: 500,
+  });
+  expect(sql.prepare("SELECT value FROM user_settings WHERE key='last_pull_at'").get()).toEqual({ value: OLD });
+  expect(sql.prepare("SELECT * FROM sync_queue ORDER BY id").all()).toEqual(queueBefore);
+  mockTableRows.set("private_notes:incremental", valid);
+  await expect(fullSync(db)).resolves.toMatchObject({ status: "partial", pulled: 501 });
+  expect(sql.prepare("SELECT COUNT(*) AS count FROM private_notes WHERE id LIKE 'boundary-note-%'").get()).toEqual({
+    count: 501,
+  });
+  expect(sql.prepare("SELECT value FROM user_settings WHERE key='last_pull_at'").get()?.value).not.toBe(OLD);
+  expect(sql.prepare("SELECT * FROM sync_queue ORDER BY id").all()).toEqual(queueBefore);
+});
+
+it.each(
+  Object.keys(boundaryRows).flatMap((table) => (["restore", "incremental"] as const).map((mode) => ({ table, mode }))),
+)("applies a valid $table row during $mode", async ({ table, mode }) => {
+  if (mode === "incremental") restoreComplete();
+  mockTableRows.set(`${table}:${mode}`, [boundaryRows[table]]);
+  const result = await fullSync(db);
+  expect(result).toMatchObject({ status: "synced", pulled: 1, accountRestored: mode === "restore" });
+  const keys: Record<string, string[]> = {
+    user_settings: ["key"],
+    user_word_meanings: ["surah", "ayah", "word_pos"],
+    study_cards: ["id"],
+    study_log: ["card_id", "reviewed_at"],
+    bookmarks: ["surah", "ayah"],
+    highlights: ["sync_id"],
+    private_notes: ["id"],
+    reflection_journey_entries: ["level_id"],
+    achievement_unlocks: ["achievement_id"],
+  };
+  const incoming = boundaryRows[table];
+  const selected = sql
+    .prepare(`SELECT * FROM ${table} WHERE ${keys[table].map((key) => key + " = ?").join(" AND ")}`)
+    .get(...keys[table].map((key) => incoming[key] as SQLInputValue));
+  const expected = table === "achievement_unlocks" ? { ...incoming, public_payload: "{}" } : incoming;
+  expect(selected).toMatchObject(expected);
+  expect(transactions).toBe(1);
 });

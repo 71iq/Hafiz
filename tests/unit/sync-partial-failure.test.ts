@@ -72,11 +72,11 @@ class MockQuery {
     return { error: null };
   }
 
-  then<TResult1 = { data: null; error: null }, TResult2 = never>(
-    onfulfilled?: ((value: { data: null; error: null }) => TResult1 | PromiseLike<TResult1>) | null,
+  then<TResult1 = { data: unknown[]; error: null }, TResult2 = never>(
+    onfulfilled?: ((value: { data: unknown[]; error: null }) => TResult1 | PromiseLike<TResult1>) | null,
     _onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
   ): Promise<TResult1 | TResult2> {
-    return Promise.resolve({ data: null, error: null }).then(onfulfilled ?? undefined);
+    return Promise.resolve({ data: [] as unknown[], error: null }).then(onfulfilled ?? undefined);
   }
 }
 

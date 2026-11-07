@@ -2989,49 +2989,246 @@
     },
     {
       "id": "RF-031",
-      "title": "Validate sync payloads at entry",
-      "description": "Validate sync payloads at entry",
-      "rationale": "Sync queue records currently use broad any values.",
+      "title": "Validate account sync rows and queued payloads before dispatch",
+      "description": "Direct boundary validation for the nine existing account-sync tables. Decode incoming pages before restore replacement or incremental page writes, and decode unversioned persisted queue entries before remote calls. Preserve legitimate current and legacy payload shapes and failed retry work.",
+      "rationale": "Only incoming live study-card state is checked. Malformed highlight deletion timestamps can lexically outrank newer local rows; queued unknown operations are treated as upserts and unknown tables fall through to generic writes. These are source-derived malformed-input risks, not observed production corruption. Per-table validation must prevent mutation/acknowledgement while preserving the established sparse and fallback contracts.",
       "modules": [
-        "lib/database/sync-queue.ts",
+        "lib/database/sync-payloads.ts",
         "lib/database/sync.ts",
-        "lib/database/user-settings.ts",
-        "tests/unit/sync-payloads.test.ts"
+        "lib/database/sync-queue.ts"
       ],
       "dependencies": [
         "RF-030"
       ],
       "acceptance_criteria": [
-        "Define validated per-table payloads with stable IDs/timestamps/deletes.",
-        "Use isolated fixtures and preserve unknown-version handling. No production migration or data rewrite."
+        "Use the existing Zod dependency and a feature-local decoder with validated per-table types for study_cards, study_log, bookmarks, highlights, private_notes, user_settings, user_word_meanings, reflection_journey_entries and achievement_unlocks. Validate nonempty stable IDs, finite numeric fields, string content and date/deletion shapes without coercion or modifying stored rows. Preserve opaque/legacy card and highlight IDs, nullable fields, optional QF metadata, valid ISO UTC/offset/fractional timestamps, sparse card tombstone defaults, existing timestamp fallbacks and explicit empty highlight updated_at behavior. No new date ordering policy, Quran mapping/data correction or fabricated payload-version protocol.",
+        "Decode a whole incoming page before applying any row. A malformed restore page, including later pages/tables, must fail before clearing local personal tables or queues. A malformed incremental page must preserve that page and the shared cursor, retain earlier committed page counts, and use the existing partial/failed status contract. Reject malformed non-array response payloads instead of treating them as an empty account. Preserve ignored unsupported user-setting keys and existing study-card state error/default behavior. A present remote user_id must belong to the captured current owner; no foreign-row application.",
+        "Decode persisted queue JSON/envelopes before remote dispatch, with closed table/operation names and validated table-specific identities. Keep INSERT/UPDATE and existing sparse/full DELETE compatibility, including physical legacy card/highlight deletion and coordinate bookmark/word-meaning deletion. Unrecognized/malformed data, table, operation, mismatched identity or foreign declared owner must remain failed/retryable without a remote write or false acknowledgement. Existing unversioned rows remain supported. Do not silently drop future outbound fields or acknowledge unsupported semantics. Keep queue records/producers and retry/count/cap semantics intact; no local validation failure may lose a user write before it reaches the queue. Validate freshness and append-only-log existence query projections before they may suppress a write and acknowledge the queue; malformed results retain retry data. Preserve validated decimal database integer IDs exactly through dispatch, including IDs above the safe JS number range; reject malformed/out-of-range numeric identities.",
+        "Characterize source failures with real isolated SQLite and actual sync entrypoints, then add independent contract controls for every table and malformed/valid legacy variants. Test valid-prefix plus bad row, late-page validation, unchanged rows/queues/cursor, malformed tombstone dates, unknown envelope operations/tables, wrong-owner rows, successful retries, append-only log identity, omitted/default tombstones and existing 10000-entry cap. Fill genuinely incomplete old fixtures while preserving their original assertions. No private payload bytes or credentials in diagnostics.",
+        "All20 fresh controller commands, stronger independent review and primary acceptance remain mandatory. One local accepted-task commit with a short PROGRESS note; delete task outputs after acceptance. No protected content/schema/migration, dependency version/vendor, production, push/deploy or local-account-data ownership-policy changes. Shared transaction/local-handle lifetime remains RF104; unsupported auth environments and account separation remain RF025."
       ],
       "verification": [
         [
-          "npm",
-          "run",
-          "test:unit",
-          "--",
-          "--runTestsByPath",
+          "git",
+          "diff",
+          "--check"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "lib/database/sync-payloads.ts",
+          "lib/database/sync.ts",
           "tests/unit/sync-payloads.test.ts",
-          "tests/unit/sync-restore-contract.test.ts"
+          "tests/unit/sync-queue-payloads.test.ts",
+          "tests/unit/sync-partial-failure.test.ts",
+          "tests/unit/sync-payload-validation.test.ts",
+          "docs/refactoring/PROGRESS.md"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/database/sync-payloads.ts",
+          "lib/database/sync.ts",
+          "tests/unit/sync-payloads.test.ts",
+          "tests/unit/sync-queue-payloads.test.ts",
+          "tests/unit/sync-partial-failure.test.ts",
+          "tests/unit/sync-payload-validation.test.ts",
+          "--max-warnings=0"
         ],
         [
           "npm",
           "run",
           "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "check:analysis"
+        ],
+        [
+          "npm",
+          "run",
+          "postinstall"
+        ],
+        [
+          "npm",
+          "ls",
+          "--all",
+          "--json"
+        ],
+        [
+          "npm",
+          "run",
+          "lint"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "node",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/tests/brace-expansion.test.cjs",
+          "scripts/tests/dependency-boundaries.test.cjs",
+          "scripts/tests/icon-tool.test.cjs",
+          "scripts/tests/jest-config.test.cjs",
+          "scripts/tests/js-yaml.test.cjs",
+          "scripts/tests/lint-coverage.test.cjs",
+          "scripts/tests/metro-unicode.test.cjs",
+          "scripts/tests/nanoid.test.cjs",
+          "scripts/tests/router-dependency-range.test.cjs",
+          "scripts/tests/security-dependency-owner.test.cjs",
+          "scripts/tests/source-map-js.test.cjs",
+          "scripts/tests/tailwind-source-map.test.cjs",
+          "scripts/tests/ws.test.cjs",
+          "scripts/tests/xmldom.test.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "test:refactor-runner"
+        ],
+        [
+          "python3",
+          "-B",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "scripts/tests",
+          "-p",
+          "test_*.py"
+        ],
+        [
+          "npm",
+          "run",
+          "check:native-config"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=4096",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "android",
+          "--output-dir",
+          ".expo/modernization-checks/android",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/android')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=3072",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "ios",
+          "--output-dir",
+          ".expo/modernization-checks/ios",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/ios')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8197",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts",
+          "tests/e2e/database-bridge.spec.ts"
         ]
       ],
       "risk": "high",
-      "approved": false,
-      "status": "pending",
+      "approved": true,
+      "status": "verified",
       "allowed_paths": [
-        "lib/database/sync-queue.ts",
+        "lib/database/sync-payloads.ts",
         "lib/database/sync.ts",
-        "lib/database/user-settings.ts",
-        "tests/unit/sync-payloads.test.ts"
+        "lib/database/sync-queue.ts",
+        "tests/unit/sync-payloads.test.ts",
+        "tests/unit/sync-queue-payloads.test.ts",
+        "tests/unit/sync-payload-validation.test.ts",
+        "tests/unit/sync-partial-failure.test.ts",
+        "tests/unit/sync-owner.test.ts"
       ],
-      "attempts": 0,
-      "priority": 1
+      "attempts": 1,
+      "priority": 1,
+      "implementation_mode": "implementation",
+      "diagnosis": "Causal SQLite cases exposed malformed highlight deletion dates, invalid queue envelopes/identities, false ACKs from read projections, and integer-ID rounding. Focused type guards/fixtures and all source repairs passed before fresh full verification.",
+      "started_at": "2026-11-07T03:24:07.864013+00:00",
+      "failure_history": [
+        {
+          "phase": "primary-acceptance",
+          "failure": "Primary withheld acceptance after first20check/review passes:9 causal SQLite cases falsely acknowledged malformed freshness/existence replies. Added projection validation and corrected the empty SELECT fixture.",
+          "run": ".ralph/runs/RF-031-direct-1794020647609642172",
+          "causal_run": ".ralph/runs/RF-031-probe-causal-1794021094873905776"
+        },
+        {
+          "phase": "full-controller-and-independent-review",
+          "time": "2026-11-07T03:20:53.931041+00:00",
+          "failure": "Independent review P2: physical highlight DELETE parsed large IDs into rounded JS numbers and acknowledged the wrong target. Actual-queue property reproduced and shrank to9007199254740993. Preserved decimal dispatch and validated int8 range; all20checks had passed.",
+          "run": ".ralph/runs/RF-031-direct-1794021209363617255"
+        }
+      ],
+      "recovery_windows": [
+        {
+          "time": "2026-11-07T03:23:33.419273+00:00",
+          "prior_attempt_offset": 0,
+          "prior_attempts": 2,
+          "reason": "Independent review found highlight integer IDs rounded by parseInt. A real-queue generated roundtrip property reproduced and shrank to9007199254740993. Dispatch now preserves decimal strings and validates signed-int8 identity range without adding runtime BigInt. All focused tests/types/lint pass. Retain both full-run outcomes and reopen a bounded fresh verification/review window."
+        }
+      ],
+      "attempt_offset": 2,
+      "completed_at": "2026-11-07T03:32:32.882745+00:00",
+      "primary_accepted_at": "2026-11-07T03:32:32.882745+00:00",
+      "independent_review": "pass",
+      "evidence": "docs/refactoring/PROGRESS.md",
+      "summary": "Validated9 account-sync tables, queued payloads and read-before-write projections before mutation/ACK. Malformed work stays retryable; legacy/sparse/opaque IDs remain supported, with exact decimal integer dispatch. All20 fresh gates, independent stronger review and primary acceptance pass:2801Jest/30Chrome;231focused tests include60 generated ID arrays. Account-data policy and shared transactions remain open; no native/device claim."
     },
     {
       "id": "RF-032",
