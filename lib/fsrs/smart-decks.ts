@@ -1,6 +1,6 @@
 import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import { enqueueSync } from "@/lib/database/sync-queue";
-import { deleteUserSetting, writeUserSetting } from "@/lib/database/user-settings";
+import { deleteUserSetting, putUserSetting, writeUserSetting } from "@/lib/database/user-settings";
 import { createEmptyCard } from "./scheduler";
 import {
   ALL_NEW_CARD_SORT_ORDERS,
@@ -214,7 +214,7 @@ export async function readSmartDeckFilter(
 }
 
 export async function writeSmartDeckFilter(
-  db: DatabaseExecutor,
+  db: AppDatabase,
   deckId: SmartDeckId,
   filter: BuiltInDeckFilter
 ): Promise<void> {
@@ -229,15 +229,18 @@ async function readDefaultDeckFilter(db: DatabaseExecutor): Promise<BuiltInDeckF
 }
 
 export async function writeAllDecksFilter(
-  db: DatabaseExecutor,
+  db: AppDatabase,
   filter: BuiltInDeckFilter
 ): Promise<void> {
   const normalized = normalizeSmartDeckFilter(filter);
   const value = JSON.stringify(normalized);
-  await writeUserSetting(db, ALL_DECKS_FILTER_KEY, value);
-  for (const deckId of SMART_DECK_ID_LIST) {
-    await writeUserSetting(db, smartDeckFilterKey(deckId), value);
-  }
+  // Every deck filter and its queued upload commit together, so no deck keeps a stale filter.
+  await db.withTransactionAsync(async (tx) => {
+    await putUserSetting(tx, ALL_DECKS_FILTER_KEY, value);
+    for (const deckId of SMART_DECK_ID_LIST) {
+      await putUserSetting(tx, smartDeckFilterKey(deckId), value);
+    }
+  });
 }
 
 export async function filterQuranRefsByDefaultDeckFilter<T extends { surah: number; ayah: number }>(

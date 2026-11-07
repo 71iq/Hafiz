@@ -2027,7 +2027,8 @@
       "attempts": 0,
       "primary_investigation_evidence": ".refactor-baseline/rf025-owner-audit-v1/receipt.json",
       "priority": 1,
-      "investigation_evidence": "docs/refactoring/AUTH_PROFILE_SAVE_OWNERSHIP.md"
+      "investigation_evidence": "docs/refactoring/AUTH_PROFILE_SAVE_OWNERSHIP.md",
+      "decision": "User decided on 2026-11-07: local personal data belongs to the device. Keep the single local dataset and the current restore/backfill behavior; no per-account partitioning or sign-out clearing. Remaining RF025 work is listener/late-request isolation only."
     },
     {
       "id": "RF-026",
@@ -4026,7 +4027,8 @@
         "package.json"
       ],
       "attempts": 0,
-      "priority": 3
+      "priority": 3,
+      "decision": "User has an Android phone available (2026-11-07). Connect it with USB debugging when RF040/RF041 start. Use a distinct QA applicationId and preserve the installed app and its data."
     },
     {
       "id": "RF-041",
@@ -4057,7 +4059,8 @@
         "docs/refactoring/NATIVE_TESTING.md"
       ],
       "attempts": 0,
-      "priority": 3
+      "priority": 3,
+      "decision": "User has an Android phone available (2026-11-07). Connect it with USB debugging when RF040/RF041 start. Use a distinct QA applicationId and preserve the installed app and its data."
     },
     {
       "id": "RF-042",
@@ -4083,12 +4086,13 @@
       ],
       "risk": "high",
       "approved": false,
-      "status": "pending",
+      "status": "deferred",
       "allowed_paths": [
         "docs/refactoring/NATIVE_TESTING.md"
       ],
       "attempts": 0,
-      "priority": 3
+      "priority": 3,
+      "decision": "User waived iOS verification on 2026-11-07. Not a completion requirement; never claim iOS runtime verification."
     },
     {
       "id": "RF-043",
@@ -20557,14 +20561,15 @@
       "acceptance_criteria": [
         "Await user access-policy choice and exact primary plan. Distinguish hidden/soft-deleted parents from hard-delete cascade. Preserve ownership, intentional public fields and readable active discussions. No production SQL. Full controller checks, independent review and primary acceptance."
       ],
-      "approved": false,
+      "approved": true,
       "status": "pending",
       "attempts": 0,
       "implementation_mode": "implementation",
       "files": [],
       "allowed_paths": [],
       "verification": [],
-      "blocker": "User access-policy choice pending through async question: hide discussion/reactions with hidden/deleted parent, or keep public. No policy implementation authorized until resolved."
+      "blocker": "User access-policy choice pending through async question: hide discussion/reactions with hidden/deleted parent, or keep public. No policy implementation authorized until resolved.",
+      "decision": "User decided on 2026-11-07: comments, likes and comment likes must not stay visible when their reflection is hidden or soft-deleted. Child visibility follows the parent. Source-only reviewed migration; no production SQL."
     },
     {
       "id": "RF-171",
@@ -20597,6 +20602,254 @@
       "files": [],
       "allowed_paths": [],
       "verification": []
+    },
+    {
+      "id": "RF-172",
+      "title": "Save syncable settings and their upload queue together",
+      "priority": 1,
+      "risk": "medium",
+      "description": "RF171 sub-task 1. writeUserSetting/deleteUserSetting detached their sync queue write with .catch(console.warn), so a failed queue write left a saved setting that never uploads. Add transaction-ready putUserSetting/removeUserSetting steps; public writes of syncable keys commit the row and queue entry together, and writeAllDecksFilter saves every deck filter in one transaction.",
+      "dependencies": [
+        "RF-033",
+        "RF-167"
+      ],
+      "modules": [
+        "lib/database/user-settings.ts",
+        "lib/fsrs/smart-decks.ts",
+        "lib/fsrs/queries.ts",
+        "lib/settings/context.tsx",
+        "tests/unit/user-settings-outbox.test.ts",
+        "tests/jest/outbox-sqlite.ts",
+        "tests/unit/settings-render-subscriptions.test.tsx"
+      ],
+      "files": [
+        "lib/database/user-settings.ts",
+        "lib/fsrs/smart-decks.ts",
+        "lib/fsrs/queries.ts",
+        "lib/settings/context.tsx",
+        "tests/unit/user-settings-outbox.test.ts",
+        "tests/jest/outbox-sqlite.ts",
+        "tests/unit/settings-render-subscriptions.test.tsx"
+      ],
+      "allowed_paths": [
+        "lib/database/user-settings.ts",
+        "lib/fsrs/smart-decks.ts",
+        "lib/fsrs/queries.ts",
+        "lib/settings/context.tsx",
+        "tests/unit/user-settings-outbox.test.ts",
+        "tests/jest/outbox-sqlite.ts",
+        "tests/unit/settings-render-subscriptions.test.tsx"
+      ],
+      "acceptance_criteria": [
+        "A syncable setting write or delete and its queue entry commit together; a queue failure rejects and leaves the previous local value. Local-only keys never queue.",
+        "writeAllDecksFilter writes all deck filters and their queue entries or none.",
+        "Callers that already catch errors keep their behavior. addMeaningCard writes its deck setting transactionally; its card insert becomes atomic with it in a later RF171 sub-task, and the legacy deck migration surfaces queue failures.",
+        "Causal tests through the real connection owner over node:sqlite. All full controller checks, separate independent review and primary acceptance."
+      ],
+      "verification": [
+        [
+          "git",
+          "diff",
+          "--check"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "lib/database/user-settings.ts",
+          "lib/settings/context.tsx",
+          "tests/unit/user-settings-outbox.test.ts",
+          "tests/jest/outbox-sqlite.ts",
+          "tests/unit/settings-render-subscriptions.test.tsx",
+          "docs/refactoring/PROGRESS.md"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/database/user-settings.ts",
+          "lib/fsrs/smart-decks.ts",
+          "lib/fsrs/queries.ts",
+          "lib/settings/context.tsx",
+          "tests/unit/user-settings-outbox.test.ts",
+          "tests/jest/outbox-sqlite.ts",
+          "tests/unit/settings-render-subscriptions.test.tsx",
+          "--max-warnings=0"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "check:analysis"
+        ],
+        [
+          "npm",
+          "run",
+          "postinstall"
+        ],
+        [
+          "npm",
+          "ls",
+          "--all",
+          "--json"
+        ],
+        [
+          "npm",
+          "run",
+          "lint",
+          "--",
+          "--format",
+          "json"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit"
+        ],
+        [
+          "node",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/tests/brace-expansion.test.cjs",
+          "scripts/tests/dependency-boundaries.test.cjs",
+          "scripts/tests/icon-tool.test.cjs",
+          "scripts/tests/jest-config.test.cjs",
+          "scripts/tests/js-yaml.test.cjs",
+          "scripts/tests/lint-coverage.test.cjs",
+          "scripts/tests/metro-unicode.test.cjs",
+          "scripts/tests/nanoid.test.cjs",
+          "scripts/tests/router-dependency-range.test.cjs",
+          "scripts/tests/security-dependency-owner.test.cjs",
+          "scripts/tests/source-map-js.test.cjs",
+          "scripts/tests/tailwind-source-map.test.cjs",
+          "scripts/tests/ws.test.cjs",
+          "scripts/tests/xmldom.test.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "test:refactor-runner"
+        ],
+        [
+          "python3",
+          "-B",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "scripts/tests",
+          "-p",
+          "test_*.py"
+        ],
+        [
+          "npm",
+          "run",
+          "check:native-config"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=4096",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "android",
+          "--output-dir",
+          ".expo/modernization-checks/android",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/android')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=3072",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "ios",
+          "--output-dir",
+          ".expo/modernization-checks/ios",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/ios')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8197",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts",
+          "tests/e2e/database-bridge.spec.ts",
+          "tests/e2e/tafsir-import.spec.ts",
+          "tests/e2e/translation-import.spec.ts"
+        ]
+      ],
+      "approved": true,
+      "status": "verified",
+      "attempts": 1,
+      "implementation_mode": "implementation",
+      "started_at": "2026-11-07T12:29:07.071018+00:00",
+      "reuse": "AppDatabase.withTransactionAsync and the existing enqueueSync; the new tests/jest/outbox-sqlite.ts harness wraps the production connection owner for later RF171 sub-tasks.",
+      "focused_validation": {
+        "pre_fix": "Three of four new cases failed on the original source: the setting changed or was deleted with no queue row, and deck filters were partly written.",
+        "post_fix": "All 4 new cases and 140 cases across the 7 affected suites pass; typecheck and scoped zero-warning lint pass."
+      },
+      "failure_history": [
+        {
+          "phase": "first-full-controller",
+          "failure": "check:analysis found removeUserSetting exported with no external user. Made it file-private; later RF171 sub-tasks export it when they use it. The Knip baseline is unchanged."
+        },
+        {
+          "phase": "independent-review",
+          "failure": "Review found the settings-render-subscriptions database mock lacked withTransactionAsync, so the daily_review_limit case failed in both locales once syncable writes became transactional. Added the transaction to the mock; the enqueue assertions are unchanged. addMeaningCard now takes AppDatabase and uses the transactional writeUserSetting, so a failed attempt leaves no deck row."
+        }
+      ],
+      "completed_at": "2026-11-07T12:43:18.231882+00:00",
+      "primary_accepted_at": "2026-11-07T12:43:18.231882+00:00",
+      "independent_review": "pass",
+      "evidence": "docs/refactoring/PROGRESS.md",
+      "summary": "Syncable setting writes/deletes, the all-decks filter and the meanings deck setting commit together with their upload queue entries. A queue failure keeps the previous value and surfaces through existing caller error handling. All 20 full checks (3,068 unit, 35 Chrome) and independent review pass."
     }
   ]
 }

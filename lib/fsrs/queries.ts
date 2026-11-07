@@ -285,7 +285,7 @@ export async function readDeckReviewSettings(
 }
 
 export async function writeDeckReviewSettings(
-  db: DatabaseExecutor,
+  db: AppDatabase,
   deckId: string,
   settings: Partial<DeckReviewSettings>
 ): Promise<void> {
@@ -311,7 +311,7 @@ export async function isMeaningCardSaved(
 }
 
 export async function addMeaningCard(
-  db: DatabaseExecutor,
+  db: AppDatabase,
   surah: number,
   ayah: number,
   wordPos: number

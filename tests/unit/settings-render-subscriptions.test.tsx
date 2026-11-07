@@ -47,6 +47,8 @@ const mockDatabase = {
       return { changes: 1, lastInsertRowId: 0 };
     },
   ),
+  // Syncable settings commit with their queue entry; the queue module is mocked below.
+  withTransactionAsync: async (task: (transaction: unknown) => Promise<void>) => task(mockDatabase),
 };
 
 // Preserve the real context value; count committed useSettings call effects.

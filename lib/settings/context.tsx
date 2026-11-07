@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from "react";
 import { Platform, useColorScheme as useSystemColorScheme, useWindowDimensions, View } from "react-native";
 import { useColorScheme as useNativeWindColorScheme, vars } from "nativewind";
-import type { DatabaseExecutor } from "@/lib/database/types";
+import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import { useDatabase } from "@/lib/database/provider";
 import { writeUserSetting } from "@/lib/database/user-settings";
 import { DEFAULT_LANGUAGE, DEFAULT_TRANSLATION_LANGUAGE } from "@/lib/translations/languages";
@@ -424,7 +424,7 @@ async function readSettings(db: DatabaseExecutor, keys: string[]): Promise<Recor
   return values;
 }
 
-async function writeSetting(db: DatabaseExecutor, key: string, value: string): Promise<void> {
+async function writeSetting(db: AppDatabase, key: string, value: string): Promise<void> {
   await writeUserSetting(db, key, value);
 }
 
