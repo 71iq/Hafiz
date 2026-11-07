@@ -23388,23 +23388,24 @@
     }
   ],
   "checkpoint": {
-    "time": "2026-11-07T19:00:45.205037+00:00",
-    "current_task": "RF-184 paused with device findings; next RF-185 onboarding buttons/rows",
+    "time": "2026-11-07T19:27:51.618700+00:00",
+    "current_task": "RF-184 Android verse-by-verse Mushaf words: device experiment showed one Text per ayah renders correctly while one Text per word clips overhanging glyphs; next render each ayah as a single Text with nested pressable word spans on Android, then verify on device",
     "open_follow_ups": [
       "RF-180",
       "RF-182",
       "RF-183",
       "RF-184",
-      "RF-185",
       "RF-186",
       "RF-187",
-      "RF-188"
+      "RF-188",
+      "onboarding 'Skip for now' skips step 3 (confirm intent)"
     ],
     "decisions_waiting_on_ehab": [
       "Apply RF-166 and RF-170 migrations to the deployed database",
       "Final push after all work is verified"
     ],
-    "last_green_commit": "24498c1 (last full 20-check gate: RF-170); later commits are docs/tooling only",
-    "uncommitted": null
+    "last_green_commit": "5aff3d2 (full 20-check batch gate: 3,099 unit, 35 Chrome)",
+    "uncommitted": null,
+    "device": "Samsung SM-A546E over USB; QA app com.anonymous.hafiz.qa installed; build with scripts/android-qa-build.sh"
   }
 }
