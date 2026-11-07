@@ -7,9 +7,9 @@ import {
   addBookmark as dbAddBookmark,
   removeBookmark as dbRemoveBookmark,
   fetchAllHighlights,
-  addHighlight as dbAddHighlight,
   addHighlightsForSelectionRefs,
   removeHighlightsForAyah,
+  replaceAyahHighlight,
   type QuranSelectionWordRef,
 } from "./queries";
 
@@ -124,11 +124,11 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
       if (!selection) return;
       const { start } = selection;
       try {
-        await removeHighlightsForAyah(db, start.surah, start.ayah);
-        await dbAddHighlight(db, start.surah, start.ayah, color);
+        await replaceAyahHighlight(db, start.surah, start.ayah, color);
         await refreshHighlights();
       } catch (e) {
         console.warn("[Selection] Failed to add highlight:", e);
+        throw e;
       }
     },
     [selection, db, refreshHighlights]
@@ -157,6 +157,7 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
         await refreshHighlights();
       } catch (e) {
         console.warn("[Selection] Failed to remove highlight:", e);
+        throw e;
       }
     },
     [selection, db, refreshHighlights]
@@ -180,7 +181,7 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (e) {
         console.warn("[Selection] Failed to toggle bookmark:", e);
-        return null;
+        throw e;
       }
     },
     [selection, db, bookmarks, refreshBookmarks]

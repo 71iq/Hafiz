@@ -1,4 +1,4 @@
-import type { DatabaseExecutor } from "@/lib/database/types";
+import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import type { BookmarkEntry, HighlightEntry } from "./types";
 import { enqueueSync } from "@/lib/database/sync-queue";
 import { enqueueQfSync } from "@/lib/quran-foundation/user-sync";
@@ -61,7 +61,12 @@ export async function fetchAllBookmarks(db: DatabaseExecutor): Promise<BookmarkE
   );
 }
 
-export async function addBookmark(db: DatabaseExecutor, surah: number, ayah: number): Promise<void> {
+/** Bookmark an ayah. The local row and both upload queue entries commit together or not at all. */
+export async function addBookmark(database: AppDatabase, surah: number, ayah: number): Promise<void> {
+  await database.withTransactionAsync((db) => addBookmarkRows(db, surah, ayah));
+}
+
+async function addBookmarkRows(db: DatabaseExecutor, surah: number, ayah: number): Promise<void> {
   const now = new Date().toISOString();
   await db.runAsync(
     `INSERT INTO bookmarks (surah, ayah, created_at, updated_at, deleted_at)
@@ -73,13 +78,18 @@ export async function addBookmark(db: DatabaseExecutor, surah: number, ayah: num
     [surah, ayah, now, now]
   );
   const row = await getBookmarkRow(db, surah, ayah);
-  enqueueSync(db, "bookmarks", "UPDATE", `${surah}:${ayah}`, row ? bookmarkToSyncData(row) : {
+  await enqueueSync(db, "bookmarks", "UPDATE", `${surah}:${ayah}`, row ? bookmarkToSyncData(row) : {
     surah, ayah, created_at: now, updated_at: now, deleted_at: null,
-  }).catch(console.warn);
-  enqueueQfSync(db, "bookmark", "UPSERT", `${surah}:${ayah}`, { surah, ayah }).catch(console.warn);
+  });
+  await enqueueQfSync(db, "bookmark", "UPSERT", `${surah}:${ayah}`, { surah, ayah });
 }
 
-export async function removeBookmark(db: DatabaseExecutor, surah: number, ayah: number): Promise<void> {
+/** Remove a bookmark. The tombstone and both upload queue entries commit together or not at all. */
+export async function removeBookmark(database: AppDatabase, surah: number, ayah: number): Promise<void> {
+  await database.withTransactionAsync((db) => removeBookmarkRows(db, surah, ayah));
+}
+
+async function removeBookmarkRows(db: DatabaseExecutor, surah: number, ayah: number): Promise<void> {
   const existing = await getBookmarkRow(db, surah, ayah);
   if (!existing) return;
   const now = new Date().toISOString();
@@ -88,16 +98,16 @@ export async function removeBookmark(db: DatabaseExecutor, surah: number, ayah: 
     [now, now, surah, ayah]
   );
   const row = await getBookmarkRow(db, surah, ayah);
-  enqueueSync(db, "bookmarks", "UPDATE", `${surah}:${ayah}`, row ? bookmarkToSyncData(row) : {
+  await enqueueSync(db, "bookmarks", "UPDATE", `${surah}:${ayah}`, row ? bookmarkToSyncData(row) : {
     surah, ayah, created_at: existing.created_at, updated_at: now, deleted_at: now,
-  }).catch(console.warn);
-  enqueueQfSync(db, "bookmark", "DELETE", `${surah}:${ayah}`, {
+  });
+  await enqueueQfSync(db, "bookmark", "DELETE", `${surah}:${ayah}`, {
     surah,
     ayah,
     qfBookmarkId: existing.qf_bookmark_id,
     qfIsInDefaultCollection: Boolean(existing.qf_is_in_default_collection),
     qfCollectionsCount: existing.qf_collections_count ?? 0,
-  }).catch(console.warn);
+  });
 }
 
 export async function fetchAllHighlights(db: DatabaseExecutor): Promise<HighlightEntry[]> {
@@ -134,7 +144,7 @@ function highlightToSyncData(row: HighlightRow): Record<string, any> {
   };
 }
 
-export async function addHighlight(
+async function insertHighlightRow(
   db: DatabaseExecutor,
   surah: number,
   ayah: number,
@@ -149,40 +159,59 @@ export async function addHighlight(
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
     [syncId, surah, ayah, wordStart ?? null, wordEnd ?? null, color, now, now]
   );
-  enqueueSync(db, "highlights", "INSERT", String(result.lastInsertRowId), {
+  await enqueueSync(db, "highlights", "INSERT", String(result.lastInsertRowId), {
     id: result.lastInsertRowId, sync_id: syncId, surah, ayah,
     word_start: wordStart ?? null, word_end: wordEnd ?? null,
     color, created_at: now, updated_at: now, deleted_at: null,
-  }).catch(console.warn);
+  });
   return result.lastInsertRowId;
 }
 
+/** Highlight every range of a text selection, or none of them. */
 export async function addHighlightsForSelectionRefs(
-  db: DatabaseExecutor,
+  database: AppDatabase,
   refs: QuranSelectionWordRef[],
   color: string,
 ): Promise<number[]> {
   const ids: number[] = [];
-  for (const range of selectionRefsToHighlightRanges(refs)) {
-    ids.push(
-      await addHighlight(
-        db,
-        range.surah,
-        range.ayah,
-        color,
-        range.wordStart ?? undefined,
-        range.wordEnd ?? undefined,
-      ),
-    );
-  }
+  await database.withTransactionAsync(async (db) => {
+    for (const range of selectionRefsToHighlightRanges(refs)) {
+      ids.push(
+        await insertHighlightRow(
+          db,
+          range.surah,
+          range.ayah,
+          color,
+          range.wordStart ?? undefined,
+          range.wordEnd ?? undefined,
+        ),
+      );
+    }
+  });
   return ids;
 }
 
-export async function removeHighlightsForAyah(
-  db: DatabaseExecutor,
+/** Remove an ayah's highlights. The physical delete and its queued deletions commit together. */
+export async function removeHighlightsForAyah(database: AppDatabase, surah: number, ayah: number): Promise<void> {
+  await database.withTransactionAsync((db) => deleteAyahHighlightRows(db, surah, ayah));
+}
+
+/** Replace an ayah's highlights with one whole-ayah highlight in a single transaction. */
+export async function replaceAyahHighlight(
+  database: AppDatabase,
   surah: number,
   ayah: number,
-): Promise<void> {
+  color: string,
+): Promise<number> {
+  let id = 0;
+  await database.withTransactionAsync(async (db) => {
+    await deleteAyahHighlightRows(db, surah, ayah);
+    id = await insertHighlightRow(db, surah, ayah, color);
+  });
+  return id;
+}
+
+async function deleteAyahHighlightRows(db: DatabaseExecutor, surah: number, ayah: number): Promise<void> {
   const rows = await db.getAllAsync<HighlightRow>(
     "SELECT * FROM highlights WHERE surah = ? AND ayah = ? AND deleted_at IS NULL",
     [surah, ayah]
@@ -190,11 +219,11 @@ export async function removeHighlightsForAyah(
   const deletedAt = new Date().toISOString();
   await db.runAsync("DELETE FROM highlights WHERE surah = ? AND ayah = ?", [surah, ayah]);
   for (const row of rows) {
-    enqueueSync(db, "highlights", "DELETE", row.sync_id ?? String(row.id), {
+    await enqueueSync(db, "highlights", "DELETE", row.sync_id ?? String(row.id), {
       ...highlightToSyncData(row),
       updated_at: deletedAt,
       deleted_at: deletedAt,
-    }).catch(console.warn);
+    });
   }
 }
 
