@@ -1,8 +1,26 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { Toast } from "@/components/ui/Toast";
+
+export type InlineNoticeAttempt = {
+  report: (message: string) => "inline" | "retained" | "discarded";
+  isCurrent: () => boolean;
+  finish: () => void;
+  retire: (reason?: "normal") => void;
+};
 
 type Notice = { id: number; message: string };
 type NoticeContextValue = {
+  createInlineAttempt: () => InlineNoticeAttempt;
   showNotice: (message: string) => void;
   registerOverlay: (id: string) => () => void;
   notice: Notice | null;
@@ -19,6 +37,52 @@ export function OperationNoticeProvider({ ready, children }: { ready: boolean; c
   const showNotice = useCallback((message: string) => {
     setNotice({ id: ++sequence.current, message });
   }, []);
+  const owner = useRef({ alive: false, ready });
+  useLayoutEffect(() => {
+    const current = owner.current;
+    current.alive = true;
+    return () => {
+      current.alive = false;
+    };
+  }, []);
+  useLayoutEffect(() => {
+    owner.current.ready = ready;
+  }, [ready]);
+  const createInlineAttempt = useCallback((): InlineNoticeAttempt => {
+    let mode: "active" | "recovery" | "discarded" | "finished" = "active";
+    let message: string | null = null;
+    let promoted = false;
+    const promote = () => {
+      if (mode === "recovery" && owner.current.alive && message !== null && !promoted) {
+        promoted = true;
+        showNotice(message);
+      }
+    };
+    return {
+      report(value) {
+        if (!owner.current.alive || mode === "discarded" || mode === "finished") return "discarded";
+        if (mode === "active" && !owner.current.ready) mode = "recovery";
+        message = value;
+        promote();
+        return mode === "active" ? "inline" : "retained";
+      },
+      isCurrent: () => mode === "active" && owner.current.alive && owner.current.ready,
+      finish() {
+        mode = "finished";
+        message = null;
+      },
+      retire(reason) {
+        if (reason === "normal") {
+          mode = "discarded";
+          message = null;
+          return;
+        }
+        if (mode !== "active") return;
+        mode = owner.current.alive && !owner.current.ready ? "recovery" : "discarded";
+        promote();
+      },
+    };
+  }, [showNotice]);
   const registerOverlay = useCallback((id: string) => {
     setOverlays((current) => [...current.filter((value) => value !== id), id]);
     return () => setOverlays((current) => current.filter((value) => value !== id));
@@ -29,8 +93,8 @@ export function OperationNoticeProvider({ ready, children }: { ready: boolean; c
   }, [id]);
   const activeOverlay = overlays.at(-1) ?? null;
   const value = useMemo(
-    () => ({ showNotice, registerOverlay, notice, ready, activeOverlay, dismiss }),
-    [showNotice, registerOverlay, notice, ready, activeOverlay, dismiss],
+    () => ({ showNotice, createInlineAttempt, registerOverlay, notice, ready, activeOverlay, dismiss }),
+    [showNotice, createInlineAttempt, registerOverlay, notice, ready, activeOverlay, dismiss],
   );
   return (
     <NoticeContext.Provider value={value}>
@@ -46,6 +110,12 @@ export function useOperationNotice(): (message: string) => void {
   const value = useContext(NoticeContext);
   if (!value) throw new Error("useOperationNotice requires OperationNoticeProvider");
   return value.showNotice;
+}
+
+export function useInlineOperationNotice(): () => InlineNoticeAttempt {
+  const value = useContext(NoticeContext);
+  if (!value) throw new Error("useInlineOperationNotice requires OperationNoticeProvider");
+  return value.createInlineAttempt;
 }
 
 /** Present above the clipped content in the existing modal window. */

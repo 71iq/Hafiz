@@ -19560,23 +19560,311 @@
       "title": "Preserve translation failure feedback during database recovery",
       "description": "TranslationLanguagePicker keeps a persistent inline error on ordinary failure, but a database retirement replaces that screen. Define and test a small recovery-only feedback policy without duplicating ordinary errors or losing retry context.",
       "modules": [
-        "components/settings/TranslationLanguagePicker.tsx",
-        "lib/settings/context.tsx"
+        "components/ui/OperationNoticeProvider.tsx",
+        "components/settings/TranslationLanguagePicker.tsx"
       ],
-      "files": [],
-      "allowed_paths": [],
+      "files": [
+        "components/ui/OperationNoticeProvider.tsx",
+        "components/settings/TranslationLanguagePicker.tsx",
+        "tests/unit/operation-notice.test.tsx",
+        "tests/unit/translation-selection.test.tsx",
+        "tests/e2e/helpers.ts",
+        "tests/e2e/tafsir-import.spec.ts",
+        "tests/e2e/translation-import.spec.ts",
+        "tests/rtl/rtl-component-registry.ts"
+      ],
+      "allowed_paths": [
+        "components/ui/OperationNoticeProvider.tsx",
+        "components/settings/TranslationLanguagePicker.tsx",
+        "tests/unit/operation-notice.test.tsx",
+        "tests/unit/translation-selection.test.tsx",
+        "tests/e2e/helpers.ts",
+        "tests/e2e/tafsir-import.spec.ts",
+        "tests/e2e/translation-import.spec.ts",
+        "tests/rtl/rtl-component-registry.ts"
+      ],
       "dependencies": [
         "RF-162",
         "RF-163"
       ],
       "priority": 1,
       "risk": "medium",
+      "approved": true,
+      "status": "verified",
+      "attempts": 2,
+      "implementation_mode": "implementation",
+      "acceptance_criteria": [
+        "Ordinary translation failure remains persistent inline with no duplicate toast; retry clears it and success closes only the current picker attempt. Existing language-setting and translation data policies remain unchanged.",
+        "A retained per-attempt message survives automatic database-recovery retirement, whether failure arrives before, during or after screen replacement. Captured English/Arabic text is shown once through the existing root/modal notice owner after readiness, for a full duration.",
+        "Provider committed readiness is written in a layout effect and automatic picker retirement runs in passive cleanup. Explicit header/backdrop/Escape close retires normally before onClose; ordinary departure and root-provider unmount suppress late failures.",
+        "Synchronous admission and per-attempt/current-visible-lifetime identity guard all success-close, error-state and finally-busy continuations. Close/reopen and old retained callbacks cannot alter the new picker.",
+        "Actual rendered bilingual picker cases cover ordinary inline failure/retry, before/during/after recovery, explicit close/normal unmount, same-render double selection, stale success/error/finally, retry-cleared prior failure and whole-owner unmount. Actual notice-owner controls cover handle retirement and message/timer lifetime.",
+        "Actual local-only Chrome synthetic translation INSERT/finalize failure proves screen recovery and discarded TEMP trigger, exact retained active rows/active-language metadata, unoccluded localized alert and complete successful retry. No protected asset writes, vendor patch, production/remote account changes or data-policy expansion.",
+        "Run all20 fresh controller checks after focused checks pass, then separate configured stronger independent review and primary final acceptance. One accepted commit and concise PROGRESS note; remove accepted logs/temp outputs and keep baseline below2GB."
+      ],
+      "verification": [
+        [
+          "git",
+          "diff",
+          "--check"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "components/ui/OperationNoticeProvider.tsx",
+          "tests/unit/operation-notice.test.tsx",
+          "tests/unit/translation-selection.test.tsx",
+          "tests/e2e/helpers.ts",
+          "tests/e2e/tafsir-import.spec.ts",
+          "tests/e2e/translation-import.spec.ts",
+          "tests/rtl/rtl-component-registry.ts",
+          "docs/refactoring/PROGRESS.md"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "components/ui/OperationNoticeProvider.tsx",
+          "components/settings/TranslationLanguagePicker.tsx",
+          "tests/unit/operation-notice.test.tsx",
+          "tests/unit/translation-selection.test.tsx",
+          "tests/e2e/helpers.ts",
+          "tests/e2e/tafsir-import.spec.ts",
+          "tests/e2e/translation-import.spec.ts",
+          "tests/rtl/rtl-component-registry.ts",
+          "--max-warnings=0"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "check:analysis"
+        ],
+        [
+          "npm",
+          "run",
+          "postinstall"
+        ],
+        [
+          "npm",
+          "ls",
+          "--all",
+          "--json"
+        ],
+        [
+          "npm",
+          "run",
+          "lint",
+          "--",
+          "--format",
+          "json"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit"
+        ],
+        [
+          "node",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/tests/brace-expansion.test.cjs",
+          "scripts/tests/dependency-boundaries.test.cjs",
+          "scripts/tests/icon-tool.test.cjs",
+          "scripts/tests/jest-config.test.cjs",
+          "scripts/tests/js-yaml.test.cjs",
+          "scripts/tests/lint-coverage.test.cjs",
+          "scripts/tests/metro-unicode.test.cjs",
+          "scripts/tests/nanoid.test.cjs",
+          "scripts/tests/router-dependency-range.test.cjs",
+          "scripts/tests/security-dependency-owner.test.cjs",
+          "scripts/tests/source-map-js.test.cjs",
+          "scripts/tests/tailwind-source-map.test.cjs",
+          "scripts/tests/ws.test.cjs",
+          "scripts/tests/xmldom.test.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "test:refactor-runner"
+        ],
+        [
+          "python3",
+          "-B",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "scripts/tests",
+          "-p",
+          "test_*.py"
+        ],
+        [
+          "npm",
+          "run",
+          "check:native-config"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=4096",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "android",
+          "--output-dir",
+          ".expo/modernization-checks/android",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/android')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=3072",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "ios",
+          "--output-dir",
+          ".expo/modernization-checks/ios",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/ios')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8197",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts",
+          "tests/e2e/database-bridge.spec.ts",
+          "tests/e2e/tafsir-import.spec.ts",
+          "tests/e2e/translation-import.spec.ts"
+        ]
+      ],
+      "diagnosis": "Primary inspected actual TranslationLanguagePicker, setTranslationLanguage import/settings continuation, stable generic notice owner and remount boundary. Stronger read-only design review confirmed retained per-attempt reports with committed readiness/passive cleanup, explicit normal close and all-continuation identity guards. Normal route departure committed together with readiness loss is conservatively classified as recovery-associated; exact navigation cause is not claimed. No changes to already-issued settings persistence policy or cross-caller translation metadata concurrency.",
+      "reuse": "Reuse the existing notice owner, Toast and Modal slots. Per-attempt retained handles need no global second channel/map, private SQLite error matching or new portal/modal. Each visible picker lifetime captures its own cleanup target.",
+      "baseline": {
+        "unit_suites": 148,
+        "unit_tests": 3019,
+        "full_lint_warnings": 63,
+        "full_lint_errors": 0,
+        "knip_findings": 5,
+        "preexisting_unformatted_paths": [
+          "components/settings/TranslationLanguagePicker.tsx"
+        ],
+        "expected_unit_suites": 149,
+        "expected_unit_tests": 3054
+      },
+      "failure_history": [
+        {
+          "phase": "causal-fixture",
+          "failure": "English cases reproduced7 behavior defects and5 controls passed. Undrained pending selections after intentional failed assertions leaked act scopes and invalidated Arabic renders. Settle every owned deferred/result in async teardown and make dismissal act callback explicitly void; retain every behavioral assertion before source repair."
+        },
+        {
+          "phase": "browser-fixture",
+          "failure": "Initial browser fixtures stopped before selection: translation hydration was not awaited and metadata queried nonexistent settings instead of user_settings. Await the actual en-bridges active marker and use existing user_settings; do not count these as application failures."
+        },
+        {
+          "phase": "causal-cleanup-root-cause",
+          "failure": "Installed cleanup starts async unmount callbacks concurrently for two roots, leaking act state across locales. Await cleanupAsync serially, preserving all assertions and zero-console-error checks. Both locales now produce14 exact causal failures and10 passing controls before app repair."
+        },
+        {
+          "phase": "browser-selection-fixture",
+          "failure": "Corrected hydration/metadata fixtures reached the picker but assumed its unlabelled Pressable rows expose button roles. Use the actual exact French text target to exercise existing selection behavior before any accessibility follow-up; no app failure is inferred from this selector."
+        },
+        {
+          "phase": "focused-lint",
+          "failure": "All38 rendered cases and types pass; capture the stable provider owner inside its layout-effect setup to satisfy cleanup-ref lint without suppression."
+        },
+        {
+          "phase": "obsolete-event-causal",
+          "failure": "Primary found4 additional bilingual old row/close callback failures after reopening, despite38 passing cases. A visible-generation identity rejects those pre-dispatch callbacks as well as old asynchronous continuations."
+        },
+        {
+          "phase": "causal-browser",
+          "failure": "After correcting fixture hydration, actual user_settings table and French text target, both prior accepted-export browser cases recover their Settings screen then fail only at missing localized alert. Data/retry assertions remain for the new full export."
+        },
+        {
+          "phase": "first-full-controller",
+          "failure": "All19 nonbrowser checks and33 existing Chrome cases passed. Both new cases passed failure notice/retained data/fresh connection assertions and reached retry; ambiguous unscoped French text matched the updated setting and closing dialog. Scope row locator to actual dialog. Both focused cases and all35 fresh full browser cases pass with every assertion retained."
+        }
+      ],
+      "focused_validation": {
+        "pre_fix": "14 bilingual rendered causal failures with10 passing controls, then4 old row/close event failures after the initial repair. Both actual prior-export Chrome cases reach recovery/ready Settings and fail only at the missing localized alert.",
+        "post_fix": "All42 focused notice/picker cases, strict types and zero-warning scoped lint pass. All20 fresh full checks,35 Chrome cases, separate stronger review and primary acceptance pass.",
+        "limits": "Underlying settings persistence/cross-caller translation metadata policy unchanged. Explicit normal retirement is silent; a departure committed with unavailable readiness is conservatively recovery-associated. Native runtime remainsRF041; unlabelled translation-row roles are pendingRF165."
+      },
+      "verification_rationale": "Full Jest executes every suite for each task; reuse its normal content-aware transform cache instead of discarding it. No prior test result is substituted. All20 full checks and stronger review remain.",
+      "started_at": "2026-11-07T09:51:28.256983+00:00",
+      "evidence": "docs/refactoring/PROGRESS.md",
+      "completed_at": "2026-11-07T10:03:01.045392+00:00",
+      "primary_accepted_at": "2026-11-07T10:03:01.045392+00:00",
+      "independent_review": "pass",
+      "summary": "Translation failures survive database recovery while ordinary errors remain persistent inline. Stale selection and close callbacks cannot change a reopened picker. All20 fresh full controller checks, separate stronger review and primary acceptance pass:149 suites/3054 cases and35 actual Chrome checks. Settings persistence/fallback policy unchanged; native runtime remainsRF041, row accessibility remainsRF165."
+    },
+    {
+      "id": "RF-165",
+      "title": "Expose translation picker selection semantics to assistive technology",
+      "description": "Actual English/Arabic browser fixtures can click French text but find no button role; TranslationLanguagePicker passes no role or selected state to its Pressable rows. Confirm the existing TafsirSourcePicker contract and add bounded rendered/browser coverage before choosing the smallest shared-compatible repair.",
+      "modules": [
+        "components/settings/TranslationLanguagePicker.tsx"
+      ],
+      "files": [],
+      "allowed_paths": [],
+      "dependencies": [
+        "RF-164"
+      ],
+      "priority": 2,
+      "risk": "low",
       "approved": false,
       "status": "pending",
       "attempts": 0,
       "implementation_mode": "implementation",
       "acceptance_criteria": [
-        "Pending exact primary scope after real recovery/inline-error diagnosis. Preserve ordinary inline retry behavior, captured bilingual messages and language-setting policy. Full controller checks, independent stronger review and primary acceptance required."
+        "Pending exact primary scope for role, selected/busy/disabled semantics and keyboard/native compatibility. Preserve styling and selection/recovery behavior; full controller checks, independent review and primary acceptance required."
       ],
       "verification": []
     }

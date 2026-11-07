@@ -1,19 +1,24 @@
 import React, { useEffect } from "react";
-import { act, cleanup, render } from "@testing-library/react-native";
+import { act, cleanupAsync, render } from "@testing-library/react-native";
 import {
   OperationNoticeOverlay,
   OperationNoticeProvider,
   useOperationNotice,
+  useInlineOperationNotice,
+  type InlineNoticeAttempt,
 } from "@/components/ui/OperationNoticeProvider";
 import { Toast } from "@/components/ui/Toast";
 
 jest.mock("@/lib/ui/reduced-motion", () => ({ useReducedMotionPreference: () => true }));
+let createInlineAttempt: () => InlineNoticeAttempt;
 let showNotice: (message: string) => void;
 function Probe() {
   const report = useOperationNotice();
+  const createAttempt = useInlineOperationNotice();
   useEffect(() => {
     showNotice = report;
-  }, [report]);
+    createInlineAttempt = createAttempt;
+  }, [report, createAttempt]);
   return null;
 }
 function tree(ready = true, firstOpen = false, secondOpen = false) {
@@ -26,8 +31,8 @@ function tree(ready = true, firstOpen = false, secondOpen = false) {
   );
 }
 beforeEach(() => jest.useFakeTimers());
-afterEach(() => {
-  cleanup();
+afterEach(async () => {
+  await cleanupAsync();
   jest.clearAllTimers();
   jest.useRealTimers();
 });
@@ -128,4 +133,88 @@ it("cancels active notice timers when the owner unmounts", () => {
   act(() => jest.advanceTimersByTime(5000));
   schedule.mockRestore();
   cancel.mockRestore();
+});
+
+it("retains ordinary inline text privately and discards normal retirement", () => {
+  const view = render(tree());
+  const attempt = createInlineAttempt();
+  expect(attempt.isCurrent()).toBe(true);
+  expect(attempt.report("Inline only")).toBe("inline");
+  expect(view.queryByText("Inline only")).toBeNull();
+  act(() => attempt.retire("normal"));
+  expect(attempt.isCurrent()).toBe(false);
+  expect(attempt.report("Obsolete")).toBe("discarded");
+  expect(view.queryByText("Obsolete")).toBeNull();
+});
+
+it("holds a report between committed readiness loss and automatic retirement", () => {
+  const view = render(tree());
+  const attempt = createInlineAttempt();
+  view.rerender(tree(false));
+  expect(attempt.isCurrent()).toBe(false);
+  act(() => expect(attempt.report("Recovery gap")).toBe("retained"));
+  expect(view.queryByText("Recovery gap")).toBeNull();
+  act(() => attempt.retire());
+  act(() => jest.advanceTimersByTime(5000));
+  view.rerender(tree());
+  expect(view.getByText("Recovery gap")).toBeTruthy();
+  act(() => jest.advanceTimersByTime(1999));
+  expect(view.getByText("Recovery gap")).toBeTruthy();
+});
+
+it("promotes an earlier inline failure once without restarting on late reports", () => {
+  const view = render(tree());
+  const attempt = createInlineAttempt();
+  expect(attempt.report("Retained inline failure")).toBe("inline");
+  view.rerender(tree(false));
+  act(() => attempt.retire());
+  view.rerender(tree());
+  expect(view.UNSAFE_getAllByType(Toast)).toHaveLength(1);
+  act(() => jest.advanceTimersByTime(1500));
+  act(() => expect(attempt.report("Retained inline failure")).toBe("retained"));
+  act(() => jest.advanceTimersByTime(700));
+  expect(view.queryByText("Retained inline failure")).toBeNull();
+});
+
+it("accepts a late recovery failure after readiness already returned", () => {
+  const view = render(tree());
+  const attempt = createInlineAttempt();
+  view.rerender(tree(false));
+  act(() => attempt.retire());
+  view.rerender(tree());
+  act(() => expect(attempt.report("Late recovery failure")).toBe("retained"));
+  expect(attempt.isCurrent()).toBe(false);
+  expect(view.getByText("Late recovery failure")).toBeTruthy();
+});
+
+it("honors explicit normal retirement during an unavailable period", () => {
+  const view = render(tree());
+  const attempt = createInlineAttempt();
+  view.rerender(tree(false));
+  act(() => attempt.retire("normal"));
+  view.rerender(tree());
+  act(() => expect(attempt.report("Closed normally")).toBe("discarded"));
+  expect(view.queryByText("Closed normally")).toBeNull();
+});
+
+it("finishes successful attempts before later recovery", () => {
+  const view = render(tree());
+  const attempt = createInlineAttempt();
+  attempt.finish();
+  view.rerender(tree(false));
+  act(() => attempt.retire());
+  view.rerender(tree());
+  expect(attempt.report("Finished work")).toBe("discarded");
+  expect(view.queryByText("Finished work")).toBeNull();
+});
+
+it("suppresses retained reporters after the provider lifetime ends", () => {
+  const view = render(tree());
+  const attempt = createInlineAttempt();
+  view.rerender(tree(false));
+  act(() => attempt.retire());
+  view.unmount();
+  const next = render(tree());
+  expect(attempt.report("Departed owner")).toBe("discarded");
+  expect(next.queryByText("Departed owner")).toBeNull();
 });

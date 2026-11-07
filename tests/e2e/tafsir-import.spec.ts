@@ -1,65 +1,7 @@
 import { gzipSync } from "node:zlib";
 import { strings } from "@/lib/i18n/strings";
-import { expect, test, type Page } from "@playwright/test";
-import { assertHealthyPage, captureConsole, waitForQaReady } from "./helpers";
-
-async function databaseSql(page: Page, operation: "exec" | "getAll" | "getFirst", source: string): Promise<unknown> {
-  return page.evaluate(
-    async ({ operation, source }) => {
-      const channel = new BroadcastChannel("hafiz-db-bridge");
-      const clientId = "rf104-preview-" + crypto.randomUUID();
-      function receive(send: () => void, accepts: (value: Record<string, unknown>) => boolean) {
-        return new Promise<Record<string, unknown>>((resolve, reject) => {
-          const timeout = window.setTimeout(() => {
-            channel.removeEventListener("message", listener);
-            reject(new Error("Synthetic tafsir preview database request timed out"));
-          }, 20_000);
-          const listener = (event: MessageEvent<unknown>) => {
-            const value = event.data;
-            if (!value || typeof value !== "object" || Array.isArray(value)) return;
-            const message = value as Record<string, unknown>;
-            if (message.version !== 1 || !accepts(message)) return;
-            window.clearTimeout(timeout);
-            channel.removeEventListener("message", listener);
-            resolve(message);
-          };
-          channel.addEventListener("message", listener);
-          send();
-        });
-      }
-      try {
-        const host = await receive(
-          () => channel.postMessage({ type: "host-probe", version: 1, tabId: clientId }),
-          (message) => message.type === "host-ready" && typeof message.tabId === "string" && message.tabId !== clientId,
-        );
-        const requestId = crypto.randomUUID();
-        const reply = await receive(
-          () =>
-            channel.postMessage({
-              type: "request",
-              version: 1,
-              requestId,
-              fromTabId: clientId,
-              targetTabId: host.tabId,
-              operation,
-              source,
-              params: [],
-            }),
-          (message) =>
-            message.type === "response" &&
-            message.requestId === requestId &&
-            message.fromTabId === host.tabId &&
-            message.targetTabId === clientId,
-        );
-        if (reply.ok !== true) throw new Error(String(reply.error));
-        return reply.result;
-      } finally {
-        channel.close();
-      }
-    },
-    { operation, source },
-  );
-}
+import { expect, test } from "@playwright/test";
+import { assertHealthyPage, captureConsole, databaseSql, waitForQaReady } from "./helpers";
 
 const cases = [
   { failureKind: "commit", language: "en", width: 1280 },

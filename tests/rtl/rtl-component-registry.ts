@@ -378,8 +378,8 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
   entry(
     "components/settings/TranslationLanguagePicker.tsx",
     "picker-menu",
-    "source",
-    "Language picker rows and selected-state affordances mirror.",
+    "rntl",
+    "Bilingual real picker coverage in tests/unit/translation-selection.test.tsx preserves mirrored rows, inline retry and recovery notices.",
   ),
   entry(
     "components/ui/AppNavigation.tsx",
