@@ -23131,12 +23131,21 @@
         "Buttons and rows render and work on Android and web in both locales; confirm whether Skip should skip step 3; device screenshots, focused tests, review and acceptance."
       ],
       "approved": true,
-      "status": "pending",
-      "attempts": 0,
+      "status": "verified",
+      "attempts": 1,
       "implementation_mode": "implementation",
-      "files": [],
-      "allowed_paths": [],
-      "verification": []
+      "files": [
+        "patches/react-native-css-interop+0.2.2.patch"
+      ],
+      "allowed_paths": [
+        "patches/react-native-css-interop+0.2.2.patch"
+      ],
+      "verification": [],
+      "completed_at": "2026-11-07T19:18:19.990265+00:00",
+      "primary_accepted_at": "2026-11-07T19:18:19.990265+00:00",
+      "independent_review": "pass",
+      "evidence": "docs/refactoring/PROGRESS.md",
+      "summary": "Root cause: react-native-css-interop's native runtime flattened Pressable style callbacks into an object, dropping the whole style (invisible buttons, unlaid rows) across ~50 files. Upgrading to nativewind 4.2.7/interop 0.2.7 did not fix it. The existing patch now keeps the callback and composes it after className styles (skipped for animated components). On device: onboarding buttons render and change color when pressed, step-2 rows lay out RTL; 3,099 unit cases, typecheck and postinstall pass; light review passed."
     },
     {
       "id": "RF-186",
