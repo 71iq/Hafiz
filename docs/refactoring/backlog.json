@@ -20098,15 +20098,206 @@
         "tests/unit/sync-partial-failure.test.ts"
       ],
       "acceptance_criteria": [
-        "Pending exact primary scope. Exercise first/later local queue failure, retained earlier queued rows, no false completion marker, successful retry and normal completed-marker controls, using actual SQLite and public fullSync. Preserve remote failure/status and account ownership contracts. Full controller checks, independent review and primary acceptance."
+        "Initial and settings-only backfills enqueue rows and write completion markers in one local transaction; a queue write failure propagates, rolls back that backfill's queue rows and leaves its marker unset.",
+        "Queue rows that existed before the backfill stay pending. The next sync re-runs the backfill and uploads every local row exactly once.",
+        "Completed markers still skip backfill. Account restore, remote failure/status reporting and data ownership are unchanged. Real SQLite through public fullSync, causal failures before the fix.",
+        "All full controller checks, separate independent review and primary acceptance."
       ],
-      "approved": false,
-      "status": "pending",
-      "attempts": 0,
+      "approved": true,
+      "status": "verified",
+      "attempts": 1,
       "implementation_mode": "implementation",
-      "files": [],
-      "allowed_paths": [],
-      "verification": []
+      "files": [
+        "lib/database/sync.ts",
+        "tests/unit/sync-partial-failure.test.ts"
+      ],
+      "allowed_paths": [
+        "lib/database/sync.ts",
+        "tests/unit/sync-partial-failure.test.ts"
+      ],
+      "verification": [
+        [
+          "git",
+          "diff",
+          "--check"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "lib/database/sync.ts",
+          "tests/unit/sync-partial-failure.test.ts",
+          "docs/refactoring/PROGRESS.md"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/database/sync.ts",
+          "tests/unit/sync-partial-failure.test.ts",
+          "--max-warnings=0"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "check:analysis"
+        ],
+        [
+          "npm",
+          "run",
+          "postinstall"
+        ],
+        [
+          "npm",
+          "ls",
+          "--all",
+          "--json"
+        ],
+        [
+          "npm",
+          "run",
+          "lint",
+          "--",
+          "--format",
+          "json"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit"
+        ],
+        [
+          "node",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/tests/brace-expansion.test.cjs",
+          "scripts/tests/dependency-boundaries.test.cjs",
+          "scripts/tests/icon-tool.test.cjs",
+          "scripts/tests/jest-config.test.cjs",
+          "scripts/tests/js-yaml.test.cjs",
+          "scripts/tests/lint-coverage.test.cjs",
+          "scripts/tests/metro-unicode.test.cjs",
+          "scripts/tests/nanoid.test.cjs",
+          "scripts/tests/router-dependency-range.test.cjs",
+          "scripts/tests/security-dependency-owner.test.cjs",
+          "scripts/tests/source-map-js.test.cjs",
+          "scripts/tests/tailwind-source-map.test.cjs",
+          "scripts/tests/ws.test.cjs",
+          "scripts/tests/xmldom.test.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "test:refactor-runner"
+        ],
+        [
+          "python3",
+          "-B",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "scripts/tests",
+          "-p",
+          "test_*.py"
+        ],
+        [
+          "npm",
+          "run",
+          "check:native-config"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=4096",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "android",
+          "--output-dir",
+          ".expo/modernization-checks/android",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/android')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=3072",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "ios",
+          "--output-dir",
+          ".expo/modernization-checks/ios",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/ios')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8197",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts",
+          "tests/e2e/database-bridge.spec.ts",
+          "tests/e2e/tafsir-import.spec.ts",
+          "tests/e2e/translation-import.spec.ts"
+        ]
+      ],
+      "started_at": "2026-11-07T11:34:26.225807+00:00",
+      "diagnosis": "enqueueBackfill and the settings backfill used enqueueSync(...).catch(console.warn), then wrote markers unconditionally. useSync already reports a rejected fullSync as status error with the pending count.",
+      "reuse": "Reuse AppDatabase.withTransactionAsync, which serializes scoped statements on native and web bridge executors; no new helper.",
+      "focused_validation": {
+        "pre_fix": "Two new real-SQLite fullSync cases failed: promise resolved instead of rejecting after a queue write failure.",
+        "post_fix": "14 sync-partial-failure cases pass. Four new cases failed before their fix: two queue-failure cases resolved instead of rejecting, and two race cases queued rows again without the in-transaction re-check."
+      },
+      "completed_at": "2026-11-07T12:12:50.602696+00:00",
+      "primary_accepted_at": "2026-11-07T12:12:50.602696+00:00",
+      "independent_review": "pass",
+      "evidence": "docs/refactoring/PROGRESS.md",
+      "summary": "Initial and settings-only backfills now queue rows and write markers in one transaction, re-checking the marker inside it. A queue write failure rejects fullSync, which useSync shows as a sync error, and the next sync uploads every row once. All 20 full checks pass (3,058 unit, 35 Chrome); the later test-only race case reran format, lint, types and full Jest (3,059). Independent review passed twice."
     },
     {
       "id": "RF-168",
@@ -20189,7 +20380,7 @@
       "title": "Preserve upload work when local mutation queue writes fail",
       "priority": 1,
       "risk": "high",
-      "description": "Notes, bookmarks/highlights, word meanings, reviews, settings and smart-deck paths can save/delete local records then detach or swallow sync queue INSERT failure. Once initial backfill is complete, later upload has no durable work to retry. Characterize and split into feature-sized atomic local-write/outbox repairs with postcommit notifications and existing transaction reuse.",
+      "description": "Notes, bookmarks/highlights, word meanings, reviews, settings and smart-deck paths can save/delete local records then detach or swallow sync queue INSERT failure. Once initial backfill is complete, later upload has no durable work to retry. Characterize and split into feature-sized atomic local-write/outbox repairs with postcommit notifications and existing transaction reuse. Also lib/achievements/queries.ts unlockAchievement (detached queue write, listeners before durability) and lib/reflection-journey/queries.ts. Scoping on 2026-11-07 proposes six ordered sub-tasks: settings, achievements, notes, selection, meanings/journey, reviews/smart decks.",
       "dependencies": [
         "RF-033",
         "RF-161"
@@ -20201,7 +20392,9 @@
         "lib/fsrs/queries.ts",
         "lib/fsrs/persist-review.ts",
         "lib/fsrs/smart-decks.ts",
-        "lib/database/user-settings.ts"
+        "lib/database/user-settings.ts",
+        "lib/achievements/queries.ts",
+        "lib/reflection-journey/queries.ts"
       ],
       "acceptance_criteria": [
         "Unapproved parent, prepare exact feature-sized scopes after causal SQLite proofs. Local mutations and required main/QF queue writes must settle atomically without nested transactions; publish achievement/review/UI side effects after successful commit, and retain existing offline/data ownership policies. No remote requirement for local saving. Full controller checks, independent stronger review and primary acceptance for each approved repair."

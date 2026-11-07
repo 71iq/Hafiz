@@ -15,6 +15,8 @@ let mockRemoteNotes: Record<string, unknown>[] = [];
 let mockQueryErrors = new Map<string, Error>();
 let mockUpsertFailureAt: number | null = null;
 let mockUpsertAttempts = 0;
+let queueInsertFailureAt: number | null = null;
+let queueInsertAttempts = 0;
 let rangeHook: ((table: string, offset: number) => void | Promise<void>) | null = null;
 const requests: { table: string; since: string | null; offset: number }[] = [];
 const successfulUpserts: Record<string, unknown>[] = [];
@@ -162,6 +164,8 @@ beforeEach(async () => {
   mockQueryErrors = new Map();
   mockUpsertFailureAt = null;
   mockUpsertAttempts = 0;
+  queueInsertFailureAt = null;
+  queueInsertAttempts = 0;
   rangeHook = null;
   requests.length = 0;
   successfulUpserts.length = 0;
@@ -178,7 +182,13 @@ beforeEach(async () => {
       reads.push(source);
       return sql.prepare(source).all(...params);
     },
-    runAsync: async (source: string, params: SQLInputValue[] = []) => sql.prepare(source).run(...params),
+    runAsync: async (source: string, params: SQLInputValue[] = []) => {
+      if (source.includes("INSERT INTO sync_queue")) {
+        queueInsertAttempts += 1;
+        if (queueInsertAttempts === queueInsertFailureAt) throw new Error("Synthetic queue write failure");
+      }
+      return sql.prepare(source).run(...params);
+    },
     withTransactionAsync: async (work: (transaction: TransactionDatabase) => Promise<void>) => {
       sql.exec("BEGIN");
       try {
@@ -355,4 +365,116 @@ describe("RF-029 sync progress reporting", () => {
       expect(successfulUpserts).toEqual([]);
     },
   );
+});
+
+describe("RF-167 backfill queue write failures", () => {
+  const INITIAL_MARKER = `sync_initial_backfill_${USER_ID}_20260525_sync_v1`;
+  const SETTINGS_MARKER = `sync_user_settings_backfill_${USER_ID}_20260528_user_settings_v1`;
+
+  function marker(key: string) {
+    return sql.prepare("SELECT value FROM user_settings WHERE key = ?").get(key)?.value;
+  }
+
+  function uploadedIds() {
+    return successfulUpserts.map((row) => String(row.key ?? row.id ?? `${row.surah}:${row.ayah}`)).sort();
+  }
+
+  function queuedIds() {
+    return sql
+      .prepare("SELECT row_id FROM sync_queue WHERE status IN ('pending','failed') ORDER BY id")
+      .all()
+      .map((row) => row.row_id);
+  }
+
+  it("leaves the initial backfill incomplete after a queue write fails, then uploads every local row once", async () => {
+    sql.prepare("DELETE FROM user_settings WHERE key IN (?, ?)").run(INITIAL_MARKER, SETTINGS_MARKER);
+    putSetting("daily_review_limit", "25");
+    sql.prepare("INSERT INTO bookmarks (surah,ayah,created_at,updated_at) VALUES (1,1,?,?)").run(OLD, OLD);
+    await seedQueueRow("queued-before-backfill");
+    queueInsertAttempts = 0;
+    // Backfill order is settings, then bookmarks, then notes. Fail after the setting was queued.
+    queueInsertFailureAt = 2;
+
+    await expect(fullSync(db)).rejects.toThrow("Synthetic queue write failure");
+
+    expect(marker(INITIAL_MARKER)).toBeUndefined();
+    expect(marker(SETTINGS_MARKER)).toBeUndefined();
+    expect(queuedIds()).toEqual(["queued-before-backfill"]);
+    expect(successfulUpserts).toEqual([]);
+    expect(sql.prepare("SELECT COUNT(*) AS count FROM bookmarks").get()).toEqual({ count: 1 });
+    expect(sql.prepare("SELECT COUNT(*) AS count FROM private_notes").get()).toEqual({ count: 1 });
+
+    queueInsertFailureAt = null;
+    const retry = await fullSync(db);
+
+    expect(retry).toMatchObject({ status: "synced", pushed: 4 });
+    expect(uploadedIds()).toEqual(["1:1", "daily_review_limit", "local-note", "queued-before-backfill"]);
+    expect(marker(INITIAL_MARKER)).toBe("true");
+    expect(marker(SETTINGS_MARKER)).toBe("true");
+    expect(await getPendingSyncCount(db)).toBe(0);
+  });
+
+  it("leaves the settings-only backfill incomplete after a queue write fails, then uploads each setting once", async () => {
+    sql.prepare("DELETE FROM user_settings WHERE key = ?").run(SETTINGS_MARKER);
+    putSetting("daily_review_limit", "25");
+    putSetting("deck_synthetic", "{}");
+    queueInsertFailureAt = 2;
+
+    await expect(fullSync(db)).rejects.toThrow("Synthetic queue write failure");
+
+    expect(marker(INITIAL_MARKER)).toBe("true");
+    expect(marker(SETTINGS_MARKER)).toBeUndefined();
+    expect(queuedIds()).toEqual([]);
+    expect(successfulUpserts).toEqual([]);
+
+    queueInsertFailureAt = null;
+    const retry = await fullSync(db);
+
+    expect(retry).toMatchObject({ status: "synced", pushed: 2 });
+    expect(uploadedIds()).toEqual(["daily_review_limit", "deck_synthetic"]);
+    expect(marker(SETTINGS_MARKER)).toBe("true");
+    expect(await getPendingSyncCount(db)).toBe(0);
+  });
+
+  it("skips a backfill that another sync completed while this one waited for the transaction", async () => {
+    sql.prepare("DELETE FROM user_settings WHERE key IN (?, ?)").run(INITIAL_MARKER, SETTINGS_MARKER);
+    const transaction = db.withTransactionAsync;
+    db.withTransactionAsync = async (work) => {
+      putSetting(INITIAL_MARKER, "true");
+      putSetting(SETTINGS_MARKER, "true");
+      return transaction(work);
+    };
+
+    const result = await fullSync(db);
+
+    expect(result).toMatchObject({ status: "synced", pushed: 0 });
+    expect(queueInsertAttempts).toBe(0);
+    expect(successfulUpserts).toEqual([]);
+  });
+
+  it("skips a settings-only backfill that another sync completed while this one waited", async () => {
+    sql.prepare("DELETE FROM user_settings WHERE key = ?").run(SETTINGS_MARKER);
+    putSetting("daily_review_limit", "25");
+    const transaction = db.withTransactionAsync;
+    db.withTransactionAsync = async (work) => {
+      putSetting(SETTINGS_MARKER, "true");
+      return transaction(work);
+    };
+
+    const result = await fullSync(db);
+
+    expect(result).toMatchObject({ status: "synced", pushed: 0 });
+    expect(queueInsertAttempts).toBe(0);
+    expect(successfulUpserts).toEqual([]);
+  });
+
+  it("does not queue backfill rows again once both markers are complete", async () => {
+    putSetting("daily_review_limit", "25");
+
+    const result = await fullSync(db);
+
+    expect(result).toMatchObject({ status: "synced", pushed: 0 });
+    expect(queueInsertAttempts).toBe(0);
+    expect(successfulUpserts).toEqual([]);
+  });
 });

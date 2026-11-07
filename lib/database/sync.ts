@@ -88,7 +88,7 @@ function highlightSyncId(row: {
  * Process the local sync queue — push pending changes to Supabase.
  * Retains group acknowledgement counts and whether any entry completed before a failure.
  */
-async function pushSyncQueue(db: DatabaseExecutor, owner: SyncOwner): Promise<PushResult> {
+async function pushSyncQueue(db: AppDatabase, owner: SyncOwner): Promise<PushResult> {
   const empty = { pushed: 0, failed: 0, hadSuccessfulEntry: false };
   if (!isSupabaseConfigured()) return empty;
 
@@ -1130,14 +1130,24 @@ function safeJson(value: unknown): unknown {
   }
 }
 
-async function enqueueInitialLocalDataForSync(db: DatabaseExecutor, userId: string): Promise<void> {
+/**
+ * Queue every local row once per account. The queue rows and completion markers commit together,
+ * so a failed queue write leaves the backfill incomplete and the next sync retries it in full.
+ */
+async function enqueueInitialLocalDataForSync(database: AppDatabase, userId: string): Promise<void> {
   const backfillKey = `sync_initial_backfill_${userId}_${INITIAL_BACKFILL_VERSION}`;
   const settingsBackfillKey = userSettingsBackfillKey(userId);
-  const done = await db.getFirstAsync<{ value: string }>("SELECT value FROM user_settings WHERE key = ?", [
-    backfillKey,
-  ]);
-  if (done?.value === "true") return;
+  if (await isBackfillComplete(database, backfillKey)) return;
+  await database.withTransactionAsync((db) => enqueueInitialLocalRows(db, backfillKey, settingsBackfillKey));
+}
 
+async function enqueueInitialLocalRows(
+  db: DatabaseExecutor,
+  backfillKey: string,
+  settingsBackfillKey: string,
+): Promise<void> {
+  // Another tab sharing this database may have completed the backfill while this one waited.
+  if (await isBackfillComplete(db, backfillKey)) return;
   const [settings, cards, logs, bookmarks, highlights, privateNotes, journeyEntries, achievements, userWordMeanings] =
     await Promise.all([
       db.getAllAsync<{ key: string; value: string; updated_at: string | null; deleted_at: string | null }>(
@@ -1166,7 +1176,7 @@ async function enqueueInitialLocalDataForSync(db: DatabaseExecutor, userId: stri
     rowId: string,
     data: Record<string, any>,
   ) => {
-    await enqueueSync(db, tableName, operation, rowId, data).catch(console.warn);
+    await enqueueSync(db, tableName, operation, rowId, data);
   };
 
   for (const row of settings) {
@@ -1221,17 +1231,23 @@ async function enqueueInitialLocalDataForSync(db: DatabaseExecutor, userId: stri
   );
 }
 
+async function isBackfillComplete(db: DatabaseExecutor, key: string): Promise<boolean> {
+  const row = await db.getFirstAsync<{ value: string }>("SELECT value FROM user_settings WHERE key = ?", [key]);
+  return row?.value === "true";
+}
+
 function userSettingsBackfillKey(userId: string): string {
   return `sync_user_settings_backfill_${userId}_${USER_SETTINGS_BACKFILL_VERSION}`;
 }
 
-async function enqueueSyncableUserSettingsForSync(db: DatabaseExecutor, userId: string): Promise<void> {
+async function enqueueSyncableUserSettingsForSync(database: AppDatabase, userId: string): Promise<void> {
   const backfillKey = userSettingsBackfillKey(userId);
-  const done = await db.getFirstAsync<{ value: string }>("SELECT value FROM user_settings WHERE key = ?", [
-    backfillKey,
-  ]);
-  if (done?.value === "true") return;
+  if (await isBackfillComplete(database, backfillKey)) return;
+  await database.withTransactionAsync((db) => enqueueSyncableUserSettingRows(db, backfillKey));
+}
 
+async function enqueueSyncableUserSettingRows(db: DatabaseExecutor, backfillKey: string): Promise<void> {
+  if (await isBackfillComplete(db, backfillKey)) return;
   const settings = await db.getAllAsync<{
     key: string;
     value: string;
@@ -1240,7 +1256,7 @@ async function enqueueSyncableUserSettingsForSync(db: DatabaseExecutor, userId: 
   }>("SELECT key, value, updated_at, deleted_at FROM user_settings");
   for (const row of settings) {
     if (!isSyncableUserSetting(row.key)) continue;
-    await enqueueSync(db, "user_settings", "UPDATE", row.key, userSettingToSyncData(row)).catch(console.warn);
+    await enqueueSync(db, "user_settings", "UPDATE", row.key, userSettingToSyncData(row));
   }
 
   await db.runAsync(
