@@ -4019,18 +4019,24 @@
       ],
       "risk": "high",
       "approved": true,
-      "status": "running",
+      "status": "verified",
       "allowed_paths": [
-        "android/app/build.gradle"
+        "android/app/build.gradle",
+        "scripts/android-qa-build.sh"
       ],
       "attempts": 1,
       "priority": 3,
       "decision": "User has an Android phone available (2026-11-07). Connect it with USB debugging when RF040/RF041 start. Use a distinct QA applicationId and preserve the installed app and its data.",
       "started_at": "2026-11-07T17:31:16.876624+00:00",
       "files": [
-        "android/app/build.gradle"
+        "android/app/build.gradle",
+        "scripts/android-qa-build.sh"
       ],
-      "progress_note": "Uncommitted in the worktree: android/app/build.gradle adds applicationIdSuffix '.qa' only when -PhafizQa=true. Device: Samsung SM-A546E (Android 16, arm64-v8a) over USB; com.anonymous.hafiz is not installed on user 0. Build with JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ANDROID_HOME=/home/ehab/Android/Sdk, synthetic EXPO_PUBLIC_SUPABASE_* values, -PreactNativeArchitectures=arm64-v8a. A single assembleRelease under the 6 GiB scope was OOM-killed twice because the Metro bundle overlaps native C++ compiles. ':app:mergeReleaseNativeLibs' alone succeeds (1.5 GB peak). Bundling inside Gradle still OOMs at 6 GiB with a 3.5 GB Node heap; next, bundle JS separately with expo export:embed into the generated createBundleReleaseJsAndAssets output dirs, then run assembleRelease without that task. Never uninstall or clear any app on the phone."
+      "completed_at": "2026-11-07T18:05:34.734745+00:00",
+      "primary_accepted_at": "2026-11-07T18:05:34.734745+00:00",
+      "independent_review": "pass",
+      "evidence": "docs/refactoring/PROGRESS.md",
+      "summary": "Opt-in QA build (-PhafizQa=true via scripts/android-qa-build.sh): installs as com.anonymous.hafiz.qa, bundles JS outside Gradle under 6 GiB scopes, synthetic backend, Hermes -O0; normal builds unchanged and a missing prebuilt bundle fails configuration. Built and installed on SM-A546E; light review passed. Maestro was not installed; device checks used adb and uiautomator instead."
     },
     {
       "id": "RF-041",
@@ -4055,14 +4061,18 @@
         ]
       ],
       "risk": "high",
-      "approved": false,
-      "status": "pending",
+      "approved": true,
+      "status": "verified",
       "allowed_paths": [
         "docs/refactoring/NATIVE_TESTING.md"
       ],
       "attempts": 0,
       "priority": 3,
-      "decision": "User has an Android phone available (2026-11-07). Connect it with USB debugging when RF040/RF041 start. Use a distinct QA applicationId and preserve the installed app and its data."
+      "decision": "User has an Android phone available (2026-11-07). Connect it with USB debugging when RF040/RF041 start. Use a distinct QA applicationId and preserve the installed app and its data.",
+      "completed_at": "2026-11-07T18:03:34.410986+00:00",
+      "primary_accepted_at": "2026-11-07T18:03:34.410986+00:00",
+      "evidence": "docs/refactoring/PROGRESS.md",
+      "summary": "Physical-device smoke on Samsung SM-A546E, Android 16, QA release build com.anonymous.hafiz.qa. Passed: install beside other apps, cold start (window 0.7 s), first-run database import (~190 s), Home, flashcard reveal and grade with progress saved, achievement notice after commit, Arabic RTL and dark theme persisting across force-stop, no fatal errors in logcat, about 420 MB PSS. Failed and recorded: RF184 Mushaf word rendering, RF185 onboarding buttons/rows, RF186 settings under tab bar, RF187 truncated chips, RF188 bundle size. Not tested: network-off phone (airplane mode not used), sign-in/sync (synthetic backend), audio, page mode."
     },
     {
       "id": "RF-042",
@@ -23079,22 +23089,144 @@
       "files": [],
       "allowed_paths": [],
       "verification": []
+    },
+    {
+      "id": "RF-184",
+      "title": "Render complete Quran words in the Android verse-by-verse Mushaf",
+      "priority": 1,
+      "risk": "high",
+      "description": "RF041 on Samsung SM-A546E, Android 16, QA release build com.anonymous.hafiz.qa: verse-by-verse Mushaf shows only fragments of most words (e.g. 1:1, 1:2) in both Classic and Tajweed Colors fonts, while flashcards render the same page-1 QCF glyphs completely. Likely a native word layout/clipping difference in the Mushaf ayah view, not the font files. Present on main (fonts and AyahBlock unchanged).",
+      "dependencies": [
+        "RF-041"
+      ],
+      "modules": [
+        "components/mushaf/",
+        "lib/fonts/loader.ts"
+      ],
+      "acceptance_criteria": [
+        "Find the native cause with a device reproduction; every word renders fully in all font styles on Android without changing Quran data or page mappings. Device screenshots before and after, plus full checks, review and acceptance."
+      ],
+      "approved": true,
+      "status": "pending",
+      "attempts": 0,
+      "implementation_mode": "implementation",
+      "files": [],
+      "allowed_paths": [],
+      "verification": []
+    },
+    {
+      "id": "RF-185",
+      "title": "Show onboarding buttons and surah rows correctly on Android",
+      "priority": 1,
+      "risk": "medium",
+      "description": "RF041 on Samsung SM-A546E, Android 16, QA release build com.anonymous.hafiz.qa: onboarding primary buttons (Get Started, Continue) are present in the accessibility tree but render invisible, and step-2 surah rows stack vertically. Those Pressables use style callbacks ({pressed}) =>, which NativeWind's Pressable interop appears to drop; className-styled buttons render. Skip for now on step 2 jumped straight to Home. Present on main.",
+      "dependencies": [
+        "RF-041"
+      ],
+      "modules": [
+        "app/onboarding.tsx"
+      ],
+      "acceptance_criteria": [
+        "Buttons and rows render and work on Android and web in both locales; confirm whether Skip should skip step 3; device screenshots, focused tests, review and acceptance."
+      ],
+      "approved": true,
+      "status": "pending",
+      "attempts": 0,
+      "implementation_mode": "implementation",
+      "files": [],
+      "allowed_paths": [],
+      "verification": []
+    },
+    {
+      "id": "RF-186",
+      "title": "Keep bottom settings above the floating tab bar on Android",
+      "priority": 2,
+      "risk": "low",
+      "description": "RF041 on Samsung SM-A546E, Android 16, QA release build com.anonymous.hafiz.qa: Settings Quran Font options (Classic/Modern/Tajweed Colors) sit under the floating tab bar; only a few pixels are tappable.",
+      "dependencies": [
+        "RF-041"
+      ],
+      "modules": [
+        "app/(tabs)/settings.tsx",
+        "components/ui/ScreenContent.tsx"
+      ],
+      "acceptance_criteria": [
+        "Scrollable screens reserve the tab bar height on native; device screenshot and review."
+      ],
+      "approved": true,
+      "status": "pending",
+      "attempts": 0,
+      "implementation_mode": "implementation",
+      "files": [],
+      "allowed_paths": [],
+      "verification": []
+    },
+    {
+      "id": "RF-187",
+      "title": "Fit verse action chips on phone widths",
+      "priority": 3,
+      "risk": "low",
+      "description": "RF041 on Samsung SM-A546E, Android 16, QA release build com.anonymous.hafiz.qa: the verse action row (Translation, Tafsir, Hadith, Qiraat) truncates the last chip to 'Qir' at 1080 px.",
+      "dependencies": [
+        "RF-041"
+      ],
+      "modules": [
+        "components/mushaf/"
+      ],
+      "acceptance_criteria": [
+        "Chips wrap or scroll without shrinking type; Arabic and English; device screenshot and review."
+      ],
+      "approved": true,
+      "status": "pending",
+      "attempts": 0,
+      "implementation_mode": "implementation",
+      "files": [],
+      "allowed_paths": [],
+      "verification": []
+    },
+    {
+      "id": "RF-188",
+      "title": "Stop compiling Quran datasets into the native JavaScript bundle",
+      "priority": 2,
+      "risk": "high",
+      "description": "RF041: native require maps inline tafsir/translation/word datasets as JS modules, producing a 530 MB bundle, 380 MB Hermes bytecode at -O0 and a 660 MB arm64 APK. Release bundling needs more than 6 GiB (Hermes -O OOMs), and first-run import took about 3 minutes on device. Present on main. Loading the same files as native assets would cut bundle size and memory without changing content.",
+      "dependencies": [
+        "RF-041"
+      ],
+      "modules": [
+        "lib/database/native-loaders.native.ts",
+        "lib/database/init.ts"
+      ],
+      "acceptance_criteria": [
+        "Design approved by primary with asset-loading on native, no Quran content change, web path unchanged, device import time and APK size measured before/after; full checks, high-effort review and acceptance."
+      ],
+      "approved": true,
+      "status": "pending",
+      "attempts": 0,
+      "implementation_mode": "implementation",
+      "files": [],
+      "allowed_paths": [],
+      "verification": []
     }
   ],
   "checkpoint": {
-    "time": "2026-11-07T17:54:00.083976+00:00",
-    "current_task": "RF-040/RF-041 Android QA: QA APK com.anonymous.hafiz.qa installed on SM-A546E; device smoke checks next",
+    "time": "2026-11-07T18:05:34.734745+00:00",
+    "current_task": "RF-184 Android verse-by-verse Mushaf word rendering",
     "open_follow_ups": [
       "RF-180",
       "RF-182",
       "RF-183",
-      "bundle-size performance task (to add)"
+      "RF-184",
+      "RF-185",
+      "RF-186",
+      "RF-187",
+      "RF-188"
     ],
     "decisions_waiting_on_ehab": [
       "Apply RF-166 and RF-170 migrations to the deployed database",
       "Final push after all work is verified"
     ],
     "last_green_commit": "24498c1 (last full 20-check gate: RF-170); later commits are docs/tooling only",
-    "uncommitted": "android/app/build.gradle QA flag and scripts/android-qa-build.sh (RF-040)"
+    "uncommitted": null
   }
 }
