@@ -17646,6 +17646,238 @@
       "independent_review": "pass",
       "evidence": "docs/refactoring/PROGRESS.md",
       "summary": "New account-sync review rows deduplicate by same-card exact timestamp instant, preserving historical rows, original payloads and date bytes. Restore uses a transaction-local key map without new growing-history transfers. All20 fresh controller checks, stronger review and primary acceptance pass:2874unit,191focused and30Chrome. Shared transactions, server concurrency and device runtime remain open."
+    },
+    {
+      "id": "RF-158",
+      "title": "Roll back Quran Foundation pulls when propagation queue writes fail",
+      "description": "Keep pulled bookmark/note changes and their main-sync propagation obligations together when a queue INSERT fails inside reconciliation. Reproduce in actual SQLite before source edits.",
+      "rationale": "The warn-only enqueueSupabase helper currently swallows SQL statement errors inside the pull transaction. Reconciliation can commit and report synced without a main-sync queue obligation; a later pull need not repair the omission.",
+      "modules": [
+        "lib/quran-foundation/user-sync.ts",
+        "tests/unit/qf-sync-pagination.test.ts",
+        "tests/unit/qf-sync-owner.test.ts"
+      ],
+      "dependencies": [
+        "RF-029",
+        "RF-146",
+        "RF-150",
+        "RF-157"
+      ],
+      "acceptance_criteria": [
+        "Before source edits, permanent real SQLite/full/initial sync cases must reproduce swallowed sync_queue INSERT ABORT errors, committed reconciliation changes without propagation and false success markers. Include a successful prefix and first/later bookmark/note paths. Preserve all existing assertions.",
+        "Pull-only queue writes must use enqueueSync directly so its original SQL error rejects and rolls back existing reconciliation. Shared attachQfBookmark/attachQfNote require an explicit enqueue function capability in options: pull supplies enqueueSync, post-push supplies existing warn-only enqueueSupabase. Preserve enqueueSupabase:false note branches, owner fences, IDs, timestamps, payload/range/metadata matching and remote CRUD behavior. No generic recovery framework, schema/migration or owner-protocol changes.",
+        "Use temporary actual SQLite BEFORE INSERT ON sync_queue triggers with RAISE(ABORT), not fake transaction success. Cover new/attached bookmarks, new/updated/attached notes, duplicate-note and missing-row tombstones as applicable, full/initial marker differences, complete pre-pull snapshot rollback and retry after removing the trigger. Initial first-pull failure must not mark local enqueue done; full failure must retain last-success marker.",
+        "Preserve post-push best-effort attachment semantics in this scope. Actual post-push controls must retain an acknowledged create/upsert ID and QF-queue accounting despite main-queue failure. A later required pull failure must not undo earlier committed acknowledgement or cause another remote create. Do not claim the whole sync is one transaction. Post-push main-propagation durability remains a separate explicit follow-up.",
+        "All20 fresh controller commands, independent stronger review and primary acceptance required. Changed files lint0warnings; existing full63 warnings/five Knip findings stay visible. One accepted-task local commit and short PROGRESS note, then delete task outputs. No protected inputs, production/network operations, push/deploy or device-runtime claim."
+      ],
+      "verification": [
+        [
+          "git",
+          "diff",
+          "--check"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "lib/quran-foundation/user-sync.ts",
+          "tests/unit/qf-sync-pagination.test.ts",
+          "tests/unit/qf-sync-owner.test.ts",
+          "docs/refactoring/PROGRESS.md"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/quran-foundation/user-sync.ts",
+          "tests/unit/qf-sync-pagination.test.ts",
+          "tests/unit/qf-sync-owner.test.ts",
+          "--max-warnings=0"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "check:analysis"
+        ],
+        [
+          "npm",
+          "run",
+          "postinstall"
+        ],
+        [
+          "npm",
+          "ls",
+          "--all",
+          "--json"
+        ],
+        [
+          "npm",
+          "run",
+          "lint"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "node",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/tests/brace-expansion.test.cjs",
+          "scripts/tests/dependency-boundaries.test.cjs",
+          "scripts/tests/icon-tool.test.cjs",
+          "scripts/tests/jest-config.test.cjs",
+          "scripts/tests/js-yaml.test.cjs",
+          "scripts/tests/lint-coverage.test.cjs",
+          "scripts/tests/metro-unicode.test.cjs",
+          "scripts/tests/nanoid.test.cjs",
+          "scripts/tests/router-dependency-range.test.cjs",
+          "scripts/tests/security-dependency-owner.test.cjs",
+          "scripts/tests/source-map-js.test.cjs",
+          "scripts/tests/tailwind-source-map.test.cjs",
+          "scripts/tests/ws.test.cjs",
+          "scripts/tests/xmldom.test.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "test:refactor-runner"
+        ],
+        [
+          "python3",
+          "-B",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "scripts/tests",
+          "-p",
+          "test_*.py"
+        ],
+        [
+          "npm",
+          "run",
+          "check:native-config"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=4096",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "android",
+          "--output-dir",
+          ".expo/modernization-checks/android",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/android')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=3072",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "ios",
+          "--output-dir",
+          ".expo/modernization-checks/ios",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/ios')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8197",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts",
+          "tests/e2e/database-bridge.spec.ts"
+        ]
+      ],
+      "risk": "high",
+      "approved": true,
+      "status": "verified",
+      "allowed_paths": [
+        "lib/quran-foundation/user-sync.ts",
+        "tests/unit/qf-sync-pagination.test.ts",
+        "tests/unit/qf-sync-owner.test.ts"
+      ],
+      "attempts": 1,
+      "priority": 1,
+      "implementation_mode": "implementation",
+      "diagnosis": "Corrected actual SQLite full/initial causal run:9 expected failures show sync_queue statement ABORT swallowed inside reconciliation, committing changed rows and false markers. Pull-only writes now require enqueueSync; shared attach helpers explicitly choose required pull versus existing best-effort post-push capability. All196 focused caller/payload cases pass.",
+      "focused_validation": {
+        "tests": 196,
+        "suites": 3,
+        "typecheck": "pass",
+        "scoped_lint": "0 warnings",
+        "format": "pass",
+        "diff": "pass",
+        "final_retry_assertion": "Strengthened first-retry assertion also passes the fresh complete2886-case Jest gate."
+      },
+      "failure_history": [
+        {
+          "phase": "causal-fixture",
+          "failure": "Initial duplicate-note trigger targeted the surviving exact match instead of the linked row being tombstoned. Primary corrected the target before rerunning unchanged source; corrected run has9 genuine expected failures,56 excluded targeted-run controls. Original run retained until acceptance.",
+          "run": ".ralph/runs/RF-158-causal-corrected-1794027755607419289.log"
+        },
+        {
+          "phase": "focused-fixture",
+          "failure": "Initial absent-marker assertion expected null from direct node:sqlite .get; corrected to undefined. First focused run1 failed/144 passed; final196 focused cases pass. Retry now asserts success on first retry, not a later invocation."
+        }
+      ],
+      "started_at": "2026-11-07T05:12:48.324405+00:00",
+      "completed_at": "2026-11-07T05:21:21.813988+00:00",
+      "primary_accepted_at": "2026-11-07T05:21:21.813988+00:00",
+      "independent_review": "pass",
+      "evidence": "docs/refactoring/PROGRESS.md",
+      "summary": "A required main-sync queue failure rolls back QF pull reconciliation and preserves prior rows/markers for retry. Post-push acknowledged IDs retain existing best-effort behavior. All20 fresh controller checks, stronger review and primary acceptance pass:2886unit,196focused and30Chrome. Post-push propagation durability, QF lexical precedence and shared transactions remain separate."
     }
   ]
 }

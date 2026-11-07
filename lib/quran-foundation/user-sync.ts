@@ -337,6 +337,7 @@ async function pushBookmarkEntry(owner: QfSyncOwner, db: SQLiteDatabase, entry: 
   const bookmark = readQfBookmarkAcknowledgement(response, local);
   await attachQfBookmark(db, local, bookmark, {
     updateActiveState: false,
+    enqueueMainSync: enqueueSupabase,
     requireCurrent: owner.requireCurrent,
   });
   owner.requireCurrent();
@@ -399,6 +400,7 @@ async function pushPrivateNoteEntry(owner: QfSyncOwner, db: SQLiteDatabase, entr
   const note = readQfNoteAcknowledgement(response, local.qf_note_id || undefined);
   await attachQfNote(db, local.id, note, [range], {
     enqueueSupabase: true,
+    enqueueMainSync: enqueueSupabase,
     requireCurrent: owner.requireCurrent,
   });
   owner.requireCurrent();
@@ -495,7 +497,7 @@ async function mergeRemoteBookmark(db: SQLiteDatabase, remote: QfBookmark): Prom
   }
 
   if (local) {
-    await attachQfBookmark(db, local, remote, { updateActiveState: true });
+    await attachQfBookmark(db, local, remote, { updateActiveState: true, enqueueMainSync: enqueueSync });
     return true;
   }
 
@@ -515,7 +517,7 @@ async function mergeRemoteBookmark(db: SQLiteDatabase, remote: QfBookmark): Prom
       remote.collectionsCount,
     ],
   );
-  await enqueueSupabase(db, "bookmarks", "INSERT", bookmarkLocalId(remote.surah, remote.ayah), {
+  await enqueueSync(db, "bookmarks", "INSERT", bookmarkLocalId(remote.surah, remote.ayah), {
     surah: remote.surah,
     ayah: remote.ayah,
     created_at: remoteCreatedAt,
@@ -534,7 +536,7 @@ async function attachQfBookmark(
   db: SQLiteDatabase,
   local: LocalBookmarkRow,
   remote: QfBookmark,
-  options: { updateActiveState: boolean; requireCurrent?: () => void },
+  options: { updateActiveState: boolean; enqueueMainSync: typeof enqueueSync; requireCurrent?: () => void },
 ): Promise<void> {
   options.requireCurrent?.();
   const now = new Date().toISOString();
@@ -565,7 +567,7 @@ async function attachQfBookmark(
   );
   options.requireCurrent?.();
   if (shouldEnqueueSupabase) {
-    await enqueueSupabase(db, "bookmarks", "UPDATE", bookmarkLocalId(local.surah, local.ayah), {
+    await options.enqueueMainSync(db, "bookmarks", "UPDATE", bookmarkLocalId(local.surah, local.ayah), {
       surah: local.surah,
       ayah: local.ayah,
       created_at: local.created_at,
@@ -600,7 +602,7 @@ async function tombstoneMissingRemoteBookmarks(
       "UPDATE bookmarks SET updated_at = ?, deleted_at = ?, qf_synced_at = ?, qf_sync_error = NULL WHERE surah = ? AND ayah = ?",
       [now, now, now, row.surah, row.ayah],
     );
-    await enqueueSupabase(db, "bookmarks", "UPDATE", localId, {
+    await enqueueSync(db, "bookmarks", "UPDATE", localId, {
       surah: row.surah,
       ayah: row.ayah,
       created_at: row.created_at,
@@ -629,7 +631,10 @@ async function mergeRemoteNote(db: SQLiteDatabase, remote: QfNote): Promise<bool
 
   if (localByQfId) {
     if (localByQfId.updated_at >= updatedAt) {
-      await attachQfNote(db, localByQfId.id, remote, remote.ranges, { enqueueSupabase: false });
+      await attachQfNote(db, localByQfId.id, remote, remote.ranges, {
+        enqueueSupabase: false,
+        enqueueMainSync: enqueueSync,
+      });
       return false;
     }
     const duplicateLocal = await findExactLocalNote(
@@ -662,7 +667,7 @@ async function mergeRemoteNote(db: SQLiteDatabase, remote: QfNote): Promise<bool
         localByQfId.id,
       ],
     );
-    await enqueueSupabase(db, "private_notes", "UPDATE", localByQfId.id, {
+    await enqueueSync(db, "private_notes", "UPDATE", localByQfId.id, {
       id: localByQfId.id,
       surah: parsedRange.surah,
       ayah_start: parsedRange.ayahStart,
@@ -688,7 +693,10 @@ async function mergeRemoteNote(db: SQLiteDatabase, remote: QfNote): Promise<bool
   );
   if (exactLocal) {
     if (exactLocal.qf_note_id && exactLocal.qf_note_id !== remote.id) return false;
-    await attachQfNote(db, exactLocal.id, remote, remote.ranges, { enqueueSupabase: true });
+    await attachQfNote(db, exactLocal.id, remote, remote.ranges, {
+      enqueueSupabase: true,
+      enqueueMainSync: enqueueSync,
+    });
     return true;
   }
 
@@ -712,7 +720,7 @@ async function mergeRemoteNote(db: SQLiteDatabase, remote: QfNote): Promise<bool
       rangesJson,
     ],
   );
-  await enqueueSupabase(db, "private_notes", "INSERT", localId, {
+  await enqueueSync(db, "private_notes", "INSERT", localId, {
     id: localId,
     surah: parsedRange.surah,
     ayah_start: parsedRange.ayahStart,
@@ -734,7 +742,7 @@ async function attachQfNote(
   localId: string,
   remote: QfNote,
   fallbackRanges: string[],
-  options: { enqueueSupabase: boolean; requireCurrent?: () => void },
+  options: { enqueueSupabase: boolean; enqueueMainSync: typeof enqueueSync; requireCurrent?: () => void },
 ): Promise<void> {
   options.requireCurrent?.();
   await db.runAsync(
@@ -751,7 +759,7 @@ async function attachQfNote(
   const row = await db.getFirstAsync<LocalPrivateNoteRow>("SELECT * FROM private_notes WHERE id = ?", [localId]);
   options.requireCurrent?.();
   if (row) {
-    await enqueueSupabase(db, "private_notes", "UPDATE", localId, noteToPayload(row));
+    await options.enqueueMainSync(db, "private_notes", "UPDATE", localId, noteToPayload(row));
     options.requireCurrent?.();
   }
 }
@@ -781,7 +789,7 @@ async function tombstoneLocalQfDuplicate(db: SQLiteDatabase, row: LocalPrivateNo
     "UPDATE private_notes SET updated_at = ?, deleted_at = ?, qf_synced_at = ?, qf_sync_error = NULL WHERE id = ?",
     [now, now, now, row.id],
   );
-  await enqueueSupabase(db, "private_notes", "UPDATE", row.id, {
+  await enqueueSync(db, "private_notes", "UPDATE", row.id, {
     ...noteToPayload({ ...row, updated_at: now, deleted_at: now }),
     qf_synced_at: now,
     qf_sync_error: null,
@@ -806,7 +814,7 @@ async function tombstoneMissingRemoteNotes(
       "UPDATE private_notes SET updated_at = ?, deleted_at = ?, qf_synced_at = ?, qf_sync_error = NULL WHERE id = ?",
       [now, now, now, row.id],
     );
-    await enqueueSupabase(db, "private_notes", "UPDATE", row.id, {
+    await enqueueSync(db, "private_notes", "UPDATE", row.id, {
       ...noteToPayload({ ...row, updated_at: now, deleted_at: now }),
       qf_synced_at: now,
       qf_sync_error: null,

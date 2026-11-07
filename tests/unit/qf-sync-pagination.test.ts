@@ -393,3 +393,206 @@ it.each(
   expect(transactions).toBe(0);
   expect(snapshot()).toEqual(before);
 });
+
+type QueueAbortCase = {
+  name: string;
+  mode: Mode;
+  tableName: "bookmarks" | "private_notes";
+  rowId: string;
+  seed?: () => void;
+  remoteBookmarks: (typeof remoteBookmark)[];
+  remoteNotes: (typeof remoteNote)[];
+};
+
+const prefixBookmark = { ...remoteBookmark, id: "remote-bookmark-prefix-success", ayah: 254 };
+const secondBookmark = { ...remoteBookmark, id: "remote-bookmark-abort", ayah: 257 };
+const prefixNote = { ...remoteNote, id: "remote-note-prefix-success", ranges: ["2:254-2:254"] };
+const secondNote = { ...remoteNote, id: "remote-note-abort", ranges: ["2:257-2:257"] };
+const queueAbortCases: QueueAbortCase[] = [
+  {
+    name: "new bookmark after a successful insert",
+    mode: "full",
+    tableName: "bookmarks",
+    rowId: "2:257",
+    remoteBookmarks: [prefixBookmark, secondBookmark],
+    remoteNotes: [],
+  },
+  {
+    name: "attached bookmark after a successful insert",
+    mode: "full",
+    tableName: "bookmarks",
+    rowId: "2:257",
+    seed: () => {
+      sql.prepare("INSERT INTO bookmarks (surah,ayah,created_at,updated_at) VALUES (2,257,?,?)").run(OLD, OLD);
+    },
+    remoteBookmarks: [prefixBookmark, secondBookmark],
+    remoteNotes: [],
+  },
+  {
+    name: "missing-bookmark tombstone after a successful insert",
+    mode: "full",
+    tableName: "bookmarks",
+    rowId: "2:255",
+    remoteBookmarks: [prefixBookmark],
+    remoteNotes: [],
+  },
+  {
+    name: "new note after a successful insert",
+    mode: "full",
+    tableName: "private_notes",
+    rowId: "qf:remote-note-abort",
+    remoteBookmarks: [],
+    remoteNotes: [prefixNote, secondNote],
+  },
+  {
+    name: "updated linked note after a successful insert",
+    mode: "full",
+    tableName: "private_notes",
+    rowId: "linked-note",
+    seed: () => {
+      sql
+        .prepare(
+          "INSERT INTO private_notes (id,surah,ayah_start,ayah_end,content,created_at,updated_at,qf_note_id) VALUES ('linked-note',2,255,255,'Older linked text',?,?,'remote-note-abort')",
+        )
+        .run(OLD, OLD);
+    },
+    remoteBookmarks: [],
+    remoteNotes: [prefixNote, { ...secondNote, updatedAt: "2026-02-01T00:00:00.000Z" }],
+  },
+  {
+    name: "attached exact note after a successful insert",
+    mode: "full",
+    tableName: "private_notes",
+    rowId: "attached-note",
+    seed: () => {
+      sql
+        .prepare(
+          "INSERT INTO private_notes (id,surah,ayah_start,ayah_end,content,created_at,updated_at) VALUES ('attached-note',2,257,257,?,?,?)",
+        )
+        .run(secondNote.body, OLD, OLD);
+    },
+    remoteBookmarks: [],
+    remoteNotes: [prefixNote, secondNote],
+  },
+  {
+    name: "duplicate-note tombstone after a successful insert",
+    mode: "full",
+    tableName: "private_notes",
+    rowId: "linked-note",
+    seed: () => {
+      sql
+        .prepare(
+          "INSERT INTO private_notes (id,surah,ayah_start,ayah_end,content,created_at,updated_at,qf_note_id) VALUES ('linked-note',2,255,255,'Older linked text',?,?,'remote-note-abort')",
+        )
+        .run(OLD, OLD);
+      sql
+        .prepare(
+          "INSERT INTO private_notes (id,surah,ayah_start,ayah_end,content,created_at,updated_at) VALUES ('duplicate-note',2,257,257,?,?,?)",
+        )
+        .run(secondNote.body, OLD, OLD);
+    },
+    remoteBookmarks: [],
+    remoteNotes: [prefixNote, { ...secondNote, updatedAt: "2026-02-01T00:00:00.000Z" }],
+  },
+  {
+    name: "missing-note tombstone after a successful insert",
+    mode: "full",
+    tableName: "private_notes",
+    rowId: "local-note-tail",
+    remoteBookmarks: [],
+    remoteNotes: [prefixNote],
+  },
+  {
+    name: "first initial-pull bookmark propagation failure",
+    mode: "initial",
+    tableName: "bookmarks",
+    rowId: "2:257",
+    remoteBookmarks: [prefixBookmark, secondBookmark],
+    remoteNotes: [],
+  },
+];
+
+it.each(queueAbortCases)(
+  "rolls back $name when the main-sync queue aborts during $mode reconciliation",
+  async ({ mode, tableName, rowId, seed, remoteBookmarks, remoteNotes }) => {
+    prepare(mode);
+    sql.prepare("INSERT OR REPLACE INTO user_settings (key,value) VALUES ('qf_last_sync_at','prior-success')").run();
+    seed?.();
+    mockPage = (entity) =>
+      entity === "bookmarks"
+        ? { ok: true, bookmarks: remoteBookmarks, nextCursor: null }
+        : { ok: true, notes: remoteNotes, nextCursor: null };
+    const before = snapshot();
+    sql.exec(`
+      CREATE TEMP TRIGGER fail_main_sync_queue
+      BEFORE INSERT ON sync_queue
+      WHEN NEW.table_name = '${tableName}' AND NEW.row_id = '${rowId}'
+      BEGIN SELECT RAISE(ABORT, 'RF158 sync_queue insert aborted'); END;
+    `);
+
+    const outcome = await run(mode).then(
+      (value) => ({ kind: "resolved" as const, value }),
+      (error: unknown) => ({ kind: "rejected" as const, error }),
+    );
+    const after = snapshot();
+
+    expect({ outcome, after }).toEqual({
+      outcome: {
+        kind: "rejected",
+        error: expect.objectContaining({ message: expect.stringContaining("RF158 sync_queue insert aborted") }),
+      },
+      after: before,
+    });
+    if (mode === "initial") {
+      expect(
+        sql.prepare("SELECT value FROM user_settings WHERE key='qf_initial_local_enqueue_done'").get(),
+      ).toBeUndefined();
+    } else {
+      expect(sql.prepare("SELECT value FROM user_settings WHERE key='qf_last_sync_at'").get()).toEqual({
+        value: "prior-success",
+      });
+    }
+
+    sql.exec("DROP TRIGGER fail_main_sync_queue");
+    await expect(run(mode)).resolves.toMatchObject({ status: "synced" });
+    expect(
+      sql
+        .prepare("SELECT table_name,operation,row_id,status FROM sync_queue WHERE table_name = ? AND row_id = ?")
+        .get(tableName, rowId),
+    ).toMatchObject({
+      table_name: tableName,
+      operation: expect.stringMatching(/^(INSERT|UPDATE)$/),
+      row_id: rowId,
+      status: "pending",
+    });
+    if (mode === "initial") {
+      expect(sql.prepare("SELECT value FROM user_settings WHERE key='qf_initial_local_enqueue_done'").get()).toEqual({
+        value: "true",
+      });
+    }
+
+    const targetQueue = sql
+      .prepare("SELECT data,status FROM sync_queue WHERE table_name = ? AND row_id = ?")
+      .get(tableName, rowId) as { data: string; status: string } | undefined;
+    expect(targetQueue?.status).toBe("pending");
+    const queuedPayload = JSON.parse(targetQueue?.data ?? "null") as Record<string, unknown>;
+    if (tableName === "bookmarks") {
+      const ayah = Number(rowId.split(":")[1]);
+      const row = sql
+        .prepare(
+          "SELECT surah,ayah,created_at,updated_at,deleted_at,qf_bookmark_id FROM bookmarks WHERE surah=2 AND ayah=?",
+        )
+        .get(ayah) as Record<string, unknown> | undefined;
+      expect(row).toBeDefined();
+      expect(queuedPayload).toMatchObject(row ?? {});
+    } else {
+      const row = sql
+        .prepare(
+          "SELECT id,surah,ayah_start,ayah_end,content,created_at,updated_at,deleted_at,qf_note_id FROM private_notes WHERE id=?",
+        )
+        .get(rowId) as Record<string, unknown> | undefined;
+      expect(row).toBeDefined();
+      expect(queuedPayload).toMatchObject(row ?? {});
+    }
+  },
+);

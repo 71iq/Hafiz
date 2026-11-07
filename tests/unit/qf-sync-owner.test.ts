@@ -1066,3 +1066,139 @@ it("current explicit initial owner supplies every credential read", async () => 
     true,
   );
 });
+
+it("keeps an acknowledged post-push note attachment when its best-effort main queue insert aborts", async () => {
+  const warning = jest.spyOn(console, "warn").mockImplementation(() => {});
+  sql.exec(`
+    CREATE TEMP TRIGGER fail_post_push_sync_queue
+    BEFORE INSERT ON sync_queue
+    WHEN NEW.table_name = 'private_notes' AND NEW.row_id = 'local-note'
+    BEGIN SELECT RAISE(ABORT, 'RF158 post-push queue insert aborted'); END;
+  `);
+  responses["list-notes"] = {
+    ok: false,
+    code: "upstream",
+    message: "Synthetic required pull failed after the create acknowledgement",
+  };
+
+  try {
+    const firstOutcome = await start();
+    expect({
+      outcome: firstOutcome,
+      note: sql.prepare("SELECT qf_note_id,qf_synced_at FROM private_notes WHERE id='local-note'").get(),
+      queue: queueState(),
+      supabaseQueue: sql.prepare("SELECT * FROM sync_queue").all(),
+      createCount: requests.filter((request) => request.action === "create-note").length,
+    }).toEqual({
+      outcome: {
+        kind: "rejected",
+        error: expect.objectContaining({
+          message: "Synthetic required pull failed after the create acknowledgement",
+        }),
+      },
+      note: { qf_note_id: "remote-note", qf_synced_at: expect.any(String) },
+      queue: [{ status: "synced", attempt_count: 0, last_error: null }],
+      supabaseQueue: [],
+      createCount: 1,
+    });
+    expect(warning).toHaveBeenCalledWith(expect.objectContaining({ message: "RF158 post-push queue insert aborted" }));
+
+    sql.exec("DROP TRIGGER fail_post_push_sync_queue");
+    delete responses["list-notes"];
+    await expect(fullQfUserSync(db)).resolves.toMatchObject({ status: "synced" });
+    expect(requests.filter((request) => request.action === "create-note")).toHaveLength(1);
+    expect(sql.prepare("SELECT qf_note_id FROM private_notes WHERE id='local-note'").get()).toEqual({
+      qf_note_id: "remote-note",
+    });
+  } finally {
+    warning.mockRestore();
+  }
+});
+
+it("keeps bookmark upsert queue propagation best-effort after a valid Quran Foundation acknowledgement", async () => {
+  const warning = jest.spyOn(console, "warn").mockImplementation(() => {});
+  seedActiveBookmark();
+  await enqueueQfSync(db, "bookmark", "UPSERT", "2:256", { surah: 2, ayah: 256 });
+  responses["upsert-bookmark"] = validBookmarkAck;
+  responses["list-bookmarks"] = { ok: true, bookmarks: [validBookmarkAck.bookmark] };
+  responses["list-notes"] = { ok: true, notes: [] };
+  sql.exec(`
+    CREATE TEMP TRIGGER fail_post_push_bookmark_queue
+    BEFORE INSERT ON sync_queue
+    WHEN NEW.table_name = 'bookmarks' AND NEW.row_id = '2:256'
+    BEGIN SELECT RAISE(ABORT, 'RF158 bookmark post-push queue aborted'); END;
+  `);
+
+  try {
+    await expect(fullQfUserSync(db)).resolves.toMatchObject({ status: "synced", pushed: 1 });
+    expect(sql.prepare("SELECT qf_bookmark_id FROM bookmarks WHERE surah=2 AND ayah=256").get()).toEqual({
+      qf_bookmark_id: "remote-bookmark",
+    });
+    expect(queueState()).toEqual([{ status: "synced", attempt_count: 0, last_error: null }]);
+    expect(sql.prepare("SELECT COUNT(*) AS count FROM sync_queue").get()).toEqual({ count: 0 });
+    expect(warning).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "RF158 bookmark post-push queue aborted" }),
+    );
+  } finally {
+    warning.mockRestore();
+  }
+});
+
+it("keeps a committed post-push note acknowledgement when a later pull transaction queue abort rolls back its prefix", async () => {
+  sql.prepare("INSERT INTO bookmarks (surah,ayah,created_at,updated_at) VALUES (2,257,?,?)").run(OLD, OLD);
+  const prefixBookmark = {
+    id: "remote-bookmark-prefix",
+    surah: 2,
+    ayah: 256,
+    type: "ayah",
+    createdAt: OLD,
+    isInDefaultCollection: false,
+    collectionsCount: 0,
+  };
+  const laterBookmark = {
+    ...prefixBookmark,
+    id: "remote-bookmark-later",
+    ayah: 257,
+  };
+  responses["list-bookmarks"] = { ok: true, bookmarks: [prefixBookmark, laterBookmark] };
+  responses["list-notes"] = { ok: true, notes: [REMOTE_NOTE] };
+  sql.exec(`
+    CREATE TEMP TRIGGER fail_later_pull_queue
+    BEFORE INSERT ON sync_queue
+    WHEN NEW.table_name = 'bookmarks' AND NEW.row_id = '2:257'
+    BEGIN SELECT RAISE(ABORT, 'RF158 later pull queue aborted'); END;
+  `);
+
+  const firstOutcome = await start();
+  expect({
+    outcome: firstOutcome,
+    note: sql.prepare("SELECT qf_note_id,qf_synced_at FROM private_notes WHERE id='local-note'").get(),
+    qfQueue: queueState(),
+    bookmarks: sql.prepare("SELECT surah,ayah,qf_bookmark_id,updated_at,deleted_at FROM bookmarks ORDER BY ayah").all(),
+    syncQueue: sql.prepare("SELECT table_name,row_id FROM sync_queue ORDER BY id").all(),
+    createCount: requests.filter((request) => request.action === "create-note").length,
+  }).toEqual({
+    outcome: {
+      kind: "rejected",
+      error: expect.objectContaining({ message: expect.stringContaining("RF158 later pull queue aborted") }),
+    },
+    note: { qf_note_id: "remote-note", qf_synced_at: expect.any(String) },
+    qfQueue: [{ status: "synced", attempt_count: 0, last_error: null }],
+    bookmarks: [{ surah: 2, ayah: 257, qf_bookmark_id: null, updated_at: OLD, deleted_at: null }],
+    syncQueue: [{ table_name: "private_notes", row_id: "local-note" }],
+    createCount: 1,
+  });
+
+  sql.exec("DROP TRIGGER fail_later_pull_queue");
+  await expect(fullQfUserSync(db)).resolves.toMatchObject({ status: "synced" });
+  expect(requests.filter((request) => request.action === "create-note")).toHaveLength(1);
+  expect(sql.prepare("SELECT surah,ayah,qf_bookmark_id FROM bookmarks ORDER BY ayah").all()).toEqual([
+    { surah: 2, ayah: 256, qf_bookmark_id: "remote-bookmark-prefix" },
+    { surah: 2, ayah: 257, qf_bookmark_id: "remote-bookmark-later" },
+  ]);
+  expect(sql.prepare("SELECT table_name,row_id FROM sync_queue ORDER BY id").all()).toEqual([
+    { table_name: "private_notes", row_id: "local-note" },
+    { table_name: "bookmarks", row_id: "2:256" },
+    { table_name: "bookmarks", row_id: "2:257" },
+  ]);
+});
