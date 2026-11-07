@@ -1,5 +1,5 @@
 import React from "react";
-import { act, cleanupAsync, render } from "@testing-library/react-native";
+import { act, cleanupAsync, render, within } from "@testing-library/react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { TranslationLanguagePicker } from "@/components/settings/TranslationLanguagePicker";
 import { OperationNoticeProvider } from "@/components/ui/OperationNoticeProvider";
@@ -125,6 +125,29 @@ describe.each(["en", "ar"] as const)("%s translation selection lifetime", (langu
       await result;
     });
   }
+  it("exposes the languages as one radio group with checked and busy state (RF-165)", async () => {
+    const view = render(tree());
+    expect(view.UNSAFE_getAllByProps({ accessibilityRole: "radiogroup" }).length).toBeGreaterThan(0);
+    expect(view.getAllByRole("radio")).toHaveLength(TRANSLATION_LANGUAGES.length);
+    const checked = view.getAllByRole("radio", { checked: true });
+    expect(checked).toHaveLength(1);
+    expect(within(checked[0]).getAllByText("English (Bridges)").length).toBeGreaterThan(0);
+    const indonesian = view.getByRole("radio", { name: /Bahasa Indonesia/ });
+    expect(indonesian.props.accessibilityState).toMatchObject({ checked: false, busy: false, disabled: false });
+
+    const result = begin(view);
+
+    expect(view.getByRole("radio", { name: /Bahasa Indonesia/ }).props.accessibilityState).toMatchObject({
+      busy: true,
+      disabled: true,
+    });
+    expect(view.getByRole("radio", { checked: true }).props.accessibilityState).toMatchObject({ disabled: true });
+    await act(async () => {
+      pending.resolve();
+      await result;
+    });
+  });
+
   it("keeps ordinary failure inline, clears it on retry, and closes only after success", async () => {
     const view = render(tree());
     const result = begin(view);

@@ -113,7 +113,7 @@ export function TranslationLanguagePicker({ visible, onClose }: Props) {
             {error}
           </Text>
         )}
-        <View className="gap-1">
+        <View className="gap-1" accessibilityRole="radiogroup">
           {TRANSLATION_LANGUAGES.map((lang) => {
             const isSelected = lang.code === translationLanguage;
             const isPressed = pressedCode === lang.code;
@@ -124,6 +124,10 @@ export function TranslationLanguagePicker({ visible, onClose }: Props) {
                 key={lang.code}
                 onPress={() => handleSelect(lang.code)}
                 disabled={!!selectingCode}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: isSelected, busy: isSelecting, disabled: !!selectingCode }}
+                aria-checked={isSelected}
+                aria-busy={isSelecting}
                 onPressIn={() => setPressedCode(lang.code)}
                 onPressOut={() => setPressedCode(null)}
                 className="items-center justify-between gap-3 rounded-2xl px-3 py-3.5"
