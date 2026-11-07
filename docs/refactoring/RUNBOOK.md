@@ -64,3 +64,14 @@ The configured Ralph models are Codex models. Since the 2026-11-07 takeover, the
 Supabase changes are source-only migrations plus matching schema.sql. Prove them with the isolated, network-disabled probes in `scripts/supabase-probes/`, which need Docker and a cached `postgres:17` image. Never apply them to a deployed database without explicit approval.
 
 Decisions on 2026-11-07: discussion follows reflection visibility (RF170); local data belongs to the device (RF025); iOS verification is waived (RF042 deferred); an Android phone is available over USB for RF040/RF041. The branch may be pushed only after all work is verified.
+
+### Cost rules (user, 2026-11-07)
+
+These replace steps 3 and 4 above wherever they differ. Correctness, causal tests and acceptance standards are unchanged.
+
+1. Tiered gates. Per task, run the focused tests for the changed area, typecheck and scoped lint; causal tests must still fail before the fix and pass after. Every 3 to 5 accepted tasks, and before any push, run the full 20-check gate once on the combined commits (`verify-task.py` with the latest task's list). Browser suites run only for tasks touching UI, routing or the service worker, or in the batch gate. If a batch gate fails, bisect within that batch and fix it before starting new tasks.
+2. Leaner reviews. The independent reviewer uses a lighter model by default and a high-effort model only for security, RLS, auth, migrations or data-integrity work. Add a reviewer's suggested tests or small guards and rerun only the affected suites; start a second review only if production logic changed beyond the suggestion.
+3. Silent waiting. Start long checks in the background, wait once, and report only when they finish or fail.
+4. Updates every 3 hours, built with `python3 scripts/ralph/status-report.py`: accepted tasks with commits, the current task, blockers and decisions waiting on Ehab, in under 12 lines.
+5. Read code in targeted ranges after grepping, do not reread unchanged files, and keep progress messages to one or two sentences.
+6. When context gets long, or after every batch gate, write `checkpoint` in backlog.json (current task, open follow-ups, decisions waiting on Ehab, last green commit) and tell Ehab a fresh session can resume from it.
