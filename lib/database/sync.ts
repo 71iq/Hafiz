@@ -11,6 +11,7 @@ import {
   type SyncRows,
   type SyncTable,
 } from "@/lib/database/sync-payloads";
+import { compareSyncTimestamps } from "@/lib/database/sync-timestamps";
 import {
   getPendingSyncEntries,
   getPendingSyncCount,
@@ -605,7 +606,7 @@ async function remoteIsNewer(tableName: SyncTable, row: Record<string, any>, use
   const { data, error } = await query;
   if (error) throw error;
   const remoteTimestamp = decodeSyncFreshness(tableName, data, userId);
-  return Boolean(remoteTimestamp && remoteTimestamp > localTimestamp);
+  return Boolean(remoteTimestamp && compareSyncTimestamps(remoteTimestamp, localTimestamp) > 0);
 }
 
 async function pushDelete(
@@ -759,7 +760,7 @@ async function upsertUserSetting(db: SQLiteDatabase, row: SyncRows["user_setting
     "SELECT updated_at FROM user_settings WHERE key = ?",
     [row.key],
   );
-  if (local?.updated_at && remoteUpdatedAt && local.updated_at >= remoteUpdatedAt) return;
+  if (local?.updated_at && remoteUpdatedAt && compareSyncTimestamps(local.updated_at, remoteUpdatedAt) >= 0) return;
 
   if (row.deleted_at != null) {
     await db.runAsync("DELETE FROM user_settings WHERE key = ?", [row.key]);
@@ -779,7 +780,7 @@ async function upsertUserWordMeaning(db: SQLiteDatabase, row: SyncRows["user_wor
     "SELECT updated_at FROM user_word_meanings WHERE surah = ? AND ayah = ? AND word_pos = ?",
     [row.surah, row.ayah, row.word_pos],
   );
-  if (local?.updated_at && remoteUpdatedAt && local.updated_at >= remoteUpdatedAt) return;
+  if (local?.updated_at && remoteUpdatedAt && compareSyncTimestamps(local.updated_at, remoteUpdatedAt) >= 0) return;
 
   if (row.deleted_at != null) {
     await db.runAsync("DELETE FROM user_word_meanings WHERE surah = ? AND ayah = ? AND word_pos = ?", [
@@ -815,7 +816,7 @@ async function upsertStudyCard(db: SQLiteDatabase, row: SyncRows["study_cards"])
     row.id,
   ]);
 
-  if (local && remoteUpdatedAt && local.updated_at >= remoteUpdatedAt) return; // Local is newer
+  if (local && remoteUpdatedAt && compareSyncTimestamps(local.updated_at, remoteUpdatedAt) >= 0) return; // Local is newer
 
   if (row.deleted_at != null) {
     await db.runAsync(
@@ -926,7 +927,7 @@ async function upsertBookmark(db: SQLiteDatabase, row: SyncRows["bookmarks"]): P
     "SELECT updated_at FROM bookmarks WHERE surah = ? AND ayah = ?",
     [row.surah, row.ayah],
   );
-  if (local && local.updated_at >= remoteUpdatedAt) return;
+  if (local && compareSyncTimestamps(local.updated_at, remoteUpdatedAt) >= 0) return;
 
   await db.runAsync(
     `INSERT OR REPLACE INTO bookmarks
@@ -953,15 +954,28 @@ async function upsertHighlight(db: SQLiteDatabase, row: SyncRows["highlights"]):
   const remoteUpdatedAt = row.updated_at ?? row.created_at ?? row.synced_at;
 
   if (row.deleted_at != null) {
-    const timestampCondition = remoteUpdatedAt ? " AND (updated_at IS NULL OR updated_at = '' OR updated_at < ?)" : "";
-    const params = [syncId, row.surah, row.ayah, row.color, row.word_start ?? null, row.word_end ?? null];
-    if (remoteUpdatedAt) params.push(remoteUpdatedAt);
-    await db.runAsync(
-      `DELETE FROM highlights
-       WHERE (sync_id = ?
-          OR (surah = ? AND ayah = ? AND color = ? AND word_start IS ? AND word_end IS ?))${timestampCondition}`,
-      params,
+    const identityPredicate =
+      "(sync_id = ? OR (surah = ? AND ayah = ? AND color = ? AND word_start IS ? AND word_end IS ?))";
+    const identityParams = [syncId, row.surah, row.ayah, row.color, row.word_start ?? null, row.word_end ?? null];
+    if (!remoteUpdatedAt) {
+      await db.runAsync("DELETE FROM highlights WHERE " + identityPredicate, identityParams);
+      return;
+    }
+
+    const targets = await db.getAllAsync<{ id: number; updated_at: string | null }>(
+      "SELECT id, updated_at FROM highlights WHERE " + identityPredicate,
+      identityParams,
     );
+    const eligibleTargets = targets.filter(
+      (target) => !target.updated_at || compareSyncTimestamps(target.updated_at, remoteUpdatedAt) < 0,
+    );
+    for (const target of eligibleTargets) {
+      await db.runAsync("DELETE FROM highlights WHERE id = ? AND updated_at IS ? AND " + identityPredicate, [
+        target.id,
+        target.updated_at,
+        ...identityParams,
+      ]);
+    }
     return;
   }
   if (typeof row.created_at !== "string" || remoteUpdatedAt == null)
@@ -973,7 +987,8 @@ async function upsertHighlight(db: SQLiteDatabase, row: SyncRows["highlights"]):
      LIMIT 1`,
     [syncId, row.surah, row.ayah, row.color, row.word_start ?? null, row.word_end ?? null],
   );
-  if (existing?.updated_at && remoteUpdatedAt && existing.updated_at >= remoteUpdatedAt) return;
+  if (existing?.updated_at && remoteUpdatedAt && compareSyncTimestamps(existing.updated_at, remoteUpdatedAt) >= 0)
+    return;
 
   if (existing) {
     await db.runAsync(
@@ -1017,7 +1032,7 @@ async function upsertPrivateNote(db: SQLiteDatabase, row: SyncRows["private_note
   const local = await db.getFirstAsync<{ updated_at: string }>("SELECT updated_at FROM private_notes WHERE id = ?", [
     row.id,
   ]);
-  if (local && remoteUpdatedAt && local.updated_at >= remoteUpdatedAt) return;
+  if (local && remoteUpdatedAt && compareSyncTimestamps(local.updated_at, remoteUpdatedAt) >= 0) return;
   const qfRangesJson =
     typeof row.qf_ranges_json === "string"
       ? row.qf_ranges_json
@@ -1056,7 +1071,7 @@ async function upsertReflectionJourneyEntry(
     "SELECT updated_at FROM reflection_journey_entries WHERE level_id = ?",
     [row.level_id],
   );
-  if (local && remoteUpdatedAt && local.updated_at >= remoteUpdatedAt) return;
+  if (local && remoteUpdatedAt && compareSyncTimestamps(local.updated_at, remoteUpdatedAt) >= 0) return;
 
   await db.runAsync(
     `INSERT OR REPLACE INTO reflection_journey_entries

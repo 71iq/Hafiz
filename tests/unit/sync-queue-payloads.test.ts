@@ -509,6 +509,45 @@ it.each([
   expect(queueState(id)).toEqual({ status: "synced" });
   expect(remoteWrites).toHaveLength(1);
 });
+it.each([
+  {
+    label: "older remote instant with later-sorting text",
+    local: "2026-06-01T00:00:00-04:00",
+    remote: "2026-06-01T03:00:00Z",
+    remoteIsNewer: false,
+  },
+  {
+    label: "newer remote instant with earlier-sorting text",
+    local: "2026-06-01T04:00:00+03:00",
+    remote: "2026-06-01T02:00:00Z",
+    remoteIsNewer: true,
+  },
+  {
+    label: "newer sub-millisecond remote instant",
+    local: "2026-06-01T00:00:00.1Z",
+    remote: "2026-06-01T00:00:00.1001+00:00",
+    remoteIsNewer: true,
+  },
+  {
+    label: "equal instant with offset and trailing zeros",
+    local: "2026-06-01T00:00:00.100-02:00",
+    remote: "2026-06-01T02:00:00.1000Z",
+    remoteIsNewer: false,
+  },
+])("compares queued upload freshness by instant: $label", async ({ local, remote, remoteIsNewer }) => {
+  await enqueueSync(db, "private_notes", "UPDATE", "queued-note", { ...note(), updated_at: local });
+  const row = await db.getFirstAsync<{ id: number }>("SELECT id FROM sync_queue ORDER BY id DESC LIMIT 1");
+  if (!row) throw new Error("Expected queued note");
+  mockProbeData = [{ updated_at: remote }];
+
+  const result = await fullSync(db);
+
+  expect(result).toMatchObject({ status: "synced", pushed: 1 });
+  expect(remoteWrites).toHaveLength(remoteIsNewer ? 0 : 1);
+  if (!remoteIsNewer) expect(remoteWrites[0]?.row?.updated_at).toBe(local);
+  expect(queueState(row.id)).toEqual({ status: "synced" });
+});
+
 it("keeps the existing valid newer-remote timestamp precedence", async () => {
   const id = await seedValidNeighbor(false);
   mockProbeData = [{ updated_at: "2026-03-01T00:00:00.000Z" }];

@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { isSyncableUserSetting } from "@/lib/database/user-settings";
+import { syncTimestampSchema } from "@/lib/database/sync-timestamps";
 
-const timestamp = z.iso.datetime({ offset: true });
+const timestamp = syncTimestampSchema;
 const optionalTimestamp = timestamp.nullish();
 const identity = z.string().min(1);
 const integer = z.number().int();

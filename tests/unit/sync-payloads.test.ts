@@ -22,6 +22,7 @@ const mockMeaningIncrementalRows: unknown[] = [];
 const mockQueryErrors = new Map<string, Error>();
 let rangeHook: ((table: string, incremental: boolean) => void) | null = null;
 const writes: string[] = [];
+let beforeHighlightDelete: (() => void) | null = null;
 const mockPending = jest.fn(async () => []);
 const mockBackfill = jest.fn(async () => 0);
 
@@ -232,6 +233,7 @@ beforeEach(async () => {
   rangeHook = null;
   requests.length = 0;
   writes.length = 0;
+  beforeHighlightDelete = null;
   transactions = 0;
   sql = new DatabaseSync(":memory:");
   const adapter = {
@@ -242,6 +244,11 @@ beforeEach(async () => {
     getAllAsync: async (source: string, params: SQLInputValue[] = []) => sql.prepare(source).all(...params),
     runAsync: async (source: string, params: SQLInputValue[] = []) => {
       writes.push(source);
+      if (source.trimStart().toUpperCase().startsWith("DELETE FROM HIGHLIGHTS") && beforeHighlightDelete) {
+        const interleave = beforeHighlightDelete;
+        beforeHighlightDelete = null;
+        interleave();
+      }
       return sql.prepare(source).run(...params);
     },
     withTransactionAsync: async (work: () => Promise<void>) => {
@@ -289,6 +296,197 @@ const invalidStates: { label: string; state: unknown }[] = [
   { label: "NaN", state: NaN },
   { label: "infinity", state: Infinity },
 ];
+type TimestampConflictTarget = {
+  label: string;
+  table: string;
+  seedLocal: (updatedAt: string) => void;
+  remoteRow: (updatedAt: string) => unknown;
+  readValue: () => unknown;
+  localResult: unknown;
+  remoteResult: unknown;
+};
+
+const timestampConflictTargets: TimestampConflictTarget[] = [
+  {
+    label: "user settings",
+    table: "user_settings",
+    seedLocal: (updatedAt) =>
+      sql
+        .prepare("INSERT INTO user_settings (key,value,updated_at) VALUES ('daily_review_limit','local',?)")
+        .run(updatedAt),
+    remoteRow: (updatedAt) => ({ key: "daily_review_limit", value: "remote", updated_at: updatedAt, deleted_at: null }),
+    readValue: () => sql.prepare("SELECT value FROM user_settings WHERE key='daily_review_limit'").get()?.value,
+    localResult: "local",
+    remoteResult: "remote",
+  },
+  {
+    label: "word meanings",
+    table: "user_word_meanings",
+    seedLocal: (updatedAt) => putMeaning(meaning({ meaning: "local", updated_at: updatedAt })),
+    remoteRow: (updatedAt) => meaning({ meaning: "remote", updated_at: updatedAt }),
+    readValue: () =>
+      sql.prepare("SELECT meaning FROM user_word_meanings WHERE surah=2 AND ayah=256 AND word_pos=1").get()?.meaning,
+    localResult: "local",
+    remoteResult: "remote",
+  },
+  {
+    label: "study cards",
+    table: "study_cards",
+    seedLocal: (updatedAt) => sql.prepare("UPDATE study_cards SET updated_at=? WHERE id='2:255'").run(updatedAt),
+    remoteRow: (updatedAt) => ({ ...card(), state: State.New, updated_at: updatedAt }),
+    readValue: () => sql.prepare("SELECT state FROM study_cards WHERE id='2:255'").get()?.state,
+    localResult: State.Review,
+    remoteResult: State.New,
+  },
+  {
+    label: "bookmarks",
+    table: "bookmarks",
+    seedLocal: (updatedAt) =>
+      sql.prepare("INSERT INTO bookmarks (surah,ayah,created_at,updated_at) VALUES (2,255,?,?)").run(OLD, updatedAt),
+    remoteRow: (updatedAt) => ({ surah: 2, ayah: 255, created_at: OLD, updated_at: updatedAt, deleted_at: null }),
+    readValue: () => sql.prepare("SELECT updated_at FROM bookmarks WHERE surah=2 AND ayah=255").get()?.updated_at,
+    localResult: (updatedAt: string) => updatedAt,
+    remoteResult: (updatedAt: string) => updatedAt,
+  },
+  {
+    label: "highlights",
+    table: "highlights",
+    seedLocal: (updatedAt) => putHighlight(highlightRow(HIGHLIGHT_CANONICAL_ID, updatedAt)),
+    remoteRow: (updatedAt) => highlightRow(HIGHLIGHT_CANONICAL_ID, updatedAt),
+    readValue: () =>
+      sql.prepare("SELECT updated_at FROM highlights WHERE sync_id=?").get(HIGHLIGHT_CANONICAL_ID)?.updated_at,
+    localResult: (updatedAt: string) => updatedAt,
+    remoteResult: (updatedAt: string) => updatedAt,
+  },
+  {
+    label: "private notes",
+    table: "private_notes",
+    seedLocal: (updatedAt) =>
+      sql.prepare("UPDATE private_notes SET content='local',updated_at=? WHERE id='synthetic-note'").run(updatedAt),
+    remoteRow: (updatedAt) => ({
+      id: "synthetic-note",
+      surah: 2,
+      ayah_start: 255,
+      ayah_end: 255,
+      content: "remote",
+      created_at: OLD,
+      updated_at: updatedAt,
+      deleted_at: null,
+    }),
+    readValue: () => sql.prepare("SELECT content FROM private_notes WHERE id='synthetic-note'").get()?.content,
+    localResult: "local",
+    remoteResult: "remote",
+  },
+  {
+    label: "reflection journey",
+    table: "reflection_journey_entries",
+    seedLocal: (updatedAt) =>
+      sql
+        .prepare(
+          "INSERT INTO reflection_journey_entries (level_id,status,response_text,created_at,updated_at) VALUES ('synthetic-level','draft','local',?,?)",
+        )
+        .run(OLD, updatedAt),
+    remoteRow: (updatedAt) => ({
+      level_id: "synthetic-level",
+      status: "completed",
+      response_text: "remote",
+      created_at: OLD,
+      updated_at: updatedAt,
+    }),
+    readValue: () =>
+      sql.prepare("SELECT response_text FROM reflection_journey_entries WHERE level_id='synthetic-level'").get()
+        ?.response_text,
+    localResult: "local",
+    remoteResult: "remote",
+  },
+];
+
+const offsetConflictDirections = [
+  {
+    label: "older remote text sorts later",
+    local: "2026-06-01T00:00:00-04:00",
+    remote: "2026-06-01T03:00:00Z",
+    winner: "local",
+  },
+  {
+    label: "newer remote text sorts earlier",
+    local: "2026-06-01T04:00:00+03:00",
+    remote: "2026-06-01T02:00:00Z",
+    winner: "remote",
+  },
+] as const;
+
+it.each(
+  timestampConflictTargets.flatMap((target) => offsetConflictDirections.map((direction) => ({ target, direction }))),
+)("uses instant order for $target.label when $direction.label", async ({ target, direction }) => {
+  restoreComplete();
+  target.seedLocal(direction.local);
+  mockTableRows.set(target.table + ":incremental", [target.remoteRow(direction.remote)]);
+
+  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced" });
+
+  const localResult =
+    typeof target.localResult === "function" ? target.localResult(direction.local) : target.localResult;
+  const remoteResult =
+    typeof target.remoteResult === "function" ? target.remoteResult(direction.remote) : target.remoteResult;
+  expect(target.readValue()).toBe(direction.winner === "local" ? localResult : remoteResult);
+});
+
+it.each([
+  {
+    label: "newer remote beyond local millisecond",
+    local: "2026-06-01T00:00:00.100Z",
+    remote: "2026-06-01T00:00:00.1001+00:00",
+    winner: "remote",
+  },
+  {
+    label: "older remote below local sub-millisecond",
+    local: "2026-06-01T00:00:00.1001+00:00",
+    remote: "2026-06-01T00:00:00.100Z",
+    winner: "local",
+  },
+  {
+    label: "equal instant with fractional trailing zeros",
+    local: "2026-06-01T02:00:00.1000+00:00",
+    remote: "2026-06-01T02:00:00.1Z",
+    winner: "local",
+  },
+])("compares card conflict by exact fractional instant: $label", async ({ local, remote, winner }) => {
+  restoreComplete();
+  sql.prepare("UPDATE study_cards SET updated_at=? WHERE id='2:255'").run(local);
+  mockIncrementalCards = [{ ...card(), state: State.New, updated_at: remote }];
+
+  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced" });
+
+  expect(sql.prepare("SELECT state,updated_at FROM study_cards WHERE id='2:255'").get()).toEqual(
+    winner === "local" ? { state: State.Review, updated_at: local } : { state: State.New, updated_at: remote },
+  );
+});
+
+it("retains a row and cursor on malformed local time, then retries after manual repair", async () => {
+  restoreComplete();
+  const malformed = "not-an-iso-timestamp";
+  sql.prepare("UPDATE study_cards SET updated_at=? WHERE id='2:255'").run(malformed);
+  mockIncrementalCards = [{ ...card(), state: State.New, updated_at: "2026-06-01T00:00:00.1001Z" }];
+  const before = snapshot();
+
+  const failed = await fullSync(db);
+
+  expect(failed).toMatchObject({ status: "failed", pulled: 0 });
+  expect(snapshot()).toEqual(before);
+  expect(sql.prepare("SELECT value FROM user_settings WHERE key='last_pull_at'").get()).toEqual({ value: OLD });
+
+  const repaired = "2026-06-01T00:00:00.100Z";
+  sql.prepare("UPDATE study_cards SET updated_at=? WHERE id='2:255'").run(repaired);
+  const retried = await fullSync(db);
+
+  expect(retried).toMatchObject({ status: "synced", pulled: 1 });
+  expect(sql.prepare("SELECT state,updated_at FROM study_cards WHERE id='2:255'").get()).toEqual({
+    state: State.New,
+    updated_at: "2026-06-01T00:00:00.1001Z",
+  });
+});
+
 it.each(invalidStates.flatMap((entry) => ["restore", "incremental"].map((mode) => ({ ...entry, mode }))))(
   "rejects $label during $mode before local writes",
   async ({ state, mode }) => {
@@ -666,6 +864,65 @@ it.each(
     expect(sql.prepare("SELECT value FROM user_settings WHERE key='last_pull_at'").get()).not.toEqual({ value: OLD });
   },
 );
+
+it.each([false, true])("deletes only instant-older highlight targets, reverse insertion=%s", async (reverseOrder) => {
+  restoreComplete();
+  const targets = [
+    highlightRow(HIGHLIGHT_CANONICAL_ID, "2026-06-01T04:00:00+03:00"),
+    highlightRow(HIGHLIGHT_CANONICAL_ID + ":tie", "2026-06-01T04:00:00+02:00"),
+    highlightRow(HIGHLIGHT_CANONICAL_ID + ":newer", "2026-06-01T00:00:00-03:00"),
+  ];
+  for (const row of reverseOrder ? [...targets].reverse() : targets) putHighlight(row);
+  const preservedIds = [HIGHLIGHT_CANONICAL_ID + ":tie", HIGHLIGHT_CANONICAL_ID + ":newer"];
+  mockIncrementalHighlights.push(
+    remoteHighlightDeletion({ updated_at: "2026-06-01T02:00:00Z", deleted_at: "2026-06-01T02:00:00Z" }),
+  );
+
+  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
+
+  expect(
+    highlightRows()
+      .map((row) => row.sync_id)
+      .sort(),
+  ).toEqual(preservedIds.sort());
+});
+
+it("keeps a highlight whose identity changes after target selection", async () => {
+  restoreComplete();
+  putHighlight(highlightRow(HIGHLIGHT_CANONICAL_ID, "2026-06-01T01:00:00Z"));
+  beforeHighlightDelete = () => {
+    sql
+      .prepare("UPDATE highlights SET sync_id='edited-highlight-id',ayah=256 WHERE sync_id=?")
+      .run(HIGHLIGHT_CANONICAL_ID);
+  };
+  mockIncrementalHighlights.push(
+    remoteHighlightDeletion({ updated_at: "2026-06-01T02:00:00Z", deleted_at: "2026-06-01T02:00:00Z" }),
+  );
+
+  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
+
+  expect(sql.prepare("SELECT sync_id,ayah FROM highlights").all()).toEqual([
+    { sync_id: "edited-highlight-id", ayah: 256 },
+  ]);
+});
+
+it("keeps a highlight edited after target selection", async () => {
+  restoreComplete();
+  putHighlight(highlightRow(HIGHLIGHT_CANONICAL_ID, "2026-06-01T01:00:00Z"));
+  const editedTimestamp = "2026-06-01T00:00:00-03:00";
+  beforeHighlightDelete = () => {
+    sql.prepare("UPDATE highlights SET updated_at=? WHERE sync_id=?").run(editedTimestamp, HIGHLIGHT_CANONICAL_ID);
+  };
+  mockIncrementalHighlights.push(
+    remoteHighlightDeletion({ updated_at: "2026-06-01T02:00:00Z", deleted_at: "2026-06-01T02:00:00Z" }),
+  );
+
+  await expect(fullSync(db)).resolves.toMatchObject({ status: "synced", pulled: 1 });
+
+  expect(sql.prepare("SELECT sync_id,updated_at FROM highlights").all()).toEqual([
+    { sync_id: HIGHLIGHT_CANONICAL_ID, updated_at: editedTimestamp },
+  ]);
+});
 
 it.each([
   { label: "equal", updatedAt: HIGHLIGHT_DELETION_TIME, retained: true },

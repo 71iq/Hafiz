@@ -17171,6 +17171,248 @@
       "independent_review": "pass",
       "evidence": "docs/refactoring/PROGRESS.md",
       "summary": "Complete distinct tafsir candidates stage before replacement. All20 fresh controller checks, separate stronger review and primary acceptance pass:2819unit,18 focused and30Chrome cases. SQL/commit/concurrent-generation/local-handle safety remains RF104; runtime/device memory unverified."
+    },
+    {
+      "id": "RF-156",
+      "title": "Compare account-sync conflict timestamps by instant",
+      "description": "Repair valid ISO timestamp conflict ordering in account sync. First reproduce real SQLite/fullSync and actual queue errors, then replace lexical precedence with one precise feature-local comparison.",
+      "rationale": "RF031 validates offset and arbitrary-fraction ISO forms, but seven local conflict guards, per-target highlight deletion and remote upload suppression compare their raw strings. This can reverse real instant order. Existing calendar helpers do not compare instants. Reuse Zod and current sync/queue functions, keeping stored/wire values exact.",
+      "modules": [
+        "lib/database/sync.ts",
+        "lib/database/sync-payloads.ts",
+        "lib/database/sync-timestamps.ts",
+        "tests/unit/sync-timestamps.test.ts",
+        "tests/unit/sync-payloads.test.ts",
+        "tests/unit/sync-queue-payloads.test.ts"
+      ],
+      "dependencies": [
+        "RF-031",
+        "RF-155"
+      ],
+      "acceptance_criteria": [
+        "Before production edits, permanent actual SQLite/fullSync and actual-queue regressions must reproduce offset ordering reversals in both directions, sub-millisecond conflicts, equivalent instant ties and per-target highlight deletion. Keep fixture synced_at canonical so its .gt mock does not hide the conflict. Preserve all previous meaningful tests.",
+        "Use one feature-local exact comparator and the existing Zod ISO contract. Preserve minute-only clocks, years0000\u20139999, offsets through\u00b123:59, UTC day/year rollover, pre-1970 instants and arbitrary decimal fractions. Whole-second UTC plus exact fractional digits is the selected implementation. Do not use runtime BigInt, Date millisecond truncation, coercion, new dependencies or any assertions hiding unknown values.",
+        "Pull retains local on equal instants; upload suppresses only strictly newer remote data. Update the seven pull guards and remoteIsNewer. Keep exact payload/stored strings, nullable fallbacks, legacy highlight empty updated_at behavior, table/account/queue identities, partial counts, cursor and retry contracts. Malformed nonempty persisted-local timestamps reject safely and retain rows/cursor; never treat NaN as equality or silently overwrite them.",
+        "For a dated highlight tombstone, select every current matching target, compare each instant and conditionally delete eligible IDs with both captured updated_at IS ? and the original identity predicate. Cover older/equal/newer duplicates in both insertion orders and an intervening timestamp or identity edit. Keep existing undated/empty deletion behavior. Do not claim transaction exclusivity or broaden the RF104 ownership scope.",
+        "Add focused comparator examples and an existing fast-check oracle property using test-only BigInt tick arithmetic. Cover minute/year/offset/fraction boundaries, invalid values and high-precision ties. Add actual caller checks for all seven guarded tables, strict outbound ties/newer/older decisions, byte-preserved dates and malformed local timestamp retry. Study_log equivalent-instant deduplication and historical rewrites are separate.",
+        "All20 fresh real controller commands, separate stronger review and primary acceptance required. Changed files lint0warnings; existing full63 warnings and five Knip findings stay visible. One accepted-task local commit with short PROGRESS note, then task-output cleanup. No protected inputs/schema/migration/production changes, push/deploy or device-runtime claim."
+      ],
+      "verification": [
+        [
+          "git",
+          "diff",
+          "--check"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "lib/database/sync.ts",
+          "lib/database/sync-payloads.ts",
+          "lib/database/sync-timestamps.ts",
+          "tests/unit/sync-timestamps.test.ts",
+          "tests/unit/sync-payloads.test.ts",
+          "tests/unit/sync-queue-payloads.test.ts",
+          "docs/refactoring/PROGRESS.md"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/database/sync.ts",
+          "lib/database/sync-payloads.ts",
+          "lib/database/sync-timestamps.ts",
+          "tests/unit/sync-timestamps.test.ts",
+          "tests/unit/sync-payloads.test.ts",
+          "tests/unit/sync-queue-payloads.test.ts",
+          "--max-warnings=0"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "check:analysis"
+        ],
+        [
+          "npm",
+          "run",
+          "postinstall"
+        ],
+        [
+          "npm",
+          "ls",
+          "--all",
+          "--json"
+        ],
+        [
+          "npm",
+          "run",
+          "lint"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "--no-cache"
+        ],
+        [
+          "node",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/tests/brace-expansion.test.cjs",
+          "scripts/tests/dependency-boundaries.test.cjs",
+          "scripts/tests/icon-tool.test.cjs",
+          "scripts/tests/jest-config.test.cjs",
+          "scripts/tests/js-yaml.test.cjs",
+          "scripts/tests/lint-coverage.test.cjs",
+          "scripts/tests/metro-unicode.test.cjs",
+          "scripts/tests/nanoid.test.cjs",
+          "scripts/tests/router-dependency-range.test.cjs",
+          "scripts/tests/security-dependency-owner.test.cjs",
+          "scripts/tests/source-map-js.test.cjs",
+          "scripts/tests/tailwind-source-map.test.cjs",
+          "scripts/tests/ws.test.cjs",
+          "scripts/tests/xmldom.test.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "test:refactor-runner"
+        ],
+        [
+          "python3",
+          "-B",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "scripts/tests",
+          "-p",
+          "test_*.py"
+        ],
+        [
+          "npm",
+          "run",
+          "check:native-config"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=4096",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "android",
+          "--output-dir",
+          ".expo/modernization-checks/android",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/android')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=3072",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "ios",
+          "--output-dir",
+          ".expo/modernization-checks/ios",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/ios')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8197",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts",
+          "tests/e2e/database-bridge.spec.ts"
+        ]
+      ],
+      "risk": "high",
+      "approved": true,
+      "status": "verified",
+      "allowed_paths": [
+        "lib/database/sync.ts",
+        "lib/database/sync-payloads.ts",
+        "lib/database/sync-timestamps.ts",
+        "tests/unit/sync-timestamps.test.ts",
+        "tests/unit/sync-payloads.test.ts",
+        "tests/unit/sync-queue-payloads.test.ts"
+      ],
+      "attempts": 1,
+      "priority": 1,
+      "implementation_mode": "implementation",
+      "diagnosis": "Seven pull guards, highlight tombstone SQL and remoteIsNewer compared ISO strings lexically, reversing offset and fractional conflicts. Corrected real SQLite/fullSync/queue causal baseline:24 failed/136 controls. Source now compares validated whole-second UTC and exact fraction digits; highlight deletes retain captured identity/time predicates.",
+      "focused_validation": {
+        "tests": 180,
+        "suites": 3,
+        "generated_cases": 200,
+        "typecheck": "pass",
+        "scoped_lint": "0 warnings",
+        "format": "pass",
+        "diff": "pass"
+      },
+      "failure_history": [
+        {
+          "phase": "causal-fixture",
+          "failure": "Initial fixture used undefined updated_at bindings and a nonsyncable setting; corrected fixtures before confirming24 real source failures. Intermediate counts retained until acceptance."
+        },
+        {
+          "phase": "focused-comparator",
+          "failure": "Corrected an erroneous max-offset expectation and oracle offset capture indices. Retained pre-epoch counterexample. Replaced unnecessary calendar arithmetic with selected Date.parse whole-second design; its initial incomplete date interpolation caused25 failures and was repaired. Final180 cases/types/scoped lint/format/diff pass."
+        }
+      ],
+      "started_at": "2026-11-07T04:21:32.773477+00:00",
+      "completed_at": "2026-11-07T04:29:41.896572+00:00",
+      "primary_accepted_at": "2026-11-07T04:29:41.896572+00:00",
+      "independent_review": "pass",
+      "evidence": "docs/refactoring/PROGRESS.md",
+      "summary": "Sync conflict precedence compares exact instants, preserving offsets/fractions/stored strings, local ties and strict outbound suppression. Dated highlight deletion protects captured identity and time. All20 controller checks, stronger review and primary acceptance pass:2863unit,180focused and30Chrome. Account policy/shared transactions/device runtime remain open."
     }
   ]
 }
