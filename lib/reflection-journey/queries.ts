@@ -1,4 +1,4 @@
-import type { DatabaseExecutor } from "@/lib/database/types";
+import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import { enqueueSync } from "@/lib/database/sync-queue";
 import {
   parseStoredReflectionJourneyBlocks,
@@ -104,7 +104,7 @@ export async function getReflectionJourneySummary(
 }
 
 export async function saveReflectionJourneyDraft(
-  db: DatabaseExecutor,
+  db: AppDatabase,
   levelId: string,
   responseText: string
 ): Promise<ReflectionJourneyEntry> {
@@ -125,7 +125,7 @@ export async function saveReflectionJourneyDraft(
 }
 
 export async function completeReflectionJourneyLevel(
-  db: DatabaseExecutor,
+  db: AppDatabase,
   levelId: string,
   responseText: string
 ): Promise<ReflectionJourneyEntry> {
@@ -158,7 +158,23 @@ export async function completeReflectionJourneyLevel(
   );
 }
 
+/** Save a journey entry. The row and its upload queue entry commit together or not at all. */
 async function upsertReflectionJourneyEntry(
+  database: AppDatabase,
+  levelId: string,
+  responseText: string,
+  status: ReflectionJourneyEntryStatus,
+  completedAt: string | null
+): Promise<ReflectionJourneyEntry> {
+  let entry: ReflectionJourneyEntry | null = null;
+  await database.withTransactionAsync(async (db) => {
+    entry = await upsertReflectionJourneyEntryRow(db, levelId, responseText, status, completedAt);
+  });
+  if (!entry) throw new Error("Reflection Journey entry was not saved.");
+  return entry;
+}
+
+async function upsertReflectionJourneyEntryRow(
   db: DatabaseExecutor,
   levelId: string,
   responseText: string,
@@ -194,7 +210,7 @@ async function upsertReflectionJourneyEntry(
     ]
   );
 
-  enqueueSync(db, "reflection_journey_entries", "INSERT", row.level_id, rowToSyncData(row)).catch(console.warn);
+  await enqueueSync(db, "reflection_journey_entries", "INSERT", row.level_id, rowToSyncData(row));
 
   return rowToEntry(row);
 }

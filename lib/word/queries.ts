@@ -1,4 +1,4 @@
-import type { DatabaseExecutor } from "@/lib/database/types";
+import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import { enqueueSync } from "@/lib/database/sync-queue";
 
 export type WordTranslationRow = {
@@ -192,16 +192,20 @@ export type QiraatRow = {
   ayah_group: string | null;
 };
 
-export async function upsertUserWordMeaning(
-  db: DatabaseExecutor,
-  params: {
-    surah: number;
-    ayah: number;
-    wordPos: number;
-    word: string | null;
-    meaning: string;
-  }
-): Promise<void> {
+type UserWordMeaningInput = {
+  surah: number;
+  ayah: number;
+  wordPos: number;
+  word: string | null;
+  meaning: string;
+};
+
+/** Save a custom word meaning. The row and its upload queue entry commit together or not at all. */
+export async function upsertUserWordMeaning(database: AppDatabase, params: UserWordMeaningInput): Promise<void> {
+  await database.withTransactionAsync((db) => upsertUserWordMeaningRow(db, params));
+}
+
+async function upsertUserWordMeaningRow(db: DatabaseExecutor, params: UserWordMeaningInput): Promise<void> {
   const now = new Date().toISOString();
   await db.runAsync(
     `INSERT INTO user_word_meanings
@@ -218,7 +222,7 @@ export async function upsertUserWordMeaning(
     [params.surah, params.ayah, params.wordPos],
   );
   if (row) {
-    enqueueSync(db, "user_word_meanings", "UPDATE", `${params.surah}:${params.ayah}:${params.wordPos}`, row).catch(console.warn);
+    await enqueueSync(db, "user_word_meanings", "UPDATE", `${params.surah}:${params.ayah}:${params.wordPos}`, row);
   }
 }
 
