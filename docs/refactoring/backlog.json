@@ -26448,15 +26448,15 @@
     }
   ],
   "checkpoint": {
-    "time": "2026-11-08T06:06:40.056952+00:00",
-    "current_task": "batch gate after RF-195",
+    "time": "2026-11-08T07:03:31.065538+00:00",
+    "current_task": "RF-034 (one multi-field form onto RHF and Zod)",
     "open_follow_ups": [],
     "device_tasks": "none pending; QA app reset to Verse by Verse and English (Bridges)",
     "decisions_waiting_on_ehab": [
       "Final push after all work is verified",
       "Optional: allow clearing com.anonymous.hafiz.qa data once to time the first-run import after RF-195"
     ],
-    "last_green_commit": "04bdf6f (full 20-check batch gate: 3,187 unit, 35 Chrome; covers RF-192, RF-193, RF-194)",
+    "last_green_commit": "f83e87e (full 20-check batch gate: 3,196 unit, 35 Chrome; covers RF-196, RF-039, RF-195)",
     "uncommitted": null,
     "production": "RF-166, RF-170, RF-169 migrations applied 2026-11-07 after backup 20261107T205118Z."
   }
