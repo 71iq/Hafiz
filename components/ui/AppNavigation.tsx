@@ -24,15 +24,8 @@ import { useSettings, withThemeOpacity } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { useAuthStore } from "@/lib/auth/store";
 import { ProfileIdentity } from "@/components/profile/ProfileIdentity";
-import {
-  PERSISTENT_SIDEBAR_BREAKPOINT,
-  PERSISTENT_SIDEBAR_WIDTH,
-  SIDEBAR_BREAKPOINT,
-} from "@/lib/ui/viewport";
-import {
-  PanelLeftOpen,
-  PanelRightOpen,
-} from "lucide-react-native";
+import { PERSISTENT_SIDEBAR_BREAKPOINT, PERSISTENT_SIDEBAR_WIDTH, SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
+import { PanelLeftOpen, PanelRightOpen } from "lucide-react-native";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -63,7 +56,7 @@ function getVisibleRoutes(state: BottomTabBarProps["state"], descriptors: Bottom
 function getSidebarRouteItems(
   state: BottomTabBarProps["state"],
   descriptors: BottomTabBarProps["descriptors"],
-  routeNames: readonly string[]
+  routeNames: readonly string[],
 ) {
   return routeNames.flatMap((name) => {
     const route = state.routes.find((item) => item.name === name);
@@ -164,7 +157,7 @@ function BottomBar(props: BottomTabBarProps) {
       style={[
         styles.bottomContainer,
         {
-          position: Platform.OS === "web" ? "fixed" as any : "absolute",
+          position: Platform.OS === "web" ? ("fixed" as any) : "absolute",
           bottom: Math.max(insets.bottom, 10),
           paddingBottom: 6,
           zIndex: 80,
@@ -190,7 +183,9 @@ function BottomBar(props: BottomTabBarProps) {
           const event = navigation.emit({ type: "tabPress", target: route.key, canPreventDefault: true });
           if (!isFocused && !event.defaultPrevented) navigation.navigate(route.name, route.params);
         };
-        const onLongPress = () => { navigation.emit({ type: "tabLongPress", target: route.key }); };
+        const onLongPress = () => {
+          navigation.emit({ type: "tabLongPress", target: route.key });
+        };
 
         return (
           <BottomTabItem
@@ -260,13 +255,7 @@ function SidebarItem({
   );
 }
 
-function SidebarSeparator({
-  isDark,
-  isPersistent,
-}: {
-  isDark: boolean;
-  isPersistent?: boolean;
-}) {
+function SidebarSeparator({ isDark, isPersistent }: { isDark: boolean; isPersistent?: boolean }) {
   return (
     <View
       className="mx-3 my-4"
@@ -383,7 +372,7 @@ function SidebarContent({
         }}
       >
         <Text
-          className={isPersistent ? "text-gold" : "text-primary dark:text-neutral-100"}
+          className={isPersistent ? "text-gold" : "text-primary dark:text-neutral-100 w-max"}
           style={{
             fontFamily: isRTL ? undefined : "NotoSerif_700Bold",
             fontSize: isPersistent ? 24 : 22,
@@ -401,11 +390,7 @@ function SidebarContent({
       {isPersistent && <View className="flex-1" />}
       {settingsItem ? renderItem(settingsItem) : null}
       <SidebarSeparator isDark={isDark} isPersistent={isPersistent} />
-      <SidebarProfileCard
-        isDark={isDark}
-        isRTL={isRTL}
-        isPersistent={isPersistent}
-      />
+      <SidebarProfileCard isDark={isDark} isRTL={isRTL} isPersistent={isPersistent} />
     </>
   );
 }
@@ -421,9 +406,12 @@ function FloatingPanel(props: BottomTabBarProps & { isRTL?: boolean }) {
   const progress = useSharedValue(0);
   const reduceMotion = useReducedMotionPreference();
 
-  useEffect(() => () => {
-    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (reduceMotion) {

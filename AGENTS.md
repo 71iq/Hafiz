@@ -1,132 +1,68 @@
-# AGENTS.md — Hafiz
+# Hafiz
 
-These instructions apply to the repository unless a more specific nested `AGENTS.md` exists.
+Offline-first Quran memorization app at hafizquran.app, built with Expo Router and React Native for web, Android and iOS. Read package.json and current source for installed versions and commands.
 
-## Project and repository map
+## What must remain true
 
-Hafiz is an early-preview Quran memorization and retention app: Mushaf reading, reflection, word study, tafsir, translations, private notes, review scheduling, and optional account sync.
+Quran content must remain accurate. Reading and local progress must work offline. Optional account sync must preserve the user's data and ownership. Arabic and English, touch and keyboard, web and native are part of the same product contract.
 
-- The root package declares no npm workspaces. The app targets static web, Android, and iOS through Expo Router.
-- Core stack: Expo SDK 55, React Native 0.83, React 19, strict TypeScript, NativeWind/Tailwind, Expo SQLite, Zustand, TanStack Query, Jest, Playwright, and optional Supabase services.
-- `app/`: Expo Router screens and route layouts. `app/_layout.tsx` owns root providers; `app/(tabs)/_layout.tsx` owns settings, chrome, and tab navigation.
-- `components/`: feature UI. Reuse `components/ui/` primitives before adding new controls; Mushaf-specific UI is under `components/mushaf/`.
-- `lib/`: domain logic, local database, settings/themes, i18n, navigation helpers, sync, Supabase, Quran Foundation integrations, and platform adapters.
-- `assets/`: bundled images, fonts, Quran datasets, tafsir/translations, and the generated runtime SQLite database. Treat third-party content and generated data as protected inputs, not ordinary source code.
-- `scripts/`: build, data-generation, verification, and deployment helpers.
-- `supabase/`: server schema, migrations, and Edge Functions; this is infrastructure code.
-- `tests/`: Jest unit/contract tests, RTL registries, and Playwright smoke/report-only suites.
-- `android/`: committed Expo-generated native project. Prefer Expo/config-level changes unless the task is specifically native.
-- Generated or ignored output includes `dist/`, `.expo/`, `public/data/`, `test-results/`, `playwright-report/`, `web-build/`, and `supabase/.temp/`. Do not edit or commit it.
-- If `quran.com-frontend-next/` exists locally, treat it as excluded reference code; it is not part of Hafiz typecheck, lint, or formatting scope.
+Choose simple ownership over more layers. Reuse the established feature component or platform adapter before adding another wrapper. Derive values instead of maintaining duplicate state, and reserve React effects for external synchronization or genuine lifecycle work. Keep domain logic testable without making local reading depend on the network.
 
-## Important entry points
+## Project map
 
-- Routes/providers: `app/_layout.tsx`, `app/(tabs)/_layout.tsx`, `app/(tabs)/index.tsx`.
-- Main reader: `app/(tabs)/mushaf.tsx` and `components/mushaf/`.
-- Shared navigation/layout: `components/ui/AppNavigation.tsx`, `components/ui/ScreenContent.tsx`, `lib/ui/viewport.ts`, and `lib/ui/chrome.tsx`.
-- Responsive overlays: `components/ui/ResponsiveOverlay.tsx`; use its overlay/header/body/footer variants instead of creating ad hoc modals or sheets.
-- Themes: `lib/settings/context.tsx`, `tailwind.config.js`, and `global.css`. Use existing semantic surface/accent tokens and theme definitions.
-- Bilingual strings/direction: `lib/i18n/strings.ts`, `lib/i18n/useStrings.ts`, and `lib/ui/direction.tsx`.
-- Local Quran database: `lib/database/provider.tsx`, `lib/database/init.ts`, `lib/database/native-loaders.*`, and `lib/database/schema.ts`.
-- Quran navigation/mapping: `lib/mushaf/` and the Mushaf components; preserve established surah, ayah, word-position, page, juz, and hizb mappings.
-- Supabase client/sync: `lib/supabase.ts`, `lib/sync/`, `supabase/schema.sql`, `supabase/migrations/`, and `supabase/functions/`.
+- app/ owns routes and layouts. components/ owns feature UI and components/ui/ owns reusable controls.
+- lib/ owns the local database, sync, themes, bilingual strings, navigation and platform adapters.
+- assets/data/ contains protected datasets and a generated Quran database. supabase/ contains schema, migrations and functions.
+- tests/ and scripts/ contain focused checks. Generated dist/, public/data/ and native build output are not source edits.
 
-## Verified commands
+Check the active branch and worktree before edits. Preserve the existing AppNavigation.tsx change in the original checkout. Modernization work has a separate checkout and runbook. Work there only when the task selects it, and follow its local instructions without merging or publishing it as incidental setup work.
 
-Install and development:
+## Product and content constraints
 
-- `npm install` — install dependencies; postinstall runs the React Native Gradle fix and `patch-package`.
-- `npm run start` — start Expo.
-- `npm run web` — start Expo web with dev tools disabled.
-- `npm run android` — run the Android native project.
-- `npm run ios` — run the iOS native project.
+Keep local reading independent of network services. Preserve sync IDs, timestamps, soft deletes and conflict semantics. Read the affected local schema, server policies and sync callers before changing persistence.
 
-Checks and tests:
+Quran text, identifiers, verse/word positions, page mappings, Arabic assets, fonts and generated databases need explicit data-change authorization. Preserve licenses in NOTICE.md. Copy/share Unicode Quran text, not display glyph data such as text_qcf2. Preserve v2_page and page-font navigation. A page source replacement requires validation of all 604 pages. Runtime assets need both native require maps and web copy/fetch handling.
 
-- `npm run typecheck` — strict TypeScript check, no emit.
-- `npm run lint` — ESLint over JS/JSX/TS/TSX.
-- `npm run format` — Prettier write mode; this modifies files, so use intentionally.
-- `npm run test:unit` — Jest tests under `tests/`, serial execution.
-- `npm run test:e2e:smoke` — build web, serve `dist/`, then run the Chromium smoke flow.
-- `npm run test:ui:phase -- <provider-boundaries|responsive-overflow|route-inventory|rtl-ui-contract|sync-contract|ui-contract|all>` — targeted report-only Playwright suite.
-- `npm run test:ui:rtl` — RTL UI contract at the 390 px Chromium project.
-- `npm run test:ui:baseline` — full report-only UI baseline.
-- `npm run verify:quick` — typecheck, unit tests, and Chromium smoke test.
-- `npm run verify:web` — typecheck, web export, and smoke test.
+Use existing components/ui/ controls and ResponsiveOverlay. Preserve dismissal, focus restoration, scrolling, safe areas and keyboard avoidance. Use semantic theme tokens. Fix overflow through sizing and wrapping rather than shrinking typography unless requested.
 
-Build and data:
+Arabic RTL and English LTR are first-class. Put changed user-facing strings in both locales. Use lib/ui/viewport.ts for responsive checks. Expand themes, locales and input checks when the change affects them. Theme-sensitive work covers light/white, beige, dark, AMOLED and system behavior.
 
-- `npm run build:web` — production static Expo export to `dist/`; `prebuild:web` prepares runtime data in ignored `public/data/`.
-- `bash scripts/vercel-build.sh` — retained compatibility wrapper for older environment names. Current production CI uses `npm run build:web` in `.github/workflows/hetzner-deploy.yml`.
-- `npm run validate:reflection-journey` — validate the reflection journey dataset.
-- `npm run build:db` — regenerate `assets/data/quran.db`; do not run unless the task explicitly concerns the data pipeline and the resulting database change is intended.
-- No repository-defined Supabase start/reset/push/deploy command or checked-in `supabase/config.toml` is present. Do not invent a Supabase workflow; follow an explicitly provided project procedure.
+## Trace the whole affected flow
 
-## Production and deployment
+Before finishing behavior changes, identify which of these paths apply:
 
-Read `docs/hetzner-migration.md` and the relevant `deploy/hetzner/` files before infrastructure or database work. Production is a static Expo export served by Caddy and a separate self-hosted Supabase stack on Hetzner. `.github/workflows/hetzner-deploy.yml` builds and verifies `main`, then deploys the export over SSH. Infrastructure and database changes use the administrator procedure rather than the web deploy key.
+- Entry points include tab navigation, the reader, search results, bookmarks and cold/warm deep links. Check the shared navigation helper rather than fixing only one caller.
+- Clients include Expo web, Android and iOS. Separate platform files can implement the same contract differently. Verify the affected platform and state any untested target.
+- Locales include Arabic RTL and English LTR. Check direction-sensitive ordering, gestures and translated strings where the change affects them.
+- State includes startup, loading, empty/error recovery, offline use, account restore, reconnect and app resume. Persisted state must survive reload without accepting stale asynchronous results.
+- Account work includes local SQLite, optional remote sync and the returned UI state. Check the intended merge/restore policy and cross-user isolation before changing it.
 
-The former Vercel and Supabase Cloud projects are retired. Do not use the ignored cloud CLI link or linked-cloud commands for production. Apply reviewed SQL through Hafiz's private database procedure, keeping its database, storage, keys, and service configuration isolated from ElPsyCongroo. Configuration comes from GitHub Actions variables or secrets and protected VM environment files. Use the documented Hafiz health script for operational checks.
+## Local development and focused checks
 
-Reusable authoring, React Native, composition, and UI verification guidance lives in the personal skills directory under `$CODEX_HOME/skills` or `~/.codex/skills`. Use `reuse-first-authoring` for nontrivial extractions, `react-native-skills` for relevant native behavior, and `composition-patterns` when changing component contracts. Use `ui-visual-verification` or `full-stack-verification` when the changed behavior needs that coverage. Existing project wrappers, installed library versions, and the targeted verification rules below take precedence over generic recommendations.
+Read package.json before choosing commands. npm run start starts Expo; npm run web starts the web client. npm run android and npm run ios run native targets and can rebuild/install them, so inspect the target first and preserve the installed app's data.
 
-## Engineering workflow
+Use npm run test:unit -- --runTestsByPath <test-file> for the nearest Jest case, npm run typecheck for type and import changes, and npm run build:web for the static export. The test:ui:phase script selects report-only UI contract phases. It can exit 0 after Playwright test failures. Inspect its failure summary and report; exit code 0 alone is not a passing check. Aggregate verify scripts can repeat exports, so inspect their constituents and reuse checks already passed.
 
-1. Start with `git status --short` and inspect the related route, component, utility, tests, and recent implementation patterns. Do not overwrite unrelated user changes.
-2. Identify the root cause before applying a nontrivial fix. Prefer the smallest coherent patch that addresses it.
-3. Reuse existing components, utilities, data access patterns, responsive breakpoints, and theme tokens before creating abstractions.
-4. Avoid unrelated refactors, broad formatting, dependency additions, or behavior changes outside the request. Add a dependency only when existing platform APIs and packages cannot reasonably solve the task.
-5. Preserve offline-first behavior and web/native compatibility. Do not make local reading features depend on Supabase or another network service.
-6. Use `@/` imports from the repository root. ESLint and Prettier are authoritative; do not hand-format protected datasets.
+npm run format writes across the project. Prefer targeted formatting for scoped edits. npm run build:db regenerates protected Quran data and requires an authorized data-pipeline task. Use the existing ESLint/Prettier configuration rather than introducing a second style policy.
 
-## Delegation and parallel work
+## Production
 
-- For a trivial task, the main agent should default to spawning one fast, lightweight sub-agent when there is a concrete independent check or lookup that can run in parallel and shorten elapsed time. Good examples are locating the relevant implementation, checking an existing pattern, or reviewing a finished diff while the main agent makes the edit.
-- Keep trivial-task delegation small: use at most one helper, choose the lowest-latency capable agent/model available, give it a tightly bounded prompt, and keep the main agent working on the critical path.
-- Do not delegate the task's only atomic action, assign multiple agents to the same lines, or wait on a helper whose coordination cost is likely to exceed the work itself. The purpose of delegation is faster completion, not delegation for its own sake.
-- For larger tasks, parallelize only genuinely independent subtasks and keep one owner for the final integration and verification.
+Before infrastructure, deployment or database operations, read docs/hetzner-migration.md and the relevant deploy/hetzner/ files. Production is a static Expo export served by Caddy with its own self-hosted Supabase stack. Keep database, storage, keys and service configuration separate from ElPsyCongroo. Former Vercel and Supabase Cloud projects are retired. Follow the private administrator procedure rather than old cloud links or invented CLI workflows. Keep secret keys server-side and use only intended public values in client bundles.
 
-## UI and UX requirements
+## Verification and delivery
 
-- Arabic RTL and English LTR are first-class modes. Add user-facing text to both locales and keep direction-sensitive alignment, icon order, gestures, and navigation correct.
-- For affected UI, check phone widths, tablet/iPad behavior, and desktop layouts using the shared viewport contract in `lib/ui/viewport.ts`.
-- Preserve React Native, web, and native/WebView interaction behavior. Avoid web-only fixes that break touch/native and native-only fixes that regress keyboard/mouse use.
-- Use `ResponsiveOverlay` and existing overlay primitives. Preserve backdrop dismissal, Escape handling, body-scroll locking, keyboard avoidance, focus restoration, and safe-area spacing.
-- Do not fix layout overflow by shrinking typography unless the request explicitly calls for smaller text. Correct sizing, wrapping, spacing, or container behavior instead.
-- Use semantic theme colors and existing palettes. Verify light/white, beige, dark, AMOLED, and system behavior when theme-sensitive code changes.
-- When relevant, verify accessibility labels/states, contrast, keyboard and focus behavior, touch targets, scrolling, safe areas, and reduced viewport height.
+Choose checks from package.json that can catch the actual regression. Documentation and agent setup need path/instruction validation and git diff --check. Localized source work needs the nearest meaningful check. Add typecheck for changed types, imports or logic. Shared navigation, data pipelines, database or configuration changes need relevant tests and npm run build:web. Avoid repeating constituents through aggregate commands.
 
-## Quran content and generated-data safety
+For visible behavior use ui-visual-verification, and for native behavior use react-native-skills. Exercise the affected state with sanitized fixtures. Report browser and native evidence separately. Device work must preserve the installed app and its data.
 
-- Do not modify Quran text, verse identifiers, surah/ayah/word positions, page mappings, Arabic assets, fonts, databases, or generated/imported content unless the task explicitly authorizes a data correction or pipeline change.
-- Do not manually reformat `assets/data/**`; it is excluded from Prettier. Preserve source attribution and licenses in `NOTICE.md`.
-- `assets/data/quran.db` is generated from schema and source datasets. A regenerated binary must be intentional and reviewed with its source changes.
-- Quran display glyph data such as `text_qcf2` is display-specific; copying/sharing must continue to use Unicode Quran text such as `text_uthmani`.
-- Preserve `v2_page` and the established page-font/navigation mappings. Do not substitute another page source without validating all 604 pages and navigation behavior.
-- Runtime data has separate native require maps and web copy/fetch paths. When explicitly adding a runtime asset, update both sides and add verification; never silently omit one platform.
+Review the full scoped diff and preserve unrelated work. For completed product changes, commit and push the current branch unless the task or runbook says otherwise. Local agent-environment maintenance stays local unless publication is requested. Verify remote HEAD after a product push. Report changed behavior, checks and material unverified areas concisely.
 
-## Supabase and database safety
+## Safe development and documentation
 
-- Inspect `supabase/schema.sql`, existing migrations, RLS policies, local SQLite schema, and sync code before changing database behavior.
-- Prefer a reviewed migration over undocumented dashboard/manual schema changes. Keep stable IDs, timestamps, soft-delete semantics, and sync conflict behavior intact.
-- Never commit `.env`, `.env.local`, credentials, signing material, service-role keys, or Edge Function secrets. Only `EXPO_PUBLIC_*` values intended for clients may enter client bundles.
-- Do not run destructive SQL, reset databases, drop tables, delete migrations, rewrite production data, or deploy functions without explicit authorization.
+Use sanitized, isolated fixtures for writes. Never point a preview, migration experiment or reset command at production. Preserve other checkouts and services. Stop only processes you started and whose PID you recorded, not processes selected by a broad name or path match.
 
-## Minimum verification
+For a logic or state bug, prefer a focused regression that fails for the original cause and passes with the fix. Extend an existing case where it fits. Test the owning behavior at one useful layer; add integration coverage only for a boundary that can fail independently. Pure spacing or color fixes need rendered evidence, not tests that mirror markup. Do not stack unrelated full suites or repeat equivalent checks.
 
-- Verification must be proportional to the change. Run the smallest check that can catch a plausible regression; do not automatically stack typecheck, full lint, unit suites, builds, browser automation, and manual matrices for a small localized edit.
-- Documentation-only: re-read changed instructions against current files, validate every path/command, and review the diff. State that application checks were not run.
-- Trivial or isolated source changes: run the nearest focused test, lint only the changed file(s), or perform a targeted manual check as appropriate. Do not require all three. Run `npm run typecheck` only when types, imports, component contracts, or TypeScript logic could be affected.
-- Small UI changes: verify the changed state at one representative viewport and locale/theme, and run the nearest relevant unit or contract test when one exists. Expand to Arabic/English, RTL/LTR, multiple widths/themes, keyboard/mouse, and touch only when the change affects those dimensions.
-- Logic changes: run the most focused relevant Jest test(s). Add typecheck or lint when the change could plausibly introduce those classes of failure; run the full unit suite only for shared or cross-cutting behavior.
-- Configuration, data pipeline, database, navigation, or cross-cutting changes: run relevant unit tests and `npm run build:web`; use `npm run verify:quick` or `npm run verify:web` when scope warrants it.
-- Native-specific changes: verify the affected native target when the environment permits. Never claim native verification from a web-only check.
-- Do not rerun equivalent checks through an aggregate verification command after their constituent checks already passed unless the task's risk warrants the redundancy.
-- Clearly report every skipped, blocked, or unavailable check and the resulting risk.
+Document durable constraints and the reasons a future maintainer would miss. Update the existing paragraph when a decision changes. Keep temporary plans, research notes, review ledgers and PR evidence outside the repository. User-facing documentation explains the user's task without contributor tooling or implementation details.
 
-## Git and completion rules
-
-- Review `git diff --check`, `git diff --stat`, and the full task diff before finishing. Keep lockfile and generated-file changes intentional.
-- For every completed change task, stage only the task-scoped files, create a descriptive commit, and push the current branch before the final response. This is the default workflow and does not require a separate request. If the user explicitly asks not to commit or push, follow that request instead; if authentication, remote configuration, or branch protection blocks the push, report the exact blocker.
-- Do not revert, stage, or commit unrelated changes. Do not amend, rebase, reset, force-update, delete files, or clean the worktree unless explicitly requested.
-- Final response must include: root cause or implementation rationale; files changed; concise behavioral summary; commands/tests run; manual verification performed; and remaining risks or unverified areas.
+AGENTS.md is the canonical project guide. CLAUDE.md imports it. Keep project rules in this file and shared personal workflows in ~/.agents/skills. Use council when requested; its model order and review gate live in that skill, not in project copies.
