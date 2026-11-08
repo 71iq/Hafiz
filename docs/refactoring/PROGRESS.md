@@ -327,3 +327,5 @@ RF199 accepted on 2026-11-08. On the web, buttons and rows that set their look t
 RF048 completed on 2026-11-08. The web app was checked at phone, tablet and desktop widths in Arabic and English and in all five themes; it fits every width, and the check found and fixed RF199. UI_VERIFICATION.md lists what ran on the web, what ran on the phone and what was not covered.
 
 RF200 accepted on 2026-11-08. The validation library was updated past a reported memory-exhaustion flaw. The update would have started rejecting sync times written without seconds; the tests caught it and those times stay accepted. All unit tests pass, and a high-effort review found no other behavior change.
+
+RF046 and RF090 completed on 2026-11-08. A repeat of the code and dependency scans shows less duplication, the same few known unused-code notes, clean module boundaries on web, Android and iOS, and security findings down from 74 to 36. The one advisory in shipped app code was fixed (RF200); the rest are in build or test tools, except one low-impact URL parsing issue that waits for the Expo upgrade.

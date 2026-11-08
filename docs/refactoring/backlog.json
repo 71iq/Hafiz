@@ -4871,12 +4871,21 @@
       ],
       "risk": "medium",
       "approved": false,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "docs/refactoring/RE_AUDIT.md"
       ],
       "attempts": 0,
-      "priority": 5
+      "priority": 5,
+      "started_at": "2026-11-08T07:51:16.722252+00:00",
+      "completed_at": "2026-11-08T07:51:16.722252+00:00",
+      "primary_accepted_at": "2026-11-08T07:51:16.722252+00:00",
+      "files": [
+        "docs/refactoring/RE_AUDIT.md"
+      ],
+      "summary": "Repeated the duplication, Knip, web/Android/iOS dependency-graph and npm audit scans with unchanged scopes. Clones fell to 15 groups/295 lines, Knip keeps its 5 documented records, all three graphs have zero violations, and audit findings fell from 74 to 36. The one shipped-app advisory (zod) became RF200 and is fixed.",
+      "evidence": "jscpd, knip, depcruise JSON for three platforms and npm audit outputs at 74033a8; check:analysis and check:boundaries pass.",
+      "independent_review": "Report; RF200 had a high-effort review; final review RF049 covers it."
     },
     {
       "id": "RF-047",
@@ -8765,7 +8774,7 @@
       ],
       "risk": "high",
       "approved": false,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "package.json",
         "package-lock.json",
@@ -8773,7 +8782,18 @@
       ],
       "attempts": 0,
       "investigation_evidence": "docs/refactoring/DEPENDENCY_SECURITY.md",
-      "priority": 5
+      "priority": 5,
+      "started_at": "2026-11-08T07:51:16.722252+00:00",
+      "completed_at": "2026-11-08T07:51:16.722252+00:00",
+      "primary_accepted_at": "2026-11-08T07:51:16.722252+00:00",
+      "files": [
+        "docs/refactoring/DEPENDENCY_SECURITY.md",
+        "package.json",
+        "package-lock.json"
+      ],
+      "summary": "Triaged the current 12 direct advisories by where they run. The shipped zod advisory is fixed (RF200). decode-uri-component in expo-router's URL parsing is a documented low-impact residual that needs expo-router 58 (RF197). Remaining findings are build, CLI or test tooling and stay low priority under the 2026-11-06 policy. No forced or major updates.",
+      "evidence": "npm audit JSON before and after RF200; npm ls paths for each advisory.",
+      "independent_review": "RF200 high-effort review; final review RF049 covers the triage."
     },
     {
       "id": "RF-091",
@@ -27302,7 +27322,7 @@
   ],
   "checkpoint": {
     "time": "2026-11-08T07:41:01.251581+00:00",
-    "current_task": "RF-200 (zod advisory), RF-046, RF-090",
+    "current_task": "RF-049 (final independent review)",
     "open_follow_ups": [],
     "device_tasks": "none pending; QA app reset to Verse by Verse and English (Bridges)",
     "decisions_waiting_on_ehab": [
