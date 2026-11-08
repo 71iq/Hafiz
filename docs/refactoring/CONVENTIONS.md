@@ -20,7 +20,7 @@ Keep RN-compatible imports. Web DOM code belongs in an explicit platform adapter
 
 Domain query functions own SQL and service requests. Parameterize SQL values. Keep local and remote row types distinct where their semantics differ. UI errors distinguish unavailable configuration, offline state, validation failure and failed persistence. Preserve existing offline content and pending work. Catch errors only to recover, report or rethrow with context. Never silently turn a failure into successful state.
 
-Query keys, identity, mutations and offline behavior follow ARCHITECTURE.md. Do not wrap local SQLite in network fetching merely to increase TanStack Query usage. Simple controlled inputs need no form migration. Multi-field forms reuse installed RHF/Zod without introducing a second validation system.
+Query keys, identity, mutations and offline behavior follow ARCHITECTURE.md. Do not wrap local SQLite in network fetching merely to increase TanStack Query usage. Simple controlled inputs need no form migration. Multi-field forms reuse installed RHF/Zod without introducing a second validation system. RF034 found every auth form (login, signup, forgot and reset password) already on RHF with Zod schemas and the same email normalization. The profile editor keeps plain controlled inputs: its only rules are input length limits, and its save path carries the account and edit-scope ownership described in AUTH_PROFILE_SAVE_OWNERSHIP.md.
 
 ## Verification and review
 

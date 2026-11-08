@@ -3879,14 +3879,23 @@
       ],
       "risk": "medium",
       "approved": false,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "app/auth/*",
         "components/profile/*",
         "tests/unit/form-validation.test.tsx"
       ],
       "attempts": 0,
-      "priority": 3
+      "priority": 3,
+      "started_at": "2026-11-08T07:04:17.507170+00:00",
+      "completed_at": "2026-11-08T07:04:17.507170+00:00",
+      "primary_accepted_at": "2026-11-08T07:04:17.507170+00:00",
+      "files": [
+        "docs/refactoring/CONVENTIONS.md"
+      ],
+      "summary": "Inventory found no inconsistent multi-field form. Login, signup, forgot-password and reset-password all use React Hook Form with zodResolver and the same trimmed, lower-cased email schema since they were written. The profile editor uses controlled inputs with maxLength limits and no other validation; migrating it would add risk to its documented save ownership without adding a rule. No code change; CONVENTIONS.md records the decision.",
+      "evidence": "grep inventory of app/auth and components/profile; git history shows zodResolver in every auth form from its first commit; auth-email-forms and profile-save-lifecycle suites cover the current behavior.",
+      "independent_review": "Documentation-only decision; covered by the final review (RF049)."
     },
     {
       "id": "RF-035",
@@ -26449,7 +26458,7 @@
   ],
   "checkpoint": {
     "time": "2026-11-08T07:03:31.065538+00:00",
-    "current_task": "RF-034 (one multi-field form onto RHF and Zod)",
+    "current_task": "RF-047 (replace brittle source tests)",
     "open_follow_ups": [],
     "device_tasks": "none pending; QA app reset to Verse by Verse and English (Bridges)",
     "decisions_waiting_on_ehab": [
