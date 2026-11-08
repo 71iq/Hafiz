@@ -61,7 +61,7 @@ type ButtonProps = PressableProps &
   };
 
 export const Button = forwardRef<any, ButtonProps>(
-  ({ variant, size, asChild, label, children, className, disabled, style, dir: explicitDir, ...props }, ref) => {
+  ({ variant, size, asChild, label, children, className, disabled, accessibilityRole, style, dir: explicitDir, ...props }, ref) => {
     const Component = asChild ? Slot : Pressable;
     const dir = useUIDirection(explicitDir);
 
@@ -70,6 +70,7 @@ export const Button = forwardRef<any, ButtonProps>(
         ref={ref}
         className={cn(buttonVariants({ variant, size }), dir === "rtl" && "flex-row-reverse", className)}
         disabled={disabled}
+        accessibilityRole={accessibilityRole ?? (asChild ? undefined : "button")}
         style={(state: PressableStateCallbackType) => [
           {
             opacity: disabled ? 0.5 : 1,

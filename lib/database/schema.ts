@@ -1,6 +1,6 @@
-import type { SQLiteDatabase } from "expo-sqlite";
+import type { DatabaseExecutor } from "@/lib/database/types";
 
-export async function createSchema(db: SQLiteDatabase): Promise<void> {
+export async function createSchema(db: DatabaseExecutor): Promise<void> {
   await db.execAsync(`
     PRAGMA journal_mode = WAL;
     PRAGMA foreign_keys = ON;
@@ -515,7 +515,7 @@ export async function createSchema(db: SQLiteDatabase): Promise<void> {
   `);
 }
 
-export async function migrateUserSchema(db: SQLiteDatabase): Promise<void> {
+export async function migrateUserSchema(db: DatabaseExecutor): Promise<void> {
   const legacyDate = "1970-01-01T00:00:00.000Z";
 
   await db.execAsync(`
@@ -593,14 +593,14 @@ export async function migrateUserSchema(db: SQLiteDatabase): Promise<void> {
 }
 
 async function addColumnIfMissing(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   table: string,
   column: string,
   definition: string
 ): Promise<void> {
   try {
     await db.getFirstAsync(`SELECT ${column} FROM ${table} LIMIT 1`);
-  } catch (_) {
+  } catch {
     try {
       await db.execAsync(`ALTER TABLE ${table} ADD COLUMN ${definition}`);
     } catch (error) {
@@ -609,7 +609,7 @@ async function addColumnIfMissing(
   }
 }
 
-async function createUserMigrationIndexes(db: SQLiteDatabase): Promise<void> {
+async function createUserMigrationIndexes(db: DatabaseExecutor): Promise<void> {
   const statements = [
     "CREATE INDEX IF NOT EXISTS idx_private_notes_updated ON private_notes(updated_at)",
     "CREATE INDEX IF NOT EXISTS idx_highlights_sync_id ON highlights(sync_id)",
@@ -630,10 +630,10 @@ async function createUserMigrationIndexes(db: SQLiteDatabase): Promise<void> {
 }
 
 /** Create text_search index — must run AFTER the text_search column migration */
-export async function createTextSearchIndex(db: SQLiteDatabase): Promise<void> {
+export async function createTextSearchIndex(db: DatabaseExecutor): Promise<void> {
   try {
     await db.execAsync("CREATE INDEX IF NOT EXISTS idx_quran_text_search ON quran_text(text_search)");
-  } catch (_) {
+  } catch {
     // Column may not exist yet on very old databases — the migration will handle it
   }
 }

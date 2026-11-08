@@ -184,6 +184,6 @@ function parseSections(value: string, fallback: string): SurahInfoSection[] {
         .filter((section) => section.body.trim().length > 0);
       if (sections.length > 0) return sections;
     }
-  } catch (_) {}
+  } catch {}
   return fallback.trim() ? [{ title: null, body: fallback }] : [];
 }

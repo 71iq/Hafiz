@@ -1,9 +1,11 @@
-import { useState, useEffect, useCallback, type ReactNode } from "react";
+import { useOperationNotice } from "@/components/ui/OperationNoticeProvider";
+import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 import { View, Text, Pressable, ActivityIndicator, Linking, ScrollView, StyleSheet } from "react-native";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ToggleGroup } from "@/components/ui/ToggleGroup";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { ReadingStepper } from "@/components/settings/ReadingStepper";
 import { Toast } from "@/components/ui/Toast";
 import { ThemeColorSwatch } from "@/components/ui/ThemeColorSwatch";
 import {
@@ -13,8 +15,6 @@ import {
   useScreenContentLayout,
 } from "@/components/ui/ScreenContent";
 import {
-  Minus,
-  Plus,
   ChevronRight,
   ChevronLeft,
   User,
@@ -41,8 +41,8 @@ import {
 } from "@/lib/settings/context";
 import { useDatabase } from "@/lib/database/provider";
 import { getLanguageByCode } from "@/lib/translations/languages";
-import { AVAILABLE_TAFSIR_SOURCES, type TafsirSourceId } from "@/lib/tafsir/sources";
-import { ensureTafsirSourceImported } from "@/lib/database/init";
+import { AVAILABLE_TAFSIR_SOURCES } from "@/lib/tafsir/sources";
+import { useTafsirSourceSelection } from "@/lib/settings/use-tafsir-source-selection";
 import { TafsirSourcePicker } from "@/components/settings/TafsirSourcePicker";
 import { TranslationLanguagePicker } from "@/components/settings/TranslationLanguagePicker";
 import { ReciterPicker } from "@/components/settings/ReciterPicker";
@@ -73,6 +73,7 @@ import {
   quranPageFontPaletteStyle,
   quranPageMarkerFontPaletteStyle,
 } from "@/lib/fonts/loader";
+import { errorMessage } from "@/lib/error-message";
 
 type SettingsCategoryId = "general" | "content" | "account" | "about";
 
@@ -121,6 +122,7 @@ export default function SettingsScreen() {
   } = useSettings();
   const db = useDatabase();
   const s = useStrings();
+  const showNotice = useOperationNotice();
   const router = useRouter();
   const params = useLocalSearchParams<{ qf?: string; qf_error?: string; category?: string }>();
   const configured = isSupabaseConfigured();
@@ -133,7 +135,6 @@ export default function SettingsScreen() {
   const [qfStatus, setQfStatus] = useState<QfConnectionStatus>("disconnected");
   const [qfBusy, setQfBusy] = useState(false);
   const [qfMessage, setQfMessage] = useState<string | null>(null);
-  const [importingTafseerSource, setImportingTafseerSource] = useState<TafsirSourceId | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const currentLang = getLanguageByCode(translationLanguage);
   const currentTafseerSource =
@@ -160,27 +161,41 @@ export default function SettingsScreen() {
     effectiveTheme,
     quranMarkerStyle,
   );
+  // Only the latest status request may publish, so a previous account's slow response cannot show
+  // its connection to the next account. Handlers capture the account and check it, by generation and
+  // by the live store user, before showing results. A switch clears the previous account's message.
+  const latestQfStatusRequest = useRef(0);
+  const handledQfCallback = useRef<string | null>(null);
+  const accountGeneration = useRef(0);
+  const accountId = user?.id ?? null;
+  useEffect(() => {
+    accountGeneration.current += 1;
+    setQfMessage(null);
+    setQfBusy(false);
+  }, [accountId]);
+  const captureAccount = useCallback(() => {
+    const generation = accountGeneration.current;
+    const capturedId = useAuthStore.getState().user?.id ?? null;
+    return () => generation === accountGeneration.current && (useAuthStore.getState().user?.id ?? null) === capturedId;
+  }, []);
+
   const refreshQfStatus = useCallback(async () => {
-    if (!configured || !user || !qfSyncEnabled) {
-      setQfStatus("disconnected");
-      return "disconnected" as QfConnectionStatus;
-    }
+    const request = ++latestQfStatusRequest.current;
+    const publish = (next: QfConnectionStatus) => {
+      if (request === latestQfStatusRequest.current) setQfStatus(next);
+      return next;
+    };
+    if (!configured || !accountId || !qfSyncEnabled) return publish("disconnected");
     const status = await getQfConnectionStatus();
     if (status.ok) {
       if (status.status === "disconnected") {
         const linked = await getQfLinkedIdentityState();
-        const next = linked.linked ? "linked_no_sync" : "disconnected";
-        setQfStatus(next);
-        return next;
+        return publish(linked.linked ? "linked_no_sync" : "disconnected");
       }
-      setQfStatus(status.status);
-      return status.status;
-    } else {
-      const next = status.code === "needs_reauth" ? "needs_reauth" : "disconnected";
-      setQfStatus(next);
-      return next;
+      return publish(status.status);
     }
-  }, [configured, qfSyncEnabled, user]);
+    return publish(status.code === "needs_reauth" ? "needs_reauth" : "disconnected");
+  }, [accountId, configured, qfSyncEnabled]);
 
   useEffect(() => {
     refreshQfStatus().catch(console.warn);
@@ -229,9 +244,21 @@ export default function SettingsScreen() {
   useEffect(() => {
     const qf = Array.isArray(params.qf) ? params.qf[0] : params.qf;
     const qfError = Array.isArray(params.qf_error) ? params.qf_error[0] : params.qf_error;
-    if (!qf && !qfError) return;
+    if (!qf && !qfError) {
+      handledQfCallback.current = null;
+      return;
+    }
+    // Handle each OAuth return once: the route keeps its params after the URL is cleared, and an
+    // account switch must not replay the previous account's callback.
+    const callbackKey = `${qf ?? ""}|${qfError ?? ""}`;
+    if (handledQfCallback.current === callbackKey) return;
+    handledQfCallback.current = callbackKey;
 
     let cancelled = false;
+    const isCurrentAccount = captureAccount();
+    const showMessage = (message: string | null) => {
+      if (!cancelled && isCurrentAccount()) setQfMessage(message);
+    };
     const finishCallback = async () => {
       if (qfError) {
         setQfMessage(safeDecode(qfError));
@@ -246,12 +273,20 @@ export default function SettingsScreen() {
           const status = await refreshQfStatus();
           if (status === "connected") {
             const result = await runInitialQfUserSync(db);
-            setQfMessage(result.status === "synced" ? s.qfSyncComplete : s.qfFinishConnection);
+            showMessage(
+              result.status === "synced"
+                ? s.qfSyncComplete
+                : result.status === "failed"
+                  ? s.qfSyncFailed
+                  : result.status === "needs_reauth"
+                    ? s.qfNeedsReauth
+                    : s.qfFinishConnection,
+            );
           } else {
-            setQfMessage(s.qfFinishConnection);
+            showMessage(s.qfFinishConnection);
           }
-        } catch (err: any) {
-          if (!cancelled) setQfMessage(err.message || s.qfSyncFailed);
+        } catch (err) {
+          showMessage(errorMessage(err) || s.qfSyncFailed);
         } finally {
           if (!cancelled) setQfBusy(false);
           clearQfSettingsQuery();
@@ -262,7 +297,17 @@ export default function SettingsScreen() {
     return () => {
       cancelled = true;
     };
-  }, [db, params.qf, params.qf_error, refreshQfStatus, s.qfFinishConnection, s.qfSyncComplete, s.qfSyncFailed]);
+  }, [
+    captureAccount,
+    db,
+    params.qf,
+    params.qf_error,
+    refreshQfStatus,
+    s.qfFinishConnection,
+    s.qfSyncComplete,
+    s.qfSyncFailed,
+    s.qfNeedsReauth,
+  ]);
 
   const handleLogout = useCallback(async () => {
     await signOut();
@@ -270,54 +315,62 @@ export default function SettingsScreen() {
   }, [signOut]);
 
   const handleQfConnect = useCallback(async () => {
+    const isCurrentAccount = captureAccount();
     setQfBusy(true);
     setQfMessage(null);
     try {
       const response = await beginQfOAuthConnection(getQfOAuthRedirectUri(), "/settings");
+      if (!isCurrentAccount()) return;
       if (!response.ok) throw new Error(response.message);
       setQfMessage(s.qfConnectionStarted);
       await openQfAuthorizationUrl(response.authorizationUrl);
-    } catch (err: any) {
-      setQfMessage(err.message || s.qfConnectionFailed);
+    } catch (err) {
+      if (isCurrentAccount()) setQfMessage(errorMessage(err) || s.qfConnectionFailed);
     } finally {
       setQfBusy(false);
     }
-  }, [s.qfConnectionFailed, s.qfConnectionStarted]);
+  }, [captureAccount, s.qfConnectionFailed, s.qfConnectionStarted]);
 
   const handleQfDisconnect = useCallback(async () => {
+    const isCurrentAccount = captureAccount();
     setQfBusy(true);
     setQfMessage(null);
     try {
       await disconnectQfUser();
       await refreshQfStatus();
+      if (!isCurrentAccount()) return;
       setQfStatus("disconnected");
       setQfMessage(s.qfDisconnected);
-    } catch (err: any) {
-      setQfMessage(err.message || s.qfSyncFailed);
+    } catch (err) {
+      if (isCurrentAccount()) setQfMessage(errorMessage(err) || s.qfSyncFailed);
     } finally {
       setQfBusy(false);
     }
-  }, [refreshQfStatus, s.qfDisconnected, s.qfSyncFailed]);
+  }, [captureAccount, refreshQfStatus, s.qfDisconnected, s.qfSyncFailed]);
 
   const handleQfManualSync = useCallback(async () => {
+    const isCurrentAccount = captureAccount();
     setQfBusy(true);
     setQfMessage(null);
     try {
       const result = await fullQfUserSync(db);
       await refreshQfStatus();
+      if (!isCurrentAccount()) return;
       setQfMessage(
         result.status === "synced"
           ? s.qfSyncComplete
           : result.status === "needs_reauth"
             ? s.qfNeedsReauth
-            : s.qfFinishConnection,
+            : result.status === "failed"
+              ? s.qfSyncFailed
+              : s.qfFinishConnection,
       );
-    } catch (err: any) {
-      setQfMessage(err.message || s.qfSyncFailed);
+    } catch (err) {
+      if (isCurrentAccount()) setQfMessage(errorMessage(err) || s.qfSyncFailed);
     } finally {
       setQfBusy(false);
     }
-  }, [db, refreshQfStatus, s.qfFinishConnection, s.qfNeedsReauth, s.qfSyncComplete, s.qfSyncFailed]);
+  }, [captureAccount, db, refreshQfStatus, s.qfFinishConnection, s.qfNeedsReauth, s.qfSyncComplete, s.qfSyncFailed]);
 
   const openIssueReporter = useCallback(() => {
     Linking.openURL("https://github.com/71iq/Hafiz/issues").catch((e) => {
@@ -348,23 +401,15 @@ export default function SettingsScreen() {
     [router],
   );
 
-  const handleTafseerSourceSelect = useCallback(
-    async (sourceId: TafsirSourceId) => {
-      if (importingTafseerSource) return false;
-      setImportingTafseerSource(sourceId);
-      try {
-        await ensureTafsirSourceImported(db, sourceId);
-        setTafseerSource(sourceId);
-        return true;
-      } catch (err) {
-        console.warn("[Settings] Failed to import tafsir source:", err);
-        setToast(s.tafseerSourceImportFailed);
-        return false;
-      } finally {
-        setImportingTafseerSource(null);
-      }
+  const handleTafsirSelectionError = useCallback(
+    (error: unknown) => {
+      console.warn("[Settings] Failed to import tafsir source:", error);
+      showNotice(s.tafseerSourceImportFailed);
     },
-    [db, importingTafseerSource, s.tafseerSourceImportFailed, setTafseerSource],
+    [s.tafseerSourceImportFailed, showNotice],
+  );
+  const { importingSource: importingTafseerSource, selectSource: handleTafseerSourceSelect } = useTafsirSourceSelection(
+    { db, onSelected: setTafseerSource, onError: handleTafsirSelectionError },
   );
 
   const categoryPanels = (
@@ -495,7 +540,10 @@ export default function SettingsScreen() {
                     </Text>
                   )}
                 </View>
-                <SettingsStepper
+                <ReadingStepper
+                  variant="pill"
+                  decrementLabel={s.decreaseArabicFontSize}
+                  incrementLabel={s.increaseArabicFontSize}
                   value={`${fontSizeLevelLabel}/${fontSizeTotalLabel}`}
                   onDecrement={() => setFontSizeIndex(fontSizeIndex - 1)}
                   onIncrement={() => setFontSizeIndex(fontSizeIndex + 1)}
@@ -1189,75 +1237,6 @@ function ContentSettingsRow({
 
 function getInlineValueDirection(value: string): "rtl" | "ltr" {
   return /[\u0600-\u06FF]/.test(value) ? "rtl" : "ltr";
-}
-
-function SettingsStepper({
-  value,
-  onDecrement,
-  onIncrement,
-  decrementDisabled,
-  incrementDisabled,
-  isDark,
-  isRTL,
-  compact = false,
-}: {
-  value: string;
-  onDecrement: () => void;
-  onIncrement: () => void;
-  decrementDisabled: boolean;
-  incrementDisabled: boolean;
-  isDark: boolean;
-  isRTL: boolean;
-  compact?: boolean;
-}) {
-  const iconColor = isDark ? "#d4d4d4" : "#6e5a47";
-  const buttonSize = compact ? 30 : 36;
-  const valueMinWidth = compact ? 42 : 64;
-  const iconSize = compact ? 15 : 17;
-  return (
-    <View
-      className="self-start rounded-full bg-surface-high dark:bg-surface-dark-high p-1"
-      style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
-    >
-      <Pressable
-        onPress={onDecrement}
-        disabled={decrementDisabled}
-        className="items-center justify-center rounded-full"
-        style={({ pressed }) => ({
-          height: buttonSize,
-          opacity: decrementDisabled ? 0.35 : pressed ? 0.68 : 1,
-          transform: [{ scale: pressed && !decrementDisabled ? 0.96 : 1 }],
-          width: buttonSize,
-        })}
-      >
-        <Minus size={iconSize} color={iconColor} />
-      </Pressable>
-      <View
-        className="items-center justify-center"
-        style={{ minWidth: valueMinWidth, paddingHorizontal: compact ? 8 : 12 }}
-      >
-        <Text
-          className="text-charcoal dark:text-neutral-100"
-          style={{ fontFamily: "Manrope_700Bold", fontSize: compact ? 13 : 14 }}
-        >
-          {value}
-        </Text>
-      </View>
-      <Pressable
-        onPress={onIncrement}
-        disabled={incrementDisabled}
-        className="items-center justify-center rounded-full"
-        style={({ pressed }) => ({
-          height: buttonSize,
-          opacity: incrementDisabled ? 0.35 : pressed ? 0.68 : 1,
-          transform: [{ scale: pressed && !incrementDisabled ? 0.96 : 1 }],
-          width: buttonSize,
-        })}
-      >
-        <Plus size={iconSize} color={iconColor} />
-      </Pressable>
-    </View>
-  );
 }
 
 function SectionLabel({ children }: { children: string }) {

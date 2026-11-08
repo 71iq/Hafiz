@@ -1,3 +1,4 @@
+import { OperationNoticeOverlay } from "@/components/ui/OperationNoticeProvider";
 import { useEffect, useMemo, useRef, type Ref, type RefObject } from "react";
 import {
   Animated,
@@ -17,6 +18,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { useUIDirection, type Direction } from "@/lib/ui/direction";
 import { useSettings } from "@/lib/settings/context";
+import { useReducedMotionPreference } from "@/lib/ui/reduced-motion";
 import { cn } from "@/lib/utils";
 
 type OverlayPresentation = "sheet" | "dialog" | "fullscreen";
@@ -126,6 +128,7 @@ export function ResponsiveOverlay({
   const { width, height } = useWindowDimensions();
   const { themeSurface } = useSettings();
   const dir = useUIDirection(explicitDir);
+  const reduceMotion = useReducedMotionPreference();
   const animation = useRef(new Animated.Value(0)).current;
   const overlayId = useRef(`overlay-${Math.random().toString(36).slice(2)}`).current;
   const isPhone = width < SIDEBAR_BREAKPOINT;
@@ -143,12 +146,16 @@ export function ResponsiveOverlay({
   }, [open, overlayId]);
 
   useEffect(() => {
+    if (reduceMotion) {
+      animation.setValue(open ? 1 : 0);
+      return;
+    }
     Animated.timing(animation, {
       toValue: open ? 1 : 0,
       duration: open ? 220 : 180,
       useNativeDriver: true,
     }).start();
-  }, [animation, open]);
+  }, [animation, open, reduceMotion]);
 
   useEffect(() => {
     if (!open || Platform.OS !== "web" || typeof window === "undefined" || !dismissOnEscape) return;
@@ -214,16 +221,13 @@ export function ResponsiveOverlay({
                 }),
               },
             ]
-          : [
-              { scale: animation.interpolate({ inputRange: [0, 1], outputRange: [0.97, 1] }) },
-            ],
+          : [{ scale: animation.interpolate({ inputRange: [0, 1], outputRange: [0.97, 1] }) }],
       opacity: animation,
     }),
-    [activePresentation, animation, computedMaxHeight, contentWidth, isPhone, resolvedSurfaceColor]
+    [activePresentation, animation, computedMaxHeight, contentWidth, isPhone, resolvedSurfaceColor],
   );
 
-  const overlayAlignment =
-    activePresentation === "sheet" ? "items-stretch justify-end" : "items-center justify-center";
+  const overlayAlignment = activePresentation === "sheet" ? "items-stretch justify-end" : "items-center justify-center";
   const Container = avoidKeyboard ? KeyboardAvoidingView : View;
 
   return (
@@ -241,13 +245,14 @@ export function ResponsiveOverlay({
         <Animated.View
           className={cn(
             "overflow-hidden bg-surface dark:bg-surface-dark shadow-2xl",
-            activePresentation === "sheet" ? "rounded-t-[28px]" : "rounded-[28px]"
+            activePresentation === "sheet" ? "rounded-t-[28px]" : "rounded-[28px]",
           )}
           style={[contentStyle, { direction: dir }]}
         >
           {children}
         </Animated.View>
       </Container>
+      <OperationNoticeOverlay overlayId={overlayId} open={open} />
     </Modal>
   );
 }
@@ -289,7 +294,7 @@ export function OverlayHeader({
           style={{ direction: "ltr" }}
         >
           {leading ? <View>{leading}</View> : null}
-          {(title || subtitle) ? (
+          {title || subtitle ? (
             <View className={cn("min-w-0 flex-1", isRTL ? "items-end" : "items-start")}>
               {title ? (
                 <Text
@@ -373,11 +378,13 @@ export function OverlayFooter({ children, dir: explicitDir, isRTL: explicitIsRTL
       className={cn(
         "border-t border-warm-200 dark:border-neutral-800 px-5 pt-4",
         isRTL ? "items-end" : "items-start",
-        className
+        className,
       )}
       style={{ paddingBottom: Math.max(insets.bottom, 12) }}
     >
-      <View className={cn("w-full gap-3", isRTL ? "flex-row-reverse" : "flex-row")} style={{ direction: "ltr" }}>{children}</View>
+      <View className={cn("w-full gap-3", isRTL ? "flex-row-reverse" : "flex-row")} style={{ direction: "ltr" }}>
+        {children}
+      </View>
     </View>
   );
 }

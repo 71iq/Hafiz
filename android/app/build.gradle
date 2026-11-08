@@ -3,6 +3,9 @@ apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
 def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
+// QA builds (-PhafizQa=true) install beside the real app and package a JS bundle built separately by
+// scripts/android-qa-build.sh, so Metro, Hermes and Gradle each run in their own 6 GiB scope.
+def hafizQa = findProperty('hafizQa') == 'true'
 
 /**
  * This is the configuration block to customize your React Native Android app.
@@ -33,6 +36,9 @@ react {
     //   skip the bundling of the JS bundle and the assets. By default is just 'debug'.
     //   If you add flavors like lite, prod, etc. you'll have to list your debuggableVariants.
     // debuggableVariants = ["liteDebug", "prodDebug"]
+    if (hafizQa) {
+        debuggableVariants = ["debug", "release"]
+    }
 
     /* Bundling */
     //   A list containing the node command and its flags. Default is just 'node'.
@@ -94,6 +100,9 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0.0"
+        if (hafizQa) {
+            applicationIdSuffix '.qa'
+        }
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }
@@ -104,6 +113,13 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+    }
+    if (hafizQa) {
+        if (!file("$buildDir/hafiz-qa-bundle/assets/index.android.bundle").exists()) {
+            throw new GradleException("QA builds package a prebuilt bundle: run scripts/android-qa-build.sh")
+        }
+        sourceSets.release.assets.srcDirs += "$buildDir/hafiz-qa-bundle/assets"
+        sourceSets.release.res.srcDirs += "$buildDir/hafiz-qa-bundle/res"
     }
     buildTypes {
         debug {

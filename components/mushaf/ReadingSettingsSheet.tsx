@@ -1,12 +1,13 @@
+import { useOperationNotice } from "@/components/ui/OperationNoticeProvider";
 import { useCallback, useMemo, useState } from "react";
 import { ActivityIndicator, Platform, Pressable, Text, View, useWindowDimensions } from "react-native";
-import { Check, ChevronLeft, ChevronRight, Minus, Plus, X } from "lucide-react-native";
+import { Check, ChevronLeft, ChevronRight, X } from "lucide-react-native";
 import { TafsirSourcePicker } from "@/components/settings/TafsirSourcePicker";
 import { OverlayBody, ResponsiveOverlay } from "@/components/ui/ResponsiveOverlay";
 import { Switch } from "@/components/ui/Switch";
-import { Toast } from "@/components/ui/Toast";
+import { ReadingStepper } from "@/components/settings/ReadingStepper";
 import { ThemeColorSwatch } from "@/components/ui/ThemeColorSwatch";
-import { ensureTafsirSourceImported } from "@/lib/database/init";
+import { useTafsirSourceSelection } from "@/lib/settings/use-tafsir-source-selection";
 import { useDatabase } from "@/lib/database/provider";
 import { toArabicNumber } from "@/lib/arabic";
 import { stringByKey, useStrings } from "@/lib/i18n/useStrings";
@@ -14,11 +15,10 @@ import type { UIStrings } from "@/lib/i18n/strings";
 import {
   FONT_SIZE_STEPS,
   useSettings,
-  type QuranFontStyle,
   type QuranMarkerStyle,
   type ThemeMode,
 } from "@/lib/settings/context";
-import { AVAILABLE_TAFSIR_SOURCES, type TafsirSourceId } from "@/lib/tafsir/sources";
+import { AVAILABLE_TAFSIR_SOURCES } from "@/lib/tafsir/sources";
 
 type Props = {
   visible: boolean;
@@ -44,6 +44,7 @@ export function ReadingSettingsSheet({
 }: Props) {
   const db = useDatabase();
   const s = useStrings();
+  const showNotice = useOperationNotice();
   const { width } = useWindowDimensions();
   const {
     theme,
@@ -64,8 +65,6 @@ export function ReadingSettingsSheet({
   const [fontPickerVisible, setFontPickerVisible] = useState(false);
   const [markerStylePickerVisible, setMarkerStylePickerVisible] = useState(false);
   const [tafseerPickerVisible, setTafseerPickerVisible] = useState(false);
-  const [importingTafseerSource, setImportingTafseerSource] = useState<TafsirSourceId | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
   const Chevron = isRTL ? ChevronLeft : ChevronRight;
   const controlColor = isDark ? "#a3a3a3" : "#7C6A58";
   const accentColor = isDark ? DARK_ACCENT : ACCENT;
@@ -128,24 +127,17 @@ export function ReadingSettingsSheet({
     [fontSizeLocked, onFontSizeChangeStart, setFontSizeIndex]
   );
 
-  const handleTafseerSourceSelect = useCallback(
-    async (sourceId: TafsirSourceId) => {
-      if (importingTafseerSource) return false;
-      setImportingTafseerSource(sourceId);
-      try {
-        await ensureTafsirSourceImported(db, sourceId);
-        setTafseerSource(sourceId);
-        return true;
-      } catch (err) {
-        console.warn("[ReadingSettingsSheet] Failed to import tafsir source:", err);
-        setToast(s.tafseerSourceImportFailed);
-        return false;
-      } finally {
-        setImportingTafseerSource(null);
-      }
+  const handleTafsirSelectionError = useCallback(
+    (error: unknown) => {
+      console.warn("[ReadingSettingsSheet] Failed to import tafsir source:", error);
+      showNotice(s.tafseerSourceImportFailed);
     },
-    [db, importingTafseerSource, s.tafseerSourceImportFailed, setTafseerSource]
+    [s.tafseerSourceImportFailed, showNotice],
   );
+  const {
+    importingSource: importingTafseerSource,
+    selectSource: handleTafseerSourceSelect,
+  } = useTafsirSourceSelection({ db, onSelected: setTafseerSource, onError: handleTafsirSelectionError });
 
   return (
     <>
@@ -237,7 +229,10 @@ export function ReadingSettingsSheet({
               isRTL={isRTL}
               compact={compactRows}
               trailing={
-                <SettingsStepper
+                <ReadingStepper
+                  variant="sheet"
+                  decrementLabel={s.decreaseArabicFontSize}
+                  incrementLabel={s.increaseArabicFontSize}
                   value={`${fontSizeLevelLabel} / ${fontSizeTotalLabel}`}
                   onDecrement={() => handleFontSizeChange(fontSizeIndex - 1)}
                   onIncrement={() => handleFontSizeChange(fontSizeIndex + 1)}
@@ -330,7 +325,6 @@ export function ReadingSettingsSheet({
         onClose={() => setTafseerPickerVisible(false)}
         helperText={s.tafseerDownloadHint}
       />
-      <Toast message={toast} onDismiss={() => setToast(null)} />
     </>
   );
 }
@@ -486,68 +480,6 @@ function SettingsActionRow({
 
 function Divider() {
   return <View className="h-px bg-warm-200/45 dark:bg-neutral-800/80" />;
-}
-
-function SettingsStepper({
-  value,
-  onDecrement,
-  onIncrement,
-  decrementDisabled,
-  incrementDisabled,
-  isDark,
-  isRTL,
-  compact = false,
-}: {
-  value: string;
-  onDecrement: () => void;
-  onIncrement: () => void;
-  decrementDisabled: boolean;
-  incrementDisabled: boolean;
-  isDark: boolean;
-  isRTL: boolean;
-  compact?: boolean;
-}) {
-  const iconColor = isDark ? "#d4d4d4" : "#6E6258";
-  const buttonSizeClass = compact ? "h-8 w-8" : "h-8 w-8";
-  return (
-    <View
-      className="rounded-lg border border-warm-200/40 bg-surface-low/60 p-0.5 dark:border-neutral-800 dark:bg-surface-dark-high/70"
-      style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
-    >
-      <Pressable
-        onPress={onDecrement}
-        disabled={decrementDisabled}
-        className={`${buttonSizeClass} items-center justify-center rounded-full`}
-        style={({ pressed }) => ({
-          opacity: decrementDisabled ? 0.35 : pressed ? 0.68 : 1,
-          transform: [{ scale: pressed && !decrementDisabled ? 0.96 : 1 }],
-          cursor: Platform.OS === "web" ? (decrementDisabled ? "auto" : "pointer") : undefined,
-        })}
-      >
-        <Minus size={15} color={iconColor} />
-      </Pressable>
-      <View className={`${compact ? "min-w-11" : "min-w-12"} items-center justify-center px-1`}>
-        <Text
-          className="text-charcoal dark:text-neutral-100"
-          style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12.5 }}
-        >
-          {value}
-        </Text>
-      </View>
-      <Pressable
-        onPress={onIncrement}
-        disabled={incrementDisabled}
-        className={`${buttonSizeClass} items-center justify-center rounded-full`}
-        style={({ pressed }) => ({
-          opacity: incrementDisabled ? 0.35 : pressed ? 0.68 : 1,
-          transform: [{ scale: pressed && !incrementDisabled ? 0.96 : 1 }],
-          cursor: Platform.OS === "web" ? (incrementDisabled ? "auto" : "pointer") : undefined,
-        })}
-      >
-        <Plus size={15} color={iconColor} />
-      </Pressable>
-    </View>
-  );
 }
 
 function ChoiceDialog<T extends string>({

@@ -1,0 +1,590 @@
+import importlib.util
+import json
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+import unittest
+from unittest.mock import patch
+
+SPEC = importlib.util.spec_from_file_location('control', Path(__file__).resolve().parents[1] / 'control.py')
+control = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(control)
+
+
+def task(task_id='T1', status='pending', dependencies=None):
+    return {'id': task_id, 'title': 'Simplify fixture', 'status': status, 'approved': True,
+            'dependencies': dependencies or [], 'allowed_paths': ['fixture.txt'],
+            'verification': [[sys.executable, '-c', 'print("verified fixture")']]}
+
+
+class SelectionTests(unittest.TestCase):
+    def test_waits_for_verified_dependencies(self):
+        first = task()
+        second = task('T2', dependencies=['T1'])
+        self.assertIs(control.select_task([first, second]), first)
+        first['status'] = 'verified'
+        self.assertIs(control.select_task([first, second]), second)
+
+    def test_recovers_unfinished_task_before_new_work(self):
+        active = task('T2', status='retry')
+        self.assertIs(control.select_task([task(), active]), active)
+
+    def test_ignores_unapproved_and_blocked_tasks(self):
+        first = task()
+        first['approved'] = False
+        self.assertIsNone(control.select_task([first, task('T2', status='blocked')]))
+
+    def test_scope_does_not_override_protected_paths(self):
+        broad = task()
+        broad['allowed_paths'] = ['*']
+        for path in ['assets/data/quran.db', 'supabase/schema.sql', 'android/app/build.gradle',
+                     'AGENTS.md', '.env.local', 'scripts/ralph/control.py', '.github/workflows/a.yml']:
+            with self.subTest(path=path):
+                self.assertFalse(control.path_allowed(path, broad))
+        self.assertTrue(control.path_allowed('lib/example.ts', broad))
+
+    def test_dynamic_route_brackets_match_literal_paths(self):
+        dynamic = task()
+        dynamic['allowed_paths'] = ['app/profile/[userId].tsx']
+        self.assertTrue(control.path_allowed('app/profile/[userId].tsx', dynamic))
+        self.assertFalse(control.path_allowed('app/profile/u.tsx', dynamic))
+        dynamic['allowed_paths'] = ['app/*/[userId].tsx']
+        self.assertTrue(control.path_allowed('app/profile/[userId].tsx', dynamic))
+        self.assertFalse(control.path_allowed('app/profile/u.tsx', dynamic))
+
+    def test_staged_protected_rename_source_is_denied(self):
+        candidate = task()
+        candidate['allowed_paths'] = ['lib/new.ts']
+        self.assertFalse(control.path_allowed('assets/data/old.ts', candidate))
+        self.assertTrue(control.path_allowed('lib/new.ts', candidate))
+
+
+class GeneratorPromptTests(unittest.TestCase):
+    def test_default_prompt_keeps_full_implementation_guidance_and_commands(self):
+        candidate = task()
+        candidate['verification'] = [['fixture-verification-sentinel']]
+        prompt = control.generator_prompt(candidate)
+        self.assertIn('Inspect callers and tests', prompt)
+        self.assertIn('adaptive-coding engineering guided', prompt)
+        self.assertIn('fixture-verification-sentinel', prompt)
+        self.assertNotIn('Frozen artifact copy-only handoff', prompt)
+
+    def test_copy_only_prompt_delegates_checks_without_engineering_guided_work(self):
+        candidate = task()
+        candidate['implementation_mode'] = 'copy-only'
+        candidate['verification'] = [['fixture-verification-sentinel']]
+        original = json.loads(json.dumps(candidate))
+        prompt = control.generator_prompt(candidate)
+        self.assertIn('Frozen artifact copy-only handoff', prompt)
+        self.assertIn('Do not run verification, hash, transform or case-count checks', prompt)
+        self.assertIn('Do not dump source or test files', prompt)
+        self.assertIn('All verification remains pending with the controller', prompt)
+        self.assertIn('controller_verification_command_count', prompt)
+        self.assertNotIn('fixture-verification-sentinel', prompt)
+        self.assertNotIn('Inspect callers and tests', prompt)
+        self.assertNotIn('adaptive-coding engineering guided', prompt)
+        self.assertEqual(candidate, original)
+
+    def test_unknown_mode_does_not_silently_fall_back(self):
+        candidate = task()
+        candidate['implementation_mode'] = 'copy-and-test'
+        with self.assertRaisesRegex(control.InvariantError, 'Unsupported implementation mode'):
+            control.generator_prompt(candidate)
+
+
+class IterationTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.state = self.root / '.ralph'
+        self.docs = self.root / 'docs/refactoring'
+        self.docs.mkdir(parents=True)
+        self.state.mkdir()
+        self.backlog = self.docs / 'backlog.json'
+        self.config = self.root / 'config.json'
+        self.config.write_text(json.dumps({'max_attempts': 2, 'batch_seconds': 30, 'session_seconds': 5}))
+        (self.root / '.gitignore').write_text('.ralph/\nstop.md\n')
+        (self.root / 'fixture.txt').write_text('before\n')
+        (self.docs / 'PROGRESS.md').write_text('# Progress\n')
+        self.backlog.write_text(json.dumps({'tasks': [task()]}))
+        self.git('init', '-q')
+        self.git('config', 'user.name', 'Fixture')
+        self.git('config', 'user.email', 'fixture@example.invalid')
+        self.git('config', 'commit.gpgsign', 'false')
+        self.git('add', '.')
+        self.git('commit', '-qm', 'fixture baseline')
+        self.patch = patch.multiple(control, ROOT=self.root, STATE=self.state, BACKLOG=self.backlog,
+                                    CONFIG=self.config, STOP=self.root / 'stop.md')
+        self.patch.start()
+        self.addCleanup(self.patch.stop)
+        control.write_json(self.state / 'smoke-passed.json', {'passed': True})
+        control.write_json(self.state / 'batch.json', {'started_epoch': control.time.time(), 'tokens': 0})
+
+    def git(self, *args):
+        return subprocess.check_output(['git', *args], cwd=self.root, text=True).strip()
+
+    def current_task(self):
+        return control.read_json(self.backlog)['tasks'][0]
+
+    def generate(self, *_args, **_kwargs):
+        (self.root / 'fixture.txt').write_text('after\n')
+        return {'status': 'implemented', 'summary': 'Fixture simplified', 'evidence': []}
+
+    def test_copy_only_review_requires_original_generator_log_compliance(self):
+        data = control.read_json(self.backlog)
+        data['tasks'][0]['implementation_mode'] = 'copy-only'
+        control.write_json(self.backlog, data)
+        self.git('add', '.')
+        self.git('commit', '-qm', 'copy-only fixture')
+        prompts = []
+        def run_agent(*args, **kwargs):
+            prompts.append((args[0], kwargs.get('readonly', False)))
+            return {'verdict': 'pass', 'findings': []} if kwargs.get('readonly') else self.generate()
+        with patch('sys.stdin.read', return_value='prompt'), patch.object(control, 'agent', side_effect=run_agent):
+            control.iteration()
+        self.assertEqual(self.current_task()['status'], 'verified')
+        self.assertIn('Frozen artifact copy-only handoff', prompts[0][0])
+        review = next(prompt for prompt, readonly in prompts if readonly)
+        self.assertIn('generator.jsonl', review)
+        self.assertIn('Reject prohibited generator-side checks or full source/test dumps', review)
+        self.assertIn('Required instruction and readiness/reuse reads are allowed', review)
+
+    def test_unknown_mode_is_rejected_before_task_state_changes(self):
+        data = control.read_json(self.backlog)
+        data['tasks'][0]['implementation_mode'] = 'copy-and-test'
+        control.write_json(self.backlog, data)
+        before = self.backlog.read_bytes()
+        with patch('sys.stdin.read', return_value='prompt'), patch.object(control, 'agent') as agent:
+            with self.assertRaisesRegex(control.InvariantError, 'Unsupported implementation mode'):
+                control.iteration()
+        self.assertEqual(self.backlog.read_bytes(), before)
+        agent.assert_not_called()
+
+    def test_success_requires_commands_and_review_before_commit(self):
+        def run_agent(*args, **kwargs):
+            return {'verdict': 'pass', 'findings': []} if kwargs.get('readonly') else self.generate()
+        with patch('sys.stdin.read', return_value='prompt'), patch.object(control, 'agent', side_effect=run_agent):
+            control.iteration()
+        self.assertEqual(self.current_task()['status'], 'verified')
+        self.assertTrue(self.git('log', '-1', '--format=%s').startswith('T1:'))
+        self.assertEqual(self.git('status', '--porcelain'), '')
+        evidence = self.root / self.current_task()['evidence']
+        self.assertEqual(control.read_json(evidence / 'verification.json')[0]['exit'], 0)
+
+    def test_rejected_review_preserves_diff_and_exhausts_after_two_attempts(self):
+        head = self.git('rev-parse', 'HEAD')
+        def run_agent(*args, **kwargs):
+            return {'verdict': 'fail', 'findings': ['Missing regression case']} if kwargs.get('readonly') else self.generate()
+        for expected in ['retry', 'blocked']:
+            with patch('sys.stdin.read', return_value='prompt'), patch.object(control, 'agent', side_effect=run_agent):
+                with self.assertRaisesRegex(RuntimeError, 'Independent review failed'):
+                    control.iteration()
+            self.assertEqual(self.current_task()['status'], expected)
+            self.assertEqual(self.git('rev-parse', 'HEAD'), head)
+            self.assertEqual((self.root / 'fixture.txt').read_text(), 'after\n')
+        self.assertTrue((self.root / 'stop.md').exists())
+
+    def test_failed_command_cannot_be_marked_verified(self):
+        data = control.read_json(self.backlog)
+        data['tasks'][0]['verification'] = [[sys.executable, '-c', 'raise SystemExit(7)']]
+        control.write_json(self.backlog, data)
+        self.git('add', '.')
+        self.git('commit', '-qm', 'failing verification fixture')
+        with patch('sys.stdin.read', return_value='prompt'), patch.object(control, 'agent', side_effect=self.generate):
+            with self.assertRaisesRegex(RuntimeError, 'Verification failed'):
+                control.iteration()
+        self.assertEqual(self.current_task()['status'], 'retry')
+
+    def test_out_of_scope_change_stops_before_review(self):
+        def generate(*_args, **_kwargs):
+            (self.root / 'unrelated.txt').write_text('keep for inspection')
+            return {'status': 'implemented', 'summary': 'bad scope', 'evidence': []}
+        with patch('sys.stdin.read', return_value='prompt'), patch.object(control, 'agent', side_effect=generate) as agent:
+            with self.assertRaisesRegex(RuntimeError, 'paths invalid'):
+                control.iteration()
+            self.assertEqual(agent.call_count, 1)
+        self.assertTrue((self.root / 'unrelated.txt').exists())
+
+    def test_high_reported_usage_does_not_block_verification_review_or_commit(self):
+        control.write_json(self.state / 'batch.json', {'started_epoch': control.time.time(), 'tokens': 600001})
+        def run_agent(*args, **kwargs):
+            return {'verdict': 'pass', 'findings': []} if kwargs.get('readonly') else self.generate()
+        with patch('sys.stdin.read', return_value='prompt'), patch.object(control, 'agent', side_effect=run_agent) as agent:
+            control.iteration()
+        self.assertEqual(agent.call_count, 2)
+        self.assertTrue(agent.call_args.kwargs['readonly'])
+        self.assertEqual(self.current_task()['status'], 'verified')
+        evidence = self.root / self.current_task()['evidence']
+        self.assertEqual(control.read_json(evidence / 'verification.json')[0]['exit'], 0)
+        self.assertEqual(self.git('show', 'HEAD:fixture.txt'), 'after')
+
+    def test_crossing_former_token_limit_during_generation_still_requires_review(self):
+        def run_agent(*args, **kwargs):
+            if kwargs.get('readonly'):
+                return {'verdict': 'pass', 'findings': []}
+            result = self.generate()
+            batch = control.read_json(self.state / 'batch.json')
+            batch['tokens'] = 1200000
+            control.write_json(self.state / 'batch.json', batch)
+            return result
+        with patch('sys.stdin.read', return_value='prompt'), patch.object(control, 'agent', side_effect=run_agent) as agent:
+            control.iteration()
+        self.assertEqual(agent.call_count, 2)
+        self.assertTrue(agent.call_args.kwargs['readonly'])
+        self.assertEqual(self.current_task()['status'], 'verified')
+        self.assertEqual(control.read_json(self.state / 'batch.json')['tokens'], 1200000)
+
+    def test_unknown_usage_preserves_reported_total_and_does_not_block_admission(self):
+        control.write_json(self.state / 'batch.json', {'started_epoch': control.time.time(), 'tokens': 123})
+        control.account_tokens(self.state / 'missing.jsonl')
+        batch = control.read_json(self.state / 'batch.json')
+        self.assertTrue(batch['usage_unknown'])
+        self.assertEqual(batch['tokens'], 123)
+        self.assertGreater(control.remaining_seconds(control.read_json(self.config)), 0)
+
+    def test_incomplete_completed_turn_usage_remains_unknown_and_allows_admission(self):
+        packets = [None, {}, {'input_tokens': 7}, {'output_tokens': 3},
+                   {'input_tokens': True, 'output_tokens': 3},
+                   {'input_tokens': -1, 'output_tokens': 3},
+                   {'input_tokens': '7', 'output_tokens': 3}]
+        logfile = self.state / 'partial.jsonl'
+        for usage in packets:
+            with self.subTest(usage=usage):
+                control.write_json(self.state / 'batch.json', {'started_epoch': control.time.time(), 'tokens': 123})
+                event = {'type': 'turn.completed'}
+                if usage is not None:
+                    event['usage'] = usage
+                logfile.write_text(json.dumps(event) + '\n')
+                control.account_tokens(logfile)
+                batch = control.read_json(self.state / 'batch.json')
+                self.assertTrue(batch['usage_unknown'])
+                self.assertEqual(batch['tokens'], 123)
+                self.assertGreater(control.remaining_seconds(control.read_json(self.config)), 0)
+
+    def test_partial_session_preserves_known_turn_totals_without_claiming_complete_usage(self):
+        completed = {'type': 'turn.completed', 'usage': {'input_tokens': 7, 'output_tokens': 3}}
+        suffixes = [[{'type': 'turn.failed', 'error': {'message': 'interrupted'}}],
+                    [{'type': 'turn.started'}], [{'type': 'turn.completed', 'usage': {}}]]
+        logfile = self.state / 'partial-session.jsonl'
+        for suffix in suffixes:
+            with self.subTest(suffix=suffix):
+                control.write_json(self.state / 'batch.json', {'started_epoch': control.time.time(), 'tokens': 123})
+                logfile.write_text(''.join(json.dumps(event) + '\n' for event in [completed, *suffix]))
+                control.account_tokens(logfile)
+                batch = control.read_json(self.state / 'batch.json')
+                self.assertTrue(batch['usage_unknown'])
+                self.assertEqual(batch['tokens'], 133)
+                self.assertGreater(control.remaining_seconds(control.read_json(self.config)), 0)
+
+    def test_valid_zero_and_positive_usage_accumulate_without_unknown_marker(self):
+        logfile = self.state / 'valid-session.jsonl'
+        logfile.write_text(''.join(json.dumps({'type': 'turn.completed', 'usage': usage}) + '\n' for usage in
+                                  [{'input_tokens': 0, 'output_tokens': 0}, {'input_tokens': 7, 'output_tokens': 3}]))
+        control.account_tokens(logfile)
+        batch = control.read_json(self.state / 'batch.json')
+        self.assertEqual(batch['tokens'], 10)
+        self.assertFalse(batch.get('usage_unknown', False))
+
+    def test_exhausted_batch_does_not_spend_task_attempt(self):
+        control.write_json(self.state / 'batch.json', {'started_epoch': control.time.time() - 31, 'tokens': 0})
+        with patch('sys.stdin.read', return_value='prompt'), patch.object(control, 'agent') as agent:
+            control.iteration()
+            agent.assert_not_called()
+        self.assertEqual(self.current_task()['status'], 'pending')
+        self.assertEqual(self.current_task().get('attempts', 0), 0)
+        self.assertTrue((self.root / 'stop.md').exists())
+
+    def test_review_budget_limit_preserves_retry_without_spending_attempt(self):
+        def run_agent(*args, **kwargs):
+            if kwargs.get('readonly'):
+                raise control.BatchLimit('Batch resource limit reached')
+            return self.generate()
+        with patch('sys.stdin.read', return_value='prompt'), patch.object(control, 'agent', side_effect=run_agent):
+            control.iteration()
+        self.assertEqual(self.current_task()['status'], 'retry')
+        self.assertEqual(self.current_task()['attempts'], 0)
+        self.assertEqual((self.root / 'fixture.txt').read_text(), 'after\n')
+
+    def test_review_account_limit_preserves_generation_and_requires_fresh_checks_and_review(self):
+        config = control.read_json(self.config)
+        config.update({'model': 'fixture', 'reasoning_effort': 'low'})
+        control.write_json(self.config, config)
+        backlog = control.read_json(self.backlog)
+        backlog['tasks'][0]['verification'] = [[sys.executable, '-c',
+            'from pathlib import Path; p=Path(".ralph/check-runs"); '
+            'p.write_text((p.read_text() if p.exists() else "") + "ran\\n")']]
+        control.write_json(self.backlog, backlog)
+        self.git('add', '.')
+        self.git('commit', '-qm', 'account limit fixture')
+        head = self.git('rev-parse', 'HEAD')
+        original_run = control.run_process
+        roles = []
+
+        def run(argv, logfile, timeout, **kwargs):
+            if logfile.suffix != '.jsonl':
+                return original_run(argv, logfile, timeout, **kwargs)
+            role = logfile.stem
+            roles.append(role)
+            if role == 'review' and roles.count('review') == 1:
+                logfile.write_text(json.dumps({'type': 'turn.failed', 'error': {
+                    'message': "You\u2019ve hit your usage limit. Try again later."}}) + '\n')
+                return 1
+            result = self.generate() if role == 'generator' else {'verdict': 'pass', 'findings': []}
+            Path(argv[argv.index('--output-last-message') + 1]).write_text(json.dumps(result))
+            logfile.write_text(json.dumps({'type': 'turn.completed', 'usage': {'input_tokens': 1, 'output_tokens': 0}}) + '\n')
+            return 0
+
+        with patch('sys.stdin.read', return_value='prompt'), patch.object(control, 'run_process', side_effect=run):
+            control.iteration()
+            self.assertEqual(self.current_task()['status'], 'retry')
+            self.assertEqual(self.current_task()['attempts'], 0)
+            self.assertEqual(self.current_task().get('resource_timeouts', 0), 0)
+            self.assertIsNotNone(control.generation_checkpoint(self.current_task()))
+            self.assertEqual(self.git('rev-parse', 'HEAD'), head)
+            batch = control.read_json(self.state / 'batch.json')
+            self.assertTrue(batch['usage_unknown'])
+            self.assertEqual(batch['tokens'], 1)
+            self.assertEqual((self.state / 'check-runs').read_text(), 'ran\n')
+            self.assertEqual((self.root / 'fixture.txt').read_text(), 'after\n')
+
+            control.write_json(self.state / 'batch.json', {'started_epoch': control.time.time(), 'tokens': 0})
+            control.iteration()
+
+        self.assertEqual(roles, ['generator', 'review', 'review'])
+        self.assertEqual((self.state / 'check-runs').read_text(), 'ran\nran\n')
+        self.assertEqual(self.current_task()['status'], 'verified')
+
+    def test_account_limit_requires_last_terminal_event_and_exact_observed_error(self):
+        logfile = self.state / 'events.jsonl'
+        limit = {'type': 'turn.failed', 'error': {'message': "You've hit your usage limit. Try later."}}
+        cases = [
+            ([limit], True),
+            ([{'type': 'error', 'message': limit['error']['message']}], False),
+            ([{'type': 'item.completed', 'item': {'output': json.dumps(limit)}}], False),
+            ([{'type': 'turn.failed', 'error': {'message': 'Required MCP server failed'}}], False),
+            ([{'type': 'turn.failed', 'error': 'unexpected error format'}], False),
+            ([limit, {'type': 'turn.completed', 'usage': {}}], False),
+            ([limit, {'type': 'turn.failed', 'error': {'message': 'Unrelated failure'}}], False),
+            ([None, [], {'type': 'turn.failed', 'error': {'message': None}}], False),
+        ]
+        for events, expected in cases:
+            with self.subTest(events=events):
+                logfile.write_text('not JSON\n' + '\n'.join(json.dumps(event) for event in events) + '\n')
+                self.assertEqual(control.account_limit_reached(logfile), expected)
+
+    def test_command_timeout_preserves_generation_and_reruns_checks_before_review(self):
+        config = control.read_json(self.config)
+        config['session_seconds'] = 0.3
+        control.write_json(self.config, config)
+        backlog = control.read_json(self.backlog)
+        backlog['tasks'][0]['verification'] = [
+            [sys.executable, '-c',
+             'from pathlib import Path; '
+             'p=Path(".ralph/check-runs"); '
+             'p.write_text((p.read_text() if p.exists() else "") + "ran\\n")'],
+            [sys.executable, '-c',
+             'from pathlib import Path; import time; '
+             'p=Path(".ralph/slow-once"); first=not p.exists(); '
+             'p.touch(); time.sleep(2 if first else 0)'],
+        ]
+        control.write_json(self.backlog, backlog)
+        self.git('add', '.')
+        self.git('commit', '-qm', 'timeout verification fixture')
+        head = self.git('rev-parse', 'HEAD')
+
+        def run_agent(*args, **kwargs):
+            return {'verdict': 'pass', 'findings': []} if kwargs.get('readonly') else self.generate()
+
+        with patch('sys.stdin.read', return_value='prompt'), patch.object(control, 'agent', side_effect=run_agent) as agent:
+            control.iteration()
+            self.assertEqual(agent.call_count, 1)
+            self.assertEqual(self.current_task()['status'], 'retry')
+            self.assertEqual(self.current_task()['attempts'], 0)
+            self.assertEqual(self.current_task()['resource_timeouts'], 1)
+            self.assertIn('Time limit 0.3s exceeded', self.current_task()['failure'])
+            self.assertEqual(self.git('rev-parse', 'HEAD'), head)
+            self.assertEqual((self.root / 'fixture.txt').read_text(), 'after\n')
+            self.assertIsNotNone(control.generation_checkpoint(self.current_task()))
+            self.assertIsNone(control.CHILD)
+            self.assertEqual((self.state / 'check-runs').read_text(), 'ran\n')
+            interrupted = next((self.state / 'runs').iterdir())
+            self.assertEqual([entry['exit'] for entry in control.read_json(interrupted / 'verification.json')], [0])
+
+            control.write_json(self.state / 'batch.json', {'started_epoch': control.time.time(), 'tokens': 0})
+            control.iteration()
+
+        self.assertEqual(agent.call_count, 2)
+        self.assertTrue(agent.call_args.kwargs['readonly'])
+        self.assertEqual((self.state / 'check-runs').read_text(), 'ran\nran\n')
+        self.assertEqual(self.current_task()['status'], 'verified')
+        evidence = self.root / self.current_task()['evidence']
+        self.assertEqual([entry['exit'] for entry in control.read_json(evidence / 'verification.json')], [0, 0])
+
+    def test_repeated_command_timeouts_block_without_spending_implementation_attempts(self):
+        config = control.read_json(self.config)
+        config.update({'session_seconds': 0.3, 'max_resource_timeouts': 2})
+        control.write_json(self.config, config)
+        backlog = control.read_json(self.backlog)
+        backlog['tasks'][0]['verification'] = [[sys.executable, '-c', 'import time; time.sleep(2)']]
+        control.write_json(self.backlog, backlog)
+        self.git('add', '.')
+        self.git('commit', '-qm', 'repeated timeout fixture')
+        head = self.git('rev-parse', 'HEAD')
+        with patch('sys.stdin.read', return_value='prompt'), patch.object(control, 'agent', side_effect=self.generate) as agent:
+            for count, expected in [(1, 'retry'), (2, 'blocked')]:
+                control.write_json(self.state / 'batch.json', {'started_epoch': control.time.time(), 'tokens': 0})
+                control.iteration()
+                self.assertEqual(self.current_task()['status'], expected)
+                self.assertEqual(self.current_task()['resource_timeouts'], count)
+                self.assertEqual(self.current_task()['attempts'], 0)
+                self.assertEqual(self.git('rev-parse', 'HEAD'), head)
+                self.assertTrue((self.state / 'generation-checkpoint.json').exists())
+                if expected == 'retry':
+                    self.assertIsNotNone(control.generation_checkpoint(self.current_task()))
+                else:
+                    self.assertIsNone(control.generation_checkpoint(self.current_task()))
+        self.assertEqual(agent.call_count, 1)
+        self.assertTrue(control.STOP.exists())
+
+    def exhaust_after_generation(self):
+        def generate(*_args, **_kwargs):
+            result = self.generate()
+            control.write_json(self.state / 'batch.json', {'started_epoch': control.time.time() - 31, 'tokens': 0})
+            return result
+        with patch('sys.stdin.read', return_value='prompt'), patch.object(control, 'agent', side_effect=generate):
+            control.iteration()
+        self.assertEqual(self.current_task()['status'], 'retry')
+        self.assertEqual(self.current_task()['attempts'], 0)
+        control.write_json(self.state / 'batch.json', {'started_epoch': control.time.time(), 'tokens': 0})
+
+    def test_budget_resume_verifies_and_reviews_without_repeating_generation(self):
+        self.exhaust_after_generation()
+        with patch('sys.stdin.read', return_value='prompt'), patch.object(control, 'agent', return_value={'verdict': 'pass', 'findings': []}) as agent:
+            control.iteration()
+        self.assertEqual(agent.call_count, 1)
+        self.assertTrue(agent.call_args.kwargs['readonly'])
+        self.assertEqual(self.current_task()['status'], 'verified')
+        evidence = self.root / self.current_task()['evidence']
+        self.assertEqual(control.read_json(evidence / 'verification.json')[0]['exit'], 0)
+
+    def test_checkpoint_rejects_changed_candidate_specification_head_or_index(self):
+        self.exhaust_after_generation()
+        candidate = self.current_task()
+        self.assertIsNotNone(control.generation_checkpoint(candidate))
+        (self.root / 'fixture.txt').write_text('changed after checkpoint\n')
+        self.assertIsNone(control.generation_checkpoint(candidate))
+        (self.root / 'fixture.txt').write_text('after\n')
+        self.assertIsNotNone(control.generation_checkpoint(candidate))
+        changed_spec = dict(candidate, acceptance_criteria=['New mandatory criterion'])
+        self.assertIsNone(control.generation_checkpoint(changed_spec))
+        config = self.config.read_text()
+        changed_config = json.loads(config)
+        changed_config['session_seconds'] += 1
+        self.config.write_text(json.dumps(changed_config))
+        self.assertIsNone(control.generation_checkpoint(candidate))
+        self.config.write_text(config)
+        self.assertIsNotNone(control.generation_checkpoint(candidate))
+        self.git('add', 'fixture.txt')
+        self.assertIsNone(control.generation_checkpoint(candidate))
+        self.git('commit', '-qm', 'changed base')
+        self.assertIsNone(control.generation_checkpoint(candidate))
+
+    def test_rejected_review_invalidates_generation_checkpoint(self):
+        self.exhaust_after_generation()
+        with patch('sys.stdin.read', return_value='prompt'), patch.object(control, 'agent', return_value={'verdict': 'fail', 'findings': ['Missing regression case']}):
+            with self.assertRaisesRegex(RuntimeError, 'Independent review failed'):
+                control.iteration()
+        self.assertIsNone(control.generation_checkpoint(self.current_task()))
+
+    def test_changed_checkpoint_candidate_returns_to_generator(self):
+        self.exhaust_after_generation()
+        (self.root / 'fixture.txt').write_text('external edit\n')
+        def run_agent(*args, **kwargs):
+            return {'verdict': 'pass', 'findings': []} if kwargs.get('readonly') else self.generate()
+        with patch('sys.stdin.read', return_value='prompt'), patch.object(control, 'agent', side_effect=run_agent) as agent:
+            control.iteration()
+        self.assertEqual(agent.call_count, 2)
+        self.assertEqual(self.current_task()['status'], 'verified')
+
+    def test_agent_cannot_modify_checkpoint_even_on_timeout(self):
+        self.exhaust_after_generation()
+        checkpoint = self.state / 'generation-checkpoint.json'
+        directory = self.state / 'timeout-checkpoint'
+        directory.mkdir()
+        def timed_out(*_args, **_kwargs):
+            checkpoint.write_text('{}')
+            raise RuntimeError('Time limit')
+        config = control.read_json(self.config)
+        config.update({'model': 'fixture', 'reasoning_effort': 'low'})
+        with patch.object(control, 'run_process', side_effect=timed_out):
+            with self.assertRaisesRegex(control.InvariantError, 'executable configuration'):
+                control.agent('fixture prompt', control.GENERATOR_SCHEMA, directory, 'generator', config)
+
+    def test_reconciles_verified_record_without_commit(self):
+        backlog = control.read_json(self.backlog)
+        backlog['tasks'][0]['status'] = 'verified'
+        control.reconcile_status(backlog)
+        self.assertEqual(backlog['tasks'][0]['status'], 'retry')
+
+    def test_changed_paths_includes_hidden_index_changes_and_rename_sources(self):
+        (self.root / 'fixture.txt').write_text('staged\n')
+        self.git('add', 'fixture.txt')
+        (self.root / 'fixture.txt').write_text('before\n')
+        self.assertIn('fixture.txt', control.changed_paths())
+        self.git('mv', 'fixture.txt', 'renamed.txt')
+        self.assertIn('fixture.txt', control.changed_paths())
+        self.assertIn('renamed.txt', control.changed_paths())
+
+    def test_failed_verification_cannot_hide_controller_mutation(self):
+        def fail_verification(*_args):
+            (self.docs / 'PROGRESS.md').write_text('tampered')
+            raise RuntimeError('command failed')
+        with patch('sys.stdin.read', return_value='prompt'), patch.object(control, 'agent', side_effect=self.generate), patch.object(control, 'verify_commands', side_effect=fail_verification):
+            with self.assertRaisesRegex(control.InvariantError, 'Verification changed controller'):
+                control.iteration()
+        self.assertEqual(self.current_task()['status'], 'blocked')
+        self.assertTrue((self.root / 'stop.md').exists())
+
+    def test_agent_timeout_cannot_hide_runner_mutation(self):
+        (self.state / '.env').write_text('safe')
+        directory = self.state / 'timeout'
+        directory.mkdir()
+        def timed_out(*_args, **_kwargs):
+            (self.state / '.env').write_text('tampered')
+            raise RuntimeError('Time limit')
+        config = control.read_json(self.config)
+        config.update({'model': 'fixture', 'reasoning_effort': 'low'})
+        with patch.object(control, 'run_process', side_effect=timed_out):
+            with self.assertRaisesRegex(control.InvariantError, 'executable configuration'):
+                control.agent('fixture prompt', control.GENERATOR_SCHEMA, directory, 'generator', config)
+        self.assertTrue(control.read_json(self.state / 'batch.json')['usage_unknown'])
+
+    def test_worker_lease_survives_parent_descriptor_close(self):
+        import fcntl
+        lease_path = self.state / 'test.lock'
+        with lease_path.open('a') as lease:
+            fcntl.flock(lease, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            child = subprocess.Popen([sys.executable, '-c', 'import time;time.sleep(3)'], pass_fds=(lease.fileno(),))
+        try:
+            with lease_path.open('a') as competing:
+                with self.assertRaises(BlockingIOError):
+                    fcntl.flock(competing, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        finally:
+            child.terminate()
+            child.wait()
+        with lease_path.open('a') as released:
+            fcntl.flock(released, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+    def test_unrelated_dirty_work_is_never_claimed(self):
+        (self.root / 'unrelated.txt').write_text('user work')
+        with patch('sys.stdin.read', return_value='prompt'), patch.object(control, 'agent') as agent:
+            with self.assertRaisesRegex(RuntimeError, 'Unexpected checkout changes'):
+                control.iteration()
+            agent.assert_not_called()
+        self.assertEqual(self.current_task()['status'], 'pending')
+
+
+if __name__ == '__main__':
+    unittest.main()

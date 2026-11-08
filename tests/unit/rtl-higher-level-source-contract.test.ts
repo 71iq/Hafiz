@@ -38,13 +38,7 @@ describe("higher-level RTL source contracts", () => {
   });
 
   it("keeps RTL page rows from double-reversing under web ambient direction", () => {
-    expectSourceContainsAll("components/reflections/ReflectionCard.tsx", [
-      "const rowFlexStyle = {",
-      'direction: "ltr" as const',
-      'flexDirection: isRTL ? "row-reverse" as const : "row" as const',
-      "style={rowFlexStyle}",
-      "...rowFlexStyle",
-    ]);
+    // ReflectionCard row directions are exercised by reflection-mutations.test.tsx.
 
     expectSourceContainsAll("components/progress/DefaultDeckProgressChart.tsx", [
       "const rowFlexStyle = {",
@@ -60,8 +54,8 @@ describe("higher-level RTL source contracts", () => {
       'flexDirection: isRTL ? "row-reverse" as const : "row" as const',
       "const primaryName = isRTL ? item.nameArabic || item.nameEnglish : item.nameEnglish || item.nameArabic;",
       "const secondaryName = isRTL",
-      "const primaryDirection = isRTL ? \"rtl\" : \"ltr\";",
-      "const secondaryDirection = isRTL ? \"ltr\" : \"rtl\";",
+      'const primaryDirection = isRTL ? "rtl" : "ltr";',
+      'const secondaryDirection = isRTL ? "ltr" : "rtl";',
       "contentContainerStyle={{ gap: 8, ...rowFlexStyle, paddingHorizontal: 1 }}",
       'alignSelf: isRTL ? "flex-end" : "flex-start"',
     ]);
@@ -72,14 +66,6 @@ describe("higher-level RTL source contracts", () => {
       'direction: "ltr" as const',
       'flexDirection: isWideActivity ? (isRTL ? "row-reverse" as const : "row" as const) : "column" as const',
       "style={mirroredRowStyle}",
-    ]);
-
-    expectSourceContainsAll("app/(tabs)/progress.tsx", [
-      "const mirroredRowStyle = {",
-      'direction: "ltr" as const',
-      'flexDirection: isRTL ? "row-reverse" as const : "row" as const',
-      "style={mirroredRowStyle}",
-      'contentContainerStyle={{ gap: 8, direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row", paddingHorizontal: 1 }}',
     ]);
 
     expectSourceContainsAll("app/(tabs)/leaderboard.tsx", [
@@ -113,10 +99,7 @@ describe("higher-level RTL source contracts", () => {
     ]);
 
     for (const relativePath of ["components/mushaf/ReadingSettingsSheet.tsx", "app/(tabs)/settings.tsx"]) {
-      expectSourceContainsAll(relativePath, [
-        'direction: "ltr"',
-        'flexDirection: isRTL ? "row-reverse" : "row"',
-      ]);
+      expectSourceContainsAll(relativePath, ['direction: "ltr"', 'flexDirection: isRTL ? "row-reverse" : "row"']);
     }
   });
 

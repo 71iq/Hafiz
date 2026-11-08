@@ -2,6 +2,7 @@ import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import { Modal, Platform, Pressable, Text, View, useWindowDimensions } from "react-native";
 import { MoreHorizontal } from "lucide-react-native";
 import { useSettings } from "@/lib/settings/context";
+import { useReducedMotionPreference } from "@/lib/ui/reduced-motion";
 import { cn } from "@/lib/utils";
 
 export type DropdownMenuItem = {
@@ -45,6 +46,7 @@ export function DropdownMenu({
   const { height, width: viewportWidth } = useWindowDimensions();
   const triggerRef = useRef<View>(null);
   const { isDark, isRTL: settingsIsRTL, themeColors } = useSettings();
+  const reduceMotion = useReducedMotionPreference();
   const isRTL = explicitIsRTL ?? settingsIsRTL;
   const [anchor, setAnchor] = useState<AnchorRect | null>(null);
 
@@ -58,16 +60,11 @@ export function DropdownMenu({
 
   const menuPosition = useMemo(() => {
     if (!anchor) return null;
-    const requestedLeft =
-      align === "start"
-        ? anchor.x
-        : anchor.x + anchor.width - menuWidth;
+    const requestedLeft = align === "start" ? anchor.x : anchor.x + anchor.width - menuWidth;
     const left = Math.min(Math.max(requestedLeft, MENU_MARGIN), viewportWidth - menuWidth - MENU_MARGIN);
     const belowTop = anchor.y + anchor.height + 8;
     const aboveTop = anchor.y - estimatedHeight - 8;
-    const top = belowTop + estimatedHeight <= height - MENU_MARGIN
-      ? belowTop
-      : Math.max(MENU_MARGIN, aboveTop);
+    const top = belowTop + estimatedHeight <= height - MENU_MARGIN ? belowTop : Math.max(MENU_MARGIN, aboveTop);
     return { left, top };
   }, [align, anchor, estimatedHeight, height, menuWidth, viewportWidth]);
 
@@ -96,7 +93,10 @@ export function DropdownMenu({
           accessibilityLabel={triggerLabel}
           disabled={disabled}
           onPress={open}
-          className={cn("h-8 w-8 items-center justify-center rounded-full bg-surface-low dark:bg-surface-dark-low", className)}
+          className={cn(
+            "h-8 w-8 items-center justify-center rounded-full bg-surface-low dark:bg-surface-dark-low",
+            className,
+          )}
           style={({ pressed }) => ({
             cursor: Platform.OS === "web" ? "pointer" : undefined,
             opacity: disabled ? 0.35 : pressed || anchor ? 0.72 : 1,
@@ -106,7 +106,14 @@ export function DropdownMenu({
         </Pressable>
       </View>
 
-      <Modal visible={anchor !== null} transparent animationType="fade" statusBarTranslucent onRequestClose={close}>
+      <Modal
+        key={reduceMotion ? "static" : "fade"}
+        visible={anchor !== null}
+        transparent
+        animationType={reduceMotion ? "none" : "fade"}
+        statusBarTranslucent
+        onRequestClose={close}
+      >
         <View className="flex-1">
           <Pressable className="absolute inset-0" onPress={close} />
           {menuPosition ? (
@@ -121,11 +128,7 @@ export function DropdownMenu({
               }}
             >
               {items.map((item) => {
-                const color = item.disabled
-                  ? mutedColor
-                  : item.destructive
-                    ? destructiveColor
-                    : textColor;
+                const color = item.disabled ? mutedColor : item.destructive ? destructiveColor : textColor;
                 return (
                   <Pressable
                     key={item.key}
@@ -141,11 +144,7 @@ export function DropdownMenu({
                       opacity: item.disabled ? 0.45 : 1,
                     })}
                   >
-                    {item.icon ? (
-                      <View className="h-5 w-5 items-center justify-center">
-                        {item.icon(color)}
-                      </View>
-                    ) : null}
+                    {item.icon ? <View className="h-5 w-5 items-center justify-center">{item.icon(color)}</View> : null}
                     <Text
                       className="min-w-0 flex-1"
                       style={{

@@ -22,11 +22,22 @@ type Props = {
   ayah: number;
 };
 
-export function HadithTab({ surah, ayah }: Props) {
+export function HadithTab(props: Props) {
+  const { uiLanguage } = useSettings();
+  const language = uiLanguage === "ar" ? "ar" : "en";
+  return (
+    <HadithTabContent
+      key={JSON.stringify([props.surah, props.ayah, language])}
+      {...props}
+      language={language}
+    />
+  );
+}
+
+function HadithTabContent({ surah, ayah, language }: Props & { language: "en" | "ar" }) {
   const db = useDatabase();
   const s = useStrings();
-  const { uiLanguage, isDark, isRTL } = useSettings();
-  const language = uiLanguage === "ar" ? "ar" : "en";
+  const { isDark, isRTL } = useSettings();
   const [pages, setPages] = useState<Record<number, QfHadithResponse>>({});
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);

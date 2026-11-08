@@ -1,4 +1,4 @@
-import type { SQLiteDatabase } from "expo-sqlite";
+import type { DatabaseExecutor } from "@/lib/database/types";
 import { filterQuranRefsByDefaultDeckFilter } from "@/lib/fsrs/smart-decks";
 
 export type VocabCard = {
@@ -22,7 +22,7 @@ export type VocabCard = {
 };
 
 export async function listVocabCards(
-  db: SQLiteDatabase
+  db: DatabaseExecutor
 ): Promise<VocabCard[]> {
   const rows = await db.getAllAsync<VocabCard>(
     `SELECT
@@ -52,7 +52,7 @@ export async function listVocabCards(
 }
 
 export async function deleteVocabCard(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   id: number
 ): Promise<void> {
   await db.runAsync("DELETE FROM vocab_cards WHERE id = ?", [id]);

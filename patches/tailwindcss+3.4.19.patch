@@ -1,0 +1,115 @@
+diff --git a/node_modules/tailwindcss/peers/index.js b/node_modules/tailwindcss/peers/index.js
+--- a/node_modules/tailwindcss/peers/index.js
++++ b/node_modules/tailwindcss/peers/index.js
+@@ -2425,6 +2425,5 @@
+           previousGeneratedColumn = 0;
+-          while (mapping.generatedLine !== previousGeneratedLine) {
+-            next += ";";
+-            previousGeneratedLine++;
+-          }
++          var lineDelta = mapping.generatedLine - previousGeneratedLine;
++          next += lineDelta === 1 ? ";" : ";".repeat(lineDelta);
++          previousGeneratedLine = mapping.generatedLine;
+         } else {
+@@ -2553,2 +2552,32 @@
+   "node_modules/source-map-js/lib/quick-sort.js"(exports2) {
++    /*
++     *
++     * Copyright (c) 2009-2011, Mozilla Foundation and contributors
++     * All rights reserved.
++     *
++     * Redistribution and use in source and binary forms, with or without
++     * modification, are permitted provided that the following conditions are met:
++     *
++     * * Redistributions of source code must retain the above copyright notice, this
++     *   list of conditions and the following disclaimer.
++     *
++     * * Redistributions in binary form must reproduce the above copyright notice,
++     *   this list of conditions and the following disclaimer in the documentation
++     *   and/or other materials provided with the distribution.
++     *
++     * * Neither the names of the Mozilla Foundation nor the names of project
++     *   contributors may be used to endorse or promote products derived from this
++     *   software without specific prior written permission.
++     *
++     * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
++     * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
++     * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
++     * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
++     * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
++     * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
++     * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
++     * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
++     * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
++     * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++     */
+     function SortTemplate(comparator) {
+@@ -2587,5 +2616,13 @@
+     }
++    var isEvalAllowed = (function() {
++      try {
++        new Function("return 0")();
++        return true;
++      } catch {
++        return false;
++      }
++    })();
+     var sortCache = /* @__PURE__ */ new WeakMap();
+     exports2.quickSort = function(ary, comparator, start = 0) {
+-      let doQuickSort = sortCache.get(comparator);
++      let doQuickSort = isEvalAllowed ? sortCache.get(comparator) : SortTemplate(comparator);
+       if (doQuickSort === void 0) {
+@@ -2607,2 +2644,3 @@
+     var quickSort = require_quick_sort().quickSort;
++    var MAX_SECTION_OFFSET_LINE = 1e7;
+     function SourceMapConsumer(aSourceMap, aSourceMapURL) {
+@@ -3099,2 +3137,3 @@
+       };
++      var maxOffsetLine = 0;
+       this._sections = sections.map(function(s) {
+@@ -3106,2 +3145,8 @@
+         var offsetColumn = util.getArg(offset, "column");
++        if (!isValidOffset(offsetLine) || !isValidOffset(offsetColumn)) {
++          throw new Error("Section offset line and column must be non-negative integers.");
++        }
++        if (offsetLine > MAX_SECTION_OFFSET_LINE) {
++          throw new Error("Section offset line must not exceed " + MAX_SECTION_OFFSET_LINE + ".");
++        }
+         if (offsetLine < lastOffset.line || offsetLine === lastOffset.line && offsetColumn < lastOffset.column) {
+@@ -3110,2 +3155,10 @@
+         lastOffset = offset;
++        var consumer = new SourceMapConsumer(util.getArg(s, "map"), aSourceMapURL);
++        var totalOffsetLine = offsetLine + (consumer._maxOffsetLine || 0);
++        if (totalOffsetLine > MAX_SECTION_OFFSET_LINE) {
++          throw new Error("Section offset line must not exceed " + MAX_SECTION_OFFSET_LINE + ", including offsets of nested sections.");
++        }
++        if (totalOffsetLine > maxOffsetLine) {
++          maxOffsetLine = totalOffsetLine;
++        }
+         return {
+@@ -3117,5 +3170,9 @@
+           },
+-          consumer: new SourceMapConsumer(util.getArg(s, "map"), aSourceMapURL)
++          consumer
+         };
+       });
++      this._maxOffsetLine = maxOffsetLine;
++    }
++    function isValidOffset(aValue) {
++      return typeof aValue === "number" && aValue >= 0 && aValue <= 9007199254740991 && Math.floor(aValue) === aValue;
+     }
+@@ -3128,4 +3185,5 @@
+         for (var i = 0; i < this._sections.length; i++) {
+-          for (var j = 0; j < this._sections[i].consumer.sources.length; j++) {
+-            sources.push(this._sections[i].consumer.sources[j]);
++          var sectionSources = this._sections[i].consumer.sources;
++          for (var j = 0; j < sectionSources.length; j++) {
++            sources.push(sectionSources[j]);
+           }
+@@ -3295,2 +3353,6 @@
+         while (lastGeneratedLine < mapping.generatedLine) {
++          if (remainingLinesIndex >= remainingLines.length) {
++            lastGeneratedLine = mapping.generatedLine;
++            break;
++          }
+           node.add(shiftNextLine());

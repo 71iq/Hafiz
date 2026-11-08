@@ -55,7 +55,7 @@ export const MirroredRow = forwardRef<View, MirroredRowProps>(
 
 MirroredRow.displayName = "MirroredRow";
 
-export const MirroredPressableRow = forwardRef<PressableRef, MirroredPressableRowProps>(
+const MirroredPressableRow = forwardRef<PressableRef, MirroredPressableRowProps>(
   ({ dir: explicitDir, className, style, ...props }, ref) => {
     const dir = useUIDirection(explicitDir);
 

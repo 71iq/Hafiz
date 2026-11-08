@@ -10,22 +10,21 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import type { SQLiteDatabase } from "expo-sqlite";
+import type { DatabaseExecutor } from "@/lib/database/types";
 import { CalendarDays, ChevronLeft, ChevronRight, Clock3, EllipsisVertical, PauseCircle, Pencil, RotateCcw, Star, Trash2, Trophy, X } from "lucide-react-native";
 import { useDatabase, useDatabaseStatus } from "@/lib/database/provider";
-import { SettingsProvider, useSettings } from "@/lib/settings/context";
-import { useStrings } from "@/lib/i18n/useStrings";
-import { interpolate } from "@/lib/i18n/useStrings";
+import { SettingsProvider, useSettings, withThemeOpacity } from "@/lib/settings/context";
+import { interpolate, useStrings } from "@/lib/i18n/useStrings";
 import type { UIStrings } from "@/lib/i18n/strings";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { DatabaseErrorState } from "@/components/ui/DatabaseErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { Rating, State } from "@/lib/fsrs/scheduler";
 import type { Grade } from "@/lib/fsrs/scheduler";
 import { calculateReviewTransition } from "@/lib/fsrs/review-transition";
+import { persistReviewTransition } from "@/lib/fsrs/persist-review";
 import {
-  updateCard,
-  insertStudyLog,
   getStudyStreak,
   getWirdStatus,
   MUTASHABIHAT_DECK_ID,
@@ -39,14 +38,14 @@ import {
   setStudyCardMarked,
   setStudyCardSuspended,
 } from "@/lib/fsrs/queries";
+import { StudyCardDeletedError } from "@/lib/fsrs/card-errors";
 import { computeUniqueFront } from "@/lib/fsrs/uniqueness";
 import { computeReviewPoints, addTodayPoints } from "@/lib/fsrs/scoring";
 import { hapticMedium, hapticSuccess } from "@/lib/haptics";
 import { Skeleton, SkeletonText } from "@/components/ui/Skeleton";
 import { syncDailyScore, updateProfileStats } from "@/lib/fsrs/leaderboard-sync";
 import { formatLocalDateInput, parseDueDateInput } from "@/lib/date";
-import type { StudyCardRow, TestMode, WordTestMode } from "@/lib/fsrs/types";
-import type { DeckReviewSettings } from "@/lib/fsrs/types";
+import type { DeckReviewSettings, StudyCardRow, TestMode, WordTestMode } from "@/lib/fsrs/types";
 import {
   DEFAULT_DECK_DAILY_REVIEW_LIMIT,
   DEFAULT_DECK_LEARNING_STEPS,
@@ -57,7 +56,9 @@ import {
 } from "@/lib/fsrs/types";
 import { fetchWordMeaningAr, fetchWordText, fetchWordTranslation } from "@/lib/word/queries";
 import { Qcf2AyahText } from "@/components/flashcards/Qcf2AyahText";
+import { DueDateSheet } from "@/components/flashcards/DueDateSheet";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { FieldMessage } from "@/components/ui/Field";
 import { OverlayBody, OverlayFooter, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import {
   getDueCardsForReview,
@@ -67,7 +68,8 @@ import {
   type SmartCardKind,
   type SmartDeckRef,
 } from "@/lib/fsrs/smart-decks";
-import { parseQiraatText, type QiraatBlock } from "@/lib/qiraat/parse";
+import { parseQiraatText } from "@/lib/qiraat/parse";
+import { QiraatBlocks } from "@/components/mushaf/QiraatBlocks";
 import { recordAchievementEvent } from "@/lib/achievements/queries";
 import { deleteUserSetting, writeUserSetting } from "@/lib/database/user-settings";
 
@@ -155,27 +157,15 @@ const EDITABLE_ANSWER_MODES: ReviewMode[] = [
 
 // ─── Main Component ──────────────────────────────────────────
 
+/** Session cards are loaded as live rows, so an action must not recreate or revive a deleted one. */
+const LIVE_CARD = { requireLive: true } as const;
+
 export default function FlashcardSessionScreenWrapper() {
   const { isReady, progress, error } = useDatabaseStatus();
   const s = useStrings();
 
   if (error) {
-    return (
-      <View className="flex-1 items-center justify-center bg-surface dark:bg-surface-dark px-6">
-        <Text
-          className="text-red-600 mb-4"
-          style={{ fontFamily: "Manrope_700Bold", fontSize: 18 }}
-        >
-          {s.databaseError}
-        </Text>
-        <Text
-          className="text-red-500 text-center"
-          style={{ fontFamily: "Manrope_400Regular", fontSize: 15 }}
-        >
-          {error}
-        </Text>
-      </View>
-    );
+    return <DatabaseErrorState title={s.databaseError} message={error} />;
   }
 
   if (!isReady) {
@@ -616,6 +606,15 @@ function FlashcardSessionScreen() {
     reviewedCountsRef.current = next;
   }, []);
 
+  /** The current card was deleted elsewhere after the session loaded it: move past it and say so. */
+  const skipDeletedCurrentCard = useCallback(async () => {
+    setConfirmCardAction(null);
+    setDueDateOpen(false);
+    await advanceAfterRemovingCurrentCard();
+    // Set after advancing, which clears the error; the summary also shows it when this was the last card.
+    setSessionError(s.cardDeletedSkipped);
+  }, [advanceAfterRemovingCurrentCard, s.cardDeletedSkipped]);
+
   const runCardAction = useCallback(async (action: () => Promise<void>) => {
     if (cardActionBusy || !currentCard) return;
     setCardActionBusy(true);
@@ -624,18 +623,19 @@ function FlashcardSessionScreen() {
       await action();
     } catch (e) {
       console.warn("[FlashcardSession] Card action failed:", e);
-      setSessionError(s.cardActionFailed);
+      if (e instanceof StudyCardDeletedError) await skipDeletedCurrentCard();
+      else setSessionError(s.cardActionFailed);
     } finally {
       setCardActionBusy(false);
     }
-  }, [cardActionBusy, currentCard, s.cardActionFailed]);
+  }, [cardActionBusy, currentCard, s.cardActionFailed, skipDeletedCurrentCard]);
 
   const handleSuspendCard = useCallback(() => {
     if (!currentCard) return;
     setCardMenuOpen(false);
     runCardAction(async () => {
       hapticMedium();
-      await setStudyCardSuspended(db, currentCard.card.deck_id, currentCard.card.id, true);
+      await setStudyCardSuspended(db, currentCard.card.deck_id, currentCard.card.id, true, LIVE_CARD);
       await advanceAfterRemovingCurrentCard();
     });
   }, [advanceAfterRemovingCurrentCard, currentCard, db, runCardAction]);
@@ -645,7 +645,7 @@ function FlashcardSessionScreen() {
     setCardMenuOpen(false);
     runCardAction(async () => {
       hapticMedium();
-      await setStudyCardBuried(db, currentCard.card.deck_id, currentCard.card.id, true);
+      await setStudyCardBuried(db, currentCard.card.deck_id, currentCard.card.id, true, LIVE_CARD);
       await advanceAfterRemovingCurrentCard();
     });
   }, [advanceAfterRemovingCurrentCard, currentCard, db, runCardAction]);
@@ -659,7 +659,8 @@ function FlashcardSessionScreen() {
         db,
         currentCard.card.deck_id,
         currentCard.card.id,
-        !currentCard.card.marked_at
+        !currentCard.card.marked_at,
+        LIVE_CARD
       );
       updateCurrentCardRow(updated);
     });
@@ -676,7 +677,7 @@ function FlashcardSessionScreen() {
         await advanceAfterRemovingCurrentCard();
         return;
       }
-      const updated = await resetStudyCardProgress(db, currentCard.card.deck_id, currentCard.card.id);
+      const updated = await resetStudyCardProgress(db, currentCard.card.deck_id, currentCard.card.id, LIVE_CARD);
       updateCurrentCardRow(updated);
       setCurrentSideIndex(0);
       setRevealed(false);
@@ -690,6 +691,7 @@ function FlashcardSessionScreen() {
     setCardMenuOpen(false);
     setDueDateText(formatLocalDateInput(new Date(currentCard.card.due)));
     setDueDateError(null);
+    setSessionError(null);
     setDueDateOpen(true);
   }, [currentCard]);
 
@@ -700,9 +702,10 @@ function FlashcardSessionScreen() {
       setDueDateError(parsed.reason === "past" ? s.cardDueDatePast : s.cardDueDateInvalid);
       return;
     }
+    setDueDateError(null);
     runCardAction(async () => {
       hapticMedium();
-      await setStudyCardDueDate(db, currentCard.card.deck_id, currentCard.card.id, parsed.date);
+      await setStudyCardDueDate(db, currentCard.card.deck_id, currentCard.card.id, parsed.date, LIVE_CARD);
       setDueDateOpen(false);
       setDueDateError(null);
       await advanceAfterRemovingCurrentCard();
@@ -713,6 +716,7 @@ function FlashcardSessionScreen() {
     if (!currentCard) return;
     const mode = currentMode ?? activeModes[currentSideIndex] ?? activeModes[0] ?? null;
     if (!mode) return;
+    setSessionError(null);
     setCardMenuOpen(false);
     setAnswerEditMode(mode);
     setAnswerEditText(getCardAnswerOverride(currentCard, mode) ?? getDefaultAnswerText(currentCard, mode, s));
@@ -757,24 +761,12 @@ function FlashcardSessionScreen() {
         reviewPolicy: reviewSettings ?? undefined,
       });
 
-      await updateCard(db, transition.updatedCard);
+      await persistReviewTransition({ db, cardId: currentCard.card.id, transition });
       const requeuedCard = transition.shouldRequeueToday
         ? { ...currentCard, card: transition.updatedCard }
         : null;
 
       const { reviewRecord } = transition;
-      await insertStudyLog(
-        db,
-        currentCard.card.id,
-        reviewRecord.rating,
-        reviewRecord.state,
-        reviewRecord.due,
-        reviewRecord.stability,
-        reviewRecord.difficulty,
-        reviewRecord.elapsedDays,
-        reviewRecord.scheduledDays,
-        reviewRecord.reviewedAt
-      );
       recordReviewedCard(currentCard.card.state);
 
       if (currentCard.card.id.startsWith("mutashabihat:") || currentCard.card.id.startsWith("similar-tail:")) {
@@ -813,7 +805,8 @@ function FlashcardSessionScreen() {
       }
     } catch (e) {
       console.warn("[FlashcardSession] Failed to grade card:", e);
-      setSessionError(s.flashcardsReviewSaveFailed);
+      if (e instanceof StudyCardDeletedError) await skipDeletedCurrentCard();
+      else setSessionError(s.flashcardsReviewSaveFailed);
     } finally {
       gradingInFlightRef.current = false;
       setGradingBusy(false);
@@ -1012,9 +1005,18 @@ function FlashcardSessionScreen() {
       {/* Bottom action area */}
       <View
         className="px-6 pb-6 pt-4 items-center"
-        style={{ backgroundColor: withOpacity(themeSurface, 0.95) }}
+        style={{ backgroundColor: withThemeOpacity(themeSurface, 0.95) }}
       >
         <View style={{ width: "100%", maxWidth }}>
+          {sessionError && (
+            <Text
+              className="mb-3 text-red-600 dark:text-red-400"
+              style={{ fontFamily: "Manrope_500Medium", fontSize: 13, textAlign: "center" }}
+            >
+              {sessionError}
+            </Text>
+          )}
+
           {phase === "front" && (
             <Button onPress={revealFirstSide} className="w-full">
               <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 16, color: "#fff" }}>
@@ -1039,17 +1041,7 @@ function FlashcardSessionScreen() {
 
           {/* Grading: show directly after last side is revealed, or in grading phase */}
           {((phase === "side" && revealed && isLastSide) || phase === "grading") && (
-            <>
-              {sessionError && (
-                <Text
-                  className="mb-3 text-red-600 dark:text-red-400"
-                  style={{ fontFamily: "Manrope_500Medium", fontSize: 13, textAlign: "center" }}
-                >
-                  {sessionError}
-                </Text>
-              )}
-              <GradingButtons onGrade={handleGrade} previews={gradePreviews} isDark={isDark} s={s} disabled={gradingBusy} />
-            </>
+            <GradingButtons onGrade={handleGrade} previews={gradePreviews} isDark={isDark} s={s} disabled={gradingBusy} />
           )}
         </View>
       </View>
@@ -1064,6 +1056,7 @@ function FlashcardSessionScreen() {
         onClose={() => setCardMenuOpen(false)}
         onDelete={() => {
           setCardMenuOpen(false);
+          setSessionError(null);
           setConfirmCardAction("delete");
         }}
         onSuspend={handleSuspendCard}
@@ -1073,6 +1066,7 @@ function FlashcardSessionScreen() {
         canEditAnswer={!!editableAnswerMode}
         onReset={() => {
           setCardMenuOpen(false);
+          setSessionError(null);
           setConfirmCardAction("reset");
         }}
         onSetDueDate={openDueDateSheet}
@@ -1080,6 +1074,7 @@ function FlashcardSessionScreen() {
       <AnswerEditSheet
         visible={answerEditOpen}
         value={answerEditText}
+        error={sessionError}
         busy={cardActionBusy}
         isDark={isDark}
         isRTL={isRTL}
@@ -1093,7 +1088,7 @@ function FlashcardSessionScreen() {
       <DueDateSheet
         visible={dueDateOpen}
         value={dueDateText}
-        error={dueDateError}
+        error={dueDateError ?? sessionError}
         busy={cardActionBusy}
         isDark={isDark}
         isRTL={isRTL}
@@ -1103,6 +1098,8 @@ function FlashcardSessionScreen() {
           if (!cardActionBusy) setDueDateOpen(false);
         }}
         onSave={handleSaveDueDate}
+        autoCapitalize="none"
+        autoCorrect={false}
       />
       <ConfirmDialog
         visible={!!confirmCardAction}
@@ -1112,6 +1109,7 @@ function FlashcardSessionScreen() {
         confirmLabel={confirmCardAction === "delete" ? s.flashcardsDelete : s.cardResetProgress}
         destructive={confirmCardAction === "delete"}
         confirmLoading={cardActionBusy}
+        error={sessionError}
         isDark={isDark}
         isRTL={isRTL}
         onCancel={() => {
@@ -1123,21 +1121,11 @@ function FlashcardSessionScreen() {
   );
 }
 
-function withOpacity(hexColor: string, opacity: number): string {
-  const match = /^#([0-9a-f]{6})$/i.exec(hexColor);
-  if (!match) return hexColor;
-  const value = match[1];
-  const r = parseInt(value.slice(0, 2), 16);
-  const g = parseInt(value.slice(2, 4), 16);
-  const b = parseInt(value.slice(4, 6), 16);
-  return `rgba(${r},${g},${b},${opacity})`;
-}
-
 function cardAnswerSettingKey(cardId: string, mode: ReviewMode): string {
   return `${CARD_ANSWER_SETTING_PREFIX}${cardId}:${mode}`;
 }
 
-async function readCardAnswerOverrides(db: SQLiteDatabase, cardId: string): Promise<Partial<Record<ReviewMode, string>>> {
+async function readCardAnswerOverrides(db: DatabaseExecutor, cardId: string): Promise<Partial<Record<ReviewMode, string>>> {
   const result: Partial<Record<ReviewMode, string>> = {};
   await Promise.all(EDITABLE_ANSWER_MODES.map(async (mode) => {
     const row = await db.getFirstAsync<{ value: string }>(
@@ -1332,7 +1320,7 @@ function CardActionRow({
   );
 }
 
-function DueDateSheet({
+function AnswerEditSheet({
   visible,
   value,
   error,
@@ -1347,78 +1335,6 @@ function DueDateSheet({
   visible: boolean;
   value: string;
   error: string | null;
-  busy: boolean;
-  isDark: boolean;
-  isRTL: boolean;
-  s: UIStrings;
-  onChange: (value: string) => void;
-  onClose: () => void;
-  onSave: () => void;
-}) {
-  return (
-    <ResponsiveSheet
-      open={visible}
-      onClose={onClose}
-      maxWidth={420}
-      maxHeight={360}
-      avoidKeyboard
-    >
-      <OverlayHeader title={s.cardSetDueDate} subtitle={s.cardDueDateHint} onClose={onClose} isRTL={isRTL} showHandle />
-      <OverlayBody scrollEnabled={false} contentContainerClassName="px-5 py-5">
-        <TextInput
-          value={value}
-          onChangeText={onChange}
-          placeholder={s.cardDueDatePlaceholder}
-          placeholderTextColor={isDark ? "#737373" : "#b9a085"}
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="numbers-and-punctuation"
-          className="min-h-12 rounded-2xl bg-surface-low dark:bg-surface-dark-low px-4 py-3 text-charcoal dark:text-neutral-100"
-          style={{
-            fontFamily: "Manrope_500Medium",
-            fontSize: 16,
-            textAlign: isRTL ? "right" : "left",
-            writingDirection: "ltr",
-          }}
-        />
-        {error ? (
-          <Text
-            className="mt-3 text-red-600 dark:text-red-400"
-            style={{ fontFamily: "Manrope_500Medium", fontSize: 13, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
-          >
-            {error}
-          </Text>
-        ) : null}
-      </OverlayBody>
-      <OverlayFooter isRTL={isRTL}>
-        <Button variant="outline" onPress={onClose} disabled={busy} className="flex-1">
-          <Text className="text-charcoal dark:text-neutral-200" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>
-            {s.flashcardsCancel}
-          </Text>
-        </Button>
-        <Button onPress={onSave} disabled={busy} className="flex-1">
-          <Text className="text-white" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>
-            {s.cardSaveDueDate}
-          </Text>
-        </Button>
-      </OverlayFooter>
-    </ResponsiveSheet>
-  );
-}
-
-function AnswerEditSheet({
-  visible,
-  value,
-  busy,
-  isDark,
-  isRTL,
-  s,
-  onChange,
-  onClose,
-  onSave,
-}: {
-  visible: boolean;
-  value: string;
   busy: boolean;
   isDark: boolean;
   isRTL: boolean;
@@ -1454,6 +1370,16 @@ function AnswerEditSheet({
             writingDirection: answerIsRTL ? "rtl" : "ltr",
           }}
         />
+        {error ? (
+          <FieldMessage
+            dir={isRTL ? "rtl" : "ltr"}
+            className="mt-3 w-full self-stretch text-red-600 dark:text-red-400"
+            accessibilityRole="alert"
+            accessibilityLiveRegion="polite"
+          >
+            {error}
+          </FieldMessage>
+        ) : null}
       </OverlayBody>
       <OverlayFooter isRTL={isRTL}>
         <Button variant="outline" onPress={onClose} disabled={busy} className="flex-1">
@@ -1878,24 +1804,7 @@ function QiraatAnswer({ card, s }: { card: CardData; s: UIStrings }) {
         </View>
       )}
 
-      {blocks.map((block: QiraatBlock, i: number) => (
-        <View key={i} className="mb-4">
-          {block.heading && (
-            <Text
-              className="text-lg text-primary-accent dark:text-primary-bright mb-1.5"
-              style={{ writingDirection: "rtl", textAlign: "right", fontWeight: "700" }}
-            >
-              {block.heading}
-            </Text>
-          )}
-          <Text
-            className="text-base text-charcoal dark:text-neutral-200 leading-8"
-            style={{ writingDirection: "rtl", textAlign: "right" }}
-          >
-            {block.body}
-          </Text>
-        </View>
-      ))}
+      <QiraatBlocks blocks={blocks} />
     </ScrollView>
   );
 }

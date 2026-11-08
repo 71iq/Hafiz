@@ -102,6 +102,7 @@ describe("settings contracts", () => {
     expect(withThemeOpacity("#fff", 0.25)).toBe("rgba(255,255,255,0.25)");
     expect(withThemeOpacity("#000000", -1)).toBe("rgba(0,0,0,0)");
     expect(withThemeOpacity("#0A141E", 2)).toBe("rgba(10,20,30,1)");
+    expect(withThemeOpacity(THEME_COLORS.white.surface, 0.95)).toBe("rgba(255,255,255,0.95)");
     expect(withThemeOpacity("transparent", 0.5)).toBe("transparent");
   });
 

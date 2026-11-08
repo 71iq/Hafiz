@@ -4,15 +4,14 @@ import { SurahHeader } from "./SurahHeader";
 import { WordToken } from "./WordToken";
 import {
   isQuranPageFontLoaded,
-  isSurahNameFontLoaded,
   loadQuranPageFont,
-  loadSurahNameFont,
   quranPageFontName,
   quranPageMarkerFontPaletteStyle,
   quranPageFontPaletteStyle,
   surahNameBismillahGlyphs,
   surahNameFontName,
 } from "@/lib/fonts/loader";
+import { useSurahNameFont } from "@/lib/fonts/use-surah-name-font";
 import { useSelection } from "@/lib/selection/context";
 import { useSettings } from "@/lib/settings/context";
 import { shouldJustifyMushafLine } from "@/lib/mushaf/page-layout";
@@ -203,7 +202,6 @@ function MushafPageInner({
   hifzVisibility = null,
 }: Props) {
   const [fontVisible, setFontVisible] = useState(false);
-  const [surahNameFontReady, setSurahNameFontReady] = useState(() => isSurahNameFontLoaded());
   const [wordsLoaded, setWordsLoaded] = useState(!!pageWordsData);
   const { getHighlightColor, getWordHighlightColor, selectAyah } = useSelection();
   const { quranFontStyle, quranMarkerStyle, showAyahMarkers, effectiveTheme } = useSettings();
@@ -248,23 +246,7 @@ function MushafPageInner({
     [lineLayout],
   );
 
-  useEffect(() => {
-    if (!needsSurahNameFont) return;
-    if (isSurahNameFontLoaded()) {
-      setSurahNameFontReady(true);
-      return;
-    }
-    setSurahNameFontReady(false);
-    let cancelled = false;
-    loadSurahNameFont()
-      .then(() => {
-        if (!cancelled) requestAnimationFrame(() => setSurahNameFontReady(true));
-      })
-      .catch(console.warn);
-    return () => {
-      cancelled = true;
-    };
-  }, [needsSurahNameFont]);
+  const surahNameFontReady = useSurahNameFont(needsSurahNameFont);
 
   const ayahIndexByKey = useMemo(() => {
     const map = new Map<string, number>();

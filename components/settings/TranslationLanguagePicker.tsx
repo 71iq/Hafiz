@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useInlineOperationNotice, type InlineNoticeAttempt } from "@/components/ui/OperationNoticeProvider";
+import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, View, Text } from "react-native";
 import { Check, ChevronLeft, ChevronRight } from "lucide-react-native";
 import { DisclosureRow } from "@/components/ui/MirroredRow";
@@ -25,39 +26,80 @@ export function TranslationLanguagePicker({ visible, onClose }: Props) {
   const [selectingCode, setSelectingCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const createAttempt = useInlineOperationNotice();
+  const nextGeneration = useRef(0);
+  const [visibleGeneration, setVisibleGeneration] = useState(0);
+  type SelectionLifetime = { id: number; active: boolean; busy: boolean; attempt: InlineNoticeAttempt | null };
+  const lifetime = useRef<SelectionLifetime | null>(null);
+
   useEffect(() => {
-    if (visible) return;
+    if (!visible) {
+      setPressedCode(null);
+      setSelectingCode(null);
+      setError(null);
+      return;
+    }
+    const current: SelectionLifetime = { id: ++nextGeneration.current, active: true, busy: false, attempt: null };
+    lifetime.current = current;
+    setVisibleGeneration(current.id);
+    return () => {
+      current.active = false;
+      current.attempt?.retire();
+      if (lifetime.current === current) lifetime.current = null;
+    };
+  }, [visible]);
+
+  const handleClose = () => {
+    const current = lifetime.current;
+    if (!current?.active || current.id !== visibleGeneration) return;
+    current.active = false;
+    current.busy = false;
+    current.attempt?.retire("normal");
+    current.attempt = null;
     setPressedCode(null);
     setSelectingCode(null);
     setError(null);
-  }, [visible]);
+    onClose();
+  };
 
   const handleSelect = async (code: string) => {
-    if (selectingCode) return;
+    const current = lifetime.current;
+    if (!visible || !current?.active || current.id !== visibleGeneration || current.busy) return;
+    current.busy = true;
+    current.attempt?.retire("normal");
+    const attempt = createAttempt();
+    current.attempt = attempt;
+    const ownsUI = () => lifetime.current === current && current.active &&
+      current.attempt === attempt && attempt.isCurrent();
     setSelectingCode(code);
     setError(null);
     try {
       await setTranslationLanguage(code);
-      onClose();
+      if (ownsUI()) handleClose();
+      attempt.finish();
     } catch (e) {
       console.warn("[TranslationLanguagePicker] Failed to select translation:", e);
-      setError(s.translationLoadFailed);
+      const presentation = attempt.report(s.translationLoadFailed);
+      if (presentation === "inline" && ownsUI()) setError(s.translationLoadFailed);
     } finally {
-      setSelectingCode(null);
+      if (ownsUI()) {
+        current.busy = false;
+        setSelectingCode(null);
+      }
     }
   };
 
   return (
     <ResponsiveSheet
       open={visible}
-      onClose={onClose}
+      onClose={handleClose}
       dismissOnBackdrop
       maxWidth={520}
       maxHeight="80%"
     >
       <OverlayHeader
         title={s.translationLanguagePickerTitle}
-        onClose={onClose}
+        onClose={handleClose}
         showHandle
         isRTL={isRTL}
       />
@@ -71,7 +113,7 @@ export function TranslationLanguagePicker({ visible, onClose }: Props) {
             {error}
           </Text>
         )}
-        <View className="gap-1">
+        <View className="gap-1" accessibilityRole="radiogroup">
           {TRANSLATION_LANGUAGES.map((lang) => {
             const isSelected = lang.code === translationLanguage;
             const isPressed = pressedCode === lang.code;
@@ -82,6 +124,10 @@ export function TranslationLanguagePicker({ visible, onClose }: Props) {
                 key={lang.code}
                 onPress={() => handleSelect(lang.code)}
                 disabled={!!selectingCode}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: isSelected, busy: isSelecting, disabled: !!selectingCode }}
+                aria-checked={isSelected}
+                aria-busy={isSelecting}
                 onPressIn={() => setPressedCode(lang.code)}
                 onPressOut={() => setPressedCode(null)}
                 className="items-center justify-between gap-3 rounded-2xl px-3 py-3.5"

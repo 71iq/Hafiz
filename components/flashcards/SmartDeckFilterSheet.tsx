@@ -3,13 +3,21 @@ import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View, useWin
 import { Check } from "lucide-react-native";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { ReviewSettingInfoSheet } from "@/components/flashcards/ReviewSettingInfoSheet";
 import { OverlayBody, OverlayFooter, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { useDatabase } from "@/lib/database/provider";
 import { interpolate, useStrings } from "@/lib/i18n/useStrings";
 import type { UIStrings } from "@/lib/i18n/strings";
 import { useSettings } from "@/lib/settings/context";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
-import { SchedulerOptionsPanel, formatStepText, parseStepText } from "@/components/flashcards/DeckReviewSettingsSheet";
+import { SchedulerOptionsPanel } from "@/components/flashcards/DeckReviewSettingsSheet";
+import {
+  clampDailyReviewLimit,
+  clampNewCardsLimit,
+  clampRequestRetention,
+  clampMaximumInterval,
+} from "@/lib/fsrs/review-settings-draft";
+import { formatStepText, parseStepText } from "@/lib/fsrs/review-step-text";
 import {
   DEFAULT_DECK_ENABLE_FUZZ,
   DEFAULT_DECK_ENABLE_SHORT_TERM,
@@ -24,22 +32,13 @@ import {
   DEFAULT_NEW_REVIEW_ORDER,
   DEFAULT_REVIEW_SORT_ORDER,
   DEFAULT_WORD_TEST_MODES,
-  MAX_DECK_MAXIMUM_INTERVAL,
-  MAX_DECK_REQUEST_RETENTION,
-  MIN_DECK_MAXIMUM_INTERVAL,
-  MIN_DECK_DAILY_REVIEW_LIMIT,
-  MIN_DECK_NEW_CARD_LIMIT,
-  MIN_DECK_REQUEST_RETENTION,
   type DeckReviewSettings,
   type NewCardSortOrder,
   type NewReviewOrder,
   type ReviewSortOrder,
   type SurahAyahRange,
 } from "@/lib/fsrs/types";
-import {
-  readDeckReviewSettings,
-  writeDeckReviewSettings,
-} from "@/lib/fsrs/queries";
+import { readDeckReviewSettings, writeDeckReviewSettings } from "@/lib/fsrs/queries";
 import {
   materializeSmartDeckCards,
   readSmartDeckFilter,
@@ -80,7 +79,9 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
   const [enableFuzz, setEnableFuzz] = useState(DEFAULT_DECK_ENABLE_FUZZ);
   const [enableShortTerm, setEnableShortTerm] = useState(DEFAULT_DECK_ENABLE_SHORT_TERM);
   const [learningStepsText, setLearningStepsText] = useState(() => formatStepText(DEFAULT_DECK_LEARNING_STEPS, isRTL));
-  const [relearningStepsText, setRelearningStepsText] = useState(() => formatStepText(DEFAULT_DECK_RELEARNING_STEPS, isRTL));
+  const [relearningStepsText, setRelearningStepsText] = useState(() =>
+    formatStepText(DEFAULT_DECK_RELEARNING_STEPS, isRTL),
+  );
   const [newReviewOrder, setNewReviewOrder] = useState<NewReviewOrder>(DEFAULT_NEW_REVIEW_ORDER);
   const [reviewSortOrder, setReviewSortOrder] = useState<ReviewSortOrder>(DEFAULT_REVIEW_SORT_ORDER);
   const [newCardSortOrder, setNewCardSortOrder] = useState<NewCardSortOrder>(DEFAULT_NEW_CARD_SORT_ORDER);
@@ -98,30 +99,32 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
       db.getAllAsync<SurahRow>("SELECT number, name_arabic, name_english, ayah_count FROM surahs ORDER BY number"),
       readSmartDeckFilter(db, deckId),
       readDeckReviewSettings(db, deckId),
-    ]).then(([rows, filter, settings]) => {
-      if (cancelled) return;
-      setError(null);
-      setSurahs(rows);
-      setFilterType(filter.type);
-      setSelectedSurahs(new Set(filter.type === "surah" ? filter.surahs : []));
-      setSelectedJuz(new Set(filter.type === "juz" ? filter.juzNumbers : []));
-      setSelectedSurahRanges(filter.type === "surah" ? initialRangeState(rows, filter.surahs, filter.ranges) : {});
-      setDailyLimit(settings.dailyReviewLimit);
-      setNewCardsLimit(settings.newCardsLimit);
-      setRequestRetention(settings.requestRetention);
-      setMaximumInterval(settings.maximumInterval);
-      setEnableFuzz(settings.enableFuzz);
-      setEnableShortTerm(settings.enableShortTerm);
-      setLearningStepsText(formatStepText(settings.learningSteps, isRTL));
-      setRelearningStepsText(formatStepText(settings.relearningSteps, isRTL));
-      setNewReviewOrder(settings.newReviewOrder);
-      setReviewSortOrder(settings.reviewSortOrder);
-      setNewCardSortOrder(settings.newCardSortOrder);
-      setReviewSettings(settings);
-    }).catch((e) => {
-      console.warn("[SmartDeckFilterSheet] Failed to load filter:", e);
-      if (!cancelled) setError(s.genericActionFailed);
-    });
+    ])
+      .then(([rows, filter, settings]) => {
+        if (cancelled) return;
+        setError(null);
+        setSurahs(rows);
+        setFilterType(filter.type);
+        setSelectedSurahs(new Set(filter.type === "surah" ? filter.surahs : []));
+        setSelectedJuz(new Set(filter.type === "juz" ? filter.juzNumbers : []));
+        setSelectedSurahRanges(filter.type === "surah" ? initialRangeState(rows, filter.surahs, filter.ranges) : {});
+        setDailyLimit(settings.dailyReviewLimit);
+        setNewCardsLimit(settings.newCardsLimit);
+        setRequestRetention(settings.requestRetention);
+        setMaximumInterval(settings.maximumInterval);
+        setEnableFuzz(settings.enableFuzz);
+        setEnableShortTerm(settings.enableShortTerm);
+        setLearningStepsText(formatStepText(settings.learningSteps, isRTL));
+        setRelearningStepsText(formatStepText(settings.relearningSteps, isRTL));
+        setNewReviewOrder(settings.newReviewOrder);
+        setReviewSortOrder(settings.reviewSortOrder);
+        setNewCardSortOrder(settings.newCardSortOrder);
+        setReviewSettings(settings);
+      })
+      .catch((e) => {
+        console.warn("[SmartDeckFilterSheet] Failed to load filter:", e);
+        if (!cancelled) setError(s.genericActionFailed);
+      });
     return () => {
       cancelled = true;
     };
@@ -139,63 +142,70 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
     setActiveInfo({ title, body });
   }, []);
 
-  const toggleSurah = useCallback((n: number) => {
-    setError(null);
-    setSelectedSurahs((prev) => {
-      const next = new Set(prev);
-      const willSelect = !next.has(n);
-      if (willSelect) next.add(n); else next.delete(n);
-      setSelectedSurahRanges((prevRanges) => {
-        const nextRanges = { ...prevRanges };
-        if (willSelect) {
-          const ayahCount = surahs.find((row) => row.number === n)?.ayah_count ?? 1;
-          nextRanges[n] = nextRanges[n] ?? { from: "1", to: String(ayahCount) };
-        } else {
-          delete nextRanges[n];
-        }
-        return nextRanges;
+  const toggleSurah = useCallback(
+    (n: number) => {
+      setError(null);
+      setSelectedSurahs((prev) => {
+        const next = new Set(prev);
+        const willSelect = !next.has(n);
+        if (willSelect) next.add(n);
+        else next.delete(n);
+        setSelectedSurahRanges((prevRanges) => {
+          const nextRanges = { ...prevRanges };
+          if (willSelect) {
+            const ayahCount = surahs.find((row) => row.number === n)?.ayah_count ?? 1;
+            nextRanges[n] = nextRanges[n] ?? { from: "1", to: String(ayahCount) };
+          } else {
+            delete nextRanges[n];
+          }
+          return nextRanges;
+        });
+        return next;
       });
-      return next;
-    });
-  }, [surahs]);
+    },
+    [surahs],
+  );
 
-  const updateSurahRange = useCallback((surah: number, field: keyof RangeInputValue, value: string) => {
-    setError(null);
-    setSelectedSurahRanges((prev) => {
-      const ayahCount = surahs.find((row) => row.number === surah)?.ayah_count ?? 1;
-      const current = prev[surah] ?? { from: "1", to: String(ayahCount) };
-      return { ...prev, [surah]: { ...current, [field]: value } };
-    });
-  }, [surahs]);
+  const updateSurahRange = useCallback(
+    (surah: number, field: keyof RangeInputValue, value: string) => {
+      setError(null);
+      setSelectedSurahRanges((prev) => {
+        const ayahCount = surahs.find((row) => row.number === surah)?.ayah_count ?? 1;
+        const current = prev[surah] ?? { from: "1", to: String(ayahCount) };
+        return { ...prev, [surah]: { ...current, [field]: value } };
+      });
+    },
+    [surahs],
+  );
 
   const toggleJuz = useCallback((n: number) => {
     setError(null);
     setSelectedJuz((prev) => {
       const next = new Set(prev);
-      if (next.has(n)) next.delete(n); else next.add(n);
+      if (next.has(n)) next.delete(n);
+      else next.add(n);
       return next;
     });
   }, []);
 
   const setNextDailyLimit = useCallback((value: number) => {
     setError(null);
-    setDailyLimit(Math.max(MIN_DECK_DAILY_REVIEW_LIMIT, value));
+    setDailyLimit(clampDailyReviewLimit(value));
   }, []);
 
   const setNextNewCardsLimit = useCallback((value: number) => {
     setError(null);
-    setNewCardsLimit(Math.max(MIN_DECK_NEW_CARD_LIMIT, value));
+    setNewCardsLimit(clampNewCardsLimit(value));
   }, []);
 
   const setNextRetention = useCallback((value: number) => {
     setError(null);
-    const clamped = Math.max(MIN_DECK_REQUEST_RETENTION, Math.min(MAX_DECK_REQUEST_RETENTION, value));
-    setRequestRetention(Number(clamped.toFixed(2)));
+    setRequestRetention(clampRequestRetention(value));
   }, []);
 
   const setNextMaximumInterval = useCallback((value: number) => {
     setError(null);
-    setMaximumInterval(Math.max(MIN_DECK_MAXIMUM_INTERVAL, Math.min(MAX_DECK_MAXIMUM_INTERVAL, value)));
+    setMaximumInterval(clampMaximumInterval(value));
   }, []);
 
   const getSurahFilter = (): BuiltInDeckFilter | null => {
@@ -286,19 +296,8 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
 
   return (
     <>
-      <ResponsiveSheet
-        open={visible}
-        onClose={onClose}
-        maxWidth={760}
-        maxHeight={720}
-        dir={isRTL ? "rtl" : "ltr"}
-      >
-        <OverlayHeader
-          title={title}
-          onClose={onClose}
-          isRTL={isRTL}
-          showHandle={isPhone}
-        />
+      <ResponsiveSheet open={visible} onClose={onClose} maxWidth={760} maxHeight={720} dir={isRTL ? "rtl" : "ltr"}>
+        <OverlayHeader title={title} onClose={onClose} isRTL={isRTL} showHandle={isPhone} />
 
         <View className="mb-4 mt-2">
           <ScrollView
@@ -331,7 +330,7 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
                   style={{
                     fontFamily: filterType === tab.value ? "Manrope_600SemiBold" : "Manrope_500Medium",
                     fontSize: 13,
-                    color: filterType === tab.value ? "#fff" : (isDark ? "#a3a3a3" : "#6e5a47"),
+                    color: filterType === tab.value ? "#fff" : isDark ? "#a3a3a3" : "#6e5a47",
                   }}
                 >
                   {tab.label}
@@ -341,10 +340,7 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
           </ScrollView>
         </View>
 
-        <OverlayBody
-          contentContainerClassName="px-5 pb-8"
-          contentContainerStyle={{ direction: isRTL ? "rtl" : "ltr" }}
-        >
+        <OverlayBody contentContainerClassName="px-5 pb-8" contentContainerStyle={{ direction: isRTL ? "rtl" : "ltr" }}>
           {filterType === "all" && (
             <Card elevation="low" className="p-5">
               <Text
@@ -379,7 +375,13 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
               style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
             >
               {Array.from({ length: 30 }, (_, i) => i + 1).map((n) => (
-                <NumberChip key={n} number={n} selected={selectedJuz.has(n)} onToggle={() => toggleJuz(n)} isDark={isDark} />
+                <NumberChip
+                  key={n}
+                  number={n}
+                  selected={selectedJuz.has(n)}
+                  onToggle={() => toggleJuz(n)}
+                  isDark={isDark}
+                />
               ))}
             </View>
           )}
@@ -457,42 +459,22 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
         ayahLabel={s.ayahs}
       />
 
-      <ResponsiveSheet
-        open={visible && activeInfo !== null}
+      <ReviewSettingInfoSheet
+        visible={visible}
+        info={activeInfo}
         onClose={() => setActiveInfo(null)}
-        maxWidth={440}
-        maxHeight={isPhone ? "70%" : 360}
-        dir={isRTL ? "rtl" : "ltr"}
-      >
-        <OverlayHeader
-          title={activeInfo?.title ?? ""}
-          onClose={() => setActiveInfo(null)}
-          isRTL={isRTL}
-          showHandle={isPhone}
-        />
-        <OverlayBody
-          contentContainerClassName="px-5 py-5"
-          contentContainerStyle={{ direction: isRTL ? "rtl" : "ltr" }}
-        >
-          <Text
-            className="text-charcoal dark:text-neutral-200"
-            style={{
-              fontFamily: "Manrope_400Regular",
-              fontSize: 14,
-              lineHeight: 23,
-              textAlign: isRTL ? "right" : "left",
-              writingDirection: isRTL ? "rtl" : "ltr",
-            }}
-          >
-            {activeInfo?.body ?? ""}
-          </Text>
-        </OverlayBody>
-      </ResponsiveSheet>
+        isPhone={isPhone}
+        isRTL={isRTL}
+      />
 
       <SurahRangeEditor
         visible={visible && rangeTarget !== null}
         surah={rangeTarget}
-        range={rangeTarget ? selectedSurahRanges[rangeTarget.number] ?? { from: "1", to: String(rangeTarget.ayah_count) } : null}
+        range={
+          rangeTarget
+            ? (selectedSurahRanges[rangeTarget.number] ?? { from: "1", to: String(rangeTarget.ayah_count) })
+            : null
+        }
         rangeLabels={{
           from: `${s.flashcardsFrom} ${s.reflectionAyahLabel}`,
           to: `${s.flashcardsTo} ${s.reflectionAyahLabel}`,
@@ -610,13 +592,7 @@ function SurahSelectorSheet({
       maxHeight={isPhone ? "86%" : 680}
       dir={isRTL ? "rtl" : "ltr"}
     >
-      <OverlayHeader
-        title={title}
-        subtitle={selectedLabel}
-        onClose={onClose}
-        isRTL={isRTL}
-        showHandle={isPhone}
-      />
+      <OverlayHeader title={title} subtitle={selectedLabel} onClose={onClose} isRTL={isRTL} showHandle={isPhone} />
       <OverlayBody
         contentContainerClassName="px-5 py-4"
         contentContainerStyle={{ direction: isRTL ? "rtl" : "ltr", gap: 8 }}
@@ -704,16 +680,27 @@ function SurahFilterItem({
           )}
         </View>
         <View className="flex-1" style={{ minWidth: 0 }}>
-          <Text className="text-charcoal dark:text-neutral-200" style={{ fontFamily: "Manrope_500Medium", fontSize: 14, textAlign: isRTL ? "right" : "left" }}>
+          <Text
+            className="text-charcoal dark:text-neutral-200"
+            style={{ fontFamily: "Manrope_500Medium", fontSize: 14, textAlign: isRTL ? "right" : "left" }}
+          >
             {surah.name_english}
           </Text>
-          <Text className="text-warm-400 dark:text-neutral-500" style={{ fontFamily: "Manrope_400Regular", fontSize: 12, textAlign: isRTL ? "right" : "left" }}>
+          <Text
+            className="text-warm-400 dark:text-neutral-500"
+            style={{ fontFamily: "Manrope_400Regular", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
+          >
             {ayahCountLabel}
           </Text>
         </View>
         <Text
           className="text-charcoal dark:text-neutral-300"
-          style={{ fontFamily: "Manrope_400Regular", fontSize: 16, writingDirection: "rtl", textAlign: isRTL ? "left" : "right" }}
+          style={{
+            fontFamily: "Manrope_400Regular",
+            fontSize: 16,
+            writingDirection: "rtl",
+            textAlign: isRTL ? "left" : "right",
+          }}
         >
           {surah.name_arabic}
         </Text>
@@ -778,13 +765,7 @@ function SurahRangeEditor({
   onClose: () => void;
 }) {
   return (
-    <ResponsiveSheet
-      open={visible}
-      onClose={onClose}
-      maxWidth={420}
-      maxHeight={320}
-      dir={isRTL ? "rtl" : "ltr"}
-    >
+    <ResponsiveSheet open={visible} onClose={onClose} maxWidth={420} maxHeight={320} dir={isRTL ? "rtl" : "ltr"}>
       <OverlayHeader title={title} subtitle={surah?.name_english} onClose={onClose} isRTL={isRTL} showHandle />
       <OverlayBody scrollEnabled={false} contentContainerClassName="px-5 py-5">
         {range ? (
@@ -820,20 +801,22 @@ function SurahRangeEditor({
 function initialRangeState(
   rows: SurahRow[],
   surahs: number[],
-  ranges?: SurahAyahRange[]
+  ranges?: SurahAyahRange[],
 ): Record<number, RangeInputValue> {
   const rangeBySurah = new Map((ranges ?? []).map((range) => [range.surah, range]));
-  return Object.fromEntries(surahs.map((surahNumber) => {
-    const surah = rows.find((row) => row.number === surahNumber);
-    const range = rangeBySurah.get(surahNumber);
-    return [
-      surahNumber,
-      {
-        from: String(range?.ayahStart ?? 1),
-        to: String(range?.ayahEnd ?? surah?.ayah_count ?? 1),
-      },
-    ];
-  }));
+  return Object.fromEntries(
+    surahs.map((surahNumber) => {
+      const surah = rows.find((row) => row.number === surahNumber);
+      const range = rangeBySurah.get(surahNumber);
+      return [
+        surahNumber,
+        {
+          from: String(range?.ayahStart ?? 1),
+          to: String(range?.ayahEnd ?? surah?.ayah_count ?? 1),
+        },
+      ];
+    }),
+  );
 }
 
 function RangeInput({
@@ -892,7 +875,7 @@ function NumberChip({
         style={{
           fontFamily: selected ? "Manrope_700Bold" : "Manrope_500Medium",
           fontSize: 16,
-          color: selected ? "#fff" : (isDark ? "#a3a3a3" : "#6e5a47"),
+          color: selected ? "#fff" : isDark ? "#a3a3a3" : "#6e5a47",
         }}
       >
         {number}

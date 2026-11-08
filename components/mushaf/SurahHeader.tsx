@@ -1,13 +1,12 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Platform, Pressable, View, Text } from "react-native";
 import { Info } from "lucide-react-native";
 import {
-  loadSurahNameFont,
-  isSurahNameFontLoaded,
   surahNameBismillahGlyphs,
   surahNameFontName,
   surahNameGlyph,
 } from "@/lib/fonts/loader";
+import { useSurahNameFont } from "@/lib/fonts/use-surah-name-font";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { useSettings } from "@/lib/settings/context";
 import { toArabicNumber } from "@/lib/arabic";
@@ -53,10 +52,8 @@ export function SurahHeader({
     nameEnglish,
   };
 
-  const [surahNameFontReady, setSurahNameFontReady] = useState(() =>
-    isSurahNameFontLoaded()
-  );
   const needsSurahNameFont = Boolean(decorativeNameGlyph || showBismillah);
+  const surahNameFontReady = useSurahNameFont(needsSurahNameFont);
   const useDecorativeSurahName = Boolean(decorativeNameGlyph && surahNameFontReady);
   const renderedSurahName = useDecorativeSurahName ? decorativeNameGlyph! : displayName;
   const renderedSurahNameDirection = useDecorativeSurahName ? "ltr" : nameDirection;
@@ -74,24 +71,6 @@ export function SurahHeader({
           },
         } as any)
       : {};
-
-  useEffect(() => {
-    if (!needsSurahNameFont) return;
-    if (isSurahNameFontLoaded()) {
-      setSurahNameFontReady(true);
-      return;
-    }
-    setSurahNameFontReady(false);
-    let cancelled = false;
-    loadSurahNameFont()
-      .then(() => {
-        if (!cancelled) requestAnimationFrame(() => setSurahNameFontReady(true));
-      })
-      .catch(console.warn);
-    return () => {
-      cancelled = true;
-    };
-  }, [needsSurahNameFont]);
 
   if (compact) {
     return (

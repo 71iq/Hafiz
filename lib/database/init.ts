@@ -1,7 +1,9 @@
 import { Platform } from "react-native";
-import type { SQLiteDatabase } from "expo-sqlite";
+import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
+import { insertPreparedRows } from "@/lib/database/bulk-insert";
 import { createSchema, createTextSearchIndex, migrateUserSchema } from "./schema";
 import { normalizeArabicCore, normalizeArabicWord } from "@/lib/arabic";
+import { mapRowsToCanonicalWords, type CanonicalWord } from "@/lib/database/word-mapping";
 import {
   buildAyahCountIndex,
   computeReflectionJourneyFingerprint,
@@ -71,7 +73,10 @@ async function doLoadTafsirSourceFile(source: TafsirSourceId, surahNumber: numbe
       }
     }
     const resp = await fetch(path);
-    return resp.ok ? resp.json() : null;
+    if (!resp.ok) {
+      throw new Error("Failed to load tafsir source " + source + " surah " + surahNumber + ": HTTP " + resp.status);
+    }
+    return resp.json();
   }
   const loader = nativeTafsirSourceLoader(source, surahNumber);
   return loader ? loader() : null;
@@ -102,166 +107,7 @@ function stripDiacritics(text: string): string {
   return text.replace(ARABIC_DIACRITICS, "");
 }
 
-type CanonicalWord = {
-  pos: number;
-  word: string;
-  normalized: string;
-  core: string;
-};
-
-type SourceWordMatch = {
-  parts: string[];
-  text: string;
-  coreText: string;
-};
-
-type MappedWordRow = [number, number, number, string | null, string | null];
-
-// quran-words.com and Da'as use source-local entry indices; map by Arabic
-// text to MASAQ's canonical Mushaf word positions before storing them.
-function splitArabicParts(text: string | null | undefined): string[] {
-  return String(text ?? "")
-    .split(/\s+/)
-    .map(normalizeArabicWord)
-    .filter(Boolean);
-}
-
-function arabicVariants(value: string): string[] {
-  const core = normalizeArabicCore(value);
-  const variants = [value, core];
-  if (core.length > 2 && core.startsWith("ا")) variants.push(core.slice(1));
-  return Array.from(new Set(variants.filter((v) => v.length > 0)));
-}
-
-function compatibleArabicToken(a: string, b: string): boolean {
-  const aVariants = arabicVariants(a);
-  const bVariants = arabicVariants(b);
-  for (const av of aVariants) {
-    for (const bv of bVariants) {
-      if (av === bv) return true;
-      const min = Math.min(av.length, bv.length);
-      if (min >= 3 && (av.endsWith(bv) || bv.endsWith(av) || av.startsWith(bv) || bv.startsWith(av))) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
-function buildSourceWordMatch(text: string | null | undefined): SourceWordMatch | null {
-  const parts = splitArabicParts(text);
-  if (parts.length === 0) return null;
-  const coreParts = parts.map(normalizeArabicCore);
-  return {
-    parts,
-    text: parts.join(""),
-    coreText: coreParts.join(""),
-  };
-}
-
-function scoreCanonicalSpan(
-  canonicalWords: CanonicalWord[],
-  start: number,
-  end: number,
-  source: SourceWordMatch,
-): number {
-  const span = canonicalWords.slice(start, end);
-  if (span.length === 0 || source.parts.length === 0) return -1;
-
-  const spanParts = span.map((w) => w.normalized).filter(Boolean);
-  const spanText = spanParts.join("");
-  const sourceText = source.text;
-  const spanCore = span.map((w) => w.core).join("");
-  const sourceCore = source.coreText;
-
-  let score = -1;
-  if (
-    spanParts.length === source.parts.length &&
-    spanParts.every((part, index) => compatibleArabicToken(part, source.parts[index]))
-  ) {
-    score = 1000;
-  } else if (spanText === sourceText) {
-    score = 920;
-  } else if (spanCore && sourceCore && spanCore === sourceCore) {
-    score = 880;
-  } else {
-    const min = Math.min(spanText.length, sourceText.length);
-    if (min >= 4 && (spanText.endsWith(sourceText) || sourceText.endsWith(spanText))) {
-      score = 760;
-    } else if (min >= 5 && (spanText.includes(sourceText) || sourceText.includes(spanText))) {
-      score = 620;
-    }
-  }
-
-  if (score < 0) return -1;
-  score -= Math.abs(spanParts.length - source.parts.length) * 20;
-  score -= spanParts.length;
-  return score;
-}
-
-function findCanonicalSpan(
-  canonicalWords: CanonicalWord[],
-  source: SourceWordMatch,
-  cursor: number,
-): { start: number; end: number } | null {
-  const sourceParts = source.parts;
-  if (canonicalWords.length === 0 || sourceParts.length === 0) return null;
-
-  let best: { start: number; end: number; score: number } | null = null;
-  const scan = (from: number) => {
-    for (let start = from; start < canonicalWords.length; start++) {
-      const maxEnd = Math.min(canonicalWords.length, start + Math.max(sourceParts.length + 2, 3));
-      for (let end = start + 1; end <= maxEnd; end++) {
-        const score = scoreCanonicalSpan(canonicalWords, start, end, source);
-        if (
-          score >= 0 &&
-          (!best ||
-            score > best.score ||
-            (score === best.score && start >= cursor && best.start < cursor) ||
-            (score === best.score && Math.abs(start - cursor) < Math.abs(best.start - cursor)))
-        ) {
-          best = { start, end, score };
-        }
-      }
-    }
-  };
-
-  scan(Math.max(0, Math.min(cursor, canonicalWords.length - 1)));
-  if (!best) scan(0);
-  const result = best as { start: number; end: number; score: number } | null;
-  return result ? { start: result.start, end: result.end } : null;
-}
-
-function appendMappedWordRow(
-  rowsByKey: Map<string, MappedWordRow>,
-  surah: number,
-  ayah: number,
-  wordPos: number,
-  word: string | null,
-  value: string | null,
-  valueSeparator: string,
-) {
-  const key = `${surah}:${ayah}:${wordPos}`;
-  const existing = rowsByKey.get(key);
-  if (!existing) {
-    rowsByKey.set(key, [surah, ayah, wordPos, word, value]);
-    return;
-  }
-
-  if (word && existing[3] && !existing[3]!.includes(word)) {
-    existing[3] = `${existing[3]} / ${word}`;
-  } else if (word && !existing[3]) {
-    existing[3] = word;
-  }
-
-  if (value && existing[4] && !existing[4]!.includes(value)) {
-    existing[4] = `${existing[4]}${valueSeparator}${value}`;
-  } else if (value && !existing[4]) {
-    existing[4] = value;
-  }
-}
-
-async function loadCanonicalWordsByAyah(db: SQLiteDatabase): Promise<Map<string, CanonicalWord[]>> {
+async function loadCanonicalWordsByAyah(db: DatabaseExecutor): Promise<Map<string, CanonicalWord[]>> {
   const rows = await db.getAllAsync<{
     surah: number;
     ayah: number;
@@ -287,42 +133,7 @@ async function loadCanonicalWordsByAyah(db: SQLiteDatabase): Promise<Map<string,
   return byAyah;
 }
 
-function mapRowsToCanonicalWords(
-  canonicalByAyah: Map<string, CanonicalWord[]>,
-  sourceRows: any[],
-  getTargets: (row: any) => string[],
-  getValue: (row: any) => string | null,
-  valueSeparator: string,
-): MappedWordRow[] {
-  const cursors = new Map<string, number>();
-  const rowsByKey = new Map<string, MappedWordRow>();
-
-  for (const source of sourceRows) {
-    const word = source.word ? String(source.word) : null;
-    const wordMatch = buildSourceWordMatch(word);
-    if (!wordMatch) continue;
-    const value = getValue(source);
-    const targets = getTargets(source);
-    for (const target of targets) {
-      const [surah, ayah] = target.split(":").map((n) => parseInt(n, 10));
-      if (!Number.isFinite(surah) || !Number.isFinite(ayah)) continue;
-
-      const canonicalWords = canonicalByAyah.get(`${surah}:${ayah}`) ?? [];
-      const cursor = cursors.get(target) ?? 0;
-      const span = findCanonicalSpan(canonicalWords, wordMatch, cursor);
-      if (!span) continue;
-
-      cursors.set(target, span.end);
-      for (let index = span.start; index < span.end; index++) {
-        appendMappedWordRow(rowsByKey, surah, ayah, canonicalWords[index].pos, word, value, valueSeparator);
-      }
-    }
-  }
-
-  return Array.from(rowsByKey.values()).sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]);
-}
-
-async function isPopulated(db: SQLiteDatabase): Promise<boolean> {
+async function isPopulated(db: DatabaseExecutor): Promise<boolean> {
   try {
     const result = await db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM surahs");
     return (result?.count ?? 0) >= 114;
@@ -331,28 +142,19 @@ async function isPopulated(db: SQLiteDatabase): Promise<boolean> {
   }
 }
 
-async function batchInsert(db: SQLiteDatabase, sql: string, rows: any[][], batchSize: number = 500): Promise<void> {
+async function batchInsert(db: AppDatabase, sql: string, rows: any[][], batchSize: number = 500): Promise<void> {
   for (let i = 0; i < rows.length; i += batchSize) {
     const batch = rows.slice(i, i + batchSize);
-    await db.withTransactionAsync(async () => {
-      const stmt = await db.prepareAsync(sql);
-      try {
-        for (const row of batch) {
-          await stmt.executeAsync(row);
-        }
-      } finally {
-        await stmt.finalizeAsync();
-      }
-    });
+    await db.withTransactionAsync((tx) => insertPreparedRows(tx, sql, batch));
   }
 }
 
-async function readSetting(db: SQLiteDatabase, key: string): Promise<string | null> {
+async function readSetting(db: DatabaseExecutor, key: string): Promise<string | null> {
   const row = await db.getFirstAsync<{ value: string }>("SELECT value FROM user_settings WHERE key = ?", [key]);
   return row?.value ?? null;
 }
 
-async function writeSetting(db: SQLiteDatabase, key: string, value: string): Promise<void> {
+async function writeSetting(db: DatabaseExecutor, key: string, value: string): Promise<void> {
   await db.runAsync("INSERT OR REPLACE INTO user_settings (key, value) VALUES (?, ?)", [key, value]);
 }
 
@@ -366,7 +168,7 @@ const DEFAULT_SURAH_ENGLISH_NAMES = new Map(
     .map((row) => [row.number, row.name_english]),
 );
 
-async function ensureDefaultSurahEnglishNames(db: SQLiteDatabase): Promise<void> {
+async function ensureDefaultSurahEnglishNames(db: AppDatabase): Promise<void> {
   const baqaraName = DEFAULT_SURAH_ENGLISH_NAMES.get(2);
   if (!baqaraName) return;
 
@@ -382,7 +184,7 @@ async function ensureDefaultSurahEnglishNames(db: SQLiteDatabase): Promise<void>
 
 // ─── Import functions ────────────────────────────────────────
 
-async function importSurahs(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {
+async function importSurahs(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   const quranData = await loadData("quran-data.json");
   const surahs = quranData.tables.surahs;
   onProgress({ step: "Surahs", current: 1, total: TOTAL_STEPS, detail: `${surahs.length} surahs` });
@@ -403,7 +205,7 @@ async function importSurahs(db: SQLiteDatabase, onProgress: ProgressCallback): P
   console.log(`[Import] Surahs done: ${surahs.length} rows`);
 }
 
-async function importSurahInfo(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {
+async function importSurahInfo(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   const data = await loadData("surah-info.json");
   if (!Array.isArray(data)) throw new Error("Invalid surah-info.json");
   onProgress({ step: "Surah Information", current: 22, total: TOTAL_STEPS, detail: `${data.length} entries` });
@@ -425,7 +227,7 @@ async function importSurahInfo(db: SQLiteDatabase, onProgress: ProgressCallback)
   console.log(`[Import] Surah information done: ${rows.length} rows`);
 }
 
-async function importQuranText(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {
+async function importQuranText(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   const [quranData, qcf2Data] = await Promise.all([loadData("quran-data.json"), loadData("quran-qcf2.json")]);
   const texts = quranData.tables.quran_text;
   onProgress({ step: "Quran Text", current: 2, total: TOTAL_STEPS, detail: `${texts.length} ayahs` });
@@ -457,7 +259,7 @@ async function importQuranText(db: SQLiteDatabase, onProgress: ProgressCallback)
   console.log(`[Import] Quran text done: ${texts.length} rows`);
 }
 
-async function importJuzAndHizb(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {
+async function importJuzAndHizb(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   const quranData = await loadData("quran-data.json");
   const juzMap = quranData.tables.juz_map;
   const hizbMap = quranData.tables.hizb_map;
@@ -481,7 +283,7 @@ async function importJuzAndHizb(db: SQLiteDatabase, onProgress: ProgressCallback
   console.log(`[Import] Juz & Hizb done`);
 }
 
-async function importWordRoots(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {
+async function importWordRoots(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   const quranData = await loadData("quran-data.json");
   const roots = quranData.tables.word_roots;
   onProgress({ step: "Word Roots", current: 4, total: TOTAL_STEPS, detail: `${roots.length} words` });
@@ -496,7 +298,7 @@ async function importWordRoots(db: SQLiteDatabase, onProgress: ProgressCallback)
   console.log(`[Import] Word roots done: ${roots.length} rows`);
 }
 
-async function importTafseer(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {
+async function importTafseer(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   onProgress({ step: "Tafsir", current: 5, total: TOTAL_STEPS, detail: "Al-Muyassar (114 files)" });
   console.log(`[Import] Importing tafseer (muyassar) from 114 files...`);
 
@@ -518,7 +320,7 @@ async function importTafseer(db: SQLiteDatabase, onProgress: ProgressCallback): 
   console.log(`[Import] Tafsir (muyassar) done: ${totalRows} rows`);
 }
 
-async function importZilal(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {
+async function importZilal(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   onProgress({ step: "Tafsir", current: 6, total: TOTAL_STEPS, detail: "Fi Zilal al-Quran" });
   console.log(`[Import] Importing tafseer (zilal)...`);
 
@@ -539,37 +341,49 @@ async function importZilal(db: SQLiteDatabase, onProgress: ProgressCallback): Pr
   console.log(`[Import] Tafsir (zilal) done: ${allRows.length} rows`);
 }
 
-async function importSurahRowTafsirSource(
-  db: SQLiteDatabase,
-  source: TafsirSourceConfig,
-  onProgress: ProgressCallback,
-): Promise<number> {
-  onProgress({ step: "Tafsir", current: 7, total: TOTAL_STEPS, detail: source.progressDetail });
-  console.log(`[Import] Importing tafseer (${source.id}) from 114 surah files...`);
+type TafsirSourceCandidateRow = [surah: number, ayah: number, source: TafsirSourceId, text: string];
 
-  let inserted = 0;
-  for (let surahNumber = 1; surahNumber <= 114; surahNumber++) {
-    const data = await doLoadTafsirSourceFile(source.id, surahNumber);
-    if (!Array.isArray(data)) continue;
-    const rows: any[][] = [];
-    for (const row of data) {
-      const surah = Array.isArray(row) ? row[0] : row?.surah;
-      const ayah = Array.isArray(row) ? row[1] : row?.ayah;
-      const text = Array.isArray(row) ? row[2] : row?.text;
-      if (!Number.isInteger(surah) || !Number.isInteger(ayah)) continue;
-      const cleanText = stripHtml(String(text ?? ""));
-      if (cleanText.length === 0) continue;
-      rows.push([surah, ayah, source.id, cleanText]);
-    }
-    await batchInsert(db, "INSERT OR REPLACE INTO tafseer (surah, ayah, source, text) VALUES (?, ?, ?, ?)", rows);
-    inserted += rows.length;
-  }
-
-  console.log(`[Import] Tafsir (${source.id}) done: ${inserted} rows`);
-  return inserted;
+function isTafsirSourceRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-export async function ensureTafsirSourceImported(db: SQLiteDatabase, sourceId: TafsirSourceId): Promise<void> {
+function isUnknownArray(value: unknown): value is unknown[] {
+  return Array.isArray(value);
+}
+
+async function loadSurahRowTafsirSourceCandidate(source: TafsirSourceConfig): Promise<TafsirSourceCandidateRow[]> {
+  console.log("[Import] Staging tafseer (" + source.id + ") from 114 surah files...");
+
+  const rowsByCoordinate = new Map<string, TafsirSourceCandidateRow>();
+  for (let surahNumber = 1; surahNumber <= 114; surahNumber++) {
+    const data: unknown = await doLoadTafsirSourceFile(source.id, surahNumber);
+    if (!isUnknownArray(data)) continue;
+    for (const row of data) {
+      let surah: unknown;
+      let ayah: unknown;
+      let text: unknown;
+      if (Array.isArray(row)) {
+        [surah, ayah, text] = row;
+      } else if (isTafsirSourceRecord(row)) {
+        surah = row.surah;
+        ayah = row.ayah;
+        text = row.text;
+      } else {
+        continue;
+      }
+      if (typeof surah !== "number" || !Number.isInteger(surah)) continue;
+      if (typeof ayah !== "number" || !Number.isInteger(ayah)) continue;
+      const cleanText = stripHtml(String(text ?? ""));
+      if (cleanText.length === 0) continue;
+      const candidateRow: TafsirSourceCandidateRow = [surah, ayah, source.id, cleanText];
+      rowsByCoordinate.set(String(surah) + ":" + String(ayah), candidateRow);
+    }
+  }
+
+  return [...rowsByCoordinate.values()];
+}
+
+export async function ensureTafsirSourceImported(db: AppDatabase, sourceId: TafsirSourceId): Promise<void> {
   const source = TAFSIR_SOURCES.find((item) => item.id === sourceId);
   if (!source || source.importKind !== "surahRows") return;
 
@@ -579,14 +393,23 @@ export async function ensureTafsirSourceImported(db: SQLiteDatabase, sourceId: T
   );
   if ((sourceCount?.count ?? 0) >= (source.expectedRows ?? 6236)) return;
 
-  await db.runAsync("DELETE FROM tafseer WHERE source = ?", [source.id]);
-  const inserted = await importSurahRowTafsirSource(db, source, () => {});
-  if (inserted === 0) {
-    throw new Error(`Tafsir source ${source.id} is unavailable`);
+  const candidateRows = await loadSurahRowTafsirSourceCandidate(source);
+  if (candidateRows.length < (source.expectedRows ?? 6236)) {
+    throw new Error("Tafsir source " + source.id + " is unavailable");
   }
+
+  await db.withTransactionAsync(async (tx) => {
+    await tx.runAsync("DELETE FROM tafseer WHERE source = ?", [source.id]);
+    await insertPreparedRows(
+      tx,
+      "INSERT OR REPLACE INTO tafseer (surah, ayah, source, text) VALUES (?, ?, ?, ?)",
+      candidateRows,
+    );
+  });
+  console.log("[Import] Tafsir (" + source.id + ") done: " + candidateRows.length + " rows");
 }
 
-async function importTranslations(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {
+async function importTranslations(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   onProgress({ step: "Translations", current: 8, total: TOTAL_STEPS, detail: "Sahih International" });
   console.log(`[Import] Importing translations...`);
 
@@ -603,7 +426,7 @@ async function importTranslations(db: SQLiteDatabase, onProgress: ProgressCallba
   console.log(`[Import] Translations done: ${allRows.length} rows`);
 }
 
-async function importPageMap(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {
+async function importPageMap(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   const pageMapData = await loadData("page-map.json");
   onProgress({ step: "Page Map", current: 9, total: TOTAL_STEPS, detail: "604 pages" });
   console.log(`[Import] Importing ${pageMapData.length} page_map rows...`);
@@ -623,7 +446,7 @@ async function importPageMap(db: SQLiteDatabase, onProgress: ProgressCallback): 
   console.log(`[Import] Page map done: ${pageMapData.length} rows`);
 }
 
-async function importWordTranslations(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {
+async function importWordTranslations(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   const wbwData = await loadData("wbw/wbw.json");
   onProgress({ step: "Word-by-Word", current: 10, total: TOTAL_STEPS, detail: `${wbwData.length} words` });
   console.log(`[Import] Importing ${wbwData.length} word_translations rows...`);
@@ -644,7 +467,7 @@ async function importWordTranslations(db: SQLiteDatabase, onProgress: ProgressCa
   console.log(`[Import] Word translations done: ${wbwData.length} rows`);
 }
 
-async function importWordIrab(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {
+async function importWordIrab(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   const masaqData = await loadData("masaq/masaq-aggregated.json");
   onProgress({ step: "Grammar (إعراب)", current: 11, total: TOTAL_STEPS, detail: `${masaqData.length} words` });
   console.log(`[Import] Importing ${masaqData.length} word_irab rows...`);
@@ -668,7 +491,7 @@ async function importWordIrab(db: SQLiteDatabase, onProgress: ProgressCallback):
   console.log(`[Import] Word irab done: ${masaqData.length} rows`);
 }
 
-async function importPageLines(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {
+async function importPageLines(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   const pageLinesData = await loadData("layout/page-lines.json");
   onProgress({ step: "Page Layout", current: 13, total: TOTAL_STEPS, detail: `${pageLinesData.length} lines` });
   console.log(`[Import] Importing ${pageLinesData.length} page_lines rows...`);
@@ -690,7 +513,7 @@ async function importPageLines(db: SQLiteDatabase, onProgress: ProgressCallback)
   console.log(`[Import] Page lines done: ${pageLinesData.length} rows`);
 }
 
-async function importTajweed(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {
+async function importTajweed(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   const tajweedData = await loadData("tajweed.json");
   onProgress({ step: "Tajweed Rules", current: 12, total: TOTAL_STEPS, detail: `${tajweedData.length} ayahs` });
   console.log(`[Import] Importing tajweed rules...`);
@@ -714,7 +537,7 @@ async function importTajweed(db: SQLiteDatabase, onProgress: ProgressCallback): 
 
 // ─── New tab dataset importers ───────────────────────────────
 
-async function importWordMeaningsAr(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {
+async function importWordMeaningsAr(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   const data = await loadData("wbw-arabic-meanings.json");
   if (!Array.isArray(data)) return;
   onProgress({ step: "Arabic Meanings", current: 14, total: TOTAL_STEPS, detail: `${data.length} words` });
@@ -736,7 +559,7 @@ async function importWordMeaningsAr(db: SQLiteDatabase, onProgress: ProgressCall
   console.log(`[Import] word_meanings_ar done: ${rows.length} canonical rows`);
 }
 
-async function importWordIrabDaas(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {
+async function importWordIrabDaas(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   const data = await loadData("irab-per-word.json");
   if (!Array.isArray(data)) return;
   onProgress({ step: "Da'as Iʿrab", current: 15, total: TOTAL_STEPS, detail: `${data.length} words` });
@@ -759,7 +582,7 @@ async function importWordIrabDaas(db: SQLiteDatabase, onProgress: ProgressCallba
   console.log(`[Import] word_irab_daas done: ${rows.length} canonical rows (from ${data.length} source entries)`);
 }
 
-async function importTajweedRulesAr(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {
+async function importTajweedRulesAr(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   const data = await loadData("tajweed-rules-ar.json");
   if (!data || typeof data !== "object") return;
   const keys = Object.keys(data).filter((k) => !k.startsWith("_"));
@@ -778,7 +601,7 @@ async function importTajweedRulesAr(db: SQLiteDatabase, onProgress: ProgressCall
   console.log(`[Import] tajweed_rules_ar done: ${rows.length} rows`);
 }
 
-async function importTajweedRulesEn(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {
+async function importTajweedRulesEn(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   const data = await loadData("tajweed-rules-en.json");
   if (!data || typeof data !== "object") return;
   const keys = Object.keys(data).filter((k) => !k.startsWith("_"));
@@ -797,7 +620,7 @@ async function importTajweedRulesEn(db: SQLiteDatabase, onProgress: ProgressCall
   console.log(`[Import] tajweed_rules_en done: ${rows.length} rows`);
 }
 
-async function importQiraatEncyclopedia(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {
+async function importQiraatEncyclopedia(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   const data = await loadData("al-qira-at-al-mawsoo-ah-al-qur-aniyyah.json");
   if (!data || typeof data !== "object") return;
   onProgress({ step: "Qiraʾat", current: 18, total: TOTAL_STEPS, detail: "…" });
@@ -855,7 +678,7 @@ async function importQiraatEncyclopedia(db: SQLiteDatabase, onProgress: Progress
   console.log(`[Import] qiraat_encyclopedia done: ${rows.length} rows`);
 }
 
-async function importAsbabAlNuzul(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {
+async function importAsbabAlNuzul(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   const data = await loadData("asbab-al-nuzul.json");
   if (!data || typeof data !== "object" || data.schema_version !== "1.0") {
     throw new Error("Unsupported asbab_al_nuzul schema_version");
@@ -889,7 +712,7 @@ async function importAsbabAlNuzul(db: SQLiteDatabase, onProgress: ProgressCallba
   console.log(`[Import] asbab_al_nuzul done: ${rows.length} rows`);
 }
 
-async function importMutashabihat(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {
+async function importMutashabihat(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   const data = await loadData("mutashabihat/nourquran_hafiz.json");
   if (!data || typeof data !== "object" || data.schema_version !== "1.0") {
     throw new Error("Unsupported Nour Quran mutashabihat schema_version");
@@ -938,9 +761,9 @@ async function importMutashabihat(db: SQLiteDatabase, onProgress: ProgressCallba
   appendGroups(similarGroups, "similar");
   appendGroups(tailGroups, "tail");
 
-  await db.withTransactionAsync(async () => {
-    await db.runAsync("DELETE FROM mutashabihat_refs");
-    await db.runAsync("DELETE FROM mutashabihat_groups");
+  await db.withTransactionAsync(async (tx) => {
+    await tx.runAsync("DELETE FROM mutashabihat_refs");
+    await tx.runAsync("DELETE FROM mutashabihat_groups");
   });
 
   await batchInsert(
@@ -957,7 +780,7 @@ async function importMutashabihat(db: SQLiteDatabase, onProgress: ProgressCallba
   console.log(`[Import] mutashabihat done: ${groupRows.length} groups + ${refRows.length} refs`);
 }
 
-async function importReflectionJourneyLevels(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {
+async function importReflectionJourneyLevels(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   const [seedData, quranData, storedFingerprint, existingCountRow] = await Promise.all([
     loadData("reflection-journey.json"),
     loadData("quran-data.json"),
@@ -982,11 +805,11 @@ async function importReflectionJourneyLevels(db: SQLiteDatabase, onProgress: Pro
     return;
   }
 
-  await db.withTransactionAsync(async () => {
-    await db.runAsync("DELETE FROM reflection_journey_levels");
+  await db.withTransactionAsync(async (tx) => {
+    await tx.runAsync("DELETE FROM reflection_journey_levels");
 
     if (parsed.levels.length > 0) {
-      const stmt = await db.prepareAsync(
+      const stmt = await tx.prepareAsync(
         `INSERT INTO reflection_journey_levels
           (id, slug, order_index, title_en, title_ar, summary_en, summary_ar, response_prompt_en, response_prompt_ar, estimated_minutes, content_json)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -1012,13 +835,13 @@ async function importReflectionJourneyLevels(db: SQLiteDatabase, onProgress: Pro
       }
     }
 
-    await writeSetting(db, "reflection_journey_content_fingerprint", fingerprint);
+    await writeSetting(tx, "reflection_journey_content_fingerprint", fingerprint);
   });
 
   console.log(`[Import] Reflection Journey done: ${parsed.levels.length} levels`);
 }
 
-async function runNewTabImports(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {
+async function runNewTabImports(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   // Idempotent: only import tables that are empty. Safe to call on fresh
   // installs and existing installs alike. Wrap each in try/catch so a
   // single bad dataset doesn't block the rest.
@@ -1123,67 +946,67 @@ async function runNewTabImports(db: SQLiteDatabase, onProgress: ProgressCallback
   }
 }
 
-async function ensureQfUserSyncSchema(db: SQLiteDatabase): Promise<void> {
+async function ensureQfUserSyncSchema(db: DatabaseExecutor): Promise<void> {
   try {
     await db.execAsync("ALTER TABLE bookmarks ADD COLUMN updated_at TEXT");
-  } catch (_) {}
+  } catch {}
   try {
     await db.execAsync("ALTER TABLE bookmarks ADD COLUMN deleted_at TEXT");
-  } catch (_) {}
+  } catch {}
   try {
     await db.execAsync("ALTER TABLE bookmarks ADD COLUMN qf_bookmark_id TEXT");
-  } catch (_) {}
+  } catch {}
   try {
     await db.execAsync("ALTER TABLE bookmarks ADD COLUMN qf_synced_at TEXT");
-  } catch (_) {}
+  } catch {}
   try {
     await db.execAsync("ALTER TABLE bookmarks ADD COLUMN qf_sync_error TEXT");
-  } catch (_) {}
+  } catch {}
   try {
     await db.execAsync("ALTER TABLE bookmarks ADD COLUMN qf_is_in_default_collection INTEGER NOT NULL DEFAULT 0");
-  } catch (_) {}
+  } catch {}
   try {
     await db.execAsync("ALTER TABLE bookmarks ADD COLUMN qf_collections_count INTEGER NOT NULL DEFAULT 0");
-  } catch (_) {}
+  } catch {}
   await db.execAsync("UPDATE bookmarks SET updated_at = created_at WHERE updated_at IS NULL");
 
   try {
     await db.execAsync("ALTER TABLE study_cards ADD COLUMN updated_at TEXT");
-  } catch (_) {}
+  } catch {}
   try {
     await db.execAsync("ALTER TABLE study_cards ADD COLUMN suspended_at TEXT");
-  } catch (_) {}
+  } catch {}
   try {
     await db.execAsync("ALTER TABLE study_cards ADD COLUMN buried_until TEXT");
-  } catch (_) {}
+  } catch {}
   try {
     await db.execAsync("ALTER TABLE study_cards ADD COLUMN marked_at TEXT");
-  } catch (_) {}
+  } catch {}
   try {
     await db.execAsync("ALTER TABLE study_cards ADD COLUMN deleted_at TEXT");
-  } catch (_) {}
+  } catch {}
   await db.execAsync("UPDATE study_cards SET updated_at = created_at WHERE updated_at IS NULL");
 
   try {
     await db.execAsync("ALTER TABLE private_notes ADD COLUMN updated_at TEXT");
-  } catch (_) {}
+  } catch {}
   await db.execAsync("UPDATE private_notes SET updated_at = created_at WHERE updated_at IS NULL");
   try {
     await db.execAsync("ALTER TABLE private_notes ADD COLUMN qf_note_id TEXT");
-  } catch (_) {}
+  } catch {}
   try {
     await db.execAsync("ALTER TABLE private_notes ADD COLUMN qf_synced_at TEXT");
-  } catch (_) {}
+  } catch {}
   try {
     await db.execAsync("ALTER TABLE private_notes ADD COLUMN qf_sync_error TEXT");
-  } catch (_) {}
+  } catch {}
   try {
     await db.execAsync("ALTER TABLE private_notes ADD COLUMN qf_ranges_json TEXT");
-  } catch (_) {}
+  } catch {}
 
   try {
     await db.execAsync("ALTER TABLE reflection_journey_entries ADD COLUMN updated_at TEXT");
-  } catch (_) {}
+  } catch {}
   await db.execAsync("UPDATE reflection_journey_entries SET updated_at = created_at WHERE updated_at IS NULL");
 
   await db.execAsync(`
@@ -1210,7 +1033,7 @@ async function ensureQfUserSyncSchema(db: SQLiteDatabase): Promise<void> {
 
 // ─── Main initialization ─────────────────────────────────────
 
-export async function initializeDatabase(db: SQLiteDatabase, onProgress: ProgressCallback): Promise<void> {
+export async function initializeDatabase(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
   console.log("[Import] Creating schema...");
   await createSchema(db);
   await migrateUserSchema(db);
@@ -1230,10 +1053,10 @@ export async function initializeDatabase(db: SQLiteDatabase, onProgress: Progres
     // Ensure QCF2 columns exist (added after initial import)
     try {
       await db.execAsync("ALTER TABLE quran_text ADD COLUMN text_qcf2 TEXT NOT NULL DEFAULT ''");
-    } catch (_) {}
+    } catch {}
     try {
       await db.execAsync("ALTER TABLE quran_text ADD COLUMN v2_page INTEGER NOT NULL DEFAULT 0");
-    } catch (_) {}
+    } catch {}
 
     // Check if QCF2 data needs populating or updating (word grouping fix)
     const qcf2Check = await db.getFirstAsync<{ cnt: number }>(
@@ -1278,7 +1101,7 @@ export async function initializeDatabase(db: SQLiteDatabase, onProgress: Progres
       try {
         await db.getFirstAsync("SELECT source FROM tafseer LIMIT 1");
         hasSource = true;
-      } catch (_) {
+      } catch {
         hasSource = false;
       }
       if (!hasSource) {
@@ -1315,7 +1138,7 @@ export async function initializeDatabase(db: SQLiteDatabase, onProgress: Progres
     // Add text_search column for diacritics-stripped search (Phase 4 migration)
     try {
       await db.execAsync("ALTER TABLE quran_text ADD COLUMN text_search TEXT NOT NULL DEFAULT ''");
-    } catch (_) {}
+    } catch {}
     const searchCheck = await db.getFirstAsync<{ text_search: string }>(
       "SELECT text_search FROM quran_text WHERE surah = 1 AND ayah = 1",
     );
@@ -1335,7 +1158,7 @@ export async function initializeDatabase(db: SQLiteDatabase, onProgress: Progres
     // Migrate sync_queue table to add row_id, status, synced_at columns (Phase 6)
     try {
       await db.getFirstAsync("SELECT row_id FROM sync_queue LIMIT 1");
-    } catch (_) {
+    } catch {
       console.log("[Import] Migrating sync_queue table...");
       try {
         await db.execAsync(`

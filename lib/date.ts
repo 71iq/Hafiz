@@ -1,6 +1,4 @@
-export type DueDateInputResult =
-  | { ok: true; date: Date }
-  | { ok: false; reason: "invalid" | "past" };
+export type DueDateInputResult = { ok: true; date: Date } | { ok: false; reason: "invalid" | "past" };
 
 export function localStartOfTomorrow(base = new Date()): Date {
   const tomorrow = new Date(base);
@@ -24,9 +22,16 @@ export function formatLocalDateKey(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+export function formatUtcDateKey(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
 export function dayIndexFromLocalDateKey(dateKey: string): number {
   const [year, month, day] = dateKey.split("-").map(Number);
-  return Math.floor(new Date(year, (month || 1) - 1, day || 1).getTime() / 86400000);
+  const localDate = new Date(year, (month || 1) - 1, day || 1);
+  const calendarDate = new Date(0);
+  calendarDate.setUTCFullYear(localDate.getFullYear(), localDate.getMonth(), localDate.getDate());
+  return Math.floor(calendarDate.getTime() / 86400000);
 }
 
 export function dayIndexFromUtcDateKey(dateKey: string): number {

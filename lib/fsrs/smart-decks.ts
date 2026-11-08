@@ -1,6 +1,6 @@
-import type { SQLiteDatabase } from "expo-sqlite";
+import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import { enqueueSync } from "@/lib/database/sync-queue";
-import { deleteUserSetting, writeUserSetting } from "@/lib/database/user-settings";
+import { putUserSetting, removeUserSetting, writeUserSetting } from "@/lib/database/user-settings";
 import { createEmptyCard } from "./scheduler";
 import {
   ALL_NEW_CARD_SORT_ORDERS,
@@ -101,7 +101,7 @@ const SQLITE_PARAM_BATCH = 800;
 const INSERT_BATCH = 500;
 const ACTIVE_CARD_SQL = "deleted_at IS NULL";
 const REVIEWABLE_CARD_SQL = `${ACTIVE_CARD_SQL} AND suspended_at IS NULL AND (buried_until IS NULL OR buried_until <= ?)`;
-const retentionMigrationPromises = new WeakMap<SQLiteDatabase, Promise<number>>();
+const retentionMigrationPromises = new WeakMap<AppDatabase, Promise<number>>();
 
 function isReviewableCard(row: StudyCardRow, nowIso: string): boolean {
   return !row.deleted_at && !row.suspended_at && (!row.buried_until || row.buried_until <= nowIso);
@@ -154,7 +154,7 @@ function smartDeckFilterKey(deckId: SmartDeckId): string {
   return `smart_deck_filter_${deckId}`;
 }
 
-async function readFilterSetting(db: SQLiteDatabase, key: string): Promise<BuiltInDeckFilter | null> {
+async function readFilterSetting(db: DatabaseExecutor, key: string): Promise<BuiltInDeckFilter | null> {
   const row = await db.getFirstAsync<{ value: string }>(
     "SELECT value FROM user_settings WHERE key = ?",
     [key]
@@ -206,7 +206,7 @@ function normalizeSmartDeckFilter(filter: unknown): BuiltInDeckFilter {
 }
 
 export async function readSmartDeckFilter(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   deckId: SmartDeckId
 ): Promise<BuiltInDeckFilter> {
   return await readFilterSetting(db, smartDeckFilterKey(deckId))
@@ -214,7 +214,7 @@ export async function readSmartDeckFilter(
 }
 
 export async function writeSmartDeckFilter(
-  db: SQLiteDatabase,
+  db: AppDatabase,
   deckId: SmartDeckId,
   filter: BuiltInDeckFilter
 ): Promise<void> {
@@ -222,26 +222,29 @@ export async function writeSmartDeckFilter(
   await writeUserSetting(db, smartDeckFilterKey(deckId), JSON.stringify(normalized));
 }
 
-export async function readDefaultDeckFilter(db: SQLiteDatabase): Promise<BuiltInDeckFilter> {
+async function readDefaultDeckFilter(db: DatabaseExecutor): Promise<BuiltInDeckFilter> {
   return await readFilterSetting(db, ALL_DECKS_FILTER_KEY)
     ?? await readFilterSetting(db, smartDeckFilterKey(SMART_DECK_IDS.retention))
     ?? { type: "all" };
 }
 
 export async function writeAllDecksFilter(
-  db: SQLiteDatabase,
+  db: AppDatabase,
   filter: BuiltInDeckFilter
 ): Promise<void> {
   const normalized = normalizeSmartDeckFilter(filter);
   const value = JSON.stringify(normalized);
-  await writeUserSetting(db, ALL_DECKS_FILTER_KEY, value);
-  for (const deckId of SMART_DECK_ID_LIST) {
-    await writeUserSetting(db, smartDeckFilterKey(deckId), value);
-  }
+  // Every deck filter and its queued upload commit together, so no deck keeps a stale filter.
+  await db.withTransactionAsync(async (tx) => {
+    await putUserSetting(tx, ALL_DECKS_FILTER_KEY, value);
+    for (const deckId of SMART_DECK_ID_LIST) {
+      await putUserSetting(tx, smartDeckFilterKey(deckId), value);
+    }
+  });
 }
 
 export async function filterQuranRefsByDefaultDeckFilter<T extends { surah: number; ayah: number }>(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   rows: T[]
 ): Promise<T[]> {
   const filter = await readDefaultDeckFilter(db);
@@ -249,7 +252,7 @@ export async function filterQuranRefsByDefaultDeckFilter<T extends { surah: numb
 }
 
 export async function filterStudyRowsByDefaultDeckFilter<T extends { id: string }>(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   rows: T[]
 ): Promise<T[]> {
   const filter = await readDefaultDeckFilter(db);
@@ -265,7 +268,7 @@ export async function filterStudyRowsByDefaultDeckFilter<T extends { id: string 
   return rows.filter((row) => allowed.has(row));
 }
 
-export async function migrateLegacyRetentionDecks(db: SQLiteDatabase): Promise<number> {
+export async function migrateLegacyRetentionDecks(db: AppDatabase): Promise<number> {
   const running = retentionMigrationPromises.get(db);
   if (running) return running;
   const promise = runLegacyRetentionDeckMigration(db).finally(() => {
@@ -275,7 +278,19 @@ export async function migrateLegacyRetentionDecks(db: SQLiteDatabase): Promise<n
   return promise;
 }
 
-async function runLegacyRetentionDeckMigration(db: SQLiteDatabase): Promise<number> {
+/**
+ * Move legacy retention cards into the smart deck and drop legacy deck settings. Every local change
+ * and its queued upload commit in one transaction, so a queue failure leaves the legacy rows for retry.
+ */
+async function runLegacyRetentionDeckMigration(database: AppDatabase): Promise<number> {
+  let migrated = 0;
+  await database.withTransactionAsync(async (tx) => {
+    migrated = await migrateLegacyRetentionRows(tx);
+  });
+  return migrated;
+}
+
+async function migrateLegacyRetentionRows(db: DatabaseExecutor): Promise<number> {
   const now = new Date().toISOString();
   let migrated = 0;
   const syncOps: Array<{
@@ -293,115 +308,111 @@ async function runLegacyRetentionDeckMigration(db: SQLiteDatabase): Promise<numb
     [...SMART_DECK_ID_LIST, MEANINGS_DECK_ID]
   );
 
-  if (rows.length > 0) {
-    await db.withTransactionAsync(async () => {
-      for (const row of rows) {
-        const legacyAyahId = parseLegacyMutashabihatCardId(row.id);
-        if (legacyAyahId) {
-          const existing = await db.getFirstAsync<StudyCardRow>(
-            "SELECT * FROM study_cards WHERE id = ? AND deleted_at IS NULL",
-            [legacyAyahId]
-          );
-          await db.runAsync("UPDATE study_log SET card_id = ? WHERE card_id = ?", [legacyAyahId, row.id]);
-          if (existing?.id) {
-            const markedAt = existing.marked_at ?? row.marked_at ?? now;
-            await db.runAsync(
-              "UPDATE study_cards SET marked_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL",
-              [markedAt, now, legacyAyahId]
-            );
-            syncOps.push({
-              operation: "UPDATE",
-              rowId: legacyAyahId,
-              data: studyCardToSyncData({
-                ...existing,
-                marked_at: markedAt,
-                updated_at: now,
-              }),
-            });
-            await db.runAsync(
-              "UPDATE study_cards SET updated_at = ?, deleted_at = ? WHERE id = ? AND deleted_at IS NULL",
-              [now, now, row.id]
-            );
-            syncOps.push({
-              operation: "DELETE",
-              rowId: row.id,
-              data: {
-                ...studyCardToSyncData(row),
-                updated_at: now,
-                deleted_at: now,
-              },
-            });
-          } else {
-            const markedAt = row.marked_at ?? now;
-            await db.runAsync(
-              "UPDATE study_cards SET id = ?, deck_id = ?, marked_at = ?, updated_at = ?, deleted_at = NULL WHERE id = ? AND deleted_at IS NULL",
-              [legacyAyahId, SMART_DECK_IDS.retention, markedAt, now, row.id]
-            );
-            syncOps.push({
-              operation: "UPDATE",
-              rowId: legacyAyahId,
-              data: studyCardToSyncData({
-                ...row,
-                id: legacyAyahId,
-                deck_id: SMART_DECK_IDS.retention,
-                marked_at: markedAt,
-                updated_at: now,
-                deleted_at: null,
-              }),
-            });
-          }
-          migrated++;
-          continue;
-        }
-
-        if (!parseAyahCardId(row.id)) continue;
-        if (row.deck_id === SMART_DECK_IDS.retention) continue;
-        const markedAt = row.marked_at ?? now;
+  for (const row of rows) {
+    const legacyAyahId = parseLegacyMutashabihatCardId(row.id);
+    if (legacyAyahId) {
+      const existing = await db.getFirstAsync<StudyCardRow>(
+        "SELECT * FROM study_cards WHERE id = ? AND deleted_at IS NULL",
+        [legacyAyahId]
+      );
+      await db.runAsync("UPDATE study_log SET card_id = ? WHERE card_id = ?", [legacyAyahId, row.id]);
+      if (existing?.id) {
+        const markedAt = existing.marked_at ?? row.marked_at ?? now;
         await db.runAsync(
-          "UPDATE study_cards SET deck_id = ?, marked_at = ?, updated_at = ?, deleted_at = NULL WHERE id = ? AND deleted_at IS NULL",
-          [SMART_DECK_IDS.retention, markedAt, now, row.id]
+          "UPDATE study_cards SET marked_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL",
+          [markedAt, now, legacyAyahId]
         );
         syncOps.push({
           operation: "UPDATE",
+          rowId: legacyAyahId,
+          data: studyCardToSyncData({
+            ...existing,
+            marked_at: markedAt,
+            updated_at: now,
+          }),
+        });
+        await db.runAsync(
+          "UPDATE study_cards SET updated_at = ?, deleted_at = ? WHERE id = ? AND deleted_at IS NULL",
+          [now, now, row.id]
+        );
+        syncOps.push({
+          operation: "DELETE",
           rowId: row.id,
+          data: {
+            ...studyCardToSyncData(row),
+            updated_at: now,
+            deleted_at: now,
+          },
+        });
+      } else {
+        const markedAt = row.marked_at ?? now;
+        await db.runAsync(
+          "UPDATE study_cards SET id = ?, deck_id = ?, marked_at = ?, updated_at = ?, deleted_at = NULL WHERE id = ? AND deleted_at IS NULL",
+          [legacyAyahId, SMART_DECK_IDS.retention, markedAt, now, row.id]
+        );
+        syncOps.push({
+          operation: "UPDATE",
+          rowId: legacyAyahId,
           data: studyCardToSyncData({
             ...row,
+            id: legacyAyahId,
             deck_id: SMART_DECK_IDS.retention,
             marked_at: markedAt,
             updated_at: now,
             deleted_at: null,
           }),
         });
-        migrated++;
       }
+      migrated++;
+      continue;
+    }
+
+    if (!parseAyahCardId(row.id)) continue;
+    if (row.deck_id === SMART_DECK_IDS.retention) continue;
+    const markedAt = row.marked_at ?? now;
+    await db.runAsync(
+      "UPDATE study_cards SET deck_id = ?, marked_at = ?, updated_at = ?, deleted_at = NULL WHERE id = ? AND deleted_at IS NULL",
+      [SMART_DECK_IDS.retention, markedAt, now, row.id]
+    );
+    syncOps.push({
+      operation: "UPDATE",
+      rowId: row.id,
+      data: studyCardToSyncData({
+        ...row,
+        deck_id: SMART_DECK_IDS.retention,
+        marked_at: markedAt,
+        updated_at: now,
+        deleted_at: null,
+      }),
     });
+    migrated++;
   }
 
   for (const op of syncOps) {
-    enqueueSync(db, "study_cards", op.operation, op.rowId, op.data).catch(console.warn);
+    await enqueueSync(db, "study_cards", op.operation, op.rowId, op.data);
   }
 
   const deckSettings = await db.getAllAsync<{ key: string; value: string }>(
     "SELECT key, value FROM user_settings WHERE key LIKE 'deck_%'"
   );
-  await Promise.all(deckSettings.map(async (setting) => {
+  for (const setting of deckSettings) {
     let deckId = setting.key.startsWith("deck_") ? setting.key.slice("deck_".length) : "";
     try {
       const deck = JSON.parse(setting.value);
       deckId = typeof deck?.id === "string" ? deck.id : deckId;
-      if (deck?.id === MEANINGS_DECK_ID) return;
+      if (deck?.id === MEANINGS_DECK_ID) continue;
     } catch {}
-    await deleteUserSetting(db, setting.key);
+    await removeUserSetting(db, setting.key);
     if (deckId && deckId !== MEANINGS_DECK_ID) {
-      await deleteUserSetting(db, `review_settings_${deckId}`);
+      await removeUserSetting(db, `review_settings_${deckId}`);
     }
-  }));
+  }
 
   return migrated;
 }
 
 export async function getSmartDeckCandidateCardIds(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   deckId: SmartDeckId,
   filter?: BuiltInDeckFilter
 ): Promise<string[]> {
@@ -473,7 +484,7 @@ export async function getSmartDeckCandidateCardIds(
     .map((row) => `${prefix}${row.id}:${row.ref_sort_order}`);
 }
 
-export async function getAllMatchingSmartCardIdSet(db: SQLiteDatabase): Promise<Set<string>> {
+export async function getAllMatchingSmartCardIdSet(db: DatabaseExecutor): Promise<Set<string>> {
   const ids = await Promise.all(SMART_DECK_ID_LIST.map((deckId) => getSmartDeckCandidateCardIds(db, deckId)));
   return new Set(ids.flat());
 }
@@ -561,7 +572,7 @@ function applyReviewQueueOptions(rows: StudyCardRow[], options?: DueCardsForRevi
 }
 
 export async function getSmartDeckStats(
-  db: SQLiteDatabase,
+  db: AppDatabase,
   deckId: SmartDeckId,
   filter?: BuiltInDeckFilter
 ): Promise<SmartDeckStats> {
@@ -572,9 +583,9 @@ export async function getSmartDeckStats(
   if (ids.length === 0) return { total: 0, due: 0, newCount: 0 };
 
   const now = new Date().toISOString();
-  const rows = await getStudyCardsByIds(db, ids, deckId);
-  const existing = new Set(rows.map((row) => row.id));
-  const missing = ids.filter((id) => !existing.has(id)).length;
+  const [rows, live] = await Promise.all([getStudyCardsByIds(db, ids, deckId), getLiveStudyCardIds(db, ids)]);
+  // A candidate live in another deck is that deck's card; materialization skips it, so it is not new here.
+  const missing = ids.filter((id) => !live.has(id)).length;
   return {
     total: ids.length,
     due: rows.filter((row) => row.due <= now && isReviewableCard(row, now)).length + missing,
@@ -583,7 +594,7 @@ export async function getSmartDeckStats(
 }
 
 export async function getSmartDeckTodayStats(
-  db: SQLiteDatabase,
+  db: AppDatabase,
   deckId: SmartDeckId,
   options?: DueCardsForReviewOptions
 ): Promise<SmartDeckStats> {
@@ -595,13 +606,12 @@ export async function getSmartDeckTodayStats(
 
   const now = new Date().toISOString();
   const normalized = normalizeDueOptions(options);
-  const rows = await getStudyCardsByIds(db, ids, deckId);
-  const existing = new Set(rows.map((row) => row.id));
+  const [rows, live] = await Promise.all([getStudyCardsByIds(db, ids, deckId), getLiveStudyCardIds(db, ids)]);
   const dueRows = rows
     .filter((row) => row.due <= now && isReviewableCard(row, now))
     .sort((a, b) => a.due.localeCompare(b.due));
   const missingRows = ids
-    .filter((id) => !existing.has(id))
+    .filter((id) => !live.has(id))
     .slice(0, normalized.newCardsLimit)
     .map((id) => {
       const emptyCard = createEmptyCard();
@@ -635,7 +645,7 @@ export async function getSmartDeckTodayStats(
 }
 
 export async function materializeSmartDeckCards(
-  db: SQLiteDatabase,
+  db: AppDatabase,
   deckId: SmartDeckId,
   limit?: number,
   newCardsLimit = DEFAULT_DECK_NEW_CARD_LIMIT
@@ -686,9 +696,15 @@ export async function materializeSmartDeckCards(
     deleted_at: null,
   }));
 
-  await db.withTransactionAsync(async () => {
-    for (let i = 0; i < createdRows.length; i += INSERT_BATCH) {
-      const batch = createdRows.slice(i, i + INSERT_BATCH);
+  let insertedCount = 0;
+  await db.withTransactionAsync(async (tx) => {
+    // A card id is global. Skip ids that are live in any deck now, including rows a sync pull wrote
+    // after the deck-scoped read above; queueing an empty card for them would overwrite real progress.
+    const live = await getLiveStudyCardIds(tx, createdRows.map((row) => row.id));
+    const insertedRows = createdRows.filter((row) => !live.has(row.id));
+    insertedCount = insertedRows.length;
+    for (let i = 0; i < insertedRows.length; i += INSERT_BATCH) {
+      const batch = insertedRows.slice(i, i + INSERT_BATCH);
       const placeholders = batch.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").join(",");
       const params: any[] = [];
       for (const row of batch) {
@@ -713,7 +729,7 @@ export async function materializeSmartDeckCards(
           row.deleted_at
         );
       }
-      await db.runAsync(
+      await tx.runAsync(
         `INSERT INTO study_cards
           (id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days, learning_steps, reps, lapses, state, last_review, suspended_at, buried_until, marked_at, created_at, updated_at, deleted_at)
          VALUES ${placeholders}
@@ -739,17 +755,17 @@ export async function materializeSmartDeckCards(
         params
       );
     }
+    // New cards and their queued uploads commit together or not at all.
+    for (const row of insertedRows) {
+      await enqueueSync(tx, "study_cards", "INSERT", row.id, row);
+    }
   });
 
-  for (const row of createdRows) {
-    enqueueSync(db, "study_cards", "INSERT", row.id, row).catch(console.warn);
-  }
-
-  return createdRows.length;
+  return insertedCount;
 }
 
 export async function materializeAllSmartDeckCards(
-  db: SQLiteDatabase,
+  db: AppDatabase,
   limitPerDeck?: number,
   newCardsLimit = DEFAULT_DECK_NEW_CARD_LIMIT
 ): Promise<number> {
@@ -761,7 +777,7 @@ export async function materializeAllSmartDeckCards(
 }
 
 export async function getDueCardsForReview(
-  db: SQLiteDatabase,
+  db: AppDatabase,
   deckId?: string,
   options?: DueCardsForReviewOptions
 ): Promise<StudyCardRow[]> {
@@ -796,7 +812,7 @@ export async function getDueCardsForReview(
 }
 
 export async function getSmartCardContent(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   cardId: string
 ): Promise<SmartCardContent | null> {
   if (cardId.startsWith("mutashabihat:")) {
@@ -909,7 +925,7 @@ export async function getSmartCardContent(
 }
 
 async function getMutashabihatCardContent(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   groupId: string,
   targetSortOrder: number,
   kind: "mutashabihat" | "similarTail"
@@ -997,7 +1013,7 @@ async function getMutashabihatCardContent(
 }
 
 async function getPreviousAyahPromptContext(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   targetRef: SmartDeckRef
 ): Promise<{ textQcf2: string; v2Page: number } | null> {
   let previousSurah = targetRef.surah;
@@ -1233,7 +1249,7 @@ function normalizeArabicWords(text: string): string[] {
 }
 
 async function getSmartDeckDueRows(
-  db: SQLiteDatabase,
+  db: AppDatabase,
   deckId: SmartDeckId,
   dueUntil: string,
   now: string
@@ -1256,8 +1272,21 @@ async function getSmartDeckDueRows(
   return rows.sort((a, b) => a.due.localeCompare(b.due));
 }
 
+async function getLiveStudyCardIds(db: DatabaseExecutor, ids: string[]): Promise<Set<string>> {
+  const live = new Set<string>();
+  for (const chunk of chunks(ids, SQLITE_PARAM_BATCH)) {
+    const placeholders = chunk.map(() => "?").join(",");
+    const rows = await db.getAllAsync<{ id: string }>(
+      `SELECT id FROM study_cards WHERE deleted_at IS NULL AND id IN (${placeholders})`,
+      chunk
+    );
+    for (const row of rows) live.add(row.id);
+  }
+  return live;
+}
+
 async function getStudyCardsByIds(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   ids: string[],
   deckId: SmartDeckId
 ): Promise<StudyCardRow[]> {
@@ -1338,7 +1367,7 @@ function normalizeRanges(values: unknown[], surahs: number[]): SurahAyahRange[] 
 }
 
 async function filterQuranRefs<T extends { surah: number; ayah: number }>(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   rows: T[],
   filter: BuiltInDeckFilter
 ): Promise<T[]> {
@@ -1366,7 +1395,7 @@ function matchesSurahFilter(
 }
 
 async function readJuzRanges(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   juzNumbers: number[]
 ): Promise<Array<{ surah: number; ayah_start: number; ayah_end: number }>> {
   if (juzNumbers.length === 0) return [];

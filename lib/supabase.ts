@@ -1,4 +1,12 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import {
+  type SupabaseClient,
+  type SignInWithOAuthCredentials,
+  type SignInWithPasswordCredentials,
+  type SignUpWithPasswordCredentials,
+  type Session,
+} from "@supabase/supabase-js";
+import { createRootAuthRuntime } from "@/lib/auth/root-runtime";
+import type { AuthOwner } from "@/lib/auth/coordinator";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 import Constants from "expo-constants";
@@ -13,7 +21,10 @@ import Constants from "expo-constants";
 // 3. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY in .env.
 //    Vercel builds map Supabase integration vars in scripts/vercel-build.sh.
 
-const expoExtra = (Constants.expoConfig?.extra ?? Constants.manifest2?.extra ?? {}) as Record<string, string | undefined>;
+const expoExtra = (Constants.expoConfig?.extra ?? Constants.manifest2?.extra ?? {}) as Record<
+  string,
+  string | undefined
+>;
 
 const SUPABASE_URL =
   process.env.EXPO_PUBLIC_SUPABASE_URL ??
@@ -43,16 +54,14 @@ const SUPABASE_ANON_KEY =
 
 /** Returns true if the Supabase client is configured with real credentials */
 export function isSupabaseConfigured(): boolean {
-  return (
-    !SUPABASE_URL.includes("YOUR_PROJECT") &&
-    !SUPABASE_ANON_KEY.includes("YOUR_ANON_KEY")
-  );
+  return !SUPABASE_URL.includes("YOUR_PROJECT") && !SUPABASE_ANON_KEY.includes("YOUR_ANON_KEY");
 }
 
 // Lazy-initialize the Supabase client so the app can boot without
 // valid credentials (offline-first). The client is only created when
 // auth, sync, or community features actually access it.
 let _client: SupabaseClient | null = null;
+let _runtime: ReturnType<typeof createRootAuthRuntime> | null = null;
 
 export const supabase: SupabaseClient = new Proxy({} as SupabaseClient, {
   get(_target, prop) {
@@ -80,19 +89,62 @@ export const supabase: SupabaseClient = new Proxy({} as SupabaseClient, {
         }
         return undefined;
       }
-      _client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-        auth: {
-          // Keep the original browser session when the backend hostname changes.
-          ...(process.env.EXPO_PUBLIC_SUPABASE_AUTH_STORAGE_KEY
-            ? { storageKey: process.env.EXPO_PUBLIC_SUPABASE_AUTH_STORAGE_KEY }
-            : {}),
-          ...(Platform.OS !== "web" ? { storage: AsyncStorage } : {}),
-          autoRefreshToken: true,
-          persistSession: true,
-          detectSessionInUrl: Platform.OS === "web",
-        },
+      _runtime = createRootAuthRuntime({
+        url: SUPABASE_URL,
+        anonKey: SUPABASE_ANON_KEY,
+        storageKey: process.env.EXPO_PUBLIC_SUPABASE_AUTH_STORAGE_KEY || undefined,
+        isWeb: Platform.OS === "web",
+        nativeStorage: AsyncStorage,
       });
+      _client = _runtime.client;
     }
+    if (prop === "auth" && _runtime) return _runtime.auth;
     return (_client as any)[prop];
   },
 });
+
+function ownedRuntime() {
+  // Preserve lazy initialization and the unconfigured main proxy behavior.
+  void supabase.auth;
+  if (!_runtime) throw new Error("Supabase not configured");
+  return _runtime;
+}
+export function updateOwnedPassword(owner: AuthOwner, session: Session | null, password: string) {
+  return ownedRuntime().updatePassword(owner, session, password);
+}
+export function signOutOwnedSession(owner: AuthOwner, session: Session | null) {
+  return ownedRuntime().signOut(owner, session);
+}
+
+export function restoreOwnedSession(
+  owner: AuthOwner,
+  session: Session | null,
+  tokens: { access_token: string; refresh_token: string },
+  isActive: () => boolean,
+  expectedUserId?: string,
+) {
+  return ownedRuntime().restoreSession(owner, session, tokens, isActive, expectedUserId);
+}
+
+export function readOwnedSession(owner: AuthOwner, session: Session | null, isActive: () => boolean) {
+  return ownedRuntime().readSession(owner, session, isActive);
+}
+
+export function prepareOwnedLink(owner: AuthOwner, session: Session | null, credentials: SignInWithOAuthCredentials) {
+  return ownedRuntime().prepareLink(owner, session, credentials);
+}
+
+export function signInOwnedPassword(
+  owner: AuthOwner,
+  session: Session | null,
+  credentials: SignInWithPasswordCredentials,
+) {
+  return ownedRuntime().signInWithPassword(owner, session, credentials);
+}
+export function signUpOwnedPassword(
+  owner: AuthOwner,
+  session: Session | null,
+  credentials: SignUpWithPasswordCredentials,
+) {
+  return ownedRuntime().signUp(owner, session, credentials);
+}

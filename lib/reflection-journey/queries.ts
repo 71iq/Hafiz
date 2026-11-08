@@ -1,4 +1,4 @@
-import type { SQLiteDatabase } from "expo-sqlite";
+import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import { enqueueSync } from "@/lib/database/sync-queue";
 import {
   parseStoredReflectionJourneyBlocks,
@@ -38,7 +38,7 @@ type EntryRow = {
 };
 
 export async function listReflectionJourneyLevels(
-  db: SQLiteDatabase
+  db: DatabaseExecutor
 ): Promise<ReflectionJourneyLevelListItem[]> {
   const [levelRows, entryRows] = await Promise.all([
     db.getAllAsync<LevelRow>(
@@ -78,7 +78,7 @@ export async function listReflectionJourneyLevels(
 }
 
 async function getReflectionJourneyLevel(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   levelId: string
 ): Promise<ReflectionJourneyLevelDetail | null> {
   const levels = await listReflectionJourneyLevels(db);
@@ -86,7 +86,7 @@ async function getReflectionJourneyLevel(
 }
 
 export async function getReflectionJourneySummary(
-  db: SQLiteDatabase
+  db: DatabaseExecutor
 ): Promise<ReflectionJourneySummary> {
   const levels = await listReflectionJourneyLevels(db);
   const completedLevels = levels.filter((level) => level.status === "completed").length;
@@ -104,7 +104,7 @@ export async function getReflectionJourneySummary(
 }
 
 export async function saveReflectionJourneyDraft(
-  db: SQLiteDatabase,
+  db: AppDatabase,
   levelId: string,
   responseText: string
 ): Promise<ReflectionJourneyEntry> {
@@ -125,7 +125,7 @@ export async function saveReflectionJourneyDraft(
 }
 
 export async function completeReflectionJourneyLevel(
-  db: SQLiteDatabase,
+  db: AppDatabase,
   levelId: string,
   responseText: string
 ): Promise<ReflectionJourneyEntry> {
@@ -158,8 +158,24 @@ export async function completeReflectionJourneyLevel(
   );
 }
 
+/** Save a journey entry. The row and its upload queue entry commit together or not at all. */
 async function upsertReflectionJourneyEntry(
-  db: SQLiteDatabase,
+  database: AppDatabase,
+  levelId: string,
+  responseText: string,
+  status: ReflectionJourneyEntryStatus,
+  completedAt: string | null
+): Promise<ReflectionJourneyEntry> {
+  let entry: ReflectionJourneyEntry | null = null;
+  await database.withTransactionAsync(async (db) => {
+    entry = await upsertReflectionJourneyEntryRow(db, levelId, responseText, status, completedAt);
+  });
+  if (!entry) throw new Error("Reflection Journey entry was not saved.");
+  return entry;
+}
+
+async function upsertReflectionJourneyEntryRow(
+  db: DatabaseExecutor,
   levelId: string,
   responseText: string,
   status: ReflectionJourneyEntryStatus,
@@ -194,7 +210,7 @@ async function upsertReflectionJourneyEntry(
     ]
   );
 
-  enqueueSync(db, "reflection_journey_entries", "INSERT", row.level_id, rowToSyncData(row)).catch(console.warn);
+  await enqueueSync(db, "reflection_journey_entries", "INSERT", row.level_id, rowToSyncData(row));
 
   return rowToEntry(row);
 }

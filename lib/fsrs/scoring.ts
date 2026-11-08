@@ -1,4 +1,4 @@
-import type { SQLiteDatabase } from "expo-sqlite";
+import type { DatabaseExecutor } from "@/lib/database/types";
 import { Rating } from "ts-fsrs";
 
 /**
@@ -32,7 +32,7 @@ export function computeReviewPoints(
 }
 
 /** Get today's total score from user_settings */
-export async function getTodayScore(db: SQLiteDatabase): Promise<{ score: number; reviewsCount: number }> {
+export async function getTodayScore(db: DatabaseExecutor): Promise<{ score: number; reviewsCount: number }> {
   const today = new Date().toISOString().split("T")[0];
   const key = `daily_score_${today}`;
   const row = await db.getFirstAsync<{ value: string }>(
@@ -49,7 +49,7 @@ export async function getTodayScore(db: SQLiteDatabase): Promise<{ score: number
 
 /** Add points to today's daily score */
 export async function addTodayPoints(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   points: number
 ): Promise<void> {
   const today = new Date().toISOString().split("T")[0];
@@ -70,7 +70,7 @@ export async function addTodayPoints(
 }
 
 /** Get the total accumulated score across all days */
-export async function getTotalScore(db: SQLiteDatabase): Promise<number> {
+export async function getTotalScore(db: DatabaseExecutor): Promise<number> {
   const rows = await db.getAllAsync<{ value: string }>(
     "SELECT value FROM user_settings WHERE key LIKE 'daily_score_%'"
   );

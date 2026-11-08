@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Platform, Pressable, Text, TextInput, View } from "react-native";
-import { Redirect, useRouter } from "expo-router";
+import { ActivityIndicator, Pressable, Text, TextInput, View } from "react-native";
+import { Redirect, useRouter, useNavigation } from "expo-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Eye, EyeOff, Lock } from "lucide-react-native";
-import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { isSupabaseConfigured } from "@/lib/supabase";
 import { isEmailAuthFlowsEnabled } from "@/lib/auth/config";
 import { useAuthStore } from "@/lib/auth/store";
+import { usePasswordRecovery } from "@/lib/auth/password-recovery";
 import { strings } from "@/lib/i18n/strings";
 import type { UIStrings } from "@/lib/i18n/strings";
 import { getStartupLanguage } from "@/lib/i18n/startup-language";
@@ -33,21 +34,52 @@ function createResetPasswordSchema(s: UIStrings) {
     });
 }
 
+function passwordResetErrorMessage(error: unknown, strings: UIStrings): string {
+  if (typeof error === "object" && error !== null) {
+    if ("code" in error && error.code === "auth_storage_lock_unavailable") return strings.authResetBrowserUnsupported;
+    if ("message" in error && typeof error.message === "string") return error.message;
+  }
+  return String(error);
+}
+
 export default function ResetPasswordScreen() {
   if (!isEmailAuthFlowsEnabled()) return <Redirect href="/auth/login" />;
-  return <ResetPasswordFormScreen />;
+  return <RecoveryForm />;
+}
+
+function RecoveryForm() {
+  const { formKey } = usePasswordRecovery();
+  return <ResetPasswordFormScreen key={formKey} />;
 }
 
 function ResetPasswordFormScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const locale = getStartupLanguage();
   const dir: Direction = locale === "ar" ? "rtl" : "ltr";
   const s = strings[locale];
   const schema = useMemo(() => createResetPasswordSchema(s), [s]);
-  const { updatePassword, isLoading, error } = useAuthStore();
-  const [message, setMessage] = useState<string | null>(null);
-  const [messageType, setMessageType] = useState<"success" | "error">("error");
-  const [ready, setReady] = useState(false);
+  const isLoading = useAuthStore((value) => value.isLoading);
+  const recovery = usePasswordRecovery();
+  const { attach, leave } = recovery;
+  useEffect(() => {
+    attach();
+    return navigation.addListener("beforeRemove", leave);
+  }, [navigation, attach, leave]);
+  const ready = recovery.state.kind === "ready";
+  const passwordBusy = ["saving", "signing-out", "finished"].includes(recovery.state.kind);
+  const success = recovery.state.kind === "signing-out" || recovery.state.kind === "finished";
+  const message =
+    recovery.state.kind === "failed"
+      ? passwordResetErrorMessage(recovery.state.error, s)
+      : recovery.state.kind === "ready" && recovery.state.error
+        ? passwordResetErrorMessage(recovery.state.error, s)
+        : recovery.state.kind === "invalid"
+          ? s.authResetLinkInvalid
+          : success
+            ? s.authPasswordUpdated
+            : null;
+  const messageType = success ? "success" : "error";
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [confirmPasswordVisible, setConfirmPasswordVisible] = useState(false);
   const configured = isSupabaseConfigured();
@@ -62,48 +94,8 @@ function ResetPasswordFormScreen() {
     defaultValues: { password: "", confirmPassword: "" },
   });
 
-  useEffect(() => {
-    if (!configured || Platform.OS !== "web") {
-      setReady(configured);
-      return;
-    }
-
-    const params = new URLSearchParams(window.location.hash.slice(1));
-    const accessToken = params.get("access_token");
-    const refreshToken = params.get("refresh_token");
-
-    if (!accessToken || !refreshToken) {
-      setMessageType("error");
-      setMessage(s.authResetLinkInvalid);
-      setReady(false);
-      return;
-    }
-
-    supabase.auth
-      .setSession({ access_token: accessToken, refresh_token: refreshToken })
-      .then(({ error: sessionError }) => {
-        if (sessionError) {
-          setMessageType("error");
-          setMessage(sessionError.message);
-          setReady(false);
-          return;
-        }
-        setReady(true);
-      });
-  }, [configured, s.authResetLinkInvalid]);
-
   const onSubmit = async (data: ResetPasswordForm) => {
-    try {
-      setMessage(null);
-      await updatePassword(data.password);
-      setMessageType("success");
-      setMessage(s.authPasswordUpdated);
-      await supabase.auth.signOut();
-      router.replace("/auth/login");
-    } catch (err: any) {
-      setMessageType("error");
-      setMessage(err.message);
-    }
+    await recovery.submit(data.password);
   };
 
   const unavailableContent = !configured ? (
@@ -123,7 +115,7 @@ function ResetPasswordFormScreen() {
       unavailableContent={unavailableContent}
     >
       <View className="w-full">
-        <AuthFormNotice message={message || error} tone={messageType} dir={dir} />
+        <AuthFormNotice message={message} tone={messageType} dir={dir} />
 
         <FormTextField
           control={control}
@@ -181,8 +173,8 @@ function ResetPasswordFormScreen() {
 
         <View className="h-7" />
 
-        <Button onPress={handleSubmit(onSubmit)} disabled={isLoading || !ready} size="lg" dir={dir}>
-          {isLoading ? (
+        <Button onPress={handleSubmit(onSubmit)} disabled={isLoading || passwordBusy || !ready} size="lg" dir={dir}>
+          {isLoading || passwordBusy ? (
             <ActivityIndicator size="small" color="#FFFFFF" />
           ) : (
             <Text

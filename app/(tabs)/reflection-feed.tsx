@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { reflectionQueryKeys } from "@/lib/reflections/query-keys";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, RefreshControl, Text, TextInput, View, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { FlashList } from "@shopify/flash-list";
@@ -22,6 +23,7 @@ import { isSupabaseConfigured } from "@/lib/supabase";
 import { setPendingDeepLink } from "@/lib/deep-link";
 import { toArabicNumber } from "@/lib/arabic";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
+import { findJuzRangeForAyah } from "@/lib/mushaf/position";
 
 type SurahOption = {
   number: number;
@@ -69,7 +71,9 @@ export default function ReflectionFeedScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [pickerMode, setPickerMode] = useState<PickerMode>(null);
   const [commentsReflectionId, setCommentsReflectionId] = useState<string | null>(null);
-  const [commentDeltas, setCommentDeltas] = useState<Record<string, number>>({});
+  const [commentDeltas, setCommentDeltas] = useState<
+    Record<string, { viewerId: string | undefined; base: number; count: number; revision: number; scope: string }>
+  >({});
   const [toast, setToast] = useState<string | null>(null);
   const normalizedSearchQuery = searchQuery.trim().replace(/\s+/g, " ").slice(0, 120);
 
@@ -85,7 +89,7 @@ export default function ReflectionFeedScreen() {
     queryFn: async (): Promise<FilterOptions> => {
       const [surahs, juzRows, juzRanges] = await Promise.all([
         db.getAllAsync<{ number: number; name_arabic: string; name_english: string }>(
-          "SELECT number, name_arabic, name_english FROM surahs ORDER BY number"
+          "SELECT number, name_arabic, name_english FROM surahs ORDER BY number",
         ),
         db.getAllAsync<{
           juz: number;
@@ -105,10 +109,10 @@ export default function ReflectionFeedScreen() {
              FROM juz_map GROUP BY juz
            ) j_start
            JOIN surahs s ON s.number = CAST(j_start.sk / 10000 AS INTEGER)
-           ORDER BY j_start.juz`
+           ORDER BY j_start.juz`,
         ),
         db.getAllAsync<ReflectionJuzRange>(
-          "SELECT juz, surah, ayah_start, ayah_end FROM juz_map ORDER BY juz, surah, ayah_start"
+          "SELECT juz, surah, ayah_start, ayah_end FROM juz_map ORDER BY juz, surah, ayah_start",
         ),
       ]);
       const rangesByJuz = new Map<number, ReflectionJuzRange[]>();
@@ -137,22 +141,34 @@ export default function ReflectionFeedScreen() {
     staleTime: Infinity,
   });
 
-  const filter = useMemo<ReflectionFeedFilter>(
-    () => {
-      if (filterKind === "surah" && selectedSurah !== null) return { type: "surah", surah: selectedSurah };
-      if (filterKind === "juz" && selectedJuz !== null) return { type: "juz", juz: selectedJuz };
-      return { type: "all" };
-    },
-    [filterKind, selectedJuz, selectedSurah]
-  );
+  const filter = useMemo<ReflectionFeedFilter>(() => {
+    if (filterKind === "surah" && selectedSurah !== null) return { type: "surah", surah: selectedSurah };
+    if (filterKind === "juz" && selectedJuz !== null) return { type: "juz", juz: selectedJuz };
+    return { type: "all" };
+  }, [filterKind, selectedJuz, selectedSurah]);
 
   const selectedJuzRanges = useMemo(
-    () => (filterKind === "juz" && selectedJuz !== null ? options.juz.find((juz) => juz.juz === selectedJuz)?.ranges : undefined),
-    [filterKind, options.juz, selectedJuz]
+    () =>
+      filterKind === "juz" && selectedJuz !== null
+        ? options.juz.find((juz) => juz.juz === selectedJuz)?.ranges
+        : undefined,
+    [filterKind, options.juz, selectedJuz],
   );
 
+  const feedKey = useMemo(
+    () =>
+      reflectionQueryKeys.feed.list({
+        filter,
+        sort,
+        viewerId: user?.id,
+        juzRanges: selectedJuzRanges,
+        searchTerm: normalizedSearchQuery,
+      }),
+    [filter, sort, user?.id, selectedJuzRanges, normalizedSearchQuery],
+  );
+  const feedScope = JSON.stringify(feedKey);
   const feedQuery = useInfiniteQuery({
-    queryKey: ["reflectionFeed", filter, sort, user?.id, selectedJuzRanges, normalizedSearchQuery],
+    queryKey: feedKey,
     queryFn: ({ pageParam }) =>
       fetchReflectionFeed({
         filter,
@@ -168,13 +184,41 @@ export default function ReflectionFeedScreen() {
     staleTime: 1000 * 60 * 2,
   });
 
-  const reflections = useMemo(() => {
-    const rows = feedQuery.data?.pages.flatMap((page) => page.data) ?? [];
-    return rows.map((reflection) => ({
-      ...reflection,
-      comments_count: reflection.comments_count + (commentDeltas[reflection.id] ?? 0),
-    }));
-  }, [commentDeltas, feedQuery.data]);
+  // Query's update counter also distinguishes successful structurally identical replies.
+  const feedRevision = queryClient.getQueryState(feedKey)?.dataUpdateCount ?? 0;
+  const rawReflections = useMemo(() => feedQuery.data?.pages.flatMap((page) => page.data) ?? [], [feedQuery.data]);
+  useLayoutEffect(() => {
+    setCommentDeltas((previous) => {
+      const entries = Object.entries(previous);
+      const retained = entries.filter(
+        ([, overlay]) =>
+          overlay.viewerId === user?.id && overlay.revision === feedRevision && overlay.scope === feedScope,
+      );
+      return retained.length === entries.length ? previous : Object.fromEntries(retained);
+    });
+  }, [feedRevision, user?.id, feedScope]);
+  const reflections = useMemo(
+    () =>
+      rawReflections.map((reflection) => {
+        const overlay = commentDeltas[reflection.id];
+        return {
+          ...reflection,
+          comments_count:
+            reflection.comments_count +
+            (overlay?.viewerId === user?.id &&
+            overlay?.revision === feedRevision &&
+            overlay?.scope === feedScope &&
+            overlay?.base === reflection.comments_count
+              ? overlay.count
+              : 0),
+        };
+      }),
+    [commentDeltas, rawReflections, user?.id, feedRevision, feedScope],
+  );
+  useLayoutEffect(() => {
+    setCommentDeltas({});
+    setCommentsReflectionId(null);
+  }, [user?.id]);
 
   const surahByNumber = useMemo(() => {
     const map = new Map<number, SurahOption>();
@@ -185,13 +229,11 @@ export default function ReflectionFeedScreen() {
   const findJuzForAyah = useCallback(
     (surah: number, ayah: number): number | null => {
       for (const juz of options.juz) {
-        for (const range of juz.ranges) {
-          if (range.surah === surah && ayah >= range.ayah_start && ayah <= range.ayah_end) return juz.juz;
-        }
+        if (findJuzRangeForAyah(juz.ranges, surah, ayah)) return juz.juz;
       }
       return null;
     },
-    [options.juz]
+    [options.juz],
   );
 
   const selectedSurahLabel = useMemo(() => {
@@ -202,8 +244,11 @@ export default function ReflectionFeedScreen() {
   }, [s.reflectionFeedFilterAll, s.tabSurah, selectedSurah, surahByNumber, uiLanguage]);
 
   const selectedJuzLabel = useMemo(
-    () => (selectedJuz === null ? s.reflectionFeedFilterAll : `${s.tabJuz} ${uiLanguage === "ar" ? toArabicNumber(selectedJuz) : selectedJuz}`),
-    [s.reflectionFeedFilterAll, s.tabJuz, selectedJuz, uiLanguage]
+    () =>
+      selectedJuz === null
+        ? s.reflectionFeedFilterAll
+        : `${s.tabJuz} ${uiLanguage === "ar" ? toArabicNumber(selectedJuz) : selectedJuz}`,
+    [s.reflectionFeedFilterAll, s.tabJuz, selectedJuz, uiLanguage],
   );
 
   const selectedFilterKindLabel =
@@ -230,10 +275,30 @@ export default function ReflectionFeedScreen() {
 
   const handleCommentAdded = useCallback(
     (reflectionId: string) => {
-      setCommentDeltas((prev) => ({ ...prev, [reflectionId]: (prev[reflectionId] ?? 0) + 1 }));
-      queryClient.invalidateQueries({ queryKey: ["reflectionFeed"] });
+      const base = rawReflections.find((row) => row.id === reflectionId)?.comments_count;
+      if (base !== undefined && queryClient.getQueryState(feedKey)?.dataUpdateCount === feedRevision)
+        setCommentDeltas((prev) => {
+          const previous = prev[reflectionId];
+          return {
+            ...prev,
+            [reflectionId]: {
+              viewerId: user?.id,
+              base,
+              revision: feedRevision,
+              scope: feedScope,
+              count:
+                previous?.base === base &&
+                previous.viewerId === user?.id &&
+                previous.revision === feedRevision &&
+                previous.scope === feedScope
+                  ? previous.count + 1
+                  : 1,
+            },
+          };
+        });
+      void queryClient.invalidateQueries({ queryKey: reflectionQueryKeys.feed.all });
     },
-    [queryClient]
+    [rawReflections, user?.id, queryClient, feedKey, feedRevision, feedScope],
   );
 
   const openPostModal = useCallback((reflectionId: string) => {
@@ -267,7 +332,7 @@ export default function ReflectionFeedScreen() {
 
       return `${surahName ?? s.tabSurah} ${ayahPart}${juzPart ? ` · ${juzPart}` : ""}`;
     },
-    [findJuzForAyah, s.tabJuz, s.tabSurah, surahByNumber, uiLanguage]
+    [findJuzForAyah, s.tabJuz, s.tabSurah, surahByNumber, uiLanguage],
   );
 
   const renderReflection = useCallback(
@@ -284,32 +349,37 @@ export default function ReflectionFeedScreen() {
         onAuthRequired={showAuthRequired}
       />
     ),
-    [formatReference, handleReferencePress, openPostModal, showAuthRequired]
+    [formatReference, handleReferencePress, openPostModal, showAuthRequired],
   );
 
   const commentsReflection = useMemo(
     () => reflections.find((reflection) => reflection.id === commentsReflectionId) ?? null,
-    [commentsReflectionId, reflections]
+    [commentsReflectionId, reflections],
   );
 
-  const listFooter = configured && feedQuery.hasNextPage ? (
-    <Pressable
-      onPress={() => feedQuery.fetchNextPage()}
-      disabled={feedQuery.isFetchingNextPage}
-      className="mb-10 mt-2 items-center rounded-full bg-primary-accent py-3 dark:bg-primary-bright"
-      style={({ pressed }) => ({ opacity: pressed || feedQuery.isFetchingNextPage ? 0.65 : 1 })}
-    >
-      {feedQuery.isFetchingNextPage ? (
-        <ActivityIndicator size="small" color="#FFFFFF" />
-      ) : (
-        <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13, color: "#FFFFFF" }}>
-          {s.reflectionLoadMore}
-        </Text>
-      )}
-    </Pressable>
-  ) : (
-    <View style={{ height: 36 }} />
-  );
+  const listFooter =
+    configured && (feedQuery.hasNextPage || feedQuery.error) ? (
+      <Pressable
+        onPress={() =>
+          feedQuery.error && !feedQuery.isFetchNextPageError
+            ? feedQuery.refetch({ cancelRefetch: false })
+            : feedQuery.fetchNextPage({ cancelRefetch: false })
+        }
+        disabled={feedQuery.isFetching}
+        className="mb-10 mt-2 items-center rounded-full bg-primary-accent py-3 dark:bg-primary-bright"
+        style={({ pressed }) => ({ opacity: pressed || feedQuery.isFetching ? 0.65 : 1 })}
+      >
+        {feedQuery.isFetching ? (
+          <ActivityIndicator size="small" color="#FFFFFF" />
+        ) : (
+          <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13, color: "#FFFFFF" }}>
+            {feedQuery.error ? s.reflectionFeedRetry : s.reflectionLoadMore}
+          </Text>
+        )}
+      </Pressable>
+    ) : (
+      <View style={{ height: 36 }} />
+    );
 
   return (
     <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
@@ -348,7 +418,13 @@ export default function ReflectionFeedScreen() {
               />
               <FilterSelect
                 accessibilityLabel={filterKind === "juz" ? s.reflectionFeedSelectJuz : s.reflectionFeedSelectSurah}
-                label={filterKind === "juz" ? selectedJuzLabel : filterKind === "surah" ? selectedSurahLabel : s.reflectionFeedFilterAll}
+                label={
+                  filterKind === "juz"
+                    ? selectedJuzLabel
+                    : filterKind === "surah"
+                      ? selectedSurahLabel
+                      : s.reflectionFeedFilterAll
+                }
                 isDark={isDark}
                 isRTL={isRTL}
                 minWidth={184}
@@ -378,14 +454,14 @@ export default function ReflectionFeedScreen() {
             </View>
           ) : feedQuery.isLoading ? (
             <ReflectionsSkeleton isDark={isDark} className="flex-1" />
-          ) : feedQuery.error ? (
+          ) : feedQuery.error && reflections.length === 0 ? (
             <View className="flex-1 items-center justify-center">
               <EmptyState
                 icon={MessageSquare}
                 title={s.reflectionFeedTitle}
                 subtitle={s.reflectionLoadFailed}
                 actionLabel={s.reflectionFeedRetry}
-                onAction={() => feedQuery.refetch()}
+                onAction={() => feedQuery.refetch({ cancelRefetch: false })}
                 isDark={isDark}
               />
             </View>
@@ -407,7 +483,10 @@ export default function ReflectionFeedScreen() {
                 paddingBottom: isPhone ? 112 : 48,
               }}
               refreshControl={
-                <RefreshControl refreshing={feedQuery.isRefetching} onRefresh={() => feedQuery.refetch()} />
+                <RefreshControl
+                  refreshing={feedQuery.isRefetching}
+                  onRefresh={() => feedQuery.refetch({ cancelRefetch: false })}
+                />
               }
               ListFooterComponent={listFooter}
             />
@@ -562,11 +641,7 @@ function FilterSelect({
         direction: isRTL ? "rtl" : "ltr",
         flexDirection: isRTL ? "row-reverse" : "row",
         flexWrap: "nowrap",
-        backgroundColor: pressed
-          ? isDark
-            ? "rgba(45, 212, 191, 0.12)"
-            : "rgba(13, 148, 136, 0.08)"
-          : "transparent",
+        backgroundColor: pressed ? (isDark ? "rgba(45, 212, 191, 0.12)" : "rgba(13, 148, 136, 0.08)") : "transparent",
         borderColor: isDark ? "rgba(45, 212, 191, 0.32)" : "rgba(13, 148, 136, 0.28)",
         borderWidth: 1,
         cursor: "pointer",
@@ -637,8 +712,8 @@ function FilterPicker({
         : filterKind === "none"
           ? s.reflectionFeedFilterAll
           : filterKind === "surah"
-          ? s.reflectionFeedSelectSurah
-          : s.reflectionFeedSelectJuz;
+            ? s.reflectionFeedSelectSurah
+            : s.reflectionFeedSelectJuz;
 
   return (
     <ResponsiveSheet open={mode !== null} onClose={onClose} maxWidth={560} maxHeight={maxHeight}>

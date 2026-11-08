@@ -330,37 +330,51 @@ CREATE POLICY "Users can delete own reflections"
   ON reflections FOR DELETE
   USING (auth.uid() = user_id);
 
--- ─── Reflection Likes: publicly readable, auth required to write
-CREATE POLICY "Likes are publicly readable"
+-- ─── Reflection Likes: visible with their reflection, auth required to write
+-- Child policies look up the parent under its own RLS, so discussion follows reflection visibility.
+CREATE POLICY "Likes follow reflection visibility"
   ON reflection_likes FOR SELECT
-  USING (true);
+  USING (EXISTS (SELECT 1 FROM public.reflections AS r WHERE r.id = reflection_id));
 
-CREATE POLICY "Users can manage own likes"
-  ON reflection_likes FOR ALL
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
+-- Likes are only added or removed, never updated: owner-rights counters fire on insert and delete.
+CREATE POLICY "Users can insert own likes"
+  ON reflection_likes FOR INSERT
+  WITH CHECK (
+    (SELECT auth.uid()) = user_id
+    AND EXISTS (SELECT 1 FROM public.reflections AS r WHERE r.id = reflection_id)
+  );
 
--- ─── Reflection Comments: publicly readable, auth required to write
-CREATE POLICY "Comments are publicly readable"
+CREATE POLICY "Users can delete own likes"
+  ON reflection_likes FOR DELETE
+  USING (auth.uid() = user_id);
+
+-- ─── Reflection Comments: visible with their reflection, auth required to write
+CREATE POLICY "Comments follow reflection visibility"
   ON reflection_comments FOR SELECT
-  USING (true);
+  USING (EXISTS (SELECT 1 FROM public.reflections AS r WHERE r.id = reflection_id));
 
 CREATE POLICY "Users can insert own comments"
   ON reflection_comments FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
+  WITH CHECK (
+    (SELECT auth.uid()) = user_id
+    AND EXISTS (SELECT 1 FROM public.reflections AS r WHERE r.id = reflection_id)
+  );
 
 CREATE POLICY "Users can delete own comments"
   ON reflection_comments FOR DELETE
   USING (auth.uid() = user_id);
 
--- ─── Reflection Comment Likes: publicly readable, auth required to write
-CREATE POLICY "Comment likes are publicly readable"
+-- ─── Reflection Comment Likes: visible with their comment, auth required to write
+CREATE POLICY "Comment likes follow reflection visibility"
   ON reflection_comment_likes FOR SELECT
-  USING (true);
+  USING (EXISTS (SELECT 1 FROM public.reflection_comments AS c WHERE c.id = comment_id));
 
 CREATE POLICY "Users can insert own comment likes"
   ON reflection_comment_likes FOR INSERT
-  WITH CHECK ((SELECT auth.uid()) = user_id);
+  WITH CHECK (
+    (SELECT auth.uid()) = user_id
+    AND EXISTS (SELECT 1 FROM public.reflection_comments AS c WHERE c.id = comment_id)
+  );
 
 CREATE POLICY "Users can delete own comment likes"
   ON reflection_comment_likes FOR DELETE
@@ -580,17 +594,24 @@ CREATE POLICY "Users can delete own avatar images"
   );
 
 -- ─── Trigger: auto-update likes_count on reflections ────────
-CREATE OR REPLACE FUNCTION update_reflection_likes_count()
-RETURNS TRIGGER AS $$
+CREATE OR REPLACE FUNCTION public.update_reflection_likes_count()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
 BEGIN
+  IF TG_TABLE_SCHEMA <> 'public' OR TG_TABLE_NAME <> 'reflection_likes' THEN
+    RAISE EXCEPTION 'update_reflection_likes_count only maintains public.reflection_likes';
+  END IF;
   IF TG_OP = 'INSERT' THEN
-    UPDATE reflections SET likes_count = likes_count + 1 WHERE id = NEW.reflection_id;
+    UPDATE public.reflections SET likes_count = COALESCE(likes_count, 0) + 1 WHERE id = NEW.reflection_id;
   ELSIF TG_OP = 'DELETE' THEN
-    UPDATE reflections SET likes_count = likes_count - 1 WHERE id = OLD.reflection_id;
+    UPDATE public.reflections SET likes_count = GREATEST(COALESCE(likes_count, 0) - 1, 0) WHERE id = OLD.reflection_id;
   END IF;
   RETURN NULL;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 DROP TRIGGER IF EXISTS trg_reflection_likes_count ON reflection_likes;
 CREATE TRIGGER trg_reflection_likes_count
@@ -598,17 +619,24 @@ CREATE TRIGGER trg_reflection_likes_count
   FOR EACH ROW EXECUTE FUNCTION update_reflection_likes_count();
 
 -- ─── Trigger: auto-update comments_count on reflections ─────
-CREATE OR REPLACE FUNCTION update_reflection_comments_count()
-RETURNS TRIGGER AS $$
+CREATE OR REPLACE FUNCTION public.update_reflection_comments_count()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
 BEGIN
+  IF TG_TABLE_SCHEMA <> 'public' OR TG_TABLE_NAME <> 'reflection_comments' THEN
+    RAISE EXCEPTION 'update_reflection_comments_count only maintains public.reflection_comments';
+  END IF;
   IF TG_OP = 'INSERT' THEN
-    UPDATE reflections SET comments_count = comments_count + 1 WHERE id = NEW.reflection_id;
+    UPDATE public.reflections SET comments_count = COALESCE(comments_count, 0) + 1 WHERE id = NEW.reflection_id;
   ELSIF TG_OP = 'DELETE' THEN
-    UPDATE reflections SET comments_count = comments_count - 1 WHERE id = OLD.reflection_id;
+    UPDATE public.reflections SET comments_count = GREATEST(COALESCE(comments_count, 0) - 1, 0) WHERE id = OLD.reflection_id;
   END IF;
   RETURN NULL;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 DROP TRIGGER IF EXISTS trg_reflection_comments_count ON reflection_comments;
 CREATE TRIGGER trg_reflection_comments_count
@@ -616,22 +644,37 @@ CREATE TRIGGER trg_reflection_comments_count
   FOR EACH ROW EXECUTE FUNCTION update_reflection_comments_count();
 
 -- ─── Trigger: auto-update likes_count on reflection comments
-CREATE OR REPLACE FUNCTION update_reflection_comment_likes_count()
-RETURNS TRIGGER AS $$
+CREATE OR REPLACE FUNCTION public.update_reflection_comment_likes_count()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
 BEGIN
+  IF TG_TABLE_SCHEMA <> 'public' OR TG_TABLE_NAME <> 'reflection_comment_likes' THEN
+    RAISE EXCEPTION 'update_reflection_comment_likes_count only maintains public.reflection_comment_likes';
+  END IF;
   IF TG_OP = 'INSERT' THEN
-    UPDATE reflection_comments SET likes_count = likes_count + 1 WHERE id = NEW.comment_id;
+    UPDATE public.reflection_comments SET likes_count = likes_count + 1 WHERE id = NEW.comment_id;
   ELSIF TG_OP = 'DELETE' THEN
-    UPDATE reflection_comments SET likes_count = GREATEST(likes_count - 1, 0) WHERE id = OLD.comment_id;
+    UPDATE public.reflection_comments SET likes_count = GREATEST(likes_count - 1, 0) WHERE id = OLD.comment_id;
   END IF;
   RETURN NULL;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 DROP TRIGGER IF EXISTS trg_reflection_comment_likes_count ON reflection_comment_likes;
 CREATE TRIGGER trg_reflection_comment_likes_count
   AFTER INSERT OR DELETE ON reflection_comment_likes
   FOR EACH ROW EXECUTE FUNCTION update_reflection_comment_likes_count();
+
+-- Counter triggers run as their owner so a reaction to another author's post still updates its
+-- count under RLS. They are never called directly.
+REVOKE UPDATE ON public.reflection_likes FROM PUBLIC, anon, authenticated;
+REVOKE UPDATE ON public.reflection_comment_likes FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.update_reflection_likes_count() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.update_reflection_comments_count() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.update_reflection_comment_likes_count() FROM PUBLIC, anon, authenticated;
 
 -- ============================================================
 -- Indexes
@@ -860,3 +903,63 @@ CREATE TRIGGER study_cards_public_surah_progress_delete
   REFERENCING OLD TABLE AS old_rows
   FOR EACH STATEMENT
   EXECUTE FUNCTION private.refresh_public_surah_progress_after_study_card_delete();
+
+-- ─── Sync conflict guard (RF169) ─────────────────────────────
+-- Skip an update whose row time is strictly older than the stored row (see migration 20261107200000).
+
+CREATE OR REPLACE FUNCTION public.sync_keep_newer_row()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = ''
+AS $$
+DECLARE
+  old_row JSONB := to_jsonb(OLD);
+  new_row JSONB := to_jsonb(NEW);
+  old_at TIMESTAMPTZ;
+  new_at TIMESTAMPTZ;
+  col TEXT;
+BEGIN
+  FOREACH col IN ARRAY TG_ARGV LOOP
+    old_at := COALESCE(old_at, (old_row ->> col)::TIMESTAMPTZ);
+    new_at := COALESCE(new_at, (new_row ->> col)::TIMESTAMPTZ);
+  END LOOP;
+  IF old_at IS NOT NULL AND new_at IS NOT NULL AND old_at > new_at THEN
+    RETURN NULL;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.sync_keep_newer_row() FROM PUBLIC, anon, authenticated;
+
+DROP TRIGGER IF EXISTS sync_keep_newer_row ON public.study_cards;
+CREATE TRIGGER sync_keep_newer_row BEFORE UPDATE ON public.study_cards
+  FOR EACH ROW EXECUTE FUNCTION public.sync_keep_newer_row('updated_at', 'created_at', 'synced_at');
+
+DROP TRIGGER IF EXISTS sync_keep_newer_row ON public.bookmarks;
+CREATE TRIGGER sync_keep_newer_row BEFORE UPDATE ON public.bookmarks
+  FOR EACH ROW EXECUTE FUNCTION public.sync_keep_newer_row('updated_at', 'created_at', 'synced_at');
+
+DROP TRIGGER IF EXISTS sync_keep_newer_row ON public.highlights;
+CREATE TRIGGER sync_keep_newer_row BEFORE UPDATE ON public.highlights
+  FOR EACH ROW EXECUTE FUNCTION public.sync_keep_newer_row('updated_at', 'created_at', 'synced_at');
+
+DROP TRIGGER IF EXISTS sync_keep_newer_row ON public.user_settings;
+CREATE TRIGGER sync_keep_newer_row BEFORE UPDATE ON public.user_settings
+  FOR EACH ROW EXECUTE FUNCTION public.sync_keep_newer_row('updated_at', 'created_at', 'synced_at');
+
+DROP TRIGGER IF EXISTS sync_keep_newer_row ON public.user_word_meanings;
+CREATE TRIGGER sync_keep_newer_row BEFORE UPDATE ON public.user_word_meanings
+  FOR EACH ROW EXECUTE FUNCTION public.sync_keep_newer_row('updated_at', 'created_at', 'synced_at');
+
+DROP TRIGGER IF EXISTS sync_keep_newer_row ON public.private_notes;
+CREATE TRIGGER sync_keep_newer_row BEFORE UPDATE ON public.private_notes
+  FOR EACH ROW EXECUTE FUNCTION public.sync_keep_newer_row('updated_at', 'created_at', 'synced_at');
+
+DROP TRIGGER IF EXISTS sync_keep_newer_row ON public.reflection_journey_entries;
+CREATE TRIGGER sync_keep_newer_row BEFORE UPDATE ON public.reflection_journey_entries
+  FOR EACH ROW EXECUTE FUNCTION public.sync_keep_newer_row('updated_at', 'created_at', 'synced_at');
+
+DROP TRIGGER IF EXISTS sync_keep_newer_row ON public.achievement_unlocks;
+CREATE TRIGGER sync_keep_newer_row BEFORE UPDATE ON public.achievement_unlocks
+  FOR EACH ROW EXECUTE FUNCTION public.sync_keep_newer_row('unlocked_at', 'synced_at');

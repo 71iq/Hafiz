@@ -21,6 +21,9 @@ import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { useWordInteraction } from "@/lib/word/context";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 
+import { groupRootResults, groupTextResults, type TextResult, type RootOccurrence, type LemmaGroup } from "@/lib/search/results";
+import { resolveRootCandidates } from "@/lib/search/root-candidates";
+
 // ─── Arabic diacritics stripping ───
 const ARABIC_DIACRITICS_RE =
   /[\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E4\u06E7\u06E8\u06EA-\u06ED\u0640]/g;
@@ -30,32 +33,6 @@ function stripDiacritics(text: string): string {
 }
 
 // ─── Types ───
-type TextResult = {
-  surah: number;
-  ayah: number;
-  text_uthmani: string;
-  text_en: string | null;
-  name_arabic: string;
-  name_english: string;
-};
-
-type RootOccurrence = {
-  surah: number;
-  ayah: number;
-  word_pos: number;
-  word_text: string;
-  root: string;
-  lemma: string;
-  text_uthmani: string;
-  name_arabic: string;
-  name_english: string;
-};
-
-type LemmaGroup = {
-  lemma: string;
-  occurrences: RootOccurrence[];
-};
-
 type HistoryEntry = {
   id: number;
   query: string;
@@ -174,6 +151,14 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<TextInput>(null);
+  const searchGenerationRef = useRef(0);
+  const cancelPendingSearch = useCallback(() => {
+    searchGenerationRef.current += 1;
+    if (debounceRef.current !== null) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+  }, []);
   // Cache of diacritic-stripped lemma/word_text → root, for resolving a typed
   // word like "جاء" to canonical root "جيأ" in root-mode search.
   const rootIndexRef = useRef<{
@@ -218,6 +203,7 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
       loadHistory();
     } else {
       // Reset state when closed
+      setSearching(false);
       setQuery("");
       setTextResults([]);
       setRootResults([]);
@@ -227,8 +213,9 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
     }
     return () => {
       if (focusTimer) clearTimeout(focusTimer);
+      cancelPendingSearch();
     };
-  }, [visible, clearTooltip, closeDetail]);
+  }, [visible, clearTooltip, closeDetail, cancelPendingSearch]);
 
   const loadHistory = useCallback(async () => {
     try {
@@ -268,8 +255,12 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
 
   const performSearch = useCallback(
     async (term: string, searchMode: "text" | "root") => {
+      cancelPendingSearch();
+      const generation = searchGenerationRef.current;
+      const isCurrentSearch = () => generation === searchGenerationRef.current;
       const stripped = stripDiacritics(term.trim());
       if (stripped.length < 2) {
+        setSearching(false);
         setTextResults([]);
         setRootResults([]);
         setHasSearched(false);
@@ -294,6 +285,7 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
              LIMIT 200`,
             [stripped, term.trim()]
           );
+          if (!isCurrentSearch()) return;
           setTextResults(rows);
           setRootResults([]);
         } else {
@@ -302,32 +294,9 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
           // direct root match + diacritic-stripped lemma/word_text lookups.
           const trimmed = term.trim();
           const strippedTerm = stripDiacritics(trimmed);
-          const rootCandidates = new Set<string>();
-          rootCandidates.add(trimmed);
-          rootCandidates.add(strippedTerm);
-
           const index = await loadRootIndex();
-          if (index.lemmaMap.has(strippedTerm)) {
-            for (const r of index.lemmaMap.get(strippedTerm)!) rootCandidates.add(r);
-          }
-          if (index.wordMap.has(strippedTerm)) {
-            for (const r of index.wordMap.get(strippedTerm)!) rootCandidates.add(r);
-          }
-          // Prefix fallback for partial words
-          if (strippedTerm.length >= 3) {
-            for (const [key, roots] of index.lemmaMap) {
-              if (key.startsWith(strippedTerm)) {
-                for (const r of roots) rootCandidates.add(r);
-              }
-            }
-            for (const [key, roots] of index.wordMap) {
-              if (key.startsWith(strippedTerm)) {
-                for (const r of roots) rootCandidates.add(r);
-              }
-            }
-          }
-
-          const candidateList = Array.from(rootCandidates).filter(Boolean);
+          if (!isCurrentSearch()) return;
+          const candidateList = resolveRootCandidates({ trimmedTerm: trimmed, strippedTerm, index });
           const placeholders = candidateList.map(() => "?").join(",");
           const rows = candidateList.length
             ? await db.getAllAsync<RootOccurrence>(
@@ -342,18 +311,8 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
               )
             : [];
 
-          const lemmaMap = new Map<string, RootOccurrence[]>();
-          for (const row of rows) {
-            const key = row.lemma || row.word_text;
-            if (!lemmaMap.has(key)) lemmaMap.set(key, []);
-            lemmaMap.get(key)!.push(row);
-          }
-
-          const groups: LemmaGroup[] = [];
-          for (const [lemma, occurrences] of lemmaMap) {
-            groups.push({ lemma, occurrences });
-          }
-          groups.sort((a, b) => b.occurrences.length - a.occurrences.length);
+          if (!isCurrentSearch()) return;
+          const groups = groupRootResults(rows);
 
           setRootResults(groups);
           setTextResults([]);
@@ -365,46 +324,47 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
         saveToHistory(term.trim(), searchMode);
       } catch (err) {
         console.error("[Search] Error:", err);
+        if (!isCurrentSearch()) return;
         setTextResults([]);
         setRootResults([]);
         setSearchError(s.searchFailed);
       } finally {
-        setSearching(false);
+        if (isCurrentSearch()) setSearching(false);
       }
     },
-    [db, saveToHistory, loadRootIndex, s.searchFailed]
+    [db, saveToHistory, loadRootIndex, s.searchFailed, cancelPendingSearch]
   );
 
   const handleQueryChange = useCallback(
     (text: string) => {
       setQuery(text);
-      if (debounceRef.current) clearTimeout(debounceRef.current);
+      cancelPendingSearch();
       debounceRef.current = setTimeout(() => {
         performSearch(text, mode);
       }, 350);
     },
-    [mode, performSearch]
+    [mode, performSearch, cancelPendingSearch]
   );
 
   const handleModeChange = useCallback(
     (newMode: "text" | "root") => {
       setMode(newMode);
       setExpandedLemmas(new Set());
-      if (query.trim().length >= 2) {
-        performSearch(query, newMode);
-      }
+      performSearch(query, newMode);
     },
     [query, performSearch]
   );
 
   const handleClear = useCallback(() => {
+    cancelPendingSearch();
+    setSearching(false);
     setQuery("");
     setTextResults([]);
     setRootResults([]);
     setHasSearched(false);
     setSearchError(null);
     inputRef.current?.focus();
-  }, []);
+  }, [cancelPendingSearch]);
 
   const handleResultTap = useCallback((surah: number, ayah: number, wordPos?: number) => {
     const target = { surah, ayah, wordPos };
@@ -440,25 +400,7 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
     });
   }, []);
 
-  const groupedTextResults = useMemo(() => {
-    const groups: { surah: number; nameArabic: string; nameEnglish: string; results: TextResult[] }[] = [];
-    let currentSurah = -1;
-
-    for (const r of textResults) {
-      if (r.surah !== currentSurah) {
-        currentSurah = r.surah;
-        groups.push({
-          surah: r.surah,
-          nameArabic: r.name_arabic,
-          nameEnglish: r.name_english,
-          results: [],
-        });
-      }
-      groups[groups.length - 1].results.push(r);
-    }
-
-    return groups;
-  }, [textResults]);
+  const groupedTextResults = useMemo(() => groupTextResults(textResults), [textResults]);
 
   const totalTextCount = textResults.length;
   const totalRootCount = useMemo(

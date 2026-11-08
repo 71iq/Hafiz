@@ -1,7 +1,8 @@
-import { View, Text } from "react-native";
+import { View } from "react-native";
 import { Tabs } from "expo-router";
 import { Sparkles, BookOpen, BarChart3, Settings, Trophy, MessageSquare, BookMarked } from "lucide-react-native";
 import { useDatabaseStatus } from "@/lib/database/provider";
+import { DatabaseErrorState } from "@/components/ui/DatabaseErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { SettingsProvider, useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -175,22 +176,7 @@ export default function TabLayout() {
   const s = useStrings();
 
   if (error) {
-    return (
-      <View className="flex-1 items-center justify-center bg-surface dark:bg-surface-dark px-6">
-        <Text
-          className="text-red-600 mb-4"
-          style={{ fontFamily: "Manrope_700Bold", fontSize: 18 }}
-        >
-          {s.databaseError}
-        </Text>
-        <Text
-          className="text-red-500 text-center"
-          style={{ fontFamily: "Manrope_400Regular", fontSize: 15 }}
-        >
-          {error}
-        </Text>
-      </View>
-    );
+    return <DatabaseErrorState title={s.databaseError} message={error} />;
   }
 
   if (!isReady) {

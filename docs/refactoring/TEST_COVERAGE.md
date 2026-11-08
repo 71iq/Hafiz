@@ -1,0 +1,23 @@
+# Source-text contract tests
+
+Some unit tests read a component's source and assert on strings. They break on harmless rewrites and can pass while behavior is wrong. RF047 maps them and replaces them one small group at a time with tests that render the component and check the behavior a user relies on.
+
+## Replaced
+
+- `page-view-navigation-icon-contract.test.ts` became `page-view-navigation-sheet.test.tsx` (RF047). It renders the menu in Arabic and English and checks the movement icon inside each option, the selected state and check mark, and that choosing a mode saves it and closes the menu. Swapping the two icons fails it, as the old string check did.
+
+## Remaining
+
+These still read source. Most pin RTL row order, sizing or layout, which needs rendered evidence (device or browser screenshots) rather than a test that repeats the markup. Replace one only together with a behavior change in that component, and keep protected data and token contracts that inspect generated invariants.
+
+| Test                                                                                                                                                                                         | What it pins                                         | Better replacement                                                                |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `ayah-block-action-row-contract`                                                                                                                                                             | one scrolling chip row; reader-chrome event stopping | render test for the chrome-toggle guard; screenshot for the row                   |
+| `ayah-detail-tab-row-contract`, `ayah-detail-tafsir-source-rtl-contract`                                                                                                                     | tab and source row order in RTL                      | screenshot in Arabic                                                              |
+| `bookmarks-sheet-rtl-contract`, `private-notes-section-rtl-contract`, `recitation-loop-control-rtl-contract`                                                                                 | RTL row order                                        | screenshot in Arabic                                                              |
+| `deck-cards-sheet-contract`                                                                                                                                                                  | sheet structure                                      | render test on card actions (partly covered by `deck-cards-due-date`)             |
+| `font-and-viewport-contract`, `mushaf-page-vertical-layout-contract`                                                                                                                         | Quran font and page sizing                           | device and browser screenshots across page widths                                 |
+| `mushaf-toolbar-contract`                                                                                                                                                                    | toolbar controls                                     | render test for button labels and actions                                         |
+| `profile-edit-modal-contract`                                                                                                                                                                | edit modal fields                                    | render test on the edit flow (save lifecycle covered by `profile-save-lifecycle`) |
+| `reading-settings-ui-contract`, `settings-content-list-contract`, `settings-theme-contract`, `settings-about-row-contract`, `settings-account-row-contract`, `settings-donor-modal-contract` | settings rows and controls                           | render tests for the controls' roles and actions; screenshots for layout          |
+| `responsive-overlay-sheet-height-contract`, `screen-scaffold-contract`                                                                                                                       | shared sheet height and screen insets                | render tests with fixed window sizes                                              |

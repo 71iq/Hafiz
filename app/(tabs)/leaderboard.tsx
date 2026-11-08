@@ -1,7 +1,8 @@
 import { useState, useCallback, useEffect } from "react";
 import { View, Text, Pressable, ScrollView, RefreshControl } from "react-native";
 import { router } from "expo-router";
-import { Trophy, CalendarCheck2, Medal, LogIn } from "lucide-react-native";
+import { Trophy, CalendarCheck2, Medal } from "lucide-react-native";
+import { AccountSyncPrompt, type AccountSyncPromptProps } from "@/components/auth/AccountSyncPrompt";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSettings } from "@/lib/settings/context";
 import { useDatabase } from "@/lib/database/provider";
@@ -299,18 +300,10 @@ export default function LeaderboardScreen() {
 }
 
 function LeaderboardSignInPrompt({
-  label,
-  buttonLabel,
   isDark,
   isRTL,
-  onPress,
-}: {
-  label: string;
-  buttonLabel: string;
-  isDark: boolean;
-  isRTL: boolean;
-  onPress: () => void;
-}) {
+  ...props
+}: AccountSyncPromptProps) {
   return (
     <View
       className="mt-4 rounded-3xl px-4 py-4"
@@ -320,45 +313,7 @@ function LeaderboardSignInPrompt({
         borderWidth: 1,
       }}
     >
-      <View
-        className="items-center gap-3"
-        style={{
-          direction: "ltr",
-          flexDirection: isRTL ? "row-reverse" : "row",
-          justifyContent: "space-between",
-        }}
-      >
-        <Text
-          className="min-w-0 flex-1 text-charcoal dark:text-neutral-100"
-          style={{
-            fontFamily: "Manrope_700Bold",
-            fontSize: 14,
-            lineHeight: 20,
-            textAlign: isRTL ? "right" : "left",
-            writingDirection: isRTL ? "rtl" : "ltr",
-          }}
-        >
-          {label}
-        </Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={buttonLabel}
-          onPress={onPress}
-          className="rounded-full px-4 py-2.5"
-          style={({ pressed }) => ({
-            backgroundColor: isDark ? "#1B4D4F" : "#003638",
-            opacity: pressed ? 0.76 : 1,
-          })}
-        >
-          <View
-            className="flex-row items-center gap-2"
-            style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
-          >
-            <LogIn size={15} color="#FDDC91" />
-            <Text style={{ color: "#FDDC91", fontFamily: "Manrope_700Bold", fontSize: 12 }}>{buttonLabel}</Text>
-          </View>
-        </Pressable>
-      </View>
+      <AccountSyncPrompt {...props} isDark={isDark} isRTL={isRTL} />
     </View>
   );
 }

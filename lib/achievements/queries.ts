@@ -1,6 +1,7 @@
-import type { SQLiteDatabase } from "expo-sqlite";
+import { parseJsonRecord } from "@/lib/serialization/json-record";
+import { buildLocalReviewCounts, calculateLongestStreak } from "@/lib/fsrs/review-activity";
+import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import { enqueueSync } from "@/lib/database/sync-queue";
-import { dayIndexFromLocalDateKey as dayIndexFromDateKey, formatLocalDateKey } from "@/lib/date";
 import { ACHIEVEMENTS, getAchievementDefinition, type AchievementDefinition } from "./catalog";
 import type { AchievementEvent, AchievementProgress, AchievementUnlock } from "./types";
 
@@ -43,21 +44,37 @@ export function subscribeAchievementUnlocks(listener: AchievementUnlockListener)
   return () => listeners.delete(listener);
 }
 
-export async function recordAchievementEvent(
-  db: SQLiteDatabase,
-  event: AchievementEvent
-): Promise<void> {
+/** Unlocks committed by one transaction, published to listeners only after it commits. */
+type UnlockSink = AchievementUnlock[] | null;
+
+function publishUnlocks(unlocks: AchievementUnlock[]): void {
+  for (const unlock of unlocks) {
+    for (const listener of listeners) listener(unlock);
+  }
+}
+
+/**
+ * Record an event's progress and unlocks. Each unlock and its queued upload commit together, and
+ * listeners hear about unlocks only after the transaction commits.
+ */
+export async function recordAchievementEvent(db: AppDatabase, event: AchievementEvent): Promise<void> {
+  const unlocks: AchievementUnlock[] = [];
+  await db.withTransactionAsync((tx) => applyAchievementEvent(tx, event, unlocks));
+  publishUnlocks(unlocks);
+}
+
+async function applyAchievementEvent(db: DatabaseExecutor, event: AchievementEvent, notify: UnlockSink): Promise<void> {
   switch (event.type) {
     case "review_logged":
-      await backfillReviewAchievements(db, true);
-      await backfillCompletionAchievements(db, true);
+      await backfillReviewAchievements(db, notify);
+      await backfillCompletionAchievements(db, notify);
       break;
     case "deck_created":
       await upsertProgress(db, "first_deck_created", 1, 1, { deckId: event.deckId });
-      await unlockAchievement(db, "first_deck_created", event.createdAt, { deckId: event.deckId }, { deckId: event.deckId }, true);
+      await unlockAchievement(db, "first_deck_created", event.createdAt, { deckId: event.deckId }, { deckId: event.deckId }, notify);
       break;
     case "private_note_created":
-      await backfillPrivateNoteAchievements(db, true);
+      await backfillPrivateNoteAchievements(db, notify);
       break;
     case "public_reflection_created":
       await incrementProgress(db, "public_reflections_10", 1, 10, { reflectionId: event.reflectionId });
@@ -68,25 +85,31 @@ export async function recordAchievementEvent(
         event.createdAt,
         { reflectionId: event.reflectionId, surah: event.surah, ayahStart: event.ayahStart, ayahEnd: event.ayahEnd },
         { surah: event.surah, ayahStart: event.ayahStart, ayahEnd: event.ayahEnd },
-        true
+        notify
       );
-      await unlockIfProgressReached(db, "public_reflections_10", event.createdAt, true);
+      await unlockIfProgressReached(db, "public_reflections_10", event.createdAt, notify);
       break;
     case "vocab_saved":
-      await backfillVocabAchievements(db, true);
+      await backfillVocabAchievements(db, notify);
       break;
     case "mutashabih_pair_reviewed":
       await upsertProgress(db, "first_mutashabih_pair", 1, 1, { pairId: event.pairId });
-      await unlockAchievement(db, "first_mutashabih_pair", event.reviewedAt, { pairId: event.pairId }, { pairId: event.pairId }, true);
+      await unlockAchievement(db, "first_mutashabih_pair", event.reviewedAt, { pairId: event.pairId }, { pairId: event.pairId }, notify);
       break;
   }
 }
 
+/** Derive unlocks from local data in one transaction; optionally publish new unlocks after commit. */
 export async function backfillAchievements(
-  db: SQLiteDatabase,
+  db: AppDatabase,
   options: { notify?: boolean } = {}
 ): Promise<void> {
-  const notify = options.notify ?? false;
+  const unlocks: UnlockSink = options.notify ? [] : null;
+  await db.withTransactionAsync((tx) => backfillAllAchievements(tx, unlocks));
+  if (unlocks) publishUnlocks(unlocks);
+}
+
+async function backfillAllAchievements(db: DatabaseExecutor, notify: UnlockSink): Promise<void> {
   await backfillReviewAchievements(db, notify);
   await backfillDeckAchievements(db, notify);
   await backfillCompletionAchievements(db, notify);
@@ -95,7 +118,7 @@ export async function backfillAchievements(
   await backfillVocabAchievements(db, notify);
 }
 
-export async function getAchievementDashboard(db: SQLiteDatabase): Promise<AchievementDashboard> {
+export async function getAchievementDashboard(db: AppDatabase): Promise<AchievementDashboard> {
   await backfillAchievements(db, { notify: false });
 
   const [unlockRows, progressRows, recentUnlocks] = await Promise.all([
@@ -135,7 +158,7 @@ export async function getAchievementDashboard(db: SQLiteDatabase): Promise<Achie
 }
 
 export async function getRecentUnlocks(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   limit: number
 ): Promise<AchievementUnlock[]> {
   const activeIds = new Set(ACHIEVEMENTS.filter((achievement) => achievement.active).map((achievement) => achievement.id));
@@ -149,7 +172,7 @@ export async function getRecentUnlocks(
     .map(rowToUnlock);
 }
 
-export async function getLatestUnseenUnlock(db: SQLiteDatabase): Promise<AchievementUnlock | null> {
+export async function getLatestUnseenUnlock(db: DatabaseExecutor): Promise<AchievementUnlock | null> {
   const activeIds = new Set(ACHIEVEMENTS.filter((achievement) => achievement.active).map((achievement) => achievement.id));
   const rows = await db.getAllAsync<UnlockRow>(
     "SELECT * FROM achievement_unlocks WHERE seen_at IS NULL ORDER BY unlocked_at DESC LIMIT 10"
@@ -159,7 +182,7 @@ export async function getLatestUnseenUnlock(db: SQLiteDatabase): Promise<Achieve
 }
 
 export async function markAchievementSeen(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   achievementId: string
 ): Promise<void> {
   await db.runAsync(
@@ -169,7 +192,7 @@ export async function markAchievementSeen(
 }
 
 export async function insertRemoteAchievementUnlock(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   row: { achievement_id: string; unlocked_at: string; public_payload?: unknown }
 ): Promise<void> {
   const publicPayload = parseJsonRecord(row.public_payload);
@@ -181,7 +204,7 @@ export async function insertRemoteAchievementUnlock(
   );
 }
 
-async function backfillReviewAchievements(db: SQLiteDatabase, notify: boolean): Promise<void> {
+async function backfillReviewAchievements(db: DatabaseExecutor, notify: UnlockSink): Promise<void> {
   const totalRow = await db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM study_log");
   const total = totalRow?.count ?? 0;
   await upsertProgress(db, "first_review", Math.min(total, 1), 1);
@@ -250,7 +273,7 @@ async function backfillReviewAchievements(db: SQLiteDatabase, notify: boolean): 
   }
 }
 
-async function backfillDeckAchievements(db: SQLiteDatabase, notify: boolean): Promise<void> {
+async function backfillDeckAchievements(db: DatabaseExecutor, notify: UnlockSink): Promise<void> {
   const rows = await db.getAllAsync<{ key: string; value: string }>(
     "SELECT key, value FROM user_settings WHERE key LIKE 'deck_%' AND key != 'deck_meanings'"
   );
@@ -271,7 +294,7 @@ async function backfillDeckAchievements(db: SQLiteDatabase, notify: boolean): Pr
   );
 }
 
-async function backfillCompletionAchievements(db: SQLiteDatabase, notify: boolean): Promise<void> {
+async function backfillCompletionAchievements(db: DatabaseExecutor, notify: UnlockSink): Promise<void> {
   const surahRows = await db.getAllAsync<{ surah: number; total: number; mastered: number }>(
     `SELECT
        qt.surah as surah,
@@ -332,7 +355,7 @@ async function backfillCompletionAchievements(db: SQLiteDatabase, notify: boolea
   }
 }
 
-async function backfillPrivateNoteAchievements(db: SQLiteDatabase, notify: boolean): Promise<void> {
+async function backfillPrivateNoteAchievements(db: DatabaseExecutor, notify: UnlockSink): Promise<void> {
   const countRow = await db.getFirstAsync<{ count: number }>(
     "SELECT COUNT(*) as count FROM private_notes WHERE deleted_at IS NULL"
   );
@@ -360,7 +383,7 @@ async function backfillPrivateNoteAchievements(db: SQLiteDatabase, notify: boole
   }
 }
 
-async function backfillReflectionAchievements(db: SQLiteDatabase, notify: boolean): Promise<void> {
+async function backfillReflectionAchievements(db: DatabaseExecutor, notify: UnlockSink): Promise<void> {
   const first = await db.getFirstAsync<ProgressRow>(
     "SELECT * FROM achievement_progress WHERE achievement_id = 'first_public_reflection'"
   );
@@ -377,7 +400,7 @@ async function backfillReflectionAchievements(db: SQLiteDatabase, notify: boolea
   }
 }
 
-async function backfillVocabAchievements(db: SQLiteDatabase, notify: boolean): Promise<void> {
+async function backfillVocabAchievements(db: DatabaseExecutor, notify: UnlockSink): Promise<void> {
   const countRow = await db.getFirstAsync<{ count: number }>(
     "SELECT COUNT(*) as count FROM study_cards WHERE id LIKE 'word:%' AND deleted_at IS NULL"
   );
@@ -392,7 +415,7 @@ async function backfillVocabAchievements(db: SQLiteDatabase, notify: boolean): P
 }
 
 async function upsertProgress(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   achievementId: string,
   currentValue: number,
   targetValue: number,
@@ -407,7 +430,7 @@ async function upsertProgress(
 }
 
 async function incrementProgress(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   achievementId: string,
   delta: number,
   targetValue: number,
@@ -421,10 +444,10 @@ async function incrementProgress(
 }
 
 async function unlockIfProgressReached(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   achievementId: string,
   unlockedAt: string,
-  notify: boolean
+  notify: UnlockSink
 ): Promise<void> {
   const row = await db.getFirstAsync<ProgressRow>(
     "SELECT * FROM achievement_progress WHERE achievement_id = ?",
@@ -435,12 +458,12 @@ async function unlockIfProgressReached(
 }
 
 async function unlockAchievement(
-  db: SQLiteDatabase,
+  db: DatabaseExecutor,
   achievementId: string,
   unlockedAt: string,
   localPayload: Record<string, unknown> = {},
   publicPayload: Record<string, unknown> = {},
-  notify: boolean
+  notify: UnlockSink
 ): Promise<void> {
   const definition = getAchievementDefinition(achievementId);
   if (!definition) return;
@@ -454,22 +477,19 @@ async function unlockAchievement(
   );
   if ((result.changes ?? 0) <= 0) return;
 
-  enqueueSync(db, "achievement_unlocks", "INSERT", achievementId, {
+  await enqueueSync(db, "achievement_unlocks", "INSERT", achievementId, {
     achievement_id: achievementId,
     unlocked_at: unlockedAt,
     public_payload: storedPublicPayload,
-  }).catch(console.warn);
+  });
 
-  if (notify) {
-    const unlock: AchievementUnlock = {
-      achievementId,
-      unlockedAt,
-      seenAt: null,
-      localPayload,
-      publicPayload: storedPublicPayload,
-    };
-    for (const listener of listeners) listener(unlock);
-  }
+  notify?.push({
+    achievementId,
+    unlockedAt,
+    seenAt: null,
+    localPayload,
+    publicPayload: storedPublicPayload,
+  });
 }
 
 function rowToUnlock(row: UnlockRow): AchievementUnlock {
@@ -480,42 +500,4 @@ function rowToUnlock(row: UnlockRow): AchievementUnlock {
     localPayload: parseJsonRecord(row.local_payload),
     publicPayload: parseJsonRecord(row.public_payload),
   };
-}
-
-function parseJsonRecord(value: unknown): Record<string, unknown> {
-  if (!value) return {};
-  if (typeof value === "object" && !Array.isArray(value)) return value as Record<string, unknown>;
-  if (typeof value !== "string") return {};
-  try {
-    const parsed = JSON.parse(value);
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
-function buildLocalReviewCounts(rows: { reviewed_at: string }[]): Map<string, number> {
-  const counts = new Map<string, number>();
-  for (const row of rows) {
-    const reviewedAt = new Date(row.reviewed_at);
-    if (Number.isNaN(reviewedAt.getTime())) continue;
-    const key = formatLocalDateKey(reviewedAt);
-    counts.set(key, (counts.get(key) ?? 0) + 1);
-  }
-  return counts;
-}
-
-function calculateLongestStreak(dateKeys: string[]): number {
-  let maxStreak = 0;
-  let runStreak = 0;
-  let prevIndex: number | null = null;
-
-  for (const dateKey of dateKeys) {
-    const dayIndex = dayIndexFromDateKey(dateKey);
-    runStreak = prevIndex !== null && dayIndex - prevIndex === 1 ? runStreak + 1 : 1;
-    maxStreak = Math.max(maxStreak, runStreak);
-    prevIndex = dayIndex;
-  }
-
-  return maxStreak;
 }

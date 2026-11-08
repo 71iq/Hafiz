@@ -1,5 +1,5 @@
 diff --git a/node_modules/react-native-css-interop/dist/css-to-rn/parseDeclaration.js b/node_modules/react-native-css-interop/dist/css-to-rn/parseDeclaration.js
-index 59ea66e..e47773a 100644
+index 59ea66e..126fe4f 100644
 --- a/node_modules/react-native-css-interop/dist/css-to-rn/parseDeclaration.js
 +++ b/node_modules/react-native-css-interop/dist/css-to-rn/parseDeclaration.js
 @@ -917,7 +917,7 @@ function parseDeclaration(declaration, options) {
@@ -11,3 +11,59 @@ index 59ea66e..e47773a 100644
          }
          case "aspect-ratio": {
              return addStyleProp(declaration.property, parseAspectRatio(declaration.value));
+diff --git a/node_modules/react-native-css-interop/dist/runtime/native/native-interop.js b/node_modules/react-native-css-interop/dist/runtime/native/native-interop.js
+index 254b7ba..e824250 100644
+--- a/node_modules/react-native-css-interop/dist/runtime/native/native-interop.js
++++ b/node_modules/react-native-css-interop/dist/runtime/native/native-interop.js
+@@ -168,7 +168,17 @@ function interop(component, configs, originalProps, ref) {
+     }, []);
+     sharedState.originalProps = originalProps;
+     sharedState.initialRender = false;
+-    return (0, render_component_1.renderComponent)(component, sharedState, { ref, ...props, ...memoOutput.handlers }, memoOutput.possiblyAnimatedProps, variables, containers);
++    // Hafiz patch: Pressable accepts a style callback. Flattening replaced it with an object, which
++    // dropped the whole style on native. Keep the callback and compose it with any className styles.
++    let renderProps = memoOutput.possiblyAnimatedProps;
++    if (typeof originalProps?.style === "function" && sharedState.animated === render_component_1.UpgradeState.NONE) {
++        const styleCallback = originalProps.style;
++        const classStyle = configs.some((config) => originalProps?.[config.source]) ? renderProps.style : undefined;
++        renderProps = { ...renderProps };
++        delete renderProps.style;
++        props.style = classStyle ? (state) => [classStyle, styleCallback(state)] : styleCallback;
++    }
++    return (0, render_component_1.renderComponent)(component, sharedState, { ref, ...props, ...memoOutput.handlers }, renderProps, variables, containers);
+ }
+ function initReducer({ dispatch, config, reducer, className, }) {
+     return reducer({
+diff --git a/node_modules/react-native-css-interop/dist/runtime/web/api.js b/node_modules/react-native-css-interop/dist/runtime/web/api.js
+index 45339c1..dc0311f 100644
+--- a/node_modules/react-native-css-interop/dist/runtime/web/api.js
++++ b/node_modules/react-native-css-interop/dist/runtime/web/api.js
+@@ -27,12 +27,22 @@ const cssInterop = (baseComponent, mapping) => {
+         for (const config of configs) {
+             const source = props[config.source];
+             if (typeof source === "string" && source) {
+-                (0, shared_1.assignToTarget)(props, {
+-                    $$css: true,
+-                    [source]: source,
+-                }, config, {
+-                    objectMergeStyle: "toArray",
+-                });
++                // Hafiz patch: Pressable accepts a style callback, and merging it into an array
++                // with the className dropped it on web. Keep a callback and resolve it with the
++                // className styles, in the same order as an object style.
++                const targetValue = config.target.length === 1 ? props[config.target[0]] : undefined;
++                if (typeof targetValue === "function") {
++                    const classStyle = { $$css: true, [source]: source };
++                    props[config.target[0]] = (state) => [targetValue(state), classStyle];
++                }
++                else {
++                    (0, shared_1.assignToTarget)(props, {
++                        $$css: true,
++                        [source]: source,
++                    }, config, {
++                        objectMergeStyle: "toArray",
++                    });
++                }
+             }
+             delete props[config.source];
+         }

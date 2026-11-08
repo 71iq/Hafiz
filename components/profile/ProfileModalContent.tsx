@@ -1,4 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { reflectionQueryKeys } from "@/lib/reflections/query-keys";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { authCommands } from "@/lib/auth/commands";
+import { getAuthSessionIdentity } from "@/lib/auth/session-identity";
 import { ActivityIndicator, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
@@ -182,13 +185,14 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
   const s = useStrings();
   const { isDark, isRTL, themeColors, uiLanguage } = useSettings();
   const { width, height } = useWindowDimensions();
-  const { user, profile, isLoading: authLoading, updateProfile } = useAuthStore();
+  const { user, session, profile, isLoading: authLoading, updateProfile } = useAuthStore();
   const [activeTab, setActiveTab] = useState<ProfileTab>("overview");
   const [localStats, setLocalStats] = useState<ProfileStatsSnapshot | null>(null);
   const [localReview, setLocalReview] = useState<ReviewSnapshot>({ activity: [], activeDays: 0, totalReviews: 0 });
   const [defaultDeckProgress, setDefaultDeckProgress] = useState<DefaultDeckProgressItem[]>([]);
   const [localSurahProgress, setLocalSurahProgress] = useState<ProfileSurahProgress[]>([]);
   const [editOpen, setEditOpen] = useState(false);
+  const [editOrigin, setEditOrigin] = useState(() => authCommands.captureOwner());
   const [displayNameDraft, setDisplayNameDraft] = useState("");
   const [bioDraft, setBioDraft] = useState("");
   const [countryDraft, setCountryDraft] = useState("");
@@ -200,6 +204,57 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
   const requestedUserId = userId || user?.id || "";
   const isOwnProfile = !!user && (!userId || userId === user.id);
   const isSignedOutOwnProfile = !user && !userId;
+  const identity = getAuthSessionIdentity(session);
+  const editIdentity = identity.kind === "identified" && identity.userId === user?.id.toLowerCase()
+    ? JSON.stringify(identity) : null;
+  const editScope = useMemo(() => ({
+    active: false,
+    busy: false,
+    picking: false,
+    canEdit: editOpen && isOwnProfile && editIdentity !== null,
+    userId: user?.id,
+    origin: editOrigin.isCurrent() ? editOrigin : authCommands.captureOwner(),
+    owner: authCommands.captureOwner(),
+  }), [editOpen, isOwnProfile, editIdentity, user?.id, editOrigin]);
+  const isCurrentEdit = useCallback(() => editScope.active && editScope.origin.isCurrent() && editScope.owner.isCurrent()
+    && useAuthStore.getState().user?.id === editScope.userId, [editScope]);
+  const closeEdit = useCallback(() => {
+    if (!editScope.active) return;
+    editScope.active = false;
+    editScope.owner.cancel();
+    setEditOpen(false);
+  }, [editScope]);
+  const openEdit = useCallback(() => {
+    if (editScope.origin.isCurrent() && editScope.owner.isCurrent() && isOwnProfile && editIdentity !== null
+      && useAuthStore.getState().profile?.id === editScope.userId) setEditOpen(true);
+  }, [editScope, isOwnProfile, editIdentity]);
+  useLayoutEffect(() => {
+    editScope.owner = authCommands.captureOwner();
+    editScope.active = editScope.canEdit && editScope.origin.isCurrent();
+    editScope.busy = false;
+    editScope.picking = false;
+    const current = useAuthStore.getState();
+    const initial = current.profile?.id === current.user?.id ? current.profile : null;
+    setDisplayNameDraft(initial?.display_name ?? "");
+    setBioDraft(initial?.bio ?? "");
+    setCountryDraft(initial?.country ?? "");
+    setAvatarDraft(null);
+    setAvatarRemovalDraft(false);
+    setProfileStatus(null);
+    setProfileSaving(false);
+    return () => {
+      editScope.active = false;
+      editScope.owner.cancel();
+    };
+  }, [editScope]);
+  useEffect(() => useAuthStore.subscribe(() => {
+    if (!editScope.owner.isCurrent()) {
+      editScope.active = false;
+      editScope.owner.cancel();
+      setEditOpen(false);
+      setEditOrigin(authCommands.captureOwner());
+    }
+  }), [editScope]);
   const numberLocale = uiLanguage === "ar" ? "ar" : "en";
   const isPhone = width < SIDEBAR_BREAKPOINT;
   const maxOverlayHeight = Math.min(height - (isPhone ? 12 : 48), isPhone ? height * 0.94 : 760);
@@ -240,12 +295,15 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
   });
 
   const close = useCallback(() => {
+    if (!editScope.origin.isCurrent() || !editScope.owner.isCurrent()) return;
+    editScope.active = false;
+    editScope.owner.cancel();
     if (router.canGoBack()) {
       router.back();
       return;
     }
     router.replace("/(tabs)/home" as any);
-  }, [router]);
+  }, [router, editScope]);
 
   const publicProfile = publicProfileQuery.data ?? null;
   const visibleProfile: PublicProfile | null = isOwnProfile
@@ -338,17 +396,6 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
             ? s.profileSaveFailed
             : "";
 
-  useEffect(() => {
-    setDisplayNameDraft(profile?.display_name ?? "");
-    setBioDraft(profile?.bio ?? "");
-    setCountryDraft(profile?.country ?? "");
-  }, [profile?.bio, profile?.country, profile?.display_name, user?.id]);
-
-  useEffect(() => {
-    setAvatarDraft(null);
-    setAvatarRemovalDraft(false);
-  }, [user?.id]);
-
   const loadLocalOverview = useCallback(async () => {
     if (!user) return;
     const [wirdStatus, totalScore, cardsReviewedRow, reviewStats] = await Promise.all([
@@ -383,12 +430,13 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
     setLocalSurahProgress(surahs);
   }, [db, user]);
 
-  const invalidateProfileSurfaces = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ["publicProfile"] });
-    queryClient.invalidateQueries({ queryKey: ["reflectionFeed"] });
-    queryClient.invalidateQueries({ queryKey: ["reflections"] });
-    queryClient.invalidateQueries({ queryKey: ["reflectionComments"] });
-    queryClient.invalidateQueries({ queryKey: ["leaderboard"] });
+  const invalidateProfileSurfaces = useCallback((isCurrent: () => boolean) => {
+    const keys = [["publicProfile"], reflectionQueryKeys.feed.all, reflectionQueryKeys.reflections.all,
+      reflectionQueryKeys.comments.all, ["leaderboard"]];
+    for (const queryKey of keys) {
+      if (!isCurrent()) return;
+      queryClient.invalidateQueries({ queryKey });
+    }
   }, [queryClient]);
 
   useEffect(() => {
@@ -418,59 +466,86 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
   }, [db, isOwnProfile, loadLocalOverview, queryClient, user?.id]);
 
   const handleSaveProfile = useCallback(async () => {
-    if (!user || !profileDirty) return;
+    if (!user || !profileDirty || !isCurrentEdit() || editScope.busy) return;
+    const owner = editScope.owner;
+    const isCurrentSave = () => editScope.owner === owner && isCurrentEdit();
+    editScope.busy = true;
     setProfileSaving(true);
     setProfileStatus(null);
     try {
       const nextAvatarUrl = avatarDraft ? await uploadProfileAvatar(user.id, avatarDraft) : avatarRemovalDraft ? null : undefined;
-      const updated = await updateProfile({
+      if (!isCurrentSave()) return;
+      const result = await updateProfile({
         displayName: displayNameDirty ? (displayNameValue.length > 0 ? displayNameValue : null) : undefined,
         bio: bioDirty ? (bioValue.length > 0 ? bioValue : null) : undefined,
         country: countryDirty ? (countryValue.length > 0 ? countryValue : null) : undefined,
         avatarUrl: avatarDirty ? nextAvatarUrl : undefined,
-      });
+      }, owner);
+      if (!isCurrentSave() || result.status !== "completed") return;
       setAvatarDraft(null);
       setAvatarRemovalDraft(false);
-      queryClient.setQueryData(["publicProfile", user.id], updated);
-      invalidateProfileSurfaces();
+      queryClient.setQueryData(["publicProfile", user.id], result.value);
+      if (!isCurrentSave()) return;
+      invalidateProfileSurfaces(isCurrentSave);
+      if (!isCurrentSave()) return;
       setProfileStatus("saved");
     } catch (e) {
+      if (!isCurrentSave()) return;
       console.warn("[Profile] Failed to update profile:", e);
       setProfileStatus(avatarDirty ? "photoFailed" : "saveFailed");
     } finally {
-      setProfileSaving(false);
+      if (editScope.active && editScope.owner === owner) {
+        if (!isCurrentSave()) {
+          editScope.active = false;
+          owner.cancel();
+          setEditOpen(false);
+        } else {
+          editScope.busy = false;
+          setProfileSaving(false);
+        }
+      }
     }
-  }, [avatarDirty, avatarDraft, avatarRemovalDraft, bioDirty, bioValue, countryDirty, countryValue, displayNameDirty, displayNameValue, invalidateProfileSurfaces, profileDirty, queryClient, updateProfile, user]);
+  }, [avatarDirty, avatarDraft, avatarRemovalDraft, bioDirty, bioValue, countryDirty, countryValue, displayNameDirty, displayNameValue, invalidateProfileSurfaces, profileDirty, queryClient, updateProfile, user, editScope, isCurrentEdit]);
 
   const handlePickAvatar = useCallback(async () => {
-    if (!user) return;
+    if (!isCurrentEdit() || editScope.busy || editScope.picking) return;
+    const owner = editScope.owner;
+    const isCurrentPicker = () => editScope.owner === owner && isCurrentEdit();
+    editScope.picking = true;
     setProfileStatus(null);
-
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      setProfileStatus("permissionDenied");
-      return;
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!isCurrentPicker()) return;
+      if (!permission.granted) {
+        setProfileStatus("permissionDenied");
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"], allowsEditing: true, aspect: [1, 1], quality: 0.82,
+      });
+      if (!isCurrentPicker()) return;
+      const asset = result.canceled ? null : result.assets[0];
+      if (!asset) return;
+      setAvatarDraft(asset);
+      setAvatarRemovalDraft(false);
+    } finally {
+      if (editScope.owner === owner) {
+        editScope.picking = false;
+        if (editScope.active && !isCurrentPicker()) {
+          editScope.active = false;
+          owner.cancel();
+          setEditOpen(false);
+        }
+      }
     }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.82,
-    });
-    const asset = result.canceled ? null : result.assets[0];
-    if (!asset) return;
-
-    setAvatarDraft(asset);
-    setAvatarRemovalDraft(false);
-  }, [user]);
+  }, [editScope, isCurrentEdit]);
 
   const handleRemoveAvatar = useCallback(async () => {
-    if (!user || (!profile?.avatar_url && !avatarDraft)) return;
+    if (!isCurrentEdit() || editScope.busy || (!profile?.avatar_url && !avatarDraft)) return;
     setProfileStatus(null);
     setAvatarDraft(null);
     setAvatarRemovalDraft(!!profile?.avatar_url);
-  }, [avatarDraft, profile?.avatar_url, user]);
+  }, [avatarDraft, profile?.avatar_url, editScope, isCurrentEdit]);
 
   const tabs = useMemo(
     () => isOwnProfile ? [
@@ -485,9 +560,9 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
     flexDirection: isRTL ? "row-reverse" as const : "row" as const,
   };
 
-  const headerActions = isOwnProfile && user ? (
+  const headerActions = isOwnProfile && user && profile?.id === user.id ? (
     <View className={`items-center gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`} style={mirroredRowStyle}>
-      <HeaderAction icon={Pencil} label={s.profileEditAction} color={isDark ? "#2dd4bf" : "#0d9488"} onPress={() => setEditOpen(true)} />
+      <HeaderAction icon={Pencil} label={s.profileEditAction} color={isDark ? "#2dd4bf" : "#0d9488"} onPress={openEdit} />
     </View>
   ) : null;
 
@@ -584,7 +659,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
 
       <ResponsiveModal
         open={editOpen}
-        onClose={() => setEditOpen(false)}
+        onClose={closeEdit}
         maxWidth={EDIT_PROFILE_MODAL_MAX_WIDTH}
         maxHeight={maxOverlayHeight}
         surfaceColor={isDark ? themeColors.surfaceLow : themeColors.surfaceBright}
@@ -630,7 +705,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
             </Text>
           </View>
           <Pressable
-            onPress={() => setEditOpen(false)}
+            onPress={closeEdit}
             hitSlop={8}
             accessibilityRole="button"
             accessibilityLabel={s.genericClose}
@@ -669,7 +744,8 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
                 <Input
                   value={displayNameDraft}
                   onChangeText={(value) => {
-                    setDisplayNameDraft(value);
+                    if (!isCurrentEdit()) return;
+                  setDisplayNameDraft(value);
                     setProfileStatus(null);
                   }}
                   placeholder={s.profileDisplayNamePlaceholder}
@@ -740,7 +816,8 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
                 <Input
                   value={bioDraft}
                   onChangeText={(value) => {
-                    setBioDraft(value);
+                    if (!isCurrentEdit()) return;
+                  setBioDraft(value);
                     setProfileStatus(null);
                   }}
                   placeholder={s.profileBioPlaceholder}
@@ -773,6 +850,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
               <CountryCommandSelect
                 value={countryDraft}
                 onChange={(value) => {
+                  if (!isCurrentEdit()) return;
                   setCountryDraft(value);
                   setProfileStatus(null);
                 }}

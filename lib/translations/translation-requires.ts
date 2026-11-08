@@ -3,30 +3,31 @@
 // On web: fetch() from /data/translations/ at runtime.
 
 import { Platform } from "react-native";
+import { readBundledJson } from "@/lib/database/bundled-json";
 
 const nativeTranslationRequires: Record<string, () => any> = Platform.OS !== "web"
   ? {
-      "en-bridges": () => require("../../assets/data/translations/en-bridges.json"),
-      id: () => require("../../assets/data/translations/id.json"),
-      bn: () => require("../../assets/data/translations/bn.json"),
-      ur: () => require("../../assets/data/translations/ur.json"),
-      fa: () => require("../../assets/data/translations/fa.json"),
-      hi: () => require("../../assets/data/translations/hi.json"),
-      tr: () => require("../../assets/data/translations/tr.json"),
-      ha: () => require("../../assets/data/translations/ha.json"),
-      fr: () => require("../../assets/data/translations/fr.json"),
-      ps: () => require("../../assets/data/translations/ps.json"),
-      sd: () => require("../../assets/data/translations/sd.json"),
-      ru: () => require("../../assets/data/translations/ru.json"),
-      ku: () => require("../../assets/data/translations/ku.json"),
-      uz: () => require("../../assets/data/translations/uz.json"),
-      sw: () => require("../../assets/data/translations/sw.json"),
-      om: () => require("../../assets/data/translations/om.json"),
-      am: () => require("../../assets/data/translations/am.json"),
-      so: () => require("../../assets/data/translations/so.json"),
-      az: () => require("../../assets/data/translations/az.json"),
-      kk: () => require("../../assets/data/translations/kk.json"),
-      ber: () => require("../../assets/data/translations/ber.json"),
+      "en-bridges": () => readBundledJson(require("../../assets/native-data/translations/en-bridges.hafizdata")),
+      id: () => readBundledJson(require("../../assets/native-data/translations/id.hafizdata")),
+      bn: () => readBundledJson(require("../../assets/native-data/translations/bn.hafizdata")),
+      ur: () => readBundledJson(require("../../assets/native-data/translations/ur.hafizdata")),
+      fa: () => readBundledJson(require("../../assets/native-data/translations/fa.hafizdata")),
+      hi: () => readBundledJson(require("../../assets/native-data/translations/hi.hafizdata")),
+      tr: () => readBundledJson(require("../../assets/native-data/translations/tr.hafizdata")),
+      ha: () => readBundledJson(require("../../assets/native-data/translations/ha.hafizdata")),
+      fr: () => readBundledJson(require("../../assets/native-data/translations/fr.hafizdata")),
+      ps: () => readBundledJson(require("../../assets/native-data/translations/ps.hafizdata")),
+      sd: () => readBundledJson(require("../../assets/native-data/translations/sd.hafizdata")),
+      ru: () => readBundledJson(require("../../assets/native-data/translations/ru.hafizdata")),
+      ku: () => readBundledJson(require("../../assets/native-data/translations/ku.hafizdata")),
+      uz: () => readBundledJson(require("../../assets/native-data/translations/uz.hafizdata")),
+      sw: () => readBundledJson(require("../../assets/native-data/translations/sw.hafizdata")),
+      om: () => readBundledJson(require("../../assets/native-data/translations/om.hafizdata")),
+      am: () => readBundledJson(require("../../assets/native-data/translations/am.hafizdata")),
+      so: () => readBundledJson(require("../../assets/native-data/translations/so.hafizdata")),
+      az: () => readBundledJson(require("../../assets/native-data/translations/az.hafizdata")),
+      kk: () => readBundledJson(require("../../assets/native-data/translations/kk.hafizdata")),
+      ber: () => readBundledJson(require("../../assets/native-data/translations/ber.hafizdata")),
     }
   : {};
 

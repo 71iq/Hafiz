@@ -1,9 +1,10 @@
 import { useAuthStore } from "@/lib/auth/store";
 import { startAppOAuth } from "@/lib/auth/oauth";
-import { supabase } from "@/lib/supabase";
+import { supabase, signUpOwnedPassword } from "@/lib/supabase";
 
 jest.mock("@/lib/supabase", () => ({
   isSupabaseConfigured: () => true,
+  signUpOwnedPassword: jest.fn(),
   supabase: {
     auth: {
       signUp: jest.fn(),
@@ -38,19 +39,24 @@ describe("temporarily disabled account flows", () => {
 
   it("rejects signup, confirmation resend and recovery without a request", async () => {
     const store = useAuthStore.getState();
-    await expect(store.signUp("qa@example.invalid", "password", "qauser", "QA")).rejects.toThrow(
+    await expect(store.signUp("qa@example.invalid", "password", "qauser", "QA").result).rejects.toThrow(
       "temporarily unavailable",
     );
     await expect(store.resendSignupConfirmation("qa@example.invalid")).rejects.toThrow("temporarily unavailable");
     await expect(store.sendPasswordReset("qa@example.invalid")).rejects.toThrow("temporarily unavailable");
     expect(supabase.auth.signUp).not.toHaveBeenCalled();
+    expect(signUpOwnedPassword).not.toHaveBeenCalled();
     expect(supabase.auth.resend).not.toHaveBeenCalled();
     expect(supabase.auth.resetPasswordForEmail).not.toHaveBeenCalled();
   });
 
   it("rejects Google sign-in and linking without a request", async () => {
-    await expect(startAppOAuth("google")).rejects.toThrow("temporarily unavailable");
-    await expect(startAppOAuth("google", "link")).rejects.toThrow("temporarily unavailable");
+    await expect(startAppOAuth("google", "sign-in", useAuthStore.getState).result).rejects.toThrow(
+      "temporarily unavailable",
+    );
+    await expect(startAppOAuth("google", "link", useAuthStore.getState).result).rejects.toThrow(
+      "temporarily unavailable",
+    );
     expect(supabase.auth.signInWithOAuth).not.toHaveBeenCalled();
   });
 });

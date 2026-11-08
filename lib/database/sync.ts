@@ -1,8 +1,20 @@
-import type { SQLiteDatabase } from "expo-sqlite";
+import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { useAuthStore } from "@/lib/auth/store";
+import { authCommands } from "@/lib/auth/commands";
+import { getAuthSessionIdentity } from "@/lib/auth/session-identity";
+import {
+  decodeSyncPage,
+  decodeSyncQueueEntry,
+  decodeSyncFreshness,
+  decodeSyncedStudyLogExists,
+  type SyncRows,
+  type SyncTable,
+} from "@/lib/database/sync-payloads";
+import { compareSyncTimestamps, syncTimestampKey } from "@/lib/database/sync-timestamps";
 import {
   getPendingSyncEntries,
+  getPendingSyncCount,
   markSynced,
   markFailed,
   cleanSyncedEntries,
@@ -11,8 +23,27 @@ import {
 } from "./sync-queue";
 import { backfillAchievements, insertRemoteAchievementUnlock } from "@/lib/achievements/queries";
 import { isSyncableUserSetting, userSettingToSyncData } from "@/lib/database/user-settings";
+import { errorMessage } from "@/lib/error-message";
 
 export type SyncStatus = "idle" | "syncing" | "synced" | "error" | "offline";
+
+type SyncOwner = Readonly<{ userId: string; requireCurrent: () => void }>;
+
+function captureSyncOwner(): SyncOwner | null {
+  const { user, session } = useAuthStore.getState();
+  if (!user) return null;
+  const identity = getAuthSessionIdentity(session);
+  if (identity.kind !== "identified" || identity.userId !== user.id.toLowerCase()) return null;
+  const authOwner = authCommands.captureOwner();
+  return {
+    userId: user.id,
+    requireCurrent: () => {
+      if (!authOwner.isCurrent() || useAuthStore.getState().user?.id !== user.id) {
+        throw new Error("Sync account changed");
+      }
+    },
+  };
+}
 
 const INITIAL_BACKFILL_VERSION = "20260525_sync_v1";
 const USER_SETTINGS_BACKFILL_VERSION = "20260528_user_settings_v1";
@@ -29,13 +60,20 @@ const REMOTE_RESTORE_TABLES = [
   "achievement_unlocks",
 ] as const;
 
-type RemoteRestoreTable = typeof REMOTE_RESTORE_TABLES[number];
-type RemoteAccountRows = Record<RemoteRestoreTable, any[]>;
+type RemoteAccountRows = { [K in SyncTable]: SyncRows[K][] };
 type AccountRestoreResult = {
   pulled: number;
   accountRestored: boolean;
   localDataReplaced: boolean;
 };
+
+export type SyncResult = AccountRestoreResult & {
+  pushed: number;
+  status: "synced" | "partial" | "failed" | "not_connected";
+};
+
+type PushResult = { pushed: number; failed: number; hadSuccessfulEntry: boolean };
+type PullResult = { pulled: number; complete: boolean };
 
 function highlightSyncId(row: {
   surah: number;
@@ -49,119 +87,177 @@ function highlightSyncId(row: {
 
 /**
  * Process the local sync queue — push pending changes to Supabase.
- * Returns the number of entries successfully synced.
+ * Retains group acknowledgement counts and whether any entry completed before a failure.
  */
-async function pushSyncQueue(db: SQLiteDatabase): Promise<number> {
-  if (!isSupabaseConfigured()) return 0;
+async function pushSyncQueue(db: AppDatabase, owner: SyncOwner): Promise<PushResult> {
+  const empty = { pushed: 0, failed: 0, hadSuccessfulEntry: false };
+  if (!isSupabaseConfigured()) return empty;
 
-  const user = useAuthStore.getState().user;
-  if (!user) return 0;
+  owner.requireCurrent();
+  const { userId } = owner;
 
-  await enqueueInitialLocalDataForSync(db, user.id);
-  await enqueueSyncableUserSettingsForSync(db, user.id);
+  await enqueueInitialLocalDataForSync(db, userId);
+  owner.requireCurrent();
+  await enqueueSyncableUserSettingsForSync(db, userId);
+  owner.requireCurrent();
 
   const entries = await getPendingSyncEntries(db, 10000);
-  if (entries.length === 0) return 0;
+  owner.requireCurrent();
+  if (entries.length === 0) return empty;
 
   // Group entries by table for batch operations
   const groups = groupByTable(entries);
   const syncedIds: number[] = [];
   const failedIds: number[] = [];
+  let hadSuccessfulEntry = false;
 
-  for (const [tableName, tableEntries] of Object.entries(groups)) {
+  for (const tableEntries of groups.values()) {
+    owner.requireCurrent();
     try {
-      await pushTableEntries(tableName, tableEntries, user.id);
+      await pushTableEntries(tableEntries, userId, () => {
+        hadSuccessfulEntry = true;
+      });
+      owner.requireCurrent();
       syncedIds.push(...tableEntries.map((e) => e.id));
-    } catch (err: any) {
-      console.warn(`[Sync] Failed to push ${tableName}:`, err.message);
+    } catch (err) {
+      owner.requireCurrent();
+      console.warn("[Sync] Failed to push queued changes:", errorMessage(err));
       failedIds.push(...tableEntries.map((e) => e.id));
     }
   }
 
+  owner.requireCurrent();
   // Mark results
   if (syncedIds.length > 0) await markSynced(db, syncedIds);
+  owner.requireCurrent();
   if (failedIds.length > 0) await markFailed(db, failedIds);
+  owner.requireCurrent();
 
   // Clean up old synced entries periodically
   await cleanSyncedEntries(db);
 
-  return syncedIds.length;
+  return { pushed: syncedIds.length, failed: failedIds.length, hadSuccessfulEntry };
 }
 
 /**
  * Pull remote changes from Supabase to local SQLite.
  * For multi-device support: fetches data updated after last sync.
  */
-async function pullRemoteChanges(db: SQLiteDatabase): Promise<number> {
-  if (!isSupabaseConfigured()) return 0;
+async function pullRemoteChanges(db: AppDatabase, owner: SyncOwner): Promise<PullResult> {
+  if (!isSupabaseConfigured()) return { pulled: 0, complete: false };
 
-  const user = useAuthStore.getState().user;
-  if (!user) return 0;
+  owner.requireCurrent();
+  const { userId } = owner;
 
   // Get last sync timestamp
   const lastSyncRow = await db.getFirstAsync<{ value: string }>(
-    "SELECT value FROM user_settings WHERE key = 'last_pull_at'"
+    "SELECT value FROM user_settings WHERE key = 'last_pull_at'",
   );
+  owner.requireCurrent();
   const lastPullAt = lastSyncRow?.value ?? "1970-01-01T00:00:00Z";
+  const pullStartedAt = new Date().toISOString();
 
   let totalPulled = 0;
+  let complete = false;
+  const onPageApplied = (count: number) => {
+    totalPulled += count;
+  };
+  let wordMeaningsComplete = true;
 
   try {
     // Pull syncable deck/review settings before cards so decks exist when rows arrive.
-    totalPulled += await pullTable(db, "user_settings", user.id, lastPullAt, upsertUserSetting);
+    await pullTable(db, "user_settings", userId, lastPullAt, upsertUserSetting, owner, onPageApplied);
 
     // Pull user-supplied word meanings before cards so vocabulary previews resolve.
     try {
-      totalPulled += await pullTable(db, "user_word_meanings", user.id, lastPullAt, upsertUserWordMeaning);
-    } catch (err: any) {
-      console.warn("[Sync] Pull user_word_meanings skipped:", err.message);
+      await pullTable(db, "user_word_meanings", userId, lastPullAt, upsertUserWordMeaning, owner, onPageApplied);
+    } catch (err) {
+      owner.requireCurrent();
+      wordMeaningsComplete = false;
+      console.warn("[Sync] Pull user_word_meanings skipped:", errorMessage(err));
     }
 
     // Pull study_cards
-    totalPulled += await pullTable(db, "study_cards", user.id, lastPullAt, upsertStudyCard);
+    await pullTable(db, "study_cards", userId, lastPullAt, upsertStudyCard, owner, onPageApplied);
 
     // Pull study_log
-    totalPulled += await pullTable(db, "study_log", user.id, lastPullAt, upsertStudyLog);
+    await pullTable(db, "study_log", userId, lastPullAt, upsertStudyLog, owner, onPageApplied);
 
     // Pull bookmarks
-    totalPulled += await pullTable(db, "bookmarks", user.id, lastPullAt, upsertBookmark);
+    await pullTable(db, "bookmarks", userId, lastPullAt, upsertBookmark, owner, onPageApplied);
 
     // Pull highlights
-    totalPulled += await pullTable(db, "highlights", user.id, lastPullAt, upsertHighlight);
+    await pullTable(db, "highlights", userId, lastPullAt, upsertHighlight, owner, onPageApplied);
 
     // Pull private notes
-    totalPulled += await pullTable(db, "private_notes", user.id, lastPullAt, upsertPrivateNote);
+    await pullTable(db, "private_notes", userId, lastPullAt, upsertPrivateNote, owner, onPageApplied);
 
     // Pull Reflection Journey entries
-    totalPulled += await pullTable(db, "reflection_journey_entries", user.id, lastPullAt, upsertReflectionJourneyEntry);
+    await pullTable(
+      db,
+      "reflection_journey_entries",
+      userId,
+      lastPullAt,
+      upsertReflectionJourneyEntry,
+      owner,
+      onPageApplied,
+    );
 
     // Pull public badge unlocks. Pulled badges are already seen locally.
-    totalPulled += await pullTable(db, "achievement_unlocks", user.id, lastPullAt, upsertAchievementUnlock);
+    await pullTable(db, "achievement_unlocks", userId, lastPullAt, upsertAchievementUnlock, owner, onPageApplied);
 
+    owner.requireCurrent();
     await backfillAchievements(db, { notify: false });
+    owner.requireCurrent();
 
-    // Update last pull timestamp
-    await db.runAsync(
-      "INSERT OR REPLACE INTO user_settings (key, value) VALUES ('last_pull_at', ?)",
-      [new Date().toISOString()]
-    );
-  } catch (err: any) {
-    console.warn("[Sync] Pull failed:", err.message);
+    // Keep the old cursor if any table was incomplete, so its unseen rows remain eligible for retry.
+    owner.requireCurrent();
+    if (wordMeaningsComplete) {
+      await db.runAsync("INSERT OR REPLACE INTO user_settings (key, value) VALUES ('last_pull_at', ?)", [
+        pullStartedAt,
+      ]);
+      owner.requireCurrent();
+      complete = true;
+    }
+  } catch (err) {
+    owner.requireCurrent();
+    console.warn("[Sync] Pull failed:", errorMessage(err));
   }
 
-  return totalPulled;
+  return { pulled: totalPulled, complete };
 }
 
 /**
  * Full sync: restore account state before any upload, then run normal queue sync.
  */
-export async function fullSync(db: SQLiteDatabase): Promise<{ pushed: number; pulled: number; accountRestored: boolean; localDataReplaced: boolean }> {
-  const restored = await restoreAccountDataIfNeeded(db);
-  const pushed = await pushSyncQueue(db);
-  const pulled = await pullRemoteChanges(db);
+export async function fullSync(db: AppDatabase): Promise<SyncResult> {
+  const empty: SyncResult = {
+    status: "not_connected",
+    pushed: 0,
+    pulled: 0,
+    accountRestored: false,
+    localDataReplaced: false,
+  };
+  if (!isSupabaseConfigured()) return empty;
+  const owner = captureSyncOwner();
+  if (!owner) return empty;
+  owner.requireCurrent();
+  const restored = await restoreAccountDataIfNeeded(db, owner);
+  owner.requireCurrent();
+  const pushed = await pushSyncQueue(db, owner);
+  owner.requireCurrent();
+  const pulled = await pullRemoteChanges(db, owner);
+  owner.requireCurrent();
+  const pending = await getPendingSyncCount(db);
+  owner.requireCurrent();
+  const totalPulled = restored.pulled + pulled.pulled;
+  const failed = !pulled.complete || pushed.failed > 0;
+  const madeProgress = pushed.hadSuccessfulEntry || totalPulled > 0 || restored.accountRestored;
+  const status = !failed && pending === 0 ? "synced" : failed && !madeProgress ? "failed" : "partial";
   return {
-    pushed,
-    pulled: restored.pulled + pulled,
+    status,
+    pushed: pushed.pushed,
+    pulled: totalPulled,
     accountRestored: restored.accountRestored,
     localDataReplaced: restored.localDataReplaced,
   };
@@ -174,64 +270,87 @@ function accountRestoreKey(userId: string): string {
 }
 
 function isSyncInternalSetting(key: string): boolean {
-  return key === "last_pull_at" ||
+  return (
+    key === "last_pull_at" ||
     key.startsWith("sync_initial_backfill_") ||
     key.startsWith("sync_user_settings_backfill_") ||
-    key.startsWith("sync_account_restore_");
+    key.startsWith("sync_account_restore_")
+  );
 }
 
-export async function hasCompletedAccountRestore(db: SQLiteDatabase, userId: string): Promise<boolean> {
-  const row = await db.getFirstAsync<{ value: string }>(
-    "SELECT value FROM user_settings WHERE key = ?",
-    [accountRestoreKey(userId)]
-  );
+export async function hasCompletedAccountRestore(db: DatabaseExecutor, userId: string): Promise<boolean> {
+  const row = await db.getFirstAsync<{ value: string }>("SELECT value FROM user_settings WHERE key = ?", [
+    accountRestoreKey(userId),
+  ]);
   return row?.value === "true";
 }
 
-async function markAccountRestoreComplete(db: SQLiteDatabase, userId: string, restoredFromRemote: boolean): Promise<void> {
+async function markAccountRestoreComplete(
+  db: DatabaseExecutor,
+  userId: string,
+  restoredFromRemote: boolean,
+  snapshotStartedAt: string,
+  owner: SyncOwner,
+): Promise<void> {
   const now = new Date().toISOString();
+  owner.requireCurrent();
   await db.runAsync(
     "INSERT OR REPLACE INTO user_settings (key, value, updated_at, deleted_at) VALUES (?, 'true', ?, NULL)",
-    [accountRestoreKey(userId), now]
+    [accountRestoreKey(userId), now],
   );
+  owner.requireCurrent();
   await db.runAsync(
     "INSERT OR REPLACE INTO user_settings (key, value, updated_at, deleted_at) VALUES ('last_pull_at', ?, ?, NULL)",
-    [now, now]
+    [snapshotStartedAt, now],
   );
+  owner.requireCurrent();
   if (!restoredFromRemote) return;
   await db.runAsync(
     "INSERT OR REPLACE INTO user_settings (key, value, updated_at, deleted_at) VALUES (?, 'true', ?, NULL)",
-    [`sync_initial_backfill_${userId}_${INITIAL_BACKFILL_VERSION}`, now]
+    [`sync_initial_backfill_${userId}_${INITIAL_BACKFILL_VERSION}`, now],
   );
+  owner.requireCurrent();
   await db.runAsync(
     "INSERT OR REPLACE INTO user_settings (key, value, updated_at, deleted_at) VALUES (?, 'true', ?, NULL)",
-    [userSettingsBackfillKey(userId), now]
+    [userSettingsBackfillKey(userId), now],
   );
 }
 
-async function restoreAccountDataIfNeeded(db: SQLiteDatabase): Promise<AccountRestoreResult> {
+async function restoreAccountDataIfNeeded(db: AppDatabase, owner: SyncOwner): Promise<AccountRestoreResult> {
   if (!isSupabaseConfigured()) return { pulled: 0, accountRestored: false, localDataReplaced: false };
 
-  const user = useAuthStore.getState().user;
-  if (!user) return { pulled: 0, accountRestored: false, localDataReplaced: false };
+  owner.requireCurrent();
+  const { userId } = owner;
 
-  if (await hasCompletedAccountRestore(db, user.id)) {
+  const completed = await hasCompletedAccountRestore(db, userId);
+  owner.requireCurrent();
+  if (completed) {
     return { pulled: 0, accountRestored: false, localDataReplaced: false };
   }
 
-  const remoteRows = await fetchRemoteAccountRows(user.id);
+  const snapshotStartedAt = new Date().toISOString();
+  const remoteRows = await fetchRemoteAccountRows(userId, owner);
+  owner.requireCurrent();
   const remoteRowCount = REMOTE_RESTORE_TABLES.reduce((sum, tableName) => sum + remoteRows[tableName].length, 0);
   if (remoteRowCount === 0) {
-    await markAccountRestoreComplete(db, user.id, false);
+    await markAccountRestoreComplete(db, userId, false, snapshotStartedAt, owner);
+    owner.requireCurrent();
     return { pulled: 0, accountRestored: false, localDataReplaced: false };
   }
 
   const hadLocalData = await hasLocalSyncableData(db);
-  await db.withTransactionAsync(async () => {
-    await clearLocalSyncableData(db);
-    await applyRemoteAccountRows(db, remoteRows);
-    await markAccountRestoreComplete(db, user.id, true);
+  owner.requireCurrent();
+  await db.withTransactionAsync(async (tx) => {
+    owner.requireCurrent();
+    await clearLocalSyncableData(tx);
+    owner.requireCurrent();
+    const studyLogKeysByCard = new Map<string, Set<string>>();
+    await applyRemoteAccountRows(tx, remoteRows, studyLogKeysByCard);
+    owner.requireCurrent();
+    await markAccountRestoreComplete(tx, userId, true, snapshotStartedAt, owner);
+    owner.requireCurrent();
   });
+  owner.requireCurrent();
 
   return {
     pulled: remoteRowCount,
@@ -240,80 +359,69 @@ async function restoreAccountDataIfNeeded(db: SQLiteDatabase): Promise<AccountRe
   };
 }
 
-async function fetchRemoteAccountRows(userId: string): Promise<RemoteAccountRows> {
-  const rows = Object.fromEntries(REMOTE_RESTORE_TABLES.map((tableName) => [tableName, []])) as unknown as RemoteAccountRows;
-  for (const tableName of REMOTE_RESTORE_TABLES) {
-    try {
-      rows[tableName] = await fetchRemoteRows(tableName, userId);
-    } catch (err: any) {
-      if (tableName === "user_word_meanings") {
-        console.warn("[Sync] Restore user_word_meanings skipped:", err.message);
-        continue;
-      }
-      throw err;
-    }
-  }
-  return rows;
+async function fetchRemoteAccountRows(userId: string, owner: SyncOwner): Promise<RemoteAccountRows> {
+  return {
+    user_settings: await fetchRemoteRows("user_settings", userId, owner),
+    user_word_meanings: await fetchRemoteRows("user_word_meanings", userId, owner),
+    study_cards: await fetchRemoteRows("study_cards", userId, owner),
+    study_log: await fetchRemoteRows("study_log", userId, owner),
+    bookmarks: await fetchRemoteRows("bookmarks", userId, owner),
+    highlights: await fetchRemoteRows("highlights", userId, owner),
+    private_notes: await fetchRemoteRows("private_notes", userId, owner),
+    reflection_journey_entries: await fetchRemoteRows("reflection_journey_entries", userId, owner),
+    achievement_unlocks: await fetchRemoteRows("achievement_unlocks", userId, owner),
+  };
 }
 
-async function fetchRemoteRows(tableName: string, userId: string, since?: string): Promise<any[]> {
-  const timeCol = "synced_at";
+async function fetchRemoteRows<K extends SyncTable>(
+  tableName: K,
+  userId: string,
+  owner: SyncOwner,
+): Promise<SyncRows[K][]> {
   const batchSize = 500;
-  const rows: any[] = [];
+  const rows: SyncRows[K][] = [];
   let offset = 0;
-
   while (true) {
-    let query = supabase
+    owner.requireCurrent();
+    const { data, error } = await supabase
       .from(tableName)
       .select("*")
-      .eq("user_id", userId);
-
-    if (since) query = query.gt(timeCol, since);
-
-    const { data, error } = await query
-      .order(timeCol, { ascending: true })
+      .eq("user_id", userId)
+      .order("synced_at", { ascending: true })
       .range(offset, offset + batchSize - 1);
-
+    owner.requireCurrent();
     if (error) throw error;
-    if (!data || data.length === 0) break;
-
-    rows.push(...data);
-    if (data.length < batchSize) break;
-    offset += data.length;
+    const page = decodeSyncPage(tableName, data, userId);
+    rows.push(...page);
+    if (page.length < batchSize) break;
+    offset += page.length;
   }
-
   return rows;
 }
 
-async function hasLocalSyncableData(db: SQLiteDatabase): Promise<boolean> {
-  const [
-    settings,
-    cards,
-    logs,
-    bookmarks,
-    highlights,
-    notes,
-    journeyEntries,
-    achievements,
-    wordMeanings,
-  ] = await Promise.all([
-    db.getAllAsync<{ key: string }>("SELECT key FROM user_settings"),
-    db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM study_cards"),
-    db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM study_log"),
-    db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM bookmarks"),
-    db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM highlights"),
-    db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM private_notes"),
-    db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM reflection_journey_entries"),
-    db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM achievement_unlocks"),
-    db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM user_word_meanings"),
-  ]);
+async function hasLocalSyncableData(db: DatabaseExecutor): Promise<boolean> {
+  const [settings, cards, logs, bookmarks, highlights, notes, journeyEntries, achievements, wordMeanings] =
+    await Promise.all([
+      db.getAllAsync<{ key: string }>("SELECT key FROM user_settings"),
+      db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM study_cards"),
+      db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM study_log"),
+      db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM bookmarks"),
+      db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM highlights"),
+      db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM private_notes"),
+      db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM reflection_journey_entries"),
+      db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM achievement_unlocks"),
+      db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM user_word_meanings"),
+    ]);
 
-  return settings.some((row) => isSyncableUserSetting(row.key)) ||
-    [cards, logs, bookmarks, highlights, notes, journeyEntries, achievements, wordMeanings]
-      .some((row) => (row?.count ?? 0) > 0);
+  return (
+    settings.some((row) => isSyncableUserSetting(row.key)) ||
+    [cards, logs, bookmarks, highlights, notes, journeyEntries, achievements, wordMeanings].some(
+      (row) => (row?.count ?? 0) > 0,
+    )
+  );
 }
 
-async function clearLocalSyncableData(db: SQLiteDatabase): Promise<void> {
+async function clearLocalSyncableData(db: DatabaseExecutor): Promise<void> {
   await db.runAsync("DELETE FROM study_cards");
   await db.runAsync("DELETE FROM study_log");
   await db.runAsync("DELETE FROM bookmarks");
@@ -333,11 +441,15 @@ async function clearLocalSyncableData(db: SQLiteDatabase): Promise<void> {
   }
 }
 
-async function applyRemoteAccountRows(db: SQLiteDatabase, rows: RemoteAccountRows): Promise<void> {
+async function applyRemoteAccountRows(
+  db: DatabaseExecutor,
+  rows: RemoteAccountRows,
+  studyLogKeysByCard: Map<string, Set<string>>,
+): Promise<void> {
   for (const row of rows.user_settings) await upsertUserSetting(db, row);
   for (const row of rows.user_word_meanings) await upsertUserWordMeaning(db, row);
   for (const row of rows.study_cards) await upsertStudyCard(db, row);
-  for (const row of rows.study_log) await upsertStudyLog(db, row);
+  for (const row of rows.study_log) await upsertStudyLog(db, row, studyLogKeysByCard);
   for (const row of rows.bookmarks) await upsertBookmark(db, row);
   for (const row of rows.highlights) await upsertHighlight(db, row);
   for (const row of rows.private_notes) await upsertPrivateNote(db, row);
@@ -345,38 +457,34 @@ async function applyRemoteAccountRows(db: SQLiteDatabase, rows: RemoteAccountRow
   for (const row of rows.achievement_unlocks) await upsertAchievementUnlock(db, row);
 }
 
-function groupByTable(entries: SyncQueueEntry[]): Record<string, SyncQueueEntry[]> {
-  const groups: Record<string, SyncQueueEntry[]> = {};
+function groupByTable(entries: SyncQueueEntry[]): Map<string, SyncQueueEntry[]> {
+  const groups = new Map<string, SyncQueueEntry[]>();
   for (const entry of entries) {
-    if (!groups[entry.table_name]) groups[entry.table_name] = [];
-    groups[entry.table_name].push(entry);
+    const group = groups.get(entry.table_name) ?? [];
+    group.push(entry);
+    groups.set(entry.table_name, group);
   }
   return groups;
 }
 
 async function pushTableEntries(
-  tableName: string,
   entries: SyncQueueEntry[],
-  userId: string
+  userId: string,
+  onEntryCompleted: () => void,
 ): Promise<void> {
-  for (const entry of entries) {
-    const data = JSON.parse(entry.data);
-    const operation = entry.operation;
-
-    if (operation === "DELETE") {
-      await pushDelete(tableName, entry.row_id, userId, data);
+  // Validate the entire group before its first remote write. Never ACK stripped future fields.
+  const decoded = entries.map((entry) => decodeSyncQueueEntry(entry, userId));
+  for (const entry of decoded) {
+    if (entry.operation === "DELETE") {
+      await pushDelete(entry.table, entry.rowId, userId, entry.queuedAt, entry.data);
     } else {
-      // INSERT or UPDATE → upsert
-      await pushUpsert(tableName, data, userId);
+      await pushUpsert(entry.table, entry.data, userId);
     }
+    onEntryCompleted();
   }
 }
 
-async function pushUpsert(
-  tableName: string,
-  data: Record<string, any>,
-  userId: string
-): Promise<void> {
+async function pushUpsert(tableName: SyncTable, data: Record<string, any>, userId: string): Promise<void> {
   const syncedAt = new Date().toISOString();
   const row = normalizeRemoteRow(tableName, { ...data, user_id: userId, synced_at: syncedAt });
 
@@ -416,9 +524,7 @@ async function pushUpsert(
 
   if (await remoteIsNewer(tableName, row, userId)) return;
 
-  const { error } = await supabase
-    .from(tableName)
-    .upsert(row, { onConflict });
+  const { error } = await supabase.from(tableName).upsert(row, { onConflict });
 
   if (error) throw error;
 }
@@ -434,50 +540,49 @@ async function pushStudyLog(row: Record<string, any>, userId: string): Promise<v
     .maybeSingle();
 
   if (existingError) throw existingError;
-  if (existing) return;
+  if (decodeSyncedStudyLogExists(existing, userId)) return;
 
-  const { error: logError } = await supabase
-    .from("study_log")
-    .insert(row);
+  const { error: logError } = await supabase.from("study_log").insert(row);
   if (logError && !logError.message.includes("duplicate")) throw logError;
 }
 
-function normalizeRemoteRow(tableName: string, row: Record<string, any>): Record<string, any> {
+function normalizeRemoteRow(tableName: SyncTable, row: Record<string, any>): Record<string, any> {
   if (tableName === "highlights" && !row.sync_id && row.surah && row.ayah && row.color) {
     row.sync_id = highlightSyncId(row as any);
   }
   if (tableName === "highlights" && row.sync_id) {
     delete row.id;
   }
+  // Legacy local highlights can carry an empty updated_at. The server column is TIMESTAMPTZ and the
+  // freshness check needs a real instant, so use the row's own deletion or creation time.
+  if (tableName === "highlights" && row.updated_at === "") {
+    row.updated_at = row.deleted_at || row.created_at;
+  }
 
-  if (tableName === "study_cards" || tableName === "highlights" || tableName === "user_settings" || tableName === "user_word_meanings") {
+  if (
+    tableName === "study_cards" ||
+    tableName === "highlights" ||
+    tableName === "user_settings" ||
+    tableName === "user_word_meanings"
+  ) {
     row.deleted_at = row.deleted_at ?? null;
   }
 
   return row;
 }
 
-function rowTimestamp(row: Record<string, any>, tableName: string): string | null {
+function rowTimestamp(row: Record<string, any>, tableName: SyncTable): string | null {
   if (tableName === "achievement_unlocks") return row.unlocked_at ?? row.synced_at ?? null;
   return row.updated_at ?? row.created_at ?? row.synced_at ?? null;
 }
 
-async function remoteIsNewer(
-  tableName: string,
-  row: Record<string, any>,
-  userId: string
-): Promise<boolean> {
+async function remoteIsNewer(tableName: SyncTable, row: Record<string, any>, userId: string): Promise<boolean> {
   const localTimestamp = rowTimestamp(row, tableName);
   if (!localTimestamp || tableName === "study_log") return false;
 
-  const timestampColumns = tableName === "achievement_unlocks"
-    ? "unlocked_at, synced_at"
-    : "updated_at, created_at, synced_at";
-  let query = supabase
-    .from(tableName)
-    .select(timestampColumns)
-    .eq("user_id", userId)
-    .limit(1);
+  const timestampColumns =
+    tableName === "achievement_unlocks" ? "unlocked_at, synced_at" : "updated_at, created_at, synced_at";
+  let query = supabase.from(tableName).select(timestampColumns).eq("user_id", userId).limit(1);
 
   switch (tableName) {
     case "user_settings":
@@ -511,50 +616,68 @@ async function remoteIsNewer(
 
   const { data, error } = await query;
   if (error) throw error;
-  const remote = Array.isArray(data) ? data[0] : null;
-  const remoteTimestamp = remote ? rowTimestamp(remote as Record<string, any>, tableName) : null;
-  return Boolean(remoteTimestamp && remoteTimestamp > localTimestamp);
+  const remoteTimestamp = decodeSyncFreshness(tableName, data, userId);
+  return Boolean(remoteTimestamp && compareSyncTimestamps(remoteTimestamp, localTimestamp) > 0);
 }
 
 async function pushDelete(
-  tableName: string,
+  tableName: SyncTable,
   rowId: string,
   userId: string,
-  data: Record<string, any> = {}
+  queuedAt: string,
+  data: Record<string, any> = {},
 ): Promise<void> {
-  const deletedAt = data.deleted_at ?? new Date().toISOString();
+  // A legacy entry without deleted_at was deleted no later than it was queued. Stamping the push time
+  // instead would let a stale delete beat a newer edit from another device.
+  const deletedAt = data.deleted_at ?? queuedAt;
   if (tableName === "user_settings") {
-    await pushUpsert(tableName, {
-      key: data.key ?? rowId,
-      value: data.value ?? "",
-      updated_at: data.updated_at ?? deletedAt,
-      deleted_at: deletedAt,
-    }, userId);
+    await pushUpsert(
+      tableName,
+      {
+        key: data.key ?? rowId,
+        value: data.value ?? "",
+        updated_at: data.updated_at ?? deletedAt,
+        deleted_at: deletedAt,
+      },
+      userId,
+    );
     return;
   }
   if (tableName === "user_word_meanings" && data.surah && data.ayah && data.word_pos) {
-    await pushUpsert(tableName, {
-      ...data,
-      updated_at: data.updated_at ?? deletedAt,
-      deleted_at: deletedAt,
-    }, userId);
+    await pushUpsert(
+      tableName,
+      {
+        ...data,
+        updated_at: data.updated_at ?? deletedAt,
+        deleted_at: deletedAt,
+      },
+      userId,
+    );
     return;
   }
   if (tableName === "study_cards" && data.deck_id) {
-    await pushUpsert(tableName, {
-      ...data,
-      updated_at: data.updated_at ?? deletedAt,
-      deleted_at: deletedAt,
-    }, userId);
+    await pushUpsert(
+      tableName,
+      {
+        ...data,
+        updated_at: data.updated_at ?? deletedAt,
+        deleted_at: deletedAt,
+      },
+      userId,
+    );
     return;
   }
   if (tableName === "highlights" && (data.sync_id || data.surah)) {
-    await pushUpsert(tableName, {
-      ...data,
-      sync_id: data.sync_id ?? highlightSyncId(data as any),
-      updated_at: data.updated_at ?? deletedAt,
-      deleted_at: deletedAt,
-    }, userId);
+    await pushUpsert(
+      tableName,
+      {
+        ...data,
+        sync_id: data.sync_id ?? highlightSyncId(data as any),
+        updated_at: data.updated_at ?? deletedAt,
+        deleted_at: deletedAt,
+      },
+      userId,
+    );
     return;
   }
 
@@ -574,12 +697,7 @@ async function pushDelete(
       break;
     }
     case "highlights":
-      query = rowId.startsWith("highlight:")
-        ? query.eq("sync_id", rowId)
-        : query.eq("id", parseInt(rowId, 10));
-      break;
-    case "user_settings":
-      query = query.eq("key", rowId);
+      query = rowId.startsWith("highlight:") ? query.eq("sync_id", rowId) : query.eq("id", rowId);
       break;
     case "user_word_meanings": {
       const [surah, ayah, wordPos] = rowId.split(":").map(Number);
@@ -599,25 +717,39 @@ async function pushDelete(
       query = query.eq("id", rowId);
   }
 
+  // With an explicit deletion time the freshness condition is part of the DELETE itself, so a newer row
+  // written by another device between queueing and pushing survives. Equal times delete, matching the
+  // upload rule. Legacy entries without deleted_at keep the unrestricted delete: their rows could carry a
+  // server-default time later than the queue time, and a conditional delete would bring them back.
+  if (data.deleted_at) {
+    if (tableName === "highlights") {
+      query = query.or(`updated_at.is.null,updated_at.lte."${data.deleted_at}"`);
+    } else {
+      query = query.lte(tableName === "achievement_unlocks" ? "unlocked_at" : "updated_at", data.deleted_at);
+    }
+  }
+
   const { error } = await query;
   if (error) throw error;
 }
 
 // ─── Pull helpers (remote → local SQLite) ──────────────────────
 
-async function pullTable(
-  db: SQLiteDatabase,
-  tableName: string,
+async function pullTable<K extends SyncTable>(
+  db: AppDatabase,
+  tableName: K,
   userId: string,
   since: string,
-  upsertFn: (db: SQLiteDatabase, row: any) => Promise<void>
-): Promise<number> {
+  upsertFn: (db: DatabaseExecutor, row: SyncRows[K]) => Promise<void>,
+  owner: SyncOwner,
+  onPageApplied: (count: number) => void,
+): Promise<void> {
   const timeCol = "synced_at";
   const batchSize = 500;
   let offset = 0;
-  let total = 0;
 
   while (true) {
+    owner.requireCurrent();
     const { data, error } = await supabase
       .from(tableName)
       .select("*")
@@ -626,59 +758,66 @@ async function pullTable(
       .order(timeCol, { ascending: true })
       .range(offset, offset + batchSize - 1);
 
+    owner.requireCurrent();
     if (error) throw error;
-    if (!data || data.length === 0) break;
+    const page = decodeSyncPage(tableName, data, userId);
+    if (page.length === 0) break;
 
-    await db.withTransactionAsync(async () => {
-      for (const row of data) {
-        await upsertFn(db, row);
+    await db.withTransactionAsync(async (tx) => {
+      owner.requireCurrent();
+      for (const row of page) {
+        owner.requireCurrent();
+        await upsertFn(tx, row);
+        owner.requireCurrent();
       }
     });
 
-    total += data.length;
-    if (data.length < batchSize) break;
-    offset += data.length;
+    owner.requireCurrent();
+    onPageApplied(page.length);
+    if (page.length < batchSize) break;
+    offset += page.length;
   }
-
-  return total;
 }
 
-async function upsertUserSetting(db: SQLiteDatabase, row: any): Promise<void> {
-  if (!isSyncableUserSetting(row.key)) return;
+async function upsertUserSetting(db: DatabaseExecutor, row: SyncRows["user_settings"]): Promise<void> {
+  if (row.kind === "ignored") return;
   const remoteUpdatedAt = row.updated_at ?? row.created_at ?? row.synced_at;
   const local = await db.getFirstAsync<{ updated_at: string | null }>(
     "SELECT updated_at FROM user_settings WHERE key = ?",
-    [row.key]
+    [row.key],
   );
-  if (local?.updated_at && remoteUpdatedAt && local.updated_at >= remoteUpdatedAt) return;
+  if (local?.updated_at && remoteUpdatedAt && compareSyncTimestamps(local.updated_at, remoteUpdatedAt) >= 0) return;
 
-  if (row.deleted_at) {
+  if (row.deleted_at != null) {
     await db.runAsync("DELETE FROM user_settings WHERE key = ?", [row.key]);
     return;
   }
 
+  if (typeof row.value !== "string") throw new Error("Invalid synced user_settings payload");
   await db.runAsync(
     "INSERT OR REPLACE INTO user_settings (key, value, updated_at, deleted_at) VALUES (?, ?, ?, NULL)",
-    [row.key, row.value, remoteUpdatedAt ?? new Date().toISOString()]
+    [row.key, row.value, remoteUpdatedAt ?? new Date().toISOString()],
   );
 }
 
-async function upsertUserWordMeaning(db: SQLiteDatabase, row: any): Promise<void> {
+async function upsertUserWordMeaning(db: DatabaseExecutor, row: SyncRows["user_word_meanings"]): Promise<void> {
   const remoteUpdatedAt = row.updated_at ?? row.created_at ?? row.synced_at;
   const local = await db.getFirstAsync<{ updated_at: string | null }>(
     "SELECT updated_at FROM user_word_meanings WHERE surah = ? AND ayah = ? AND word_pos = ?",
-    [row.surah, row.ayah, row.word_pos]
+    [row.surah, row.ayah, row.word_pos],
   );
-  if (local?.updated_at && remoteUpdatedAt && local.updated_at >= remoteUpdatedAt) return;
+  if (local?.updated_at && remoteUpdatedAt && compareSyncTimestamps(local.updated_at, remoteUpdatedAt) >= 0) return;
 
-  if (row.deleted_at) {
-    await db.runAsync(
-      "DELETE FROM user_word_meanings WHERE surah = ? AND ayah = ? AND word_pos = ?",
-      [row.surah, row.ayah, row.word_pos]
-    );
+  if (row.deleted_at != null) {
+    await db.runAsync("DELETE FROM user_word_meanings WHERE surah = ? AND ayah = ? AND word_pos = ?", [
+      row.surah,
+      row.ayah,
+      row.word_pos,
+    ]);
     return;
   }
 
+  if (typeof row.meaning !== "string") throw new Error("Invalid synced user_word_meanings payload");
   await db.runAsync(
     `INSERT OR REPLACE INTO user_word_meanings
      (surah, ayah, word_pos, word, meaning, created_at, updated_at)
@@ -691,21 +830,21 @@ async function upsertUserWordMeaning(db: SQLiteDatabase, row: any): Promise<void
       row.meaning,
       row.created_at ?? remoteUpdatedAt ?? new Date().toISOString(),
       remoteUpdatedAt ?? new Date().toISOString(),
-    ]
+    ],
   );
 }
 
-async function upsertStudyCard(db: SQLiteDatabase, row: any): Promise<void> {
+async function upsertStudyCard(db: DatabaseExecutor, row: SyncRows["study_cards"]): Promise<void> {
   // Last-write-wins: only update if remote is newer
   const remoteUpdatedAt = row.updated_at ?? row.created_at ?? row.synced_at;
-  const local = await db.getFirstAsync<{ updated_at: string }>(
-    "SELECT updated_at FROM study_cards WHERE id = ?",
-    [row.id]
-  );
+  if (!remoteUpdatedAt) throw new Error("Invalid synced study_cards payload");
+  const local = await db.getFirstAsync<{ updated_at: string }>("SELECT updated_at FROM study_cards WHERE id = ?", [
+    row.id,
+  ]);
 
-  if (local && remoteUpdatedAt && local.updated_at >= remoteUpdatedAt) return; // Local is newer
+  if (local && remoteUpdatedAt && compareSyncTimestamps(local.updated_at, remoteUpdatedAt) >= 0) return; // Local is newer
 
-  if (row.deleted_at) {
+  if (row.deleted_at != null) {
     await db.runAsync(
       `INSERT INTO study_cards
        (id, deck_id, due, stability, difficulty, elapsed_days, scheduled_days,
@@ -731,12 +870,25 @@ async function upsertStudyCard(db: SQLiteDatabase, row: any): Promise<void> {
         updated_at = excluded.updated_at,
         deleted_at = excluded.deleted_at`,
       [
-        row.id, row.deck_id ?? "deleted", row.due ?? remoteUpdatedAt, row.stability ?? 0, row.difficulty ?? 0,
-        row.elapsed_days ?? 0, row.scheduled_days ?? 0, row.learning_steps ?? 0,
-        row.reps ?? 0, row.lapses ?? 0, row.state ?? 0, row.last_review ?? null,
-        row.suspended_at ?? null, row.buried_until ?? null, row.marked_at ?? null,
-        row.created_at ?? remoteUpdatedAt, remoteUpdatedAt, row.deleted_at,
-      ]
+        row.id,
+        row.deck_id ?? "deleted",
+        row.due ?? remoteUpdatedAt,
+        row.stability ?? 0,
+        row.difficulty ?? 0,
+        row.elapsed_days ?? 0,
+        row.scheduled_days ?? 0,
+        row.learning_steps ?? 0,
+        row.reps ?? 0,
+        row.lapses ?? 0,
+        row.state ?? 0,
+        row.last_review ?? null,
+        row.suspended_at ?? null,
+        row.buried_until ?? null,
+        row.marked_at ?? null,
+        row.created_at ?? remoteUpdatedAt,
+        remoteUpdatedAt,
+        row.deleted_at,
+      ],
     );
     return;
   }
@@ -748,41 +900,87 @@ async function upsertStudyCard(db: SQLiteDatabase, row: any): Promise<void> {
       marked_at, created_at, updated_at, deleted_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
     [
-      row.id, row.deck_id, row.due, row.stability, row.difficulty,
-      row.elapsed_days, row.scheduled_days, row.learning_steps,
-      row.reps, row.lapses, row.state, row.last_review,
-      row.suspended_at ?? null, row.buried_until ?? null, row.marked_at ?? null,
-      row.created_at, remoteUpdatedAt,
-    ]
+      row.id,
+      row.deck_id,
+      row.due,
+      row.stability,
+      row.difficulty,
+      row.elapsed_days,
+      row.scheduled_days,
+      row.learning_steps,
+      row.reps,
+      row.lapses,
+      row.state,
+      row.last_review ?? null,
+      row.suspended_at ?? null,
+      row.buried_until ?? null,
+      row.marked_at ?? null,
+      row.created_at,
+      remoteUpdatedAt,
+    ],
   );
 }
 
-async function upsertStudyLog(db: SQLiteDatabase, row: any): Promise<void> {
-  // Study log is append-only: check if we already have this exact entry
+async function upsertStudyLog(
+  db: DatabaseExecutor,
+  row: SyncRows["study_log"],
+  restoreKeysByCard?: Map<string, Set<string>>,
+): Promise<void> {
+  const restoreKey = restoreKeysByCard ? syncTimestampKey(row.reviewed_at) : null;
+  const seenRestoreKeys = restoreKeysByCard?.get(row.card_id);
+  if (restoreKey !== null && seenRestoreKeys?.has(restoreKey)) return;
+
+  // Preserve the literal lookup as the fast path for incremental pulls and restore.
   const existing = await db.getFirstAsync<{ id: number }>(
     "SELECT id FROM study_log WHERE card_id = ? AND reviewed_at = ?",
-    [row.card_id, row.reviewed_at]
+    [row.card_id, row.reviewed_at],
   );
-  if (existing) return;
+  const rememberRestoreKey = () => {
+    if (restoreKeysByCard === undefined || restoreKey === null) return;
+    const keys = restoreKeysByCard.get(row.card_id) ?? new Set<string>();
+    keys.add(restoreKey);
+    restoreKeysByCard.set(row.card_id, keys);
+  };
+  if (existing) {
+    rememberRestoreKey();
+    return;
+  }
+
+  if (restoreKeysByCard === undefined) {
+    const sameCardRows = await db.getAllAsync<{ reviewed_at: string }>(
+      "SELECT reviewed_at FROM study_log WHERE card_id = ?",
+      [row.card_id],
+    );
+    const incomingKey = syncTimestampKey(row.reviewed_at);
+    if (sameCardRows.some((local) => syncTimestampKey(local.reviewed_at) === incomingKey)) return;
+  }
 
   await db.runAsync(
     `INSERT INTO study_log
      (card_id, rating, state, due, stability, difficulty, elapsed_days, scheduled_days, reviewed_at, sync_status)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced')`,
     [
-      row.card_id, row.rating, row.state, row.due, row.stability,
-      row.difficulty, row.elapsed_days, row.scheduled_days, row.reviewed_at,
-    ]
+      row.card_id,
+      row.rating,
+      row.state,
+      row.due,
+      row.stability,
+      row.difficulty,
+      row.elapsed_days,
+      row.scheduled_days,
+      row.reviewed_at,
+    ],
   );
+  rememberRestoreKey();
 }
 
-async function upsertBookmark(db: SQLiteDatabase, row: any): Promise<void> {
+async function upsertBookmark(db: DatabaseExecutor, row: SyncRows["bookmarks"]): Promise<void> {
   const remoteUpdatedAt = row.updated_at ?? row.created_at;
   const local = await db.getFirstAsync<{ updated_at: string }>(
     "SELECT updated_at FROM bookmarks WHERE surah = ? AND ayah = ?",
-    [row.surah, row.ayah]
+    [row.surah, row.ayah],
   );
-  if (local && local.updated_at >= remoteUpdatedAt) return;
+  if (local && compareSyncTimestamps(local.updated_at, remoteUpdatedAt) >= 0) return;
 
   await db.runAsync(
     `INSERT OR REPLACE INTO bookmarks
@@ -800,31 +998,52 @@ async function upsertBookmark(db: SQLiteDatabase, row: any): Promise<void> {
       row.qf_sync_error ?? null,
       row.qf_is_in_default_collection ? 1 : 0,
       row.qf_collections_count ?? 0,
-    ]
+    ],
   );
 }
 
-async function upsertHighlight(db: SQLiteDatabase, row: any): Promise<void> {
+async function upsertHighlight(db: DatabaseExecutor, row: SyncRows["highlights"]): Promise<void> {
   const syncId = row.sync_id ?? highlightSyncId(row);
   const remoteUpdatedAt = row.updated_at ?? row.created_at ?? row.synced_at;
+
+  if (row.deleted_at != null) {
+    const identityPredicate =
+      "(sync_id = ? OR (surah = ? AND ayah = ? AND color = ? AND word_start IS ? AND word_end IS ?))";
+    const identityParams = [syncId, row.surah, row.ayah, row.color, row.word_start ?? null, row.word_end ?? null];
+    if (!remoteUpdatedAt) {
+      await db.runAsync("DELETE FROM highlights WHERE " + identityPredicate, identityParams);
+      return;
+    }
+
+    const targets = await db.getAllAsync<{ id: number; updated_at: string | null }>(
+      "SELECT id, updated_at FROM highlights WHERE " + identityPredicate,
+      identityParams,
+    );
+    const eligibleTargets = targets.filter(
+      (target) => !target.updated_at || compareSyncTimestamps(target.updated_at, remoteUpdatedAt) < 0,
+    );
+    for (const target of eligibleTargets) {
+      await db.runAsync("DELETE FROM highlights WHERE id = ? AND updated_at IS ? AND " + identityPredicate, [
+        target.id,
+        target.updated_at,
+        ...identityParams,
+      ]);
+    }
+    return;
+  }
+  if (typeof row.created_at !== "string" || remoteUpdatedAt == null)
+    throw new Error("Invalid synced highlights payload");
+  // An empty updated_at is only a deletion contract. A live row falls back to its creation time so the
+  // freshness check still applies and no empty timestamp is stored.
+  const liveUpdatedAt = remoteUpdatedAt || row.created_at;
   const existing = await db.getFirstAsync<{ id: number; updated_at: string | null }>(
     `SELECT id, updated_at FROM highlights
      WHERE sync_id = ?
         OR (surah = ? AND ayah = ? AND color = ? AND word_start IS ? AND word_end IS ?)
      LIMIT 1`,
-    [syncId, row.surah, row.ayah, row.color, row.word_start, row.word_end]
+    [syncId, row.surah, row.ayah, row.color, row.word_start ?? null, row.word_end ?? null],
   );
-  if (existing?.updated_at && remoteUpdatedAt && existing.updated_at >= remoteUpdatedAt) return;
-
-  if (row.deleted_at) {
-    await db.runAsync(
-      `DELETE FROM highlights
-       WHERE sync_id = ?
-          OR (surah = ? AND ayah = ? AND color = ? AND word_start IS ? AND word_end IS ?)`,
-      [syncId, row.surah, row.ayah, row.color, row.word_start, row.word_end]
-    );
-    return;
-  }
+  if (existing?.updated_at && compareSyncTimestamps(existing.updated_at, liveUpdatedAt) >= 0) return;
 
   if (existing) {
     await db.runAsync(
@@ -836,31 +1055,39 @@ async function upsertHighlight(db: SQLiteDatabase, row: any): Promise<void> {
         syncId,
         row.surah,
         row.ayah,
-        row.word_start,
-        row.word_end,
+        row.word_start ?? null,
+        row.word_end ?? null,
         row.color,
         row.created_at,
-        remoteUpdatedAt,
+        liveUpdatedAt,
         existing.id,
-      ]
+      ],
     );
   } else {
     await db.runAsync(
       `INSERT INTO highlights
         (sync_id, surah, ayah, word_start, word_end, color, created_at, updated_at, deleted_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
-      [syncId, row.surah, row.ayah, row.word_start, row.word_end, row.color, row.created_at, remoteUpdatedAt]
+      [
+        syncId,
+        row.surah,
+        row.ayah,
+        row.word_start ?? null,
+        row.word_end ?? null,
+        row.color,
+        row.created_at,
+        liveUpdatedAt,
+      ],
     );
   }
 }
 
-async function upsertPrivateNote(db: SQLiteDatabase, row: any): Promise<void> {
+async function upsertPrivateNote(db: DatabaseExecutor, row: SyncRows["private_notes"]): Promise<void> {
   const remoteUpdatedAt = row.updated_at ?? row.created_at ?? row.synced_at;
-  const local = await db.getFirstAsync<{ updated_at: string }>(
-    "SELECT updated_at FROM private_notes WHERE id = ?",
-    [row.id]
-  );
-  if (local && remoteUpdatedAt && local.updated_at >= remoteUpdatedAt) return;
+  const local = await db.getFirstAsync<{ updated_at: string }>("SELECT updated_at FROM private_notes WHERE id = ?", [
+    row.id,
+  ]);
+  if (local && remoteUpdatedAt && compareSyncTimestamps(local.updated_at, remoteUpdatedAt) >= 0) return;
   const qfRangesJson =
     typeof row.qf_ranges_json === "string"
       ? row.qf_ranges_json
@@ -881,39 +1108,35 @@ async function upsertPrivateNote(db: SQLiteDatabase, row: any): Promise<void> {
       row.content,
       row.created_at,
       remoteUpdatedAt,
-      row.deleted_at,
+      row.deleted_at ?? null,
       row.qf_note_id ?? null,
       row.qf_synced_at ?? null,
       row.qf_sync_error ?? null,
       qfRangesJson,
-    ]
+    ],
   );
 }
 
-async function upsertReflectionJourneyEntry(db: SQLiteDatabase, row: any): Promise<void> {
+async function upsertReflectionJourneyEntry(
+  db: DatabaseExecutor,
+  row: SyncRows["reflection_journey_entries"],
+): Promise<void> {
   const remoteUpdatedAt = row.updated_at ?? row.created_at ?? row.synced_at;
   const local = await db.getFirstAsync<{ updated_at: string }>(
     "SELECT updated_at FROM reflection_journey_entries WHERE level_id = ?",
-    [row.level_id]
+    [row.level_id],
   );
-  if (local && remoteUpdatedAt && local.updated_at >= remoteUpdatedAt) return;
+  if (local && remoteUpdatedAt && compareSyncTimestamps(local.updated_at, remoteUpdatedAt) >= 0) return;
 
   await db.runAsync(
     `INSERT OR REPLACE INTO reflection_journey_entries
       (level_id, status, response_text, created_at, updated_at, completed_at)
      VALUES (?, ?, ?, ?, ?, ?)`,
-    [
-      row.level_id,
-      row.status,
-      row.response_text,
-      row.created_at,
-      remoteUpdatedAt,
-      row.completed_at,
-    ]
+    [row.level_id, row.status, row.response_text, row.created_at, remoteUpdatedAt, row.completed_at ?? null],
   );
 }
 
-async function upsertAchievementUnlock(db: SQLiteDatabase, row: any): Promise<void> {
+async function upsertAchievementUnlock(db: DatabaseExecutor, row: SyncRows["achievement_unlocks"]): Promise<void> {
   await insertRemoteAchievementUnlock(db, {
     achievement_id: row.achievement_id,
     unlocked_at: row.unlocked_at,
@@ -930,49 +1153,53 @@ function safeJson(value: unknown): unknown {
   }
 }
 
-async function enqueueInitialLocalDataForSync(db: SQLiteDatabase, userId: string): Promise<void> {
+/**
+ * Queue every local row once per account. The queue rows and completion markers commit together,
+ * so a failed queue write leaves the backfill incomplete and the next sync retries it in full.
+ */
+async function enqueueInitialLocalDataForSync(database: AppDatabase, userId: string): Promise<void> {
   const backfillKey = `sync_initial_backfill_${userId}_${INITIAL_BACKFILL_VERSION}`;
   const settingsBackfillKey = userSettingsBackfillKey(userId);
-  const done = await db.getFirstAsync<{ value: string }>(
-    "SELECT value FROM user_settings WHERE key = ?",
-    [backfillKey]
-  );
-  if (done?.value === "true") return;
+  if (await isBackfillComplete(database, backfillKey)) return;
+  await database.withTransactionAsync((db) => enqueueInitialLocalRows(db, backfillKey, settingsBackfillKey));
+}
 
-  const [
-    settings,
-    cards,
-    logs,
-    bookmarks,
-    highlights,
-    privateNotes,
-    journeyEntries,
-    achievements,
-    userWordMeanings,
-  ] = await Promise.all([
-    db.getAllAsync<{ key: string; value: string; updated_at: string | null; deleted_at: string | null }>(
-      "SELECT key, value, updated_at, deleted_at FROM user_settings"
-    ),
-    db.getAllAsync<Record<string, any>>("SELECT * FROM study_cards"),
-    db.getAllAsync<Record<string, any>>(
-      `SELECT card_id, rating, state, due, stability, difficulty, elapsed_days, scheduled_days, reviewed_at
-       FROM study_log`
-    ),
-    db.getAllAsync<Record<string, any>>("SELECT * FROM bookmarks"),
-    db.getAllAsync<Record<string, any>>("SELECT * FROM highlights"),
-    db.getAllAsync<Record<string, any>>("SELECT * FROM private_notes"),
-    db.getAllAsync<Record<string, any>>("SELECT * FROM reflection_journey_entries"),
-    db.getAllAsync<Record<string, any>>("SELECT achievement_id, unlocked_at, public_payload FROM achievement_unlocks"),
-    db.getAllAsync<Record<string, any>>("SELECT surah, ayah, word_pos, word, meaning, created_at, updated_at FROM user_word_meanings"),
-  ]);
+async function enqueueInitialLocalRows(
+  db: DatabaseExecutor,
+  backfillKey: string,
+  settingsBackfillKey: string,
+): Promise<void> {
+  // Another tab sharing this database may have completed the backfill while this one waited.
+  if (await isBackfillComplete(db, backfillKey)) return;
+  const [settings, cards, logs, bookmarks, highlights, privateNotes, journeyEntries, achievements, userWordMeanings] =
+    await Promise.all([
+      db.getAllAsync<{ key: string; value: string; updated_at: string | null; deleted_at: string | null }>(
+        "SELECT key, value, updated_at, deleted_at FROM user_settings",
+      ),
+      db.getAllAsync<Record<string, any>>("SELECT * FROM study_cards"),
+      db.getAllAsync<Record<string, any>>(
+        `SELECT card_id, rating, state, due, stability, difficulty, elapsed_days, scheduled_days, reviewed_at
+       FROM study_log`,
+      ),
+      db.getAllAsync<Record<string, any>>("SELECT * FROM bookmarks"),
+      db.getAllAsync<Record<string, any>>("SELECT * FROM highlights"),
+      db.getAllAsync<Record<string, any>>("SELECT * FROM private_notes"),
+      db.getAllAsync<Record<string, any>>("SELECT * FROM reflection_journey_entries"),
+      db.getAllAsync<Record<string, any>>(
+        "SELECT achievement_id, unlocked_at, public_payload FROM achievement_unlocks",
+      ),
+      db.getAllAsync<Record<string, any>>(
+        "SELECT surah, ayah, word_pos, word, meaning, created_at, updated_at FROM user_word_meanings",
+      ),
+    ]);
 
   const enqueueBackfill = async (
     tableName: string,
     operation: "INSERT" | "UPDATE" | "DELETE",
     rowId: string,
-    data: Record<string, any>
+    data: Record<string, any>,
   ) => {
-    await enqueueSync(db, tableName, operation, rowId, data).catch(console.warn);
+    await enqueueSync(db, tableName, operation, rowId, data);
   };
 
   for (const row of settings) {
@@ -1019,36 +1246,44 @@ async function enqueueInitialLocalDataForSync(db: SQLiteDatabase, userId: string
 
   await db.runAsync(
     "INSERT OR REPLACE INTO user_settings (key, value, updated_at, deleted_at) VALUES (?, 'true', ?, NULL)",
-    [backfillKey, new Date().toISOString()]
+    [backfillKey, new Date().toISOString()],
   );
   await db.runAsync(
     "INSERT OR REPLACE INTO user_settings (key, value, updated_at, deleted_at) VALUES (?, 'true', ?, NULL)",
-    [settingsBackfillKey, new Date().toISOString()]
+    [settingsBackfillKey, new Date().toISOString()],
   );
+}
+
+async function isBackfillComplete(db: DatabaseExecutor, key: string): Promise<boolean> {
+  const row = await db.getFirstAsync<{ value: string }>("SELECT value FROM user_settings WHERE key = ?", [key]);
+  return row?.value === "true";
 }
 
 function userSettingsBackfillKey(userId: string): string {
   return `sync_user_settings_backfill_${userId}_${USER_SETTINGS_BACKFILL_VERSION}`;
 }
 
-async function enqueueSyncableUserSettingsForSync(db: SQLiteDatabase, userId: string): Promise<void> {
+async function enqueueSyncableUserSettingsForSync(database: AppDatabase, userId: string): Promise<void> {
   const backfillKey = userSettingsBackfillKey(userId);
-  const done = await db.getFirstAsync<{ value: string }>(
-    "SELECT value FROM user_settings WHERE key = ?",
-    [backfillKey]
-  );
-  if (done?.value === "true") return;
+  if (await isBackfillComplete(database, backfillKey)) return;
+  await database.withTransactionAsync((db) => enqueueSyncableUserSettingRows(db, backfillKey));
+}
 
-  const settings = await db.getAllAsync<{ key: string; value: string; updated_at: string | null; deleted_at: string | null }>(
-    "SELECT key, value, updated_at, deleted_at FROM user_settings"
-  );
+async function enqueueSyncableUserSettingRows(db: DatabaseExecutor, backfillKey: string): Promise<void> {
+  if (await isBackfillComplete(db, backfillKey)) return;
+  const settings = await db.getAllAsync<{
+    key: string;
+    value: string;
+    updated_at: string | null;
+    deleted_at: string | null;
+  }>("SELECT key, value, updated_at, deleted_at FROM user_settings");
   for (const row of settings) {
     if (!isSyncableUserSetting(row.key)) continue;
-    await enqueueSync(db, "user_settings", "UPDATE", row.key, userSettingToSyncData(row)).catch(console.warn);
+    await enqueueSync(db, "user_settings", "UPDATE", row.key, userSettingToSyncData(row));
   }
 
   await db.runAsync(
     "INSERT OR REPLACE INTO user_settings (key, value, updated_at, deleted_at) VALUES (?, 'true', ?, NULL)",
-    [backfillKey, new Date().toISOString()]
+    [backfillKey, new Date().toISOString()],
   );
 }

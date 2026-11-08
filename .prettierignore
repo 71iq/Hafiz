@@ -5,3 +5,14 @@ dist
 node_modules
 quran.com-frontend-next
 web-build
+
+# Third-party skills and local execution artifacts
+.agents
+.claude
+.ralph
+.refactor-baseline
+scripts/ralph/vendor
+android/.gradle
+android/.kotlin
+android/build
+android/app/build

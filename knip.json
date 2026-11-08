@@ -1,0 +1,31 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "app/**/*.{ts,tsx}",
+    "scripts/**/*.{js,mjs,cjs}",
+    "app.config.*",
+    "*.config.{js,ts}",
+    "tests/**/*.{test,spec}.{ts,tsx}",
+    "components/zayt/ZaytRivePreview.native.tsx",
+    "components/zayt/ZaytRivePreview.web.tsx",
+    "lib/database/native-loaders.web.ts",
+    "lib/fonts/qpc-v4-tajweed-fonts.web.ts"
+  ],
+  "project": [
+    "app/**/*.{ts,tsx}",
+    "components/**/*.{ts,tsx}",
+    "lib/**/*.{ts,tsx}",
+    "scripts/**/*.{js,mjs,cjs}",
+    "tests/**/*.{ts,tsx}"
+  ],
+  "ignore": [
+    "assets/**",
+    "public/**",
+    "supabase/**",
+    "quran.com-frontend-next/**",
+    "lib/database/native-loaders.native.ts",
+    "lib/translations/translation-requires.ts",
+    "scripts/ralph/vendor/**"
+  ],
+  "ignoreDependencies": ["@expo/metro-runtime", "react-dom", "react-native-web"]
+}

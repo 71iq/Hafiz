@@ -2,15 +2,22 @@ import React, { useEffect, useRef } from "react";
 import { Animated, View, type ViewProps, type DimensionValue } from "react-native";
 import { useSettings } from "@/lib/settings/context";
 import { cn } from "@/lib/utils";
+import { useReducedMotionPreference } from "@/lib/ui/reduced-motion";
 
 // ---------------------------------------------------------------------------
 // Shared pulse animation hook
 // ---------------------------------------------------------------------------
 
 function usePulse(duration = 1200): Animated.Value {
-  const opacity = useRef(new Animated.Value(0.3)).current;
+  const reduceMotion = useReducedMotionPreference();
+  const opacity = useRef(new Animated.Value(reduceMotion ? 0.5 : 0.3)).current;
 
   useEffect(() => {
+    if (reduceMotion) {
+      opacity.setValue(0.5);
+      return;
+    }
+    opacity.setValue(0.3);
     const animation = Animated.loop(
       Animated.sequence([
         Animated.timing(opacity, {
@@ -27,7 +34,7 @@ function usePulse(duration = 1200): Animated.Value {
     );
     animation.start();
     return () => animation.stop();
-  }, [opacity, duration]);
+  }, [opacity, duration, reduceMotion]);
 
   return opacity;
 }

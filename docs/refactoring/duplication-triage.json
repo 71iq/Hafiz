@@ -1,0 +1,435 @@
+{
+  "scope": "2026-10-15 baseline; primary-engineer provisional decisions require full caller inspection before implementation.",
+  "groups": [
+    {
+      "index": 0,
+      "files": [
+        "(tabs)/_layout.tsx",
+        "flashcards/session.tsx"
+      ],
+      "decision": "needs-characterization",
+      "rationale": "The repeated readiness error markup can share a presenter, but each route must keep provider placement, language lookup and loading ownership.",
+      "follow_up": "RF-051",
+      "resolved_files": [
+        "app/(tabs)/_layout.tsx",
+        "app/flashcards/session.tsx"
+      ]
+    },
+    {
+      "index": 1,
+      "files": [
+        "(tabs)/_layout.tsx",
+        "onboarding.tsx"
+      ],
+      "decision": "needs-characterization",
+      "rationale": "Same readiness presenter as group 0. Verify onboarding initialization and settings-provider placement before moving markup.",
+      "follow_up": "RF-051",
+      "resolved_files": [
+        "app/(tabs)/_layout.tsx",
+        "app/onboarding.tsx"
+      ]
+    },
+    {
+      "index": 2,
+      "files": [
+        "(tabs)/_layout.tsx",
+        "flashcards/vocab.tsx"
+      ],
+      "decision": "needs-characterization",
+      "rationale": "Vocabulary uses the same readiness presentation while its language lookup occurs outside settings. Keep that lifecycle explicit.",
+      "follow_up": "RF-051",
+      "resolved_files": [
+        "app/(tabs)/_layout.tsx",
+        "app/flashcards/vocab.tsx"
+      ]
+    },
+    {
+      "index": 3,
+      "files": [
+        "(tabs)/home.tsx",
+        "(tabs)/home.tsx"
+      ],
+      "decision": "needs-characterization",
+      "rationale": "SmartDeckCard and VocabularyDeckCard have matching header markup but different deck policies. Characterize actions and compact layout before sharing their presentation.",
+      "follow_up": "RF-052",
+      "resolved_files": [
+        "app/(tabs)/home.tsx",
+        "app/(tabs)/home.tsx"
+      ]
+    },
+    {
+      "index": 4,
+      "files": [
+        "(tabs)/home.tsx",
+        "(tabs)/home.tsx"
+      ],
+      "decision": "needs-characterization",
+      "rationale": "Deck action rows repeat stopPropagation, configuration and card-list controls. Verify permissions and callback meaning before a feature-local shared action row.",
+      "follow_up": "RF-052",
+      "resolved_files": [
+        "app/(tabs)/home.tsx",
+        "app/(tabs)/home.tsx"
+      ]
+    },
+    {
+      "index": 5,
+      "files": [
+        "(tabs)/home.tsx",
+        "(tabs)/home.tsx"
+      ],
+      "decision": "needs-characterization",
+      "rationale": "Compact and expanded deck cards share layout but canStart and deck fields come from different policies. Avoid a generic card with many unrelated switches.",
+      "follow_up": "RF-052",
+      "resolved_files": [
+        "app/(tabs)/home.tsx",
+        "app/(tabs)/home.tsx"
+      ]
+    },
+    {
+      "index": 6,
+      "files": [
+        "(tabs)/leaderboard.tsx",
+        "(tabs)/progress.tsx"
+      ],
+      "decision": "refactor",
+      "rationale": "Account sync callouts repeat one bilingual accessible login presentation in progress and leaderboard. Share the presenter while keeping visibility conditions in each route.",
+      "follow_up": "RF-053",
+      "resolved_files": [
+        "app/(tabs)/leaderboard.tsx",
+        "app/(tabs)/progress.tsx"
+      ]
+    },
+    {
+      "index": 7,
+      "files": [
+        "auth/forgot-password.tsx",
+        "auth/reset-password.tsx"
+      ],
+      "decision": "intentional",
+      "rationale": "Both screens already compose AuthScreenShell and FormTextField. Their recovery/reset controllers and submitted fields differ. The matched shell props do not justify another form wrapper.",
+      "resolved_files": [
+        "app/auth/forgot-password.tsx",
+        "app/auth/reset-password.tsx"
+      ]
+    },
+    {
+      "index": 8,
+      "files": [
+        "auth/login.tsx",
+        "auth/signup.tsx"
+      ],
+      "decision": "needs-characterization",
+      "rationale": "Password visibility and input chrome repeat across two existing RHF forms. Inspect FormTextField and focus/submit semantics before deciding on a password-field variant.",
+      "follow_up": "RF-034",
+      "resolved_files": [
+        "app/auth/login.tsx",
+        "app/auth/signup.tsx"
+      ]
+    },
+    {
+      "index": 9,
+      "files": [
+        "auth/login.tsx",
+        "auth/signup.tsx"
+      ],
+      "decision": "refactor",
+      "rationale": "OAuthButtons already accepts the relevant string shape. Inspect passing the existing UIStrings object directly instead of copying the same five fields in both callers. Preserve distinct auth footers.",
+      "follow_up": "RF-054",
+      "resolved_files": [
+        "app/auth/login.tsx",
+        "app/auth/signup.tsx"
+      ]
+    },
+    {
+      "index": 10,
+      "files": [
+        "flashcards/session.tsx",
+        "flashcards/DeckCardsSheet.tsx"
+      ],
+      "decision": "refactor",
+      "rationale": "DueDateSheet is an existing identical component copied into two flashcard owners. Move one canonical feature component, preserving its controlled state and ResponsiveSheet behavior.",
+      "follow_up": "RF-055",
+      "resolved_files": [
+        "app/flashcards/session.tsx",
+        "components/flashcards/DeckCardsSheet.tsx"
+      ]
+    },
+    {
+      "index": 11,
+      "files": [
+        "flashcards/session.tsx",
+        "flashcards/DeckCardsSheet.tsx"
+      ],
+      "decision": "refactor",
+      "rationale": "This is the remainder of the same duplicated DueDateSheet as group 10. One extraction must migrate both callers and remove both private copies.",
+      "follow_up": "RF-055",
+      "resolved_files": [
+        "app/flashcards/session.tsx",
+        "components/flashcards/DeckCardsSheet.tsx"
+      ]
+    },
+    {
+      "index": 12,
+      "files": [
+        "flashcards/session.tsx",
+        "flashcards/session.tsx"
+      ],
+      "decision": "intentional",
+      "rationale": "Different edit sheets already reuse OverlayFooter and Button. Their save text and form policies differ; a configurable footer wrapper would add indirection for this short composition.",
+      "resolved_files": [
+        "app/flashcards/session.tsx",
+        "app/flashcards/session.tsx"
+      ]
+    },
+    {
+      "index": 13,
+      "files": [
+        "flashcards/session.tsx",
+        "mushaf/word-tabs/QiraatTab.tsx"
+      ],
+      "decision": "refactor",
+      "rationale": "Qiraat block heading/body rendering is repeated between review and reader views. Share only the rendering of already-parsed blocks and preserve Arabic text, direction and typography.",
+      "follow_up": "RF-056",
+      "resolved_files": [
+        "app/flashcards/session.tsx",
+        "components/mushaf/word-tabs/QiraatTab.tsx"
+      ]
+    },
+    {
+      "index": 14,
+      "files": [
+        "profile/[userId].tsx",
+        "profile/index.tsx"
+      ],
+      "decision": "needs-characterization",
+      "rationale": "RF-001 removed the copied startup-language helper. The profile database error presenter still repeats. Characterize and share presentation without changing database or language policy.",
+      "follow_up": "RF-051",
+      "resolved_files": [
+        "app/profile/[userId].tsx",
+        "app/profile/index.tsx"
+      ]
+    },
+    {
+      "index": 15,
+      "files": [
+        "auth/AuthScreenShell.tsx",
+        "auth/OAuthButtons.tsx"
+      ],
+      "decision": "refactor",
+      "rationale": "Both auth components implement the same pre-provider cached dark-theme lookup. Use one pure startup-theme owner and characterize storage errors, system media preference and native fallback.",
+      "follow_up": "RF-057",
+      "resolved_files": [
+        "components/auth/AuthScreenShell.tsx",
+        "components/auth/OAuthButtons.tsx"
+      ]
+    },
+    {
+      "index": 16,
+      "files": [
+        "flashcards/DeckReviewSettingsSheet.tsx",
+        "flashcards/SmartDeckFilterSheet.tsx"
+      ],
+      "decision": "needs-characterization",
+      "rationale": "Review settings drafts repeat in regular and smart-deck editors, but loading/reset and filter ownership differ. Characterize the draft lifecycle before a shared form or state interface.",
+      "follow_up": "RF-058",
+      "resolved_files": [
+        "components/flashcards/DeckReviewSettingsSheet.tsx",
+        "components/flashcards/SmartDeckFilterSheet.tsx"
+      ]
+    },
+    {
+      "index": 17,
+      "files": [
+        "flashcards/DeckReviewSettingsSheet.tsx",
+        "flashcards/SmartDeckFilterSheet.tsx"
+      ],
+      "decision": "needs-characterization",
+      "rationale": "This is draft hydration shared with group 16. Verify reset behavior, locale-specific step text and saving before combining state initialization.",
+      "follow_up": "RF-058",
+      "resolved_files": [
+        "components/flashcards/DeckReviewSettingsSheet.tsx",
+        "components/flashcards/SmartDeckFilterSheet.tsx"
+      ]
+    },
+    {
+      "index": 18,
+      "files": [
+        "flashcards/DeckReviewSettingsSheet.tsx",
+        "flashcards/SmartDeckFilterSheet.tsx"
+      ],
+      "decision": "needs-characterization",
+      "rationale": "Clamping and mode toggles repeat, but state lifecycle must be tested before moving callbacks into a hook. Avoid replacing the sheets with a large state container.",
+      "follow_up": "RF-058",
+      "resolved_files": [
+        "components/flashcards/DeckReviewSettingsSheet.tsx",
+        "components/flashcards/SmartDeckFilterSheet.tsx"
+      ]
+    },
+    {
+      "index": 19,
+      "files": [
+        "flashcards/DeckReviewSettingsSheet.tsx",
+        "flashcards/SmartDeckFilterSheet.tsx"
+      ],
+      "decision": "intentional",
+      "rationale": "The two editors already share SchedulerOptionsPanel. An explicit typed prop list at each owner is normal composition, not another independent implementation of the controls.",
+      "resolved_files": [
+        "components/flashcards/DeckReviewSettingsSheet.tsx",
+        "components/flashcards/SmartDeckFilterSheet.tsx"
+      ]
+    },
+    {
+      "index": 20,
+      "files": [
+        "flashcards/DeckReviewSettingsSheet.tsx",
+        "flashcards/SmartDeckFilterSheet.tsx"
+      ],
+      "decision": "refactor",
+      "rationale": "The review-setting help overlay has identical presentation in both editors. A small feature-owned info sheet can reuse ResponsiveSheet, header and body with unchanged dismissal.",
+      "follow_up": "RF-059",
+      "resolved_files": [
+        "components/flashcards/DeckReviewSettingsSheet.tsx",
+        "components/flashcards/SmartDeckFilterSheet.tsx"
+      ]
+    },
+    {
+      "index": 21,
+      "files": [
+        "mushaf/AyahBlock.tsx",
+        "mushaf/AyahDetailModal.tsx"
+      ],
+      "decision": "intentional",
+      "rationale": "Both owners already use ActionIcon. The matched play/pause/loading expression is short and callbacks have different playback context. Another wrapper would mostly forward existing props.",
+      "resolved_files": [
+        "components/mushaf/AyahBlock.tsx",
+        "components/mushaf/AyahDetailModal.tsx"
+      ]
+    },
+    {
+      "index": 22,
+      "files": [
+        "mushaf/MushafPage.tsx",
+        "mushaf/SurahHeader.tsx"
+      ],
+      "decision": "refactor",
+      "rationale": "The surah-name font readiness effect repeats cancellation and loaded checks. A shared font-readiness hook can own that lifecycle without editing any font asset or mapping.",
+      "follow_up": "RF-060",
+      "resolved_files": [
+        "components/mushaf/MushafPage.tsx",
+        "components/mushaf/SurahHeader.tsx"
+      ]
+    },
+    {
+      "index": 23,
+      "files": [
+        "reflection-journey/JourneyAyahCard.tsx",
+        "reflection-journey/JourneyAyahCard.tsx"
+      ],
+      "decision": "needs-characterization",
+      "rationale": "Two journey branches repeat an ayah preview prefix but their content and loading behavior may differ. Inspect both complete branches and test taps/fonts before extraction.",
+      "follow_up": "RF-061",
+      "resolved_files": [
+        "components/reflection-journey/JourneyAyahCard.tsx",
+        "components/reflection-journey/JourneyAyahCard.tsx"
+      ]
+    },
+    {
+      "index": 24,
+      "files": [
+        "settings/TafsirSourcePicker.tsx",
+        "settings/TranslationLanguagePicker.tsx"
+      ],
+      "decision": "needs-characterization",
+      "rationale": "Tafsir and translation rows share selected/download chrome but their source models and import policies differ. Inspect a shared controlled row after testing those policies.",
+      "follow_up": "RF-036",
+      "resolved_files": [
+        "components/settings/TafsirSourcePicker.tsx",
+        "components/settings/TranslationLanguagePicker.tsx"
+      ]
+    },
+    {
+      "index": 25,
+      "files": [
+        "achievements/queries.ts",
+        "leaderboard/api.ts"
+      ],
+      "decision": "refactor",
+      "rationale": "The JSON-record fallback parser is duplicated across achievement and leaderboard boundaries. Characterize objects, arrays, invalid JSON and primitives before choosing a single pure parser.",
+      "follow_up": "RF-062",
+      "resolved_files": [
+        "lib/achievements/queries.ts",
+        "lib/leaderboard/api.ts"
+      ]
+    },
+    {
+      "index": 26,
+      "files": [
+        "achievements/queries.ts",
+        "fsrs/queries.ts"
+      ],
+      "decision": "refactor",
+      "rationale": "Local review-date counts and longest-streak calculations repeat in FSRS and achievements. Share tested date policy, preserving invalid-date handling, ordering and local calendar semantics.",
+      "follow_up": "RF-063",
+      "resolved_files": [
+        "lib/achievements/queries.ts",
+        "lib/fsrs/queries.ts"
+      ]
+    },
+    {
+      "index": 27,
+      "files": [
+        "fsrs/leaderboard-sync.ts",
+        "leaderboard/api.ts"
+      ],
+      "decision": "refactor",
+      "rationale": "Missing public-review aggregate detection repeats in two clients of the same optional server contract. Share the pure error classifier without changing production schema or other failure handling.",
+      "follow_up": "RF-064",
+      "resolved_files": [
+        "lib/fsrs/leaderboard-sync.ts",
+        "lib/leaderboard/api.ts"
+      ]
+    },
+    {
+      "index": 28,
+      "files": [
+        "fsrs/smart-decks.ts",
+        "fsrs/smart-decks.ts"
+      ],
+      "decision": "needs-characterization",
+      "rationale": "Two smart-deck card-resolution branches repeat qiraat lookup fields. Verify prefixes, absent rows, labels and return shapes before sharing a query.",
+      "follow_up": "RF-022",
+      "resolved_files": [
+        "lib/fsrs/smart-decks.ts",
+        "lib/fsrs/smart-decks.ts"
+      ]
+    },
+    {
+      "index": 29,
+      "files": [
+        "leaderboard/api.ts",
+        "leaderboard/api.ts"
+      ],
+      "decision": "refactor",
+      "rationale": "Weekly/monthly leaderboard responses use the same per-user reduction/ranking rule with different date filters. Share only the typed reduction after tie/limit/null-profile tests.",
+      "follow_up": "RF-065",
+      "resolved_files": [
+        "lib/leaderboard/api.ts",
+        "lib/leaderboard/api.ts"
+      ]
+    },
+    {
+      "index": 30,
+      "files": [
+        "notes/queries.ts",
+        "quran-foundation/user-sync.ts"
+      ],
+      "decision": "needs-characterization",
+      "rationale": "Local notes and QF sync map the same private-note fields, but malformed ranges and sync metadata need contract tests before selecting one mapping owner.",
+      "follow_up": "RF-032",
+      "resolved_files": [
+        "lib/notes/queries.ts",
+        "lib/quran-foundation/user-sync.ts"
+      ]
+    }
+  ]
+}

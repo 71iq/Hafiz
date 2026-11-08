@@ -15,8 +15,10 @@ import Animated, {
   useSharedValue,
   withSpring,
   withTiming,
+  ReduceMotion,
 } from "react-native-reanimated";
 import { useEffect, useState, useCallback, useRef } from "react";
+import { useReducedMotionPreference } from "@/lib/ui/reduced-motion";
 import { useChrome } from "@/lib/ui/chrome";
 import { useSettings, withThemeOpacity } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
@@ -89,6 +91,11 @@ function BottomTabItem({
   isDark: boolean;
 }) {
   const scale = useSharedValue(1);
+  const reduceMotion = useReducedMotionPreference();
+  const scaleTarget = useRef(1);
+  useEffect(() => {
+    if (reduceMotion) scale.value = scaleTarget.current;
+  }, [reduceMotion, scale]);
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
@@ -101,8 +108,14 @@ function BottomTabItem({
     <AnimatedPressable
       onPress={onPress}
       onLongPress={onLongPress}
-      onPressIn={() => { scale.value = withSpring(0.98, { damping: 15, stiffness: 400 }); }}
-      onPressOut={() => { scale.value = withSpring(1, { damping: 15, stiffness: 400 }); }}
+      onPressIn={() => {
+        scaleTarget.current = 0.98;
+        scale.value = reduceMotion ? 0.98 : withSpring(0.98, { damping: 15, stiffness: 400, reduceMotion: ReduceMotion.Never });
+      }}
+      onPressOut={() => {
+        scaleTarget.current = 1;
+        scale.value = reduceMotion ? 1 : withSpring(1, { damping: 15, stiffness: 400, reduceMotion: ReduceMotion.Never });
+      }}
       accessibilityRole="button"
       accessibilityState={isFocused ? { selected: true } : {}}
       style={[
@@ -128,10 +141,15 @@ function BottomBar(props: BottomTabBarProps) {
   const barBackground = withThemeOpacity(themeSurface, 0.8);
   const nativeBarBackground = withThemeOpacity(themeSurface, 0.95);
 
+  const reduceMotion = useReducedMotionPreference();
   const hidden = useSharedValue(0);
   useEffect(() => {
-    hidden.value = withTiming(chromeVisible ? 0 : 1, { duration: 200 });
-  }, [chromeVisible, hidden]);
+    if (reduceMotion) {
+      hidden.value = chromeVisible ? 0 : 1;
+      return;
+    }
+    hidden.value = withTiming(chromeVisible ? 0 : 1, { duration: 200, reduceMotion: ReduceMotion.Never });
+  }, [chromeVisible, hidden, reduceMotion]);
   const barAnimStyle = useAnimatedStyle(() => {
     const slide = hidden.value * 120;
     return {
@@ -401,14 +419,19 @@ function FloatingPanel(props: BottomTabBarProps & { isRTL?: boolean }) {
   const [open, setOpen] = useState(false);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const progress = useSharedValue(0);
+  const reduceMotion = useReducedMotionPreference();
 
   useEffect(() => () => {
     if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
   }, []);
 
   useEffect(() => {
-    progress.value = withTiming(open ? 1 : 0, { duration: 180 });
-  }, [open, progress]);
+    if (reduceMotion) {
+      progress.value = open ? 1 : 0;
+      return;
+    }
+    progress.value = withTiming(open ? 1 : 0, { duration: 180, reduceMotion: ReduceMotion.Never });
+  }, [open, progress, reduceMotion]);
 
   useEffect(() => {
     if (immersive) setOpen(false);

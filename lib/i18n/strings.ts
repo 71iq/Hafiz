@@ -28,6 +28,8 @@ export const strings = {
     themeAmoled: "Tahajjud",
     themeSystem: "System",
     fontSizeLabel: "Arabic Font Size",
+    decreaseArabicFontSize: "Decrease Arabic font size",
+    increaseArabicFontSize: "Increase Arabic font size",
     fontSizeFixedPageView: "Applies to verse and scroll page views; swipe page view is fitted automatically",
     quranFontLabel: "Quran Font",
     quranFontQcf2: "Classic",
@@ -527,6 +529,10 @@ export const strings = {
     flashcardsDelete: "Delete",
     deckCardsTitle: "Deck Cards",
     deckCardsLoadFailed: "Could not load deck cards",
+    cardDeletedSkipped: "This card was deleted, so it was skipped.",
+    cardDeletedElsewhere: "This card was deleted. The list has been refreshed.",
+    homeLoadFailed: "Could not load your dashboard. Your saved progress is safe.",
+    homeLoadRetry: "Retry",
     deckCardsLoading: "Loading cards...",
     deckCardsSearchPlaceholder: "Search cards...",
     deckCardsEmpty: "No cards found",
@@ -761,6 +767,7 @@ export const strings = {
     authPasswordResetSent: "Password reset link sent. Check your inbox and spam folder.",
     authResetPasswordTitle: "Set a new password",
     authResetPasswordSubtitle: "Enter a new password for your account.",
+    authResetBrowserUnsupported: "Password reset is unavailable in this browser. Try another browser or the Hafiz app.",
     authResetLinkInvalid: "This reset link is invalid or expired. Request a new password reset link.",
     authUpdatePassword: "Update password",
     authPasswordUpdated: "Password updated. Log in with your new password.",
@@ -959,6 +966,8 @@ export const strings = {
     themeAmoled: "تهجد",
     themeSystem: "النظام",
     fontSizeLabel: "حجم الخط العربي",
+    decreaseArabicFontSize: "تصغير الخط العربي",
+    increaseArabicFontSize: "تكبير الخط العربي",
     fontSizeFixedPageView: "ينطبق على عرض الآيات وتمرير الصفحات؛ أما العرض الأفقي فيُضبط تلقائيًا",
     quranFontLabel: "خط القرآن",
     quranFontQcf2: "تقليدي",
@@ -1409,6 +1418,10 @@ export const strings = {
     flashcardsDelete: "حذف",
     deckCardsTitle: "بطاقات المجموعة",
     deckCardsLoadFailed: "تعذر تحميل بطاقات المجموعة",
+    cardDeletedSkipped: "حُذفت هذه البطاقة، لذا تم تخطيها.",
+    cardDeletedElsewhere: "حُذفت هذه البطاقة، وتم تحديث القائمة.",
+    homeLoadFailed: "تعذر تحميل لوحة المتابعة. تقدمك المحفوظ في أمان.",
+    homeLoadRetry: "إعادة المحاولة",
     deckCardsLoading: "جارٍ تحميل البطاقات...",
     deckCardsSearchPlaceholder: "ابحث في البطاقات...",
     deckCardsEmpty: "لا توجد بطاقات",
@@ -1643,6 +1656,7 @@ export const strings = {
     authPasswordResetSent: "تم إرسال رابط إعادة التعيين. تحقق من صندوق الوارد والرسائل غير المرغوب فيها.",
     authResetPasswordTitle: "عيّن كلمة مرور جديدة",
     authResetPasswordSubtitle: "أدخل كلمة مرور جديدة لحسابك.",
+    authResetBrowserUnsupported: "إعادة تعيين كلمة المرور غير متاحة في هذا المتصفح. جرّب متصفحًا آخر أو تطبيق حافظ.",
     authResetLinkInvalid: "رابط إعادة التعيين غير صالح أو منتهي الصلاحية. اطلب رابطًا جديدًا.",
     authUpdatePassword: "تحديث كلمة المرور",
     authPasswordUpdated: "تم تحديث كلمة المرور. سجّل الدخول بكلمة المرور الجديدة.",
@@ -1843,6 +1857,5 @@ export const strings = {
   },
 } as const;
 
-export type Locale = keyof typeof strings;
 export type UIStringKey = keyof typeof strings.en;
 export type UIStrings = { readonly [K in UIStringKey]: string };

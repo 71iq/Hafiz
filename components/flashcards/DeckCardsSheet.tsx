@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, Text, TextInput, View, type ViewStyle } from "react-native";
 import { CalendarDays, Clock3, PauseCircle, RotateCcw, Search, Star, Trash2 } from "lucide-react-native";
-import { Button } from "@/components/ui/Button";
+import { DueDateSheet } from "@/components/flashcards/DueDateSheet";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { DropdownMenu, type DropdownMenuItem } from "@/components/ui/DropdownMenu";
-import { OverlayBody, OverlayFooter, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
+import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { useDatabase } from "@/lib/database/provider";
 import { useStrings } from "@/lib/i18n/useStrings";
 import type { UIStrings } from "@/lib/i18n/strings";
@@ -17,6 +17,7 @@ import {
   setStudyCardMarked,
   setStudyCardSuspended,
 } from "@/lib/fsrs/queries";
+import { StudyCardDeletedError } from "@/lib/fsrs/card-errors";
 import type { DeckCardListItem } from "@/lib/fsrs/types";
 import { formatLocalDateInput, parseDueDateInput } from "@/lib/date";
 import { useSettings } from "@/lib/settings/context";
@@ -55,6 +56,11 @@ const CARD_FILTERS: Filter[] = [
   "buried",
 ];
 
+/** A listed row was live when loaded, so acting on it must not revive it; a virtual card may be created. */
+function liveIf(card: DeckCardListItem) {
+  return { requireLive: !card.isVirtual };
+}
+
 export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged }: Props) {
   const db = useDatabase();
   const s = useStrings();
@@ -70,15 +76,18 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
   const [dueDateText, setDueDateText] = useState("");
   const [dueDateError, setDueDateError] = useState<string | null>(null);
 
+  /** Reload the list; false when it failed and its own error is showing. */
   const loadCards = useCallback(async () => {
-    if (!visible || !deckId) return;
+    if (!visible || !deckId) return true;
     setLoading(true);
     setError(null);
     try {
       setCards(await getDeckCardsForList(db, deckId));
+      return true;
     } catch (e) {
       console.warn("[DeckCardsSheet] Failed to load cards:", e);
       setError(s.deckCardsLoadFailed);
+      return false;
     } finally {
       setLoading(false);
     }
@@ -119,16 +128,23 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
       onChanged();
     } catch (e) {
       console.warn("[DeckCardsSheet] Card action failed:", e);
-      setError(s.cardActionFailed);
+      if (e instanceof StudyCardDeletedError) {
+        setConfirmAction(null);
+        setDueTarget(null);
+        const reloaded = await loadCards();
+        onChanged();
+        if (reloaded) setError(s.cardDeletedElsewhere);
+      } else setError(s.cardActionFailed);
     } finally {
       setBusyId(null);
     }
-  }, [busyId, deckId, loadCards, onChanged, s.cardActionFailed]);
+  }, [busyId, deckId, loadCards, onChanged, s.cardActionFailed, s.cardDeletedElsewhere]);
 
   const openDueDate = useCallback((card: DeckCardListItem) => {
     setDueTarget(card);
     setDueDateText(formatLocalDateInput(new Date(card.due)));
     setDueDateError(null);
+    setError(null);
   }, []);
 
   const saveDueDate = useCallback(() => {
@@ -138,8 +154,9 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
       setDueDateError(parsed.reason === "past" ? s.cardDueDatePast : s.cardDueDateInvalid);
       return;
     }
+    setDueDateError(null);
     runAction(dueTarget, async () => {
-      await setStudyCardDueDate(db, deckId, dueTarget.id, parsed.date);
+      await setStudyCardDueDate(db, deckId, dueTarget.id, parsed.date, liveIf(dueTarget));
       setDueTarget(null);
       setDueDateError(null);
     });
@@ -237,18 +254,24 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
                       isRTL={isRTL}
                       rowFlexStyle={rowFlexStyle}
                       s={s}
-                      onDelete={() => setConfirmAction({ type: "delete", card })}
-                      onReset={() => setConfirmAction({ type: "reset", card })}
+                      onDelete={() => {
+                        setError(null);
+                        setConfirmAction({ type: "delete", card });
+                      }}
+                      onReset={() => {
+                        setError(null);
+                        setConfirmAction({ type: "reset", card });
+                      }}
                       onToggleMark={() => runAction(card, async () => {
-                        await setStudyCardMarked(db, card.deck_id, card.id, !card.marked_at);
+                        await setStudyCardMarked(db, card.deck_id, card.id, !card.marked_at, liveIf(card));
                       })}
                       onToggleSuspend={() => runAction(card, async () => {
-                        await setStudyCardSuspended(db, card.deck_id, card.id, !card.suspended_at);
+                        await setStudyCardSuspended(db, card.deck_id, card.id, !card.suspended_at, liveIf(card));
                       })}
                       onToggleBury={() => {
                         const isBuried = !!card.buried_until && card.buried_until > new Date().toISOString();
                         runAction(card, async () => {
-                          await setStudyCardBuried(db, card.deck_id, card.id, !isBuried);
+                          await setStudyCardBuried(db, card.deck_id, card.id, !isBuried, liveIf(card));
                         });
                       }}
                       onSetDueDate={() => openDueDate(card)}
@@ -269,6 +292,7 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
         confirmLabel={confirmAction?.type === "delete" ? s.flashcardsDelete : s.cardResetProgress}
         destructive={confirmAction?.type === "delete"}
         confirmLoading={!!confirmAction && busyId === confirmAction.card.id}
+        error={error}
         isDark={isDark}
         isRTL={isRTL}
         onCancel={() => {
@@ -283,16 +307,16 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
           }
           runAction(card, async () => {
             if (type === "delete") await deleteStudyCard(db, card.deck_id, card.id);
-            else await resetStudyCardProgress(db, card.deck_id, card.id);
+            else await resetStudyCardProgress(db, card.deck_id, card.id, liveIf(card));
             setConfirmAction(null);
           });
         }}
       />
 
-      <DueDateEditor
+      <DueDateSheet
         visible={!!dueTarget}
         value={dueDateText}
-        error={dueDateError}
+        error={dueDateError ?? error}
         busy={!!dueTarget && busyId === dueTarget.id}
         isDark={isDark}
         isRTL={isRTL}
@@ -469,73 +493,6 @@ function TableMessage({ text, isRTL }: { text: string; isRTL: boolean }) {
     >
       {text}
     </Text>
-  );
-}
-
-function DueDateEditor({
-  visible,
-  value,
-  error,
-  busy,
-  isDark,
-  isRTL,
-  s,
-  onChange,
-  onClose,
-  onSave,
-}: {
-  visible: boolean;
-  value: string;
-  error: string | null;
-  busy: boolean;
-  isDark: boolean;
-  isRTL: boolean;
-  s: UIStrings;
-  onChange: (value: string) => void;
-  onClose: () => void;
-  onSave: () => void;
-}) {
-  return (
-    <ResponsiveSheet
-      open={visible}
-      onClose={onClose}
-      maxWidth={420}
-      maxHeight={360}
-      avoidKeyboard
-    >
-      <OverlayHeader title={s.cardSetDueDate} subtitle={s.cardDueDateHint} onClose={onClose} isRTL={isRTL} showHandle />
-      <OverlayBody scrollEnabled={false} contentContainerClassName="px-5 py-5">
-        <TextInput
-          value={value}
-          onChangeText={onChange}
-          placeholder={s.cardDueDatePlaceholder}
-          placeholderTextColor={isDark ? "#737373" : "#b9a085"}
-          keyboardType="numbers-and-punctuation"
-          className="min-h-12 rounded-2xl bg-surface-low dark:bg-surface-dark-low px-4 py-3 text-charcoal dark:text-neutral-100"
-          style={{ fontFamily: "Manrope_500Medium", fontSize: 16, textAlign: isRTL ? "right" : "left", writingDirection: "ltr" }}
-        />
-        {error ? (
-          <Text
-            className="mt-3 text-red-600 dark:text-red-400"
-            style={{ fontFamily: "Manrope_500Medium", fontSize: 13, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
-          >
-            {error}
-          </Text>
-        ) : null}
-      </OverlayBody>
-      <OverlayFooter isRTL={isRTL}>
-        <Button variant="outline" onPress={onClose} disabled={busy} className="flex-1">
-          <Text className="text-charcoal dark:text-neutral-200" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>
-            {s.flashcardsCancel}
-          </Text>
-        </Button>
-        <Button onPress={onSave} disabled={busy} className="flex-1">
-          <Text className="text-white" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>
-            {s.cardSaveDueDate}
-          </Text>
-        </Button>
-      </OverlayFooter>
-    </ResponsiveSheet>
   );
 }
 

@@ -1,8 +1,7 @@
-import { memo, useCallback, useEffect, useMemo, useRef } from "react";
+import { memo, useCallback, useRef } from "react";
 import { Text, Pressable, Platform, View } from "react-native";
-import { useWordInteraction } from "@/lib/word/context";
-import { useChrome } from "@/lib/ui/chrome";
 import { useSettings } from "@/lib/settings/context";
+import { useWordTap } from "./useWordTap";
 
 type Props = {
   glyph: string;
@@ -20,7 +19,13 @@ type Props = {
   compactLayout?: boolean;
 };
 
-const DOUBLE_TAP_MS = 260;
+// Android clips each Text to its own box, but QCF page words draw outside their advance: over all
+// 604 pages, shaped words reach up to 1.77 em past the line-end (left) edge and, rarely, 1.48 em past
+// the right edge. On Android the word's Text keeps its box, highlight and taps but draws no ink; a
+// non-interactive copy widened by this much on both sides draws the glyph. Its right padding keeps the
+// right-aligned glyph exactly where the word box puts it; centering would follow Android's ink
+// bounds and shift it (RF189).
+const INK_OVERFLOW_EM = 2;
 
 function WordTokenInner({
   glyph,
@@ -37,72 +42,23 @@ function WordTokenInner({
   hidden = false,
   compactLayout = false,
 }: Props) {
-  const { tooltipWord, setTooltipWord, openDetail } = useWordInteraction();
-  const { markActivity } = useChrome();
   const { isDark, viewMode, pageScroll } = useSettings();
   const tokenRef = useRef<View>(null);
-  const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isTouchInput = useMemo(() => {
-    if (Platform.OS !== "web") return true;
-    if (typeof navigator !== "undefined" && navigator.maxTouchPoints > 0) return true;
-    if (typeof window !== "undefined" && typeof window.matchMedia === "function") {
-      return window.matchMedia("(pointer: coarse)").matches;
-    }
-    return false;
-  }, []);
-
-  useEffect(() => () => {
-    if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
-  }, []);
-
-  const isTooltipSelected =
-    tooltipWord !== null &&
-    tooltipWord.surah === surah &&
-    tooltipWord.ayah === ayah &&
-    tooltipWord.wordPos === wordPos;
+  const tap = useWordTap({ surah, ayah, wordPos, v2Page, disabled, hidden });
+  const { wordRef, isTooltipSelected, isTouchInput, openDetail } = tap;
   const allowNativeTouchSelection =
     Platform.OS === "web" &&
     isTouchInput &&
     viewMode === "page" &&
     pageScroll === "horizontal";
 
-  const wordRef = { surah, ayah, wordPos, v2Page };
-
-  const showTooltip = useCallback(() => {
-    tokenRef.current?.measureInWindow((x, y, width, height) => {
-      setTooltipWord(wordRef, { x, y, width, height });
-    });
-  }, [surah, ayah, wordPos, v2Page, setTooltipWord]);
-
+  const pressWord = tap.press;
   const handlePress = useCallback(() => {
-    if (disabled || hidden) return;
-    if (!isTouchInput) {
-      // Mouse / desktop: single click → tooltip
-      showTooltip();
-      return;
-    }
-    // Touch input: keep reader chrome changes owned by the reader tap layer.
-    if (tapTimerRef.current) {
-      clearTimeout(tapTimerRef.current);
-      tapTimerRef.current = null;
-      showTooltip();
-      return;
-    }
-    tapTimerRef.current = setTimeout(() => {
-      tapTimerRef.current = null;
-      showTooltip();
-    }, DOUBLE_TAP_MS);
-  }, [disabled, hidden, isTouchInput, showTooltip]);
-
-  const handleLongPress = useCallback(() => {
-    if (disabled || hidden) return;
-    markActivity();
-    if (tapTimerRef.current) {
-      clearTimeout(tapTimerRef.current);
-      tapTimerRef.current = null;
-    }
-    openDetail(wordRef);
-  }, [disabled, hidden, surah, ayah, wordPos, v2Page, markActivity, openDetail]);
+    pressWord((done) =>
+      tokenRef.current?.measureInWindow((x, y, width, height) => done({ x, y, width, height })),
+    );
+  }, [pressWord]);
+  const handleLongPress = tap.longPress;
 
   // Web: right-click also opens the detail sheet (matches "long press" intent)
   const webContextMenu =
@@ -134,6 +90,11 @@ function WordTokenInner({
         } as any)
       : {};
 
+  const drawsInkLayer = Platform.OS === "android" && !hidden;
+  const inkClassName = isTooltipSelected
+    ? "text-primary-accent dark:text-primary-bright"
+    : "text-charcoal dark:text-neutral-100";
+
   return (
     <Pressable
       ref={tokenRef as any}
@@ -151,11 +112,7 @@ function WordTokenInner({
     >
       <Text
         selectable={Platform.OS === "web" && !hidden}
-        className={
-          isTooltipSelected
-            ? "text-primary-accent dark:text-primary-bright"
-            : "text-charcoal dark:text-neutral-100"
-        }
+        className={inkClassName}
         style={{
           fontFamily,
           ...(Platform.OS === "web" && fontPalette ? ({ fontPalette } as any) : null),
@@ -177,10 +134,41 @@ function WordTokenInner({
             paddingBottom: Math.max(1, fontSize * 0.04),
           }),
           ...(Platform.OS === "web" ? ({ userSelect: hidden ? "none" : "text" } as any) : null),
+          ...(drawsInkLayer && { color: "transparent" }),
         }}
       >
         {glyph}
       </Text>
+      {drawsInkLayer && (
+        // A View, because Android ignores pointerEvents on Text and the wide layer would take
+        // neighboring words' taps.
+        <View
+          pointerEvents="none"
+          accessible={false}
+          importantForAccessibility="no-hide-descendants"
+          style={{
+            position: "absolute",
+            top: 0,
+            bottom: 0,
+            left: -fontSize * INK_OVERFLOW_EM,
+            right: -fontSize * INK_OVERFLOW_EM,
+          }}
+        >
+          <Text
+            className={inkClassName}
+            style={{
+              fontFamily,
+              fontSize,
+              lineHeight,
+              // The layer is placed from the Pressable's edge; add its and the word Text's padding.
+              paddingRight: fontSize * INK_OVERFLOW_EM + (compactLayout ? 0 : 2),
+              textAlign: "right",
+            }}
+          >
+            {glyph}
+          </Text>
+        </View>
+      )}
     </Pressable>
   );
 }

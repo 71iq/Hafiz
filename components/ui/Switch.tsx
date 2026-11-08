@@ -1,6 +1,7 @@
 import { Pressable, Animated } from "react-native";
 import { useEffect, useRef } from "react";
 import { useSettings } from "@/lib/settings/context";
+import { useReducedMotionPreference } from "@/lib/ui/reduced-motion";
 
 type Props = {
   value: boolean;
@@ -13,13 +14,19 @@ export function Switch({ value, onValueChange, disabled }: Props) {
   const { themeColors } = useSettings();
   const thumbLeft = useRef(new Animated.Value(value ? 22 : 2)).current;
 
+  const reduceMotion = useReducedMotionPreference();
+
   useEffect(() => {
+    if (reduceMotion) {
+      thumbLeft.setValue(value ? 22 : 2);
+      return;
+    }
     Animated.spring(thumbLeft, {
       toValue: value ? 22 : 2,
       useNativeDriver: false,
       bounciness: 4,
     }).start();
-  }, [value]);
+  }, [reduceMotion, thumbLeft, value]);
 
   return (
     <Pressable

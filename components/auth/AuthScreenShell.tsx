@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ChevronLeft, ChevronRight } from "lucide-react-native";
 import { useColorScheme } from "nativewind";
+import { getCachedAuthDarkMode } from "@/lib/settings/startup-theme";
 import { DirectionProvider, type Direction } from "@/lib/ui/direction";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 
@@ -583,19 +584,6 @@ function BotanicalLines({
 export function useAuthDarkMode(): boolean {
   const { colorScheme } = useColorScheme();
   return getCachedAuthDarkMode() ?? colorScheme === "dark";
-}
-
-function getCachedAuthDarkMode(): boolean | null {
-  if (Platform.OS !== "web" || typeof window === "undefined") return null;
-
-  const theme = window.localStorage.getItem("hafiz_theme");
-  if (theme === "dark" || theme === "amoled") return true;
-  if (theme === "beige" || theme === "white") return false;
-  if (theme === "system") {
-    return window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? null;
-  }
-
-  return null;
 }
 
 function MobilePaperMotif() {

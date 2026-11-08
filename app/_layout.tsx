@@ -1,24 +1,21 @@
 import "../global.css";
+import { OperationNoticeProvider } from "@/components/ui/OperationNoticeProvider";
+import { bindAuthQueryCache } from "@/lib/query/auth-cache-lifecycle";
+import { bindNativeQueryLifecycle, createAppQueryClient } from "@/lib/query/native-lifecycle";
+import { PasswordRecoveryProvider } from "@/lib/auth/password-recovery";
 import { Stack, usePathname } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import * as Font from "expo-font";
 import { Platform } from "react-native";
 import { useEffect, useState } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { PortalHost } from "@rn-primitives/portal";
 import { DatabaseProvider, useDatabaseStatus } from "@/lib/database/provider";
 import { UI_FONTS, loadUiFontsWeb } from "@/lib/fonts/ui-fonts";
 import { useAuthStore } from "@/lib/auth/store";
 import { AyahAudioProvider } from "@/lib/audio/ayah-audio";
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes
-      retry: 1,
-    },
-  },
-});
+const queryClient = createAppQueryClient();
 
 export { ErrorBoundary } from "expo-router";
 
@@ -52,6 +49,11 @@ function StableDocumentTitle() {
   return null;
 }
 
+function DatabaseNoticeBoundary({ children }: { children: React.ReactNode }) {
+  const { db, isReady } = useDatabaseStatus();
+  return <OperationNoticeProvider ready={Boolean(db && isReady)}>{children}</OperationNoticeProvider>;
+}
+
 function AudioProviderBoundary({ children }: { children: React.ReactNode }) {
   const { db } = useDatabaseStatus();
   if (!db) return <>{children}</>;
@@ -64,6 +66,9 @@ export default function RootLayout() {
   // still waits for expo-font since the splash covers the interval.
   const [fontsLoaded, setFontsLoaded] = useState(Platform.OS === "web");
   const initialize = useAuthStore((s) => s.initialize);
+
+  useEffect(() => bindAuthQueryCache(queryClient), []);
+  useEffect(() => bindNativeQueryLifecycle(), []);
 
   useEffect(() => {
     if (Platform.OS === "web") {
@@ -86,50 +91,36 @@ export default function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <DatabaseProvider>
-        <AudioProviderBoundary>
-          <StableDocumentTitle />
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="about" />
-            <Stack.Screen name="credits" />
-            <Stack.Screen name="privacy" />
-            <Stack.Screen name="terms" />
-            <Stack.Screen name="zayt-preview" />
-            <Stack.Screen name="onboarding" options={{ animation: "fade" }} />
-            <Stack.Screen name="open" />
-            <Stack.Screen
-              name="flashcards/session"
-              options={{ animation: "slide_from_bottom" }}
-            />
-            <Stack.Screen
-              name="auth/login"
-              options={{ animation: "slide_from_bottom" }}
-            />
-            <Stack.Screen
-              name="auth/signup"
-              options={{ animation: "slide_from_bottom" }}
-            />
-            <Stack.Screen
-              name="auth/forgot-password"
-              options={{ animation: "slide_from_bottom" }}
-            />
-            <Stack.Screen
-              name="auth/reset-password"
-              options={{ animation: "slide_from_bottom" }}
-            />
-            <Stack.Screen
-              name="profile/index"
-              options={{ animation: "fade", presentation: "transparentModal" }}
-            />
-            <Stack.Screen
-              name="profile/[userId]"
-              options={{ animation: "fade", presentation: "transparentModal" }}
-            />
-          </Stack>
-          <PortalHost />
-        </AudioProviderBoundary>
-      </DatabaseProvider>
+      <PasswordRecoveryProvider>
+        <DatabaseProvider>
+          <DatabaseNoticeBoundary>
+            <AudioProviderBoundary>
+              <StableDocumentTitle />
+              <Stack screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="(tabs)" />
+                <Stack.Screen name="about" />
+                <Stack.Screen name="credits" />
+                <Stack.Screen name="privacy" />
+                <Stack.Screen name="terms" />
+                <Stack.Screen name="zayt-preview" />
+                <Stack.Screen name="onboarding" options={{ animation: "fade" }} />
+                <Stack.Screen name="open" />
+                <Stack.Screen name="flashcards/session" options={{ animation: "slide_from_bottom" }} />
+                <Stack.Screen name="auth/login" options={{ animation: "slide_from_bottom" }} />
+                <Stack.Screen name="auth/signup" options={{ animation: "slide_from_bottom" }} />
+                <Stack.Screen name="auth/forgot-password" options={{ animation: "slide_from_bottom" }} />
+                <Stack.Screen name="auth/reset-password" options={{ animation: "slide_from_bottom" }} />
+                <Stack.Screen name="profile/index" options={{ animation: "fade", presentation: "transparentModal" }} />
+                <Stack.Screen
+                  name="profile/[userId]"
+                  options={{ animation: "fade", presentation: "transparentModal" }}
+                />
+              </Stack>
+              <PortalHost />
+            </AudioProviderBoundary>
+          </DatabaseNoticeBoundary>
+        </DatabaseProvider>
+      </PasswordRecoveryProvider>
     </QueryClientProvider>
   );
 }

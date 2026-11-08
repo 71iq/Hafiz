@@ -1,20 +1,15 @@
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-} from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
 import { Platform } from "react-native";
-import {
-  importDatabaseFromAssetAsync,
-  openDatabaseAsync,
-  type SQLiteDatabase,
-} from "expo-sqlite";
+import { importDatabaseFromAssetAsync, openDatabaseAsync } from "expo-sqlite";
+import { createConnectionOwner, type ConnectionOwner } from "@/lib/database/connection-owner";
+import { createDatabaseBridgeClient, createDatabaseBridgeHost } from "@/lib/database/bridge-connection";
+import type { AppDatabase } from "@/lib/database/types";
 import { initializeDatabase, type ImportProgress } from "./init";
 import { backfillAchievements } from "@/lib/achievements/queries";
+import { DB_BRIDGE_VERSION, decodeDbMessage, type DbMessage } from "@/lib/database/bridge-messages";
 
 type DatabaseContextType = {
-  db: SQLiteDatabase | null;
+  db: AppDatabase | null;
   isReady: boolean;
   progress: ImportProgress | null;
   error: string | null;
@@ -36,45 +31,17 @@ const OPEN_RETRY_DELAY_MS = 400;
 const HOST_WAIT_TIMEOUT_MS = 30000;
 const HOST_RETRY_WAIT_TIMEOUT_MS = 1500;
 const HOST_CONNECT_RETRY_DELAY_MS = 300;
-const REQUEST_TIMEOUT_MS = 60000;
 const POST_CLOSE_SETTLE_MS = 200;
 
-type DbOperation = "exec" | "run" | "getFirst" | "getAll";
-
-type HostProbeMessage = { type: "host-probe"; tabId: string };
-type HostReadyMessage = { type: "host-ready"; tabId: string };
-type HostClosingMessage = { type: "host-closing"; tabId: string };
-type DbRequestMessage = {
-  type: "request";
-  requestId: string;
-  fromTabId: string;
-  targetTabId: string;
-  operation: DbOperation;
-  source: string;
-  params: unknown[];
-};
-type DbResponseMessage = {
-  type: "response";
-  requestId: string;
-  fromTabId: string;
-  targetTabId: string;
-  ok: boolean;
-  result?: unknown;
-  error?: string;
+type WebLockManager = {
+  request: (
+    name: string,
+    options: { mode: "exclusive"; ifAvailable: true },
+    callback: (lock: unknown) => Promise<void> | void,
+  ) => Promise<void>;
 };
 
-type DbMessage =
-  | HostProbeMessage
-  | HostReadyMessage
-  | HostClosingMessage
-  | DbRequestMessage
-  | DbResponseMessage;
-
-type PendingRequest = {
-  resolve: (value: unknown) => void;
-  reject: (error: Error) => void;
-  timeout: ReturnType<typeof setTimeout>;
-};
+type NavigatorWithWebLocks = Navigator & { locks?: WebLockManager };
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -89,505 +56,456 @@ function isOpfsLockError(error: unknown) {
   );
 }
 
-function formatRemoteError(error: unknown) {
-  return error instanceof Error ? error.message : String(error);
-}
-
-function toCloneableResult(result: unknown) {
-  if (result == null) return null;
-  return JSON.parse(JSON.stringify(result)) as unknown;
-}
-
-async function executeDbOperation(db: SQLiteDatabase, message: DbRequestMessage) {
-  switch (message.operation) {
-    case "exec":
-      return db.execAsync(message.source);
-    case "run":
-      return db.runAsync(message.source, ...(message.params as any[]));
-    case "getFirst":
-      return db.getFirstAsync(message.source, ...(message.params as any[]));
-    case "getAll":
-      return db.getAllAsync(message.source, ...(message.params as any[]));
-    default:
-      throw new Error("Unsupported database operation");
-  }
-}
-
 export function DatabaseProvider({ children }: { children: React.ReactNode }) {
-  const [db, setDb] = useState<SQLiteDatabase | null>(null);
+  const [db, setDb] = useState<AppDatabase | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [progress, setProgress] = useState<ImportProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const tabId =
+    const uniqueId = () =>
       typeof crypto !== "undefined" && "randomUUID" in crypto
         ? crypto.randomUUID()
-        : Math.random().toString(36).slice(2);
-    let cancelled = false;
-    let currentDb: SQLiteDatabase | null = null;
-    let channel: BroadcastChannel | null = null;
-    let releaseLock: (() => void) | null = null;
-    let hostTabId: string | null = null;
-    let isHostReady = false;
-    let isInitializing = false;
-    let isPageHidden = false;
-    let lifecycleClosePromise: Promise<void> | null = null;
-    const pendingRequests = new Map<string, PendingRequest>();
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const tabId = uniqueId();
     const isWeb = Platform.OS === "web";
-    const hasBroadcastChannel =
-      isWeb && typeof BroadcastChannel !== "undefined";
-    const hasWebLocks =
-      isWeb &&
-      typeof navigator !== "undefined" &&
-      typeof (navigator as any).locks?.request === "function";
+    const hasBroadcastChannel = isWeb && typeof BroadcastChannel !== "undefined";
+    const locks = isWeb && typeof navigator !== "undefined" ? (navigator as NavigatorWithWebLocks).locks : undefined;
+    const hasWebLocks = typeof locks?.request === "function";
+    type Host = {
+      id: string;
+      epoch: number;
+      db: AppDatabase | null;
+      owner: ConnectionOwner | null;
+      bridge: ReturnType<typeof createDatabaseBridgeHost> | null;
+      release: (() => void) | null;
+      ready: boolean;
+      operations: Set<Promise<void>>;
+      close: Promise<void> | null;
+      cleanupFailure: Error | null;
+    };
+    type Remote = {
+      hostId: string;
+      active: boolean;
+      db: AppDatabase | null;
+      client: ReturnType<typeof createDatabaseBridgeClient> | null;
+    };
+    type Attempt = { epoch: number; resources: Host[]; promise: Promise<void> };
+    let cancelled = false;
+    let hidden = false;
+    let epoch = 0;
+    let channel: BroadcastChannel | null = null;
+    let currentDb: AppDatabase | null = null;
+    let host: Host | null = null;
+    let remote: Remote | null = null;
+    let attempt: Attempt | null = null;
+    let restartRequested = false;
+    let closeBarrier: Promise<void> = Promise.resolve();
+    let closeFailure: Error | null = null;
+    let recoveryTimer: ReturnType<typeof setTimeout> | null = null;
+    const cancelWaits = new Set<() => void>();
+    const live = (generation: number) => !cancelled && !hidden && generation === epoch;
+    const asError = (value: unknown) => (value instanceof Error ? value : new Error(String(value)));
 
     function postMessage(message: DbMessage) {
-      channel?.postMessage(message);
-    }
-
-    function rejectPendingRequests(error: Error) {
-      for (const [requestId, pending] of pendingRequests) {
-        clearTimeout(pending.timeout);
-        pending.reject(error);
-        pendingRequests.delete(requestId);
+      if (!channel || cancelled) return false;
+      try {
+        channel.postMessage(message);
+        return true;
+      } catch {
+        // A host result may settle after its channel has closed.
+        return false;
       }
     }
-
-    function createRemoteDatabaseProxy(targetTabId: string) {
-      const request = (
-        operation: DbOperation,
-        source: string,
-        params: unknown[] = [],
-      ) =>
-        new Promise<unknown>((resolve, reject) => {
-          if (!channel) {
-            reject(new Error("Database channel is unavailable"));
-            return;
-          }
-
-          const requestId =
-            typeof crypto !== "undefined" && "randomUUID" in crypto
-              ? crypto.randomUUID()
-              : `${Date.now()}-${Math.random()}`;
-          const timeout = setTimeout(() => {
-            pendingRequests.delete(requestId);
-            reject(new Error("Database request timed out"));
-          }, REQUEST_TIMEOUT_MS);
-
-          pendingRequests.set(requestId, { resolve, reject, timeout });
-          postMessage({
-            type: "request",
-            requestId,
-            fromTabId: tabId,
-            targetTabId,
-            operation,
-            source,
-            params,
-          });
-        });
-
-      const proxy: any = {
-        execAsync: (source: string) =>
-          request("exec", source) as Promise<void>,
-        runAsync: (source: string, ...params: unknown[]) =>
-          request("run", source, params) as ReturnType<
-            SQLiteDatabase["runAsync"]
-          >,
-        getFirstAsync: (source: string, ...params: unknown[]) =>
-          request("getFirst", source, params) as ReturnType<
-            SQLiteDatabase["getFirstAsync"]
-          >,
-        getAllAsync: (source: string, ...params: unknown[]) =>
-          request("getAll", source, params) as ReturnType<
-            SQLiteDatabase["getAllAsync"]
-          >,
-        withTransactionAsync: async (task: () => Promise<void>) => {
-          await proxy.execAsync?.("BEGIN");
-          try {
-            await task();
-            await proxy.execAsync?.("COMMIT");
-          } catch (transactionError) {
-            try {
-              await proxy.execAsync?.("ROLLBACK");
-            } catch {
-              // Ignore rollback failures and surface the original transaction error.
-            }
-            throw transactionError;
-          }
-        },
-        prepareAsync: async (source: string) => ({
-          executeAsync: (...params: unknown[]) => request("run", source, params),
-          finalizeAsync: async () => {},
-        }),
-        closeAsync: async () => {},
-      };
-
-      return proxy as SQLiteDatabase;
+    function cancelRecovery() {
+      if (recoveryTimer !== null) clearTimeout(recoveryTimer);
+      recoveryTimer = null;
     }
-
-    function handleChannelMessage(event: MessageEvent<DbMessage>) {
-      const message = event.data;
-      if (!message || !("type" in message)) return;
-
+    function scheduleRecovery() {
+      cancelRecovery();
+      const generation = epoch;
+      recoveryTimer = setTimeout(() => {
+        recoveryTimer = null;
+        if (live(generation) && !currentDb) void runInit();
+      }, POST_CLOSE_SETTLE_MS);
+    }
+    function retireRemote(owner: Remote, reason: Error, recover: boolean, publish = true) {
+      if (remote !== owner || !owner.active) return;
+      owner.active = false;
+      owner.client?.retire(reason);
+      remote = null;
+      if (currentDb === owner.db) currentDb = null;
+      if (!cancelled && publish) {
+        setDb(null);
+        setIsReady(false);
+        setProgress(null);
+      }
+      if (recover && !cancelled && !hidden) scheduleRecovery();
+    }
+    function createRemoteDatabaseProxy(target: string) {
+      const owner: Remote = { hostId: target, active: true, db: null, client: null };
+      owner.client = createDatabaseBridgeClient({
+        tabId,
+        hostId: target,
+        uniqueId,
+        postMessage,
+        isActive: () => owner.active && remote === owner && currentDb === owner.db && !cancelled && !hidden,
+        onDisconnect: (reason) => retireRemote(owner, reason, true),
+      });
+      owner.db = owner.client.database;
+      return owner;
+    }
+    const hostIsCurrent = (resource: Host) =>
+      live(resource.epoch) && host === resource && resource.ready && currentDb === resource.db && resource.db !== null;
+    function handleChannelMessage(event: MessageEvent<unknown>) {
+      const message = decodeDbMessage(event.data);
+      if (!message) return;
       if (message.type === "host-probe") {
-        if (message.tabId !== tabId && isHostReady) {
-          postMessage({ type: "host-ready", tabId });
-        }
+        if (host && hostIsCurrent(host) && message.tabId !== tabId)
+          postMessage({ type: "host-ready", version: DB_BRIDGE_VERSION, tabId: host.id });
         return;
       }
-
       if (message.type === "host-closing") {
-        if (message.tabId === hostTabId && !releaseLock && !cancelled) {
-          hostTabId = null;
-          currentDb = null;
-          setDb(null);
-          setIsReady(false);
-          rejectPendingRequests(new Error("Database host closed"));
-          setTimeout(() => {
-            if (!cancelled) void runInit();
-          }, POST_CLOSE_SETTLE_MS);
-        }
+        if (remote?.hostId === message.tabId) retireRemote(remote, new Error("Database host closed"), true);
         return;
       }
-
       if (message.type === "request") {
-        if (message.targetTabId !== tabId || !isHostReady || !currentDb) return;
-
-        void (async () => {
-          try {
-            const result = toCloneableResult(
-              await executeDbOperation(currentDb!, message),
-            );
-            postMessage({
-              type: "response",
-              requestId: message.requestId,
-              fromTabId: tabId,
-              targetTabId: message.fromTabId,
-              ok: true,
-              result,
-            });
-          } catch (requestError) {
-            postMessage({
-              type: "response",
-              requestId: message.requestId,
-              fromTabId: tabId,
-              targetTabId: message.fromTabId,
-              ok: false,
-              error: formatRemoteError(requestError),
-            });
-          }
-        })();
+        const resource = host;
+        if (!resource?.bridge || message.targetTabId !== resource.id || !hostIsCurrent(resource)) return;
+        const operation = resource.bridge.handleRequest(message);
+        resource.operations.add(operation);
+        void operation.then(
+          () => resource.operations.delete(operation),
+          () => resource.operations.delete(operation),
+        );
         return;
       }
-
-      if (message.type === "response") {
-        if (message.targetTabId !== tabId) return;
-        const pending = pendingRequests.get(message.requestId);
-        if (!pending) return;
-
-        clearTimeout(pending.timeout);
-        pendingRequests.delete(message.requestId);
-        if (message.ok) {
-          pending.resolve(message.result);
-        } else {
-          pending.reject(new Error(message.error ?? "Database request failed"));
-        }
-      }
+      if (message.type === "response") remote?.client?.handleResponse(message);
     }
-
-    async function waitForHost(timeoutMs = HOST_WAIT_TIMEOUT_MS) {
-      if (!channel) return null;
-      const activeChannel = channel;
-
-      return new Promise<string | null>((resolve) => {
-        let settled = false;
-        const timeout = setTimeout(() => {
-          if (settled) return;
-          settled = true;
-          activeChannel.removeEventListener("message", onMessage);
-          resolve(null);
-        }, timeoutMs);
-
-        const onMessage = (event: MessageEvent<DbMessage>) => {
-          const message = event.data;
-          if (message?.type !== "host-ready" || message.tabId === tabId) return;
-          if (settled) return;
-
-          settled = true;
-          clearTimeout(timeout);
-          activeChannel.removeEventListener("message", onMessage);
-          resolve(message.tabId);
+    function waitBeforeRetry(ms: number, isActive: () => boolean) {
+      if (!isActive()) return Promise.resolve();
+      return new Promise<void>((resolve) => {
+        const finish = () => {
+          clearTimeout(timer);
+          cancelWaits.delete(finish);
+          resolve();
         };
-
-        activeChannel.addEventListener("message", onMessage);
-        activeChannel.postMessage({ type: "host-probe", tabId });
+        const timer = setTimeout(finish, ms);
+        cancelWaits.add(finish);
       });
     }
-
-    async function tryAcquireHostLock() {
-      if (!hasWebLocks) return true;
-
+    function waitForHost(timeoutMs: number, isActive: () => boolean) {
+      if (!channel || !isActive()) return Promise.resolve<string | null>(null);
+      const targetChannel = channel;
+      return new Promise<string | null>((resolve) => {
+        let settled = false;
+        const finish = (value: string | null) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          targetChannel.removeEventListener("message", onMessage);
+          cancelWaits.delete(cancel);
+          resolve(value);
+        };
+        const cancel = () => finish(null);
+        const onMessage = (event: MessageEvent<unknown>) => {
+          const message = decodeDbMessage(event.data);
+          if (isActive() && message?.type === "host-ready" && message.tabId !== tabId) finish(message.tabId);
+        };
+        const timer = setTimeout(cancel, timeoutMs);
+        cancelWaits.add(cancel);
+        targetChannel.addEventListener("message", onMessage);
+        if (!postMessage({ type: "host-probe", version: DB_BRIDGE_VERSION, tabId })) finish(null);
+      });
+    }
+    function tryAcquireHostLock(resource: Host, isActive: () => boolean) {
+      if (!isActive()) return Promise.resolve(false);
+      if (!hasWebLocks || !locks) return Promise.resolve(true);
       return new Promise<boolean>((resolve, reject) => {
-        const locks = (navigator as Navigator & {
-          locks: {
-            request: (
-              name: string,
-              options: { mode: "exclusive"; ifAvailable: true },
-              callback: (lock: unknown) => Promise<void> | void,
-            ) => Promise<void>;
-          };
-        }).locks;
-
         locks
-          .request(
-            LOCK_NAME,
-            { mode: "exclusive", ifAvailable: true },
-            (lock) => {
-              if (!lock) {
-                resolve(false);
-                return;
-              }
-
-              return new Promise<void>((release) => {
-                releaseLock = release;
-                resolve(true);
-              });
-            },
-          )
+          .request(LOCK_NAME, { mode: "exclusive", ifAvailable: true }, (lock) => {
+            if (!lock || !isActive()) {
+              resolve(false);
+              return;
+            }
+            return new Promise<void>((release) => {
+              resource.release = release;
+              resolve(true);
+            });
+          })
           .catch(reject);
       });
     }
-
-    async function releaseLockHandle() {
-      const release = releaseLock;
-      releaseLock = null;
-      isHostReady = false;
+    async function releaseResourceLock(resource: Host) {
+      const release = resource.release;
+      resource.release = null;
       if (release) {
         release();
         await sleep(POST_CLOSE_SETTLE_MS);
       }
     }
-
-    async function closeForLifecycleTransition() {
-      await closeDbHandle();
-      await releaseLockHandle();
+    function retireResource(resource: Host, reason: Error) {
+      resource.ready = false;
+      resource.owner?.retire(reason);
+      resource.bridge?.retire(reason);
     }
-
-    async function closeDbHandle() {
-      const handle = currentDb;
-      currentDb = null;
-      if (handle) {
-        try {
-          await handle.closeAsync();
-        } catch {
-          // Ignore close failures during provider teardown.
-        }
-      }
-    }
-
-    async function openWithRetry(): Promise<SQLiteDatabase> {
-      let lastError: unknown;
-
-      for (let attempt = 1; attempt <= OPEN_MAX_ATTEMPTS; attempt += 1) {
-        try {
-          if (isWeb) {
-            await importDatabaseFromAssetAsync(DATABASE_NAME, {
-              assetId: quranDbAsset,
-            });
+    function closeResource(resource: Host): Promise<void> {
+      retireResource(resource, new Error("Database connection closing"));
+      if (!resource.close)
+        resource.close = (async () => {
+          await Promise.allSettled([...resource.operations]);
+          if (resource.cleanupFailure) throw resource.cleanupFailure;
+          if (resource.owner) {
+            // Keep the host lock if private handle close is uncertain.
+            await resource.owner.close();
+            resource.owner = null;
+            resource.db = null;
           }
-          return await openDatabaseAsync(DATABASE_NAME);
-        } catch (err) {
-          lastError = err;
-          await closeDbHandle();
-
-          if (!isWeb || !isOpfsLockError(err) || attempt === OPEN_MAX_ATTEMPTS) {
-            break;
-          }
-
-          await releaseLockHandle();
-          await sleep(OPEN_RETRY_DELAY_MS * attempt);
-          if (!(await tryAcquireHostLock())) break;
-        }
-      }
-
-      throw lastError instanceof Error ? lastError : new Error(String(lastError));
+          await releaseResourceLock(resource);
+        })();
+      return resource.close;
     }
-
-    async function connectToHost(timeoutMs = HOST_WAIT_TIMEOUT_MS) {
-      const targetTabId = await waitForHost(timeoutMs);
-      if (!targetTabId) {
-        throw new Error("Unable to connect to the active database tab");
-      }
-
-      hostTabId = targetTabId;
-      currentDb = createRemoteDatabaseProxy(targetTabId);
-      if (!cancelled && !isPageHidden) {
-        setDb(currentDb);
-        setProgress(null);
-        setError(null);
-        setIsReady(true);
-      }
-    }
-
-    async function connectToHostOrAcquireLock() {
-      const deadline = Date.now() + HOST_WAIT_TIMEOUT_MS;
-      let lastError: unknown;
-
-      while (Date.now() < deadline) {
-        try {
-          await connectToHost(HOST_RETRY_WAIT_TIMEOUT_MS);
-          return true;
-        } catch (err) {
-          lastError = err;
-        }
-
-        if (cancelled || isPageHidden) return true;
-
-        await sleep(HOST_CONNECT_RETRY_DELAY_MS);
-        const acquiredLock = await tryAcquireHostLock();
-        if (cancelled || isPageHidden) {
-          await releaseLockHandle();
-          return true;
-        }
-        if (acquiredLock) return false;
-      }
-
-      throw lastError instanceof Error ? lastError : new Error(String(lastError));
-    }
-
-    async function initializeAsHost() {
-      const database = await openWithRetry();
-      if (cancelled || isPageHidden) {
-        await database.closeAsync().catch(() => {});
-        return;
-      }
-
-      currentDb = database;
-      setDb(database);
-
-      await initializeDatabase(database, setProgress);
-      await backfillAchievements(database, { notify: false });
-
-      if (cancelled || isPageHidden) {
-        await closeDbHandle();
-        await releaseLockHandle();
-        return;
-      }
-
+    function recordCloseFailure(failure: unknown) {
+      closeFailure = asError(failure);
       if (!cancelled) {
-        isHostReady = true;
-        postMessage({ type: "host-ready", tabId });
-        setProgress(null);
-        setError(null);
-        setIsReady(true);
+        setError(closeFailure.message);
+        setIsReady(false);
+        setDb(null);
       }
     }
-
-    async function runInit() {
-      if (cancelled || isPageHidden || isInitializing) return;
-      isInitializing = true;
-
-      if (lifecycleClosePromise) {
-        await lifecycleClosePromise;
-        lifecycleClosePromise = null;
-      }
-
-      if (cancelled || isPageHidden) {
-        isInitializing = false;
-        return;
-      }
-
-      setIsReady(false);
-      setError(null);
-      setProgress(null);
-
-      try {
-        const shouldHost = await tryAcquireHostLock();
-        if (cancelled || isPageHidden) {
-          await releaseLockHandle();
+    async function closeResources(resources: Host[]) {
+      const results = await Promise.allSettled([...new Set(resources)].map(closeResource));
+      const rejected = results.find((result) => result.status === "rejected");
+      if (rejected?.status === "rejected") throw rejected.reason;
+    }
+    async function openWithRetry(resource: Host, isActive: () => boolean) {
+      let lastError: unknown;
+      for (let index = 1; index <= OPEN_MAX_ATTEMPTS; index++) {
+        if (!isActive()) return;
+        try {
+          if (isWeb) await importDatabaseFromAssetAsync(DATABASE_NAME, { assetId: quranDbAsset });
+          if (!isActive()) return;
+          const raw = await openDatabaseAsync(DATABASE_NAME, { useNewConnection: true });
+          const owner = createConnectionOwner(raw, (failure) => {
+            const belongs = host === resource || attempt?.resources.includes(resource);
+            if (!live(resource.epoch) || !belongs) return;
+            retire(failure);
+            if (!cancelled) setError(failure.message);
+            if (!cancelled && !hidden) scheduleRecovery();
+          });
+          resource.owner = owner;
+          resource.db = owner.database;
+          if (!isActive()) owner.retire(new Error("Database initialization retired"));
           return;
+        } catch (failure) {
+          lastError = failure;
+          if (asError(failure).message.includes("SQLite worker cleanup failed: ")) {
+            resource.cleanupFailure = asError(failure);
+            throw failure;
+          }
+          if (!isActive() || !isWeb || !isOpfsLockError(failure) || index === OPEN_MAX_ATTEMPTS) break;
+          await releaseResourceLock(resource);
+          await waitBeforeRetry(OPEN_RETRY_DELAY_MS * index, isActive);
+          if (!isActive() || !(await tryAcquireHostLock(resource, isActive))) break;
         }
-
-        if (!shouldHost && hasBroadcastChannel) {
-          const connectedToHost = await connectToHostOrAcquireLock();
-          if (cancelled || connectedToHost) return;
+      }
+      throw asError(lastError);
+    }
+    async function connectToHost(resource: Host, isActive: () => boolean) {
+      const deadline = Date.now() + HOST_WAIT_TIMEOUT_MS;
+      let lastError: Error = new Error("Unable to connect to the active database tab");
+      while (isActive() && Date.now() < deadline) {
+        const target = await waitForHost(HOST_RETRY_WAIT_TIMEOUT_MS, isActive);
+        if (!isActive()) return true;
+        if (target) {
+          const proxy = createRemoteDatabaseProxy(target);
+          remote = proxy;
+          currentDb = proxy.db;
+          cancelRecovery();
+          setDb(currentDb);
+          setProgress(null);
+          setError(null);
+          setIsReady(true);
+          return true;
         }
-
-        await initializeAsHost();
-      } catch (err) {
-        if (cancelled || isPageHidden) return;
-
-        await closeDbHandle();
-        await releaseLockHandle();
-
-        if (isWeb && hasBroadcastChannel && isOpfsLockError(err)) {
+        lastError = new Error("Unable to connect to the active database tab");
+        await waitBeforeRetry(HOST_CONNECT_RETRY_DELAY_MS, isActive);
+        if (!isActive()) return true;
+        if (await tryAcquireHostLock(resource, isActive)) return false;
+      }
+      if (!isActive()) return true;
+      throw lastError;
+    }
+    async function initializeAsHost(resource: Host, isActive: () => boolean) {
+      await openWithRetry(resource, isActive);
+      if (!isActive() || !resource.db) return;
+      const database = resource.db;
+      await initializeDatabase(database, (next) => {
+        if (isActive()) setProgress(next);
+      });
+      if (!isActive()) return;
+      await backfillAchievements(database, { notify: false });
+      if (!isActive()) return;
+      resource.bridge = createDatabaseBridgeHost(resource.owner!, {
+        hostId: resource.id,
+        uniqueId,
+        postMessage,
+        isActive: () => hostIsCurrent(resource),
+      });
+      host = resource;
+      resource.ready = true;
+      currentDb = database;
+      cancelRecovery();
+      setDb(database);
+      setProgress(null);
+      setError(null);
+      setIsReady(true);
+      postMessage({ type: "host-ready", version: DB_BRIDGE_VERSION, tabId: resource.id });
+    }
+    function runInit(): Promise<void> {
+      if (cancelled || hidden || currentDb) return Promise.resolve();
+      if (closeFailure) {
+        setError(closeFailure.message);
+        return Promise.resolve();
+      }
+      if (attempt) {
+        restartRequested = true;
+        return attempt.promise;
+      }
+      const owner: Attempt = { epoch, resources: [], promise: Promise.resolve() };
+      attempt = owner;
+      const previousClose = closeBarrier;
+      const isActive = () => live(owner.epoch);
+      const makeResource = () => {
+        const resource: Host = {
+          id: uniqueId(),
+          epoch: owner.epoch,
+          db: null,
+          owner: null,
+          bridge: null,
+          release: null,
+          ready: false,
+          operations: new Set(),
+          close: null,
+          cleanupFailure: null,
+        };
+        owner.resources.push(resource);
+        return resource;
+      };
+      owner.promise = (async () => {
+        await previousClose;
+        if (!isActive()) return;
+        setIsReady(false);
+        setError(null);
+        setProgress(null);
+        const resource = makeResource();
+        try {
+          const shouldHost = await tryAcquireHostLock(resource, isActive);
+          if (!isActive()) return;
+          if (!shouldHost && hasBroadcastChannel && (await connectToHost(resource, isActive))) return;
+          if (isActive()) await initializeAsHost(resource, isActive);
+        } catch (failure) {
+          if (!isActive()) return;
           try {
-            const connectedToHost = await connectToHostOrAcquireLock();
-            if (cancelled || connectedToHost) return;
-            await initializeAsHost();
+            await closeResources(owner.resources);
+          } catch (closeError) {
+            recordCloseFailure(closeError);
             return;
-          } catch (hostError) {
-            err = hostError;
+          }
+          if (!isActive()) return;
+          if (isWeb && hasBroadcastChannel && isOpfsLockError(failure)) {
+            const fallback = makeResource();
+            try {
+              if (await connectToHost(fallback, isActive)) return;
+              if (isActive()) await initializeAsHost(fallback, isActive);
+              return;
+            } catch (hostError) {
+              failure = hostError;
+              try {
+                await closeResource(fallback);
+              } catch (closeError) {
+                recordCloseFailure(closeError);
+                return;
+              }
+            }
+          }
+          if (isActive()) {
+            console.error("Database initialization failed:", failure);
+            setProgress(null);
+            setError(asError(failure).message);
           }
         }
-
-        console.error("Database initialization failed:", err);
+      })()
+        .catch((failure) => {
+          if (isActive()) recordCloseFailure(failure);
+        })
+        .finally(() => {
+          if (attempt !== owner) return;
+          attempt = null;
+          const restart = restartRequested;
+          restartRequested = false;
+          if (restart && !cancelled && !hidden && !currentDb && !closeFailure) void runInit();
+        });
+      return owner.promise;
+    }
+    function retire(reason: Error, publish = true) {
+      epoch += 1;
+      restartRequested = false;
+      cancelRecovery();
+      for (const cancel of [...cancelWaits]) cancel();
+      const oldHost = host;
+      const oldAttempt = attempt;
+      host = null;
+      if (oldHost?.ready) postMessage({ type: "host-closing", version: DB_BRIDGE_VERSION, tabId: oldHost.id });
+      // Release held protocol callbacks before waiting for initialization or RPCs.
+      for (const resource of new Set([...(oldAttempt?.resources ?? []), ...(oldHost ? [oldHost] : [])]))
+        retireResource(resource, reason);
+      if (remote) retireRemote(remote, reason, false, publish);
+      currentDb = null;
+      if (!cancelled && publish) {
+        setDb(null);
+        setIsReady(false);
         setProgress(null);
-        setError(err instanceof Error ? err.message : String(err));
-      } finally {
-        isInitializing = false;
       }
+      const previousClose = closeBarrier;
+      closeBarrier = (async () => {
+        const prior = await Promise.allSettled([previousClose, oldAttempt?.promise ?? Promise.resolve()]);
+        await closeResources([...(oldAttempt?.resources ?? []), ...(oldHost ? [oldHost] : [])]);
+        const failed = prior.find((result) => result.status === "rejected");
+        if (failed?.status === "rejected") throw failed.reason;
+      })();
+      void closeBarrier.catch(recordCloseFailure);
     }
-
     function handlePageHide() {
-      isPageHidden = true;
-      hostTabId = null;
-      rejectPendingRequests(new Error("Database page hidden"));
-      if (isHostReady) postMessage({ type: "host-closing", tabId });
-      isHostReady = false;
-      setDb(null);
-      setIsReady(false);
-      lifecycleClosePromise = closeForLifecycleTransition();
+      if (hidden) return;
+      hidden = true;
+      retire(new Error("Database page hidden"));
     }
-
     function handlePageShow() {
-      isPageHidden = false;
-      if (cancelled || currentDb || isInitializing) return;
+      hidden = false;
       void runInit();
     }
-
     if (hasBroadcastChannel) {
       channel = new BroadcastChannel(CHANNEL_NAME);
       channel.addEventListener("message", handleChannelMessage);
     }
-
-    if (isWeb && typeof window !== "undefined") {
-      window.addEventListener("pagehide", handlePageHide);
-      window.addEventListener("pageshow", handlePageShow);
-    }
-
+    const lifecycleWindow = isWeb && typeof window !== "undefined" ? window : null;
+    lifecycleWindow?.addEventListener("pagehide", handlePageHide);
+    lifecycleWindow?.addEventListener("pageshow", handlePageShow);
     void runInit();
-
     return () => {
+      lifecycleWindow?.removeEventListener("pagehide", handlePageHide);
+      lifecycleWindow?.removeEventListener("pageshow", handlePageShow);
+      hidden = true;
+      // Send remote reservation cancellation while the channel is still usable.
+      retire(new Error("Database provider closed"), false);
       cancelled = true;
-      if (isWeb && typeof window !== "undefined") {
-        window.removeEventListener("pagehide", handlePageHide);
-        window.removeEventListener("pageshow", handlePageShow);
-      }
-      rejectPendingRequests(new Error("Database provider closed"));
-      if (isHostReady) postMessage({ type: "host-closing", tabId });
-      void closeDbHandle();
-      void releaseLockHandle();
       channel?.close();
+      channel = null;
     };
   }, []);
 
-  return (
-    <DatabaseContext.Provider value={{ db, isReady, progress, error }}>
-      {children}
-    </DatabaseContext.Provider>
-  );
+  return <DatabaseContext.Provider value={{ db, isReady, progress, error }}>{children}</DatabaseContext.Provider>;
 }
 
 export function useDatabase() {

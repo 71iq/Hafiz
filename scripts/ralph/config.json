@@ -1,0 +1,12 @@
+{
+  "branch": "codex/hafiz-modernization",
+  "max_iterations": 3,
+  "max_attempts": 2,
+  "max_resource_timeouts": 2,
+  "session_seconds": 900,
+  "batch_seconds": 5400,
+  "memory_max": "6G",
+  "model": "gpt-6-astra",
+  "reasoning_effort": "high",
+  "generator_model": "gpt-5.6-luna"
+}
