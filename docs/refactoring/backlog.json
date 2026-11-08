@@ -4586,13 +4586,23 @@
       ],
       "risk": "high",
       "approved": false,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "docs/refactoring/decisions/0002-expo-upgrade.md",
         "docs/refactoring/TECH_STACK.md"
       ],
       "attempts": 0,
-      "priority": 5
+      "priority": 5,
+      "started_at": "2026-11-08T07:08:45.690036+00:00",
+      "completed_at": "2026-11-08T07:08:45.690036+00:00",
+      "primary_accepted_at": "2026-11-08T07:08:45.690036+00:00",
+      "files": [
+        "docs/refactoring/decisions/0002-expo-upgrade.md",
+        "docs/refactoring/TECH_STACK.md"
+      ],
+      "summary": "Compared SDK 56, 57 and 58 release notes with the current stack, patches and store requirements. SDK 55 meets Google Play's API 36 target; the iOS 27 scene lifecycle in SDK 58 matters once Apple requires the iOS 27 SDK. Decision (ADR 0002): defer to a separate post-merge branch that goes straight to the current SDK, revalidating the four local patches with the Android device gates from this branch. Follow-up RF197.",
+      "evidence": "Official Expo changelogs for SDK 56/57/58, Google Play target API page, installed versions and android targetSdk 36 from node_modules/react-native/gradle/libs.versions.toml.",
+      "independent_review": "Decision record; covered by the final review (RF049)."
     },
     {
       "id": "RF-046",
@@ -26630,11 +26640,37 @@
       "summary": "When the tabs are directly below the /open screen, the deep link now calls router.dismissTo('/(tabs)/mushaf') and returns to them; otherwise (cold start, or a session, auth or onboarding screen below) it replaces /open as before so that flow stays underneath. The Mushaf tab consumes the target on refocus as before.",
       "evidence": "Router-level test with expo-router's testing library: three warm links keep one (tabs) route (fails on the original source with two), Mushaf already focused, a session left underneath, and a cold link. Device: six warm links keep about 640 views and 250 MB (before: 13,685 views and 1.35 GB) and the reader opens 50:1. Deep-link suites 106/106, typecheck, lint.",
       "independent_review": "Light-model review found that an unconditional dismissTo would pop a review session, auth (including reset-password) or onboarding opened over the tabs; narrowed to the tabs-directly-below case with tests for both, re-verified on device."
+    },
+    {
+      "id": "RF-197",
+      "title": "Upgrade to the current Expo SDK after the modernization merge",
+      "priority": 4,
+      "risk": "high",
+      "description": "ADR 0002: move from SDK 55 straight to the current SDK (58 or later) in a separate branch once codex/hafiz-modernization is merged. Revalidate the expo-sqlite, react-native-css-interop, @tanstack/query-core and tailwindcss patches; adopt the iOS scene lifecycle; check R8 minification of release builds.",
+      "dependencies": [
+        "RF-045"
+      ],
+      "modules": [
+        "package.json",
+        "package-lock.json",
+        "patches/*",
+        "app.json"
+      ],
+      "acceptance_criteria": [
+        "Android QA device gates from this branch (cold start, first-run import, reader in both views, review session, translations, page-view glyphs), full unit and Chrome gate, iOS run before release; no merge or deploy without Ehab."
+      ],
+      "approved": false,
+      "status": "deferred",
+      "attempts": 0,
+      "implementation_mode": "implementation",
+      "files": [],
+      "allowed_paths": [],
+      "verification": []
     }
   ],
   "checkpoint": {
     "time": "2026-11-08T07:03:31.065538+00:00",
-    "current_task": "RF-048 (responsive and bilingual UI verification)",
+    "current_task": "RF-048 (UI phases running), then RF-044, RF-046, RF-090",
     "open_follow_ups": [],
     "device_tasks": "none pending; QA app reset to Verse by Verse and English (Bridges)",
     "decisions_waiting_on_ehab": [

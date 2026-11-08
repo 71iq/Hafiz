@@ -317,3 +317,5 @@ RF195 accepted on 2026-11-08. Quran data and translations are now written to the
 RF034 closed on 2026-11-08 without a code change. Every sign-in and password form already validates the same way, with React Hook Form and Zod. The profile editor only limits input length and keeps its simpler inputs, because its save flow guards against account switches and a migration would add risk without adding a rule.
 
 RF047 accepted on 2026-11-08. The page-view navigation menu's test now opens the menu in Arabic and English and checks what a reader sees and does, instead of searching the source for icon names. TEST_COVERAGE.md lists the other source-reading tests and what should replace each; most guard layout and need screenshots rather than tests.
+
+RF045 completed on 2026-11-08. Expo is now at SDK 58; Hafiz stays on SDK 55 for this branch, which already meets Google Play's current target. The upgrade goes straight to the current SDK in its own branch after this one merges, so its device risks are reviewed separately (ADR 0002, RF197).
