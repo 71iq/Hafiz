@@ -325,3 +325,5 @@ RF044 accepted on 2026-11-08. Lint warnings went from 61 to 26 by removing ones 
 RF199 accepted on 2026-11-08. On the web, buttons and rows that set their look through a press-state style lost that style entirely, so Arabic menu rows were laid out backwards and the selected translation was not highlighted. The NativeWind patch now keeps those styles on the web, as RF185 did on Android. Found during RF048; checked in Chrome in Arabic and English across all themes, with a light review.
 
 RF048 completed on 2026-11-08. The web app was checked at phone, tablet and desktop widths in Arabic and English and in all five themes; it fits every width, and the check found and fixed RF199. UI_VERIFICATION.md lists what ran on the web, what ran on the phone and what was not covered.
+
+RF200 accepted on 2026-11-08. The validation library was updated past a reported memory-exhaustion flaw. The update would have started rejecting sync times written without seconds; the tests caught it and those times stay accepted. All unit tests pass, and a high-effort review found no other behavior change.
