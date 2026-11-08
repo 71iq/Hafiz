@@ -319,3 +319,5 @@ RF034 closed on 2026-11-08 without a code change. Every sign-in and password for
 RF047 accepted on 2026-11-08. The page-view navigation menu's test now opens the menu in Arabic and English and checks what a reader sees and does, instead of searching the source for icon names. TEST_COVERAGE.md lists the other source-reading tests and what should replace each; most guard layout and need screenshots rather than tests.
 
 RF045 completed on 2026-11-08. Expo is now at SDK 58; Hafiz stays on SDK 55 for this branch, which already meets Google Play's current target. The upgrade goes straight to the current SDK in its own branch after this one merges, so its device risks are reviewed separately (ADR 0002, RF197).
+
+RF044 accepted on 2026-11-08. Lint warnings went from 61 to 26 by removing ones that cannot change behavior. The remaining hook-dependency warnings are listed by file in LINT.md for separate tested fixes, and the ESLint 10 move is its own task (RF198).

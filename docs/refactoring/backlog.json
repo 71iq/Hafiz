@@ -4533,22 +4533,184 @@
       ],
       "verification": [
         [
-          "npm",
-          "run",
-          "lint",
-          "--",
-          "--max-warnings",
-          "0"
+          "git",
+          "diff",
+          "--check"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "lib/leaderboard/rows.ts",
+          "lib/leaderboard/api.ts",
+          "lib/fsrs/leaderboard-sync.ts",
+          "tests/unit/leaderboard-rows.test.ts",
+          "tests/unit/leaderboard-stats-owner.test.ts",
+          "docs/refactoring/PROGRESS.md"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/leaderboard/rows.ts",
+          "lib/leaderboard/api.ts",
+          "lib/fsrs/leaderboard-sync.ts",
+          "tests/unit/leaderboard-rows.test.ts",
+          "tests/unit/leaderboard-stats-owner.test.ts",
+          "--max-warnings=0"
         ],
         [
           "npm",
           "run",
           "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "check:analysis"
+        ],
+        [
+          "npm",
+          "run",
+          "postinstall"
+        ],
+        [
+          "npm",
+          "ls",
+          "--all",
+          "--json"
+        ],
+        [
+          "npm",
+          "run",
+          "lint",
+          "--",
+          "--format",
+          "json"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit"
+        ],
+        [
+          "node",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/tests/brace-expansion.test.cjs",
+          "scripts/tests/dependency-boundaries.test.cjs",
+          "scripts/tests/icon-tool.test.cjs",
+          "scripts/tests/jest-config.test.cjs",
+          "scripts/tests/js-yaml.test.cjs",
+          "scripts/tests/lint-coverage.test.cjs",
+          "scripts/tests/metro-unicode.test.cjs",
+          "scripts/tests/nanoid.test.cjs",
+          "scripts/tests/router-dependency-range.test.cjs",
+          "scripts/tests/security-dependency-owner.test.cjs",
+          "scripts/tests/source-map-js.test.cjs",
+          "scripts/tests/tailwind-source-map.test.cjs",
+          "scripts/tests/ws.test.cjs",
+          "scripts/tests/xmldom.test.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "test:refactor-runner"
+        ],
+        [
+          "python3",
+          "-B",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "scripts/tests",
+          "-p",
+          "test_*.py"
+        ],
+        [
+          "npm",
+          "run",
+          "check:native-config"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=4096",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "android",
+          "--output-dir",
+          ".expo/modernization-checks/android",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/android')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=3072",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "ios",
+          "--output-dir",
+          ".expo/modernization-checks/ios",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/ios')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8197",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts",
+          "tests/e2e/database-bridge.spec.ts",
+          "tests/e2e/tafsir-import.spec.ts",
+          "tests/e2e/translation-import.spec.ts"
         ]
       ],
       "risk": "medium",
       "approved": false,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "docs/refactoring/LINT.md",
         "app/*",
@@ -4557,7 +4719,24 @@
         "scripts/*"
       ],
       "attempts": 0,
-      "priority": 5
+      "priority": 5,
+      "started_at": "2026-11-08T07:12:52.767486+00:00",
+      "completed_at": "2026-11-08T07:12:52.767486+00:00",
+      "primary_accepted_at": "2026-11-08T07:12:52.767486+00:00",
+      "files": [
+        "lib/database/init.ts",
+        "lib/database/schema.ts",
+        "components/mushaf/SurahInfoModal.tsx",
+        "lib/notes/queries.ts",
+        "lib/quran-foundation/cache.ts",
+        "lib/quran-foundation/content.ts",
+        "app/(tabs)/mushaf.tsx",
+        "app/flashcards/session.tsx",
+        "docs/refactoring/LINT.md"
+      ],
+      "summary": "Grouped the 61 current warnings (baseline 71) and removed the 35 with no behavior risk: 29 unused catch bindings became optional catch bindings and 6 duplicate imports were merged. The 25 exhaustive-deps warnings are listed by file in LINT.md for separate behavior-tested tasks; the unused variable in the protected data script is left. ESLint 10 compatibility is split into RF198 without forcing peers.",
+      "evidence": "eslint JSON before and after; typecheck; related suites 816/816; Prettier state unchanged for files clean at HEAD.",
+      "independent_review": "Mechanical, behavior-neutral edits reviewed by primary; covered by the gate and final review RF049."
     },
     {
       "id": "RF-045",
@@ -26666,11 +26845,36 @@
       "files": [],
       "allowed_paths": [],
       "verification": []
+    },
+    {
+      "id": "RF-198",
+      "title": "Move to a supported ESLint 10 configuration",
+      "priority": 5,
+      "risk": "medium",
+      "description": "RF044 split: ESLint 9 is past upstream maintenance; current eslint-plugin-react and eslint-plugin-import do not declare ESLint 10 support and eslint-config-expo depends on them.",
+      "dependencies": [
+        "RF-044"
+      ],
+      "modules": [
+        "package.json",
+        "package-lock.json",
+        "eslint.config.js"
+      ],
+      "acceptance_criteria": [
+        "A tuple with declared ESLint 10 support for every plugin, the same effective enabled rules (compare --print-config), no forced peers; full gate."
+      ],
+      "approved": false,
+      "status": "deferred",
+      "attempts": 0,
+      "implementation_mode": "implementation",
+      "files": [],
+      "allowed_paths": [],
+      "verification": []
     }
   ],
   "checkpoint": {
     "time": "2026-11-08T07:03:31.065538+00:00",
-    "current_task": "RF-048 (UI phases running), then RF-044, RF-046, RF-090",
+    "current_task": "RF-048 (review UI phase results)",
     "open_follow_ups": [],
     "device_tasks": "none pending; QA app reset to Verse by Verse and English (Bridges)",
     "decisions_waiting_on_ehab": [

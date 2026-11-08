@@ -600,7 +600,7 @@ async function addColumnIfMissing(
 ): Promise<void> {
   try {
     await db.getFirstAsync(`SELECT ${column} FROM ${table} LIMIT 1`);
-  } catch (_) {
+  } catch {
     try {
       await db.execAsync(`ALTER TABLE ${table} ADD COLUMN ${definition}`);
     } catch (error) {
@@ -633,7 +633,7 @@ async function createUserMigrationIndexes(db: DatabaseExecutor): Promise<void> {
 export async function createTextSearchIndex(db: DatabaseExecutor): Promise<void> {
   try {
     await db.execAsync("CREATE INDEX IF NOT EXISTS idx_quran_text_search ON quran_text(text_search)");
-  } catch (_) {
+  } catch {
     // Column may not exist yet on very old databases — the migration will handle it
   }
 }

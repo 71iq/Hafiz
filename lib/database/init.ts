@@ -1142,64 +1142,64 @@ async function runNewTabImports(db: AppDatabase, onProgress: ProgressCallback): 
 async function ensureQfUserSyncSchema(db: DatabaseExecutor): Promise<void> {
   try {
     await db.execAsync("ALTER TABLE bookmarks ADD COLUMN updated_at TEXT");
-  } catch (_) {}
+  } catch {}
   try {
     await db.execAsync("ALTER TABLE bookmarks ADD COLUMN deleted_at TEXT");
-  } catch (_) {}
+  } catch {}
   try {
     await db.execAsync("ALTER TABLE bookmarks ADD COLUMN qf_bookmark_id TEXT");
-  } catch (_) {}
+  } catch {}
   try {
     await db.execAsync("ALTER TABLE bookmarks ADD COLUMN qf_synced_at TEXT");
-  } catch (_) {}
+  } catch {}
   try {
     await db.execAsync("ALTER TABLE bookmarks ADD COLUMN qf_sync_error TEXT");
-  } catch (_) {}
+  } catch {}
   try {
     await db.execAsync("ALTER TABLE bookmarks ADD COLUMN qf_is_in_default_collection INTEGER NOT NULL DEFAULT 0");
-  } catch (_) {}
+  } catch {}
   try {
     await db.execAsync("ALTER TABLE bookmarks ADD COLUMN qf_collections_count INTEGER NOT NULL DEFAULT 0");
-  } catch (_) {}
+  } catch {}
   await db.execAsync("UPDATE bookmarks SET updated_at = created_at WHERE updated_at IS NULL");
 
   try {
     await db.execAsync("ALTER TABLE study_cards ADD COLUMN updated_at TEXT");
-  } catch (_) {}
+  } catch {}
   try {
     await db.execAsync("ALTER TABLE study_cards ADD COLUMN suspended_at TEXT");
-  } catch (_) {}
+  } catch {}
   try {
     await db.execAsync("ALTER TABLE study_cards ADD COLUMN buried_until TEXT");
-  } catch (_) {}
+  } catch {}
   try {
     await db.execAsync("ALTER TABLE study_cards ADD COLUMN marked_at TEXT");
-  } catch (_) {}
+  } catch {}
   try {
     await db.execAsync("ALTER TABLE study_cards ADD COLUMN deleted_at TEXT");
-  } catch (_) {}
+  } catch {}
   await db.execAsync("UPDATE study_cards SET updated_at = created_at WHERE updated_at IS NULL");
 
   try {
     await db.execAsync("ALTER TABLE private_notes ADD COLUMN updated_at TEXT");
-  } catch (_) {}
+  } catch {}
   await db.execAsync("UPDATE private_notes SET updated_at = created_at WHERE updated_at IS NULL");
   try {
     await db.execAsync("ALTER TABLE private_notes ADD COLUMN qf_note_id TEXT");
-  } catch (_) {}
+  } catch {}
   try {
     await db.execAsync("ALTER TABLE private_notes ADD COLUMN qf_synced_at TEXT");
-  } catch (_) {}
+  } catch {}
   try {
     await db.execAsync("ALTER TABLE private_notes ADD COLUMN qf_sync_error TEXT");
-  } catch (_) {}
+  } catch {}
   try {
     await db.execAsync("ALTER TABLE private_notes ADD COLUMN qf_ranges_json TEXT");
-  } catch (_) {}
+  } catch {}
 
   try {
     await db.execAsync("ALTER TABLE reflection_journey_entries ADD COLUMN updated_at TEXT");
-  } catch (_) {}
+  } catch {}
   await db.execAsync("UPDATE reflection_journey_entries SET updated_at = created_at WHERE updated_at IS NULL");
 
   await db.execAsync(`
@@ -1246,10 +1246,10 @@ export async function initializeDatabase(db: AppDatabase, onProgress: ProgressCa
     // Ensure QCF2 columns exist (added after initial import)
     try {
       await db.execAsync("ALTER TABLE quran_text ADD COLUMN text_qcf2 TEXT NOT NULL DEFAULT ''");
-    } catch (_) {}
+    } catch {}
     try {
       await db.execAsync("ALTER TABLE quran_text ADD COLUMN v2_page INTEGER NOT NULL DEFAULT 0");
-    } catch (_) {}
+    } catch {}
 
     // Check if QCF2 data needs populating or updating (word grouping fix)
     const qcf2Check = await db.getFirstAsync<{ cnt: number }>(
@@ -1294,7 +1294,7 @@ export async function initializeDatabase(db: AppDatabase, onProgress: ProgressCa
       try {
         await db.getFirstAsync("SELECT source FROM tafseer LIMIT 1");
         hasSource = true;
-      } catch (_) {
+      } catch {
         hasSource = false;
       }
       if (!hasSource) {
@@ -1331,7 +1331,7 @@ export async function initializeDatabase(db: AppDatabase, onProgress: ProgressCa
     // Add text_search column for diacritics-stripped search (Phase 4 migration)
     try {
       await db.execAsync("ALTER TABLE quran_text ADD COLUMN text_search TEXT NOT NULL DEFAULT ''");
-    } catch (_) {}
+    } catch {}
     const searchCheck = await db.getFirstAsync<{ text_search: string }>(
       "SELECT text_search FROM quran_text WHERE surah = 1 AND ayah = 1",
     );
@@ -1351,7 +1351,7 @@ export async function initializeDatabase(db: AppDatabase, onProgress: ProgressCa
     // Migrate sync_queue table to add row_id, status, synced_at columns (Phase 6)
     try {
       await db.getFirstAsync("SELECT row_id FROM sync_queue LIMIT 1");
-    } catch (_) {
+    } catch {
       console.log("[Import] Migrating sync_queue table...");
       try {
         await db.execAsync(`

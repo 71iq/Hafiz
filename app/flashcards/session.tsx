@@ -14,8 +14,7 @@ import type { DatabaseExecutor } from "@/lib/database/types";
 import { CalendarDays, ChevronLeft, ChevronRight, Clock3, EllipsisVertical, PauseCircle, Pencil, RotateCcw, Star, Trash2, Trophy, X } from "lucide-react-native";
 import { useDatabase, useDatabaseStatus } from "@/lib/database/provider";
 import { SettingsProvider, useSettings, withThemeOpacity } from "@/lib/settings/context";
-import { useStrings } from "@/lib/i18n/useStrings";
-import { interpolate } from "@/lib/i18n/useStrings";
+import { interpolate, useStrings } from "@/lib/i18n/useStrings";
 import type { UIStrings } from "@/lib/i18n/strings";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -46,8 +45,7 @@ import { hapticMedium, hapticSuccess } from "@/lib/haptics";
 import { Skeleton, SkeletonText } from "@/components/ui/Skeleton";
 import { syncDailyScore, updateProfileStats } from "@/lib/fsrs/leaderboard-sync";
 import { formatLocalDateInput, parseDueDateInput } from "@/lib/date";
-import type { StudyCardRow, TestMode, WordTestMode } from "@/lib/fsrs/types";
-import type { DeckReviewSettings } from "@/lib/fsrs/types";
+import type { DeckReviewSettings, StudyCardRow, TestMode, WordTestMode } from "@/lib/fsrs/types";
 import {
   DEFAULT_DECK_DAILY_REVIEW_LIMIT,
   DEFAULT_DECK_LEARNING_STEPS,

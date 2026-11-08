@@ -295,7 +295,7 @@ async function hasExactPrivateNote(
 function safeJson(value: string): unknown {
   try {
     return JSON.parse(value);
-  } catch (_) {
+  } catch {
     return value;
   }
 }

@@ -193,7 +193,7 @@ async function readFunctionError(error: unknown): Promise<QfContentError | null>
     ) {
       return body;
     }
-  } catch (_) {}
+  } catch {}
   return null;
 }
 

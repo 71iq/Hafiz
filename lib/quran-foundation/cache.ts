@@ -156,7 +156,7 @@ function parseJson(value: string | null): any {
   if (!value) return undefined;
   try {
     return JSON.parse(value);
-  } catch (_) {
+  } catch {
     return undefined;
   }
 }
