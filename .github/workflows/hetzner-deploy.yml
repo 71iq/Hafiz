@@ -14,7 +14,8 @@ permissions:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    # Playwright 1.60 cannot install Chromium on Ubuntu 26.04, which ubuntu-latest now uses.
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
       EXPO_PUBLIC_SUPABASE_URL: ${{ vars.EXPO_PUBLIC_SUPABASE_URL }}
