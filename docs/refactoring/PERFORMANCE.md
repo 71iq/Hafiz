@@ -40,7 +40,7 @@ Measured on 2026-11-08 on a Samsung SM-A546E (Android 16, 120 Hz) with the isola
 | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
 | Cold start to first frame (`am start -W`, 3 runs)      | 970, 706 and 701 ms                                                                                                              |
 | JavaScript running, database ready (populated install) | 0.53 s, 1.24 s after launch                                                                                                      |
-| First-run import                                       | 207 s, dominated by SQLite inserts (RF195)                                                                                       |
+| First-run import                                       | 207 s before RF195; 42 s after batched inserts and word-mapping caches, same row counts                                          |
 | APK, Hermes bundle (after RF188)                       | 373 MB, 10.8 MB                                                                                                                  |
 | Verse view, 15 fast swipes from 2:1                    | p50 7 ms, p90 12 ms, p99 31 ms, 5.7% janky frames; 245 MB PSS                                                                    |
 | Page view, 45 swipes from page 2                       | p50 9 ms, p90 14 ms, p99 48 ms, 4.2% janky; 450 to 470 MB PSS, about 3,000 views, stable                                         |
