@@ -5125,14 +5125,23 @@
       ],
       "risk": "high",
       "approved": false,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "docs/refactoring/UI_VERIFICATION.md",
         "tests/e2e/*",
         "tests/e2e/report-only/*"
       ],
       "attempts": 0,
-      "priority": 3
+      "priority": 3,
+      "started_at": "2026-11-08T07:29:38.367660+00:00",
+      "completed_at": "2026-11-08T07:29:38.367660+00:00",
+      "primary_accepted_at": "2026-11-08T07:29:38.367660+00:00",
+      "files": [
+        "docs/refactoring/UI_VERIFICATION.md"
+      ],
+      "summary": "Ran the report-only UI phases at 360, 768 and 1440 px (all pass) and a themed, bilingual, reduced-height Chrome pass on the changed translation picker, which found RF199 (web press-state styles dropped; fixed). Recorded per-feature evidence and gaps in UI_VERIFICATION.md.",
+      "evidence": "Phase summaries 40/40, 10/10, 3/3 per width; 20 theme/locale/height combinations with no overflow; route screenshots in both locales after RF199.",
+      "independent_review": "Verification record; RF199 had its own review; final review RF049 covers it."
     },
     {
       "id": "RF-049",
@@ -27082,7 +27091,7 @@
   ],
   "checkpoint": {
     "time": "2026-11-08T07:03:31.065538+00:00",
-    "current_task": "RF-048 (review UI phase results)",
+    "current_task": "batch gate after RF-048, then RF-046, RF-090, RF-049, RF-050",
     "open_follow_ups": [],
     "device_tasks": "none pending; QA app reset to Verse by Verse and English (Bridges)",
     "decisions_waiting_on_ehab": [
