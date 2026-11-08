@@ -55,7 +55,7 @@ rm -rf "$OUT" && mkdir -p "$OUT/assets" "$OUT/res"
 ENTRY="$(node -e "require('expo/scripts/resolveAppEntry')" "$ROOT" android absolute)"
 HERMESC="$(dirname "$(node --print "require.resolve('hermes-compiler/package.json', { paths: [require.resolve('react-native/package.json')] })")")/hermesc/linux64-bin/hermesc"
 NODE_OPTIONS=--max-old-space-size=4096 scope npx expo export:embed --platform android --dev false --minify true \
-  --entry-file "$ENTRY" --bundle-output "$WORK/index.android.bundle.js" --assets-dest "$OUT/res" --reset-cache
+  --entry-file "$ENTRY" --bundle-output "$WORK/index.android.bundle.js" --assets-dest "$OUT/res" --reset-cache --max-workers 2
 scope "$HERMESC" -emit-binary -O -w -out "$OUT/assets/index.android.bundle" "$WORK/index.android.bundle.js"
 # Native C++ compiles use every core by default and exceed 6 GiB; two cores and one worker fit.
 (cd android && CMAKE_BUILD_PARALLEL_LEVEL=2 scope taskset -c 0,1 ./gradlew :app:assembleRelease \

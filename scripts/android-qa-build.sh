@@ -19,7 +19,7 @@ HERMESC="$(dirname "$(node --print "require.resolve('hermes-compiler/package.jso
 
 cd "$ROOT"
 NODE_OPTIONS=--max-old-space-size=4096 scope npx expo export:embed --platform android --dev false --minify true \
-  --entry-file "$ENTRY" --bundle-output "$WORK/index.android.bundle.js" --assets-dest "$OUT/res" --reset-cache
+  --entry-file "$ENTRY" --bundle-output "$WORK/index.android.bundle.js" --assets-dest "$OUT/res" --reset-cache --max-workers 2
 scope "$HERMESC" -emit-binary -O -w -out "$OUT/assets/index.android.bundle" "$WORK/index.android.bundle.js"
 cd "$ROOT/android"
 scope taskset -c 0,1 ./gradlew :app:assembleRelease -PhafizQa=true -PreactNativeArchitectures=arm64-v8a \
