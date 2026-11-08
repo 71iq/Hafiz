@@ -307,3 +307,5 @@ RF193 accepted on 2026-11-08. Replies from the Quran Foundation sync service are
 RF194 accepted on 2026-11-08. Error handlers across sign-in, sync, leaderboard, Settings and recitation read error text through one shared helper instead of untyped access. Users see the same messages as before, and an unusual empty failure now shows the screen's normal fallback instead of failing inside the handler. Related suites, typecheck, lint and a light review pass.
 
 The onboarding follow-up from RF185 is closed without a change. "Skip for now" calls the same completion as finishing, on every step after the first, so it skips the rest of setup by design rather than skipping one step.
+
+RF196 accepted on 2026-11-08. Opening verse links while the app was already running kept a full copy of the app's screens for every link, so memory climbed past 1.3 GB and Back stepped through old copies. Links now return to the open app, and memory stays near 250 MB on the phone. A link that arrives during a review session, sign-in or onboarding still leaves that screen underneath, as before. Found while profiling for RF039; router tests, device checks and a light review pass.

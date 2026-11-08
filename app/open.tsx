@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useLocalSearchParams, router } from "expo-router";
+import { useLocalSearchParams, useNavigation, router } from "expo-router";
 import { View, ActivityIndicator } from "react-native";
 import { setPendingDeepLink } from "@/lib/deep-link";
 
@@ -14,6 +14,7 @@ import { setPendingDeepLink } from "@/lib/deep-link";
  */
 export default function OpenDeepLink() {
   const params = useLocalSearchParams<{ surah?: string; ayah?: string }>();
+  const navigation = useNavigation();
 
   useEffect(() => {
     const surah = parseInt(params.surah ?? "", 10);
@@ -23,9 +24,14 @@ export default function OpenDeepLink() {
       setPendingDeepLink({ surah, ayah });
     }
 
-    // Replace so user can't navigate "back" to this blank screen
-    router.replace("/(tabs)/mushaf");
-  }, [params.surah, params.ayah]);
+    // A warm link pushes this screen on top of the open app. When the tabs are directly below,
+    // return to them; replacing would stack another full tab tree under every link, growing memory
+    // and the Back history (RF196). Otherwise (cold start, or a session, auth or onboarding screen
+    // below) replace this screen as before so that flow stays underneath.
+    const { routes, index } = navigation.getState() ?? { routes: [], index: 0 };
+    if (routes[index - 1]?.name === "(tabs)") router.dismissTo("/(tabs)/mushaf");
+    else router.replace("/(tabs)/mushaf");
+  }, [navigation, params.surah, params.ayah]);
 
   // Brief loading state while redirecting
   return (
