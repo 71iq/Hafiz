@@ -24661,12 +24661,17 @@
         "Scrollable screens reserve the tab bar height on native; device screenshot and review."
       ],
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "attempts": 0,
       "implementation_mode": "implementation",
       "files": [],
       "allowed_paths": [],
-      "verification": []
+      "verification": [],
+      "completed_at": "2026-11-08T04:13:57.604409+00:00",
+      "primary_accepted_at": "2026-11-08T04:13:57.604409+00:00",
+      "summary": "Not reproducible on the current build. Settings General, Content and Account all scroll their last row clear of the floating tab bar (ScreenScrollView reserves COMPACT_SCREEN_BOTTOM_INSET above it). Swipes that start on the horizontal Quran font preview row do not scroll the page, which likely explains the RF041 observation. No code change.",
+      "evidence": "SM-A546E, QA build from 470aea0: bottom of each Settings tab after scrolling; Page View Navigation, Favorite Reciter and Sign Up end above the tab bar and are fully tappable.",
+      "independent_review": "No code change; primary review of device screenshots."
     },
     {
       "id": "RF-187",
@@ -24684,12 +24689,17 @@
         "Chips wrap or scroll without shrinking type; Arabic and English; device screenshot and review."
       ],
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "attempts": 0,
       "implementation_mode": "implementation",
       "files": [],
       "allowed_paths": [],
-      "verification": []
+      "verification": [],
+      "completed_at": "2026-11-08T04:13:57.604409+00:00",
+      "primary_accepted_at": "2026-11-08T04:13:57.604409+00:00",
+      "summary": "Working as designed. The verse action row is a deliberate single horizontal scroller (ae70281, Ehab), so the cut 'Qir' is the scroll edge, not truncation. On device the row scrolls to Tafsir, Hadith, Qira'at and Notes at full type size, which meets the acceptance criterion. No code change; wrapping would reverse Ehab's choice.",
+      "evidence": "SM-A546E, QA build from 470aea0: 2:255 action row before and after a horizontal swipe.",
+      "independent_review": "No code change; primary review of device screenshots."
     },
     {
       "id": "RF-188",
@@ -25455,10 +25465,8 @@
   ],
   "checkpoint": {
     "time": "2026-11-08T04:11:24.791960+00:00",
-    "current_task": "RF-186 (device: Settings bottom options under the tab bar)",
+    "current_task": "RF-189 (device: page-view glyph clipping)",
     "open_follow_ups": [
-      "RF-186",
-      "RF-187",
       "RF-189",
       "RF-192",
       "RF-193",
@@ -25466,7 +25474,7 @@
       "RF-195",
       "onboarding 'Skip for now' skips step 3 (confirm intent)"
     ],
-    "device_tasks": "RF-186, RF-187, RF-189 need the phone; QA app installed from 470aea0 sources",
+    "device_tasks": "RF-189 needs the phone",
     "decisions_waiting_on_ehab": [
       "Final push after all work is verified"
     ],
