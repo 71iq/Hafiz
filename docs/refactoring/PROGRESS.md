@@ -321,3 +321,5 @@ RF047 accepted on 2026-11-08. The page-view navigation menu's test now opens the
 RF045 completed on 2026-11-08. Expo is now at SDK 58; Hafiz stays on SDK 55 for this branch, which already meets Google Play's current target. The upgrade goes straight to the current SDK in its own branch after this one merges, so its device risks are reviewed separately (ADR 0002, RF197).
 
 RF044 accepted on 2026-11-08. Lint warnings went from 61 to 26 by removing ones that cannot change behavior. The remaining hook-dependency warnings are listed by file in LINT.md for separate tested fixes, and the ESLint 10 move is its own task (RF198).
+
+RF199 accepted on 2026-11-08. On the web, buttons and rows that set their look through a press-state style lost that style entirely, so Arabic menu rows were laid out backwards and the selected translation was not highlighted. The NativeWind patch now keeps those styles on the web, as RF185 did on Android. Found during RF048; checked in Chrome in Arabic and English across all themes, with a light review.

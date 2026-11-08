@@ -26870,6 +26870,214 @@
       "files": [],
       "allowed_paths": [],
       "verification": []
+    },
+    {
+      "id": "RF-199",
+      "title": "Keep Pressable style callbacks on web when a className is present",
+      "priority": 2,
+      "risk": "medium",
+      "description": "RF048 found Arabic disclosure rows double-reversed and selected rows untinted on web. react-native-css-interop's web cssInterop merged a style callback into [callback, classStyle]; react-native-web only calls style when it is a function, so the callback was dropped for every Pressable with both className and a style callback (about 120 sites). Present on main. Web counterpart of RF185.",
+      "dependencies": [
+        "RF-185"
+      ],
+      "modules": [
+        "patches/react-native-css-interop+0.2.2.patch"
+      ],
+      "acceptance_criteria": [
+        "Callback styles apply on web with className styles; object styles unchanged; patch applies to a pristine package; web screenshots in both locales; review."
+      ],
+      "approved": true,
+      "status": "verified",
+      "attempts": 0,
+      "implementation_mode": "implementation",
+      "files": [
+        "patches/react-native-css-interop+0.2.2.patch",
+        "tests/unit/css-interop-web-style-callback.test.tsx"
+      ],
+      "allowed_paths": [],
+      "verification": [
+        [
+          "git",
+          "diff",
+          "--check"
+        ],
+        [
+          "node_modules/.bin/prettier",
+          "--check",
+          "lib/leaderboard/rows.ts",
+          "lib/leaderboard/api.ts",
+          "lib/fsrs/leaderboard-sync.ts",
+          "tests/unit/leaderboard-rows.test.ts",
+          "tests/unit/leaderboard-stats-owner.test.ts",
+          "docs/refactoring/PROGRESS.md"
+        ],
+        [
+          "node_modules/.bin/eslint",
+          "lib/leaderboard/rows.ts",
+          "lib/leaderboard/api.ts",
+          "lib/fsrs/leaderboard-sync.ts",
+          "tests/unit/leaderboard-rows.test.ts",
+          "tests/unit/leaderboard-stats-owner.test.ts",
+          "--max-warnings=0"
+        ],
+        [
+          "npm",
+          "run",
+          "typecheck"
+        ],
+        [
+          "npm",
+          "run",
+          "check:analysis"
+        ],
+        [
+          "npm",
+          "run",
+          "postinstall"
+        ],
+        [
+          "npm",
+          "ls",
+          "--all",
+          "--json"
+        ],
+        [
+          "npm",
+          "run",
+          "lint",
+          "--",
+          "--format",
+          "json"
+        ],
+        [
+          "npm",
+          "run",
+          "test:unit"
+        ],
+        [
+          "node",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/tests/brace-expansion.test.cjs",
+          "scripts/tests/dependency-boundaries.test.cjs",
+          "scripts/tests/icon-tool.test.cjs",
+          "scripts/tests/jest-config.test.cjs",
+          "scripts/tests/js-yaml.test.cjs",
+          "scripts/tests/lint-coverage.test.cjs",
+          "scripts/tests/metro-unicode.test.cjs",
+          "scripts/tests/nanoid.test.cjs",
+          "scripts/tests/router-dependency-range.test.cjs",
+          "scripts/tests/security-dependency-owner.test.cjs",
+          "scripts/tests/source-map-js.test.cjs",
+          "scripts/tests/tailwind-source-map.test.cjs",
+          "scripts/tests/ws.test.cjs",
+          "scripts/tests/xmldom.test.cjs"
+        ],
+        [
+          "npm",
+          "run",
+          "test:refactor-runner"
+        ],
+        [
+          "python3",
+          "-B",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "scripts/tests",
+          "-p",
+          "test_*.py"
+        ],
+        [
+          "npm",
+          "run",
+          "check:native-config"
+        ],
+        [
+          "npm",
+          "run",
+          "check:boundaries"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "npm",
+          "run",
+          "build:web"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=4096",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "android",
+          "--output-dir",
+          ".expo/modernization-checks/android",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/android')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "EXPO_NO_DOTENV=1",
+          "EXPO_PUBLIC_SUPABASE_URL=https://synthetic.example.invalid",
+          "EXPO_PUBLIC_SUPABASE_ANON_KEY=public-synthetic-key",
+          "EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED=true",
+          "NODE_OPTIONS=--max-old-space-size=3072",
+          "node_modules/.bin/expo",
+          "export",
+          "--platform",
+          "ios",
+          "--output-dir",
+          ".expo/modernization-checks/ios",
+          "--no-bytecode",
+          "--max-workers",
+          "1"
+        ],
+        [
+          "python3",
+          "-c",
+          "import shutil;shutil.rmtree('.expo/modernization-checks/ios')"
+        ],
+        [
+          "env",
+          "CI=1",
+          "PLAYWRIGHT_CHROMIUM_CHANNEL=chrome",
+          "PLAYWRIGHT_PORT=8197",
+          "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8197",
+          "node_modules/.bin/playwright",
+          "test",
+          "--project=smoke-chromium",
+          "tests/e2e/smoke.spec.ts",
+          "tests/e2e/database-bridge.spec.ts",
+          "tests/e2e/tafsir-import.spec.ts",
+          "tests/e2e/translation-import.spec.ts"
+        ]
+      ],
+      "started_at": "2026-11-08T07:29:15.741151+00:00",
+      "completed_at": "2026-11-08T07:29:15.741151+00:00",
+      "primary_accepted_at": "2026-11-08T07:29:15.741151+00:00",
+      "summary": "The css-interop patch now also covers the web runtime: a style callback with a className becomes state => [callback(state), classStyle], the same order as object styles. The patch drops the .cache build artifacts (including stale compiled CSS) that RF185 had re-added; Metro and the CSS processor regenerate them. Native is unchanged.",
+      "evidence": "Web runtime test (jsdom) fails on the original source for the callback case; object and no-className cases unchanged. Patch applies to a pristine npm copy and matches the installed files; postinstall reports all four patches. Chrome: translation picker rows mirror in Arabic and the selected row is tinted in all five themes at 390x844 and 390x600 with no overflow; Home, Leaderboard, Progress, Settings, Reflections and Flashcards render in both locales; responsive-overflow and RTL phases pass at 360.",
+      "independent_review": "Light-model review: no defects; only Pressable receives a function in a className-mapped style target, react-native-web resolves the nested array, .cache files are regenerated by Metro, and the newly applied callback styles across about 120 sites are intended."
     }
   ],
   "checkpoint": {
