@@ -35,15 +35,16 @@ if (( VERSION_CODE <= published )); then
   exit 1
 fi
 
+repo_vars=$(gh variable list --json name,value 2>/dev/null || echo '[]')
 for name in EXPO_PUBLIC_SUPABASE_URL EXPO_PUBLIC_SUPABASE_ANON_KEY EXPO_PUBLIC_QF_USER_AUTH_ENABLED \
   EXPO_PUBLIC_QF_CONTENT_ENABLED EXPO_PUBLIC_EMAIL_AUTH_FLOWS_ENABLED EXPO_PUBLIC_SOCIAL_AUTH_ENABLED; do
   if [ -z "${!name:-}" ]; then
-    value=$(gh variable get "$name" 2>/dev/null || true)
+    value=$(node -e 'const v=JSON.parse(process.argv[1]).find((x)=>x.name===process.argv[2]);process.stdout.write(v?v.value:"")' "$repo_vars" "$name")
     [ -n "$value" ] && export "$name=$value"
   fi
 done
 test -n "${EXPO_PUBLIC_SUPABASE_URL:-}" && test -n "${EXPO_PUBLIC_SUPABASE_ANON_KEY:-}" ||
-  { echo "Public Supabase values are missing (gh variable get failed)." >&2; exit 1; }
+  { echo "Public Supabase values are missing (gh variable list failed)." >&2; exit 1; }
 
 echo "Building Hafiz $VERSION_NAME ($VERSION_CODE)"
 (cd android && scope ./gradlew :app:assembleRelease -PreactNativeArchitectures=arm64-v8a,armeabi-v7a \
