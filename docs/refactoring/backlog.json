@@ -26044,10 +26044,15 @@
         "Device import time measured before and after with identical row counts; reading available offline as before; causal tests for any deferred import; light review."
       ],
       "approved": true,
-      "status": "pending",
+      "status": "verified",
       "attempts": 0,
       "implementation_mode": "implementation",
-      "files": [],
+      "files": [
+        "lib/database/bulk-insert.ts",
+        "lib/database/init.ts",
+        "lib/translations/import.ts",
+        "tests/unit/bulk-insert.test.ts"
+      ],
       "allowed_paths": [],
       "verification": [
         [
@@ -26225,7 +26230,13 @@
           "tests/e2e/tafsir-import.spec.ts",
           "tests/e2e/translation-import.spec.ts"
         ]
-      ]
+      ],
+      "started_at": "2026-11-08T06:54:33.886994+00:00",
+      "completed_at": "2026-11-08T06:54:33.886994+00:00",
+      "primary_accepted_at": "2026-11-08T06:54:33.886994+00:00",
+      "summary": "The first-run import and translation import send rows as multi-row INSERT statements of up to 999 bound values instead of one native call per row (lib/database/bulk-insert.ts). Rows apply in order, so OR REPLACE and OR IGNORE give the same table contents; non-INSERT statements such as the text_search UPDATE keep the one-row path. Transaction batching and import order are unchanged.",
+      "evidence": "Real-SQLite tests (node:sqlite) show identical table contents to per-row inserts for OR REPLACE and OR IGNORE with repeated keys, 6 calls instead of 1,000, and the UPDATE fallback; the call-count case fails on the original approach. Device SM-A546E: translation import of 6,236 rows went from 2.1 to 4.3 s to 0.2 to 0.4 s, text verified on 2:255. A full first-run device timing needs the QA app's data cleared, which waits on Ehab; the web export uses a prebuilt database and does not exercise this path. Related import suites 185/185 and 35/35, typecheck, lint.",
+      "independent_review": "Primary review against real SQLite semantics; the gate and the final review (RF049) cover it. The change keeps per-batch transactions and SQL text apart from the VALUES list."
     },
     {
       "id": "RF-196",
@@ -26438,13 +26449,12 @@
   ],
   "checkpoint": {
     "time": "2026-11-08T06:06:40.056952+00:00",
-    "current_task": "RF-195 (first-run import time)",
-    "open_follow_ups": [
-      "RF-195"
-    ],
+    "current_task": "batch gate after RF-195",
+    "open_follow_ups": [],
     "device_tasks": "none pending; QA app reset to Verse by Verse and English (Bridges)",
     "decisions_waiting_on_ehab": [
-      "Final push after all work is verified"
+      "Final push after all work is verified",
+      "Optional: allow clearing com.anonymous.hafiz.qa data once to time the first-run import after RF-195"
     ],
     "last_green_commit": "04bdf6f (full 20-check batch gate: 3,187 unit, 35 Chrome; covers RF-192, RF-193, RF-194)",
     "uncommitted": null,

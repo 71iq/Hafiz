@@ -1,4 +1,5 @@
 import type { AppDatabase } from "@/lib/database/types";
+import { insertPreparedRows } from "@/lib/database/bulk-insert";
 import { loadTranslation } from "./translation-requires";
 
 /**
@@ -16,14 +17,11 @@ export async function importTranslation(db: AppDatabase, langCode: string): Prom
 
   await db.withTransactionAsync(async (tx) => {
     await tx.runAsync("DELETE FROM translation_active");
-    const stmt = await tx.prepareAsync("INSERT INTO translation_active (surah, ayah, text) VALUES (?, ?, ?)");
-    try {
-      for (const row of data) {
-        await stmt.executeAsync([row.surah, row.ayah, row.text]);
-      }
-    } finally {
-      await stmt.finalizeAsync();
-    }
+    await insertPreparedRows(
+      tx,
+      "INSERT INTO translation_active (surah, ayah, text) VALUES (?, ?, ?)",
+      data.map((row: { surah: number; ayah: number; text: string }) => [row.surah, row.ayah, row.text]),
+    );
   });
 
   const elapsed = ((Date.now() - start) / 1000).toFixed(1);

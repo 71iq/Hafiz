@@ -1,6 +1,6 @@
 import { Platform } from "react-native";
-import type { SQLiteBindParams } from "expo-sqlite";
-import type { AppDatabase, DatabaseExecutor, TransactionDatabase } from "@/lib/database/types";
+import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
+import { insertPreparedRows } from "@/lib/database/bulk-insert";
 import { createSchema, createTextSearchIndex, migrateUserSchema } from "./schema";
 import { normalizeArabicCore, normalizeArabicWord } from "@/lib/arabic";
 import {
@@ -332,21 +332,6 @@ async function isPopulated(db: DatabaseExecutor): Promise<boolean> {
     return (result?.count ?? 0) >= 114;
   } catch {
     return false;
-  }
-}
-
-async function insertPreparedRows(
-  tx: TransactionDatabase,
-  sql: string,
-  rows: readonly SQLiteBindParams[],
-): Promise<void> {
-  const stmt = await tx.prepareAsync(sql);
-  try {
-    for (const row of rows) {
-      await stmt.executeAsync(row);
-    }
-  } finally {
-    await stmt.finalizeAsync();
   }
 }
 
