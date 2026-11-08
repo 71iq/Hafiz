@@ -1,16 +1,34 @@
 # Import this file from the existing Caddyfile after validating both together.
 (hafiz_static) {
-  root * /opt/hafiz/current/dist
   encode zstd gzip
   header X-Content-Type-Options nosniff
   header Referrer-Policy strict-origin-when-cross-origin
-  header Cache-Control "no-cache"
-  @versioned path /_expo/static/* /assets/*
-  header @versioned Cache-Control "public, max-age=31536000, immutable"
-  @profile path_regexp profile ^/profile/[^/]+/?$
-  rewrite @profile /profile/[userId].html
-  try_files {path} {path}.html {path}/index.html /+not-found.html
-  file_server
+
+  # Sideloaded Android releases, published by scripts/release-android.sh outside the web release
+  # so website deploys never remove them. Versioned APKs never change; hafiz.apk and latest.json do.
+  @downloads path /downloads/*
+  handle @downloads {
+    root * /opt/hafiz/public
+    @apk path *.apk
+    header @apk Content-Type application/vnd.android.package-archive
+    header @apk Content-Disposition attachment
+    @versioned_apk path_regexp ^/downloads/android/hafiz-[^/]+\.apk$
+    header @versioned_apk Cache-Control "public, max-age=31536000, immutable"
+    @mutable not path_regexp ^/downloads/android/hafiz-[^/]+\.apk$
+    header @mutable Cache-Control "no-cache"
+    file_server
+  }
+
+  handle {
+    root * /opt/hafiz/current/dist
+    header Cache-Control "no-cache"
+    @versioned path /_expo/static/* /assets/*
+    header @versioned Cache-Control "public, max-age=31536000, immutable"
+    @profile path_regexp profile ^/profile/[^/]+/?$
+    rewrite @profile /profile/[userId].html
+    try_files {path} {path}.html {path}/index.html /+not-found.html
+    file_server
+  }
 }
 
 http://127.0.0.1:8081 {

@@ -23,7 +23,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.hafiz"
+      "package": "com.anonymous.hafiz",
+      "versionCode": 1
     },
     "web": {
       "bundler": "metro",

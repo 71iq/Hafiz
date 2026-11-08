@@ -6,6 +6,17 @@ def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
 // QA builds (-PhafizQa=true) install beside the real app and package a JS bundle built separately by
 // scripts/android-qa-build.sh, so Metro, Hermes and Gradle each run in their own 6 GiB scope.
 def hafizQa = findProperty('hafizQa') == 'true'
+// app.json is the single source of the app version; the in-app updater compares version codes.
+def appJson = new groovy.json.JsonSlurper().parse(new File(projectRoot, "app.json"))
+// Sideloaded releases must always be signed with the same private key so updates install over
+// each other. scripts/release-android.sh points HAFIZ_RELEASE_SIGNING at a properties file kept
+// outside the repository; without it release builds keep the debug key (QA and CI builds).
+def releaseSigningPath = System.getenv('HAFIZ_RELEASE_SIGNING')
+def releaseSigning = null
+if (!hafizQa && releaseSigningPath) {
+    releaseSigning = new Properties()
+    new File(releaseSigningPath).withInputStream { releaseSigning.load(it) }
+}
 
 /**
  * This is the configuration block to customize your React Native Android app.
@@ -98,8 +109,8 @@ android {
         applicationId 'com.anonymous.hafiz'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0.0"
+        versionCode appJson.expo.android.versionCode as Integer
+        versionName appJson.expo.version
         if (hafizQa) {
             applicationIdSuffix '.qa'
         }
@@ -112,6 +123,14 @@ android {
             storePassword 'android'
             keyAlias 'androiddebugkey'
             keyPassword 'android'
+        }
+        if (releaseSigning) {
+            release {
+                storeFile file(releaseSigning.getProperty('storeFile'))
+                storePassword releaseSigning.getProperty('storePassword')
+                keyAlias releaseSigning.getProperty('keyAlias')
+                keyPassword releaseSigning.getProperty('keyPassword')
+            }
         }
     }
     if (hafizQa) {
@@ -126,9 +145,7 @@ android {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            signingConfig releaseSigning ? signingConfigs.release : signingConfigs.debug
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
             shrinkResources enableShrinkResources.toBoolean()
             minifyEnabled enableMinifyInReleaseBuilds

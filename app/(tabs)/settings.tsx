@@ -74,6 +74,7 @@ import {
   quranPageMarkerFontPaletteStyle,
 } from "@/lib/fonts/loader";
 import { errorMessage } from "@/lib/error-message";
+import { useAppReleaseRow } from "@/components/app-update/use-app-release-row";
 
 type SettingsCategoryId = "general" | "content" | "account" | "about";
 
@@ -122,6 +123,7 @@ export default function SettingsScreen() {
   } = useSettings();
   const db = useDatabase();
   const s = useStrings();
+  const appReleaseRow = useAppReleaseRow();
   const showNotice = useOperationNotice();
   const router = useRouter();
   const params = useLocalSearchParams<{ qf?: string; qf_error?: string; category?: string }>();
@@ -817,6 +819,16 @@ export default function SettingsScreen() {
           <SectionLabel>{s.settingsAboutSection}</SectionLabel>
           <Card elevation="low" className="p-2 mb-8">
             <View className="gap-1">
+              {appReleaseRow ? (
+                <SettingsLinkRow
+                  icon={appReleaseRow.icon}
+                  title={appReleaseRow.title}
+                  description={appReleaseRow.description}
+                  onPress={appReleaseRow.onPress}
+                  isDark={isDark}
+                  isRTL={isRTL}
+                />
+              ) : null}
               <SettingsLinkRow
                 icon={Info}
                 title={s.settingsAboutHafiz}

@@ -53,6 +53,7 @@ import type { AchievementUnlock } from "@/lib/achievements/types";
 import { getReflectionJourneySummary } from "@/lib/reflection-journey/queries";
 import { localizeReflectionJourneyText } from "@/lib/reflection-journey/schema";
 import { DESKTOP_CONTENT_MAX_WIDTH, VIEWPORT_BREAKPOINTS } from "@/lib/ui/viewport";
+import { AppReleaseCard } from "@/components/app-update/AppReleaseCard";
 
 type SmartDeckDisplay = {
   id: SmartDeckId;
@@ -538,6 +539,8 @@ export default function HomeScreen() {
             </Card>
           </Pressable>
         )}
+
+        <AppReleaseCard />
 
         {!user && !authBannerDismissed && (
           <Card elevation="low" className="p-4 mb-6">
