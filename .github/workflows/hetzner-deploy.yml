@@ -39,7 +39,10 @@ jobs:
           set -euo pipefail
           test -n "$EXPO_PUBLIC_SUPABASE_URL"
           test -n "$EXPO_PUBLIC_SUPABASE_ANON_KEY"
-          npm ci
+          # Dependency install scripts only fetch tools the deploy does not use (the Supabase CLI
+          # download has failed with GitHub 504s); run the project's own postinstall for patches.
+          npm ci --ignore-scripts
+          npm run postinstall
           npm run typecheck
           npx jest --runInBand tests/unit/quran-data-contract.test.ts tests/unit/sync-restore-contract.test.ts tests/unit/sync-concurrency.test.tsx tests/unit/scroll-to-visible-index.test.ts tests/unit/oauth-buttons-contract.test.tsx tests/unit/auth-disabled.test.ts tests/unit/qf-oauth-redirect.test.ts tests/unit/qf-content-disabled.test.ts tests/unit/public-review-activity-contract.test.ts tests/unit/public-surah-progress-contract.test.ts
           python3 scripts/test-web-release.py
