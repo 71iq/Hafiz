@@ -309,3 +309,5 @@ RF194 accepted on 2026-11-08. Error handlers across sign-in, sync, leaderboard, 
 The onboarding follow-up from RF185 is closed without a change. "Skip for now" calls the same completion as finishing, on every step after the first, so it skips the rest of setup by design rather than skipping one step.
 
 RF196 accepted on 2026-11-08. Opening verse links while the app was already running kept a full copy of the app's screens for every link, so memory climbed past 1.3 GB and Back stepped through old copies. Links now return to the open app, and memory stays near 250 MB on the phone. A link that arrives during a review session, sign-in or onboarding still leaves that screen underneath, as before. Found while profiling for RF039; router tests, device checks and a light review pass.
+
+RF039 completed on 2026-11-08. On the phone the app starts in about 0.7 seconds, and scrolling the reader in both views and grading reviews stay smooth. Profiling found that verse links opened while the app was running piled up copies of the app (RF196, fixed). The 3.5-minute first-run import is RF195. Results and method are in PERFORMANCE.md.

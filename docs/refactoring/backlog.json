@@ -4327,12 +4327,21 @@
       ],
       "risk": "medium",
       "approved": false,
-      "status": "pending",
+      "status": "verified",
       "allowed_paths": [
         "docs/refactoring/PERFORMANCE.md"
       ],
       "attempts": 0,
-      "priority": 2
+      "priority": 2,
+      "started_at": "2026-11-08T06:29:12.491586+00:00",
+      "completed_at": "2026-11-08T06:29:12.491586+00:00",
+      "primary_accepted_at": "2026-11-08T06:29:12.491586+00:00",
+      "files": [
+        "docs/refactoring/PERFORMANCE.md"
+      ],
+      "summary": "Profiled cold start, reader (verse and page view), review session and memory on SM-A546E with the QA release build; results in PERFORMANCE.md. Frames are within budget in all three flows. The one material problem, warm deep links stacking a full tab tree per link (1.35 GB), became RF196 and is fixed. Page view memory is about 2x verse view but bounded. First-run import time is RF195. No settings selector split is needed.",
+      "evidence": "adb am start -W, dumpsys meminfo and gfxinfo with scripted input on device; before/after RF196 memory and view counts.",
+      "independent_review": "Measurement report; the code change it produced (RF196) had its own review. Final review RF049 covers the report."
     },
     {
       "id": "RF-040",
@@ -26429,7 +26438,7 @@
   ],
   "checkpoint": {
     "time": "2026-11-08T06:06:40.056952+00:00",
-    "current_task": "RF-039 (performance profile write-up)",
+    "current_task": "RF-195 (first-run import time)",
     "open_follow_ups": [
       "RF-195"
     ],
