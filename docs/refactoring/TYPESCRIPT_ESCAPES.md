@@ -15,7 +15,7 @@ Data from Supabase and the Quran Foundation edge function is untrusted. Sync row
 
 ## Local storage and protected data (keep, typed at the import step)
 
-- `lib/database/init.ts` (37) and `lib/database/native-loaders.native.ts` (3): loaders for bundled Quran, tafsir and translation JSON return `any`. These are protected, versioned assets checked by data-pipeline tests, and each import function maps them into typed SQLite rows. Typing the loaders would duplicate the dataset schemas without catching a real failure; revisit only if RF188 changes how the files are loaded.
+- `lib/database/init.ts` (37) and `lib/database/native-loaders.native.ts` (3): loaders for bundled Quran, tafsir and translation JSON return `any`. These are protected, versioned assets checked by data-pipeline tests, and each import function maps them into typed SQLite rows. Typing the loaders would duplicate the dataset schemas without catching a real failure. RF188 moved native loading to asset files read through `readBundledJson`, which still returns parsed JSON for the same import functions, so this reasoning holds.
 - `lib/fsrs/smart-decks.ts` (7) and `lib/database/sync.ts` (3 `highlightSyncId(row as any)`): SQL parameter arrays and a narrow helper call. Low risk; fold into a later cleanup only together with a behavior change there.
 
 ## Platform typings (keep)
@@ -25,4 +25,4 @@ Data from Supabase and the Quran Foundation edge function is untrusted. Sync row
 
 ## Error handling (low)
 
-`catch (err: any)` appears 19 times, mostly reading `err.message` for a user message. Replacing it with `unknown` and the existing message helpers is RF194, low priority, and must keep every message unchanged.
+Done in RF194. Every `catch (err: any)` is now `catch (err)` with `errorMessage` from `lib/error-message.ts`, which reads any object's text `message` (Supabase can reject with plain objects) and otherwise returns undefined so the caller's fallback applies. Messages for real errors are unchanged.

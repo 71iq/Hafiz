@@ -13,6 +13,7 @@ import { formatReciterLabel, getReciterById } from "@/lib/quran-foundation/recit
 import { useSettings } from "@/lib/settings/context";
 import { toArabicNumber } from "@/lib/arabic";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
+import { errorMessage } from "@/lib/error-message";
 
 type RecitationMode = "single" | "range" | "surah";
 
@@ -126,8 +127,8 @@ export function RecitationRangeSheet({ visible, onClose, currentAyah }: Props) {
       if (!result.ok) {
         throw new Error(result.code === "not_configured" ? s.qfContentMisconfigured : s.qfContentUnavailable);
       }
-    } catch (err: any) {
-      setError(err?.message ?? s.qfContentUnavailable);
+    } catch (err) {
+      setError(errorMessage(err) ?? s.qfContentUnavailable);
     } finally {
       setStarting(false);
     }

@@ -22,6 +22,7 @@ import {
 import { OAuthButtons } from "@/components/auth/OAuthButtons";
 import { useEmailSubmission } from "@/components/auth/use-email-submission";
 import type { Direction } from "@/lib/ui/direction";
+import { errorMessage } from "@/lib/error-message";
 
 type SignupForm = {
   email: string;
@@ -112,8 +113,8 @@ function SignupFormScreen() {
       setShowError(null);
       await resendSignupConfirmation(pendingConfirmationEmail);
       setShowError(s.authConfirmationResent);
-    } catch (err: any) {
-      setShowError(err.message);
+    } catch (err) {
+      setShowError(errorMessage(err) ?? null);
     }
   };
 

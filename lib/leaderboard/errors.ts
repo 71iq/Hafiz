@@ -1,5 +1,10 @@
-export function isMissingPublicReviewAggregateError(error: { code?: string; message?: string; details?: string } | null): boolean {
-  const message = `${error?.code ?? ""} ${error?.message ?? ""} ${error?.details ?? ""}`.toLowerCase();
+export function isMissingPublicReviewAggregateError(error: unknown): boolean {
+  const field = (key: "code" | "message" | "details") => {
+    if (!error || typeof error !== "object") return "";
+    const value: unknown = Reflect.get(error, key);
+    return value == null ? "" : String(value);
+  };
+  const message = `${field("code")} ${field("message")} ${field("details")}`.toLowerCase();
   return (
     message.includes("public_review_activity") ||
     message.includes("public_review_stats")

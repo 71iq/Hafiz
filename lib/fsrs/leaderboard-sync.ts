@@ -11,6 +11,7 @@ import { getTodayScore, getTotalScore } from "./scoring";
 import { getLocalSurahProgress } from "@/lib/profile/progress";
 import { hasCompletedAccountRestore } from "@/lib/database/sync";
 import { dayIndexFromUtcDateKey as toDayIndex, formatUtcDateKey } from "@/lib/date";
+import { errorMessage } from "@/lib/error-message";
 
 type ProfileStatsPatch = {
   total_score: number;
@@ -450,10 +451,10 @@ export async function updateProfileStats(db: DatabaseExecutor): Promise<void> {
 
       try {
         await upsertPublicReviewSummary(owner, localReviewSummary, remotePublicReviewSummary);
-      } catch (reviewAggregateError: any) {
+      } catch (reviewAggregateError) {
         if (!owner.isCurrent()) return;
         if (!isMissingPublicReviewAggregateError(reviewAggregateError)) {
-          console.warn("[Leaderboard] Failed to update public review summary:", reviewAggregateError.message);
+          console.warn("[Leaderboard] Failed to update public review summary:", errorMessage(reviewAggregateError));
         }
       }
 
@@ -509,9 +510,9 @@ export async function updateProfileStats(db: DatabaseExecutor): Promise<void> {
           if (!owner.isCurrent()) return;
           if (deleteError) throw deleteError;
         }
-      } catch (progressError: any) {
+      } catch (progressError) {
         if (owner.isCurrent())
-          console.warn("[Leaderboard] Failed to update public surah progress:", progressError.message);
+          console.warn("[Leaderboard] Failed to update public surah progress:", errorMessage(progressError));
       }
     } catch (error) {
       if (owner.isCurrent()) throw error;

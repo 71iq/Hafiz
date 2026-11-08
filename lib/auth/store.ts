@@ -20,6 +20,7 @@ import { connectQfFromSession } from "@/lib/quran-foundation/user";
 import { captureQfRequestOwner } from "@/lib/quran-foundation/request-owner";
 import { QF_OAUTH_PROVIDER } from "@/lib/quran-foundation/user-types";
 import type { AuthState, AuthActions, Profile, AuthActionHandle, SignUpResult } from "@/lib/auth/types";
+import { errorMessage } from "@/lib/error-message";
 
 type AuthStore = AuthState & AuthActions;
 
@@ -427,8 +428,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         options: { emailRedirectTo: getEmailRedirectTo() },
       });
       if (error) throw error;
-    } catch (err: any) {
-      set({ error: err.message });
+    } catch (err) {
+      set({ error: errorMessage(err) ?? null });
       throw err;
     } finally {
       loading.finish();
@@ -443,8 +444,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         redirectTo: getPasswordResetRedirectTo(),
       });
       if (error) throw error;
-    } catch (err: any) {
-      set({ error: err.message });
+    } catch (err) {
+      set({ error: errorMessage(err) ?? null });
       throw err;
     } finally {
       loading.finish();
@@ -458,8 +459,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         const { data, error } = await updateOwnedPassword(owner, get().session, password);
         if (error) throw error;
         if (owner.isCurrent()) set({ user: data.user });
-      } catch (err: any) {
-        if (owner.isCurrent()) set({ error: err.message });
+      } catch (err) {
+        if (owner.isCurrent()) set({ error: errorMessage(err) ?? null });
         throw err;
       }
     });
@@ -471,8 +472,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       try {
         const { error } = await supabase.auth.signOut({ scope: "local" });
         if (error) throw error;
-      } catch (err: any) {
-        console.warn("[Auth] Sign out error:", err.message);
+      } catch (err) {
+        console.warn("[Auth] Sign out error:", errorMessage(err));
       } finally {
         set({ session: null, user: null, profile: null, error: null });
         loading.finish();
@@ -495,9 +496,9 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
       if (error) throw error;
       publishProfileRead(user.id, profileAtRead, hadPendingWrite, data as Profile);
-    } catch (err: any) {
+    } catch (err) {
       if (!isCurrentOwner()) return;
-      console.warn("[Auth] Failed to fetch profile:", err.message);
+      console.warn("[Auth] Failed to fetch profile:", errorMessage(err));
       publishProfileRead(user.id, profileAtRead, hadPendingWrite, buildFallbackProfile(user));
     }
   },
@@ -550,8 +551,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         } finally {
           write.release();
         }
-      } catch (err: any) {
-        if (isCurrent()) set({ error: err.message });
+      } catch (err) {
+        if (isCurrent()) set({ error: errorMessage(err) ?? null });
         else owner.cancel();
         throw err;
       }
@@ -590,9 +591,9 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
       if (error) throw error;
       return publishProfileRead(user.id, profileAtRead, hadPendingWrite, (data as Profile) ?? fallback);
-    } catch (err: any) {
+    } catch (err) {
       if (!isCurrentOwner()) return null;
-      console.warn("[Auth] Failed to ensure profile:", err.message);
+      console.warn("[Auth] Failed to ensure profile:", errorMessage(err));
       return publishProfileRead(user.id, profileAtRead, hadPendingWrite, fallback);
     }
   },

@@ -23,6 +23,7 @@ import {
 } from "./sync-queue";
 import { backfillAchievements, insertRemoteAchievementUnlock } from "@/lib/achievements/queries";
 import { isSyncableUserSetting, userSettingToSyncData } from "@/lib/database/user-settings";
+import { errorMessage } from "@/lib/error-message";
 
 export type SyncStatus = "idle" | "syncing" | "synced" | "error" | "offline";
 
@@ -118,9 +119,9 @@ async function pushSyncQueue(db: AppDatabase, owner: SyncOwner): Promise<PushRes
       });
       owner.requireCurrent();
       syncedIds.push(...tableEntries.map((e) => e.id));
-    } catch (err: any) {
+    } catch (err) {
       owner.requireCurrent();
-      console.warn("[Sync] Failed to push queued changes:", err.message);
+      console.warn("[Sync] Failed to push queued changes:", errorMessage(err));
       failedIds.push(...tableEntries.map((e) => e.id));
     }
   }
@@ -170,10 +171,10 @@ async function pullRemoteChanges(db: AppDatabase, owner: SyncOwner): Promise<Pul
     // Pull user-supplied word meanings before cards so vocabulary previews resolve.
     try {
       await pullTable(db, "user_word_meanings", userId, lastPullAt, upsertUserWordMeaning, owner, onPageApplied);
-    } catch (err: any) {
+    } catch (err) {
       owner.requireCurrent();
       wordMeaningsComplete = false;
-      console.warn("[Sync] Pull user_word_meanings skipped:", err.message);
+      console.warn("[Sync] Pull user_word_meanings skipped:", errorMessage(err));
     }
 
     // Pull study_cards
@@ -218,9 +219,9 @@ async function pullRemoteChanges(db: AppDatabase, owner: SyncOwner): Promise<Pul
       owner.requireCurrent();
       complete = true;
     }
-  } catch (err: any) {
+  } catch (err) {
     owner.requireCurrent();
-    console.warn("[Sync] Pull failed:", err.message);
+    console.warn("[Sync] Pull failed:", errorMessage(err));
   }
 
   return { pulled: totalPulled, complete };

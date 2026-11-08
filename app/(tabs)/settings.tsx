@@ -73,6 +73,7 @@ import {
   quranPageFontPaletteStyle,
   quranPageMarkerFontPaletteStyle,
 } from "@/lib/fonts/loader";
+import { errorMessage } from "@/lib/error-message";
 
 type SettingsCategoryId = "general" | "content" | "account" | "about";
 
@@ -284,8 +285,8 @@ export default function SettingsScreen() {
           } else {
             showMessage(s.qfFinishConnection);
           }
-        } catch (err: any) {
-          showMessage(err.message || s.qfSyncFailed);
+        } catch (err) {
+          showMessage(errorMessage(err) || s.qfSyncFailed);
         } finally {
           if (!cancelled) setQfBusy(false);
           clearQfSettingsQuery();
@@ -323,8 +324,8 @@ export default function SettingsScreen() {
       if (!response.ok) throw new Error(response.message);
       setQfMessage(s.qfConnectionStarted);
       await openQfAuthorizationUrl(response.authorizationUrl);
-    } catch (err: any) {
-      if (isCurrentAccount()) setQfMessage(err.message || s.qfConnectionFailed);
+    } catch (err) {
+      if (isCurrentAccount()) setQfMessage(errorMessage(err) || s.qfConnectionFailed);
     } finally {
       setQfBusy(false);
     }
@@ -340,8 +341,8 @@ export default function SettingsScreen() {
       if (!isCurrentAccount()) return;
       setQfStatus("disconnected");
       setQfMessage(s.qfDisconnected);
-    } catch (err: any) {
-      if (isCurrentAccount()) setQfMessage(err.message || s.qfSyncFailed);
+    } catch (err) {
+      if (isCurrentAccount()) setQfMessage(errorMessage(err) || s.qfSyncFailed);
     } finally {
       setQfBusy(false);
     }
@@ -364,8 +365,8 @@ export default function SettingsScreen() {
               ? s.qfSyncFailed
               : s.qfFinishConnection,
       );
-    } catch (err: any) {
-      if (isCurrentAccount()) setQfMessage(err.message || s.qfSyncFailed);
+    } catch (err) {
+      if (isCurrentAccount()) setQfMessage(errorMessage(err) || s.qfSyncFailed);
     } finally {
       setQfBusy(false);
     }

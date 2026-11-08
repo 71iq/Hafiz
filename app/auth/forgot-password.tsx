@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/Button";
 import { FormTextField } from "@/components/ui/FormTextField";
 import { AuthFormNotice, AuthScreenShell, AuthUnavailableState } from "@/components/auth/AuthScreenShell";
 import type { Direction } from "@/lib/ui/direction";
+import { errorMessage } from "@/lib/error-message";
 
 type ForgotPasswordForm = {
   email: string;
@@ -62,9 +63,9 @@ function ForgotPasswordFormScreen() {
       await sendPasswordReset(data.email);
       setMessageType("success");
       setMessage(s.authPasswordResetSent);
-    } catch (err: any) {
+    } catch (err) {
       setMessageType("error");
-      setMessage(err.message);
+      setMessage(errorMessage(err) ?? null);
     }
   };
 
