@@ -81,6 +81,11 @@ export const rtlStyleAllowlist: RtlStyleAllowlistEntry[] = [
     reason: "Web selection menu placement uses measured browser selection coordinates.",
   },
   {
+    file: "components/mushaf/WordToken.tsx",
+    pattern: /left: -fontSize|right: -fontSize|paddingRight: fontSize|textAlign: "right"/,
+    reason: "Android ink layer for QCF page glyphs: physical offsets in the font's own geometry inside the reader's fixed LTR word row (RF189).",
+  },
+  {
     file: "components/mushaf/WordTooltip.tsx",
     pattern: /borderLeft|borderRight/,
     reason: "Tooltip triangle uses transparent physical borders as a CSS drawing technique.",
