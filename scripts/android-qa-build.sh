@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 # Build an isolated Android QA APK (com.anonymous.hafiz.qa) for arm64 devices. It installs beside any
 # real Hafiz install and uses synthetic public Supabase values, so it never contacts a live backend.
-# The JS bundle is built outside Gradle: the inlined native datasets make Metro plus Hermes exceed the
-# 6 GiB scope when Gradle bundles them. Each step runs in its own 6 GiB scope.
-# Hermes runs at -O0 to fit; the bundle content is unchanged, but this is not a release-performance build.
+# The JS bundle is built outside Gradle so Metro, Hermes and Gradle each run in their own 6 GiB scope.
+# Quran datasets ship as .hafizdata assets (scripts/native-data-mirror.cjs), not inside the bundle.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="$ROOT/android/app/build/hafiz-qa-bundle"
@@ -21,7 +20,7 @@ HERMESC="$(dirname "$(node --print "require.resolve('hermes-compiler/package.jso
 cd "$ROOT"
 NODE_OPTIONS=--max-old-space-size=4096 scope npx expo export:embed --platform android --dev false --minify true \
   --entry-file "$ENTRY" --bundle-output "$WORK/index.android.bundle.js" --assets-dest "$OUT/res" --reset-cache
-scope "$HERMESC" -emit-binary -O0 -w -out "$OUT/assets/index.android.bundle" "$WORK/index.android.bundle.js"
+scope "$HERMESC" -emit-binary -O -w -out "$OUT/assets/index.android.bundle" "$WORK/index.android.bundle.js"
 cd "$ROOT/android"
 scope taskset -c 0,1 ./gradlew :app:assembleRelease -PhafizQa=true -PreactNativeArchitectures=arm64-v8a \
   --no-daemon --max-workers=1
