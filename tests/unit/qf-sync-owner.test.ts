@@ -556,7 +556,7 @@ it("preserves a valid initial pull-enqueue-push-pull sequence", async () => {
 it.each([
   { response: { ok: false, code: "upstream", message: "Synthetic status outage" }, status: "failed" },
   { response: { ok: false, code: "needs_reauth", message: "Synthetic reauthentication" }, status: "needs_reauth" },
-  { response: { ok: true, status: "not_connected" }, status: "not_connected" },
+  { response: { ok: true, status: "disconnected" }, status: "not_connected" },
   { response: { ok: true, status: "needs_reauth" }, status: "needs_reauth" },
 ])("retains the existing connection outcome $status", async ({ response, status }) => {
   const before = snapshot();
