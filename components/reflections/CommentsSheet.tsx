@@ -10,6 +10,7 @@ import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { formatRelativeTime } from "@/lib/i18n/relative-time";
 import { fetchComments, addComment, toggleCommentLike } from "@/lib/reflections/api";
+import { SavedRowUnreadableError } from "@/lib/reflections/rows";
 import type { Reflection, ReflectionComment, ReflectionCommentSort } from "@/lib/reflections/types";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { Input } from "@/components/ui/Input";
@@ -143,18 +144,25 @@ export function CommentsSheet({
     if (!lease) return;
     const submitted = text;
     setFailure(null);
+    const finishPosted = () => {
+      setText((current) => (current === submitted ? "" : current));
+      void queryClient.invalidateQueries({ queryKey: reflectionQueryKeys.comments.forReflection(reflectionId) });
+      onCommentAdded(reflectionId);
+    };
     try {
       const comment = await addComment(user.id, reflectionId, submitted.trim());
       if (!lease.isCurrent()) return;
       setLocalComments((prev) => [...prev, comment]);
-      setText((current) => (current === submitted ? "" : current));
-      void queryClient.invalidateQueries({ queryKey: reflectionQueryKeys.comments.forReflection(reflectionId) });
-      onCommentAdded(reflectionId);
+      finishPosted();
     } catch (error) {
-      if (lease.isCurrent()) {
-        console.warn("[Comments] Failed to add:", error);
-        setFailure("post");
+      if (!lease.isCurrent()) return;
+      // Posted, but the reply could not be read: the refetch shows it instead of a duplicate retry.
+      if (error instanceof SavedRowUnreadableError) {
+        finishPosted();
+        return;
       }
+      console.warn("[Comments] Failed to add:", error);
+      setFailure("post");
     } finally {
       lease.release();
     }

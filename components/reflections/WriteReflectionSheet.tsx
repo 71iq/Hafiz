@@ -7,6 +7,7 @@ import { useAuthStore } from "@/lib/auth/store";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings, interpolate } from "@/lib/i18n/useStrings";
 import { createReflection } from "@/lib/reflections/api";
+import { SavedRowUnreadableError } from "@/lib/reflections/rows";
 import { useDatabase } from "@/lib/database/provider";
 import { recordAchievementEvent } from "@/lib/achievements/queries";
 import { useQueryClient } from "@tanstack/react-query";
@@ -56,6 +57,17 @@ export function WriteReflectionSheet({ open, onClose, surah, ayahStart, ayahEnd,
     const lease = begin("submit");
     if (!lease) return;
     setError(null);
+    const finishPosted = () => {
+      // Invalidate reflection queries for this ayah range
+      for (let a = ayahStart; a <= ayahEnd; a++) {
+        queryClient.invalidateQueries({ queryKey: reflectionQueryKeys.reflections.ayah({ surah, ayah: a }) });
+        queryClient.invalidateQueries({ queryKey: reflectionQueryKeys.count({ surah, ayah: a }) });
+      }
+      queryClient.invalidateQueries({ queryKey: reflectionQueryKeys.feed.all });
+      setContent("");
+      onClose();
+      onSuccess?.();
+    };
     try {
       const mushafIndex = await loadMushafIndex(db);
       if (!lease.isCurrent()) return;
@@ -80,17 +92,14 @@ export function WriteReflectionSheet({ open, onClose, surah, ayahStart, ayahEnd,
         ayahEnd,
         createdAt: reflection.created_at,
       }).catch(console.warn);
-      // Invalidate reflection queries for this ayah range
-      for (let a = ayahStart; a <= ayahEnd; a++) {
-        queryClient.invalidateQueries({ queryKey: reflectionQueryKeys.reflections.ayah({ surah, ayah: a }) });
-        queryClient.invalidateQueries({ queryKey: reflectionQueryKeys.count({ surah, ayah: a }) });
-      }
-      queryClient.invalidateQueries({ queryKey: reflectionQueryKeys.feed.all });
-      setContent("");
-      onClose();
-      onSuccess?.();
+      finishPosted();
     } catch (error) {
       if (!lease.isCurrent()) return;
+      if (error instanceof SavedRowUnreadableError) {
+        // Posted, but the reply could not be read: refresh instead of offering a duplicate retry.
+        finishPosted();
+        return;
+      }
       const code = error && typeof error === "object" && "code" in error ? error.code : undefined;
       const message =
         error && typeof error === "object" && "message" in error && typeof error.message === "string"

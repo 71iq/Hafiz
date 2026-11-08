@@ -20,6 +20,7 @@ import {
   toggleLike,
 } from "@/lib/reflections/api";
 import type { Reflection, ReflectionComment } from "@/lib/reflections/types";
+import { SavedRowUnreadableError } from "@/lib/reflections/rows";
 import { reflectionQueryKeys as keys } from "@/lib/reflections/query-keys";
 import { strings } from "@/lib/i18n/strings";
 import { loadMushafIndex, type MushafIndex } from "@/lib/mushaf/position";
@@ -478,6 +479,52 @@ it("public-post failure retains its draft, enables editing and retries with the 
   expect(createReflection).toHaveBeenCalledTimes(2);
   expect(close).toHaveBeenCalledTimes(1);
 });
+
+it.each(["en", "ar"] as const)(
+  "a saved post whose reply cannot be read closes as posted without a retry (%s)",
+  async (locale) => {
+    mockLocale = locale;
+    const close = jest.fn(),
+      success = jest.fn(),
+      invalidate = jest.spyOn(client, "invalidateQueries");
+    jest.mocked(createReflection).mockRejectedValueOnce(new SavedRowUnreadableError("reflection"));
+    const view = render(
+      <WriteReflectionSheet open surah={2} ayahStart={1} ayahEnd={1} onClose={close} onSuccess={success} />,
+      { wrapper },
+    );
+    fireEvent.changeText(view.getByPlaceholderText(strings[locale].reflectionPlaceholder), "Synthetic saved post");
+    fireEvent.press(view.getByText(strings[locale].reflectionSubmit));
+    await flush();
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(success).toHaveBeenCalledTimes(1);
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: keys.feed.all });
+    expect(view.queryByText(strings[locale].reflectionPostFailed)).toBeNull();
+    expect(recordAchievementEvent).not.toHaveBeenCalled();
+    expect(createReflection).toHaveBeenCalledTimes(1);
+  },
+);
+
+it.each(["en", "ar"] as const)(
+  "a saved comment whose reply cannot be read clears the draft and refetches (%s)",
+  async (locale) => {
+    mockLocale = locale;
+    const added = jest.fn(),
+      invalidate = jest.spyOn(client, "invalidateQueries");
+    jest.mocked(addComment).mockRejectedValueOnce(new SavedRowUnreadableError("comment"));
+    const view = render(<CommentsSheet reflectionId="post" onClose={jest.fn()} onCommentAdded={added} />, {
+      wrapper,
+    });
+    await waitFor(() => expect(view.getByText("Synthetic comment")).toBeTruthy());
+    const input = view.getByPlaceholderText(strings[locale].reflectionAddComment);
+    fireEvent.changeText(input, "Synthetic saved comment");
+    fireEvent(input, "submitEditing");
+    await flush();
+    expect(input.props.value).toBe("");
+    expect(added).toHaveBeenCalledWith("post");
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: keys.comments.forReflection("post") });
+    expect(view.queryByText(strings[locale].commentPostFailed)).toBeNull();
+  },
+);
 
 it("comments preserve newly typed text while a prior submitted snapshot finishes", async () => {
   mockLocale = "en";

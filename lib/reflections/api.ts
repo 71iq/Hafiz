@@ -7,6 +7,7 @@ import type {
   ReflectionFeedSort,
   ReflectionJuzRange,
 } from "./types";
+import { parseCommentRow, parseCommentRows, parseReflectionRow, parseReflectionRows, parseSavedRow } from "./rows";
 
 const PAGE_SIZE = 5;
 const FEED_PAGE_SIZE = 10;
@@ -83,16 +84,8 @@ async function attachUserLikes(reflections: Reflection[], userId?: string): Prom
   }));
 }
 
-function normalizeComment(comment: ReflectionComment): ReflectionComment {
-  return {
-    ...comment,
-    likes_count: comment.likes_count ?? 0,
-  };
-}
-
 async function attachUserCommentLikes(comments: ReflectionComment[], userId?: string): Promise<ReflectionComment[]> {
-  const normalized = comments.map(normalizeComment);
-  if (!userId || normalized.length === 0) return normalized;
+  if (!userId || comments.length === 0) return comments;
 
   const { data: likes, error } = await supabase
     .from("reflection_comment_likes")
@@ -100,16 +93,16 @@ async function attachUserCommentLikes(comments: ReflectionComment[], userId?: st
     .eq("user_id", userId)
     .in(
       "comment_id",
-      normalized.map((comment) => comment.id),
+      comments.map((comment) => comment.id),
     );
 
   if (error) {
-    if (isMissingCommentLikesTableError(error)) return normalized;
+    if (isMissingCommentLikesTableError(error)) return comments;
     throw error;
   }
 
   const likedSet = new Set((likes ?? []).map((like) => like.comment_id));
-  return normalized.map((comment) => ({
+  return comments.map((comment) => ({
     ...comment,
     user_has_liked: likedSet.has(comment.id),
   }));
@@ -138,7 +131,7 @@ export async function fetchReflections(
 
   if (error) throw error;
 
-  const resultPage = pageResult((data ?? []) as Reflection[], PAGE_SIZE);
+  const resultPage = pageResult(parseReflectionRows(data), PAGE_SIZE);
   const trimmed = await attachUserLikes(resultPage.data, userId);
   return { data: trimmed, hasMore: resultPage.hasMore };
 }
@@ -214,7 +207,7 @@ export async function fetchReflectionFeed({
   const { data, error } = await query.range(from, to);
   if (error) throw error;
 
-  const pageResultData = pageResult((data ?? []) as Reflection[], FEED_PAGE_SIZE);
+  const pageResultData = pageResult(parseReflectionRows(data), FEED_PAGE_SIZE);
   const trimmed = await attachUserLikes(pageResultData.data, userId);
 
   return { data: trimmed, hasMore: pageResultData.hasMore };
@@ -271,11 +264,11 @@ export async function createReflection(
       .single();
 
     if (fallback.error) throw fallback.error;
-    return { ...(fallback.data as Reflection), juz_start: juzStart, juz_end: juzEnd };
+    return { ...parseSavedRow("reflection", parseReflectionRow, fallback.data), juz_start: juzStart, juz_end: juzEnd };
   }
 
   if (error) throw error;
-  return data as Reflection;
+  return parseSavedRow("reflection", parseReflectionRow, data);
 }
 
 /** Toggle like on a reflection */
@@ -325,12 +318,12 @@ export async function fetchComments(
   if (error && sort === "popular" && isMissingColumnError(error, "likes_count")) {
     const fallback = await applySort(buildQuery(), sort, false).range(from, to);
     if (fallback.error) throw fallback.error;
-    const result = pageResult((fallback.data ?? []) as ReflectionComment[], COMMENT_PAGE_SIZE);
+    const result = pageResult(parseCommentRows(fallback.data), COMMENT_PAGE_SIZE);
     return { ...result, data: await attachUserCommentLikes(result.data, userId) };
   }
 
   if (error) throw error;
-  const result = pageResult((data ?? []) as ReflectionComment[], COMMENT_PAGE_SIZE);
+  const result = pageResult(parseCommentRows(data), COMMENT_PAGE_SIZE);
   return { ...result, data: await attachUserCommentLikes(result.data, userId) };
 }
 
@@ -343,11 +336,7 @@ export async function addComment(userId: string, reflectionId: string, content: 
     .single();
 
   if (error) throw error;
-  return {
-    ...(data as ReflectionComment),
-    likes_count: (data as ReflectionComment).likes_count ?? 0,
-    user_has_liked: false,
-  };
+  return { ...parseSavedRow("comment", parseCommentRow, data), user_has_liked: false };
 }
 
 /** Toggle like on a comment */
