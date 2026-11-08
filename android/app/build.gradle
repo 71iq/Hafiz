@@ -4,7 +4,7 @@ apply plugin: "com.facebook.react"
 
 def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
 // QA builds (-PhafizQa=true) install beside the real app and package a JS bundle built separately by
-// scripts/android-qa-build.sh, because bundling the inlined datasets inside Gradle exceeds 6 GiB.
+// scripts/android-qa-build.sh, so Metro, Hermes and Gradle each run in their own 6 GiB scope.
 def hafizQa = findProperty('hafizQa') == 'true'
 
 /**
