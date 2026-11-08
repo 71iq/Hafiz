@@ -25648,8 +25648,8 @@
     }
   ],
   "checkpoint": {
-    "time": "2026-11-08T04:11:24.791960+00:00",
-    "current_task": "batch gate after RF-189, then RF-192",
+    "time": "2026-11-08T05:41:31.177489+00:00",
+    "current_task": "RF-192 (validate reflection and comment rows)",
     "open_follow_ups": [
       "RF-192",
       "RF-193",
@@ -25661,7 +25661,7 @@
     "decisions_waiting_on_ehab": [
       "Final push after all work is verified"
     ],
-    "last_green_commit": "470aea0 (full 20-check gate on RF-188; only a Prettier reflow of native-loaders.native.ts followed, rechecked with its test and typecheck)",
+    "last_green_commit": "02a8027 (full 20-check batch gate: 3,161 unit, 35 Chrome; covers RF-186, RF-187, RF-189)",
     "uncommitted": null,
     "production": "RF-166, RF-170, RF-169 migrations applied 2026-11-07 after backup 20261107T205118Z."
   }
