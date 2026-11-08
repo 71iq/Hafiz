@@ -47,8 +47,9 @@ test -n "${EXPO_PUBLIC_SUPABASE_URL:-}" && test -n "${EXPO_PUBLIC_SUPABASE_ANON_
   { echo "Public Supabase values are missing (gh variable list failed)." >&2; exit 1; }
 
 echo "Building Hafiz $VERSION_NAME ($VERSION_CODE)"
-(cd android && scope ./gradlew :app:assembleRelease -PreactNativeArchitectures=arm64-v8a,armeabi-v7a \
-  --no-daemon --max-workers=2)
+# Native C++ compiles use every core by default and exceed 6 GiB; two cores and one worker fit.
+(cd android && CMAKE_BUILD_PARALLEL_LEVEL=2 scope taskset -c 0,1 ./gradlew :app:assembleRelease \
+  -PreactNativeArchitectures=arm64-v8a,armeabi-v7a --no-daemon --max-workers=1)
 APK="$ROOT/android/app/build/outputs/apk/release/app-release.apk"
 
 APKSIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
