@@ -26220,17 +26220,16 @@
     }
   ],
   "checkpoint": {
-    "time": "2026-11-08T05:41:31.177489+00:00",
-    "current_task": "batch gate after RF-194",
+    "time": "2026-11-08T06:06:40.056952+00:00",
+    "current_task": "RF-039 (performance profile; page-view memory growth found)",
     "open_follow_ups": [
-      "RF-195",
-      "onboarding 'Skip for now' skips step 3 (confirm intent)"
+      "RF-195"
     ],
     "device_tasks": "none pending; QA app reset to Verse by Verse and English (Bridges)",
     "decisions_waiting_on_ehab": [
       "Final push after all work is verified"
     ],
-    "last_green_commit": "02a8027 (full 20-check batch gate: 3,161 unit, 35 Chrome; covers RF-186, RF-187, RF-189)",
+    "last_green_commit": "04bdf6f (full 20-check batch gate: 3,187 unit, 35 Chrome; covers RF-192, RF-193, RF-194)",
     "uncommitted": null,
     "production": "RF-166, RF-170, RF-169 migrations applied 2026-11-07 after backup 20261107T205118Z."
   }

@@ -305,3 +305,5 @@ RF192 accepted on 2026-11-08. Community reflections and comments from the server
 RF193 accepted on 2026-11-08. Replies from the Quran Foundation sync service are now checked before Settings, the sign-in return or sync use them. A malformed reply shows the existing "sync is unavailable" message instead of a wrong connection state or a broken sign-in link; valid replies behave as before. Causal tests, the Quran Foundation and Settings suites, typecheck, lint and a light review pass.
 
 RF194 accepted on 2026-11-08. Error handlers across sign-in, sync, leaderboard, Settings and recitation read error text through one shared helper instead of untyped access. Users see the same messages as before, and an unusual empty failure now shows the screen's normal fallback instead of failing inside the handler. Related suites, typecheck, lint and a light review pass.
+
+The onboarding follow-up from RF185 is closed without a change. "Skip for now" calls the same completion as finishing, on every step after the first, so it skips the rest of setup by design rather than skipping one step.
