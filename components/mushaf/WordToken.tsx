@@ -19,6 +19,14 @@ type Props = {
   compactLayout?: boolean;
 };
 
+// Android clips each Text to its own box, but QCF page words draw outside their advance: over all
+// 604 pages, shaped words reach up to 1.77 em past the line-end (left) edge and, rarely, 1.48 em past
+// the right edge. On Android the word's Text keeps its box, highlight and taps but draws no ink; a
+// non-interactive copy widened by this much on both sides draws the glyph. Its right padding keeps the
+// right-aligned glyph exactly where the word box puts it; centering would follow Android's ink
+// bounds and shift it (RF189).
+const INK_OVERFLOW_EM = 2;
+
 function WordTokenInner({
   glyph,
   fontFamily,
@@ -82,6 +90,11 @@ function WordTokenInner({
         } as any)
       : {};
 
+  const drawsInkLayer = Platform.OS === "android" && !hidden;
+  const inkClassName = isTooltipSelected
+    ? "text-primary-accent dark:text-primary-bright"
+    : "text-charcoal dark:text-neutral-100";
+
   return (
     <Pressable
       ref={tokenRef as any}
@@ -99,11 +112,7 @@ function WordTokenInner({
     >
       <Text
         selectable={Platform.OS === "web" && !hidden}
-        className={
-          isTooltipSelected
-            ? "text-primary-accent dark:text-primary-bright"
-            : "text-charcoal dark:text-neutral-100"
-        }
+        className={inkClassName}
         style={{
           fontFamily,
           ...(Platform.OS === "web" && fontPalette ? ({ fontPalette } as any) : null),
@@ -125,10 +134,41 @@ function WordTokenInner({
             paddingBottom: Math.max(1, fontSize * 0.04),
           }),
           ...(Platform.OS === "web" ? ({ userSelect: hidden ? "none" : "text" } as any) : null),
+          ...(drawsInkLayer && { color: "transparent" }),
         }}
       >
         {glyph}
       </Text>
+      {drawsInkLayer && (
+        // A View, because Android ignores pointerEvents on Text and the wide layer would take
+        // neighboring words' taps.
+        <View
+          pointerEvents="none"
+          accessible={false}
+          importantForAccessibility="no-hide-descendants"
+          style={{
+            position: "absolute",
+            top: 0,
+            bottom: 0,
+            left: -fontSize * INK_OVERFLOW_EM,
+            right: -fontSize * INK_OVERFLOW_EM,
+          }}
+        >
+          <Text
+            className={inkClassName}
+            style={{
+              fontFamily,
+              fontSize,
+              lineHeight,
+              // The layer is placed from the Pressable's edge; add its and the word Text's padding.
+              paddingRight: fontSize * INK_OVERFLOW_EM + (compactLayout ? 0 : 2),
+              textAlign: "right",
+            }}
+          >
+            {glyph}
+          </Text>
+        </View>
+      )}
     </Pressable>
   );
 }
