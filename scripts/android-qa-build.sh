@@ -5,7 +5,7 @@
 # Quran datasets ship as .hafizdata assets (scripts/native-data-mirror.cjs), not inside the bundle.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-OUT="$ROOT/android/app/build/hafiz-qa-bundle"
+OUT="$ROOT/android/app/build/hafiz-prebuilt-bundle"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 export CI=1 EXPO_NO_DOTENV=1 NODE_ENV=production

@@ -6,6 +6,9 @@ def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
 // QA builds (-PhafizQa=true) install beside the real app and package a JS bundle built separately by
 // scripts/android-qa-build.sh, so Metro, Hermes and Gradle each run in their own 6 GiB scope.
 def hafizQa = findProperty('hafizQa') == 'true'
+// QA and release scripts bundle the JavaScript outside Gradle (-PhafizPrebuiltBundle=true) so Metro
+// and Gradle never share one 6 GiB scope; the bundle is packaged from build/hafiz-prebuilt-bundle.
+def prebuiltBundle = hafizQa || findProperty('hafizPrebuiltBundle') == 'true'
 // app.json is the single source of the app version; the in-app updater compares version codes.
 def appJson = new groovy.json.JsonSlurper().parse(new File(projectRoot, "app.json"))
 // Sideloaded releases must always be signed with the same private key so updates install over
@@ -47,7 +50,7 @@ react {
     //   skip the bundling of the JS bundle and the assets. By default is just 'debug'.
     //   If you add flavors like lite, prod, etc. you'll have to list your debuggableVariants.
     // debuggableVariants = ["liteDebug", "prodDebug"]
-    if (hafizQa) {
+    if (prebuiltBundle) {
         debuggableVariants = ["debug", "release"]
     }
 
@@ -133,12 +136,12 @@ android {
             }
         }
     }
-    if (hafizQa) {
-        if (!file("$buildDir/hafiz-qa-bundle/assets/index.android.bundle").exists()) {
-            throw new GradleException("QA builds package a prebuilt bundle: run scripts/android-qa-build.sh")
+    if (prebuiltBundle) {
+        if (!file("$buildDir/hafiz-prebuilt-bundle/assets/index.android.bundle").exists()) {
+            throw new GradleException("Prebuilt-bundle builds: run scripts/android-qa-build.sh or scripts/release-android.sh")
         }
-        sourceSets.release.assets.srcDirs += "$buildDir/hafiz-qa-bundle/assets"
-        sourceSets.release.res.srcDirs += "$buildDir/hafiz-qa-bundle/res"
+        sourceSets.release.assets.srcDirs += "$buildDir/hafiz-prebuilt-bundle/assets"
+        sourceSets.release.res.srcDirs += "$buildDir/hafiz-prebuilt-bundle/res"
     }
     buildTypes {
         debug {

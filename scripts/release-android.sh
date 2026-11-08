@@ -47,9 +47,19 @@ test -n "${EXPO_PUBLIC_SUPABASE_URL:-}" && test -n "${EXPO_PUBLIC_SUPABASE_ANON_
   { echo "Public Supabase values are missing (gh variable list failed)." >&2; exit 1; }
 
 echo "Building Hafiz $VERSION_NAME ($VERSION_CODE)"
+# Metro, Hermes and Gradle each get their own 6 GiB scope, as in scripts/android-qa-build.sh.
+OUT="$ROOT/android/app/build/hafiz-prebuilt-bundle"
+WORK="$(mktemp -d)"
+trap 'rm -rf "$WORK"' EXIT
+rm -rf "$OUT" && mkdir -p "$OUT/assets" "$OUT/res"
+ENTRY="$(node -e "require('expo/scripts/resolveAppEntry')" "$ROOT" android absolute)"
+HERMESC="$(dirname "$(node --print "require.resolve('hermes-compiler/package.json', { paths: [require.resolve('react-native/package.json')] })")")/hermesc/linux64-bin/hermesc"
+NODE_OPTIONS=--max-old-space-size=4096 scope npx expo export:embed --platform android --dev false --minify true \
+  --entry-file "$ENTRY" --bundle-output "$WORK/index.android.bundle.js" --assets-dest "$OUT/res" --reset-cache
+scope "$HERMESC" -emit-binary -O -w -out "$OUT/assets/index.android.bundle" "$WORK/index.android.bundle.js"
 # Native C++ compiles use every core by default and exceed 6 GiB; two cores and one worker fit.
 (cd android && CMAKE_BUILD_PARALLEL_LEVEL=2 scope taskset -c 0,1 ./gradlew :app:assembleRelease \
-  -PreactNativeArchitectures=arm64-v8a,armeabi-v7a --no-daemon --max-workers=1)
+  -PhafizPrebuiltBundle=true -PreactNativeArchitectures=arm64-v8a,armeabi-v7a --no-daemon --max-workers=1)
 APK="$ROOT/android/app/build/outputs/apk/release/app-release.apk"
 
 APKSIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
