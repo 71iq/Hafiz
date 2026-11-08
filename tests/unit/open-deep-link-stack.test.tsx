@@ -22,7 +22,7 @@ function renderApp(initialUrl: string) {
       "(tabs)/home": () => <Text>Home screen</Text>,
       "(tabs)/mushaf": () => <Text>Mushaf screen</Text>,
       open: OpenDeepLink,
-      session: () => <Text>Session screen</Text>,
+      "flashcards/session": () => <Text>Session screen</Text>,
     },
     { initialUrl },
   );
@@ -59,14 +59,14 @@ describe("RF-196 warm deep links", () => {
 
   it("keeps a screen opened over the tabs, such as a review session, underneath", async () => {
     const app = renderApp("/home");
-    act(() => router.push("/session"));
+    act(() => router.push("/flashcards/session"));
     await act(async () => {});
 
     act(() => router.push("/open?surah=2&ayah=255"));
     await act(async () => {});
 
     expect(screen.getByText("Mushaf screen")).toBeTruthy();
-    expect(rootRouteNames(app)).toEqual(["(tabs)", "session", "(tabs)"]);
+    expect(rootRouteNames(app)).toEqual(["(tabs)", "flashcards/session", "(tabs)"]);
     expect(consumePendingDeepLink()).toEqual({ surah: 2, ayah: 255 });
   });
 
