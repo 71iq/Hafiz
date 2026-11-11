@@ -1808,6 +1808,24 @@ describe("Flashcard session due-date editor characterization", () => {
       expect(view.getByText(s.cardDeletedSkipped)).toBeTruthy();
     });
 
+    it("finishes instead of reshowing a graded card when the last card is suspended", async () => {
+      jest.mocked(setStudyCardSuspended).mockResolvedValueOnce({ ...secondCard, suspended: 1 } as StudyCardRow);
+      const view = renderSession();
+      await reveal(view);
+      // Easy graduates the new card, so it is not requeued behind the last card.
+      fireEvent.press(getTextButton(view, s.flashcardsEasy));
+      await waitFor(() => expect(view.getByText(secondCue)).toBeTruthy());
+
+      fireEvent.press(view.getByRole("button", { name: s.cardActionsTitle }));
+      await waitFor(() => expect(view.getByText(s.cardActionsTitle)).toBeTruthy());
+      fireEvent.press(view.getByRole("button", { name: s.cardSuspend }));
+
+      // Graded cards stay in the session list; removing the last card must not step back onto one.
+      await waitFor(() => expect(view.getByText(s.flashcardsSummaryTitle)).toBeTruthy());
+      expect(view.queryByText(firstCue)).toBeNull();
+      expect(putCardRow).toHaveBeenCalledTimes(1);
+    });
+
     it("skips a card deleted during the session when a card action finds it gone (RF-183)", async () => {
       jest.spyOn(console, "warn").mockImplementation(() => undefined);
       jest.mocked(setStudyCardMarked).mockRejectedValueOnce(new StudyCardDeletedError());

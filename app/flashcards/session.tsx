@@ -582,13 +582,13 @@ function FlashcardSessionScreen() {
     setSessionError(null);
     setCurrentSideIndex(0);
     setRevealed(false);
-    if (cards.length <= 1) {
-      setCards([]);
+    // Graded cards stay in the list before currentIndex, so removing the last card ends the session
+    // instead of stepping back onto a card that was already reviewed.
+    setCards((prev) => prev.filter((_, index) => index !== currentIndex));
+    if (currentIndex >= cards.length - 1) {
       await finishSessionWithSummary();
       return;
     }
-    setCards((prev) => prev.filter((_, index) => index !== currentIndex));
-    setCurrentIndex((index) => Math.min(index, cards.length - 2));
     setPhase("front");
   }, [cards.length, currentIndex, finishSessionWithSummary]);
 
