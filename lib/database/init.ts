@@ -846,14 +846,16 @@ async function importMutashabihat(db: AppDatabase, onProgress: ProgressCallback)
 }
 
 async function importReflectionJourneyLevels(db: AppDatabase, onProgress: ProgressCallback): Promise<void> {
-  const [seedData, quranData, storedFingerprint, existingCountRow] = await Promise.all([
+  // Ayah counts come from the surahs table: parsing the 8 MB quran-data.json for them on every
+  // native launch delayed startup.
+  const [seedData, surahRows, storedFingerprint, existingCountRow] = await Promise.all([
     loadData("reflection-journey.json"),
-    loadData("quran-data.json"),
+    db.getAllAsync<{ number: number; ayah_count: number }>("SELECT number, ayah_count FROM surahs"),
     readSetting(db, "reflection_journey_content_fingerprint"),
     db.getFirstAsync<{ count: number }>("SELECT COUNT(*) as count FROM reflection_journey_levels"),
   ]);
 
-  const ayahCountIndex = buildAyahCountIndex(quranData);
+  const ayahCountIndex = buildAyahCountIndex({ surahs: surahRows });
   const parsed = loadAndValidateReflectionJourneySeed(seedData, ayahCountIndex);
   const fingerprint = computeReflectionJourneyFingerprint(parsed);
   const existingCount = existingCountRow?.count ?? 0;
@@ -1257,6 +1259,7 @@ export async function initializeDatabase(db: AppDatabase, onProgress: ProgressCa
       await importSurahInfo(db, onProgress);
     }
 
+    clearImportCaches();
     console.log("[Import] Database already populated, skipping import.");
     onProgress({ step: "Complete", current: TOTAL_STEPS, total: TOTAL_STEPS, detail: "Already imported" });
     return;
