@@ -47,7 +47,10 @@ export function useWordTap({ surah, ayah, wordPos, v2Page, disabled = false, hid
 
   const press = useCallback(
     (locate: LocateWord) => {
-      if (disabled || hidden) return;
+      // Native has no floating tooltip (long press opens word detail), so a tap must not select the
+      // word: nothing showed or cleared that selection and the word stayed highlighted. The tap
+      // reaches the reader's tap layer, which toggles the controls.
+      if (disabled || hidden || Platform.OS !== "web") return;
       const showTooltip = () => locate((position) => setTooltipWord(wordRef, position));
       if (!isTouchInput) {
         // Mouse / desktop: single click shows the tooltip.
