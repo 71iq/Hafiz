@@ -50,6 +50,10 @@ type MushafTarget = { surah: number; ayah: number; wordPos?: number };
 type HifzPageAyah = { key: string; wordCount: number };
 
 const PAGE_RAIL_MAX_WIDTH = 760;
+// How long after a touch drag, wheel or scroll key a scroll still counts as the reader's own,
+// long enough to cover a fling's momentum.
+const USER_SCROLL_INPUT_WINDOW_MS = 2500;
+const SCROLL_KEYS = new Set(["ArrowDown", "ArrowUp", "PageDown", "PageUp", "Home", "End", " "]);
 const READER_INTERACTION_SELECTOR = '[data-hafiz-quran-token], [data-hafiz-word-tooltip="true"], [data-hafiz-reader-interaction="true"]';
 
 function isFromFocusModeControls(event: any) {
@@ -285,6 +289,24 @@ function MushafInner() {
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const touchMovedRef = useRef(false);
   const tapRevealGuardUntilRef = useRef(0);
+  const lastUserScrollInputRef = useRef(0);
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof window === "undefined") return;
+    const markInput = () => {
+      lastUserScrollInputRef.current = Date.now();
+    };
+    const markKey = (event: KeyboardEvent) => {
+      if (SCROLL_KEYS.has(event.key)) markInput();
+    };
+    window.addEventListener("wheel", markInput, { passive: true });
+    window.addEventListener("touchmove", markInput, { passive: true });
+    window.addEventListener("keydown", markKey);
+    return () => {
+      window.removeEventListener("wheel", markInput);
+      window.removeEventListener("touchmove", markInput);
+      window.removeEventListener("keydown", markKey);
+    };
+  }, []);
   const [focusModeActive, setFocusModeActive] = useState(false);
   const [focusModePlaying, setFocusModePlaying] = useState(false);
   const [focusControlsVisible, setFocusControlsVisible] = useState(false);
@@ -333,7 +355,9 @@ function MushafInner() {
     }
     if (dy < -8) {
       setChromeVisible(true);
-    } else if (dy > 8) {
+    } else if (dy > 8 && now - lastUserScrollInputRef.current < USER_SCROLL_INPUT_WINDOW_MS) {
+      // Only the reader's own scrolling hides the controls. Lists also move while items measure,
+      // retry a scroll to a target or restore a position, and those must leave the controls shown.
       setChromeVisible(false);
     }
     lastScrollYRef.current = y;
@@ -414,6 +438,7 @@ function MushafInner() {
             (Math.abs(x - start.x) > 8 || Math.abs(y - start.y) > 8)
           ) {
             touchMovedRef.current = true;
+            lastUserScrollInputRef.current = Date.now();
           }
         },
         onTouchEnd: () => {
@@ -508,6 +533,8 @@ function MushafInner() {
 
   const scheduleVerseScrollToIndex = useCallback(
     (index: number, animated = false) => {
+      // Programmatic scrolls (restore, search results, links) must not read as the reader scrolling.
+      tapRevealGuardUntilRef.current = Date.now() + 1500;
       clearVerseScrollRetry();
       const request = verseScrollRequestRef.current;
       return scrollToVisibleIndex(
@@ -842,6 +869,7 @@ function MushafInner() {
 
   const navigateToTarget = useCallback(
     (target: MushafTarget, animated = true) => {
+      tapRevealGuardUntilRef.current = Date.now() + 1500;
       pauseFocusAutoScroll();
       resetHifzForNavigation();
       void scrollToTarget(target, animated)
@@ -1268,8 +1296,10 @@ function MushafInner() {
 
   // Persist last visible position (debounced) so the next visit restores it
   const lastSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Saving waits for the restore attempt, or the initial page 1 would overwrite the saved position.
+  const positionRestoreSettledRef = useRef(false);
   useEffect(() => {
-    if (loading) return;
+    if (loading || !positionRestoreSettledRef.current) return;
     if (lastSaveTimerRef.current) clearTimeout(lastSaveTimerRef.current);
     lastSaveTimerRef.current = setTimeout(() => {
       const value = isPageMode
@@ -1306,11 +1336,13 @@ function MushafInner() {
         // Defer to deep-link handler if one is pending — peek without consuming
         if (deepLinkHandledRef.current || peekPendingDeepLink()) return;
 
-        if (parsed?.mode === "page" && isPageMode && parsed.page > 1 && goToPageRef.current) {
-          setTimeout(() => {
-            if (deepLinkHandledRef.current) return;
-            if (currentPageRef.current === 1) goToPageRef.current?.(parsed.page);
-          }, 150);
+        if (parsed?.mode === "page" && isPageMode && parsed.page > 1) {
+          // Committed through the page prop: PageMushaf applies it once its page data has loaded,
+          // whereas a direct jump before then was silently dropped.
+          if (!deepLinkHandledRef.current && currentPageRef.current === 1) {
+            tapRevealGuardUntilRef.current = Date.now() + 1500;
+            commitCurrentPage(parsed.page);
+          }
         } else if (parsed?.mode === "verse" && !isPageMode) {
           const idx = items.findIndex(
             (it) => it.type === "ayah" && it.surah === parsed.surah && it.ayah === parsed.ayah
@@ -1324,9 +1356,11 @@ function MushafInner() {
         }
       } catch (e) {
         console.warn("[Mushaf] restore last position failed:", e);
+      } finally {
+        positionRestoreSettledRef.current = true;
       }
     })();
-  }, [loading, items, mushafIndex, isPageMode, db, scheduleVerseScrollToIndex]);
+  }, [loading, items, mushafIndex, isPageMode, db, scheduleVerseScrollToIndex, commitCurrentPage]);
 
   // Web only: ArrowLeft / ArrowRight in page mode → ±1 page (RTL aware)
   useEffect(() => {
