@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useFocusEffect, router } from "expo-router";
-import { View, Text, Pressable, ActivityIndicator, Platform, ScrollView, useWindowDimensions } from "react-native";
+import { View, Text, Pressable, ActivityIndicator, Platform, ScrollView, useWindowDimensions, BackHandler } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
   useAnimatedStyle,
@@ -1138,6 +1138,26 @@ function MushafInner() {
     setImmersive(false);
     setChromeVisible(true);
   }, [clearFocusControlsTimer, setChromeVisible, setImmersive]);
+
+  // Tab screens stay mounted, so the hidden bar and focus mode must end when the reader loses
+  // focus; otherwise every other tab is left without its tab bar.
+  const exitFocusModeRef = useRef(exitFocusMode);
+  exitFocusModeRef.current = exitFocusMode;
+  useFocusEffect(
+    useCallback(() => {
+      return () => exitFocusModeRef.current();
+    }, [])
+  );
+
+  // Android Back leaves focus mode before it leaves the reader.
+  useEffect(() => {
+    if (Platform.OS !== "android" || !focusModeActive) return;
+    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      exitFocusModeRef.current();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [focusModeActive]);
 
   const handleFocusSpeedChange = useCallback(
     (speed: number) => {
