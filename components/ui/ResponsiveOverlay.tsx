@@ -242,7 +242,9 @@ export function ResponsiveOverlay({
         // ignored), so Android needs padding too or the keyboard covers sheet inputs.
         behavior={Platform.OS === "web" ? undefined : "padding"}
         className={cn("flex-1 px-0", overlayAlignment)}
-        style={{ backgroundColor: "rgba(0,0,0,0.55)", direction: dir }}
+        // The modal covers the translucent status bar; a sheet that shrinks above the keyboard must
+        // still stop below it.
+        style={{ backgroundColor: "rgba(0,0,0,0.55)", direction: dir, paddingTop: insets.top }}
       >
         <Pressable
           className="absolute inset-0"
