@@ -31,13 +31,19 @@ class NativeOwnershipTests(unittest.TestCase):
 
     def test_each_mirrored_declaration_detects_independent_drift(self):
         original = json.loads((self.root / "app.json").read_text())
-        changes = [("name", "Other"), ("version", "9.0.0"), ("orientation", "landscape"), ("scheme", "other"), ("userInterfaceStyle", "dark")]
+        changes = [("name", "Other"), ("orientation", "landscape"), ("scheme", "other"), ("userInterfaceStyle", "dark")]
         for name, value in changes:
             with self.subTest(field=name):
                 data = json.loads(json.dumps(original))
                 data["expo"][name] = value
                 (self.root / "app.json").write_text(json.dumps(data))
                 self.assertTrue(checker.check(self.root))
+
+    def test_literal_version_name_drift(self):
+        gradle = self.root / "android/app/build.gradle"
+        self.assertIn("versionName appJson.expo.version", gradle.read_text())
+        gradle.write_text(gradle.read_text().replace("versionName appJson.expo.version", "versionName '9.0.0'"))
+        self.assertTrue(checker.check(self.root))
 
     def test_android_package_and_back_drift(self):
         original = json.loads((self.root / "app.json").read_text())
@@ -50,7 +56,7 @@ class NativeOwnershipTests(unittest.TestCase):
 
     def test_splash_and_adaptive_background_drift(self):
         original = json.loads((self.root / "app.json").read_text())
-        for branch, name, value in [("splash", "resizeMode", "cover"), ("splash", "backgroundColor", "#ffffff"), ("adaptiveIcon", "backgroundColor", "#ffffff")]:
+        for branch, name, value in [("splash", "resizeMode", "cover"), ("splash", "backgroundColor", "#000000"), ("adaptiveIcon", "backgroundColor", "#000000")]:
             with self.subTest(branch=branch, field=name):
                 data = json.loads(json.dumps(original))
                 target = data["expo"]["android"][branch] if branch == "adaptiveIcon" else data["expo"][branch]
