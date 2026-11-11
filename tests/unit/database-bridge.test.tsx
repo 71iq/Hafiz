@@ -982,7 +982,7 @@ describe("database bridge message boundary", () => {
       await new Promise((yes) => setTimeout(yes, 250));
     }
   });
-  it("RF030 preserves native initialization and closes its handle on unmount", async () => {
+  it("RF030 seeds native from the bundled database and closes its handle on unmount", async () => {
     jest.replaceProperty(Platform, "OS", "ios");
     const statuses: ReturnType<typeof useDatabaseStatus>[] = [];
     const view = render(
@@ -991,7 +991,7 @@ describe("database bridge message boundary", () => {
       </DatabaseProvider>,
     );
     await waitFor(() => expect(statuses.at(-1)?.isReady).toBe(true));
-    expect(mockImportDatabaseFromAssetAsync).not.toHaveBeenCalled();
+    expect(mockImportDatabaseFromAssetAsync).toHaveBeenCalledWith("hafiz.db", { assetId: expect.anything() });
     expect(mockOpenDatabaseAsync).toHaveBeenCalledWith("hafiz.db", { useNewConnection: true });
     expect(statuses.at(-1)?.db).not.toHaveProperty("closeAsync");
     expect(statuses.at(-1)?.db).not.toHaveProperty("prepareAsync");

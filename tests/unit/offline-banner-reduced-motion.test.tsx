@@ -14,6 +14,8 @@ const mockSettings = {
 };
 let mockNetInfo: { isConnected: boolean | null } = { isConnected: null };
 
+jest.mock("react-native-safe-area-context", () => require("react-native-safe-area-context/jest/mock").default);
+
 jest.mock("@react-native-community/netinfo", () => ({
   useNetInfo: () => mockNetInfo,
 }));
@@ -142,7 +144,9 @@ it.each([
   [true, -80, 0],
 ] as const)("starts connectivity %s at its static endpoint while preference is unknown", (connected, y, opacity) => {
   const view = renderBanner(connected);
-  expect(view.getByText(OFFLINE_TEXT.en)).toBeTruthy();
+  // The banner stays mounted while online, hidden from screen readers until it slides in.
+  expect(view.getByText(OFFLINE_TEXT.en, { includeHiddenElements: true })).toBeTruthy();
+  expect(view.queryByText(OFFLINE_TEXT.en) === null).toBe(connected);
   expect(groups).toHaveLength(0);
   expect(setValue.mock.calls.slice(-2)).toEqual([[y], [opacity]]);
 });
@@ -277,7 +281,7 @@ it.each([
   (uiLanguage, text, flexDirection, writingDirection, textAlign) => {
     const view = renderBanner(true, uiLanguage);
     const banner = view.UNSAFE_getByType(Animated.View);
-    const label = view.getByText(text);
+    const label = view.getByText(text, { includeHiddenElements: true });
     const row = view
       .UNSAFE_getAllByType(View)
       .find((node) => node.props.className === "mx-4 mt-2 rounded-xl px-3 py-2.5");
