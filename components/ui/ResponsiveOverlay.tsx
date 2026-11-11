@@ -120,12 +120,13 @@ export function ResponsiveOverlay({
   maxHeight,
   surfaceColor,
   dir: explicitDir,
-  avoidKeyboard = false,
+  avoidKeyboard = true,
   initialFocusRef,
   restoreFocusRef,
   children,
 }: ResponsiveOverlayProps) {
   const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const { themeSurface } = useSettings();
   const dir = useUIDirection(explicitDir);
   const reduceMotion = useReducedMotionPreference();
@@ -189,8 +190,9 @@ export function ResponsiveOverlay({
   const computedMaxHeight = useMemo(() => {
     if (maxHeight != null) return maxHeight;
     if (activePresentation === "fullscreen") return "100%" as const;
-    return Math.min(height - (isPhone ? 16 : 48), isPhone ? height * 0.92 : 720);
-  }, [activePresentation, height, isPhone, maxHeight]);
+    // The modal draws under the translucent status bar, so phone sheets stop below its inset.
+    return Math.min(height - (isPhone ? insets.top + 8 : 48), isPhone ? height * 0.92 : 720);
+  }, [activePresentation, height, insets.top, isPhone, maxHeight]);
 
   const contentWidth = useMemo(() => {
     if (activePresentation === "fullscreen") return width;
@@ -205,6 +207,9 @@ export function ResponsiveOverlay({
       maxWidth: activePresentation === "sheet" ? "100%" : contentWidth,
       maxHeight: computedMaxHeight,
       height: activePresentation === "sheet" && isPhone ? computedMaxHeight : undefined,
+      // Lets a fixed-height sheet shrink above the keyboard instead of being pushed off screen.
+      flexShrink: 1,
+      minHeight: 0,
       backgroundColor: resolvedSurfaceColor,
       borderTopLeftRadius: activePresentation === "sheet" ? 28 : 28,
       borderTopRightRadius: activePresentation === "sheet" ? 28 : 28,
@@ -233,7 +238,9 @@ export function ResponsiveOverlay({
   return (
     <Modal visible={open} transparent animationType="none" statusBarTranslucent onRequestClose={onClose}>
       <Container
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        // Edge-to-edge Android no longer resizes the window for the keyboard (adjustResize is
+        // ignored), so Android needs padding too or the keyboard covers sheet inputs.
+        behavior={Platform.OS === "web" ? undefined : "padding"}
         className={cn("flex-1 px-0", overlayAlignment)}
         style={{ backgroundColor: "rgba(0,0,0,0.55)", direction: dir }}
       >
@@ -352,6 +359,7 @@ export function OverlayBody({
   contentContainerClassName,
   contentContainerStyle,
 }: OverlayBodyProps) {
+  const insets = useSafeAreaInsets();
   if (!scrollEnabled) {
     return <View className={cn("flex-1 min-h-0", className)}>{children}</View>;
   }
@@ -361,10 +369,14 @@ export function OverlayBody({
       ref={scrollRef}
       className={cn("flex-1 min-h-0", className)}
       showsVerticalScrollIndicator={false}
+      // The first tap on a button must act, not only dismiss the keyboard.
+      keyboardShouldPersistTaps="handled"
       contentContainerStyle={contentContainerStyle}
       contentContainerClassName={contentContainerClassName}
     >
       {children}
+      {/* Keeps the last lines above the Android navigation bar without overriding sheet padding. */}
+      {insets.bottom > 0 ? <View style={{ height: insets.bottom }} /> : null}
     </ScrollView>
   );
 }

@@ -4,6 +4,8 @@ import { act, cleanup, fireEvent, render, renderHook } from "@testing-library/re
 import { ResponsiveOverlay } from "@/components/ui/ResponsiveOverlay";
 import { useReducedMotionPreference } from "@/lib/ui/reduced-motion";
 
+jest.mock("react-native-safe-area-context", () => require("react-native-safe-area-context/jest/mock").default);
+
 jest.mock("@/lib/ui/direction", () => ({ useUIDirection: (dir?: "rtl" | "ltr") => dir ?? "ltr" }));
 
 jest.mock("@/lib/settings/context", () => ({
