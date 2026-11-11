@@ -142,6 +142,71 @@ async function isPopulated(db: DatabaseExecutor): Promise<boolean> {
   }
 }
 
+// Written only after a full first-launch import. Content tables alone cannot tell a finished import
+// from one that Android killed halfway, because surahs are imported first.
+const CONTENT_IMPORT_MARKER = "content_import_complete_v1";
+
+// Tables filled by the first-launch import with plain INSERTs or partial rows. A resumed import
+// clears them first so it cannot duplicate rows. User-owned tables are never listed here.
+const FIRST_LAUNCH_CONTENT_TABLES = [
+  "quran_text",
+  "juz_map",
+  "hizb_map",
+  "word_roots",
+  "translations",
+  "page_map",
+  "word_translations",
+  "word_irab",
+  "tajweed_rules",
+  "page_lines",
+] as const;
+
+export type ContentImportState = "fresh" | "resume" | "complete";
+
+async function countRows(db: DatabaseExecutor, sql: string): Promise<number> {
+  try {
+    const row = await db.getFirstAsync<{ count: number }>(sql);
+    return row?.count ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Decides whether the bundled Quran content must be imported. Installs from before the marker
+ * existed count as complete when their core tables are full; anything else with surahs present
+ * was interrupted and resumes.
+ */
+export async function resolveContentImportState(db: DatabaseExecutor): Promise<ContentImportState> {
+  if (!(await isPopulated(db))) return "fresh";
+  if ((await readSetting(db, CONTENT_IMPORT_MARKER).catch(() => null)) === "1") return "complete";
+
+  const coreChecks = [
+    ["SELECT COUNT(*) as count FROM quran_text", 6236],
+    ["SELECT COUNT(*) as count FROM translations", 6236],
+    ["SELECT COUNT(*) as count FROM tafseer WHERE source = 'muyassar'", 6236],
+    ["SELECT COUNT(*) as count FROM juz_map", 1],
+    ["SELECT COUNT(*) as count FROM hizb_map", 1],
+    ["SELECT COUNT(*) as count FROM page_map", 604],
+    ["SELECT COUNT(*) as count FROM word_roots", 1],
+    ["SELECT COUNT(*) as count FROM word_translations", 1],
+    ["SELECT COUNT(*) as count FROM word_irab", 1],
+    ["SELECT COUNT(*) as count FROM tajweed_rules", 1],
+  ] as const;
+  for (const [sql, minimum] of coreChecks) {
+    if ((await countRows(db, sql)) < minimum) return "resume";
+  }
+  await writeSetting(db, CONTENT_IMPORT_MARKER, "1");
+  return "complete";
+}
+
+async function clearPartialContentImport(db: AppDatabase): Promise<void> {
+  for (const table of FIRST_LAUNCH_CONTENT_TABLES) {
+    await db.execAsync(`DELETE FROM ${table}`);
+  }
+  await db.execAsync("DELETE FROM tafseer WHERE source IN ('muyassar', 'zilal')");
+}
+
 async function batchInsert(db: AppDatabase, sql: string, rows: any[][], batchSize: number = 500): Promise<void> {
   for (let i = 0; i < rows.length; i += batchSize) {
     const batch = rows.slice(i, i + batchSize);
@@ -1039,8 +1104,12 @@ export async function initializeDatabase(db: AppDatabase, onProgress: ProgressCa
   await migrateUserSchema(db);
   await ensureQfUserSyncSchema(db);
 
-  const populated = await isPopulated(db);
-  if (populated) {
+  const importState = await resolveContentImportState(db);
+  if (importState === "resume") {
+    console.warn("[Import] Previous first-launch import was interrupted; importing again.");
+    await clearPartialContentImport(db);
+  }
+  if (importState === "complete") {
     await ensureDefaultSurahEnglishNames(db);
 
     // Check if page_lines needs migration (added after initial import)
@@ -1243,6 +1312,7 @@ export async function initializeDatabase(db: AppDatabase, onProgress: ProgressCa
   // Free the fetch cache — the parsed JSON (~50MB) has been inserted into
   // SQLite and is no longer needed in memory.
   clearImportCaches();
+  await writeSetting(db, CONTENT_IMPORT_MARKER, "1");
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
   console.log(`[Import] All imports complete in ${elapsed}s`);
