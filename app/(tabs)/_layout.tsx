@@ -48,6 +48,11 @@ function SyncOverlay() {
   );
 }
 
+// Home is the tab navigator's initial route so Back never lands on the hidden index redirect.
+export const unstable_settings = {
+  initialRouteName: "home",
+};
+
 function TabsWithStrings() {
   const { isDark, isRTL, uiLanguage, themeSurface } = useSettings();
   const { immersive } = useChrome();
@@ -59,6 +64,9 @@ function TabsWithStrings() {
       {!immersive && <SyncOverlay />}
       {!immersive && <OfflineBanner uiLanguage={uiLanguage} />}
       <Tabs
+        // Android Back from a tab returns to Home, then leaves the app. The hidden index route only
+        // decides between onboarding and Home, so it must never be a Back destination.
+        backBehavior="initialRoute"
         screenOptions={{
           headerShown: false,
         }}
