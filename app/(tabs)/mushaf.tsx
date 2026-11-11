@@ -1764,13 +1764,18 @@ function MushafInner() {
             />
             {!chromeVisible && !focusModeActive && (
               <>
+                {/* With the toolbar collapsed the page scrolls to the top edge, so the position strip
+                    gets its own band instead of drawing over the first Quran line. */}
                 <View
                   pointerEvents="none"
                   style={{
                     position: "absolute",
-                    top: 12,
-                    left: 12,
-                    right: 12,
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                    backgroundColor: withThemeOpacity(themeSurface, 0.95),
                     flexDirection: "row",
                     justifyContent: "space-between",
                     alignItems: "center",
