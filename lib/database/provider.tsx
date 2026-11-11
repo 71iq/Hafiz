@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { Platform } from "react-native";
-import { importDatabaseFromAssetAsync, openDatabaseAsync } from "expo-sqlite";
+import { openDatabaseAsync } from "expo-sqlite";
+import { importBundledDatabase } from "./bundled-database";
 import { createConnectionOwner, type ConnectionOwner } from "@/lib/database/connection-owner";
 import { createDatabaseBridgeClient, createDatabaseBridgeHost } from "@/lib/database/bridge-connection";
 import type { AppDatabase } from "@/lib/database/types";
@@ -283,7 +284,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
       for (let index = 1; index <= OPEN_MAX_ATTEMPTS; index++) {
         if (!isActive()) return;
         try {
-          if (isWeb) await importDatabaseFromAssetAsync(DATABASE_NAME, { assetId: quranDbAsset });
+          await importBundledDatabase(DATABASE_NAME, quranDbAsset);
           if (!isActive()) return;
           const raw = await openDatabaseAsync(DATABASE_NAME, { useNewConnection: true });
           const owner = createConnectionOwner(raw, (failure) => {
