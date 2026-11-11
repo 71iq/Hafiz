@@ -125,8 +125,12 @@ describe.each(variants)(
         writingDirection: "rtl",
       });
       if (kind === "header") {
-        expect(Boolean(view.queryByText(decorative))).toBe(language === "ar" && ready);
-        if (!ready || language === "en") expect(view.getByText(name)).toBeTruthy();
+        // The compact page-view card shows the calligraphic name in both languages once the font is
+        // ready; English compact cards carry the English name in their subtitle instead.
+        const decorativeShown = (language === "ar" || compact) && ready;
+        expect(Boolean(view.queryByText(decorative))).toBe(decorativeShown);
+        if (!decorativeShown) expect(view.getByText(name)).toBeTruthy();
+        if (compact && language === "en") expect(view.getAllByText(new RegExp(name)).length).toBeGreaterThan(0);
         expect(view.getByRole("button")).toBeTruthy();
       }
     }
