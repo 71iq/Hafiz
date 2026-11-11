@@ -24,6 +24,9 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   ActivityIndicator,
   Animated,
+  BackHandler,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -132,6 +135,18 @@ function OnboardingInner() {
     },
     [completing, creating, currentScreen, screenAnim],
   );
+
+  // Android Back follows the on-screen back button: it returns one step until the deck is saved,
+  // instead of leaving the app from the middle of onboarding.
+  const canStepBack = currentScreen > 0 && !(currentScreen === 2 && retentionSaved);
+  useEffect(() => {
+    if (!canStepBack) return;
+    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      animateTo(currentScreen - 1);
+      return true;
+    });
+    return () => subscription.remove();
+  }, [animateTo, canStepBack, currentScreen]);
 
   const completeOnboarding = useCallback(async () => {
     if (completing) return;
@@ -252,7 +267,7 @@ function OnboardingInner() {
           justifyContent: "space-between",
         }}
       >
-        {currentScreen > 0 && !(currentScreen === 2 && retentionSaved) ? (
+        {canStepBack ? (
           <Pressable
             accessibilityRole="button"
             hitSlop={10}
@@ -921,7 +936,11 @@ function OnboardingInner() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: themeColors.surface }}>
       <StatusBar style={isDark ? "light" : "dark"} backgroundColor={themeColors.surface} />
-      <View style={{ flex: 1, alignItems: "center", backgroundColor: themeColors.surface }}>
+      {/* Edge-to-edge Android does not resize for the keyboard; padding keeps Continue above it. */}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "web" ? undefined : "padding"}
+        style={{ flex: 1, alignItems: "center", backgroundColor: themeColors.surface }}
+      >
         <View
           style={{
             flex: 1,
@@ -1029,7 +1048,7 @@ function OnboardingInner() {
             ) : null}
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
