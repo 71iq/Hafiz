@@ -243,21 +243,23 @@ export function WordDetailSheet() {
 
         <View className="flex-1 min-h-0">
           <View className={`px-4 py-3 flex-shrink-0 ${isRTL ? "items-end" : "items-start"}`}>
-            <Text
-              // Remount once the page font exists: Android keeps the fallback typeface of glyphs mounted earlier.
-              key={wordHeaderFontReady ? `font-${headerFontFamily}` : "font-pending"}
-              className="text-charcoal dark:text-neutral-100"
-              style={{
-                fontFamily: headerFontFamily,
-                ...headerFontPaletteStyle,
-                fontSize: 38,
-                lineHeight: 58,
-                opacity: wordHeaderFontReady ? 1 : 0,
-                writingDirection: "ltr",
-              }}
-            >
-              {headerMeta.qcf2Glyph?.trim() || headerMeta.wordText?.trim() || "—"}
-            </Text>
+            {/* Glyphs mounted before their page font exists render and measure in the system font. */}
+            {wordHeaderFontReady ? (
+              <Text
+                className="text-charcoal dark:text-neutral-100"
+                style={{
+                  fontFamily: headerFontFamily,
+                  ...headerFontPaletteStyle,
+                  fontSize: 38,
+                  lineHeight: 58,
+                  writingDirection: "ltr",
+                }}
+              >
+                {headerMeta.qcf2Glyph?.trim() || headerMeta.wordText?.trim() || "—"}
+              </Text>
+            ) : (
+              <View style={{ height: 58 }} />
+            )}
             {!isArabicMode && !!headerMeta.translationEn && (
               <Text
                 className={`mt-1 text-warm-500 dark:text-neutral-400 ${isRTL ? "text-right" : "text-left"}`}

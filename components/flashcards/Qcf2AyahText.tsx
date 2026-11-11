@@ -1,4 +1,5 @@
-import { Text, View } from "react-native";
+import { Fragment } from "react";
+import { Platform, Text, View } from "react-native";
 import {
   quranPageFontName,
   quranPageMarkerFontPaletteStyle,
@@ -30,6 +31,9 @@ export function Qcf2AyahText({
   const { quranFontStyle, showAyahMarkers, quranMarkerStyle, effectiveTheme } = useSettings();
   const visible = useQuranPageFontReady(quranFontStyle, v2Page);
 
+  // Glyphs mounted before their page font exists render and measure in the system font.
+  if (!visible) return <View style={{ minHeight: lineHeight }} />;
+
   const allTokens = textQcf2.split(" ").filter(Boolean);
   const tokens = showAyahMarker && showAyahMarkers ? allTokens : allTokens.slice(0, -1);
   if (tokens.length === 0) return null;
@@ -43,10 +47,39 @@ export function Qcf2AyahText({
     quranMarkerStyle,
   );
 
+  if (Platform.OS === "android") {
+    // Android clips each separate Text to its own advance box, and page-font word glyphs draw outside
+    // it, so per-word Text views showed cut fragments of the words. One Text with nested spans draws
+    // every word fully, like the reader's verse view.
+    return (
+      <Text
+        className={colorClassName}
+        style={{ fontFamily, ...fontPaletteStyle, fontSize, lineHeight, textAlign: "center", alignSelf: "stretch" }}
+      >
+        {tokens.map((token, index) => {
+          const highlighted = index === highlightIndex;
+          const isMarker = showAyahMarker && showAyahMarkers && index === tokens.length - 1;
+          return (
+            <Fragment key={`${token}-${index}`}>
+              <Text
+                className={highlighted ? "text-primary-accent dark:text-primary-bright" : undefined}
+                style={{
+                  ...(isMarker ? markerFontPaletteStyle : null),
+                  backgroundColor: highlighted ? "rgba(13, 148, 136, 0.13)" : undefined,
+                }}
+              >
+                {token}
+              </Text>
+              {index < tokens.length - 1 ? " " : null}
+            </Fragment>
+          );
+        })}
+      </Text>
+    );
+  }
+
   return (
     <View
-      // Remount once the page font exists: Android keeps the fallback typeface of glyphs mounted earlier.
-      key={visible ? `font-${fontFamily}` : "font-pending"}
       style={{
         direction: "ltr",
         flexDirection: "row-reverse",
@@ -54,7 +87,6 @@ export function Qcf2AyahText({
         justifyContent: "center",
         gap: Math.max(3, fontSize * 0.16),
         rowGap: Math.max(4, fontSize * 0.2),
-        opacity: visible ? 1 : 0,
       }}
     >
       {tokens.map((token, index) => {

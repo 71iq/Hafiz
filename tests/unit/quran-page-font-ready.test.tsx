@@ -36,15 +36,14 @@ beforeEach(() => {
 });
 
 describe("Quran page font readiness", () => {
-  it("remounts review-card glyphs once their page font is registered", async () => {
-    const view = render(<Qcf2AyahText textQcf2={"ﱺ ﱻ ﱼ"} v2Page={300} fontSize={28} lineHeight={48} />);
-    const before = view.getByText("ﱺ", { includeHiddenElements: true });
+  it("mounts review-card glyphs only after their page font is registered", async () => {
+    const view = render(<Qcf2AyahText textQcf2={"\uFC7A \uFC7B \uFC7C"} v2Page={300} fontSize={28} lineHeight={48} />);
+    // Android would draw and measure early glyphs in the system font and keep that measurement.
+    expect(view.queryByText("\uFC7A", { includeHiddenElements: true })).toBeNull();
 
     await act(async () => mockResolveLoad?.());
 
-    const after = view.getByText("ﱺ");
-    // Android resolves a Text view's typeface at mount, so the glyph must be a new instance.
-    expect(after).not.toBe(before);
+    expect(view.getByText("\uFC7A")).toBeTruthy();
   });
 
   it("reports an already loaded font as ready without a pending pass", () => {

@@ -301,12 +301,13 @@ function AyahBlockInner({
             </Text>
           </View>
         </Pressable>
+      ) : !fontVisible ? (
+        // Glyphs mounted before their page font exists render and measure in the system font.
+        <View className={isPhone ? "pt-5 pb-1" : "pt-6 pb-1"} style={{ minHeight: qcf2LineHeight }} />
       ) : (
         <View
-          // Remount once the page font exists: Android keeps the fallback typeface of glyphs mounted earlier.
-          key={fontVisible ? `font-${v2Page}` : "font-pending"}
           className={isPhone ? "pt-5 pb-1" : "pt-6 pb-1"}
-          style={{ opacity: fontVisible ? 1 : 0, direction: "ltr", alignItems: "flex-end", paddingHorizontal: 3, alignSelf: "stretch", width: "100%" }}
+          style={{ direction: "ltr", alignItems: "flex-end", paddingHorizontal: 3, alignSelf: "stretch", width: "100%" }}
         >
           {Platform.OS === "android" && !hideMode ? (
             // Android clips each separate Text to its own box, which cut page-font word glyphs that draw

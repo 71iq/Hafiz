@@ -539,10 +539,9 @@ export default function SettingsScreen() {
               </View>
 
               <View className="bg-surface dark:bg-surface-dark rounded-2xl px-4 py-4">
-                {quranPreview ? (
+                {/* Glyphs mounted before their page font exists render and measure in the system font. */}
+                {quranPreview && quranPreviewFontReady ? (
                   <View
-                    // Remount once the page font exists: Android keeps the fallback typeface of glyphs mounted earlier.
-                    key={quranPreviewFontReady ? `font-${quranPreview.v2Page}-${quranFontStyle}` : "font-pending"}
                     style={{
                       direction: "ltr",
                       flexDirection: "row-reverse",
@@ -551,7 +550,6 @@ export default function SettingsScreen() {
                       alignItems: "center",
                       gap: Math.max(4, fontSize * 0.18),
                       rowGap: Math.max(4, fontSize * 0.2),
-                      opacity: quranPreviewFontReady ? 1 : 0,
                     }}
                   >
                     {quranPreview.tokens.map((token, index) => {

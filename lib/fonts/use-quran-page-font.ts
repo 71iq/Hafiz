@@ -2,12 +2,12 @@ import { useEffect, useState } from "react";
 import { isQuranPageFontLoaded, loadQuranPageFont, type QuranPageFontStyle } from "./loader";
 
 /**
- * Loads a Quran page font and reports when glyphs may be drawn with it.
+ * Loads a Quran page font and reports when glyphs may be mounted.
  *
  * Page-font glyph codes are ordinary Arabic presentation-form characters, so text drawn before its
- * page font is registered shows wrong Arabic from the system font. Android also resolves a Text
- * view's typeface when it mounts and keeps it, so callers must key the glyph container on this
- * value: the remount after loading is what makes Android draw the real page font.
+ * page font is registered shows wrong Arabic from the system font. Android also caches the text
+ * measurement made with that fallback font, so a later remount keeps the wrong line breaks and
+ * clips the ayah. Callers must not mount glyph text until this returns true.
  */
 export function useQuranPageFontReady(style: QuranPageFontStyle, page: number | null | undefined): boolean {
   const [ready, setReady] = useState(() => (page ? isQuranPageFontLoaded(style, page) : false));

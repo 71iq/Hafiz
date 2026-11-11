@@ -447,47 +447,47 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
               {s.loading}
             </Text>
           ) : null}
-          <View
-            // Remount once the page font exists: Android keeps the fallback typeface of glyphs mounted earlier.
-            key={fontVisible ? `font-${qcf2FontFamily}` : "font-pending"}
-            className="items-end"
-            style={{
-              opacity: fontVisible ? 1 : 0,
-              direction: "ltr",
-            }}
-          >
+          {/* Glyphs mounted before their page font exists render and measure in the system font. */}
+          {fontVisible ? (
             <View
-              className="self-end"
+              className="items-end"
               style={{
                 direction: "ltr",
-                flexDirection: "row-reverse",
-                flexWrap: "wrap",
-                justifyContent: "flex-start",
-                alignItems: "center",
-                gap: 2,
-                maxWidth: "100%",
               }}
             >
-              {qcf2Tokens.map((glyph, index) => {
-                const isMarker = index === qcf2Tokens.length - 1;
-                return (
-                  <Text
-                    key={`${activeTarget.surah}-${activeTarget.ayah}-${index}`}
-                    className="text-charcoal dark:text-neutral-100"
-                    style={{
-                      fontFamily: qcf2FontFamily,
-                      ...(isMarker ? qcf2MarkerFontPaletteStyle : qcf2FontPaletteStyle),
-                      fontSize: isPhone ? 30 : 36,
-                      lineHeight: isPhone ? 58 : 66,
-                      paddingHorizontal: 2,
-                    }}
-                  >
-                    {glyph}
-                  </Text>
-                );
-              })}
+              <View
+                className="self-end"
+                style={{
+                  direction: "ltr",
+                  flexDirection: "row-reverse",
+                  flexWrap: "wrap",
+                  justifyContent: "flex-start",
+                  alignItems: "center",
+                  gap: 2,
+                  maxWidth: "100%",
+                }}
+              >
+                {qcf2Tokens.map((glyph, index) => {
+                  const isMarker = index === qcf2Tokens.length - 1;
+                  return (
+                    <Text
+                      key={`${activeTarget.surah}-${activeTarget.ayah}-${index}`}
+                      className="text-charcoal dark:text-neutral-100"
+                      style={{
+                        fontFamily: qcf2FontFamily,
+                        ...(isMarker ? qcf2MarkerFontPaletteStyle : qcf2FontPaletteStyle),
+                        fontSize: isPhone ? 30 : 36,
+                        lineHeight: isPhone ? 58 : 66,
+                        paddingHorizontal: 2,
+                      }}
+                    >
+                      {glyph}
+                    </Text>
+                  );
+                })}
+              </View>
             </View>
-          </View>
+          ) : null}
         </View>
 
         <ScrollView
