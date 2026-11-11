@@ -1,182 +1,99 @@
+// Regenerates the native app icons and splash logo from the website logo (public/icon.png), so the
+// installed app and hafizquran.app share one mark. Run with `node scripts/generate-icons.mjs`.
+// app.json and android/app/src/main/res/values/colors.xml keep the white icon and splash background.
 import sharp from "sharp";
 import path from "path";
 import { fileURLToPath } from "url";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const OUTPUT_DIR = path.join(__dirname, "..", "assets", "images");
+const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
+const IMAGES = path.join(ROOT, "assets", "images");
+const RES = path.join(ROOT, "android", "app", "src", "main", "res");
+const SOURCE = path.join(ROOT, "public", "icon.png");
 
-const TEAL = "#003638";
-const GOLD = "#FDDC91";
+// The logo is drawn in two inks on white; each pixel is un-mixed from white against the nearer ink.
+const INKS = [
+  [13, 66, 82], // navy
+  [195, 165, 111], // gold
+];
+// The adaptive icon mask always shows the 66dp circle of the 108dp layer; the logo's diagonal fills it.
+const SAFE_DIAGONAL = 0.61;
+const DENSITIES = { mdpi: 1, hdpi: 1.5, xhdpi: 2, xxhdpi: 3, xxxhdpi: 4 };
 
-/**
- * Creates an SVG string for the open book icon.
- * The book is designed on a 1024x1024 canvas.
- * Two curved pages meeting at a spine, like an open Mushaf.
- */
-function bookIconSvg({ size, bookColor, bgColor, bgOpacity = 1, padding = 0, monochrome = false }) {
-  const bg =
-    bgOpacity > 0 && bgColor
-      ? `<rect width="${size}" height="${size}" rx="0" fill="${bgColor}" fill-opacity="${bgOpacity}"/>`
-      : "";
-
-  // Apply padding (fraction of size)
-  const pad = size * padding;
-  const effectiveScale = (size - 2 * pad) / 1024;
-  const tx = pad;
-  const ty = pad;
-
-  let book;
-  if (monochrome) {
-    // For Android monochrome: clean silhouette, no detail lines.
-    // Android uses the alpha channel and tints with the device theme color.
-    book = `
-    <g transform="translate(${tx}, ${ty}) scale(${effectiveScale})">
-      <!-- Left page -->
-      <path d="
-        M 509 280
-        C 477 270, 380 260, 290 290
-        Q 270 298, 270 320
-        L 270 700
-        Q 270 722, 290 715
-        C 380 685, 477 690, 509 700
-        Z
-      " fill="${bookColor}"/>
-      <!-- Right page -->
-      <path d="
-        M 515 280
-        C 547 270, 644 260, 734 290
-        Q 754 298, 754 320
-        L 754 700
-        Q 754 722, 734 715
-        C 644 685, 547 690, 515 700
-        Z
-      " fill="${bookColor}"/>
-    </g>
-    `;
-  } else {
-    // The book paths designed on a 1024x1024 canvas:
-    // Left page — curved left side, straight spine
-    // Right page — straight spine, curved right side
-    // Spine line down the center + detail lines for texture
-    book = `
-    <g transform="translate(${tx}, ${ty}) scale(${effectiveScale})">
-      <!-- Left page -->
-      <path d="
-        M 512 280
-        C 480 270, 380 260, 290 290
-        Q 270 298, 270 320
-        L 270 700
-        Q 270 722, 290 715
-        C 380 685, 480 690, 512 700
-        Z
-      " fill="${bookColor}"/>
-      <!-- Right page -->
-      <path d="
-        M 512 280
-        C 544 270, 644 260, 734 290
-        Q 754 298, 754 320
-        L 754 700
-        Q 754 722, 734 715
-        C 644 685, 544 690, 512 700
-        Z
-      " fill="${bookColor}"/>
-      <!-- Spine -->
-      <line x1="512" y1="290" x2="512" y2="700" stroke="${bgColor || TEAL}" stroke-width="5" stroke-opacity="0.4"/>
-      <!-- Page detail lines - left -->
-      <line x1="330" y1="370" x2="490" y2="350" stroke="${bgColor || TEAL}" stroke-width="3" stroke-opacity="0.15"/>
-      <line x1="330" y1="420" x2="490" y2="400" stroke="${bgColor || TEAL}" stroke-width="3" stroke-opacity="0.15"/>
-      <line x1="330" y1="470" x2="490" y2="450" stroke="${bgColor || TEAL}" stroke-width="3" stroke-opacity="0.15"/>
-      <line x1="330" y1="520" x2="490" y2="500" stroke="${bgColor || TEAL}" stroke-width="3" stroke-opacity="0.15"/>
-      <line x1="330" y1="570" x2="490" y2="550" stroke="${bgColor || TEAL}" stroke-width="3" stroke-opacity="0.15"/>
-      <!-- Page detail lines - right -->
-      <line x1="534" y1="350" x2="694" y2="370" stroke="${bgColor || TEAL}" stroke-width="3" stroke-opacity="0.15"/>
-      <line x1="534" y1="400" x2="694" y2="420" stroke="${bgColor || TEAL}" stroke-width="3" stroke-opacity="0.15"/>
-      <line x1="534" y1="450" x2="694" y2="470" stroke="${bgColor || TEAL}" stroke-width="3" stroke-opacity="0.15"/>
-      <line x1="534" y1="500" x2="694" y2="520" stroke="${bgColor || TEAL}" stroke-width="3" stroke-opacity="0.15"/>
-      <line x1="534" y1="550" x2="694" y2="570" stroke="${bgColor || TEAL}" stroke-width="3" stroke-opacity="0.15"/>
-    </g>
-    `;
+async function transparentLogo() {
+  const { data, info } = await sharp(SOURCE).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  const out = Buffer.alloc(info.width * info.height * 4);
+  for (let i = 0, o = 0; i < data.length; i += 3, o += 4) {
+    let best = { alpha: 0, error: Infinity, ink: INKS[0] };
+    for (const ink of INKS) {
+      let dot = 0;
+      let norm = 0;
+      for (let c = 0; c < 3; c++) {
+        dot += (255 - data[i + c]) * (255 - ink[c]);
+        norm += (255 - ink[c]) ** 2;
+      }
+      const alpha = Math.min(1, Math.max(0, dot / norm));
+      let error = 0;
+      for (let c = 0; c < 3; c++) error += (data[i + c] - (alpha * ink[c] + (1 - alpha) * 255)) ** 2;
+      if (error < best.error) best = { alpha, error, ink };
+    }
+    out.set([...best.ink, best.alpha < 0.02 ? 0 : Math.round(best.alpha * 255)], o);
   }
-
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${bg}${book}</svg>`;
+  return sharp(out, { raw: { width: info.width, height: info.height, channels: 4 } })
+    .png()
+    .toBuffer()
+    .then((png) => sharp(png).trim({ background: { r: 0, g: 0, b: 0, alpha: 0 }, threshold: 1 }).png().toBuffer({ resolveWithObject: true }));
 }
 
-async function generate() {
-  console.log("Generating icons...\n");
+const logo = await transparentLogo();
+const { width: logoWidth, height: logoHeight } = logo.info;
 
-  // 1. App icon (1024x1024) — gold book on teal background
-  const iconSvg = bookIconSvg({
-    size: 1024,
-    bookColor: GOLD,
-    bgColor: TEAL,
-  });
-  await sharp(Buffer.from(iconSvg))
+/** The logo centered on a transparent square, scaled by its diagonal or its longer side. */
+async function placed(size, { diagonal, longSide }) {
+  const scale = diagonal ? (diagonal * size) / Math.hypot(logoWidth, logoHeight) : (longSide * size) / Math.max(logoWidth, logoHeight);
+  const width = Math.round(logoWidth * scale);
+  const height = Math.round(logoHeight * scale);
+  const resized = await sharp(logo.data).resize(width, height).toBuffer();
+  return sharp({ create: { width: size, height: size, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+    .composite([{ input: resized, left: Math.floor((size - width) / 2), top: Math.floor((size - height) / 2) }])
     .png()
-    .toFile(path.join(OUTPUT_DIR, "icon.png"));
-  console.log("  icon.png (1024x1024)");
-
-  // 2. Splash icon (200x200) — teal book on transparent background
-  const splashSvg = bookIconSvg({
-    size: 200,
-    bookColor: TEAL,
-    bgColor: null,
-    bgOpacity: 0,
-  });
-  await sharp(Buffer.from(splashSvg))
-    .png()
-    .toFile(path.join(OUTPUT_DIR, "splash-icon.png"));
-  console.log("  splash-icon.png (200x200)");
-
-  // 3. Android adaptive icon foreground (1024x1024) — gold book centered with safe zone padding
-  const fgSvg = bookIconSvg({
-    size: 1024,
-    bookColor: GOLD,
-    bgColor: null,
-    bgOpacity: 0,
-    padding: 0.3,
-  });
-  await sharp(Buffer.from(fgSvg))
-    .png()
-    .toFile(path.join(OUTPUT_DIR, "android-icon-foreground.png"));
-  console.log("  android-icon-foreground.png (1024x1024)");
-
-  // 4. Android adaptive icon background (1024x1024) — solid teal
-  const bgSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024"><rect width="1024" height="1024" fill="${TEAL}"/></svg>`;
-  await sharp(Buffer.from(bgSvg))
-    .png()
-    .toFile(path.join(OUTPUT_DIR, "android-icon-background.png"));
-  console.log("  android-icon-background.png (1024x1024)");
-
-  // 5. Android monochrome (1024x1024) — white book silhouette on transparent background
-  //    Android tints the alpha channel with the device theme color at runtime
-  const monoSvg = bookIconSvg({
-    size: 1024,
-    bookColor: "#FFFFFF",
-    bgColor: null,
-    bgOpacity: 0,
-    padding: 0.3,
-    monochrome: true,
-  });
-  await sharp(Buffer.from(monoSvg))
-    .png()
-    .toFile(path.join(OUTPUT_DIR, "android-icon-monochrome.png"));
-  console.log("  android-icon-monochrome.png (1024x1024)");
-
-  // 6. Favicon (48x48) — gold book on teal background
-  const faviconSvg = bookIconSvg({
-    size: 48,
-    bookColor: GOLD,
-    bgColor: TEAL,
-  });
-  await sharp(Buffer.from(faviconSvg))
-    .png()
-    .toFile(path.join(OUTPUT_DIR, "favicon.png"));
-  console.log("  favicon.png (48x48)");
-
-  console.log("\nAll icons generated successfully!");
+    .toBuffer();
 }
 
-generate().catch((err) => {
-  console.error("Error generating icons:", err);
-  process.exit(1);
-});
+const onWhite = (png) => sharp(png).flatten({ background: "#FFFFFF" });
+// Android tints the monochrome layer from its alpha, so the logo becomes a white silhouette.
+const monochrome = async (png) => {
+  const { width, height } = await sharp(png).metadata();
+  const alpha = await sharp(png).extractChannel(3).toBuffer();
+  return sharp({ create: { width, height, channels: 3, background: "#FFFFFF" } }).joinChannel(alpha).png();
+};
+const circle = (size) => Buffer.from(`<svg width="${size}" height="${size}"><circle cx="${size / 2}" cy="${size / 2}" r="${size / 2}"/></svg>`);
+
+const foreground = await placed(1024, { diagonal: SAFE_DIAGONAL });
+await sharp(foreground).toFile(path.join(IMAGES, "android-icon-foreground.png"));
+await (await monochrome(foreground)).toFile(path.join(IMAGES, "android-icon-monochrome.png"));
+await sharp({ create: { width: 1024, height: 1024, channels: 4, background: "#FFFFFF" } }).png().toFile(path.join(IMAGES, "android-icon-background.png"));
+await onWhite(await placed(1024, { longSide: 0.71 })).png().toFile(path.join(IMAGES, "icon.png"));
+await sharp(await placed(200, { longSide: 0.9 })).toFile(path.join(IMAGES, "splash-icon.png"));
+
+for (const [density, factor] of Object.entries(DENSITIES)) {
+  const layer = Math.round(108 * factor);
+  const fg = await sharp(await placed(layer * 4, { diagonal: SAFE_DIAGONAL })).resize(layer, layer).png().toBuffer();
+  await sharp(fg).webp({ lossless: true }).toFile(path.join(RES, `mipmap-${density}`, "ic_launcher_foreground.webp"));
+  await (await monochrome(fg)).webp({ lossless: true }).toFile(path.join(RES, `mipmap-${density}`, "ic_launcher_monochrome.webp"));
+
+  // Launchers before Android 8 use the square and round bitmaps.
+  const legacy = Math.round(48 * factor);
+  const square = await onWhite(await placed(legacy * 4, { longSide: 0.72 })).resize(legacy, legacy).png().toBuffer();
+  await sharp(square).webp({ lossless: true }).toFile(path.join(RES, `mipmap-${density}`, "ic_launcher.webp"));
+  await sharp(square)
+    .ensureAlpha()
+    .composite([{ input: circle(legacy), blend: "dest-in" }])
+    .webp({ lossless: true })
+    .toFile(path.join(RES, `mipmap-${density}`, "ic_launcher_round.webp"));
+
+  // Android 12+ splash: a 288dp canvas whose visible circle is 192dp.
+  const splash = Math.round(288 * factor);
+  await sharp(await placed(splash, { longSide: 0.42 })).toFile(path.join(RES, `drawable-${density}`, "splashscreen_logo.png"));
+}
+
+console.log("Icons generated from public/icon.png");
