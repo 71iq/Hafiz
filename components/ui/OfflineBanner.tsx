@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { Animated, View, Text } from "react-native";
 import { useColorScheme } from "nativewind";
 import { useNetInfo } from "@react-native-community/netinfo";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WifiOff } from "lucide-react-native";
 import { useSettings, withThemeOpacity } from "@/lib/settings/context";
 import { useReducedMotionPreference } from "@/lib/ui/reduced-motion";
@@ -26,6 +27,7 @@ export function OfflineBanner({ uiLanguage }: Props) {
   const isDark = colorScheme === "dark";
 
   const netInfo = useNetInfo();
+  const insets = useSafeAreaInsets();
   const isOffline = netInfo.isConnected === false;
   const reduceMotion = useReducedMotionPreference();
 
@@ -74,9 +76,13 @@ export function OfflineBanner({ uiLanguage }: Props) {
   return (
     <Animated.View
       pointerEvents="none"
+      aria-hidden={!isOffline}
+      accessibilityElementsHidden={!isOffline}
+      importantForAccessibility={isOffline ? "auto" : "no-hide-descendants"}
       style={{
         position: "absolute",
-        top: 0,
+        // Edge-to-edge Android draws under the status bar.
+        top: insets.top,
         left: 0,
         right: 0,
         zIndex: 50,
