@@ -207,9 +207,9 @@ export function ResponsiveOverlay({
       maxWidth: activePresentation === "sheet" ? "100%" : contentWidth,
       maxHeight: computedMaxHeight,
       height: activePresentation === "sheet" && isPhone ? computedMaxHeight : undefined,
-      // Lets a fixed-height sheet shrink above the keyboard instead of being pushed off screen.
-      flexShrink: 1,
-      minHeight: 0,
+      // Lets a fixed-height phone sheet shrink above the keyboard instead of being pushed off screen.
+      // Content-sized dialogs and panels must not shrink: their flex-1 bodies would collapse to zero.
+      ...(activePresentation === "sheet" && isPhone ? { flexShrink: 1, minHeight: 0 } : null),
       backgroundColor: resolvedSurfaceColor,
       borderTopLeftRadius: activePresentation === "sheet" ? 28 : 28,
       borderTopRightRadius: activePresentation === "sheet" ? 28 : 28,
