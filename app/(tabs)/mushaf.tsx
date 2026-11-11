@@ -468,13 +468,12 @@ function MushafInner() {
   const sliderAnimStyle = useAnimatedStyle(() => ({
     opacity: 1 - headerHidden.value,
   }));
-  const onHeaderLayout = useCallback(
-    (e: { nativeEvent: { layout: { height: number } } }) => {
-      const h = e.nativeEvent.layout.height;
-      if (h > 0 && measuredHeaderH == null) setMeasuredHeaderH(h);
-    },
-    [measuredHeaderH]
-  );
+  // Follows the header's natural height. Keeping only the first measurement froze a height taken
+  // while the toolbar row was still wrapping, which left a tall empty band above page view.
+  const onHeaderLayout = useCallback((e: { nativeEvent: { layout: { height: number } } }) => {
+    const h = Math.round(e.nativeEvent.layout.height);
+    if (h > 0) setMeasuredHeaderH((current) => (current === h ? current : h));
+  }, []);
 
   const [items, setItems] = useState<MushafItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1135,7 +1134,10 @@ function MushafInner() {
     shadowOffset: { width: 0, height: 8 },
     elevation: 10,
   } as const;
-  const pageHeaderOverlayStyle = isPageMode
+  // Vertical page view keeps the toolbar in the layout, as verse view does, so it never covers the
+  // top of a page. Only horizontal paging floats it: those pages are fitted to the screen height and
+  // must not re-fit when the toolbar hides.
+  const pageHeaderOverlayStyle = isPageMode && pageScroll === "horizontal"
     ? ({
         position: Platform.OS === "web" && (isPhone || isTablet) ? ("fixed" as any) : "absolute",
         // An absolute child ignores the SafeAreaView's top padding, so native must add the inset
