@@ -1114,7 +1114,9 @@ export function PageMushaf({
   const renderPage = useCallback(
     ({ item, index }: { item: PageData; index: number }) => {
       return (
-        <View>
+        // A page waiting for its font renders a small placeholder; holding the computed height keeps
+        // later pages at the offsets getItemLayout reports, so jumps and the page number stay right.
+        <View style={layoutInfo ? { minHeight: layoutInfo.heights[index] } : undefined}>
           <MushafPage
             pageNumber={item.page}
             ayahs={item.ayahs}
@@ -1151,6 +1153,7 @@ export function PageMushaf({
       );
     },
     [
+      layoutInfo,
       surahMap,
       fontSize,
       lineHeight,
