@@ -2,7 +2,7 @@
   "expo": {
     "name": "Hafiz",
     "slug": "hafiz",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "hafiz",
@@ -24,7 +24,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.anonymous.hafiz",
-      "versionCode": 1
+      "versionCode": 2
     },
     "web": {
       "bundler": "metro",
