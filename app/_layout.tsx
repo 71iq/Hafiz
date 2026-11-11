@@ -76,10 +76,13 @@ export default function RootLayout() {
       SplashScreen.hideAsync().catch(() => {});
       return;
     }
+    // A failed UI font load must not leave a blank screen: render with system fonts instead.
     Font.loadAsync(UI_FONTS)
-      .then(() => setFontsLoaded(true))
       .catch(console.error)
-      .finally(() => SplashScreen.hideAsync());
+      .finally(() => {
+        setFontsLoaded(true);
+        SplashScreen.hideAsync().catch(() => {});
+      });
   }, []);
 
   // Initialize auth (restore session) on mount
