@@ -219,15 +219,16 @@ export function GoToNavigator({
                 {surah.name_english}
               </Text>
             </View>
+            {/* Sized by its own text with an explicit family: Android cut the last letter of
+                content-sized Arabic names measured with the default family ("الكه" for "الكهف"). */}
             <Text
               className="text-charcoal dark:text-neutral-300"
               style={{
+                flexShrink: 0,
+                fontFamily: "Manrope_500Medium",
                 fontSize: 20,
                 lineHeight: 38,
-                writingDirection: "rtl",
                 paddingHorizontal: 10,
-                textAlign: "right",
-                overflow: "visible",
               }}
             >
               {surah.name_arabic}
