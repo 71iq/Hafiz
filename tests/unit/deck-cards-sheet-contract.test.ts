@@ -16,6 +16,6 @@ describe("DeckCardsSheet layout contract", () => {
   it("keeps the cards table full width while preserving horizontal overflow on narrow screens", () => {
     expect(source).toContain('style={{ width: "100%" }}');
     expect(source).toContain('contentContainerStyle={{ flexGrow: 1, minWidth: "100%" }}');
-    expect(source).toContain('style={{ minWidth: 620, width: "100%" }}');
+    expect(source).toContain('style={{ minWidth: 320, width: "100%" }}');
   });
 });

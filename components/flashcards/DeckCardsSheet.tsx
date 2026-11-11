@@ -6,7 +6,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { DropdownMenu, type DropdownMenuItem } from "@/components/ui/DropdownMenu";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import { useDatabase } from "@/lib/database/provider";
-import { useStrings } from "@/lib/i18n/useStrings";
+import { interpolate, useStrings } from "@/lib/i18n/useStrings";
 import type { UIStrings } from "@/lib/i18n/strings";
 import {
   deleteStudyCard,
@@ -42,6 +42,8 @@ type Filter =
   | "marked"
   | "suspended"
   | "buried";
+
+const DECK_CARDS_PAGE = 100;
 
 const CARD_FILTERS: Filter[] = [
   "all",
@@ -117,6 +119,14 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
       return card.searchText.toLowerCase().includes(needle);
     });
   }, [cards, filter, query]);
+
+  // A deck can hold 6,236 cards; rendering every row at once stalled the sheet on phones. Rows are
+  // shown a page at a time, and a new deck, search or filter starts again from the first page.
+  const pageKey = `${deckId}|${filter}|${query}`;
+  const [paging, setPaging] = useState({ key: pageKey, count: DECK_CARDS_PAGE });
+  const shownCount = paging.key === pageKey ? paging.count : DECK_CARDS_PAGE;
+  const shownCards = filteredCards.slice(0, shownCount);
+  const hiddenCount = filteredCards.length - shownCards.length;
 
   const runAction = useCallback(async (card: DeckCardListItem, action: () => Promise<void>) => {
     if (!deckId || busyId) return;
@@ -238,7 +248,8 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
             >
               <View
                 className="rounded-2xl border border-warm-200 dark:border-neutral-800 overflow-hidden"
-                style={{ minWidth: 620, width: "100%" }}
+                // Columns flex to fit a phone; the minimum only scrolls on screens narrower than the four columns.
+                style={{ minWidth: 320, width: "100%" }}
               >
                 <DeckCardsHeader isRTL={isRTL} s={s} rowFlexStyle={rowFlexStyle} />
                 {loading ? (
@@ -246,7 +257,7 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
                 ) : filteredCards.length === 0 ? (
                   <TableMessage text={s.deckCardsEmpty} isRTL={isRTL} />
                 ) : (
-                  filteredCards.map((card) => (
+                  shownCards.map((card) => (
                     <DeckCardRow
                       key={card.id}
                       card={card}
@@ -280,6 +291,20 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
                 )}
               </View>
             </ScrollView>
+            {!loading && hiddenCount > 0 ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setPaging({ key: pageKey, count: shownCount + DECK_CARDS_PAGE })}
+                className="items-center rounded-2xl bg-surface-low dark:bg-surface-dark-low py-3"
+              >
+                <Text
+                  className="text-primary-accent dark:text-primary-bright"
+                  style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13 }}
+                >
+                  {interpolate(s.deckCardsShowMore, { count: hiddenCount })}
+                </Text>
+              </Pressable>
+            ) : null}
           </View>
         </OverlayBody>
       </ResponsiveSheet>
