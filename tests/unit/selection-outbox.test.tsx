@@ -8,6 +8,7 @@ import {
   replaceAyahHighlight,
 } from "@/lib/selection/queries";
 import { SelectionProvider, useSelection } from "@/lib/selection/context";
+import { OperationNoticeProvider } from "@/components/ui/OperationNoticeProvider";
 import type { AppDatabase } from "@/lib/database/types";
 import { openOutboxDatabase, type OutboxDatabase } from "@/tests/jest/outbox-sqlite";
 
@@ -134,7 +135,11 @@ describe("RF-175 bookmarks, highlights and their upload queues", () => {
   });
 
   it("reports a failed bookmark to the action bar instead of returning silently", async () => {
-    const wrapper = ({ children }: { children: React.ReactNode }) => <SelectionProvider>{children}</SelectionProvider>;
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <OperationNoticeProvider ready>
+        <SelectionProvider>{children}</SelectionProvider>
+      </OperationNoticeProvider>
+    );
     const { result } = renderHook(() => useSelection(), { wrapper });
     // The owner runs work in order, so this read settles after the provider's initial loads.
     await act(async () => {

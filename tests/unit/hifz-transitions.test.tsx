@@ -16,7 +16,7 @@ const mockForbidden = jest.fn<never, unknown[]>(() => {
   throw new Error("Unexpected fixture side effect");
 });
 const mockWord = { navigateToAyah: null, detailWord: null, setNavigateToAyah: jest.fn(), closeDetail: jest.fn() };
-const mockSelection = { selection: null, toastMessage: null, dismissToast: jest.fn() };
+const mockSelection = { selection: null };
 const mockChrome = { visible: true, setVisible: jest.fn(), setImmersive: jest.fn() };
 const pageSQL = "SELECT surah, ayah, text_qcf2 FROM quran_text WHERE v2_page = ? ORDER BY surah, ayah";
 const mockDatabase = {

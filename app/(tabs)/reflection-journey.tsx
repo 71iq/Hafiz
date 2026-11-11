@@ -14,7 +14,6 @@ import { BookMarked, Lock, Sparkles } from "lucide-react-native";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { Toast } from "@/components/ui/Toast";
 import { JourneyAyahCard } from "@/components/reflection-journey/JourneyAyahCard";
 import { useDatabase } from "@/lib/database/provider";
 import { useStrings, interpolate } from "@/lib/i18n/useStrings";
@@ -47,7 +46,7 @@ function ReflectionJourneyInner() {
   const s = useStrings();
   const { isDark, isRTL, uiLanguage } = useSettings();
   const { width } = useWindowDimensions();
-  const { toastMessage, dismissToast, showToast } = useSelection();
+  const { showToast } = useSelection();
   const [levels, setLevels] = useState<ReflectionJourneyLevelListItem[]>([]);
   const [selectedLevelId, setSelectedLevelId] = useState<string | null>(null);
   const [responseText, setResponseText] = useState("");
@@ -398,7 +397,6 @@ function ReflectionJourneyInner() {
         </View>
       </ScrollView>
 
-      {toastMessage ? <Toast message={toastMessage} onDismiss={dismissToast} /> : null}
     </SafeAreaView>
   );
 }

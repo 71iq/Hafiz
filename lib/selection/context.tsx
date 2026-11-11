@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
 import { useDatabase } from "@/lib/database/provider";
+import { useOperationNotice } from "@/components/ui/OperationNoticeProvider";
 import { hapticLight } from "@/lib/haptics";
 import type { Selection, HighlightEntry, BookmarkEntry } from "./types";
 import {
@@ -18,7 +19,6 @@ type SelectionContextType = {
   highlights: Map<string, HighlightEntry[]>;
   bookmarks: Set<string>;
   bookmarksList: BookmarkEntry[];
-  toastMessage: string | null;
   selectAyah: (surah: number, ayah: number) => void;
   clearSelection: () => void;
   addHighlightForSelection: (color: string) => Promise<void>;
@@ -26,7 +26,6 @@ type SelectionContextType = {
   removeHighlightForSelection: () => Promise<void>;
   toggleBookmarkForSelection: () => Promise<"added" | "removed" | null>;
   showToast: (msg: string) => void;
-  dismissToast: () => void;
   refreshHighlights: () => Promise<void>;
   refreshBookmarks: () => Promise<void>;
   isBookmarked: (surah: number, ayah: number) => boolean;
@@ -39,7 +38,6 @@ const SelectionContext = createContext<SelectionContextType>({
   highlights: new Map(),
   bookmarks: new Set(),
   bookmarksList: [],
-  toastMessage: null,
   selectAyah: () => {},
   clearSelection: () => {},
   addHighlightForSelection: async () => {},
@@ -47,7 +45,6 @@ const SelectionContext = createContext<SelectionContextType>({
   removeHighlightForSelection: async () => {},
   toggleBookmarkForSelection: async () => null,
   showToast: () => {},
-  dismissToast: () => {},
   refreshHighlights: async () => {},
   refreshBookmarks: async () => {},
   isBookmarked: () => false,
@@ -69,7 +66,6 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
   const [highlights, setHighlights] = useState<Map<string, HighlightEntry[]>>(new Map());
   const [bookmarks, setBookmarks] = useState<Set<string>>(new Set());
   const [bookmarksList, setBookmarksList] = useState<BookmarkEntry[]>([]);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -187,13 +183,9 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
     [selection, db, bookmarks, refreshBookmarks]
   );
 
-  const showToast = useCallback((msg: string) => {
-    setToastMessage(msg);
-  }, []);
-
-  const dismissToast = useCallback(() => {
-    setToastMessage(null);
-  }, []);
+  // Feedback goes through the root notice owner, which renders inside the top sheet. A toast kept in
+  // the reader screen sits behind an open sheet's Android Modal window and is never seen.
+  const showToast = useOperationNotice();
 
   const isBookmarked = useCallback(
     (surah: number, ayah: number): boolean => bookmarks.has(ayahKey(surah, ayah)),
@@ -228,7 +220,6 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
         highlights,
         bookmarks,
         bookmarksList,
-        toastMessage,
         selectAyah,
         clearSelection,
         addHighlightForSelection,
@@ -236,7 +227,6 @@ export function SelectionProvider({ children }: { children: React.ReactNode }) {
         removeHighlightForSelection,
         toggleBookmarkForSelection,
         showToast,
-        dismissToast,
         refreshHighlights,
         refreshBookmarks,
         isBookmarked,

@@ -278,7 +278,7 @@ function MushafInner() {
   const isTablet = windowWidth >= SIDEBAR_BREAKPOINT && windowWidth < VIEWPORT_BREAKPOINTS.desktop;
   // Compact layout under ~480px tightens phone chrome spacing.
   const isNarrow = windowWidth < 480;
-  const { selection, toastMessage, dismissToast } = useSelection();
+  const { selection } = useSelection();
   const { navigateToAyah, detailWord } = useWordInteraction();
   const { visible: chromeVisible, setVisible: setChromeVisible, setImmersive } = useChrome();
   const lastScrollYRef = useRef(0);
@@ -1395,14 +1395,7 @@ function MushafInner() {
     const name = uiLanguage === "ar" ? sm?.name_arabic : sm?.name_english;
     return { name: name ?? null, juz, hizb };
   })();
-  const activeToastMessage = toastMessage ?? focusToastMessage;
-  const dismissActiveToast = useCallback(() => {
-    if (toastMessage) {
-      dismissToast();
-      return;
-    }
-    setFocusToastMessage(null);
-  }, [dismissToast, toastMessage]);
+  const dismissFocusToast = useCallback(() => setFocusToastMessage(null), []);
 
   if (loading && !isPageMode) {
     return (
@@ -1932,7 +1925,7 @@ function MushafInner() {
         )}
 
         {/* Toast notifications */}
-        <Toast message={activeToastMessage} onDismiss={dismissActiveToast} />
+        <Toast message={focusToastMessage} onDismiss={dismissFocusToast} />
       </SafeAreaView>
     </>
   );
