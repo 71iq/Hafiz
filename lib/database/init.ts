@@ -207,6 +207,42 @@ async function clearPartialContentImport(db: AppDatabase): Promise<void> {
   await db.execAsync("DELETE FROM tafseer WHERE source IN ('muyassar', 'zilal')");
 }
 
+const BASMALA_SEARCH_PREFIX = "بسم الله الرحمن الرحيم ";
+
+function dropFirstWords(text: string, count: number): string {
+  return text.split(" ").slice(count).join(" ");
+}
+
+/**
+ * The bundled plain text once prefixed ayah 1 of every surah except Al-Fatiha and At-Tawba with the
+ * Basmala, so copying, searching or reviewing 2:1 gave "بسم الله الرحمن الرحيم الم". The Basmala
+ * opens the surah but is not part of that ayah (Al-Fatiha 1:1 is the exception). The bundled data is
+ * corrected; this removes the prefix from databases imported before the correction.
+ */
+export async function removeBasmalaPrefixFromFirstAyahs(db: AppDatabase): Promise<number> {
+  const probe = await db.getFirstAsync<{ text_search: string }>(
+    "SELECT text_search FROM quran_text WHERE surah = 2 AND ayah = 1",
+  );
+  if (!probe?.text_search?.startsWith(BASMALA_SEARCH_PREFIX)) return 0;
+  const rows = await db.getAllAsync<{ surah: number; text_uthmani: string; text_clean: string; text_search: string }>(
+    "SELECT surah, text_uthmani, text_clean, text_search FROM quran_text WHERE ayah = 1 AND surah NOT IN (1, 9)",
+  );
+  const updates = rows
+    .filter((row) => row.text_search.startsWith(BASMALA_SEARCH_PREFIX))
+    .map((row) => [
+      dropFirstWords(row.text_uthmani, 4),
+      dropFirstWords(row.text_clean, 4),
+      dropFirstWords(row.text_search, 4),
+      row.surah,
+    ]);
+  await batchInsert(
+    db,
+    "UPDATE quran_text SET text_uthmani = ?, text_clean = ?, text_search = ? WHERE surah = ? AND ayah = 1",
+    updates,
+  );
+  return updates.length;
+}
+
 async function batchInsert(db: AppDatabase, sql: string, rows: any[][], batchSize: number = 500): Promise<void> {
   for (let i = 0; i < rows.length; i += batchSize) {
     const batch = rows.slice(i, i + batchSize);
@@ -1225,6 +1261,9 @@ export async function initializeDatabase(db: AppDatabase, onProgress: ProgressCa
 
     // Create text_search index (must happen after column migration)
     await createTextSearchIndex(db);
+
+    const basmalaFixed = await removeBasmalaPrefixFromFirstAyahs(db);
+    if (basmalaFixed > 0) console.log(`[Import] Removed the Basmala prefix from ${basmalaFixed} first ayahs`);
 
     // Migrate sync_queue table to add row_id, status, synced_at columns (Phase 6)
     try {
