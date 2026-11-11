@@ -887,6 +887,7 @@ export async function getDeckCardsForList(
     const emptyCard = createEmptyCard(now);
     const nowIso = now.toISOString();
     const items: DeckCardListItem[] = [];
+    const ayahLookup = await loadAyahListLookup(db, candidateIds);
     for (const id of candidateIds) {
       const row = rowById.get(id) ?? {
         id,
@@ -907,7 +908,7 @@ export async function getDeckCardsForList(
         created_at: nowIso,
         updated_at: nowIso,
       };
-      items.push(await decorateDeckCardListItem(db, row, !rowById.has(id)));
+      items.push(await decorateDeckCardListItem(db, row, !rowById.has(id), ayahLookup));
     }
     return items;
   }
@@ -918,16 +919,42 @@ export async function getDeckCardsForList(
   );
   const filteredRows = await filterStudyRowsByDefaultDeckFilter(db, rows);
   const items: DeckCardListItem[] = [];
+  const ayahLookup = await loadAyahListLookup(db, filteredRows.map((row) => row.id));
   for (const row of filteredRows) {
-    items.push(await decorateDeckCardListItem(db, rowWithDefaultStatus(row), false));
+    items.push(await decorateDeckCardListItem(db, rowWithDefaultStatus(row), false, ayahLookup));
   }
   return items;
+}
+
+type AyahListInfo = {
+  text_uthmani: string;
+  text_search: string | null;
+  name_arabic: string;
+  name_english: string;
+  text_en: string | null;
+};
+
+/**
+ * Ayah text, surah names and translation for every ayah, in one query. The retention deck lists up
+ * to 6,236 ayah cards, and three single-row queries per card on the serialized connection kept the
+ * card list loading for many seconds. Loaded only when the list holds ayah cards.
+ */
+async function loadAyahListLookup(db: DatabaseExecutor, cardIds: string[]): Promise<Map<string, AyahListInfo> | null> {
+  if (!cardIds.some((id) => parseStudyCardId(id)?.kind === "ayah")) return null;
+  const rows = await db.getAllAsync<AyahListInfo & { surah: number; ayah: number }>(
+    `SELECT q.surah, q.ayah, q.text_uthmani, q.text_search, s.name_arabic, s.name_english, t.text_en
+       FROM quran_text q
+       JOIN surahs s ON s.number = q.surah
+       LEFT JOIN translations t ON t.surah = q.surah AND t.ayah = q.ayah`,
+  );
+  return new Map(rows.map((row) => [`${row.surah}:${row.ayah}`, row]));
 }
 
 async function decorateDeckCardListItem(
   db: DatabaseExecutor,
   row: StudyCardRow,
-  isVirtual: boolean
+  isVirtual: boolean,
+  ayahLookup: Map<string, AyahListInfo> | null = null
 ): Promise<DeckCardListItem> {
   const normalizedRow = rowWithDefaultStatus(row);
   const smartContent = await getSmartCardContent(db, normalizedRow.id);
@@ -977,7 +1004,10 @@ async function decorateDeckCardListItem(
     };
   }
 
-  const [ayahRow, surahRow, translationRow] = await Promise.all([
+  const cached = parsed.kind === "ayah" ? ayahLookup?.get(`${parsed.surah}:${parsed.ayah}`) : undefined;
+  const [ayahRow, surahRow, translationRow] = cached
+    ? [cached, cached, cached.text_en == null ? null : { text_en: cached.text_en }]
+    : await Promise.all([
     db.getFirstAsync<{ text_uthmani: string; text_search: string | null }>(
       "SELECT text_uthmani, text_search FROM quran_text WHERE surah = ? AND ayah = ?",
       [parsed.surah, parsed.ayah]
