@@ -7,12 +7,8 @@ import { useStrings } from "@/lib/i18n/useStrings";
 import { useDatabase } from "@/lib/database/provider";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
-import {
-  isQuranPageFontLoaded,
-  loadQuranPageFont,
-  quranPageFontName,
-  quranPageFontPaletteStyle,
-} from "@/lib/fonts/loader";
+import { quranPageFontName, quranPageFontPaletteStyle } from "@/lib/fonts/loader";
+import { useQuranPageFontReady } from "@/lib/fonts/use-quran-page-font";
 import { MeaningTab } from "./word-tabs/MeaningTab";
 import { IrabTab } from "./word-tabs/IrabTab";
 import { TasreefTab } from "./word-tabs/TasreefTab";
@@ -46,7 +42,7 @@ export function WordDetailSheet() {
     previous: null,
     next: null,
   });
-  const [wordHeaderFontReady, setWordHeaderFontReady] = useState(false);
+  const wordHeaderFontReady = useQuranPageFontReady(WORD_HEADER_FONT_STYLE, detailWord?.v2Page);
   const [headerMeta, setHeaderMeta] = useState<WordHeaderMeta>({
     wordText: null,
     qcf2Glyph: null,
@@ -129,26 +125,6 @@ export function WordDetailSheet() {
     };
   }, [db, detailWord?.surah, detailWord?.ayah, detailWord?.wordPos]);
 
-  useEffect(() => {
-    if (!detailWord) {
-      setWordHeaderFontReady(false);
-      return;
-    }
-    setWordHeaderFontReady(false);
-    if (isQuranPageFontLoaded(WORD_HEADER_FONT_STYLE, detailWord.v2Page)) {
-      requestAnimationFrame(() => setWordHeaderFontReady(true));
-      return;
-    }
-    let cancelled = false;
-    loadQuranPageFont(WORD_HEADER_FONT_STYLE, detailWord.v2Page)
-      .then(() => {
-        if (!cancelled) requestAnimationFrame(() => setWordHeaderFontReady(true));
-      })
-      .catch(console.warn);
-    return () => {
-      cancelled = true;
-    };
-  }, [detailWord?.v2Page]);
 
   useEffect(() => {
     if (!detailWord) {
@@ -268,6 +244,8 @@ export function WordDetailSheet() {
         <View className="flex-1 min-h-0">
           <View className={`px-4 py-3 flex-shrink-0 ${isRTL ? "items-end" : "items-start"}`}>
             <Text
+              // Remount once the page font exists: Android keeps the fallback typeface of glyphs mounted earlier.
+              key={wordHeaderFontReady ? `font-${headerFontFamily}` : "font-pending"}
               className="text-charcoal dark:text-neutral-100"
               style={{
                 fontFamily: headerFontFamily,

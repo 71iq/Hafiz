@@ -67,12 +67,11 @@ import { toArabicNumber } from "@/lib/arabic";
 import { SETTINGS_CONTENT_MAX_WIDTH } from "@/lib/ui/viewport";
 import { ProfileIdentity } from "@/components/profile/ProfileIdentity";
 import {
-  isQuranPageFontLoaded,
-  loadQuranPageFont,
   quranPageFontName,
   quranPageFontPaletteStyle,
   quranPageMarkerFontPaletteStyle,
 } from "@/lib/fonts/loader";
+import { useQuranPageFontReady } from "@/lib/fonts/use-quran-page-font";
 import { errorMessage } from "@/lib/error-message";
 import { useAppReleaseRow } from "@/components/app-update/use-app-release-row";
 
@@ -147,7 +146,7 @@ export default function SettingsScreen() {
   const accountName = profile?.display_name || profile?.username || user?.email?.split("@")[0] || s.authProfile;
   const fontSizeUsesFittedPageSize = viewMode === "page" && pageScroll === "horizontal";
   const [quranPreview, setQuranPreview] = useState<QuranPreviewAyah | null>(null);
-  const [quranPreviewFontReady, setQuranPreviewFontReady] = useState(false);
+  const quranPreviewFontReady = useQuranPageFontReady(quranFontStyle, quranPreview?.v2Page);
   const fontSizeLevelLabel = isRTL ? toArabicNumber(fontSizeIndex + 1) : String(fontSizeIndex + 1);
   const fontSizeTotalLabel = isRTL ? toArabicNumber(FONT_SIZE_STEPS.length) : String(FONT_SIZE_STEPS.length);
   const TranslationChevron = isRTL ? ChevronLeft : ChevronRight;
@@ -225,23 +224,6 @@ export default function SettingsScreen() {
     };
   }, [db]);
 
-  useEffect(() => {
-    setQuranPreviewFontReady(false);
-    if (!quranPreview) return;
-    if (isQuranPageFontLoaded(quranFontStyle, quranPreview.v2Page)) {
-      requestAnimationFrame(() => setQuranPreviewFontReady(true));
-      return;
-    }
-    let cancelled = false;
-    loadQuranPageFont(quranFontStyle, quranPreview.v2Page)
-      .then(() => {
-        if (!cancelled) requestAnimationFrame(() => setQuranPreviewFontReady(true));
-      })
-      .catch(console.warn);
-    return () => {
-      cancelled = true;
-    };
-  }, [quranFontStyle, quranPreview]);
 
   useEffect(() => {
     const qf = Array.isArray(params.qf) ? params.qf[0] : params.qf;
@@ -559,6 +541,8 @@ export default function SettingsScreen() {
               <View className="bg-surface dark:bg-surface-dark rounded-2xl px-4 py-4">
                 {quranPreview ? (
                   <View
+                    // Remount once the page font exists: Android keeps the fallback typeface of glyphs mounted earlier.
+                    key={quranPreviewFontReady ? `font-${quranPreview.v2Page}-${quranFontStyle}` : "font-pending"}
                     style={{
                       direction: "ltr",
                       flexDirection: "row-reverse",

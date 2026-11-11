@@ -2,14 +2,13 @@ import { useEffect, useState, useCallback, useRef, useMemo, memo } from "react";
 import { ActivityIndicator, View, Text, Pressable, Animated as RNAnimated, Platform, ScrollView, useWindowDimensions } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import {
-  isQuranPageFontLoaded,
-  loadQuranPageFont,
   quranPageFontName,
   quranPageMarkerFontPaletteStyle,
   quranPageFontPaletteStyle,
 } from "@/lib/fonts/loader";
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
+import { useQuranPageFontReady } from "@/lib/fonts/use-quran-page-font";
 import { useSelection } from "@/lib/selection/context";
 import { WordToken } from "./WordToken";
 import { AyahWordText } from "./WordSpan";
@@ -86,9 +85,7 @@ function AyahBlockInner({
   const { isBookmarked, getHighlightColor, getWordHighlightColor, showToast, refreshBookmarks, selectAyah } = useSelection();
   const { getAyahState, toggleAyah } = useAyahAudio();
 
-  const [fontVisible, setFontVisible] = useState(() =>
-    isQuranPageFontLoaded(quranFontStyle, v2Page)
-  );
+  const fontVisible = useQuranPageFontReady(quranFontStyle, v2Page);
   const [revealed, setRevealed] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailTab, setDetailTab] = useState<AyahDetailTabKey>("hadith");
@@ -117,22 +114,6 @@ function AyahBlockInner({
     };
   }, [text]);
 
-  useEffect(() => {
-    setFontVisible(false);
-    if (isQuranPageFontLoaded(quranFontStyle, v2Page)) {
-      requestAnimationFrame(() => setFontVisible(true));
-      return;
-    }
-    let cancelled = false;
-    loadQuranPageFont(quranFontStyle, v2Page).then(() => {
-      if (!cancelled) {
-        requestAnimationFrame(() => setFontVisible(true));
-      }
-    }).catch(console.warn);
-    return () => {
-      cancelled = true;
-    };
-  }, [quranFontStyle, v2Page]);
 
   useEffect(() => {
     setRevealed(false);
@@ -245,7 +226,7 @@ function AyahBlockInner({
       <View
         className={isRTL ? "flex-row-reverse items-center justify-between gap-3" : "flex-row items-center justify-between gap-3"}
         style={{
-          paddingTop: isPhone ? 34 : 28,
+          paddingTop: isPhone ? 4 : 8,
         }}
       >
         <View className={isRTL ? "flex-row-reverse items-center gap-1.5" : "flex-row items-center gap-1.5"}>
@@ -322,7 +303,9 @@ function AyahBlockInner({
         </Pressable>
       ) : (
         <View
-          className={isPhone ? "pt-8 pb-1" : "pt-6 pb-1"}
+          // Remount once the page font exists: Android keeps the fallback typeface of glyphs mounted earlier.
+          key={fontVisible ? `font-${v2Page}` : "font-pending"}
+          className={isPhone ? "pt-5 pb-1" : "pt-6 pb-1"}
           style={{ opacity: fontVisible ? 1 : 0, direction: "ltr", alignItems: "flex-end", paddingHorizontal: 3, alignSelf: "stretch", width: "100%" }}
         >
           {Platform.OS === "android" && !hideMode ? (

@@ -1,13 +1,11 @@
-import { useEffect, useState } from "react";
 import { Text, View } from "react-native";
 import {
-  isQuranPageFontLoaded,
-  loadQuranPageFont,
   quranPageFontName,
   quranPageMarkerFontPaletteStyle,
   quranPageFontPaletteStyle,
 } from "@/lib/fonts/loader";
 import { useSettings } from "@/lib/settings/context";
+import { useQuranPageFontReady } from "@/lib/fonts/use-quran-page-font";
 
 type Props = {
   textQcf2: string;
@@ -30,22 +28,7 @@ export function Qcf2AyahText({
   showAyahMarker = true,
 }: Props) {
   const { quranFontStyle, showAyahMarkers, quranMarkerStyle, effectiveTheme } = useSettings();
-  const [visible, setVisible] = useState(() => isQuranPageFontLoaded(quranFontStyle, v2Page));
-
-  useEffect(() => {
-    setVisible(false);
-    if (isQuranPageFontLoaded(quranFontStyle, v2Page)) {
-      requestAnimationFrame(() => setVisible(true));
-      return;
-    }
-    let cancelled = false;
-    loadQuranPageFont(quranFontStyle, v2Page).then(() => {
-      if (!cancelled) requestAnimationFrame(() => setVisible(true));
-    }).catch(console.warn);
-    return () => {
-      cancelled = true;
-    };
-  }, [quranFontStyle, v2Page]);
+  const visible = useQuranPageFontReady(quranFontStyle, v2Page);
 
   const allTokens = textQcf2.split(" ").filter(Boolean);
   const tokens = showAyahMarker && showAyahMarkers ? allTokens : allTokens.slice(0, -1);
@@ -62,6 +45,8 @@ export function Qcf2AyahText({
 
   return (
     <View
+      // Remount once the page font exists: Android keeps the fallback typeface of glyphs mounted earlier.
+      key={visible ? `font-${fontFamily}` : "font-pending"}
       style={{
         direction: "ltr",
         flexDirection: "row-reverse",

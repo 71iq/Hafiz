@@ -9,9 +9,8 @@ import { HadithTab } from "@/components/mushaf/ayah-tabs/HadithTab";
 import { PrivateNotesSection } from "@/components/notes/PrivateNotesSection";
 import { TafsirSourcePicker } from "@/components/settings/TafsirSourcePicker";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
+import { useQuranPageFontReady } from "@/lib/fonts/use-quran-page-font";
 import {
-  isQuranPageFontLoaded,
-  loadQuranPageFont,
   quranPageFontName,
   quranPageMarkerFontPaletteStyle,
   quranPageFontPaletteStyle,
@@ -85,7 +84,6 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
   const { isBookmarked, showToast, refreshBookmarks } = useSelection();
   const { getAyahState, toggleAyah } = useAyahAudio();
   const [ayahRow, setAyahRow] = useState<AyahRow | null>(null);
-  const [fontVisible, setFontVisible] = useState(false);
   const [translationText, setTranslationText] = useState<string | null>(null);
   const [tafsirRows, setTafsirRows] = useState<TafsirRow[] | null>(null);
   const [selectedTafsirSource, setSelectedTafsirSource] = useState<TafsirSourceId>(tafseerSource);
@@ -112,6 +110,7 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
   const audioIconColor = audioState.active ? "#0d9488" : iconColor;
   const isPhone = width < SIDEBAR_BREAKPOINT;
   const maxOverlayHeight = Math.min(height - (isPhone ? 12 : 48), isPhone ? height * 0.94 : 720);
+  const fontVisible = useQuranPageFontReady(quranFontStyle, ayahRow?.v2_page);
   const qcf2AllTokens = ayahRow?.text_qcf2.split(" ").filter(Boolean) ?? [];
   const qcf2Tokens = showAyahMarkers ? qcf2AllTokens : qcf2AllTokens.slice(0, -1);
   const qcf2FontFamily = ayahRow ? quranPageFontName(quranFontStyle, ayahRow.v2_page) : undefined;
@@ -139,7 +138,6 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
 
   useEffect(() => {
     setAyahRow(null);
-    setFontVisible(false);
     setTranslationText(null);
     setTafsirRows(null);
   }, [activeTarget?.surah, activeTarget?.ayah]);
@@ -204,21 +202,6 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
     };
   }, [db, activeTarget?.surah, activeTarget?.ayah]);
 
-  useEffect(() => {
-    if (!ayahRow) return;
-    setFontVisible(false);
-    if (isQuranPageFontLoaded(quranFontStyle, ayahRow.v2_page)) {
-      requestAnimationFrame(() => setFontVisible(true));
-      return;
-    }
-    let cancelled = false;
-    loadQuranPageFont(quranFontStyle, ayahRow.v2_page).then(() => {
-      if (!cancelled) requestAnimationFrame(() => setFontVisible(true));
-    }).catch(console.warn);
-    return () => {
-      cancelled = true;
-    };
-  }, [ayahRow, quranFontStyle]);
 
   useEffect(() => {
     if (!activeTarget || !showTranslation) return;
@@ -465,6 +448,8 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
             </Text>
           ) : null}
           <View
+            // Remount once the page font exists: Android keeps the fallback typeface of glyphs mounted earlier.
+            key={fontVisible ? `font-${qcf2FontFamily}` : "font-pending"}
             className="items-end"
             style={{
               opacity: fontVisible ? 1 : 0,
