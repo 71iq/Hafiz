@@ -447,7 +447,7 @@ export default function SettingsScreen() {
                       opacity: pressed ? 0.72 : 1,
                     })}
                   >
-                    <ThemeColorSwatch theme={option.value} systemTheme={systemTheme} selected={isActive} size={42} />
+                    <ThemeColorSwatch theme={option.value} systemTheme={systemTheme} selected={isActive} size={42} label={option.label} />
                   </Pressable>
                 );
               })}

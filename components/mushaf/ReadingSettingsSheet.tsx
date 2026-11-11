@@ -355,7 +355,7 @@ function ThemeSegmentedControl({
               cursor: Platform.OS === "web" ? "pointer" : undefined,
             })}
           >
-            <ThemeColorSwatch theme={option.value} systemTheme={systemTheme} selected={option.active} size={40} />
+            <ThemeColorSwatch theme={option.value} systemTheme={systemTheme} selected={option.active} size={40} label={option.label} />
           </Pressable>
         );
       })}

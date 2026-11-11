@@ -6,9 +6,27 @@ type Props = {
   selected?: boolean;
   size?: number;
   systemTheme?: "dark" | "white";
+  /** Visible name under the swatch; without it the five swatches (one half black) were guesswork. */
+  label?: string;
 };
 
-export function ThemeColorSwatch({ theme, selected = false, size = 36, systemTheme = "white" }: Props) {
+export function ThemeColorSwatch({ theme, selected = false, size = 36, systemTheme = "white", label }: Props) {
+  if (label) {
+    return (
+      <View style={{ width: "100%", alignItems: "center", gap: 4, pointerEvents: "none" }}>
+        <ThemeColorSwatch theme={theme} selected={selected} size={size} systemTheme={systemTheme} />
+        <Text
+          accessible={false}
+          numberOfLines={1}
+          className={selected ? "text-primary-accent dark:text-primary-bright" : "text-warm-500 dark:text-neutral-400"}
+          style={{ fontFamily: selected ? "Manrope_700Bold" : "Manrope_500Medium", fontSize: 11 }}
+        >
+          {label}
+        </Text>
+      </View>
+    );
+  }
+
   const palette: ThemePalette = theme === "system" ? systemTheme : theme;
   const backgroundColor = THEME_COLORS[palette].surface;
   const accentColor = palette === "dark" || palette === "amoled" ? "#2DD4BF" : "#0D9488";
