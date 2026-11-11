@@ -272,7 +272,7 @@ function MushafInner() {
     isLoaded: settingsLoaded,
   } = useSettings();
   const s = useStrings();
-  const { width: windowWidth } = useWindowDimensions();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const isPhone = windowWidth < SIDEBAR_BREAKPOINT;
   const isTablet = windowWidth >= SIDEBAR_BREAKPOINT && windowWidth < VIEWPORT_BREAKPOINTS.desktop;
@@ -325,7 +325,9 @@ function MushafInner() {
     }
     const dy = y - lastScrollYRef.current;
     const now = Date.now();
-    if (now <= tapRevealGuardUntilRef.current) {
+    // A step larger than the screen is a programmatic jump (restoring the saved position, opening
+    // a search result), not the reader scrolling, so it must not hide the controls.
+    if (now <= tapRevealGuardUntilRef.current || Math.abs(dy) > windowHeight) {
       lastScrollYRef.current = y;
       return;
     }
@@ -335,7 +337,7 @@ function MushafInner() {
       setChromeVisible(false);
     }
     lastScrollYRef.current = y;
-  }, [focusModeActive, setChromeVisible]);
+  }, [focusModeActive, setChromeVisible, windowHeight]);
 
   const toggleChromeFromReaderTap = useCallback(() => {
     if (focusModeActive) {
@@ -1108,7 +1110,9 @@ function MushafInner() {
   const pageHeaderOverlayStyle = isPageMode
     ? ({
         position: Platform.OS === "web" && (isPhone || isTablet) ? ("fixed" as any) : "absolute",
-        top: 0,
+        // An absolute child ignores the SafeAreaView's top padding, so native must add the inset
+        // itself or the toolbar draws under the status bar.
+        top: Platform.OS === "web" ? 0 : insets.top,
         left: 0,
         right: 0,
         zIndex: 80,
