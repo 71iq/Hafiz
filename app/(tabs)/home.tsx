@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
-import { View, Text, Pressable, useWindowDimensions } from "react-native";
+import { View, Text, Pressable, StyleSheet, useWindowDimensions } from "react-native";
 import { useRouter, type Href } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import {
@@ -723,6 +723,74 @@ export default function HomeScreen() {
   );
 }
 
+/**
+ * A deck card whose body starts its review. The start target sits behind the content instead of
+ * wrapping it, so the card-list and settings buttons are siblings rather than buttons nested inside
+ * a button (invalid on web and read as one control by screen readers). Content ignores touches so
+ * taps on the text reach the start target.
+ */
+function DeckCardShell({
+  canStart,
+  onStartReview,
+  label,
+  compact,
+  isRTL,
+  iconNode,
+  textNode,
+  actionNodes,
+  statsNode,
+}: {
+  canStart: boolean;
+  onStartReview: () => void;
+  label: string;
+  compact: boolean;
+  isRTL: boolean;
+  iconNode: React.ReactNode;
+  textNode: React.ReactNode;
+  actionNodes: React.ReactNode;
+  statsNode: React.ReactNode;
+}) {
+  const row = { direction: "ltr" as const, flexDirection: isRTL ? ("row-reverse" as const) : ("row" as const) };
+  const passive = <View style={{ pointerEvents: "none" }}>{iconNode}</View>;
+  const passiveText = <View style={{ flex: 1, minWidth: 0, pointerEvents: "none" }}>{textNode}</View>;
+  const passiveStats = <View style={{ pointerEvents: "none" }}>{statsNode}</View>;
+  return (
+    <Card elevation="low" className="px-4 py-3 rounded-3xl" style={{ opacity: canStart ? 1 : 0.55 }}>
+      <Pressable
+        onPress={canStart ? onStartReview : undefined}
+        disabled={!canStart}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        accessibilityState={{ disabled: !canStart }}
+        style={({ pressed }) => [
+          StyleSheet.absoluteFill,
+          { backgroundColor: pressed && canStart ? "rgba(13, 148, 136, 0.08)" : "transparent" },
+        ]}
+      />
+      {compact ? (
+        <View className="gap-3" pointerEvents="box-none">
+          <View className="items-center gap-3" style={row} pointerEvents="box-none">
+            {passive}
+            {passiveText}
+          </View>
+          <View className="items-center justify-between gap-2" style={row} pointerEvents="box-none">
+            {actionNodes}
+            {passiveStats}
+          </View>
+        </View>
+      ) : (
+        // box-none goes through the prop: React Native Web ignores it as a style value.
+        <View className="items-center gap-3" style={row} pointerEvents="box-none">
+          {passive}
+          {passiveText}
+          {actionNodes}
+          {passiveStats}
+        </View>
+      )}
+    </Card>
+  );
+}
+
 function SmartDeckCard({
   deck,
   filterLabel,
@@ -802,6 +870,8 @@ function SmartDeckCard({
           event.stopPropagation?.();
           onConfigure();
         }}
+        accessibilityRole="button"
+        accessibilityLabel={s.smartDeckFilterTitle}
         className="w-8 h-8 rounded-full bg-surface-low dark:bg-surface-dark-low items-center justify-center"
         hitSlop={8}
       >
@@ -814,45 +884,17 @@ function SmartDeckCard({
   );
 
   return (
-    <Pressable
-      onPress={canStart ? onStartReview : undefined}
-      accessibilityRole="button"
-      style={({ pressed }) => ({
-        opacity: canStart ? 1 : 0.55,
-        transform: [{ scale: pressed && canStart ? 0.985 : 1 }],
-      })}
-    >
-      <Card elevation="low" className="px-4 py-3 rounded-3xl">
-        {compact ? (
-          <View className="gap-3">
-            <View
-              className="items-center gap-3"
-              style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
-            >
-              {iconNode}
-              {textNode}
-            </View>
-            <View
-              className="items-center justify-between gap-2"
-              style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
-            >
-              {actionNodes}
-              {statsNode}
-            </View>
-          </View>
-        ) : (
-          <View
-            className="items-center gap-3"
-            style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
-          >
-            {iconNode}
-            {textNode}
-            {actionNodes}
-            {statsNode}
-          </View>
-        )}
-      </Card>
-    </Pressable>
+    <DeckCardShell
+      canStart={canStart}
+      onStartReview={onStartReview}
+      label={deck.title}
+      compact={compact}
+      isRTL={isRTL}
+      iconNode={iconNode}
+      textNode={textNode}
+      actionNodes={actionNodes}
+      statsNode={statsNode}
+    />
   );
 }
 
@@ -946,45 +988,17 @@ function VocabularyDeckCard({
   );
 
   return (
-    <Pressable
-      onPress={canStart ? onStartReview : undefined}
-      accessibilityRole="button"
-      style={({ pressed }) => ({
-        opacity: canStart ? 1 : 0.55,
-        transform: [{ scale: pressed && canStart ? 0.985 : 1 }],
-      })}
-    >
-      <Card elevation="low" className="px-4 py-3 rounded-3xl">
-        {compact ? (
-          <View className="gap-3">
-            <View
-              className="items-center gap-3"
-              style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
-            >
-              {iconNode}
-              {textNode}
-            </View>
-            <View
-              className="items-center justify-between gap-2"
-              style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
-            >
-              {actionNodes}
-              {statsNode}
-            </View>
-          </View>
-        ) : (
-          <View
-            className="items-center gap-3"
-            style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}
-          >
-            {iconNode}
-            {textNode}
-            {actionNodes}
-            {statsNode}
-          </View>
-        )}
-      </Card>
-    </Pressable>
+    <DeckCardShell
+      canStart={canStart}
+      onStartReview={onStartReview}
+      label={s.vocabDeckTitle}
+      compact={compact}
+      isRTL={isRTL}
+      iconNode={iconNode}
+      textNode={textNode}
+      actionNodes={actionNodes}
+      statsNode={statsNode}
+    />
   );
 }
 
@@ -1004,41 +1018,48 @@ function DeckStats({
   isRTL: boolean;
 }) {
   const { themeColors } = useSettings();
+  const s = useStrings();
+  // Each count carries a caption: three bare colored numbers left people guessing what they meant.
+  const stats = [
+    { value: total, label: s.deckStatCards, color: undefined },
+    ...(showReviewStats
+      ? [
+          { value: newCount, label: s.deckCardsFilterNew, color: isDark ? "#4ade80" : "#16a34a" },
+          { value: dueCount, label: s.deckCardsFilterDue, color: isDark ? "#f87171" : "#dc2626" },
+        ]
+      : []),
+  ];
   return (
-    <View className={`flex-row items-center gap-2 ${isRTL ? "flex-row-reverse" : ""}`} style={{ direction: "ltr" }}>
-      <Text
-        className="text-charcoal dark:text-neutral-100 text-center min-w-[30px]"
-        style={{ fontFamily: "Manrope_700Bold", fontSize: 14, fontVariant: ["tabular-nums"] }}
-      >
-        {total}
-      </Text>
-      {showReviewStats && (
-        <>
-          <View style={{ width: 1, height: 20, backgroundColor: themeColors.surfaceDim }} />
-          <Text
-            className="text-center min-w-[24px]"
-            style={{
-              fontFamily: "Manrope_700Bold",
-              fontSize: 14,
-              fontVariant: ["tabular-nums"],
-              color: isDark ? "#4ade80" : "#16a34a",
-            }}
-          >
-            {newCount}
-          </Text>
-          <Text
-            className="text-center min-w-[24px]"
-            style={{
-              fontFamily: "Manrope_700Bold",
-              fontSize: 14,
-              fontVariant: ["tabular-nums"],
-              color: isDark ? "#f87171" : "#dc2626",
-            }}
-          >
-            {dueCount}
-          </Text>
-        </>
-      )}
+    <View
+      accessible
+      accessibilityLabel={stats.map((stat) => `${stat.value} ${stat.label}`).join(", ")}
+      className={`flex-row items-center gap-3 ${isRTL ? "flex-row-reverse" : ""}`}
+      style={{ direction: "ltr" }}
+    >
+      {stats.map((stat, index) => (
+        <View key={stat.label} className={`items-center ${isRTL ? "flex-row-reverse" : "flex-row"}`} style={{ gap: 12 }}>
+          {index === 1 ? <View style={{ width: 1, height: 28, backgroundColor: themeColors.surfaceDim }} /> : null}
+          <View className="items-center min-w-[32px]">
+            <Text
+              className={stat.color ? "text-center" : "text-charcoal dark:text-neutral-100 text-center"}
+              style={{
+                fontFamily: "Manrope_700Bold",
+                fontSize: 14,
+                fontVariant: ["tabular-nums"],
+                ...(stat.color ? { color: stat.color } : null),
+              }}
+            >
+              {stat.value}
+            </Text>
+            <Text
+              className="text-warm-500 dark:text-neutral-400 text-center"
+              style={{ fontFamily: "Manrope_500Medium", fontSize: 10, marginTop: 1 }}
+            >
+              {stat.label}
+            </Text>
+          </View>
+        </View>
+      ))}
     </View>
   );
 }

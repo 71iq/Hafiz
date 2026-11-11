@@ -130,10 +130,13 @@ function filter() {
 }
 function card(view: ReturnType<typeof render>, title: string) {
   let node = view.getByText(title).parent;
-  while (node && !(node.props.accessibilityRole === "button" && typeof node.props.style === "function"))
-    node = node.parent;
+  while (node && node.type !== Card) node = node.parent;
   if (!node) throw new Error("Missing real deck card");
   return node;
+}
+/** The deck's start target: a sibling behind the content, labeled with the deck title. */
+function startTarget(view: ReturnType<typeof render>, title: string) {
+  return within(card(view, title)).getByLabelText(title);
 }
 async function home() {
   const view = render(<HomeScreen />);
@@ -219,21 +222,19 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("real home deck cards in %
         textAlign: language === "ar" ? "right" : "left",
       });
       expect(scope.UNSAFE_getByType(Icon).props).toMatchObject({ size: 18, color: dark ? "#2dd4bf" : "#0d9488" });
-      expect(scope.UNSAFE_getByType(Card).props).toMatchObject({
+      expect(node.props).toMatchObject({
         elevation: "low",
         className: "px-4 py-3 rounded-3xl",
+        style: { opacity: 1 },
       });
-      const layout = scope.UNSAFE_getByType(Card).props.children;
+      const layout = React.Children.toArray(node.props.children)[1] as React.ReactElement<any>;
       expect(layout.props.className).toBe(compact ? "gap-3" : "items-center gap-3");
       expect(React.Children.count(layout.props.children)).toBe(compact ? 2 : 4);
-      const row = compact ? React.Children.toArray(layout.props.children)[0] : layout;
-      expect(row).toEqual(
-        expect.objectContaining({
-          props: expect.objectContaining({
-            style: { direction: "ltr", flexDirection: language === "ar" ? "row-reverse" : "row" },
-          }),
-        }),
-      );
+      const row = (compact ? React.Children.toArray(layout.props.children)[0] : layout) as React.ReactElement<any>;
+      expect(StyleSheet.flatten(row.props.style)).toMatchObject({
+        direction: "ltr",
+        flexDirection: language === "ar" ? "row-reverse" : "row",
+      });
       expect(scope.getByText(String(stats.total))).toBeTruthy();
       const newNodes = scope.getAllByText(String(stats.newCount));
       const dueNodes = scope.getAllByText(String(stats.dueCount));
@@ -243,16 +244,19 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("real home deck cards in %
       expect(dueNodes.some((n) => StyleSheet.flatten(n.props.style).color === (dark ? "#f87171" : "#dc2626"))).toBe(
         true,
       );
-      expect(node.props.style({ pressed: true })).toEqual({ opacity: 1, transform: [{ scale: 0.985 }] });
-      expect(node.props.style({ pressed: false })).toEqual({ opacity: 1, transform: [{ scale: 1 }] });
+      const start = startTarget(view, title);
+      expect(start.props.accessibilityRole).toBe("button");
+      expect(StyleSheet.flatten(start.props.style)).toMatchObject({ position: "absolute", backgroundColor: "transparent" });
+      // The card-list control is a sibling of the start target, never a button nested inside it.
+      let parent = scope.getByLabelText(s.deckCardsTitle).parent;
+      while (parent && parent !== node) {
+        expect(parent).not.toBe(start);
+        parent = parent.parent;
+      }
     }
-    // Smart settings intentionally has no role/label today; vocabulary has both.
-    const smartSettings = within(smart).UNSAFE_getByType(Settings2).parent;
-    if (!smartSettings) throw new Error("Missing smart settings control");
-    let smartControl = smartSettings;
-    while (typeof smartControl.props.onPress !== "function" && smartControl.parent) smartControl = smartControl.parent;
-    expect(smartControl.props.accessibilityLabel).toBeUndefined();
-    expect(smartControl.props.accessibilityRole).toBeUndefined();
+    // Both settings controls are labeled buttons.
+    const smartControl = within(smart).getByLabelText(s.smartDeckFilterTitle);
+    expect(smartControl.props.accessibilityRole).toBe("button");
     const stop = jest.fn();
     fireEvent.press(within(smart).getByLabelText(s.deckCardsTitle), { stopPropagation: stop });
     expect(stop).toHaveBeenCalledTimes(1);
@@ -301,8 +305,8 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("real home deck cards in %
     expect(review().mode).toBe("word");
     act(() => review().onClose());
     expect(mockRouterPush).not.toHaveBeenCalled();
-    fireEvent.press(view.getByText(s.smartDeckRetentionTitle));
-    fireEvent.press(view.getByText(s.vocabDeckTitle));
+    fireEvent.press(startTarget(view, s.smartDeckRetentionTitle));
+    fireEvent.press(startTarget(view, s.vocabDeckTitle));
     expect(mockRouterPush.mock.calls).toEqual([
       [{ pathname: "/flashcards/session", params: { deckId: SMART_DECK_IDS.retention } }],
       [{ pathname: "/flashcards/session", params: { deckId: MEANINGS_DECK_ID } }],
@@ -313,9 +317,10 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("real home deck cards in %
     const view = await home();
     const s = strings[language];
     const node = card(view, s.smartDeckRetentionTitle);
-    expect(node.props.onPress).toBeUndefined();
-    expect(node.props.style({ pressed: true })).toEqual({ opacity: 0.55, transform: [{ scale: 1 }] });
-    fireEvent.press(view.getByText(s.smartDeckRetentionTitle));
+    expect(node.props.style).toEqual({ opacity: 0.55 });
+    const start = startTarget(view, s.smartDeckRetentionTitle);
+    expect(start.props.accessibilityState).toMatchObject({ disabled: true });
+    fireEvent.press(start);
     expect(mockRouterPush).not.toHaveBeenCalled();
     expect(view.queryByText(s.vocabDeckTitle)).toBeNull();
     const stop = jest.fn();
