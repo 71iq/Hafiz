@@ -353,6 +353,11 @@ export function OverlayHeader({
   );
 }
 
+// The body starts from its content height and grows or shrinks from there. With flex: 1 (basis 0)
+// it filled fixed-height sheets but collapsed to nothing in content-sized dialogs on native, where
+// Reading Settings showed only its header; web sized it from content and hid the bug.
+const OVERLAY_BODY_FLEX = { flexGrow: 1, flexShrink: 1, flexBasis: "auto" } as const;
+
 export function OverlayBody({
   children,
   scrollRef,
@@ -363,13 +368,14 @@ export function OverlayBody({
 }: OverlayBodyProps) {
   const insets = useSafeAreaInsets();
   if (!scrollEnabled) {
-    return <View className={cn("flex-1 min-h-0", className)}>{children}</View>;
+    return <View className={cn("min-h-0", className)} style={OVERLAY_BODY_FLEX}>{children}</View>;
   }
 
   return (
     <ScrollView
       ref={scrollRef}
-      className={cn("flex-1 min-h-0", className)}
+      className={cn("min-h-0", className)}
+      style={OVERLAY_BODY_FLEX}
       showsVerticalScrollIndicator={false}
       // The first tap on a button must act, not only dismiss the keyboard.
       keyboardShouldPersistTaps="handled"
