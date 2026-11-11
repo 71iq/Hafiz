@@ -44,7 +44,9 @@ export function SurahHeader({
   const localizedAyahCount = isArabicMode ? toArabicNumber(ayahCount) : String(ayahCount);
   const displayName = isArabicMode ? nameArabic : nameEnglish;
   const nameDirection = isArabicMode ? "rtl" : "ltr";
-  const decorativeNameGlyph = isArabicMode ? surahNameGlyph(surahNumber) : undefined;
+  // The page-view card shows the calligraphic name in both languages: a one-line English title in
+  // that card was cut on Android ("The C..."), so English names move to the subtitle there.
+  const decorativeNameGlyph = isArabicMode || compact ? surahNameGlyph(surahNumber) : undefined;
   const [infoOpen, setInfoOpen] = useState(false);
   const infoTarget: SurahInfoTarget = {
     surahNumber,
@@ -114,7 +116,8 @@ export function SurahHeader({
                 className="text-warm-500 dark:text-neutral-400 text-center"
                 style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, lineHeight: 14 }}
               >
-                {localizedSurahNumber} · {localizedAyahCount} {s.ayahs}
+                {localizedSurahNumber}
+                {!isArabicMode ? ` · ${nameEnglish}` : ""} · {localizedAyahCount} {s.ayahs}
               </Text>
             </Pressable>
             <OrnamentLine />
