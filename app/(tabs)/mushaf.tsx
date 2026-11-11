@@ -53,6 +53,7 @@ const PAGE_RAIL_MAX_WIDTH = 760;
 // How long after a touch drag, wheel or scroll key a scroll still counts as the reader's own,
 // long enough to cover a fling's momentum.
 const USER_SCROLL_INPUT_WINDOW_MS = 2500;
+const HEADER_CONTENT_STYLE = { position: "absolute", top: 0, left: 0, right: 0 } as const;
 const SCROLL_KEYS = new Set(["ArrowDown", "ArrowUp", "PageDown", "PageUp", "Home", "End", " "]);
 const READER_INTERACTION_SELECTOR = '[data-hafiz-quran-token], [data-hafiz-word-tooltip="true"], [data-hafiz-reader-interaction="true"]';
 
@@ -469,7 +470,10 @@ function MushafInner() {
     opacity: 1 - headerHidden.value,
   }));
   // Follows the header's natural height. Keeping only the first measurement froze a height taken
-  // while the toolbar row was still wrapping, which left a tall empty band above page view.
+  // while the toolbar row was still wrapping, which left a tall empty band above page view. The
+  // measured content is positioned out of flow (HEADER_CONTENT_STYLE), so the collapsing container
+  // clips it instead of squashing it; a squashed measurement would become the height the next
+  // reveal animates to, leaving the toolbar a sliver.
   const onHeaderLayout = useCallback((e: { nativeEvent: { layout: { height: number } } }) => {
     const h = Math.round(e.nativeEvent.layout.height);
     if (h > 0) setMeasuredHeaderH((current) => (current === h ? current : h));
@@ -1463,7 +1467,7 @@ function MushafInner() {
           style={[pageHeaderOverlayStyle, headerAnimStyle]}
         >
           {isPhone || isTablet ? (
-            <View onLayout={onHeaderLayout} className="px-3 pt-2 pb-1">
+            <View onLayout={onHeaderLayout} className="px-3 pt-2 pb-1" style={HEADER_CONTENT_STYLE}>
               <View
                 style={{
                   direction: "ltr",
@@ -1603,6 +1607,7 @@ function MushafInner() {
           ) : (
             <View
               onLayout={onHeaderLayout}
+              style={HEADER_CONTENT_STYLE}
               className={`flex-row items-center justify-between bg-surface dark:bg-surface-dark ${
                 isNarrow ? "px-2 py-2" : "px-4 py-3"
               }`}
