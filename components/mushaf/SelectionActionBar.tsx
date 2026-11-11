@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 import { View, Text, Pressable } from "react-native";
 import { Copy, BookMarked, Highlighter, PenLine, StickyNote, Trash2 } from "lucide-react-native";
 import * as Clipboard from "expo-clipboard";
+import { systemConfirmsCopy } from "@/lib/clipboard-feedback";
 import { Sheet, SheetContent } from "@/components/ui/Sheet";
 import { useSelection } from "@/lib/selection/context";
 import { useDatabase } from "@/lib/database/provider";
@@ -59,7 +60,7 @@ export function SelectionActionBar() {
       if (!meta) return;
       const formatted = formatForCopy(meta.text, meta.surahName, meta.surah, meta.ayah, meta.ayah);
       await Clipboard.setStringAsync(formatted);
-      showToast(s.copied);
+      if (!systemConfirmsCopy()) showToast(s.copied);
       handleClose();
     } catch (e) {
       console.warn("[SelectionActionBar] Failed to copy selection:", e);

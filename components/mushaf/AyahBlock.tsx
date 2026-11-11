@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef, useMemo, memo } from "react";
 import { ActivityIndicator, View, Text, Pressable, Animated as RNAnimated, Platform, ScrollView, useWindowDimensions } from "react-native";
 import * as Clipboard from "expo-clipboard";
+import { systemConfirmsCopy } from "@/lib/clipboard-feedback";
 import {
   quranPageFontName,
   quranPageMarkerFontPaletteStyle,
@@ -174,7 +175,7 @@ function AyahBlockInner({
         fetchSurahName(db, surah),
       ]);
       await Clipboard.setStringAsync(formatForCopy(text, surahName, surah, ayah, ayah));
-      showToast(s.copied);
+      if (!systemConfirmsCopy()) showToast(s.copied);
     } catch (e) {
       console.warn("[AyahBlock] Failed to copy share text:", e);
       showToast(s.copyFailed);

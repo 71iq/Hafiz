@@ -2,6 +2,7 @@ import { useOperationNotice } from "@/components/ui/OperationNoticeProvider";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ActivityIndicator, Platform, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 import * as Clipboard from "expo-clipboard";
+import { systemConfirmsCopy } from "@/lib/clipboard-feedback";
 import { BookOpenText, Bookmark, ChevronLeft, ChevronRight, MessageCircle, NotebookPen, Pause, Play, Share2 } from "lucide-react-native";
 import { ReflectionsSection } from "@/components/reflections/ReflectionsSection";
 import { QiraatTab } from "@/components/mushaf/word-tabs/QiraatTab";
@@ -282,7 +283,7 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
       await Clipboard.setStringAsync(
         formatForCopy(ayahRow.text_uthmani, surahName, activeTarget.surah, activeTarget.ayah, activeTarget.ayah)
       );
-      showToast(s.copied);
+      if (!systemConfirmsCopy()) showToast(s.copied);
     } catch (e) {
       console.warn("[AyahDetailModal] Failed to copy share text:", e);
       showToast(s.copyFailed);
