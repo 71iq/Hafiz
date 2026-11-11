@@ -63,7 +63,9 @@ scope "$HERMESC" -emit-binary -O -w -out "$OUT/assets/index.android.bundle" "$WO
 APK="$ROOT/android/app/build/outputs/apk/release/app-release.apk"
 
 APKSIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
-cert=$("$APKSIGNER" verify --print-certs "$APK" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')
+# apksigner prints "Signer #1 certificate ..." or, in newer build-tools, "V2 Signer: certificate ...".
+cert=$("$APKSIGNER" verify --print-certs "$APK" 2>/dev/null |
+  sed -n -E 's/^(Signer #[0-9]+|V[0-9]+ Signer): certificate SHA-256 digest: //p' | sort -u)
 [ "$cert" = "$EXPECTED_CERT" ] || { echo "APK is not signed with the release key ($cert)." >&2; exit 1; }
 
 FILE="hafiz-$VERSION_NAME-$VERSION_CODE.apk"
