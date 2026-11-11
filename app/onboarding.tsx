@@ -32,6 +32,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { matchesSurahQuery } from "@/lib/search/surah-match";
 
 type SurahRow = {
   number: number;
@@ -103,15 +104,8 @@ function OnboardingInner() {
   const totalAyahs = useMemo(() => selectedRows.reduce((sum, surah) => sum + surah.ayah_count, 0), [selectedRows]);
 
   const filteredSurahs = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    if (!query) return surahs;
-    return surahs.filter((surah) => {
-      return (
-        String(surah.number).includes(query) ||
-        surah.name_english.toLowerCase().includes(query) ||
-        surah.name_arabic.includes(query)
-      );
-    });
+    if (!searchQuery.trim()) return surahs;
+    return surahs.filter((surah) => matchesSurahQuery(surah, searchQuery));
   }, [searchQuery, surahs]);
 
   const allSurahsSelected = surahs.length > 0 && selectedSurahs.size === surahs.length;

@@ -7,6 +7,7 @@ import { useStrings } from "@/lib/i18n/useStrings";
 import { useSettings } from "@/lib/settings/context";
 import { ResponsiveOverlay, OverlayHeader, OverlayBody } from "@/components/ui/ResponsiveOverlay";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
+import { matchesSurahQuery } from "@/lib/search/surah-match";
 
 type SurahRow = {
   number: number;
@@ -153,23 +154,18 @@ export function GoToNavigator({
     onClose();
   };
 
-  const isNumeric = /^\d+$/.test(searchText);
+  const filteredSurahs = searchText ? surahs.filter((surah) => matchesSurahQuery(surah, searchText)) : surahs;
 
-  const filteredSurahs = searchText
-    ? surahs.filter((surah) =>
-        isNumeric
-          ? String(surah.number).startsWith(searchText)
-          : surah.name_english.toLowerCase().includes(searchText.toLowerCase()) ||
-            surah.name_arabic.includes(searchText)
-      )
-    : surahs;
-
+  // A juz matches its own number, or the name of the surah it starts in.
+  const juzNumberQuery = /^[\d٠-٩]+$/.test(searchText.trim());
   const filteredJuz = searchText
     ? juzList.filter((juz) =>
-        isNumeric
-          ? String(juz.juz).startsWith(searchText)
-          : juz.surahNameEnglish.toLowerCase().includes(searchText.toLowerCase()) ||
-            juz.surahNameArabic.includes(searchText)
+        juzNumberQuery
+          ? matchesSurahQuery({ number: juz.juz, name_arabic: "", name_english: "" }, searchText)
+          : matchesSurahQuery(
+              { number: juz.startSurah, name_arabic: juz.surahNameArabic, name_english: juz.surahNameEnglish },
+              searchText,
+            ),
       )
     : juzList;
 
