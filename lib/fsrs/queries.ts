@@ -436,11 +436,15 @@ function reviewQueueOptionsFromSettings(settings: DeckReviewSettings, limit: num
   };
 }
 
+/**
+ * Cards studied today. A card counts once however many learning steps or Again presses it took, so
+ * learning one new card does not use up several places in the daily limit.
+ */
 async function getTodayReviewedCount(db: DatabaseExecutor, deckId?: string): Promise<number> {
   const { start, end } = todayBounds();
   if (deckId) {
     const row = await db.getFirstAsync<{ count: number }>(
-      `SELECT COUNT(*) as count
+      `SELECT COUNT(DISTINCT sl.card_id) as count
        FROM study_log sl
        JOIN study_cards sc ON sc.id = sl.card_id
        WHERE sc.deck_id = ? AND sc.deleted_at IS NULL AND sl.reviewed_at >= ? AND sl.reviewed_at < ?`,
@@ -450,7 +454,7 @@ async function getTodayReviewedCount(db: DatabaseExecutor, deckId?: string): Pro
   }
 
   const row = await db.getFirstAsync<{ count: number }>(
-    `SELECT COUNT(*) as count
+    `SELECT COUNT(DISTINCT sl.card_id) as count
        FROM study_log sl
        JOIN study_cards sc ON sc.id = sl.card_id
       WHERE sc.deleted_at IS NULL
