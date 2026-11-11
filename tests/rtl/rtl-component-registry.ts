@@ -53,6 +53,12 @@ export const rtlComponentRegistry: RtlComponentRegistryEntry[] = [
     "Public badge grid mirrors visual order.",
   ),
   entry(
+    "components/app-update/AppReleaseCard.tsx",
+    "button",
+    "source",
+    "Download/update card row mirrors with settings RTL; copy aligns to the reading side.",
+  ),
+  entry(
     "components/auth/AccountSyncPrompt.tsx",
     "button",
     "rntl",
