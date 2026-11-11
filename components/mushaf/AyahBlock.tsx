@@ -195,8 +195,10 @@ function AyahBlockInner({
   const audioIconColor = audioState.active ? "#0d9488" : iconColor;
 
   return (
+    // Ayahs are separated by a hairline: the block shares the page color, so padding alone read as
+    // stray empty space between verses.
     <View
-      className="mb-4 rounded-3xl bg-surface dark:bg-surface-dark px-4 py-4"
+      className="bg-surface dark:bg-surface-dark px-4 pt-2 pb-3 border-b border-warm-200 dark:border-neutral-800"
       style={{
         position: "relative",
         width: Math.max(0, Math.min(width - 24, 840)),
@@ -226,7 +228,7 @@ function AyahBlockInner({
       <View
         className={isRTL ? "flex-row-reverse items-center justify-between gap-3" : "flex-row items-center justify-between gap-3"}
         style={{
-          paddingTop: isPhone ? 4 : 8,
+          paddingTop: isPhone ? 2 : 6,
         }}
       >
         <View className={isRTL ? "flex-row-reverse items-center gap-1.5" : "flex-row items-center gap-1.5"}>
@@ -303,10 +305,10 @@ function AyahBlockInner({
         </Pressable>
       ) : !fontVisible ? (
         // Glyphs mounted before their page font exists render and measure in the system font.
-        <View className={isPhone ? "pt-5 pb-1" : "pt-6 pb-1"} style={{ minHeight: qcf2LineHeight }} />
+        <View className={isPhone ? "pt-3 pb-1" : "pt-5 pb-1"} style={{ minHeight: qcf2LineHeight }} />
       ) : (
         <View
-          className={isPhone ? "pt-5 pb-1" : "pt-6 pb-1"}
+          className={isPhone ? "pt-3 pb-1" : "pt-5 pb-1"}
           style={{ direction: "ltr", alignItems: "flex-end", paddingHorizontal: 3, alignSelf: "stretch", width: "100%" }}
         >
           {Platform.OS === "android" && !hideMode ? (
@@ -421,18 +423,20 @@ function AyahBlockInner({
         </View>
       )}
 
-      <View className="pt-3">
+      <View className="pt-2">
+        {/* The row runs to the block edges so pills that do not fit are cut at the edge, like any
+            swipeable row, rather than mid-word inside the padding. */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           bounces={false}
-          className="mt-1"
+          style={{ marginHorizontal: -16 }}
           {...readerControlProps}
           contentContainerStyle={{
             direction: isRTL ? "rtl" : "ltr",
             flexDirection: isRTL ? "row-reverse" : "row",
             gap: 8,
-            paddingHorizontal: 0,
+            paddingHorizontal: 16,
           }}
         >
           <ActionPill
