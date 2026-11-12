@@ -52,6 +52,7 @@ jest.mock("@react-navigation/native", () => {
 jest.mock("expo-router", () => ({
   router: { push: (...args: unknown[]) => mockRouterPush(...args) },
   useRouter: () => ({ push: (...args: unknown[]) => mockRouterPush(...args) }),
+  useNavigation: () => ({ navigate: jest.fn() }),
 }));
 
 jest.mock("@/lib/database/provider", () => ({
