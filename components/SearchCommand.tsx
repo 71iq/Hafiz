@@ -440,7 +440,6 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
       <View className="flex-1" style={{ height: modalHeight, maxHeight: modalHeight }}>
         <OverlayHeader
           title={s.searchTitle}
-          subtitle={`${s.searchTextMode} / ${s.searchRootMode}`}
           onClose={onClose}
           showHandle={isPhone}
           isRTL={isRTL}
