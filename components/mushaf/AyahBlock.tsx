@@ -7,6 +7,7 @@ import {
   quranPageMarkerFontPaletteStyle,
   quranPageFontPaletteStyle,
 } from "@/lib/fonts/loader";
+import { useRecyclingState } from "@shopify/flash-list";
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
 import { useQuranPageFontReady } from "@/lib/fonts/use-quran-page-font";
@@ -88,8 +89,10 @@ function AyahBlockInner({
   const { getAyahState, toggleAyah } = useAyahAudio();
 
   const fontVisible = useQuranPageFontReady(quranFontStyle, v2Page);
-  const [revealed, setRevealed] = useState(false);
-  const [detailOpen, setDetailOpen] = useState(false);
+  // FlashList reuses a block for another ayah; recycling state resets with the ayah, so a revealed
+  // verse in hide mode (or an open detail sheet) does not carry over to the verse that reuses it.
+  const [revealed, setRevealed] = useRecyclingState(false, [surah, ayah, hideMode]);
+  const [detailOpen, setDetailOpen] = useRecyclingState(false, [surah, ayah]);
   const [detailTab, setDetailTab] = useState<AyahDetailTabKey>("hadith");
   const [bookmarkBusy, setBookmarkBusy] = useState(false);
   const [shareBusy, setShareBusy] = useState(false);
@@ -116,10 +119,6 @@ function AyahBlockInner({
     };
   }, [text]);
 
-
-  useEffect(() => {
-    setRevealed(false);
-  }, [hideMode]);
 
   const openDetail = useCallback((tab: AyahDetailTabKey) => {
     setDetailTab(tab);
