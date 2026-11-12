@@ -517,9 +517,10 @@ export default function HomeScreen() {
                 <View className="flex-1">
                   <Text
                     className="text-warm-400 dark:text-neutral-500 uppercase"
-                    style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, letterSpacing: 1.5 }}
+                    // Letter spacing would break the joins between Arabic letters.
+                    style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, letterSpacing: isRTL ? 0 : 1.5 }}
                   >
-                    {s.goTo}
+                    {s.continueReading}
                   </Text>
                   <Text
                     className="text-charcoal dark:text-neutral-100"

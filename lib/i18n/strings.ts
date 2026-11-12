@@ -68,6 +68,7 @@ export const strings = {
     readingSettingsSavedAutomatically: "Settings are saved automatically",
     // Mushaf header
     goTo: "Go to",
+    continueReading: "Continue reading",
     pageN: "Page {{n}}",
     pageXOfY: "Page {{page}} of {{total}}",
     loadingQuran: "Loading Quran...",
@@ -1028,6 +1029,7 @@ export const strings = {
     readingSettingsChooseMarkerStyle: "اختر نمط العلامات",
     readingSettingsSavedAutomatically: "تُحفظ الإعدادات تلقائيًا",
     goTo: "انتقال",
+    continueReading: "متابعة القراءة",
     pageN: "الصفحة {{n}}",
     pageXOfY: "الصفحة {{page}} من {{total}}",
     loadingQuran: "جارٍ تحميل القرآن...",
