@@ -76,16 +76,17 @@ export function AuthScreenShell({
               paddingVertical: isDesktop ? 24 : 0,
             }}
           >
+            {/* The shell shows behind the phone's paper motif, so it follows the dark form panel; a fixed
+                light colour drew a white wedge at the bottom of dark sign-in screens. */}
             <View
-              className="overflow-hidden"
+              className="overflow-hidden bg-[#FFFDF9] dark:bg-surface-dark"
               style={{
                 width: shellWidth,
                 maxWidth: "100%",
                 minHeight: isDesktop ? Math.min(Math.max(height - 48, 660), 860) : height,
                 borderRadius: isDesktop ? 30 : 0,
                 borderWidth: isDesktop ? 1 : 0,
-                borderColor: "#E8E1DA",
-                backgroundColor: "#FFFDF9",
+                borderColor: isDark ? "#262626" : "#E8E1DA",
                 boxShadow: isDesktop ? "0 18px 42px rgba(45, 45, 45, 0.10)" : undefined,
                 direction: dir,
               }}
@@ -590,7 +591,7 @@ function MobilePaperMotif() {
   return (
     <View pointerEvents="none" className="overflow-hidden" style={{ height: 92 }}>
       <View
-        className="absolute bg-surface-low"
+        className="absolute bg-surface-low dark:bg-surface-dark-low"
         style={{
           left: -42,
           right: -28,

@@ -73,6 +73,9 @@ export const Input = forwardRef<TextInput, InputProps>(
           invalid && "border border-red-500",
           containerClassName
         )}
+        // row-reverse mirrors the icons by hand; under an inherited rtl direction it flipped them back to
+        // the wrong sides, so the row is pinned to ltr.
+        style={{ direction: "ltr" }}
       >
         {startIcon}
         {input}
