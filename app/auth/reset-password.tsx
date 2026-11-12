@@ -11,7 +11,7 @@ import { useAuthStore } from "@/lib/auth/store";
 import { usePasswordRecovery } from "@/lib/auth/password-recovery";
 import { strings } from "@/lib/i18n/strings";
 import type { UIStrings } from "@/lib/i18n/strings";
-import { getStartupLanguage } from "@/lib/i18n/startup-language";
+import { useAppLanguage } from "@/lib/i18n/useStrings";
 import { Button } from "@/components/ui/Button";
 import { FormTextField } from "@/components/ui/FormTextField";
 import { AuthFormNotice, AuthScreenShell, AuthUnavailableState } from "@/components/auth/AuthScreenShell";
@@ -55,7 +55,7 @@ function RecoveryForm() {
 function ResetPasswordFormScreen() {
   const router = useRouter();
   const navigation = useNavigation();
-  const locale = getStartupLanguage();
+  const locale = useAppLanguage();
   const dir: Direction = locale === "ar" ? "rtl" : "ltr";
   const s = strings[locale];
   const schema = useMemo(() => createResetPasswordSchema(s), [s]);

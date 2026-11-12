@@ -4,13 +4,13 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { completeQfOAuthConnection } from "@/lib/quran-foundation/user";
 import { strings } from "@/lib/i18n/strings";
-import { getStartupLanguage } from "@/lib/i18n/startup-language";
+import { useAppLanguage } from "@/lib/i18n/useStrings";
 import { getQfOAuthRedirectUri } from "@/lib/quran-foundation/oauth-redirect";
 
 export default function QfCallbackScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ code?: string; state?: string; error?: string; error_description?: string }>();
-  const s = strings[getStartupLanguage()];
+  const s = strings[useAppLanguage()];
   const [message, setMessage] = useState<string>(s.qfAuthCallbackLoading);
 
   useEffect(() => {

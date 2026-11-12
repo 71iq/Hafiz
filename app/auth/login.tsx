@@ -10,7 +10,7 @@ import { isEmailAuthFlowsEnabled, isSocialAuthEnabled } from "@/lib/auth/config"
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { strings } from "@/lib/i18n/strings";
 import type { UIStrings } from "@/lib/i18n/strings";
-import { getStartupLanguage } from "@/lib/i18n/startup-language";
+import { useAppLanguage } from "@/lib/i18n/useStrings";
 import { Button } from "@/components/ui/Button";
 import { FormTextField } from "@/components/ui/FormTextField";
 import {
@@ -38,7 +38,7 @@ function createLoginSchema(s: UIStrings) {
 
 export default function LoginScreen() {
   const router = useRouter();
-  const locale = getStartupLanguage();
+  const locale = useAppLanguage();
   const dir: Direction = locale === "ar" ? "rtl" : "ltr";
   const s = strings[locale];
   const schema = useMemo(() => createLoginSchema(s), [s]);
