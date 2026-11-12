@@ -527,7 +527,7 @@ export default function HomeScreen() {
                     className="text-charcoal dark:text-neutral-100"
                     style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15 }}
                   >
-                    {`${s.flashcardsScopeBysurah} ${surahNames[resume.surah] ?? resume.surah} · ${resume.surah}:${resume.ayah}`}
+                    {`${surahNames[resume.surah] ? interpolate(s.surahNamed, { name: surahNames[resume.surah] }) : resume.surah} · ${resume.surah}:${resume.ayah}`}
                   </Text>
                   <Text
                     className="text-warm-400 dark:text-neutral-500"
