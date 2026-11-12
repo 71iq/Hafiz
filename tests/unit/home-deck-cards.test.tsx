@@ -57,7 +57,6 @@ jest.mock("@/lib/fsrs/queries", () => ({
   ...jest.requireActual<typeof import("@/lib/fsrs/queries")>("@/lib/fsrs/queries"),
   getDeckTodayStats: jest.fn(),
   readDeckReviewSettings: jest.fn(),
-  getTodayDueCount: jest.fn(async () => 0),
   getMemorizedAyahCardCount: jest.fn(async () => 0),
   getWirdStatus: jest.fn(async () => ({
     currentDays: 0,
@@ -328,6 +327,19 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("real home deck cards in %
     fireEvent.press(within(node).getByLabelText(s.deckCardsTitle), { stopPropagation: stop });
     expect(stop).toHaveBeenCalledTimes(1);
     expect(cards()).toMatchObject({ visible: true, deckId: SMART_DECK_IDS.retention });
+  });
+  it("heads the dashboard with what the deck rows offer and starts Review all over every deck", async () => {
+    jest
+      .mocked(getDeckTodayStats)
+      .mockImplementation(async (_db, id) =>
+        id === MEANINGS_DECK_ID ? { ...vocabStats } : { total: 40, newCount: 4, dueCount: 2 },
+      );
+    const view = await home();
+    const s = strings[language];
+    // Five smart decks offer 4 new and 2 due each; the vocabulary deck offers 7 new and 11 due.
+    expect(view.getByText("48")).toBeTruthy();
+    fireEvent.press(view.getByText(s.flashcardsStartReview));
+    expect(mockRouterPush).toHaveBeenCalledWith({ pathname: "/flashcards/session", params: {} });
   });
   it("uses the shared phoneLarge breakpoint inclusively and changes layout after resize", async () => {
     width(VIEWPORT_BREAKPOINTS.phoneLarge);

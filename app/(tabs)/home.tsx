@@ -33,7 +33,6 @@ import { AchievementUnlockToast } from "@/components/achievements/AchievementUnl
 import {
   getDeckTodayStats,
   getMemorizedAyahCardCount,
-  getTodayDueCount,
   getWirdStatus,
   readDeckReviewSettings,
   MEANINGS_DECK_ID,
@@ -94,7 +93,11 @@ export default function HomeScreen() {
   });
   const [authBannerDismissed, setAuthBannerDismissed] = useState(false);
   const user = useAuthStore((state) => state.user);
-  const [totalDue, setTotalDue] = useState(0);
+  // The headline is what the deck rows offer, which is also what Review all loads.
+  const totalDue = smartDecks.reduce(
+    (sum, deck) => sum + deck.dueCount + deck.newCount,
+    vocabStats.dueCount + vocabStats.newCount,
+  );
   const [memorizedCards, setMemorizedCards] = useState(0);
   const [wirdStatus, setWirdStatus] = useState<WirdStatus>({
     currentDays: 0,
@@ -192,13 +195,9 @@ export default function HomeScreen() {
         }),
       );
 
-      const [dashboardSettings, vocabSettings] = await Promise.all([
-        readDeckReviewSettings(db, undefined),
-        readDeckReviewSettings(db, MEANINGS_DECK_ID),
-      ]);
-      const [dashboardDue, memorizedTotal, nextWirdStatus, vocabTodayStats, reflectionJourneySummary] =
+      const vocabSettings = await readDeckReviewSettings(db, MEANINGS_DECK_ID);
+      const [memorizedTotal, nextWirdStatus, vocabTodayStats, reflectionJourneySummary] =
         await Promise.all([
-          getTodayDueCount(db, undefined, dashboardSettings),
           getMemorizedAyahCardCount(db),
           getWirdStatus(db),
           getDeckTodayStats(db, MEANINGS_DECK_ID, vocabSettings),
@@ -212,7 +211,6 @@ export default function HomeScreen() {
       if (!isCurrent()) return;
       setSurahNames(nameMap);
       setSmartDecks(smartDisplays);
-      setTotalDue(dashboardDue);
       setMemorizedCards(memorizedTotal);
       setWirdStatus(nextWirdStatus);
       setVocabStats(vocabTodayStats);

@@ -474,42 +474,31 @@ export async function getRemainingReviewLimit(
   return Math.max(0, clampReviewLimit(limit) - await getTodayReviewedCount(db, deckId));
 }
 
-export async function getTodayDueCount(
-  db: AppDatabase,
-  deckId: string | undefined,
-  settingsOrLimit: DeckReviewSettings | number
-): Promise<number> {
-  const settings = typeof settingsOrLimit === "number"
-    ? normalizeDeckReviewSettings({ dailyReviewLimit: settingsOrLimit })
-    : normalizeDeckReviewSettings(settingsOrLimit);
-  const remaining = await getRemainingReviewLimit(db, deckId, settings.dailyReviewLimit);
-  if (remaining <= 0) return 0;
-  return (await getDueCardsForReview(db, deckId, reviewQueueOptionsFromSettings(settings, remaining))).length;
-}
-
 export type ReviewQueueItem = { card: StudyCardRow; settings: DeckReviewSettings };
+
+/** The decks Home lists, in its order. Review all and the Home due headline cover exactly these. */
+export const REVIEW_DECK_IDS: readonly string[] = [...Object.values(SMART_DECK_IDS), MEANINGS_DECK_ID];
 
 /**
  * The cards a review session loads, each paired with its own deck's review settings, so grading,
- * interval previews and test modes follow the card's deck in Review all as in a single deck.
+ * interval previews and test modes follow the card's deck in Review all as in a single deck. Review
+ * all is every deck's own queue in turn, with that deck's limits, so it offers what the deck rows
+ * count, including new smart-deck cards that have no row yet.
  */
 export async function loadReviewQueue(db: AppDatabase, deckId?: string): Promise<ReviewQueueItem[]> {
-  const queueSettings = await readDeckReviewSettings(db, deckId);
-  const remaining = await getRemainingReviewLimit(db, deckId, queueSettings.dailyReviewLimit);
+  if (!deckId) {
+    const queue: ReviewQueueItem[] = [];
+    for (const id of REVIEW_DECK_IDS) queue.push(...await loadReviewQueue(db, id));
+    return queue;
+  }
+  const settings = await readDeckReviewSettings(db, deckId);
+  const remaining = await getRemainingReviewLimit(db, deckId, settings.dailyReviewLimit);
   if (remaining <= 0) return [];
   if (isSmartDeckId(deckId)) {
-    await materializeSmartDeckCards(db, deckId, remaining, queueSettings.newCardsLimit);
+    await materializeSmartDeckCards(db, deckId, remaining, settings.newCardsLimit);
   }
-  const rows = await getDueCardsForReview(db, deckId, reviewQueueOptionsFromSettings(queueSettings, remaining));
-  if (deckId) return rows.map((card) => ({ card, settings: queueSettings }));
-
-  const settingsByDeck = new Map<string, DeckReviewSettings>();
-  for (const card of rows) {
-    if (!settingsByDeck.has(card.deck_id)) {
-      settingsByDeck.set(card.deck_id, await readDeckReviewSettings(db, card.deck_id));
-    }
-  }
-  return rows.map((card) => ({ card, settings: settingsByDeck.get(card.deck_id)! }));
+  const rows = await getDueCardsForReview(db, deckId, reviewQueueOptionsFromSettings(settings, remaining));
+  return rows.map((card) => ({ card, settings }));
 }
 
 export async function getDueCount(db: AppDatabase, deckId?: string): Promise<number> {

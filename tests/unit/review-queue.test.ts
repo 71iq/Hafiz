@@ -1,6 +1,12 @@
 import { DatabaseSync } from "node:sqlite";
 import type { AppDatabase, TransactionDatabase } from "@/lib/database/types";
-import { getDeckTodayStats, loadReviewQueue, readDeckReviewSettings, writeDeckReviewSettings } from "@/lib/fsrs/queries";
+import {
+  getDeckTodayStats,
+  loadReviewQueue,
+  readDeckReviewSettings,
+  REVIEW_DECK_IDS,
+  writeDeckReviewSettings,
+} from "@/lib/fsrs/queries";
 import { getDueCardsForReview, SMART_DECK_IDS } from "@/lib/fsrs/smart-decks";
 import { State } from "@/lib/fsrs/scheduler";
 import type { StudyCardRow } from "@/lib/fsrs/types";
@@ -144,5 +150,20 @@ describe("review queue shared by Home and sessions", () => {
     expect(Object.keys(byId).sort()).toEqual(["qiraat:1:1", "word:2:255:3"]);
     expect(byId["qiraat:1:1"]).toMatchObject({ learningSteps: ["7m"], requestRetention: 0.85 });
     expect(byId["word:2:255:3"]).toMatchObject({ learningSteps: ["2h"], requestRetention: 0.9 });
+  });
+
+  it("offers in Review all exactly what the deck rows count, including new smart cards without a row", async () => {
+    for (const ayah of [1, 2, 3]) qiraatCandidate(1, ayah);
+    insert("word:2:255:3", "meanings");
+    let offered = 0;
+    for (const deckId of REVIEW_DECK_IDS) {
+      const stats = await getDeckTodayStats(db, deckId, await readDeckReviewSettings(db, deckId));
+      offered += stats.dueCount + stats.newCount;
+    }
+
+    const queue = await loadReviewQueue(db);
+
+    expect(queue.map((item) => item.card.id).sort()).toEqual(["qiraat:1:1", "qiraat:1:2", "qiraat:1:3", "word:2:255:3"]);
+    expect(queue).toHaveLength(offered);
   });
 });
