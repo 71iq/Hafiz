@@ -51,7 +51,7 @@ import { stringByKey, useStrings } from "@/lib/i18n/useStrings";
 import { isEmailAuthFlowsEnabled } from "@/lib/auth/config";
 import { useAuthStore } from "@/lib/auth/store";
 import { isSupabaseConfigured } from "@/lib/supabase";
-import { isQfContentEnabled, isQfSyncEnabled } from "@/lib/quran-foundation/config";
+import { isRecitationEnabled, isQfSyncEnabled } from "@/lib/quran-foundation/config";
 import { getQfOAuthRedirectUri } from "@/lib/quran-foundation/oauth-redirect";
 import { formatReciterLabel, getReciterById } from "@/lib/quran-foundation/recitations";
 import {
@@ -625,7 +625,7 @@ export default function SettingsScreen() {
               />
             </ContentSettingsGroup>
 
-            {isQfContentEnabled() && (
+            {isRecitationEnabled() && (
               <ContentSettingsGroup title={s.recitationSettingsLabel} isRTL={isRTL}>
                 <ContentSettingsRow
                   label={s.recitationFavoriteReciter}

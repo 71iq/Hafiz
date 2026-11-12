@@ -61,7 +61,7 @@ jest.mock("@/lib/settings/context", () => {
 });
 jest.mock("@/lib/selection/context", () => ({ useSelection: () => mockSelection }));
 jest.mock("@/lib/audio/ayah-audio", () => ({ useAyahAudio: () => mockAudio }));
-jest.mock("@/lib/quran-foundation/config", () => ({ isQfContentEnabled: () => false }));
+jest.mock("@/lib/quran-foundation/config", () => ({ isQfContentEnabled: () => false, isRecitationEnabled: () => false }));
 jest.mock("@/components/reflections/ReflectionsSection", () => ({ ReflectionsSection: () => null }));
 jest.mock("@/components/notes/PrivateNotesSection", () => ({ PrivateNotesSection: () => null }));
 jest.mock("@/components/mushaf/word-tabs/QiraatTab", () => ({ QiraatTab: () => null }));

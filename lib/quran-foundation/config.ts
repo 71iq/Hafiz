@@ -37,3 +37,8 @@ export function isQfSyncEnabled(): boolean {
 export function isQfContentEnabled(): boolean {
   return ["1", "true", "yes"].includes(QF_CONTENT_ENABLED.trim().toLowerCase());
 }
+
+/** Recitation plays from public audio CDNs (lib/audio/public-ayah-audio.ts), independent of QF content. */
+export function isRecitationEnabled(): boolean {
+  return true;
+}

@@ -33,7 +33,7 @@ import {
 import { formatForCopy } from "@/lib/selection/format";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { useAyahAudio } from "@/lib/audio/ayah-audio";
-import { isQfContentEnabled } from "@/lib/quran-foundation/config";
+import { isQfContentEnabled, isRecitationEnabled } from "@/lib/quran-foundation/config";
 import { AyahDetailModal, type AyahDetailTabKey } from "./AyahDetailModal";
 import { textStartStyle } from "@/lib/ui/direction";
 
@@ -255,7 +255,7 @@ function AyahBlockInner({
               <View className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-gold" />
             )}
           </Pressable>
-          {isQfContentEnabled() && (
+          {isRecitationEnabled() && (
             <ActionIcon
               icon={
                 audioState.loading ? (

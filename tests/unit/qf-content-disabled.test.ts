@@ -55,4 +55,17 @@ describe("Quran Foundation content feature gate", () => {
       body: { action: "audio-ayah", surah: 2, ayah: 255, recitationId: 42 },
     });
   });
+
+  it("plays a known recitation from the public audio CDN without Quran Foundation content", async () => {
+    await expect(fetchQfAyahAudio(2, 255, 7)).resolves.toMatchObject({
+      ok: true,
+      recitationId: 7,
+      verseKey: "2:255",
+      audio: { url: "https://verses.quran.foundation/Alafasy/mp3/002255.mp3" },
+    });
+    await expect(fetchQfAyahAudio(1, 1, 6)).resolves.toMatchObject({
+      audio: { url: "https://mirrors.quranicaudio.com/everyayah/Husary_64kbps/001001.mp3" },
+    });
+    expect(invoke).not.toHaveBeenCalled();
+  });
 });

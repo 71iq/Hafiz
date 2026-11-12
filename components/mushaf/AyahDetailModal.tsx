@@ -19,7 +19,7 @@ import {
   quranPageFontPaletteStyle,
 } from "@/lib/fonts/loader";
 import { useAyahAudio } from "@/lib/audio/ayah-audio";
-import { isQfContentEnabled } from "@/lib/quran-foundation/config";
+import { isQfContentEnabled, isRecitationEnabled } from "@/lib/quran-foundation/config";
 import { ensureTafsirSourceImported } from "@/lib/database/init";
 import { useDatabase } from "@/lib/database/provider";
 import { stringByKey, useStrings } from "@/lib/i18n/useStrings";
@@ -454,7 +454,7 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
         </View>
 
         <MirroredRow dir={isRTL ? "rtl" : "ltr"} className="mt-3 flex-wrap gap-2">
-          {isQfContentEnabled() && (
+          {isRecitationEnabled() && (
             <AyahActionButton
               icon={
                 audioState.loading ? (
