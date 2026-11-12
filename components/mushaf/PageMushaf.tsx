@@ -289,7 +289,13 @@ function PageSeparator({
 
         <View className="flex-row items-center" style={{ width: "40%" }}>
           <View className="flex-1 h-px bg-warm-200 dark:bg-neutral-700" />
-          <Text className="px-3 text-xs text-warm-400 dark:text-neutral-500">
+          {/* Android measured three Arabic-Indic digits a little narrower than it draws them, so the
+              last one wrapped out of view (442 drew as ٤٤); the minimum width holds any page number. */}
+          <Text
+            className="px-3 text-xs text-warm-400 dark:text-neutral-500"
+            style={{ minWidth: 64, textAlign: "center", writingDirection: "ltr", flexShrink: 0 }}
+            numberOfLines={1}
+          >
             {pageLabel}
           </Text>
           <View className="flex-1 h-px bg-warm-200 dark:bg-neutral-700" />
@@ -680,11 +686,20 @@ export function PageMushaf({
     const contentHeight = pageHeight - pagePaddingTop - pagePaddingBottom - SEPARATOR_HEIGHT;
     const targetY = pageStart + pagePaddingTop + (before / total) * contentHeight;
     const offset = Math.max(pageStart, targetY - effectiveContainerHeight * 0.25);
+    // On a cold start the list is still applying its initial page, so the offset stays pending and is
+    // retried until a scroll event confirms it, as for a font size change.
     const frame = requestAnimationFrame(() => {
       verticalOffsetRef.current = offset;
-      flatListRef.current?.scrollToOffset({ offset, animated: false });
+      pendingAnchorOffsetRef.current = offset;
+      retryPendingAnchor();
     });
-    return () => cancelAnimationFrame(frame);
+    const timer = setTimeout(() => {
+      if (pendingAnchorOffsetRef.current === offset) pendingAnchorOffsetRef.current = null;
+    }, 1500);
+    return () => {
+      cancelAnimationFrame(frame);
+      clearTimeout(timer);
+    };
     // Only a new target scrolls; later layout or size changes keep the reader's own position.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [highlightedAyahKey, horizontal, pageData.length > 0, layoutInfo !== null]);
