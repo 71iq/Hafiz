@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Pressable,
   ScrollView,
@@ -10,10 +10,11 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
-import { BookMarked, Lock, Sparkles } from "lucide-react-native";
+import { AlertCircle, BookMarked, Lock, Sparkles } from "lucide-react-native";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { BusyIndicator } from "@/components/ui/BusyIndicator";
 import { JourneyAyahCard } from "@/components/reflection-journey/JourneyAyahCard";
 import { useDatabase } from "@/lib/database/provider";
 import { useStrings, interpolate } from "@/lib/i18n/useStrings";
@@ -49,6 +50,8 @@ function ReflectionJourneyInner() {
   const { width } = useWindowDimensions();
   const { showToast } = useSelection();
   const [levels, setLevels] = useState<ReflectionJourneyLevelListItem[]>([]);
+  const [loadStatus, setLoadStatus] = useState<"loading" | "ready" | "error">("loading");
+  const latestLoad = useRef(0);
   const [selectedLevelId, setSelectedLevelId] = useState<string | null>(null);
   const [responseText, setResponseText] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -61,25 +64,41 @@ function ReflectionJourneyInner() {
   const nextLevel = selectedIndex >= 0 ? levels[selectedIndex + 1] ?? null : null;
   const contentWidthStyle = { alignSelf: "center" as const, width: isWide ? ("60%" as const) : ("100%" as const) };
 
+  // Keeps the given or currently selected level when it still exists, so a refocus or save
+  // does not jump away from it. Only the latest request may publish; a failure keeps any
+  // levels already shown and reports whether the refresh worked.
   const loadLevels = useCallback(
-    async (preferredLevelId?: string | null) => {
-      const items = await listReflectionJourneyLevels(db);
+    async (preferredLevelId?: string | null): Promise<boolean> => {
+      const request = ++latestLoad.current;
+      setLoadStatus((current) => (current === "error" ? "loading" : current));
+      let items: ReflectionJourneyLevelListItem[];
+      try {
+        items = await listReflectionJourneyLevels(db);
+      } catch (loadError) {
+        console.warn("[ReflectionJourney] Failed to load levels:", loadError);
+        if (request === latestLoad.current) setLoadStatus("error");
+        return false;
+      }
+      if (request !== latestLoad.current) return true;
       setLevels(items);
-
-      const preferred =
-        (preferredLevelId && items.find((item) => item.id === preferredLevelId)?.id) ??
-        items.find((item) => item.status === "available" || item.status === "draft")?.id ??
-        items[0]?.id ??
-        null;
-
-      setSelectedLevelId(preferred);
+      setLoadStatus("ready");
+      setSelectedLevelId((currentId) => {
+        const keepId = preferredLevelId ?? currentId;
+        return (
+          (keepId && items.find((item) => item.id === keepId)?.id) ??
+          items.find((item) => item.status === "available" || item.status === "draft")?.id ??
+          items[0]?.id ??
+          null
+        );
+      });
+      return true;
     },
     [db]
   );
 
   useFocusEffect(
     useCallback(() => {
-      loadLevels();
+      void loadLevels();
     }, [loadLevels])
   );
 
@@ -140,6 +159,35 @@ function ReflectionJourneyInner() {
       setSavingComplete(false);
     }
   }, [db, loadLevels, responseText, s.reflectionJourneyCompletedToast, s.reflectionJourneyMaxChars, s.reflectionJourneyMinChars, s.reflectionJourneySaveFailed, selectedLevel, showToast]);
+
+  if (levels.length === 0 && loadStatus !== "ready") {
+    return (
+      <SafeAreaView className="flex-1 bg-surface dark:bg-surface-dark">
+        <View className="flex-1 items-center px-6 pt-8" style={contentWidthStyle}>
+          <Card elevation="low" className="w-full rounded-4xl">
+            {loadStatus === "loading" ? (
+              <View
+                className="items-center justify-center"
+                style={{ paddingVertical: 48 }}
+                accessible
+                accessibilityLabel={s.reflectionJourneyLoading}
+              >
+                <BusyIndicator size={36} color={isDark ? "#2dd4bf" : "#0d9488"} />
+              </View>
+            ) : (
+              <EmptyState
+                icon={AlertCircle}
+                title={s.reflectionJourneyLoadFailed}
+                actionLabel={s.reflectionJourneyRetry}
+                onAction={() => void loadLevels()}
+                isDark={isDark}
+              />
+            )}
+          </Card>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (levels.length === 0) {
     return (

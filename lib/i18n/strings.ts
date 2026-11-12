@@ -344,6 +344,9 @@ export const strings = {
     reflectionJourneyMaxChars: "Max {{n}} characters",
     reflectionJourneyRecitationPlaceholder: "Recitation guidance will be added here later.",
     reflectionJourneyEmptyTitle: "Coming soon",
+    reflectionJourneyLoading: "Loading reflection journey",
+    reflectionJourneyLoadFailed: "Could not load the reflection journey",
+    reflectionJourneyRetry: "Retry",
     // Progress page
     progressTitle: "Progress",
     progressDailyReminder: "Daily Reminder",
@@ -1786,6 +1789,9 @@ export const strings = {
     reflectionJourneyMaxChars: "الحد الأقصى {{n}} حرفًا",
     reflectionJourneyRecitationPlaceholder: "ستُضاف إرشادات التلاوة هنا لاحقًا.",
     reflectionJourneyEmptyTitle: "قريبًا",
+    reflectionJourneyLoading: "جارٍ تحميل رحلة التأمل",
+    reflectionJourneyLoadFailed: "تعذر تحميل رحلة التأمل",
+    reflectionJourneyRetry: "إعادة المحاولة",
     // Reflections
     reflections: "تأملات",
     reflectionCount: "{{n}} تأملات",
