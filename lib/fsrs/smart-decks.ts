@@ -243,21 +243,18 @@ export async function writeAllDecksFilter(
   });
 }
 
-export async function filterQuranRefsByDefaultDeckFilter<T extends { surah: number; ayah: number }>(
-  db: DatabaseExecutor,
-  rows: T[]
-): Promise<T[]> {
-  const filter = await readDefaultDeckFilter(db);
-  return filterQuranRefs(db, rows, filter);
-}
-
-export async function filterStudyRowsByDefaultDeckFilter<T extends { id: string }>(
+/**
+ * The default surah filter chooses which memorized ayahs the ayah decks study. A word saved to the
+ * meanings deck is the user's own pick from any surah, so the filter never hides it.
+ */
+export async function filterStudyRowsByDefaultDeckFilter<T extends { id: string; deck_id: string }>(
   db: DatabaseExecutor,
   rows: T[]
 ): Promise<T[]> {
   const filter = await readDefaultDeckFilter(db);
   if (filter.type === "all") return rows;
   const keyedRows = rows
+    .filter((row) => row.deck_id !== MEANINGS_DECK_ID)
     .map((row) => {
       const ref = parseStudyCardRef(row.id);
       return ref ? { row, ...ref } : null;
@@ -265,7 +262,7 @@ export async function filterStudyRowsByDefaultDeckFilter<T extends { id: string 
     .filter((row): row is { row: T; surah: number; ayah: number } => !!row);
   const matching = await filterQuranRefs(db, keyedRows, filter);
   const allowed = new Set(matching.map((item) => item.row));
-  return rows.filter((row) => allowed.has(row));
+  return rows.filter((row) => row.deck_id === MEANINGS_DECK_ID || allowed.has(row));
 }
 
 export async function migrateLegacyRetentionDecks(db: AppDatabase): Promise<number> {

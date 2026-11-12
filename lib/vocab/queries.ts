@@ -1,5 +1,4 @@
 import type { DatabaseExecutor } from "@/lib/database/types";
-import { filterQuranRefsByDefaultDeckFilter } from "@/lib/fsrs/smart-decks";
 
 export type VocabCard = {
   id: number;
@@ -21,10 +20,11 @@ export type VocabCard = {
   last_review: string | null;
 };
 
+// Saved words come from any surah, so the default surah deck filter does not apply here.
 export async function listVocabCards(
   db: DatabaseExecutor
 ): Promise<VocabCard[]> {
-  const rows = await db.getAllAsync<VocabCard>(
+  return db.getAllAsync<VocabCard>(
     `SELECT
        v.id,
        v.surah,
@@ -48,7 +48,6 @@ export async function listVocabCards(
        ON custom.surah = v.surah AND custom.ayah = v.ayah AND custom.word_pos = v.word_pos
      ORDER BY datetime(v.due) ASC, v.id ASC`
   );
-  return filterQuranRefsByDefaultDeckFilter(db, rows);
 }
 
 export async function deleteVocabCard(

@@ -209,6 +209,21 @@ describe("smart-deck and review queue SQLite contracts", () => {
     expect(ids(await getDueCardsForReview(db, SMART_DECK_IDS.qiraat))).toEqual(["qiraat:1:3"]);
   });
 
+  it("keeps saved words from any surah in the meanings deck under the default surah filter", async () => {
+    sql
+      .prepare("INSERT INTO user_settings VALUES (?, ?)")
+      .run("smart_deck_filter_all_decks", JSON.stringify({ type: "surah", surahs: [1] }));
+    insert(card("word:1:2:1", { deck_id: "meanings" }));
+    insert(card("word:2:255:3", { deck_id: "meanings" }));
+    insert(card("1:2"));
+    insert(card("2:255"));
+    expect(ids(await getDueCardsForReview(db, "meanings", { reviewSortOrder: "due" })).sort()).toEqual([
+      "word:1:2:1",
+      "word:2:255:3",
+    ]);
+    expect(ids(await getDueCardsForReview(db, "custom", { reviewSortOrder: "due" }))).toEqual(["1:2"]);
+  });
+
   it("materializes only the new-card capacity and preserves active rows and timestamps on repeat", async () => {
     for (const n of [1, 2, 3, 4]) candidate(n);
     insert(card("qiraat:1:1", { deck_id: SMART_DECK_IDS.qiraat }));
