@@ -108,13 +108,14 @@ export function PublicPage({ page }: { page: PublicPageKey }) {
           style={{
             width: "100%",
             maxWidth,
+            // Rows inside follow this direction; adding row-reverse as well flipped Arabic rows back.
             direction: isRTL ? "rtl" : "ltr",
           }}
         >
           <View
             className="mb-6 items-center justify-between gap-3"
             style={{
-              flexDirection: isRTL ? "row-reverse" : "row",
+              flexDirection: "row",
               flexWrap: "wrap",
             }}
           >
@@ -137,7 +138,7 @@ export function PublicPage({ page }: { page: PublicPageKey }) {
 
             <View
               className="items-center gap-2"
-              style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
+              style={{ flexDirection: "row" }}
             >
               <PageAction
                 label={labels.home}
@@ -281,7 +282,7 @@ export function PublicPage({ page }: { page: PublicPageKey }) {
                       <View
                         key={bullet}
                         className="gap-3"
-                        style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
+                        style={{ flexDirection: "row" }}
                       >
                         <Text
                           className="text-primary-accent dark:text-primary-bright"
@@ -308,7 +309,7 @@ export function PublicPage({ page }: { page: PublicPageKey }) {
                 {!!section.links?.length && (
                   <View
                     className="mt-5 flex-wrap gap-3"
-                    style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
+                    style={{ flexDirection: "row" }}
                   >
                     {section.links.map((link) => {
                       const webLinkProps = getExternalWebLinkProps(link.href);
@@ -400,10 +401,11 @@ function PublicPageTabs({
 
   return (
     <View
-      className="mb-10 rounded-full bg-surface-low dark:bg-surface-dark-low p-1"
+      // Phone widths wrap long labels such as Terms of Service onto two lines instead of truncating them.
+      className={`mb-10 ${isCompact ? "rounded-3xl" : "rounded-full"} bg-surface-low dark:bg-surface-dark-low p-1`}
       style={{
         alignSelf: isCompact ? "stretch" : isRTL ? "flex-end" : "flex-start",
-        flexDirection: isRTL ? "row-reverse" : "row",
+        flexDirection: "row",
       }}
     >
       {PUBLIC_PAGE_TABS.map((tab) => {
@@ -422,7 +424,7 @@ function PublicPageTabs({
             onPress={() => {
               if (!selected) onChange(tab);
             }}
-            className={`${isCompact ? "flex-1 px-2" : "px-5"} min-h-10 items-center justify-center rounded-full ${
+            className={`${isCompact ? "flex-1 px-1.5 py-1.5 rounded-2xl" : "px-5 rounded-full"} min-h-10 items-center justify-center ${
               selected ? "bg-white dark:bg-surface-dark-high" : ""
             }`}
             style={({ pressed }) => ({
@@ -434,7 +436,7 @@ function PublicPageTabs({
           >
             <Text
               className="text-center"
-              numberOfLines={1}
+              numberOfLines={isCompact ? 2 : 1}
               style={{
                 color: selected ? activeTextColor : inactiveTextColor,
                 fontFamily: "Manrope_700Bold",
