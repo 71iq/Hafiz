@@ -4,7 +4,7 @@ import { useDatabase, useDatabaseStatus } from "@/lib/database/provider";
 import { writeUserSetting } from "@/lib/database/user-settings";
 import { materializeAllSmartDeckCards, writeAllDecksFilter } from "@/lib/fsrs/smart-decks";
 import { interpolate, useStrings } from "@/lib/i18n/useStrings";
-import { SettingsProvider, useSettings } from "@/lib/settings/context";
+import { useSettings } from "@/lib/settings/context";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -1065,9 +1065,5 @@ export default function OnboardingScreen() {
     return <LoadingScreen progress={progress} />;
   }
 
-  return (
-    <SettingsProvider>
-      <OnboardingInner />
-    </SettingsProvider>
-  );
+  return <OnboardingInner />;
 }

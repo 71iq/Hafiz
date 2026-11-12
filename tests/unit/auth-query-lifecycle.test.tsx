@@ -54,6 +54,9 @@ jest.mock("@/lib/database/provider", () => ({
 jest.mock("@/lib/audio/ayah-audio", () => ({
   AyahAudioProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
+jest.mock("@/lib/settings/context", () => ({
+  SettingsProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
 jest.mock("@/lib/fonts/ui-fonts", () => ({ UI_FONTS: {}, loadUiFontsWeb: async () => undefined }));
 jest.mock("@/lib/supabase", () => ({
   isSupabaseConfigured: () => false,

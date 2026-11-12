@@ -5,7 +5,6 @@ import { ProfileModalContent } from "@/components/profile/ProfileModalContent";
 import { useDatabaseStatus } from "@/lib/database/provider";
 import { strings } from "@/lib/i18n/strings";
 import { getStartupLanguage } from "@/lib/i18n/startup-language";
-import { SettingsProvider } from "@/lib/settings/context";
 
 export default function PublicProfileScreen() {
   const { userId } = useLocalSearchParams<{ userId: string }>();
@@ -14,11 +13,7 @@ export default function PublicProfileScreen() {
   if (error) return <RouteDatabaseError message={error} />;
   if (!isReady) return <LoadingScreen progress={progress} />;
 
-  return (
-    <SettingsProvider>
-      <ProfileModalContent userId={typeof userId === "string" ? userId : undefined} />
-    </SettingsProvider>
-  );
+  return <ProfileModalContent userId={typeof userId === "string" ? userId : undefined} />;
 }
 
 function RouteDatabaseError({ message }: { message: string }) {

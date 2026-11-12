@@ -67,7 +67,10 @@ jest.mock("@/lib/settings/context", () => {
   return { ...actual, useSettings: useMeasuredSettings };
 });
 
-jest.mock("@/lib/database/provider", () => ({ useDatabase: () => mockDatabase }));
+jest.mock("@/lib/database/provider", () => ({
+  useDatabase: () => mockDatabase,
+  useDatabaseStatus: () => ({ db: mockDatabase, isReady: true, progress: null, error: null }),
+}));
 jest.mock("nativewind", () => ({
   useColorScheme: () => ({ setColorScheme: mockSetColorScheme }),
   vars: (variables: Record<string, string>) => variables,

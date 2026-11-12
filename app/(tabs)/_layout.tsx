@@ -4,7 +4,7 @@ import { Sparkles, BookOpen, BarChart3, Settings, Trophy, MessageSquare, BookMar
 import { useDatabaseStatus } from "@/lib/database/provider";
 import { DatabaseErrorState } from "@/components/ui/DatabaseErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
-import { SettingsProvider, useSettings } from "@/lib/settings/context";
+import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { AppNavigation } from "@/components/ui/AppNavigation";
 import { useSync } from "@/lib/sync/useSync";
@@ -192,12 +192,10 @@ export default function TabLayout() {
   }
 
   return (
-    <SettingsProvider>
-      <ChromeProvider>
-        <ErrorBoundary section="TabLayout">
-          <TabsWithStrings />
-        </ErrorBoundary>
-      </ChromeProvider>
-    </SettingsProvider>
+    <ChromeProvider>
+      <ErrorBoundary section="TabLayout">
+        <TabsWithStrings />
+      </ErrorBoundary>
+    </ChromeProvider>
   );
 }

@@ -13,7 +13,7 @@ import { useLocalSearchParams, useNavigation } from "expo-router";
 import type { DatabaseExecutor } from "@/lib/database/types";
 import { CalendarDays, ChevronLeft, ChevronRight, Clock3, EllipsisVertical, PauseCircle, Pencil, RotateCcw, Star, Trash2, Trophy, X } from "lucide-react-native";
 import { useDatabase, useDatabaseStatus } from "@/lib/database/provider";
-import { SettingsProvider, useSettings, withThemeOpacity } from "@/lib/settings/context";
+import { useSettings, withThemeOpacity } from "@/lib/settings/context";
 import { interpolate, useStrings } from "@/lib/i18n/useStrings";
 import type { UIStrings } from "@/lib/i18n/strings";
 import { Card } from "@/components/ui/Card";
@@ -169,11 +169,7 @@ export default function FlashcardSessionScreenWrapper() {
     return <LoadingScreen progress={progress} />;
   }
 
-  return (
-    <SettingsProvider>
-      <FlashcardSessionScreen />
-    </SettingsProvider>
-  );
+  return <FlashcardSessionScreen />;
 }
 
 function FlashcardSessionScreen() {

@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import { Platform, useColorScheme as useSystemColorScheme, useWindowDimensions, View } from "react-native";
 import { useColorScheme as useNativeWindColorScheme, vars } from "nativewind";
 import type { AppDatabase, DatabaseExecutor } from "@/lib/database/types";
-import { useDatabase } from "@/lib/database/provider";
+import { useDatabaseStatus } from "@/lib/database/provider";
 import { writeUserSetting } from "@/lib/database/user-settings";
 import { DEFAULT_LANGUAGE, DEFAULT_TRANSLATION_LANGUAGE } from "@/lib/translations/languages";
 import { importTranslation } from "@/lib/translations/import";
@@ -432,12 +432,18 @@ async function readSettings(db: DatabaseExecutor, keys: string[]): Promise<Recor
   return values;
 }
 
-async function writeSetting(db: AppDatabase, key: string, value: string): Promise<void> {
+async function writeSetting(db: AppDatabase | null, key: string, value: string): Promise<void> {
+  if (!db) throw new Error("Database not initialized");
   await writeUserSetting(db, key, value);
 }
 
+// The root layout owns the only provider. It mounts before the database is ready so routes never
+// remount it, and it keeps the last loaded values while a database connection is replaced, so the
+// language, direction and theme do not reset to defaults when a route opens or the connection
+// restarts. isLoaded is true only once the current connection's settings have been read.
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
-  const db = useDatabase();
+  const { db: connectedDb, isReady } = useDatabaseStatus();
+  const db = isReady ? connectedDb : null;
   const { setColorScheme } = useNativeWindColorScheme();
   const systemScheme = useSystemColorScheme();
   const { width } = useWindowDimensions();
@@ -463,11 +469,14 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [focusScrollSpeed, setFocusScrollSpeedState] = useState(FOCUS_SCROLL_SPEED_DEFAULT);
   const [hifzAutoDelayMs, setHifzAutoDelayMsState] = useState(DEFAULT_HIFZ_AUTO_DELAY_MS);
   const [hifzAutoAdvancePage, setHifzAutoAdvancePageState] = useState(false);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [loadedDb, setLoadedDb] = useState<AppDatabase | null>(null);
+  const isLoaded = db !== null && loadedDb === db;
 
-  // Load settings from SQLite on mount
+  // Load settings from SQLite once each database connection is ready
   useEffect(() => {
-    async function load() {
+    if (!db) return;
+    let cancelled = false;
+    async function load(db: AppDatabase) {
       try {
         const saved = await readSettings(db, [
           "font_size_index",
@@ -489,6 +498,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           "translation_language",
           "translation_active_lang",
         ]);
+        if (cancelled) return;
 
         const savedFontSize = saved.font_size_index;
         if (savedFontSize !== null) {
@@ -601,10 +611,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       } catch (err) {
         console.warn("[Settings] Failed to load settings:", err);
       } finally {
-        setIsLoaded(true);
+        if (!cancelled) setLoadedDb(db);
       }
     }
-    load();
+    load(db);
+    return () => {
+      cancelled = true;
+    };
   }, [db]);
 
   const systemTheme = systemScheme === "dark" ? "dark" : "white";
@@ -706,6 +719,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const setTranslationLanguage = useCallback(
     async (code: string) => {
       if (code === translationLanguage) return;
+      if (!db) throw new Error("Database not initialized");
       if (code === DEFAULT_LANGUAGE) {
         setTranslationLanguageState(code);
         await writeSetting(db, "translation_language", code);

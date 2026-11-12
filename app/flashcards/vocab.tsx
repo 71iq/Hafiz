@@ -4,7 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { ArrowLeft, ArrowRight, Trash2, X } from "lucide-react-native";
 import { useDatabase, useDatabaseStatus } from "@/lib/database/provider";
-import { SettingsProvider, useSettings } from "@/lib/settings/context";
+import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { strings } from "@/lib/i18n/strings";
 import { getStartupLanguage } from "@/lib/i18n/startup-language";
@@ -29,11 +29,7 @@ export default function VocabSessionScreenWrapper() {
     return <LoadingScreen progress={progress} />;
   }
 
-  return (
-    <SettingsProvider>
-      <VocabSessionScreen />
-    </SettingsProvider>
-  );
+  return <VocabSessionScreen />;
 }
 
 function VocabSessionScreen() {

@@ -14,6 +14,7 @@ import { DatabaseProvider, useDatabaseStatus } from "@/lib/database/provider";
 import { UI_FONTS, loadUiFontsWeb } from "@/lib/fonts/ui-fonts";
 import { useAuthStore } from "@/lib/auth/store";
 import { AyahAudioProvider } from "@/lib/audio/ayah-audio";
+import { SettingsProvider } from "@/lib/settings/context";
 
 const queryClient = createAppQueryClient();
 
@@ -96,32 +97,38 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <PasswordRecoveryProvider>
         <DatabaseProvider>
-          <DatabaseNoticeBoundary>
-            <AudioProviderBoundary>
-              <StableDocumentTitle />
-              <Stack screenOptions={{ headerShown: false }}>
-                <Stack.Screen name="(tabs)" />
-                <Stack.Screen name="about" />
-                <Stack.Screen name="credits" />
-                <Stack.Screen name="privacy" />
-                <Stack.Screen name="terms" />
-                <Stack.Screen name="zayt-preview" />
-                <Stack.Screen name="onboarding" options={{ animation: "fade" }} />
-                <Stack.Screen name="open" />
-                <Stack.Screen name="flashcards/session" options={{ animation: "slide_from_bottom" }} />
-                <Stack.Screen name="auth/login" options={{ animation: "slide_from_bottom" }} />
-                <Stack.Screen name="auth/signup" options={{ animation: "slide_from_bottom" }} />
-                <Stack.Screen name="auth/forgot-password" options={{ animation: "slide_from_bottom" }} />
-                <Stack.Screen name="auth/reset-password" options={{ animation: "slide_from_bottom" }} />
-                <Stack.Screen name="profile/index" options={{ animation: "fade", presentation: "transparentModal" }} />
-                <Stack.Screen
-                  name="profile/[userId]"
-                  options={{ animation: "fade", presentation: "transparentModal" }}
-                />
-              </Stack>
-              <PortalHost />
-            </AudioProviderBoundary>
-          </DatabaseNoticeBoundary>
+          {/* The only settings provider: routes share it so opening one never resets language or theme. */}
+          <SettingsProvider>
+            <DatabaseNoticeBoundary>
+              <AudioProviderBoundary>
+                <StableDocumentTitle />
+                <Stack screenOptions={{ headerShown: false }}>
+                  <Stack.Screen name="(tabs)" />
+                  <Stack.Screen name="about" />
+                  <Stack.Screen name="credits" />
+                  <Stack.Screen name="privacy" />
+                  <Stack.Screen name="terms" />
+                  <Stack.Screen name="zayt-preview" />
+                  <Stack.Screen name="onboarding" options={{ animation: "fade" }} />
+                  <Stack.Screen name="open" />
+                  <Stack.Screen name="flashcards/session" options={{ animation: "slide_from_bottom" }} />
+                  <Stack.Screen name="auth/login" options={{ animation: "slide_from_bottom" }} />
+                  <Stack.Screen name="auth/signup" options={{ animation: "slide_from_bottom" }} />
+                  <Stack.Screen name="auth/forgot-password" options={{ animation: "slide_from_bottom" }} />
+                  <Stack.Screen name="auth/reset-password" options={{ animation: "slide_from_bottom" }} />
+                  <Stack.Screen
+                    name="profile/index"
+                    options={{ animation: "fade", presentation: "transparentModal" }}
+                  />
+                  <Stack.Screen
+                    name="profile/[userId]"
+                    options={{ animation: "fade", presentation: "transparentModal" }}
+                  />
+                </Stack>
+                <PortalHost />
+              </AudioProviderBoundary>
+            </DatabaseNoticeBoundary>
+          </SettingsProvider>
         </DatabaseProvider>
       </PasswordRecoveryProvider>
     </QueryClientProvider>

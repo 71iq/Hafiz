@@ -9,7 +9,7 @@ import { useDatabaseStatus } from "@/lib/database/provider";
 import { strings } from "@/lib/i18n/strings";
 import { getStartupLanguage } from "@/lib/i18n/startup-language";
 import { useStrings } from "@/lib/i18n/useStrings";
-import { SettingsProvider, useSettings } from "@/lib/settings/context";
+import { useSettings } from "@/lib/settings/context";
 import { textStartStyle } from "@/lib/ui/direction";
 
 export default function ZaytPreviewRoute() {
@@ -31,11 +31,7 @@ export default function ZaytPreviewRoute() {
 
   if (!isReady) return <LoadingScreen progress={progress} />;
 
-  return (
-    <SettingsProvider>
-      <ZaytPreviewScreen />
-    </SettingsProvider>
-  );
+  return <ZaytPreviewScreen />;
 }
 
 function ZaytPreviewScreen() {

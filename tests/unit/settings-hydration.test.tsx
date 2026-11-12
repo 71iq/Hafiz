@@ -32,8 +32,9 @@ jest.mock("nativewind", () => ({
   vars: (variables: Record<string, string>) => variables,
 }));
 
+let mockIsReady = true;
 jest.mock("@/lib/database/provider", () => ({
-  useDatabase: () => mockUseDatabase(),
+  useDatabaseStatus: () => ({ db: mockUseDatabase(), isReady: mockIsReady, progress: null, error: null }),
 }));
 
 jest.mock("@/lib/translations/import", () => ({
@@ -92,6 +93,7 @@ async function renderLoadedSettings(fixture: SettingsFixture) {
 describe("settings ayah-marker hydration", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockIsReady = true;
     jest.replaceProperty(Platform, "OS", "web");
     windowGetItem.mockReturnValue(null);
     Object.defineProperty(globalThis, "window", {
@@ -170,5 +172,71 @@ describe("settings ayah-marker hydration", () => {
     await renderLoadedSettings(fixture);
 
     expect(mockImportTranslation).not.toHaveBeenCalled();
+  });
+});
+
+describe("shared settings provider across database readiness", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockIsReady = true;
+    jest.replaceProperty(Platform, "OS", "android");
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it("waits for a ready database without reading it", () => {
+    const fixture = createFixture();
+    mockIsReady = false;
+    mockUseDatabase.mockReturnValue(fixture);
+    const { result } = renderHook(() => useSettings(), { wrapper: SettingsWrapper });
+
+    expect(result.current.isLoaded).toBe(false);
+    expect(result.current.uiLanguage).toBe("en");
+    expect(fixture.getAllAsync).not.toHaveBeenCalled();
+  });
+
+  it("keeps the loaded language while a connection restarts and reloads for the new one", async () => {
+    const first = createFixture();
+    first.settings.set("ui_language", "ar");
+    const rendered = await renderLoadedSettings(first);
+    expect(rendered.result.current.uiLanguage).toBe("ar");
+    expect(rendered.result.current.isRTL).toBe(true);
+
+    mockIsReady = false;
+    rendered.rerender({});
+    expect(rendered.result.current.isLoaded).toBe(false);
+    expect(rendered.result.current.uiLanguage).toBe("ar");
+
+    const second = createFixture();
+    second.settings.set("ui_language", "en");
+    mockUseDatabase.mockReturnValue(second);
+    mockIsReady = true;
+    rendered.rerender({});
+    await waitFor(() => expect(rendered.result.current.isLoaded).toBe(true));
+    expect(rendered.result.current.uiLanguage).toBe("en");
+    expect(first.getAllAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores settings read from a connection that was replaced mid-load", async () => {
+    let releaseStale!: () => void;
+    const stale = createFixture();
+    stale.settings.set("ui_language", "ar");
+    const staleRead = stale.getAllAsync.getMockImplementation()!;
+    stale.getAllAsync.mockImplementationOnce(
+      (query, keys) => new Promise((resolve) => (releaseStale = () => resolve(staleRead(query, keys)))),
+    );
+    mockUseDatabase.mockReturnValue(stale);
+    const rendered = renderHook(() => useSettings(), { wrapper: SettingsWrapper });
+
+    const current = createFixture();
+    current.settings.set("ui_language", "en");
+    mockUseDatabase.mockReturnValue(current);
+    rendered.rerender({});
+    await waitFor(() => expect(rendered.result.current.isLoaded).toBe(true));
+    await act(async () => releaseStale());
+
+    expect(rendered.result.current.uiLanguage).toBe("en");
+    expect(rendered.result.current.isLoaded).toBe(true);
   });
 });
