@@ -279,6 +279,15 @@ describe("DeckCardsSheet due-date editor characterization", () => {
     expect(Number.isFinite(performance.now())).toBe(true);
   });
 
+  it("offers a digit keyboard with a dash on Android instead of a full keyboard", async () => {
+    jest.replaceProperty(ReactNative.Platform, "OS", "android");
+    const s = strings.ar;
+    const view = renderDeckWithCallbacks(jest.fn(), jest.fn());
+    await waitFor(() => expect(view.getByText(secondCard.title)).toBeTruthy());
+    const input = await openSecondCardEditor(view, s);
+    expect(input.props.keyboardType).toBe("phone-pad");
+  });
+
   it("characterizes Arabic light validation, fixed date writing, cancel, and reopen", async () => {
     const s = strings.ar;
     const onClose = jest.fn();

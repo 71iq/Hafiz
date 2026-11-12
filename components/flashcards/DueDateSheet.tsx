@@ -1,9 +1,15 @@
-import { Text } from "react-native";
+import { Platform, Text } from "react-native";
 import { Button } from "@/components/ui/Button";
 import { Input, type InputProps } from "@/components/ui/Input";
 import { OverlayBody, OverlayFooter, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import type { UIStrings } from "@/lib/i18n/strings";
 import { textStartStyle } from "@/lib/ui/direction";
+
+// The iOS punctuation pad has digits and "-". Elsewhere it falls back to a full
+// keyboard, while the phone pad (inputmode="tel" on web) has both.
+function dueDateKeyboardType(): InputProps["keyboardType"] {
+  return Platform.OS === "ios" ? "numbers-and-punctuation" : "phone-pad";
+}
 
 type DueDateSheetProps = {
   visible: boolean;
@@ -43,7 +49,7 @@ export function DueDateSheet({
           placeholderTextColor={isDark ? "#737373" : "#b9a085"}
           autoCapitalize={autoCapitalize}
           autoCorrect={autoCorrect}
-          keyboardType="numbers-and-punctuation"
+          keyboardType={dueDateKeyboardType()}
           dir={isRTL ? "rtl" : "ltr"}
           className="min-h-12 rounded-2xl bg-surface-low dark:bg-surface-dark-low px-4 py-3 text-charcoal dark:text-neutral-100"
           style={{
