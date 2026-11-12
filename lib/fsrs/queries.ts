@@ -428,16 +428,6 @@ async function insertMeaningCardRows(
 
 // ─── Query helpers ───────────────────────────────────────────
 
-function reviewQueueOptionsFromSettings(settings: DeckReviewSettings, limit: number): DueCardsForReviewOptions {
-  return {
-    limit,
-    newCardsLimit: settings.newCardsLimit,
-    newReviewOrder: settings.newReviewOrder,
-    reviewSortOrder: settings.reviewSortOrder,
-    newCardSortOrder: settings.newCardSortOrder,
-  };
-}
-
 /**
  * Cards studied today. A card counts once however many learning steps or Again presses it took, so
  * learning one new card does not use up several places in the daily limit.
@@ -474,6 +464,43 @@ export async function getRemainingReviewLimit(
   return Math.max(0, clampReviewLimit(limit) - await getTodayReviewedCount(db, deckId));
 }
 
+/** New cards of a deck first studied today: a log row written while the card was still new. */
+async function getTodayIntroducedNewCount(db: DatabaseExecutor, deckId: string): Promise<number> {
+  const { start, end } = todayBounds();
+  const row = await db.getFirstAsync<{ count: number }>(
+    `SELECT COUNT(DISTINCT sl.card_id) as count
+       FROM study_log sl
+       JOIN study_cards sc ON sc.id = sl.card_id
+      WHERE sc.deck_id = ? AND sc.deleted_at IS NULL AND sl.state = 0
+        AND sl.reviewed_at >= ? AND sl.reviewed_at < ?`,
+    [deckId, start, end]
+  );
+  return row?.count ?? 0;
+}
+
+type DeckQueueOptions = Exclude<DueCardsForReviewOptions, number> & { limit: number; newCardsLimit: number };
+
+/**
+ * One deck's queue options for the rest of today: its review limit less the cards studied today and
+ * its new-card limit less the new cards introduced today, so neither limit restarts with each
+ * session. Null once the daily review limit is used up.
+ */
+async function getDeckQueueOptions(
+  db: DatabaseExecutor,
+  deckId: string,
+  settings: DeckReviewSettings
+): Promise<DeckQueueOptions | null> {
+  const limit = await getRemainingReviewLimit(db, deckId, settings.dailyReviewLimit);
+  if (limit <= 0) return null;
+  return {
+    limit,
+    newCardsLimit: Math.max(0, settings.newCardsLimit - await getTodayIntroducedNewCount(db, deckId)),
+    newReviewOrder: settings.newReviewOrder,
+    reviewSortOrder: settings.reviewSortOrder,
+    newCardSortOrder: settings.newCardSortOrder,
+  };
+}
+
 export type ReviewQueueItem = { card: StudyCardRow; settings: DeckReviewSettings };
 
 /** The decks Home lists, in its order. Review all and the Home due headline cover exactly these. */
@@ -492,12 +519,12 @@ export async function loadReviewQueue(db: AppDatabase, deckId?: string): Promise
     return queue;
   }
   const settings = await readDeckReviewSettings(db, deckId);
-  const remaining = await getRemainingReviewLimit(db, deckId, settings.dailyReviewLimit);
-  if (remaining <= 0) return [];
+  const options = await getDeckQueueOptions(db, deckId, settings);
+  if (!options) return [];
   if (isSmartDeckId(deckId)) {
-    await materializeSmartDeckCards(db, deckId, remaining, settings.newCardsLimit);
+    await materializeSmartDeckCards(db, deckId, options.limit, options.newCardsLimit);
   }
-  const rows = await getDueCardsForReview(db, deckId, reviewQueueOptionsFromSettings(settings, remaining));
+  const rows = await getDueCardsForReview(db, deckId, options);
   return rows.map((card) => ({ card, settings }));
 }
 
@@ -533,19 +560,19 @@ export async function getDeckTodayStats(
   const settings = typeof settingsOrLimit === "number"
     ? normalizeDeckReviewSettings({ dailyReviewLimit: settingsOrLimit })
     : normalizeDeckReviewSettings(settingsOrLimit);
-  const remaining = await getRemainingReviewLimit(db, deckId, settings.dailyReviewLimit);
-  if (remaining <= 0) {
+  const options = await getDeckQueueOptions(db, deckId, settings);
+  if (!options) {
     return { total: await getTotalCardCount(db, deckId), dueCount: 0, newCount: 0 };
   }
 
   if (isSmartDeckId(deckId)) {
-    const stats = await getSmartDeckTodayStats(db, deckId, reviewQueueOptionsFromSettings(settings, remaining));
+    const stats = await getSmartDeckTodayStats(db, deckId, options);
     return { total: stats.total, dueCount: stats.due, newCount: stats.newCount };
   }
 
   const [total, rows] = await Promise.all([
     getTotalCardCount(db, deckId),
-    getDueCardsForReview(db, deckId, reviewQueueOptionsFromSettings(settings, remaining)),
+    getDueCardsForReview(db, deckId, options),
   ]);
   return {
     total,

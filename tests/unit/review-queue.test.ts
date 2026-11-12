@@ -166,4 +166,21 @@ describe("review queue shared by Home and sessions", () => {
     expect(queue.map((item) => item.card.id).sort()).toEqual(["qiraat:1:1", "qiraat:1:2", "qiraat:1:3", "word:2:255:3"]);
     expect(queue).toHaveLength(offered);
   });
+
+  it("counts new cards introduced earlier today against the deck's daily new-card limit", async () => {
+    for (const ayah of [1, 2, 3, 4, 5]) qiraatCandidate(1, ayah);
+    await writeDeckReviewSettings(db, QIRAAT, { newCardsLimit: 3 });
+    // An earlier session today introduced two new cards; they are now on a later learning step.
+    for (const id of ["qiraat:1:1", "qiraat:1:2"]) {
+      insert(id, QIRAAT, { state: State.Learning, reps: 1, due: minutesFromNow(24 * 60) });
+      sql.prepare("INSERT INTO study_log (card_id, state, reviewed_at) VALUES (?, 0, ?)").run(id, minutesFromNow(-30));
+    }
+    const settings = await readDeckReviewSettings(db, QIRAAT);
+
+    const home = await getDeckTodayStats(db, QIRAAT, settings);
+    const queue = await loadReviewQueue(db, QIRAAT);
+
+    expect(home.newCount).toBe(1);
+    expect(queue.filter((item) => item.card.state === State.New)).toHaveLength(1);
+  });
 });
