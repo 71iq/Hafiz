@@ -2,6 +2,7 @@ import { OperationNoticeOverlay } from "@/components/ui/OperationNoticeProvider"
 import { useEffect, useMemo, useRef, type Ref, type RefObject } from "react";
 import {
   Animated,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -236,9 +237,18 @@ export function ResponsiveOverlay({
 
   const overlayAlignment = activePresentation === "sheet" ? "items-stretch justify-end" : "items-center justify-center";
   const Container = avoidKeyboard ? KeyboardAvoidingView : View;
+  // Android Back reaches the modal even while its keyboard is open; the first press only hides the
+  // keyboard, as elsewhere in Android, so a typed query or note is not closed with it.
+  const handleRequestClose = () => {
+    if (Platform.OS === "android" && Keyboard.isVisible()) {
+      Keyboard.dismiss();
+      return;
+    }
+    onClose();
+  };
 
   return (
-    <Modal visible={open} transparent animationType="none" statusBarTranslucent onRequestClose={onClose}>
+    <Modal visible={open} transparent animationType="none" statusBarTranslucent onRequestClose={handleRequestClose}>
       <Container
         // Edge-to-edge Android no longer resizes the window for the keyboard (adjustResize is
         // ignored), so Android needs padding too or the keyboard covers sheet inputs.

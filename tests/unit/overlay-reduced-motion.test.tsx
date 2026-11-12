@@ -1,5 +1,5 @@
 import React from "react";
-import { AccessibilityInfo, Animated, Modal, Text } from "react-native";
+import { AccessibilityInfo, Animated, Keyboard, Modal, Platform, Text } from "react-native";
 import { act, cleanup, fireEvent, render, renderHook } from "@testing-library/react-native";
 import { ResponsiveOverlay } from "@/components/ui/ResponsiveOverlay";
 import { useReducedMotionPreference } from "@/lib/ui/reduced-motion";
@@ -138,6 +138,16 @@ it("actual backdrop and Modal request each call the original close once", async 
   expect(close).toHaveBeenCalledTimes(1);
   act(() => view.UNSAFE_getByType(Modal).props.onRequestClose());
   expect(close).toHaveBeenCalledTimes(2);
+  // Android Back with the keyboard open hides the keyboard first and keeps the overlay.
+  const platform = jest.replaceProperty(Platform, "OS", "android");
+  const visible = jest.spyOn(Keyboard, "isVisible").mockReturnValue(true);
+  const dismiss = jest.spyOn(Keyboard, "dismiss").mockImplementation(() => {});
+  act(() => view.UNSAFE_getByType(Modal).props.onRequestClose());
+  expect(dismiss).toHaveBeenCalledTimes(1);
+  expect(close).toHaveBeenCalledTimes(2);
+  visible.mockRestore();
+  dismiss.mockRestore();
+  platform.restore();
   expect(view.UNSAFE_getByType(Modal).props.animationType).toBe("none");
   expect(view.UNSAFE_getByType(Modal).props.statusBarTranslucent).toBe(true);
 });
