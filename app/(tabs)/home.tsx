@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import { View, Text, Pressable, StyleSheet, useWindowDimensions } from "react-native";
+import { formatAyahRef, toArabicNumber } from "@/lib/arabic";
 import { useRouter, type Href } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import {
@@ -77,9 +78,15 @@ type DeckCardsTarget = {
   title: string;
 };
 
+function formatArabicDate(date: Date): string {
+  return [date.getDate(), date.getMonth() + 1, date.getFullYear()].map(toArabicNumber).join("/");
+}
+
 export default function HomeScreen() {
   const db = useDatabase();
   const { isDark, isRTL, uiLanguage } = useSettings();
+  // Arabic uses Arabic-Indic digits, matching the reader.
+  const localNumber = (value: number) => (isRTL ? toArabicNumber(value) : value.toLocaleString());
   const s = useStrings();
   const router = useRouter();
   const { width } = useWindowDimensions();
@@ -365,7 +372,7 @@ export default function HomeScreen() {
               className="text-warm-400 dark:text-neutral-500 uppercase"
               style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, letterSpacing: 1.8 }}
             >
-              {new Date().toLocaleDateString()}
+              {isRTL ? formatArabicDate(new Date()) : new Date().toLocaleDateString()}
             </Text>
             <Pressable
               onPress={() => setShowSearch(true)}
@@ -424,7 +431,7 @@ export default function HomeScreen() {
                   className="text-charcoal dark:text-neutral-100"
                   style={{ fontFamily: "NotoSerif_700Bold", fontSize: 68, lineHeight: 68 }}
                 >
-                  {totalDue}
+                  {localNumber(totalDue)}
                 </Text>
                 <Text
                   className="text-warm-400 dark:text-neutral-500"
@@ -443,7 +450,7 @@ export default function HomeScreen() {
                     fontVariant: ["tabular-nums"],
                   }}
                 >
-                  {memorizedCards.toLocaleString()}
+                  {localNumber(memorizedCards)}
                 </Text>
                 <Text
                   className="text-warm-400 dark:text-neutral-500"
@@ -480,7 +487,7 @@ export default function HomeScreen() {
                 className="text-charcoal dark:text-neutral-100"
                 style={{ fontFamily: "Manrope_700Bold", fontSize: 16 }}
               >
-                {wirdStatus.currentDays.toLocaleString()}
+                {localNumber(wirdStatus.currentDays)}
               </Text>
               <Text
                 className="text-warm-400 dark:text-neutral-500"
@@ -526,13 +533,13 @@ export default function HomeScreen() {
                     className="text-charcoal dark:text-neutral-100"
                     style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15 }}
                   >
-                    {`${surahNames[resume.surah] ? interpolate(s.surahNamed, { name: surahNames[resume.surah] }) : resume.surah} · ${resume.surah}:${resume.ayah}`}
+                    {`${surahNames[resume.surah] ? interpolate(s.surahNamed, { name: surahNames[resume.surah] }) : resume.surah}${isRTL ? "، " : " · "}${formatAyahRef(isRTL, resume.surah, resume.ayah)}`}
                   </Text>
                   <Text
                     className="text-warm-400 dark:text-neutral-500"
                     style={{ fontFamily: "Manrope_500Medium", fontSize: 12 }}
                   >
-                    {interpolate(s.pageN, { n: resume.page })}
+                    {interpolate(s.pageN, { n: localNumber(resume.page) })}
                   </Text>
                 </View>
               </View>
@@ -1050,7 +1057,7 @@ function DeckStats({
                 ...(stat.color ? { color: stat.color } : null),
               }}
             >
-              {stat.value}
+              {isRTL ? toArabicNumber(stat.value) : stat.value}
             </Text>
             <Text
               className="text-warm-500 dark:text-neutral-400 text-center"

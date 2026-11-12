@@ -13,6 +13,7 @@ import { readSmartDeckFilter, SMART_DECK_IDS, type BuiltInDeckFilter } from "@/l
 import type { DeckCardsSheet } from "@/components/flashcards/DeckCardsSheet";
 import type { DeckReviewSettingsSheet } from "@/components/flashcards/DeckReviewSettingsSheet";
 import type { SmartDeckFilterSheet } from "@/components/flashcards/SmartDeckFilterSheet";
+import { toArabicNumber } from "@/lib/arabic";
 
 type CardsProps = React.ComponentProps<typeof DeckCardsSheet>;
 type ReviewProps = React.ComponentProps<typeof DeckReviewSettingsSheet>;
@@ -180,6 +181,8 @@ afterEach(() => {
 });
 
 describe.each(["en", "ar"] satisfies ("en" | "ar")[])("real home deck cards in %s", (language) => {
+  // Arabic shows Arabic-Indic digits, matching the reader.
+  const num = (value: number | string) => (language === "ar" ? toArabicNumber(Number(value)) : String(value));
   beforeEach(() => {
     Object.assign(mockSettings, { uiLanguage: language, isRTL: language === "ar" });
     jest.replaceProperty(I18nManager, "isRTL", language === "ar");
@@ -235,9 +238,9 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("real home deck cards in %
         direction: "ltr",
         flexDirection: language === "ar" ? "row-reverse" : "row",
       });
-      expect(scope.getByText(String(stats.total))).toBeTruthy();
-      const newNodes = scope.getAllByText(String(stats.newCount));
-      const dueNodes = scope.getAllByText(String(stats.dueCount));
+      expect(scope.getByText(num(stats.total))).toBeTruthy();
+      const newNodes = scope.getAllByText(num(stats.newCount));
+      const dueNodes = scope.getAllByText(num(stats.dueCount));
       expect(newNodes.some((n) => StyleSheet.flatten(n.props.style).color === (dark ? "#4ade80" : "#16a34a"))).toBe(
         true,
       );
@@ -337,7 +340,7 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("real home deck cards in %
     const view = await home();
     const s = strings[language];
     // Five smart decks offer 4 new and 2 due each; the vocabulary deck offers 7 new and 11 due.
-    expect(view.getByText("48")).toBeTruthy();
+    expect(view.getByText(num(48))).toBeTruthy();
     fireEvent.press(view.getByText(s.flashcardsStartReview));
     expect(mockRouterPush).toHaveBeenCalledWith({ pathname: "/flashcards/session", params: {} });
   });
@@ -402,6 +405,7 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("real home deck cards in %
 });
 
 describe.each(["en", "ar"] satisfies ("en" | "ar")[])("home dashboard load failure in %s", (language) => {
+  const num = (value: number | string) => (language === "ar" ? toArabicNumber(Number(value)) : String(value));
   beforeEach(() => {
     Object.assign(mockSettings, { uiLanguage: language, isRTL: language === "ar" });
     jest.replaceProperty(I18nManager, "isRTL", language === "ar");
@@ -423,8 +427,8 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("home dashboard load failu
     });
 
     await waitFor(() => expect(view.getByText(s.homeLoadFailed)).toBeTruthy());
-    expect(within(card(view, s.smartDeckRetentionTitle)).getByText(String(smartStats.total))).toBeTruthy();
-    expect(within(card(view, s.vocabDeckTitle)).getByText(String(vocabStats.total))).toBeTruthy();
+    expect(within(card(view, s.smartDeckRetentionTitle)).getByText(num(smartStats.total))).toBeTruthy();
+    expect(within(card(view, s.vocabDeckTitle)).getByText(num(vocabStats.total))).toBeTruthy();
 
     jest
       .mocked(getDeckTodayStats)
@@ -434,7 +438,7 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("home dashboard load failu
     });
 
     await waitFor(() => expect(view.queryByText(s.homeLoadFailed)).toBeNull());
-    expect(within(card(view, s.smartDeckRetentionTitle)).getByText(String(changedSmart.total))).toBeTruthy();
+    expect(within(card(view, s.smartDeckRetentionTitle)).getByText(num(changedSmart.total))).toBeTruthy();
   });
 
   it.each(["fails", "succeeds"] as const)(
@@ -463,7 +467,7 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("home dashboard load failu
         review().onSaved();
       });
       await waitFor(() =>
-        expect(within(card(view, s.smartDeckRetentionTitle)).getByText(String(newerSmart.total))).toBeTruthy(),
+        expect(within(card(view, s.smartDeckRetentionTitle)).getByText(num(newerSmart.total))).toBeTruthy(),
       );
 
       await act(async () => {
@@ -471,7 +475,7 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("home dashboard load failu
       });
 
       expect(view.queryByText(s.homeLoadFailed)).toBeNull();
-      expect(within(card(view, s.smartDeckRetentionTitle)).getByText(String(newerSmart.total))).toBeTruthy();
+      expect(within(card(view, s.smartDeckRetentionTitle)).getByText(num(newerSmart.total))).toBeTruthy();
     },
   );
 });
