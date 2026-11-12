@@ -194,7 +194,7 @@ export default function LoginScreen() {
     <AuthScreenShell
       locale={locale}
       title={s.authLogin}
-      subtitle={configured ? s.authLoginSubtitle : s.authUnavailableSubtitle}
+      subtitle={s.authLoginSubtitle}
       appName={s.appName}
       brandHeadline={s.authBrandHeadline}
       brandBody={s.authBrandBody}

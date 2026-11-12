@@ -276,7 +276,7 @@ function SignupFormScreen() {
     <AuthScreenShell
       locale={locale}
       title={s.authSignup}
-      subtitle={configured ? s.authSignupSubtitle : s.authUnavailableSubtitle}
+      subtitle={s.authSignupSubtitle}
       appName={s.appName}
       brandHeadline={s.authBrandHeadline}
       brandBody={s.authBrandBody}

@@ -78,7 +78,7 @@ function ForgotPasswordFormScreen() {
     <AuthScreenShell
       locale={locale}
       title={s.authForgotPasswordTitle}
-      subtitle={configured ? s.authForgotPasswordSubtitle : s.authUnavailableSubtitle}
+      subtitle={s.authForgotPasswordSubtitle}
       appName={s.appName}
       brandHeadline={s.authBrandHeadline}
       brandBody={s.authBrandBody}
