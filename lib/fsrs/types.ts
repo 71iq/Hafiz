@@ -27,6 +27,9 @@ export type DeckCardListItem = StudyCardRow & {
   reference: string;
   title: string;
   subtitle: string;
+  /** The Arabic interface's title and subtitle: Arabic surah names and Arabic-Indic references. */
+  titleAr: string;
+  subtitleAr: string;
   preview: string;
   searchText: string;
   kind: "ayah" | "word" | "smart";

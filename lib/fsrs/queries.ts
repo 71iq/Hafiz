@@ -60,6 +60,7 @@ import {
   SMART_DECK_IDS,
   type DueCardsForReviewOptions,
 } from "./smart-decks";
+import { formatAyahRef, toArabicNumber } from "@/lib/arabic";
 
 type ReviewActivityDay = { date: string; count: number };
 
@@ -1027,6 +1028,8 @@ async function decorateDeckCardListItem(
       reference,
       title,
       subtitle: ref.surahNameAr,
+      titleAr: formatAyahRef(true, ref.surah, ref.ayah),
+      subtitleAr: ref.surahNameAr,
       preview,
       searchText,
       kind: "smart",
@@ -1041,6 +1044,8 @@ async function decorateDeckCardListItem(
       reference: normalizedRow.id,
       title: normalizedRow.id,
       subtitle: normalizedRow.deck_id,
+      titleAr: normalizedRow.id,
+      subtitleAr: normalizedRow.deck_id,
       preview: "",
       searchText: `${normalizedRow.id} ${normalizedRow.deck_id}`,
       kind: "ayah",
@@ -1112,6 +1117,8 @@ async function decorateDeckCardListItem(
       reference,
       title: word,
       subtitle: `${surahRow?.name_english ?? parsed.surah} · ${parsed.surah}:${parsed.ayah}`,
+      titleAr: word,
+      subtitleAr: `${surahRow?.name_arabic ?? toArabicNumber(parsed.surah)}، ${formatAyahRef(true, parsed.surah, parsed.ayah)}`,
       preview,
       searchText,
       kind: "word",
@@ -1135,6 +1142,8 @@ async function decorateDeckCardListItem(
     reference,
     title: reference,
     subtitle: surahRow?.name_english ?? "",
+    titleAr: formatAyahRef(true, parsed.surah, parsed.ayah),
+    subtitleAr: surahRow?.name_arabic ?? "",
     preview,
     searchText,
     kind: "ayah",

@@ -131,6 +131,8 @@ function makeCard(id: string, title: string, due: Date): DeckCardListItem {
     reference: id,
     title,
     subtitle: `Subtitle for ${title}`,
+    titleAr: title,
+    subtitleAr: `Subtitle for ${title}`,
     preview: `Preview for ${title}`,
     searchText: `${title} ${id}`,
     kind: "ayah",

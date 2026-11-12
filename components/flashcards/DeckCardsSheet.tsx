@@ -462,14 +462,14 @@ function DeckCardRow({
           style={{ fontFamily: "Manrope_700Bold", fontSize: 13, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
           numberOfLines={1}
         >
-          {card.title}
+          {isRTL ? card.titleAr : card.title}
         </Text>
         <Text
           className="text-warm-500 dark:text-neutral-400"
           style={{ fontFamily: "Manrope_400Regular", fontSize: 11, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
           numberOfLines={1}
         >
-          {card.subtitle || card.reference}
+          {(isRTL ? card.subtitleAr : card.subtitle) || card.reference}
         </Text>
       </View>
       <Text

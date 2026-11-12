@@ -768,7 +768,7 @@ function SurahRangeEditor({
 }) {
   return (
     <ResponsiveSheet open={visible} onClose={onClose} maxWidth={420} maxHeight={320} dir={isRTL ? "rtl" : "ltr"}>
-      <OverlayHeader title={title} subtitle={surah?.name_english} onClose={onClose} isRTL={isRTL} showHandle />
+      <OverlayHeader title={title} subtitle={isRTL ? surah?.name_arabic : surah?.name_english} onClose={onClose} isRTL={isRTL} showHandle />
       <OverlayBody scrollEnabled={false} contentContainerClassName="px-5 py-5">
         {range ? (
           <View className="gap-3" style={{ flexDirection: isRTL ? "row-reverse" : "row" }}>
