@@ -491,7 +491,7 @@ export default function SettingsScreen() {
                 </Text>
               )}
 
-              {quranFontStyle !== "qcf2" && (
+              {quranRenderFontStyle !== "qcf2" && (
                 <SettingsControlRow label={s.quranMarkerStyleLabel} isRTL={isRTL}>
                   <ToggleGroup<QuranMarkerStyle>
                     value={quranMarkerStyle}

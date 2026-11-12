@@ -263,7 +263,7 @@ export function ReadingSettingsSheet({
               value={markerStyleLabel}
               isRTL={isRTL}
               onPress={() => setMarkerStylePickerVisible(true)}
-              disabled={quranFontStyle === "qcf2"}
+              disabled={quranRenderFontStyle === "qcf2"}
               trailing={<Chevron size={17} color={controlColor} />}
               compact={compactRows}
             />
