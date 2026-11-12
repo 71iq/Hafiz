@@ -345,6 +345,7 @@ export function WordDetailSheet() {
       <AyahDetailModal
         target={ayahModalOpen ? { surah, ayah } : null}
         onClose={() => setAyahModalOpen(false)}
+        onNavigate={handleClose}
         initialTab={activeTab === "meaning" ? "translation" : "tafsir"}
       />
     </>

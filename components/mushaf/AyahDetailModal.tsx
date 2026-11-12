@@ -62,10 +62,12 @@ export type AyahDetailTabKey = "translation" | "tafsir" | "hadith" | "qiraat" | 
 type Props = {
   target: TargetAyah | null;
   onClose: () => void;
+  /** Called after this sheet closes for a navigation, so a sheet that opened it can close too. */
+  onNavigate?: () => void;
   initialTab?: AyahDetailTabKey;
 };
 
-export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Props) {
+export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "tafsir" }: Props) {
   const db = useDatabase();
   const s = useStrings();
   const showNotice = useOperationNotice();
@@ -658,7 +660,16 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
           {activeTab === "qiraat" && <QiraatTab surah={activeTarget.surah} ayah={activeTarget.ayah} showHeader={false} />}
           {activeTab === "notes" && <PrivateNotesSection surah={activeTarget.surah} ayah={activeTarget.ayah} />}
           {activeTab === "reflections" && (
-            <ReflectionsSection surah={activeTarget.surah} ayah={activeTarget.ayah} initiallyExpanded showHeader={false} />
+            <ReflectionsSection
+              surah={activeTarget.surah}
+              ayah={activeTarget.ayah}
+              initiallyExpanded
+              showHeader={false}
+              onNavigate={() => {
+                onClose();
+                onNavigate?.();
+              }}
+            />
           )}
         </View>
       </OverlayBody>

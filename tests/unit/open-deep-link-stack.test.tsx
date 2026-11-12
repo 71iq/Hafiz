@@ -1,9 +1,19 @@
 import React from "react";
-import { Text } from "react-native";
+import { Pressable, Text } from "react-native";
 import { Stack, Tabs, router } from "expo-router";
-import { act, renderRouter, screen } from "expo-router/testing-library";
+import { act, fireEvent, renderRouter, screen } from "expo-router/testing-library";
 import OpenDeepLink from "@/app/open";
 import { consumePendingDeepLink } from "@/lib/deep-link";
+import { useOpenMushaf } from "@/lib/navigation/open-mushaf";
+
+function OpenAyahButton({ label }: { label: string }) {
+  const openMushaf = useOpenMushaf();
+  return (
+    <Pressable onPress={() => openMushaf({ surah: 2, ayah: 255 })}>
+      <Text>{label}</Text>
+    </Pressable>
+  );
+}
 
 type RouteState = { name: string; state?: RouteState; routes?: RouteState[] };
 
@@ -19,9 +29,10 @@ function renderApp(initialUrl: string) {
     {
       _layout: () => <Stack screenOptions={{ headerShown: false }} />,
       "(tabs)/_layout": () => <Tabs />,
-      "(tabs)/home": () => <Text>Home screen</Text>,
+      "(tabs)/home": () => <OpenAyahButton label="Open from home" />,
       "(tabs)/mushaf": () => <Text>Mushaf screen</Text>,
       open: OpenDeepLink,
+      profile: () => <OpenAyahButton label="Open from profile" />,
       "flashcards/session": () => <Text>Session screen</Text>,
     },
     { initialUrl },
@@ -72,6 +83,33 @@ describe("RF-196 warm deep links", () => {
 
   it("opens the reader when the link is the first screen", async () => {
     const app = renderApp("/open?surah=2&ayah=255");
+    await act(async () => {});
+
+    expect(screen.getByText("Mushaf screen")).toBeTruthy();
+    expect(rootRouteNames(app)).toEqual(["(tabs)"]);
+    expect(consumePendingDeepLink()).toEqual({ surah: 2, ayah: 255 });
+  });
+});
+
+describe("opening the reader from inside the app", () => {
+  it("dismisses a screen above the tabs, such as the profile sheet, instead of opening the reader behind it", async () => {
+    const app = renderApp("/home");
+    act(() => router.push("/profile"));
+    await act(async () => {});
+    expect(rootRouteNames(app)).toEqual(["(tabs)", "profile"]);
+
+    fireEvent.press(screen.getByText("Open from profile"));
+    await act(async () => {});
+
+    expect(screen.getByText("Mushaf screen")).toBeTruthy();
+    expect(rootRouteNames(app)).toEqual(["(tabs)"]);
+    expect(consumePendingDeepLink()).toEqual({ surah: 2, ayah: 255 });
+  });
+
+  it("switches tab from a tab screen without stacking another tab tree", async () => {
+    const app = renderApp("/home");
+
+    fireEvent.press(screen.getByText("Open from home"));
     await act(async () => {});
 
     expect(screen.getByText("Mushaf screen")).toBeTruthy();

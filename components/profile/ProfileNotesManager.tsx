@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, Text, View, useWindowDimensions } from "react-native";
-import { router } from "expo-router";
 import { BookOpen, Edit3, NotebookPen, Search, Trash2, type LucideIcon } from "lucide-react-native";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -9,7 +8,7 @@ import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/Res
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
 import { interpolate, useStrings } from "@/lib/i18n/useStrings";
-import { setPendingDeepLink } from "@/lib/deep-link";
+import { useOpenMushaf } from "@/lib/navigation/open-mushaf";
 import { toArabicNumber } from "@/lib/arabic";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import {
@@ -94,11 +93,14 @@ export function ProfileNotesManager() {
     }
   }, [db, deleteBusy, deletingNote, refreshNotes, s.privateNoteDeleteFailed]);
 
-  const openAyah = useCallback((note: PrivateNoteSearchResult) => {
-    setAllNotesOpen(false);
-    setPendingDeepLink({ surah: note.surah, ayah: note.ayahStart });
-    router.push("/(tabs)/mushaf" as any);
-  }, []);
+  const openMushaf = useOpenMushaf();
+  const openAyah = useCallback(
+    (note: PrivateNoteSearchResult) => {
+      setAllNotesOpen(false);
+      openMushaf({ surah: note.surah, ayah: note.ayahStart });
+    },
+    [openMushaf],
+  );
 
   const openEdit = useCallback((note: PrivateNoteSearchResult) => {
     setAllNotesOpen(false);

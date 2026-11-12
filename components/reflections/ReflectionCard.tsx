@@ -24,6 +24,8 @@ type Props = {
   referenceLabel?: string;
   onReferencePress?: (reflection: Reflection) => void;
   onAuthRequired?: () => void;
+  /** Called before the card navigates away, so the sheet that shows it can close first. */
+  onNavigate?: () => void;
 };
 
 export function ReflectionCard({
@@ -36,6 +38,7 @@ export function ReflectionCard({
   referenceLabel,
   onReferencePress,
   onAuthRequired,
+  onNavigate,
 }: Props) {
   const { isDark, isRTL, uiLanguage, themeColors } = useSettings();
   const s = useStrings();
@@ -149,8 +152,9 @@ export function ReflectionCard({
   const menuSide = isRTL ? { left: 12 } : { right: 12 };
   const isFeed = variant === "feed";
   const openProfile = useCallback(() => {
+    onNavigate?.();
     router.push(reflection.user_id === user?.id ? ("/profile" as any) : (`/profile/${reflection.user_id}` as any));
-  }, [reflection.user_id, user?.id]);
+  }, [onNavigate, reflection.user_id, user?.id]);
   const contentText = (
     <Text
       className="text-charcoal dark:text-neutral-200"

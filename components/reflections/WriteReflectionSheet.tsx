@@ -25,9 +25,20 @@ type Props = {
   ayahEnd: number;
   ayahPreview?: string; // text reference like "Al-Baqarah 2:255"
   onSuccess?: () => void;
+  /** Called after this sheet closes for a navigation, so a sheet that contains it can close too. */
+  onNavigate?: () => void;
 };
 
-export function WriteReflectionSheet({ open, onClose, surah, ayahStart, ayahEnd, ayahPreview, onSuccess }: Props) {
+export function WriteReflectionSheet({
+  open,
+  onClose,
+  surah,
+  ayahStart,
+  ayahEnd,
+  ayahPreview,
+  onSuccess,
+  onNavigate,
+}: Props) {
   const { isDark, isRTL } = useSettings();
   const { width, height } = useWindowDimensions();
   const s = useStrings();
@@ -140,8 +151,9 @@ export function WriteReflectionSheet({ open, onClose, surah, ayahStart, ayahEnd,
 
   const handleLogin = useCallback(() => {
     handleClose();
+    onNavigate?.();
     router.push("/auth/login");
-  }, [handleClose]);
+  }, [handleClose, onNavigate]);
 
   return (
     <ResponsiveSheet

@@ -28,6 +28,8 @@ type Props = {
   onLikeToggled?: (reflectionId: string, liked: boolean, delta: number) => void;
   onAuthRequired?: () => void;
   onClose: () => void;
+  /** Called after this sheet closes for a navigation, so a sheet that contains it can close too. */
+  onNavigate?: () => void;
   onCommentAdded: (reflectionId: string) => void;
 };
 
@@ -53,6 +55,7 @@ export function CommentsSheet({
   onLikeToggled,
   onAuthRequired,
   onClose,
+  onNavigate,
   onCommentAdded,
 }: Props) {
   const { isDark, isRTL, uiLanguage, themeColors } = useSettings();
@@ -248,11 +251,28 @@ export function CommentsSheet({
   );
 
   const mutedColor = isDark ? "#737373" : "#A39B93";
+  // Android keeps this screen and its Modal window mounted under a pushed route, so the sheet
+  // has to close before navigating or the next screen opens behind it.
+  const closeForNavigation = useCallback(() => {
+    handleClose();
+    onNavigate?.();
+  }, [handleClose, onNavigate]);
   const openProfile = useCallback(
     (commentUserId: string) => {
+      closeForNavigation();
       router.push(commentUserId === user?.id ? ("/profile" as any) : (`/profile/${commentUserId}` as any));
     },
-    [user?.id],
+    [closeForNavigation, user?.id],
+  );
+  const handleReferencePress = useMemo(
+    () =>
+      onReferencePress
+        ? (target: Reflection) => {
+            closeForNavigation();
+            onReferencePress(target);
+          }
+        : undefined,
+    [closeForNavigation, onReferencePress],
   );
 
   return (
@@ -279,7 +299,8 @@ export function CommentsSheet({
                 variant="feed"
                 showReference={showReference}
                 referenceLabel={referenceLabel}
-                onReferencePress={onReferencePress}
+                onReferencePress={handleReferencePress}
+                onNavigate={closeForNavigation}
                 onCommentsPress={() => {}}
                 onLikeToggled={onLikeToggled ?? (() => {})}
                 onAuthRequired={onAuthRequired}
@@ -543,7 +564,7 @@ export function CommentsSheet({
               </Text>
               <Pressable
                 onPress={() => {
-                  handleClose();
+                  closeForNavigation();
                   router.push("/auth/login");
                 }}
                 className="mt-3 self-start rounded-full bg-primary-accent px-4 py-2 dark:bg-primary-bright"

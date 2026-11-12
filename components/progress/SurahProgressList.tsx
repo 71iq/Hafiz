@@ -1,10 +1,9 @@
 import React from "react";
 import { ScrollView, View, Text, Pressable } from "react-native";
-import { useRouter } from "expo-router";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { BookOpen, ChevronDown } from "lucide-react-native";
-import { setPendingDeepLink } from "@/lib/deep-link";
+import { useOpenMushaf } from "@/lib/navigation/open-mushaf";
 import { useSettings } from "@/lib/settings/context";
 import type { UIStrings } from "@/lib/i18n/strings";
 import { textStartStyle } from "@/lib/ui/direction";
@@ -40,7 +39,7 @@ export function SurahProgressList({
   readOnly = false,
   s,
 }: Props) {
-  const router = useRouter();
+  const openMushaf = useOpenMushaf();
   const { themeColors } = useSettings();
   const previewData = previewLimit ? data.slice(0, previewLimit) : data;
   const isHorizontalPreview = !!previewLimit;
@@ -59,9 +58,8 @@ export function SurahProgressList({
   }
 
   const handlePress = (surah: number) => {
-    setPendingDeepLink({ surah, ayah: 1 });
-    router.push("/(tabs)/mushaf");
     onItemPress?.();
+    openMushaf({ surah, ayah: 1 });
   };
   const rowFlexStyle = {
     direction: "ltr" as const,

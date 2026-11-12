@@ -22,6 +22,8 @@ type Props = {
   ayah: number;
   initiallyExpanded?: boolean;
   showHeader?: boolean;
+  /** Called before the section navigates away, so the sheet that shows it can close first. */
+  onNavigate?: () => void;
 };
 
 export function ReflectionsSection(props: Props) {
@@ -34,6 +36,7 @@ function ReflectionsSectionContent({
   ayah,
   initiallyExpanded = false,
   showHeader = true,
+  onNavigate,
   user,
 }: Props & { user: ReturnType<typeof useAuthStore.getState>["user"] }) {
   const { isDark, themeColors } = useSettings();
@@ -209,7 +212,11 @@ function ReflectionsSectionContent({
                 reflection={r}
                 onLikeToggled={handleLikeToggled}
                 onCommentsPress={setCommentsReflectionId}
-                onAuthRequired={() => router.push("/auth/login")}
+                onAuthRequired={() => {
+                  onNavigate?.();
+                  router.push("/auth/login");
+                }}
+                onNavigate={onNavigate}
               />
             ))
           )}
@@ -244,7 +251,10 @@ function ReflectionsSectionContent({
           )}
 
           <Pressable
-            onPress={() => router.push("/reflection-feed" as Href)}
+            onPress={() => {
+              onNavigate?.();
+              router.push("/reflection-feed" as Href);
+            }}
             className="items-center py-2.5"
             style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
           >
@@ -276,6 +286,7 @@ function ReflectionsSectionContent({
       <CommentsSheet
         reflectionId={commentsReflectionId}
         onClose={() => setCommentsReflectionId(null)}
+        onNavigate={onNavigate}
         onCommentAdded={handleCommentAdded}
       />
 
@@ -283,6 +294,7 @@ function ReflectionsSectionContent({
       <WriteReflectionSheet
         open={writeOpen}
         onClose={() => setWriteOpen(false)}
+        onNavigate={onNavigate}
         surah={surah}
         ayahStart={ayah}
         ayahEnd={ayah}

@@ -1,7 +1,8 @@
 import { useEffect } from "react";
-import { useLocalSearchParams, useNavigation, router } from "expo-router";
+import { useLocalSearchParams, useNavigation } from "expo-router";
 import { View, ActivityIndicator } from "react-native";
 import { setPendingDeepLink } from "@/lib/deep-link";
+import { navigateToMushaf } from "@/lib/navigation/open-mushaf";
 
 /**
  * Deep link handler route.
@@ -28,9 +29,7 @@ export default function OpenDeepLink() {
     // return to them; replacing would stack another full tab tree under every link, growing memory
     // and the Back history (RF196). Otherwise (cold start, or a session, auth or onboarding screen
     // below) replace this screen as before so that flow stays underneath.
-    const { routes, index } = navigation.getState() ?? { routes: [], index: 0 };
-    if (routes[index - 1]?.name === "(tabs)") router.dismissTo("/(tabs)/mushaf");
-    else router.replace("/(tabs)/mushaf");
+    navigateToMushaf(navigation.getState());
   }, [navigation, params.surah, params.ayah]);
 
   // Brief loading state while redirecting
