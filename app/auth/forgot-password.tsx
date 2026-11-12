@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ActivityIndicator, Text, View } from "react-native";
+import { ActivityIndicator, Platform, Text, View } from "react-native";
 import { Redirect, useRouter } from "expo-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -62,7 +62,8 @@ function ForgotPasswordFormScreen() {
       setMessage(null);
       await sendPasswordReset(data.email);
       setMessageType("success");
-      setMessage(s.authPasswordResetSent);
+      // Native reset links open the web reset page; say so, since the app cannot finish the reset.
+      setMessage(Platform.OS === "web" ? s.authPasswordResetSent : s.authPasswordResetSentInBrowser);
     } catch (err) {
       setMessageType("error");
       setMessage(errorMessage(err) ?? null);

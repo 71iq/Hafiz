@@ -141,9 +141,12 @@ function getEmailRedirectTo(): string | undefined {
   return globalThis.location?.origin;
 }
 
-function getPasswordResetRedirectTo(): string | undefined {
-  const baseUrl = getEmailRedirectTo();
-  return baseUrl ? `${baseUrl}/auth/reset-password` : undefined;
+// Native has no recovery deep link, so its reset email opens the public web reset page,
+// where the password is changed for the same account before the user signs in on the app.
+const PUBLIC_WEB_ORIGIN = "https://hafizquran.app";
+
+export function getPasswordResetRedirectTo(): string {
+  return `${getEmailRedirectTo() ?? PUBLIC_WEB_ORIGIN}/auth/reset-password`;
 }
 
 function setSessionIdentity({ session, user }: Pick<AuthState, "session" | "user">): void {

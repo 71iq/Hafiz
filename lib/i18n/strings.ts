@@ -783,6 +783,8 @@ export const strings = {
     authForgotPasswordSubtitle: "Enter your email and we'll send you a reset link.",
     authSendResetLink: "Send reset link",
     authPasswordResetSent: "Password reset link sent. Check your inbox and spam folder.",
+    authPasswordResetSentInBrowser:
+      "Password reset link sent. Check your inbox and spam folder. The link opens hafizquran.app in your browser. Set your new password there, then sign in here.",
     authResetPasswordTitle: "Set a new password",
     authResetPasswordSubtitle: "Enter a new password for your account.",
     authResetBrowserUnsupported: "Password reset is unavailable in this browser. Try another browser or the Hafiz app.",
@@ -1690,6 +1692,8 @@ export const strings = {
     authForgotPasswordSubtitle: "أدخل بريدك الإلكتروني وسنرسل لك رابط إعادة التعيين.",
     authSendResetLink: "إرسال رابط إعادة التعيين",
     authPasswordResetSent: "تم إرسال رابط إعادة التعيين. تحقق من صندوق الوارد والرسائل غير المرغوب فيها.",
+    authPasswordResetSentInBrowser:
+      "تم إرسال رابط إعادة التعيين. تحقق من صندوق الوارد والرسائل غير المرغوب فيها. يفتح الرابط موقع hafizquran.app في المتصفح. عيّن كلمة المرور الجديدة هناك، ثم سجّل الدخول هنا.",
     authResetPasswordTitle: "عيّن كلمة مرور جديدة",
     authResetPasswordSubtitle: "أدخل كلمة مرور جديدة لحسابك.",
     authResetBrowserUnsupported: "إعادة تعيين كلمة المرور غير متاحة في هذا المتصفح. جرّب متصفحًا آخر أو تطبيق حافظ.",
