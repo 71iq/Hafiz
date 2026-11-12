@@ -626,15 +626,16 @@ export function PageMushaf({
     }
   }, [jumpToPage, pageData.length, requestedPage]);
 
+  // Neighbouring page fonts load ahead in both modes, so a page scrolled into view is not a spinner.
   useEffect(() => {
-    if (!horizontal || pageData.length === 0) return;
+    if (pageData.length === 0) return;
     const start = Math.max(1, currentPage - 2);
     const end = Math.min(pageData.length, currentPage + 2);
     for (let page = start; page <= end; page++) {
       loadQuranPageFont(quranFontStyle, page).catch(console.warn);
     }
     loadQuranPageFont(quranFontStyle, 1).catch(console.warn);
-  }, [currentPage, horizontal, pageData.length, quranFontStyle]);
+  }, [currentPage, pageData.length, quranFontStyle]);
 
   useEffect(() => {
     if (Platform.OS !== "web") return;
@@ -1203,9 +1204,7 @@ export function PageMushaf({
     return (
       <View className="flex-1 items-center justify-center">
         <ActivityIndicator size="large" color="#0d9488" />
-        <Text className="text-warm-500 dark:text-neutral-400 mt-3 text-sm">
-          Loading pages...
-        </Text>
+        <Text className="text-warm-500 dark:text-neutral-400 mt-3 text-sm">{s.loading}</Text>
       </View>
     );
   }
@@ -1288,11 +1287,12 @@ export function PageMushaf({
           scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}
           initialScrollIndex={Math.max(0, currentPage - 1)}
-          initialNumToRender={1}
-          maxToRenderPerBatch={1}
-          updateCellsBatchingPeriod={80}
-          windowSize={3}
-          removeClippedSubviews
+          // A page is a few hundred native views, but rendering only one ahead left blank pages
+          // during a fast scroll; two per batch and a window of five keep pages ready.
+          initialNumToRender={2}
+          maxToRenderPerBatch={2}
+          updateCellsBatchingPeriod={50}
+          windowSize={5}
           contentContainerStyle={{ paddingBottom: verticalScrollBottomInset }}
           {...(Platform.OS === "web" ? ({ onWheel: pauseAutoScrollForUser } as Record<string, unknown>) : {})}
         />
