@@ -122,7 +122,8 @@ const originalWindowDimensions = ReactNative.Dimensions.get("window");
 const originalScreenDimensions = ReactNative.Dimensions.get("screen");
 
 jest.mock("expo-router", () => ({
-  useRouter: () => ({ replace: mockRouterReplace }),
+  router: { replace: (...args: unknown[]) => mockRouterReplace(...args), dismissTo: jest.fn() },
+  useNavigation: () => ({ getState: () => undefined }),
   useLocalSearchParams: () => ({ deckId: "fixture-session-deck" }),
 }));
 

@@ -1,16 +1,27 @@
 import React from "react";
 import { Pressable, Text } from "react-native";
-import { Stack, Tabs, router } from "expo-router";
+import { Stack, Tabs, router, useNavigation } from "expo-router";
 import { act, fireEvent, renderRouter, screen } from "expo-router/testing-library";
 import OpenDeepLink from "@/app/open";
 import { consumePendingDeepLink } from "@/lib/deep-link";
 import { useOpenMushaf } from "@/lib/navigation/open-mushaf";
+import { returnToTabs } from "@/lib/navigation/return-to-tabs";
 
 function OpenAyahButton({ label }: { label: string }) {
   const openMushaf = useOpenMushaf();
   return (
     <Pressable onPress={() => openMushaf({ surah: 2, ayah: 255 })}>
       <Text>{label}</Text>
+    </Pressable>
+  );
+}
+
+// Stands in for the review session's Done and close actions, which leave through returnToTabs.
+function SessionScreen() {
+  const navigation = useNavigation();
+  return (
+    <Pressable onPress={() => returnToTabs(navigation.getState(), "/(tabs)/home")}>
+      <Text>Session screen</Text>
     </Pressable>
   );
 }
@@ -29,11 +40,16 @@ function renderApp(initialUrl: string) {
     {
       _layout: () => <Stack screenOptions={{ headerShown: false }} />,
       "(tabs)/_layout": () => <Tabs />,
-      "(tabs)/home": () => <OpenAyahButton label="Open from home" />,
+      "(tabs)/home": () => (
+        <>
+          <Text>Home screen</Text>
+          <OpenAyahButton label="Open from home" />
+        </>
+      ),
       "(tabs)/mushaf": () => <Text>Mushaf screen</Text>,
       open: OpenDeepLink,
       profile: () => <OpenAyahButton label="Open from profile" />,
-      "flashcards/session": () => <Text>Session screen</Text>,
+      "flashcards/session": SessionScreen,
     },
     { initialUrl },
   );
@@ -115,5 +131,31 @@ describe("opening the reader from inside the app", () => {
     expect(screen.getByText("Mushaf screen")).toBeTruthy();
     expect(rootRouteNames(app)).toEqual(["(tabs)"]);
     expect(consumePendingDeepLink()).toEqual({ surah: 2, ayah: 255 });
+  });
+});
+
+describe("leaving a review session", () => {
+  it("returns to the Home it was opened from without leaving a second Home behind Back", async () => {
+    const app = renderApp("/home");
+    act(() => router.push("/flashcards/session"));
+    await act(async () => {});
+
+    fireEvent.press(screen.getByText("Session screen"));
+    await act(async () => {});
+
+    expect(screen.getByText("Home screen")).toBeTruthy();
+    expect(rootRouteNames(app)).toEqual(["(tabs)"]);
+    expect(router.canGoBack()).toBe(false);
+  });
+
+  it("opens Home when the session was the first screen, as after onboarding", async () => {
+    const app = renderApp("/flashcards/session");
+    await act(async () => {});
+
+    fireEvent.press(screen.getByText("Session screen"));
+    await act(async () => {});
+
+    expect(screen.getByText("Home screen")).toBeTruthy();
+    expect(rootRouteNames(app)).toEqual(["(tabs)"]);
   });
 });

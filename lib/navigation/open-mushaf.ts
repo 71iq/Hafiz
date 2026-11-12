@@ -1,8 +1,9 @@
 import { useCallback } from "react";
 import { router, useNavigation } from "expo-router";
 import { setPendingDeepLink, type DeepLinkTarget } from "@/lib/deep-link";
+import { returnToTabs, type RootStackState } from "@/lib/navigation/return-to-tabs";
 
-type NavigatorState = { type?: string; index?: number; routes?: { name: string }[] } | undefined;
+type NavigatorState = (RootStackState & { type?: string }) | undefined;
 
 /**
  * Moves to the Mushaf tab from the screen that owns `state` (that screen's navigator state).
@@ -17,9 +18,7 @@ export function navigateToMushaf(state: NavigatorState) {
     router.navigate("/(tabs)/mushaf");
     return;
   }
-  const index = state?.index ?? 0;
-  if (state?.routes?.[index - 1]?.name === "(tabs)") router.dismissTo("/(tabs)/mushaf");
-  else router.replace("/(tabs)/mushaf");
+  returnToTabs(state, "/(tabs)/mushaf");
 }
 
 /** Opens the Mushaf at `target` from any screen. See navigateToMushaf. */

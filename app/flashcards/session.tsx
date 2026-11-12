@@ -9,7 +9,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useNavigation } from "expo-router";
 import type { DatabaseExecutor } from "@/lib/database/types";
 import { CalendarDays, ChevronLeft, ChevronRight, Clock3, EllipsisVertical, PauseCircle, Pencil, RotateCcw, Star, Trash2, Trophy, X } from "lucide-react-native";
 import { useDatabase, useDatabaseStatus } from "@/lib/database/provider";
@@ -42,6 +42,7 @@ import { StudyCardDeletedError } from "@/lib/fsrs/card-errors";
 import { computeUniqueFront } from "@/lib/fsrs/uniqueness";
 import { computeReviewPoints, addTodayPoints } from "@/lib/fsrs/scoring";
 import { hapticMedium, hapticSuccess } from "@/lib/haptics";
+import { returnToTabs } from "@/lib/navigation/return-to-tabs";
 import { Skeleton, SkeletonText } from "@/components/ui/Skeleton";
 import { syncDailyScore, updateProfileStats } from "@/lib/fsrs/leaderboard-sync";
 import { formatLocalDateInput, parseDueDateInput } from "@/lib/date";
@@ -185,7 +186,7 @@ function FlashcardSessionScreen() {
   const { isDark, isRTL, fontSize, lineHeight, tafseerSource, themeSurface, isLoaded: settingsLoaded } = useSettings();
   const s = useStrings();
   const NextIcon = isRTL ? ChevronLeft : ChevronRight;
-  const router = useRouter();
+  const navigation = useNavigation();
   const { deckId } = useLocalSearchParams<{ deckId?: string }>();
   const { width } = useWindowDimensions();
   const maxWidth = Math.min(width, 600);
@@ -818,7 +819,7 @@ function FlashcardSessionScreen() {
     resetSessionProgress();
     setSummary(null);
     setPhase("loading");
-    router.replace("/(tabs)/home");
+    returnToTabs(navigation.getState(), "/(tabs)/home");
   };
 
   // ─── Render ────────────────────────────────────────────────
