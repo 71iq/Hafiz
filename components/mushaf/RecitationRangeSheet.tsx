@@ -385,8 +385,15 @@ function LabeledInput({
   isDark: boolean;
   isRTL: boolean;
 }) {
+  // The label is shown, not only announced: Range mode has two identical-looking fields.
   return (
-    <View>
+    <View className="gap-1.5">
+      <Text
+        className="px-1 text-warm-500 dark:text-neutral-400"
+        style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12, ...textStartStyle(isRTL) }}
+      >
+        {label}
+      </Text>
       <TextInput
         value={value}
         onChangeText={onChangeText}
