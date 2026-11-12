@@ -659,6 +659,36 @@ export function PageMushaf({
     }
   }, [jumpToPage, pageData.length, requestedPage]);
 
+  // A jump lands on the page's top, but at larger font sizes a page is taller than the screen and a
+  // target ayah lower on it (2:255 on page 42) stayed out of view. Bring the highlighted ayah near the
+  // top, estimating its height on the page from the glyphs before it.
+  useEffect(() => {
+    if (horizontal || !highlightedAyahKey || !layoutInfo || pageData.length === 0) return;
+    const index = pageData.findIndex((item) =>
+      item.ayahs.some((ayah) => `${ayah.surah}:${ayah.ayah}` === highlightedAyahKey)
+    );
+    if (index < 0) return;
+    const pageStart = layoutInfo.offsets[index];
+    const pageHeight = layoutInfo.heights[index];
+    if (typeof pageStart !== "number" || typeof pageHeight !== "number") return;
+    if (pageHeight <= effectiveContainerHeight) return;
+    const glyphCounts = pageData[index].ayahs.map((ayah) => ayah.textQcf2.split(/\s+/).filter(Boolean).length);
+    const total = glyphCounts.reduce((sum, count) => sum + count, 0);
+    const targetIndex = pageData[index].ayahs.findIndex((ayah) => `${ayah.surah}:${ayah.ayah}` === highlightedAyahKey);
+    const before = glyphCounts.slice(0, targetIndex).reduce((sum, count) => sum + count, 0);
+    if (total <= 0 || before <= 0) return;
+    const contentHeight = pageHeight - pagePaddingTop - pagePaddingBottom - SEPARATOR_HEIGHT;
+    const targetY = pageStart + pagePaddingTop + (before / total) * contentHeight;
+    const offset = Math.max(pageStart, targetY - effectiveContainerHeight * 0.25);
+    const frame = requestAnimationFrame(() => {
+      verticalOffsetRef.current = offset;
+      flatListRef.current?.scrollToOffset({ offset, animated: false });
+    });
+    return () => cancelAnimationFrame(frame);
+    // Only a new target scrolls; later layout or size changes keep the reader's own position.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightedAyahKey, horizontal, pageData.length > 0, layoutInfo !== null]);
+
   // Neighbouring page fonts load ahead in both modes, so a page scrolled into view is not a spinner.
   useEffect(() => {
     if (pageData.length === 0) return;
