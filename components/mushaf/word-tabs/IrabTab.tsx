@@ -39,6 +39,18 @@ export function IrabTab({ surah, ayah, wordPos, onScrollToMatch }: Props) {
     setMatchY(event.nativeEvent.layout.y);
   };
 
+  // A phrase such as "على الناس" is stored once per word with the same text and analysis; show it once
+  // and treat it as the tapped word's entry when any of its words is the one tapped.
+  const groupedRows = rows.reduce<{ row: WordIrabDaasRow; wordPositions: number[] }[]>((groups, row) => {
+    const previous = groups[groups.length - 1];
+    if (previous && previous.row.word === row.word && previous.row.irab === row.irab) {
+      previous.wordPositions.push(row.word_pos);
+    } else {
+      groups.push({ row, wordPositions: [row.word_pos] });
+    }
+    return groups;
+  }, []);
+
   if (loading) {
     return (
       <View className="py-6 items-center">
@@ -62,8 +74,8 @@ export function IrabTab({ surah, ayah, wordPos, onScrollToMatch }: Props) {
 
   return (
     <View className="py-4 px-1">
-      {rows.map((row) => {
-        const isMatch = row.word_pos === wordPos;
+      {groupedRows.map(({ row, wordPositions }) => {
+        const isMatch = wordPositions.includes(wordPos);
         return (
           <View
             key={`${row.surah}-${row.ayah}-${row.word_pos}`}

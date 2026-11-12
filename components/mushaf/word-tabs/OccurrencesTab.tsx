@@ -11,7 +11,7 @@ import {
 } from "@/lib/word/queries";
 import { useStrings, interpolate } from "@/lib/i18n/useStrings";
 import { useSettings } from "@/lib/settings/context";
-import { formatAyahRef } from "@/lib/arabic";
+import { formatAyahRef, toArabicNumber } from "@/lib/arabic";
 
 // Common roots occur thousands of times, so rows load a page at a time.
 const OCCURRENCES_PAGE = 50;
@@ -110,7 +110,7 @@ export function OccurrencesTab({ surah, ayah, wordPos }: Props) {
         </Text>
         <View className="bg-teal-100 dark:bg-teal-900/40 rounded-full px-3 py-1">
           <Text className="text-teal-700 dark:text-teal-300 text-xs font-semibold">
-            {interpolate(s.occurrences, { n: current?.total ?? 0 })}
+            {interpolate(s.occurrences, { n: isRTL ? toArabicNumber(current?.total ?? 0) : current?.total ?? 0 })}
           </Text>
         </View>
       </View>

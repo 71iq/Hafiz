@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useMemo, useRef, type ReactNode } from "react";
-import { View, Text, Pressable, ScrollView, useWindowDimensions } from "react-native";
-import { formatAyahRef } from "@/lib/arabic";
+import { View, Text, Pressable, ScrollView, Platform, useWindowDimensions } from "react-native";
+import { formatAyahRef, toArabicNumber } from "@/lib/arabic";
 import { BookOpen, ChevronLeft, ChevronRight } from "lucide-react-native";
 import { useWordInteraction, type WordRef } from "@/lib/word/context";
 import { useSettings } from "@/lib/settings/context";
@@ -44,7 +44,10 @@ export function WordDetailSheet() {
     previous: null,
     next: null,
   });
-  const wordHeaderFontReady = useQuranPageFontReady(WORD_HEADER_FONT_STYLE, detailWord?.v2Page);
+  // The colour tajweed font draws black base glyphs on Android in dark themes, as in the reader, so
+  // those themes show the header word in the classic font there.
+  const headerFontStyle = Platform.OS !== "web" && isDark ? "qcf2" : WORD_HEADER_FONT_STYLE;
+  const wordHeaderFontReady = useQuranPageFontReady(headerFontStyle, detailWord?.v2Page);
   const [headerMeta, setHeaderMeta] = useState<WordHeaderMeta>({
     wordText: null,
     qcf2Glyph: null,
@@ -55,11 +58,12 @@ export function WordDetailSheet() {
   });
   const contentScrollRef = useRef<ScrollView>(null);
 
+  const localNumber = (value: number) => (isRTL ? toArabicNumber(value) : String(value));
   const isPhone = width < SIDEBAR_BREAKPOINT;
   const maxModalHeight = Math.min(height - (isPhone ? 12 : 48), isPhone ? height * 0.94 : 720);
-  const headerFontFamily = detailWord ? quranPageFontName(WORD_HEADER_FONT_STYLE, detailWord.v2Page) : undefined;
+  const headerFontFamily = detailWord ? quranPageFontName(headerFontStyle, detailWord.v2Page) : undefined;
   const headerFontPaletteStyle = detailWord
-    ? quranPageFontPaletteStyle(WORD_HEADER_FONT_STYLE, detailWord.v2Page, effectiveTheme)
+    ? quranPageFontPaletteStyle(headerFontStyle, detailWord.v2Page, effectiveTheme)
     : null;
 
   const tabs = useMemo(
@@ -269,13 +273,13 @@ export function WordDetailSheet() {
                   <MetaPill label={s.lemmaLabel ?? "Lemma"} value={headerMeta.lemma ?? "—"} />
                 </>
               )}
-              <MetaPill label={s.wordTabOccurrences} value={headerMeta.rootCount == null ? "—" : String(headerMeta.rootCount)} />
+              <MetaPill label={s.wordTabOccurrences} value={headerMeta.rootCount == null ? "—" : localNumber(headerMeta.rootCount)} />
             </View>
 
             <View className={`mt-2 flex-row gap-2 ${isRTL ? "flex-row-reverse" : ""}`}>
-              <QuickStat label={surahLabel} value={String(surah)} />
-              <QuickStat label={ayahLabel} value={String(ayah)} />
-              <QuickStat label={wordLabel} value={String(wordPos)} />
+              <QuickStat label={surahLabel} value={localNumber(surah)} />
+              <QuickStat label={ayahLabel} value={localNumber(ayah)} />
+              <QuickStat label={wordLabel} value={localNumber(wordPos)} />
             </View>
           </View>
 
