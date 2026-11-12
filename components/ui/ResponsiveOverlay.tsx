@@ -1,5 +1,5 @@
 import { OperationNoticeOverlay } from "@/components/ui/OperationNoticeProvider";
-import { useEffect, useMemo, useRef, type Ref, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, type Ref, type RefObject } from "react";
 import {
   Animated,
   Keyboard,
@@ -190,6 +190,27 @@ export function ResponsiveOverlay({
     };
   }, [initialFocusRef, open, restoreFocusRef]);
 
+  // Edge-to-edge Android ignores adjustResize, and KeyboardAvoidingView kept a navigation-bar-sized
+  // padding after the keyboard hid, leaving every sheet lifted off the bottom. Android pads from the
+  // keyboard events directly and clears the padding when the keyboard hides.
+  const androidAvoidsKeyboard = Platform.OS === "android" && avoidKeyboard && open;
+  const [androidKeyboardInset, setAndroidKeyboardInset] = useState(0);
+  const containerHeightRef = useRef(0);
+  useEffect(() => {
+    if (!androidAvoidsKeyboard) return;
+    const show = Keyboard.addListener("keyboardDidShow", (event) => {
+      const { height: keyboardHeight, screenY } = event.endCoordinates;
+      const overlap = containerHeightRef.current > 0 ? containerHeightRef.current - screenY : keyboardHeight;
+      setAndroidKeyboardInset(Math.max(0, overlap));
+    });
+    const hide = Keyboard.addListener("keyboardDidHide", () => setAndroidKeyboardInset(0));
+    return () => {
+      show.remove();
+      hide.remove();
+      setAndroidKeyboardInset(0);
+    };
+  }, [androidAvoidsKeyboard]);
+
   const computedMaxHeight = useMemo(() => {
     if (maxHeight != null) return maxHeight;
     if (activePresentation === "fullscreen") return "100%" as const;
@@ -236,7 +257,7 @@ export function ResponsiveOverlay({
   );
 
   const overlayAlignment = activePresentation === "sheet" ? "items-stretch justify-end" : "items-center justify-center";
-  const Container = avoidKeyboard ? KeyboardAvoidingView : View;
+  const Container = avoidKeyboard && Platform.OS === "ios" ? KeyboardAvoidingView : View;
   // Android Back reaches the modal even while its keyboard is open; the first press only hides the
   // keyboard, as elsewhere in Android, so a typed query or note is not closed with it.
   const handleRequestClose = () => {
@@ -250,13 +271,19 @@ export function ResponsiveOverlay({
   return (
     <Modal visible={open} transparent animationType="none" statusBarTranslucent onRequestClose={handleRequestClose}>
       <Container
-        // Edge-to-edge Android no longer resizes the window for the keyboard (adjustResize is
-        // ignored), so Android needs padding too or the keyboard covers sheet inputs.
-        behavior={Platform.OS === "web" ? undefined : "padding"}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
         className={cn("flex-1 px-0", overlayAlignment)}
+        onLayout={(event) => {
+          containerHeightRef.current = event.nativeEvent.layout.height;
+        }}
         // The modal covers the translucent status bar; a sheet that shrinks above the keyboard must
         // still stop below it.
-        style={{ backgroundColor: "rgba(0,0,0,0.55)", direction: dir, paddingTop: insets.top }}
+        style={{
+          backgroundColor: "rgba(0,0,0,0.55)",
+          direction: dir,
+          paddingTop: insets.top,
+          ...(androidAvoidsKeyboard ? { paddingBottom: androidKeyboardInset } : null),
+        }}
       >
         <Pressable
           className="absolute inset-0"
