@@ -398,6 +398,7 @@ function SidebarContent({
 
 function FloatingPanel(props: BottomTabBarProps & { isRTL?: boolean }) {
   const { isRTL } = props;
+  const s = useStrings();
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
   const { isDark } = useSettings();
@@ -432,9 +433,15 @@ function FloatingPanel(props: BottomTabBarProps & { isRTL?: boolean }) {
       hideTimerRef.current = null;
     }
   }, []);
+  // A mouse hovers before it clicks: hover opens the panel, so a click just after it keeps the panel open
+  // instead of toggling it shut. Touch has no hover and still toggles.
+  const hoverOpenedAtRef = useRef(0);
   const showPanel = useCallback(() => {
     cancelHide();
-    setOpen(true);
+    setOpen((wasOpen) => {
+      if (!wasOpen) hoverOpenedAtRef.current = Date.now();
+      return true;
+    });
   }, [cancelHide]);
   const hidePanel = useCallback(() => {
     cancelHide();
@@ -447,7 +454,13 @@ function FloatingPanel(props: BottomTabBarProps & { isRTL?: boolean }) {
       setOpen(false);
     }, 180);
   }, [cancelHide]);
-  const togglePanel = useCallback(() => setOpen((v) => !v), []);
+  const togglePanel = useCallback(() => {
+    if (Date.now() - hoverOpenedAtRef.current < 600) {
+      setOpen(true);
+      return;
+    }
+    setOpen((v) => !v);
+  }, []);
 
   const panelStyle = useAnimatedStyle(() => {
     const hiddenOffset = isRTL ? 24 : -24;
@@ -459,7 +472,11 @@ function FloatingPanel(props: BottomTabBarProps & { isRTL?: boolean }) {
 
   const pointerEvents = open ? "auto" : "none";
   const menuColor = isDark ? "#a3a3a3" : "#8B8178";
-  const sideStyle = isRTL ? { right: 16 } : { left: 16 };
+  // The trigger is an edge tab inside the 24 px content gutter; a 44 px button 16 px in covered page
+  // text such as the Decks heading. hitSlop keeps the touch target large.
+  const sideStyle = isRTL
+    ? { right: 0, borderTopLeftRadius: 14, borderBottomLeftRadius: 14 }
+    : { left: 0, borderTopRightRadius: 14, borderBottomRightRadius: 14 };
   const edgeStyle = isRTL ? { right: 0 } : { left: 0 };
   const triggerTop = Math.max(insets.top + 132, Math.round(height * 0.45) - 22);
   const panelTop = Math.max(insets.top + 88, 96);
@@ -476,12 +493,15 @@ function FloatingPanel(props: BottomTabBarProps & { isRTL?: boolean }) {
         onFocus={showPanel}
         onBlur={scheduleHidePanel}
         accessibilityRole="button"
-        className="items-center justify-center rounded-full bg-surface-high/90 dark:bg-surface-dark-high/90"
+        accessibilityLabel={s.navigationMenu}
+        accessibilityState={{ expanded: open }}
+        hitSlop={{ top: 8, bottom: 8, left: 12, right: 12 }}
+        className="items-center justify-center bg-surface-high/90 dark:bg-surface-dark-high/90"
         style={{
           position: "absolute",
           top: triggerTop,
-          width: 44,
-          height: 44,
+          width: 24,
+          height: 56,
           zIndex: 60,
           ...sideStyle,
           ...Platform.select({
@@ -490,7 +510,7 @@ function FloatingPanel(props: BottomTabBarProps & { isRTL?: boolean }) {
           }),
         }}
       >
-        <SidebarTriggerIcon size={18} color={menuColor} />
+        <SidebarTriggerIcon size={16} color={menuColor} />
       </Pressable>
 
       <Pressable
