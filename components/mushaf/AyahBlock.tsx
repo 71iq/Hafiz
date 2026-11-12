@@ -229,7 +229,10 @@ function AyahBlockInner({
       )}
       <View
         className={isRTL ? "flex-row-reverse items-center justify-between gap-3" : "flex-row items-center justify-between gap-3"}
+        // Hand-mirrored rows pin LTR coordinates; under the reader's RTL root row-reverse flipped twice
+        // and put the ayah reference on the left in Arabic.
         style={{
+          direction: "ltr",
           paddingTop: isPhone ? 2 : 6,
         }}
       >
@@ -434,9 +437,11 @@ function AyahBlockInner({
           bounces={false}
           style={{ marginHorizontal: -16 }}
           {...readerControlProps}
+          // Direction alone mirrors the row (and starts the scroll at the right in Arabic); adding
+          // row-reverse flipped it back.
           contentContainerStyle={{
             direction: isRTL ? "rtl" : "ltr",
-            flexDirection: isRTL ? "row-reverse" : "row",
+            flexDirection: "row",
             gap: 8,
             paddingHorizontal: 16,
           }}
@@ -546,7 +551,7 @@ function ActionPill({
       }`}
       style={{
         direction: isRTL ? "rtl" : "ltr",
-        flexDirection: isRTL ? "row-reverse" : "row",
+        flexDirection: "row",
         flexShrink: 0,
         opacity: disabled && !active ? 0.55 : 1,
       }}

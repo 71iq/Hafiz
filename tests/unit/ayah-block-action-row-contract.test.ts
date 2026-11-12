@@ -9,7 +9,8 @@ describe("AyahBlock action row contract", () => {
     expect(source).toContain("ScrollView");
     expect(source).toContain("horizontal");
     expect(source).toContain("showsHorizontalScrollIndicator={false}");
-    expect(source).toContain('flexDirection: isRTL ? "row-reverse" : "row"');
+    // The pill row mirrors through its direction alone; row-reverse under that direction flipped twice.
+    expect(source).toContain('direction: isRTL ? "rtl" : "ltr",\n            flexDirection: "row",');
     expect(source).toContain("gap: 8");
     expect(source).toContain("flexShrink: 0");
     expect(source).toContain("numberOfLines={1}");

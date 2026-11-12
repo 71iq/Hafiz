@@ -644,7 +644,8 @@ export default function HomeScreen() {
           </Pressable>
         )}
 
-        <View className={`mb-3 ${isRTL ? "items-end" : "items-start"}`}>
+        {/* Hand-mirrored alignment pins LTR coordinates; under the RTL tab root it flipped twice. */}
+        <View className={`mb-3 ${isRTL ? "items-end" : "items-start"}`} style={{ direction: "ltr" }}>
           <Text
             className="text-charcoal dark:text-neutral-100"
             style={{

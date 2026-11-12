@@ -31,7 +31,11 @@ export function AchievementUnlockToast({ unlock, onDismiss }: Props) {
 
   return (
     <Card elevation="low" className="mb-6 p-4">
-      <View className={`mb-3 flex-row items-center justify-between ${isRTL ? "flex-row-reverse" : ""}`}>
+      {/* Hand-mirrored row pins LTR coordinates; under the RTL tab root row-reverse flipped twice. */}
+      <View
+        className={`mb-3 flex-row items-center justify-between ${isRTL ? "flex-row-reverse" : ""}`}
+        style={{ direction: "ltr" }}
+      >
         <Text
           className="text-charcoal dark:text-neutral-100"
           style={{ fontFamily: "Manrope_700Bold", fontSize: 14, ...textStartStyle(isRTL)}}
