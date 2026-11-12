@@ -20,6 +20,12 @@ type Props = {
   visible: boolean;
 };
 
+function stopTouch(event: { stopPropagation?: () => void }) {
+  event.stopPropagation?.();
+}
+
+const NATIVE_STOP_TOUCH = { onTouchStart: stopTouch, onTouchMove: stopTouch, onTouchEnd: stopTouch };
+
 export function FocusModeControls({
   playing,
   speed,
@@ -82,13 +88,17 @@ export function FocusModeControls({
       }}
     >
       <View
+        // The reader's tap layer pauses focus mode on touch end. On web it skips this bar by its data
+        // attribute; native touches bubbled up and paused right after Play resumed, so they stop here.
         {...(Platform.OS === "web"
           ? ({ "data-focus-mode-controls": "true" } as Record<string, unknown>)
-          : null)}
+          : NATIVE_STOP_TOUCH)}
         className="rounded-full border border-white/15 px-3 py-2"
         style={{
           width: "100%",
           maxWidth: 520,
+          // Hand-mirrored row: pin LTR so the RTL reader root does not flip it back.
+          direction: "ltr",
           flexDirection: isRTL ? "row-reverse" : "row",
           alignItems: "center",
           gap: 10,
