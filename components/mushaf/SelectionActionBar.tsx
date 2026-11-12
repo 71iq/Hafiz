@@ -17,7 +17,7 @@ import { PrivateNoteSheet } from "@/components/notes/PrivateNoteSheet";
 export function SelectionActionBar() {
   const db = useDatabase();
   const s = useStrings();
-  const { isDark, themeColors } = useSettings();
+  const { isDark, isRTL, themeColors } = useSettings();
   const {
     selection,
     clearSelection,
@@ -151,14 +151,24 @@ export function SelectionActionBar() {
           </Text>
         )}
 
-        {/* Action buttons row */}
-        <View style={{ flexDirection: "row", justifyContent: "space-around", marginBottom: showColors ? 16 : 0 }}>
+        {/* Action buttons row. Five equal columns with two-line labels fit 360dp phones. The row
+            mirrors by hand, so it pins LTR coordinates; an inherited "rtl" would flip it back. */}
+        <View
+          style={{
+            direction: "ltr",
+            flexDirection: isRTL ? "row-reverse" : "row",
+            alignItems: "flex-start",
+            gap: 4,
+            marginBottom: showColors ? 16 : 0,
+          }}
+        >
           <ActionButton
             icon={<Copy size={20} color={iconColor} />}
             label={s.copy}
             onPress={handleCopy}
             isDark={isDark}
             disabled={actionBusy}
+            isRTL={isRTL}
           />
           <ActionButton
             icon={<PenLine size={20} color={iconColor} />}
@@ -166,6 +176,7 @@ export function SelectionActionBar() {
             onPress={handleReflect}
             isDark={isDark}
             disabled={actionBusy}
+            isRTL={isRTL}
           />
           <ActionButton
             icon={<StickyNote size={20} color={iconColor} />}
@@ -173,6 +184,7 @@ export function SelectionActionBar() {
             onPress={handleNote}
             isDark={isDark}
             disabled={actionBusy}
+            isRTL={isRTL}
           />
           <ActionButton
             icon={<Highlighter size={20} color={currentHighlight ?? iconColor} />}
@@ -181,6 +193,7 @@ export function SelectionActionBar() {
             isDark={isDark}
             active={showColors}
             disabled={actionBusy}
+            isRTL={isRTL}
           />
           <ActionButton
             icon={<BookMarked size={20} color={currentlyBookmarked ? "#FDDC91" : iconColor} />}
@@ -188,6 +201,7 @@ export function SelectionActionBar() {
             onPress={handleBookmark}
             isDark={isDark}
             disabled={actionBusy}
+            isRTL={isRTL}
           />
         </View>
 
@@ -275,6 +289,7 @@ function ActionButton({
   label,
   onPress,
   isDark,
+  isRTL,
   active,
   disabled = false,
 }: {
@@ -282,6 +297,7 @@ function ActionButton({
   label: string;
   onPress: () => void;
   isDark: boolean;
+  isRTL: boolean;
   active?: boolean;
   disabled?: boolean;
 }) {
@@ -289,10 +305,14 @@ function ActionButton({
     <Pressable
       onPress={onPress}
       disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={label}
       style={({ pressed }) => ({
+        flex: 1,
+        minWidth: 0,
         alignItems: "center",
         gap: 6,
-        paddingHorizontal: 12,
+        paddingHorizontal: 2,
         paddingVertical: 8,
         borderRadius: 16,
         opacity: disabled ? 0.45 : pressed ? 0.7 : 1,
@@ -307,8 +327,11 @@ function ActionButton({
           color: isDark ? "#a3a3a3" : "#8B8178",
           fontFamily: "Manrope_500Medium",
           fontSize: 11,
+          lineHeight: 15,
+          textAlign: "center",
+          writingDirection: isRTL ? "rtl" : "ltr",
         }}
-        numberOfLines={1}
+        numberOfLines={2}
       >
         {label}
       </Text>
