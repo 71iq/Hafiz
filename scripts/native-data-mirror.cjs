@@ -30,12 +30,18 @@ function mirrorNativeData(root) {
         toStat = fs.statSync(to);
       } catch {}
       if (toStat && toStat.ino === fromStat.ino && toStat.dev === fromStat.dev) continue;
-      if (toStat && toStat.size === fromStat.size && toStat.mtimeMs >= fromStat.mtimeMs) continue;
       fs.mkdirSync(path.dirname(to), { recursive: true });
-      fs.rmSync(to, { force: true });
+      // Relink whenever the inode differs. A size and mtime check cannot tell a replaced source
+      // from the old one when both land in the same clock tick, so it only guards the copy fallback.
+      const pending = `${to}.tmp-${process.pid}`;
+      fs.rmSync(pending, { force: true });
       try {
-        fs.linkSync(from, to);
+        fs.linkSync(from, pending);
+        fs.renameSync(pending, to);
       } catch {
+        fs.rmSync(pending, { force: true });
+        if (toStat && toStat.size === fromStat.size && toStat.mtimeMs >= fromStat.mtimeMs) continue;
+        fs.rmSync(to, { force: true });
         fs.copyFileSync(from, to);
       }
       linked += 1;
