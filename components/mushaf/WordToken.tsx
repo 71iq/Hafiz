@@ -105,6 +105,13 @@ function WordTokenInner({
       style={{
         paddingHorizontal: compactLayout ? 0 : 1,
         overflow: "visible",
+        // The underline marking a hidden word sits on the wrapper, so the word itself can be fully
+        // invisible below it.
+        ...(hidden && {
+          borderBottomWidth: Math.max(2, fontSize * 0.08),
+          borderBottomColor: isDark ? "#474747" : "#e8dac5",
+          paddingBottom: Math.max(1, fontSize * 0.04),
+        }),
         ...(Platform.OS === "web" ? ({ userSelect: hidden ? "none" : "text" } as any) : null),
       }}
       {...webContextMenu}
@@ -127,12 +134,9 @@ function WordTokenInner({
             backgroundColor: "rgba(13, 148, 136, 0.08)",
             borderRadius: 6,
           }),
-          ...(hidden && {
-            color: "transparent",
-            borderBottomWidth: Math.max(2, fontSize * 0.08),
-            borderBottomColor: isDark ? "#474747" : "#e8dac5",
-            paddingBottom: Math.max(1, fontSize * 0.04),
-          }),
+          // Page fonts are colour fonts whose palette layers ignore the text colour, so a transparent
+          // colour still drew hidden words faintly. Opacity hides every layer.
+          ...(hidden && { color: "transparent", opacity: 0 }),
           ...(Platform.OS === "web" ? ({ userSelect: hidden ? "none" : "text" } as any) : null),
           ...(drawsInkLayer && { color: "transparent" }),
         }}

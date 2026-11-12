@@ -83,6 +83,8 @@ describe("RF-189 page-view word ink on Android", () => {
     const view = renderWord({ hidden: true });
 
     expect(view.getAllByText(RAHMAN, { includeHiddenElements: true })).toHaveLength(1);
+    // Colour-font palette layers ignore a transparent colour; only opacity hides them.
+    expect(flat(view.getByText(RAHMAN, { includeHiddenElements: true })).opacity).toBe(0);
   });
 
   it("keeps one text per word on the web", () => {
