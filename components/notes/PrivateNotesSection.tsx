@@ -10,6 +10,7 @@ import {
   type PrivateNote,
 } from "@/lib/notes/queries";
 import { PrivateNoteSheet } from "./PrivateNoteSheet";
+import { textStartStyle } from "@/lib/ui/direction";
 
 type Props = {
   surah: number;
@@ -79,7 +80,7 @@ export function PrivateNotesSection({ surah, ayah }: Props) {
       >
         <Text
           className="text-charcoal dark:text-neutral-100"
-          style={{ fontFamily: "Manrope_700Bold", fontSize: 15, textAlign: isRTL ? "right" : "left" }}
+          style={{ fontFamily: "Manrope_700Bold", fontSize: 15, ...textStartStyle(isRTL)}}
         >
           {s.privateNotes}
         </Text>
@@ -98,7 +99,7 @@ export function PrivateNotesSection({ surah, ayah }: Props) {
       {error && (
         <Text
           className="mb-3 text-red-600 dark:text-red-400"
-          style={{ fontFamily: "Manrope_500Medium", fontSize: 13, textAlign: isRTL ? "right" : "left" }}
+          style={{ fontFamily: "Manrope_500Medium", fontSize: 13, ...textStartStyle(isRTL)}}
         >
           {error}
         </Text>
@@ -107,7 +108,7 @@ export function PrivateNotesSection({ surah, ayah }: Props) {
       {notes.length === 0 ? (
         <Text
           className="text-warm-400 dark:text-neutral-500"
-          style={{ fontFamily: "Manrope_400Regular", fontSize: 13, lineHeight: 20, textAlign: isRTL ? "right" : "left" }}
+          style={{ fontFamily: "Manrope_400Regular", fontSize: 13, lineHeight: 20, ...textStartStyle(isRTL)}}
         >
           {s.privateNotesEmpty}
         </Text>
@@ -131,7 +132,7 @@ export function PrivateNotesSection({ surah, ayah }: Props) {
                       fontFamily: "Manrope_400Regular",
                       fontSize: 13,
                       lineHeight: 20,
-                      textAlign: isRTL ? "right" : "left",
+                      ...textStartStyle(isRTL),
                       writingDirection: isRTL ? "rtl" : "ltr",
                     }}
                     numberOfLines={4}
@@ -140,7 +141,7 @@ export function PrivateNotesSection({ surah, ayah }: Props) {
                   </Text>
                   <Text
                     className="mt-2 text-warm-400 dark:text-neutral-500"
-                    style={{ fontFamily: "Manrope_500Medium", fontSize: 10, textAlign: isRTL ? "right" : "left" }}
+                    style={{ fontFamily: "Manrope_500Medium", fontSize: 10, ...textStartStyle(isRTL)}}
                   >
                     {new Date(note.updatedAt).toLocaleDateString()}
                   </Text>

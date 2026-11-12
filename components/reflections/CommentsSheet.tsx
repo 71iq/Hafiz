@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/Input";
 import { ProfileIdentity } from "@/components/profile/ProfileIdentity";
 import { ReflectionCard } from "./ReflectionCard";
 import { useReflectionMutationScope, type ReflectionMutationLease } from "./use-mutation-scope";
+import { textStartStyle } from "@/lib/ui/direction";
 
 type Props = {
   reflectionId: string | null;
@@ -303,7 +304,7 @@ export function CommentsSheet({
                   style={{
                     fontFamily: "Manrope_600SemiBold",
                     fontSize: 12,
-                    textAlign: isRTL ? "right" : "left",
+                    ...textStartStyle(isRTL),
                     writingDirection: isRTL ? "rtl" : "ltr",
                   }}
                 >
@@ -350,7 +351,7 @@ export function CommentsSheet({
                           style={{
                             fontFamily: active ? "Manrope_700Bold" : "Manrope_500Medium",
                             fontSize: 13,
-                            textAlign: isRTL ? "right" : "left",
+                            ...textStartStyle(isRTL),
                             writingDirection: isRTL ? "rtl" : "ltr",
                           }}
                         >
@@ -369,7 +370,7 @@ export function CommentsSheet({
                 style={{
                   fontFamily: "Manrope_500Medium",
                   fontSize: 12,
-                  textAlign: isRTL ? "right" : "left",
+                  ...textStartStyle(isRTL),
                   writingDirection: isRTL ? "rtl" : "ltr",
                 }}
               >
@@ -423,7 +424,7 @@ export function CommentsSheet({
                         fontFamily: "Manrope_400Regular",
                         fontSize: 13,
                         lineHeight: 20,
-                        textAlign: isRTL ? "right" : "left",
+                        ...textStartStyle(isRTL),
                         writingDirection: isRTL ? "rtl" : "ltr",
                       }}
                     >
@@ -534,7 +535,7 @@ export function CommentsSheet({
                   fontFamily: "Manrope_400Regular",
                   fontSize: 13,
                   lineHeight: 20,
-                  textAlign: isRTL ? "right" : "left",
+                  ...textStartStyle(isRTL),
                   writingDirection: isRTL ? "rtl" : "ltr",
                 }}
               >

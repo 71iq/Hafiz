@@ -2,7 +2,7 @@ import { Text as RNText, type TextProps } from "react-native";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 import { forwardRef } from "react";
-import { useUIDirection, textAlignForDirection, type Direction } from "@/lib/ui/direction";
+import { useUIDirection, textAlignStyle, type Direction } from "@/lib/ui/direction";
 
 const textVariants = cva("text-charcoal dark:text-neutral-200", {
   variants: {
@@ -45,7 +45,7 @@ export const Text = forwardRef<RNText, TypographyProps>(
       <RNText
         ref={ref}
         className={cn(textVariants({ variant }), className)}
-        style={[{ textAlign: textAlignForDirection(dir, align), writingDirection: dir }, style]}
+        style={[{ ...textAlignStyle(dir, align), writingDirection: dir }, style]}
         {...props}
       />
     );

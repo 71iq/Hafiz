@@ -16,7 +16,7 @@ import {
 import { X } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
-import { useUIDirection, type Direction } from "@/lib/ui/direction";
+import { useUIDirection, type Direction, textStartStyle } from "@/lib/ui/direction";
 import { useSettings } from "@/lib/settings/context";
 import { useReducedMotionPreference } from "@/lib/ui/reduced-motion";
 import { cn } from "@/lib/utils";
@@ -311,7 +311,7 @@ export function OverlayHeader({
                   style={{
                     fontFamily: "Manrope_700Bold",
                     fontSize: 18,
-                    textAlign: isRTL ? "right" : "left",
+                    ...textStartStyle(isRTL),
                     writingDirection: isRTL ? "rtl" : "ltr",
                   }}
                 >
@@ -325,7 +325,7 @@ export function OverlayHeader({
                     fontFamily: "Manrope_400Regular",
                     fontSize: 13,
                     lineHeight: 20,
-                    textAlign: isRTL ? "right" : "left",
+                    ...textStartStyle(isRTL),
                     writingDirection: isRTL ? "rtl" : "ltr",
                   }}
                 >

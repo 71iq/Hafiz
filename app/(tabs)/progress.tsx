@@ -35,6 +35,7 @@ import {
   type ProfileSurahProgress,
 } from "@/lib/profile/progress";
 import { subscribeSyncCompleted } from "@/lib/sync/events";
+import { textStartStyle } from "@/lib/ui/direction";
 
 type HeatmapDay = { date: string; count: number };
 
@@ -224,7 +225,7 @@ export default function ProgressScreen() {
                 style={{
                   fontFamily: "Manrope_700Bold",
                   fontSize: 16,
-                  textAlign: isRTL ? "right" : "left",
+                  ...textStartStyle(isRTL),
                   writingDirection: isRTL ? "rtl" : "ltr",
                 }}
               >
@@ -292,13 +293,13 @@ export default function ProgressScreen() {
                 <View className={`min-w-0 flex-1 ${isRTL ? "items-end" : "items-start"}`}>
                   <Text
                     className="text-charcoal dark:text-neutral-200"
-                    style={{ fontFamily: "Manrope_700Bold", fontSize: 16, textAlign: isRTL ? "right" : "left" }}
+                    style={{ fontFamily: "Manrope_700Bold", fontSize: 16, ...textStartStyle(isRTL)}}
                   >
                     {s.achievementsTitle}
                   </Text>
                   <Text
                     className="mt-1 text-warm-400 dark:text-neutral-500"
-                    style={{ fontFamily: "Manrope_500Medium", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
+                    style={{ fontFamily: "Manrope_500Medium", fontSize: 12, ...textStartStyle(isRTL)}}
                   >
                     {`${achievementDashboard.unlockedCount} / ${achievementDashboard.totalCount}`}
                   </Text>
@@ -333,7 +334,7 @@ export default function ProgressScreen() {
               <View className="mt-4">
                 <Text
                   className="mb-2 text-warm-500 dark:text-neutral-400"
-                  style={{ fontFamily: "Manrope_700Bold", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
+                  style={{ fontFamily: "Manrope_700Bold", fontSize: 12, ...textStartStyle(isRTL)}}
                 >
                   {s.achievementRecentUnlocks}
                 </Text>
@@ -493,7 +494,7 @@ function CompactProgressStat({
         style={{
           fontFamily: "NotoSerif_700Bold",
           fontSize: 18,
-          textAlign: isRTL ? "right" : "left",
+          ...textStartStyle(isRTL),
           writingDirection: isRTL ? "rtl" : "ltr",
           fontVariant: ["tabular-nums"],
         }}
@@ -506,7 +507,7 @@ function CompactProgressStat({
           fontFamily: "Manrope_500Medium",
           fontSize: 10,
           lineHeight: 13,
-          textAlign: isRTL ? "right" : "left",
+          ...textStartStyle(isRTL),
           writingDirection: isRTL ? "rtl" : "ltr",
         }}
       >

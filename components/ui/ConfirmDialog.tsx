@@ -4,6 +4,7 @@ import { AlertTriangle } from "lucide-react-native";
 import { Button } from "@/components/ui/Button";
 import { FieldMessage } from "@/components/ui/Field";
 import { OverlayBody, OverlayFooter, OverlayHeader, ResponsiveModal } from "@/components/ui/ResponsiveOverlay";
+import { textStartStyle } from "@/lib/ui/direction";
 
 type Props = {
   visible: boolean;
@@ -62,7 +63,7 @@ export function ConfirmDialog({
               fontFamily: "Manrope_400Regular",
               fontSize: 14,
               lineHeight: 22,
-              textAlign: isRTL ? "right" : "left",
+              ...textStartStyle(isRTL),
               writingDirection: isRTL ? "rtl" : "ltr",
             }}
           >

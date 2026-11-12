@@ -32,6 +32,7 @@ import { useSelection } from "@/lib/selection/context";
 import { useSettings } from "@/lib/settings/context";
 import { AVAILABLE_TAFSIR_SOURCES, type TafsirSourceId } from "@/lib/tafsir/sources";
 import { DEFAULT_LANGUAGE, getLanguageByCode } from "@/lib/translations/languages";
+import { textStartStyle } from "@/lib/ui/direction";
 
 type TargetAyah = {
   surah: number;
@@ -441,7 +442,7 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
               style={{
                 fontFamily: "Manrope_500Medium",
                 fontSize: 13,
-                textAlign: isRTL ? "right" : "left",
+                ...textStartStyle(isRTL),
                 writingDirection: isRTL ? "rtl" : "ltr",
               }}
             >
@@ -524,7 +525,7 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
                 fontSize: 16,
                 lineHeight: 26,
                 writingDirection: translationIsRtl ? "rtl" : "ltr",
-                textAlign: translationIsRtl ? "right" : "left",
+                ...textStartStyle(translationIsRtl),
               }}
             >
               {showTranslation ? (translationText ?? s.loading) : s.loading}
@@ -542,7 +543,7 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
                     style={{
                       fontFamily: "Manrope_600SemiBold",
                       fontSize: 13,
-                      textAlign: isRTL ? "right" : "left",
+                      ...textStartStyle(isRTL),
                       writingDirection: isRTL ? "rtl" : "ltr",
                     }}
                   >
@@ -554,7 +555,7 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
                       fontFamily: "Manrope_400Regular",
                       fontSize: 12,
                       lineHeight: 18,
-                      textAlign: isRTL ? "right" : "left",
+                      ...textStartStyle(isRTL),
                       writingDirection: isRTL ? "rtl" : "ltr",
                     }}
                   >
@@ -597,7 +598,7 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
                     fontSize: 15,
                     lineHeight: 26,
                     writingDirection: isRTL ? "rtl" : "ltr",
-                    textAlign: isRTL ? "right" : "left",
+                    ...textStartStyle(isRTL),
                   }}
                 >
                   {s.loading}
@@ -610,7 +611,7 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
                     fontSize: 15,
                     lineHeight: 26,
                     writingDirection: isRTL ? "rtl" : "ltr",
-                    textAlign: isRTL ? "right" : "left",
+                    ...textStartStyle(isRTL),
                   }}
                 >
                   {s.noTafseerData}
@@ -644,7 +645,7 @@ export function AyahDetailModal({ target, onClose, initialTab = "tafsir" }: Prop
                       fontSize: 15,
                       lineHeight: 26,
                       writingDirection: selectedTafsirIsRtl ? "rtl" : "ltr",
-                      textAlign: selectedTafsirIsRtl ? "right" : "left",
+                      ...textStartStyle(selectedTafsirIsRtl),
                     }}
                   >
                     {selectedTafsir?.text ?? s.noTafseerData}
@@ -738,7 +739,7 @@ function TabButton({
         style={{
           fontFamily: "Manrope_600SemiBold",
           fontSize: 12,
-          textAlign: isRTL ? "right" : "left",
+          ...textStartStyle(isRTL),
           writingDirection: isRTL ? "rtl" : "ltr",
           ...(Platform.OS === "web" ? ({ whiteSpace: "nowrap" } as any) : null),
         }}

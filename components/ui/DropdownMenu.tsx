@@ -4,6 +4,7 @@ import { MoreHorizontal } from "lucide-react-native";
 import { useSettings } from "@/lib/settings/context";
 import { useReducedMotionPreference } from "@/lib/ui/reduced-motion";
 import { cn } from "@/lib/utils";
+import { textStartStyle } from "@/lib/ui/direction";
 
 export type DropdownMenuItem = {
   key: string;
@@ -151,7 +152,7 @@ export function DropdownMenu({
                         color,
                         fontFamily: "Manrope_600SemiBold",
                         fontSize: 13,
-                        textAlign: isRTL ? "right" : "left",
+                        ...textStartStyle(isRTL),
                         writingDirection: isRTL ? "rtl" : "ltr",
                       }}
                       numberOfLines={1}

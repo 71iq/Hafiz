@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WifiOff } from "lucide-react-native";
 import { useSettings, withThemeOpacity } from "@/lib/settings/context";
 import { useReducedMotionPreference } from "@/lib/ui/reduced-motion";
+import { textStartStyle } from "@/lib/ui/direction";
 
 const OFFLINE_TEXT = {
   en: "You\u2019re offline \u2014 study features work, community features will sync when connected",
@@ -106,7 +107,7 @@ export function OfflineBanner({ uiLanguage }: Props) {
             fontSize: 12,
             color: textColor,
             writingDirection: uiLanguage === "ar" ? "rtl" : "ltr",
-            textAlign: uiLanguage === "ar" ? "right" : "left",
+            ...textStartStyle(uiLanguage === "ar"),
             flex: 1,
           }}
         >

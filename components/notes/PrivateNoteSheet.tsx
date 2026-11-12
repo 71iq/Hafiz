@@ -8,6 +8,7 @@ import { useStrings } from "@/lib/i18n/useStrings";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { createPrivateNote, isDuplicatePrivateNoteError, updatePrivateNote, type PrivateNote } from "@/lib/notes/queries";
 import { isQfSyncableNoteContent } from "@/lib/quran-foundation/user-types";
+import { textStartStyle } from "@/lib/ui/direction";
 
 type Props = {
   open: boolean;
@@ -117,7 +118,7 @@ export function PrivateNoteSheet({
         {hasLengthError && (
           <Text
             className="mt-2 text-warm-500 dark:text-neutral-400"
-            style={{ fontFamily: "Manrope_500Medium", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
+            style={{ fontFamily: "Manrope_500Medium", fontSize: 12, ...textStartStyle(isRTL)}}
           >
             {s.privateNoteLengthError}
           </Text>
@@ -125,7 +126,7 @@ export function PrivateNoteSheet({
         {duplicateError && (
           <Text
             className="mt-2 text-warm-500 dark:text-neutral-400"
-            style={{ fontFamily: "Manrope_500Medium", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
+            style={{ fontFamily: "Manrope_500Medium", fontSize: 12, ...textStartStyle(isRTL)}}
           >
             {s.privateNoteDuplicate}
           </Text>
@@ -133,7 +134,7 @@ export function PrivateNoteSheet({
         {error && (
           <Text
             className="mt-2 text-red-600 dark:text-red-400"
-            style={{ fontFamily: "Manrope_500Medium", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
+            style={{ fontFamily: "Manrope_500Medium", fontSize: 12, ...textStartStyle(isRTL)}}
           >
             {s.privateNoteSaveFailed}
           </Text>

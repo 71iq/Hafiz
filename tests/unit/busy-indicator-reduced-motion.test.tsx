@@ -8,7 +8,10 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 jest.mock("@/lib/settings/context", () => ({
   useSettings: () => ({ themeSurface: "#fff", effectiveTheme: "white", isDark: false }),
 }));
-jest.mock("@/lib/ui/direction", () => ({ useUIDirection: (dir?: string) => dir ?? "ltr" }));
+jest.mock("@/lib/ui/direction", () => ({
+  ...jest.requireActual("@/lib/ui/direction"),
+  useUIDirection: (dir?: string) => dir ?? "ltr",
+}));
 jest.mock("react-native-safe-area-context", () => require("react-native-safe-area-context/jest/mock").default);
 const descriptor = Object.getOwnPropertyDescriptor(AccessibilityInfo, "addEventListener");
 let resolveQuery: (value: boolean) => void;

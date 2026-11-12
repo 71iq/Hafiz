@@ -21,6 +21,7 @@ import type {
   ReflectionJourneyTranslationBlock,
 } from "@/lib/reflection-journey/types";
 import { useSettings } from "@/lib/settings/context";
+import { textStartStyle } from "@/lib/ui/direction";
 
 type Props = {
   block:
@@ -216,13 +217,13 @@ export function JourneyAyahCard({ block }: Props) {
         <View className={`mb-3 ${isRTL ? "items-end" : "items-start"}`}>
           <Text
             className="text-charcoal dark:text-neutral-100"
-            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15, textAlign: isRTL ? "right" : "left" }}
+            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15, ...textStartStyle(isRTL)}}
           >
             {resolvedTitle}
           </Text>
           <Text
             className="text-warm-400 dark:text-neutral-500 mt-1"
-            style={{ fontFamily: "Manrope_500Medium", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
+            style={{ fontFamily: "Manrope_500Medium", fontSize: 12, ...textStartStyle(isRTL)}}
           >
             {referenceLabel}
           </Text>
@@ -323,12 +324,7 @@ export function JourneyAyahCard({ block }: Props) {
                     fontFamily: "Manrope_400Regular",
                     fontSize: 15,
                     lineHeight: 26,
-                    textAlign:
-                      block.type === "tafseer"
-                        ? "right"
-                        : translationDirection === "rtl"
-                          ? "right"
-                          : "left",
+                    ...textStartStyle(block.type === "tafseer" || translationDirection === "rtl"),
                     writingDirection:
                       block.type === "tafseer" ? "rtl" : translationDirection,
                   }}
@@ -349,13 +345,13 @@ export function JourneyAyahCard({ block }: Props) {
               <View className="flex-1">
                 <Text
                   className="text-charcoal dark:text-neutral-100"
-                  style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, textAlign: isRTL ? "right" : "left" }}
+                  style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, ...textStartStyle(isRTL)}}
                 >
                   {s.comingSoon}
                 </Text>
                 <Text
                   className="text-warm-400 dark:text-neutral-500"
-                  style={{ fontFamily: "Manrope_500Medium", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
+                  style={{ fontFamily: "Manrope_500Medium", fontSize: 12, ...textStartStyle(isRTL)}}
                 >
                   {referenceLabel}
                 </Text>
@@ -367,7 +363,7 @@ export function JourneyAyahCard({ block }: Props) {
                 fontFamily: "Manrope_400Regular",
                 fontSize: 14,
                 lineHeight: 24,
-                textAlign: isRTL ? "right" : "left",
+                ...textStartStyle(isRTL),
                 writingDirection: isRTL ? "rtl" : "ltr",
               }}
             >

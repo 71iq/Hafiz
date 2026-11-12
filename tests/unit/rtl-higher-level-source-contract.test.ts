@@ -20,7 +20,7 @@ describe("higher-level RTL source contracts", () => {
       "left: menuPosition.left",
       'direction: "ltr"',
       'flexDirection: isRTL ? "row-reverse" : "row"',
-      'textAlign: isRTL ? "right" : "left"',
+      '...textStartStyle(isRTL)',
       'writingDirection: isRTL ? "rtl" : "ltr"',
     ]);
   });
@@ -32,7 +32,7 @@ describe("higher-level RTL source contracts", () => {
       'flexDirection: showSummary ? (isRTL ? "row-reverse" : "row") : "column"',
       "marginLeft: isRTL ? 0 : DAY_LABEL_WIDTH",
       "marginRight: isRTL ? DAY_LABEL_WIDTH : 0",
-      'textAlign: isRTL ? "right" : "left"',
+      '...textStartStyle(isRTL)',
       'writingDirection: isRTL ? "rtl" : "ltr"',
     ]);
   });

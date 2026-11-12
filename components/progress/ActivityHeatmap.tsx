@@ -3,6 +3,7 @@ import { View, Text, Pressable, useWindowDimensions } from "react-native";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { useSettings } from "@/lib/settings/context";
 import type { UIStrings } from "@/lib/i18n/strings";
+import { textStartStyle } from "@/lib/ui/direction";
 
 type DayData = { date: string; count: number };
 
@@ -198,7 +199,7 @@ export function ActivityHeatmap({
                 color: isDark ? "#737373" : "#8B8178",
                 position: "absolute",
                 left: m.left,
-                textAlign: isRTL ? "right" : "left",
+                ...textStartStyle(isRTL),
                 writingDirection: isRTL ? "rtl" : "ltr",
               }}
             >
@@ -230,7 +231,7 @@ export function ActivityHeatmap({
                         fontFamily: "Manrope_500Medium",
                         fontSize: 9,
                         color: isDark ? "#525252" : "#b9a085",
-                        textAlign: isRTL ? "right" : "left",
+                        ...textStartStyle(isRTL),
                         writingDirection: isRTL ? "rtl" : "ltr",
                         width: DAY_LABEL_WIDTH,
                       }}
@@ -345,7 +346,7 @@ export function ActivityHeatmap({
                 style={{
                   fontFamily: "Manrope_500Medium",
                   fontSize: 11,
-                  textAlign: isRTL ? "right" : "left",
+                  ...textStartStyle(isRTL),
                   writingDirection: isRTL ? "rtl" : "ltr",
                 }}
               >

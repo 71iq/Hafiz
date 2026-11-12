@@ -10,6 +10,6 @@ describe("BookmarksSheet RTL contract", () => {
     expect(source).toContain("justifyContent: \"space-between\",");
     expect(source).toContain("gap: 10,");
     expect(source).toContain("gap: 12,");
-    expect(source).toContain('textAlign: isRTL ? "right" : "left",');
+    expect(source).toContain('...textStartStyle(isRTL),');
   });
 });

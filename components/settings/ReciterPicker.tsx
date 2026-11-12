@@ -7,6 +7,7 @@ import { toArabicNumber } from "@/lib/arabic";
 import { fetchQfReciters, type QfContentReciter } from "@/lib/quran-foundation/content";
 import { RECITERS, getReciterById, type QfReciter } from "@/lib/quran-foundation/recitations";
 import { useSettings } from "@/lib/settings/context";
+import { textStartStyle } from "@/lib/ui/direction";
 
 type Props = {
   visible: boolean;
@@ -72,7 +73,7 @@ export function ReciterPicker({ visible, selectedId, onSelect, onClose }: Props)
             <ActivityIndicator size="small" color={isDark ? "#2dd4bf" : "#0d9488"} />
             <Text
               className="text-warm-500 dark:text-neutral-400"
-              style={{ fontFamily: "Manrope_500Medium", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
+              style={{ fontFamily: "Manrope_500Medium", fontSize: 12, ...textStartStyle(isRTL)}}
             >
               {s.recitationRecitersLoading}
             </Text>
@@ -133,7 +134,7 @@ export function ReciterPicker({ visible, selectedId, onSelect, onClose }: Props)
                     style={{
                       fontFamily: selected ? "Manrope_700Bold" : "Manrope_600SemiBold",
                       fontSize: 15,
-                      textAlign: isRTL ? "right" : "left",
+                      ...textStartStyle(isRTL),
                       writingDirection: isRTL ? "rtl" : "ltr",
                     }}
                     numberOfLines={1}
@@ -150,7 +151,7 @@ export function ReciterPicker({ visible, selectedId, onSelect, onClose }: Props)
                         style={{
                           fontFamily: "Manrope_600SemiBold",
                           fontSize: 11,
-                          textAlign: isRTL ? "right" : "left",
+                          ...textStartStyle(isRTL),
                           writingDirection: isRTL ? "rtl" : "ltr",
                         }}
                       >

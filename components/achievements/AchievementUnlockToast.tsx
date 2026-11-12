@@ -7,6 +7,7 @@ import { getAchievementDefinition } from "@/lib/achievements/catalog";
 import type { AchievementUnlock } from "@/lib/achievements/types";
 import type { AchievementDashboardItem } from "@/lib/achievements/queries";
 import { AchievementBadge } from "./AchievementBadge";
+import { textStartStyle } from "@/lib/ui/direction";
 
 type Props = {
   unlock: AchievementUnlock;
@@ -33,7 +34,7 @@ export function AchievementUnlockToast({ unlock, onDismiss }: Props) {
       <View className={`mb-3 flex-row items-center justify-between ${isRTL ? "flex-row-reverse" : ""}`}>
         <Text
           className="text-charcoal dark:text-neutral-100"
-          style={{ fontFamily: "Manrope_700Bold", fontSize: 14, textAlign: isRTL ? "right" : "left" }}
+          style={{ fontFamily: "Manrope_700Bold", fontSize: 14, ...textStartStyle(isRTL)}}
         >
           {s.achievementUnlocked}
         </Text>

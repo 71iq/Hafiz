@@ -26,6 +26,7 @@ import { useAuthStore } from "@/lib/auth/store";
 import { ProfileIdentity } from "@/components/profile/ProfileIdentity";
 import { PERSISTENT_SIDEBAR_BREAKPOINT, PERSISTENT_SIDEBAR_WIDTH, SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { PanelLeftOpen, PanelRightOpen } from "lucide-react-native";
+import { textStartStyle } from "@/lib/ui/direction";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -244,7 +245,7 @@ function SidebarItem({
           styles.sidebarLabel,
           {
             color: iconColor,
-            textAlign: isRTL ? "right" : "left",
+            ...textStartStyle(isRTL),
             writingDirection: isRTL ? "rtl" : "ltr",
           },
         ]}
@@ -377,7 +378,7 @@ function SidebarContent({
             fontFamily: isRTL ? undefined : "NotoSerif_700Bold",
             fontSize: isPersistent ? 24 : 22,
             fontWeight: isRTL ? "700" : undefined,
-            textAlign: isRTL ? "right" : "left",
+            ...textStartStyle(isRTL),
             writingDirection: isRTL ? "rtl" : "ltr",
           }}
         >

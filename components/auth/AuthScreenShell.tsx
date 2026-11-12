@@ -13,7 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { ChevronLeft, ChevronRight } from "lucide-react-native";
 import { useColorScheme } from "nativewind";
 import { getCachedAuthDarkMode } from "@/lib/settings/startup-theme";
-import { DirectionProvider, type Direction } from "@/lib/ui/direction";
+import { DirectionProvider, type Direction, textStartStyle } from "@/lib/ui/direction";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 
 const logoSource = require("@/assets/images/logo.png");
@@ -399,7 +399,7 @@ function BrandPanel({
               fontSize: 34,
               lineHeight: 42,
               maxWidth: 330,
-              textAlign: dir === "rtl" ? "right" : "left",
+              ...textStartStyle(dir === "rtl"),
               writingDirection: dir,
             }}
           >
@@ -417,7 +417,7 @@ function BrandPanel({
               fontSize: 17,
               lineHeight: 28,
               maxWidth: 320,
-              textAlign: dir === "rtl" ? "right" : "left",
+              ...textStartStyle(dir === "rtl"),
               writingDirection: dir,
             }}
           >

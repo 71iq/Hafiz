@@ -7,6 +7,7 @@ import { BookOpen, ChevronDown } from "lucide-react-native";
 import { setPendingDeepLink } from "@/lib/deep-link";
 import { useSettings } from "@/lib/settings/context";
 import type { UIStrings } from "@/lib/i18n/strings";
+import { textStartStyle } from "@/lib/ui/direction";
 
 type SurahProgress = {
   surah: number;
@@ -108,7 +109,7 @@ export function SurahProgressList({
                     fontSize: 14,
                     color: isDark ? "#e5e5e5" : "#2D2D2D",
                     writingDirection: primaryDirection,
-                    textAlign: isRTL ? "right" : "left",
+                    ...textStartStyle(isRTL),
                   }}
                   numberOfLines={1}
                 >
@@ -120,7 +121,7 @@ export function SurahProgressList({
                       fontFamily: "Manrope_400Regular",
                       fontSize: 11,
                       color: isDark ? "#737373" : "#8B8178",
-                      textAlign: isRTL ? "right" : "left",
+                      ...textStartStyle(isRTL),
                       writingDirection: secondaryDirection,
                     }}
                     numberOfLines={1}

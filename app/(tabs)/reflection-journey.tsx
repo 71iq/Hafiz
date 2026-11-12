@@ -31,6 +31,7 @@ import type { ReflectionJourneyLevelListItem } from "@/lib/reflection-journey/ty
 import { useSelection, SelectionProvider } from "@/lib/selection/context";
 import { useSettings } from "@/lib/settings/context";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
+import { textStartStyle } from "@/lib/ui/direction";
 
 export default function ReflectionJourneyScreen() {
   return (
@@ -171,7 +172,7 @@ function ReflectionJourneyInner() {
                 </Text>
                 <Text
                   className="text-warm-500 dark:text-neutral-400 mt-1"
-                  style={{ fontFamily: "Manrope_400Regular", fontSize: 13, lineHeight: 21, textAlign: isRTL ? "right" : "left" }}
+                  style={{ fontFamily: "Manrope_400Regular", fontSize: 13, lineHeight: 21, ...textStartStyle(isRTL)}}
                 >
                   {s.reflectionJourneySubtitle}
                 </Text>
@@ -192,7 +193,7 @@ function ReflectionJourneyInner() {
             >
               <Text
                 className="text-charcoal dark:text-neutral-100 mb-3"
-                style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15, textAlign: isRTL ? "right" : "left" }}
+                style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15, ...textStartStyle(isRTL)}}
               >
                 {s.reflectionJourneyLevels}
               </Text>
@@ -237,14 +238,14 @@ function ReflectionJourneyInner() {
                     <View className={`flex-1 ${isRTL ? "items-end" : "items-start"}`}>
                       <Text
                         className="text-charcoal dark:text-neutral-100"
-                        style={{ fontFamily: "NotoSerif_700Bold", fontSize: 22, textAlign: isRTL ? "right" : "left" }}
+                        style={{ fontFamily: "NotoSerif_700Bold", fontSize: 22, ...textStartStyle(isRTL)}}
                       >
                         {localizeReflectionJourneyText(selectedLevel.title, uiLanguage)}
                       </Text>
                       {selectedLevel.summary ? (
                         <Text
                           className="text-warm-500 dark:text-neutral-400 mt-2"
-                          style={{ fontFamily: "Manrope_400Regular", fontSize: 14, lineHeight: 24, textAlign: isRTL ? "right" : "left" }}
+                          style={{ fontFamily: "Manrope_400Regular", fontSize: 14, lineHeight: 24, ...textStartStyle(isRTL)}}
                         >
                           {localizeReflectionJourneyText(selectedLevel.summary, uiLanguage)}
                         </Text>
@@ -256,7 +257,7 @@ function ReflectionJourneyInner() {
                   {selectedLevel.estimatedMinutes ? (
                     <Text
                       className="text-warm-400 dark:text-neutral-500 mt-3"
-                      style={{ fontFamily: "Manrope_500Medium", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
+                      style={{ fontFamily: "Manrope_500Medium", fontSize: 12, ...textStartStyle(isRTL)}}
                     >
                       {interpolate(s.reflectionJourneyMinutes, { n: selectedLevel.estimatedMinutes })}
                     </Text>
@@ -269,7 +270,7 @@ function ReflectionJourneyInner() {
                       {block.title ? (
                         <Text
                           className="text-charcoal dark:text-neutral-100 mb-2"
-                          style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15, textAlign: isRTL ? "right" : "left" }}
+                          style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15, ...textStartStyle(isRTL)}}
                         >
                           {localizeReflectionJourneyText(block.title, uiLanguage)}
                         </Text>
@@ -280,7 +281,7 @@ function ReflectionJourneyInner() {
                           fontFamily: "Manrope_400Regular",
                           fontSize: 15,
                           lineHeight: 26,
-                          textAlign: isRTL ? "right" : "left",
+                          ...textStartStyle(isRTL),
                           writingDirection: isRTL ? "rtl" : "ltr",
                         }}
                       >
@@ -295,7 +296,7 @@ function ReflectionJourneyInner() {
                 <Card elevation="low" className="rounded-4xl p-5">
                   <Text
                     className="text-warm-500 dark:text-neutral-400 mb-3"
-                    style={{ fontFamily: "Manrope_400Regular", fontSize: 13, lineHeight: 22, textAlign: isRTL ? "right" : "left" }}
+                    style={{ fontFamily: "Manrope_400Regular", fontSize: 13, lineHeight: 22, ...textStartStyle(isRTL)}}
                   >
                     {localizeReflectionJourneyText(selectedLevel.responsePrompt, uiLanguage)}
                   </Text>
@@ -318,7 +319,7 @@ function ReflectionJourneyInner() {
                       fontFamily: "Manrope_400Regular",
                       fontSize: 14,
                       lineHeight: 24,
-                      textAlign: isRTL ? "right" : "left",
+                      ...textStartStyle(isRTL),
                       writingDirection: isRTL ? "rtl" : "ltr",
                     }}
                   />
@@ -344,7 +345,7 @@ function ReflectionJourneyInner() {
                         fontFamily: "Manrope_500Medium",
                         fontSize: 12,
                         color: "#ef4444",
-                        textAlign: isRTL ? "right" : "left",
+                        ...textStartStyle(isRTL),
                       }}
                     >
                       {error}
@@ -428,7 +429,7 @@ function LevelPill({
         <View className={`flex-1 ${isRTL ? "items-end" : "items-start"}`}>
           <Text
             className="text-charcoal dark:text-neutral-100"
-            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, textAlign: isRTL ? "right" : "left" }}
+            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, ...textStartStyle(isRTL)}}
             numberOfLines={1}
           >
             {title}
@@ -438,7 +439,7 @@ function LevelPill({
               fontFamily: "Manrope_500Medium",
               fontSize: 11,
               color: mutedColor,
-              textAlign: isRTL ? "right" : "left",
+              ...textStartStyle(isRTL),
             }}
           >
             {level.order}

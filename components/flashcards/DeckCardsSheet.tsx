@@ -22,6 +22,7 @@ import type { DeckCardListItem } from "@/lib/fsrs/types";
 import { formatLocalDateInput, parseDueDateInput } from "@/lib/date";
 import { useSettings } from "@/lib/settings/context";
 import { State } from "@/lib/fsrs/scheduler";
+import { textStartStyle } from "@/lib/ui/direction";
 
 type Props = {
   visible: boolean;
@@ -202,7 +203,7 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
                 style={{
                   fontFamily: "Manrope_400Regular",
                   fontSize: 14,
-                  textAlign: isRTL ? "right" : "left",
+                  ...textStartStyle(isRTL),
                   writingDirection: isRTL ? "rtl" : "ltr",
                 }}
               />
@@ -234,7 +235,7 @@ export function DeckCardsSheet({ visible, deckId, deckTitle, onClose, onChanged 
             {error ? (
               <Text
                 className="text-red-600 dark:text-red-400"
-                style={{ fontFamily: "Manrope_500Medium", fontSize: 13, textAlign: isRTL ? "right" : "left" }}
+                style={{ fontFamily: "Manrope_500Medium", fontSize: 13, ...textStartStyle(isRTL)}}
               >
                 {error}
               </Text>
@@ -374,7 +375,7 @@ function HeaderCell({ label, flex, isRTL }: { label: string; flex: number; isRTL
   return (
     <Text
       className="text-warm-500 dark:text-neutral-400"
-      style={{ flex, fontFamily: "Manrope_700Bold", fontSize: 11, textAlign: isRTL ? "right" : "left" }}
+      style={{ flex, fontFamily: "Manrope_700Bold", fontSize: 11, ...textStartStyle(isRTL)}}
       numberOfLines={1}
     >
       {label}
@@ -458,14 +459,14 @@ function DeckCardRow({
       <View style={{ flex: 1.45, minWidth: 0 }}>
         <Text
           className="text-charcoal dark:text-neutral-100"
-          style={{ fontFamily: "Manrope_700Bold", fontSize: 13, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
+          style={{ fontFamily: "Manrope_700Bold", fontSize: 13, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
           numberOfLines={1}
         >
           {card.title}
         </Text>
         <Text
           className="text-warm-500 dark:text-neutral-400"
-          style={{ fontFamily: "Manrope_400Regular", fontSize: 11, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
+          style={{ fontFamily: "Manrope_400Regular", fontSize: 11, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
           numberOfLines={1}
         >
           {card.subtitle || card.reference}
@@ -473,7 +474,7 @@ function DeckCardRow({
       </View>
       <Text
         className="text-warm-500 dark:text-neutral-400"
-        style={{ flex: 0.72, fontFamily: "Manrope_500Medium", fontSize: 11, textAlign: isRTL ? "right" : "left" }}
+        style={{ flex: 0.72, fontFamily: "Manrope_500Medium", fontSize: 11, ...textStartStyle(isRTL)}}
         numberOfLines={1}
       >
         {formatShortDate(card.due)}

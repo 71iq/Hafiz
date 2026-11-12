@@ -6,7 +6,10 @@ import { useReducedMotionPreference } from "@/lib/ui/reduced-motion";
 
 jest.mock("react-native-safe-area-context", () => require("react-native-safe-area-context/jest/mock").default);
 
-jest.mock("@/lib/ui/direction", () => ({ useUIDirection: (dir?: "rtl" | "ltr") => dir ?? "ltr" }));
+jest.mock("@/lib/ui/direction", () => ({
+  ...jest.requireActual("@/lib/ui/direction"),
+  useUIDirection: (dir?: "rtl" | "ltr") => dir ?? "ltr",
+}));
 
 jest.mock("@/lib/settings/context", () => ({
   useSettings: () => ({ themeSurface: "#fdf8f1" }),

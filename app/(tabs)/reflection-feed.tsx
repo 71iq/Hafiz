@@ -24,6 +24,7 @@ import { setPendingDeepLink } from "@/lib/deep-link";
 import { toArabicNumber } from "@/lib/arabic";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { findJuzRangeForAyah } from "@/lib/mushaf/position";
+import { textStartStyle } from "@/lib/ui/direction";
 
 type SurahOption = {
   number: number;
@@ -585,7 +586,7 @@ function ReflectionFeedSearch({
         style={{
           fontFamily: "Manrope_400Regular",
           fontSize: 14,
-          textAlign: isRTL ? "right" : "left",
+          ...textStartStyle(isRTL),
           writingDirection: isRTL ? "rtl" : "ltr",
         }}
       />
@@ -655,7 +656,7 @@ function FilterSelect({
           fontFamily: "Manrope_600SemiBold",
           fontSize: 12,
           minWidth: 0,
-          textAlign: isRTL ? "right" : "left",
+          ...textStartStyle(isRTL),
         }}
       >
         {label}
@@ -877,14 +878,14 @@ function PickerRow({
       <View className="flex-1">
         <Text
           className="text-charcoal dark:text-neutral-100"
-          style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, textAlign: isRTL ? "right" : "left" }}
+          style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, ...textStartStyle(isRTL)}}
         >
           {title}
         </Text>
         {!!subtitle && (
           <Text
             className="mt-0.5 text-warm-400 dark:text-neutral-500"
-            style={{ fontFamily: "Manrope_400Regular", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
+            style={{ fontFamily: "Manrope_400Regular", fontSize: 12, ...textStartStyle(isRTL)}}
           >
             {subtitle}
           </Text>

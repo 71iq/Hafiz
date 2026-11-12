@@ -15,6 +15,6 @@ describe("AyahDetailModal tafsir source row RTL contract", () => {
     expect(rowSource).toContain('className="items-center gap-1.5 rounded-full bg-surface dark:bg-surface-dark px-3 py-2"');
     expect(rowSource).toContain('direction: "ltr",');
     expect(rowSource).toContain('flexDirection: isRTL ? "row-reverse" : "row",');
-    expect(rowSource).toContain('textAlign: isRTL ? "right" : "left",');
+    expect(rowSource).toContain('...textStartStyle(isRTL),');
   });
 });

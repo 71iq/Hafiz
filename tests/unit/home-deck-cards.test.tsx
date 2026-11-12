@@ -1,3 +1,4 @@
+import { textStartStyle } from "@/lib/ui/direction";
 import React from "react";
 import { I18nManager, StyleSheet, useWindowDimensions } from "react-native";
 import { act, cleanup, fireEvent, render, waitFor, within } from "@testing-library/react-native";
@@ -213,13 +214,13 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("real home deck cards in %
       expect(sub.props.numberOfLines).toBe(compact ? undefined : 1);
       expect(StyleSheet.flatten(heading.props.style)).toMatchObject({
         fontSize: 14,
-        textAlign: language === "ar" ? "right" : "left",
+        ...textStartStyle(language === "ar"),
         writingDirection: language === "ar" ? "rtl" : "ltr",
       });
       expect(StyleSheet.flatten(sub.props.style)).toMatchObject({
         fontSize: 11,
         lineHeight: 16,
-        textAlign: language === "ar" ? "right" : "left",
+        ...textStartStyle(language === "ar"),
       });
       expect(scope.UNSAFE_getByType(Icon).props).toMatchObject({ size: 18, color: dark ? "#2dd4bf" : "#0d9488" });
       expect(node.props).toMatchObject({

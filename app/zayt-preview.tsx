@@ -10,6 +10,7 @@ import { strings } from "@/lib/i18n/strings";
 import { getStartupLanguage } from "@/lib/i18n/startup-language";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { SettingsProvider, useSettings } from "@/lib/settings/context";
+import { textStartStyle } from "@/lib/ui/direction";
 
 export default function ZaytPreviewRoute() {
   const { isReady, progress, error } = useDatabaseStatus();
@@ -79,7 +80,7 @@ function ZaytPreviewScreen() {
               style={{
                 fontFamily: "Manrope_700Bold",
                 fontSize: 24,
-                textAlign: isRTL ? "right" : "left",
+                ...textStartStyle(isRTL),
                 writingDirection: isRTL ? "rtl" : "ltr",
               }}
             >
@@ -91,7 +92,7 @@ function ZaytPreviewScreen() {
                 fontFamily: "Manrope_400Regular",
                 fontSize: 14,
                 lineHeight: 20,
-                textAlign: isRTL ? "right" : "left",
+                ...textStartStyle(isRTL),
                 writingDirection: isRTL ? "rtl" : "ltr",
               }}
             >

@@ -3,6 +3,7 @@ import { toArabicNumber } from "@/lib/arabic";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { JuzNameText } from "./JuzNameText";
+import { textStartStyle } from "@/lib/ui/direction";
 
 type Props = {
   surahName: string | null;
@@ -30,7 +31,7 @@ export function MushafIndicator({ surahName, juz }: Props) {
         style={{
           fontFamily: "Manrope_500Medium",
           fontSize: 12,
-          textAlign: isRTL ? "right" : "left",
+          ...textStartStyle(isRTL),
           writingDirection: isRTL ? "rtl" : "ltr",
         }}
         numberOfLines={1}

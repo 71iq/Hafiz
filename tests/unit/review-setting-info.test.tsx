@@ -1,3 +1,4 @@
+import { textStartStyle } from "@/lib/ui/direction";
 import React from "react";
 import * as ReactNative from "react-native";
 import { act, cleanup, fireEvent, fireEventAsync, render, waitFor, within } from "@testing-library/react-native";
@@ -188,7 +189,7 @@ describe("review-setting help caller characterization", () => {
         const text = within(modal).getByText(body);
         const direction = isRTL ? "rtl" : "ltr";
         expect(flattenStyle(title.props.style)).toMatchObject({
-          textAlign: isRTL ? "right" : "left",
+          ...textStartStyle(isRTL),
           writingDirection: direction,
         });
         expect(text.props.className).toBe("text-charcoal dark:text-neutral-200");
@@ -196,7 +197,7 @@ describe("review-setting help caller characterization", () => {
           fontFamily: "Manrope_400Regular",
           fontSize: 14,
           lineHeight: 23,
-          textAlign: isRTL ? "right" : "left",
+          ...textStartStyle(isRTL),
           writingDirection: direction,
         });
         const sheet = view.UNSAFE_getAllByType(ResponsiveSheet).find((node) => node.props.maxWidth === 440);

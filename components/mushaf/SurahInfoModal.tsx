@@ -4,6 +4,7 @@ import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
+import { textStartStyle } from "@/lib/ui/direction";
 
 export type SurahInfoTarget = {
   surahNumber: number;
@@ -115,7 +116,7 @@ export function SurahInfoModal({
                 fontFamily: "Manrope_500Medium",
                 fontSize: 14,
                 lineHeight: 22,
-                textAlign: isRTL ? "right" : "left",
+                ...textStartStyle(isRTL),
                 writingDirection: isRTL ? "rtl" : "ltr",
               }}
             >
@@ -133,7 +134,7 @@ export function SurahInfoModal({
                       fontFamily: "Manrope_700Bold",
                       fontSize: 16,
                       lineHeight: 24,
-                      textAlign: contentIsRTL ? "right" : "left",
+                      ...textStartStyle(contentIsRTL),
                       writingDirection: contentIsRTL ? "rtl" : "ltr",
                     }}
                   >
@@ -146,7 +147,7 @@ export function SurahInfoModal({
                     fontFamily: "Manrope_400Regular",
                     fontSize: 15,
                     lineHeight: 27,
-                    textAlign: contentIsRTL ? "right" : "left",
+                    ...textStartStyle(contentIsRTL),
                     writingDirection: contentIsRTL ? "rtl" : "ltr",
                   }}
                 >

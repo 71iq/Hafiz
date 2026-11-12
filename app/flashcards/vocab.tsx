@@ -13,6 +13,7 @@ import { LoadingScreen } from "@/components/LoadingScreen";
 import { listVocabCards, deleteVocabCard, type VocabCard } from "@/lib/vocab/queries";
 import { Rating } from "@/lib/fsrs/scheduler";
 import { fsrs } from "ts-fsrs";
+import { textStartStyle } from "@/lib/ui/direction";
 
 const scheduler = fsrs({ request_retention: 0.95 });
 
@@ -221,7 +222,7 @@ function VocabSessionScreen() {
                   className="text-charcoal dark:text-neutral-200 mt-5"
                   style={{
                     writingDirection: uiLanguage === "ar" ? "rtl" : undefined,
-                    textAlign: uiLanguage === "ar" ? "right" : "left",
+                    ...textStartStyle(uiLanguage === "ar"),
                     fontFamily: "Manrope_400Regular",
                     fontSize: 16,
                     lineHeight: 26,

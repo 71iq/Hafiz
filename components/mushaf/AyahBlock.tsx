@@ -33,6 +33,7 @@ import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { useAyahAudio } from "@/lib/audio/ayah-audio";
 import { isQfContentEnabled } from "@/lib/quran-foundation/config";
 import { AyahDetailModal, type AyahDetailTabKey } from "./AyahDetailModal";
+import { textStartStyle } from "@/lib/ui/direction";
 
 function stopReaderChromeToggle(event: any) {
   event?.stopPropagation?.();
@@ -557,7 +558,7 @@ function ActionPill({
         style={{
           fontFamily: "Manrope_600SemiBold",
           fontSize: 11,
-          textAlign: isRTL ? "right" : "left",
+          ...textStartStyle(isRTL),
           writingDirection: isRTL ? "rtl" : "ltr",
           ...(Platform.OS === "web" ? ({ whiteSpace: "nowrap" } as any) : null),
         }}

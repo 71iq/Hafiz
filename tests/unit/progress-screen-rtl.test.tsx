@@ -1,3 +1,4 @@
+import { textStartStyle } from "@/lib/ui/direction";
 import React from "react";
 import { fireEvent, render, waitFor } from "@testing-library/react-native";
 import { ScrollView } from "react-native";
@@ -212,7 +213,7 @@ describe("ProgressScreen RTL behavior", () => {
       flexDirection: "row-reverse",
     });
     expect(flattenStyle(arabicLabel.props.style)).toMatchObject({
-      textAlign: "right",
+      ...textStartStyle(true),
       writingDirection: "rtl",
     });
     expect(arabicLabel.props.className).toContain("text-charcoal dark:text-neutral-100");
@@ -263,7 +264,7 @@ describe("ProgressScreen RTL behavior", () => {
       flexDirection: "row",
     });
     expect(flattenStyle(englishLabel.props.style)).toMatchObject({
-      textAlign: "left",
+      ...textStartStyle(false),
       writingDirection: "ltr",
     });
     expect(englishLabel.props.className).toContain("text-charcoal dark:text-neutral-100");

@@ -1,3 +1,4 @@
+import { textStartStyle } from "@/lib/ui/direction";
 import React from "react";
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/react-native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -186,7 +187,7 @@ function assertPrompt(
     flexDirection: options.isRTL ? "row-reverse" : "row",
   });
   expect(flattenStyle(label.props.style)).toMatchObject({
-    textAlign: options.isRTL ? "right" : "left",
+    ...textStartStyle(options.isRTL),
     writingDirection: options.isRTL ? "rtl" : "ltr",
   });
   expect(label.props.className).toContain("text-charcoal dark:text-neutral-100");

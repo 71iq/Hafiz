@@ -1,3 +1,4 @@
+import { Platform } from "react-native";
 import React from "react";
 import { StyleSheet, type StyleProp } from "react-native";
 import { render, type RenderAPI } from "@testing-library/react-native";
@@ -25,8 +26,17 @@ export function expectWritingDirection(node: RtlTestNode, dir: Direction) {
   expect(getStyleValue(node, "writingDirection")).toBe(dir);
 }
 
+/**
+ * Start alignment as the shared direction helpers express it: web keeps the physical side, while
+ * native pins the text's own direction and aligns "left", which React Native treats as the start.
+ */
 export function expectTextAlignStart(node: RtlTestNode, dir: Direction) {
-  expect(getStyleValue(node, "textAlign")).toBe(dir === "rtl" ? "right" : "left");
+  if (Platform.OS === "web") {
+    expect(getStyleValue(node, "textAlign")).toBe(dir === "rtl" ? "right" : "left");
+    return;
+  }
+  expect(getStyleValue(node, "textAlign")).toBe("left");
+  expect(getStyleValue(node, "direction")).toBe(dir);
 }
 
 export function expectFlexDirectionForDir(node: RtlTestNode, dir: Direction) {

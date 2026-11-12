@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/Card";
 import { useSettings } from "@/lib/settings/context";
 import type { UIStrings } from "@/lib/i18n/strings";
 import type { DefaultDeckProgressItem, DefaultDeckProgressKey } from "@/lib/profile/progress";
+import { textStartStyle } from "@/lib/ui/direction";
 
 type DefaultDeckProgressStrings = Pick<
   UIStrings,
@@ -63,13 +64,13 @@ export function DefaultDeckProgressChart({
         <View className={`min-w-0 flex-1 ${isRTL ? "items-end" : "items-start"}`}>
           <Text
             className="text-charcoal dark:text-neutral-200"
-            style={{ fontFamily: "Manrope_700Bold", fontSize: 16, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
+            style={{ fontFamily: "Manrope_700Bold", fontSize: 16, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
           >
             {s.progressDefaultDecks}
           </Text>
           <Text
             className="mt-1 text-warm-400 dark:text-neutral-500"
-            style={{ fontFamily: "Manrope_500Medium", fontSize: 12, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
+            style={{ fontFamily: "Manrope_500Medium", fontSize: 12, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
           >
             {`${s.flashcardsTotalCards}: ${totalCards.toLocaleString()}`}
           </Text>
@@ -98,7 +99,7 @@ export function DefaultDeckProgressChart({
       ) : (
         <Text
           className="mt-5 text-warm-500 dark:text-neutral-400"
-          style={{ fontFamily: "Manrope_500Medium", fontSize: 13, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
+          style={{ fontFamily: "Manrope_500Medium", fontSize: 13, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
         >
           {s.progressDefaultDecksEmpty}
         </Text>
@@ -130,7 +131,7 @@ function DefaultDeckProgressRow({
       <View className={`mb-2 flex-row items-center justify-between gap-3 ${isRTL ? "flex-row-reverse" : ""}`} style={rowFlexStyle}>
         <Text
           className="min-w-0 flex-1 text-charcoal dark:text-neutral-200"
-          style={{ fontFamily: "Manrope_700Bold", fontSize: 13, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
+          style={{ fontFamily: "Manrope_700Bold", fontSize: 13, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
           numberOfLines={1}
         >
           {title}
@@ -193,7 +194,7 @@ function DeckMetric({
       </Text>
       <Text
         className="text-warm-500 dark:text-neutral-500"
-        style={{ fontFamily: "Manrope_500Medium", fontSize: 10, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
+        style={{ fontFamily: "Manrope_500Medium", fontSize: 10, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
       >
         {label}
       </Text>
@@ -219,7 +220,7 @@ function DeckLegendDot({
       <View className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
       <Text
         className="text-warm-500 dark:text-neutral-500"
-        style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
+        style={{ fontFamily: "Manrope_600SemiBold", fontSize: 10, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
       >
         {label}
       </Text>

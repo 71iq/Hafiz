@@ -54,6 +54,7 @@ import { getReflectionJourneySummary } from "@/lib/reflection-journey/queries";
 import { localizeReflectionJourneyText } from "@/lib/reflection-journey/schema";
 import { DESKTOP_CONTENT_MAX_WIDTH, VIEWPORT_BREAKPOINTS } from "@/lib/ui/viewport";
 import { AppReleaseCard } from "@/components/app-update/AppReleaseCard";
+import { textStartStyle, textEndStyle } from "@/lib/ui/direction";
 
 type SmartDeckDisplay = {
   id: SmartDeckId;
@@ -387,7 +388,7 @@ export default function HomeScreen() {
                   fontFamily: "Manrope_500Medium",
                   fontSize: 13,
                   lineHeight: 19,
-                  textAlign: isRTL ? "right" : "left",
+                  ...textStartStyle(isRTL),
                   writingDirection: isRTL ? "rtl" : "ltr",
                 }}
                 accessibilityRole="alert"
@@ -429,7 +430,7 @@ export default function HomeScreen() {
                 </Text>
                 <Text
                   className="text-warm-400 dark:text-neutral-500"
-                  style={{ fontFamily: "Manrope_500Medium", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
+                  style={{ fontFamily: "Manrope_500Medium", fontSize: 12, ...textStartStyle(isRTL)}}
                 >
                   {s.flashcardsDueToday}
                 </Text>
@@ -448,7 +449,7 @@ export default function HomeScreen() {
                 </Text>
                 <Text
                   className="text-warm-400 dark:text-neutral-500"
-                  style={{ fontFamily: "Manrope_500Medium", fontSize: 11, textAlign: isRTL ? "right" : "left" }}
+                  style={{ fontFamily: "Manrope_500Medium", fontSize: 11, ...textStartStyle(isRTL)}}
                 >
                   {s.homeMemorized}
                 </Text>
@@ -495,7 +496,7 @@ export default function HomeScreen() {
               style={{
                 fontFamily: "Manrope_500Medium",
                 fontSize: 12,
-                textAlign: isRTL ? "left" : "right",
+                ...textEndStyle(isRTL),
                 writingDirection: isRTL ? "rtl" : "ltr",
               }}
             >
@@ -617,7 +618,7 @@ export default function HomeScreen() {
                   </Text>
                   <Text
                     className="text-charcoal dark:text-neutral-100 mt-1"
-                    style={{ fontFamily: "NotoSerif_700Bold", fontSize: 22, textAlign: isRTL ? "right" : "left" }}
+                    style={{ fontFamily: "NotoSerif_700Bold", fontSize: 22, ...textStartStyle(isRTL)}}
                   >
                     {s.reflectionJourneyTitle}
                   </Text>
@@ -627,7 +628,7 @@ export default function HomeScreen() {
                       fontFamily: "Manrope_400Regular",
                       fontSize: 13,
                       lineHeight: 21,
-                      textAlign: isRTL ? "right" : "left",
+                      ...textStartStyle(isRTL),
                     }}
                   >
                     {journeySummary.currentLevelTitle
@@ -649,7 +650,7 @@ export default function HomeScreen() {
             style={{
               fontFamily: "Manrope_600SemiBold",
               fontSize: 16,
-              textAlign: isRTL ? "right" : "left",
+              ...textStartStyle(isRTL),
               writingDirection: isRTL ? "rtl" : "ltr",
             }}
           >
@@ -826,7 +827,7 @@ function SmartDeckCard({
         style={{
           fontFamily: "Manrope_600SemiBold",
           fontSize: 14,
-          textAlign: isRTL ? "right" : "left",
+          ...textStartStyle(isRTL),
           writingDirection: isRTL ? "rtl" : "ltr",
         }}
         numberOfLines={compact ? undefined : 1}
@@ -839,7 +840,7 @@ function SmartDeckCard({
           fontFamily: "Manrope_400Regular",
           fontSize: 11,
           lineHeight: 16,
-          textAlign: isRTL ? "right" : "left",
+          ...textStartStyle(isRTL),
           writingDirection: isRTL ? "rtl" : "ltr",
         }}
         numberOfLines={compact ? undefined : 1}
@@ -930,7 +931,7 @@ function VocabularyDeckCard({
         style={{
           fontFamily: "Manrope_600SemiBold",
           fontSize: 14,
-          textAlign: isRTL ? "right" : "left",
+          ...textStartStyle(isRTL),
           writingDirection: isRTL ? "rtl" : "ltr",
         }}
         numberOfLines={compact ? undefined : 1}
@@ -943,7 +944,7 @@ function VocabularyDeckCard({
           fontFamily: "Manrope_400Regular",
           fontSize: 11,
           lineHeight: 16,
-          textAlign: isRTL ? "right" : "left",
+          ...textStartStyle(isRTL),
           writingDirection: isRTL ? "rtl" : "ltr",
         }}
         numberOfLines={compact ? undefined : 1}

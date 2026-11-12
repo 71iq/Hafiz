@@ -1,5 +1,6 @@
 import { Text } from "react-native";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
+import { textStartStyle } from "@/lib/ui/direction";
 
 type Props = {
   visible: boolean;
@@ -26,7 +27,7 @@ export function ReviewSettingInfoSheet({ visible, info, onClose, isPhone, isRTL 
             fontFamily: "Manrope_400Regular",
             fontSize: 14,
             lineHeight: 23,
-            textAlign: isRTL ? "right" : "left",
+            ...textStartStyle(isRTL),
             writingDirection: isRTL ? "rtl" : "ltr",
           }}
         >

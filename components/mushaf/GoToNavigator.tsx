@@ -8,6 +8,7 @@ import { useSettings } from "@/lib/settings/context";
 import { ResponsiveOverlay, OverlayHeader, OverlayBody } from "@/components/ui/ResponsiveOverlay";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { matchesSurahQuery } from "@/lib/search/surah-match";
+import { textStartStyle } from "@/lib/ui/direction";
 
 type SurahRow = {
   number: number;
@@ -213,7 +214,7 @@ export function GoToNavigator({
                 style={{
                   fontFamily: "Manrope_500Medium",
                   fontSize: 15,
-                  textAlign: isRTL ? "right" : "left",
+                  ...textStartStyle(isRTL),
                 }}
               >
                 {surah.name_english}
@@ -277,7 +278,7 @@ export function GoToNavigator({
                 style={{
                   fontFamily: "Manrope_500Medium",
                   fontSize: 15,
-                  textAlign: isRTL ? "right" : "left",
+                  ...textStartStyle(isRTL),
                 }}
               >
                 {isRTL ? `${s.tabJuz} ${toArabicNumber(juz.juz)}` : `Juz ${juz.juz}`}
@@ -287,7 +288,7 @@ export function GoToNavigator({
                 style={{
                   fontFamily: "Manrope_400Regular",
                   fontSize: 12,
-                  textAlign: isRTL ? "right" : "left",
+                  ...textStartStyle(isRTL),
                 }}
               >
                 {juz.surahNameEnglish} {juz.startSurah}:{juz.startAyah}
@@ -335,7 +336,7 @@ export function GoToNavigator({
             style={{
               fontFamily: "Manrope_400Regular",
               fontSize: 15,
-              textAlign: isRTL ? "right" : "left",
+              ...textStartStyle(isRTL),
               writingDirection: isRTL ? "rtl" : "ltr",
               ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as any) : null),
             }}
@@ -394,7 +395,7 @@ export function GoToNavigator({
               style={{
                 fontFamily: "Manrope_500Medium",
                 fontSize: 13,
-                textAlign: isRTL ? "right" : "left",
+                ...textStartStyle(isRTL),
                 writingDirection: isRTL ? "rtl" : "ltr",
               }}
             >

@@ -27,7 +27,7 @@ describe("settings content list contract", () => {
     expect(source).toContain("borderBottomWidth: showDivider ? StyleSheet.hairlineWidth : 0");
     expect(source).toContain('direction: "ltr"');
     expect(source).toContain('flexDirection: isRTL ? "row-reverse" : "row"');
-    expect(source).toContain('textAlign: isRTL ? "right" : "left"');
-    expect(source).toContain('textAlign: isRTL ? "left" : "right"');
+    expect(source).toContain('...textStartStyle(isRTL)');
+    expect(source).toContain('...textEndStyle(isRTL)');
   });
 });

@@ -4,6 +4,7 @@ import { useSettings } from "@/lib/settings/context";
 import type { AchievementCategory } from "@/lib/achievements/catalog";
 import type { AchievementDashboardItem } from "@/lib/achievements/queries";
 import { AchievementBadge } from "./AchievementBadge";
+import { textStartStyle } from "@/lib/ui/direction";
 
 type Props = {
   items: AchievementDashboardItem[];
@@ -32,7 +33,7 @@ export function AchievementGrid({ items }: Props) {
           <View key={category}>
             <Text
               className="mb-2 text-charcoal dark:text-neutral-200"
-              style={{ fontFamily: "Manrope_700Bold", fontSize: 13, textAlign: isRTL ? "right" : "left" }}
+              style={{ fontFamily: "Manrope_700Bold", fontSize: 13, ...textStartStyle(isRTL)}}
             >
               {s[`achievementCategory.${category}`] ?? category}
             </Text>

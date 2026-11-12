@@ -9,7 +9,7 @@ describe("PrivateNotesSection RTL contract", () => {
     expect(source).toContain('style={{ direction: "ltr", flexDirection: isRTL ? "row-reverse" : "row" }}');
     expect(source).toContain('className="items-center gap-1 rounded-full bg-primary-accent px-3 py-1.5"');
     expect(source).toContain('className="items-start gap-3"');
-    expect(source).toContain('textAlign: isRTL ? "right" : "left"');
+    expect(source).toContain('...textStartStyle(isRTL)');
     expect(source).toContain('writingDirection: isRTL ? "rtl" : "ltr"');
   });
 });

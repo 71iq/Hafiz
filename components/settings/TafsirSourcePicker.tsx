@@ -14,6 +14,7 @@ import {
   type TafsirSourceConfig,
   type TafsirSourceId,
 } from "@/lib/tafsir/sources";
+import { textStartStyle } from "@/lib/ui/direction";
 
 type Props = {
   visible: boolean;
@@ -116,7 +117,7 @@ export function TafsirSourcePicker({
             fontFamily: "Manrope_400Regular",
             fontSize: 13,
             lineHeight: 20,
-            textAlign: isRTL ? "right" : "left",
+            ...textStartStyle(isRTL),
             writingDirection: isRTL ? "rtl" : "ltr",
           }}
         >
@@ -183,7 +184,7 @@ export function TafsirSourcePicker({
                   style={{
                     fontFamily: isSelected ? "Manrope_600SemiBold" : "Manrope_500Medium",
                     fontSize: 15,
-                    textAlign: isRTL ? "right" : "left",
+                    ...textStartStyle(isRTL),
                     writingDirection: isRTL ? "rtl" : "ltr",
                   }}
                 >
@@ -194,7 +195,7 @@ export function TafsirSourcePicker({
                   style={{
                     fontFamily: "Manrope_400Regular",
                     fontSize: 13,
-                    textAlign: isRTL ? "right" : "left",
+                    ...textStartStyle(isRTL),
                     writingDirection: isRTL ? "rtl" : "ltr",
                   }}
                 >
@@ -205,7 +206,7 @@ export function TafsirSourcePicker({
                   style={{
                     fontFamily: "Manrope_600SemiBold",
                     fontSize: 11,
-                    textAlign: isRTL ? "right" : "left",
+                    ...textStartStyle(isRTL),
                     writingDirection: isRTL ? "rtl" : "ltr",
                   }}
                 >

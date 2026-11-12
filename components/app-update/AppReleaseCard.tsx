@@ -6,6 +6,7 @@ import { useSettings } from "@/lib/settings/context";
 import { interpolate, useStrings } from "@/lib/i18n/useStrings";
 import { ANDROID_LATEST_APK_URL, androidReleaseApkUrl } from "@/lib/app-update/release";
 import { useAndroidUpdate } from "@/lib/app-update/use-android-update";
+import { textStartStyle } from "@/lib/ui/direction";
 
 /**
  * Home card for the sideloaded Android app: on the web it offers the APK download, and in the
@@ -36,7 +37,7 @@ export function AppReleaseCard() {
         <View className="flex-1" style={{ alignItems: isRTL ? "flex-end" : "flex-start" }}>
           <Text
             className="text-charcoal dark:text-neutral-200"
-            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, textAlign: isRTL ? "right" : "left" }}
+            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, ...textStartStyle(isRTL)}}
             numberOfLines={1}
           >
             {title}
@@ -47,7 +48,7 @@ export function AppReleaseCard() {
               fontFamily: "Manrope_400Regular",
               fontSize: 12,
               lineHeight: 18,
-              textAlign: isRTL ? "right" : "left",
+              ...textStartStyle(isRTL),
             }}
           >
             {subtitle}

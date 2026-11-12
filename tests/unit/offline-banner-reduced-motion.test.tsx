@@ -1,3 +1,4 @@
+import { textStartStyle } from "@/lib/ui/direction";
 import React from "react";
 import { AccessibilityInfo, Animated, StyleSheet, View } from "react-native";
 import { act, cleanup, render } from "@testing-library/react-native";
@@ -274,11 +275,11 @@ it("stops the exact transition group on unmount", async () => {
 });
 
 it.each([
-  ["en", OFFLINE_TEXT.en, "row", "ltr", "left"],
-  ["ar", OFFLINE_TEXT.ar, "row-reverse", "rtl", "right"],
+  ["en", OFFLINE_TEXT.en, "row", "ltr"],
+  ["ar", OFFLINE_TEXT.ar, "row-reverse", "rtl"],
 ] as const)(
   "preserves %s presentation, direction and pointer behavior",
-  (uiLanguage, text, flexDirection, writingDirection, textAlign) => {
+  (uiLanguage, text, flexDirection, writingDirection) => {
     const view = renderBanner(true, uiLanguage);
     const banner = view.UNSAFE_getByType(Animated.View);
     const label = view.getByText(text, { includeHiddenElements: true });
@@ -305,7 +306,7 @@ it.each([
         fontSize: 12,
         color: "#8a7058",
         writingDirection,
-        textAlign,
+        ...textStartStyle(uiLanguage === "ar"),
         flex: 1,
       }),
     );

@@ -1,7 +1,7 @@
 import { View, type ViewProps } from "react-native";
 import { type ComponentProps } from "react";
 import { Text } from "@/components/ui/Text";
-import { useUIDirection, textAlignForDirection, type Direction } from "@/lib/ui/direction";
+import { useUIDirection, textAlignStyle, type Direction } from "@/lib/ui/direction";
 import { cn } from "@/lib/utils";
 
 type FieldProps = ViewProps & {
@@ -35,7 +35,7 @@ export function Label({ dir: explicitDir, className, style, ...props }: LabelPro
       dir={dir}
       variant="title-sm"
       className={cn("text-charcoal dark:text-neutral-300", className)}
-      style={[{ textAlign: textAlignForDirection(dir), writingDirection: dir }, style]}
+      style={[{ ...textAlignStyle(dir), writingDirection: dir }, style]}
       {...props}
     />
   );
@@ -54,7 +54,7 @@ export function FieldMessage({
       dir={dir}
       variant="caption"
       className={cn(tone === "error" ? "text-red-500" : "text-warm-500 dark:text-neutral-400", className)}
-      style={[{ textAlign: textAlignForDirection(dir), writingDirection: dir }, style]}
+      style={[{ ...textAlignStyle(dir), writingDirection: dir }, style]}
       {...props}
     />
   );

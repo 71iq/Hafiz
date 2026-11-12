@@ -5,6 +5,7 @@ import { ACHIEVEMENTS } from "@/lib/achievements/catalog";
 import type { AchievementUnlock } from "@/lib/achievements/types";
 import type { AchievementDashboardItem } from "@/lib/achievements/queries";
 import { AchievementBadge } from "./AchievementBadge";
+import { textStartStyle } from "@/lib/ui/direction";
 
 type Props = {
   unlocks: AchievementUnlock[];
@@ -33,7 +34,7 @@ export function PublicBadgesGrid({ unlocks }: Props) {
     return (
       <Text
         className="text-warm-400 dark:text-neutral-500"
-        style={{ fontFamily: "Manrope_400Regular", fontSize: 13, textAlign: isRTL ? "right" : "left" }}
+        style={{ fontFamily: "Manrope_400Regular", fontSize: 13, ...textStartStyle(isRTL)}}
       >
         {s.publicBadgesEmpty}
       </Text>

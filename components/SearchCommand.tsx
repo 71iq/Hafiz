@@ -23,6 +23,7 @@ import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/Res
 
 import { groupRootResults, groupTextResults, type TextResult, type RootOccurrence, type LemmaGroup } from "@/lib/search/results";
 import { resolveRootCandidates } from "@/lib/search/root-candidates";
+import { textStartStyle } from "@/lib/ui/direction";
 
 // ─── Arabic diacritics stripping ───
 const ARABIC_DIACRITICS_RE =
@@ -451,7 +452,7 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
                 fontSize: 15,
                 color: isDark ? "#e5e5e5" : "#2D2D2D",
                 writingDirection: isRTL ? "rtl" : "ltr",
-                textAlign: isRTL ? "right" : "left",
+                ...textStartStyle(isRTL),
                 paddingVertical: 4,
                 ...(Platform.OS === "web"
                   ? ({
@@ -568,7 +569,7 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
                           fontFamily: "Manrope_500Medium",
                           fontSize: 15,
                           writingDirection: isRTL ? "rtl" : "ltr",
-                          textAlign: isRTL ? "right" : "left",
+                          ...textStartStyle(isRTL),
                         }}
                       >
                         {item.query}

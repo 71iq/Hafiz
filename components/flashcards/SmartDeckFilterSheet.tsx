@@ -47,6 +47,7 @@ import {
   type SmartDeckId,
   writeSmartDeckFilter,
 } from "@/lib/fsrs/smart-decks";
+import { textStartStyle, textEndStyle } from "@/lib/ui/direction";
 
 type Props = {
   visible: boolean;
@@ -348,7 +349,7 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
                 style={{
                   fontFamily: "Manrope_600SemiBold",
                   fontSize: 15,
-                  textAlign: isRTL ? "right" : "left",
+                  ...textStartStyle(isRTL),
                   writingDirection: isRTL ? "rtl" : "ltr",
                 }}
               >
@@ -423,7 +424,7 @@ export function SmartDeckFilterSheet({ visible, deckId, onClose, onSaved }: Prop
             {error && (
               <Text
                 className="text-red-600 dark:text-red-400"
-                style={{ fontFamily: "Manrope_500Medium", fontSize: 13, textAlign: isRTL ? "right" : "left" }}
+                style={{ fontFamily: "Manrope_500Medium", fontSize: 13, ...textStartStyle(isRTL)}}
               >
                 {error}
               </Text>
@@ -519,7 +520,7 @@ function SurahFilterSummary({
             style={{
               fontFamily: "Manrope_600SemiBold",
               fontSize: 15,
-              textAlign: isRTL ? "right" : "left",
+              ...textStartStyle(isRTL),
               writingDirection: isRTL ? "rtl" : "ltr",
             }}
           >
@@ -533,7 +534,7 @@ function SurahFilterSummary({
                 fontFamily: "Manrope_400Regular",
                 fontSize: 13,
                 lineHeight: 20,
-                textAlign: isRTL ? "right" : "left",
+                ...textStartStyle(isRTL),
                 writingDirection: isRTL ? "rtl" : "ltr",
               }}
             >
@@ -682,13 +683,13 @@ function SurahFilterItem({
         <View className="flex-1" style={{ minWidth: 0 }}>
           <Text
             className="text-charcoal dark:text-neutral-200"
-            style={{ fontFamily: "Manrope_500Medium", fontSize: 14, textAlign: isRTL ? "right" : "left" }}
+            style={{ fontFamily: "Manrope_500Medium", fontSize: 14, ...textStartStyle(isRTL)}}
           >
             {surah.name_english}
           </Text>
           <Text
             className="text-warm-400 dark:text-neutral-500"
-            style={{ fontFamily: "Manrope_400Regular", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
+            style={{ fontFamily: "Manrope_400Regular", fontSize: 12, ...textStartStyle(isRTL)}}
           >
             {ayahCountLabel}
           </Text>
@@ -699,7 +700,7 @@ function SurahFilterItem({
             fontFamily: "Manrope_400Regular",
             fontSize: 16,
             writingDirection: "rtl",
-            textAlign: isRTL ? "left" : "right",
+            ...textEndStyle(isRTL),
           }}
         >
           {surah.name_arabic}
@@ -844,7 +845,7 @@ function RangeInput({
         style={{
           fontFamily: "Manrope_500Medium",
           fontSize: 15,
-          textAlign: isRTL ? "right" : "left",
+          ...textStartStyle(isRTL),
         }}
         placeholderTextColor={isDark ? "#525252" : "#DFD9D1"}
       />

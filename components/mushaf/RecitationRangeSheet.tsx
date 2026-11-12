@@ -14,6 +14,7 @@ import { useSettings } from "@/lib/settings/context";
 import { toArabicNumber } from "@/lib/arabic";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { errorMessage } from "@/lib/error-message";
+import { textStartStyle } from "@/lib/ui/direction";
 
 type RecitationMode = "single" | "range" | "surah";
 
@@ -189,7 +190,7 @@ export function RecitationRangeSheet({ visible, onClose, currentAyah }: Props) {
         >
           <Text
             className="text-charcoal dark:text-neutral-100"
-            style={{ fontFamily: "Manrope_700Bold", fontSize: 14, textAlign: isRTL ? "right" : "left" }}
+            style={{ fontFamily: "Manrope_700Bold", fontSize: 14, ...textStartStyle(isRTL)}}
           >
             {s.recitationReciter}
           </Text>
@@ -200,7 +201,7 @@ export function RecitationRangeSheet({ visible, onClose, currentAyah }: Props) {
               fontFamily: "Manrope_500Medium",
               fontSize: 12,
               lineHeight: 18,
-              textAlign: isRTL ? "right" : "left",
+              ...textStartStyle(isRTL),
               writingDirection: isRTL ? "rtl" : "ltr",
             }}
           >
@@ -260,13 +261,13 @@ export function RecitationRangeSheet({ visible, onClose, currentAyah }: Props) {
             <View className={isRTL ? "items-end" : "items-start"}>
               <Text
                 className="text-warm-500 dark:text-neutral-400"
-                style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
+                style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12, ...textStartStyle(isRTL)}}
               >
                 {s.recitationCurrentSurah}
               </Text>
               <Text
                 className="mt-1 text-charcoal dark:text-neutral-100"
-                style={{ fontFamily: "Manrope_700Bold", fontSize: 18, textAlign: isRTL ? "right" : "left" }}
+                style={{ fontFamily: "Manrope_700Bold", fontSize: 18, ...textStartStyle(isRTL)}}
               >
                 {formatCount(current.surah)}
               </Text>
@@ -308,13 +309,13 @@ export function RecitationRangeSheet({ visible, onClose, currentAyah }: Props) {
           <View className="mt-4 rounded-3xl bg-primary-accent/10 dark:bg-primary-bright/10 p-4">
             <Text
               className="text-primary-accent dark:text-primary-bright"
-              style={{ fontFamily: "Manrope_700Bold", fontSize: 13, textAlign: isRTL ? "right" : "left" }}
+              style={{ fontFamily: "Manrope_700Bold", fontSize: 13, ...textStartStyle(isRTL)}}
             >
               {s.recitationPlaying}
             </Text>
             <Text
               className="mt-1 text-warm-700 dark:text-neutral-300"
-              style={{ fontFamily: "Manrope_500Medium", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
+              style={{ fontFamily: "Manrope_500Medium", fontSize: 12, ...textStartStyle(isRTL)}}
             >
               {formatPlaybackLine(rangeState, formatCount)}
             </Text>
@@ -324,7 +325,7 @@ export function RecitationRangeSheet({ visible, onClose, currentAyah }: Props) {
         {!!error && (
           <Text
             className="mt-4 text-red-600 dark:text-red-400"
-            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
+            style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12, ...textStartStyle(isRTL)}}
           >
             {error}
           </Text>
@@ -399,7 +400,7 @@ function LabeledInput({
         style={{
           fontFamily: "Manrope_700Bold",
           fontSize: 16,
-          textAlign: isRTL ? "right" : "left",
+          ...textStartStyle(isRTL),
           writingDirection: "ltr",
         }}
       />
@@ -436,7 +437,7 @@ function LoopControl({
         </View>
         <Text
           className="min-w-0 flex-1 text-charcoal dark:text-neutral-100"
-          style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13, textAlign: isRTL ? "right" : "left" }}
+          style={{ fontFamily: "Manrope_600SemiBold", fontSize: 13, ...textStartStyle(isRTL)}}
         >
           {label}
         </Text>

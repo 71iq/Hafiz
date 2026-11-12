@@ -16,6 +16,7 @@ import { TajweedTab } from "./word-tabs/TajweedTab";
 import { OccurrencesTab } from "./word-tabs/OccurrencesTab";
 import { AyahDetailModal } from "./AyahDetailModal";
 import { fetchWordQcf2Glyph, fetchWordRoot, fetchWordText, fetchWordTranslation } from "@/lib/word/queries";
+import { textStartStyle } from "@/lib/ui/direction";
 
 type TabKey = "meaning" | "irab" | "tajweed" | "tasreef" | "occurrences";
 const WORD_HEADER_FONT_STYLE = "v4-tajweed";
@@ -262,8 +263,8 @@ export function WordDetailSheet() {
             )}
             {!isArabicMode && !!headerMeta.translationEn && (
               <Text
-                className={`mt-1 text-warm-500 dark:text-neutral-400 ${isRTL ? "text-right" : "text-left"}`}
-                style={{ fontFamily: "Manrope_500Medium", fontSize: 13 }}
+                className="mt-1 text-warm-500 dark:text-neutral-400"
+                style={{ fontFamily: "Manrope_500Medium", fontSize: 13, ...textStartStyle(isRTL) }}
               >
                 {headerMeta.translationEn}
               </Text>

@@ -3,6 +3,7 @@ import { Check, MoveHorizontal, MoveVertical, type LucideIcon } from "lucide-rea
 import { useMemo } from "react";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { useSettings, type PageScroll } from "@/lib/settings/context";
+import { textStartStyle } from "@/lib/ui/direction";
 
 export type PageViewNavigationAnchor = {
   x: number;
@@ -115,7 +116,7 @@ export function PageViewNavigationSheet({
                       fontFamily: "Manrope_600SemiBold",
                       fontSize: 13,
                       lineHeight: 18,
-                      textAlign: isRTL ? "right" : "left",
+                      ...textStartStyle(isRTL),
                       writingDirection: isRTL ? "rtl" : "ltr",
                     }}
                     numberOfLines={1}

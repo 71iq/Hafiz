@@ -19,6 +19,7 @@ import {
   type ThemeMode,
 } from "@/lib/settings/context";
 import { AVAILABLE_TAFSIR_SOURCES } from "@/lib/tafsir/sources";
+import { textStartStyle, textEndStyle } from "@/lib/ui/direction";
 
 type Props = {
   visible: boolean;
@@ -372,7 +373,7 @@ function SettingsSectionLabel({ label, isRTL }: { label: string; isRTL: boolean 
         fontSize: 11,
         letterSpacing: 0,
         textTransform: "uppercase",
-        textAlign: isRTL ? "right" : "left",
+        ...textStartStyle(isRTL),
         writingDirection: isRTL ? "rtl" : "ltr",
       }}
     >
@@ -409,7 +410,7 @@ function SettingsActionRow({
             fontFamily: "Manrope_600SemiBold",
             fontSize: compact ? 14 : 14.5,
             lineHeight: compact ? 19 : 20,
-            textAlign: isRTL ? "right" : "left",
+            ...textStartStyle(isRTL),
             writingDirection: isRTL ? "rtl" : "ltr",
           }}
         >
@@ -422,7 +423,7 @@ function SettingsActionRow({
               fontFamily: "Manrope_400Regular",
               fontSize: 12,
               lineHeight: 17,
-              textAlign: isRTL ? "right" : "left",
+              ...textStartStyle(isRTL),
               writingDirection: isRTL ? "rtl" : "ltr",
             }}
           >
@@ -438,7 +439,7 @@ function SettingsActionRow({
             flexShrink: 1,
             fontFamily: "Manrope_500Medium",
             fontSize: compact ? 13 : 14,
-            textAlign: isRTL ? "left" : "right",
+            ...textEndStyle(isRTL),
             writingDirection: isRTL ? "rtl" : "ltr",
           }}
         >
@@ -522,7 +523,7 @@ function ChoiceDialog<T extends string>({
           style={{
             fontFamily: "Manrope_700Bold",
             fontSize: 18,
-            textAlign: isRTL ? "right" : "left",
+            ...textStartStyle(isRTL),
             writingDirection: isRTL ? "rtl" : "ltr",
           }}
         >
@@ -571,7 +572,7 @@ function ChoiceDialog<T extends string>({
                   style={{
                     fontFamily: "Manrope_600SemiBold",
                     fontSize: 15,
-                    textAlign: isRTL ? "right" : "left",
+                    ...textStartStyle(isRTL),
                     writingDirection: isRTL ? "rtl" : "ltr",
                   }}
                 >
@@ -583,7 +584,7 @@ function ChoiceDialog<T extends string>({
                     style={{
                       fontFamily: "Manrope_400Regular",
                       fontSize: 12,
-                      textAlign: isRTL ? "right" : "left",
+                      ...textStartStyle(isRTL),
                       writingDirection: isRTL ? "rtl" : "ltr",
                     }}
                   >

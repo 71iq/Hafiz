@@ -11,6 +11,7 @@ import {
   OverlayHeader,
   ResponsiveSheet,
 } from "@/components/ui/ResponsiveOverlay";
+import { textStartStyle } from "@/lib/ui/direction";
 
 type Props = {
   visible: boolean;
@@ -108,7 +109,7 @@ export function TranslationLanguagePicker({ visible, onClose }: Props) {
         {error && (
           <Text
             className="mb-3 text-red-600 dark:text-red-400"
-            style={{ fontFamily: "Manrope_500Medium", fontSize: 13, textAlign: isRTL ? "right" : "left" }}
+            style={{ fontFamily: "Manrope_500Medium", fontSize: 13, ...textStartStyle(isRTL)}}
           >
             {error}
           </Text>
@@ -165,7 +166,7 @@ export function TranslationLanguagePicker({ visible, onClose }: Props) {
                       ? "Manrope_600SemiBold"
                       : "Manrope_500Medium",
                     fontSize: 15,
-                    textAlign: isRTL ? "right" : "left",
+                    ...textStartStyle(isRTL),
                     writingDirection: isRTL ? "rtl" : "ltr",
                   }}
                 >
@@ -176,7 +177,7 @@ export function TranslationLanguagePicker({ visible, onClose }: Props) {
                   style={{
                     fontFamily: "Manrope_400Regular",
                     fontSize: 13,
-                    textAlign: isRTL ? "right" : "left",
+                    ...textStartStyle(isRTL),
                     writingDirection: isRTL ? "rtl" : "ltr",
                   }}
                 >

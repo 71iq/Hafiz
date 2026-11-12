@@ -54,6 +54,7 @@ import {
 } from "@/lib/fsrs/types";
 import { useSettings } from "@/lib/settings/context";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
+import { textStartStyle } from "@/lib/ui/direction";
 export { formatStepText, parseStepText } from "@/lib/fsrs/review-step-text";
 
 type ReviewSettingsMode = "ayah" | "word";
@@ -281,7 +282,7 @@ export function DeckReviewSettingsSheet({ visible, deckId, deckTitle, mode, onCl
             style={{
               fontFamily: "Manrope_700Bold",
               fontSize: 17,
-              textAlign: isRTL ? "right" : "left",
+              ...textStartStyle(isRTL),
               writingDirection: isRTL ? "rtl" : "ltr",
             }}
             numberOfLines={2}
@@ -327,7 +328,7 @@ export function DeckReviewSettingsSheet({ visible, deckId, deckTitle, mode, onCl
             {error && (
               <Text
                 className="text-red-600 dark:text-red-400"
-                style={{ fontFamily: "Manrope_500Medium", fontSize: 13, textAlign: isRTL ? "right" : "left" }}
+                style={{ fontFamily: "Manrope_500Medium", fontSize: 13, ...textStartStyle(isRTL)}}
               >
                 {error}
               </Text>
@@ -638,7 +639,7 @@ function SettingsSection({
           fontFamily: "Manrope_600SemiBold",
           fontSize: 11,
           letterSpacing: 1.2,
-          textAlign: isRTL ? "right" : "left",
+          ...textStartStyle(isRTL),
           textTransform: "uppercase",
           writingDirection: isRTL ? "rtl" : "ltr",
         }}
@@ -702,7 +703,7 @@ function SettingsRow({
             fontFamily: "Manrope_400Regular",
             fontSize: 12,
             lineHeight: 18,
-            textAlign: isRTL ? "right" : "left",
+            ...textStartStyle(isRTL),
             writingDirection: isRTL ? "rtl" : "ltr",
           }}
         >
@@ -802,7 +803,7 @@ function StepInputRow({
           fontFamily: "Manrope_600SemiBold",
           fontSize: 14,
           minWidth: compact ? 220 : 240,
-          textAlign: isRTL ? "right" : "left",
+          ...textStartStyle(isRTL),
           writingDirection: isRTL ? "rtl" : "ltr",
         }}
       />
@@ -1015,7 +1016,7 @@ function ReviewSwitchRow({
             flexShrink: 1,
             fontFamily: quiet && value ? "Manrope_600SemiBold" : "Manrope_500Medium",
             fontSize: 14,
-            textAlign: isRTL ? "right" : "left",
+            ...textStartStyle(isRTL),
             writingDirection: isRTL ? "rtl" : "ltr",
           }}
         >
@@ -1066,7 +1067,7 @@ function SettingTitle({
           flexShrink: 1,
           fontFamily: "Manrope_600SemiBold",
           fontSize,
-          textAlign: isRTL ? "right" : "left",
+          ...textStartStyle(isRTL),
           writingDirection: isRTL ? "rtl" : "ltr",
         }}
       >

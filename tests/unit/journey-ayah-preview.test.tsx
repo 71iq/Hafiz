@@ -1,3 +1,4 @@
+import { textStartStyle } from "@/lib/ui/direction";
 import React from "react";
 import { ActivityIndicator, I18nManager, StyleSheet } from "react-native";
 import { act, cleanup, fireEvent, render } from "@testing-library/react-native";
@@ -254,7 +255,7 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("real journey card in %s",
         fontFamily: "Manrope_400Regular",
         fontSize: 15,
         lineHeight: 26,
-        textAlign: direction === "rtl" ? "right" : "left",
+        ...textStartStyle(direction === "rtl"),
         writingDirection: direction,
       });
       expect(loadQuranPageFont).not.toHaveBeenCalled();
@@ -276,7 +277,7 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("real journey card in %s",
         fontFamily: "Manrope_400Regular",
         fontSize: 15,
         lineHeight: 26,
-        textAlign: "right",
+        ...textStartStyle(true),
         writingDirection: "rtl",
       });
       expect(loadQuranPageFont).not.toHaveBeenCalled();
@@ -301,7 +302,7 @@ describe.each(["en", "ar"] satisfies ("en" | "ar")[])("real journey card in %s",
       fontFamily: "Manrope_400Regular",
       fontSize: 14,
       lineHeight: 24,
-      textAlign: language === "ar" ? "right" : "left",
+      ...textStartStyle(language === "ar"),
       writingDirection: language === "ar" ? "rtl" : "ltr",
     });
     expect(view.getAllByText("7:4")).toHaveLength(2);

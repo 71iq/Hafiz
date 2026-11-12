@@ -16,6 +16,7 @@ import { useStrings, interpolate, stringByKey } from "@/lib/i18n/useStrings";
 import type { AchievementDashboardItem } from "@/lib/achievements/queries";
 import type { AchievementDefinition } from "@/lib/achievements/catalog";
 import { AchievementProgressBar } from "./AchievementProgressBar";
+import { textStartStyle } from "@/lib/ui/direction";
 
 const ICONS: Record<AchievementDefinition["icon"], LucideIcon> = {
   book: BookOpen,
@@ -82,7 +83,7 @@ export function AchievementBadge({ item, compact = false }: Props) {
         <View className="min-w-0 flex-1">
           <Text
             className="text-charcoal dark:text-neutral-100"
-            style={{ fontFamily: "Manrope_700Bold", fontSize: compact ? 12 : 13, textAlign: isRTL ? "right" : "left" }}
+            style={{ fontFamily: "Manrope_700Bold", fontSize: compact ? 12 : 13, ...textStartStyle(isRTL)}}
             numberOfLines={compact ? 2 : 1}
           >
             {title}
@@ -90,7 +91,7 @@ export function AchievementBadge({ item, compact = false }: Props) {
           {!compact && (
             <Text
               className="mt-1 text-warm-400 dark:text-neutral-500"
-              style={{ fontFamily: "Manrope_400Regular", fontSize: 11, lineHeight: 16, textAlign: isRTL ? "right" : "left" }}
+              style={{ fontFamily: "Manrope_400Regular", fontSize: 11, lineHeight: 16, ...textStartStyle(isRTL)}}
               numberOfLines={2}
             >
               {description}
@@ -103,7 +104,7 @@ export function AchievementBadge({ item, compact = false }: Props) {
           <AchievementProgressBar current={currentValue} target={targetValue} />
           <Text
             className="mt-1.5 text-warm-400 dark:text-neutral-500"
-            style={{ fontFamily: "Manrope_500Medium", fontSize: 10, textAlign: isRTL ? "right" : "left" }}
+            style={{ fontFamily: "Manrope_500Medium", fontSize: 10, ...textStartStyle(isRTL)}}
           >
             {interpolate(s.achievementProgressCount, {
               current: String(Math.min(currentValue, targetValue)),

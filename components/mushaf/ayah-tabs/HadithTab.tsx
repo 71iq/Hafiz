@@ -14,6 +14,7 @@ import {
   type QfHadith,
   type QfHadithResponse,
 } from "@/lib/quran-foundation/content";
+import { textStartStyle } from "@/lib/ui/direction";
 
 const HADITH_PAGE_SIZE = 4;
 
@@ -152,7 +153,7 @@ function HadithTabContent({ surah, ayah, language }: Props & { language: "en" | 
             fontFamily: "Manrope_500Medium",
             fontSize: 14,
             lineHeight: 22,
-            textAlign: isRTL ? "right" : "left",
+            ...textStartStyle(isRTL),
             writingDirection: isRTL ? "rtl" : "ltr",
           }}
         >
@@ -179,7 +180,7 @@ function HadithTabContent({ surah, ayah, language }: Props & { language: "en" | 
           fontFamily: "Manrope_500Medium",
           fontSize: 14,
           lineHeight: 22,
-          textAlign: isRTL ? "right" : "left",
+          ...textStartStyle(isRTL),
           writingDirection: isRTL ? "rtl" : "ltr",
         }}
       >

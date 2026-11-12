@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/Button";
 import { Input, type InputProps } from "@/components/ui/Input";
 import { OverlayBody, OverlayFooter, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import type { UIStrings } from "@/lib/i18n/strings";
+import { textStartStyle } from "@/lib/ui/direction";
 
 type DueDateSheetProps = {
   visible: boolean;
@@ -48,7 +49,7 @@ export function DueDateSheet({
           style={{
             fontFamily: "Manrope_500Medium",
             fontSize: 16,
-            textAlign: isRTL ? "right" : "left",
+            ...textStartStyle(isRTL),
             writingDirection: "ltr",
           }}
         />
@@ -58,7 +59,7 @@ export function DueDateSheet({
             style={{
               fontFamily: "Manrope_500Medium",
               fontSize: 13,
-              textAlign: isRTL ? "right" : "left",
+              ...textStartStyle(isRTL),
               writingDirection: isRTL ? "rtl" : "ltr",
             }}
           >

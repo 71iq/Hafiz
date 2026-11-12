@@ -19,6 +19,7 @@ import {
   type PublicPageLanguage,
   type PublicPageLink,
 } from "@/lib/public-pages/content";
+import { textStartStyle } from "@/lib/ui/direction";
 
 const UI_LANGUAGE_CACHE_KEY = "hafiz_ui_language";
 const PUBLIC_PAGE_TABS: PublicPageKey[] = ["about", "privacy", "terms", "credits"];
@@ -178,7 +179,7 @@ export function PublicPage({ page }: { page: PublicPageKey }) {
               style={{
                 fontFamily: "Manrope_500Medium",
                 fontSize: 13,
-                textAlign: isRTL ? "right" : "left",
+                ...textStartStyle(isRTL),
                 writingDirection: isRTL ? "rtl" : "ltr",
               }}
             >
@@ -193,7 +194,7 @@ export function PublicPage({ page }: { page: PublicPageKey }) {
                 fontFamily: "Manrope_700Bold",
                 fontSize: 12,
                 letterSpacing: 0,
-                textAlign: isRTL ? "right" : "left",
+                ...textStartStyle(isRTL),
                 textTransform: "uppercase",
                 writingDirection: isRTL ? "rtl" : "ltr",
               }}
@@ -206,7 +207,7 @@ export function PublicPage({ page }: { page: PublicPageKey }) {
                 fontFamily: "NotoSerif_700Bold",
                 fontSize: 38,
                 lineHeight: 48,
-                textAlign: isRTL ? "right" : "left",
+                ...textStartStyle(isRTL),
                 writingDirection: isRTL ? "rtl" : "ltr",
               }}
             >
@@ -219,7 +220,7 @@ export function PublicPage({ page }: { page: PublicPageKey }) {
                 fontSize: 17,
                 lineHeight: 28,
                 maxWidth: 760,
-                textAlign: isRTL ? "right" : "left",
+                ...textStartStyle(isRTL),
                 writingDirection: isRTL ? "rtl" : "ltr",
               }}
             >
@@ -231,7 +232,7 @@ export function PublicPage({ page }: { page: PublicPageKey }) {
                 style={{
                   fontFamily: "Manrope_600SemiBold",
                   fontSize: 13,
-                  textAlign: isRTL ? "right" : "left",
+                  ...textStartStyle(isRTL),
                   writingDirection: isRTL ? "rtl" : "ltr",
                 }}
               >
@@ -253,7 +254,7 @@ export function PublicPage({ page }: { page: PublicPageKey }) {
                     fontFamily: "Manrope_700Bold",
                     fontSize: 20,
                     lineHeight: 28,
-                    textAlign: isRTL ? "right" : "left",
+                    ...textStartStyle(isRTL),
                     writingDirection: isRTL ? "rtl" : "ltr",
                   }}
                 >
@@ -267,7 +268,7 @@ export function PublicPage({ page }: { page: PublicPageKey }) {
                       fontFamily: "Manrope_400Regular",
                       fontSize: 15,
                       lineHeight: 25,
-                      textAlign: isRTL ? "right" : "left",
+                      ...textStartStyle(isRTL),
                       writingDirection: isRTL ? "rtl" : "ltr",
                     }}
                   >
@@ -294,7 +295,7 @@ export function PublicPage({ page }: { page: PublicPageKey }) {
                             fontFamily: "Manrope_400Regular",
                             fontSize: 15,
                             lineHeight: 24,
-                            textAlign: isRTL ? "right" : "left",
+                            ...textStartStyle(isRTL),
                             writingDirection: isRTL ? "rtl" : "ltr",
                           }}
                         >

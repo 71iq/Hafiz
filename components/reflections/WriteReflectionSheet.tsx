@@ -15,6 +15,7 @@ import { router } from "expo-router";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { useReflectionMutationScope } from "./use-mutation-scope";
 import { findJuzForAyah, loadMushafIndex } from "@/lib/mushaf/position";
+import { textStartStyle } from "@/lib/ui/direction";
 
 type Props = {
   open: boolean;
@@ -167,7 +168,7 @@ export function WriteReflectionSheet({ open, onClose, surah, ayahStart, ayahEnd,
                 fontSize: 14,
                 color: mutedColor,
                 marginBottom: 12,
-                textAlign: isRTL ? "right" : "left",
+                ...textStartStyle(isRTL),
               }}
             >
               {s.reflectionLoginRequired}
@@ -192,14 +193,14 @@ export function WriteReflectionSheet({ open, onClose, surah, ayahStart, ayahEnd,
                     letterSpacing: 1,
                     textTransform: "uppercase",
                     marginBottom: 4,
-                    textAlign: isRTL ? "right" : "left",
+                    ...textStartStyle(isRTL),
                   }}
                 >
                   {s.reflectionAyahLabel}
                 </Text>
                 <Text
                   className="text-warm-500 dark:text-neutral-400"
-                  style={{ fontFamily: "NotoSerif_700Bold", fontSize: 15, textAlign: isRTL ? "right" : "left" }}
+                  style={{ fontFamily: "NotoSerif_700Bold", fontSize: 15, ...textStartStyle(isRTL)}}
                 >
                   {ayahPreview}
                 </Text>
@@ -247,7 +248,7 @@ export function WriteReflectionSheet({ open, onClose, surah, ayahStart, ayahEnd,
                   fontSize: 12,
                   color: "#ef4444",
                   marginBottom: 8,
-                  textAlign: isRTL ? "right" : "left",
+                  ...textStartStyle(isRTL),
                 }}
               >
                 {error}

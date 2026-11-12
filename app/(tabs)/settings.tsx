@@ -65,6 +65,7 @@ import type { QfConnectionStatus } from "@/lib/quran-foundation/user-types";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { toArabicNumber } from "@/lib/arabic";
 import { SETTINGS_CONTENT_MAX_WIDTH } from "@/lib/ui/viewport";
+import { textStartStyle, textEndStyle } from "@/lib/ui/direction";
 import { ProfileIdentity } from "@/components/profile/ProfileIdentity";
 import {
   quranPageFontName,
@@ -509,7 +510,7 @@ export default function SettingsScreen() {
                     style={{
                       fontFamily: "Manrope_600SemiBold",
                       fontSize: 14,
-                      textAlign: isRTL ? "right" : "left",
+                      ...textStartStyle(isRTL),
                       writingDirection: isRTL ? "rtl" : "ltr",
                     }}
                   >
@@ -518,7 +519,7 @@ export default function SettingsScreen() {
                   {fontSizeUsesFittedPageSize && (
                     <Text
                       className="text-warm-400 dark:text-neutral-500"
-                      style={{ fontFamily: "Manrope_500Medium", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
+                      style={{ fontFamily: "Manrope_500Medium", fontSize: 12, ...textStartStyle(isRTL)}}
                     >
                       {s.fontSizeFixedPageView}
                     </Text>
@@ -672,7 +673,7 @@ export default function SettingsScreen() {
                           style={{
                             fontFamily: "Manrope_600SemiBold",
                             fontSize: 14,
-                            textAlign: isRTL ? "right" : "left",
+                            ...textStartStyle(isRTL),
                           }}
                         >
                           {s.qfConnectionTitle}
@@ -682,7 +683,7 @@ export default function SettingsScreen() {
                           style={{
                             fontFamily: "Manrope_400Regular",
                             fontSize: 12,
-                            textAlign: isRTL ? "right" : "left",
+                            ...textStartStyle(isRTL),
                           }}
                         >
                           {qfStatus === "connected"
@@ -698,7 +699,7 @@ export default function SettingsScreen() {
                     {!!qfMessage && (
                       <Text
                         className="mt-3 text-warm-500 dark:text-neutral-400"
-                        style={{ fontFamily: "Manrope_500Medium", fontSize: 12, textAlign: isRTL ? "right" : "left" }}
+                        style={{ fontFamily: "Manrope_500Medium", fontSize: 12, ...textStartStyle(isRTL)}}
                       >
                         {qfMessage}
                       </Text>
@@ -885,7 +886,7 @@ export default function SettingsScreen() {
             style={{
               fontFamily: "NotoSerif_700Bold",
               fontSize: isLaptop ? 32 : 28,
-              textAlign: isRTL ? "right" : "left",
+              ...textStartStyle(isRTL),
               writingDirection: isRTL ? "rtl" : "ltr",
             }}
           >
@@ -942,7 +943,7 @@ export default function SettingsScreen() {
                 fontFamily: "Manrope_400Regular",
                 fontSize: 14,
                 lineHeight: 22,
-                textAlign: isRTL ? "right" : "left",
+                ...textStartStyle(isRTL),
                 writingDirection: isRTL ? "rtl" : "ltr",
               }}
             >
@@ -1069,7 +1070,7 @@ function SettingsControlRow({ label, isRTL, children }: { label: string; isRTL: 
           fontFamily: "Manrope_600SemiBold",
           fontSize: 14,
           minWidth: 140,
-          textAlign: isRTL ? "right" : "left",
+          ...textStartStyle(isRTL),
           writingDirection: isRTL ? "rtl" : "ltr",
         }}
       >
@@ -1102,7 +1103,7 @@ function ContentSettingsTitle({ children, isRTL }: { children: string; isRTL: bo
         fontFamily: "Manrope_700Bold",
         fontSize: 24,
         lineHeight: 31,
-        textAlign: isRTL ? "right" : "left",
+        ...textStartStyle(isRTL),
         writingDirection: isRTL ? "rtl" : "ltr",
       }}
     >
@@ -1121,7 +1122,7 @@ function ContentSettingsGroup({ title, isRTL, children }: { title: string; isRTL
           fontFamily: "Manrope_700Bold",
           fontSize: 20,
           lineHeight: 26,
-          textAlign: isRTL ? "right" : "left",
+          ...textStartStyle(isRTL),
           writingDirection: isRTL ? "rtl" : "ltr",
         }}
       >
@@ -1191,7 +1192,7 @@ function ContentSettingsRow({
           fontFamily: "Manrope_600SemiBold",
           fontSize: 16,
           maxWidth: "48%",
-          textAlign: isRTL ? "right" : "left",
+          ...textStartStyle(isRTL),
           writingDirection: isRTL ? "rtl" : "ltr",
         }}
       >
@@ -1213,7 +1214,7 @@ function ContentSettingsRow({
             flexShrink: 1,
             fontFamily: "Manrope_500Medium",
             fontSize: 15,
-            textAlign: isRTL ? "left" : "right",
+            ...textEndStyle(isRTL),
             writingDirection: valueDirection,
           }}
         >
@@ -1243,7 +1244,7 @@ function SectionLabel({ children }: { children: string }) {
         fontSize: 14,
         letterSpacing: 0.6,
         textTransform: "uppercase",
-        textAlign: isRTL ? "right" : "left",
+        ...textStartStyle(isRTL),
         writingDirection: isRTL ? "rtl" : "ltr",
       }}
     >
@@ -1319,7 +1320,7 @@ function SettingsLinkRow({
             fontFamily: "Manrope_600SemiBold",
             fontSize: 14,
             lineHeight: 19,
-            textAlign: isRTL ? "right" : "left",
+            ...textStartStyle(isRTL),
             writingDirection: isRTL ? "rtl" : "ltr",
           }}
         >
@@ -1331,7 +1332,7 @@ function SettingsLinkRow({
             fontFamily: "Manrope_400Regular",
             fontSize: 12,
             lineHeight: 16,
-            textAlign: isRTL ? "right" : "left",
+            ...textStartStyle(isRTL),
             writingDirection: isRTL ? "rtl" : "ltr",
           }}
         >

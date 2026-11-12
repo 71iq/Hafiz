@@ -24,6 +24,7 @@ import {
 } from "@/lib/leaderboard/api";
 import { LEADERBOARD_CONTENT_MAX_WIDTH } from "@/lib/ui/viewport";
 import { cn } from "@/lib/utils";
+import { textStartStyle, textEndStyle } from "@/lib/ui/direction";
 
 type Tab = "daily" | "weekly" | "alltime" | "streak";
 
@@ -252,7 +253,7 @@ export default function LeaderboardScreen() {
                   letterSpacing: 2,
                   textTransform: "uppercase",
                   color: mutedColor,
-                  textAlign: isRTL ? "right" : "left",
+                  ...textStartStyle(isRTL),
                   writingDirection: isRTL ? "rtl" : "ltr",
                 }}
               >
@@ -263,7 +264,7 @@ export default function LeaderboardScreen() {
                   fontFamily: "Manrope_500Medium",
                   fontSize: 11,
                   color: mutedColor,
-                  textAlign: isRTL ? "left" : "right",
+                  ...textEndStyle(isRTL),
                   writingDirection: isRTL ? "rtl" : "ltr",
                 }}
               >

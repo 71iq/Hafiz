@@ -6,6 +6,7 @@ import { useWordInteraction, type TooltipPosition } from "@/lib/word/context";
 import { fetchWordTranslation, fetchWordMeaningAr } from "@/lib/word/queries";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
+import { textStartStyle } from "@/lib/ui/direction";
 
 const TOOLTIP_HEIGHT = 36;
 const ARROW_SIZE = 6;
@@ -98,7 +99,7 @@ function TooltipPopup({
             overflow: "hidden",
             // @ts-ignore — whiteSpace is valid CSS on web
             whiteSpace: "nowrap",
-            textAlign: isRTL ? "right" : "left",
+            ...textStartStyle(isRTL),
             writingDirection: isRTL ? "rtl" : "ltr",
           }}
           numberOfLines={1}

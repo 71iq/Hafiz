@@ -10,6 +10,7 @@ import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings } from "@/lib/i18n/useStrings";
 import { SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
+import { textStartStyle } from "@/lib/ui/direction";
 
 type Props = {
   visible: boolean;
@@ -165,7 +166,7 @@ export function BookmarksSheet({ visible, onClose, onNavigate }: Props) {
                       fontFamily: "Manrope_600SemiBold",
                       fontSize: 14,
                       color: isDark ? "#e5e5e5" : "#2D2D2D",
-                      textAlign: isRTL ? "right" : "left",
+                      ...textStartStyle(isRTL),
                     }}
                   >
                     {b.surahNameArabic}
@@ -175,7 +176,7 @@ export function BookmarksSheet({ visible, onClose, onNavigate }: Props) {
                       fontFamily: "Manrope_400Regular",
                       fontSize: 12,
                       color: isDark ? "#737373" : "#A39B93",
-                      textAlign: isRTL ? "right" : "left",
+                      ...textStartStyle(isRTL),
                     }}
                   >
                     {b.surahNameEnglish}

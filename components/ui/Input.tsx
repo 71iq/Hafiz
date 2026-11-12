@@ -3,7 +3,7 @@ import { type ReactNode } from "react";
 import { TextInput, View, type TextInputProps } from "react-native";
 import { useColorScheme } from "nativewind";
 import { useSettings } from "@/lib/settings/context";
-import { useUIDirection, textAlignForDirection, type Direction } from "@/lib/ui/direction";
+import { useUIDirection, textAlignStyle, type Direction } from "@/lib/ui/direction";
 import { cn } from "@/lib/utils";
 
 export type InputProps = TextInputProps & {
@@ -54,7 +54,7 @@ export const Input = forwardRef<TextInput, InputProps>(
           {
             fontFamily: "Manrope_400Regular",
             fontSize: 15,
-            textAlign: textAlignForDirection(dir),
+            ...textAlignStyle(dir),
             writingDirection: dir,
           },
           multiline ? { lineHeight: 22, textAlignVertical: "top" as const } : null,

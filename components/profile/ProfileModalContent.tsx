@@ -49,6 +49,7 @@ import { cn } from "@/lib/utils";
 import { ProfileAvatar } from "./ProfileAvatar";
 import { ProfileNotesManager } from "./ProfileNotesManager";
 import { ProfileStatCard } from "./ProfileStatCard";
+import { textStartStyle, textEndStyle } from "@/lib/ui/direction";
 
 type ProfileModalContentProps = {
   userId?: string;
@@ -685,7 +686,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
                 fontFamily: "Manrope_700Bold",
                 fontSize: isPhone ? 28 : 32,
                 lineHeight: isPhone ? 34 : 39,
-                textAlign: isRTL ? "right" : "left",
+                ...textStartStyle(isRTL),
                 writingDirection: isRTL ? "rtl" : "ltr",
               }}
             >
@@ -697,7 +698,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
                 fontFamily: "Manrope_400Regular",
                 fontSize: isPhone ? 17 : 19,
                 lineHeight: isPhone ? 24 : 27,
-                textAlign: isRTL ? "right" : "left",
+                ...textStartStyle(isRTL),
                 writingDirection: isRTL ? "rtl" : "ltr",
               }}
             >
@@ -767,7 +768,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
                     fontFamily: "Manrope_400Regular",
                     fontSize: isPhone ? 16 : 18,
                     lineHeight: isPhone ? 22 : 25,
-                    textAlign: isRTL ? "right" : "left",
+                    ...textStartStyle(isRTL),
                     writingDirection: isRTL ? "rtl" : "ltr",
                   }}
                 >
@@ -837,7 +838,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
                     [isRTL ? "left" : "right"]: 18,
                     fontFamily: "Manrope_500Medium",
                     fontSize: 15,
-                    textAlign: isRTL ? "left" : "right",
+                    ...textEndStyle(isRTL),
                   }}
                 >
                   {bioCount}
@@ -871,7 +872,7 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
                 style={{
                   fontFamily: "Manrope_500Medium",
                   fontSize: 13,
-                  textAlign: isRTL ? "right" : "left",
+                  ...textStartStyle(isRTL),
                   writingDirection: isRTL ? "rtl" : "ltr",
                 }}
               >
@@ -917,7 +918,7 @@ function ProfileEditFieldLabel({ label, isRTL }: { label: string; isRTL: boolean
         fontFamily: "Manrope_600SemiBold",
         fontSize: 18,
         lineHeight: 24,
-        textAlign: isRTL ? "right" : "left",
+        ...textStartStyle(isRTL),
         writingDirection: isRTL ? "rtl" : "ltr",
       }}
     >
@@ -1039,7 +1040,7 @@ function CountryCommandSelect({
               flex: 1,
               fontFamily: "Manrope_400Regular",
               fontSize: 15,
-              textAlign: isRTL ? "right" : "left",
+              ...textStartStyle(isRTL),
               writingDirection: isRTL ? "rtl" : "ltr",
             }}
           >
@@ -1110,7 +1111,7 @@ function CountryCommandSelect({
                         style={{
                           fontFamily: selected ? "Manrope_700Bold" : "Manrope_500Medium",
                           fontSize: 14,
-                          textAlign: isRTL ? "right" : "left",
+                          ...textStartStyle(isRTL),
                           writingDirection: isRTL ? "rtl" : "ltr",
                         }}
                       >
@@ -1189,14 +1190,14 @@ function ProfileOverview({
             <View className="min-w-0 flex-1">
               <Text
                 className="text-charcoal dark:text-neutral-100"
-                style={{ fontFamily: "Manrope_700Bold", fontSize: 15, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
+                style={{ fontFamily: "Manrope_700Bold", fontSize: 15, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
               >
                 {s.profileCountryTitle}
               </Text>
               <Text
                 selectable
                 className="mt-0.5 text-warm-700 dark:text-neutral-300"
-                style={{ fontFamily: "Manrope_400Regular", fontSize: 14, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
+                style={{ fontFamily: "Manrope_400Regular", fontSize: 14, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
               >
                 {country}
               </Text>
@@ -1209,14 +1210,14 @@ function ProfileOverview({
         <Card elevation="low" className="p-5">
           <Text
             className="mb-2 text-charcoal dark:text-neutral-100"
-            style={{ fontFamily: "Manrope_700Bold", fontSize: 16, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
+            style={{ fontFamily: "Manrope_700Bold", fontSize: 16, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
           >
             {s.profileBioTitle}
           </Text>
           <Text
             selectable
             className="text-warm-700 dark:text-neutral-300"
-            style={{ fontFamily: "Manrope_400Regular", fontSize: 14, lineHeight: 22, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
+            style={{ fontFamily: "Manrope_400Regular", fontSize: 14, lineHeight: 22, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
           >
             {bio}
           </Text>
@@ -1226,7 +1227,7 @@ function ProfileOverview({
       <Card elevation="low" className="p-5">
         <Text
           className="mb-4 text-charcoal dark:text-neutral-100"
-          style={{ fontFamily: "Manrope_700Bold", fontSize: 16, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
+          style={{ fontFamily: "Manrope_700Bold", fontSize: 16, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
         >
           {s.progressActivity}
         </Text>
@@ -1271,7 +1272,7 @@ function ProfileOverview({
       <View>
         <Text
           className="mb-3 text-charcoal dark:text-neutral-100"
-          style={{ fontFamily: "Manrope_700Bold", fontSize: 16, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
+          style={{ fontFamily: "Manrope_700Bold", fontSize: 16, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
         >
           {s.progressSurahProgress}
         </Text>
@@ -1281,7 +1282,7 @@ function ProfileOverview({
       <Card elevation="low" className="p-5">
         <Text
           className="mb-3 text-charcoal dark:text-neutral-100"
-          style={{ fontFamily: "Manrope_700Bold", fontSize: 16, textAlign: isRTL ? "right" : "left", writingDirection: isRTL ? "rtl" : "ltr" }}
+          style={{ fontFamily: "Manrope_700Bold", fontSize: 16, ...textStartStyle(isRTL), writingDirection: isRTL ? "rtl" : "ltr" }}
         >
           {s.publicBadges}
         </Text>
@@ -1358,7 +1359,7 @@ function SignedOutProfile({ isDark, isRTL, onClose }: { isDark: boolean; isRTL: 
           >
             <Text
               className="text-charcoal dark:text-neutral-200"
-              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15, textAlign: isRTL ? "right" : "left" }}
+              style={{ fontFamily: "Manrope_600SemiBold", fontSize: 15, ...textStartStyle(isRTL)}}
             >
               {s.authSignup}
             </Text>

@@ -72,6 +72,7 @@ import { parseQiraatText } from "@/lib/qiraat/parse";
 import { QiraatBlocks } from "@/components/mushaf/QiraatBlocks";
 import { recordAchievementEvent } from "@/lib/achievements/queries";
 import { deleteUserSetting, writeUserSetting } from "@/lib/database/user-settings";
+import { textStartStyle } from "@/lib/ui/direction";
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -1309,7 +1310,7 @@ function CardActionRow({
             flex: 1,
             fontFamily: "Manrope_600SemiBold",
             fontSize: 14,
-            textAlign: isRTL ? "right" : "left",
+            ...textStartStyle(isRTL),
             writingDirection: isRTL ? "rtl" : "ltr",
           }}
         >
@@ -1366,7 +1367,7 @@ function AnswerEditSheet({
             fontFamily: "Manrope_500Medium",
             fontSize: 16,
             lineHeight: 25,
-            textAlign: answerIsRTL ? "right" : "left",
+            ...textStartStyle(answerIsRTL),
             writingDirection: answerIsRTL ? "rtl" : "ltr",
           }}
         />
@@ -1568,7 +1569,7 @@ function CustomAnswerText({ text, fontSize }: { text: string; fontSize: number }
         fontFamily: "Manrope_400Regular",
         fontSize,
         lineHeight: Math.round(fontSize * 1.62),
-        textAlign: answerIsRTL ? "right" : "left",
+        ...textStartStyle(answerIsRTL),
         writingDirection: answerIsRTL ? "rtl" : "ltr",
       }}
     >

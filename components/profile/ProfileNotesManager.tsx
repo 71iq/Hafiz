@@ -17,6 +17,7 @@ import {
   searchPrivateNotes,
   type PrivateNoteSearchResult,
 } from "@/lib/notes/queries";
+import { textStartStyle } from "@/lib/ui/direction";
 
 const PROFILE_NOTES_PREVIEW_LIMIT = 4;
 
@@ -123,7 +124,7 @@ export function ProfileNotesManager() {
             style={{
               fontFamily: "Manrope_700Bold",
               fontSize: 18,
-              textAlign: isRTL ? "right" : "left",
+              ...textStartStyle(isRTL),
               writingDirection: isRTL ? "rtl" : "ltr",
             }}
           >
@@ -135,7 +136,7 @@ export function ProfileNotesManager() {
               fontFamily: "Manrope_400Regular",
               fontSize: 13,
               lineHeight: 19,
-              textAlign: isRTL ? "right" : "left",
+              ...textStartStyle(isRTL),
               writingDirection: isRTL ? "rtl" : "ltr",
             }}
           >
@@ -167,7 +168,7 @@ export function ProfileNotesManager() {
           style={{
             fontFamily: "Manrope_500Medium",
             fontSize: 13,
-            textAlign: isRTL ? "right" : "left",
+            ...textStartStyle(isRTL),
             writingDirection: isRTL ? "rtl" : "ltr",
           }}
         >
@@ -318,7 +319,7 @@ function NoteCard({
                   style={{
                     fontFamily: "Manrope_700Bold",
                     fontSize: 13,
-                    textAlign: isRTL ? "right" : "left",
+                    ...textStartStyle(isRTL),
                     writingDirection: isRTL ? "rtl" : "ltr",
                   }}
                 >
@@ -330,7 +331,7 @@ function NoteCard({
                   style={{
                     fontFamily: "Manrope_500Medium",
                     fontSize: 12,
-                    textAlign: isRTL ? "right" : "left",
+                    ...textStartStyle(isRTL),
                     writingDirection: isRTL ? "rtl" : "ltr",
                   }}
                 >
@@ -352,7 +353,7 @@ function NoteCard({
               fontFamily: "Manrope_400Regular",
               fontSize: 14,
               lineHeight: 22,
-              textAlign: isRTL ? "right" : "left",
+              ...textStartStyle(isRTL),
               writingDirection: isRTL ? "rtl" : "ltr",
             }}
           >
@@ -363,7 +364,7 @@ function NoteCard({
             style={{
               fontFamily: "Manrope_500Medium",
               fontSize: 11,
-              textAlign: isRTL ? "right" : "left",
+              ...textStartStyle(isRTL),
               writingDirection: isRTL ? "rtl" : "ltr",
             }}
           >

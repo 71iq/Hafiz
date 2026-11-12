@@ -1,5 +1,6 @@
 import { LogIn } from "lucide-react-native";
 import { Pressable, Text, View } from "react-native";
+import { textStartStyle } from "@/lib/ui/direction";
 
 export type AccountSyncPromptProps = {
   label: string;
@@ -25,7 +26,7 @@ export function AccountSyncPrompt({ label, buttonLabel, isDark, isRTL, onPress }
           fontFamily: "Manrope_700Bold",
           fontSize: 14,
           lineHeight: 20,
-          textAlign: isRTL ? "right" : "left",
+          ...textStartStyle(isRTL),
           writingDirection: isRTL ? "rtl" : "ltr",
         }}
       >
