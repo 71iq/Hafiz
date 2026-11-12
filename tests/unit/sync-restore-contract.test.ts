@@ -92,6 +92,6 @@ describe("account sync restore contract", () => {
 
     expect(source).toContain("chooseRicherReview(localReview, remoteReview)");
     expect(source).toContain("chooseRicherSurahProgress(localSurahProgress, remoteSurahProgress)");
-    expect(source.match(/enabled: !!requestedUserId && !isSignedOutOwnProfile/g)).toHaveLength(2);
+    expect(source.match(/enabled: hasValidRequestedUserId && !isSignedOutOwnProfile/g)).toHaveLength(2);
   });
 });

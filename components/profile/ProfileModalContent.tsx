@@ -7,6 +7,7 @@ import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { Camera, Check, ChevronDown, MapPin, Pencil, Save, Search, Trash2, UserRound, X, type LucideIcon } from "lucide-react-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { isAccountId } from "@/lib/auth/session-identity";
 import { PublicBadgesGrid } from "@/components/achievements/PublicBadgesGrid";
 import { ActivityHeatmap } from "@/components/progress/ActivityHeatmap";
 import { DefaultDeckProgressChart } from "@/components/progress/DefaultDeckProgressChart";
@@ -205,6 +206,8 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
   const requestedUserId = userId || user?.id || "";
   const isOwnProfile = !!user && (!userId || userId === user.id);
   const isSignedOutOwnProfile = !user && !userId;
+  // A link to a malformed id named no account; every public query for it was rejected by the server.
+  const hasValidRequestedUserId = isAccountId(requestedUserId);
   const identity = getAuthSessionIdentity(session);
   const editIdentity = identity.kind === "identified" && identity.userId === user?.id.toLowerCase()
     ? JSON.stringify(identity) : null;
@@ -263,14 +266,14 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
   const publicProfileQuery = useQuery({
     queryKey: ["publicProfile", requestedUserId],
     queryFn: () => fetchPublicProfile(requestedUserId),
-    enabled: !!requestedUserId && !isOwnProfile && !isSignedOutOwnProfile,
+    enabled: hasValidRequestedUserId && !isOwnProfile && !isSignedOutOwnProfile,
     staleTime: 1000 * 60 * 2,
   });
 
   const publicBadgesQuery = useQuery({
     queryKey: ["publicAchievementUnlocks", requestedUserId],
     queryFn: () => fetchPublicAchievementUnlocks(requestedUserId),
-    enabled: !!requestedUserId && !isOwnProfile,
+    enabled: hasValidRequestedUserId && !isOwnProfile,
     staleTime: 1000 * 60 * 2,
   });
 
@@ -284,14 +287,14 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
   const publicActivityQuery = useQuery({
     queryKey: ["publicReviewActivity", requestedUserId],
     queryFn: () => fetchPublicReviewActivity(requestedUserId),
-    enabled: !!requestedUserId && !isSignedOutOwnProfile,
+    enabled: hasValidRequestedUserId && !isSignedOutOwnProfile,
     staleTime: 1000 * 60 * 2,
   });
 
   const publicSurahProgressQuery = useQuery({
     queryKey: ["publicSurahProgress", requestedUserId],
     queryFn: async () => attachSurahNames(db, await fetchPublicSurahProgress(requestedUserId)),
-    enabled: !!requestedUserId && !isSignedOutOwnProfile,
+    enabled: hasValidRequestedUserId && !isSignedOutOwnProfile,
     staleTime: 1000 * 60 * 2,
   });
 
@@ -386,6 +389,8 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
   ];
   const publicBadges = isOwnProfile ? ownBadgesQuery.data ?? [] : publicBadgesQuery.data ?? [];
   const loadingPublic = !isOwnProfile && !isSignedOutOwnProfile && publicProfileQuery.isLoading;
+  const publicProfileMissing =
+    !isOwnProfile && (!hasValidRequestedUserId || (publicProfileQuery.isSuccess && publicProfileQuery.data === null));
   const statusMessage =
     profileStatus === "saved"
       ? s.profileSaved
@@ -605,9 +610,9 @@ export function ProfileModalContent({ userId }: ProfileModalContentProps) {
             <EmptyState
               icon={UserRound}
               title={s.authProfile}
-              subtitle={s.errorSubtitle}
-              actionLabel={isOwnProfile ? undefined : s.errorTryAgain}
-              onAction={isOwnProfile ? undefined : () => void publicProfileQuery.refetch()}
+              subtitle={publicProfileMissing ? s.profileNotFound : s.errorSubtitle}
+              actionLabel={isOwnProfile || publicProfileMissing ? undefined : s.errorTryAgain}
+              onAction={isOwnProfile || publicProfileMissing ? undefined : () => void publicProfileQuery.refetch()}
               isDark={isDark}
             />
           ) : (

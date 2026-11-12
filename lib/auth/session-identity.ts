@@ -10,6 +10,11 @@ export type AuthSessionIdentity =
   | { kind: "identified"; userId: string; sessionId: string };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Account ids are UUIDs; anything else cannot name a user and must not reach the server. */
+export function isAccountId(value: string): boolean {
+  return UUID.test(value);
+}
 const BASE64URL = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 
 function decodePayload(input: string): string | null {
