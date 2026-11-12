@@ -41,11 +41,28 @@ export default function LeaderboardScreen() {
 
   const configured = isSupabaseConfigured();
 
-  const syncLeaderboard = useCallback(async () => {
-    if (!configured || !user) return;
-    await syncDailyScore(db);
-    await updateProfileStats(db);
-  }, [configured, db, user]);
+  const userId = user?.id ?? null;
+
+  // Upload this account's stats in the background and refresh the boards once it lands. Reads
+  // never wait for it, so a failed upload cannot hide the leaderboard. The sync helpers bind
+  // each write to the signed-in account that started it.
+  const syncInBackground = useCallback(() => {
+    if (!configured || !userId) return;
+    void (async () => {
+      try {
+        await syncDailyScore(db);
+        await updateProfileStats(db);
+      } catch (syncError) {
+        console.warn("[Leaderboard] Failed to sync this account's stats:", syncError);
+        return;
+      }
+      await queryClient.invalidateQueries({ queryKey: ["leaderboard"] });
+    })();
+  }, [configured, db, queryClient, userId]);
+
+  useEffect(() => {
+    syncInBackground();
+  }, [syncInBackground]);
 
   const queryFn = useCallback(() => {
     switch (activeTab) {
@@ -61,7 +78,7 @@ export default function LeaderboardScreen() {
   }, [activeTab]);
 
   useEffect(() => {
-    if (!configured || !user) return;
+    if (!configured || !userId) return;
     const loaders: Record<Tab, () => Promise<LeaderboardEntry[]>> = {
       daily: fetchDailyLeaderboard,
       weekly: fetchWeeklyLeaderboard,
@@ -72,15 +89,12 @@ export default function LeaderboardScreen() {
       queryClient
         .prefetchQuery({
           queryKey: ["leaderboard", tab],
-          queryFn: async () => {
-            await syncLeaderboard();
-            return loaders[tab]();
-          },
+          queryFn: loaders[tab],
           staleTime: 1000 * 60 * 2,
         })
         .catch(console.warn);
     });
-  }, [configured, queryClient, syncLeaderboard, user]);
+  }, [configured, queryClient, userId]);
 
   const {
     data: entries = [],
@@ -90,10 +104,7 @@ export default function LeaderboardScreen() {
     isRefetching,
   } = useQuery({
     queryKey: ["leaderboard", activeTab],
-    queryFn: async () => {
-      await syncLeaderboard();
-      return queryFn();
-    },
+    queryFn,
     enabled: configured,
     staleTime: 1000 * 60 * 2, // 2 minutes
   });
@@ -221,7 +232,15 @@ export default function LeaderboardScreen() {
           contentInsetAdjustmentBehavior="automatic"
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} />}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefetching}
+              onRefresh={() => {
+                syncInBackground();
+                void refetch();
+              }}
+            />
+          }
         >
           <View style={railStyle}>
             {featuredEntries.length > 0 && (

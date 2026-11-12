@@ -332,4 +332,37 @@ describe("LeaderboardScreen sign-in prompt characterization", () => {
     expect(view.queryByText("سجّل الدخول لمقارنة نتائجك")).toBeNull();
     expect(view.queryByText("Sign in to compare your results")).toBeNull();
   });
+
+  it("shows the board for a signed-in user while their stats upload is still pending", async () => {
+    jest.mocked(isSupabaseConfigured).mockReturnValue(true);
+    mockAuthState.user = { id: "user-1" };
+    const upload = createDeferred<void>();
+    jest.mocked(syncDailyScore).mockReturnValue(upload.promise);
+    jest.mocked(fetchDailyLeaderboard).mockResolvedValue(leaderboardEntries);
+    const { view } = renderLeaderboard();
+
+    await waitFor(() => expect(view.getByText("Amina")).toBeTruthy());
+    expect(syncDailyScore).toHaveBeenCalledTimes(1);
+    const readsBeforeUpload = jest.mocked(fetchDailyLeaderboard).mock.calls.length;
+
+    upload.resolve();
+    await waitFor(() => expect(updateProfileStats).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(jest.mocked(fetchDailyLeaderboard).mock.calls.length).toBe(readsBeforeUpload + 1));
+    expect(syncDailyScore).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the board readable when the stats upload fails", async () => {
+    jest.mocked(isSupabaseConfigured).mockReturnValue(true);
+    mockAuthState.user = { id: "user-1" };
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    jest.mocked(syncDailyScore).mockRejectedValue(new Error("fixture upload failure"));
+    jest.mocked(fetchDailyLeaderboard).mockResolvedValue(leaderboardEntries);
+    const { view } = renderLeaderboard();
+
+    await waitFor(() => expect(view.getByText("Amina")).toBeTruthy());
+    await waitFor(() => expect(warn).toHaveBeenCalled());
+    expect(view.queryByText("تعذر تحميل لوحة المتصدرين")).toBeNull();
+    expect(updateProfileStats).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
 });
