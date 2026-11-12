@@ -3,13 +3,14 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { ActivityIndicator, Platform, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { systemConfirmsCopy } from "@/lib/clipboard-feedback";
-import { BookOpenText, Bookmark, ChevronLeft, ChevronRight, MessageCircle, NotebookPen, Pause, Play, Share2 } from "lucide-react-native";
+import { BookOpenText, Bookmark, ChevronLeft, ChevronRight, Copy, MessageCircle, NotebookPen, Pause, Play } from "lucide-react-native";
 import { ReflectionsSection } from "@/components/reflections/ReflectionsSection";
 import { QiraatTab } from "@/components/mushaf/word-tabs/QiraatTab";
 import { HadithTab } from "@/components/mushaf/ayah-tabs/HadithTab";
 import { PrivateNotesSection } from "@/components/notes/PrivateNotesSection";
 import { TafsirSourcePicker } from "@/components/settings/TafsirSourcePicker";
 import { OverlayBody, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
+import { MirroredRow } from "@/components/ui/MirroredRow";
 import { useQuranPageFontReady } from "@/lib/fonts/use-quran-page-font";
 import {
   quranPageFontName,
@@ -366,8 +367,11 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
         maxWidth={1080}
         maxHeight={maxOverlayHeight}
       >
+      {/* Phones at 360-393dp leave little room beside the close button, so the header keeps only
+          ayah navigation and the per-ayah actions sit in the body under the ayah text. */}
       <OverlayHeader
         title={title}
+        titleNumberOfLines={1}
         subtitle={subtitle}
         isRTL={isRTL}
         onClose={onClose}
@@ -385,52 +389,6 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
               onPress={() => handleNavigateAyah("next")}
               disabled={!adjacentAyahs.next}
               accessibilityLabel={s.nextAyah}
-            />
-            <Pressable
-              disabled
-              hitSlop={8}
-              className="rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 px-3 py-2"
-              style={{ opacity: 0.8, cursor: Platform.OS === "web" ? "auto" : undefined }}
-            >
-              <Text
-                className="text-primary-accent dark:text-primary-bright"
-                style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11 }}
-              >
-                {activeTarget.surah}:{activeTarget.ayah}
-              </Text>
-              {bookmarked && <View className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-gold" />}
-            </Pressable>
-            {isQfContentEnabled() && (
-              <ActionIcon
-                icon={
-                  audioState.loading ? (
-                    <ActivityIndicator size="small" color={audioIconColor} />
-                  ) : audioState.playing ? (
-                    <Pause size={15} color={audioIconColor} />
-                  ) : (
-                    <Play size={15} color={audioIconColor} />
-                  )
-                }
-                onPress={handleAudioPress}
-                disabled={audioState.loading}
-                accessibilityLabel={audioState.loading ? s.audioLoading : audioState.playing ? s.audioPause : s.audioPlay}
-              />
-            )}
-            <ActionIcon
-              icon={
-                bookmarkBusy ? (
-                  <ActivityIndicator size="small" color={iconColor} />
-                ) : (
-                  <Bookmark size={15} color={bookmarked ? "#FDDC91" : iconColor} fill={bookmarked ? "#FDDC91" : "none"} />
-                )
-              }
-              onPress={handleBookmark}
-              disabled={bookmarkBusy}
-            />
-            <ActionIcon
-              icon={shareBusy ? <ActivityIndicator size="small" color={iconColor} /> : <Share2 size={15} color={iconColor} />}
-              onPress={handleShare}
-              disabled={shareBusy}
             />
           </View>
         }
@@ -493,6 +451,47 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
             </View>
           ) : null}
         </View>
+
+        <MirroredRow dir={isRTL ? "rtl" : "ltr"} className="mt-3 flex-wrap gap-2">
+          {isQfContentEnabled() && (
+            <AyahActionButton
+              icon={
+                audioState.loading ? (
+                  <ActivityIndicator size="small" color={audioIconColor} />
+                ) : audioState.playing ? (
+                  <Pause size={15} color={audioIconColor} />
+                ) : (
+                  <Play size={15} color={audioIconColor} />
+                )
+              }
+              label={audioState.playing ? s.ayahAudioPauseShort : s.ayahAudioListen}
+              accessibilityLabel={audioState.loading ? s.audioLoading : audioState.playing ? s.audioPause : s.audioPlay}
+              onPress={handleAudioPress}
+              disabled={audioState.loading}
+              isRTL={isRTL}
+            />
+          )}
+          <AyahActionButton
+            icon={
+              bookmarkBusy ? (
+                <ActivityIndicator size="small" color={iconColor} />
+              ) : (
+                <Bookmark size={15} color={bookmarked ? "#FDDC91" : iconColor} fill={bookmarked ? "#FDDC91" : "none"} />
+              )
+            }
+            label={bookmarked ? s.removeBookmark : s.bookmark}
+            onPress={handleBookmark}
+            disabled={bookmarkBusy}
+            isRTL={isRTL}
+          />
+          <AyahActionButton
+            icon={shareBusy ? <ActivityIndicator size="small" color={iconColor} /> : <Copy size={15} color={iconColor} />}
+            label={s.copy}
+            onPress={handleShare}
+            disabled={shareBusy}
+            isRTL={isRTL}
+          />
+        </MirroredRow>
 
         <ScrollView
           horizontal
@@ -711,6 +710,46 @@ function ActionIcon({
       }}
     >
       {icon}
+    </Pressable>
+  );
+}
+
+function AyahActionButton({
+  icon,
+  label,
+  accessibilityLabel,
+  onPress,
+  disabled = false,
+  isRTL,
+}: {
+  icon: ReactNode;
+  label: string;
+  accessibilityLabel?: string;
+  onPress: () => void;
+  disabled?: boolean;
+  isRTL: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel ?? label}
+      className="items-center gap-1.5 rounded-full bg-surface-low px-3 py-2 dark:bg-surface-dark-low"
+      style={{
+        direction: "ltr",
+        flexDirection: isRTL ? "row-reverse" : "row",
+        opacity: disabled ? 0.45 : 1,
+        cursor: Platform.OS === "web" ? (disabled ? "auto" : "pointer") : undefined,
+      }}
+    >
+      {icon}
+      <Text
+        className="text-warm-600 dark:text-neutral-300"
+        style={{ fontFamily: "Manrope_600SemiBold", fontSize: 12, writingDirection: isRTL ? "rtl" : "ltr" }}
+      >
+        {label}
+      </Text>
     </Pressable>
   );
 }

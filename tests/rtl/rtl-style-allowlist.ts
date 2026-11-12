@@ -41,11 +41,6 @@ export const rtlStyleAllowlist: RtlStyleAllowlistEntry[] = [
     reason: "Ayah block uses full-bleed overlays and icon badges around protected Quran text.",
   },
   {
-    file: "components/mushaf/AyahDetailModal.tsx",
-    pattern: /-right-/,
-    reason: "Bookmark/status badge is icon-local until overlay RTL behavior is promoted from Playwright coverage.",
-  },
-  {
     file: "components/mushaf/FocusModeControls.tsx",
     pattern: /left|right|marginLeft/,
     reason: "Focus controls include full-width phone chrome and progress-thumb coordinates.",

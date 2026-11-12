@@ -44,6 +44,8 @@ type ResponsiveOverlayProps = {
 
 type OverlayHeaderProps = {
   title?: string;
+  /** Truncates the title to this many lines, for headers that share their row with several actions. */
+  titleNumberOfLines?: number;
   subtitle?: string;
   leading?: React.ReactNode;
   actions?: React.ReactNode;
@@ -276,6 +278,7 @@ export function ResponsiveModal(props: Omit<ResponsiveOverlayProps, "phonePresen
 
 export function OverlayHeader({
   title,
+  titleNumberOfLines,
   subtitle,
   leading,
   actions,
@@ -307,6 +310,7 @@ export function OverlayHeader({
             <View className={cn("min-w-0 flex-1", isRTL ? "items-end" : "items-start")}>
               {title ? (
                 <Text
+                  numberOfLines={titleNumberOfLines}
                   className="text-charcoal dark:text-neutral-100"
                   style={{
                     fontFamily: "Manrope_700Bold",
