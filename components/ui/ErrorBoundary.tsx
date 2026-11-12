@@ -1,5 +1,8 @@
 import React, { Component, type ErrorInfo, type ReactNode } from "react";
-import { View, Text, Pressable, StyleSheet, type ViewStyle } from "react-native";
+import { View, StyleSheet } from "react-native";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { useStrings } from "@/lib/i18n/useStrings";
+import { useSettings } from "@/lib/settings/context";
 import { AlertTriangle } from "lucide-react-native";
 
 // ---------------------------------------------------------------------------
@@ -33,51 +36,8 @@ const viewStyles = StyleSheet.create({
     paddingHorizontal: 32,
     paddingVertical: 48,
   },
-  iconWrapper: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 20,
-  },
-  button: {
-    height: 44,
-    paddingHorizontal: 24,
-    borderRadius: 9999, // pill
-    backgroundColor: "#0d9488", // primary-accent (teal-600)
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  buttonPressed: {
-    transform: [{ scale: 0.98 }],
-    opacity: 0.9,
-  },
 });
 
-const textStyles = StyleSheet.create({
-  title: {
-    fontFamily: "Manrope_600SemiBold",
-    fontSize: 18,
-    lineHeight: 26,
-    color: "#2D2D2D", // charcoal
-    textAlign: "center",
-    marginBottom: 6,
-  },
-  subtitle: {
-    fontFamily: "Manrope_400Regular",
-    fontSize: 14,
-    lineHeight: 20,
-    color: "#8a7058", // warm-600 — muted body text
-    textAlign: "center",
-    marginBottom: 28,
-  },
-  buttonText: {
-    fontFamily: "Manrope_600SemiBold",
-    fontSize: 15,
-    color: "#FFFFFF",
-  },
-});
 
 // ---------------------------------------------------------------------------
 // ErrorBoundary (class component — React requirement for error boundaries)
@@ -112,28 +72,25 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       return this.props.fallback;
     }
 
-    return (
-      <View className="bg-surface dark:bg-surface-dark" style={viewStyles.container}>
-        <View className="bg-surface-low dark:bg-surface-dark-low" style={viewStyles.iconWrapper}>
-          <AlertTriangle size={40} color="#8a7058" strokeWidth={1.5} />
-        </View>
-
-        <Text style={textStyles.title}>Something went wrong</Text>
-        <Text style={textStyles.subtitle}>
-          This section couldn't load properly
-        </Text>
-
-        <Pressable
-          onPress={this.handleReset}
-          style={({ pressed }): ViewStyle =>
-            pressed
-              ? { ...viewStyles.button, ...viewStyles.buttonPressed }
-              : viewStyles.button
-          }
-        >
-          <Text style={textStyles.buttonText}>Try Again</Text>
-        </Pressable>
-      </View>
-    );
+    return <ErrorFallback onReset={this.handleReset} />;
   }
+}
+
+// The fallback reads strings and theme through hooks, so it follows the app language and dark themes;
+// the class body drew fixed English text in a fixed dark colour.
+function ErrorFallback({ onReset }: { onReset: () => void }) {
+  const s = useStrings();
+  const { isDark } = useSettings();
+  return (
+    <View className="bg-surface dark:bg-surface-dark" style={viewStyles.container}>
+      <EmptyState
+        icon={AlertTriangle}
+        title={s.errorTitle}
+        subtitle={s.errorSubtitle}
+        actionLabel={s.errorTryAgain}
+        onAction={onReset}
+        isDark={isDark}
+      />
+    </View>
+  );
 }
