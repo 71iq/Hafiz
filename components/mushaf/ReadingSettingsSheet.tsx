@@ -53,6 +53,7 @@ export function ReadingSettingsSheet({
     fontSizeIndex,
     setFontSizeIndex,
     quranFontStyle,
+    quranRenderFontStyle,
     setQuranFontStyle,
     quranMarkerStyle,
     setQuranMarkerStyle,
@@ -217,6 +218,7 @@ export function ReadingSettingsSheet({
           <View className="mb-5 overflow-hidden rounded-xl border border-warm-200/45 bg-surface-bright/80 dark:border-neutral-800/80 dark:bg-surface-dark-low/70">
             <SettingsActionRow
               title={s.quranFontLabel}
+              subtitle={quranRenderFontStyle !== quranFontStyle ? s.quranFontDarkFallback : undefined}
               value={quranBaseFontLabel}
               isRTL={isRTL}
               onPress={() => setFontPickerVisible(true)}

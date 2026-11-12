@@ -117,6 +117,7 @@ export default function SettingsScreen() {
     viewMode,
     setViewMode,
     quranFontStyle,
+    quranRenderFontStyle,
     setQuranFontStyle,
     quranMarkerStyle,
     setQuranMarkerStyle,
@@ -147,7 +148,7 @@ export default function SettingsScreen() {
   const accountName = profile?.display_name || profile?.username || user?.email?.split("@")[0] || s.authProfile;
   const fontSizeUsesFittedPageSize = viewMode === "page" && pageScroll === "horizontal";
   const [quranPreview, setQuranPreview] = useState<QuranPreviewAyah | null>(null);
-  const quranPreviewFontReady = useQuranPageFontReady(quranFontStyle, quranPreview?.v2Page);
+  const quranPreviewFontReady = useQuranPageFontReady(quranRenderFontStyle, quranPreview?.v2Page);
   const fontSizeLevelLabel = isRTL ? toArabicNumber(fontSizeIndex + 1) : String(fontSizeIndex + 1);
   const fontSizeTotalLabel = isRTL ? toArabicNumber(FONT_SIZE_STEPS.length) : String(FONT_SIZE_STEPS.length);
   const TranslationChevron = isRTL ? ChevronLeft : ChevronRight;
@@ -155,10 +156,10 @@ export default function SettingsScreen() {
   const categoryParam = Array.isArray(params.category) ? params.category[0] : params.category;
   const activeCategory = parseSettingsCategory(categoryParam) ?? "general";
   const previewPage = quranPreview?.v2Page ?? 1;
-  const previewFontFamily = quranPreview ? quranPageFontName(quranFontStyle, previewPage) : undefined;
-  const previewFontPaletteStyle = quranPageFontPaletteStyle(quranFontStyle, previewPage, effectiveTheme);
+  const previewFontFamily = quranPreview ? quranPageFontName(quranRenderFontStyle, previewPage) : undefined;
+  const previewFontPaletteStyle = quranPageFontPaletteStyle(quranRenderFontStyle, previewPage, effectiveTheme);
   const previewMarkerFontPaletteStyle = quranPageMarkerFontPaletteStyle(
-    quranFontStyle,
+    quranRenderFontStyle,
     previewPage,
     effectiveTheme,
     quranMarkerStyle,
@@ -480,6 +481,15 @@ export default function SettingsScreen() {
                   ]}
                 />
               </SettingsControlRow>
+
+              {quranRenderFontStyle !== quranFontStyle && (
+                <Text
+                  className="text-warm-400 dark:text-neutral-500"
+                  style={{ fontFamily: "Manrope_500Medium", fontSize: 12, ...textStartStyle(isRTL) }}
+                >
+                  {s.quranFontDarkFallback}
+                </Text>
+              )}
 
               {quranFontStyle !== "qcf2" && (
                 <SettingsControlRow label={s.quranMarkerStyleLabel} isRTL={isRTL}>
