@@ -409,7 +409,19 @@ export function OverlayBody({
 }: OverlayBodyProps) {
   const insets = useSafeAreaInsets();
   if (!scrollEnabled) {
-    return <View className={cn("min-h-0", className)} style={OVERLAY_BODY_FLEX}>{children}</View>;
+    // The content container's padding applies here too; dropping it left fixed bodies edge to edge.
+    const hasContentContainer = contentContainerClassName != null || contentContainerStyle != null;
+    return (
+      <View className={cn("min-h-0", className)} style={OVERLAY_BODY_FLEX}>
+        {hasContentContainer ? (
+          <View className={cn("min-h-0 flex-1", contentContainerClassName)} style={contentContainerStyle}>
+            {children}
+          </View>
+        ) : (
+          children
+        )}
+      </View>
+    );
   }
 
   return (
