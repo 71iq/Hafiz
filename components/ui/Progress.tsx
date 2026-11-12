@@ -22,6 +22,8 @@ export const Progress = forwardRef<View, ProgressProps>(
         style={[
           {
             alignItems: dir === "rtl" ? "flex-end" : "flex-start",
+            // Pinned so flex-end is the right side; an inherited rtl direction made it the left.
+            direction: "ltr",
             backgroundColor: "rgba(223, 217, 209, 0.15)",
           },
           style,

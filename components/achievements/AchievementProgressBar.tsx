@@ -14,6 +14,8 @@ export function AchievementProgressBar({ current, target }: Props) {
       className="mt-3 h-1.5 overflow-hidden rounded-full"
       style={{
         alignItems: isRTL ? "flex-end" : "flex-start",
+        // Pinned so flex-end is the right side; an inherited rtl direction made it the left.
+        direction: "ltr",
         backgroundColor: themeColors.surfaceHigh,
       }}
     >

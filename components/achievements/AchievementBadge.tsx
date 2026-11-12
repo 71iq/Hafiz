@@ -106,10 +106,11 @@ export function AchievementBadge({ item, compact = false }: Props) {
             className="mt-1.5 text-warm-400 dark:text-neutral-500"
             style={{ fontFamily: "Manrope_500Medium", fontSize: 10, ...textStartStyle(isRTL)}}
           >
-            {interpolate(s.achievementProgressCount, {
+            {/* A bidi isolate keeps "2 / 100" in order inside Arabic text. */}
+            {`\u2066${interpolate(s.achievementProgressCount, {
               current: String(Math.min(currentValue, targetValue)),
               target: String(targetValue),
-            })}
+            })}\u2069`}
           </Text>
         </>
       )}
