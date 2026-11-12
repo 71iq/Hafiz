@@ -42,6 +42,13 @@ function parseStepToken(value: string): SchedulerStep | null {
   const canonical = normalized.match(/^(\d+(?:\.\d+)?)\s*([mhd])$/);
   if (canonical) return `${canonical[1]}${canonical[2]}` as SchedulerStep;
 
+  // Arabic dual nouns carry their own count: "دقيقتان" alone means two minutes.
+  const dual = normalized.match(/^(?:2\s*)?(دقيقتان|دقيقتين|ساعتان|ساعتين|يومان|يومين)$/);
+  if (dual) {
+    const unit = dual[1].startsWith("دقيقت") ? "m" : dual[1].startsWith("ساعت") ? "h" : "d";
+    return `2${unit}` as SchedulerStep;
+  }
+
   const arabic = normalized.match(/^(\d+(?:\.\d+)?)\s*(دقيقة|دقائق|دق|ساعة|ساعات|ساعه|س|يوم|أيام|ايام)$/);
   if (!arabic) return null;
   const unit = arabic[2];

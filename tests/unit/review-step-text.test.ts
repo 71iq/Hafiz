@@ -24,6 +24,9 @@ describe("review step-text codec", () => {
     ["bad, nope", ["10m", "1d"]],
     ["-1m, .5h, 2s", ["10m", "1d"]],
     ["1 دقيقة 2 ساعات", ["10m", "1d"]],
+    ["دقيقتان، ساعتان، يومان", ["2m", "2h", "2d"]],
+    ["دقيقتين، ٢ ساعتين، يومين", ["2m", "2h", "2d"]],
+    ["دقيقتان ساعتان", ["2m", "2h"]],
   ])("preserves parsing of %j", (input, expected) => {
     expect(parseStepText(input, fallback)).toEqual(expected);
     expect(fallback).toEqual(["10m", "1d"]);
