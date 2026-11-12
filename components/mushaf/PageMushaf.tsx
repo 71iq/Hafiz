@@ -536,6 +536,39 @@ export function PageMushaf({
     }
   }, [verticalLineHeightMultiplier, verticalLineSlotHeight, pageData, pagePaddingTop, pagePaddingBottom]);
 
+  // A font or size change rebuilds every page height while the list keeps its pixel offset, which
+  // landed on a different page. Keep the reader on the same page at the same relative position.
+  // When the pages grow, the target can lie past the end of the old content and Android clamps the
+  // scroll there, so the offset stays pending until the list reports content tall enough to hold it.
+  const previousLayoutRef = useRef(layoutInfo);
+  const pendingAnchorOffsetRef = useRef<number | null>(null);
+  useEffect(() => {
+    const previous = previousLayoutRef.current;
+    previousLayoutRef.current = layoutInfo;
+    if (horizontal || !previous || !layoutInfo || previous === layoutInfo) return;
+    const index = currentPageRef.current - 1;
+    const previousStart = previous.offsets[index];
+    const previousHeight = previous.heights[index];
+    const nextStart = layoutInfo.offsets[index];
+    const nextHeight = layoutInfo.heights[index];
+    if ([previousStart, previousHeight, nextStart, nextHeight].some((value) => typeof value !== "number")) return;
+    const progress = previousHeight > 0
+      ? Math.max(0, Math.min(1, (verticalOffsetRef.current - previousStart) / previousHeight))
+      : 0;
+    const offset = nextStart + progress * nextHeight;
+    verticalOffsetRef.current = offset;
+    pendingAnchorOffsetRef.current = offset + effectiveContainerHeight > contentHeightRef.current ? offset : null;
+    flatListRef.current?.scrollToOffset({ offset, animated: false });
+    if (pendingAnchorOffsetRef.current === null) return;
+    // Never leave page tracking suspended if the list does not report a new size.
+    const timer = setTimeout(() => {
+      pendingAnchorOffsetRef.current = null;
+    }, 1500);
+    return () => clearTimeout(timer);
+    // The container height is read for this layout change only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [horizontal, layoutInfo]);
+
   // getItemLayout enables instant scrollToIndex without rendering intermediate items
   const getItemLayout = useCallback(
     (_data: ArrayLike<PageData> | null | undefined, index: number) => {
@@ -695,6 +728,14 @@ export function PageMushaf({
 
   const handleVerticalScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const pending = pendingAnchorOffsetRef.current;
+      if (pending !== null) {
+        if (Math.abs(event.nativeEvent.contentOffset.y - pending) > 2) {
+          onScroll?.(event);
+          return;
+        }
+        pendingAnchorOffsetRef.current = null;
+      }
       verticalOffsetRef.current = event.nativeEvent.contentOffset.y;
       const page = pageForVerticalOffset(event.nativeEvent.contentOffset.y);
       if (page !== null) updateCurrentPage(page);
@@ -703,9 +744,24 @@ export function PageMushaf({
     [onScroll, pageForVerticalOffset, updateCurrentPage]
   );
 
-  const handleContentSizeChange = useCallback((_width: number, height: number) => {
-    contentHeightRef.current = height;
+  // The JS layout can report the new content height before the native scroll view has it, so the
+  // pending offset is retried briefly until a scroll event confirms the list reached it.
+  const retryPendingAnchor = useCallback((attempt = 0) => {
+    const pending = pendingAnchorOffsetRef.current;
+    if (pending === null) return;
+    flatListRef.current?.scrollToOffset({ offset: pending, animated: false });
+    if (attempt < 20) setTimeout(() => retryPendingAnchor(attempt + 1), 50);
   }, []);
+
+  const handleContentSizeChange = useCallback(
+    (_width: number, height: number) => {
+      contentHeightRef.current = height;
+      const pending = pendingAnchorOffsetRef.current;
+      if (pending === null || pending + effectiveContainerHeight > height) return;
+      retryPendingAnchor();
+    },
+    [effectiveContainerHeight, retryPendingAnchor]
+  );
 
   const resetHorizontalDrag = useCallback(
     (duration = HORIZONTAL_CANCEL_DURATION) => {
