@@ -28,8 +28,7 @@ import {
   getStudyStreak,
   getWirdStatus,
   MUTASHABIHAT_DECK_ID,
-  getRemainingReviewLimit,
-  readDeckReviewSettings,
+  loadReviewQueue,
   deleteStudyCard,
   getNextEligibleReviewDate,
   resetStudyCardProgress,
@@ -48,11 +47,8 @@ import { syncDailyScore, updateProfileStats } from "@/lib/fsrs/leaderboard-sync"
 import { formatLocalDateInput, parseDueDateInput } from "@/lib/date";
 import type { DeckReviewSettings, StudyCardRow, TestMode, WordTestMode } from "@/lib/fsrs/types";
 import {
-  DEFAULT_DECK_DAILY_REVIEW_LIMIT,
   DEFAULT_DECK_LEARNING_STEPS,
   DEFAULT_DECK_RELEARNING_STEPS,
-  DEFAULT_ENABLED_MODES,
-  DEFAULT_WORD_TEST_MODES,
   TEST_MODE_COLORS,
 } from "@/lib/fsrs/types";
 import { fetchWordMeaningAr, fetchWordText, fetchWordTranslation } from "@/lib/word/queries";
@@ -62,10 +58,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { FieldMessage } from "@/components/ui/Field";
 import { OverlayBody, OverlayFooter, OverlayHeader, ResponsiveSheet } from "@/components/ui/ResponsiveOverlay";
 import {
-  getDueCardsForReview,
   getSmartCardContent,
-  isSmartDeckId,
-  materializeSmartDeckCards,
   type SmartCardKind,
   type SmartDeckRef,
 } from "@/lib/fsrs/smart-decks";
@@ -82,6 +75,8 @@ type SessionPhase = "loading" | "front" | "side" | "grading" | "summary";
 type CardData = {
   kind: "ayah" | "word" | SmartCardKind;
   card: StudyCardRow;
+  /** The review settings of the card's own deck, also in Review all. */
+  settings: DeckReviewSettings;
   surah: number;
   ayah: number;
   wordPos?: number;
@@ -197,11 +192,6 @@ function FlashcardSessionScreen() {
   const [sessionCardTotal, setSessionCardTotal] = useState(0);
   const [currentSideIndex, setCurrentSideIndex] = useState(0);
   const [revealed, setRevealed] = useState(false);
-  const [enabledModes, setEnabledModes] = useState<TestMode[]>(DEFAULT_ENABLED_MODES);
-  const [wordEnabledModes, setWordEnabledModes] = useState<WordTestMode[]>(DEFAULT_WORD_TEST_MODES);
-  const [reviewLimit, setReviewLimit] = useState(DEFAULT_DECK_DAILY_REVIEW_LIMIT);
-  const [reviewSettings, setReviewSettings] = useState<DeckReviewSettings | null>(null);
-  const [reviewSettingsLoaded, setReviewSettingsLoaded] = useState(false);
   const [summary, setSummary] = useState<SessionSummary | null>(null);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [gradingBusy, setGradingBusy] = useState(false);
@@ -243,33 +233,9 @@ function FlashcardSessionScreen() {
     setCardActionBusy(false);
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    setReviewSettingsLoaded(false);
-    readDeckReviewSettings(db, normalizedDeckId).then((settings) => {
-      if (cancelled) return;
-      setEnabledModes(settings.testModes);
-      setWordEnabledModes(settings.wordTestModes);
-      setReviewLimit(settings.dailyReviewLimit);
-      setReviewSettings(settings);
-      setReviewSettingsLoaded(true);
-    }).catch((err) => {
-      console.warn(err);
-      if (cancelled) return;
-      setEnabledModes(DEFAULT_ENABLED_MODES);
-      setWordEnabledModes(DEFAULT_WORD_TEST_MODES);
-      setReviewLimit(DEFAULT_DECK_DAILY_REVIEW_LIMIT);
-      setReviewSettings(null);
-      setReviewSettingsLoaded(true);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [db, normalizedDeckId]);
-
   // Load due cards and pre-fetch all card data
   useEffect(() => {
-    if (!settingsLoaded || !reviewSettingsLoaded) return;
+    if (!settingsLoaded) return;
 
     let cancelled = false;
 
@@ -280,29 +246,9 @@ function FlashcardSessionScreen() {
       try {
         // Pre-load streak for scoring
         streakRef.current = await getStudyStreak(db);
-        const activeReviewSettings = reviewSettings;
-        const remainingReviewLimit = await getRemainingReviewLimit(db, normalizedDeckId, activeReviewSettings?.dailyReviewLimit ?? reviewLimit);
-        if (isSmartDeckId(normalizedDeckId) && remainingReviewLimit > 0) {
-          await materializeSmartDeckCards(
-            db,
-            normalizedDeckId,
-            remainingReviewLimit,
-            activeReviewSettings?.newCardsLimit
-          );
-        }
-        const dueRows = remainingReviewLimit > 0
-          ? await getDueCardsForReview(db, normalizedDeckId, activeReviewSettings
-              ? {
-                  limit: remainingReviewLimit,
-                  newCardsLimit: activeReviewSettings.newCardsLimit,
-                  newReviewOrder: activeReviewSettings.newReviewOrder,
-                  reviewSortOrder: activeReviewSettings.reviewSortOrder,
-                  newCardSortOrder: activeReviewSettings.newCardSortOrder,
-                }
-              : { limit: remainingReviewLimit })
-          : [];
+        const queue = await loadReviewQueue(db, normalizedDeckId);
         if (cancelled) return;
-        if (dueRows.length === 0) {
+        if (queue.length === 0) {
           resetSessionProgress();
           setSummary({ total: 0, newCount: 0, reviewCount: 0, relearningCount: 0, durationMs: 0, nextReviewDate: null, wirdDays: 0, wirdMaintainedToday: false });
           setPhase("summary");
@@ -310,7 +256,7 @@ function FlashcardSessionScreen() {
         }
 
         const loaded: CardData[] = [];
-        for (const row of dueRows) {
+        for (const { card: row, settings } of queue) {
           if (cancelled) return;
           const smartContent = await getSmartCardContent(db, row.id);
           if (smartContent?.targetRef) {
@@ -318,6 +264,7 @@ function FlashcardSessionScreen() {
             loaded.push({
               kind: smartContent.kind,
               card: row,
+              settings,
               surah: targetRef.surah,
               ayah: targetRef.ayah,
               surahName: targetRef.surahNameAr,
@@ -421,6 +368,7 @@ function FlashcardSessionScreen() {
           loaded.push({
             kind: isWordCard ? "word" : "ayah",
             card: row,
+            settings,
             surah,
             ayah,
             wordPos,
@@ -476,9 +424,6 @@ function FlashcardSessionScreen() {
     db,
     normalizedDeckId,
     tafseerSource,
-    reviewLimit,
-    reviewSettings,
-    reviewSettingsLoaded,
     settingsLoaded,
     resetSessionProgress,
     s.smartDeckMutashabihatTitle,
@@ -491,8 +436,8 @@ function FlashcardSessionScreen() {
 
   const currentCard = cards[currentIndex] ?? null;
   const gradePreviews = useMemo(
-    () => currentCard ? getGradeSchedulePreviews(currentCard.card, reviewSettings, isRTL) : {},
-    [currentCard, reviewSettings, isRTL]
+    () => currentCard ? getGradeSchedulePreviews(currentCard.card, currentCard.settings, isRTL) : {},
+    [currentCard, isRTL]
   );
   const activeModes = useMemo<ReviewMode[]>(() => {
     if (!currentCard) return [] as ReviewMode[];
@@ -506,20 +451,20 @@ function FlashcardSessionScreen() {
       return currentCard.asbabOccasions?.length ? ["asbabReading"] : [];
     }
     if (currentCard.isWordCard) {
-      return wordEnabledModes.filter((mode) => {
+      return currentCard.settings.wordTestModes.filter((mode) => {
         if (mode === "wordMeaningArabic" && !currentCard.wordMeaningAr && !getCardAnswerOverride(currentCard, mode)) return false;
         if (mode === "wordMeaningTranslation" && !currentCard.wordMeaningEn && !getCardAnswerOverride(currentCard, mode)) return false;
         return true;
       });
     }
-    return enabledModes.filter((mode) => {
+    return currentCard.settings.testModes.filter((mode) => {
       if (mode === "previousAyah" && (!currentCard.prevAyahText || currentCard.uniqueFront.contextCount > 0) && !getCardAnswerOverride(currentCard, mode)) return false;
       if (mode === "nextAyah" && !currentCard.nextAyahText && !getCardAnswerOverride(currentCard, mode)) return false;
       if (mode === "translation" && !currentCard.translation && !getCardAnswerOverride(currentCard, mode)) return false;
       if (mode === "tafseer" && !currentCard.tafseer && !getCardAnswerOverride(currentCard, mode)) return false;
       return true;
     });
-  }, [enabledModes, wordEnabledModes, currentCard]);
+  }, [currentCard]);
 
   const currentMode = activeModes[currentSideIndex] ?? null;
   const isLastSide = currentSideIndex >= activeModes.length - 1;
@@ -758,7 +703,7 @@ function FlashcardSessionScreen() {
         card: currentCard.card,
         rating,
         reviewedAt,
-        reviewPolicy: reviewSettings ?? undefined,
+        reviewPolicy: currentCard.settings,
       });
 
       await persistReviewTransition({ db, cardId: currentCard.card.id, transition });

@@ -1,6 +1,6 @@
 import { DatabaseSync } from "node:sqlite";
 import type { AppDatabase, TransactionDatabase } from "@/lib/database/types";
-import { getDeckTodayStats, readDeckReviewSettings } from "@/lib/fsrs/queries";
+import { getDeckTodayStats, loadReviewQueue, readDeckReviewSettings, writeDeckReviewSettings } from "@/lib/fsrs/queries";
 import { getDueCardsForReview, SMART_DECK_IDS } from "@/lib/fsrs/smart-decks";
 import { State } from "@/lib/fsrs/scheduler";
 import type { StudyCardRow } from "@/lib/fsrs/types";
@@ -23,8 +23,12 @@ describe("review queue shared by Home and sessions", () => {
     jest.setSystemTime(NOW);
     sql = new DatabaseSync(":memory:");
     sql.exec(`
-      CREATE TABLE user_settings (key TEXT PRIMARY KEY, value TEXT);
+      CREATE TABLE user_settings (key TEXT PRIMARY KEY, value TEXT, updated_at TEXT, deleted_at TEXT);
       CREATE TABLE qiraat_encyclopedia (surah INTEGER NOT NULL, ayah INTEGER NOT NULL, text TEXT, ayah_group TEXT, PRIMARY KEY(surah, ayah));
+      CREATE TABLE quran_text (surah INTEGER NOT NULL, ayah INTEGER NOT NULL, text_clean TEXT, text_qcf2 TEXT, PRIMARY KEY(surah, ayah));
+      CREATE TABLE asbab_al_nuzul (surah INTEGER NOT NULL, ayah INTEGER NOT NULL, occasions_json TEXT);
+      CREATE TABLE mutashabihat_groups (id TEXT PRIMARY KEY, sort_order INTEGER, cue TEXT, kind TEXT);
+      CREATE TABLE mutashabihat_refs (group_id TEXT, sort_order INTEGER, surah INTEGER, ayah INTEGER, tail_5 TEXT);
       CREATE TABLE study_log (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         card_id TEXT NOT NULL,
@@ -125,5 +129,20 @@ describe("review queue shared by Home and sessions", () => {
 
     expect(ids(session)).toEqual(["qiraat:1:1", "qiraat:1:2"]);
     expect(home.dueCount + home.newCount).toBe(session.length);
+  });
+
+  it("pairs every Review all card with its own deck's settings instead of legacy defaults", async () => {
+    qiraatCandidate(1, 1);
+    insert("qiraat:1:1", QIRAAT);
+    insert("word:2:255:3", "meanings");
+    await writeDeckReviewSettings(db, QIRAAT, { learningSteps: ["7m"], requestRetention: 0.85 });
+    await writeDeckReviewSettings(db, "meanings", { learningSteps: ["2h"], requestRetention: 0.9 });
+
+    const queue = await loadReviewQueue(db);
+
+    const byId = Object.fromEntries(queue.map((item) => [item.card.id, item.settings]));
+    expect(Object.keys(byId).sort()).toEqual(["qiraat:1:1", "word:2:255:3"]);
+    expect(byId["qiraat:1:1"]).toMatchObject({ learningSteps: ["7m"], requestRetention: 0.85 });
+    expect(byId["word:2:255:3"]).toMatchObject({ learningSteps: ["2h"], requestRetention: 0.9 });
   });
 });

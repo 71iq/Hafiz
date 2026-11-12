@@ -55,6 +55,7 @@ import {
   getSmartDeckStats,
   getSmartDeckTodayStats,
   isSmartDeckId,
+  materializeSmartDeckCards,
   migrateLegacyRetentionDecks,
   SMART_DECK_IDS,
   type DueCardsForReviewOptions,
@@ -484,6 +485,31 @@ export async function getTodayDueCount(
   const remaining = await getRemainingReviewLimit(db, deckId, settings.dailyReviewLimit);
   if (remaining <= 0) return 0;
   return (await getDueCardsForReview(db, deckId, reviewQueueOptionsFromSettings(settings, remaining))).length;
+}
+
+export type ReviewQueueItem = { card: StudyCardRow; settings: DeckReviewSettings };
+
+/**
+ * The cards a review session loads, each paired with its own deck's review settings, so grading,
+ * interval previews and test modes follow the card's deck in Review all as in a single deck.
+ */
+export async function loadReviewQueue(db: AppDatabase, deckId?: string): Promise<ReviewQueueItem[]> {
+  const queueSettings = await readDeckReviewSettings(db, deckId);
+  const remaining = await getRemainingReviewLimit(db, deckId, queueSettings.dailyReviewLimit);
+  if (remaining <= 0) return [];
+  if (isSmartDeckId(deckId)) {
+    await materializeSmartDeckCards(db, deckId, remaining, queueSettings.newCardsLimit);
+  }
+  const rows = await getDueCardsForReview(db, deckId, reviewQueueOptionsFromSettings(queueSettings, remaining));
+  if (deckId) return rows.map((card) => ({ card, settings: queueSettings }));
+
+  const settingsByDeck = new Map<string, DeckReviewSettings>();
+  for (const card of rows) {
+    if (!settingsByDeck.has(card.deck_id)) {
+      settingsByDeck.set(card.deck_id, await readDeckReviewSettings(db, card.deck_id));
+    }
+  }
+  return rows.map((card) => ({ card, settings: settingsByDeck.get(card.deck_id)! }));
 }
 
 export async function getDueCount(db: AppDatabase, deckId?: string): Promise<number> {

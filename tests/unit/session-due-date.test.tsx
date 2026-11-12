@@ -16,21 +16,15 @@ import type { SmartCardContent, SmartDeckRef } from "@/lib/fsrs/smart-decks";
 import { DEFAULT_RECITATION_ID } from "@/lib/quran-foundation/recitations";
 import { DEFAULT_TAFSIR_SOURCE } from "@/lib/tafsir/sources";
 import { addTodayPoints, computeReviewPoints } from "@/lib/fsrs/scoring";
-import {
-  getDueCardsForReview,
-  getSmartCardContent,
-  isSmartDeckId,
-  materializeSmartDeckCards,
-} from "@/lib/fsrs/smart-decks";
+import { getSmartCardContent } from "@/lib/fsrs/smart-decks";
 import {
   deleteStudyCard,
   setStudyCardBuried,
   getNextEligibleReviewDate,
-  getRemainingReviewLimit,
   getStudyStreak,
   getWirdStatus,
+  loadReviewQueue,
   putStudyLogRow,
-  readDeckReviewSettings,
   resetStudyCardProgress,
   setStudyCardDueDate,
   setStudyCardMarked,
@@ -153,12 +147,11 @@ jest.mock("@/lib/fonts/loader", () => ({
 jest.mock("@/lib/fsrs/queries", () => ({
   deleteStudyCard: jest.fn(),
   getNextEligibleReviewDate: jest.fn(),
-  getRemainingReviewLimit: jest.fn(),
   getStudyStreak: jest.fn(),
   getWirdStatus: jest.fn(),
   publishReviewLogged: jest.fn(),
   putStudyLogRow: jest.fn(),
-  readDeckReviewSettings: jest.fn(),
+  loadReviewQueue: jest.fn(),
   resetStudyCardProgress: jest.fn(),
   setStudyCardBuried: jest.fn(),
   setStudyCardDueDate: jest.fn(),
@@ -169,10 +162,7 @@ jest.mock("@/lib/fsrs/queries", () => ({
 }));
 
 jest.mock("@/lib/fsrs/smart-decks", () => ({
-  getDueCardsForReview: jest.fn(),
   getSmartCardContent: jest.fn(),
-  isSmartDeckId: jest.fn(),
-  materializeSmartDeckCards: jest.fn(),
 }));
 
 jest.mock("@/lib/fsrs/scoring", () => ({
@@ -317,6 +307,10 @@ const reviewSettings = {
   testModes: ["nextAyah", "translation", "surahName"],
   wordTestModes: ["wordMeaningArabic", "wordMeaningTranslation"],
 } satisfies DeckReviewSettings;
+
+function reviewQueue(cards: StudyCardRow[], settings: DeckReviewSettings = reviewSettings) {
+  return cards.map((card) => ({ card, settings }));
+}
 
 type RenderedNode = ReturnType<ReturnType<typeof render>["getByText"]>;
 
@@ -641,13 +635,9 @@ describe("Flashcard session due-date editor characterization", () => {
       window: { width: 390, height: 844, scale: 1, fontScale: 1 },
       screen: { width: 390, height: 844, scale: 1, fontScale: 1 },
     });
-    jest.mocked(readDeckReviewSettings).mockResolvedValue(reviewSettings);
     jest.mocked(getStudyStreak).mockResolvedValue(0);
-    jest.mocked(getRemainingReviewLimit).mockResolvedValue(2);
-    jest.mocked(getDueCardsForReview).mockResolvedValue([firstCard, secondCard]);
+    jest.mocked(loadReviewQueue).mockResolvedValue(reviewQueue([firstCard, secondCard]));
     jest.mocked(getSmartCardContent).mockImplementation(async (_db, cardId) => smartContentById.get(cardId) ?? null);
-    jest.mocked(isSmartDeckId).mockReturnValue(false);
-    jest.mocked(materializeSmartDeckCards).mockResolvedValue(0);
     jest.mocked(setStudyCardDueDate).mockResolvedValue(firstCard);
     jest.mocked(computeReviewPoints).mockReturnValue(0);
     jest.mocked(loadQuranPageFont).mockResolvedValue();
@@ -822,7 +812,7 @@ describe("Flashcard session due-date editor characterization", () => {
         expect(mockRouterReplace).not.toHaveBeenCalled();
         expect(setStudyCardDueDate).toHaveBeenCalledTimes(1);
         expect(hapticMedium).toHaveBeenCalledTimes(1);
-        expect(getDueCardsForReview).toHaveBeenCalledTimes(1);
+        expect(loadReviewQueue).toHaveBeenCalledTimes(1);
       } finally {
         deferred.reject(failure);
         await act(async () => {
@@ -1065,7 +1055,7 @@ describe("Flashcard session due-date editor characterization", () => {
           expect(view.getByText(firstCue)).toBeTruthy();
           expect(view.getByText(s.flashcardsReveal)).toBeTruthy();
           expect(view.queryByText(secondCue)).toBeNull();
-          expect(getDueCardsForReview).toHaveBeenCalledTimes(1);
+          expect(loadReviewQueue).toHaveBeenCalledTimes(1);
           expect(mockRouterReplace).not.toHaveBeenCalled();
           expect(setStudyCardDueDate).toHaveBeenCalledTimes(1);
 
@@ -1078,7 +1068,7 @@ describe("Flashcard session due-date editor characterization", () => {
           expect(within(reopenedModal).queryByText(s.cardDueDateInvalid)).toBeNull();
           expect(within(reopenedModal).queryByText(s.cardDueDatePast)).toBeNull();
           expect(setStudyCardDueDate).toHaveBeenCalledTimes(1);
-          expect(getDueCardsForReview).toHaveBeenCalledTimes(1);
+          expect(loadReviewQueue).toHaveBeenCalledTimes(1);
         } finally {
           deferred.reject(failure);
           await act(async () => {
@@ -1360,7 +1350,7 @@ describe("Flashcard session due-date editor characterization", () => {
         expect(hapticMedium).not.toHaveBeenCalled();
         expect(deleteStudyCard).not.toHaveBeenCalled();
         expect(resetStudyCardProgress).not.toHaveBeenCalled();
-        expect(getDueCardsForReview).toHaveBeenCalledTimes(1);
+        expect(loadReviewQueue).toHaveBeenCalledTimes(1);
         expectNoUnrelatedCardActionServiceCalls();
         if (operation === "write") {
           expect(writeUserSetting).toHaveBeenCalledTimes(1);
@@ -1397,7 +1387,7 @@ describe("Flashcard session due-date editor characterization", () => {
         expect(hapticMedium).not.toHaveBeenCalled();
         expect(deleteStudyCard).not.toHaveBeenCalled();
         expect(resetStudyCardProgress).not.toHaveBeenCalled();
-        expect(getDueCardsForReview).toHaveBeenCalledTimes(1);
+        expect(loadReviewQueue).toHaveBeenCalledTimes(1);
         expectNoUnrelatedCardActionServiceCalls();
       } finally {
         deferred.reject(failure);
@@ -1588,7 +1578,7 @@ describe("Flashcard session due-date editor characterization", () => {
           }
           expect(view.getByRole("button", { name: s.cardActionsTitle }).props.accessibilityState.disabled).toBe(false);
           expect(hapticMedium).toHaveBeenCalledTimes(1);
-          expect(getDueCardsForReview).toHaveBeenCalledTimes(1);
+          expect(loadReviewQueue).toHaveBeenCalledTimes(1);
 
           fireEvent.press(view.getByRole("button", { name: s.cardActionsTitle }));
           await waitFor(() => expect(view.getByText(s.cardActionsTitle)).toBeTruthy());
@@ -1675,9 +1665,32 @@ describe("Flashcard session due-date editor characterization", () => {
       await waitFor(() => expect(view.getByText(s.flashcardsEasy)).toBeTruthy());
     }
 
+    it("previews and grades each card with its own deck's settings, as in Review all", async () => {
+      const card = { ...firstCard, state: State.New, reps: 0, stability: 0, difficulty: 0, last_review: null };
+      const deckSettings = { ...reviewSettings, enableFuzz: false, learningSteps: ["7m", "3h"] } satisfies DeckReviewSettings;
+      jest.mocked(loadReviewQueue).mockResolvedValue([
+        ...reviewQueue([card], deckSettings),
+        ...reviewQueue([secondCard]),
+      ]);
+      const view = renderSession();
+      await reveal(view);
+      expect(view.getByText("1/2 · 7m")).toBeTruthy();
+      fireEvent.press(getTextButton(view, s.flashcardsAgain));
+      await waitFor(() => expect(putStudyLogRow).toHaveBeenCalledTimes(1));
+      const reviewedAt = jest.mocked(putStudyLogRow).mock.calls[0][1].reviewedAt;
+      const transition = calculateReviewTransition({
+        card,
+        rating: Rating.Again,
+        reviewedAt: new Date(reviewedAt),
+        reviewPolicy: deckSettings,
+      });
+      expect(putCardRow).toHaveBeenCalledWith(mockDatabase, transition.updatedCard);
+      expect(new Date(transition.updatedCard.due).getTime() - new Date(reviewedAt).getTime()).toBe(7 * 60 * 1000);
+    });
+
     it("awaits card then log persistence, rejects duplicate grades, and scores the original card", async () => {
       const card = { ...firstCard, state: State.Review, reps: 5, stability: 12, difficulty: 6 };
-      jest.mocked(getDueCardsForReview).mockResolvedValue([card, secondCard]);
+      jest.mocked(loadReviewQueue).mockResolvedValue(reviewQueue([card, secondCard]));
       jest.mocked(getStudyStreak).mockResolvedValue(7);
       jest.mocked(computeReviewPoints).mockReturnValue(9);
       const cardWrite = createDeferred<void>();
@@ -1734,7 +1747,7 @@ describe("Flashcard session due-date editor characterization", () => {
     });
 
     it("requeues a same-day card with its updated row then finishes and syncs once", async () => {
-      jest.mocked(getDueCardsForReview).mockResolvedValue([firstCard]);
+      jest.mocked(loadReviewQueue).mockResolvedValue(reviewQueue([firstCard]));
       const view = renderSession();
       await reveal(view);
       fireEvent.press(getTextButton(view, s.flashcardsAgain));
@@ -1800,7 +1813,7 @@ describe("Flashcard session due-date editor characterization", () => {
 
     it("shows the deleted-card notice on the summary when the deleted card was the last one (RF-183)", async () => {
       jest.spyOn(console, "warn").mockImplementation(() => undefined);
-      jest.mocked(getDueCardsForReview).mockResolvedValue([firstCard]);
+      jest.mocked(loadReviewQueue).mockResolvedValue(reviewQueue([firstCard]));
       jest.mocked(putCardRow).mockRejectedValueOnce(new StudyCardDeletedError());
       const view = renderSession();
       await reveal(view);
@@ -1857,24 +1870,13 @@ describe("Flashcard session due-date editor characterization", () => {
       expect(view.queryByText(s.flashcardsReviewSaveFailed)).toBeNull();
     });
 
-    it("cancels pending settings on unmount before starting queue loading", async () => {
-      const settings = createDeferred<DeckReviewSettings>();
-      jest.mocked(readDeckReviewSettings).mockReturnValueOnce(settings.promise);
-      const view = renderSession();
-      expect(readDeckReviewSettings).toHaveBeenCalledTimes(1);
-      view.unmount();
-      await act(async () => settings.resolve(reviewSettings));
-      expect(getStudyStreak).not.toHaveBeenCalled();
-      expect(getDueCardsForReview).not.toHaveBeenCalled();
-    });
-
     it("cancels pending queue loading before fetching card content after unmount", async () => {
-      const queue = createDeferred<StudyCardRow[]>();
-      jest.mocked(getDueCardsForReview).mockReturnValueOnce(queue.promise);
+      const queue = createDeferred<ReturnType<typeof reviewQueue>>();
+      jest.mocked(loadReviewQueue).mockReturnValueOnce(queue.promise);
       const view = renderSession();
-      await waitFor(() => expect(getDueCardsForReview).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(loadReviewQueue).toHaveBeenCalledTimes(1));
       view.unmount();
-      await act(async () => queue.resolve([firstCard]));
+      await act(async () => queue.resolve(reviewQueue([firstCard])));
       expect(getSmartCardContent).not.toHaveBeenCalled();
       expect(putCardRow).not.toHaveBeenCalled();
       expect(mockRouterReplace).not.toHaveBeenCalled();
@@ -1883,7 +1885,7 @@ describe("Flashcard session due-date editor characterization", () => {
     it("shows a failed queue load as an empty summary with an error and no review side effects", async () => {
       const failure = new Error("synthetic queue failure");
       const warning = jest.spyOn(console, "warn").mockImplementation(() => undefined);
-      jest.mocked(getDueCardsForReview).mockRejectedValueOnce(failure);
+      jest.mocked(loadReviewQueue).mockRejectedValueOnce(failure);
       const view = renderSession();
       await waitFor(() => expect(view.getByText(s.genericActionFailed)).toBeTruthy());
       expect(view.getByText(s.flashcardsSummaryTitle)).toBeTruthy();
