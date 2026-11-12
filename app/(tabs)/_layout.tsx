@@ -72,6 +72,23 @@ function TabsWithStrings() {
         }}
         tabBar={(props) => <AppNavigation {...props} isRTL={isRTL} />}
       >
+        {/* Home is declared first: the router takes the first screen as the initial route that
+            backBehavior returns to, so the hidden index redirect must not come first (Back from Home
+            showed its blank screen). */}
+        <Tabs.Screen
+          name="home"
+          options={{
+            title: s.tabHome,
+            tabBarIcon: ({ color, size }) => (
+              <Sparkles
+                size={size}
+                color={color}
+                fill="none"
+                strokeWidth={2}
+              />
+            ),
+          }}
+        />
         <Tabs.Screen
           name="index"
           options={{ href: null }}
@@ -108,21 +125,7 @@ function TabsWithStrings() {
             ),
           }}
         />
-        {/* Visible tabs: Home, Mushaf, Leaderboard, Progress, Settings */}
-        <Tabs.Screen
-          name="home"
-          options={{
-            title: s.tabHome,
-            tabBarIcon: ({ color, size }) => (
-              <Sparkles
-                size={size}
-                color={color}
-                fill="none"
-                strokeWidth={2}
-              />
-            ),
-          }}
-        />
+        {/* Visible tabs after Home: Mushaf, Leaderboard, Progress, Settings */}
         <Tabs.Screen
           name="mushaf"
           options={{
