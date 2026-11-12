@@ -1,6 +1,6 @@
 import { useOperationNotice } from "@/components/ui/OperationNoticeProvider";
 import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
-import { View, Text, Pressable, ActivityIndicator, Linking, ScrollView, StyleSheet } from "react-native";
+import { View, Text, Pressable, ActivityIndicator, Linking, StyleSheet, useWindowDimensions } from "react-native";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ToggleGroup } from "@/components/ui/ToggleGroup";
@@ -64,7 +64,7 @@ import { fullQfUserSync, runInitialQfUserSync } from "@/lib/quran-foundation/use
 import type { QfConnectionStatus } from "@/lib/quran-foundation/user-types";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { toArabicNumber } from "@/lib/arabic";
-import { SETTINGS_CONTENT_MAX_WIDTH } from "@/lib/ui/viewport";
+import { SETTINGS_CONTENT_MAX_WIDTH, SIDEBAR_BREAKPOINT } from "@/lib/ui/viewport";
 import { textStartStyle, textEndStyle } from "@/lib/ui/direction";
 import { ProfileIdentity } from "@/components/profile/ProfileIdentity";
 import {
@@ -1019,6 +1019,11 @@ function SettingsCategoryTabs({
   onSelect: (category: SettingsCategoryId) => void;
   compact: boolean;
 }) {
+  // A phone cannot fit four labels plus icons at the regular text size (a fixed-width scrolling
+  // row cut "Account" mid-word and hid "About" at 384dp). Phones drop the icons and size each
+  // segment from its label so all four fit; wider compact layouts keep icons and fill the row.
+  const { width } = useWindowDimensions();
+  const isPhone = compact && width < SIDEBAR_BREAKPOINT;
   const items = categories.map((category) => {
     const isActive = activeCategory === category.id;
     const Icon = category.icon;
@@ -1026,40 +1031,29 @@ function SettingsCategoryTabs({
     return {
       value: category.id,
       label: category.title,
-      icon: <Icon size={15} color={iconColor} />,
+      icon: isPhone ? undefined : <Icon size={15} color={iconColor} />,
     };
   });
 
-  const tabs = (
+  return (
     <ToggleGroup<SettingsCategoryId>
       value={activeCategory}
       onValueChange={onSelect}
       items={items}
       dir={isRTL ? "rtl" : "ltr"}
       className="bg-surface-low/80 dark:bg-surface-dark-low/80"
-      style={{
-        flex: compact ? undefined : 1,
-        maxWidth: compact ? undefined : 620,
-        minWidth: compact ? undefined : 520,
-        width: compact ? 520 : undefined,
-      }}
+      itemClassName={isPhone ? "flex-auto px-2" : undefined}
+      style={
+        compact
+          ? { alignSelf: "stretch" }
+          : {
+              flex: 1,
+              maxWidth: 620,
+              minWidth: 520,
+            }
+      }
     />
   );
-
-  if (compact) {
-    return (
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={{ alignSelf: "stretch" }}
-        contentContainerStyle={{ flexGrow: 1 }}
-      >
-        {tabs}
-      </ScrollView>
-    );
-  }
-
-  return tabs;
 }
 
 function SettingsControlRow({ label, isRTL, children }: { label: string; isRTL: boolean; children: ReactNode }) {

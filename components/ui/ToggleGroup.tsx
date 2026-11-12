@@ -7,6 +7,8 @@ type ToggleGroupProps<T extends string> = ViewProps & {
   onValueChange: (value: T) => void;
   items: { value: T; label: string; icon?: React.ReactNode }[];
   dir?: Direction;
+  /** Overrides item layout classes, e.g. "flex-auto px-2" to size items from their labels. */
+  itemClassName?: string;
 };
 
 /**
@@ -18,6 +20,7 @@ export function ToggleGroup<T extends string>({
   onValueChange,
   items,
   dir: explicitDir,
+  itemClassName,
   className,
   style,
   ...props
@@ -43,6 +46,7 @@ export function ToggleGroup<T extends string>({
               "flex-1 flex-row items-center justify-center gap-1.5 rounded-full py-2 px-3",
               dir === "rtl" && "flex-row-reverse",
               active && "bg-surface-bright dark:bg-surface-dark-bright",
+              itemClassName,
             )}
             style={({ pressed }) => ({
               direction: "ltr",
