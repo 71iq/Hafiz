@@ -687,7 +687,9 @@ function SettingsRow({
         justifyContent: "space-between",
       }}
     >
-      <View className="min-w-0 flex-1">
+      {/* flex-1 only beside the control: in the stacked layout a zero flex basis collapsed the label's
+          height and the control drew over it. */}
+      <View className={compact ? "min-w-0 flex-1" : "min-w-0"}>
         <SettingTitle
           title={title}
           info={info}
