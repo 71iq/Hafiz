@@ -2066,7 +2066,8 @@ function getGradeSchedulePreviews(
     });
     const stepLabel = getLearningStepPreview(transition.updatedCard, settings, isRTL);
     const returnLabel = formatReturnDelay(new Date(transition.updatedCard.due), now, isRTL);
-    previews[rating] = stepLabel ? `${stepLabel} · ${returnLabel}` : returnLabel;
+    // A middle dot reads as the Arabic zero (٠) beside Arabic-Indic digits, so Arabic uses its comma.
+    previews[rating] = stepLabel ? `${stepLabel}${isRTL ? "، " : " · "}${returnLabel}` : returnLabel;
   }
 
   return previews;
@@ -2091,8 +2092,9 @@ function getLearningStepPreview(
 
 function formatReturnDelay(due: Date, now: Date, isRTL: boolean): string {
   const minutes = Math.ceil(Math.max(0, due.getTime() - now.getTime()) / 60000);
+  // Arabic unit letters sit after a no-break space so they do not run into the digits.
   const units = isRTL
-    ? { minute: "د", hour: "س", day: "ي", month: "ش", year: "سنة" }
+    ? { minute: "\u00A0د", hour: "\u00A0س", day: "\u00A0ي", month: "\u00A0ش", year: "\u00A0سنة" }
     : { minute: "m", hour: "h", day: "d", month: "mo", year: "y" };
 
   if (minutes <= 1) return `<${formatCompactNumber(1, isRTL)}${units.minute}`;
