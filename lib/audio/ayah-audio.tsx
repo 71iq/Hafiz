@@ -111,34 +111,36 @@ export function AyahAudioProvider({ children }: { children: React.ReactNode }) {
   const db = useDatabase();
   const player = useAudioPlayer(null, { updateInterval: 250, keepAudioSessionActive: false });
   const status = useAudioPlayerStatus(player);
+  const releaseLockScreen = useCallback(() => {
+    try {
+      player.setActiveForLockScreen(false);
+    } catch {
+      // Lock screen controls were never active.
+    }
+  }, [player]);
   const [activeAyah, setActiveAyah] = useState<ActiveAyah | null>(null);
   const [loadingKey, setLoadingKey] = useState<string | null>(null);
   const [rangePlayback, setRangePlayback] = useState<RangeAudioState>(INACTIVE_RANGE_STATE);
   const playbackModeRef = useRef<PlaybackMode | null>(null);
   const rangeSessionRef = useRef<RangeSession | null>(null);
   const rangeDelayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pauseRangeRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
+    // Recitation keeps playing with the screen off or another app in front, as listeners expect; the
+    // lock screen controls keep Android's foreground service alive past its 3 minute limit.
     setAudioModeAsync({
       playsInSilentMode: true,
-      shouldPlayInBackground: false,
+      shouldPlayInBackground: true,
+      interruptionMode: "doNotMix",
     }).catch(console.warn);
   }, []);
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (nextState) => {
-      if (nextState === "active") {
-        setIsAudioActiveAsync(true).catch(console.warn);
-        return;
-      }
-      // Leaving the app pauses a range as the pause button does, so it resumes in place.
-      if (pauseRangeRef.current && rangeSessionRef.current) pauseRangeRef.current();
-      else player.pause();
-      setIsAudioActiveAsync(false).catch(console.warn);
+      if (nextState === "active") setIsAudioActiveAsync(true).catch(console.warn);
     });
     return () => subscription.remove();
-  }, [player]);
+  }, []);
 
   const clearRangeDelayTimer = useCallback(() => {
     if (!rangeDelayTimerRef.current) return;
@@ -206,6 +208,11 @@ export function AyahAudioProvider({ children }: { children: React.ReactNode }) {
 
       playbackModeRef.current = mode;
       playUrl(player, response.audio.url);
+      try {
+        player.setActiveForLockScreen(true, { title: `${surah}:${ayah}`, artist: "Hafiz" });
+      } catch (error) {
+        console.warn("[AyahAudio] Lock screen controls unavailable:", error);
+      }
       setLoadingKey(null);
       return { ok: true };
     },
@@ -266,6 +273,7 @@ export function AyahAudioProvider({ children }: { children: React.ReactNode }) {
       clearRangeSession();
       setActiveAyah(null);
       setLoadingKey(null);
+      releaseLockScreen();
       return;
     }
 
@@ -282,7 +290,7 @@ export function AyahAudioProvider({ children }: { children: React.ReactNode }) {
         setLoadingKey(null);
       });
     }, session.delayMs);
-  }, [clearRangeDelayTimer, clearRangeSession, playCurrentRangeAyah]);
+  }, [clearRangeDelayTimer, clearRangeSession, playCurrentRangeAyah, releaseLockScreen]);
 
   useEffect(() => {
     if (!status.didJustFinish) return;
@@ -295,15 +303,17 @@ export function AyahAudioProvider({ children }: { children: React.ReactNode }) {
     playbackModeRef.current = null;
     setActiveAyah(null);
     setLoadingKey(null);
-  }, [advanceRange, status.didJustFinish]);
+    releaseLockScreen();
+  }, [advanceRange, releaseLockScreen, status.didJustFinish]);
 
   const stop = useCallback(() => {
     clearRangeSession();
     playbackModeRef.current = null;
     player.pause();
+    releaseLockScreen();
     setActiveAyah(null);
     setLoadingKey(null);
-  }, [clearRangeSession, player]);
+  }, [clearRangeSession, player, releaseLockScreen]);
 
   const pauseRange = useCallback(() => {
     const session = rangeSessionRef.current;
@@ -315,8 +325,6 @@ export function AyahAudioProvider({ children }: { children: React.ReactNode }) {
     player.pause();
     setRangePlayback((prev) => ({ ...prev, paused: true }));
   }, [clearRangeDelayTimer, player, status.playing]);
-
-  pauseRangeRef.current = pauseRange;
 
   const togglePause = useCallback(() => {
     const session = rangeSessionRef.current;

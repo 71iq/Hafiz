@@ -34,7 +34,15 @@
     "plugins": [
       "expo-router",
       "expo-sharing",
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-audio",
+        {
+          "enableBackgroundPlayback": true,
+          "recordAudioAndroid": false,
+          "microphonePermission": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

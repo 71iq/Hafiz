@@ -4,7 +4,7 @@ import { AyahAudioProvider, useAyahAudio } from "@/lib/audio/ayah-audio";
 
 type Status = { playing: boolean; isLoaded: boolean; didJustFinish: boolean };
 
-const mockPlayer = { replace: jest.fn(), play: jest.fn(), pause: jest.fn(), seekTo: jest.fn(async () => undefined) };
+const mockPlayer = { replace: jest.fn(), play: jest.fn(), pause: jest.fn(), seekTo: jest.fn(async () => undefined), setActiveForLockScreen: jest.fn() };
 let mockStatus: Status = { playing: false, isLoaded: false, didJustFinish: false };
 let rerenderStatus: (() => void) | null = null;
 
