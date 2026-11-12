@@ -498,9 +498,11 @@ export function AyahDetailModal({ target, onClose, onNavigate, initialTab = "taf
           showsHorizontalScrollIndicator={false}
           bounces={false}
           className="mt-4"
+          // Direction alone mirrors the tab row and starts its scroll at the right in Arabic; adding
+          // row-reverse under direction "rtl" flipped it back to left-to-right order.
           contentContainerStyle={{
             direction: isRTL ? "rtl" : "ltr",
-            flexDirection: isRTL ? "row-reverse" : "row",
+            flexDirection: "row",
             gap: 8,
             paddingHorizontal: 0,
           }}
@@ -777,7 +779,7 @@ function TabButton({
       }`}
       style={{
         direction: isRTL ? "rtl" : "ltr",
-        flexDirection: isRTL ? "row-reverse" : "row",
+        flexDirection: "row",
         flexShrink: 0,
         cursor: Platform.OS === "web" ? "pointer" : undefined,
       }}

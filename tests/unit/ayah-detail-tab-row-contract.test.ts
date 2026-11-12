@@ -8,7 +8,8 @@ describe("AyahDetailModal tab row contract", () => {
     expect(source).toContain("<ScrollView");
     expect(source).toContain("horizontal");
     expect(source).toContain("showsHorizontalScrollIndicator={false}");
-    expect(source).toContain('flexDirection: isRTL ? "row-reverse" : "row"');
+    // Direction alone mirrors the row; row-reverse under direction "rtl" would flip it back.
+    expect(source).toMatch(/direction: isRTL \? "rtl" : "ltr",\s+flexDirection: "row",\s+gap: 8/);
     expect(source).toContain("gap: 8");
     expect(source).toContain("flexShrink: 0");
     expect(source).toContain("numberOfLines={1}");

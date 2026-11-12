@@ -52,7 +52,6 @@ export function WordDetailSheet() {
     rootCount: null,
     translationEn: null,
   });
-  const tabScrollRef = useRef<ScrollView>(null);
   const contentScrollRef = useRef<ScrollView>(null);
 
   const isPhone = width < SIDEBAR_BREAKPOINT;
@@ -174,14 +173,6 @@ export function WordDetailSheet() {
     return () => cancelAnimationFrame(frame);
   }, [activeTab, detailWord?.surah, detailWord?.ayah, detailWord?.wordPos]);
 
-  useEffect(() => {
-    if (!isRTL) return;
-    const frame = requestAnimationFrame(() => {
-      tabScrollRef.current?.scrollToEnd({ animated: false });
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [isRTL, activeTab]);
-
   if (!detailWord) return null;
 
   const { surah, ayah, wordPos } = detailWord;
@@ -289,9 +280,11 @@ export function WordDetailSheet() {
 
           <View className="h-14 justify-center bg-surface-low dark:bg-surface-dark-low">
             <ScrollView
-              ref={tabScrollRef}
               horizontal
               showsHorizontalScrollIndicator={false}
+              // Direction alone mirrors the tab row and starts its scroll at the right in Arabic. The
+              // sheet is already "rtl" there, so row-reverse ran the tabs left to right and a
+              // scroll-to-end on every tab change was needed to bring the first tab into view.
               contentContainerStyle={{
                 minWidth: "100%",
                 paddingHorizontal: 16,
@@ -299,7 +292,8 @@ export function WordDetailSheet() {
                 paddingVertical: 6,
                 alignItems: "center",
                 justifyContent: "flex-start",
-                flexDirection: isRTL ? "row-reverse" : "row",
+                direction: isRTL ? "rtl" : "ltr",
+                flexDirection: "row",
               }}
             >
               {tabs.map((tab) => {
