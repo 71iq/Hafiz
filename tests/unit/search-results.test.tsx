@@ -432,6 +432,28 @@ describe.each(locales)("Search request lifecycle in %s", (language) => {
     expect(navigate).toHaveBeenCalledWith(2, 1, 3);
     expect(mockPendingLink).not.toHaveBeenCalled();
   });
+  it("shows a large lemma group in pages instead of rendering every occurrence at once", async () => {
+    const view = mount();
+    view.edit("قال");
+    fireEvent.press(view.getByText(strings[language].searchRootMode));
+    await settle(() => indexRequest().resolve([{ root: "قول", lemma: "قَالَ", word_text: "قَالَ" }]));
+    await settle(() =>
+      rootRequest().pending.resolve(
+        Array.from({ length: 45 }, (_, i) => ({
+          ...row(`occurrence ${i + 1}`, i + 1),
+          word_pos: 1,
+          word_text: "word",
+          root: "قول",
+          lemma: "big group",
+        })),
+      ),
+    );
+    expect(view.getByText("occurrence 30")).toBeTruthy();
+    expect(view.queryByText("occurrence 31")).toBeNull();
+    fireEvent.press(view.getByText(strings[language].listShowMore.replace("{{count}}", "15")));
+    expect(view.getByText("occurrence 45")).toBeTruthy();
+    expect(view.queryByText(strings[language].listShowMore.replace("{{count}}", "15"))).toBeNull();
+  });
   it("preserves fallback deep link and delayed navigation after result tap", async () => {
     const view = mount();
     view.edit("active");

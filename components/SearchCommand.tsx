@@ -13,6 +13,7 @@ import { router } from "expo-router";
 import { Search, X, Clock, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react-native";
 import { SearchResultsSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Button } from "@/components/ui/Button";
 import { useDatabase } from "@/lib/database/provider";
 import { useSettings } from "@/lib/settings/context";
 import { useStrings, interpolate } from "@/lib/i18n/useStrings";
@@ -26,6 +27,9 @@ import { resolveRootCandidates } from "@/lib/search/root-candidates";
 import { textStartStyle } from "@/lib/ui/direction";
 
 // ─── Arabic diacritics stripping ───
+// An expanded lemma renders inside one list item, so a common lemma shows its occurrences in pages.
+const LEMMA_OCCURRENCES_PAGE = 30;
+
 const ARABIC_DIACRITICS_RE =
   /[\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E4\u06E7\u06E8\u06EA-\u06ED\u0640]/g;
 
@@ -148,7 +152,8 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
   const [hasSearched, setHasSearched] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
-  const [expandedLemmas, setExpandedLemmas] = useState<Set<string>>(new Set());
+  // Expanded lemma -> how many of its occurrences are shown.
+  const [expandedLemmas, setExpandedLemmas] = useState<ReadonlyMap<string, number>>(new Map());
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<TextInput>(null);
@@ -210,7 +215,7 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
       setRootResults([]);
       setHasSearched(false);
       setSearchError(null);
-      setExpandedLemmas(new Set());
+      setExpandedLemmas(new Map());
     }
     return () => {
       if (focusTimer) clearTimeout(focusTimer);
@@ -318,7 +323,7 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
           setRootResults(groups);
           setTextResults([]);
           if (groups.length > 0) {
-            setExpandedLemmas(new Set([groups[0].lemma]));
+            setExpandedLemmas(new Map([[groups[0].lemma, LEMMA_OCCURRENCES_PAGE]]));
           }
         }
 
@@ -350,7 +355,7 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
   const handleModeChange = useCallback(
     (newMode: "text" | "root") => {
       setMode(newMode);
-      setExpandedLemmas(new Set());
+      setExpandedLemmas(new Map());
       performSearch(query, newMode);
     },
     [query, performSearch]
@@ -394,11 +399,15 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
 
   const toggleLemma = useCallback((lemma: string) => {
     setExpandedLemmas((prev) => {
-      const next = new Set(prev);
+      const next = new Map(prev);
       if (next.has(lemma)) next.delete(lemma);
-      else next.add(lemma);
+      else next.set(lemma, LEMMA_OCCURRENCES_PAGE);
       return next;
     });
+  }, []);
+
+  const showMoreLemma = useCallback((lemma: string) => {
+    setExpandedLemmas((prev) => new Map(prev).set(lemma, (prev.get(lemma) ?? 0) + LEMMA_OCCURRENCES_PAGE));
   }, []);
 
   const groupedTextResults = useMemo(() => groupTextResults(textResults), [textResults]);
@@ -741,7 +750,9 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
               style={{ flex: 1 }}
               contentContainerStyle={{ paddingBottom: 40 }}
               renderItem={({ item: group }) => {
-                const isExpanded = expandedLemmas.has(group.lemma);
+                const shownCount = expandedLemmas.get(group.lemma);
+                const isExpanded = shownCount !== undefined;
+                const hiddenCount = isExpanded ? Math.max(0, group.occurrences.length - shownCount) : 0;
                 return (
                   <View className="mb-1">
                     <Pressable
@@ -780,7 +791,7 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
                     </Pressable>
 
                     {isExpanded &&
-                      group.occurrences.map((occ) => {
+                      group.occurrences.slice(0, shownCount).map((occ) => {
                         const segments = highlightWord(occ.text_uthmani, occ.word_text);
                         return (
                           <Pressable
@@ -836,6 +847,15 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
                           </Pressable>
                         );
                       })}
+                    {hiddenCount > 0 ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        label={interpolate(s.listShowMore, { count: hiddenCount })}
+                        onPress={() => showMoreLemma(group.lemma)}
+                        className="mb-2 self-center"
+                      />
+                    ) : null}
                   </View>
                 );
               }}
