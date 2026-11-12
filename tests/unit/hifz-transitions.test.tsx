@@ -69,7 +69,17 @@ jest.mock("@/lib/selection/context", () => ({
 }));
 jest.mock("@/lib/ui/chrome", () => ({ useChrome: () => mockChrome, useChromeActions: () => mockChrome }));
 jest.mock("@/lib/deep-link", () => ({ consumePendingDeepLink: () => null, peekPendingDeepLink: () => null }));
-jest.mock("@/lib/quran-foundation/config", () => ({ isQfContentEnabled: () => false }));
+jest.mock("@/lib/quran-foundation/config", () => ({ isQfContentEnabled: () => false, isRecitationEnabled: () => false }));
+jest.mock("@/lib/audio/ayah-audio", () => ({
+  useAyahAudio: () => ({
+    rangeState: { active: false, playing: false, paused: false, loading: false, currentAyah: null, currentIndex: 0, totalAyahs: 0 },
+    stop: jest.fn(),
+    togglePause: jest.fn(),
+    getAyahState: () => ({ active: false, playing: false, loading: false }),
+    toggleAyah: jest.fn(),
+    playRange: jest.fn(),
+  }),
+}));
 jest.mock("@/lib/fonts/loader", () => ({ loadQuranPageFont: (...a: unknown[]) => mockForbidden(...a) }));
 jest.mock("@/lib/mushaf/position", () => {
   const actual = jest.requireActual<typeof import("@/lib/mushaf/position")>("@/lib/mushaf/position");

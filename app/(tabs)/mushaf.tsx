@@ -9,7 +9,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { FlashList, FlashListRef } from "@shopify/flash-list";
 import { useChrome } from "@/lib/ui/chrome";
-import { BookOpen, AlignJustify, Eye, EyeOff, Home, Search, BookMarked, ListMusic, ScanLine, ChevronDown, SlidersHorizontal } from "lucide-react-native";
+import { BookOpen, AlignJustify, Eye, EyeOff, Home, Search, BookMarked, ListMusic, ScanLine, ChevronDown, SlidersHorizontal, Pause, Play, Square } from "lucide-react-native";
 import { useDatabase } from "@/lib/database/provider";
 import { writeUserSetting } from "@/lib/database/user-settings";
 import { useSettings, withThemeOpacity } from "@/lib/settings/context";
@@ -29,7 +29,8 @@ import { RecitationRangeSheet } from "@/components/mushaf/RecitationRangeSheet";
 import { ReadingSettingsSheet } from "@/components/mushaf/ReadingSettingsSheet";
 import { PageViewNavigationSheet, type PageViewNavigationAnchor } from "@/components/mushaf/PageViewNavigationSheet";
 import type { HifzVisibility } from "@/components/mushaf/MushafPage";
-import { loadMushafIndex, findJuzForAyah, findHizbForAyah, topmostAyahForPage, type MushafIndex } from "@/lib/mushaf/position";
+import { loadMushafIndex, findJuzForAyah, findHizbForAyah, topmostAyahForPage, pageForAyah, type MushafIndex } from "@/lib/mushaf/position";
+import { useAyahAudio } from "@/lib/audio/ayah-audio";
 import { FloatingWordTooltip } from "@/components/mushaf/WordTooltip";
 import { SelectionActionBar } from "@/components/mushaf/SelectionActionBar";
 import { WebSelectionMenu } from "@/components/mushaf/WebSelectionMenu";
@@ -37,10 +38,10 @@ import { BookmarksSheet } from "@/components/mushaf/BookmarksSheet";
 import { Toast } from "@/components/ui/Toast";
 import { SearchCommand } from "@/components/SearchCommand";
 import { consumePendingDeepLink, peekPendingDeepLink } from "@/lib/deep-link";
-import { isQfContentEnabled } from "@/lib/quran-foundation/config";
+import { isRecitationEnabled } from "@/lib/quran-foundation/config";
 import { loadQuranPageFont } from "@/lib/fonts/loader";
 import { scrollToVisibleIndex } from "@/lib/mushaf/scroll-to-visible-index";
-import { toArabicNumber } from "@/lib/arabic";
+import { formatAyahRef, toArabicNumber } from "@/lib/arabic";
 import {
   SIDEBAR_BREAKPOINT,
   VIEWPORT_BREAKPOINTS,
@@ -542,6 +543,11 @@ function MushafInner() {
 
   // Target highlight: "surah:ayah" key from deep links, search, and cross-screen navigation.
   const [highlightedKey, setHighlightedKey] = useState<string | null>(null);
+  // A running recitation highlights the ayah being recited, ahead of an arrival highlight.
+  const { rangeState: recitation, stop: stopRecitation, togglePause: toggleRecitationPause } = useAyahAudio();
+  const recitingKey =
+    recitation.active && recitation.currentAyah ? `${recitation.currentAyah.surah}:${recitation.currentAyah.ayah}` : null;
+  const displayedHighlightKey = recitingKey ?? highlightedKey;
   const [highlightedWord, setHighlightedWord] = useState<{ surah: number; ayah: number; wordPos: number } | null>(null);
 
   const commitCurrentPage = useCallback((page: number) => {
@@ -946,7 +952,7 @@ function MushafInner() {
           fontSize={fontSize}
           lineHeight={lineHeight}
           hideMode={verseHideMode}
-          highlighted={highlightedKey === `${item.surah}:${item.ayah}`}
+          highlighted={displayedHighlightKey === `${item.surah}:${item.ayah}`}
           highlightedWordPos={
             highlightedWord?.surah === item.surah && highlightedWord?.ayah === item.ayah
               ? highlightedWord.wordPos
@@ -955,7 +961,7 @@ function MushafInner() {
         />
       );
     },
-    [fontSize, lineHeight, verseHideMode, highlightedKey, highlightedWord]
+    [fontSize, lineHeight, verseHideMode, displayedHighlightKey, highlightedWord]
   );
 
   const getItemType = useCallback((item: MushafItem) => item.type, []);
@@ -1394,6 +1400,22 @@ function MushafInner() {
     })();
   }, [loading, items, mushafIndex, isPageMode, db, scheduleVerseScrollToIndex, commitCurrentPage]);
 
+  // The reader follows a recitation onto the page, or verse, being recited.
+  useEffect(() => {
+    if (!recitation.active || !recitation.currentAyah) return;
+    const { surah, ayah } = recitation.currentAyah;
+    if (isPageMode) {
+      if (!mushafIndex) return;
+      const page = pageForAyah(mushafIndex, surah, ayah);
+      if (page && page !== currentPageRef.current) goToPageRef.current?.(page);
+      return;
+    }
+    const idx = items.findIndex((it) => it.type === "ayah" && it.surah === surah && it.ayah === ayah);
+    if (idx >= 0) flashListRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.2 });
+    // Only a new recited ayah moves the reader.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recitingKey]);
+
   // Web only: ArrowLeft / ArrowRight in page mode → ±1 page (RTL aware)
   useEffect(() => {
     if (Platform.OS !== "web" || !isPageMode) return;
@@ -1579,7 +1601,7 @@ function MushafInner() {
                     >
                       <BookMarked size={16} color={isDark ? "#737373" : "#8B8178"} />
                     </Pressable>
-                    {isQfContentEnabled() && (
+                    {isRecitationEnabled() && (
                       <Pressable
                         onPress={handleOpenRecitation}
                         accessibilityRole="button"
@@ -1676,7 +1698,7 @@ function MushafInner() {
                 >
                   <BookMarked size={16} color={isDark ? "#737373" : "#8B8178"} />
                 </Pressable>
-                {isQfContentEnabled() && (
+                {isRecitationEnabled() && (
                   <Pressable
                     onPress={handleOpenRecitation}
                     accessibilityRole="button"
@@ -1784,7 +1806,7 @@ function MushafInner() {
                 pageSidePadding={isPhone ? 6 : 16}
                 horizontalTopInset={0}
                 horizontalBottomInset={0}
-                highlightedAyahKey={highlightedKey}
+                highlightedAyahKey={displayedHighlightKey}
                 highlightedWord={highlightedWord}
                 autoScrollActive={focusModeActive}
                 autoScrollPlaying={focusModePlaying}
@@ -1869,7 +1891,7 @@ function MushafInner() {
               renderItem={renderItem}
               getItemType={getItemType}
               keyExtractor={keyExtractor}
-              extraData={{ fontSize, verseHideMode, highlightedKey, highlightedWord }}
+              extraData={{ fontSize, verseHideMode, highlightedKey: displayedHighlightKey, highlightedWord }}
               contentContainerStyle={{ paddingBottom: isPhone ? 24 : 56 }}
               onScroll={handleScrollChrome}
               scrollEventThrottle={16}
@@ -2003,6 +2025,69 @@ function MushafInner() {
               )}
             </View>
           </Animated.View>
+        )}
+
+        {/* Recitation player: shown while a recitation runs, even with the chrome hidden. */}
+        {recitation.active && (
+          <View
+            pointerEvents="box-none"
+            style={{
+              position: Platform.OS === "web" && (isPhone || isTablet) ? ("fixed" as any) : "absolute",
+              left: 0,
+              right: 0,
+              bottom: railBottomOffset + ((showBottomSlider || showHifzControls) && chromeVisible ? 68 : 8),
+              zIndex: 71,
+              alignItems: "center",
+              paddingHorizontal: isPhone ? 12 : 16,
+            }}
+          >
+            <View
+              accessibilityLiveRegion="polite"
+              style={[
+                {
+                  flexDirection: isRTL ? "row-reverse" : "row",
+                  direction: "ltr",
+                  alignItems: "center",
+                  gap: 10,
+                  borderRadius: 999,
+                  paddingVertical: 6,
+                  paddingHorizontal: 8,
+                },
+                floatingRailSurface,
+              ]}
+            >
+              <Pressable
+                onPress={toggleRecitationPause}
+                accessibilityRole="button"
+                accessibilityLabel={recitation.paused ? s.audioPlay : s.audioPause}
+                hitSlop={6}
+                className="h-10 w-10 items-center justify-center rounded-full bg-primary-accent/15 dark:bg-primary-bright/15"
+              >
+                {!recitation.paused ? (
+                  <Pause size={18} color={isDark ? "#5eead4" : "#0d9488"} />
+                ) : (
+                  <Play size={18} color={isDark ? "#5eead4" : "#0d9488"} />
+                )}
+              </Pressable>
+              <Text
+                className="text-charcoal dark:text-neutral-100"
+                style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14, writingDirection: "ltr", minWidth: 64, textAlign: "center" }}
+              >
+                {recitation.currentAyah
+                  ? `${formatAyahRef(isRTL, recitation.currentAyah.surah, recitation.currentAyah.ayah)}${isRTL ? "، " : " · "}${isRTL ? toArabicNumber(recitation.currentIndex + 1) : recitation.currentIndex + 1}/${isRTL ? toArabicNumber(recitation.totalAyahs) : recitation.totalAyahs}`
+                  : ""}
+              </Text>
+              <Pressable
+                onPress={stopRecitation}
+                accessibilityRole="button"
+                accessibilityLabel={s.recitationStop}
+                hitSlop={6}
+                className="h-10 w-10 items-center justify-center rounded-full"
+              >
+                <Square size={16} color={isDark ? "#d4d4d4" : "#6e5a47"} />
+              </Pressable>
+            </View>
+          </View>
         )}
 
         {/* Toast notifications */}

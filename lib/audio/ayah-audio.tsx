@@ -53,6 +53,8 @@ export type PlayRangeOptions = {
 export type RangeAudioState = {
   active: boolean;
   playing: boolean;
+  /** The reader paused the range; it resumes where it stopped. */
+  paused: boolean;
   loading: boolean;
   currentAyah: AyahAudioTarget | null;
   currentIndex: number;
@@ -75,6 +77,9 @@ type RangeSession = {
   index: number;
   rangeRepeatIndex: number;
   ayahRepeatIndex: number;
+  paused: boolean;
+  /** Paused between ayahs or while loading: resuming loads the current ayah instead of playing on. */
+  resumeLoadsAyah: boolean;
 };
 
 type AyahAudioContextType = {
@@ -83,12 +88,15 @@ type AyahAudioContextType = {
   playRange: (options: PlayRangeOptions) => Promise<ToggleResult>;
   rangeState: RangeAudioState;
   stop: () => void;
+  /** Pauses or resumes whatever is playing, keeping a range session where it is. */
+  togglePause: () => void;
 };
 
 const AyahAudioContext = createContext<AyahAudioContextType | null>(null);
 const INACTIVE_RANGE_STATE: RangeAudioState = {
   active: false,
   playing: false,
+  paused: false,
   loading: false,
   currentAyah: null,
   currentIndex: 0,
@@ -109,6 +117,7 @@ export function AyahAudioProvider({ children }: { children: React.ReactNode }) {
   const playbackModeRef = useRef<PlaybackMode | null>(null);
   const rangeSessionRef = useRef<RangeSession | null>(null);
   const rangeDelayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pauseRangeRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     setAudioModeAsync({
@@ -123,7 +132,9 @@ export function AyahAudioProvider({ children }: { children: React.ReactNode }) {
         setIsAudioActiveAsync(true).catch(console.warn);
         return;
       }
-      player.pause();
+      // Leaving the app pauses a range as the pause button does, so it resumes in place.
+      if (pauseRangeRef.current && rangeSessionRef.current) pauseRangeRef.current();
+      else player.pause();
       setIsAudioActiveAsync(false).catch(console.warn);
     });
     return () => subscription.remove();
@@ -209,6 +220,7 @@ export function AyahAudioProvider({ children }: { children: React.ReactNode }) {
     setRangePlayback({
       active: true,
       playing: false,
+      paused: false,
       loading: true,
       currentAyah: target,
       currentIndex: session.index,
@@ -224,7 +236,7 @@ export function AyahAudioProvider({ children }: { children: React.ReactNode }) {
       target.ayah,
       session.recitationId,
       "range",
-      () => rangeSessionRef.current === session
+      () => rangeSessionRef.current === session && !session.paused
     );
     if (!rangeSessionRef.current) return result;
     if (!result.ok) {
@@ -258,6 +270,10 @@ export function AyahAudioProvider({ children }: { children: React.ReactNode }) {
     }
 
     clearRangeDelayTimer();
+    if (session.paused) {
+      session.resumeLoadsAyah = true;
+      return;
+    }
     rangeDelayTimerRef.current = setTimeout(() => {
       void playCurrentRangeAyah().catch((error) => {
         console.warn("[AyahAudio] Range playback failed:", error);
@@ -288,6 +304,45 @@ export function AyahAudioProvider({ children }: { children: React.ReactNode }) {
     setActiveAyah(null);
     setLoadingKey(null);
   }, [clearRangeSession, player]);
+
+  const pauseRange = useCallback(() => {
+    const session = rangeSessionRef.current;
+    if (!session || session.paused) return;
+    session.paused = true;
+    // A pending next ayah, or one still loading, starts on resume instead of after the gap.
+    if (rangeDelayTimerRef.current || !status.playing) session.resumeLoadsAyah = true;
+    clearRangeDelayTimer();
+    player.pause();
+    setRangePlayback((prev) => ({ ...prev, paused: true }));
+  }, [clearRangeDelayTimer, player, status.playing]);
+
+  pauseRangeRef.current = pauseRange;
+
+  const togglePause = useCallback(() => {
+    const session = rangeSessionRef.current;
+    if (!session) {
+      if (status.playing) player.pause();
+      else if (status.isLoaded) player.play();
+      return;
+    }
+    if (!session.paused) {
+      pauseRange();
+      return;
+    }
+    session.paused = false;
+    setRangePlayback((prev) => ({ ...prev, paused: false }));
+    if (session.resumeLoadsAyah) {
+      session.resumeLoadsAyah = false;
+      void playCurrentRangeAyah().catch((error) => {
+        console.warn("[AyahAudio] Range playback failed:", error);
+        clearRangeSession();
+        setActiveAyah(null);
+        setLoadingKey(null);
+      });
+      return;
+    }
+    player.play();
+  }, [clearRangeSession, pauseRange, playCurrentRangeAyah, player, status.isLoaded, status.playing]);
 
   useEffect(
     () => () => {
@@ -372,6 +427,8 @@ export function AyahAudioProvider({ children }: { children: React.ReactNode }) {
         index: 0,
         rangeRepeatIndex: 1,
         ayahRepeatIndex: 1,
+        paused: false,
+        resumeLoadsAyah: false,
       };
 
       return playCurrentRangeAyah();
@@ -394,8 +451,9 @@ export function AyahAudioProvider({ children }: { children: React.ReactNode }) {
       playRange,
       rangeState,
       stop,
+      togglePause,
     }),
-    [getAyahState, playRange, rangeState, stop, toggleAyah]
+    [getAyahState, playRange, rangeState, stop, toggleAyah, togglePause]
   );
 
   return <AyahAudioContext.Provider value={value}>{children}</AyahAudioContext.Provider>;

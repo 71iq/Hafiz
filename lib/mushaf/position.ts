@@ -108,3 +108,14 @@ export function topmostAyahForPage(index: MushafIndex, page: number): { surah: n
   if (!row) return null;
   return { surah: row.surah_start, ayah: row.ayah_start };
 }
+
+/** The page an ayah sits on (the first one, when an ayah spans two pages), or null. */
+export function pageForAyah(index: MushafIndex, surah: number, ayah: number): number | null {
+  const target = surah * 1000 + ayah;
+  for (const row of index.pageByNumber.values()) {
+    const start = row.surah_start * 1000 + row.ayah_start;
+    const end = row.surah_end * 1000 + row.ayah_end;
+    if (target >= start && target <= end) return row.page;
+  }
+  return null;
+}
