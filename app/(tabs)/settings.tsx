@@ -1208,7 +1208,9 @@ function ContentSettingsRow({
           direction: "ltr",
           flexDirection: isRTL ? "row-reverse" : "row",
           gap: 10,
-          justifyContent: isRTL ? "flex-start" : "flex-end",
+          // With row-reverse in Arabic, flex-end is the left edge, mirroring the English row where the
+          // value and chevron sit at the end; flex-start left them beside the label at varying offsets.
+          justifyContent: "flex-end",
         }}
       >
         <Text
