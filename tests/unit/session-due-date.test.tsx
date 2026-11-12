@@ -1763,7 +1763,8 @@ describe("Flashcard session due-date editor characterization", () => {
       await waitFor(() => expect(view.getByText(s.flashcardsSummaryTitle)).toBeTruthy());
       const row = view.UNSAFE_getAllByType(Card).find((card) => within(card).queryByText(s.flashcardsSummaryReviewed));
       if (!row) throw new Error("Missing summary row");
-      expect(within(row).getByText("2")).toBeTruthy();
+      // One card graded twice is one card reviewed.
+      expect(within(row).getByText("1")).toBeTruthy();
       expect(jest.mocked(putCardRow).mock.calls[1][1].reps).toBe(updated.reps + 1);
       expect(jest.mocked(putStudyLogRow).mock.calls[1][1].state).toBe(State.Learning);
       expect(computeReviewPoints).toHaveBeenCalledTimes(2);

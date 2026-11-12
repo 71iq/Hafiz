@@ -195,6 +195,9 @@ function FlashcardSessionScreen() {
   const streakRef = useRef(0);
   const sessionPointsRef = useRef(0);
   const reviewedCountsRef = useRef({ total: 0, newCount: 0, reviewCount: 0, relearningCount: 0 });
+  // A learning card can come back several times in one session; the summary counts each card once, by
+  // the state it had when first graded, so "cards reviewed" is not the number of grades.
+  const reviewedCardIdsRef = useRef(new Set<string>());
   const gradingInFlightRef = useRef(false);
   const flipAnim = useRef(new RNAnimated.Value(0)).current;
   const normalizedDeckId = Array.isArray(deckId) ? deckId[0] : deckId;
@@ -214,6 +217,7 @@ function FlashcardSessionScreen() {
     setSessionError(null);
     sessionPointsRef.current = 0;
     reviewedCountsRef.current = { total: 0, newCount: 0, reviewCount: 0, relearningCount: 0 };
+    reviewedCardIdsRef.current = new Set();
     setCards([]);
     setSessionCardTotal(0);
     setCurrentIndex(0);
@@ -539,7 +543,9 @@ function FlashcardSessionScreen() {
     )));
   }, [currentIndex]);
 
-  const recordReviewedCard = useCallback((state: number) => {
+  const recordReviewedCard = useCallback((cardId: string, state: number) => {
+    if (reviewedCardIdsRef.current.has(cardId)) return;
+    reviewedCardIdsRef.current.add(cardId);
     const next = { ...reviewedCountsRef.current, total: reviewedCountsRef.current.total + 1 };
     if (state === State.New) next.newCount += 1;
     else if (state === State.Relearning) next.relearningCount += 1;
@@ -708,7 +714,7 @@ function FlashcardSessionScreen() {
         : null;
 
       const { reviewRecord } = transition;
-      recordReviewedCard(currentCard.card.state);
+      recordReviewedCard(currentCard.card.id, currentCard.card.state);
 
       if (currentCard.card.id.startsWith("mutashabihat:") || currentCard.card.id.startsWith("similar-tail:")) {
         recordAchievementEvent(db, {
