@@ -114,8 +114,12 @@ The owner confirmed that the original Quran Foundation encryption key is
 unavailable and requested disabling the integration for now. Set
 `EXPO_PUBLIC_QF_USER_AUTH_ENABLED=false` and
 `EXPO_PUBLIC_QF_CONTENT_ENABLED=false` in the web build. Login, connection,
-external sync, audio and remote hadith controls are hidden, content requests
-stop before calling Supabase, and Caddy has no public function route.
+external sync and remote hadith controls are hidden, content requests stop
+before calling Supabase, and Caddy has no public function route. Recitation
+does not depend on this: the built-in recitations play per-ayah files from the
+public verses.quran.foundation and quranicaudio CDNs
+(`lib/audio/public-ayah-audio.ts`), so audio stays available. Hadiths already
+opened on a device stay readable from its local cache.
 All connection records, identities, cached content and original deployed
 functions remain in the migration backups. Do not generate a replacement key
 and assume it can decrypt the old connection. Re-enabling the integration
