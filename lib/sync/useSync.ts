@@ -11,8 +11,11 @@ import { getPendingSyncCount } from "@/lib/database/sync-queue";
 import { updateProfileStats } from "@/lib/fsrs/leaderboard-sync";
 import { isQfSyncEnabled } from "@/lib/quran-foundation/config";
 import { fullQfUserSync, getPendingQfSyncCount } from "@/lib/quran-foundation/user-sync";
-import { emitSyncCompleted } from "@/lib/sync/events";
+import { emitSyncCompleted, subscribeSyncQueued } from "@/lib/sync/events";
 import { useSettings } from "@/lib/settings/context";
+
+const LOCAL_CHANGE_SYNC_DELAY_MS = 20_000;
+const PERIODIC_SYNC_INTERVAL_MS = 5 * 60_000;
 
 type SyncView = { start: () => Promise<void> };
 // The optional status overlay can remount while its database work is still pending.
@@ -189,9 +192,44 @@ export function useSync() {
     viewOwner.current.start = doSync;
   }, [db, userId, identityKey, isLoaded, isTranslationLoading, doSync]);
 
+  // Besides launch, resume and reconnect, a signed-in session syncs shortly after local changes, when
+  // the app goes to the background (so a long session's work reaches the account before the OS
+  // suspends it) and periodically while open (so another device's changes arrive).
+  const localChangeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleLocalChangeSync = useCallback(() => {
+    if (localChangeTimer.current !== null) clearTimeout(localChangeTimer.current);
+    localChangeTimer.current = setTimeout(function runWhenIdle() {
+      // A run in progress may have read its queue before this change; try again once it settles.
+      if (physicalSyncRun) {
+        localChangeTimer.current = setTimeout(runWhenIdle, LOCAL_CHANGE_SYNC_DELAY_MS);
+        return;
+      }
+      localChangeTimer.current = null;
+      void doSync();
+    }, LOCAL_CHANGE_SYNC_DELAY_MS);
+  }, [doSync]);
+
+  useEffect(() => {
+    if (!userId) return;
+    const unsubscribe = subscribeSyncQueued(scheduleLocalChangeSync);
+    return () => {
+      unsubscribe();
+      if (localChangeTimer.current !== null) clearTimeout(localChangeTimer.current);
+      localChangeTimer.current = null;
+    };
+  }, [userId, scheduleLocalChangeSync]);
+
+  useEffect(() => {
+    if (!userId) return;
+    const interval = setInterval(() => {
+      if (AppState.currentState === "active") void doSync();
+    }, PERIODIC_SYNC_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [userId, doSync]);
+
   useEffect(() => {
     const sub = AppState.addEventListener("change", (nextState: AppStateStatus) => {
-      if (nextState === "active") void doSync();
+      if (nextState === "active" || nextState === "background") void doSync();
     });
     return () => sub.remove();
   }, [doSync]);

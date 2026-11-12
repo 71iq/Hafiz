@@ -41,7 +41,14 @@ jest.mock("@/lib/quran-foundation/user-sync", () => ({
   fullQfUserSync: (...args: unknown[]) => mockQfSync(...args),
   getPendingQfSyncCount: (...args: unknown[]) => mockQfCount(...args),
 }));
-jest.mock("@/lib/sync/events", () => ({ emitSyncCompleted: jest.fn() }));
+const mockQueuedListeners = new Set<() => void>();
+jest.mock("@/lib/sync/events", () => ({
+  emitSyncCompleted: jest.fn(),
+  subscribeSyncQueued: (listener: () => void) => {
+    mockQueuedListeners.add(listener);
+    return () => mockQueuedListeners.delete(listener);
+  },
+}));
 jest.mock("@react-native-community/netinfo", () => ({ fetch: jest.fn(), addEventListener: jest.fn(() => () => {}) }));
 
 function deferred<T>() {
@@ -586,4 +593,38 @@ it("does not let error-count recovery publish after its account retires", async 
   await waitFor(() => expect(result.current.status).toBe("synced"));
   expect(result.current.pendingCount).toBe(0);
   expect(mockFullSync).toHaveBeenCalledTimes(2);
+});
+
+it("pushes a local change about 20 seconds after it is queued", async () => {
+  const { result } = renderHook(() => useSync());
+  await waitFor(() => expect(result.current.status).toBe("synced"));
+  expect(mockFullSync).toHaveBeenCalledTimes(1);
+
+  act(() => {
+    for (const listener of mockQueuedListeners) listener();
+    for (const listener of mockQueuedListeners) listener();
+  });
+  await act(async () => {
+    jest.advanceTimersByTime(19_000);
+  });
+  expect(mockFullSync).toHaveBeenCalledTimes(1);
+  await act(async () => {
+    jest.advanceTimersByTime(1_500);
+  });
+  await waitFor(() => expect(mockFullSync).toHaveBeenCalledTimes(2));
+});
+
+it("syncs when the app goes to the background", async () => {
+  const { AppState } = jest.requireActual<typeof import("react-native")>("react-native");
+  let changeListener: ((state: string) => void) | undefined;
+  jest.spyOn(AppState, "addEventListener").mockImplementation(((_type: string, listener: (state: string) => void) => {
+    changeListener = listener;
+    return { remove: () => {} };
+  }) as never);
+  const { result } = renderHook(() => useSync());
+  await waitFor(() => expect(result.current.status).toBe("synced"));
+  await act(async () => {
+    changeListener?.("background");
+  });
+  await waitFor(() => expect(mockFullSync).toHaveBeenCalledTimes(2));
 });

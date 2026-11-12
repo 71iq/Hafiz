@@ -1,4 +1,5 @@
 import type { DatabaseExecutor } from "@/lib/database/types";
+import { emitSyncQueued } from "@/lib/sync/events";
 
 /**
  * Enqueue a sync operation. Called after every write to a syncable table.
@@ -15,6 +16,7 @@ export async function enqueueSync(
      VALUES (?, ?, ?, ?, 'pending', ?)`,
     [tableName, operation, rowId, JSON.stringify(data), new Date().toISOString()]
   );
+  emitSyncQueued();
 }
 
 /** Get count of pending sync entries */

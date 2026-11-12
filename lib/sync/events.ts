@@ -19,3 +19,18 @@ export function subscribeSyncCompleted(listener: Listener) {
     listeners.delete(listener);
   };
 }
+
+type QueuedListener = () => void;
+const queuedListeners = new Set<QueuedListener>();
+
+/** A local change was queued for sync; the sync hook pushes it shortly after. */
+export function emitSyncQueued() {
+  for (const listener of queuedListeners) listener();
+}
+
+export function subscribeSyncQueued(listener: QueuedListener) {
+  queuedListeners.add(listener);
+  return () => {
+    queuedListeners.delete(listener);
+  };
+}
