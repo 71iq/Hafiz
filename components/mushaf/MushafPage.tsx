@@ -14,6 +14,7 @@ import {
 import { useSurahNameFont } from "@/lib/fonts/use-surah-name-font";
 import { useSelection } from "@/lib/selection/context";
 import { useSettings } from "@/lib/settings/context";
+import { useStrings } from "@/lib/i18n/useStrings";
 import { shouldJustifyMushafLine } from "@/lib/mushaf/page-layout";
 
 export type PageWordsByLine = Record<string, string>;
@@ -202,6 +203,9 @@ function MushafPageInner({
   hifzVisibility = null,
 }: Props) {
   const [fontVisible, setFontVisible] = useState(false);
+  // A failed page font load showed a spinner forever; it now offers a retry.
+  const [fontLoadFailed, setFontLoadFailed] = useState(false);
+  const [fontLoadAttempt, setFontLoadAttempt] = useState(0);
   const [wordsLoaded, setWordsLoaded] = useState(!!pageWordsData);
   const { getHighlightColor, getWordHighlightColor, selectAyah } = useSelection();
   const { quranFontStyle, quranMarkerStyle, showAyahMarkers, effectiveTheme } = useSettings();
@@ -218,6 +222,7 @@ function MushafPageInner({
 
   useEffect(() => {
     setFontVisible(false);
+    setFontLoadFailed(false);
 
     const reveal = () => {
       requestAnimationFrame(() => setFontVisible(true));
@@ -230,10 +235,19 @@ function MushafPageInner({
       return;
     }
 
+    let cancelled = false;
     loadQuranPageFont(quranFontStyle, pageNumber)
-      .then(reveal)
-      .catch(console.warn);
-  }, [pageNumber, quranFontStyle]);
+      .then(() => {
+        if (!cancelled) reveal();
+      })
+      .catch((error) => {
+        console.warn(error);
+        if (!cancelled) setFontLoadFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [pageNumber, quranFontStyle, fontLoadAttempt]);
 
   const pageGlyphs = useMemo(
     () => buildPageGlyphs(ayahs),
@@ -321,8 +335,12 @@ function MushafPageInner({
   // Show loading indicator while font is not loaded at all
   if (!isQuranPageFontLoaded(quranFontStyle, pageNumber)) {
     return (
-      <View style={{ width, minHeight: 200 }} className="items-center justify-center">
-        {showLoadingIndicator && <ActivityIndicator size="small" color="#0d9488" />}
+      <View style={{ width, minHeight: 200 }} className="items-center justify-center gap-3">
+        {fontLoadFailed ? (
+          <PageFontRetry onRetry={() => setFontLoadAttempt((attempt) => attempt + 1)} />
+        ) : (
+          showLoadingIndicator && <ActivityIndicator size="small" color="#0d9488" />
+        )}
       </View>
     );
   }
@@ -647,3 +665,24 @@ function MushafPageInner({
 }
 
 export const MushafPage = memo(MushafPageInner);
+
+/** Shown when a page font fails to load. Kept separate so pages do not subscribe to UI strings. */
+function PageFontRetry({ onRetry }: { onRetry: () => void }) {
+  const s = useStrings();
+  return (
+    <>
+      <Text className="text-warm-500 dark:text-neutral-400" style={{ fontFamily: "Manrope_500Medium", fontSize: 14 }}>
+        {s.mushafPageLoadFailed}
+      </Text>
+      <Pressable
+        accessibilityRole="button"
+        onPress={onRetry}
+        className="rounded-full bg-primary-accent/10 dark:bg-primary-bright/10 px-4 py-2"
+      >
+        <Text className="text-primary-accent dark:text-primary-bright" style={{ fontFamily: "Manrope_600SemiBold", fontSize: 14 }}>
+          {s.mushafPageRetry}
+        </Text>
+      </Pressable>
+    </>
+  );
+}
