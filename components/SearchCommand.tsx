@@ -438,7 +438,7 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
     >
       <View className="flex-1" style={{ height: modalHeight, maxHeight: modalHeight }}>
         <OverlayHeader
-          title={s.searchPlaceholder}
+          title={s.searchTitle}
           subtitle={`${s.searchTextMode} / ${s.searchRootMode}`}
           onClose={onClose}
           showHandle={isPhone}
@@ -447,7 +447,11 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
 
         {/* Search bar */}
         <View className="px-5 pt-4 pb-3">
-          <View className={`${isRTL ? "flex-row-reverse" : "flex-row"} items-center gap-2.5 bg-surface-low dark:bg-surface-dark-low rounded-full px-4 py-2.5`}>
+          {/* Mirrored by hand, so pinned LTR: an inherited RTL direction would flip it back. */}
+          <View
+            className={`${isRTL ? "flex-row-reverse" : "flex-row"} items-center gap-2.5 bg-surface-low dark:bg-surface-dark-low rounded-full px-4 py-2.5`}
+            style={{ direction: "ltr" }}
+          >
             <Search size={18} color={mutedColor} />
             <TextInput
               ref={inputRef}
@@ -648,7 +652,7 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
                         overflow: "visible",
                       }}
                     >
-                      {group.nameArabic} — {group.nameEnglish}
+                      {isRTL ? group.nameArabic : `${group.nameArabic} — ${group.nameEnglish}`}
                       <Text className="text-warm-400 dark:text-neutral-500" style={{ fontSize: 11 }}>
                         {"  "}({group.results.length})
                       </Text>
@@ -820,7 +824,7 @@ export function SearchCommand({ visible, onClose, onNavigateToAyah }: SearchComm
                                 className="text-warm-400 dark:text-neutral-500"
                                 style={{ fontFamily: "Manrope_400Regular", fontSize: 11 }}
                               >
-                                {occ.name_english}
+                                {isRTL ? occ.name_arabic : occ.name_english}
                               </Text>
                             </View>
                             <Text
