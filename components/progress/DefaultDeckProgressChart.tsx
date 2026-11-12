@@ -145,8 +145,11 @@ function DefaultDeckProgressRow({
       </View>
       <View
         className="h-3 overflow-hidden rounded-full"
+        // The track is pinned to ltr so flex-end is the right side; under an inherited rtl direction
+        // it meant the left and Arabic bars filled from the wrong end.
         style={{
           backgroundColor: themeColors.surfaceHigh,
+          direction: "ltr",
         }}
       >
         <View

@@ -7,6 +7,7 @@ import { useOpenMushaf } from "@/lib/navigation/open-mushaf";
 import { useSettings } from "@/lib/settings/context";
 import type { UIStrings } from "@/lib/i18n/strings";
 import { textStartStyle } from "@/lib/ui/direction";
+import { toArabicNumber } from "@/lib/arabic";
 
 type SurahProgress = {
   surah: number;
@@ -61,6 +62,7 @@ export function SurahProgressList({
     onItemPress?.();
     openMushaf({ surah, ayah: 1 });
   };
+  const localNumber = (value: number) => (isRTL ? toArabicNumber(value) : String(value));
   const rowFlexStyle = {
     direction: "ltr" as const,
     flexDirection: isRTL ? "row-reverse" as const : "row" as const,
@@ -69,9 +71,8 @@ export function SurahProgressList({
   const renderItem = (item: SurahProgress, cardWidth?: number) => {
     const pct = item.totalCards > 0 ? (item.memorized / item.totalCards) * 100 : 0;
     const primaryName = isRTL ? item.nameArabic || item.nameEnglish : item.nameEnglish || item.nameArabic;
-    const secondaryName = isRTL
-      ? item.nameEnglish && item.nameEnglish !== primaryName ? item.nameEnglish : ""
-      : item.nameArabic && item.nameArabic !== primaryName ? item.nameArabic : "";
+    // English readers get the Arabic name as a subtitle; the Arabic UI shows the Arabic name alone.
+    const secondaryName = isRTL ? "" : item.nameArabic && item.nameArabic !== primaryName ? item.nameArabic : "";
     const primaryDirection = isRTL ? "rtl" : "ltr";
     const secondaryDirection = isRTL ? "ltr" : "rtl";
     const content = (
@@ -97,7 +98,7 @@ export function SurahProgressList({
                 }}
               >
                 <Text style={{ fontFamily: "Manrope_600SemiBold", fontSize: 11, color: isDark ? "#2dd4bf" : "#0d9488" }}>
-                  {item.surah}
+                  {localNumber(item.surah)}
                 </Text>
               </View>
               <View style={{ flex: 1, alignItems: isRTL ? "flex-end" : "flex-start" }}>
@@ -137,7 +138,7 @@ export function SurahProgressList({
                 writingDirection: "ltr",
               }}
             >
-              {item.memorized}/{item.totalCards}
+              {localNumber(item.memorized)}/{localNumber(item.totalCards)}
             </Text>
           </View>
 
@@ -147,6 +148,8 @@ export function SurahProgressList({
               borderRadius: 999,
               backgroundColor: themeColors.surfaceHigh,
               overflow: "hidden",
+              // Pinned so flex-end is the right side whatever direction the list inherits.
+              direction: "ltr",
             }}
           >
             {pct > 0 && (
@@ -191,10 +194,12 @@ export function SurahProgressList({
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: 8, ...rowFlexStyle, paddingHorizontal: 1 }}
+        // Direction alone mirrors the row and starts its scroll at the right in Arabic; row-reverse
+        // under "ltr" opened a long list at its end.
+        contentContainerStyle={{ gap: 8, direction: isRTL ? "rtl" : "ltr", flexDirection: "row", paddingHorizontal: 1 }}
       >
         {previewData.map((item) => renderItem(item, 184))}
-        {onViewAll ? (
+        {onViewAll && data.length > previewData.length ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={s.surahProgressViewAll}
@@ -204,7 +209,9 @@ export function SurahProgressList({
               width: 132,
             })}
           >
-            <Card elevation="low" className="h-full min-h-[86px] items-center justify-center p-4">
+            {/* h-full stretched this card far below the row inside the horizontal scroll and pushed its
+                label out of view; flex-1 matches the surah cards' height. */}
+            <Card elevation="low" className="flex-1 min-h-[86px] items-center justify-center p-4">
               <View className={`items-center gap-2 ${isRTL ? "flex-row-reverse" : "flex-row"}`} style={rowFlexStyle}>
                 <Text
                   className="text-primary dark:text-primary-bright"

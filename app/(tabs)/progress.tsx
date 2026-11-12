@@ -297,11 +297,12 @@ export default function ProgressScreen() {
                   >
                     {s.achievementsTitle}
                   </Text>
+                  {/* The count sits in a left-to-right isolate; in Arabic text "5 / 53" otherwise read "53 / 5". */}
                   <Text
                     className="mt-1 text-warm-400 dark:text-neutral-500"
                     style={{ fontFamily: "Manrope_500Medium", fontSize: 12, ...textStartStyle(isRTL)}}
                   >
-                    {`${achievementDashboard.unlockedCount} / ${achievementDashboard.totalCount}`}
+                    {`\u2066${achievementDashboard.unlockedCount} / ${achievementDashboard.totalCount}\u2069`}
                   </Text>
                 </View>
               </View>
@@ -362,7 +363,7 @@ export default function ProgressScreen() {
         <ResponsiveModal open={achievementsModalOpen} onClose={() => setAchievementsModalOpen(false)} maxWidth={760}>
           <OverlayHeader
             title={s.achievementsTitle}
-            subtitle={`${achievementDashboard.unlockedCount} / ${achievementDashboard.totalCount}`}
+            subtitle={`\u2066${achievementDashboard.unlockedCount} / ${achievementDashboard.totalCount}\u2069`}
             isRTL={isRTL}
             onClose={() => setAchievementsModalOpen(false)}
             leading={
