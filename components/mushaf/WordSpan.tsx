@@ -1,7 +1,7 @@
 import { Fragment, memo, useCallback, useRef, type ReactNode } from "react";
 import { Text, type GestureResponderEvent, type StyleProp, type TextStyle } from "react-native";
 import { useWordInteraction } from "@/lib/word/context";
-import { useChrome } from "@/lib/ui/chrome";
+import { useChromeActions } from "@/lib/ui/chrome";
 import { useWordTap } from "./useWordTap";
 
 type Props = {
@@ -98,7 +98,7 @@ export function AyahWordText({
   wordHighlightColor,
 }: AyahWordTextProps) {
   const { openDetail } = useWordInteraction();
-  const { markActivity } = useChrome();
+  const { markActivity } = useChromeActions();
   const pressedWordRef = useRef<number | null>(null);
   const recordWord = useCallback((wordPos: number) => {
     pressedWordRef.current = wordPos;

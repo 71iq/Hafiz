@@ -8,7 +8,10 @@ const mockMarkActivity = jest.fn();
 jest.mock("@/lib/word/context", () => ({
   useWordInteraction: () => ({ tooltipWord: null, setTooltipWord: jest.fn(), openDetail: mockOpenDetail }),
 }));
-jest.mock("@/lib/ui/chrome", () => ({ useChrome: () => ({ markActivity: mockMarkActivity }) }));
+jest.mock("@/lib/ui/chrome", () => ({
+  useChrome: () => ({ markActivity: mockMarkActivity }),
+  useChromeActions: () => ({ markActivity: mockMarkActivity }),
+}));
 
 function renderAyah() {
   return render(

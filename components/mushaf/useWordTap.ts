@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { Platform } from "react-native";
 import { useWordInteraction, type TooltipPosition } from "@/lib/word/context";
-import { useChrome } from "@/lib/ui/chrome";
+import { useChromeActions } from "@/lib/ui/chrome";
 
 const DOUBLE_TAP_MS = 260;
 
@@ -23,7 +23,7 @@ export type LocateWord = (done: (position: TooltipPosition) => void) => void;
  */
 export function useWordTap({ surah, ayah, wordPos, v2Page, disabled = false, hidden = false }: WordTapInput) {
   const { tooltipWord, setTooltipWord, openDetail } = useWordInteraction();
-  const { markActivity } = useChrome();
+  const { markActivity } = useChromeActions();
   const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTouchInput = useMemo(() => {
     if (Platform.OS !== "web") return true;

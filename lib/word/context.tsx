@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useRef } from "react";
+import React, { createContext, useContext, useState, useCallback, useMemo, useRef } from "react";
 
 export type WordRef = {
   surah: number;
@@ -117,22 +117,38 @@ export function WordInteractionProvider({ children }: { children: React.ReactNod
     navigateRef.current = fn;
   }, []);
 
+  // Memoized so word tokens re-render only when tooltip or detail state actually changes.
+  const value = useMemo(
+    () => ({
+      tooltipWord,
+      tooltipPosition,
+      detailWord,
+      setTooltipWord,
+      openDetail,
+      closeDetail,
+      clearTooltip,
+      clearTooltipDelayed,
+      cancelTooltipClear,
+      navigateToAyah,
+      setNavigateToAyah,
+    }),
+    [
+      tooltipWord,
+      tooltipPosition,
+      detailWord,
+      setTooltipWord,
+      openDetail,
+      closeDetail,
+      clearTooltip,
+      clearTooltipDelayed,
+      cancelTooltipClear,
+      navigateToAyah,
+      setNavigateToAyah,
+    ],
+  );
+
   return (
-    <WordInteractionContext.Provider
-      value={{
-        tooltipWord,
-        tooltipPosition,
-        detailWord,
-        setTooltipWord,
-        openDetail,
-        closeDetail,
-        clearTooltip,
-        clearTooltipDelayed,
-        cancelTooltipClear,
-        navigateToAyah,
-        setNavigateToAyah,
-      }}
-    >
+    <WordInteractionContext.Provider value={value}>
       {children}
     </WordInteractionContext.Provider>
   );

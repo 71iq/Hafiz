@@ -67,7 +67,7 @@ jest.mock("@/lib/selection/context", () => ({
   SelectionProvider: ({ children }: React.PropsWithChildren) => children,
   useSelection: () => mockSelection,
 }));
-jest.mock("@/lib/ui/chrome", () => ({ useChrome: () => mockChrome }));
+jest.mock("@/lib/ui/chrome", () => ({ useChrome: () => mockChrome, useChromeActions: () => mockChrome }));
 jest.mock("@/lib/deep-link", () => ({ consumePendingDeepLink: () => null, peekPendingDeepLink: () => null }));
 jest.mock("@/lib/quran-foundation/config", () => ({ isQfContentEnabled: () => false }));
 jest.mock("@/lib/fonts/loader", () => ({ loadQuranPageFont: (...a: unknown[]) => mockForbidden(...a) }));
