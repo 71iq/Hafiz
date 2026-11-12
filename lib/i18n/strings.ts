@@ -252,6 +252,7 @@ export const strings = {
     noTajweedRules: "No tajweed rules for this word",
     // OccurrencesTab
     occurrences: "{{n}} occurrences",
+    listShowMore: "Show more ({{count}} left)",
     noRootData: "No root data available",
     // MeaningTab
     noMeaningData: "No meaning data available",
@@ -1191,6 +1192,7 @@ export const strings = {
     noTasreefData: "لا توجد بيانات صرفية",
     noTajweedRules: "لا توجد أحكام تجويد لهذه الكلمة",
     occurrences: "{{n}} مواضع",
+    listShowMore: "عرض المزيد (متبقٍ {{count}})",
     noRootData: "لا توجد بيانات للجذر",
     noMeaningData: "لا توجد بيانات للمعنى",
     wordMeaningTranslation: "الترجمة",

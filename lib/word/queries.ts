@@ -132,14 +132,22 @@ export async function fetchWordQcf2Glyph(
   return tokens[wordPos - 1] ?? null;
 }
 
+/** One page of a root's occurrences in mushaf order. Common roots have thousands of rows. */
 export async function fetchRootOccurrences(
   db: DatabaseExecutor,
   root: string,
+  limit: number,
+  offset = 0,
 ): Promise<RootOccurrence[]> {
   return db.getAllAsync<RootOccurrence>(
-    "SELECT surah, ayah, word_pos, word_text FROM word_roots WHERE root = ? ORDER BY surah, ayah, word_pos",
-    [root],
+    "SELECT surah, ayah, word_pos, word_text FROM word_roots WHERE root = ? ORDER BY surah, ayah, word_pos LIMIT ? OFFSET ?",
+    [root, limit, offset],
   );
+}
+
+export async function countRootOccurrences(db: DatabaseExecutor, root: string): Promise<number> {
+  const row = await db.getFirstAsync<{ n: number }>("SELECT COUNT(*) AS n FROM word_roots WHERE root = ?", [root]);
+  return row?.n ?? 0;
 }
 
 export async function fetchTextUthmani(
