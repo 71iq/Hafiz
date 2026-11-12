@@ -258,7 +258,11 @@ function SignupFormScreen() {
 
   const footer = configured ? (
     <>
-      <OAuthButtons strings={s} onError={(msg) => setShowError(msg)} />
+      <OAuthButtons
+        strings={s}
+        onError={(msg) => setShowError(msg)}
+        onSignedIn={() => router.replace("/(tabs)/home")}
+      />
       <AuthRouteLink
         prompt={s.authHasAccount}
         action={s.authLogin}

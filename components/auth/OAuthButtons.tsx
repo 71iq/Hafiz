@@ -37,13 +37,15 @@ type Props = {
   };
   isDark?: boolean;
   onError?: (msg: string) => void;
+  /** Runs once a native OAuth flow has established this screen's session. */
+  onSignedIn?: () => void;
 };
 
 const googleLogo = require("@/assets/images/auth/google.png") as ImageSourcePropType;
 const appleLogo = require("@/assets/images/auth/apple.png") as ImageSourcePropType;
 const facebookLogo = require("@/assets/images/auth/facebook-icon.png") as ImageSourcePropType;
 
-export function OAuthButtons({ strings: s, isDark, onError }: Props) {
+export function OAuthButtons({ strings: s, isDark, onError, onSignedIn }: Props) {
   const { db } = useDatabaseStatus();
   const { colorScheme } = useColorScheme();
   const { width } = useWindowDimensions();
@@ -88,6 +90,11 @@ export function OAuthButtons({ strings: s, isDark, onError }: Props) {
         result.value.qfOwner?.isCurrent()
       ) {
         runInitialQfUserSync(db, result.value.qfOwner).catch(console.warn);
+      }
+      // Web sign-in leaves the page for the provider and returns with no session here.
+      // Native resolves with the restored session, so leave the auth screen like email login.
+      if (ownsBusy() && result.status === "completed" && result.owner.isCurrent() && result.value.session) {
+        onSignedIn?.();
       }
     } catch (error) {
       if (ownsBusy() && flow.isCurrent()) onError?.(error instanceof Error ? error.message : String(error));

@@ -253,3 +253,46 @@ it("skips QF follow-up across committed database A-B-A during OAuth", async () =
 
   expect(runInitialQfUserSync).not.toHaveBeenCalled();
 });
+
+describe("leaving the auth screen after social sign-in", () => {
+  const session = { access_token: "synthetic" } as NonNullable<AppOAuthOutcome["session"]>;
+  function renderWithSignedIn() {
+    const onSignedIn = jest.fn();
+    const view = render(<OAuthButtons strings={strings.en} onSignedIn={onSignedIn} />, {
+      wrapper: ({ children }) => <DirectionProvider dir="ltr">{children}</DirectionProvider>,
+    });
+    return { view, onSignedIn };
+  }
+  async function pressGoogle(view: ReturnType<typeof render>, result: AuthCommandResult<AppOAuthOutcome>) {
+    const flow = makeFlow();
+    await act(async () => {
+      fireEvent.press(view.getByLabelText(strings.en.authContinueWithGoogle));
+    });
+    await act(async () => flow.resolve(result));
+  }
+
+  it("navigates once a native flow restores a session", async () => {
+    const { view, onSignedIn } = renderWithSignedIn();
+    await pressGoogle(view, {
+      status: "completed",
+      value: { session, qfConnected: false, qfOwner: null },
+      owner: makeAuthOwner(),
+    });
+    expect(onSignedIn).toHaveBeenCalledTimes(1);
+  });
+
+  it("stays put for a sessionless web redirect, a superseded flow or a stale owner", async () => {
+    const { view, onSignedIn } = renderWithSignedIn();
+    const stale = makeAuthOwner();
+    jest.mocked(stale.isCurrent).mockReturnValue(false);
+    await pressGoogle(view, {
+      status: "completed",
+      value: { session: null, qfConnected: false, qfOwner: null },
+      owner: makeAuthOwner(),
+    });
+    await pressGoogle(view, { status: "superseded" });
+    await pressGoogle(view, { status: "completed", value: { session, qfConnected: false, qfOwner: null }, owner: stale });
+    expect(startAppOAuth).toHaveBeenCalledTimes(3);
+    expect(onSignedIn).not.toHaveBeenCalled();
+  });
+});
