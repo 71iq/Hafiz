@@ -297,7 +297,7 @@ export default function ProgressScreen() {
                   >
                     {s.achievementsTitle}
                   </Text>
-                  {/* The count sits in a left-to-right isolate; in Arabic text "5 / 53" otherwise read "53 / 5". */}
+                  {/* The count is a bidi isolate so Arabic text keeps "5 / 53" in order instead of "53 / 5". */}
                   <Text
                     className="mt-1 text-warm-400 dark:text-neutral-500"
                     style={{ fontFamily: "Manrope_500Medium", fontSize: 12, ...textStartStyle(isRTL)}}
